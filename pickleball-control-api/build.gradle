@@ -18,12 +18,18 @@ dependencies {
     // from the main shaded Pickleball artifact.
     api project(':')
 
-    // Browser-evidence bridge code compiles against Selenium types exposed by
-    // the main project implementation without promoting Selenium to this
-    // internal module's public API.
+    // Browser-evidence and element-inspection bridge code compiles against
+    // Selenium types exposed by the main project implementation without
+    // promoting Selenium to this internal module's public API.
     compileOnly('org.seleniumhq.selenium:selenium-java') {
         version { strictly('[4.44,5.0)') }
     }
+
+    // Element inspection reuses ExecutionDictionary.CategoryResolution, whose
+    // internal XPath representation is backed by the root project's bundled
+    // XPathy library. Keep it compile-only here so the control module does not
+    // create a second public dependency contract.
+    compileOnly rootProject.files('libs/xpathy-3.0.0.jar')
 }
 
 tasks.withType(JavaCompile).configureEach {

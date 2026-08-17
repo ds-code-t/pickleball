@@ -50,7 +50,7 @@ class StudioMcpContextTest {
             assertTrue(webContext.getWebServer().getPort() > 0);
 
             ToolCallbackProvider provider = context.getBean("studioTools", ToolCallbackProvider.class);
-            assertEquals(36, provider.getToolCallbacks().length);
+            assertEquals(42, provider.getToolCallbacks().length);
         }
     }
 }

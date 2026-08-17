@@ -51,6 +51,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/README.md`
 - `docs/service-call-scenarios.md`
 - `docs/studio-runtime-bridge.md`
+- `docs/studio-runtime-investigation.md`
 
 ## Framework Java and AspectJ source
 
@@ -382,11 +383,15 @@ This inventory helps coding agents discover relevant files. It does not replace 
 ## Control API module
 
 - `pickleball-control-api/build.gradle`
+- `pickleball-control-api/src/main/java/tools/dscode/control/api/BoundedJsonEvidence.java`
 - `pickleball-control-api/src/main/java/tools/dscode/control/api/ControlCallResult.java`
 - `pickleball-control-api/src/main/java/tools/dscode/control/api/ControlCallStatus.java`
 - `pickleball-control-api/src/main/java/tools/dscode/control/api/ControlError.java`
 - `pickleball-control-api/src/main/java/tools/dscode/control/api/DynamicControl.java`
 - `pickleball-control-api/src/main/java/tools/dscode/control/api/DynamicStepSpec.java`
+- `pickleball-control-api/src/main/java/tools/dscode/control/api/ElementControl.java`
+- `pickleball-control-api/src/main/java/tools/dscode/control/api/ElementEvidence.java`
+- `pickleball-control-api/src/main/java/tools/dscode/control/api/ElementInspection.java`
 - `pickleball-control-api/src/main/java/tools/dscode/control/api/GherkinControl.java`
 - `pickleball-control-api/src/main/java/tools/dscode/control/api/MappingContext.java`
 - `pickleball-control-api/src/main/java/tools/dscode/control/api/MappingControl.java`
@@ -396,7 +401,10 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-control-api/src/main/java/tools/dscode/control/api/OverrideScope.java`
 - `pickleball-control-api/src/main/java/tools/dscode/control/api/ResolutionCandidate.java`
 - `pickleball-control-api/src/main/java/tools/dscode/control/api/ResolutionExplanation.java`
+- `pickleball-control-api/src/main/java/tools/dscode/control/api/ServiceCallControl.java`
+- `pickleball-control-api/src/main/java/tools/dscode/control/api/ServiceCallEvidence.java`
 - `pickleball-control-api/src/main/java/tools/dscode/control/bridge/ControlBridgeBootstrap.java`
+- `pickleball-control-api/src/main/java/tools/dscode/control/bridge/ControlBridgeBreakpoint.java`
 - `pickleball-control-api/src/main/java/tools/dscode/control/bridge/ControlBridgeBrowserPage.java`
 - `pickleball-control-api/src/main/java/tools/dscode/control/bridge/ControlBridgeBrowserPageResult.java`
 - `pickleball-control-api/src/main/java/tools/dscode/control/bridge/ControlBridgeBrowserScreenshot.java`
@@ -404,6 +412,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-control-api/src/main/java/tools/dscode/control/bridge/ControlBridgeCallResult.java`
 - `pickleball-control-api/src/main/java/tools/dscode/control/bridge/ControlBridgeCoordinator.java`
 - `pickleball-control-api/src/main/java/tools/dscode/control/bridge/ControlBridgeDescriptor.java`
+- `pickleball-control-api/src/main/java/tools/dscode/control/bridge/ControlBridgeElementInspectionResult.java`
 - `pickleball-control-api/src/main/java/tools/dscode/control/bridge/ControlBridgeError.java`
 - `pickleball-control-api/src/main/java/tools/dscode/control/bridge/ControlBridgeEvent.java`
 - `pickleball-control-api/src/main/java/tools/dscode/control/bridge/ControlBridgeEventPage.java`
@@ -412,6 +421,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-control-api/src/main/java/tools/dscode/control/bridge/ControlBridgeMappingSnapshotResult.java`
 - `pickleball-control-api/src/main/java/tools/dscode/control/bridge/ControlBridgeRuntime.java`
 - `pickleball-control-api/src/main/java/tools/dscode/control/bridge/ControlBridgeScenarioStatus.java`
+- `pickleball-control-api/src/main/java/tools/dscode/control/bridge/ControlBridgeServiceCallResult.java`
 - `pickleball-control-api/src/main/java/tools/dscode/control/bridge/ControlBridgeStatus.java`
 - `pickleball-control-api/src/main/java/tools/dscode/control/bridge/ControlBridgeValue.java`
 - `pickleball-control-api/src/main/java/tools/dscode/control/bridge/ControlBridgeValueResult.java`
@@ -432,6 +442,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-studio/src/main/java/tools/dscode/studio/gui/RuntimeDesktopState.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/gui/RuntimeEventPanel.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/gui/RuntimeEventTimeline.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/gui/RuntimeInvestigationPanel.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/gui/StudioDesktopApplication.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/gui/StudioDesktopSession.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/gui/StudioFrame.java`
@@ -448,6 +459,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-studio/src/main/java/tools/dscode/studio/language/WorkspaceLanguageService.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/mcp/RuntimeBrowserEvidenceMcpTools.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/mcp/RuntimeEvidenceMcpTools.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/mcp/RuntimeInvestigationMcpTools.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/mcp/RuntimeMappingMcpTools.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/mcp/StudioMcpConfiguration.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/mcp/StudioMcpTools.java`
@@ -459,6 +471,8 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-studio/src/main/java/tools/dscode/studio/process/ProcessResult.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/process/ProcessState.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/process/WorkspaceProcessService.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/runtime/RuntimeBoundedJsonEvidence.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/runtime/RuntimeBreakpoint.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/runtime/RuntimeBridgeClient.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/runtime/RuntimeBridgeDescriptor.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/runtime/RuntimeBridgeError.java`
@@ -471,6 +485,9 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-studio/src/main/java/tools/dscode/studio/runtime/RuntimeBrowserScreenshotBridgeResult.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/runtime/RuntimeBrowserScreenshotResult.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/runtime/RuntimeControlResult.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/runtime/RuntimeElementEvidence.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/runtime/RuntimeElementInspection.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/runtime/RuntimeElementInspectionResult.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/runtime/RuntimeEvent.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/runtime/RuntimeEventPage.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/runtime/RuntimeLaunchResult.java`
@@ -481,6 +498,8 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-studio/src/main/java/tools/dscode/studio/runtime/RuntimeMappingState.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/runtime/RuntimeMappingStateResult.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/runtime/RuntimeScenarioStatus.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/runtime/RuntimeServiceCallEvidence.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/runtime/RuntimeServiceCallResult.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/runtime/RuntimeValue.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/runtime/RuntimeValueResult.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/StudioApplication.java`

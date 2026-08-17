@@ -38,21 +38,10 @@ public final class RuntimeBridgeService implements AutoCloseable {
     private final ConcurrentHashMap<String, Session> sessions = new ConcurrentHashMap<>();
     private final RuntimeMappingSnapshotStore mappingSnapshots = new RuntimeMappingSnapshotStore();
 
-    public RuntimeBridgeService(
-            WorkspaceInfo workspace,
-            MavenBuildService maven,
-            GradleBuildService gradle
-    ) {
+    public RuntimeBridgeService(WorkspaceInfo workspace, MavenBuildService maven, GradleBuildService gradle) {
         this(
-                workspace,
-                maven,
-                gradle,
-                Path.of(
-                        System.getProperty("user.home"),
-                        ".pickleball",
-                        "studio",
-                        "bridge"
-                )
+                workspace, maven, gradle,
+                Path.of(System.getProperty("user.home"), ".pickleball", "studio", "bridge")
         );
     }
 
@@ -68,33 +57,19 @@ public final class RuntimeBridgeService implements AutoCloseable {
         this.sessionRoot = sessionRoot.toAbsolutePath().normalize();
     }
 
-    public RuntimeLaunchResult start(
-            List<String> buildArguments,
-            Integer timeoutSeconds,
-            Boolean pauseFirstScenario
-    ) {
+    public RuntimeLaunchResult start(List<String> buildArguments, Integer timeoutSeconds, Boolean pauseFirstScenario) {
         List<String> arguments = buildArguments == null || buildArguments.isEmpty()
-                ? List.of("test")
-                : List.copyOf(buildArguments);
-        int timeout = timeoutSeconds == null
-                ? DEFAULT_RUNTIME_TIMEOUT_SECONDS
-                : timeoutSeconds;
-        if (timeout < 1) {
-            throw new IllegalArgumentException("Runtime build timeout must be greater than zero.");
-        }
+                ? List.of("test") : List.copyOf(buildArguments);
+        int timeout = timeoutSeconds == null ? DEFAULT_RUNTIME_TIMEOUT_SECONDS : timeoutSeconds;
+        if (timeout < 1) throw new IllegalArgumentException("Runtime build timeout must be greater than zero.");
 
         String sessionId = UUID.randomUUID().toString();
         String token = token();
         Path directory = sessionRoot.resolve(sessionId);
         createSessionDirectory(directory);
-
         Session session = new Session(sessionId, token, directory);
         sessions.put(sessionId, session);
-
-        Map<String, String> environment = bridgeEnvironment(
-                session,
-                pauseFirstScenario == null || pauseFirstScenario
-        );
+        Map<String, String> environment = bridgeEnvironment(session, pauseFirstScenario == null || pauseFirstScenario);
 
         try {
             if (workspace.gradleProject()) {
@@ -105,9 +80,7 @@ public final class RuntimeBridgeService implements AutoCloseable {
                 ManagedMavenRunResult result = maven.start(arguments, timeout, environment);
                 return new RuntimeLaunchResult(sessionId, "Maven", result.process());
             }
-            throw new IllegalArgumentException(
-                    "Workspace is not a Gradle or Maven project: " + workspace.root()
-            );
+            throw new IllegalArgumentException("Workspace is not a Gradle or Maven project: " + workspace.root());
         } catch (RuntimeException failure) {
             sessions.remove(sessionId);
             deleteDirectoryIfEmpty(directory);
@@ -117,39 +90,25 @@ public final class RuntimeBridgeService implements AutoCloseable {
 
     public List<RuntimeBridgeDescriptor> list(String sessionId) {
         Session session = requireSession(sessionId);
-        if (!Files.isDirectory(session.directory)) {
-            return List.of();
-        }
-
+        if (!Files.isDirectory(session.directory)) return List.of();
         List<RuntimeBridgeDescriptor> result = new ArrayList<>();
         try (var files = Files.list(session.directory)) {
             for (Path descriptorFile : files
                     .filter(path -> path.getFileName().toString().startsWith("runtime-"))
                     .filter(path -> path.getFileName().toString().endsWith(".json"))
-                    .sorted()
-                    .toList()) {
+                    .sorted().toList()) {
                 RuntimeBridgeDescriptor descriptor = readDescriptor(descriptorFile);
-                if (!session.id.equals(descriptor.sessionId())) {
-                    continue;
-                }
-                if (!ProcessHandle.of(descriptor.pid())
-                        .map(ProcessHandle::isAlive)
-                        .orElse(false)) {
+                if (!session.id.equals(descriptor.sessionId())) continue;
+                if (!ProcessHandle.of(descriptor.pid()).map(ProcessHandle::isAlive).orElse(false)) {
                     Files.deleteIfExists(descriptorFile);
                     continue;
                 }
                 result.add(descriptor);
             }
         } catch (IOException failure) {
-            throw new IllegalStateException(
-                    "Could not inspect runtime bridge session: " + session.directory,
-                    failure
-            );
+            throw new IllegalStateException("Could not inspect runtime bridge session: " + session.directory, failure);
         }
-
-        result.sort(Comparator
-                .comparing(RuntimeBridgeDescriptor::startedAt)
-                .thenComparing(RuntimeBridgeDescriptor::runtimeId));
+        result.sort(Comparator.comparing(RuntimeBridgeDescriptor::startedAt).thenComparing(RuntimeBridgeDescriptor::runtimeId));
         return List.copyOf(result);
     }
 
@@ -164,35 +123,18 @@ public final class RuntimeBridgeService implements AutoCloseable {
     }
 
     public RuntimeEventPage events(
-            String sessionId,
-            String runtimeId,
-            String scenarioId,
-            Long afterSequence,
-            Integer limit
+            String sessionId, String runtimeId, String scenarioId, Long afterSequence, Integer limit
     ) {
         Session session = requireSession(sessionId);
-        return client(session, runtimeId).events(
-                scenarioId,
-                afterSequence,
-                limit
-        );
+        return client(session, runtimeId).events(scenarioId, afterSequence, limit);
     }
 
-    public RuntimeControlResult pause(
-            String sessionId,
-            String runtimeId,
-            Integer waitSeconds,
-            Integer leaseSeconds
-    ) {
+    public RuntimeControlResult pause(String sessionId, String runtimeId, Integer waitSeconds, Integer leaseSeconds) {
         return pause(sessionId, runtimeId, null, waitSeconds, leaseSeconds);
     }
 
     public RuntimeControlResult pause(
-            String sessionId,
-            String runtimeId,
-            String scenarioId,
-            Integer waitSeconds,
-            Integer leaseSeconds
+            String sessionId, String runtimeId, String scenarioId, Integer waitSeconds, Integer leaseSeconds
     ) {
         Session session = requireSession(sessionId);
         return client(session, runtimeId).pause(scenarioId, waitSeconds, leaseSeconds);
@@ -202,116 +144,121 @@ public final class RuntimeBridgeService implements AutoCloseable {
         return resume(sessionId, runtimeId, null);
     }
 
-    public RuntimeControlResult resume(
-            String sessionId,
-            String runtimeId,
-            String scenarioId
-    ) {
+    public RuntimeControlResult resume(String sessionId, String runtimeId, String scenarioId) {
         Session session = requireSession(sessionId);
         return client(session, runtimeId).resume(scenarioId);
     }
 
     public RuntimeControlResult executeStep(
-            String sessionId,
-            String runtimeId,
-            String text,
-            String argument,
-            Integer timeoutSeconds
+            String sessionId, String runtimeId, String text, String argument, Integer timeoutSeconds
     ) {
         return executeStep(sessionId, runtimeId, null, text, argument, timeoutSeconds);
     }
 
     public RuntimeControlResult executeStep(
-            String sessionId,
-            String runtimeId,
-            String scenarioId,
-            String text,
-            String argument,
-            Integer timeoutSeconds
+            String sessionId, String runtimeId, String scenarioId,
+            String text, String argument, Integer timeoutSeconds
     ) {
         Session session = requireSession(sessionId);
-        return client(session, runtimeId).executeStep(
-                scenarioId,
-                text,
-                argument,
-                timeoutSeconds
-        );
+        return client(session, runtimeId).executeStep(scenarioId, text, argument, timeoutSeconds);
     }
 
     public RuntimeValueResult mappingGet(
-            String sessionId,
-            String runtimeId,
-            String scenarioId,
-            String mapReference,
-            String key,
-            Integer timeoutSeconds
+            String sessionId, String runtimeId, String scenarioId,
+            String mapReference, String key, Integer timeoutSeconds
     ) {
         Session session = requireSession(sessionId);
-        return client(session, runtimeId).mappingGet(
-                scenarioId,
-                mapReference,
-                key,
-                timeoutSeconds
-        );
+        return client(session, runtimeId).mappingGet(scenarioId, mapReference, key, timeoutSeconds);
     }
 
     public RuntimeValueResult mappingPut(
-            String sessionId,
-            String runtimeId,
-            String scenarioId,
-            String mapReference,
-            String key,
-            String jsonValue,
-            Integer timeoutSeconds
+            String sessionId, String runtimeId, String scenarioId,
+            String mapReference, String key, String jsonValue, Integer timeoutSeconds
     ) {
         Session session = requireSession(sessionId);
-        return client(session, runtimeId).mappingPut(
-                scenarioId,
-                mapReference,
-                key,
-                jsonValue,
-                timeoutSeconds
-        );
+        return client(session, runtimeId).mappingPut(scenarioId, mapReference, key, jsonValue, timeoutSeconds);
     }
 
     public RuntimeValueResult mappingResolve(
-            String sessionId,
-            String runtimeId,
-            String scenarioId,
-            String input,
-            Integer timeoutSeconds
+            String sessionId, String runtimeId, String scenarioId, String input, Integer timeoutSeconds
     ) {
         Session session = requireSession(sessionId);
-        return client(session, runtimeId).mappingResolve(
-                scenarioId,
-                input,
-                timeoutSeconds
-        );
+        return client(session, runtimeId).mappingResolve(scenarioId, input, timeoutSeconds);
     }
 
     public RuntimeBrowserPageResult browserPage(
-            String sessionId,
-            String runtimeId,
-            String scenarioId,
-            Integer timeoutSeconds
+            String sessionId, String runtimeId, String scenarioId, Integer timeoutSeconds
     ) {
         Session session = requireSession(sessionId);
         return client(session, runtimeId).browserPage(scenarioId, timeoutSeconds);
     }
 
-    public RuntimeBrowserScreenshotResult browserScreenshot(
+    public RuntimeElementInspectionResult elementInspect(
             String sessionId,
             String runtimeId,
             String scenarioId,
+            String category,
+            String text,
+            String operation,
+            Integer maxElements,
             Integer timeoutSeconds
     ) {
         Session session = requireSession(sessionId);
-        RuntimeBrowserScreenshotBridgeResult result =
-                client(session, runtimeId).browserScreenshot(scenarioId, timeoutSeconds);
+        return client(session, runtimeId).elementInspect(
+                scenarioId, category, text, operation, maxElements, timeoutSeconds
+        );
+    }
+
+    public RuntimeServiceCallResult serviceCall(
+            String sessionId,
+            String runtimeId,
+            String scenarioId,
+            String selector,
+            Integer timeoutSeconds
+    ) {
+        Session session = requireSession(sessionId);
+        return client(session, runtimeId).serviceCall(scenarioId, selector, timeoutSeconds);
+    }
+
+    public List<RuntimeBreakpoint> breakpoints(String sessionId, String runtimeId) {
+        Session session = requireSession(sessionId);
+        return client(session, runtimeId).breakpoints();
+    }
+
+    public RuntimeBreakpoint addBreakpoint(
+            String sessionId,
+            String runtimeId,
+            String scenarioId,
+            String hook,
+            String signatureContains,
+            String stepContains,
+            String phraseContains,
+            Boolean oneShot,
+            Integer leaseSeconds
+    ) {
+        Session session = requireSession(sessionId);
+        return client(session, runtimeId).addBreakpoint(
+                scenarioId, hook, signatureContains, stepContains, phraseContains, oneShot, leaseSeconds
+        );
+    }
+
+    public boolean removeBreakpoint(String sessionId, String runtimeId, String breakpointId) {
+        Session session = requireSession(sessionId);
+        return client(session, runtimeId).removeBreakpoint(breakpointId);
+    }
+
+    public int clearBreakpoints(String sessionId, String runtimeId) {
+        Session session = requireSession(sessionId);
+        return client(session, runtimeId).clearBreakpoints();
+    }
+
+    public RuntimeBrowserScreenshotResult browserScreenshot(
+            String sessionId, String runtimeId, String scenarioId, Integer timeoutSeconds
+    ) {
+        Session session = requireSession(sessionId);
+        RuntimeBrowserScreenshotBridgeResult result = client(session, runtimeId).browserScreenshot(scenarioId, timeoutSeconds);
         if (!"SUCCESS".equals(result.status()) || result.screenshot() == null) {
-            return new RuntimeBrowserScreenshotResult(
-                    result.status(), null, result.error(), result.runtime()
-            );
+            return new RuntimeBrowserScreenshotResult(result.status(), null, result.error(), result.runtime());
         }
 
         RuntimeBrowserScreenshotBridge screenshot = result.screenshot();
@@ -330,23 +277,16 @@ public final class RuntimeBridgeService implements AutoCloseable {
             try {
                 Files.createDirectories(evidenceDirectory);
                 Path file = evidenceDirectory.resolve(
-                        "browser-%013d-%s-%s.png".formatted(
-                                System.currentTimeMillis(),
-                                runtimeId,
-                                UUID.randomUUID()
-                        )
+                        "browser-%013d-%s-%s.png".formatted(System.currentTimeMillis(), runtimeId, UUID.randomUUID())
                 );
                 Files.write(file, png);
                 trimBrowserScreenshots(evidenceDirectory);
                 return new RuntimeBrowserScreenshotResult(
                         result.status(),
                         new RuntimeBrowserScreenshot(
-                                screenshot.mimeType(),
-                                screenshot.byteSize(),
-                                file.toAbsolutePath().normalize().toString()
+                                screenshot.mimeType(), screenshot.byteSize(), file.toAbsolutePath().normalize().toString()
                         ),
-                        result.error(),
-                        result.runtime()
+                        result.error(), result.runtime()
                 );
             } catch (IOException failure) {
                 throw new IllegalStateException("Could not save runtime browser screenshot evidence.", failure);
@@ -355,66 +295,31 @@ public final class RuntimeBridgeService implements AutoCloseable {
     }
 
     public RuntimeMappingSnapshotResult mappingSnapshot(
-            String sessionId,
-            String runtimeId,
-            String scenarioId,
-            String mapReference,
-            Integer timeoutSeconds
+            String sessionId, String runtimeId, String scenarioId, String mapReference, Integer timeoutSeconds
     ) {
         Session session = requireSession(sessionId);
-        RuntimeMappingStateResult result = client(session, runtimeId).mappingSnapshot(
-                scenarioId,
-                mapReference,
-                timeoutSeconds
-        );
+        RuntimeMappingStateResult result = client(session, runtimeId).mappingSnapshot(scenarioId, mapReference, timeoutSeconds);
         if (!"SUCCESS".equals(result.status()) || result.snapshot() == null) {
-            return new RuntimeMappingSnapshotResult(
-                    result.status(),
-                    null,
-                    result.error(),
-                    result.runtime()
-            );
+            return new RuntimeMappingSnapshotResult(result.status(), null, result.error(), result.runtime());
         }
-
-        String selectedScenarioId = result.runtime() == null
-                ? normalized(scenarioId)
-                : result.runtime().scenarioId();
+        String selectedScenarioId = result.runtime() == null ? normalized(scenarioId) : result.runtime().scenarioId();
         RuntimeMappingSnapshot snapshot = mappingSnapshots.store(
-                session.id,
-                runtimeId,
-                selectedScenarioId,
-                result.snapshot()
+                session.id, runtimeId, selectedScenarioId, result.snapshot()
         );
-        return new RuntimeMappingSnapshotResult(
-                result.status(),
-                snapshot,
-                result.error(),
-                result.runtime()
-        );
+        return new RuntimeMappingSnapshotResult(result.status(), snapshot, result.error(), result.runtime());
     }
 
     public List<RuntimeMappingSnapshotSummary> mappingSnapshots(
-            String sessionId,
-            String runtimeId,
-            String scenarioId,
-            String mapReference
+            String sessionId, String runtimeId, String scenarioId, String mapReference
     ) {
         requireSession(sessionId);
         return mappingSnapshots.list(sessionId, runtimeId, scenarioId, mapReference);
     }
 
-    public RuntimeControlResult mappingRestore(
-            String sessionId,
-            String snapshotId,
-            Integer timeoutSeconds
-    ) {
+    public RuntimeControlResult mappingRestore(String sessionId, String snapshotId, Integer timeoutSeconds) {
         Session session = requireSession(sessionId);
         RuntimeMappingSnapshot snapshot = mappingSnapshots.get(sessionId, snapshotId);
-        return client(session, snapshot.runtimeId()).mappingRestore(
-                snapshot.scenarioId(),
-                snapshot.state(),
-                timeoutSeconds
-        );
+        return client(session, snapshot.runtimeId()).mappingRestore(snapshot.scenarioId(), snapshot.state(), timeoutSeconds);
     }
 
     @Override
@@ -428,17 +333,11 @@ public final class RuntimeBridgeService implements AutoCloseable {
                         client.resume();
                     } else {
                         scenarios.forEach(scenario -> {
-                            try {
-                                client.resume(scenario.scenarioId());
-                            } catch (RuntimeException ignored) {
-                            }
+                            try { client.resume(scenario.scenarioId()); } catch (RuntimeException ignored) { }
                         });
                     }
                 } catch (RuntimeException ignored) {
-                    try {
-                        client.resume();
-                    } catch (RuntimeException ignoredAgain) {
-                    }
+                    try { client.resume(); } catch (RuntimeException ignoredAgain) { }
                 }
             }
         }
@@ -451,39 +350,27 @@ public final class RuntimeBridgeService implements AutoCloseable {
             List<Path> screenshots = files
                     .filter(path -> path.getFileName().toString().startsWith("browser-"))
                     .filter(path -> path.getFileName().toString().endsWith(".png"))
-                    .sorted()
-                    .toList();
+                    .sorted().toList();
             int excess = screenshots.size() - MAX_BROWSER_SCREENSHOTS_PER_SESSION;
-            for (int i = 0; i < excess; i++) {
-                Files.deleteIfExists(screenshots.get(i));
-            }
+            for (int i = 0; i < excess; i++) Files.deleteIfExists(screenshots.get(i));
         }
     }
 
     private RuntimeBridgeClient client(Session session, String runtimeId) {
-        if (runtimeId == null || runtimeId.isBlank()) {
-            throw new IllegalArgumentException("Runtime id must not be blank.");
-        }
+        if (runtimeId == null || runtimeId.isBlank()) throw new IllegalArgumentException("Runtime id must not be blank.");
         RuntimeBridgeDescriptor descriptor = list(session.id).stream()
                 .filter(candidate -> runtimeId.equals(candidate.runtimeId()))
                 .findFirst()
                 .orElseThrow(() -> new IllegalArgumentException(
-                        "Unknown live runtime bridge id " + runtimeId
-                                + " for session " + session.id
+                        "Unknown live runtime bridge id " + runtimeId + " for session " + session.id
                 ));
         return new RuntimeBridgeClient(descriptor, session.token);
     }
 
     private Session requireSession(String sessionId) {
-        if (sessionId == null || sessionId.isBlank()) {
-            throw new IllegalArgumentException("Runtime bridge session id must not be blank.");
-        }
+        if (sessionId == null || sessionId.isBlank()) throw new IllegalArgumentException("Runtime bridge session id must not be blank.");
         Session session = sessions.get(sessionId);
-        if (session == null) {
-            throw new IllegalArgumentException(
-                    "Unknown Studio runtime bridge session: " + sessionId
-            );
-        }
+        if (session == null) throw new IllegalArgumentException("Unknown Studio runtime bridge session: " + sessionId);
         return session;
     }
 
@@ -491,25 +378,15 @@ public final class RuntimeBridgeService implements AutoCloseable {
         try {
             return json.readValue(file.toFile(), RuntimeBridgeDescriptor.class);
         } catch (IOException failure) {
-            throw new IllegalStateException(
-                    "Could not read runtime bridge descriptor: " + file,
-                    failure
-            );
+            throw new IllegalStateException("Could not read runtime bridge descriptor: " + file, failure);
         }
     }
 
     private List<RuntimeBridgeDescriptor> safeList(Session session) {
-        try {
-            return list(session.id);
-        } catch (RuntimeException ignored) {
-            return List.of();
-        }
+        try { return list(session.id); } catch (RuntimeException ignored) { return List.of(); }
     }
 
-    private Map<String, String> bridgeEnvironment(
-            Session session,
-            boolean pauseFirstScenario
-    ) {
+    private Map<String, String> bridgeEnvironment(Session session, boolean pauseFirstScenario) {
         Map<String, String> environment = new HashMap<>();
         environment.put(ENV_SESSION_DIR, session.directory.toString());
         environment.put(ENV_SESSION_ID, session.id);
@@ -526,22 +403,14 @@ public final class RuntimeBridgeService implements AutoCloseable {
                         directory,
                         java.nio.file.attribute.PosixFilePermissions.fromString("rwx------")
                 );
-            } catch (UnsupportedOperationException ignored) {
-                // Windows and other non-POSIX file systems use their native directory ACLs.
-            }
+            } catch (UnsupportedOperationException ignored) { }
         } catch (IOException failure) {
-            throw new IllegalStateException(
-                    "Could not create Studio runtime bridge session directory: " + directory,
-                    failure
-            );
+            throw new IllegalStateException("Could not create Studio runtime bridge session directory: " + directory, failure);
         }
     }
 
     private void deleteDirectoryIfEmpty(Path directory) {
-        try {
-            Files.deleteIfExists(directory);
-        } catch (IOException ignored) {
-        }
+        try { Files.deleteIfExists(directory); } catch (IOException ignored) { }
     }
 
     private String token() {

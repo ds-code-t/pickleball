@@ -30,6 +30,7 @@ docs/nested-steps.md
 docs/pickleball-studio.md
 docs/service-call-scenarios.md
 docs/studio-runtime-bridge.md
+docs/studio-runtime-investigation.md
 maven-consumer-project/pom.xml
 maven-consumer-project/src/test/java/com/example/pickleball/PickleballTests.java
 maven-consumer-project/src/test/java/com/example/pickleball/support/LocalTestSite.java

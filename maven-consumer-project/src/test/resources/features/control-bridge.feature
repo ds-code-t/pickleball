@@ -1,8 +1,7 @@
-
-@all @smoke @control-bridge
+@all @smoke @control-bridge @phase3h
 Feature: Pickleball Studio control bridge
 
-  Scenario: Paused runtime accepts retry-friendly detached control
+  Scenario: Paused runtime supports retry-friendly investigation and control
     Given BEGIN CONTROL BRIDGE IPC TEST
     And CONTROL BRIDGE IPC SYNC POINT
     And VERIFY CONTROL BRIDGE IPC TEST

@@ -22,125 +22,59 @@ import java.nio.file.Path;
 @SpringBootConfiguration
 @EnableAutoConfiguration
 public class StudioMcpConfiguration {
+    @Bean WorkspaceService workspaceService() { return new WorkspaceService(); }
 
     @Bean
-    WorkspaceService workspaceService() {
-        return new WorkspaceService();
+    WorkspaceInfo workspaceInfo(WorkspaceService service, @Value("${pickleball.studio.workspace}") String root) {
+        return service.open(Path.of(root));
+    }
+
+    @Bean WorkspaceFileService workspaceFileService(WorkspaceInfo workspace) { return new WorkspaceFileService(workspace.root()); }
+    @Bean WorkspaceProcessService workspaceProcessService(WorkspaceInfo workspace) { return new WorkspaceProcessService(workspace); }
+    @Bean WorkspaceLanguageService workspaceLanguageService(WorkspaceFileService files) { return new WorkspaceLanguageService(files); }
+    @Bean(destroyMethod = "close") ManagedProcessService managedProcessService(WorkspaceProcessService processes) { return new ManagedProcessService(processes); }
+
+    @Bean
+    MavenBuildService mavenBuildService(WorkspaceInfo workspace, WorkspaceProcessService processes, ManagedProcessService managed) {
+        return new MavenBuildService(workspace, processes, managed);
     }
 
     @Bean
-    WorkspaceInfo workspaceInfo(
-            WorkspaceService workspaceService,
-            @Value("${pickleball.studio.workspace}") String workspaceRoot
-    ) {
-        return workspaceService.open(Path.of(workspaceRoot));
+    GradleBuildService gradleBuildService(WorkspaceInfo workspace, WorkspaceProcessService processes, ManagedProcessService managed) {
+        return new GradleBuildService(workspace, processes, managed);
     }
 
-    @Bean
-    WorkspaceFileService workspaceFileService(WorkspaceInfo workspaceInfo) {
-        return new WorkspaceFileService(workspaceInfo.root());
-    }
-
-    @Bean
-    WorkspaceProcessService workspaceProcessService(WorkspaceInfo workspaceInfo) {
-        return new WorkspaceProcessService(workspaceInfo);
-    }
-
-    @Bean
-    WorkspaceLanguageService workspaceLanguageService(WorkspaceFileService workspaceFileService) {
-        return new WorkspaceLanguageService(workspaceFileService);
-    }
+    @Bean GradleProjectModelService gradleProjectModelService(WorkspaceInfo workspace) { return new GradleProjectModelService(workspace); }
 
     @Bean(destroyMethod = "close")
-    ManagedProcessService managedProcessService(WorkspaceProcessService workspaceProcessService) {
-        return new ManagedProcessService(workspaceProcessService);
-    }
-
-    @Bean
-    MavenBuildService mavenBuildService(
-            WorkspaceInfo workspaceInfo,
-            WorkspaceProcessService workspaceProcessService,
-            ManagedProcessService managedProcessService
-    ) {
-        return new MavenBuildService(workspaceInfo, workspaceProcessService, managedProcessService);
-    }
-
-    @Bean
-    GradleBuildService gradleBuildService(
-            WorkspaceInfo workspaceInfo,
-            WorkspaceProcessService workspaceProcessService,
-            ManagedProcessService managedProcessService
-    ) {
-        return new GradleBuildService(workspaceInfo, workspaceProcessService, managedProcessService);
-    }
-
-    @Bean
-    GradleProjectModelService gradleProjectModelService(WorkspaceInfo workspaceInfo) {
-        return new GradleProjectModelService(workspaceInfo);
-    }
-
-    @Bean(destroyMethod = "close")
-    RuntimeBridgeService runtimeBridgeService(
-            WorkspaceInfo workspaceInfo,
-            MavenBuildService mavenBuildService,
-            GradleBuildService gradleBuildService
-    ) {
-        return new RuntimeBridgeService(
-                workspaceInfo,
-                mavenBuildService,
-                gradleBuildService
-        );
+    RuntimeBridgeService runtimeBridgeService(WorkspaceInfo workspace, MavenBuildService maven, GradleBuildService gradle) {
+        return new RuntimeBridgeService(workspace, maven, gradle);
     }
 
     @Bean
     StudioMcpTools studioMcpTools(
-            WorkspaceInfo workspaceInfo,
-            WorkspaceFileService workspaceFileService,
-            WorkspaceProcessService workspaceProcessService,
-            ManagedProcessService managedProcessService,
-            MavenBuildService mavenBuildService,
-            GradleBuildService gradleBuildService,
-            GradleProjectModelService gradleProjectModelService,
-            WorkspaceLanguageService workspaceLanguageService,
-            RuntimeBridgeService runtimeBridgeService
+            WorkspaceInfo workspace, WorkspaceFileService files, WorkspaceProcessService workspaceProcesses,
+            ManagedProcessService processes, MavenBuildService maven, GradleBuildService gradle,
+            GradleProjectModelService gradleModels, WorkspaceLanguageService language, RuntimeBridgeService runtimeBridge
     ) {
-        return new StudioMcpTools(
-                workspaceInfo,
-                workspaceFileService,
-                workspaceProcessService,
-                managedProcessService,
-                mavenBuildService,
-                gradleBuildService,
-                gradleProjectModelService,
-                workspaceLanguageService,
-                runtimeBridgeService
-        );
+        return new StudioMcpTools(workspace, files, workspaceProcesses, processes, maven, gradle, gradleModels, language, runtimeBridge);
     }
 
-    @Bean
-    RuntimeEvidenceMcpTools runtimeEvidenceMcpTools(RuntimeBridgeService runtimeBridgeService) {
-        return new RuntimeEvidenceMcpTools(runtimeBridgeService);
-    }
-
-    @Bean
-    RuntimeMappingMcpTools runtimeMappingMcpTools(RuntimeBridgeService runtimeBridgeService) {
-        return new RuntimeMappingMcpTools(runtimeBridgeService);
-    }
-
-    @Bean
-    RuntimeBrowserEvidenceMcpTools runtimeBrowserEvidenceMcpTools(RuntimeBridgeService runtimeBridgeService) {
-        return new RuntimeBrowserEvidenceMcpTools(runtimeBridgeService);
-    }
+    @Bean RuntimeEvidenceMcpTools runtimeEvidenceMcpTools(RuntimeBridgeService bridge) { return new RuntimeEvidenceMcpTools(bridge); }
+    @Bean RuntimeMappingMcpTools runtimeMappingMcpTools(RuntimeBridgeService bridge) { return new RuntimeMappingMcpTools(bridge); }
+    @Bean RuntimeBrowserEvidenceMcpTools runtimeBrowserEvidenceMcpTools(RuntimeBridgeService bridge) { return new RuntimeBrowserEvidenceMcpTools(bridge); }
+    @Bean RuntimeInvestigationMcpTools runtimeInvestigationMcpTools(RuntimeBridgeService bridge) { return new RuntimeInvestigationMcpTools(bridge); }
 
     @Bean
     ToolCallbackProvider studioTools(
-            StudioMcpTools studioMcpTools,
-            RuntimeEvidenceMcpTools runtimeEvidenceMcpTools,
-            RuntimeMappingMcpTools runtimeMappingMcpTools,
-            RuntimeBrowserEvidenceMcpTools runtimeBrowserEvidenceMcpTools
+            StudioMcpTools studio,
+            RuntimeEvidenceMcpTools evidence,
+            RuntimeMappingMcpTools mappings,
+            RuntimeBrowserEvidenceMcpTools browser,
+            RuntimeInvestigationMcpTools investigation
     ) {
         return MethodToolCallbackProvider.builder()
-                .toolObjects(studioMcpTools, runtimeEvidenceMcpTools, runtimeMappingMcpTools, runtimeBrowserEvidenceMcpTools)
+                .toolObjects(studio, evidence, mappings, browser, investigation)
                 .build();
     }
 }

@@ -5,6 +5,9 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.cucumber.core.runner.CurrentScenarioState;
 import io.cucumber.core.runner.GlobalState;
 import io.cucumber.core.runner.StepExtension;
+import org.openqa.selenium.Dimension;
+import org.openqa.selenium.OutputType;
+import org.openqa.selenium.remote.RemoteWebDriver;
 import tools.dscode.common.control.ControlDecision;
 import tools.dscode.common.control.ControlEvent;
 import tools.dscode.common.control.ControlHook;
@@ -13,23 +16,27 @@ import tools.dscode.common.mappings.NodeMap;
 import tools.dscode.common.treeparsing.parsedComponents.Phrase;
 import tools.dscode.control.api.ControlCallResult;
 import tools.dscode.control.api.DynamicControl;
+import tools.dscode.control.api.ElementControl;
+import tools.dscode.control.api.ElementInspection;
 import tools.dscode.control.api.MappingControl;
+import tools.dscode.control.api.ServiceCallControl;
+import tools.dscode.control.api.ServiceCallEvidence;
 import tools.dscode.coredefinitions.BrowserSteps;
-import org.openqa.selenium.Dimension;
-import org.openqa.selenium.OutputType;
-import org.openqa.selenium.remote.RemoteWebDriver;
 
 import java.lang.reflect.Array;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Comparator;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.UUID;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -38,6 +45,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiFunction;
 import java.util.function.Function;
@@ -55,26 +63,21 @@ final class ControlBridgeCoordinator implements ControlHookHandler, AutoCloseabl
     private static final int MAX_MAPPING_SNAPSHOT_BYTES = 512 * 1024;
     private static final int MAX_PAGE_SOURCE_CHARS = 256 * 1024;
     private static final int MAX_SCREENSHOT_BYTES = 5 * 1024 * 1024;
+    private static final int MAX_BREAKPOINTS = 100;
     private static final Object NOT_JSON_COMPATIBLE = new Object();
 
     private final String runtimeId;
     private final long pid;
     private final List<String> capabilities;
     private final ConcurrentHashMap<Long, ScenarioLane> lanes = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, BreakpointRule> breakpoints = new ConcurrentHashMap<>();
     private final AtomicBoolean pauseNextScenario = new AtomicBoolean();
-    private final AtomicInteger nextPauseLeaseSeconds =
-            new AtomicInteger(DEFAULT_PAUSE_LEASE_SECONDS);
-    private final AtomicReference<CompletableFuture<ControlBridgeStatus>> nextPauseFuture =
-            new AtomicReference<>();
+    private final AtomicInteger nextPauseLeaseSeconds = new AtomicInteger(DEFAULT_PAUSE_LEASE_SECONDS);
+    private final AtomicReference<CompletableFuture<ControlBridgeStatus>> nextPauseFuture = new AtomicReference<>();
 
     private volatile boolean closed;
 
-    ControlBridgeCoordinator(
-            String runtimeId,
-            long pid,
-            List<String> capabilities,
-            boolean pauseFirstScenario
-    ) {
+    ControlBridgeCoordinator(String runtimeId, long pid, List<String> capabilities, boolean pauseFirstScenario) {
         this.runtimeId = runtimeId;
         this.pid = pid;
         this.capabilities = List.copyOf(capabilities);
@@ -89,23 +92,23 @@ final class ControlBridgeCoordinator implements ControlHookHandler, AutoCloseabl
 
         long threadId = Thread.currentThread().threadId();
         ScenarioLane lane = lanes.get(threadId);
-
         if (lane == null && GlobalState.getCurrentScenarioState() != null) {
             lane = lanes.computeIfAbsent(threadId, ScenarioLane::new);
             if (pauseNextScenario.compareAndSet(true, false)) {
-                CompletableFuture<ControlBridgeStatus> future = nextPauseFuture.getAndSet(null);
                 lane.requestPause(
                         nextPauseLeaseSeconds.getAndSet(DEFAULT_PAUSE_LEASE_SECONDS),
-                        future
+                        nextPauseFuture.getAndSet(null)
                 );
             }
         }
-
         if (lane == null) {
             return ControlDecision.CONTINUE;
         }
 
         lane.capture(event);
+        if (event.hook() != ControlHook.SCENARIO_END) {
+            applyBreakpoints(lane, event);
+        }
 
         if (event.hook() == ControlHook.SCENARIO_END) {
             lane.finish();
@@ -123,11 +126,7 @@ final class ControlBridgeCoordinator implements ControlHookHandler, AutoCloseabl
     ControlBridgeStatus status() {
         ScenarioLane selected = selectedLane(null);
         int activeCount = lanes.size();
-
         if (selected == null) {
-            boolean paused = lanes.values().stream().anyMatch(lane -> lane.paused);
-            boolean pauseRequested = pauseNextScenario.get()
-                    || lanes.values().stream().anyMatch(lane -> lane.pauseRequested);
             return new ControlBridgeStatus(
                     ControlBridgeRuntime.PROTOCOL_VERSION,
                     runtimeId,
@@ -140,12 +139,11 @@ final class ControlBridgeCoordinator implements ControlHookHandler, AutoCloseabl
                     null,
                     null,
                     null,
-                    paused,
-                    pauseRequested,
+                    lanes.values().stream().anyMatch(lane -> lane.paused),
+                    pauseNextScenario.get() || lanes.values().stream().anyMatch(lane -> lane.pauseRequested),
                     capabilities
             );
         }
-
         return selected.status(activeCount);
     }
 
@@ -153,32 +151,15 @@ final class ControlBridgeCoordinator implements ControlHookHandler, AutoCloseabl
         return lanes.values().stream()
                 .map(ScenarioLane::scenarioStatus)
                 .sorted(Comparator
-                        .comparing(
-                                ControlBridgeScenarioStatus::scenarioId,
-                                Comparator.nullsLast(String::compareTo)
-                        )
+                        .comparing(ControlBridgeScenarioStatus::scenarioId, Comparator.nullsLast(String::compareTo))
                         .thenComparingLong(ControlBridgeScenarioStatus::threadId))
                 .toList();
     }
 
-    ControlBridgeCallResult requestPause(
-            String scenarioId,
-            Integer waitSeconds,
-            Integer leaseSeconds
-    ) {
+    ControlBridgeCallResult requestPause(String scenarioId, Integer waitSeconds, Integer leaseSeconds) {
         String targetId = normalizeScenarioId(scenarioId);
-        int wait = bounded(
-                waitSeconds,
-                DEFAULT_WAIT_SECONDS,
-                MAX_WAIT_SECONDS,
-                "waitSeconds"
-        );
-        int lease = bounded(
-                leaseSeconds,
-                DEFAULT_PAUSE_LEASE_SECONDS,
-                MAX_PAUSE_LEASE_SECONDS,
-                "leaseSeconds"
-        );
+        int wait = bounded(waitSeconds, DEFAULT_WAIT_SECONDS, MAX_WAIT_SECONDS, "waitSeconds");
+        int lease = bounded(leaseSeconds, DEFAULT_PAUSE_LEASE_SECONDS, MAX_PAUSE_LEASE_SECONDS, "leaseSeconds");
 
         ScenarioLane lane = selectedLane(targetId);
         if (lane == null) {
@@ -186,17 +167,13 @@ final class ControlBridgeCoordinator implements ControlHookHandler, AutoCloseabl
                 return unavailable("No active scenario with id " + targetId + ".");
             }
             if (!lanes.isEmpty()) {
-                return unavailable(
-                        "Pause requires a scenarioId when multiple scenarios are active."
-                );
+                return unavailable("Pause requires a scenarioId when multiple scenarios are active.");
             }
 
             CompletableFuture<ControlBridgeStatus> future = new CompletableFuture<>();
             CompletableFuture<ControlBridgeStatus> previous = nextPauseFuture.getAndSet(future);
             if (previous != null && !previous.isDone()) {
-                previous.completeExceptionally(
-                        new IllegalStateException("Pause request was replaced by a newer request.")
-                );
+                previous.completeExceptionally(new IllegalStateException("Pause request was replaced by a newer request."));
             }
             nextPauseLeaseSeconds.set(lease);
             pauseNextScenario.set(true);
@@ -227,63 +204,36 @@ final class ControlBridgeCoordinator implements ControlHookHandler, AutoCloseabl
                 pending.complete(status());
             }
             if (!lanes.isEmpty()) {
-                return unavailable(
-                        "Resume requires a scenarioId when multiple scenarios are active."
-                );
+                return unavailable("Resume requires a scenarioId when multiple scenarios are active.");
             }
             return success("RUNNING", status());
         }
-
         lane.resume();
         return success("RUNNING", lane.status(lanes.size()));
     }
 
-    ControlBridgeCallResult executeStep(
-            String scenarioId,
-            String text,
-            String argument,
-            Integer timeoutSeconds
-    ) {
+    ControlBridgeCallResult executeStep(String scenarioId, String text, String argument, Integer timeoutSeconds) {
         if (text == null || text.isBlank()) {
             return unavailable("Dynamic step text must not be blank.");
         }
-
-        int timeout = commandTimeout(timeoutSeconds);
         ScenarioLane lane = selectedLane(normalizeScenarioId(scenarioId));
         if (lane == null) {
             return unavailableForScenarioCommand(scenarioId, "Dynamic execution");
         }
-
         return submit(
                 lane,
-                timeout,
-                () -> fromControlResult(
-                        DynamicControl.executeStep(text, argument == null ? "" : argument),
-                        lane
-                ),
+                commandTimeout(timeoutSeconds),
+                () -> fromControlResult(DynamicControl.executeStep(text, argument == null ? "" : argument), lane),
                 (type, message) -> failed(type, message, lane.status(lanes.size())),
                 message -> unavailable(message, lane.status(lanes.size()))
         );
     }
 
-    ControlBridgeValueResult mappingGet(
-            String scenarioId,
-            String mapReference,
-            String key,
-            Integer timeoutSeconds
-    ) {
-        if (mapReference == null || mapReference.isBlank()) {
-            return valueUnavailable("NodeMap reference must not be blank.");
-        }
-        if (key == null || key.isBlank()) {
-            return valueUnavailable("Mapping key must not be blank.");
-        }
-
+    ControlBridgeValueResult mappingGet(String scenarioId, String mapReference, String key, Integer timeoutSeconds) {
+        if (mapReference == null || mapReference.isBlank()) return valueUnavailable("NodeMap reference must not be blank.");
+        if (key == null || key.isBlank()) return valueUnavailable("Mapping key must not be blank.");
         ScenarioLane lane = selectedLane(normalizeScenarioId(scenarioId));
-        if (lane == null) {
-            return valueUnavailableForScenarioCommand(scenarioId, "Mapping read");
-        }
-
+        if (lane == null) return valueUnavailableForScenarioCommand(scenarioId, "Mapping read");
         return submit(
                 lane,
                 commandTimeout(timeoutSeconds),
@@ -293,85 +243,66 @@ final class ControlBridgeCoordinator implements ControlHookHandler, AutoCloseabl
         );
     }
 
-    ControlBridgeValueResult mappingPut(
-            String scenarioId,
-            String mapReference,
-            String key,
-            Object value,
-            Integer timeoutSeconds
-    ) {
-        if (mapReference == null || mapReference.isBlank()) {
-            return valueUnavailable("NodeMap reference must not be blank.");
-        }
-        if (key == null || key.isBlank()) {
-            return valueUnavailable("Mapping key must not be blank.");
-        }
-
+    ControlBridgeValueResult mappingPut(String scenarioId, String mapReference, String key, Object value, Integer timeoutSeconds) {
+        if (mapReference == null || mapReference.isBlank()) return valueUnavailable("NodeMap reference must not be blank.");
+        if (key == null || key.isBlank()) return valueUnavailable("Mapping key must not be blank.");
         ScenarioLane lane = selectedLane(normalizeScenarioId(scenarioId));
-        if (lane == null) {
-            return valueUnavailableForScenarioCommand(scenarioId, "Mapping write");
-        }
-
+        if (lane == null) return valueUnavailableForScenarioCommand(scenarioId, "Mapping write");
         return submit(
                 lane,
                 commandTimeout(timeoutSeconds),
                 () -> {
                     ControlCallResult<NodeMap> written = MappingControl.put(mapReference, key, value);
-                    if (!written.successful()) {
-                        return fromValueFailure(written, lane);
-                    }
-                    return fromValueResult(MappingControl.get(mapReference, key), lane);
+                    return written.successful()
+                            ? fromValueResult(MappingControl.get(mapReference, key), lane)
+                            : fromValueFailure(written, lane);
                 },
                 (type, message) -> valueFailed(type, message, lane.status(lanes.size())),
                 message -> valueUnavailable(message, lane.status(lanes.size()))
         );
     }
 
-    ControlBridgeMappingSnapshotResult mappingSnapshot(
-            String scenarioId,
-            String mapReference,
-            Integer timeoutSeconds
-    ) {
-        if (mapReference == null || mapReference.isBlank()) {
-            return snapshotUnavailable("NodeMap reference must not be blank.");
-        }
-
+    ControlBridgeValueResult mappingResolve(String scenarioId, String input, Integer timeoutSeconds) {
+        if (input == null) return valueUnavailable("Mapping resolution input must not be null.");
         ScenarioLane lane = selectedLane(normalizeScenarioId(scenarioId));
-        if (lane == null) {
-            return snapshotUnavailableForScenarioCommand(scenarioId, "Mapping snapshot");
-        }
+        if (lane == null) return valueUnavailableForScenarioCommand(scenarioId, "Mapping resolution");
+        return submit(
+                lane,
+                commandTimeout(timeoutSeconds),
+                () -> {
+                    var current = MappingControl.current();
+                    if (!current.successful()) return fromValueFailure(current, lane);
+                    return valueSuccess(current.value().resolveWholeValue(input), lane.status(lanes.size()));
+                },
+                (type, message) -> valueFailed(type, message, lane.status(lanes.size())),
+                message -> valueUnavailable(message, lane.status(lanes.size()))
+        );
+    }
 
+    ControlBridgeMappingSnapshotResult mappingSnapshot(String scenarioId, String mapReference, Integer timeoutSeconds) {
+        if (mapReference == null || mapReference.isBlank()) return snapshotUnavailable("NodeMap reference must not be blank.");
+        ScenarioLane lane = selectedLane(normalizeScenarioId(scenarioId));
+        if (lane == null) return snapshotUnavailableForScenarioCommand(scenarioId, "Mapping snapshot");
         String reference = mapReference.trim();
         return submit(
                 lane,
                 commandTimeout(timeoutSeconds),
                 () -> {
                     ControlCallResult<NodeMap> current = MappingControl.currentNodeMap(reference);
-                    if (!current.successful()) {
-                        return snapshotFromFailure(current, lane);
-                    }
-                    return snapshotSuccess(reference, current.value(), lane.status(lanes.size()));
+                    return current.successful()
+                            ? snapshotSuccess(reference, current.value(), lane.status(lanes.size()))
+                            : snapshotFromFailure(current, lane);
                 },
                 (type, message) -> snapshotFailed(type, message, lane.status(lanes.size())),
                 message -> snapshotUnavailable(message, lane.status(lanes.size()))
         );
     }
 
-    ControlBridgeCallResult mappingRestore(
-            String scenarioId,
-            ControlBridgeMappingSnapshot snapshot,
-            Integer timeoutSeconds
-    ) {
+    ControlBridgeCallResult mappingRestore(String scenarioId, ControlBridgeMappingSnapshot snapshot, Integer timeoutSeconds) {
         String validation = validateSnapshot(snapshot);
-        if (validation != null) {
-            return unavailable(validation);
-        }
-
+        if (validation != null) return unavailable(validation);
         ScenarioLane lane = selectedLane(normalizeScenarioId(scenarioId));
-        if (lane == null) {
-            return unavailableForScenarioCommand(scenarioId, "Mapping restore");
-        }
-
+        if (lane == null) return unavailableForScenarioCommand(scenarioId, "Mapping restore");
         return submit(
                 lane,
                 commandTimeout(timeoutSeconds),
@@ -381,15 +312,9 @@ final class ControlBridgeCoordinator implements ControlHookHandler, AutoCloseabl
         );
     }
 
-    ControlBridgeBrowserPageResult browserPage(
-            String scenarioId,
-            Integer timeoutSeconds
-    ) {
+    ControlBridgeBrowserPageResult browserPage(String scenarioId, Integer timeoutSeconds) {
         ScenarioLane lane = selectedLane(normalizeScenarioId(scenarioId));
-        if (lane == null) {
-            return browserPageUnavailableForScenarioCommand(scenarioId);
-        }
-
+        if (lane == null) return browserPageUnavailable(scenarioCommandUnavailableMessage(scenarioId, "Browser page evidence"));
         return submit(
                 lane,
                 commandTimeout(timeoutSeconds),
@@ -399,15 +324,9 @@ final class ControlBridgeCoordinator implements ControlHookHandler, AutoCloseabl
         );
     }
 
-    ControlBridgeBrowserScreenshotResult browserScreenshot(
-            String scenarioId,
-            Integer timeoutSeconds
-    ) {
+    ControlBridgeBrowserScreenshotResult browserScreenshot(String scenarioId, Integer timeoutSeconds) {
         ScenarioLane lane = selectedLane(normalizeScenarioId(scenarioId));
-        if (lane == null) {
-            return browserScreenshotUnavailableForScenarioCommand(scenarioId);
-        }
-
+        if (lane == null) return browserScreenshotUnavailable(scenarioCommandUnavailableMessage(scenarioId, "Browser screenshot evidence"));
         return submit(
                 lane,
                 commandTimeout(timeoutSeconds),
@@ -417,50 +336,106 @@ final class ControlBridgeCoordinator implements ControlHookHandler, AutoCloseabl
         );
     }
 
-    ControlBridgeValueResult mappingResolve(
+    ControlBridgeElementInspectionResult inspectElements(
             String scenarioId,
-            String input,
+            String category,
+            String text,
+            String operation,
+            Integer maxElements,
             Integer timeoutSeconds
     ) {
-        if (input == null) {
-            return valueUnavailable("Mapping resolution input must not be null.");
-        }
-
         ScenarioLane lane = selectedLane(normalizeScenarioId(scenarioId));
-        if (lane == null) {
-            return valueUnavailableForScenarioCommand(scenarioId, "Mapping resolution");
-        }
-
+        if (lane == null) return elementUnavailable(scenarioCommandUnavailableMessage(scenarioId, "Element inspection"));
         return submit(
                 lane,
                 commandTimeout(timeoutSeconds),
-                () -> {
-                    var current = MappingControl.current();
-                    if (!current.successful()) {
-                        return fromValueFailure(current, lane);
-                    }
-                    Object value = current.value().resolveWholeValue(input);
-                    return valueSuccess(value, lane.status(lanes.size()));
-                },
-                (type, message) -> valueFailed(type, message, lane.status(lanes.size())),
-                message -> valueUnavailable(message, lane.status(lanes.size()))
+                () -> elementResult(ElementControl.inspect(category, text, operation, maxElements), lane),
+                (type, message) -> elementFailed(type, message, lane.status(lanes.size())),
+                message -> elementUnavailable(message, lane.status(lanes.size()))
         );
+    }
+
+    ControlBridgeServiceCallResult executeServiceCall(String scenarioId, String selector, Integer timeoutSeconds) {
+        ScenarioLane lane = selectedLane(normalizeScenarioId(scenarioId));
+        if (lane == null) return serviceUnavailable(scenarioCommandUnavailableMessage(scenarioId, "Service-call execution"));
+        return submit(
+                lane,
+                commandTimeout(timeoutSeconds),
+                () -> serviceResult(ServiceCallControl.execute(selector), lane),
+                (type, message) -> serviceFailed(type, message, lane.status(lanes.size())),
+                message -> serviceUnavailable(message, lane.status(lanes.size()))
+        );
+    }
+
+    ControlBridgeBreakpoint addBreakpoint(
+            String scenarioId,
+            String hook,
+            String signatureContains,
+            String stepContains,
+            String phraseContains,
+            Boolean oneShot,
+            Integer leaseSeconds
+    ) {
+        if (breakpoints.size() >= MAX_BREAKPOINTS) {
+            throw new IllegalArgumentException("A runtime may retain at most " + MAX_BREAKPOINTS + " breakpoints.");
+        }
+        String normalizedScenario = normalizeScenarioId(scenarioId);
+        ControlHook parsedHook = parseHook(hook);
+        String signature = normalizeFilter(signatureContains);
+        String step = normalizeFilter(stepContains);
+        String phrase = normalizeFilter(phraseContains);
+        if (normalizedScenario == null && parsedHook == null && signature == null && step == null && phrase == null) {
+            throw new IllegalArgumentException("Breakpoint must specify at least one scenario, hook, signature, step, or phrase filter.");
+        }
+        BreakpointRule rule = new BreakpointRule(
+                UUID.randomUUID().toString(),
+                normalizedScenario,
+                parsedHook,
+                signature,
+                step,
+                phrase,
+                oneShot != null && oneShot,
+                bounded(leaseSeconds, DEFAULT_PAUSE_LEASE_SECONDS, MAX_PAUSE_LEASE_SECONDS, "leaseSeconds")
+        );
+        breakpoints.put(rule.id, rule);
+        return rule.snapshot();
+    }
+
+    List<ControlBridgeBreakpoint> breakpoints() {
+        return breakpoints.values().stream()
+                .map(BreakpointRule::snapshot)
+                .sorted(Comparator.comparing(ControlBridgeBreakpoint::breakpointId))
+                .toList();
+    }
+
+    boolean removeBreakpoint(String breakpointId) {
+        if (breakpointId == null || breakpointId.isBlank()) {
+            throw new IllegalArgumentException("breakpointId must not be blank.");
+        }
+        return breakpoints.remove(breakpointId.trim()) != null;
+    }
+
+    int clearBreakpoints() {
+        int size = breakpoints.size();
+        breakpoints.clear();
+        return size;
+    }
+
+    private void applyBreakpoints(ScenarioLane lane, ControlEvent event) {
+        for (BreakpointRule rule : breakpoints.values()) {
+            if (!rule.matches(lane, event)) continue;
+            rule.hit(lane.scenarioId);
+            lane.requestPause(rule.leaseSeconds, null);
+            if (rule.oneShot) breakpoints.remove(rule.id, rule);
+        }
     }
 
     private ControlBridgeBrowserPageResult browserPageOnScenarioThread(ScenarioLane lane) {
         RemoteWebDriver driver = BrowserSteps.getCurrentDriverIfPresent();
-        if (driver == null) {
-            return browserPageUnavailable(
-                    "The selected scenario has not created a browser.",
-                    lane.status(lanes.size())
-            );
-        }
-
+        if (driver == null) return browserPageUnavailable("The selected scenario has not created a browser.", lane.status(lanes.size()));
         String source = Objects.toString(driver.getPageSource(), "");
         boolean truncated = source.length() > MAX_PAGE_SOURCE_CHARS;
-        if (truncated) {
-            source = source.substring(0, MAX_PAGE_SOURCE_CHARS);
-        }
+        if (truncated) source = source.substring(0, MAX_PAGE_SOURCE_CHARS);
         Dimension size = driver.manage().window().getSize();
         return new ControlBridgeBrowserPageResult(
                 "SUCCESS",
@@ -481,102 +456,32 @@ final class ControlBridgeCoordinator implements ControlHookHandler, AutoCloseabl
 
     private ControlBridgeBrowserScreenshotResult browserScreenshotOnScenarioThread(ScenarioLane lane) {
         RemoteWebDriver driver = BrowserSteps.getCurrentDriverIfPresent();
-        if (driver == null) {
-            return browserScreenshotUnavailable(
-                    "The selected scenario has not created a browser.",
-                    lane.status(lanes.size())
-            );
-        }
-
+        if (driver == null) return browserScreenshotUnavailable("The selected scenario has not created a browser.", lane.status(lanes.size()));
         byte[] png = driver.getScreenshotAs(OutputType.BYTES);
         if (png.length > MAX_SCREENSHOT_BYTES) {
-            return browserScreenshotUnavailable(
-                    "Browser screenshot exceeds " + MAX_SCREENSHOT_BYTES + " bytes.",
-                    lane.status(lanes.size())
-            );
+            return browserScreenshotUnavailable("Browser screenshot exceeds " + MAX_SCREENSHOT_BYTES + " bytes.", lane.status(lanes.size()));
         }
         return new ControlBridgeBrowserScreenshotResult(
                 "SUCCESS",
-                new ControlBridgeBrowserScreenshot(
-                        "image/png",
-                        png.length,
-                        Base64.getEncoder().encodeToString(png)
-                ),
+                new ControlBridgeBrowserScreenshot("image/png", png.length, Base64.getEncoder().encodeToString(png)),
                 null,
                 lane.status(lanes.size())
-        );
-    }
-
-    private ControlBridgeBrowserPageResult browserPageUnavailableForScenarioCommand(String scenarioId) {
-        return browserPageUnavailable(scenarioCommandUnavailableMessage(scenarioId, "Browser page evidence"));
-    }
-
-    private ControlBridgeBrowserScreenshotResult browserScreenshotUnavailableForScenarioCommand(String scenarioId) {
-        return browserScreenshotUnavailable(scenarioCommandUnavailableMessage(scenarioId, "Browser screenshot evidence"));
-    }
-
-    private String scenarioCommandUnavailableMessage(String scenarioId, String operation) {
-        String targetId = normalizeScenarioId(scenarioId);
-        if (targetId != null) {
-            return "No active scenario with id " + targetId + ".";
-        }
-        if (lanes.isEmpty()) {
-            return operation + " requires an active Pickleball scenario.";
-        }
-        return operation + " requires a scenarioId when multiple scenarios are active.";
-    }
-
-    private ControlBridgeBrowserPageResult browserPageUnavailable(String message) {
-        return browserPageUnavailable(message, status());
-    }
-
-    private ControlBridgeBrowserPageResult browserPageUnavailable(String message, ControlBridgeStatus runtime) {
-        return new ControlBridgeBrowserPageResult(
-                "UNAVAILABLE", null, new ControlBridgeError("UNAVAILABLE", message, ""), runtime
-        );
-    }
-
-    private ControlBridgeBrowserPageResult browserPageFailed(String type, String message, ControlBridgeStatus runtime) {
-        return new ControlBridgeBrowserPageResult(
-                "FAILED", null, new ControlBridgeError(type, clipped(message), ""), runtime
-        );
-    }
-
-    private ControlBridgeBrowserScreenshotResult browserScreenshotUnavailable(String message) {
-        return browserScreenshotUnavailable(message, status());
-    }
-
-    private ControlBridgeBrowserScreenshotResult browserScreenshotUnavailable(String message, ControlBridgeStatus runtime) {
-        return new ControlBridgeBrowserScreenshotResult(
-                "UNAVAILABLE", null, new ControlBridgeError("UNAVAILABLE", message, ""), runtime
-        );
-    }
-
-    private ControlBridgeBrowserScreenshotResult browserScreenshotFailed(String type, String message, ControlBridgeStatus runtime) {
-        return new ControlBridgeBrowserScreenshotResult(
-                "FAILED", null, new ControlBridgeError(type, clipped(message), ""), runtime
         );
     }
 
     @Override
     public void close() {
         closed = true;
+        breakpoints.clear();
         pauseNextScenario.set(false);
         nextPauseLeaseSeconds.set(DEFAULT_PAUSE_LEASE_SECONDS);
-
         CompletableFuture<ControlBridgeStatus> pendingPause = nextPauseFuture.getAndSet(null);
-        if (pendingPause != null && !pendingPause.isDone()) {
-            pendingPause.complete(status());
-        }
-
+        if (pendingPause != null && !pendingPause.isDone()) pendingPause.complete(status());
         lanes.values().forEach(ScenarioLane::finish);
         lanes.clear();
     }
 
-    private ControlBridgeCallResult awaitPause(
-            CompletableFuture<ControlBridgeStatus> future,
-            int waitSeconds
-    ) {
+    private ControlBridgeCallResult awaitPause(CompletableFuture<ControlBridgeStatus> future, int waitSeconds) {
         try {
             ControlBridgeStatus paused = future.get(waitSeconds, TimeUnit.SECONDS);
             return paused.paused()
@@ -607,11 +512,10 @@ final class ControlBridgeCoordinator implements ControlHookHandler, AutoCloseabl
     ) {
         ScenarioCommand command = new ScenarioCommand(
                 action::get,
-                (type, message) -> failureFactory.apply(type, message),
+                failureFactory::apply,
                 unavailableFactory::apply
         );
         lane.commands.offer(command);
-
         try {
             return (T) command.result.get(timeoutSeconds, TimeUnit.SECONDS);
         } catch (TimeoutException failure) {
@@ -619,117 +523,62 @@ final class ControlBridgeCoordinator implements ControlHookHandler, AutoCloseabl
             lane.commands.remove(command);
             return failureFactory.apply(
                     "CONTROL_TIMEOUT",
-                    "Timed out waiting for the scenario thread to complete the control command. "
-                            + "If execution had already started, it may still complete."
+                    "Timed out waiting for the scenario thread to complete the control command. If execution had already started, it may still complete."
             );
         } catch (InterruptedException failure) {
             Thread.currentThread().interrupt();
             command.cancelled.set(true);
             lane.commands.remove(command);
-            return failureFactory.apply(
-                    "INTERRUPTED",
-                    "Interrupted while waiting for the control command."
-            );
+            return failureFactory.apply("INTERRUPTED", "Interrupted while waiting for the control command.");
         } catch (Exception failure) {
-            return failureFactory.apply(
-                    failure.getClass().getName(),
-                    Objects.toString(failure.getMessage(), "")
-            );
+            return failureFactory.apply(failure.getClass().getName(), Objects.toString(failure.getMessage(), ""));
         }
     }
 
     private ScenarioLane selectedLane(String scenarioId) {
         if (scenarioId != null) {
-            return lanes.values().stream()
-                    .filter(lane -> scenarioId.equals(lane.scenarioId))
-                    .findFirst()
-                    .orElse(null);
+            return lanes.values().stream().filter(lane -> scenarioId.equals(lane.scenarioId)).findFirst().orElse(null);
         }
-
         ScenarioLane paused = pausedLane();
-        if (paused != null) {
-            return paused;
-        }
-        if (lanes.size() != 1) {
-            return null;
-        }
-        return lanes.values().iterator().next();
+        if (paused != null) return paused;
+        return lanes.size() == 1 ? lanes.values().iterator().next() : null;
     }
 
     private ScenarioLane pausedLane() {
         ScenarioLane selected = null;
         for (ScenarioLane lane : lanes.values()) {
-            if (!lane.paused) {
-                continue;
-            }
-            if (selected != null) {
-                return null;
-            }
+            if (!lane.paused) continue;
+            if (selected != null) return null;
             selected = lane;
         }
         return selected;
     }
 
-    private ControlBridgeCallResult unavailableForScenarioCommand(
-            String scenarioId,
-            String operation
-    ) {
+    private String scenarioCommandUnavailableMessage(String scenarioId, String operation) {
         String targetId = normalizeScenarioId(scenarioId);
-        if (targetId != null) {
-            return unavailable("No active scenario with id " + targetId + ".");
-        }
-        if (lanes.isEmpty()) {
-            return unavailable(operation + " requires an active Pickleball scenario.");
-        }
-        return unavailable(operation + " requires a scenarioId when multiple scenarios are active.");
+        if (targetId != null) return "No active scenario with id " + targetId + ".";
+        if (lanes.isEmpty()) return operation + " requires an active Pickleball scenario.";
+        return operation + " requires a scenarioId when multiple scenarios are active.";
     }
 
-    private ControlBridgeValueResult valueUnavailableForScenarioCommand(
-            String scenarioId,
-            String operation
-    ) {
-        String targetId = normalizeScenarioId(scenarioId);
-        if (targetId != null) {
-            return valueUnavailable("No active scenario with id " + targetId + ".");
-        }
-        if (lanes.isEmpty()) {
-            return valueUnavailable(operation + " requires an active Pickleball scenario.");
-        }
-        return valueUnavailable(
-                operation + " requires a scenarioId when multiple scenarios are active."
-        );
+    private ControlBridgeCallResult unavailableForScenarioCommand(String scenarioId, String operation) {
+        return unavailable(scenarioCommandUnavailableMessage(scenarioId, operation));
     }
 
-    private ControlBridgeMappingSnapshotResult snapshotUnavailableForScenarioCommand(
-            String scenarioId,
-            String operation
-    ) {
-        String targetId = normalizeScenarioId(scenarioId);
-        if (targetId != null) {
-            return snapshotUnavailable("No active scenario with id " + targetId + ".");
-        }
-        if (lanes.isEmpty()) {
-            return snapshotUnavailable(operation + " requires an active Pickleball scenario.");
-        }
-        return snapshotUnavailable(
-                operation + " requires a scenarioId when multiple scenarios are active."
-        );
+    private ControlBridgeValueResult valueUnavailableForScenarioCommand(String scenarioId, String operation) {
+        return valueUnavailable(scenarioCommandUnavailableMessage(scenarioId, operation));
     }
 
-    private ControlBridgeMappingSnapshotResult snapshotSuccess(
-            String mapReference,
-            NodeMap map,
-            ControlBridgeStatus runtime
-    ) {
+    private ControlBridgeMappingSnapshotResult snapshotUnavailableForScenarioCommand(String scenarioId, String operation) {
+        return snapshotUnavailable(scenarioCommandUnavailableMessage(scenarioId, operation));
+    }
+
+    private ControlBridgeMappingSnapshotResult snapshotSuccess(String mapReference, NodeMap map, ControlBridgeStatus runtime) {
         ObjectNode values = map.getRoot().deepCopy();
         values.remove(NodeMap.MAP_TYPE_KEY);
         int snapshotBytes = values.toString().getBytes(StandardCharsets.UTF_8).length;
         if (snapshotBytes > MAX_MAPPING_SNAPSHOT_BYTES) {
-            return snapshotUnavailable(
-                    "Materialized mapping snapshot exceeds "
-                            + MAX_MAPPING_SNAPSHOT_BYTES + " UTF-8 JSON bytes.",
-                    runtime
-            );
+            return snapshotUnavailable("Materialized mapping snapshot exceeds " + MAX_MAPPING_SNAPSHOT_BYTES + " UTF-8 JSON bytes.", runtime);
         }
         return new ControlBridgeMappingSnapshotResult(
                 "SUCCESS",
@@ -747,92 +596,29 @@ final class ControlBridgeCoordinator implements ControlHookHandler, AutoCloseabl
         );
     }
 
-    private ControlBridgeMappingSnapshotResult snapshotFromFailure(
-            ControlCallResult<?> result,
-            ScenarioLane lane
-    ) {
+    private ControlBridgeMappingSnapshotResult snapshotFromFailure(ControlCallResult<?> result, ScenarioLane lane) {
         var error = result.error();
         return new ControlBridgeMappingSnapshotResult(
                 result.status().name(),
                 null,
-                error == null
-                        ? null
-                        : new ControlBridgeError(
-                                error.type(),
-                                clipped(error.message()),
-                                clipped(error.stackTrace())
-                        ),
+                error == null ? null : bridgeError(error.type(), error.message(), error.stackTrace()),
                 lane.status(lanes.size())
         );
     }
 
-    private ControlBridgeMappingSnapshotResult snapshotUnavailable(String message) {
-        return snapshotUnavailable(message, status());
-    }
-
-    private ControlBridgeMappingSnapshotResult snapshotUnavailable(
-            String message,
-            ControlBridgeStatus runtime
-    ) {
-        return new ControlBridgeMappingSnapshotResult(
-                "UNAVAILABLE",
-                null,
-                new ControlBridgeError("UNAVAILABLE", message, ""),
-                runtime
-        );
-    }
-
-    private ControlBridgeMappingSnapshotResult snapshotFailed(
-            String type,
-            String message,
-            ControlBridgeStatus runtime
-    ) {
-        return new ControlBridgeMappingSnapshotResult(
-                "FAILED",
-                null,
-                new ControlBridgeError(type, message, ""),
-                runtime
-        );
-    }
-
-    private ControlBridgeCallResult restoreSnapshot(
-            ControlBridgeMappingSnapshot snapshot,
-            ScenarioLane lane
-    ) {
+    private ControlBridgeCallResult restoreSnapshot(ControlBridgeMappingSnapshot snapshot, ScenarioLane lane) {
         ControlCallResult<NodeMap> current = MappingControl.currentNodeMap(snapshot.mapReference());
-        if (!current.successful()) {
-            return callFromFailure(current, lane);
-        }
-
+        if (!current.successful()) return callFromFailure(current, lane);
         NodeMap target = current.value();
         if (target.getClass() != NodeMap.class) {
-            return unavailable(
-                    "Mapping restore only supports ordinary NodeMap instances. "
-                            + "The current " + snapshot.mapReference() + " map is "
-                            + target.getClass().getName() + ".",
-                    lane.status(lanes.size())
-            );
+            return unavailable("Mapping restore only supports ordinary NodeMap instances. The current "
+                    + snapshot.mapReference() + " map is " + target.getClass().getName() + ".", lane.status(lanes.size()));
         }
-        if (!target.getClass().getName().equals(snapshot.mapClass())) {
-            return unavailable(
-                    "The live map class no longer matches the captured snapshot.",
-                    lane.status(lanes.size())
-            );
-        }
-        if (!target.getMapType().name().equals(snapshot.mapType())) {
-            return unavailable(
-                    "The live map type no longer matches the captured snapshot.",
-                    lane.status(lanes.size())
-            );
-        }
-        if (!dataSources(target).equals(snapshot.dataSources())) {
-            return unavailable(
-                    "The live map data sources no longer match the captured snapshot.",
-                    lane.status(lanes.size())
-            );
-        }
+        if (!target.getClass().getName().equals(snapshot.mapClass())) return unavailable("The live map class no longer matches the captured snapshot.", lane.status(lanes.size()));
+        if (!target.getMapType().name().equals(snapshot.mapType())) return unavailable("The live map type no longer matches the captured snapshot.", lane.status(lanes.size()));
+        if (!dataSources(target).equals(snapshot.dataSources())) return unavailable("The live map data sources no longer match the captured snapshot.", lane.status(lanes.size()));
 
-        ObjectNode values = snapshot.values();
+        ObjectNode values = snapshot.values().deepCopy();
         values.remove(NodeMap.MAP_TYPE_KEY);
         var mapType = target.getMapType();
         target.clearValues();
@@ -841,131 +627,66 @@ final class ControlBridgeCoordinator implements ControlHookHandler, AutoCloseabl
         return success("RESTORED", lane.status(lanes.size()));
     }
 
-    private ControlBridgeCallResult callFromFailure(
-            ControlCallResult<?> result,
-            ScenarioLane lane
-    ) {
-        var error = result.error();
-        return new ControlBridgeCallResult(
-                result.status().name(),
-                null,
-                null,
-                error == null
-                        ? null
-                        : new ControlBridgeError(
-                                error.type(),
-                                clipped(error.message()),
-                                clipped(error.stackTrace())
-                        ),
-                lane.status(lanes.size())
-        );
-    }
-
     private static String validateSnapshot(ControlBridgeMappingSnapshot snapshot) {
-        if (snapshot == null) {
-            return "Mapping snapshot must not be null.";
-        }
-        if (snapshot.version() != ControlBridgeMappingSnapshot.CURRENT_VERSION) {
-            return "Unsupported mapping snapshot version: " + snapshot.version() + ".";
-        }
-        if (snapshot.mapReference() == null || snapshot.mapReference().isBlank()) {
-            return "Mapping snapshot mapReference must not be blank.";
-        }
-        if (snapshot.mapType() == null || snapshot.mapType().isBlank()) {
-            return "Mapping snapshot mapType must not be blank.";
-        }
-        if (snapshot.mapClass() == null || snapshot.mapClass().isBlank()) {
-            return "Mapping snapshot mapClass must not be blank.";
-        }
-        if (!snapshot.restorable()) {
-            return "This materialized mapping snapshot is inspection-only and cannot be restored.";
-        }
-        if (snapshot.values() == null) {
-            return "Mapping snapshot values must not be null.";
-        }
+        if (snapshot == null) return "Mapping snapshot must not be null.";
+        if (snapshot.version() != ControlBridgeMappingSnapshot.CURRENT_VERSION) return "Unsupported mapping snapshot version: " + snapshot.version() + ".";
+        if (snapshot.mapReference() == null || snapshot.mapReference().isBlank()) return "Mapping snapshot mapReference must not be blank.";
+        if (snapshot.mapType() == null || snapshot.mapType().isBlank()) return "Mapping snapshot mapType must not be blank.";
+        if (snapshot.mapClass() == null || snapshot.mapClass().isBlank()) return "Mapping snapshot mapClass must not be blank.";
+        if (!snapshot.restorable()) return "This materialized mapping snapshot is inspection-only and cannot be restored.";
+        if (snapshot.values() == null) return "Mapping snapshot values must not be null.";
         return null;
     }
 
     private static List<String> dataSources(NodeMap map) {
-        return map.getDataSources().stream()
-                .map(Enum::name)
-                .sorted()
-                .toList();
+        return map.getDataSources().stream().map(Enum::name).sorted().toList();
     }
 
-    private ControlBridgeCallResult fromControlResult(
-            ControlCallResult<Object> result,
-            ScenarioLane lane
-    ) {
-        if (result == null) {
-            return failed("NULL_RESULT", "Dynamic control returned no result.", lane.status(lanes.size()));
-        }
-
+    private ControlBridgeCallResult fromControlResult(ControlCallResult<Object> result, ScenarioLane lane) {
+        if (result == null) return failed("NULL_RESULT", "Dynamic control returned no result.", lane.status(lanes.size()));
         Object value = result.value();
         var error = result.error();
         return new ControlBridgeCallResult(
                 result.status().name(),
                 value == null ? null : value.getClass().getName(),
                 value == null ? null : clipped(Objects.toString(value)),
-                error == null
-                        ? null
-                        : new ControlBridgeError(
-                                error.type(),
-                                clipped(error.message()),
-                                clipped(error.stackTrace())
-                        ),
+                error == null ? null : bridgeError(error.type(), error.message(), error.stackTrace()),
                 lane.status(lanes.size())
         );
     }
 
-    private ControlBridgeValueResult fromValueResult(
-            ControlCallResult<?> result,
-            ScenarioLane lane
-    ) {
-        if (result == null) {
-            return valueFailed(
-                    "NULL_RESULT",
-                    "Dynamic control returned no result.",
-                    lane.status(lanes.size())
-            );
-        }
-        if (!result.successful()) {
-            return fromValueFailure(result, lane);
-        }
-        return valueSuccess(result.value(), lane.status(lanes.size()));
+    private ControlBridgeCallResult callFromFailure(ControlCallResult<?> result, ScenarioLane lane) {
+        var error = result.error();
+        return new ControlBridgeCallResult(
+                result.status().name(), null, null,
+                error == null ? null : bridgeError(error.type(), error.message(), error.stackTrace()),
+                lane.status(lanes.size())
+        );
     }
 
-    private ControlBridgeValueResult fromValueFailure(
-            ControlCallResult<?> result,
-            ScenarioLane lane
-    ) {
+    private ControlBridgeValueResult fromValueResult(ControlCallResult<?> result, ScenarioLane lane) {
+        if (result == null) return valueFailed("NULL_RESULT", "Dynamic control returned no result.", lane.status(lanes.size()));
+        return result.successful() ? valueSuccess(result.value(), lane.status(lanes.size())) : fromValueFailure(result, lane);
+    }
+
+    private ControlBridgeValueResult fromValueFailure(ControlCallResult<?> result, ScenarioLane lane) {
         var error = result.error();
         return new ControlBridgeValueResult(
-                result.status().name(),
-                null,
-                error == null
-                        ? null
-                        : new ControlBridgeError(
-                                error.type(),
-                                clipped(error.message()),
-                                clipped(error.stackTrace())
-                        ),
+                result.status().name(), null,
+                error == null ? null : bridgeError(error.type(), error.message(), error.stackTrace()),
                 lane.status(lanes.size())
         );
     }
 
-    private ControlBridgeValueResult valueSuccess(
-            Object value,
-            ControlBridgeStatus runtime
-    ) {
+    private ControlBridgeValueResult valueSuccess(Object value, ControlBridgeStatus runtime) {
         Object jsonValue = jsonCompatibleValue(value, new IdentityHashMap<>());
-        boolean jsonCompatible = jsonValue != NOT_JSON_COMPATIBLE;
+        boolean compatible = jsonValue != NOT_JSON_COMPATIBLE;
         return new ControlBridgeValueResult(
                 "SUCCESS",
                 new ControlBridgeValue(
                         value == null ? "null" : value.getClass().getName(),
-                        jsonCompatible,
-                        jsonCompatible ? jsonValue : null,
+                        compatible,
+                        compatible ? jsonValue : null,
                         clipped(Objects.toString(value))
                 ),
                 null,
@@ -973,144 +694,142 @@ final class ControlBridgeCoordinator implements ControlHookHandler, AutoCloseabl
         );
     }
 
+    private ControlBridgeElementInspectionResult elementResult(ControlCallResult<ElementInspection> result, ScenarioLane lane) {
+        if (result == null) return elementFailed("NULL_RESULT", "Element control returned no result.", lane.status(lanes.size()));
+        var error = result.error();
+        return new ControlBridgeElementInspectionResult(
+                result.status().name(),
+                result.value(),
+                error == null ? null : bridgeError(error.type(), error.message(), error.stackTrace()),
+                lane.status(lanes.size())
+        );
+    }
+
+    private ControlBridgeServiceCallResult serviceResult(ControlCallResult<ServiceCallEvidence> result, ScenarioLane lane) {
+        if (result == null) return serviceFailed("NULL_RESULT", "Service-call control returned no result.", lane.status(lanes.size()));
+        var error = result.error();
+        return new ControlBridgeServiceCallResult(
+                result.status().name(),
+                result.value(),
+                error == null ? null : bridgeError(error.type(), error.message(), error.stackTrace()),
+                lane.status(lanes.size())
+        );
+    }
+
+    private static ControlBridgeError bridgeError(String type, String message, String stackTrace) {
+        return new ControlBridgeError(type, clipped(message), clipped(stackTrace));
+    }
+
     private ControlBridgeCallResult success(String value, ControlBridgeStatus runtime) {
-        return new ControlBridgeCallResult(
-                "SUCCESS",
-                String.class.getName(),
-                value,
-                null,
-                runtime
-        );
+        return new ControlBridgeCallResult("SUCCESS", String.class.getName(), value, null, runtime);
     }
 
-    private ControlBridgeCallResult unavailable(String message) {
-        return unavailable(message, status());
+    private ControlBridgeCallResult unavailable(String message) { return unavailable(message, status()); }
+    private ControlBridgeCallResult unavailable(String message, ControlBridgeStatus runtime) {
+        return new ControlBridgeCallResult("UNAVAILABLE", null, null, new ControlBridgeError("UNAVAILABLE", clipped(message), ""), runtime);
+    }
+    private ControlBridgeCallResult failed(String type, String message) { return failed(type, message, status()); }
+    private ControlBridgeCallResult failed(String type, String message, ControlBridgeStatus runtime) {
+        return new ControlBridgeCallResult("FAILED", null, null, new ControlBridgeError(type, clipped(message), ""), runtime);
     }
 
-    private ControlBridgeCallResult unavailable(
-            String message,
-            ControlBridgeStatus runtime
-    ) {
-        return new ControlBridgeCallResult(
-                "UNAVAILABLE",
-                null,
-                null,
-                new ControlBridgeError("UNAVAILABLE", message, ""),
-                runtime
-        );
+    private ControlBridgeValueResult valueUnavailable(String message) { return valueUnavailable(message, status()); }
+    private ControlBridgeValueResult valueUnavailable(String message, ControlBridgeStatus runtime) {
+        return new ControlBridgeValueResult("UNAVAILABLE", null, new ControlBridgeError("UNAVAILABLE", clipped(message), ""), runtime);
+    }
+    private ControlBridgeValueResult valueFailed(String type, String message, ControlBridgeStatus runtime) {
+        return new ControlBridgeValueResult("FAILED", null, new ControlBridgeError(type, clipped(message), ""), runtime);
     }
 
-    private ControlBridgeCallResult failed(String type, String message) {
-        return failed(type, message, status());
+    private ControlBridgeMappingSnapshotResult snapshotUnavailable(String message) { return snapshotUnavailable(message, status()); }
+    private ControlBridgeMappingSnapshotResult snapshotUnavailable(String message, ControlBridgeStatus runtime) {
+        return new ControlBridgeMappingSnapshotResult("UNAVAILABLE", null, new ControlBridgeError("UNAVAILABLE", clipped(message), ""), runtime);
+    }
+    private ControlBridgeMappingSnapshotResult snapshotFailed(String type, String message, ControlBridgeStatus runtime) {
+        return new ControlBridgeMappingSnapshotResult("FAILED", null, new ControlBridgeError(type, clipped(message), ""), runtime);
     }
 
-    private ControlBridgeCallResult failed(
-            String type,
-            String message,
-            ControlBridgeStatus runtime
-    ) {
-        return new ControlBridgeCallResult(
-                "FAILED",
-                null,
-                null,
-                new ControlBridgeError(type, message, ""),
-                runtime
-        );
+    private ControlBridgeBrowserPageResult browserPageUnavailable(String message) { return browserPageUnavailable(message, status()); }
+    private ControlBridgeBrowserPageResult browserPageUnavailable(String message, ControlBridgeStatus runtime) {
+        return new ControlBridgeBrowserPageResult("UNAVAILABLE", null, new ControlBridgeError("UNAVAILABLE", clipped(message), ""), runtime);
+    }
+    private ControlBridgeBrowserPageResult browserPageFailed(String type, String message, ControlBridgeStatus runtime) {
+        return new ControlBridgeBrowserPageResult("FAILED", null, new ControlBridgeError(type, clipped(message), ""), runtime);
     }
 
-    private ControlBridgeValueResult valueUnavailable(String message) {
-        return valueUnavailable(message, status());
+    private ControlBridgeBrowserScreenshotResult browserScreenshotUnavailable(String message) { return browserScreenshotUnavailable(message, status()); }
+    private ControlBridgeBrowserScreenshotResult browserScreenshotUnavailable(String message, ControlBridgeStatus runtime) {
+        return new ControlBridgeBrowserScreenshotResult("UNAVAILABLE", null, new ControlBridgeError("UNAVAILABLE", clipped(message), ""), runtime);
+    }
+    private ControlBridgeBrowserScreenshotResult browserScreenshotFailed(String type, String message, ControlBridgeStatus runtime) {
+        return new ControlBridgeBrowserScreenshotResult("FAILED", null, new ControlBridgeError(type, clipped(message), ""), runtime);
     }
 
-    private ControlBridgeValueResult valueUnavailable(
-            String message,
-            ControlBridgeStatus runtime
-    ) {
-        return new ControlBridgeValueResult(
-                "UNAVAILABLE",
-                null,
-                new ControlBridgeError("UNAVAILABLE", message, ""),
-                runtime
-        );
+    private ControlBridgeElementInspectionResult elementUnavailable(String message) { return elementUnavailable(message, status()); }
+    private ControlBridgeElementInspectionResult elementUnavailable(String message, ControlBridgeStatus runtime) {
+        return new ControlBridgeElementInspectionResult("UNAVAILABLE", null, new ControlBridgeError("UNAVAILABLE", clipped(message), ""), runtime);
+    }
+    private ControlBridgeElementInspectionResult elementFailed(String type, String message, ControlBridgeStatus runtime) {
+        return new ControlBridgeElementInspectionResult("FAILED", null, new ControlBridgeError(type, clipped(message), ""), runtime);
     }
 
-    private ControlBridgeValueResult valueFailed(
-            String type,
-            String message,
-            ControlBridgeStatus runtime
-    ) {
-        return new ControlBridgeValueResult(
-                "FAILED",
-                null,
-                new ControlBridgeError(type, message, ""),
-                runtime
-        );
+    private ControlBridgeServiceCallResult serviceUnavailable(String message) { return serviceUnavailable(message, status()); }
+    private ControlBridgeServiceCallResult serviceUnavailable(String message, ControlBridgeStatus runtime) {
+        return new ControlBridgeServiceCallResult("UNAVAILABLE", null, new ControlBridgeError("UNAVAILABLE", clipped(message), ""), runtime);
+    }
+    private ControlBridgeServiceCallResult serviceFailed(String type, String message, ControlBridgeStatus runtime) {
+        return new ControlBridgeServiceCallResult("FAILED", null, new ControlBridgeError(type, clipped(message), ""), runtime);
     }
 
     private static int commandTimeout(Integer timeoutSeconds) {
-        return bounded(
-                timeoutSeconds,
-                DEFAULT_COMMAND_TIMEOUT_SECONDS,
-                MAX_COMMAND_TIMEOUT_SECONDS,
-                "timeoutSeconds"
-        );
+        return bounded(timeoutSeconds, DEFAULT_COMMAND_TIMEOUT_SECONDS, MAX_COMMAND_TIMEOUT_SECONDS, "timeoutSeconds");
     }
 
-    private static int bounded(
-            Integer requested,
-            int defaultValue,
-            int maxValue,
-            String name
-    ) {
+    private static int bounded(Integer requested, int defaultValue, int maxValue, String name) {
         int value = requested == null ? defaultValue : requested;
-        if (value < 1 || value > maxValue) {
-            throw new IllegalArgumentException(name + " must be between 1 and " + maxValue);
-        }
+        if (value < 1 || value > maxValue) throw new IllegalArgumentException(name + " must be between 1 and " + maxValue);
         return value;
+    }
+
+    private static ControlHook parseHook(String hook) {
+        if (hook == null || hook.isBlank()) return null;
+        try {
+            return ControlHook.valueOf(hook.trim().toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException failure) {
+            throw new IllegalArgumentException("Unknown control hook: " + hook, failure);
+        }
     }
 
     private static String normalizeScenarioId(String scenarioId) {
         return scenarioId == null || scenarioId.isBlank() ? null : scenarioId.trim();
     }
 
+    private static String normalizeFilter(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
+    }
+
+    private static boolean contains(String value, String filter) {
+        return filter == null || (value != null && value.contains(filter));
+    }
+
     private static String clipped(String value) {
-        if (value == null || value.length() <= MAX_TEXT) {
-            return value;
-        }
+        if (value == null || value.length() <= MAX_TEXT) return value;
         return value.substring(0, MAX_TEXT) + "\n...[truncated]";
     }
 
-    private static Object jsonCompatibleValue(
-            Object value,
-            IdentityHashMap<Object, Boolean> path
-    ) {
-        if (value == null || value instanceof String || value instanceof Number || value instanceof Boolean) {
-            return value;
-        }
-        if (value instanceof Character character) {
-            return character.toString();
-        }
-        if (value instanceof Enum<?> enumValue) {
-            return enumValue.name();
-        }
-        if (value instanceof JsonNode) {
-            return value;
-        }
-        if (path.put(value, Boolean.TRUE) != null) {
-            return NOT_JSON_COMPATIBLE;
-        }
-
+    private static Object jsonCompatibleValue(Object value, IdentityHashMap<Object, Boolean> path) {
+        if (value == null || value instanceof String || value instanceof Number || value instanceof Boolean) return value;
+        if (value instanceof Character character) return character.toString();
+        if (value instanceof Enum<?> enumValue) return enumValue.name();
+        if (value instanceof JsonNode) return value;
+        if (path.put(value, Boolean.TRUE) != null) return NOT_JSON_COMPATIBLE;
         try {
             if (value instanceof Map<?, ?> map) {
                 Map<String, Object> converted = new LinkedHashMap<>();
                 for (Map.Entry<?, ?> entry : map.entrySet()) {
-                    if (!(entry.getKey() instanceof String key)) {
-                        return NOT_JSON_COMPATIBLE;
-                    }
+                    if (!(entry.getKey() instanceof String key)) return NOT_JSON_COMPATIBLE;
                     Object convertedValue = jsonCompatibleValue(entry.getValue(), path);
-                    if (convertedValue == NOT_JSON_COMPATIBLE) {
-                        return NOT_JSON_COMPATIBLE;
-                    }
+                    if (convertedValue == NOT_JSON_COMPATIBLE) return NOT_JSON_COMPATIBLE;
                     converted.put(key, convertedValue);
                 }
                 return converted;
@@ -1119,20 +838,16 @@ final class ControlBridgeCoordinator implements ControlHookHandler, AutoCloseabl
                 List<Object> converted = new ArrayList<>();
                 for (Object item : iterable) {
                     Object convertedValue = jsonCompatibleValue(item, path);
-                    if (convertedValue == NOT_JSON_COMPATIBLE) {
-                        return NOT_JSON_COMPATIBLE;
-                    }
+                    if (convertedValue == NOT_JSON_COMPATIBLE) return NOT_JSON_COMPATIBLE;
                     converted.add(convertedValue);
                 }
                 return converted;
             }
             if (value.getClass().isArray()) {
                 List<Object> converted = new ArrayList<>(Array.getLength(value));
-                for (int index = 0; index < Array.getLength(value); index++) {
-                    Object convertedValue = jsonCompatibleValue(Array.get(value, index), path);
-                    if (convertedValue == NOT_JSON_COMPATIBLE) {
-                        return NOT_JSON_COMPATIBLE;
-                    }
+                for (int i = 0; i < Array.getLength(value); i++) {
+                    Object convertedValue = jsonCompatibleValue(Array.get(value, i), path);
+                    if (convertedValue == NOT_JSON_COMPATIBLE) return NOT_JSON_COMPATIBLE;
                     converted.add(convertedValue);
                 }
                 return converted;
@@ -1146,7 +861,6 @@ final class ControlBridgeCoordinator implements ControlHookHandler, AutoCloseabl
     private final class ScenarioLane {
         private final long threadId;
         private final BlockingQueue<ScenarioCommand> commands = new LinkedBlockingQueue<>();
-
         private volatile String scenarioId;
         private volatile String scenarioName;
         private volatile String stepText;
@@ -1158,15 +872,12 @@ final class ControlBridgeCoordinator implements ControlHookHandler, AutoCloseabl
         private volatile long pauseDeadlineNanos;
         private volatile CompletableFuture<ControlBridgeStatus> pauseFuture;
 
-        private ScenarioLane(long threadId) {
-            this.threadId = threadId;
-        }
+        private ScenarioLane(long threadId) { this.threadId = threadId; }
 
         private void capture(ControlEvent event) {
             CurrentScenarioState scenario = GlobalState.getCurrentScenarioState();
             StepExtension step = GlobalState.getRunningStep();
             Phrase phrase = GlobalState.getRunningPhrase();
-
             scenarioId = scenario == null ? null : scenario.id.toString();
             scenarioName = scenario == null ? null : scenario.scenarioName;
             stepText = safeStepText(step);
@@ -1177,37 +888,22 @@ final class ControlBridgeCoordinator implements ControlHookHandler, AutoCloseabl
 
         private ControlBridgeScenarioStatus scenarioStatus() {
             return new ControlBridgeScenarioStatus(
-                    threadId,
-                    scenarioId,
-                    scenarioName,
-                    stepText,
-                    phraseText,
-                    lastHook,
-                    lastSignature,
-                    paused,
-                    pauseRequested
+                    threadId, scenarioId, scenarioName, stepText, phraseText,
+                    lastHook, lastSignature, paused, pauseRequested
             );
         }
 
-        private void requestPause(
-                int leaseSeconds,
-                CompletableFuture<ControlBridgeStatus> future
-        ) {
+        private void requestPause(int leaseSeconds, CompletableFuture<ControlBridgeStatus> future) {
             pauseRequested = true;
             extendPause(leaseSeconds);
-            if (future != null) {
-                pauseFuture = future;
-            }
+            if (future != null) pauseFuture = future;
         }
 
         private void extendPause(int leaseSeconds) {
-            pauseDeadlineNanos = System.nanoTime()
-                    + Duration.ofSeconds(leaseSeconds).toNanos();
+            pauseDeadlineNanos = System.nanoTime() + Duration.ofSeconds(leaseSeconds).toNanos();
         }
 
-        private synchronized void cancelPauseRequest(
-                CompletableFuture<ControlBridgeStatus> future
-        ) {
+        private synchronized void cancelPauseRequest(CompletableFuture<ControlBridgeStatus> future) {
             if (!paused && pauseFuture == future) {
                 pauseFuture = null;
                 pauseRequested = false;
@@ -1218,41 +914,29 @@ final class ControlBridgeCoordinator implements ControlHookHandler, AutoCloseabl
             paused = true;
             CompletableFuture<ControlBridgeStatus> future = pauseFuture;
             pauseFuture = null;
-            if (future != null && !future.isDone()) {
-                future.complete(status(lanes.size()));
-            }
-
+            if (future != null && !future.isDone()) future.complete(status(lanes.size()));
             while (!closed && pauseRequested) {
                 long remaining = pauseDeadlineNanos - System.nanoTime();
                 if (remaining <= 0) {
                     pauseRequested = false;
                     break;
                 }
-
-                long waitMillis = Math.min(
-                        250,
-                        Math.max(1, TimeUnit.NANOSECONDS.toMillis(remaining))
-                );
+                long waitMillis = Math.min(250, Math.max(1, TimeUnit.NANOSECONDS.toMillis(remaining)));
                 try {
                     ScenarioCommand command = commands.poll(waitMillis, TimeUnit.MILLISECONDS);
-                    if (command != null) {
-                        command.execute();
-                    }
+                    if (command != null) command.execute();
                 } catch (InterruptedException failure) {
                     Thread.currentThread().interrupt();
                     pauseRequested = false;
                     break;
                 }
             }
-
             paused = false;
         }
 
         private void drainCommands() {
             ScenarioCommand command;
-            while ((command = commands.poll()) != null) {
-                command.execute();
-            }
+            while ((command = commands.poll()) != null) command.execute();
         }
 
         private void resume() {
@@ -1264,49 +948,95 @@ final class ControlBridgeCoordinator implements ControlHookHandler, AutoCloseabl
         private void finish() {
             pauseRequested = false;
             paused = false;
-
             CompletableFuture<ControlBridgeStatus> future = pauseFuture;
             pauseFuture = null;
-            if (future != null && !future.isDone()) {
-                future.complete(status(Math.max(0, lanes.size() - 1)));
-            }
-
+            if (future != null && !future.isDone()) future.complete(status(Math.max(0, lanes.size() - 1)));
             ScenarioCommand command;
             while ((command = commands.poll()) != null) {
-                command.completeUnavailable(
-                        "Scenario ended before the control command could execute."
-                );
+                command.completeUnavailable("Scenario ended before the control command could execute.");
             }
         }
 
         private ControlBridgeStatus status(int activeCount) {
             return new ControlBridgeStatus(
                     ControlBridgeRuntime.PROTOCOL_VERSION,
-                    runtimeId,
-                    pid,
-                    activeCount,
-                    threadId,
-                    scenarioId,
-                    scenarioName,
-                    stepText,
-                    phraseText,
-                    lastHook,
-                    lastSignature,
-                    paused,
-                    pauseRequested,
-                    capabilities
+                    runtimeId, pid, activeCount, threadId,
+                    scenarioId, scenarioName, stepText, phraseText,
+                    lastHook, lastSignature, paused, pauseRequested, capabilities
             );
         }
 
         private String safeStepText(StepExtension step) {
-            if (step == null) {
-                return null;
-            }
+            if (step == null) return null;
             try {
                 return clipped(step.getStepText());
             } catch (RuntimeException ignored) {
                 return clipped(step.toString());
             }
+        }
+    }
+
+    private static final class BreakpointRule {
+        private final String id;
+        private final String scenarioId;
+        private final ControlHook hook;
+        private final String signatureContains;
+        private final String stepContains;
+        private final String phraseContains;
+        private final boolean oneShot;
+        private final int leaseSeconds;
+        private final AtomicLong hitCount = new AtomicLong();
+        private volatile String lastHitAt;
+        private volatile String lastScenarioId;
+
+        private BreakpointRule(
+                String id,
+                String scenarioId,
+                ControlHook hook,
+                String signatureContains,
+                String stepContains,
+                String phraseContains,
+                boolean oneShot,
+                int leaseSeconds
+        ) {
+            this.id = id;
+            this.scenarioId = scenarioId;
+            this.hook = hook;
+            this.signatureContains = signatureContains;
+            this.stepContains = stepContains;
+            this.phraseContains = phraseContains;
+            this.oneShot = oneShot;
+            this.leaseSeconds = leaseSeconds;
+        }
+
+        private boolean matches(ScenarioLane lane, ControlEvent event) {
+            return (scenarioId == null || scenarioId.equals(lane.scenarioId))
+                    && (hook == null || hook == event.hook())
+                    && contains(event.signature(), signatureContains)
+                    && contains(lane.stepText, stepContains)
+                    && contains(lane.phraseText, phraseContains);
+        }
+
+        private void hit(String scenarioId) {
+            hitCount.incrementAndGet();
+            lastHitAt = Instant.now().toString();
+            lastScenarioId = scenarioId;
+        }
+
+        private ControlBridgeBreakpoint snapshot() {
+            return new ControlBridgeBreakpoint(
+                    id,
+                    scenarioId,
+                    hook == null ? null : hook.name(),
+                    signatureContains,
+                    stepContains,
+                    phraseContains,
+                    oneShot,
+                    leaseSeconds,
+                    hitCount.get(),
+                    lastHitAt,
+                    lastScenarioId
+            );
         }
     }
 
@@ -1339,9 +1069,7 @@ final class ControlBridgeCoordinator implements ControlHookHandler, AutoCloseabl
         }
 
         private void execute() {
-            if (wakeup || cancelled.get() || result.isDone()) {
-                return;
-            }
+            if (wakeup || cancelled.get() || result.isDone()) return;
             try {
                 result.complete(action.get());
             } catch (Throwable failure) {
@@ -1353,9 +1081,7 @@ final class ControlBridgeCoordinator implements ControlHookHandler, AutoCloseabl
         }
 
         private void completeUnavailable(String message) {
-            if (!wakeup && !result.isDone()) {
-                result.complete(unavailableFactory.apply(message));
-            }
+            if (!wakeup && !result.isDone()) result.complete(unavailableFactory.apply(message));
         }
 
         private static ScenarioCommand wakeup() {

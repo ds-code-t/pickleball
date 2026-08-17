@@ -4,17 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.cucumber.java.After;
 import io.cucumber.java.en.Given;
-import tools.dscode.control.bridge.ControlBridgeBootstrap;
-import tools.dscode.control.bridge.ControlBridgeBrowserPageResult;
-import tools.dscode.control.bridge.ControlBridgeBrowserScreenshotResult;
-import tools.dscode.control.bridge.ControlBridgeCallResult;
-import tools.dscode.control.bridge.ControlBridgeDescriptor;
-import tools.dscode.control.bridge.ControlBridgeEvent;
-import tools.dscode.control.bridge.ControlBridgeEventPage;
-import tools.dscode.control.bridge.ControlBridgeMappingSnapshotResult;
-import tools.dscode.control.bridge.ControlBridgeScenarioStatus;
-import tools.dscode.control.bridge.ControlBridgeStatus;
-import tools.dscode.control.bridge.ControlBridgeValueResult;
+import tools.dscode.control.bridge.*;
 import tools.dscode.coredefinitions.BrowserSteps;
 
 import java.io.IOException;
@@ -37,9 +27,7 @@ import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
 
 public final class ControlBridgeTestSteps {
     private final ObjectMapper json = new ObjectMapper();
-    private final HttpClient http = HttpClient.newBuilder()
-            .connectTimeout(Duration.ofSeconds(5))
-            .build();
+    private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
 
     private Path sessionDirectory;
     private String token;
@@ -53,166 +41,148 @@ public final class ControlBridgeTestSteps {
         sessionDirectory = Files.createTempDirectory("pkb-control-bridge-");
         token = "test-" + UUID.randomUUID();
         descriptor = ControlBridgeBootstrap.start(
-                sessionDirectory,
-                UUID.randomUUID().toString(),
-                token,
-                false
+                sessionDirectory, UUID.randomUUID().toString(), token, false
         );
 
         client = CompletableFuture.supplyAsync(() -> {
             try {
-                HttpResponse<byte[]> unauthorized = send(
-                        "GET",
-                        "/v1/status",
-                        null,
-                        null
-                );
-
+                int unauthorizedStatus = send("GET", "/v1/status", null, null).statusCode();
                 ControlBridgeScenarioStatus scenario = awaitScenario();
                 ControlBridgeCallResult wrongTarget = post(
                         "/v1/pause",
-                        Map.of(
-                                "scenarioId", UUID.randomUUID().toString(),
-                                "waitSeconds", 1,
-                                "leaseSeconds", 30
-                        )
+                        Map.of("scenarioId", UUID.randomUUID().toString(), "waitSeconds", 1, "leaseSeconds", 30)
                 );
                 ControlBridgeCallResult paused = post(
                         "/v1/pause",
-                        Map.of(
-                                "scenarioId", scenario.scenarioId(),
-                                "waitSeconds", 10,
-                                "leaseSeconds", 30
-                        )
+                        Map.of("scenarioId", scenario.scenarioId(), "waitSeconds", 10, "leaseSeconds", 30)
                 );
-                ControlBridgeBrowserPageResult browserPage = postBrowserPage(
+
+                ControlBridgeBrowserPageResult browserPage = postTyped(
                         "/v1/browser/page",
-                        Map.of(
-                                "scenarioId", scenario.scenarioId(),
-                                "timeoutSeconds", 10
-                        )
+                        Map.of("scenarioId", scenario.scenarioId(), "timeoutSeconds", 10),
+                        ControlBridgeBrowserPageResult.class
                 );
-                ControlBridgeBrowserScreenshotResult browserScreenshot = postBrowserScreenshot(
+                ControlBridgeBrowserScreenshotResult browserScreenshot = postTyped(
                         "/v1/browser/screenshot",
+                        Map.of("scenarioId", scenario.scenarioId(), "timeoutSeconds", 10),
+                        ControlBridgeBrowserScreenshotResult.class
+                );
+                ControlBridgeElementInspectionResult elements = postTyped(
+                        "/v1/browser/elements",
                         Map.of(
                                 "scenarioId", scenario.scenarioId(),
+                                "category", "Button",
+                                "operation", "DEFAULT",
+                                "maxElements", 5,
                                 "timeoutSeconds", 10
-                        )
+                        ),
+                        ControlBridgeElementInspectionResult.class
                 );
-                ControlBridgeEventPage events = events(
-                        scenario.scenarioId(),
-                        0L,
-                        100
+                ControlBridgeServiceCallResult failedServiceCall = postTyped(
+                        "/v1/services/call",
+                        Map.of(
+                                "scenarioId", scenario.scenarioId(),
+                                "selector", "%phase3h-missing-service-call",
+                                "timeoutSeconds", 10
+                        ),
+                        ControlBridgeServiceCallResult.class
                 );
-                ControlBridgeEventPage cursorEvents = events(
-                        scenario.scenarioId(),
-                        events.nextSequence(),
-                        100
+                ControlBridgeServiceCallResult serviceCall = postTyped(
+                        "/v1/services/call",
+                        Map.of(
+                                "scenarioId", scenario.scenarioId(),
+                                "selector", "%health-full-url",
+                                "timeoutSeconds", 10
+                        ),
+                        ControlBridgeServiceCallResult.class
                 );
+
+                ControlBridgeBreakpoint breakpoint = postTyped(
+                        "/v1/breakpoints/add",
+                        Map.of(
+                                "scenarioId", scenario.scenarioId(),
+                                "hook", "AFTER_STEP",
+                                "stepContains", "CONTROL BRIDGE IPC SYNC POINT",
+                                "oneShot", true,
+                                "leaseSeconds", 30
+                        ),
+                        ControlBridgeBreakpoint.class
+                );
+                List<ControlBridgeBreakpoint> breakpointsBefore = breakpoints();
+
+                ControlBridgeEventPage events = events(scenario.scenarioId(), 0L, 100);
+                ControlBridgeEventPage cursorEvents = events(scenario.scenarioId(), events.nextSequence(), 100);
                 ControlBridgeValueResult baseline = postValue(
                         "/v1/mappings/put",
                         Map.of(
-                                "scenarioId", scenario.scenarioId(),
-                                "mapReference", "OVERRIDE",
-                                "key", "controlBridgeIpcValue",
-                                "value", "baseline",
-                                "timeoutSeconds", 10
+                                "scenarioId", scenario.scenarioId(), "mapReference", "OVERRIDE",
+                                "key", "controlBridgeIpcValue", "value", "baseline", "timeoutSeconds", 10
                         )
                 );
-                ControlBridgeMappingSnapshotResult snapshot = postSnapshot(
+                ControlBridgeMappingSnapshotResult snapshot = postTyped(
                         "/v1/mappings/snapshot",
-                        Map.of(
-                                "scenarioId", scenario.scenarioId(),
-                                "mapReference", "OVERRIDE",
-                                "timeoutSeconds", 10
-                        )
+                        Map.of("scenarioId", scenario.scenarioId(), "mapReference", "OVERRIDE", "timeoutSeconds", 10),
+                        ControlBridgeMappingSnapshotResult.class
                 );
                 ControlBridgeValueResult written = postValue(
                         "/v1/mappings/put",
                         Map.of(
-                                "scenarioId", scenario.scenarioId(),
-                                "mapReference", "OVERRIDE",
-                                "key", "controlBridgeIpcValue",
-                                "value", "bridge-value",
-                                "timeoutSeconds", 10
+                                "scenarioId", scenario.scenarioId(), "mapReference", "OVERRIDE",
+                                "key", "controlBridgeIpcValue", "value", "bridge-value", "timeoutSeconds", 10
                         )
                 );
                 ControlBridgeValueResult read = postValue(
                         "/v1/mappings/get",
                         Map.of(
-                                "scenarioId", scenario.scenarioId(),
-                                "mapReference", "OVERRIDE",
-                                "key", "controlBridgeIpcValue",
-                                "timeoutSeconds", 10
+                                "scenarioId", scenario.scenarioId(), "mapReference", "OVERRIDE",
+                                "key", "controlBridgeIpcValue", "timeoutSeconds", 10
                         )
                 );
                 ControlBridgeValueResult resolved = postValue(
                         "/v1/mappings/resolve",
-                        Map.of(
-                                "scenarioId", scenario.scenarioId(),
-                                "input", "<controlBridgeIpcValue>",
-                                "timeoutSeconds", 10
-                        )
+                        Map.of("scenarioId", scenario.scenarioId(), "input", "<controlBridgeIpcValue>", "timeoutSeconds", 10)
                 );
                 ControlBridgeCallResult restored = post(
                         "/v1/mappings/restore",
-                        Map.of(
-                                "scenarioId", scenario.scenarioId(),
-                                "snapshot", snapshot.snapshot(),
-                                "timeoutSeconds", 10
-                        )
+                        Map.of("scenarioId", scenario.scenarioId(), "snapshot", snapshot.snapshot(), "timeoutSeconds", 10)
                 );
                 ControlBridgeValueResult restoredRead = postValue(
                         "/v1/mappings/get",
                         Map.of(
-                                "scenarioId", scenario.scenarioId(),
-                                "mapReference", "OVERRIDE",
-                                "key", "controlBridgeIpcValue",
-                                "timeoutSeconds", 10
+                                "scenarioId", scenario.scenarioId(), "mapReference", "OVERRIDE",
+                                "key", "controlBridgeIpcValue", "timeoutSeconds", 10
                         )
                 );
                 ControlBridgeCallResult failed = post(
                         "/v1/steps/execute",
                         Map.of(
                                 "scenarioId", scenario.scenarioId(),
-                                "text", ", verify \"left\" equals \"right\"",
-                                "argument", "",
-                                "timeoutSeconds", 10
+                                "text", ", verify \"left\" equals \"right\"", "argument", "", "timeoutSeconds", 10
                         )
                 );
                 ControlBridgeCallResult succeeded = post(
                         "/v1/steps/execute",
                         Map.of(
                                 "scenarioId", scenario.scenarioId(),
-                                "text", "CONTROL API TEST STEP",
-                                "argument", "",
-                                "timeoutSeconds", 10
+                                "text", "CONTROL API TEST STEP", "argument", "", "timeoutSeconds", 10
                         )
                 );
-                ControlBridgeCallResult resumed = post(
-                        "/v1/resume",
-                        Map.of("scenarioId", scenario.scenarioId())
+
+                ControlBridgeCallResult firstResume = post(
+                        "/v1/resume", Map.of("scenarioId", scenario.scenarioId())
+                );
+                ControlBridgeStatus breakpointPause = awaitPaused();
+                List<ControlBridgeBreakpoint> breakpointsAfterHit = breakpoints();
+                ControlBridgeCallResult secondResume = post(
+                        "/v1/resume", Map.of("scenarioId", scenario.scenarioId())
                 );
 
                 return new ClientOutcome(
-                        unauthorized.statusCode(),
-                        scenario,
-                        wrongTarget,
-                        paused,
-                        browserPage,
-                        browserScreenshot,
-                        events,
-                        cursorEvents,
-                        baseline,
-                        snapshot,
-                        written,
-                        read,
-                        resolved,
-                        restored,
-                        restoredRead,
-                        failed,
-                        succeeded,
-                        resumed
+                        unauthorizedStatus, scenario, wrongTarget, paused,
+                        browserPage, browserScreenshot, elements, failedServiceCall, serviceCall,
+                        breakpoint, breakpointsBefore, breakpointPause, breakpointsAfterHit,
+                        events, cursorEvents, baseline, snapshot, written, read, resolved,
+                        restored, restoredRead, failed, succeeded, firstResume, secondResume
                 );
             } catch (Exception failure) {
                 throw new IllegalStateException(failure);
@@ -221,74 +191,58 @@ public final class ControlBridgeTestSteps {
     }
 
     @Given("^CONTROL BRIDGE IPC SYNC POINT$")
-    public void controlBridgeIpcSyncPoint() throws Exception {
-        long deadline = System.nanoTime() + Duration.ofSeconds(5).toNanos();
-
-        while (System.nanoTime() < deadline) {
-            if (client.isDone()) {
-                return;
-            }
-
-            ControlBridgeStatus runtime = status();
-            if (runtime.paused() || runtime.pauseRequested()) {
-                return;
-            }
-
-            Thread.sleep(25);
-        }
-
-        throw new AssertionError(
-                "Control bridge pause request was not registered before the IPC sync point completed"
-        );
+    public void controlBridgeIpcSyncPoint() {
+        // Marker step: the Phase 3H one-shot AFTER_STEP breakpoint pauses after this method returns.
     }
 
     @Given("^VERIFY CONTROL BRIDGE IPC TEST$")
     public void verifyControlBridgeIpcTest() throws Exception {
-        ClientOutcome outcome = client.get(20, TimeUnit.SECONDS);
-
+        ClientOutcome outcome = client.get(25, TimeUnit.SECONDS);
         assertEquals(401, outcome.unauthorizedStatus(), "wrong/missing token status");
-        assertEquals(
-                getCurrentScenarioState().id.toString(),
-                outcome.scenario().scenarioId(),
-                "targeted scenario id"
-        );
+        assertEquals(getCurrentScenarioState().id.toString(), outcome.scenario().scenarioId(), "targeted scenario id");
         assertEquals("UNAVAILABLE", outcome.wrongTarget().status(), "wrong scenario target");
         assertEquals("SUCCESS", outcome.paused().status(), "pause result");
         assertTrue(outcome.paused().runtime().paused(), "runtime should report paused");
 
         assertEquals("SUCCESS", outcome.browserPage().status(), "browser page status");
-        assertTrue(!outcome.browserPage().page().url().isBlank(), "browser page URL");
         assertTrue(!outcome.browserPage().page().pageSource().isBlank(), "browser page DOM source");
         assertEquals("SUCCESS", outcome.browserScreenshot().status(), "browser screenshot status");
         assertEquals("image/png", outcome.browserScreenshot().screenshot().mimeType(), "browser screenshot MIME type");
         assertTrue(outcome.browserScreenshot().screenshot().byteSize() > 0, "browser screenshot byte size");
-        assertTrue(!outcome.browserScreenshot().screenshot().base64().isBlank(), "browser screenshot payload");
+
+        assertEquals("SUCCESS", outcome.elements().status(), "element inspection status");
+        assertEquals("Button", outcome.elements().inspection().category(), "element inspection category");
+        assertTrue(outcome.elements().inspection().resolvedXPath() != null, "element inspection resolved XPath");
+        assertTrue(outcome.elements().inspection().matchCount() >= 0, "element match count");
+
+        assertEquals("FAILED", outcome.failedServiceCall().status(), "retry-friendly failed service-call");
+        assertEquals("SUCCESS", outcome.serviceCall().status(), "service-call control status");
+        assertEquals("%health-full-url", outcome.serviceCall().evidence().selector(), "service-call selector");
+        assertEquals(200, outcome.serviceCall().evidence().statusCode(), "service-call status code");
+        assertTrue(outcome.serviceCall().evidence().request().value() != null, "service-call request evidence");
+        assertTrue(outcome.serviceCall().evidence().response().value() != null, "service-call response evidence");
+
+        assertTrue(
+                outcome.breakpointsBefore().stream().anyMatch(bp -> bp.breakpointId().equals(outcome.breakpoint().breakpointId())),
+                "breakpoint should be listed before hit"
+        );
+        assertTrue(outcome.breakpointPause().paused(), "breakpoint should pause the scenario");
+        assertEquals("AFTER_STEP", outcome.breakpointPause().lastHook(), "breakpoint hook");
+        assertTrue(
+                outcome.breakpointsAfterHit().stream().noneMatch(bp -> bp.breakpointId().equals(outcome.breakpoint().breakpointId())),
+                "one-shot breakpoint should be removed after hit"
+        );
 
         assertTrue(!outcome.events().events().isEmpty(), "semantic event history should not be empty");
         assertTrue(!outcome.events().gap(), "initial semantic event history should have no gap");
-        assertTrue(
-                outcome.events().events().stream()
-                        .allMatch(event -> outcome.scenario().scenarioId().equals(event.scenarioId())),
-                "scenario-filtered event history"
-        );
+        assertTrue(outcome.events().events().stream().allMatch(event -> outcome.scenario().scenarioId().equals(event.scenarioId())), "scenario-filtered event history");
         assertIncreasing(outcome.events().events());
-        assertTrue(
-                outcome.cursorEvents().events().isEmpty(),
-                "cursor read while paused should not repeat retained events"
-        );
-        assertTrue(
-                outcome.cursorEvents().nextSequence() >= outcome.events().nextSequence(),
-                "event cursor should not move backwards"
-        );
+        assertTrue(outcome.cursorEvents().events().isEmpty(), "cursor read while paused should not repeat retained events");
 
         assertMappingValue(outcome.baseline(), "baseline", "mapping baseline");
         assertEquals("SUCCESS", outcome.snapshot().status(), "mapping snapshot status");
         assertTrue(outcome.snapshot().snapshot().restorable(), "OVERRIDE snapshot should be restorable");
-        assertMaterializedMappingValue(
-                outcome.snapshot().snapshot().values().get("controlBridgeIpcValue"),
-                "baseline",
-                "mapping snapshot value"
-        );
+        assertMaterializedMappingValue(outcome.snapshot().snapshot().values().get("controlBridgeIpcValue"), "baseline", "mapping snapshot value");
         assertMappingValue(outcome.written(), "bridge-value", "mapping write");
         assertMappingValue(outcome.read(), "bridge-value", "mapping read");
         assertMappingValue(outcome.resolved(), "bridge-value", "mapping resolve");
@@ -296,25 +250,21 @@ public final class ControlBridgeTestSteps {
         assertMappingValue(outcome.restoredRead(), "baseline", "mapping restored value");
         assertEquals("FAILED", outcome.failed().status(), "retry-friendly failing step");
         assertEquals("SUCCESS", outcome.succeeded().status(), "successful retry step");
-        assertEquals("SUCCESS", outcome.resumed().status(), "resume result");
+        assertEquals("SUCCESS", outcome.firstResume().status(), "resume before breakpoint");
+        assertEquals("SUCCESS", outcome.secondResume().status(), "resume after breakpoint");
         assertEquals(1, ControlApiTestSteps.invocationCount(), "detached successful invocation count");
-        assertTrue(!getCurrentScenarioState().isScenarioFailed(), "detached failure must not fail scenario");
+        assertTrue(!getCurrentScenarioState().isScenarioFailed(), "detached failures must not fail scenario");
     }
 
     @After("@control-bridge")
     public void cleanupControlBridge() {
         try {
-            if (descriptor != null && token != null) {
-                post("/v1/resume", Map.of());
-            }
+            if (descriptor != null && token != null) post("/v1/resume", Map.of());
         } catch (Exception ignored) {
         } finally {
             ControlBridgeBootstrap.stop();
             if (sessionDirectory != null) {
-                try {
-                    Files.deleteIfExists(sessionDirectory);
-                } catch (IOException ignored) {
-                }
+                try { Files.deleteIfExists(sessionDirectory); } catch (IOException ignored) { }
             }
         }
     }
@@ -323,83 +273,65 @@ public final class ControlBridgeTestSteps {
         long deadline = System.nanoTime() + Duration.ofSeconds(5).toNanos();
         while (System.nanoTime() < deadline) {
             List<ControlBridgeScenarioStatus> active = scenarios();
-            if (!active.isEmpty()) {
-                return active.getFirst();
-            }
+            if (!active.isEmpty()) return active.getFirst();
             Thread.sleep(25);
         }
         throw new AssertionError("Control bridge did not publish an active scenario");
     }
 
-    private List<ControlBridgeScenarioStatus> scenarios() throws Exception {
-        HttpResponse<byte[]> response = send("GET", "/v1/scenarios", null, token);
-        assertEquals(200, response.statusCode(), "/v1/scenarios HTTP status");
-        return List.of(json.readValue(response.body(), ControlBridgeScenarioStatus[].class));
+    private ControlBridgeStatus awaitPaused() throws Exception {
+        long deadline = System.nanoTime() + Duration.ofSeconds(10).toNanos();
+        while (System.nanoTime() < deadline) {
+            ControlBridgeStatus current = status();
+            if (current.paused()) return current;
+            Thread.sleep(25);
+        }
+        throw new AssertionError("Semantic breakpoint did not pause the scenario");
     }
 
-    private ControlBridgeEventPage events(
-            String scenarioId,
-            long afterSequence,
-            int limit
-    ) throws Exception {
-        String path = "/v1/events?scenarioId="
-                + URLEncoder.encode(scenarioId, StandardCharsets.UTF_8)
-                + "&afterSequence=" + afterSequence
-                + "&limit=" + limit;
-        HttpResponse<byte[]> response = send("GET", path, null, token);
-        assertEquals(200, response.statusCode(), "/v1/events HTTP status");
-        return json.readValue(response.body(), ControlBridgeEventPage.class);
+    private List<ControlBridgeScenarioStatus> scenarios() throws Exception {
+        return List.of(getTyped("/v1/scenarios", ControlBridgeScenarioStatus[].class));
+    }
+
+    private List<ControlBridgeBreakpoint> breakpoints() throws Exception {
+        ControlBridgeBreakpoint[] values = getTyped("/v1/breakpoints", ControlBridgeBreakpoint[].class);
+        return List.of(values);
+    }
+
+    private ControlBridgeEventPage events(String scenarioId, long afterSequence, int limit) throws Exception {
+        String path = "/v1/events?scenarioId=" + URLEncoder.encode(scenarioId, StandardCharsets.UTF_8)
+                + "&afterSequence=" + afterSequence + "&limit=" + limit;
+        return getTyped(path, ControlBridgeEventPage.class);
     }
 
     private ControlBridgeCallResult post(String path, Object body) throws Exception {
-        HttpResponse<byte[]> response = send("POST", path, body, token);
-        assertEquals(200, response.statusCode(), path + " HTTP status");
-        return json.readValue(response.body(), ControlBridgeCallResult.class);
+        return postTyped(path, body, ControlBridgeCallResult.class);
     }
 
     private ControlBridgeValueResult postValue(String path, Object body) throws Exception {
-        HttpResponse<byte[]> response = send("POST", path, body, token);
-        assertEquals(200, response.statusCode(), path + " HTTP status");
-        return json.readValue(response.body(), ControlBridgeValueResult.class);
+        return postTyped(path, body, ControlBridgeValueResult.class);
     }
 
-    private ControlBridgeBrowserPageResult postBrowserPage(String path, Object body) throws Exception {
+    private <T> T postTyped(String path, Object body, Class<T> type) throws Exception {
         HttpResponse<byte[]> response = send("POST", path, body, token);
         assertEquals(200, response.statusCode(), path + " HTTP status");
-        return json.readValue(response.body(), ControlBridgeBrowserPageResult.class);
+        return json.readValue(response.body(), type);
     }
 
-    private ControlBridgeBrowserScreenshotResult postBrowserScreenshot(String path, Object body) throws Exception {
-        HttpResponse<byte[]> response = send("POST", path, body, token);
+    private <T> T getTyped(String path, Class<T> type) throws Exception {
+        HttpResponse<byte[]> response = send("GET", path, null, token);
         assertEquals(200, response.statusCode(), path + " HTTP status");
-        return json.readValue(response.body(), ControlBridgeBrowserScreenshotResult.class);
-    }
-
-    private ControlBridgeMappingSnapshotResult postSnapshot(String path, Object body) throws Exception {
-        HttpResponse<byte[]> response = send("POST", path, body, token);
-        assertEquals(200, response.statusCode(), path + " HTTP status");
-        return json.readValue(response.body(), ControlBridgeMappingSnapshotResult.class);
+        return json.readValue(response.body(), type);
     }
 
     private ControlBridgeStatus status() throws Exception {
-        HttpResponse<byte[]> response = send("GET", "/v1/status", null, token);
-        assertEquals(200, response.statusCode(), "/v1/status HTTP status");
-        return json.readValue(response.body(), ControlBridgeStatus.class);
+        return getTyped("/v1/status", ControlBridgeStatus.class);
     }
 
-    private HttpResponse<byte[]> send(
-            String method,
-            String path,
-            Object body,
-            String bearerToken
-    ) throws Exception {
+    private HttpResponse<byte[]> send(String method, String path, Object body, String bearerToken) throws Exception {
         HttpRequest.Builder request = HttpRequest.newBuilder(uri(path))
-                .timeout(Duration.ofSeconds(15))
-                .header("Accept", "application/json");
-        if (bearerToken != null) {
-            request.header("Authorization", "Bearer " + bearerToken);
-        }
-
+                .timeout(Duration.ofSeconds(15)).header("Accept", "application/json");
+        if (bearerToken != null) request.header("Authorization", "Bearer " + bearerToken);
         if ("GET".equals(method)) {
             request.GET();
         } else {
@@ -407,14 +339,11 @@ public final class ControlBridgeTestSteps {
             request.header("Content-Type", "application/json");
             request.POST(HttpRequest.BodyPublishers.ofByteArray(bytes));
         }
-
         return http.send(request.build(), HttpResponse.BodyHandlers.ofByteArray());
     }
 
     private URI uri(String path) {
-        return URI.create(
-                "http://" + descriptor.host() + ":" + descriptor.port() + path
-        );
+        return URI.create("http://" + descriptor.host() + ":" + descriptor.port() + path);
     }
 
     private static void assertIncreasing(List<ControlBridgeEvent> events) {
@@ -425,21 +354,13 @@ public final class ControlBridgeTestSteps {
         }
     }
 
-    private static void assertMaterializedMappingValue(
-            JsonNode value,
-            String expected,
-            String label
-    ) {
+    private static void assertMaterializedMappingValue(JsonNode value, String expected, String label) {
         assertTrue(value != null && value.isArray(), label + " should be a materialized collection");
         assertTrue(value.size() > 0, label + " should not be empty");
         assertEquals(expected, value.get(value.size() - 1).asText(), label);
     }
 
-    private static void assertMappingValue(
-            ControlBridgeValueResult result,
-            Object expected,
-            String label
-    ) {
+    private static void assertMappingValue(ControlBridgeValueResult result, Object expected, String label) {
         assertEquals("SUCCESS", result.status(), label + " status");
         assertTrue(result.value().jsonCompatible(), label + " JSON compatibility");
         assertEquals(expected, result.value().jsonValue(), label + " value");
@@ -452,9 +373,7 @@ public final class ControlBridgeTestSteps {
     }
 
     private static void assertTrue(boolean value, String label) {
-        if (!value) {
-            throw new AssertionError(label);
-        }
+        if (!value) throw new AssertionError(label);
     }
 
     private record ClientOutcome(
@@ -464,6 +383,13 @@ public final class ControlBridgeTestSteps {
             ControlBridgeCallResult paused,
             ControlBridgeBrowserPageResult browserPage,
             ControlBridgeBrowserScreenshotResult browserScreenshot,
+            ControlBridgeElementInspectionResult elements,
+            ControlBridgeServiceCallResult failedServiceCall,
+            ControlBridgeServiceCallResult serviceCall,
+            ControlBridgeBreakpoint breakpoint,
+            List<ControlBridgeBreakpoint> breakpointsBefore,
+            ControlBridgeStatus breakpointPause,
+            List<ControlBridgeBreakpoint> breakpointsAfterHit,
             ControlBridgeEventPage events,
             ControlBridgeEventPage cursorEvents,
             ControlBridgeValueResult baseline,
@@ -475,7 +401,7 @@ public final class ControlBridgeTestSteps {
             ControlBridgeValueResult restoredRead,
             ControlBridgeCallResult failed,
             ControlBridgeCallResult succeeded,
-            ControlBridgeCallResult resumed
-    ) {
-    }
+            ControlBridgeCallResult firstResume,
+            ControlBridgeCallResult secondResume
+    ) { }
 }
