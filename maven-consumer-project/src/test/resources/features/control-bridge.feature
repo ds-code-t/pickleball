@@ -1,5 +1,5 @@
 
-@all @control-bridge
+@all @smoke @control-bridge
 Feature: Pickleball Studio control bridge
 
   Scenario: Paused runtime accepts retry-friendly detached control

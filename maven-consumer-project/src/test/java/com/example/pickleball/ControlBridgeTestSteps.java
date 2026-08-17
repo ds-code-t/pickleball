@@ -1,9 +1,12 @@
 package com.example.pickleball;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.cucumber.java.After;
 import io.cucumber.java.en.Given;
 import tools.dscode.control.bridge.ControlBridgeBootstrap;
+import tools.dscode.control.bridge.ControlBridgeBrowserPageResult;
+import tools.dscode.control.bridge.ControlBridgeBrowserScreenshotResult;
 import tools.dscode.control.bridge.ControlBridgeCallResult;
 import tools.dscode.control.bridge.ControlBridgeDescriptor;
 import tools.dscode.control.bridge.ControlBridgeEvent;
@@ -12,6 +15,7 @@ import tools.dscode.control.bridge.ControlBridgeMappingSnapshotResult;
 import tools.dscode.control.bridge.ControlBridgeScenarioStatus;
 import tools.dscode.control.bridge.ControlBridgeStatus;
 import tools.dscode.control.bridge.ControlBridgeValueResult;
+import tools.dscode.coredefinitions.BrowserSteps;
 
 import java.io.IOException;
 import java.net.URI;
@@ -45,6 +49,7 @@ public final class ControlBridgeTestSteps {
     @Given("^BEGIN CONTROL BRIDGE IPC TEST$")
     public void beginControlBridgeIpcTest() throws Exception {
         ControlApiTestSteps.reset();
+        BrowserSteps.getCurrentDriver();
         sessionDirectory = Files.createTempDirectory("pkb-control-bridge-");
         token = "test-" + UUID.randomUUID();
         descriptor = ControlBridgeBootstrap.start(
@@ -78,6 +83,20 @@ public final class ControlBridgeTestSteps {
                                 "scenarioId", scenario.scenarioId(),
                                 "waitSeconds", 10,
                                 "leaseSeconds", 30
+                        )
+                );
+                ControlBridgeBrowserPageResult browserPage = postBrowserPage(
+                        "/v1/browser/page",
+                        Map.of(
+                                "scenarioId", scenario.scenarioId(),
+                                "timeoutSeconds", 10
+                        )
+                );
+                ControlBridgeBrowserScreenshotResult browserScreenshot = postBrowserScreenshot(
+                        "/v1/browser/screenshot",
+                        Map.of(
+                                "scenarioId", scenario.scenarioId(),
+                                "timeoutSeconds", 10
                         )
                 );
                 ControlBridgeEventPage events = events(
@@ -180,6 +199,8 @@ public final class ControlBridgeTestSteps {
                         scenario,
                         wrongTarget,
                         paused,
+                        browserPage,
+                        browserScreenshot,
                         events,
                         cursorEvents,
                         baseline,
@@ -235,6 +256,14 @@ public final class ControlBridgeTestSteps {
         assertEquals("SUCCESS", outcome.paused().status(), "pause result");
         assertTrue(outcome.paused().runtime().paused(), "runtime should report paused");
 
+        assertEquals("SUCCESS", outcome.browserPage().status(), "browser page status");
+        assertTrue(!outcome.browserPage().page().url().isBlank(), "browser page URL");
+        assertTrue(!outcome.browserPage().page().pageSource().isBlank(), "browser page DOM source");
+        assertEquals("SUCCESS", outcome.browserScreenshot().status(), "browser screenshot status");
+        assertEquals("image/png", outcome.browserScreenshot().screenshot().mimeType(), "browser screenshot MIME type");
+        assertTrue(outcome.browserScreenshot().screenshot().byteSize() > 0, "browser screenshot byte size");
+        assertTrue(!outcome.browserScreenshot().screenshot().base64().isBlank(), "browser screenshot payload");
+
         assertTrue(!outcome.events().events().isEmpty(), "semantic event history should not be empty");
         assertTrue(!outcome.events().gap(), "initial semantic event history should have no gap");
         assertTrue(
@@ -255,9 +284,9 @@ public final class ControlBridgeTestSteps {
         assertMappingValue(outcome.baseline(), "baseline", "mapping baseline");
         assertEquals("SUCCESS", outcome.snapshot().status(), "mapping snapshot status");
         assertTrue(outcome.snapshot().snapshot().restorable(), "OVERRIDE snapshot should be restorable");
-        assertEquals(
+        assertMaterializedMappingValue(
+                outcome.snapshot().snapshot().values().get("controlBridgeIpcValue"),
                 "baseline",
-                outcome.snapshot().snapshot().values().get("controlBridgeIpcValue").asText(),
                 "mapping snapshot value"
         );
         assertMappingValue(outcome.written(), "bridge-value", "mapping write");
@@ -334,6 +363,18 @@ public final class ControlBridgeTestSteps {
         return json.readValue(response.body(), ControlBridgeValueResult.class);
     }
 
+    private ControlBridgeBrowserPageResult postBrowserPage(String path, Object body) throws Exception {
+        HttpResponse<byte[]> response = send("POST", path, body, token);
+        assertEquals(200, response.statusCode(), path + " HTTP status");
+        return json.readValue(response.body(), ControlBridgeBrowserPageResult.class);
+    }
+
+    private ControlBridgeBrowserScreenshotResult postBrowserScreenshot(String path, Object body) throws Exception {
+        HttpResponse<byte[]> response = send("POST", path, body, token);
+        assertEquals(200, response.statusCode(), path + " HTTP status");
+        return json.readValue(response.body(), ControlBridgeBrowserScreenshotResult.class);
+    }
+
     private ControlBridgeMappingSnapshotResult postSnapshot(String path, Object body) throws Exception {
         HttpResponse<byte[]> response = send("POST", path, body, token);
         assertEquals(200, response.statusCode(), path + " HTTP status");
@@ -384,6 +425,16 @@ public final class ControlBridgeTestSteps {
         }
     }
 
+    private static void assertMaterializedMappingValue(
+            JsonNode value,
+            String expected,
+            String label
+    ) {
+        assertTrue(value != null && value.isArray(), label + " should be a materialized collection");
+        assertTrue(value.size() > 0, label + " should not be empty");
+        assertEquals(expected, value.get(value.size() - 1).asText(), label);
+    }
+
     private static void assertMappingValue(
             ControlBridgeValueResult result,
             Object expected,
@@ -411,6 +462,8 @@ public final class ControlBridgeTestSteps {
             ControlBridgeScenarioStatus scenario,
             ControlBridgeCallResult wrongTarget,
             ControlBridgeCallResult paused,
+            ControlBridgeBrowserPageResult browserPage,
+            ControlBridgeBrowserScreenshotResult browserScreenshot,
             ControlBridgeEventPage events,
             ControlBridgeEventPage cursorEvents,
             ControlBridgeValueResult baseline,
