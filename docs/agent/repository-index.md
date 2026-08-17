@@ -402,7 +402,10 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-control-api/src/main/java/tools/dscode/control/bridge/ControlBridgeDescriptor.java`
 - `pickleball-control-api/src/main/java/tools/dscode/control/bridge/ControlBridgeError.java`
 - `pickleball-control-api/src/main/java/tools/dscode/control/bridge/ControlBridgeRuntime.java`
+- `pickleball-control-api/src/main/java/tools/dscode/control/bridge/ControlBridgeScenarioStatus.java`
 - `pickleball-control-api/src/main/java/tools/dscode/control/bridge/ControlBridgeStatus.java`
+- `pickleball-control-api/src/main/java/tools/dscode/control/bridge/ControlBridgeValue.java`
+- `pickleball-control-api/src/main/java/tools/dscode/control/bridge/ControlBridgeValueResult.java`
 
 ## Pickleball Studio module
 
@@ -447,6 +450,9 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-studio/src/main/java/tools/dscode/studio/runtime/RuntimeBridgeStatus.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/runtime/RuntimeControlResult.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/runtime/RuntimeLaunchResult.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/runtime/RuntimeScenarioStatus.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/runtime/RuntimeValue.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/runtime/RuntimeValueResult.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/StudioApplication.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/workspace/TextSearchMatch.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/workspace/WorkspaceEntry.java`
@@ -464,6 +470,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-studio/src/test/java/tools/dscode/studio/process/ManagedProcessFixture.java`
 - `pickleball-studio/src/test/java/tools/dscode/studio/process/ManagedProcessServiceTest.java`
 - `pickleball-studio/src/test/java/tools/dscode/studio/process/WorkspaceProcessServiceTest.java`
+- `pickleball-studio/src/test/java/tools/dscode/studio/runtime/RuntimeBridgeClientTest.java`
 - `pickleball-studio/src/test/java/tools/dscode/studio/runtime/RuntimeBridgeServiceTest.java`
 - `pickleball-studio/src/test/java/tools/dscode/studio/StudioApplicationTest.java`
 - `pickleball-studio/src/test/java/tools/dscode/studio/workspace/WorkspaceFileServiceTest.java`

@@ -1,4 +1,3 @@
-
 package com.example.pickleball;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -7,7 +6,9 @@ import io.cucumber.java.en.Given;
 import tools.dscode.control.bridge.ControlBridgeBootstrap;
 import tools.dscode.control.bridge.ControlBridgeCallResult;
 import tools.dscode.control.bridge.ControlBridgeDescriptor;
+import tools.dscode.control.bridge.ControlBridgeScenarioStatus;
 import tools.dscode.control.bridge.ControlBridgeStatus;
+import tools.dscode.control.bridge.ControlBridgeValueResult;
 
 import java.io.IOException;
 import java.net.URI;
@@ -17,6 +18,7 @@ import java.net.http.HttpResponse;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -56,13 +58,54 @@ public final class ControlBridgeTestSteps {
                         null
                 );
 
+                ControlBridgeScenarioStatus scenario = awaitScenario();
+                ControlBridgeCallResult wrongTarget = post(
+                        "/v1/pause",
+                        Map.of(
+                                "scenarioId", UUID.randomUUID().toString(),
+                                "waitSeconds", 1,
+                                "leaseSeconds", 30
+                        )
+                );
                 ControlBridgeCallResult paused = post(
                         "/v1/pause",
-                        Map.of("waitSeconds", 10, "leaseSeconds", 30)
+                        Map.of(
+                                "scenarioId", scenario.scenarioId(),
+                                "waitSeconds", 10,
+                                "leaseSeconds", 30
+                        )
+                );
+                ControlBridgeValueResult written = postValue(
+                        "/v1/mappings/put",
+                        Map.of(
+                                "scenarioId", scenario.scenarioId(),
+                                "mapReference", "OVERRIDE",
+                                "key", "controlBridgeIpcValue",
+                                "value", "bridge-value",
+                                "timeoutSeconds", 10
+                        )
+                );
+                ControlBridgeValueResult read = postValue(
+                        "/v1/mappings/get",
+                        Map.of(
+                                "scenarioId", scenario.scenarioId(),
+                                "mapReference", "OVERRIDE",
+                                "key", "controlBridgeIpcValue",
+                                "timeoutSeconds", 10
+                        )
+                );
+                ControlBridgeValueResult resolved = postValue(
+                        "/v1/mappings/resolve",
+                        Map.of(
+                                "scenarioId", scenario.scenarioId(),
+                                "input", "<controlBridgeIpcValue>",
+                                "timeoutSeconds", 10
+                        )
                 );
                 ControlBridgeCallResult failed = post(
                         "/v1/steps/execute",
                         Map.of(
+                                "scenarioId", scenario.scenarioId(),
                                 "text", ", verify \"left\" equals \"right\"",
                                 "argument", "",
                                 "timeoutSeconds", 10
@@ -71,16 +114,25 @@ public final class ControlBridgeTestSteps {
                 ControlBridgeCallResult succeeded = post(
                         "/v1/steps/execute",
                         Map.of(
+                                "scenarioId", scenario.scenarioId(),
                                 "text", "CONTROL API TEST STEP",
                                 "argument", "",
                                 "timeoutSeconds", 10
                         )
                 );
-                ControlBridgeCallResult resumed = post("/v1/resume", Map.of());
+                ControlBridgeCallResult resumed = post(
+                        "/v1/resume",
+                        Map.of("scenarioId", scenario.scenarioId())
+                );
 
                 return new ClientOutcome(
                         unauthorized.statusCode(),
+                        scenario,
+                        wrongTarget,
                         paused,
+                        written,
+                        read,
+                        resolved,
                         failed,
                         succeeded,
                         resumed
@@ -118,8 +170,17 @@ public final class ControlBridgeTestSteps {
         ClientOutcome outcome = client.get(20, TimeUnit.SECONDS);
 
         assertEquals(401, outcome.unauthorizedStatus(), "wrong/missing token status");
+        assertEquals(
+                getCurrentScenarioState().id.toString(),
+                outcome.scenario().scenarioId(),
+                "targeted scenario id"
+        );
+        assertEquals("UNAVAILABLE", outcome.wrongTarget().status(), "wrong scenario target");
         assertEquals("SUCCESS", outcome.paused().status(), "pause result");
         assertTrue(outcome.paused().runtime().paused(), "runtime should report paused");
+        assertMappingValue(outcome.written(), "bridge-value", "mapping write");
+        assertMappingValue(outcome.read(), "bridge-value", "mapping read");
+        assertMappingValue(outcome.resolved(), "bridge-value", "mapping resolve");
         assertEquals("FAILED", outcome.failed().status(), "retry-friendly failing step");
         assertEquals("SUCCESS", outcome.succeeded().status(), "successful retry step");
         assertEquals("SUCCESS", outcome.resumed().status(), "resume result");
@@ -145,10 +206,34 @@ public final class ControlBridgeTestSteps {
         }
     }
 
+    private ControlBridgeScenarioStatus awaitScenario() throws Exception {
+        long deadline = System.nanoTime() + Duration.ofSeconds(5).toNanos();
+        while (System.nanoTime() < deadline) {
+            List<ControlBridgeScenarioStatus> active = scenarios();
+            if (!active.isEmpty()) {
+                return active.getFirst();
+            }
+            Thread.sleep(25);
+        }
+        throw new AssertionError("Control bridge did not publish an active scenario");
+    }
+
+    private List<ControlBridgeScenarioStatus> scenarios() throws Exception {
+        HttpResponse<byte[]> response = send("GET", "/v1/scenarios", null, token);
+        assertEquals(200, response.statusCode(), "/v1/scenarios HTTP status");
+        return List.of(json.readValue(response.body(), ControlBridgeScenarioStatus[].class));
+    }
+
     private ControlBridgeCallResult post(String path, Object body) throws Exception {
         HttpResponse<byte[]> response = send("POST", path, body, token);
         assertEquals(200, response.statusCode(), path + " HTTP status");
         return json.readValue(response.body(), ControlBridgeCallResult.class);
+    }
+
+    private ControlBridgeValueResult postValue(String path, Object body) throws Exception {
+        HttpResponse<byte[]> response = send("POST", path, body, token);
+        assertEquals(200, response.statusCode(), path + " HTTP status");
+        return json.readValue(response.body(), ControlBridgeValueResult.class);
     }
 
     private ControlBridgeStatus status() throws Exception {
@@ -187,6 +272,16 @@ public final class ControlBridgeTestSteps {
         );
     }
 
+    private static void assertMappingValue(
+            ControlBridgeValueResult result,
+            Object expected,
+            String label
+    ) {
+        assertEquals("SUCCESS", result.status(), label + " status");
+        assertTrue(result.value().jsonCompatible(), label + " JSON compatibility");
+        assertEquals(expected, result.value().jsonValue(), label + " value");
+    }
+
     private static void assertEquals(Object expected, Object actual, String label) {
         if (!java.util.Objects.equals(expected, actual)) {
             throw new AssertionError(label + ": expected " + expected + " but was " + actual);
@@ -201,7 +296,12 @@ public final class ControlBridgeTestSteps {
 
     private record ClientOutcome(
             int unauthorizedStatus,
+            ControlBridgeScenarioStatus scenario,
+            ControlBridgeCallResult wrongTarget,
             ControlBridgeCallResult paused,
+            ControlBridgeValueResult written,
+            ControlBridgeValueResult read,
+            ControlBridgeValueResult resolved,
             ControlBridgeCallResult failed,
             ControlBridgeCallResult succeeded,
             ControlBridgeCallResult resumed

@@ -1,7 +1,7 @@
 
 # Pickleball Studio runtime bridge
 
-Pickleball Studio can opt a managed test run into a private bridge between the Studio JVM and the consumer test JVM. The bridge lets Studio, MCP clients, and later GUI integrations inspect a live Pickleball scenario, pause it at a semantic control boundary, execute retry-friendly detached steps through the existing dynamic-control API, and resume normal traversal.
+Pickleball Studio can opt a managed test run into a private bridge between the Studio JVM and the consumer test JVM. The bridge lets Studio, MCP clients, and later GUI integrations inspect live Pickleball scenarios, target one scenario during parallel execution, pause it at a semantic control boundary, inspect or mutate live mappings, execute retry-friendly detached steps through the existing dynamic-control API, and resume normal traversal.
 
 The bridge is **not** enabled by merely depending on Pickleball. Ordinary Maven/Gradle runs, normal Studio `maven_start` / `gradle_start` calls, and the desktop **Run Tests** action retain their existing behavior.
 
@@ -64,13 +64,17 @@ Authorization: Bearer <session-token>
 
 The bridge accepts loopback traffic only. The token is generated per Studio runtime session and retained by the owning Studio process. Bridge responses are marked `Cache-Control: no-store`.
 
-The initial bridge endpoints are:
+The current bridge endpoints are:
 
 ```text
 GET  /v1/status
+GET  /v1/scenarios
 POST /v1/pause
 POST /v1/resume
 POST /v1/steps/execute
+POST /v1/mappings/get
+POST /v1/mappings/put
+POST /v1/mappings/resolve
 ```
 
 This protocol is internal to the Studio/Pickleball integration. MCP clients should use Studio's `runtime_*` tools instead of connecting to the consumer bridge directly.
@@ -105,16 +109,41 @@ When the lease expires, scenario execution resumes automatically. A pause reques
 
 `runtime_resume` is idempotent.
 
-## Parallel scenarios
+## Parallel scenarios and explicit targeting
 
-A bridge process may observe more than one scenario thread. Phase 3A avoids guessing which one a controller intended.
+A bridge process may observe more than one scenario thread. `runtime_scenarios` returns every currently active scenario with its stable scenario id for that scenario run, thread id, current step/phrase text, latest semantic hook, and pause state.
 
-A control command is accepted when:
+`runtime_pause`, `runtime_resume`, `runtime_execute_step`, and the mapping tools accept an optional `scenarioId`. When several scenarios are active, callers should pass the id returned by `runtime_scenarios`. A wrong or stale id returns `UNAVAILABLE`; the bridge does not guess.
 
-- exactly one scenario is active; or
-- exactly one scenario is already paused.
+The original unqualified behavior remains for compatibility: a command can omit `scenarioId` when exactly one scenario is active or exactly one scenario is already uniquely paused. An unqualified pause requested before any scenario has started still applies to the next observed scenario.
 
-If several scenarios are active and none is uniquely selected by a pause, the bridge returns `UNAVAILABLE`. A later phase may add explicit scenario/thread targeting.
+
+## Live mapping control
+
+Phase 3B adds direct mapping operations on the selected scenario thread:
+
+```text
+runtime_mapping_get
+runtime_mapping_put
+runtime_mapping_resolve
+```
+
+`runtime_mapping_get` reads one key from a live `NodeMap` reference such as `OVERRIDE`, `RUN`, `STEP`, `PARENT.STEP`, or `SCENARIO`. `runtime_mapping_put` writes one value to that live map. `runtime_mapping_resolve` resolves an input through the scenario's current `ParsingMap`, preserving the normal Pickleball resolution order.
+
+`runtime_mapping_put` accepts the value as one JSON literal so its intended type crosses the Studio/process boundary explicitly. Examples include:
+
+```text
+"READY"
+3
+true
+null
+[1,2]
+{"a":1}
+```
+
+Mapping results use a safe value envelope containing the runtime type, a clipped text representation, and a structured `jsonValue` only when the value is JSON-compatible. Arbitrary consumer objects are not generically serialized. This keeps direct mapping inspection deterministic without turning the bridge into an unrestricted object serializer.
+
+These operations mutate the same live maps used by normal execution. They are intentionally not rolled back automatically. Mapping snapshots/file transfer remain a separate later capability.
 
 ## Retry-friendly detached execution
 
@@ -142,15 +171,19 @@ Effects that happened before a failed detached call are not rolled back.
 
 ## Studio MCP flow
 
-Phase 3A adds six MCP tools, bringing the Studio tool count to **26**:
+Phase 3B extends the runtime MCP surface to **30** total Studio tools. Runtime control now includes:
 
 ```text
 runtime_start
 runtime_list
 runtime_status
+runtime_scenarios
 runtime_pause
 runtime_resume
 runtime_execute_step
+runtime_mapping_get
+runtime_mapping_put
+runtime_mapping_resolve
 ```
 
 A typical controller flow is:
@@ -162,18 +195,24 @@ runtime_start
 runtime_list
   -> wait until one or more consumer JVM descriptors appear
 
-runtime_status
-  -> inspect selected live runtime
+runtime_scenarios
+  -> choose a scenario id when parallel scenarios are active
 
 runtime_pause
-  -> pause if it is not already paused
+  -> pause the chosen scenario if it is not already paused
+
+runtime_mapping_get / runtime_mapping_resolve
+  -> inspect live data and resolution state
+
+runtime_mapping_put
+  -> test a typed mapping override when useful
 
 runtime_execute_step
   -> inspect SUCCESS / FAILED / UNAVAILABLE
   -> retry another detached step when useful
 
 runtime_resume
-  -> continue normal scenario traversal
+  -> continue that scenario's normal traversal
 ```
 
 The existing managed-process tools remain the source for build lifecycle and output:
@@ -200,16 +239,15 @@ The bridge environment is added only through the new opt-in managed-start overlo
 
 Bridge metadata is separate from Pickleball execution RunVars. When a controller knows the intended Pickleball test settings, it should continue to supply those settings through the existing `pkb_runvars` controlled-run contract described in [AI Run Configuration](ai-run-configuration.md). `runtime_start` does not reconstruct or replace that configuration model.
 
-## Current Phase 3A boundaries
+## Current Phase 3B boundaries
 
-Phase 3A establishes transport, discovery, pause/resume, live status, and one generic detached-step command. It does **not** yet add:
+Phase 3B adds active-scenario discovery, explicit scenario targeting, and direct live mapping get/put/resolve operations on top of the Phase 3A transport. It does **not** yet add:
 
 - GUI controls for live runtime sessions;
-- explicit scenario/thread selection for parallel test execution;
 - streaming hook/event history;
-- dedicated browser, service-call, mapping, or screenshot bridge commands;
+- dedicated browser, service-call, or screenshot bridge commands beyond generic detached step execution;
 - mapping snapshot transfer through Studio;
-- arbitrary object serialization across the JVM boundary;
+- arbitrary consumer-object serialization across the JVM boundary;
 - persistent runtime sessions after Studio exits;
 - remote/non-loopback control.
 

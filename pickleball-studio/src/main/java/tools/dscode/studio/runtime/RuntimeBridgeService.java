@@ -158,19 +158,42 @@ public final class RuntimeBridgeService implements AutoCloseable {
         return client(session, runtimeId).status();
     }
 
+    public List<RuntimeScenarioStatus> scenarios(String sessionId, String runtimeId) {
+        Session session = requireSession(sessionId);
+        return client(session, runtimeId).scenarios();
+    }
+
     public RuntimeControlResult pause(
             String sessionId,
             String runtimeId,
             Integer waitSeconds,
             Integer leaseSeconds
     ) {
+        return pause(sessionId, runtimeId, null, waitSeconds, leaseSeconds);
+    }
+
+    public RuntimeControlResult pause(
+            String sessionId,
+            String runtimeId,
+            String scenarioId,
+            Integer waitSeconds,
+            Integer leaseSeconds
+    ) {
         Session session = requireSession(sessionId);
-        return client(session, runtimeId).pause(waitSeconds, leaseSeconds);
+        return client(session, runtimeId).pause(scenarioId, waitSeconds, leaseSeconds);
     }
 
     public RuntimeControlResult resume(String sessionId, String runtimeId) {
+        return resume(sessionId, runtimeId, null);
+    }
+
+    public RuntimeControlResult resume(
+            String sessionId,
+            String runtimeId,
+            String scenarioId
+    ) {
         Session session = requireSession(sessionId);
-        return client(session, runtimeId).resume();
+        return client(session, runtimeId).resume(scenarioId);
     }
 
     public RuntimeControlResult executeStep(
@@ -180,17 +203,99 @@ public final class RuntimeBridgeService implements AutoCloseable {
             String argument,
             Integer timeoutSeconds
     ) {
+        return executeStep(sessionId, runtimeId, null, text, argument, timeoutSeconds);
+    }
+
+    public RuntimeControlResult executeStep(
+            String sessionId,
+            String runtimeId,
+            String scenarioId,
+            String text,
+            String argument,
+            Integer timeoutSeconds
+    ) {
         Session session = requireSession(sessionId);
-        return client(session, runtimeId).executeStep(text, argument, timeoutSeconds);
+        return client(session, runtimeId).executeStep(
+                scenarioId,
+                text,
+                argument,
+                timeoutSeconds
+        );
+    }
+
+    public RuntimeValueResult mappingGet(
+            String sessionId,
+            String runtimeId,
+            String scenarioId,
+            String mapReference,
+            String key,
+            Integer timeoutSeconds
+    ) {
+        Session session = requireSession(sessionId);
+        return client(session, runtimeId).mappingGet(
+                scenarioId,
+                mapReference,
+                key,
+                timeoutSeconds
+        );
+    }
+
+    public RuntimeValueResult mappingPut(
+            String sessionId,
+            String runtimeId,
+            String scenarioId,
+            String mapReference,
+            String key,
+            String jsonValue,
+            Integer timeoutSeconds
+    ) {
+        Session session = requireSession(sessionId);
+        return client(session, runtimeId).mappingPut(
+                scenarioId,
+                mapReference,
+                key,
+                jsonValue,
+                timeoutSeconds
+        );
+    }
+
+    public RuntimeValueResult mappingResolve(
+            String sessionId,
+            String runtimeId,
+            String scenarioId,
+            String input,
+            Integer timeoutSeconds
+    ) {
+        Session session = requireSession(sessionId);
+        return client(session, runtimeId).mappingResolve(
+                scenarioId,
+                input,
+                timeoutSeconds
+        );
     }
 
     @Override
     public void close() {
         for (Session session : sessions.values()) {
             for (RuntimeBridgeDescriptor descriptor : safeList(session)) {
+                RuntimeBridgeClient client = new RuntimeBridgeClient(descriptor, session.token);
                 try {
-                    new RuntimeBridgeClient(descriptor, session.token).resume();
+                    List<RuntimeScenarioStatus> scenarios = client.scenarios();
+                    if (scenarios.isEmpty()) {
+                        client.resume();
+                    } else {
+                        scenarios.forEach(scenario -> {
+                            try {
+                                client.resume(scenario.scenarioId());
+                            } catch (RuntimeException ignored) {
+                            }
+                        });
+                    }
                 } catch (RuntimeException ignored) {
+                    try {
+                        client.resume();
+                    } catch (RuntimeException ignoredAgain) {
+                    }
                 }
             }
         }

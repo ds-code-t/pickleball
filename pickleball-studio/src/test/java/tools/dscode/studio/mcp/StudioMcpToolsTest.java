@@ -87,9 +87,13 @@ class StudioMcpToolsTest {
                                 "runtime_start",
                                 "runtime_list",
                                 "runtime_status",
+                                "runtime_scenarios",
                                 "runtime_pause",
                                 "runtime_resume",
-                                "runtime_execute_step"
+                                "runtime_execute_step",
+                                "runtime_mapping_get",
+                                "runtime_mapping_put",
+                                "runtime_mapping_resolve"
                         ),
                         callbacks.keySet()
                 );

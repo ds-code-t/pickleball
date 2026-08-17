@@ -25,9 +25,13 @@ final class ControlBridgeRuntime implements AutoCloseable {
     static final int PROTOCOL_VERSION = 1;
     static final List<String> CAPABILITIES = List.of(
             "status",
+            "scenarios",
             "pause",
             "resume",
-            "execute_step"
+            "execute_step",
+            "mapping_get",
+            "mapping_put",
+            "mapping_resolve"
     );
 
     private static final String HOST = "127.0.0.1";
@@ -149,23 +153,60 @@ final class ControlBridgeRuntime implements AutoCloseable {
 
     private void registerContexts() {
         server.createContext("/v1/status", exchange ->
-                handle(exchange, "GET", () -> coordinator.status()));
+                handle(exchange, "GET", coordinator::status));
+        server.createContext("/v1/scenarios", exchange ->
+                handle(exchange, "GET", coordinator::scenarios));
         server.createContext("/v1/pause", exchange ->
                 handle(exchange, "POST", () -> {
                     PauseRequest request = readOptional(exchange, PauseRequest.class);
                     return coordinator.requestPause(
+                            request == null ? null : request.scenarioId(),
                             request == null ? null : request.waitSeconds(),
                             request == null ? null : request.leaseSeconds()
                     );
                 }));
         server.createContext("/v1/resume", exchange ->
-                handle(exchange, "POST", coordinator::resume));
+                handle(exchange, "POST", () -> {
+                    ResumeRequest request = readOptional(exchange, ResumeRequest.class);
+                    return coordinator.resume(request == null ? null : request.scenarioId());
+                }));
         server.createContext("/v1/steps/execute", exchange ->
                 handle(exchange, "POST", () -> {
                     ExecuteStepRequest request = readRequired(exchange, ExecuteStepRequest.class);
                     return coordinator.executeStep(
+                            request.scenarioId(),
                             request.text(),
                             request.argument(),
+                            request.timeoutSeconds()
+                    );
+                }));
+        server.createContext("/v1/mappings/get", exchange ->
+                handle(exchange, "POST", () -> {
+                    MappingGetRequest request = readRequired(exchange, MappingGetRequest.class);
+                    return coordinator.mappingGet(
+                            request.scenarioId(),
+                            request.mapReference(),
+                            request.key(),
+                            request.timeoutSeconds()
+                    );
+                }));
+        server.createContext("/v1/mappings/put", exchange ->
+                handle(exchange, "POST", () -> {
+                    MappingPutRequest request = readRequired(exchange, MappingPutRequest.class);
+                    return coordinator.mappingPut(
+                            request.scenarioId(),
+                            request.mapReference(),
+                            request.key(),
+                            request.value(),
+                            request.timeoutSeconds()
+                    );
+                }));
+        server.createContext("/v1/mappings/resolve", exchange ->
+                handle(exchange, "POST", () -> {
+                    MappingResolveRequest request = readRequired(exchange, MappingResolveRequest.class);
+                    return coordinator.mappingResolve(
+                            request.scenarioId(),
+                            request.input(),
                             request.timeoutSeconds()
                     );
                 }));
@@ -311,14 +352,43 @@ final class ControlBridgeRuntime implements AutoCloseable {
     }
 
     private record PauseRequest(
+            String scenarioId,
             Integer waitSeconds,
             Integer leaseSeconds
     ) {
     }
 
+    private record ResumeRequest(String scenarioId) {
+    }
+
     private record ExecuteStepRequest(
+            String scenarioId,
             String text,
             String argument,
+            Integer timeoutSeconds
+    ) {
+    }
+
+    private record MappingGetRequest(
+            String scenarioId,
+            String mapReference,
+            String key,
+            Integer timeoutSeconds
+    ) {
+    }
+
+    private record MappingPutRequest(
+            String scenarioId,
+            String mapReference,
+            String key,
+            Object value,
+            Integer timeoutSeconds
+    ) {
+    }
+
+    private record MappingResolveRequest(
+            String scenarioId,
+            String input,
             Integer timeoutSeconds
     ) {
     }

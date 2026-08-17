@@ -1,6 +1,6 @@
-
 package tools.dscode.control.bridge;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import io.cucumber.core.runner.CurrentScenarioState;
 import io.cucumber.core.runner.GlobalState;
 import io.cucumber.core.runner.StepExtension;
@@ -8,12 +8,20 @@ import tools.dscode.common.control.ControlDecision;
 import tools.dscode.common.control.ControlEvent;
 import tools.dscode.common.control.ControlHook;
 import tools.dscode.common.control.ControlHookHandler;
+import tools.dscode.common.mappings.NodeMap;
 import tools.dscode.common.treeparsing.parsedComponents.Phrase;
 import tools.dscode.control.api.ControlCallResult;
 import tools.dscode.control.api.DynamicControl;
+import tools.dscode.control.api.MappingControl;
 
+import java.lang.reflect.Array;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.IdentityHashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CompletableFuture;
@@ -24,6 +32,9 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.BiFunction;
+import java.util.function.Function;
+import java.util.function.Supplier;
 
 final class ControlBridgeCoordinator implements ControlHookHandler, AutoCloseable {
     static final int DEFAULT_WAIT_SECONDS = 30;
@@ -34,6 +45,7 @@ final class ControlBridgeCoordinator implements ControlHookHandler, AutoCloseabl
     static final int MAX_COMMAND_TIMEOUT_SECONDS = 3600;
 
     private static final int MAX_TEXT = 64 * 1024;
+    private static final Object NOT_JSON_COMPATIBLE = new Object();
 
     private final String runtimeId;
     private final long pid;
@@ -99,7 +111,7 @@ final class ControlBridgeCoordinator implements ControlHookHandler, AutoCloseabl
     }
 
     ControlBridgeStatus status() {
-        ScenarioLane selected = selectedLane();
+        ScenarioLane selected = selectedLane(null);
         int activeCount = lanes.size();
 
         if (selected == null) {
@@ -127,7 +139,24 @@ final class ControlBridgeCoordinator implements ControlHookHandler, AutoCloseabl
         return selected.status(activeCount);
     }
 
-    ControlBridgeCallResult requestPause(Integer waitSeconds, Integer leaseSeconds) {
+    List<ControlBridgeScenarioStatus> scenarios() {
+        return lanes.values().stream()
+                .map(ScenarioLane::scenarioStatus)
+                .sorted(Comparator
+                        .comparing(
+                                ControlBridgeScenarioStatus::scenarioId,
+                                Comparator.nullsLast(String::compareTo)
+                        )
+                        .thenComparingLong(ControlBridgeScenarioStatus::threadId))
+                .toList();
+    }
+
+    ControlBridgeCallResult requestPause(
+            String scenarioId,
+            Integer waitSeconds,
+            Integer leaseSeconds
+    ) {
+        String targetId = normalizeScenarioId(scenarioId);
         int wait = bounded(
                 waitSeconds,
                 DEFAULT_WAIT_SECONDS,
@@ -141,11 +170,14 @@ final class ControlBridgeCoordinator implements ControlHookHandler, AutoCloseabl
                 "leaseSeconds"
         );
 
-        ScenarioLane lane = selectedLane();
+        ScenarioLane lane = selectedLane(targetId);
         if (lane == null) {
+            if (targetId != null) {
+                return unavailable("No active scenario with id " + targetId + ".");
+            }
             if (!lanes.isEmpty()) {
                 return unavailable(
-                        "Pause requires exactly one active scenario unless a scenario is already paused."
+                        "Pause requires a scenarioId when multiple scenarios are active."
                 );
             }
 
@@ -171,26 +203,33 @@ final class ControlBridgeCoordinator implements ControlHookHandler, AutoCloseabl
         return awaitPause(future, wait);
     }
 
-    ControlBridgeCallResult resume() {
-        ScenarioLane lane = pausedLane();
+    ControlBridgeCallResult resume(String scenarioId) {
+        String targetId = normalizeScenarioId(scenarioId);
+        ScenarioLane lane = selectedLane(targetId);
         if (lane == null) {
-            lane = selectedLane();
-        }
-        if (lane == null) {
+            if (targetId != null) {
+                return unavailable("No active scenario with id " + targetId + ".");
+            }
             pauseNextScenario.set(false);
             nextPauseLeaseSeconds.set(DEFAULT_PAUSE_LEASE_SECONDS);
             CompletableFuture<ControlBridgeStatus> pending = nextPauseFuture.getAndSet(null);
             if (pending != null && !pending.isDone()) {
                 pending.complete(status());
             }
+            if (!lanes.isEmpty()) {
+                return unavailable(
+                        "Resume requires a scenarioId when multiple scenarios are active."
+                );
+            }
             return success("RUNNING", status());
         }
 
         lane.resume();
-        return success("RUNNING", status());
+        return success("RUNNING", lane.status(lanes.size()));
     }
 
     ControlBridgeCallResult executeStep(
+            String scenarioId,
             String text,
             String argument,
             Integer timeoutSeconds
@@ -199,46 +238,113 @@ final class ControlBridgeCoordinator implements ControlHookHandler, AutoCloseabl
             return unavailable("Dynamic step text must not be blank.");
         }
 
-        int timeout = bounded(
-                timeoutSeconds,
-                DEFAULT_COMMAND_TIMEOUT_SECONDS,
-                MAX_COMMAND_TIMEOUT_SECONDS,
-                "timeoutSeconds"
-        );
-
-        ScenarioLane lane = selectedLane();
+        int timeout = commandTimeout(timeoutSeconds);
+        ScenarioLane lane = selectedLane(normalizeScenarioId(scenarioId));
         if (lane == null) {
-            if (lanes.isEmpty()) {
-                return unavailable("Dynamic execution requires an active Pickleball scenario.");
-            }
-            return unavailable(
-                    "Dynamic execution requires exactly one active scenario unless one is paused."
-            );
+            return unavailableForScenarioCommand(scenarioId, "Dynamic execution");
         }
 
-        ScenarioCommand command = new ScenarioCommand(() ->
-                fromControlResult(DynamicControl.executeStep(text, argument == null ? "" : argument))
+        return submit(
+                lane,
+                timeout,
+                () -> fromControlResult(
+                        DynamicControl.executeStep(text, argument == null ? "" : argument),
+                        lane
+                ),
+                (type, message) -> failed(type, message, lane.status(lanes.size())),
+                message -> unavailable(message, lane.status(lanes.size()))
         );
-        lane.commands.offer(command);
+    }
 
-        try {
-            return command.result.get(timeout, TimeUnit.SECONDS);
-        } catch (TimeoutException failure) {
-            command.cancelled.set(true);
-            lane.commands.remove(command);
-            return failed(
-                    "CONTROL_TIMEOUT",
-                    "Timed out waiting for the scenario thread to complete the control command. "
-                            + "If execution had already started, it may still complete."
-            );
-        } catch (InterruptedException failure) {
-            Thread.currentThread().interrupt();
-            command.cancelled.set(true);
-            lane.commands.remove(command);
-            return failed("INTERRUPTED", "Interrupted while waiting for the control command.");
-        } catch (Exception failure) {
-            return failed(failure.getClass().getName(), Objects.toString(failure.getMessage(), ""));
+    ControlBridgeValueResult mappingGet(
+            String scenarioId,
+            String mapReference,
+            String key,
+            Integer timeoutSeconds
+    ) {
+        if (mapReference == null || mapReference.isBlank()) {
+            return valueUnavailable("NodeMap reference must not be blank.");
         }
+        if (key == null || key.isBlank()) {
+            return valueUnavailable("Mapping key must not be blank.");
+        }
+
+        ScenarioLane lane = selectedLane(normalizeScenarioId(scenarioId));
+        if (lane == null) {
+            return valueUnavailableForScenarioCommand(scenarioId, "Mapping read");
+        }
+
+        return submit(
+                lane,
+                commandTimeout(timeoutSeconds),
+                () -> fromValueResult(MappingControl.get(mapReference, key), lane),
+                (type, message) -> valueFailed(type, message, lane.status(lanes.size())),
+                message -> valueUnavailable(message, lane.status(lanes.size()))
+        );
+    }
+
+    ControlBridgeValueResult mappingPut(
+            String scenarioId,
+            String mapReference,
+            String key,
+            Object value,
+            Integer timeoutSeconds
+    ) {
+        if (mapReference == null || mapReference.isBlank()) {
+            return valueUnavailable("NodeMap reference must not be blank.");
+        }
+        if (key == null || key.isBlank()) {
+            return valueUnavailable("Mapping key must not be blank.");
+        }
+
+        ScenarioLane lane = selectedLane(normalizeScenarioId(scenarioId));
+        if (lane == null) {
+            return valueUnavailableForScenarioCommand(scenarioId, "Mapping write");
+        }
+
+        return submit(
+                lane,
+                commandTimeout(timeoutSeconds),
+                () -> {
+                    ControlCallResult<NodeMap> written = MappingControl.put(mapReference, key, value);
+                    if (!written.successful()) {
+                        return fromValueFailure(written, lane);
+                    }
+                    return fromValueResult(MappingControl.get(mapReference, key), lane);
+                },
+                (type, message) -> valueFailed(type, message, lane.status(lanes.size())),
+                message -> valueUnavailable(message, lane.status(lanes.size()))
+        );
+    }
+
+    ControlBridgeValueResult mappingResolve(
+            String scenarioId,
+            String input,
+            Integer timeoutSeconds
+    ) {
+        if (input == null) {
+            return valueUnavailable("Mapping resolution input must not be null.");
+        }
+
+        ScenarioLane lane = selectedLane(normalizeScenarioId(scenarioId));
+        if (lane == null) {
+            return valueUnavailableForScenarioCommand(scenarioId, "Mapping resolution");
+        }
+
+        return submit(
+                lane,
+                commandTimeout(timeoutSeconds),
+                () -> {
+                    var current = MappingControl.current();
+                    if (!current.successful()) {
+                        return fromValueFailure(current, lane);
+                    }
+                    Object value = current.value().resolveWholeValue(input);
+                    return valueSuccess(value, lane.status(lanes.size()));
+                },
+                (type, message) -> valueFailed(type, message, lane.status(lanes.size())),
+                message -> valueUnavailable(message, lane.status(lanes.size()))
+        );
     }
 
     @Override
@@ -280,7 +386,55 @@ final class ControlBridgeCoordinator implements ControlHookHandler, AutoCloseabl
         }
     }
 
-    private ScenarioLane selectedLane() {
+    @SuppressWarnings("unchecked")
+    private <T> T submit(
+            ScenarioLane lane,
+            int timeoutSeconds,
+            Supplier<T> action,
+            BiFunction<String, String, T> failureFactory,
+            Function<String, T> unavailableFactory
+    ) {
+        ScenarioCommand command = new ScenarioCommand(
+                action::get,
+                (type, message) -> failureFactory.apply(type, message),
+                unavailableFactory::apply
+        );
+        lane.commands.offer(command);
+
+        try {
+            return (T) command.result.get(timeoutSeconds, TimeUnit.SECONDS);
+        } catch (TimeoutException failure) {
+            command.cancelled.set(true);
+            lane.commands.remove(command);
+            return failureFactory.apply(
+                    "CONTROL_TIMEOUT",
+                    "Timed out waiting for the scenario thread to complete the control command. "
+                            + "If execution had already started, it may still complete."
+            );
+        } catch (InterruptedException failure) {
+            Thread.currentThread().interrupt();
+            command.cancelled.set(true);
+            lane.commands.remove(command);
+            return failureFactory.apply(
+                    "INTERRUPTED",
+                    "Interrupted while waiting for the control command."
+            );
+        } catch (Exception failure) {
+            return failureFactory.apply(
+                    failure.getClass().getName(),
+                    Objects.toString(failure.getMessage(), "")
+            );
+        }
+    }
+
+    private ScenarioLane selectedLane(String scenarioId) {
+        if (scenarioId != null) {
+            return lanes.values().stream()
+                    .filter(lane -> scenarioId.equals(lane.scenarioId))
+                    .findFirst()
+                    .orElse(null);
+        }
+
         ScenarioLane paused = pausedLane();
         if (paused != null) {
             return paused;
@@ -305,9 +459,42 @@ final class ControlBridgeCoordinator implements ControlHookHandler, AutoCloseabl
         return selected;
     }
 
-    private ControlBridgeCallResult fromControlResult(ControlCallResult<Object> result) {
+    private ControlBridgeCallResult unavailableForScenarioCommand(
+            String scenarioId,
+            String operation
+    ) {
+        String targetId = normalizeScenarioId(scenarioId);
+        if (targetId != null) {
+            return unavailable("No active scenario with id " + targetId + ".");
+        }
+        if (lanes.isEmpty()) {
+            return unavailable(operation + " requires an active Pickleball scenario.");
+        }
+        return unavailable(operation + " requires a scenarioId when multiple scenarios are active.");
+    }
+
+    private ControlBridgeValueResult valueUnavailableForScenarioCommand(
+            String scenarioId,
+            String operation
+    ) {
+        String targetId = normalizeScenarioId(scenarioId);
+        if (targetId != null) {
+            return valueUnavailable("No active scenario with id " + targetId + ".");
+        }
+        if (lanes.isEmpty()) {
+            return valueUnavailable(operation + " requires an active Pickleball scenario.");
+        }
+        return valueUnavailable(
+                operation + " requires a scenarioId when multiple scenarios are active."
+        );
+    }
+
+    private ControlBridgeCallResult fromControlResult(
+            ControlCallResult<Object> result,
+            ScenarioLane lane
+    ) {
         if (result == null) {
-            return failed("NULL_RESULT", "Dynamic control returned no result.");
+            return failed("NULL_RESULT", "Dynamic control returned no result.", lane.status(lanes.size()));
         }
 
         Object value = result.value();
@@ -323,7 +510,62 @@ final class ControlBridgeCoordinator implements ControlHookHandler, AutoCloseabl
                                 clipped(error.message()),
                                 clipped(error.stackTrace())
                         ),
-                status()
+                lane.status(lanes.size())
+        );
+    }
+
+    private ControlBridgeValueResult fromValueResult(
+            ControlCallResult<?> result,
+            ScenarioLane lane
+    ) {
+        if (result == null) {
+            return valueFailed(
+                    "NULL_RESULT",
+                    "Dynamic control returned no result.",
+                    lane.status(lanes.size())
+            );
+        }
+        if (!result.successful()) {
+            return fromValueFailure(result, lane);
+        }
+        return valueSuccess(result.value(), lane.status(lanes.size()));
+    }
+
+    private ControlBridgeValueResult fromValueFailure(
+            ControlCallResult<?> result,
+            ScenarioLane lane
+    ) {
+        var error = result.error();
+        return new ControlBridgeValueResult(
+                result.status().name(),
+                null,
+                error == null
+                        ? null
+                        : new ControlBridgeError(
+                                error.type(),
+                                clipped(error.message()),
+                                clipped(error.stackTrace())
+                        ),
+                lane.status(lanes.size())
+        );
+    }
+
+    private ControlBridgeValueResult valueSuccess(
+            Object value,
+            ControlBridgeStatus runtime
+    ) {
+        Object jsonValue = jsonCompatibleValue(value, new IdentityHashMap<>());
+        boolean jsonCompatible = jsonValue != NOT_JSON_COMPATIBLE;
+        return new ControlBridgeValueResult(
+                "SUCCESS",
+                new ControlBridgeValue(
+                        value == null ? "null" : value.getClass().getName(),
+                        jsonCompatible,
+                        jsonCompatible ? jsonValue : null,
+                        clipped(Objects.toString(value))
+                ),
+                null,
+                runtime
         );
     }
 
@@ -338,22 +580,75 @@ final class ControlBridgeCoordinator implements ControlHookHandler, AutoCloseabl
     }
 
     private ControlBridgeCallResult unavailable(String message) {
+        return unavailable(message, status());
+    }
+
+    private ControlBridgeCallResult unavailable(
+            String message,
+            ControlBridgeStatus runtime
+    ) {
         return new ControlBridgeCallResult(
                 "UNAVAILABLE",
                 null,
                 null,
                 new ControlBridgeError("UNAVAILABLE", message, ""),
-                status()
+                runtime
         );
     }
 
     private ControlBridgeCallResult failed(String type, String message) {
+        return failed(type, message, status());
+    }
+
+    private ControlBridgeCallResult failed(
+            String type,
+            String message,
+            ControlBridgeStatus runtime
+    ) {
         return new ControlBridgeCallResult(
                 "FAILED",
                 null,
                 null,
                 new ControlBridgeError(type, message, ""),
-                status()
+                runtime
+        );
+    }
+
+    private ControlBridgeValueResult valueUnavailable(String message) {
+        return valueUnavailable(message, status());
+    }
+
+    private ControlBridgeValueResult valueUnavailable(
+            String message,
+            ControlBridgeStatus runtime
+    ) {
+        return new ControlBridgeValueResult(
+                "UNAVAILABLE",
+                null,
+                new ControlBridgeError("UNAVAILABLE", message, ""),
+                runtime
+        );
+    }
+
+    private ControlBridgeValueResult valueFailed(
+            String type,
+            String message,
+            ControlBridgeStatus runtime
+    ) {
+        return new ControlBridgeValueResult(
+                "FAILED",
+                null,
+                new ControlBridgeError(type, message, ""),
+                runtime
+        );
+    }
+
+    private static int commandTimeout(Integer timeoutSeconds) {
+        return bounded(
+                timeoutSeconds,
+                DEFAULT_COMMAND_TIMEOUT_SECONDS,
+                MAX_COMMAND_TIMEOUT_SECONDS,
+                "timeoutSeconds"
         );
     }
 
@@ -370,11 +665,78 @@ final class ControlBridgeCoordinator implements ControlHookHandler, AutoCloseabl
         return value;
     }
 
+    private static String normalizeScenarioId(String scenarioId) {
+        return scenarioId == null || scenarioId.isBlank() ? null : scenarioId.trim();
+    }
+
     private static String clipped(String value) {
         if (value == null || value.length() <= MAX_TEXT) {
             return value;
         }
         return value.substring(0, MAX_TEXT) + "\n...[truncated]";
+    }
+
+    private static Object jsonCompatibleValue(
+            Object value,
+            IdentityHashMap<Object, Boolean> path
+    ) {
+        if (value == null || value instanceof String || value instanceof Number || value instanceof Boolean) {
+            return value;
+        }
+        if (value instanceof Character character) {
+            return character.toString();
+        }
+        if (value instanceof Enum<?> enumValue) {
+            return enumValue.name();
+        }
+        if (value instanceof JsonNode) {
+            return value;
+        }
+        if (path.put(value, Boolean.TRUE) != null) {
+            return NOT_JSON_COMPATIBLE;
+        }
+
+        try {
+            if (value instanceof Map<?, ?> map) {
+                Map<String, Object> converted = new LinkedHashMap<>();
+                for (Map.Entry<?, ?> entry : map.entrySet()) {
+                    if (!(entry.getKey() instanceof String key)) {
+                        return NOT_JSON_COMPATIBLE;
+                    }
+                    Object convertedValue = jsonCompatibleValue(entry.getValue(), path);
+                    if (convertedValue == NOT_JSON_COMPATIBLE) {
+                        return NOT_JSON_COMPATIBLE;
+                    }
+                    converted.put(key, convertedValue);
+                }
+                return converted;
+            }
+            if (value instanceof Iterable<?> iterable) {
+                List<Object> converted = new ArrayList<>();
+                for (Object item : iterable) {
+                    Object convertedValue = jsonCompatibleValue(item, path);
+                    if (convertedValue == NOT_JSON_COMPATIBLE) {
+                        return NOT_JSON_COMPATIBLE;
+                    }
+                    converted.add(convertedValue);
+                }
+                return converted;
+            }
+            if (value.getClass().isArray()) {
+                List<Object> converted = new ArrayList<>(Array.getLength(value));
+                for (int index = 0; index < Array.getLength(value); index++) {
+                    Object convertedValue = jsonCompatibleValue(Array.get(value, index), path);
+                    if (convertedValue == NOT_JSON_COMPATIBLE) {
+                        return NOT_JSON_COMPATIBLE;
+                    }
+                    converted.add(convertedValue);
+                }
+                return converted;
+            }
+            return NOT_JSON_COMPATIBLE;
+        } finally {
+            path.remove(value);
+        }
     }
 
     private final class ScenarioLane {
@@ -407,6 +769,20 @@ final class ControlBridgeCoordinator implements ControlHookHandler, AutoCloseabl
             phraseText = phrase == null ? null : clipped(Objects.toString(phrase));
             lastHook = event.hook().name();
             lastSignature = clipped(event.signature());
+        }
+
+        private ControlBridgeScenarioStatus scenarioStatus() {
+            return new ControlBridgeScenarioStatus(
+                    threadId,
+                    scenarioId,
+                    scenarioName,
+                    stepText,
+                    phraseText,
+                    lastHook,
+                    lastSignature,
+                    paused,
+                    pauseRequested
+            );
         }
 
         private void requestPause(
@@ -456,7 +832,7 @@ final class ControlBridgeCoordinator implements ControlHookHandler, AutoCloseabl
                 try {
                     ScenarioCommand command = commands.poll(waitMillis, TimeUnit.MILLISECONDS);
                     if (command != null) {
-                        executeCommand(command);
+                        command.execute();
                     }
                 } catch (InterruptedException failure) {
                     Thread.currentThread().interrupt();
@@ -471,21 +847,7 @@ final class ControlBridgeCoordinator implements ControlHookHandler, AutoCloseabl
         private void drainCommands() {
             ScenarioCommand command;
             while ((command = commands.poll()) != null) {
-                executeCommand(command);
-            }
-        }
-
-        private void executeCommand(ScenarioCommand command) {
-            if (command.wakeup || command.cancelled.get()) {
-                return;
-            }
-            try {
-                command.result.complete(command.action.get());
-            } catch (Throwable failure) {
-                command.result.complete(failed(
-                        failure.getClass().getName(),
-                        Objects.toString(failure.getMessage(), "")
-                ));
+                command.execute();
             }
         }
 
@@ -507,11 +869,9 @@ final class ControlBridgeCoordinator implements ControlHookHandler, AutoCloseabl
 
             ScenarioCommand command;
             while ((command = commands.poll()) != null) {
-                if (!command.wakeup && !command.result.isDone()) {
-                    command.result.complete(unavailable(
-                            "Scenario ended before the control command could execute."
-                    ));
-                }
+                command.completeUnavailable(
+                        "Scenario ended before the control command could execute."
+                );
             }
         }
 
@@ -546,28 +906,56 @@ final class ControlBridgeCoordinator implements ControlHookHandler, AutoCloseabl
         }
     }
 
-    @FunctionalInterface
-    private interface ScenarioAction {
-        ControlBridgeCallResult get();
-    }
-
     private static final class ScenarioCommand {
-        private final ScenarioAction action;
-        private final CompletableFuture<ControlBridgeCallResult> result = new CompletableFuture<>();
+        private final Supplier<Object> action;
+        private final BiFunction<String, String, Object> failureFactory;
+        private final Function<String, Object> unavailableFactory;
+        private final CompletableFuture<Object> result = new CompletableFuture<>();
         private final AtomicBoolean cancelled = new AtomicBoolean();
         private final boolean wakeup;
 
-        private ScenarioCommand(ScenarioAction action) {
-            this(action, false);
+        private ScenarioCommand(
+                Supplier<Object> action,
+                BiFunction<String, String, Object> failureFactory,
+                Function<String, Object> unavailableFactory
+        ) {
+            this(action, failureFactory, unavailableFactory, false);
         }
 
-        private ScenarioCommand(ScenarioAction action, boolean wakeup) {
+        private ScenarioCommand(
+                Supplier<Object> action,
+                BiFunction<String, String, Object> failureFactory,
+                Function<String, Object> unavailableFactory,
+                boolean wakeup
+        ) {
             this.action = action;
+            this.failureFactory = failureFactory;
+            this.unavailableFactory = unavailableFactory;
             this.wakeup = wakeup;
         }
 
+        private void execute() {
+            if (wakeup || cancelled.get() || result.isDone()) {
+                return;
+            }
+            try {
+                result.complete(action.get());
+            } catch (Throwable failure) {
+                result.complete(failureFactory.apply(
+                        failure.getClass().getName(),
+                        Objects.toString(failure.getMessage(), "")
+                ));
+            }
+        }
+
+        private void completeUnavailable(String message) {
+            if (!wakeup && !result.isDone()) {
+                result.complete(unavailableFactory.apply(message));
+            }
+        }
+
         private static ScenarioCommand wakeup() {
-            return new ScenarioCommand(null, true);
+            return new ScenarioCommand(null, null, null, true);
         }
     }
 }

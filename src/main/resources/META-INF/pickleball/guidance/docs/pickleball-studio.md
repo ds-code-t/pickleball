@@ -357,6 +357,33 @@ When multiple scenario threads are active, Phase 3A controls a runtime only when
 
 See [Studio Runtime Bridge](studio-runtime-bridge.md) for the protocol, security, lifecycle, and controller flow.
 
+## Phase 3B: targeted scenarios and live mapping control
+
+Phase 3B keeps the Phase 3A transport and session model but removes the main ambiguity during parallel execution. `runtime_scenarios` lists every active scenario in one consumer runtime, including its scenario id, scenario thread id, current step/phrase, latest semantic hook, and pause state. Runtime pause/resume/detached-step calls now accept an optional `scenarioId`; when several scenarios are active, a caller can target the exact scenario instead of relying on implicit selection. Wrong or stale ids return `UNAVAILABLE`.
+
+Phase 3B also adds direct live mapping operations on the selected scenario thread:
+
+```text
+runtime_mapping_get
+runtime_mapping_put
+runtime_mapping_resolve
+```
+
+`runtime_mapping_get` reads from a live `NodeMap` reference. `runtime_mapping_put` accepts one JSON literal so mapping values cross the JVM boundary with explicit JSON-compatible type information. `runtime_mapping_resolve` resolves a value through the scenario's current live `ParsingMap` and therefore uses the same mapping precedence as normal Pickleball execution.
+
+Mapping results include the runtime Java type, a bounded textual representation, and a structured JSON value only when the returned value is safely JSON-compatible. Custom consumer objects are not generically serialized. Live mapping writes are deliberate mutations and are not rolled back automatically.
+
+These four additions bring the Studio MCP tool count to **30**:
+
+```text
+runtime_scenarios
+runtime_mapping_get
+runtime_mapping_put
+runtime_mapping_resolve
+```
+
+Dedicated browser/service commands, mapping snapshot transfer, streaming hook history, and GUI runtime controls remain later work. Browser and service behavior can continue to be explored through retry-friendly detached Pickleball steps where that already provides clear semantics.
+
 ## Validation
 
 Focused Studio validation:
@@ -366,7 +393,7 @@ Focused Studio validation:
 ./gradlew --rerun-tasks :pickleball-studio:verifyBundledStudio
 ```
 
-The Studio tests include real child-JVM process checks, managed incremental-output/cancellation and descendant-termination checks, synchronous plus managed Maven `--version` checks, cross-platform Gradle Wrapper fixture checks, a Gradle Tooling API project/source/task model fixture, Java/Gherkin source-outline and workspace-symbol navigation fixtures, non-headless-independent desktop-session/tree-model checks, and runtime-bridge service/MCP registration checks. The Maven consumer additionally exercises the real loopback bridge against an active Pickleball scenario. The Tooling API test uses the Gradle installation already running the repository test build, so it does not require a host Gradle installation or a separate distribution download.
+The Studio tests include real child-JVM process checks, managed incremental-output/cancellation and descendant-termination checks, synchronous plus managed Maven `--version` checks, cross-platform Gradle Wrapper fixture checks, a Gradle Tooling API project/source/task model fixture, Java/Gherkin source-outline and workspace-symbol navigation fixtures, non-headless-independent desktop-session/tree-model checks, runtime-bridge service/MCP registration checks, and JSON-literal type-preservation checks for direct mapping writes. The Maven consumer additionally exercises the real loopback bridge against an active Pickleball scenario, including authenticated scenario targeting, live mapping write/read/resolve, retry-friendly detached failure, successful retry, and resume. The Tooling API test uses the Gradle installation already running the repository test build, so it does not require a host Gradle installation or a separate distribution download.
 
 `verifyBundledStudio` checks both sides of the isolation contract:
 
@@ -376,7 +403,7 @@ The Studio tests include real child-JVM process checks, managed incremental-outp
 - the nested JAR contains the Swing desktop UI implementation;
 - the nested JAR contains the Spring AI WebMVC MCP server starter;
 - the nested JAR contains Gradle Tooling API 9.6.1;
-- the nested JAR contains Jackson databind 2.20.0 for runtime-bridge JSON;
+- the nested JAR contains Jackson databind for runtime-bridge JSON;
 - the nested JAR contains Gherkin 35.1.0 and Messages 29.0.1 for Studio source navigation;
 - the nested JAR contains the Studio-managed Maven runtime index and Maven embedder jar as opaque resources.
 
@@ -384,13 +411,13 @@ After focused validation, run the normal root and Maven-consumer validation from
 
 ## Current boundaries
 
-Phase 3A does **not** yet implement:
+Phase 3B does **not** yet implement:
 
 - syntax highlighting, code completion, editor refactoring, or live parsing of unsaved buffers;
 - full Gradle external dependency/classpath import;
 - persistent process/activity history or desktop layout/session restoration across Studio restarts;
 - interactive terminal stdin/PTY support;
 - full Java semantic/classpath reference resolution, usages, or Gherkin-to-Java step binding;
-- GUI controls for live runtime sessions, explicit parallel-scenario targeting, streaming hook history, or dedicated browser/service/mapping bridge commands beyond generic detached step execution.
+- GUI controls for live runtime sessions, streaming hook history, mapping snapshot transfer, or dedicated browser/service/screenshot bridge commands beyond generic detached step execution.
 
 Those capabilities should continue to layer on the shared Studio service model and the explicit Phase 3 runtime bridge rather than bypassing either boundary.

@@ -1,4 +1,3 @@
-
 package tools.dscode.studio.runtime;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -9,6 +8,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.util.List;
 
 final class RuntimeBridgeClient {
     private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(5);
@@ -35,22 +35,45 @@ final class RuntimeBridgeClient {
         );
     }
 
+    List<RuntimeScenarioStatus> scenarios() {
+        RuntimeScenarioStatus[] scenarios = request(
+                "GET",
+                "/v1/scenarios",
+                null,
+                RuntimeScenarioStatus[].class,
+                Duration.ofSeconds(10)
+        );
+        return List.of(scenarios);
+    }
+
     RuntimeControlResult pause(Integer waitSeconds, Integer leaseSeconds) {
+        return pause(null, waitSeconds, leaseSeconds);
+    }
+
+    RuntimeControlResult pause(
+            String scenarioId,
+            Integer waitSeconds,
+            Integer leaseSeconds
+    ) {
         int wait = waitSeconds == null ? 30 : waitSeconds;
         return request(
                 "POST",
                 "/v1/pause",
-                new PauseRequest(waitSeconds, leaseSeconds),
+                new PauseRequest(scenarioId, waitSeconds, leaseSeconds),
                 RuntimeControlResult.class,
                 Duration.ofSeconds(Math.max(10, wait + 5L))
         );
     }
 
     RuntimeControlResult resume() {
+        return resume(null);
+    }
+
+    RuntimeControlResult resume(String scenarioId) {
         return request(
                 "POST",
                 "/v1/resume",
-                null,
+                new ResumeRequest(scenarioId),
                 RuntimeControlResult.class,
                 Duration.ofSeconds(10)
         );
@@ -61,12 +84,88 @@ final class RuntimeBridgeClient {
             String argument,
             Integer timeoutSeconds
     ) {
+        return executeStep(null, text, argument, timeoutSeconds);
+    }
+
+    RuntimeControlResult executeStep(
+            String scenarioId,
+            String text,
+            String argument,
+            Integer timeoutSeconds
+    ) {
         int timeout = timeoutSeconds == null ? 60 : timeoutSeconds;
         return request(
                 "POST",
                 "/v1/steps/execute",
-                new ExecuteStepRequest(text, argument, timeoutSeconds),
+                new ExecuteStepRequest(scenarioId, text, argument, timeoutSeconds),
                 RuntimeControlResult.class,
+                Duration.ofSeconds(Math.max(10, timeout + 5L))
+        );
+    }
+
+    RuntimeValueResult mappingGet(
+            String scenarioId,
+            String mapReference,
+            String key,
+            Integer timeoutSeconds
+    ) {
+        int timeout = timeoutSeconds == null ? 60 : timeoutSeconds;
+        return request(
+                "POST",
+                "/v1/mappings/get",
+                new MappingGetRequest(scenarioId, mapReference, key, timeoutSeconds),
+                RuntimeValueResult.class,
+                Duration.ofSeconds(Math.max(10, timeout + 5L))
+        );
+    }
+
+    RuntimeValueResult mappingPut(
+            String scenarioId,
+            String mapReference,
+            String key,
+            String jsonValue,
+            Integer timeoutSeconds
+    ) {
+        if (jsonValue == null || jsonValue.isBlank()) {
+            throw new IllegalArgumentException(
+                    "Mapping jsonValue must contain one JSON literal. Use null for a JSON null value."
+            );
+        }
+
+        Object value;
+        try {
+            value = json.readValue(jsonValue, Object.class);
+        } catch (IOException failure) {
+            throw new IllegalArgumentException("Mapping jsonValue is not valid JSON.", failure);
+        }
+
+        int timeout = timeoutSeconds == null ? 60 : timeoutSeconds;
+        return request(
+                "POST",
+                "/v1/mappings/put",
+                new MappingPutRequest(
+                        scenarioId,
+                        mapReference,
+                        key,
+                        value,
+                        timeoutSeconds
+                ),
+                RuntimeValueResult.class,
+                Duration.ofSeconds(Math.max(10, timeout + 5L))
+        );
+    }
+
+    RuntimeValueResult mappingResolve(
+            String scenarioId,
+            String input,
+            Integer timeoutSeconds
+    ) {
+        int timeout = timeoutSeconds == null ? 60 : timeoutSeconds;
+        return request(
+                "POST",
+                "/v1/mappings/resolve",
+                new MappingResolveRequest(scenarioId, input, timeoutSeconds),
+                RuntimeValueResult.class,
                 Duration.ofSeconds(Math.max(10, timeout + 5L))
         );
     }
@@ -140,14 +239,43 @@ final class RuntimeBridgeClient {
     }
 
     private record PauseRequest(
+            String scenarioId,
             Integer waitSeconds,
             Integer leaseSeconds
     ) {
     }
 
+    private record ResumeRequest(String scenarioId) {
+    }
+
     private record ExecuteStepRequest(
+            String scenarioId,
             String text,
             String argument,
+            Integer timeoutSeconds
+    ) {
+    }
+
+    private record MappingGetRequest(
+            String scenarioId,
+            String mapReference,
+            String key,
+            Integer timeoutSeconds
+    ) {
+    }
+
+    private record MappingPutRequest(
+            String scenarioId,
+            String mapReference,
+            String key,
+            Object value,
+            Integer timeoutSeconds
+    ) {
+    }
+
+    private record MappingResolveRequest(
+            String scenarioId,
+            String input,
             Integer timeoutSeconds
     ) {
     }

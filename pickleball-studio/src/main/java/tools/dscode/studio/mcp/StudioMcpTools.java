@@ -24,6 +24,8 @@ import tools.dscode.studio.runtime.RuntimeBridgeService;
 import tools.dscode.studio.runtime.RuntimeBridgeStatus;
 import tools.dscode.studio.runtime.RuntimeControlResult;
 import tools.dscode.studio.runtime.RuntimeLaunchResult;
+import tools.dscode.studio.runtime.RuntimeScenarioStatus;
+import tools.dscode.studio.runtime.RuntimeValueResult;
 import tools.dscode.studio.workspace.TextSearchMatch;
 import tools.dscode.studio.workspace.WorkspaceEntry;
 import tools.dscode.studio.workspace.WorkspaceFileService;
@@ -365,29 +367,50 @@ public final class StudioMcpTools {
     }
 
     @Tool(
+            name = "runtime_scenarios",
+            description = "List active Pickleball scenarios in one consumer runtime. Use scenarioId to target controls when parallel scenarios are active."
+    )
+    public List<RuntimeScenarioStatus> runtimeScenarios(
+            @ToolParam(description = "Session id returned by runtime_start.") String sessionId,
+            @ToolParam(description = "Runtime id returned by runtime_list.") String runtimeId
+    ) {
+        return runtimeBridge.scenarios(sessionId, runtimeId);
+    }
+
+    @Tool(
             name = "runtime_pause",
-            description = "Request a live Pickleball runtime to pause at a semantic control hook. A finite pause lease prevents an abandoned controller from blocking the scenario indefinitely."
+            description = "Request a live Pickleball scenario to pause at a semantic control hook. A finite pause lease prevents an abandoned controller from blocking execution indefinitely."
     )
     public RuntimeControlResult runtimePause(
             @ToolParam(description = "Session id returned by runtime_start.") String sessionId,
             @ToolParam(description = "Runtime id returned by runtime_list.") String runtimeId,
+            @ToolParam(description = "Optional scenario id from runtime_scenarios. Required when multiple scenarios are active unless one is already uniquely paused.", required = false)
+            String scenarioId,
             @ToolParam(description = "Seconds to wait for a pausable hook. Defaults to 30; maximum 600.", required = false)
             Integer waitSeconds,
             @ToolParam(description = "Maximum pause lease in seconds. Defaults to 120; maximum 3600.", required = false)
             Integer leaseSeconds
     ) {
-        return runtimeBridge.pause(sessionId, runtimeId, waitSeconds, leaseSeconds);
+        return runtimeBridge.pause(
+                sessionId,
+                runtimeId,
+                scenarioId,
+                waitSeconds,
+                leaseSeconds
+        );
     }
 
     @Tool(
             name = "runtime_resume",
-            description = "Resume a paused Pickleball runtime. This operation is idempotent."
+            description = "Resume a paused Pickleball scenario. Without scenarioId the operation remains idempotent when the runtime has zero or one unambiguous scenario."
     )
     public RuntimeControlResult runtimeResume(
             @ToolParam(description = "Session id returned by runtime_start.") String sessionId,
-            @ToolParam(description = "Runtime id returned by runtime_list.") String runtimeId
+            @ToolParam(description = "Runtime id returned by runtime_list.") String runtimeId,
+            @ToolParam(description = "Optional scenario id from runtime_scenarios.", required = false)
+            String scenarioId
     ) {
-        return runtimeBridge.resume(sessionId, runtimeId);
+        return runtimeBridge.resume(sessionId, runtimeId, scenarioId);
     }
 
     @Tool(
@@ -397,6 +420,8 @@ public final class StudioMcpTools {
     public RuntimeControlResult runtimeExecuteStep(
             @ToolParam(description = "Session id returned by runtime_start.") String sessionId,
             @ToolParam(description = "Runtime id returned by runtime_list.") String runtimeId,
+            @ToolParam(description = "Optional scenario id from runtime_scenarios. Required when parallel scenarios are otherwise ambiguous.", required = false)
+            String scenarioId,
             @ToolParam(description = "Pickleball/Cucumber step text to create and execute.") String text,
             @ToolParam(description = "Optional doc-string/table argument text.", required = false)
             String argument,
@@ -406,8 +431,81 @@ public final class StudioMcpTools {
         return runtimeBridge.executeStep(
                 sessionId,
                 runtimeId,
+                scenarioId,
                 text,
                 argument,
+                timeoutSeconds
+        );
+    }
+
+    @Tool(
+            name = "runtime_mapping_get",
+            description = "Read one value directly from a live Pickleball NodeMap on the selected scenario thread. JSON-compatible values are returned structurally with a safe textual fallback."
+    )
+    public RuntimeValueResult runtimeMappingGet(
+            @ToolParam(description = "Session id returned by runtime_start.") String sessionId,
+            @ToolParam(description = "Runtime id returned by runtime_list.") String runtimeId,
+            @ToolParam(description = "Optional scenario id from runtime_scenarios.", required = false)
+            String scenarioId,
+            @ToolParam(description = "Live NodeMap reference such as OVERRIDE, RUN, STEP, PARENT.STEP, or SCENARIO.") String mapReference,
+            @ToolParam(description = "Mapping key/path to read.") String key,
+            @ToolParam(description = "Seconds to wait for the scenario-thread command. Defaults to 60; maximum 3600.", required = false)
+            Integer timeoutSeconds
+    ) {
+        return runtimeBridge.mappingGet(
+                sessionId,
+                runtimeId,
+                scenarioId,
+                mapReference,
+                key,
+                timeoutSeconds
+        );
+    }
+
+    @Tool(
+            name = "runtime_mapping_put",
+            description = "Write one JSON-compatible value directly to a live Pickleball NodeMap on the selected scenario thread and return the stored value."
+    )
+    public RuntimeValueResult runtimeMappingPut(
+            @ToolParam(description = "Session id returned by runtime_start.") String sessionId,
+            @ToolParam(description = "Runtime id returned by runtime_list.") String runtimeId,
+            @ToolParam(description = "Optional scenario id from runtime_scenarios.", required = false)
+            String scenarioId,
+            @ToolParam(description = "Live NodeMap reference such as OVERRIDE, RUN, STEP, PARENT.STEP, or SCENARIO.") String mapReference,
+            @ToolParam(description = "Mapping key/path to write.") String key,
+            @ToolParam(description = "One JSON literal preserving the intended type, for example \"READY\", 3, true, null, [1,2], or {\"a\":1}.") String jsonValue,
+            @ToolParam(description = "Seconds to wait for the scenario-thread command. Defaults to 60; maximum 3600.", required = false)
+            Integer timeoutSeconds
+    ) {
+        return runtimeBridge.mappingPut(
+                sessionId,
+                runtimeId,
+                scenarioId,
+                mapReference,
+                key,
+                jsonValue,
+                timeoutSeconds
+        );
+    }
+
+    @Tool(
+            name = "runtime_mapping_resolve",
+            description = "Resolve one value through the selected scenario's current live ParsingMap using normal Pickleball resolution precedence."
+    )
+    public RuntimeValueResult runtimeMappingResolve(
+            @ToolParam(description = "Session id returned by runtime_start.") String sessionId,
+            @ToolParam(description = "Runtime id returned by runtime_list.") String runtimeId,
+            @ToolParam(description = "Optional scenario id from runtime_scenarios.", required = false)
+            String scenarioId,
+            @ToolParam(description = "Mapping expression/value to resolve, for example <customer.status>.") String input,
+            @ToolParam(description = "Seconds to wait for the scenario-thread command. Defaults to 60; maximum 3600.", required = false)
+            Integer timeoutSeconds
+    ) {
+        return runtimeBridge.mappingResolve(
+                sessionId,
+                runtimeId,
+                scenarioId,
+                input,
                 timeoutSeconds
         );
     }
