@@ -1,6 +1,6 @@
 # Pickleball Studio runtime bridge
 
-Pickleball Studio can opt a managed test run into a private bridge between the Studio JVM and the consumer test JVM. The bridge lets Studio desktop and MCP clients inspect live Pickleball scenarios, target one scenario during parallel execution, pause it at a semantic control boundary, inspect or mutate live mappings, execute retry-friendly detached steps through the existing dynamic-control API, and resume normal traversal.
+Pickleball Studio can opt a managed test run into a private bridge between the Studio JVM and the consumer test JVM. The bridge lets Studio desktop and MCP clients inspect live Pickleball scenarios, target one scenario during parallel execution, pause it at a semantic control boundary, inspect or mutate live mappings, execute retry-friendly detached steps through the existing dynamic-control API, read bounded semantic execution evidence, and resume normal traversal.
 
 The bridge is **not** enabled by merely depending on Pickleball. Ordinary Maven/Gradle runs, normal Studio `maven_start` / `gradle_start` calls, and the desktop **Run Tests** action retain their existing behavior. The desktop **Runtime > Runtime Control... > Start Control Run** path is explicitly bridge-enabled.
 
@@ -68,6 +68,7 @@ The current bridge endpoints are:
 ```text
 GET  /v1/status
 GET  /v1/scenarios
+GET  /v1/events
 POST /v1/pause
 POST /v1/resume
 POST /v1/steps/execute
@@ -84,12 +85,12 @@ Pickleball's active `CurrentScenarioState` is thread-local. For that reason, an 
 
 `ControlBridgeCoordinator` registers as an additive `ControlRuntime` observer. Incoming control work is queued, then executed by the real scenario thread when it reaches a semantic control hook. This preserves access to the active Cucumber/Pickleball state, glue, browser, services, mappings, and other live scenario resources.
 
-The bridge observer does not replace the application's existing `ControlRuntime` global or thread-local handler:
+The bridge observers do not replace the application's existing `ControlRuntime` global or thread-local handler:
 
 - the normal handler still owns `ControlDecision` and value replacement;
 - bridge observers are observation-only;
 - bridge-triggered detached work still reaches the normal handler;
-- observer re-entry is suppressed so bridge work does not recursively redispatch the bridge observer.
+- observer re-entry is suppressed so bridge work does not recursively redispatch bridge observers.
 
 With no observer and no bridge environment, existing control-runtime behavior remains unchanged.
 
@@ -115,6 +116,67 @@ A bridge process may observe more than one scenario thread. `runtime_scenarios` 
 `runtime_pause`, `runtime_resume`, `runtime_execute_step`, and the mapping tools accept an optional `scenarioId`. When several scenarios are active, callers should pass the id returned by `runtime_scenarios`. A wrong or stale id returns `UNAVAILABLE`; the bridge does not guess.
 
 The desktop Runtime Control window renders the discovered runtimes and scenarios as selectors. Its Pause, Resume, detached-step, and mapping actions target the selected scenario id. The original unqualified API behavior remains for compatibility when exactly one scenario is active or exactly one scenario is already uniquely paused.
+
+## Bounded semantic event history
+
+Phase 3D adds read-only semantic hook history for each participating consumer runtime.
+
+`ControlBridgeEventRecorder` is an additive observation-only `ControlRuntime` observer. It is registered **before** the pausing coordinator, so the hook at which a scenario becomes paused is recorded before that same scenario thread blocks in the pause loop.
+
+The recorder stores only immutable clipped metadata:
+
+- monotonically increasing runtime sequence;
+- timestamp;
+- scenario thread id;
+- scenario id and name;
+- hook name;
+- hook signature;
+- current step text;
+- current phrase text.
+
+It never retains or serializes `ControlEvent.target`, `ControlEvent.arguments`, browser objects, mapping objects, service objects, or other consumer object graphs.
+
+Retention is intentionally bounded:
+
+- maximum retained events per consumer runtime: `2048`;
+- default page size: `100`;
+- maximum page size: `500`;
+- event text fields are clipped to `2048` characters.
+
+The bridge endpoint is:
+
+```text
+GET /v1/events
+```
+
+Supported query parameters are:
+
+```text
+scenarioId=<optional active-or-completed scenario id>
+afterSequence=<exclusive runtime sequence cursor; default 0>
+limit=<1..500; default 100>
+```
+
+The response contains:
+
+```text
+events
+nextSequence
+earliestAvailableSequence
+latestSequence
+gap
+hasMore
+```
+
+`nextSequence` is the exclusive cursor to use on the next read. When additional matching events remain inside the current retained window, `hasMore=true` and `nextSequence` is the last returned sequence. Otherwise it advances to the runtime's latest known sequence so a filtered client does not repeatedly rescan unrelated events.
+
+`gap=true` means the supplied nonzero cursor is older than the earliest event still retained. Clients must treat that as incomplete history instead of assuming that no events occurred.
+
+The event ring is runtime-scoped rather than lane-scoped, so retained events remain readable after an individual scenario completes, until they are evicted by the bounded ring or the consumer runtime bridge closes.
+
+Event history is read directly from immutable snapshots and does **not** require the scenario-thread command queue. Reading evidence therefore cannot consume a control hook or block a paused scenario.
+
+`ControlRuntime` intentionally suppresses recursive observer dispatch caused by work initiated from an observer. For that reason, the semantic event ring records the normal traversal boundaries observed by the bridge, but does not claim to enumerate every nested hook fired inside a detached bridge command. The returned detached-command result remains authoritative for that exploratory action.
 
 ## Live mapping control
 
@@ -171,13 +233,14 @@ Effects that happened before a failed detached call are not rolled back. The des
 
 ## Studio MCP flow
 
-Phase 3B extends the runtime MCP surface to **30** total Studio tools. Runtime control includes:
+Phase 3D adds one evidence tool, bringing Studio to **31** MCP tools. Runtime control/evidence includes:
 
 ```text
 runtime_start
 runtime_list
 runtime_status
 runtime_scenarios
+runtime_events
 runtime_pause
 runtime_resume
 runtime_execute_step
@@ -185,6 +248,8 @@ runtime_mapping_get
 runtime_mapping_put
 runtime_mapping_resolve
 ```
+
+`runtime_events` is a read-only adapter over `RuntimeBridgeService.events(...)`. It accepts the runtime session id, runtime id, optional scenario id, optional exclusive `afterSequence` cursor, and optional page limit.
 
 A typical controller flow is:
 
@@ -198,8 +263,15 @@ runtime_list
 runtime_scenarios
   -> choose a scenario id when parallel scenarios are active
 
+runtime_events
+  -> read retained semantic context before taking action
+  -> retain nextSequence for the next evidence read
+
 runtime_pause
   -> pause the chosen scenario if it is not already paused
+
+runtime_events
+  -> inspect the semantic boundary where the pause was reached
 
 runtime_mapping_get / runtime_mapping_resolve
   -> inspect live data and resolution state
@@ -227,7 +299,7 @@ Cancelling the managed build still terminates the owned process tree through the
 
 ## Desktop runtime-control flow
 
-Phase 3C exposes the same runtime service through the Swing desktop UI without changing the bridge protocol or MCP tool count.
+Phase 3C exposes the same runtime control service through the Swing desktop UI.
 
 Open:
 
@@ -251,6 +323,8 @@ The modeless Runtime Control window provides:
 
 The existing main-window **Run Tests** action remains bridge-free. Closing or hiding the Runtime Control window does not silently cancel the managed build. Cancelling uses the explicit **Cancel Run** action, while pause safety remains governed by the finite bridge lease. Closing Pickleball Studio closes `RuntimeBridgeService`, resumes discovered paused scenarios best-effort, then terminates owned managed processes.
 
+Phase 3D does not yet add an event-history view to the Swing dialog. The bounded event service is available to Studio/MCP first and can be rendered by a later desktop slice without changing the consumer bridge contract.
+
 ## Build-tool behavior
 
 `RuntimeBridgeService` uses the same build services as the rest of Studio:
@@ -265,11 +339,12 @@ The bridge environment is added only through the opt-in managed-start overloads.
 
 Bridge metadata is separate from Pickleball execution RunVars. When a controller knows the intended Pickleball test settings, it should continue to supply those settings through the existing `pkb_runvars` controlled-run contract described in [AI Run Configuration](ai-run-configuration.md). `runtime_start` and the desktop controlled-run action do not reconstruct or replace that configuration model.
 
-## Current Phase 3C boundaries
+## Current Phase 3D boundaries
 
-Phase 3C adds desktop launch, discovery, targeted pause/resume, detached-step execution, live mapping get/put/resolve, controlled-build output, and result/status rendering on top of the Phase 3B service API. It does **not** yet add:
+Phase 3D adds bounded, cursor-based semantic event history and MCP access on top of the existing Phase 3 runtime bridge. It does **not** yet add:
 
-- streaming semantic hook/event history;
+- a desktop event-history viewer;
+- unbounded or persisted event history after the consumer runtime exits;
 - dedicated browser, service-call, or screenshot bridge commands beyond generic detached step execution;
 - mapping snapshot transfer through Studio;
 - arbitrary consumer-object serialization across the JVM boundary;

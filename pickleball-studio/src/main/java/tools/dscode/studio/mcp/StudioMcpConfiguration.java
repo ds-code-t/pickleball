@@ -118,9 +118,17 @@ public class StudioMcpConfiguration {
     }
 
     @Bean
-    ToolCallbackProvider studioTools(StudioMcpTools studioMcpTools) {
+    RuntimeEvidenceMcpTools runtimeEvidenceMcpTools(RuntimeBridgeService runtimeBridgeService) {
+        return new RuntimeEvidenceMcpTools(runtimeBridgeService);
+    }
+
+    @Bean
+    ToolCallbackProvider studioTools(
+            StudioMcpTools studioMcpTools,
+            RuntimeEvidenceMcpTools runtimeEvidenceMcpTools
+    ) {
         return MethodToolCallbackProvider.builder()
-                .toolObjects(studioMcpTools)
+                .toolObjects(studioMcpTools, runtimeEvidenceMcpTools)
                 .build();
     }
 }

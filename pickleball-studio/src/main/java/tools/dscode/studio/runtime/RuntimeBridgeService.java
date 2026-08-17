@@ -1,4 +1,3 @@
-
 package tools.dscode.studio.runtime;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -6,7 +5,6 @@ import tools.dscode.studio.build.GradleBuildService;
 import tools.dscode.studio.build.ManagedGradleRunResult;
 import tools.dscode.studio.build.ManagedMavenRunResult;
 import tools.dscode.studio.build.MavenBuildService;
-import tools.dscode.studio.process.ManagedProcessSummary;
 import tools.dscode.studio.workspace.WorkspaceInfo;
 
 import java.io.IOException;
@@ -161,6 +159,21 @@ public final class RuntimeBridgeService implements AutoCloseable {
     public List<RuntimeScenarioStatus> scenarios(String sessionId, String runtimeId) {
         Session session = requireSession(sessionId);
         return client(session, runtimeId).scenarios();
+    }
+
+    public RuntimeEventPage events(
+            String sessionId,
+            String runtimeId,
+            String scenarioId,
+            Long afterSequence,
+            Integer limit
+    ) {
+        Session session = requireSession(sessionId);
+        return client(session, runtimeId).events(
+                scenarioId,
+                afterSequence,
+                limit
+        );
     }
 
     public RuntimeControlResult pause(

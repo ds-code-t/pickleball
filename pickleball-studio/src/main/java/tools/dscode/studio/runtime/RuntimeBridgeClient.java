@@ -4,10 +4,13 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
 import java.net.URI;
+import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 
 final class RuntimeBridgeClient {
@@ -44,6 +47,36 @@ final class RuntimeBridgeClient {
                 Duration.ofSeconds(10)
         );
         return List.of(scenarios);
+    }
+
+    RuntimeEventPage events(
+            String scenarioId,
+            Long afterSequence,
+            Integer limit
+    ) {
+        List<String> parameters = new ArrayList<>();
+        if (scenarioId != null && !scenarioId.isBlank()) {
+            parameters.add("scenarioId=" + encode(scenarioId.trim()));
+        }
+        if (afterSequence != null) {
+            parameters.add("afterSequence=" + afterSequence);
+        }
+        if (limit != null) {
+            parameters.add("limit=" + limit);
+        }
+
+        String path = "/v1/events";
+        if (!parameters.isEmpty()) {
+            path += "?" + String.join("&", parameters);
+        }
+
+        return request(
+                "GET",
+                path,
+                null,
+                RuntimeEventPage.class,
+                Duration.ofSeconds(10)
+        );
     }
 
     RuntimeControlResult pause(Integer waitSeconds, Integer leaseSeconds) {
@@ -207,7 +240,7 @@ final class RuntimeBridgeClient {
             if (response.statusCode() != 200) {
                 throw new IllegalStateException(
                         "Runtime bridge returned HTTP " + response.statusCode()
-                                + ": " + new String(response.body(), java.nio.charset.StandardCharsets.UTF_8)
+                                + ": " + new String(response.body(), StandardCharsets.UTF_8)
                 );
             }
             return json.readValue(response.body(), responseType);
@@ -236,6 +269,10 @@ final class RuntimeBridgeClient {
         return URI.create(
                 "http://" + descriptor.host() + ":" + descriptor.port() + path
         );
+    }
+
+    private static String encode(String value) {
+        return URLEncoder.encode(value, StandardCharsets.UTF_8);
     }
 
     private record PauseRequest(

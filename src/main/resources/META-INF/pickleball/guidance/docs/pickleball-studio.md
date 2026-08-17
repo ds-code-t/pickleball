@@ -379,7 +379,7 @@ runtime_mapping_put
 runtime_mapping_resolve
 ```
 
-Dedicated browser/service commands, mapping snapshot transfer, and streaming hook history remain later work. Browser and service behavior can continue to be explored through retry-friendly detached Pickleball steps where that already provides clear semantics.
+Dedicated browser/service commands and mapping snapshot transfer remain later work. Browser and service behavior can continue to be explored through retry-friendly detached Pickleball steps where that already provides clear semantics.
 
 ## Phase 3C: desktop live runtime control
 
@@ -410,6 +410,40 @@ The original main-window **Run Tests** action remains bridge-free. Hiding the Ru
 
 Phase 3C adds no MCP tools, so the Studio MCP count remains **30**.
 
+## Phase 3D: bounded semantic runtime evidence
+
+Phase 3D adds bounded semantic hook history to each participating consumer runtime without changing the scenario-thread command model.
+
+The bridge records immutable metadata snapshots for normal semantic hook traversal:
+
+```text
+sequence
+timestamp
+threadId
+scenarioId
+scenarioName
+hook
+signature
+stepText
+phraseText
+```
+
+The recorder deliberately does not retain hook targets, arguments, browser/service objects, or other consumer object graphs. It is registered before the pausing coordinator so the semantic boundary that causes a pause is visible in history before the scenario thread blocks.
+
+Retention is runtime-scoped and bounded to **2,048 events**. Events remain available after an individual scenario completes until the runtime ring evicts them or the bridge closes. Reads are cursor-based rather than a long-lived streaming connection:
+
+```text
+runtime_events
+```
+
+`runtime_events` accepts an optional `scenarioId`, an exclusive `afterSequence` cursor, and an optional limit. The default page size is 100 and the maximum is 500. Results report `nextSequence`, `earliestAvailableSequence`, `latestSequence`, `hasMore`, and `gap`; a gap means the caller's nonzero cursor fell behind bounded retention and the history is incomplete.
+
+The read is independent of the scenario-thread queue, so an AI can inspect evidence while a scenario is paused without consuming another hook or waiting for scenario execution to resume.
+
+Because `ControlRuntime` intentionally suppresses recursive observer dispatch for work initiated from an observer, this evidence describes the semantic boundaries observed during normal scenario traversal. It does not claim to enumerate every nested hook fired inside a detached bridge command; the command's returned result remains authoritative for that exploratory action.
+
+Phase 3D adds one MCP tool, bringing Studio to **31** tools. The existing Swing Runtime Control window remains unchanged in this slice; a later desktop slice can render the same `RuntimeBridgeService.events(...)` data without changing the consumer bridge.
+
 ## Validation
 
 Focused Studio validation:
@@ -419,7 +453,9 @@ Focused Studio validation:
 ./gradlew --rerun-tasks :pickleball-studio:verifyBundledStudio
 ```
 
-The Studio tests include real child-JVM process checks, managed incremental-output/cancellation and descendant-termination checks, synchronous plus managed Maven `--version` checks, cross-platform Gradle Wrapper fixture checks, a Gradle Tooling API project/source/task model fixture, Java/Gherkin source-outline and workspace-symbol navigation fixtures, non-headless-independent desktop-session/tree-model checks, runtime-bridge service/MCP registration checks, JSON-literal type-preservation checks for direct mapping writes, and a desktop-facade controlled-run fixture that verifies bridge environment injection without requiring a live consumer JVM. The Maven consumer additionally exercises the real loopback bridge against an active Pickleball scenario, including authenticated scenario targeting, live mapping write/read/resolve, retry-friendly detached failure, successful retry, and resume. The Tooling API test uses the Gradle installation already running the repository test build, so it does not require a host Gradle installation or a separate distribution download.
+The Studio tests include real child-JVM process checks, managed incremental-output/cancellation and descendant-termination checks, synchronous plus managed Maven `--version` checks, cross-platform Gradle Wrapper fixture checks, a Gradle Tooling API project/source/task model fixture, Java/Gherkin source-outline and workspace-symbol navigation fixtures, non-headless-independent desktop-session/tree-model checks, runtime-bridge service/MCP registration checks, JSON-literal type-preservation checks for direct mapping writes, event-query/cursor client checks, and a desktop-facade controlled-run fixture that verifies bridge environment injection without requiring a live consumer JVM.
+
+The Maven consumer additionally exercises the real loopback bridge against an active Pickleball scenario, including authenticated scenario targeting, bounded scenario-filtered event reads and cursor advancement while paused, live mapping write/read/resolve, retry-friendly detached failure, successful retry, and resume. The Tooling API test uses the Gradle installation already running the repository test build, so it does not require a host Gradle installation or a separate distribution download.
 
 `verifyBundledStudio` checks both sides of the isolation contract:
 
@@ -437,14 +473,15 @@ After focused validation, run the normal root and Maven-consumer validation from
 
 ## Current boundaries
 
-Phase 3C does **not** yet implement:
+Phase 3D does **not** yet implement:
 
 - syntax highlighting, code completion, editor refactoring, or live parsing of unsaved buffers;
 - full Gradle external dependency/classpath import;
-- persistent process/activity history, runtime-control history, or desktop layout/session restoration across Studio restarts;
+- persistent process/activity history, runtime-control history, runtime-event history, or desktop layout/session restoration across Studio/runtime restarts;
 - interactive terminal stdin/PTY support;
 - full Java semantic/classpath reference resolution, usages, or Gherkin-to-Java step binding;
-- streaming runtime hook/event history, mapping snapshot transfer, or dedicated browser/service/screenshot bridge commands beyond generic detached step execution;
+- a desktop runtime-event-history viewer;
+- mapping snapshot transfer or dedicated browser/service/screenshot bridge commands beyond generic detached step execution;
 - remote/non-loopback runtime control.
 
 Those capabilities should continue to layer on the shared Studio service model and the explicit Phase 3 runtime bridge rather than bypassing either boundary.

@@ -401,6 +401,9 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-control-api/src/main/java/tools/dscode/control/bridge/ControlBridgeCoordinator.java`
 - `pickleball-control-api/src/main/java/tools/dscode/control/bridge/ControlBridgeDescriptor.java`
 - `pickleball-control-api/src/main/java/tools/dscode/control/bridge/ControlBridgeError.java`
+- `pickleball-control-api/src/main/java/tools/dscode/control/bridge/ControlBridgeEvent.java`
+- `pickleball-control-api/src/main/java/tools/dscode/control/bridge/ControlBridgeEventPage.java`
+- `pickleball-control-api/src/main/java/tools/dscode/control/bridge/ControlBridgeEventRecorder.java`
 - `pickleball-control-api/src/main/java/tools/dscode/control/bridge/ControlBridgeRuntime.java`
 - `pickleball-control-api/src/main/java/tools/dscode/control/bridge/ControlBridgeScenarioStatus.java`
 - `pickleball-control-api/src/main/java/tools/dscode/control/bridge/ControlBridgeStatus.java`
@@ -435,6 +438,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-studio/src/main/java/tools/dscode/studio/language/SourceSymbol.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/language/SourceSymbolKind.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/language/WorkspaceLanguageService.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/mcp/RuntimeEvidenceMcpTools.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/mcp/StudioMcpConfiguration.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/mcp/StudioMcpTools.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/mcp/StudioServer.java`
@@ -451,6 +455,8 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-studio/src/main/java/tools/dscode/studio/runtime/RuntimeBridgeService.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/runtime/RuntimeBridgeStatus.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/runtime/RuntimeControlResult.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/runtime/RuntimeEvent.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/runtime/RuntimeEventPage.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/runtime/RuntimeLaunchResult.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/runtime/RuntimeScenarioStatus.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/runtime/RuntimeValue.java`

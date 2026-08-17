@@ -6,15 +6,19 @@ import io.cucumber.java.en.Given;
 import tools.dscode.control.bridge.ControlBridgeBootstrap;
 import tools.dscode.control.bridge.ControlBridgeCallResult;
 import tools.dscode.control.bridge.ControlBridgeDescriptor;
+import tools.dscode.control.bridge.ControlBridgeEvent;
+import tools.dscode.control.bridge.ControlBridgeEventPage;
 import tools.dscode.control.bridge.ControlBridgeScenarioStatus;
 import tools.dscode.control.bridge.ControlBridgeStatus;
 import tools.dscode.control.bridge.ControlBridgeValueResult;
 
 import java.io.IOException;
 import java.net.URI;
+import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -75,6 +79,16 @@ public final class ControlBridgeTestSteps {
                                 "leaseSeconds", 30
                         )
                 );
+                ControlBridgeEventPage events = events(
+                        scenario.scenarioId(),
+                        0L,
+                        100
+                );
+                ControlBridgeEventPage cursorEvents = events(
+                        scenario.scenarioId(),
+                        events.nextSequence(),
+                        100
+                );
                 ControlBridgeValueResult written = postValue(
                         "/v1/mappings/put",
                         Map.of(
@@ -130,6 +144,8 @@ public final class ControlBridgeTestSteps {
                         scenario,
                         wrongTarget,
                         paused,
+                        events,
+                        cursorEvents,
                         written,
                         read,
                         resolved,
@@ -178,6 +194,24 @@ public final class ControlBridgeTestSteps {
         assertEquals("UNAVAILABLE", outcome.wrongTarget().status(), "wrong scenario target");
         assertEquals("SUCCESS", outcome.paused().status(), "pause result");
         assertTrue(outcome.paused().runtime().paused(), "runtime should report paused");
+
+        assertTrue(!outcome.events().events().isEmpty(), "semantic event history should not be empty");
+        assertTrue(!outcome.events().gap(), "initial semantic event history should have no gap");
+        assertTrue(
+                outcome.events().events().stream()
+                        .allMatch(event -> outcome.scenario().scenarioId().equals(event.scenarioId())),
+                "scenario-filtered event history"
+        );
+        assertIncreasing(outcome.events().events());
+        assertTrue(
+                outcome.cursorEvents().events().isEmpty(),
+                "cursor read while paused should not repeat retained events"
+        );
+        assertTrue(
+                outcome.cursorEvents().nextSequence() >= outcome.events().nextSequence(),
+                "event cursor should not move backwards"
+        );
+
         assertMappingValue(outcome.written(), "bridge-value", "mapping write");
         assertMappingValue(outcome.read(), "bridge-value", "mapping read");
         assertMappingValue(outcome.resolved(), "bridge-value", "mapping resolve");
@@ -222,6 +256,20 @@ public final class ControlBridgeTestSteps {
         HttpResponse<byte[]> response = send("GET", "/v1/scenarios", null, token);
         assertEquals(200, response.statusCode(), "/v1/scenarios HTTP status");
         return List.of(json.readValue(response.body(), ControlBridgeScenarioStatus[].class));
+    }
+
+    private ControlBridgeEventPage events(
+            String scenarioId,
+            long afterSequence,
+            int limit
+    ) throws Exception {
+        String path = "/v1/events?scenarioId="
+                + URLEncoder.encode(scenarioId, StandardCharsets.UTF_8)
+                + "&afterSequence=" + afterSequence
+                + "&limit=" + limit;
+        HttpResponse<byte[]> response = send("GET", path, null, token);
+        assertEquals(200, response.statusCode(), "/v1/events HTTP status");
+        return json.readValue(response.body(), ControlBridgeEventPage.class);
     }
 
     private ControlBridgeCallResult post(String path, Object body) throws Exception {
@@ -272,6 +320,14 @@ public final class ControlBridgeTestSteps {
         );
     }
 
+    private static void assertIncreasing(List<ControlBridgeEvent> events) {
+        long previous = 0;
+        for (ControlBridgeEvent event : events) {
+            assertTrue(event.sequence() > previous, "event sequence should increase");
+            previous = event.sequence();
+        }
+    }
+
     private static void assertMappingValue(
             ControlBridgeValueResult result,
             Object expected,
@@ -299,6 +355,8 @@ public final class ControlBridgeTestSteps {
             ControlBridgeScenarioStatus scenario,
             ControlBridgeCallResult wrongTarget,
             ControlBridgeCallResult paused,
+            ControlBridgeEventPage events,
+            ControlBridgeEventPage cursorEvents,
             ControlBridgeValueResult written,
             ControlBridgeValueResult read,
             ControlBridgeValueResult resolved,

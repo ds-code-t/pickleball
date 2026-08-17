@@ -54,7 +54,10 @@ class StudioMcpToolsTest {
                         new WorkspaceLanguageService(files),
                         runtimeBridge
                 );
-                ToolCallbackProvider provider = MethodToolCallbackProvider.builder().toolObjects(tools).build();
+                RuntimeEvidenceMcpTools evidence = new RuntimeEvidenceMcpTools(runtimeBridge);
+                ToolCallbackProvider provider = MethodToolCallbackProvider.builder()
+                        .toolObjects(tools, evidence)
+                        .build();
 
                 Map<String, ToolCallback> callbacks = Arrays.stream(provider.getToolCallbacks())
                         .collect(Collectors.toMap(
@@ -88,6 +91,7 @@ class StudioMcpToolsTest {
                                 "runtime_list",
                                 "runtime_status",
                                 "runtime_scenarios",
+                                "runtime_events",
                                 "runtime_pause",
                                 "runtime_resume",
                                 "runtime_execute_step",

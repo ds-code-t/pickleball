@@ -1,4 +1,3 @@
-
 package tools.dscode.control.bridge;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -8,6 +7,7 @@ import tools.dscode.common.control.ControlRuntime;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -26,6 +26,7 @@ final class ControlBridgeRuntime implements AutoCloseable {
     static final List<String> CAPABILITIES = List.of(
             "status",
             "scenarios",
+            "events",
             "pause",
             "resume",
             "execute_step",
@@ -40,6 +41,7 @@ final class ControlBridgeRuntime implements AutoCloseable {
     private final ObjectMapper json = new ObjectMapper();
     private final String token;
     private final Path descriptorFile;
+    private final ControlBridgeEventRecorder eventRecorder;
     private final ControlBridgeCoordinator coordinator;
     private final HttpServer server;
     private final ExecutorService executor;
@@ -49,6 +51,7 @@ final class ControlBridgeRuntime implements AutoCloseable {
     private ControlBridgeRuntime(
             String token,
             Path descriptorFile,
+            ControlBridgeEventRecorder eventRecorder,
             ControlBridgeCoordinator coordinator,
             HttpServer server,
             ExecutorService executor,
@@ -56,6 +59,7 @@ final class ControlBridgeRuntime implements AutoCloseable {
     ) {
         this.token = token;
         this.descriptorFile = descriptorFile;
+        this.eventRecorder = eventRecorder;
         this.coordinator = coordinator;
         this.server = server;
         this.executor = executor;
@@ -90,6 +94,7 @@ final class ControlBridgeRuntime implements AutoCloseable {
 
         String runtimeId = UUID.randomUUID().toString();
         long pid = ProcessHandle.current().pid();
+        ControlBridgeEventRecorder eventRecorder = new ControlBridgeEventRecorder();
         ControlBridgeCoordinator coordinator = new ControlBridgeCoordinator(
                 runtimeId,
                 pid,
@@ -108,6 +113,7 @@ final class ControlBridgeRuntime implements AutoCloseable {
             ControlBridgeRuntime runtime = new ControlBridgeRuntime(
                     token,
                     descriptorFile,
+                    eventRecorder,
                     coordinator,
                     server,
                     executor,
@@ -125,12 +131,16 @@ final class ControlBridgeRuntime implements AutoCloseable {
 
             runtime.registerContexts();
             server.start();
+            // The recorder must observe the hook before the coordinator can pause on it.
+            ControlRuntime.addObserver(eventRecorder);
             ControlRuntime.addObserver(coordinator);
             runtime.writeDescriptor();
             return runtime;
         } catch (Throwable failure) {
             ControlRuntime.removeObserver(coordinator);
+            ControlRuntime.removeObserver(eventRecorder);
             coordinator.close();
+            eventRecorder.close();
             if (server != null) {
                 server.stop(0);
             }
@@ -156,6 +166,12 @@ final class ControlBridgeRuntime implements AutoCloseable {
                 handle(exchange, "GET", coordinator::status));
         server.createContext("/v1/scenarios", exchange ->
                 handle(exchange, "GET", coordinator::scenarios));
+        server.createContext("/v1/events", exchange ->
+                handle(exchange, "GET", () -> eventRecorder.page(
+                        queryParameter(exchange, "scenarioId"),
+                        longQueryParameter(exchange, "afterSequence"),
+                        intQueryParameter(exchange, "limit")
+                )));
         server.createContext("/v1/pause", exchange ->
                 handle(exchange, "POST", () -> {
                     PauseRequest request = readOptional(exchange, PauseRequest.class);
@@ -287,6 +303,48 @@ final class ControlBridgeRuntime implements AutoCloseable {
         return body;
     }
 
+    private String queryParameter(HttpExchange exchange, String name) {
+        String raw = exchange.getRequestURI().getRawQuery();
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+
+        for (String parameter : raw.split("&")) {
+            int separator = parameter.indexOf('=');
+            String rawName = separator < 0 ? parameter : parameter.substring(0, separator);
+            if (!name.equals(URLDecoder.decode(rawName, StandardCharsets.UTF_8))) {
+                continue;
+            }
+            String rawValue = separator < 0 ? "" : parameter.substring(separator + 1);
+            return URLDecoder.decode(rawValue, StandardCharsets.UTF_8);
+        }
+        return null;
+    }
+
+    private Long longQueryParameter(HttpExchange exchange, String name) {
+        String value = queryParameter(exchange, name);
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return Long.valueOf(value);
+        } catch (NumberFormatException failure) {
+            throw new IllegalArgumentException(name + " must be a whole number.", failure);
+        }
+    }
+
+    private Integer intQueryParameter(HttpExchange exchange, String name) {
+        String value = queryParameter(exchange, name);
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return Integer.valueOf(value);
+        } catch (NumberFormatException failure) {
+            throw new IllegalArgumentException(name + " must be a whole number.", failure);
+        }
+    }
+
     private void sendJson(HttpExchange exchange, int status, Object body) throws IOException {
         byte[] bytes = json.writeValueAsBytes(body);
         exchange.sendResponseHeaders(status, bytes.length);
@@ -330,7 +388,9 @@ final class ControlBridgeRuntime implements AutoCloseable {
         }
 
         ControlRuntime.removeObserver(coordinator);
+        ControlRuntime.removeObserver(eventRecorder);
         coordinator.close();
+        eventRecorder.close();
         server.stop(0);
         executor.shutdownNow();
 
