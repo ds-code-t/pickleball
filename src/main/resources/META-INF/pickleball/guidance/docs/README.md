@@ -38,6 +38,8 @@ When these docs are materialized from the Maven dependency with `DiagnosticCli e
 - [Dynamic control API](dynamic-control-api.md) — optional retry-friendly dynamic Gherkin execution, isolated/scoped ParsingMap control, snapshots, value interception, and synchronous semantic hooks for controller tooling.
 - [Pickleball Studio](pickleball-studio.md) — isolated Studio application, Swing workspace/editor UI, workspace/process services, Maven and Gradle build execution, Gradle Tooling API project/navigation models, Java/Gherkin source navigation, managed runs, Streamable-HTTP MCP, and the opt-in live runtime bridge.
 - [Studio Runtime Bridge](studio-runtime-bridge.md) — private loopback Studio-to-consumer-JVM control sessions, active-scenario targeting, live mapping control, pause/resume, and retry-friendly detached execution.
+- [Studio runtime investigation](studio-runtime-investigation.md) — Pickleball-native element inspection, service-call evidence, and temporary semantic breakpoints.
+- [Studio human/AI collaboration](studio-collaboration.md) — shared Desktop/MCP services, visible agent sessions and activity, concurrent-edit protection, human intervention, and deterministic wait conveniences.
 - [Diagnostic lineage and metadata](diagnostic-lineage-metadata.md) — distinguish lineage annotations, execution/evidence RunVars, controls, and derived evidence.
 - [Diagnostic reporting](diagnostic-reporting.md) — sparse-first AI evidence, source provenance, step/capability metadata, trace evidence, screenshots/fingerprints, comparison, and retention.
 - [AI diagnostic reporting plan](ai-diagnostic-reporting-plan.md) — current sparse-first investigation and controlled-rerun architecture.

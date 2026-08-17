@@ -8,11 +8,14 @@ import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.context.annotation.Bean;
 import tools.dscode.studio.build.GradleBuildService;
 import tools.dscode.studio.build.MavenBuildService;
+import tools.dscode.studio.collaboration.StudioCollaborationService;
 import tools.dscode.studio.gradle.GradleProjectModelService;
+import tools.dscode.studio.gui.StudioDesktopSession;
 import tools.dscode.studio.language.WorkspaceLanguageService;
 import tools.dscode.studio.process.ManagedProcessService;
 import tools.dscode.studio.process.WorkspaceProcessService;
 import tools.dscode.studio.runtime.RuntimeBridgeService;
+import tools.dscode.studio.workspace.WorkspaceConcurrencyService;
 import tools.dscode.studio.workspace.WorkspaceFileService;
 import tools.dscode.studio.workspace.WorkspaceInfo;
 import tools.dscode.studio.workspace.WorkspaceService;
@@ -30,6 +33,8 @@ public class StudioMcpConfiguration {
     }
 
     @Bean WorkspaceFileService workspaceFileService(WorkspaceInfo workspace) { return new WorkspaceFileService(workspace.root()); }
+    @Bean WorkspaceConcurrencyService workspaceConcurrencyService(WorkspaceFileService files) { return new WorkspaceConcurrencyService(files); }
+    @Bean StudioCollaborationService studioCollaborationService() { return new StudioCollaborationService(); }
     @Bean WorkspaceProcessService workspaceProcessService(WorkspaceInfo workspace) { return new WorkspaceProcessService(workspace); }
     @Bean WorkspaceLanguageService workspaceLanguageService(WorkspaceFileService files) { return new WorkspaceLanguageService(files); }
     @Bean(destroyMethod = "close") ManagedProcessService managedProcessService(WorkspaceProcessService processes) { return new ManagedProcessService(processes); }
@@ -52,6 +57,31 @@ public class StudioMcpConfiguration {
     }
 
     @Bean
+    StudioDesktopSession studioDesktopSession(
+            WorkspaceInfo workspace,
+            WorkspaceFileService files,
+            WorkspaceConcurrencyService concurrentFiles,
+            WorkspaceLanguageService language,
+            ManagedProcessService processes,
+            MavenBuildService maven,
+            GradleBuildService gradle,
+            RuntimeBridgeService runtimeBridge,
+            StudioCollaborationService collaboration
+    ) {
+        return StudioDesktopSession.shared(
+                workspace,
+                files,
+                concurrentFiles,
+                language,
+                processes,
+                maven,
+                gradle,
+                runtimeBridge,
+                collaboration
+        );
+    }
+
+    @Bean
     StudioMcpTools studioMcpTools(
             WorkspaceInfo workspace, WorkspaceFileService files, WorkspaceProcessService workspaceProcesses,
             ManagedProcessService processes, MavenBuildService maven, GradleBuildService gradle,
@@ -66,15 +96,33 @@ public class StudioMcpConfiguration {
     @Bean RuntimeInvestigationMcpTools runtimeInvestigationMcpTools(RuntimeBridgeService bridge) { return new RuntimeInvestigationMcpTools(bridge); }
 
     @Bean
+    StudioCollaborationMcpTools studioCollaborationMcpTools(
+            StudioCollaborationService collaboration,
+            WorkspaceConcurrencyService concurrentFiles,
+            ManagedProcessService processes,
+            RuntimeBridgeService runtimeBridge
+    ) {
+        return new StudioCollaborationMcpTools(
+                collaboration,
+                concurrentFiles,
+                processes,
+                runtimeBridge
+        );
+    }
+
+    @Bean
     ToolCallbackProvider studioTools(
             StudioMcpTools studio,
             RuntimeEvidenceMcpTools evidence,
             RuntimeMappingMcpTools mappings,
             RuntimeBrowserEvidenceMcpTools browser,
-            RuntimeInvestigationMcpTools investigation
+            RuntimeInvestigationMcpTools investigation,
+            StudioCollaborationMcpTools collaboration,
+            StudioCollaborationService studioCollaborationService
     ) {
-        return MethodToolCallbackProvider.builder()
-                .toolObjects(studio, evidence, mappings, browser, investigation)
+        ToolCallbackProvider methods = MethodToolCallbackProvider.builder()
+                .toolObjects(studio, evidence, mappings, browser, investigation, collaboration)
                 .build();
+        return new StudioObservedToolCallbackProvider(methods, studioCollaborationService);
     }
 }

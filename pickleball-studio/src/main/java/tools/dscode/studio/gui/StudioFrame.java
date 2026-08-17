@@ -1,4 +1,3 @@
-
 package tools.dscode.studio.gui;
 
 import tools.dscode.studio.language.SourceDiagnostic;
@@ -7,8 +6,10 @@ import tools.dscode.studio.language.SourceSymbol;
 import tools.dscode.studio.process.ManagedProcessSummary;
 import tools.dscode.studio.process.ProcessOutputChunk;
 import tools.dscode.studio.process.ProcessState;
+import tools.dscode.studio.workspace.WorkspaceCheckedWriteResult;
+import tools.dscode.studio.workspace.WorkspaceConcurrencyService;
 import tools.dscode.studio.workspace.WorkspaceEntry;
-import tools.dscode.studio.workspace.WorkspaceTextFile;
+import tools.dscode.studio.workspace.WorkspaceVersionedTextFile;
 
 import javax.swing.DefaultListCellRenderer;
 import javax.swing.DefaultListModel;
@@ -65,6 +66,7 @@ final class StudioFrame extends JFrame {
     private final JList<SourceSymbol> symbolList = new JList<>(symbolModel);
     private final JTextArea output = new JTextArea();
     private final JLabel status = new JLabel("Ready");
+    private final JLabel unsaved = new JLabel("Unsaved: 0");
 
     private final JButton saveButton = new JButton("Save");
     private final JButton reloadButton = new JButton("Reload");
@@ -130,6 +132,8 @@ final class StudioFrame extends JFrame {
         bar.addSeparator();
         bar.add(runButton);
         bar.add(cancelButton);
+        bar.addSeparator();
+        bar.add(unsaved);
         return bar;
     }
 
@@ -329,20 +333,23 @@ final class StudioFrame extends JFrame {
 
         status.setText("Opening " + path + "...");
         async(
-                () -> session.read(path),
+                () -> session.readVersioned(path),
                 file -> openLoadedFile(file, line)
         );
     }
 
-    private void openLoadedFile(WorkspaceTextFile file, Integer line) {
+    private void openLoadedFile(WorkspaceVersionedTextFile file, Integer line) {
         EditorTab existing = editors.get(file.path());
         if (existing != null) {
             editorTabs.setSelectedComponent(existing);
             return;
         }
 
-        EditorTab tab = new EditorTab(file.path(), file.content(), () ->
-                SwingUtilities.invokeLater(() -> updateTabTitle(file.path()))
+        EditorTab tab = new EditorTab(
+                file.path(),
+                file.content(),
+                file.sha256(),
+                () -> SwingUtilities.invokeLater(() -> editorStateChanged(file.path()))
         );
         editors.put(file.path(), tab);
         editorTabs.addTab(tab.title(), tab);
@@ -350,9 +357,26 @@ final class StudioFrame extends JFrame {
         if (line != null) {
             tab.navigateToLine(line);
         }
+        publishEditorState(tab);
         updateActions();
         refreshOutline();
         status.setText(file.path());
+    }
+
+    private void editorStateChanged(String path) {
+        updateTabTitle(path);
+        EditorTab tab = editors.get(path);
+        if (tab != null) {
+            publishEditorState(tab);
+        }
+    }
+
+    private void publishEditorState(EditorTab tab) {
+        try {
+            session.editorState(tab.path(), tab.dirty(), tab.baseSha256());
+        } catch (RuntimeException ignored) {
+            // Editor presence must not interrupt local editing.
+        }
     }
 
     private void updateTabTitle(String path) {
@@ -381,14 +405,58 @@ final class StudioFrame extends JFrame {
         String content = tab.text();
         status.setText("Saving " + tab.path() + "...");
         async(
-                () -> session.save(tab.path(), content),
-                ignored -> {
-                    tab.markSaved(content);
-                    updateTabTitle(tab.path());
-                    refreshOutline();
-                    status.setText("Saved " + tab.path());
+                () -> session.saveChecked(tab.path(), tab.baseSha256(), content),
+                result -> {
+                    if (result.written()) {
+                        tab.markSaved(content, result.newSha256());
+                        updateTabTitle(tab.path());
+                        publishEditorState(tab);
+                        refreshOutline();
+                        status.setText("Saved " + tab.path());
+                    } else {
+                        handleSaveConflict(tab, content, result);
+                    }
                 }
         );
+    }
+
+    private void handleSaveConflict(
+            EditorTab tab,
+            String content,
+            WorkspaceCheckedWriteResult conflict
+    ) {
+        Object[] options = {"Overwrite disk", "Reload disk", "Cancel"};
+        int answer = JOptionPane.showOptionDialog(
+                this,
+                "The file changed on disk after this editor loaded it.\n"
+                        + "Expected: " + shortHash(conflict.expectedSha256()) + "\n"
+                        + "Current:  " + shortHash(conflict.actualSha256()) + "\n\n"
+                        + "Choose whether to overwrite the external change or reload it.",
+                "Concurrent edit detected",
+                JOptionPane.DEFAULT_OPTION,
+                JOptionPane.WARNING_MESSAGE,
+                null,
+                options,
+                options[2]
+        );
+        if (answer == 0) {
+            status.setText("Overwriting " + tab.path() + "...");
+            async(
+                    () -> session.save(tab.path(), content),
+                    ignored -> {
+                        String hash = WorkspaceConcurrencyService.sha256(content);
+                        tab.markSaved(content, hash);
+                        updateTabTitle(tab.path());
+                        publishEditorState(tab);
+                        refreshOutline();
+                        status.setText("Saved " + tab.path() + " after conflict confirmation");
+                    }
+            );
+        } else if (answer == 1) {
+            reloadEditor(tab);
+        } else {
+            status.setText("Save cancelled for " + tab.path());
+        }
     }
 
     private void reloadSelected() {
@@ -409,13 +477,17 @@ final class StudioFrame extends JFrame {
                 return;
             }
         }
+        reloadEditor(tab);
+    }
 
+    private void reloadEditor(EditorTab tab) {
         status.setText("Reloading " + tab.path() + "...");
         async(
-                () -> session.read(tab.path()),
+                () -> session.readVersioned(tab.path()),
                 file -> {
-                    tab.replaceSavedContent(file.content());
+                    tab.replaceSavedContent(file.content(), file.sha256());
                     updateTabTitle(tab.path());
+                    publishEditorState(tab);
                     refreshOutline();
                     status.setText("Reloaded " + tab.path());
                 }
@@ -613,6 +685,7 @@ final class StudioFrame extends JFrame {
         EditorTab tab = selectedEditor();
         saveButton.setEnabled(tab != null && tab.dirty());
         reloadButton.setEnabled(tab != null);
+        unsaved.setText("Unsaved: " + editors.values().stream().filter(EditorTab::dirty).count());
         if (activeProcessId == null) {
             runButton.setEnabled(session.testBuildTool() != null);
         }
@@ -661,6 +734,13 @@ final class StudioFrame extends JFrame {
                 "Pickleball Studio",
                 JOptionPane.ERROR_MESSAGE
         );
+    }
+
+    private static String shortHash(String hash) {
+        if (hash == null || hash.isBlank()) {
+            return "-";
+        }
+        return hash.length() <= 12 ? hash : hash.substring(0, 12);
     }
 
     private final class SymbolOpenMouseListener extends java.awt.event.MouseAdapter {

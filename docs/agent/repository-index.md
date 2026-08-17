@@ -50,6 +50,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/pickleball-studio.md`
 - `docs/README.md`
 - `docs/service-call-scenarios.md`
+- `docs/studio-collaboration.md`
 - `docs/studio-runtime-bridge.md`
 - `docs/studio-runtime-investigation.md`
 
@@ -431,6 +432,12 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `gradle/pickleball-studio.gradle`
 - `pickleball-studio/AGENTS.md`
 - `pickleball-studio/build.gradle`
+- `pickleball-studio/src/main/java/tools/dscode/studio/collaboration/StudioActivity.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/collaboration/StudioActivityPage.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/collaboration/StudioAgentSession.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/collaboration/StudioClientKind.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/collaboration/StudioCollaborationService.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/collaboration/StudioEditorState.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/gradle/GradleProjectInfo.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/gradle/GradleProjectModelService.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/gradle/GradleSourceDirectoryInfo.java`
@@ -443,6 +450,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-studio/src/main/java/tools/dscode/studio/gui/RuntimeEventPanel.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/gui/RuntimeEventTimeline.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/gui/RuntimeInvestigationPanel.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/gui/StudioCollaborationDialog.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/gui/StudioDesktopApplication.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/gui/StudioDesktopSession.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/gui/StudioFrame.java`
@@ -461,9 +469,12 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-studio/src/main/java/tools/dscode/studio/mcp/RuntimeEvidenceMcpTools.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/mcp/RuntimeInvestigationMcpTools.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/mcp/RuntimeMappingMcpTools.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/mcp/StudioCollaborationMcpTools.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/mcp/StudioMcpConfiguration.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/mcp/StudioMcpTools.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/mcp/StudioObservedToolCallbackProvider.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/mcp/StudioServer.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/mcp/StudioServerHandle.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/mcp/StudioWorkspaceStatus.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/process/ManagedProcessService.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/process/ManagedProcessSummary.java`
@@ -504,18 +515,23 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-studio/src/main/java/tools/dscode/studio/runtime/RuntimeValueResult.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/StudioApplication.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/workspace/TextSearchMatch.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/workspace/WorkspaceCheckedWriteResult.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/workspace/WorkspaceConcurrencyService.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/workspace/WorkspaceEntry.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/workspace/WorkspaceFileService.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/workspace/WorkspaceInfo.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/workspace/WorkspaceService.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/workspace/WorkspaceTextFile.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/workspace/WorkspaceVersionedTextFile.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/workspace/WorkspaceWriteResult.java`
+- `pickleball-studio/src/test/java/tools/dscode/studio/collaboration/StudioCollaborationServiceTest.java`
 - `pickleball-studio/src/test/java/tools/dscode/studio/gradle/GradleProjectModelServiceTest.java`
 - `pickleball-studio/src/test/java/tools/dscode/studio/gui/RuntimeEventTimelineTest.java`
 - `pickleball-studio/src/test/java/tools/dscode/studio/gui/StudioDesktopRuntimeControlTest.java`
 - `pickleball-studio/src/test/java/tools/dscode/studio/gui/StudioDesktopSessionTest.java`
 - `pickleball-studio/src/test/java/tools/dscode/studio/gui/WorkspaceTreeBuilderTest.java`
 - `pickleball-studio/src/test/java/tools/dscode/studio/language/WorkspaceLanguageServiceTest.java`
+- `pickleball-studio/src/test/java/tools/dscode/studio/mcp/StudioCollaborationMcpToolsTest.java`
 - `pickleball-studio/src/test/java/tools/dscode/studio/mcp/StudioMcpContextTest.java`
 - `pickleball-studio/src/test/java/tools/dscode/studio/mcp/StudioMcpToolsTest.java`
 - `pickleball-studio/src/test/java/tools/dscode/studio/process/ManagedProcessFixture.java`

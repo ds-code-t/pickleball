@@ -21,19 +21,27 @@ public final class StudioServer {
     }
 
     public static int start(Path workspace, int port, String requestedToken, PrintStream out, PrintStream err) {
-        if (port < 0 || port > 65535) {
-            err.println("Studio MCP port must be between 0 and 65535.");
-            return 2;
-        }
-
-        String token;
         try {
-            token = requestedToken == null ? generateToken() : validateToken(requestedToken);
+            StudioServerHandle handle = open(workspace, port, requestedToken);
+            out.println("Pickleball Studio MCP server ready");
+            out.println("Workspace: " + handle.workspace());
+            out.println("MCP endpoint: " + handle.endpointUrl());
+            return 0;
         } catch (IllegalArgumentException error) {
             err.println(error.getMessage());
             return 2;
+        } catch (RuntimeException error) {
+            err.println("Unable to start Pickleball Studio MCP server: " + error.getMessage());
+            return 2;
+        }
+    }
+
+    public static StudioServerHandle open(Path workspace, int port, String requestedToken) {
+        if (port < 0 || port > 65535) {
+            throw new IllegalArgumentException("Studio MCP port must be between 0 and 65535.");
         }
 
+        String token = requestedToken == null ? generateToken() : validateToken(requestedToken);
         Path root = workspace.toAbsolutePath().normalize();
         String endpoint = "/mcp/" + token;
 
@@ -45,8 +53,12 @@ public final class StudioServer {
         properties.put("spring.ai.mcp.server.name", "pickleball-studio");
         properties.put("spring.ai.mcp.server.version", studioVersion());
         properties.put("spring.ai.mcp.server.type", "SYNC");
-        properties.put("spring.ai.mcp.server.instructions",
-                "Use Pickleball Studio workspace tools for deterministic project inspection and file changes.");
+        properties.put(
+                "spring.ai.mcp.server.instructions",
+                "Use Pickleball Studio for deterministic project/runtime operations. "
+                        + "Start an agent_session for collaboration-aware work, check studio_editor_states before edits, "
+                        + "and use versioned checked writes when a human may be editing the same file."
+        );
         properties.put("spring.ai.mcp.server.capabilities.tool", true);
         properties.put("spring.ai.mcp.server.capabilities.resource", false);
         properties.put("spring.ai.mcp.server.capabilities.prompt", false);
@@ -57,32 +69,29 @@ public final class StudioServer {
         properties.put("spring.ai.mcp.server.streamable-http.mcp-endpoint", endpoint);
         properties.put("logging.level.root", "WARN");
 
-        try {
-            ConfigurableApplicationContext context = new SpringApplicationBuilder(StudioMcpConfiguration.class)
-                    .web(WebApplicationType.SERVLET)
-                    .bannerMode(Banner.Mode.OFF)
-                    .logStartupInfo(false)
-                    .properties(properties)
-                    .run();
+        ConfigurableApplicationContext context = new SpringApplicationBuilder(StudioMcpConfiguration.class)
+                .web(WebApplicationType.SERVLET)
+                .bannerMode(Banner.Mode.OFF)
+                .logStartupInfo(false)
+                .properties(properties)
+                .run();
 
-            if (!(context instanceof WebServerApplicationContext webContext)) {
-                context.close();
-                throw new IllegalStateException("Studio MCP server did not create a web application context.");
-            }
-            WebServer webServer = webContext.getWebServer();
-            if (webServer == null) {
-                context.close();
-                throw new IllegalStateException("Studio MCP server did not create a web server.");
-            }
-
-            out.println("Pickleball Studio MCP server ready");
-            out.println("Workspace: " + root);
-            out.println("MCP endpoint: http://127.0.0.1:" + webServer.getPort() + endpoint);
-            return 0;
-        } catch (RuntimeException error) {
-            err.println("Unable to start Pickleball Studio MCP server: " + error.getMessage());
-            return 2;
+        if (!(context instanceof WebServerApplicationContext webContext)) {
+            context.close();
+            throw new IllegalStateException("Studio MCP server did not create a web application context.");
         }
+        WebServer webServer = webContext.getWebServer();
+        if (webServer == null) {
+            context.close();
+            throw new IllegalStateException("Studio MCP server did not create a web server.");
+        }
+
+        return new StudioServerHandle(
+                context,
+                root,
+                webServer.getPort(),
+                endpoint
+        );
     }
 
     private static String studioVersion() {

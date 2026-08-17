@@ -29,6 +29,7 @@ docs/mapping-and-templating.md
 docs/nested-steps.md
 docs/pickleball-studio.md
 docs/service-call-scenarios.md
+docs/studio-collaboration.md
 docs/studio-runtime-bridge.md
 docs/studio-runtime-investigation.md
 maven-consumer-project/pom.xml

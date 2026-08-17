@@ -2,14 +2,19 @@ package tools.dscode.studio.mcp;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.tool.ToolCallbackProvider;
 import org.springframework.boot.Banner;
 import org.springframework.boot.WebApplicationType;
 import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.boot.web.server.context.WebServerApplicationContext;
 import org.springframework.context.ConfigurableApplicationContext;
+import tools.dscode.studio.collaboration.StudioCollaborationService;
+import tools.dscode.studio.gui.StudioDesktopSession;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -48,9 +53,29 @@ class StudioMcpContextTest {
             WebServerApplicationContext webContext = (WebServerApplicationContext) context;
             assertNotNull(webContext.getWebServer());
             assertTrue(webContext.getWebServer().getPort() > 0);
+            StudioDesktopSession desktop = context.getBean(StudioDesktopSession.class);
+            StudioCollaborationService collaboration = context.getBean(StudioCollaborationService.class);
+            assertNotNull(desktop);
+            desktop.activateDesktop();
+            assertTrue(collaboration.activity(0L, 20).activities().stream()
+                    .anyMatch(activity -> "desktop.session.open".equals(activity.operation())));
 
             ToolCallbackProvider provider = context.getBean("studioTools", ToolCallbackProvider.class);
-            assertEquals(42, provider.getToolCallbacks().length);
+            assertEquals(52, provider.getToolCallbacks().length);
+
+            ToolCallback write = Arrays.stream(provider.getToolCallbacks())
+                    .filter(callback -> "workspace_write_file".equals(
+                            callback.getToolDefinition().name()
+                    ))
+                    .findFirst()
+                    .orElseThrow();
+            write.call("{\"path\":\"observed.txt\",\"content\":\"hello\"}");
+            assertTrue(Files.exists(tempDir.resolve("observed.txt")));
+            assertTrue(collaboration.activity(0L, 50).activities().stream()
+                    .anyMatch(activity -> "workspace_write_file".equals(activity.target())
+                            && "mcp.tool".equals(activity.operation())));
+            assertTrue(collaboration.activity(0L, 50).activities().stream()
+                    .noneMatch(activity -> activity.detail().contains("hello")));
         }
     }
 }

@@ -1,5 +1,8 @@
 package tools.dscode.studio.gui;
 
+import tools.dscode.studio.mcp.StudioServer;
+import tools.dscode.studio.mcp.StudioServerHandle;
+
 import javax.swing.JMenu;
 import javax.swing.JMenuBar;
 import javax.swing.JMenuItem;
@@ -19,9 +22,12 @@ public final class StudioDesktopApplication {
             return 2;
         }
 
+        StudioServerHandle server;
         StudioDesktopSession session;
         try {
-            session = StudioDesktopSession.open(workspace);
+            server = StudioServer.open(workspace, 0, null);
+            session = server.context().getBean(StudioDesktopSession.class);
+            session.activateDesktop();
         } catch (IllegalArgumentException | IllegalStateException failure) {
             error.println(failure.getMessage());
             return 2;
@@ -37,10 +43,22 @@ public final class StudioDesktopApplication {
             try {
                 StudioFrame frame = new StudioFrame(session);
                 RuntimeControlDialog runtimeDialog = new RuntimeControlDialog(frame, session);
-                frame.setJMenuBar(menuBar(frame, runtimeDialog, session));
+                StudioCollaborationDialog collaborationDialog = new StudioCollaborationDialog(
+                        frame,
+                        session,
+                        server
+                );
+                frame.setJMenuBar(menuBar(frame, runtimeDialog, collaborationDialog, session));
+                frame.addWindowListener(new java.awt.event.WindowAdapter() {
+                    @Override
+                    public void windowClosed(java.awt.event.WindowEvent event) {
+                        server.close();
+                    }
+                });
                 frame.setVisible(true);
             } catch (RuntimeException failure) {
                 session.close();
+                server.close();
                 failure.printStackTrace(error);
             }
         });
@@ -50,6 +68,7 @@ public final class StudioDesktopApplication {
     private static JMenuBar menuBar(
             StudioFrame frame,
             RuntimeControlDialog runtimeDialog,
+            StudioCollaborationDialog collaborationDialog,
             StudioDesktopSession session
     ) {
         JMenuItem runtimeControl = new JMenuItem("Runtime Control...");
@@ -62,7 +81,16 @@ public final class StudioDesktopApplication {
         JMenu runtime = new JMenu("Runtime");
         runtime.add(runtimeControl);
 
+        JMenuItem collaboration = new JMenuItem("AI Collaboration...");
+        collaboration.addActionListener(event -> {
+            collaborationDialog.setLocationRelativeTo(frame);
+            collaborationDialog.setVisible(true);
+        });
+        JMenu studio = new JMenu("Studio");
+        studio.add(collaboration);
+
         JMenuBar menuBar = new JMenuBar();
+        menuBar.add(studio);
         menuBar.add(runtime);
         return menuBar;
     }
