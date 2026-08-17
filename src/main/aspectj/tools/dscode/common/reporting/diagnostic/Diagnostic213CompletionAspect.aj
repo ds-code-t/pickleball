@@ -679,16 +679,18 @@ public privileged aspect Diagnostic213CompletionAspect {
         if (state == null || !state.retained || state.eventCount == 0 || state.path == null) return;
         Path indexPath = reporter.runRoot.resolve("run-index.json");
         if (!Files.isRegularFile(indexPath)) return;
-        try {
-            Map<String, Object> index = DiagnosticReporter.JSON.readValue(indexPath.toFile(), LinkedHashMap.class);
-            Map<String, Object> trace = state.asMap();
-            index.put("runTraceEvidence", trace);
-            Map<String, Object> paths = new LinkedHashMap<>(asMap(index.get("paths")));
-            paths.put("runTrace", trace.get("path"));
-            index.put("paths", paths);
-            reporter.writeJsonAtomic(indexPath, index);
-        } catch (Throwable error) {
-            reporter.failEvidence("write run trace index metadata", error);
+        synchronized (reporter) {
+            try {
+                Map<String, Object> index = DiagnosticReporter.JSON.readValue(indexPath.toFile(), LinkedHashMap.class);
+                Map<String, Object> trace = state.asMap();
+                index.put("runTraceEvidence", trace);
+                Map<String, Object> paths = new LinkedHashMap<>(asMap(index.get("paths")));
+                paths.put("runTrace", trace.get("path"));
+                index.put("paths", paths);
+                reporter.writeJsonAtomic(indexPath, index);
+            } catch (Throwable error) {
+                reporter.failEvidence("write run trace index metadata", error);
+            }
         }
     }
 
