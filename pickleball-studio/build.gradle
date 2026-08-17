@@ -211,6 +211,9 @@ tasks.register('verifyBundledStudio') {
                     if (nestedJar.getEntry('BOOT-INF/classes/tools/dscode/studio/gui/StudioFrame.class') == null) {
                         throw new GradleException('Nested Studio JAR is missing the desktop UI')
                     }
+                    if (nestedJar.getEntry('BOOT-INF/classes/tools/dscode/studio/gui/RuntimeEventPanel.class') == null) {
+                        throw new GradleException('Nested Studio JAR is missing the desktop runtime event view')
+                    }
                     if (nestedJar.getEntry('BOOT-INF/classes/tools/dscode/studio/runtime/RuntimeBridgeService.class') == null) {
                         throw new GradleException('Nested Studio JAR is missing the runtime bridge client service')
                     }

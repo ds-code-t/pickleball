@@ -424,6 +424,8 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-studio/src/main/java/tools/dscode/studio/gui/EditorTab.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/gui/RuntimeControlDialog.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/gui/RuntimeDesktopState.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/gui/RuntimeEventPanel.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/gui/RuntimeEventTimeline.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/gui/StudioDesktopApplication.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/gui/StudioDesktopSession.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/gui/StudioFrame.java`
@@ -470,6 +472,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-studio/src/main/java/tools/dscode/studio/workspace/WorkspaceTextFile.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/workspace/WorkspaceWriteResult.java`
 - `pickleball-studio/src/test/java/tools/dscode/studio/gradle/GradleProjectModelServiceTest.java`
+- `pickleball-studio/src/test/java/tools/dscode/studio/gui/RuntimeEventTimelineTest.java`
 - `pickleball-studio/src/test/java/tools/dscode/studio/gui/StudioDesktopRuntimeControlTest.java`
 - `pickleball-studio/src/test/java/tools/dscode/studio/gui/StudioDesktopSessionTest.java`
 - `pickleball-studio/src/test/java/tools/dscode/studio/gui/WorkspaceTreeBuilderTest.java`

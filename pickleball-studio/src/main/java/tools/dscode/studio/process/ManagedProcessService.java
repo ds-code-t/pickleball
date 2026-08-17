@@ -224,12 +224,31 @@ public final class ManagedProcessService implements AutoCloseable {
             }
         }
 
-        private synchronized void cancel() {
-            if (state != ProcessState.RUNNING || !execution.process().isAlive()) {
+        private void cancel() {
+            boolean terminate;
+            synchronized (this) {
+                terminate = state == ProcessState.RUNNING && execution.process().isAlive();
+                if (terminate) {
+                    state = ProcessState.CANCELLED;
+                }
+            }
+
+            if (terminate) {
+                execution.terminateQuietly();
+            }
+            awaitLifecycle();
+        }
+
+        private void awaitLifecycle() {
+            Thread running = lifecycle;
+            if (running == null || running == Thread.currentThread()) {
                 return;
             }
-            state = ProcessState.CANCELLED;
-            execution.terminateQuietly();
+            try {
+                running.join();
+            } catch (InterruptedException error) {
+                Thread.currentThread().interrupt();
+            }
         }
 
         private ManagedProcessSummary summary() {

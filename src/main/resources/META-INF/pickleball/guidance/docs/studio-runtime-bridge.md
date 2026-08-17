@@ -323,7 +323,23 @@ The modeless Runtime Control window provides:
 
 The existing main-window **Run Tests** action remains bridge-free. Closing or hiding the Runtime Control window does not silently cancel the managed build. Cancelling uses the explicit **Cancel Run** action, while pause safety remains governed by the finite bridge lease. Closing Pickleball Studio closes `RuntimeBridgeService`, resumes discovered paused scenarios best-effort, then terminates owned managed processes.
 
-Phase 3D does not yet add an event-history view to the Swing dialog. The bounded event service is available to Studio/MCP first and can be rendered by a later desktop slice without changing the consumer bridge contract.
+## Desktop runtime-event evidence
+
+Phase 3E adds an **Events** tab to the same modeless Runtime Control window. It is a read-only Swing adapter over `StudioDesktopSession.runtimeEvents(...)` and therefore over `RuntimeBridgeService.events(...)`; it does not connect to the consumer bridge independently or implement another event recorder.
+
+The desktop event view follows the selected runtime and shows the whole runtime timeline by default. **Selected scenario only** changes the service query to the currently selected active scenario id. Switching sessions, runtimes, or the effective scenario filter resets the local cursor to zero so evidence from different streams is not merged.
+
+The client-side display intentionally has a separate bound from bridge retention:
+
+- consumer runtime retention: `2048` events;
+- bridge read page: up to `500` events;
+- desktop loaded-event display: `1000` events.
+
+If the bridge reports `gap=true`, the Events tab keeps that warning visible and shows the earliest available sequence. **Clear View** removes only loaded Swing text/events and retains the current `nextSequence` cursor. **Reload Retained** clears the view and resets the cursor to `0`, re-reading whatever still exists in the consumer runtime ring. Neither action changes consumer-side retention.
+
+When a page reports `hasMore=true`, the desktop continues reading immediately from `nextSequence`; ordinary periodic refresh then follows new events. Auto-tail is optional so a user inspecting older visible events is not forced back to the end on every refresh.
+
+Phase 3E changes no bridge endpoint, capability, protocol version, or MCP tool.
 
 ## Build-tool behavior
 
@@ -339,11 +355,9 @@ The bridge environment is added only through the opt-in managed-start overloads.
 
 Bridge metadata is separate from Pickleball execution RunVars. When a controller knows the intended Pickleball test settings, it should continue to supply those settings through the existing `pkb_runvars` controlled-run contract described in [AI Run Configuration](ai-run-configuration.md). `runtime_start` and the desktop controlled-run action do not reconstruct or replace that configuration model.
 
-## Current Phase 3D boundaries
+## Current Phase 3E boundaries
 
-Phase 3D adds bounded, cursor-based semantic event history and MCP access on top of the existing Phase 3 runtime bridge. It does **not** yet add:
-
-- a desktop event-history viewer;
+Phase 3E adds a bounded desktop event timeline over the existing Phase 3D evidence service. It does **not** yet add:
 - unbounded or persisted event history after the consumer runtime exits;
 - dedicated browser, service-call, or screenshot bridge commands beyond generic detached step execution;
 - mapping snapshot transfer through Studio;

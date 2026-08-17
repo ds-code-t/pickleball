@@ -442,7 +442,26 @@ The read is independent of the scenario-thread queue, so an AI can inspect evide
 
 Because `ControlRuntime` intentionally suppresses recursive observer dispatch for work initiated from an observer, this evidence describes the semantic boundaries observed during normal scenario traversal. It does not claim to enumerate every nested hook fired inside a detached bridge command; the command's returned result remains authoritative for that exploratory action.
 
-Phase 3D adds one MCP tool, bringing Studio to **31** tools. The existing Swing Runtime Control window remains unchanged in this slice; a later desktop slice can render the same `RuntimeBridgeService.events(...)` data without changing the consumer bridge.
+Phase 3D adds one MCP tool, bringing Studio to **31** tools.
+
+## Phase 3E: desktop runtime evidence timeline
+
+Phase 3E renders the Phase 3D evidence service in the existing Swing Runtime Control window without changing the consumer bridge protocol or MCP contract. The new **Events** tab polls `RuntimeBridgeService.events(...)` through `StudioDesktopSession`, using the same runtime/scenario selection already used by the control UI.
+
+The desktop timeline:
+
+- follows the selected consumer runtime and shows all scenarios by default so completed-scenario evidence remains visible while the runtime ring retains it;
+- can optionally filter to the currently selected active scenario with **Selected scenario only**;
+- requests up to 500 events per page and immediately continues while `hasMore=true`;
+- advances only with the returned `nextSequence` cursor and reports the bridge's `gap` state instead of hiding lost history;
+- keeps at most 1,000 loaded events in the Swing view, independently of the consumer runtime's 2,048-event retention ring;
+- provides **Clear View**, which removes only the local displayed events while keeping the current runtime cursor;
+- provides **Reload Retained**, which clears the view and restarts the read at cursor `0` so the currently retained runtime history is loaded again;
+- supports optional auto-tail while preserving the user's scroll position when auto-tail is disabled.
+
+Switching runtime sessions, runtimes, or the event scenario filter resets the desktop cursor so evidence from two different streams is never combined in one view. The desktop view does not add persistence: history still disappears when the consumer runtime exits, and the local 1,000-event display bound may omit older events even while they remain in the consumer's 2,048-event ring.
+
+Phase 3E adds no MCP tools, so Studio remains at **31** tools.
 
 ## Validation
 
@@ -453,7 +472,7 @@ Focused Studio validation:
 ./gradlew --rerun-tasks :pickleball-studio:verifyBundledStudio
 ```
 
-The Studio tests include real child-JVM process checks, managed incremental-output/cancellation and descendant-termination checks, synchronous plus managed Maven `--version` checks, cross-platform Gradle Wrapper fixture checks, a Gradle Tooling API project/source/task model fixture, Java/Gherkin source-outline and workspace-symbol navigation fixtures, non-headless-independent desktop-session/tree-model checks, runtime-bridge service/MCP registration checks, JSON-literal type-preservation checks for direct mapping writes, event-query/cursor client checks, and a desktop-facade controlled-run fixture that verifies bridge environment injection without requiring a live consumer JVM.
+The Studio tests include real child-JVM process checks, managed incremental-output/cancellation and descendant-termination checks, synchronous plus managed Maven `--version` checks, cross-platform Gradle Wrapper fixture checks, a Gradle Tooling API project/source/task model fixture, Java/Gherkin source-outline and workspace-symbol navigation fixtures, non-headless-independent desktop-session/tree-model checks, runtime-bridge service/MCP registration checks, JSON-literal type-preservation checks for direct mapping writes, event-query/cursor client checks, desktop timeline cursor/gap/display-bound checks, and a desktop-facade controlled-run fixture that verifies bridge environment injection without requiring a live consumer JVM.
 
 The Maven consumer additionally exercises the real loopback bridge against an active Pickleball scenario, including authenticated scenario targeting, bounded scenario-filtered event reads and cursor advancement while paused, live mapping write/read/resolve, retry-friendly detached failure, successful retry, and resume. The Tooling API test uses the Gradle installation already running the repository test build, so it does not require a host Gradle installation or a separate distribution download.
 
@@ -462,7 +481,7 @@ The Maven consumer additionally exercises the real loopback bridge against an ac
 - the outer Pickleball JAR contains the opaque nested Studio JAR;
 - Studio implementation classes do not leak into the outer consumer runtime classpath;
 - the nested JAR is a Spring Boot executable JAR whose `Start-Class` is `StudioApplication`;
-- the nested JAR contains the Swing desktop UI implementation;
+- the nested JAR contains the Swing desktop UI implementation, including the runtime event view;
 - the nested JAR contains the Spring AI WebMVC MCP server starter;
 - the nested JAR contains Gradle Tooling API 9.6.1;
 - the nested JAR contains Jackson databind for runtime-bridge JSON;
@@ -473,14 +492,13 @@ After focused validation, run the normal root and Maven-consumer validation from
 
 ## Current boundaries
 
-Phase 3D does **not** yet implement:
+Phase 3E does **not** yet implement:
 
 - syntax highlighting, code completion, editor refactoring, or live parsing of unsaved buffers;
 - full Gradle external dependency/classpath import;
 - persistent process/activity history, runtime-control history, runtime-event history, or desktop layout/session restoration across Studio/runtime restarts;
 - interactive terminal stdin/PTY support;
 - full Java semantic/classpath reference resolution, usages, or Gherkin-to-Java step binding;
-- a desktop runtime-event-history viewer;
 - mapping snapshot transfer or dedicated browser/service/screenshot bridge commands beyond generic detached step execution;
 - remote/non-loopback runtime control.
 

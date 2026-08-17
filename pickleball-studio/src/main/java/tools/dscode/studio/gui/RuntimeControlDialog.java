@@ -40,6 +40,7 @@ final class RuntimeControlDialog extends JDialog {
     private static final int MAX_OUTPUT_CHARS = 2 * 1024 * 1024;
 
     private final StudioDesktopSession session;
+    private final RuntimeEventPanel eventPanel;
     private final JButton startButton = new JButton("Start Control Run");
     private final JButton cancelButton = new JButton("Cancel Run");
     private final JButton refreshButton = new JButton("Refresh");
@@ -70,6 +71,7 @@ final class RuntimeControlDialog extends JDialog {
     RuntimeControlDialog(JFrame owner, StudioDesktopSession session) {
         super(owner, "Pickleball Runtime Control", false);
         this.session = session;
+        this.eventPanel = new RuntimeEventPanel(session);
 
         setDefaultCloseOperation(HIDE_ON_CLOSE);
         setMinimumSize(new Dimension(900, 700));
@@ -146,6 +148,7 @@ final class RuntimeControlDialog extends JDialog {
 
         JTabbedPane tabs = new JTabbedPane();
         tabs.addTab("Runtime", live);
+        tabs.addTab("Events", eventPanel);
         tabs.addTab("Build Output", new JScrollPane(buildOutput));
         return tabs;
     }
@@ -280,6 +283,7 @@ final class RuntimeControlDialog extends JDialog {
         runtimeStatus.setText("Waiting for a controlled run...");
         result.setText("");
         buildOutput.setText("");
+        eventPanel.reset();
         stdoutOffset = 0;
         stderrOffset = 0;
         stdoutTruncationReported = false;
@@ -322,6 +326,7 @@ final class RuntimeControlDialog extends JDialog {
                 state -> {
                     applyRuntimeState(state, preferredScenarioId);
                     bridgeRefreshInFlight = false;
+                    refreshEvents();
                 },
                 failure -> {
                     bridgeRefreshInFlight = false;
@@ -331,6 +336,14 @@ final class RuntimeControlDialog extends JDialog {
                                     : failure.getMessage()
                     );
                 }
+        );
+    }
+
+    private void refreshEvents() {
+        eventPanel.refresh(
+                bridgeSessionId,
+                selectedRuntimeId(),
+                selectedScenarioId()
         );
     }
 

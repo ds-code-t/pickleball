@@ -11,6 +11,7 @@ import java.time.Instant;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ManagedProcessServiceTest {
@@ -48,6 +49,7 @@ class ManagedProcessServiceTest {
             ManagedProcessSummary cancelled = managed.cancel(started.id());
 
             assertEquals(ProcessState.CANCELLED, cancelled.state());
+            assertNotNull(cancelled.completedAt());
             assertEquals(ProcessState.CANCELLED, waitForTerminal(managed, started.id()).state());
         }
     }
@@ -60,7 +62,9 @@ class ManagedProcessServiceTest {
             ProcessOutputChunk output = waitForOutput(managed, started.id(), "child=");
             long childPid = Long.parseLong(output.stdout().trim().substring("child=".length()));
 
-            managed.cancel(started.id());
+            ManagedProcessSummary cancelled = managed.cancel(started.id());
+            assertEquals(ProcessState.CANCELLED, cancelled.state());
+            assertNotNull(cancelled.completedAt());
             assertEquals(ProcessState.CANCELLED, waitForTerminal(managed, started.id()).state());
             waitForProcessExit(childPid);
         }

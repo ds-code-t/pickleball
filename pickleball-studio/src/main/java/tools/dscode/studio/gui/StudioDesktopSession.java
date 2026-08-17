@@ -13,6 +13,7 @@ import tools.dscode.studio.runtime.RuntimeBridgeDescriptor;
 import tools.dscode.studio.runtime.RuntimeBridgeService;
 import tools.dscode.studio.runtime.RuntimeBridgeStatus;
 import tools.dscode.studio.runtime.RuntimeControlResult;
+import tools.dscode.studio.runtime.RuntimeEventPage;
 import tools.dscode.studio.runtime.RuntimeLaunchResult;
 import tools.dscode.studio.runtime.RuntimeScenarioStatus;
 import tools.dscode.studio.runtime.RuntimeValueResult;
@@ -143,6 +144,22 @@ public final class StudioDesktopSession implements AutoCloseable {
                 selected.runtimeId(),
                 status,
                 scenarios
+        );
+    }
+
+    public RuntimeEventPage runtimeEvents(
+            String sessionId,
+            String runtimeId,
+            String scenarioId,
+            Long afterSequence,
+            Integer limit
+    ) {
+        return runtimeBridge.events(
+                sessionId,
+                runtimeId,
+                scenarioId,
+                afterSequence,
+                limit
         );
     }
 
