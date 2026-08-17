@@ -92,16 +92,16 @@ Feature: RUN step parameter variations
     * RUN
       | RunType   | RunKey        | pkb_featurename               | pkb_name                       | pkb_order |
       | SCENARIOS | pluralByTable | RUN step parameter variations | ^RUN parameter fixture [AB]$ | lexical   |
-    * , verify "<pluralByTable[][0].SCENARIO NAME>" equals "RUN parameter fixture A"
-    * , verify "<pluralByTable[][1].SCENARIO NAME>" equals "RUN parameter fixture B"
+    * , verify "<pluralByTable[][0].SCENARIO NAME[0]>" equals "RUN parameter fixture A"
+    * , verify "<pluralByTable[][1].SCENARIO NAME[0]>" equals "RUN parameter fixture B"
     * , verify "<pluralByTable.SCENARIO NAME>" equals "RUN parameter fixture B"
 
   Scenario: Table plural RunType overrides inline singular RunType
     * RUN SCENARIO
       | RunType   | RunKey             | pkb_featurename               | pkb_name                       | pkb_order |
       | SCENARIOS | tablePluralOverride | RUN step parameter variations | ^RUN parameter fixture [AB]$ | lexical   |
-    * , verify "<tablePluralOverride[][0].SCENARIO NAME>" equals "RUN parameter fixture A"
-    * , verify "<tablePluralOverride[][1].SCENARIO NAME>" equals "RUN parameter fixture B"
+    * , verify "<tablePluralOverride[][0].SCENARIO NAME[0]>" equals "RUN parameter fixture A"
+    * , verify "<tablePluralOverride[][1].SCENARIO NAME[0]>" equals "RUN parameter fixture B"
 
   Scenario: Deferred RUN saves explicit RETURN after the selected scenario completes
     * MAP TABLE VALUES TO SCENARIO MAP
