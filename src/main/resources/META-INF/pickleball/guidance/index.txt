@@ -27,7 +27,9 @@ docs/getting-started.md
 docs/key-parser-dsl.md
 docs/mapping-and-templating.md
 docs/nested-steps.md
+docs/pickleball-studio.md
 docs/service-call-scenarios.md
+docs/studio-runtime-bridge.md
 maven-consumer-project/pom.xml
 maven-consumer-project/src/test/java/com/example/pickleball/PickleballTests.java
 maven-consumer-project/src/test/java/com/example/pickleball/support/LocalTestSite.java
@@ -55,6 +57,7 @@ maven-consumer-project/src/test/resources/data/files/customerPayload.json
 maven-consumer-project/src/test/resources/features/catalog-context.feature
 maven-consumer-project/src/test/resources/features/component-scenarios.feature
 maven-consumer-project/src/test/resources/features/configuration-system-properties.feature
+maven-consumer-project/src/test/resources/features/control-bridge.feature
 maven-consumer-project/src/test/resources/features/data-element-all-phases.feature
 maven-consumer-project/src/test/resources/features/data-element-native-collections.feature
 maven-consumer-project/src/test/resources/features/data-element-native-formats.feature

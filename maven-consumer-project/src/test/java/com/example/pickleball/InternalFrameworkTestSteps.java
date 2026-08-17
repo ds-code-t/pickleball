@@ -1,3 +1,4 @@
+
 package com.example.pickleball;
 
 import com.example.pickleball.support.InternalJavaTestRunner;
@@ -39,7 +40,8 @@ public final class InternalFrameworkTestSteps {
                 BusinessTimePostModifierChecks.class,
                 PkbPropertyValueNormalizerChecks.class,
                 ProfileConfigurationChecks.class,
-                DynamicControlApiChecks.class
+                DynamicControlApiChecks.class,
+                ControlRuntimeObserverChecks.class
         );
     }
 

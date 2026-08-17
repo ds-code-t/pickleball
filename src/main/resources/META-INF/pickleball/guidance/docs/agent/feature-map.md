@@ -5,8 +5,9 @@ This file maps consumer-visible capabilities to their likely implementation anch
 | Capability | Implementation and search anchors | Framework tests | Maven consumer coverage | Canonical documentation |
 |---|---|---|---|---|
 | Build, publication, and Java compatibility | `build.gradle`; `src/main/aspectj`; search `publishing`, `shadowJar`, `aspectj`, `JavaLanguageVersion` | `src/test`; build verification | `maven-consumer-project/pom.xml`; Maven wrappers; `PickleballTests.java` | `README.md`; `docs/getting-started.md`; `docs/cucumber-compatibility.md`; `docs/consumer-project.md` |
+| Pickleball Studio isolated application, Swing workspace/editor UI, workspace/file/process services, managed process lifecycle/history/output, self-contained Maven and Gradle Wrapper execution, Gradle Tooling API project/source/task models, Java/Gherkin source definition navigation, private live consumer-runtime bridge, and Streamable-HTTP MCP foundation | `pickleball-studio`; `pickleball-studio/src/main/java/tools/dscode/studio/gui`; `pickleball-studio/src/main/java/tools/dscode/studio/runtime`; `pickleball-studio/src/main/java/tools/dscode/studio/workspace`; `pickleball-studio/src/main/java/tools/dscode/studio/process`; `pickleball-studio/src/main/java/tools/dscode/studio/build`; `pickleball-studio/src/main/java/tools/dscode/studio/gradle`; `pickleball-studio/src/main/java/tools/dscode/studio/language`; `pickleball-studio/src/main/java/tools/dscode/studio/mcp`; `src/main/java/tools/dscode/studio/launcher`; `gradle/pickleball-studio.gradle`; search `StudioApplication`, `StudioDesktopApplication`, `StudioDesktopSession`, `StudioFrame`, `RuntimeBridgeService`, `RuntimeBridgeClient`, `RuntimeLaunchResult`, `WorkspaceFileService`, `ManagedProcessService`, `MavenBuildService`, `GradleBuildService`, `GradleProjectModelService`, `WorkspaceLanguageService`, `StudioMcpTools`, `verifyBundledStudio` | `pickleball-studio/src/test/java`; `StudioDesktopSessionTest`; `WorkspaceTreeBuilderTest`; `RuntimeBridgeServiceTest`; `WorkspaceFileServiceTest`; `WorkspaceProcessServiceTest`; `ManagedProcessServiceTest`; `MavenBuildServiceTest`; `GradleBuildServiceTest`; `GradleProjectModelServiceTest`; `WorkspaceLanguageServiceTest`; `StudioMcpToolsTest`; `StudioMcpContextTest`; `:pickleball-studio:test`; `:pickleball-studio:verifyBundledStudio` | `control-bridge.feature`; consumer `ControlBridgeTestSteps.java` validates authenticated loopback pause/fail-retry/success/resume behavior against a live scenario; the consumer dependency remains the single `tools.dscode:pickleball` artifact; Phase 3A launch is explicit/opt-in, uses random loopback ports plus per-session bearer tokens, executes live control calls on the scenario thread, preserves existing primary `ControlRuntime` handlers, and leaves ordinary Studio builds bridge-free | `docs/pickleball-studio.md`; `docs/studio-runtime-bridge.md`; `pickleball-studio/AGENTS.md` |
 | Dynamic steps and expression execution | `src/main/java/tools/dscode/coredefinitions/DynamicSteps.java`; `src/main/java/tools/dscode/common/treeparsing`; `CucumberOptionResolver.java` | Search `src/test` for step/expression checks | `dynamic-steps.feature`; `forms-dynamic-steps.feature` | `docs/dynamic-steps.md` |
-| Dynamic control API, mapping emulation, and semantic interception hooks | `pickleball-control-api`; `src/main/java/tools/dscode/common/control`; `src/main/aspectj/tools/dscode/common/control/ControlRuntimeAspect.aj` (annotation-style woven aspect; `.java` path is an inert Javadoc compatibility placeholder); `DynamicExecution.java`; `StepExtension.java`; `MappingProcessor.java`; `ParsingMap.java`; `NodeMap.java`; search `ControlHook`, `ControlValueEvent`, `ControlExecutionScope`, `DynamicControl`, `MappingControl`, `MappingContext`, `MappingSnapshot`, `BEFORE_MAPPING_RESOLVE`, `BEFORE_MAPPING_LOOKUP`, `BEFORE_MAPPING_WRITE`, `BEFORE_DOM_ACCESS`, `BEFORE_DRIVER_COMMAND` | Build/weaving verification | Consumer-hosted `DynamicControlApiChecks.java` through `internal-framework-java-checks.feature`; `maven-consumer-project/pom.xml` verifies the API through the single main Pickleball dependency | `docs/dynamic-control-api.md` |
+| Dynamic control API, mapping emulation, semantic interception hooks, and consumer-side Studio bridge runtime | `pickleball-control-api`; `pickleball-control-api/src/main/java/tools/dscode/control/bridge`; `src/main/java/tools/dscode/common/control`; `src/main/aspectj/tools/dscode/common/control/ControlRuntimeAspect.aj` (annotation-style woven aspect; `.java` path is an inert Javadoc compatibility placeholder); `DynamicExecution.java`; `StepExtension.java`; `MappingProcessor.java`; `ParsingMap.java`; `NodeMap.java`; search `ControlHook`, `ControlValueEvent`, `ControlExecutionScope`, `ControlRuntime.addObserver`, `DynamicControl`, `ControlBridgeBootstrap`, `ControlBridgeRuntime`, `ControlBridgeCoordinator`, `MappingControl`, `MappingContext`, `MappingSnapshot`, `BEFORE_MAPPING_RESOLVE`, `BEFORE_MAPPING_LOOKUP`, `BEFORE_MAPPING_WRITE`, `BEFORE_DOM_ACCESS`, `BEFORE_DRIVER_COMMAND` | Build/weaving verification | Consumer-hosted `DynamicControlApiChecks.java` and `ControlRuntimeObserverChecks.java` through `internal-framework-java-checks.feature`; `control-bridge.feature`; `ControlBridgeTestSteps.java`; `maven-consumer-project/pom.xml` verifies the APIs through the single main Pickleball dependency | `docs/dynamic-control-api.md`; `docs/studio-runtime-bridge.md` |
 | Selenium navigation and element interaction | `BrowserSteps.java`; `NavigationSteps.java`; `ElementWrapper.java`; `HumanInteractions.java`; `SeleniumUtils.java` | Search element/interaction tests | `navigation.feature`; `forms-dynamic-steps.feature`; `dialogs.feature`; `catalog-context.feature`; test-site pages | `docs/dynamic-steps.md`; `docs/custom-element-definitions.md` |
 | Custom element definitions and catalog context | Search `src/main/java` for `ElementDefinition`, `Catalog`, `Selector`, `Locator` | Search catalog/selector tests | `catalog-context.feature`; `forms-dynamic-steps.feature`; `site/catalog.html`; `site/forms.html` | `docs/custom-element-definitions.md`; `docs/config-files-and-resource-mapping.md` |
 | Keyboard and key-expression DSL | `KeyParser.java`; mapping query classes; search `Keyboard`, `Tokenized`, `Query` | Search key/query tests | `keyboard.feature`; `site/keyboard.html` | `docs/key-parser-dsl.md` |
@@ -31,7 +32,7 @@ Normal project configuration resolves before profile selection. Public normal so
 
 `pkb_runvars` is the public controlled-run input. It accepts either one compact assignment string or expanded `pkb_runvars.<pkb_var>` members; the forms cannot be mixed. A selected YAML/inline profile may also provide `pkb_runvars` as an assignment string or RunVar map. When controlled RunVars are active, optional normal RunVars do not leak into the controlled execution.
 
-A named profile or controlled run inherits only missing project execution-context keys: `pkb_glue`, `pkb_features`, `pkb_datapath`, `pkb_callpath`, `pkb_componentpath`, and `pkb_configpath`. An explicit blank/null member suppresses inheritance and remains a replayable blank tombstone in the final canonical profile so existing subsystem fallback semantics are preserved. The literal compact value `null` has no special meaning.
+A named profile or controlled run inherits only missing project execution-context RunVars: `pkb_glue`, `pkb_features`, `pkb_datapath`, `pkb_callpath`, `pkb_componentpath`, and `pkb_configpath`. An explicit blank/null member suppresses inheritance and remains a replayable blank tombstone in the final canonical profile so existing subsystem fallback semantics are preserved. The literal compact value `null` has no special meaning.
 
 After template resolution, the final effective RunVars are always serialized deterministically into `pkb_run_profile`. `pkb_run_profile` is canonical derived output only; compact or expanded external input is rejected. Sensitive nonblank values serialize through `${protected:<pkb-key>}`; genuinely blank sensitive values stay blank.
 
@@ -56,8 +57,8 @@ feature.scenario.marker
 Only unescaped periods delimit components:
 
 ```text
-\.    literal period
-\\    literal backslash
+\\.    literal period
+\\\\    literal backslash
 ```
 
 Examples:
@@ -65,7 +66,7 @@ Examples:
 ```text
 RUN SCENARIO: Selection fixture A
 RUN SCENARIO: Reusable scenario selection.Selection fixture B
-RUN COMPONENT SCENARIO: Data\.reference\.records.Escaped\.selector fixture.start\.marker
+RUN COMPONENT SCENARIO: Data\\.reference\\.records.Escaped\\.selector fixture.start\\.marker
 RUN "health" SERVICE CALL: Reusable service call definitions.HealthCall
 CALL: HealthCall
 <$CALL:ExplicitNullReturnCall>
@@ -87,7 +88,7 @@ Without a leading slash, marker addresses are right-aligned:
 <data:marker>
 <data:scenario.marker>
 <data:feature.scenario.marker>
-<data:Data\.reference\.records.Customer\.record.payload\.marker>
+<data:Data\\.reference\\.records.Customer\\.record.payload\\.marker>
 ```
 
 Marker mapping references resolve to the attached native `DataTable` or `DocString`. Java marker APIs continue to return `ScenarioStepData`.

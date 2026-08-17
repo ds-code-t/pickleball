@@ -19,6 +19,11 @@ import tools.dscode.studio.process.ManagedProcessSummary;
 import tools.dscode.studio.process.ProcessOutputChunk;
 import tools.dscode.studio.process.ProcessResult;
 import tools.dscode.studio.process.WorkspaceProcessService;
+import tools.dscode.studio.runtime.RuntimeBridgeDescriptor;
+import tools.dscode.studio.runtime.RuntimeBridgeService;
+import tools.dscode.studio.runtime.RuntimeBridgeStatus;
+import tools.dscode.studio.runtime.RuntimeControlResult;
+import tools.dscode.studio.runtime.RuntimeLaunchResult;
 import tools.dscode.studio.workspace.TextSearchMatch;
 import tools.dscode.studio.workspace.WorkspaceEntry;
 import tools.dscode.studio.workspace.WorkspaceFileService;
@@ -41,6 +46,7 @@ public final class StudioMcpTools {
     private final GradleBuildService gradle;
     private final GradleProjectModelService gradleModel;
     private final WorkspaceLanguageService language;
+    private final RuntimeBridgeService runtimeBridge;
 
     public StudioMcpTools(
             WorkspaceInfo workspace,
@@ -50,7 +56,8 @@ public final class StudioMcpTools {
             MavenBuildService maven,
             GradleBuildService gradle,
             GradleProjectModelService gradleModel,
-            WorkspaceLanguageService language
+            WorkspaceLanguageService language,
+            RuntimeBridgeService runtimeBridge
     ) {
         this.workspace = workspace;
         this.files = files;
@@ -60,6 +67,7 @@ public final class StudioMcpTools {
         this.gradle = gradle;
         this.gradleModel = gradleModel;
         this.language = language;
+        this.runtimeBridge = runtimeBridge;
     }
 
     @Tool(
@@ -181,7 +189,7 @@ public final class StudioMcpTools {
             description = "Return current state and metadata for one managed Studio process."
     )
     public ManagedProcessSummary processStatus(
-            @ToolParam(description = "Studio process id returned by process_start, maven_start, or gradle_start.") String id
+            @ToolParam(description = "Studio process id returned by process_start, maven_start, gradle_start, or runtime_start.") String id
     ) {
         return managedProcesses.status(id);
     }
@@ -318,5 +326,91 @@ public final class StudioMcpTools {
     ) {
         return language.findDefinitions(name, sourceLanguage, kinds, maxResults);
     }
+
+
+    @Tool(
+            name = "runtime_start",
+            description = "Start an opt-in Pickleball test run with the private Studio runtime bridge enabled. The build is managed by Studio; bridge control is not enabled for ordinary maven_start or gradle_start calls."
+    )
+    public RuntimeLaunchResult runtimeStart(
+            @ToolParam(description = "Build goals/tasks and options. Empty defaults to [\"test\"].", required = false)
+            List<String> buildArguments,
+            @ToolParam(description = "Managed build timeout in seconds. Defaults to 3600.", required = false)
+            Integer timeoutSeconds,
+            @ToolParam(description = "Pause the first Pickleball scenario at its first semantic control hook. Defaults to true.", required = false)
+            Boolean pauseFirstScenario
+    ) {
+        return runtimeBridge.start(buildArguments, timeoutSeconds, pauseFirstScenario);
+    }
+
+    @Tool(
+            name = "runtime_list",
+            description = "List live consumer test JVMs that have published a private runtime bridge descriptor for one Studio runtime session."
+    )
+    public List<RuntimeBridgeDescriptor> runtimeList(
+            @ToolParam(description = "Session id returned by runtime_start.") String sessionId
+    ) {
+        return runtimeBridge.list(sessionId);
+    }
+
+    @Tool(
+            name = "runtime_status",
+            description = "Read live Pickleball scenario/control state from one consumer test JVM."
+    )
+    public RuntimeBridgeStatus runtimeStatus(
+            @ToolParam(description = "Session id returned by runtime_start.") String sessionId,
+            @ToolParam(description = "Runtime id returned by runtime_list.") String runtimeId
+    ) {
+        return runtimeBridge.status(sessionId, runtimeId);
+    }
+
+    @Tool(
+            name = "runtime_pause",
+            description = "Request a live Pickleball runtime to pause at a semantic control hook. A finite pause lease prevents an abandoned controller from blocking the scenario indefinitely."
+    )
+    public RuntimeControlResult runtimePause(
+            @ToolParam(description = "Session id returned by runtime_start.") String sessionId,
+            @ToolParam(description = "Runtime id returned by runtime_list.") String runtimeId,
+            @ToolParam(description = "Seconds to wait for a pausable hook. Defaults to 30; maximum 600.", required = false)
+            Integer waitSeconds,
+            @ToolParam(description = "Maximum pause lease in seconds. Defaults to 120; maximum 3600.", required = false)
+            Integer leaseSeconds
+    ) {
+        return runtimeBridge.pause(sessionId, runtimeId, waitSeconds, leaseSeconds);
+    }
+
+    @Tool(
+            name = "runtime_resume",
+            description = "Resume a paused Pickleball runtime. This operation is idempotent."
+    )
+    public RuntimeControlResult runtimeResume(
+            @ToolParam(description = "Session id returned by runtime_start.") String sessionId,
+            @ToolParam(description = "Runtime id returned by runtime_list.") String runtimeId
+    ) {
+        return runtimeBridge.resume(sessionId, runtimeId);
+    }
+
+    @Tool(
+            name = "runtime_execute_step",
+            description = "Execute one retry-friendly detached Pickleball step on the selected scenario thread. FAILED or UNAVAILABLE is returned as data so a controller can inspect the result and try another step without automatically failing the scenario."
+    )
+    public RuntimeControlResult runtimeExecuteStep(
+            @ToolParam(description = "Session id returned by runtime_start.") String sessionId,
+            @ToolParam(description = "Runtime id returned by runtime_list.") String runtimeId,
+            @ToolParam(description = "Pickleball/Cucumber step text to create and execute.") String text,
+            @ToolParam(description = "Optional doc-string/table argument text.", required = false)
+            String argument,
+            @ToolParam(description = "Seconds to wait for the scenario-thread command. Defaults to 60; maximum 3600.", required = false)
+            Integer timeoutSeconds
+    ) {
+        return runtimeBridge.executeStep(
+                sessionId,
+                runtimeId,
+                text,
+                argument,
+                timeoutSeconds
+        );
+    }
+
 
 }

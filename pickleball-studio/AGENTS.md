@@ -88,9 +88,27 @@ Phase 2H adds the Swing desktop workspace/editor adapter.
 - The current editor is plain text. Do not claim syntax highlighting, completion, semantic Java resolution, Gherkin step binding, refactoring, persistent desktop session state, or an interactive PTY terminal until implemented explicitly.
 - Closing the UI may discard unsaved text only after explicit user confirmation.
 
+## Live runtime bridge
+
+Phase 3A adds the explicit Studio-JVM-to-consumer-test-JVM control boundary through `RuntimeBridgeService` and `tools.dscode.control.bridge`.
+
+- The bridge is opt-in per `runtime_start`; ordinary Maven/Gradle execution and the desktop **Run Tests** action must remain bridge-free.
+- Consumer bridge servers bind only to `127.0.0.1` on operating-system-assigned ports and require a per-session bearer token.
+- Never write the bearer token into runtime descriptor files, logs, MCP results, or documentation examples.
+- Runtime descriptors are discovery metadata only. The Studio-owned session retains the token.
+- Commands that require live Pickleball state must execute on the actual scenario thread through the bridge's semantic-hook queue. Do not call `DynamicControl` directly from HTTP/MCP worker threads.
+- The bridge registers through additive `ControlRuntime` observers. Do not replace or clear a consumer's primary global/thread-local control handler.
+- Observer decisions are ignored; the existing primary handler remains authoritative for `ControlDecision` and value replacement.
+- Pause requests must use finite leases and timed-out pause requests must be withdrawn.
+- When parallel active scenarios are ambiguous, return `UNAVAILABLE` rather than selecting an arbitrary scenario thread.
+- `RuntimeBridgeService` owns Studio session/token/discovery/client behavior. MCP tools are adapters over that service.
+- Existing `ManagedProcessService` remains the owner of the launched build process, output, cancellation, and descendant cleanup.
+- Phase 3A exposes status, pause, resume, and generic retry-friendly detached step execution. Do not claim dedicated browser/service/mapping bridge commands, explicit parallel-scenario targeting, streaming hook history, or GUI runtime controls until implemented.
+- Runtime bridge transport is an internal Studio/Pickleball protocol. External AI clients should use Studio MCP rather than connecting to consumer bridge ports directly.
+
 ## MCP
 
-Phase 2B introduced Spring AI Streamable-HTTP through the WebMVC server starter. Phase 2C added one-shot process and Maven tools. Phase 2D added managed process lifecycle tools. Phase 2E added synchronous and managed Gradle Wrapper execution. Phase 2F adds read-only Gradle Tooling API model/navigation tools. Phase 2G adds read-only Java/Gherkin source navigation tools. Phase 2H adds a Swing desktop adapter over those same services; it does not change the 20-tool MCP contract.
+Phase 2B introduced Spring AI Streamable-HTTP through the WebMVC server starter. Phase 2C added one-shot process and Maven tools. Phase 2D added managed process lifecycle tools. Phase 2E added synchronous and managed Gradle Wrapper execution. Phase 2F adds read-only Gradle Tooling API model/navigation tools. Phase 2G adds read-only Java/Gherkin source navigation tools. Phase 2H added a Swing desktop adapter over those same services. Phase 3A adds six runtime bridge tools, bringing the MCP contract to 26 tools.
 
 - Bind the Studio MCP server to loopback only.
 - Keep the per-launch endpoint token behavior unless a later authentication design explicitly replaces it.
@@ -98,9 +116,9 @@ Phase 2B introduced Spring AI Streamable-HTTP through the WebMVC server starter.
 - Keep synchronous `process_run` / `maven_run` / `gradle_run` for one-call execution.
 - Gradle model/navigation tools are `gradle_model` and `gradle_tasks`; they must remain read-only adapters over `GradleProjectModelService`.
 - Source navigation tools are `source_outline`, `symbol_search`, and `symbol_definitions`; they must remain read-only adapters over `WorkspaceLanguageService`.
-- Managed runs use `process_start`, `process_list`, `process_status`, `process_output`, `process_cancel`, `maven_start`, and `gradle_start`.
+- Managed runs use `process_start`, `process_list`, `process_status`, `process_output`, `process_cancel`, `maven_start`, and `gradle_start`; `runtime_start` also returns an ordinary managed process id for the bridge-enabled build.
 - Managed run ids and history belong to the running Studio server/JVM; do not imply persistence across Studio restarts.
-- MCP does not yet imply Pickleball runtime connectivity. Phase 3 must use an explicit Studio-JVM-to-consumer-test-JVM bridge.
+- Runtime bridge MCP tools are `runtime_start`, `runtime_list`, `runtime_status`, `runtime_pause`, `runtime_resume`, and `runtime_execute_step`; they must remain adapters over `RuntimeBridgeService`.
 
 ## Current phase
 
@@ -120,6 +138,8 @@ Phase 2G adds parse-only Java and Gherkin definition outlines, workspace symbol 
 
 Phase 2H adds the first Swing workspace/editor UI with file editing, saved-source outline/symbol navigation, managed Gradle/Maven test execution, output, and cancellation.
 
-Do not claim that syntax highlighting/completion, live unsaved-buffer parsing, full Gradle dependency/classpath import, persistent run/activity or desktop session state, interactive terminal input, semantic Java reference/type analysis, Gherkin step binding, or live Pickleball control is implemented until those later slices are added.
+Phase 3A adds opt-in private loopback runtime sessions, descriptor discovery, live status, finite-lease pause/resume, and retry-friendly detached step execution through the existing Pickleball control API.
+
+Do not claim that syntax highlighting/completion, live unsaved-buffer parsing, full Gradle dependency/classpath import, persistent run/activity or desktop session state, interactive terminal input, semantic Java reference/type analysis, Gherkin step binding, GUI runtime controls, explicit parallel-scenario targeting, streaming hook history, or dedicated browser/service/mapping bridge commands are implemented until those later slices are added.
 
 See `docs/pickleball-studio.md`.

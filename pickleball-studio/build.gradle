@@ -31,6 +31,7 @@ dependencies {
     implementation platform('org.springframework.boot:spring-boot-dependencies:4.1.0')
     implementation platform('org.springframework.ai:spring-ai-bom:2.0.0')
     implementation 'org.springframework.ai:spring-ai-starter-mcp-server-webmvc'
+    implementation 'com.fasterxml.jackson.core:jackson-databind:2.20.0'
 
     // Studio embeds the public Gradle Tooling API for project model/navigation.
     // The API follows each workspace's project-specific Gradle distribution by
@@ -210,6 +211,9 @@ tasks.register('verifyBundledStudio') {
                     if (nestedJar.getEntry('BOOT-INF/classes/tools/dscode/studio/gui/StudioFrame.class') == null) {
                         throw new GradleException('Nested Studio JAR is missing the desktop UI')
                     }
+                    if (nestedJar.getEntry('BOOT-INF/classes/tools/dscode/studio/runtime/RuntimeBridgeService.class') == null) {
+                        throw new GradleException('Nested Studio JAR is missing the runtime bridge client service')
+                    }
                     def hasMcpStarter = java.util.Collections.list(nestedJar.entries()).any {
                         it.name.startsWith('BOOT-INF/lib/spring-ai-starter-mcp-server-webmvc-')
                     }
@@ -221,6 +225,12 @@ tasks.register('verifyBundledStudio') {
                     }
                     if (!hasGradleToolingApi) {
                         throw new GradleException('Nested Studio JAR is missing the Gradle Tooling API')
+                    }
+                    def hasJacksonDatabind = java.util.Collections.list(nestedJar.entries()).any {
+                        it.name.startsWith('BOOT-INF/lib/jackson-databind-') && it.name.endsWith('.jar')
+                    }
+                    if (!hasJacksonDatabind) {
+                        throw new GradleException('Nested Studio JAR is missing Jackson databind for runtime bridge JSON')
                     }
                     if (nestedJar.getEntry('BOOT-INF/lib/gherkin-35.1.0.jar') == null) {
                         throw new GradleException('Nested Studio JAR is missing Gherkin 35.1.0')

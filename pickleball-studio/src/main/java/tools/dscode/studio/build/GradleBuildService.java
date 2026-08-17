@@ -9,6 +9,7 @@ import tools.dscode.studio.workspace.WorkspaceInfo;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -45,6 +46,14 @@ public final class GradleBuildService {
     }
 
     public ManagedGradleRunResult start(List<String> arguments, Integer timeoutSeconds) {
+        return start(arguments, timeoutSeconds, Map.of());
+    }
+
+    public ManagedGradleRunResult start(
+            List<String> arguments,
+            Integer timeoutSeconds,
+            Map<String, String> additionalEnvironment
+    ) {
         if (managedProcesses == null) {
             throw new IllegalStateException("Managed Gradle execution requires ManagedProcessService");
         }
@@ -54,9 +63,21 @@ public final class GradleBuildService {
                 prepared.command(),
                 Path.of("."),
                 prepared.timeoutSeconds(),
-                prepared.environment()
+                environment(prepared.environment(), additionalEnvironment)
         );
         return new ManagedGradleRunResult(prepared.wrapper(), process);
+    }
+
+    private static Map<String, String> environment(
+            Map<String, String> fixed,
+            Map<String, String> additional
+    ) {
+        Map<String, String> result = new HashMap<>();
+        if (additional != null) {
+            result.putAll(additional);
+        }
+        result.putAll(fixed);
+        return Map.copyOf(result);
     }
 
     private PreparedGradle prepare(List<String> arguments, Integer timeoutSeconds) {

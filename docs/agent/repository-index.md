@@ -50,6 +50,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/pickleball-studio.md`
 - `docs/README.md`
 - `docs/service-call-scenarios.md`
+- `docs/studio-runtime-bridge.md`
 
 ## Framework Java and AspectJ source
 
@@ -395,6 +396,13 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-control-api/src/main/java/tools/dscode/control/api/OverrideScope.java`
 - `pickleball-control-api/src/main/java/tools/dscode/control/api/ResolutionCandidate.java`
 - `pickleball-control-api/src/main/java/tools/dscode/control/api/ResolutionExplanation.java`
+- `pickleball-control-api/src/main/java/tools/dscode/control/bridge/ControlBridgeBootstrap.java`
+- `pickleball-control-api/src/main/java/tools/dscode/control/bridge/ControlBridgeCallResult.java`
+- `pickleball-control-api/src/main/java/tools/dscode/control/bridge/ControlBridgeCoordinator.java`
+- `pickleball-control-api/src/main/java/tools/dscode/control/bridge/ControlBridgeDescriptor.java`
+- `pickleball-control-api/src/main/java/tools/dscode/control/bridge/ControlBridgeError.java`
+- `pickleball-control-api/src/main/java/tools/dscode/control/bridge/ControlBridgeRuntime.java`
+- `pickleball-control-api/src/main/java/tools/dscode/control/bridge/ControlBridgeStatus.java`
 
 ## Pickleball Studio module
 
@@ -432,6 +440,13 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-studio/src/main/java/tools/dscode/studio/process/ProcessResult.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/process/ProcessState.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/process/WorkspaceProcessService.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/runtime/RuntimeBridgeClient.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/runtime/RuntimeBridgeDescriptor.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/runtime/RuntimeBridgeError.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/runtime/RuntimeBridgeService.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/runtime/RuntimeBridgeStatus.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/runtime/RuntimeControlResult.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/runtime/RuntimeLaunchResult.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/StudioApplication.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/workspace/TextSearchMatch.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/workspace/WorkspaceEntry.java`
@@ -449,6 +464,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-studio/src/test/java/tools/dscode/studio/process/ManagedProcessFixture.java`
 - `pickleball-studio/src/test/java/tools/dscode/studio/process/ManagedProcessServiceTest.java`
 - `pickleball-studio/src/test/java/tools/dscode/studio/process/WorkspaceProcessServiceTest.java`
+- `pickleball-studio/src/test/java/tools/dscode/studio/runtime/RuntimeBridgeServiceTest.java`
 - `pickleball-studio/src/test/java/tools/dscode/studio/StudioApplicationTest.java`
 - `pickleball-studio/src/test/java/tools/dscode/studio/workspace/WorkspaceFileServiceTest.java`
 - `pickleball-studio/src/test/java/tools/dscode/studio/workspace/WorkspaceServiceTest.java`
@@ -457,6 +473,8 @@ This inventory helps coding agents discover relevant files. It does not replace 
 
 - `maven-consumer-project/src/test/java/com/example/pickleball/ConfigurationValidationSteps.java`
 - `maven-consumer-project/src/test/java/com/example/pickleball/ControlApiTestSteps.java`
+- `maven-consumer-project/src/test/java/com/example/pickleball/ControlBridgeTestSteps.java`
+- `maven-consumer-project/src/test/java/com/example/pickleball/ControlRuntimeObserverChecks.java`
 - `maven-consumer-project/src/test/java/com/example/pickleball/DataReferenceSteps.java`
 - `maven-consumer-project/src/test/java/com/example/pickleball/DiagnosticValidationSteps.java`
 - `maven-consumer-project/src/test/java/com/example/pickleball/DynamicControlApiChecks.java`
@@ -490,6 +508,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `maven-consumer-project/src/test/resources/features/catalog-context.feature`
 - `maven-consumer-project/src/test/resources/features/component-scenarios.feature`
 - `maven-consumer-project/src/test/resources/features/configuration-system-properties.feature`
+- `maven-consumer-project/src/test/resources/features/control-bridge.feature`
 - `maven-consumer-project/src/test/resources/features/data-element-all-phases.feature`
 - `maven-consumer-project/src/test/resources/features/data-element-native-collections.feature`
 - `maven-consumer-project/src/test/resources/features/data-element-native-formats.feature`

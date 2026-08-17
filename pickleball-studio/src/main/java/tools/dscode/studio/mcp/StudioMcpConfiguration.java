@@ -12,6 +12,7 @@ import tools.dscode.studio.gradle.GradleProjectModelService;
 import tools.dscode.studio.language.WorkspaceLanguageService;
 import tools.dscode.studio.process.ManagedProcessService;
 import tools.dscode.studio.process.WorkspaceProcessService;
+import tools.dscode.studio.runtime.RuntimeBridgeService;
 import tools.dscode.studio.workspace.WorkspaceFileService;
 import tools.dscode.studio.workspace.WorkspaceInfo;
 import tools.dscode.studio.workspace.WorkspaceService;
@@ -78,6 +79,19 @@ public class StudioMcpConfiguration {
         return new GradleProjectModelService(workspaceInfo);
     }
 
+    @Bean(destroyMethod = "close")
+    RuntimeBridgeService runtimeBridgeService(
+            WorkspaceInfo workspaceInfo,
+            MavenBuildService mavenBuildService,
+            GradleBuildService gradleBuildService
+    ) {
+        return new RuntimeBridgeService(
+                workspaceInfo,
+                mavenBuildService,
+                gradleBuildService
+        );
+    }
+
     @Bean
     StudioMcpTools studioMcpTools(
             WorkspaceInfo workspaceInfo,
@@ -87,7 +101,8 @@ public class StudioMcpConfiguration {
             MavenBuildService mavenBuildService,
             GradleBuildService gradleBuildService,
             GradleProjectModelService gradleProjectModelService,
-            WorkspaceLanguageService workspaceLanguageService
+            WorkspaceLanguageService workspaceLanguageService,
+            RuntimeBridgeService runtimeBridgeService
     ) {
         return new StudioMcpTools(
                 workspaceInfo,
@@ -97,7 +112,8 @@ public class StudioMcpConfiguration {
                 mavenBuildService,
                 gradleBuildService,
                 gradleProjectModelService,
-                workspaceLanguageService
+                workspaceLanguageService,
+                runtimeBridgeService
         );
     }
 

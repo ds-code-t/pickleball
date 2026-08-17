@@ -47,8 +47,10 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/key-parser-dsl.md`
 - `docs/mapping-and-templating.md`
 - `docs/nested-steps.md`
+- `docs/pickleball-studio.md`
 - `docs/README.md`
 - `docs/service-call-scenarios.md`
+- `docs/studio-runtime-bridge.md`
 
 ## Framework Java and AspectJ source
 
@@ -356,6 +358,8 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/parallelutilities/Stagger.java`
 - `src/main/java/tools/dscode/pickleruntime/CucumberOptionResolver.java`
 - `src/main/java/tools/dscode/registry/GlobalRegistry.java`
+- `src/main/java/tools/dscode/studio/launcher/PickleballMain.java`
+- `src/main/java/tools/dscode/studio/launcher/StudioLauncher.java`
 - `src/main/java/tools/dscode/testengine/DynamicEngineDiscoveryRequest.java`
 - `src/main/java/tools/dscode/testengine/DynamicSuiteBootstrap.java`
 - `src/main/java/tools/dscode/testengine/DynamicSuiteConfigUtils.java`
@@ -373,7 +377,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 
 ## Framework tests
 
-- _No matching files found._
+- `src/test/java/tools/dscode/studio/launcher/StudioLauncherTest.java`
 
 ## Control API module
 
@@ -392,11 +396,85 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-control-api/src/main/java/tools/dscode/control/api/OverrideScope.java`
 - `pickleball-control-api/src/main/java/tools/dscode/control/api/ResolutionCandidate.java`
 - `pickleball-control-api/src/main/java/tools/dscode/control/api/ResolutionExplanation.java`
+- `pickleball-control-api/src/main/java/tools/dscode/control/bridge/ControlBridgeBootstrap.java`
+- `pickleball-control-api/src/main/java/tools/dscode/control/bridge/ControlBridgeCallResult.java`
+- `pickleball-control-api/src/main/java/tools/dscode/control/bridge/ControlBridgeCoordinator.java`
+- `pickleball-control-api/src/main/java/tools/dscode/control/bridge/ControlBridgeDescriptor.java`
+- `pickleball-control-api/src/main/java/tools/dscode/control/bridge/ControlBridgeError.java`
+- `pickleball-control-api/src/main/java/tools/dscode/control/bridge/ControlBridgeRuntime.java`
+- `pickleball-control-api/src/main/java/tools/dscode/control/bridge/ControlBridgeStatus.java`
+
+## Pickleball Studio module
+
+- `gradle/pickleball-studio.gradle`
+- `pickleball-studio/AGENTS.md`
+- `pickleball-studio/build.gradle`
+- `pickleball-studio/src/main/java/tools/dscode/studio/gradle/GradleProjectInfo.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/gradle/GradleProjectModelService.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/gradle/GradleSourceDirectoryInfo.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/gradle/GradleTaskInfo.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/gradle/GradleToolingConnectionFactory.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/gradle/GradleWorkspaceModel.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/gui/EditorTab.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/gui/StudioDesktopApplication.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/gui/StudioDesktopSession.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/gui/StudioFrame.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/gui/WorkspaceTreeBuilder.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/gui/WorkspaceTreeItem.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/language/GherkinSourceParser.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/language/JavaSourceParser.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/language/SourceDiagnostic.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/language/SourceLanguage.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/language/SourceLocation.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/language/SourceOutline.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/language/SourceSymbol.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/language/SourceSymbolKind.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/language/WorkspaceLanguageService.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/mcp/StudioMcpConfiguration.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/mcp/StudioMcpTools.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/mcp/StudioServer.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/mcp/StudioWorkspaceStatus.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/process/ManagedProcessService.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/process/ManagedProcessSummary.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/process/ProcessOutputChunk.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/process/ProcessResult.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/process/ProcessState.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/process/WorkspaceProcessService.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/runtime/RuntimeBridgeClient.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/runtime/RuntimeBridgeDescriptor.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/runtime/RuntimeBridgeError.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/runtime/RuntimeBridgeService.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/runtime/RuntimeBridgeStatus.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/runtime/RuntimeControlResult.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/runtime/RuntimeLaunchResult.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/StudioApplication.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/workspace/TextSearchMatch.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/workspace/WorkspaceEntry.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/workspace/WorkspaceFileService.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/workspace/WorkspaceInfo.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/workspace/WorkspaceService.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/workspace/WorkspaceTextFile.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/workspace/WorkspaceWriteResult.java`
+- `pickleball-studio/src/test/java/tools/dscode/studio/gradle/GradleProjectModelServiceTest.java`
+- `pickleball-studio/src/test/java/tools/dscode/studio/gui/StudioDesktopSessionTest.java`
+- `pickleball-studio/src/test/java/tools/dscode/studio/gui/WorkspaceTreeBuilderTest.java`
+- `pickleball-studio/src/test/java/tools/dscode/studio/language/WorkspaceLanguageServiceTest.java`
+- `pickleball-studio/src/test/java/tools/dscode/studio/mcp/StudioMcpContextTest.java`
+- `pickleball-studio/src/test/java/tools/dscode/studio/mcp/StudioMcpToolsTest.java`
+- `pickleball-studio/src/test/java/tools/dscode/studio/process/ManagedProcessFixture.java`
+- `pickleball-studio/src/test/java/tools/dscode/studio/process/ManagedProcessServiceTest.java`
+- `pickleball-studio/src/test/java/tools/dscode/studio/process/WorkspaceProcessServiceTest.java`
+- `pickleball-studio/src/test/java/tools/dscode/studio/runtime/RuntimeBridgeServiceTest.java`
+- `pickleball-studio/src/test/java/tools/dscode/studio/StudioApplicationTest.java`
+- `pickleball-studio/src/test/java/tools/dscode/studio/workspace/WorkspaceFileServiceTest.java`
+- `pickleball-studio/src/test/java/tools/dscode/studio/workspace/WorkspaceServiceTest.java`
 
 ## Maven consumer Java support
 
 - `maven-consumer-project/src/test/java/com/example/pickleball/ConfigurationValidationSteps.java`
 - `maven-consumer-project/src/test/java/com/example/pickleball/ControlApiTestSteps.java`
+- `maven-consumer-project/src/test/java/com/example/pickleball/ControlBridgeTestSteps.java`
+- `maven-consumer-project/src/test/java/com/example/pickleball/ControlRuntimeObserverChecks.java`
 - `maven-consumer-project/src/test/java/com/example/pickleball/DataReferenceSteps.java`
 - `maven-consumer-project/src/test/java/com/example/pickleball/DiagnosticValidationSteps.java`
 - `maven-consumer-project/src/test/java/com/example/pickleball/DynamicControlApiChecks.java`
@@ -430,6 +508,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `maven-consumer-project/src/test/resources/features/catalog-context.feature`
 - `maven-consumer-project/src/test/resources/features/component-scenarios.feature`
 - `maven-consumer-project/src/test/resources/features/configuration-system-properties.feature`
+- `maven-consumer-project/src/test/resources/features/control-bridge.feature`
 - `maven-consumer-project/src/test/resources/features/data-element-all-phases.feature`
 - `maven-consumer-project/src/test/resources/features/data-element-native-collections.feature`
 - `maven-consumer-project/src/test/resources/features/data-element-native-formats.feature`

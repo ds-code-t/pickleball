@@ -9,6 +9,7 @@ import tools.dscode.studio.workspace.WorkspaceInfo;
 import java.io.File;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -64,6 +65,14 @@ public final class MavenBuildService {
     }
 
     public ManagedMavenRunResult start(List<String> arguments, Integer timeoutSeconds) {
+        return start(arguments, timeoutSeconds, Map.of());
+    }
+
+    public ManagedMavenRunResult start(
+            List<String> arguments,
+            Integer timeoutSeconds,
+            Map<String, String> additionalEnvironment
+    ) {
         if (managedProcesses == null) {
             throw new IllegalStateException("Managed Maven execution requires ManagedProcessService");
         }
@@ -73,9 +82,21 @@ public final class MavenBuildService {
                 prepared.command(),
                 Path.of("."),
                 prepared.timeoutSeconds(),
-                prepared.environment()
+                environment(prepared.environment(), additionalEnvironment)
         );
         return new ManagedMavenRunResult(MavenToolchainService.MAVEN_VERSION, process);
+    }
+
+    private static Map<String, String> environment(
+            Map<String, String> fixed,
+            Map<String, String> additional
+    ) {
+        Map<String, String> result = new HashMap<>();
+        if (additional != null) {
+            result.putAll(additional);
+        }
+        result.putAll(fixed);
+        return Map.copyOf(result);
     }
 
     private PreparedMaven prepare(List<String> arguments, Integer timeoutSeconds) {
