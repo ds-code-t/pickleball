@@ -9,7 +9,7 @@ Feature: RUN step parameter variations
   Scenario: RUN parameter fixture B
     * , verify "fixture B" equals "fixture B"
 
-  # Inline run type and path/tag selectors.
+  # Inline run type and path/tag selectors remain supported as shorthand.
 
   Scenario: Inline SCENARIO type with scenario selector
     * RUN "inlineScenario" SCENARIO: RUN parameter fixture A
@@ -41,7 +41,7 @@ Feature: RUN step parameter variations
 
   Scenario: Inline SCENARIO type with table selector
     * RUN "tableScenario" SCENARIO
-      | pkb_featurename              | pkb_name                    |
+      | pkb_featurename               | pkb_name                    |
       | RUN step parameter variations | ^RUN parameter fixture A$ |
     * , verify "<tableScenario.SCENARIO NAME>" equals "RUN parameter fixture A"
 
@@ -57,7 +57,17 @@ Feature: RUN step parameter variations
       | Reusable service call definitions | ^HealthCall$ | http://127.0.0.1:8765 |
     * , verify "<tableService.RESPONSE.statusCode>" equals "200"
 
-  # RunType supplied by the table, including the outer RUN: inlineArgs form.
+  # Canonical RUN form: each DataTable row is an independent invocation.
+
+  Scenario: Bare RUN mixes singular RunTypes in one table
+    * RUN
+      | RunType            | RunKey              | Run Tags                 | pkb_componentpath           | endpoint              |
+      | SCENARIO           | mixedTableScenario  | @run-parameter-fixture-a |                             |                       |
+      | COMPONENT SCENARIO | mixedTableComponent | @run-parameter-fixture-b | src/test/resources/features |                       |
+      | SERVICE CALL       | mixedTableService   | %health-full-url          |                             | http://127.0.0.1:8765 |
+    * , verify "<mixedTableScenario.SCENARIO NAME>" equals "RUN parameter fixture A"
+    * , verify "<mixedTableComponent.SCENARIO NAME>" equals "RUN parameter fixture B"
+    * , verify "<mixedTableService.RESPONSE.statusCode>" equals "200"
 
   Scenario: Bare RUN with SCENARIO RunType supplied by table
     * RUN
@@ -77,6 +87,31 @@ Feature: RUN step parameter variations
       | SERVICE CALL | bareService | Reusable service call definitions | ^HealthCall$ | http://127.0.0.1:8765 |
     * , verify "<bareService.RESPONSE.statusCode>" equals "200"
     * , verify "<bareService.RESPONSE.body.status>" equals "UP"
+
+  Scenario: Table plural RunType allows multiple matches for only that row
+    * RUN
+      | RunType   | RunKey        | pkb_featurename               | pkb_name                       | pkb_order |
+      | SCENARIOS | pluralByTable | RUN step parameter variations | ^RUN parameter fixture [AB]$ | lexical   |
+    * , verify "<pluralByTable[][0].SCENARIO NAME>" equals "RUN parameter fixture A"
+    * , verify "<pluralByTable[][1].SCENARIO NAME>" equals "RUN parameter fixture B"
+    * , verify "<pluralByTable.SCENARIO NAME>" equals "RUN parameter fixture B"
+
+  Scenario: Table plural RunType overrides inline singular RunType
+    * RUN SCENARIO
+      | RunType   | RunKey             | pkb_featurename               | pkb_name                       | pkb_order |
+      | SCENARIOS | tablePluralOverride | RUN step parameter variations | ^RUN parameter fixture [AB]$ | lexical   |
+    * , verify "<tablePluralOverride[][0].SCENARIO NAME>" equals "RUN parameter fixture A"
+    * , verify "<tablePluralOverride[][1].SCENARIO NAME>" equals "RUN parameter fixture B"
+
+  Scenario: Deferred RUN saves explicit RETURN after the selected scenario completes
+    * MAP TABLE VALUES TO SCENARIO MAP
+      | url    | http://127.0.0.1:8765 |
+      | client | deferred-run-client   |
+      | scope  | inventory.read        |
+    * RUN
+      | RunType      | RunKey         | Run Tags        |
+      | SERVICE CALL | deferredReturn | %TokenValueCall |
+    * , verify "<deferredReturn>" equals "inline-deferred-run-client-inventory-read"
 
   Scenario: Table SCENARIO RunType with inline path selector
     * RUN: RUN parameter fixture A
@@ -110,7 +145,7 @@ Feature: RUN step parameter variations
       |        |
     * , verify "<inlineKeyFallback.SCENARIO NAME>" equals "RUN parameter fixture B"
 
-  # RunType precedence. A nonblank table RunType overrides the inline type.
+  # RunType precedence. A nonblank table RunType overrides the inline type and multiplicity.
 
   Scenario: Table COMPONENT SCENARIO overrides inline SCENARIO
     * RUN SCENARIO: RUN parameter fixture A
@@ -140,8 +175,8 @@ Feature: RUN step parameter variations
 
   Scenario: Inline scenario path overrides table pkb_name
     * RUN "inlineNameWins" SCENARIO: RUN parameter fixture A
-      | pkb_name                    |
-      | ^RUN parameter fixture B$   |
+      | pkb_name                  |
+      | ^RUN parameter fixture B$ |
     * , verify "<inlineNameWins.SCENARIO NAME>" equals "RUN parameter fixture A"
 
   Scenario: Inline feature path overrides table pkb_featurename
@@ -174,7 +209,7 @@ Feature: RUN step parameter variations
       | @run-parameter-fixture-b |
     * , verify "<pkbTagsScenario.SCENARIO NAME>" equals "RUN parameter fixture B"
 
-  # Ordering, limits, plural execution, and per-row RunType stay table driven.
+  # Ordering, limits, and inline plural shorthand remain supported.
 
   Scenario: Ordering and limit are applied before singular validation
     * RUN "limitedScenario" SCENARIO
@@ -182,28 +217,20 @@ Feature: RUN step parameter variations
       | RUN step parameter variations | ^RUN parameter fixture [AB]$ | lexical   | 1         |
     * , verify "<limitedScenario.SCENARIO NAME>" equals "RUN parameter fixture A"
 
-  Scenario: Plural regular scenarios
+  Scenario: Plural regular scenarios inline shorthand
     * RUN SCENARIOS
       | pkb_featurename               | pkb_name                       | pkb_order |
       | RUN step parameter variations | ^RUN parameter fixture [AB]$ | lexical   |
 
-  Scenario: Plural component scenarios
+  Scenario: Plural component scenarios inline shorthand
     * RUN COMPONENT SCENARIOS
       | pkb_componentpath           | pkb_featurename               | pkb_name                       | pkb_order |
       | src/test/resources/features | RUN step parameter variations | ^RUN parameter fixture [AB]$ | lexical   |
 
-  Scenario: Plural service calls
+  Scenario: Plural service calls inline shorthand
     * RUN SERVICE CALLS
       | pkb_featurename                   | pkb_name     | RunKey       | endpoint              | status |
       | Reusable service call definitions | ^HealthCall$ | pluralHealth | http://127.0.0.1:8765 | 200    |
       | Reusable service call definitions | ^StatusCall$ | pluralStatus | http://127.0.0.1:8765 | 418    |
     * , verify "<pluralHealth.RESPONSE.statusCode>" equals "200"
     * , verify "<pluralStatus.RESPONSE.statusCode>" equals "418"
-
-  Scenario: Plural RUN resolves a different RunType per table row
-    * RUN SCENARIOS
-      | RunType      | pkb_featurename                   | pkb_name                  | RunKey        | endpoint              |
-      | SCENARIO     | RUN step parameter variations     | ^RUN parameter fixture A$ | mixedScenario |                       |
-      | SERVICE CALL | Reusable service call definitions | ^HealthCall$              | mixedService  | http://127.0.0.1:8765 |
-    * , verify "<mixedScenario.SCENARIO NAME>" equals "RUN parameter fixture A"
-    * , verify "<mixedService.RESPONSE.statusCode>" equals "200"

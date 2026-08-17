@@ -214,7 +214,6 @@ public class ModularScenariosChecks {
                 String.class,
                 String.class,
                 String.class,
-                String.class,
                 DataTable.class
         );
         Pattern pattern = Pattern.compile(method.getAnnotation(Given.class).value());
@@ -225,10 +224,9 @@ public class ModularScenariosChecks {
         assertTrue(singular.matches());
         assertNull(singular.group(1));
         assertEquals("SCENARIO", singular.group(2));
-        assertNull(singular.group(3));
         assertEquals(
                 " Reusable scenario selection.Selection fixture A",
-                singular.group(4)
+                singular.group(3)
         );
 
         Matcher keyedCall = pattern.matcher(
@@ -237,19 +235,17 @@ public class ModularScenariosChecks {
         assertTrue(keyedCall.matches());
         assertEquals("health", keyedCall.group(1));
         assertEquals("SERVICE CALL", keyedCall.group(2));
-        assertNull(keyedCall.group(3));
         assertEquals(
                 " Reusable service call definitions.HealthCall",
-                keyedCall.group(4)
+                keyedCall.group(3)
         );
 
         Matcher plural = pattern.matcher(
                 "RUN COMPONENT SCENARIOS: %save_customer"
         );
         assertTrue(plural.matches());
-        assertEquals("COMPONENT SCENARIO", plural.group(2));
-        assertEquals("S", plural.group(3));
-        assertEquals(" %save_customer", plural.group(4));
+        assertEquals("COMPONENT SCENARIOS", plural.group(2));
+        assertEquals(" %save_customer", plural.group(3));
     }
 
     @Test

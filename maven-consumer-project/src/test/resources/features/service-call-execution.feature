@@ -226,15 +226,18 @@ Feature: Service call orchestration with generic request mappings
     And , verify "<serverFailure.RESPONSE.statusCode>" equals "500"
     And , verify "<serverFailure.RESPONSE.body.status>" equals "500"
 
-  Scenario: Reusing a RunKey follows ordinary NodeMap replacement behavior
+  Scenario: Reusing a RunKey appends ordinary NodeMap collection values
     When RUN SERVICE CALL
       | Run Tags     | RunKey       | endpoint              | status |
       | %status-call | latestStatus | http://127.0.0.1:8765 | 404    |
     And RUN SERVICE CALL
       | Run Tags     | RunKey       | endpoint              | status |
       | %status-call | latestStatus | http://127.0.0.1:8765 | 503    |
-    Then , verify "<latestStatus.RESPONSE.statusCode>" equals "503"
-    And , verify "<latestStatus.RESPONSE.body.status>" equals "503"
+    Then , verify "<latestStatus[][0].RESPONSE.statusCode>" equals "404"
+    And , verify "<latestStatus[][0].RESPONSE.body.status>" equals "404"
+    And , verify "<latestStatus[][1].RESPONSE.statusCode>" equals "503"
+    And , verify "<latestStatus[][1].RESPONSE.body.status>" equals "503"
+    And , verify "<latestStatus.RESPONSE.statusCode>" equals "503"
 
   Scenario: Preserve a no-content response and its response headers
     When RUN "deletedItem" SERVICE CALL: %delete-call
@@ -261,7 +264,7 @@ Feature: Service call orchestration with generic request mappings
     And , verify "<soapAdd.RESPONSE.statusCode>" equals "200"
     And , verify "<soapAdd.RESPONSE.body>" contains "17"
 
-  Scenario: Preserve a component reference that ends before sending an HTTP request
+  Scenario: Preserve a completed partial result when a component ends before sending an HTTP request
     When RUN "earlyExit" SERVICE CALL: %early-exit
       | endpoint              |
       | http://127.0.0.1:8765 |

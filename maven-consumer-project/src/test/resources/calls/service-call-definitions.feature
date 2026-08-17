@@ -230,7 +230,7 @@ Feature: Reusable service call definitions
 
   # XML-looking input deliberately uses only the XML-safe ~[~...~]~ reference
   # bookends. The left operand comes from the parent scenario map. The completed
-  # earlier service call is registered in the shared RunMap, so the right operand
+  # earlier service call is stored in the shared RunMap, so the right operand
   # uses an unqualified RunMap reference rather than PARENT.SCENARIO.
   Scenario Outline: MappedSoapAddCall
     Given MAP "REQUEST" TABLE VALUES TO SCENARIO MAP
@@ -261,8 +261,8 @@ Feature: Reusable service call definitions
       | Scenario Tags     | endpoint              |
       | %mapped-soap-body | http://127.0.0.1:8765 |
 
-  # END SCENARIO stops the remaining component steps. The caller already
-  # holds the component root by reference, so its partial REQUEST remains visible.
+  # END SCENARIO stops the remaining component steps. A keyed deferred RUN
+  # finalizes the partial completed root afterward, so its REQUEST remains visible.
   Scenario Outline: EarlyExitCall
     Given MAP "REQUEST" TABLE VALUES TO SCENARIO MAP
       | endpoint | <endpoint>/api/service-calls/inspect |
@@ -400,7 +400,7 @@ Feature: Reusable service call definitions
 
   # This component performs an ordinary nested RUN SERVICE CALL. Its child resolves
   # url, client, and scope from this component's scenario map through ancestry.
-  # The child root is still registered by reference under TOKEN in the shared RunMap.
+  # The child result is finalized under TOKEN before the parent continues.
   Scenario Outline: NestedComponent
     Given MAP TABLE VALUES TO SCENARIO MAP
       | url    | <url>    |
