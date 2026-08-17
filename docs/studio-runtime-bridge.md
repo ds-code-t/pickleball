@@ -1,9 +1,8 @@
-
 # Pickleball Studio runtime bridge
 
-Pickleball Studio can opt a managed test run into a private bridge between the Studio JVM and the consumer test JVM. The bridge lets Studio, MCP clients, and later GUI integrations inspect live Pickleball scenarios, target one scenario during parallel execution, pause it at a semantic control boundary, inspect or mutate live mappings, execute retry-friendly detached steps through the existing dynamic-control API, and resume normal traversal.
+Pickleball Studio can opt a managed test run into a private bridge between the Studio JVM and the consumer test JVM. The bridge lets Studio desktop and MCP clients inspect live Pickleball scenarios, target one scenario during parallel execution, pause it at a semantic control boundary, inspect or mutate live mappings, execute retry-friendly detached steps through the existing dynamic-control API, and resume normal traversal.
 
-The bridge is **not** enabled by merely depending on Pickleball. Ordinary Maven/Gradle runs, normal Studio `maven_start` / `gradle_start` calls, and the desktop **Run Tests** action retain their existing behavior.
+The bridge is **not** enabled by merely depending on Pickleball. Ordinary Maven/Gradle runs, normal Studio `maven_start` / `gradle_start` calls, and the desktop **Run Tests** action retain their existing behavior. The desktop **Runtime > Runtime Control... > Start Control Run** path is explicitly bridge-enabled.
 
 ## Process boundary
 
@@ -27,7 +26,7 @@ Studio never loads the consumer test runtime into its own classpath. The consume
 
 ## Opt-in launch and discovery
 
-`runtime_start` creates a Studio-owned session directory under:
+`runtime_start` and the desktop **Start Control Run** action create a Studio-owned session directory under:
 
 ```text
 ~/.pickleball/studio/bridge/<session-id>/
@@ -54,7 +53,7 @@ The descriptor contains protocol/runtime metadata and capabilities, but **never 
 
 ## Authentication and transport
 
-Phase 3A uses protocol version `1`.
+The current bridge uses protocol version `1`.
 
 Every bridge request requires:
 
@@ -77,7 +76,7 @@ POST /v1/mappings/put
 POST /v1/mappings/resolve
 ```
 
-This protocol is internal to the Studio/Pickleball integration. MCP clients should use Studio's `runtime_*` tools instead of connecting to the consumer bridge directly.
+This protocol is internal to the Studio/Pickleball integration. MCP clients should use Studio's `runtime_*` tools instead of connecting to consumer bridge ports directly. The desktop UI uses the same `RuntimeBridgeService` as MCP and does not connect to bridge ports independently.
 
 ## Scenario-thread execution
 
@@ -96,7 +95,7 @@ With no observer and no bridge environment, existing control-runtime behavior re
 
 ## Pause and resume
 
-`runtime_pause` requests a pause at a semantic control hook. If no scenario has started yet, the request applies to the next observed active scenario.
+`runtime_pause` and the desktop **Pause** action request a pause at a semantic control hook. If no scenario has started yet, an unqualified pause request applies to the next observed active scenario.
 
 Pauses use a finite lease:
 
@@ -105,9 +104,9 @@ Pauses use a finite lease:
 
 When the lease expires, scenario execution resumes automatically. A pause request that times out before reaching a hook is withdrawn; it does not remain armed for a later scenario.
 
-`runtime_start` defaults `pauseFirstScenario` to `true`, which is useful for AI-controlled runs: the first scenario can become controllable before it advances through its normal step tree.
+`runtime_start` and desktop controlled runs default `pauseFirstScenario` to `true`, which makes the first scenario controllable before it advances through normal traversal.
 
-`runtime_resume` is idempotent.
+`runtime_resume` and the desktop **Resume** action are idempotent.
 
 ## Parallel scenarios and explicit targeting
 
@@ -115,8 +114,7 @@ A bridge process may observe more than one scenario thread. `runtime_scenarios` 
 
 `runtime_pause`, `runtime_resume`, `runtime_execute_step`, and the mapping tools accept an optional `scenarioId`. When several scenarios are active, callers should pass the id returned by `runtime_scenarios`. A wrong or stale id returns `UNAVAILABLE`; the bridge does not guess.
 
-The original unqualified behavior remains for compatibility: a command can omit `scenarioId` when exactly one scenario is active or exactly one scenario is already uniquely paused. An unqualified pause requested before any scenario has started still applies to the next observed scenario.
-
+The desktop Runtime Control window renders the discovered runtimes and scenarios as selectors. Its Pause, Resume, detached-step, and mapping actions target the selected scenario id. The original unqualified API behavior remains for compatibility when exactly one scenario is active or exactly one scenario is already uniquely paused.
 
 ## Live mapping control
 
@@ -145,6 +143,8 @@ Mapping results use a safe value envelope containing the runtime type, a clipped
 
 These operations mutate the same live maps used by normal execution. They are intentionally not rolled back automatically. Mapping snapshots/file transfer remain a separate later capability.
 
+The desktop Mapping tab is a direct adapter over these same operations. It accepts a map reference, key, JSON literal, or resolve input and displays the returned status/type/value/error envelope; it does not implement a second mapping grammar.
+
 ## Retry-friendly detached execution
 
 `runtime_execute_step` uses the existing `DynamicControl.executeStep(...)` API on the selected scenario thread.
@@ -167,11 +167,11 @@ The bridge returns only a safe textual representation of arbitrary step return v
 
 It does not attempt generic serialization of arbitrary consumer objects.
 
-Effects that happened before a failed detached call are not rolled back.
+Effects that happened before a failed detached call are not rolled back. The desktop detached-step action displays the same logical result and does not reinterpret `FAILED` as a Swing/process failure.
 
 ## Studio MCP flow
 
-Phase 3B extends the runtime MCP surface to **30** total Studio tools. Runtime control now includes:
+Phase 3B extends the runtime MCP surface to **30** total Studio tools. Runtime control includes:
 
 ```text
 runtime_start
@@ -225,6 +225,32 @@ process_cancel
 
 Cancelling the managed build still terminates the owned process tree through the existing Studio process service.
 
+## Desktop runtime-control flow
+
+Phase 3C exposes the same runtime service through the Swing desktop UI without changing the bridge protocol or MCP tool count.
+
+Open:
+
+```text
+Runtime > Runtime Control...
+```
+
+The modeless Runtime Control window provides:
+
+- **Start Control Run** — starts a managed `test` build through `RuntimeBridgeService`, with first-scenario pause enabled;
+- **Cancel Run** — delegates to `ManagedProcessService` for the controlled build process;
+- runtime and scenario selectors backed by bridge descriptor/scenario discovery;
+- live runtime/scenario status refresh;
+- **Pause** and **Resume** for the selected scenario;
+- retry-friendly detached-step text plus optional argument execution;
+- mapping Get/Put/Resolve using the Phase 3B mapping APIs;
+- bounded incremental stdout/stderr display for the controlled build;
+- bounded operation-result display using the same `SUCCESS` / `FAILED` / `UNAVAILABLE` semantics returned to MCP.
+
+`StudioDesktopSession` is the desktop facade over `RuntimeBridgeService` and `ManagedProcessService`; `RuntimeControlDialog` is only a Swing adapter. The dialog does not build HTTP requests, own bearer tokens, construct Maven/Gradle commands, or call Pickleball Core directly.
+
+The existing main-window **Run Tests** action remains bridge-free. Closing or hiding the Runtime Control window does not silently cancel the managed build. Cancelling uses the explicit **Cancel Run** action, while pause safety remains governed by the finite bridge lease. Closing Pickleball Studio closes `RuntimeBridgeService`, resumes discovered paused scenarios best-effort, then terminates owned managed processes.
+
 ## Build-tool behavior
 
 `RuntimeBridgeService` uses the same build services as the rest of Studio:
@@ -233,23 +259,23 @@ Cancelling the managed build still terminates the owned process tree through the
 - Maven workspaces run through Studio's bundled Maven runtime;
 - Gradle is preferred when a workspace is detected as both;
 - default build arguments are `test`;
-- the Phase 3A runtime-build timeout defaults to `3600` seconds.
+- the runtime-build timeout defaults to `3600` seconds.
 
-The bridge environment is added only through the new opt-in managed-start overloads. Existing Maven/Gradle execution paths do not receive bridge variables.
+The bridge environment is added only through the opt-in managed-start overloads. Existing Maven/Gradle execution paths do not receive bridge variables.
 
-Bridge metadata is separate from Pickleball execution RunVars. When a controller knows the intended Pickleball test settings, it should continue to supply those settings through the existing `pkb_runvars` controlled-run contract described in [AI Run Configuration](ai-run-configuration.md). `runtime_start` does not reconstruct or replace that configuration model.
+Bridge metadata is separate from Pickleball execution RunVars. When a controller knows the intended Pickleball test settings, it should continue to supply those settings through the existing `pkb_runvars` controlled-run contract described in [AI Run Configuration](ai-run-configuration.md). `runtime_start` and the desktop controlled-run action do not reconstruct or replace that configuration model.
 
-## Current Phase 3B boundaries
+## Current Phase 3C boundaries
 
-Phase 3B adds active-scenario discovery, explicit scenario targeting, and direct live mapping get/put/resolve operations on top of the Phase 3A transport. It does **not** yet add:
+Phase 3C adds desktop launch, discovery, targeted pause/resume, detached-step execution, live mapping get/put/resolve, controlled-build output, and result/status rendering on top of the Phase 3B service API. It does **not** yet add:
 
-- GUI controls for live runtime sessions;
-- streaming hook/event history;
+- streaming semantic hook/event history;
 - dedicated browser, service-call, or screenshot bridge commands beyond generic detached step execution;
 - mapping snapshot transfer through Studio;
 - arbitrary consumer-object serialization across the JVM boundary;
-- persistent runtime sessions after Studio exits;
-- remote/non-loopback control.
+- persistent runtime sessions or desktop control history after Studio exits;
+- remote/non-loopback control;
+- syntax highlighting, completion, semantic Java resolution, Gherkin step binding, or other editor features unrelated to the runtime bridge.
 
 Dedicated bridge commands should be added only when they provide clearer deterministic semantics than invoking the existing Pickleball step/control APIs.
 

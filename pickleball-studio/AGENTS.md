@@ -12,7 +12,7 @@ Keep these rules:
 - Do not add Studio dependencies to the public Pickleball Maven dependency graph.
 - Do not depend on Pickleball Core from generic Studio infrastructure unless a later Pickleball-specific adapter explicitly requires it.
 - Put project files, search, builds, processes, output, activity, MCP hosting, and GUI infrastructure in Studio.
-- Keep live scenario/browser/mapping execution inside Pickleball Core and connect it later through an explicit bridge.
+- Keep live scenario/browser/mapping execution inside Pickleball Core and connect it through the explicit runtime bridge.
 - GUI, CLI, MCP, and future Java integrations should call the same Studio services rather than reimplementing behavior.
 - MCP classes are adapters over Studio services. Do not put workspace/business behavior directly into MCP handlers.
 - AI policy belongs in the AI client. Studio exposes deterministic capabilities and evidence.
@@ -36,7 +36,7 @@ Workspace paths must stay inside the opened workspace. Tree/search traversal mus
 
 Managed process history is session-scoped and bounded. Output buffers must remain bounded; clients use returned stdout/stderr cursors and must honor gap/truncation metadata instead of assuming all historical output is retained. Studio shutdown and explicit cancellation must terminate child processes and owned descendants so wrapper/build children are not left running.
 
-Future CLI, GUI, MCP, build, and language adapters should reuse these services rather than building parallel file/process semantics.
+CLI, GUI, MCP, build, and language adapters should reuse these services rather than building parallel file/process semantics.
 
 ## Maven tool runtime
 
@@ -76,42 +76,47 @@ Phase 2G adds read-only Java/Gherkin definition navigation through `WorkspaceLan
 
 ## Desktop UI
 
-Phase 2H adds the Swing desktop workspace/editor adapter.
+Phase 2H established the Swing desktop workspace/editor adapter. Phase 3C adds a modeless runtime-control adapter over the Phase 3 bridge.
 
-- `StudioDesktopSession` is the desktop-facing facade over existing workspace, language, build, and managed-process services.
-- `StudioFrame` and other Swing classes must remain UI adapters; do not duplicate workspace boundary checks, source parsing, build command construction, or process lifecycle logic in widgets.
+- `StudioDesktopSession` is the desktop-facing facade over existing workspace, language, build, managed-process, and runtime-bridge services.
+- `StudioFrame`, `RuntimeControlDialog`, and other Swing classes must remain UI adapters; do not duplicate workspace boundary checks, source parsing, build command construction, process lifecycle, bridge HTTP/authentication, scenario-thread routing, or mapping semantics in widgets.
 - Keep the desktop implementation JDK-only unless a later UI dependency is explicitly justified.
 - Workspace tree behavior must reuse `WorkspaceFileService` traversal and skip rules.
 - Java/Gherkin outline and symbol navigation must reuse `WorkspaceLanguageService`.
-- Gradle/Maven test actions must use managed build services and `ManagedProcessService`, including cancellation and shutdown cleanup.
-- Keep desktop output bounded.
+- Ordinary Gradle/Maven **Run Tests** actions must use managed build services and remain bridge-free.
+- **Runtime > Runtime Control... > Start Control Run** is the explicit bridge-enabled desktop path and must delegate through `RuntimeBridgeService` via `StudioDesktopSession`.
+- Controlled-build output/cancellation must use `ManagedProcessService`, including bounded output and descendant cleanup.
+- Runtime/scenario selectors must use runtime descriptor/scenario discovery from `RuntimeBridgeService`; do not invent a Swing-only selection model.
+- Pause/resume, detached-step execution, and mapping get/put/resolve must target the selected scenario through the same runtime service methods used by MCP.
+- Hiding the runtime-control window must not silently cancel the managed build. Explicit cancellation remains the user action; finite pause leases remain the safety mechanism for abandoned pauses.
 - The current editor is plain text. Do not claim syntax highlighting, completion, semantic Java resolution, Gherkin step binding, refactoring, persistent desktop session state, or an interactive PTY terminal until implemented explicitly.
 - Closing the UI may discard unsaved text only after explicit user confirmation.
 
 ## Live runtime bridge
 
-Phase 3A established the explicit Studio-JVM-to-consumer-test-JVM control boundary through `RuntimeBridgeService` and `tools.dscode.control.bridge`; Phase 3B adds explicit scenario targeting and direct live mapping control on that same transport.
+Phase 3A established the explicit Studio-JVM-to-consumer-test-JVM control boundary through `RuntimeBridgeService` and `tools.dscode.control.bridge`; Phase 3B added explicit scenario targeting and direct live mapping control; Phase 3C exposes those services through the desktop UI without changing the bridge protocol.
 
-- The bridge is opt-in per `runtime_start`; ordinary Maven/Gradle execution and the desktop **Run Tests** action must remain bridge-free.
+- The bridge is opt-in per `runtime_start` or desktop **Start Control Run**; ordinary Maven/Gradle execution and the desktop **Run Tests** action must remain bridge-free.
 - Consumer bridge servers bind only to `127.0.0.1` on operating-system-assigned ports and require a per-session bearer token.
-- Never write the bearer token into runtime descriptor files, logs, MCP results, or documentation examples.
+- Never write the bearer token into runtime descriptor files, logs, MCP results, Swing text areas, or documentation examples.
 - Runtime descriptors are discovery metadata only. The Studio-owned session retains the token.
-- Commands that require live Pickleball state must execute on the actual scenario thread through the bridge's semantic-hook queue. Do not call `DynamicControl` directly from HTTP/MCP worker threads.
+- Commands that require live Pickleball state must execute on the actual scenario thread through the bridge's semantic-hook queue. Do not call `DynamicControl` directly from HTTP/MCP/Swing worker threads.
 - The bridge registers through additive `ControlRuntime` observers. Do not replace or clear a consumer's primary global/thread-local control handler.
 - Observer decisions are ignored; the existing primary handler remains authoritative for `ControlDecision` and value replacement.
 - Pause requests must use finite leases and timed-out pause requests must be withdrawn.
-- Use `runtime_scenarios`/`scenarioId` for explicit parallel-scenario targeting. When a caller omits the id and selection is still ambiguous, return `UNAVAILABLE` rather than selecting an arbitrary scenario thread.
-- `RuntimeBridgeService` owns Studio session/token/discovery/client behavior. MCP tools are adapters over that service.
+- Use runtime scenario discovery/`scenarioId` for explicit parallel-scenario targeting. When a caller omits the id and selection is still ambiguous, return `UNAVAILABLE` rather than selecting an arbitrary scenario thread.
+- `RuntimeBridgeService` owns Studio session/token/discovery/client behavior. MCP and Swing controls are adapters over that service.
 - Existing `ManagedProcessService` remains the owner of the launched build process, output, cancellation, and descendant cleanup.
 - Phase 3B exposes active-scenario discovery, explicit `scenarioId` targeting, status/pause/resume, generic retry-friendly detached step execution, and direct mapping get/put/resolve. Mapping commands must execute through the same scenario-thread queue and must not bypass `MappingControl` semantics.
 - Mapping values crossing the bridge may be structured only when they are JSON-compatible; arbitrary consumer objects get a bounded textual fallback instead of generic serialization.
-- `runtime_mapping_put` accepts one JSON literal and deliberately mutates the selected live map; do not imply automatic rollback or snapshot semantics.
-- Do not claim dedicated browser/service/screenshot bridge commands, mapping snapshot transfer, streaming hook history, or GUI runtime controls until implemented.
+- `runtime_mapping_put` and the desktop Mapping Put action accept one JSON literal and deliberately mutate the selected live map; do not imply automatic rollback or snapshot semantics.
+- Phase 3C desktop controls must preserve the bridge's logical `SUCCESS` / `FAILED` / `UNAVAILABLE` results rather than converting exploratory `FAILED` into a managed-process failure.
+- Do not claim dedicated browser/service/screenshot bridge commands, mapping snapshot transfer, streaming hook history, persistent runtime-control history, or remote control until implemented.
 - Runtime bridge transport is an internal Studio/Pickleball protocol. External AI clients should use Studio MCP rather than connecting to consumer bridge ports directly.
 
 ## MCP
 
-Phase 2B introduced Spring AI Streamable-HTTP through the WebMVC server starter. Phase 2C added one-shot process and Maven tools. Phase 2D added managed process lifecycle tools. Phase 2E added synchronous and managed Gradle Wrapper execution. Phase 2F adds read-only Gradle Tooling API model/navigation tools. Phase 2G adds read-only Java/Gherkin source navigation tools. Phase 2H added a Swing desktop adapter over those same services. Phase 3A added six runtime bridge tools; Phase 3B adds four targeted-scenario/mapping tools, bringing the MCP contract to 30 tools.
+Phase 2B introduced Spring AI Streamable-HTTP through the WebMVC server starter. Phase 2C added one-shot process and Maven tools. Phase 2D added managed process lifecycle tools. Phase 2E added synchronous and managed Gradle Wrapper execution. Phase 2F adds read-only Gradle Tooling API model/navigation tools. Phase 2G adds read-only Java/Gherkin source navigation tools. Phase 2H added a Swing desktop adapter over those same services. Phase 3A added six runtime bridge tools; Phase 3B added four targeted-scenario/mapping tools, bringing the MCP contract to 30 tools. Phase 3C adds no MCP tools.
 
 - Bind the Studio MCP server to loopback only.
 - Keep the per-launch endpoint token behavior unless a later authentication design explicitly replaces it.
@@ -131,13 +136,13 @@ Phase 2B added generic workspace file services and MCP exposure of those service
 
 Phase 2C added bounded one-shot process execution plus self-contained Maven 3.9.16 build/test execution through CLI and MCP.
 
-Phase 2D added session-scoped managed process lifecycle, bounded run history, incremental stdout/stderr output cursors, cancellation, and managed Maven starts for MCP and future Studio UI integrations.
+Phase 2D added session-scoped managed process lifecycle, bounded run history, incremental stdout/stderr output cursors, cancellation, and managed Maven starts for MCP and GUI integrations.
 
 Phase 2E adds project Gradle Wrapper execution through CLI and MCP, including managed Gradle starts, while requiring no host Gradle installation.
 
-Phase 2F adds Gradle Tooling API environment/project/source/task models for CLI, MCP, and future GUI navigation. Model reads follow the target build's project-specific distribution by default; when a build declares no Gradle version, Tooling API default behavior uses the client Tooling API version.
+Phase 2F adds Gradle Tooling API environment/project/source/task models for CLI, MCP, and GUI navigation. Model reads follow the target build's project-specific distribution by default; when a build declares no Gradle version, Tooling API default behavior uses the client Tooling API version.
 
-Phase 2G adds parse-only Java and Gherkin definition outlines, workspace symbol search, exact definition lookup, and syntax diagnostics for CLI, MCP, and future GUI navigation.
+Phase 2G adds parse-only Java and Gherkin definition outlines, workspace symbol search, exact definition lookup, and syntax diagnostics for CLI, MCP, and GUI navigation.
 
 Phase 2H adds the first Swing workspace/editor UI with file editing, saved-source outline/symbol navigation, managed Gradle/Maven test execution, output, and cancellation.
 
@@ -145,6 +150,8 @@ Phase 3A adds opt-in private loopback runtime sessions, descriptor discovery, li
 
 Phase 3B adds active-scenario listing, explicit scenario targeting for parallel execution, and direct live mapping get/put/resolve operations with safe JSON-compatible value transport.
 
-Do not claim that syntax highlighting/completion, live unsaved-buffer parsing, full Gradle dependency/classpath import, persistent run/activity or desktop session state, interactive terminal input, semantic Java reference/type analysis, Gherkin step binding, GUI runtime controls, streaming hook history, mapping snapshot transfer, or dedicated browser/service/screenshot bridge commands are implemented until those later slices are added.
+Phase 3C adds the desktop Runtime Control window, bridge-enabled managed test launch, runtime/scenario selectors, targeted pause/resume, detached-step and mapping controls, and bounded controlled-build output through the same Studio services already used by MCP.
+
+Do not claim that syntax highlighting/completion, live unsaved-buffer parsing, full Gradle dependency/classpath import, persistent run/activity/runtime-control or desktop session state, interactive terminal input, semantic Java reference/type analysis, Gherkin step binding, streaming hook history, mapping snapshot transfer, dedicated browser/service/screenshot bridge commands, or remote runtime control are implemented until those later slices are added.
 
 See `docs/pickleball-studio.md`.

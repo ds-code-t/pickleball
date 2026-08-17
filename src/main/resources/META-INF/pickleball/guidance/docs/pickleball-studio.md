@@ -17,7 +17,7 @@ Studio currently targets:
 - project Gradle Wrappers for Studio-managed Gradle execution without a host Gradle installation;
 - Gradle Tooling API 9.6.1 for structured Gradle project/navigation models;
 - Cucumber Gherkin 35.1.0 with Messages 29.0.1 for feature-file syntax navigation aligned with the current Pickleball runtime;
-- JDK Swing for the desktop workspace/editor UI, with no additional GUI dependency;
+- JDK Swing for the desktop workspace/editor and runtime-control UI, with no additional GUI dependency;
 - Gradle Nexus Publish Plugin 2.0.0;
 - AspectJ 1.9.24 for Pickleball Core.
 
@@ -77,7 +77,7 @@ workspace_write_file
 workspace_search_text
 ```
 
-MCP is an adapter, not the internal application architecture. `StudioMcpTools` delegates to ordinary Studio services that CLI, future GUI, and future Java integrations can reuse.
+MCP is an adapter, not the internal application architecture. `StudioMcpTools` delegates to ordinary Studio services that CLI, GUI, and future Java integrations can reuse.
 
 ### Starting the MCP server
 
@@ -145,7 +145,7 @@ maven_run
 
 ## Phase 2D: managed process lifecycle and output
 
-Phase 2D adds `ManagedProcessService` on top of the workspace process layer. It is intended for the long-lived Studio server and future GUI integrations where builds or tools need to continue while the caller polls their state.
+Phase 2D adds `ManagedProcessService` on top of the workspace process layer. It is intended for the long-lived Studio server and GUI integrations where builds or tools need to continue while the caller polls their state.
 
 Managed runs provide:
 
@@ -214,7 +214,7 @@ Phase 2E remains Gradle **build execution** through a checked-in Wrapper. Wrappe
 
 ## Phase 2F: Gradle Tooling API project/navigation models
 
-Phase 2F embeds Gradle Tooling API 9.6.1 inside the isolated Studio application and adds `GradleProjectModelService`. This is separate from `GradleBuildService`: Wrapper execution remains the build runner, while the Tooling API supplies structured, read-only project information for Studio, MCP, and future GUI navigation.
+Phase 2F embeds Gradle Tooling API 9.6.1 inside the isolated Studio application and adds `GradleProjectModelService`. This is separate from `GradleBuildService`: Wrapper execution remains the build runner, while the Tooling API supplies structured, read-only project information for Studio, MCP, and GUI navigation.
 
 The Tooling API is project-version aware. By default it uses the Gradle version configured by the target build, including its Wrapper configuration. If the target build declares no Gradle version, Gradle's Tooling API default is to use the Tooling API client's Gradle version. It does not require a host-installed `gradle`.
 
@@ -287,27 +287,26 @@ Launch it with:
 java -jar build/libs/pickleball-2.1.7.jar studio ui .
 ```
 
-The desktop foundation currently provides:
+The desktop foundation provides:
 
 - a workspace tree backed by `WorkspaceFileService`, including the same generated/heavy-directory and symbolic-link traversal rules as CLI/MCP;
 - tabbed UTF-8 text editing with dirty-state markers, save, reload, `Ctrl+S`, and `Ctrl+R`;
 - Java/Gherkin source outlines and syntax diagnostics backed by `WorkspaceLanguageService`;
 - workspace symbol search with navigation to the selected definition;
 - double-click navigation from the workspace tree, outline, and symbol results;
-- a managed test action that runs Gradle `test` through the project Wrapper for Gradle workspaces or Maven `test` through Studio's bundled Maven runtime for Maven workspaces;
+- a managed **Run Tests** action that runs Gradle `test` through the project Wrapper for Gradle workspaces or Maven `test` through Studio's bundled Maven runtime for Maven workspaces;
 - incremental stdout/stderr display through `ManagedProcessService`;
 - cancellation of the active managed test run;
 - bounded desktop output so long-running builds do not grow the editor process indefinitely;
 - cleanup of managed child processes when the Studio window closes.
 
-The UI is launched through `StudioDesktopApplication`, while `StudioDesktopSession` is the reusable desktop-facing facade over workspace, language, build, and managed-process services. The Swing frame itself must not become a second source of file/build semantics.
+The UI is launched through `StudioDesktopApplication`, while `StudioDesktopSession` is the reusable desktop-facing facade over workspace, language, build, managed-process, and Phase 3 runtime services. Swing widgets must not become a second source of file/build/runtime semantics.
 
-The first editor is intentionally plain text. Phase 2H does not add syntax highlighting, completion, semantic Java type/reference resolution, Gherkin-to-Java step binding, refactoring, persistent layout/session state, or an interactive PTY terminal.
+The editor remains plain text. Studio does not yet add syntax highlighting, completion, semantic Java type/reference resolution, Gherkin-to-Java step binding, refactoring, persistent layout/session state, or an interactive PTY terminal.
 
 The source outline reflects the currently saved workspace file. Saving an editor refreshes its outline. Live parsing of unsaved editor buffers can be added later without changing the underlying source-navigation model.
 
-If a workspace is both Gradle- and Maven-detected, the desktop test action currently prefers Gradle build execution. Workspaces with neither build marker can still use file editing and source navigation, but the test action is disabled.
-
+If a workspace is both Gradle- and Maven-detected, desktop build actions prefer Gradle. Workspaces with neither build marker can still use file editing and source navigation, but build/runtime launch actions are disabled.
 
 ## Phase 3A: live consumer runtime bridge foundation
 
@@ -325,7 +324,7 @@ Participating consumer JVMs:
 
 The scenario-thread queue is required because Pickleball's active `CurrentScenarioState` is thread-local. HTTP worker threads do not call `DynamicControl` directly.
 
-`ControlRuntime` now supports additive observation-only handlers through `addObserver` / `removeObserver`. The existing global/thread-local handler remains authoritative for `ControlDecision` and value replacement. Bridge-triggered detached work can still reach that primary handler, while observer re-entry is suppressed.
+`ControlRuntime` supports additive observation-only handlers through `addObserver` / `removeObserver`. The existing global/thread-local handler remains authoritative for `ControlDecision` and value replacement. Bridge-triggered detached work can still reach that primary handler, while observer re-entry is suppressed.
 
 Pauses are finite. The default lease is 120 seconds and the maximum is 3600 seconds. A pause request that times out before reaching a semantic hook is withdrawn rather than remaining armed for a later scenario.
 
@@ -338,7 +337,7 @@ resume
 execute_step
 ```
 
-Studio MCP adds six tools, bringing the current tool count to **26**:
+Studio MCP adds six runtime tools in Phase 3A:
 
 ```text
 runtime_start
@@ -353,13 +352,11 @@ runtime_execute_step
 
 `runtime_execute_step` returns the same retry-friendly logical outcomes as the in-process API (`SUCCESS`, `FAILED`, `UNAVAILABLE`). A failed detached attempt does not by itself fail the active scenario, so a controller can inspect the result and try another action.
 
-When multiple scenario threads are active, Phase 3A controls a runtime only when exactly one scenario is active or exactly one scenario is already paused. It returns `UNAVAILABLE` instead of guessing which parallel scenario the caller intended.
-
 See [Studio Runtime Bridge](studio-runtime-bridge.md) for the protocol, security, lifecycle, and controller flow.
 
 ## Phase 3B: targeted scenarios and live mapping control
 
-Phase 3B keeps the Phase 3A transport and session model but removes the main ambiguity during parallel execution. `runtime_scenarios` lists every active scenario in one consumer runtime, including its scenario id, scenario thread id, current step/phrase, latest semantic hook, and pause state. Runtime pause/resume/detached-step calls now accept an optional `scenarioId`; when several scenarios are active, a caller can target the exact scenario instead of relying on implicit selection. Wrong or stale ids return `UNAVAILABLE`.
+Phase 3B keeps the Phase 3A transport and session model but removes the main ambiguity during parallel execution. `runtime_scenarios` lists every active scenario in one consumer runtime, including its scenario id, scenario thread id, current step/phrase, latest semantic hook, and pause state. Runtime pause/resume/detached-step calls accept an optional `scenarioId`; when several scenarios are active, a caller can target the exact scenario instead of relying on implicit selection. Wrong or stale ids return `UNAVAILABLE`.
 
 Phase 3B also adds direct live mapping operations on the selected scenario thread:
 
@@ -373,7 +370,7 @@ runtime_mapping_resolve
 
 Mapping results include the runtime Java type, a bounded textual representation, and a structured JSON value only when the returned value is safely JSON-compatible. Custom consumer objects are not generically serialized. Live mapping writes are deliberate mutations and are not rolled back automatically.
 
-These four additions bring the Studio MCP tool count to **30**:
+These additions bring the Studio MCP tool count to **30**:
 
 ```text
 runtime_scenarios
@@ -382,7 +379,36 @@ runtime_mapping_put
 runtime_mapping_resolve
 ```
 
-Dedicated browser/service commands, mapping snapshot transfer, streaming hook history, and GUI runtime controls remain later work. Browser and service behavior can continue to be explored through retry-friendly detached Pickleball steps where that already provides clear semantics.
+Dedicated browser/service commands, mapping snapshot transfer, and streaming hook history remain later work. Browser and service behavior can continue to be explored through retry-friendly detached Pickleball steps where that already provides clear semantics.
+
+## Phase 3C: desktop live runtime control
+
+Phase 3C exposes the Phase 3A/3B runtime service through the existing Swing desktop application. It does not add a second bridge implementation or change the MCP contract.
+
+Open the desktop application normally, then use:
+
+```text
+Runtime > Runtime Control...
+```
+
+The modeless Runtime Control window provides:
+
+- **Start Control Run**, which calls `RuntimeBridgeService` through `StudioDesktopSession` and starts the normal managed `test` build with first-scenario pause enabled;
+- **Cancel Run**, using the same `ManagedProcessService` process id returned by the runtime launch;
+- polling/discovery of every participating consumer runtime descriptor for the Studio runtime session;
+- runtime and scenario selectors for parallel test workers/scenarios;
+- live scenario id/thread/step/phrase/hook/pause state;
+- targeted **Pause** and **Resume**;
+- retry-friendly detached-step execution with optional argument text;
+- live mapping Get/Put/Resolve using the Phase 3B APIs and JSON-literal write contract;
+- bounded incremental stdout/stderr for the controlled build;
+- direct display of `SUCCESS`, `FAILED`, and `UNAVAILABLE` operation results without converting exploratory failures into process failures.
+
+`RuntimeControlDialog` is a Swing adapter. It does not construct bridge HTTP requests, retain bearer tokens, call `DynamicControl`, or build Maven/Gradle commands itself. `StudioDesktopSession` owns the desktop-facing composition of `RuntimeBridgeService` with the existing process/build services.
+
+The original main-window **Run Tests** action remains bridge-free. Hiding the Runtime Control window does not cancel its managed build. Pause safety still comes from finite bridge leases; explicit cancellation still terminates the managed process tree. Closing Studio closes the runtime bridge service and managed-process service.
+
+Phase 3C adds no MCP tools, so the Studio MCP count remains **30**.
 
 ## Validation
 
@@ -393,7 +419,7 @@ Focused Studio validation:
 ./gradlew --rerun-tasks :pickleball-studio:verifyBundledStudio
 ```
 
-The Studio tests include real child-JVM process checks, managed incremental-output/cancellation and descendant-termination checks, synchronous plus managed Maven `--version` checks, cross-platform Gradle Wrapper fixture checks, a Gradle Tooling API project/source/task model fixture, Java/Gherkin source-outline and workspace-symbol navigation fixtures, non-headless-independent desktop-session/tree-model checks, runtime-bridge service/MCP registration checks, and JSON-literal type-preservation checks for direct mapping writes. The Maven consumer additionally exercises the real loopback bridge against an active Pickleball scenario, including authenticated scenario targeting, live mapping write/read/resolve, retry-friendly detached failure, successful retry, and resume. The Tooling API test uses the Gradle installation already running the repository test build, so it does not require a host Gradle installation or a separate distribution download.
+The Studio tests include real child-JVM process checks, managed incremental-output/cancellation and descendant-termination checks, synchronous plus managed Maven `--version` checks, cross-platform Gradle Wrapper fixture checks, a Gradle Tooling API project/source/task model fixture, Java/Gherkin source-outline and workspace-symbol navigation fixtures, non-headless-independent desktop-session/tree-model checks, runtime-bridge service/MCP registration checks, JSON-literal type-preservation checks for direct mapping writes, and a desktop-facade controlled-run fixture that verifies bridge environment injection without requiring a live consumer JVM. The Maven consumer additionally exercises the real loopback bridge against an active Pickleball scenario, including authenticated scenario targeting, live mapping write/read/resolve, retry-friendly detached failure, successful retry, and resume. The Tooling API test uses the Gradle installation already running the repository test build, so it does not require a host Gradle installation or a separate distribution download.
 
 `verifyBundledStudio` checks both sides of the isolation contract:
 
@@ -411,13 +437,14 @@ After focused validation, run the normal root and Maven-consumer validation from
 
 ## Current boundaries
 
-Phase 3B does **not** yet implement:
+Phase 3C does **not** yet implement:
 
 - syntax highlighting, code completion, editor refactoring, or live parsing of unsaved buffers;
 - full Gradle external dependency/classpath import;
-- persistent process/activity history or desktop layout/session restoration across Studio restarts;
+- persistent process/activity history, runtime-control history, or desktop layout/session restoration across Studio restarts;
 - interactive terminal stdin/PTY support;
 - full Java semantic/classpath reference resolution, usages, or Gherkin-to-Java step binding;
-- GUI controls for live runtime sessions, streaming hook history, mapping snapshot transfer, or dedicated browser/service/screenshot bridge commands beyond generic detached step execution.
+- streaming runtime hook/event history, mapping snapshot transfer, or dedicated browser/service/screenshot bridge commands beyond generic detached step execution;
+- remote/non-loopback runtime control.
 
 Those capabilities should continue to layer on the shared Studio service model and the explicit Phase 3 runtime bridge rather than bypassing either boundary.

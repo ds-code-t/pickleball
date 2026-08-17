@@ -1,6 +1,8 @@
-
 package tools.dscode.studio.gui;
 
+import javax.swing.JMenu;
+import javax.swing.JMenuBar;
+import javax.swing.JMenuItem;
 import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
 import java.awt.GraphicsEnvironment;
@@ -33,12 +35,35 @@ public final class StudioDesktopApplication {
             }
 
             try {
-                new StudioFrame(session).setVisible(true);
+                StudioFrame frame = new StudioFrame(session);
+                RuntimeControlDialog runtimeDialog = new RuntimeControlDialog(frame, session);
+                frame.setJMenuBar(menuBar(frame, runtimeDialog, session));
+                frame.setVisible(true);
             } catch (RuntimeException failure) {
                 session.close();
                 failure.printStackTrace(error);
             }
         });
         return 0;
+    }
+
+    private static JMenuBar menuBar(
+            StudioFrame frame,
+            RuntimeControlDialog runtimeDialog,
+            StudioDesktopSession session
+    ) {
+        JMenuItem runtimeControl = new JMenuItem("Runtime Control...");
+        runtimeControl.setEnabled(session.testBuildTool() != null);
+        runtimeControl.addActionListener(event -> {
+            runtimeDialog.setLocationRelativeTo(frame);
+            runtimeDialog.setVisible(true);
+        });
+
+        JMenu runtime = new JMenu("Runtime");
+        runtime.add(runtimeControl);
+
+        JMenuBar menuBar = new JMenuBar();
+        menuBar.add(runtime);
+        return menuBar;
     }
 }
