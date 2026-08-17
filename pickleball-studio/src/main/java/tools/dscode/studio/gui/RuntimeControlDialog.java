@@ -8,6 +8,9 @@ import tools.dscode.studio.runtime.RuntimeBridgeError;
 import tools.dscode.studio.runtime.RuntimeBridgeStatus;
 import tools.dscode.studio.runtime.RuntimeControlResult;
 import tools.dscode.studio.runtime.RuntimeLaunchResult;
+import tools.dscode.studio.runtime.RuntimeMappingSnapshot;
+import tools.dscode.studio.runtime.RuntimeMappingSnapshotResult;
+import tools.dscode.studio.runtime.RuntimeMappingSnapshotSummary;
 import tools.dscode.studio.runtime.RuntimeScenarioStatus;
 import tools.dscode.studio.runtime.RuntimeValue;
 import tools.dscode.studio.runtime.RuntimeValueResult;
@@ -55,6 +58,7 @@ final class RuntimeControlDialog extends JDialog {
     private final JTextField mapKey = new JTextField();
     private final JTextField mapJsonValue = new JTextField("\"value\"");
     private final JTextField mapResolveInput = new JTextField();
+    private final JComboBox<RuntimeMappingSnapshotSummary> mappingSnapshotBox = new JComboBox<>();
     private final JLabel stateLabel = new JLabel("No controlled run started.");
 
     private final Timer processTimer;
@@ -173,7 +177,7 @@ final class RuntimeControlDialog extends JDialog {
     }
 
     private JPanel mappingPanel() {
-        JPanel fields = new JPanel(new GridLayout(4, 2, 6, 4));
+        JPanel fields = new JPanel(new GridLayout(5, 2, 6, 4));
         fields.add(new JLabel("Map reference"));
         fields.add(mapReference);
         fields.add(new JLabel("Key"));
@@ -182,11 +186,15 @@ final class RuntimeControlDialog extends JDialog {
         fields.add(mapJsonValue);
         fields.add(new JLabel("Resolve input"));
         fields.add(mapResolveInput);
+        fields.add(new JLabel("Snapshot"));
+        fields.add(mappingSnapshotBox);
 
         JPanel actions = new JPanel();
         JButton get = new JButton("Get");
         JButton put = new JButton("Put");
         JButton resolve = new JButton("Resolve");
+        JButton snapshot = new JButton("Snapshot");
+        JButton restore = new JButton("Restore Snapshot");
         get.addActionListener(event -> runValueAction(() ->
                 session.runtimeMappingGet(
                         bridgeSessionId,
@@ -214,9 +222,30 @@ final class RuntimeControlDialog extends JDialog {
                         mapResolveInput.getText()
                 )
         ));
+        snapshot.addActionListener(event -> runSnapshotAction(() ->
+                session.runtimeMappingSnapshot(
+                        bridgeSessionId,
+                        selectedRuntimeId(),
+                        selectedScenarioId(),
+                        mapReference.getText()
+                )
+        ));
+        restore.addActionListener(event -> {
+            RuntimeMappingSnapshotSummary selected = selectedMappingSnapshot();
+            if (selected == null) {
+                result.setText("No mapping snapshot is selected.");
+                return;
+            }
+            runControlAction(() -> session.runtimeMappingRestore(
+                    bridgeSessionId,
+                    selected.snapshotId()
+            ));
+        });
         actions.add(get);
         actions.add(put);
         actions.add(resolve);
+        actions.add(snapshot);
+        actions.add(restore);
 
         JPanel panel = new JPanel(new BorderLayout(6, 6));
         panel.add(fields, BorderLayout.CENTER);
@@ -269,6 +298,29 @@ final class RuntimeControlDialog extends JDialog {
                 );
             }
         });
+        mappingSnapshotBox.setRenderer(new DefaultListCellRenderer() {
+            @Override
+            public java.awt.Component getListCellRendererComponent(
+                    javax.swing.JList<?> list,
+                    Object value,
+                    int index,
+                    boolean selected,
+                    boolean focused
+            ) {
+                String text = value instanceof RuntimeMappingSnapshotSummary snapshot
+                        ? snapshot.mapReference()
+                        + "  " + snapshot.capturedAt()
+                        + (snapshot.restorable() ? "" : "  INSPECT ONLY")
+                        : String.valueOf(value);
+                return super.getListCellRendererComponent(
+                        list,
+                        text,
+                        index,
+                        selected,
+                        focused
+                );
+            }
+        });
     }
 
     private void startControlRun() {
@@ -280,6 +332,7 @@ final class RuntimeControlDialog extends JDialog {
         bridgeSessionId = null;
         runtimeBox.removeAllItems();
         scenarioBox.removeAllItems();
+        mappingSnapshotBox.removeAllItems();
         runtimeStatus.setText("Waiting for a controlled run...");
         result.setText("");
         buildOutput.setText("");
@@ -360,6 +413,7 @@ final class RuntimeControlDialog extends JDialog {
                 state.scenarios().toArray(RuntimeScenarioStatus[]::new)
         ));
         selectScenario(preferredScenarioId);
+        refreshMappingSnapshots(selectedMappingSnapshotId());
 
         RuntimeBridgeStatus runtime = state.runtimeStatus();
         if (runtime == null) {
@@ -417,6 +471,25 @@ final class RuntimeControlDialog extends JDialog {
                 action,
                 value -> {
                     result.setText(format(value));
+                    refreshBridge();
+                },
+                this::showFailure
+        );
+    }
+
+    private void runSnapshotAction(Supplier<RuntimeMappingSnapshotResult> action) {
+        if (!hasRuntimeSelection()) {
+            result.setText("No live runtime is selected.");
+            return;
+        }
+        async(
+                action,
+                value -> {
+                    result.setText(format(value));
+                    String snapshotId = value.snapshot() == null
+                            ? null
+                            : value.snapshot().snapshotId();
+                    refreshMappingSnapshots(snapshotId);
                     refreshBridge();
                 },
                 this::showFailure
@@ -524,6 +597,45 @@ final class RuntimeControlDialog extends JDialog {
         return scenario == null ? null : scenario.scenarioId();
     }
 
+    private RuntimeMappingSnapshotSummary selectedMappingSnapshot() {
+        Object selected = mappingSnapshotBox.getSelectedItem();
+        return selected instanceof RuntimeMappingSnapshotSummary snapshot ? snapshot : null;
+    }
+
+    private String selectedMappingSnapshotId() {
+        RuntimeMappingSnapshotSummary snapshot = selectedMappingSnapshot();
+        return snapshot == null ? null : snapshot.snapshotId();
+    }
+
+    private void refreshMappingSnapshots(String preferredSnapshotId) {
+        if (!hasRuntimeSelection()) {
+            mappingSnapshotBox.removeAllItems();
+            return;
+        }
+        List<RuntimeMappingSnapshotSummary> snapshots = session.runtimeMappingSnapshots(
+                bridgeSessionId,
+                selectedRuntimeId(),
+                selectedScenarioId()
+        );
+        mappingSnapshotBox.setModel(new DefaultComboBoxModel<>(
+                snapshots.toArray(RuntimeMappingSnapshotSummary[]::new)
+        ));
+        selectMappingSnapshot(preferredSnapshotId);
+    }
+
+    private void selectMappingSnapshot(String snapshotId) {
+        if (snapshotId == null) {
+            return;
+        }
+        for (int index = 0; index < mappingSnapshotBox.getItemCount(); index++) {
+            RuntimeMappingSnapshotSummary snapshot = mappingSnapshotBox.getItemAt(index);
+            if (snapshotId.equals(snapshot.snapshotId())) {
+                mappingSnapshotBox.setSelectedIndex(index);
+                return;
+            }
+        }
+    }
+
     private void selectRuntime(String runtimeId) {
         if (runtimeId == null) {
             return;
@@ -594,6 +706,27 @@ final class RuntimeControlDialog extends JDialog {
                 text.append(System.lineSeparator())
                         .append("Text: ").append(runtimeValue.text());
             }
+        }
+        appendError(text, value.error());
+        return text.toString();
+    }
+
+    private String format(RuntimeMappingSnapshotResult value) {
+        StringBuilder text = new StringBuilder(value.status());
+        RuntimeMappingSnapshot snapshot = value.snapshot();
+        if (snapshot != null) {
+            text.append(System.lineSeparator())
+                    .append("Snapshot id: ").append(snapshot.snapshotId());
+            text.append(System.lineSeparator())
+                    .append("Map: ").append(snapshot.mapReference());
+            text.append(System.lineSeparator())
+                    .append("Type: ").append(snapshot.mapType());
+            text.append(System.lineSeparator())
+                    .append("Class: ").append(snapshot.mapClass());
+            text.append(System.lineSeparator())
+                    .append("Restorable: ").append(snapshot.restorable());
+            text.append(System.lineSeparator())
+                    .append("Values: ").append(snapshot.state().values());
         }
         appendError(text, value.error());
         return text.toString();

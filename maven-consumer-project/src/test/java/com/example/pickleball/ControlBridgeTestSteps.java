@@ -8,6 +8,7 @@ import tools.dscode.control.bridge.ControlBridgeCallResult;
 import tools.dscode.control.bridge.ControlBridgeDescriptor;
 import tools.dscode.control.bridge.ControlBridgeEvent;
 import tools.dscode.control.bridge.ControlBridgeEventPage;
+import tools.dscode.control.bridge.ControlBridgeMappingSnapshotResult;
 import tools.dscode.control.bridge.ControlBridgeScenarioStatus;
 import tools.dscode.control.bridge.ControlBridgeStatus;
 import tools.dscode.control.bridge.ControlBridgeValueResult;
@@ -89,6 +90,24 @@ public final class ControlBridgeTestSteps {
                         events.nextSequence(),
                         100
                 );
+                ControlBridgeValueResult baseline = postValue(
+                        "/v1/mappings/put",
+                        Map.of(
+                                "scenarioId", scenario.scenarioId(),
+                                "mapReference", "OVERRIDE",
+                                "key", "controlBridgeIpcValue",
+                                "value", "baseline",
+                                "timeoutSeconds", 10
+                        )
+                );
+                ControlBridgeMappingSnapshotResult snapshot = postSnapshot(
+                        "/v1/mappings/snapshot",
+                        Map.of(
+                                "scenarioId", scenario.scenarioId(),
+                                "mapReference", "OVERRIDE",
+                                "timeoutSeconds", 10
+                        )
+                );
                 ControlBridgeValueResult written = postValue(
                         "/v1/mappings/put",
                         Map.of(
@@ -113,6 +132,23 @@ public final class ControlBridgeTestSteps {
                         Map.of(
                                 "scenarioId", scenario.scenarioId(),
                                 "input", "<controlBridgeIpcValue>",
+                                "timeoutSeconds", 10
+                        )
+                );
+                ControlBridgeCallResult restored = post(
+                        "/v1/mappings/restore",
+                        Map.of(
+                                "scenarioId", scenario.scenarioId(),
+                                "snapshot", snapshot.snapshot(),
+                                "timeoutSeconds", 10
+                        )
+                );
+                ControlBridgeValueResult restoredRead = postValue(
+                        "/v1/mappings/get",
+                        Map.of(
+                                "scenarioId", scenario.scenarioId(),
+                                "mapReference", "OVERRIDE",
+                                "key", "controlBridgeIpcValue",
                                 "timeoutSeconds", 10
                         )
                 );
@@ -146,9 +182,13 @@ public final class ControlBridgeTestSteps {
                         paused,
                         events,
                         cursorEvents,
+                        baseline,
+                        snapshot,
                         written,
                         read,
                         resolved,
+                        restored,
+                        restoredRead,
                         failed,
                         succeeded,
                         resumed
@@ -212,9 +252,19 @@ public final class ControlBridgeTestSteps {
                 "event cursor should not move backwards"
         );
 
+        assertMappingValue(outcome.baseline(), "baseline", "mapping baseline");
+        assertEquals("SUCCESS", outcome.snapshot().status(), "mapping snapshot status");
+        assertTrue(outcome.snapshot().snapshot().restorable(), "OVERRIDE snapshot should be restorable");
+        assertEquals(
+                "baseline",
+                outcome.snapshot().snapshot().values().get("controlBridgeIpcValue").asText(),
+                "mapping snapshot value"
+        );
         assertMappingValue(outcome.written(), "bridge-value", "mapping write");
         assertMappingValue(outcome.read(), "bridge-value", "mapping read");
         assertMappingValue(outcome.resolved(), "bridge-value", "mapping resolve");
+        assertEquals("SUCCESS", outcome.restored().status(), "mapping restore status");
+        assertMappingValue(outcome.restoredRead(), "baseline", "mapping restored value");
         assertEquals("FAILED", outcome.failed().status(), "retry-friendly failing step");
         assertEquals("SUCCESS", outcome.succeeded().status(), "successful retry step");
         assertEquals("SUCCESS", outcome.resumed().status(), "resume result");
@@ -282,6 +332,12 @@ public final class ControlBridgeTestSteps {
         HttpResponse<byte[]> response = send("POST", path, body, token);
         assertEquals(200, response.statusCode(), path + " HTTP status");
         return json.readValue(response.body(), ControlBridgeValueResult.class);
+    }
+
+    private ControlBridgeMappingSnapshotResult postSnapshot(String path, Object body) throws Exception {
+        HttpResponse<byte[]> response = send("POST", path, body, token);
+        assertEquals(200, response.statusCode(), path + " HTTP status");
+        return json.readValue(response.body(), ControlBridgeMappingSnapshotResult.class);
     }
 
     private ControlBridgeStatus status() throws Exception {
@@ -357,9 +413,13 @@ public final class ControlBridgeTestSteps {
             ControlBridgeCallResult paused,
             ControlBridgeEventPage events,
             ControlBridgeEventPage cursorEvents,
+            ControlBridgeValueResult baseline,
+            ControlBridgeMappingSnapshotResult snapshot,
             ControlBridgeValueResult written,
             ControlBridgeValueResult read,
             ControlBridgeValueResult resolved,
+            ControlBridgeCallResult restored,
+            ControlBridgeValueResult restoredRead,
             ControlBridgeCallResult failed,
             ControlBridgeCallResult succeeded,
             ControlBridgeCallResult resumed

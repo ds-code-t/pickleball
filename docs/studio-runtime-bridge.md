@@ -1,6 +1,6 @@
 # Pickleball Studio runtime bridge
 
-Pickleball Studio can opt a managed test run into a private bridge between the Studio JVM and the consumer test JVM. The bridge lets Studio desktop and MCP clients inspect live Pickleball scenarios, target one scenario during parallel execution, pause it at a semantic control boundary, inspect or mutate live mappings, execute retry-friendly detached steps through the existing dynamic-control API, read bounded semantic execution evidence, and resume normal traversal.
+Pickleball Studio can opt a managed test run into a private bridge between the Studio JVM and the consumer test JVM. The bridge lets Studio desktop and MCP clients inspect live Pickleball scenarios, target one scenario during parallel execution, pause it at a semantic control boundary, inspect or mutate live mappings, capture and explicitly restore bounded Studio-owned mapping snapshots, execute retry-friendly detached steps through the existing dynamic-control API, read bounded semantic execution evidence, and resume normal traversal.
 
 The bridge is **not** enabled by merely depending on Pickleball. Ordinary Maven/Gradle runs, normal Studio `maven_start` / `gradle_start` calls, and the desktop **Run Tests** action retain their existing behavior. The desktop **Runtime > Runtime Control... > Start Control Run** path is explicitly bridge-enabled.
 
@@ -74,8 +74,12 @@ POST /v1/resume
 POST /v1/steps/execute
 POST /v1/mappings/get
 POST /v1/mappings/put
+POST /v1/mappings/snapshot
+POST /v1/mappings/restore
 POST /v1/mappings/resolve
 ```
+
+The additive Phase 3F descriptor capabilities are `mapping_snapshot` and `mapping_restore`; protocol version `1` is unchanged.
 
 This protocol is internal to the Studio/Pickleball integration. MCP clients should use Studio's `runtime_*` tools instead of connecting to consumer bridge ports directly. The desktop UI uses the same `RuntimeBridgeService` as MCP and does not connect to bridge ports independently.
 
@@ -113,7 +117,7 @@ When the lease expires, scenario execution resumes automatically. A pause reques
 
 A bridge process may observe more than one scenario thread. `runtime_scenarios` returns every currently active scenario with its stable scenario id for that scenario run, thread id, current step/phrase text, latest semantic hook, and pause state.
 
-`runtime_pause`, `runtime_resume`, `runtime_execute_step`, and the mapping tools accept an optional `scenarioId`. When several scenarios are active, callers should pass the id returned by `runtime_scenarios`. A wrong or stale id returns `UNAVAILABLE`; the bridge does not guess.
+`runtime_pause`, `runtime_resume`, `runtime_execute_step`, and live mapping capture/read/write/resolve operations accept an optional `scenarioId`. When several scenarios are active, callers should pass the id returned by `runtime_scenarios`. A wrong or stale id returns `UNAVAILABLE`; the bridge does not guess.
 
 The desktop Runtime Control window renders the discovered runtimes and scenarios as selectors. Its Pause, Resume, detached-step, and mapping actions target the selected scenario id. The original unqualified API behavior remains for compatibility when exactly one scenario is active or exactly one scenario is already uniquely paused.
 
@@ -203,9 +207,43 @@ null
 
 Mapping results use a safe value envelope containing the runtime type, a clipped text representation, and a structured `jsonValue` only when the value is JSON-compatible. Arbitrary consumer objects are not generically serialized. This keeps direct mapping inspection deterministic without turning the bridge into an unrestricted object serializer.
 
-These operations mutate the same live maps used by normal execution. They are intentionally not rolled back automatically. Mapping snapshots/file transfer remain a separate later capability.
+These operations mutate the same live maps used by normal execution. They are intentionally not rolled back automatically.
 
-The desktop Mapping tab is a direct adapter over these same operations. It accepts a map reference, key, JSON literal, or resolve input and displays the returned status/type/value/error envelope; it does not implement a second mapping grammar.
+### Studio-owned mapping snapshots
+
+Phase 3F adds explicit capture/list/restore around those live mapping operations:
+
+```text
+runtime_mapping_snapshot
+runtime_mapping_snapshots
+runtime_mapping_restore
+```
+
+The consumer bridge endpoints are:
+
+```text
+POST /v1/mappings/snapshot
+POST /v1/mappings/restore
+```
+
+Capture runs on the selected scenario thread and materializes one referenced live `NodeMap` as JSON object state plus map reference, map type, concrete class, and sorted data-source metadata. The bridge itself does not retain snapshot ids or history. On a successful capture, `RuntimeBridgeService` stores the materialized state in Studio and returns a generated `snapshotId`.
+
+Studio snapshot history is deliberately bounded and ephemeral:
+
+- maximum retained snapshots: **50 per Studio runtime session**;
+- maximum materialized values payload per captured map: **512 KiB of compact UTF-8 JSON**;
+- retention lives only in the running Studio JVM;
+- snapshots are not written to the bridge descriptor or consumer filesystem;
+- snapshots are cleared when Studio's `RuntimeBridgeService` closes;
+- listing may filter by runtime id, scenario id, or map reference.
+
+Capture may inspect any `NodeMap` implementation, but only an exact ordinary `NodeMap` is marked `restorable=true`. Specialized subclasses such as live data-context maps are materialized for inspection only because serialized JSON cannot recreate their cursor/reference/live-object semantics.
+
+Restore is explicit rather than automatic rollback. Studio resolves the `snapshotId` to its originally captured runtime, scenario, and map reference, then sends that materialized state back through the scenario-thread command queue. Restore succeeds only when the current target is still an ordinary `NodeMap` whose concrete class, map type, and data-source metadata match the capture. It clears and repopulates that **same live map object**, preserving object identity already held by active `ParsingMap` instances. Map-type metadata is reconstructed from the live map rather than trusted from the transferred JSON payload.
+
+A snapshot can remain listed in Studio after its scenario or consumer runtime exits, until bounded eviction or Studio shutdown. A later restore then returns `UNAVAILABLE`; Studio does not recreate a dead scenario or consumer JVM.
+
+The desktop Mapping tab is a direct adapter over these same operations. In addition to Get/Put/Resolve it can **Snapshot** the current map, select retained snapshots for the current runtime/scenario, and **Restore Snapshot** by id. An inspection-only snapshot is labeled accordingly. The desktop does not maintain a second snapshot store or restoration algorithm.
 
 ## Retry-friendly detached execution
 
@@ -233,7 +271,7 @@ Effects that happened before a failed detached call are not rolled back. The des
 
 ## Studio MCP flow
 
-Phase 3D adds one evidence tool, bringing Studio to **31** MCP tools. Runtime control/evidence includes:
+Phase 3F adds three mapping-snapshot tools to the existing runtime contract, bringing Studio to **34** MCP tools. Runtime control/evidence includes:
 
 ```text
 runtime_start
@@ -247,6 +285,9 @@ runtime_execute_step
 runtime_mapping_get
 runtime_mapping_put
 runtime_mapping_resolve
+runtime_mapping_snapshot
+runtime_mapping_snapshots
+runtime_mapping_restore
 ```
 
 `runtime_events` is a read-only adapter over `RuntimeBridgeService.events(...)`. It accepts the runtime session id, runtime id, optional scenario id, optional exclusive `afterSequence` cursor, and optional page limit.
@@ -276,8 +317,14 @@ runtime_events
 runtime_mapping_get / runtime_mapping_resolve
   -> inspect live data and resolution state
 
+runtime_mapping_snapshot
+  -> capture a restorable baseline before deliberate mutation when useful
+
 runtime_mapping_put
-  -> test a typed mapping override when useful
+  -> test a typed mapping override
+
+runtime_mapping_restore
+  -> explicitly return an ordinary live NodeMap to the captured baseline when desired
 
 runtime_execute_step
   -> inspect SUCCESS / FAILED / UNAVAILABLE
@@ -315,7 +362,7 @@ The modeless Runtime Control window provides:
 - live runtime/scenario status refresh;
 - **Pause** and **Resume** for the selected scenario;
 - retry-friendly detached-step text plus optional argument execution;
-- mapping Get/Put/Resolve using the Phase 3B mapping APIs;
+- mapping Get/Put/Resolve using the Phase 3B mapping APIs plus Phase 3F Snapshot/Restore backed by Studio-owned snapshot ids;
 - bounded incremental stdout/stderr display for the controlled build;
 - bounded operation-result display using the same `SUCCESS` / `FAILED` / `UNAVAILABLE` semantics returned to MCP.
 
@@ -339,7 +386,7 @@ If the bridge reports `gap=true`, the Events tab keeps that warning visible and 
 
 When a page reports `hasMore=true`, the desktop continues reading immediately from `nextSequence`; ordinary periodic refresh then follows new events. Auto-tail is optional so a user inspecting older visible events is not forced back to the end on every refresh.
 
-Phase 3E changes no bridge endpoint, capability, protocol version, or MCP tool.
+Phase 3E changes no bridge endpoint, capability, protocol version, or MCP tool. Phase 3F later adds mapping snapshot/restore without changing protocol version `1`; it is an additive capability extension.
 
 ## Build-tool behavior
 
@@ -355,12 +402,12 @@ The bridge environment is added only through the opt-in managed-start overloads.
 
 Bridge metadata is separate from Pickleball execution RunVars. When a controller knows the intended Pickleball test settings, it should continue to supply those settings through the existing `pkb_runvars` controlled-run contract described in [AI Run Configuration](ai-run-configuration.md). `runtime_start` and the desktop controlled-run action do not reconstruct or replace that configuration model.
 
-## Current Phase 3E boundaries
+## Current Phase 3F boundaries
 
-Phase 3E adds a bounded desktop event timeline over the existing Phase 3D evidence service. It does **not** yet add:
+Phase 3F adds Studio-owned, bounded materialized mapping snapshots and explicit ordinary-`NodeMap` restore. It does **not** yet add:
 - unbounded or persisted event history after the consumer runtime exits;
 - dedicated browser, service-call, or screenshot bridge commands beyond generic detached step execution;
-- mapping snapshot transfer through Studio;
+- persistent mapping snapshots across Studio restarts or exact restoration of specialized live `NodeMap` subclasses;
 - arbitrary consumer-object serialization across the JVM boundary;
 - persistent runtime sessions or desktop control history after Studio exits;
 - remote/non-loopback control;

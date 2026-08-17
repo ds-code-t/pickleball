@@ -35,6 +35,7 @@ public final class RuntimeBridgeService implements AutoCloseable {
     private final GradleBuildService gradle;
     private final Path sessionRoot;
     private final ConcurrentHashMap<String, Session> sessions = new ConcurrentHashMap<>();
+    private final RuntimeMappingSnapshotStore mappingSnapshots = new RuntimeMappingSnapshotStore();
 
     public RuntimeBridgeService(
             WorkspaceInfo workspace,
@@ -287,6 +288,69 @@ public final class RuntimeBridgeService implements AutoCloseable {
         );
     }
 
+    public RuntimeMappingSnapshotResult mappingSnapshot(
+            String sessionId,
+            String runtimeId,
+            String scenarioId,
+            String mapReference,
+            Integer timeoutSeconds
+    ) {
+        Session session = requireSession(sessionId);
+        RuntimeMappingStateResult result = client(session, runtimeId).mappingSnapshot(
+                scenarioId,
+                mapReference,
+                timeoutSeconds
+        );
+        if (!"SUCCESS".equals(result.status()) || result.snapshot() == null) {
+            return new RuntimeMappingSnapshotResult(
+                    result.status(),
+                    null,
+                    result.error(),
+                    result.runtime()
+            );
+        }
+
+        String selectedScenarioId = result.runtime() == null
+                ? normalized(scenarioId)
+                : result.runtime().scenarioId();
+        RuntimeMappingSnapshot snapshot = mappingSnapshots.store(
+                session.id,
+                runtimeId,
+                selectedScenarioId,
+                result.snapshot()
+        );
+        return new RuntimeMappingSnapshotResult(
+                result.status(),
+                snapshot,
+                result.error(),
+                result.runtime()
+        );
+    }
+
+    public List<RuntimeMappingSnapshotSummary> mappingSnapshots(
+            String sessionId,
+            String runtimeId,
+            String scenarioId,
+            String mapReference
+    ) {
+        requireSession(sessionId);
+        return mappingSnapshots.list(sessionId, runtimeId, scenarioId, mapReference);
+    }
+
+    public RuntimeControlResult mappingRestore(
+            String sessionId,
+            String snapshotId,
+            Integer timeoutSeconds
+    ) {
+        Session session = requireSession(sessionId);
+        RuntimeMappingSnapshot snapshot = mappingSnapshots.get(sessionId, snapshotId);
+        return client(session, snapshot.runtimeId()).mappingRestore(
+                snapshot.scenarioId(),
+                snapshot.state(),
+                timeoutSeconds
+        );
+    }
+
     @Override
     public void close() {
         for (Session session : sessions.values()) {
@@ -313,6 +377,7 @@ public final class RuntimeBridgeService implements AutoCloseable {
             }
         }
         sessions.clear();
+        mappingSnapshots.clear();
     }
 
     private RuntimeBridgeClient client(Session session, String runtimeId) {
@@ -403,6 +468,10 @@ public final class RuntimeBridgeService implements AutoCloseable {
         byte[] bytes = new byte[32];
         random.nextBytes(bytes);
         return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+    }
+
+    private static String normalized(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
     }
 
     private static final class Session {

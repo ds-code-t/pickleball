@@ -203,6 +203,36 @@ final class RuntimeBridgeClient {
         );
     }
 
+    RuntimeMappingStateResult mappingSnapshot(
+            String scenarioId,
+            String mapReference,
+            Integer timeoutSeconds
+    ) {
+        int timeout = timeoutSeconds == null ? 60 : timeoutSeconds;
+        return request(
+                "POST",
+                "/v1/mappings/snapshot",
+                new MappingSnapshotRequest(scenarioId, mapReference, timeoutSeconds),
+                RuntimeMappingStateResult.class,
+                Duration.ofSeconds(Math.max(10, timeout + 5L))
+        );
+    }
+
+    RuntimeControlResult mappingRestore(
+            String scenarioId,
+            RuntimeMappingState snapshot,
+            Integer timeoutSeconds
+    ) {
+        int timeout = timeoutSeconds == null ? 60 : timeoutSeconds;
+        return request(
+                "POST",
+                "/v1/mappings/restore",
+                new MappingRestoreRequest(scenarioId, snapshot, timeoutSeconds),
+                RuntimeControlResult.class,
+                Duration.ofSeconds(Math.max(10, timeout + 5L))
+        );
+    }
+
     private <T> T request(
             String method,
             String path,
@@ -313,6 +343,20 @@ final class RuntimeBridgeClient {
     private record MappingResolveRequest(
             String scenarioId,
             String input,
+            Integer timeoutSeconds
+    ) {
+    }
+
+    private record MappingSnapshotRequest(
+            String scenarioId,
+            String mapReference,
+            Integer timeoutSeconds
+    ) {
+    }
+
+    private record MappingRestoreRequest(
+            String scenarioId,
+            RuntimeMappingState snapshot,
             Integer timeoutSeconds
     ) {
     }

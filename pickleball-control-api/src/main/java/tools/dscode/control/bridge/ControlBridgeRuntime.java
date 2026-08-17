@@ -32,7 +32,9 @@ final class ControlBridgeRuntime implements AutoCloseable {
             "execute_step",
             "mapping_get",
             "mapping_put",
-            "mapping_resolve"
+            "mapping_resolve",
+            "mapping_snapshot",
+            "mapping_restore"
     );
 
     private static final String HOST = "127.0.0.1";
@@ -223,6 +225,24 @@ final class ControlBridgeRuntime implements AutoCloseable {
                     return coordinator.mappingResolve(
                             request.scenarioId(),
                             request.input(),
+                            request.timeoutSeconds()
+                    );
+                }));
+        server.createContext("/v1/mappings/snapshot", exchange ->
+                handle(exchange, "POST", () -> {
+                    MappingSnapshotRequest request = readRequired(exchange, MappingSnapshotRequest.class);
+                    return coordinator.mappingSnapshot(
+                            request.scenarioId(),
+                            request.mapReference(),
+                            request.timeoutSeconds()
+                    );
+                }));
+        server.createContext("/v1/mappings/restore", exchange ->
+                handle(exchange, "POST", () -> {
+                    MappingRestoreRequest request = readRequired(exchange, MappingRestoreRequest.class);
+                    return coordinator.mappingRestore(
+                            request.scenarioId(),
+                            request.snapshot(),
                             request.timeoutSeconds()
                     );
                 }));
@@ -449,6 +469,20 @@ final class ControlBridgeRuntime implements AutoCloseable {
     private record MappingResolveRequest(
             String scenarioId,
             String input,
+            Integer timeoutSeconds
+    ) {
+    }
+
+    private record MappingSnapshotRequest(
+            String scenarioId,
+            String mapReference,
+            Integer timeoutSeconds
+    ) {
+    }
+
+    private record MappingRestoreRequest(
+            String scenarioId,
+            ControlBridgeMappingSnapshot snapshot,
             Integer timeoutSeconds
     ) {
     }

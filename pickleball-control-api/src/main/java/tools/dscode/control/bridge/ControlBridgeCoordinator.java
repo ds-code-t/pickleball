@@ -1,6 +1,7 @@
 package tools.dscode.control.bridge;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.cucumber.core.runner.CurrentScenarioState;
 import io.cucumber.core.runner.GlobalState;
 import io.cucumber.core.runner.StepExtension;
@@ -15,6 +16,7 @@ import tools.dscode.control.api.DynamicControl;
 import tools.dscode.control.api.MappingControl;
 
 import java.lang.reflect.Array;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -45,6 +47,7 @@ final class ControlBridgeCoordinator implements ControlHookHandler, AutoCloseabl
     static final int MAX_COMMAND_TIMEOUT_SECONDS = 3600;
 
     private static final int MAX_TEXT = 64 * 1024;
+    private static final int MAX_MAPPING_SNAPSHOT_BYTES = 512 * 1024;
     private static final Object NOT_JSON_COMPATIBLE = new Object();
 
     private final String runtimeId;
@@ -317,6 +320,60 @@ final class ControlBridgeCoordinator implements ControlHookHandler, AutoCloseabl
         );
     }
 
+    ControlBridgeMappingSnapshotResult mappingSnapshot(
+            String scenarioId,
+            String mapReference,
+            Integer timeoutSeconds
+    ) {
+        if (mapReference == null || mapReference.isBlank()) {
+            return snapshotUnavailable("NodeMap reference must not be blank.");
+        }
+
+        ScenarioLane lane = selectedLane(normalizeScenarioId(scenarioId));
+        if (lane == null) {
+            return snapshotUnavailableForScenarioCommand(scenarioId, "Mapping snapshot");
+        }
+
+        String reference = mapReference.trim();
+        return submit(
+                lane,
+                commandTimeout(timeoutSeconds),
+                () -> {
+                    ControlCallResult<NodeMap> current = MappingControl.currentNodeMap(reference);
+                    if (!current.successful()) {
+                        return snapshotFromFailure(current, lane);
+                    }
+                    return snapshotSuccess(reference, current.value(), lane.status(lanes.size()));
+                },
+                (type, message) -> snapshotFailed(type, message, lane.status(lanes.size())),
+                message -> snapshotUnavailable(message, lane.status(lanes.size()))
+        );
+    }
+
+    ControlBridgeCallResult mappingRestore(
+            String scenarioId,
+            ControlBridgeMappingSnapshot snapshot,
+            Integer timeoutSeconds
+    ) {
+        String validation = validateSnapshot(snapshot);
+        if (validation != null) {
+            return unavailable(validation);
+        }
+
+        ScenarioLane lane = selectedLane(normalizeScenarioId(scenarioId));
+        if (lane == null) {
+            return unavailableForScenarioCommand(scenarioId, "Mapping restore");
+        }
+
+        return submit(
+                lane,
+                commandTimeout(timeoutSeconds),
+                () -> restoreSnapshot(snapshot, lane),
+                (type, message) -> failed(type, message, lane.status(lanes.size())),
+                message -> unavailable(message, lane.status(lanes.size()))
+        );
+    }
+
     ControlBridgeValueResult mappingResolve(
             String scenarioId,
             String input,
@@ -487,6 +544,199 @@ final class ControlBridgeCoordinator implements ControlHookHandler, AutoCloseabl
         return valueUnavailable(
                 operation + " requires a scenarioId when multiple scenarios are active."
         );
+    }
+
+    private ControlBridgeMappingSnapshotResult snapshotUnavailableForScenarioCommand(
+            String scenarioId,
+            String operation
+    ) {
+        String targetId = normalizeScenarioId(scenarioId);
+        if (targetId != null) {
+            return snapshotUnavailable("No active scenario with id " + targetId + ".");
+        }
+        if (lanes.isEmpty()) {
+            return snapshotUnavailable(operation + " requires an active Pickleball scenario.");
+        }
+        return snapshotUnavailable(
+                operation + " requires a scenarioId when multiple scenarios are active."
+        );
+    }
+
+    private ControlBridgeMappingSnapshotResult snapshotSuccess(
+            String mapReference,
+            NodeMap map,
+            ControlBridgeStatus runtime
+    ) {
+        ObjectNode values = map.getRoot().deepCopy();
+        values.remove(NodeMap.MAP_TYPE_KEY);
+        int snapshotBytes = values.toString().getBytes(StandardCharsets.UTF_8).length;
+        if (snapshotBytes > MAX_MAPPING_SNAPSHOT_BYTES) {
+            return snapshotUnavailable(
+                    "Materialized mapping snapshot exceeds "
+                            + MAX_MAPPING_SNAPSHOT_BYTES + " UTF-8 JSON bytes.",
+                    runtime
+            );
+        }
+        return new ControlBridgeMappingSnapshotResult(
+                "SUCCESS",
+                new ControlBridgeMappingSnapshot(
+                        ControlBridgeMappingSnapshot.CURRENT_VERSION,
+                        mapReference,
+                        map.getMapType().name(),
+                        map.getClass().getName(),
+                        dataSources(map),
+                        map.getClass() == NodeMap.class,
+                        values
+                ),
+                null,
+                runtime
+        );
+    }
+
+    private ControlBridgeMappingSnapshotResult snapshotFromFailure(
+            ControlCallResult<?> result,
+            ScenarioLane lane
+    ) {
+        var error = result.error();
+        return new ControlBridgeMappingSnapshotResult(
+                result.status().name(),
+                null,
+                error == null
+                        ? null
+                        : new ControlBridgeError(
+                                error.type(),
+                                clipped(error.message()),
+                                clipped(error.stackTrace())
+                        ),
+                lane.status(lanes.size())
+        );
+    }
+
+    private ControlBridgeMappingSnapshotResult snapshotUnavailable(String message) {
+        return snapshotUnavailable(message, status());
+    }
+
+    private ControlBridgeMappingSnapshotResult snapshotUnavailable(
+            String message,
+            ControlBridgeStatus runtime
+    ) {
+        return new ControlBridgeMappingSnapshotResult(
+                "UNAVAILABLE",
+                null,
+                new ControlBridgeError("UNAVAILABLE", message, ""),
+                runtime
+        );
+    }
+
+    private ControlBridgeMappingSnapshotResult snapshotFailed(
+            String type,
+            String message,
+            ControlBridgeStatus runtime
+    ) {
+        return new ControlBridgeMappingSnapshotResult(
+                "FAILED",
+                null,
+                new ControlBridgeError(type, message, ""),
+                runtime
+        );
+    }
+
+    private ControlBridgeCallResult restoreSnapshot(
+            ControlBridgeMappingSnapshot snapshot,
+            ScenarioLane lane
+    ) {
+        ControlCallResult<NodeMap> current = MappingControl.currentNodeMap(snapshot.mapReference());
+        if (!current.successful()) {
+            return callFromFailure(current, lane);
+        }
+
+        NodeMap target = current.value();
+        if (target.getClass() != NodeMap.class) {
+            return unavailable(
+                    "Mapping restore only supports ordinary NodeMap instances. "
+                            + "The current " + snapshot.mapReference() + " map is "
+                            + target.getClass().getName() + ".",
+                    lane.status(lanes.size())
+            );
+        }
+        if (!target.getClass().getName().equals(snapshot.mapClass())) {
+            return unavailable(
+                    "The live map class no longer matches the captured snapshot.",
+                    lane.status(lanes.size())
+            );
+        }
+        if (!target.getMapType().name().equals(snapshot.mapType())) {
+            return unavailable(
+                    "The live map type no longer matches the captured snapshot.",
+                    lane.status(lanes.size())
+            );
+        }
+        if (!dataSources(target).equals(snapshot.dataSources())) {
+            return unavailable(
+                    "The live map data sources no longer match the captured snapshot.",
+                    lane.status(lanes.size())
+            );
+        }
+
+        ObjectNode values = snapshot.values();
+        values.remove(NodeMap.MAP_TYPE_KEY);
+        var mapType = target.getMapType();
+        target.clearValues();
+        target.setMapType(mapType);
+        target.merge(values);
+        return success("RESTORED", lane.status(lanes.size()));
+    }
+
+    private ControlBridgeCallResult callFromFailure(
+            ControlCallResult<?> result,
+            ScenarioLane lane
+    ) {
+        var error = result.error();
+        return new ControlBridgeCallResult(
+                result.status().name(),
+                null,
+                null,
+                error == null
+                        ? null
+                        : new ControlBridgeError(
+                                error.type(),
+                                clipped(error.message()),
+                                clipped(error.stackTrace())
+                        ),
+                lane.status(lanes.size())
+        );
+    }
+
+    private static String validateSnapshot(ControlBridgeMappingSnapshot snapshot) {
+        if (snapshot == null) {
+            return "Mapping snapshot must not be null.";
+        }
+        if (snapshot.version() != ControlBridgeMappingSnapshot.CURRENT_VERSION) {
+            return "Unsupported mapping snapshot version: " + snapshot.version() + ".";
+        }
+        if (snapshot.mapReference() == null || snapshot.mapReference().isBlank()) {
+            return "Mapping snapshot mapReference must not be blank.";
+        }
+        if (snapshot.mapType() == null || snapshot.mapType().isBlank()) {
+            return "Mapping snapshot mapType must not be blank.";
+        }
+        if (snapshot.mapClass() == null || snapshot.mapClass().isBlank()) {
+            return "Mapping snapshot mapClass must not be blank.";
+        }
+        if (!snapshot.restorable()) {
+            return "This materialized mapping snapshot is inspection-only and cannot be restored.";
+        }
+        if (snapshot.values() == null) {
+            return "Mapping snapshot values must not be null.";
+        }
+        return null;
+    }
+
+    private static List<String> dataSources(NodeMap map) {
+        return map.getDataSources().stream()
+                .map(Enum::name)
+                .sorted()
+                .toList();
     }
 
     private ControlBridgeCallResult fromControlResult(

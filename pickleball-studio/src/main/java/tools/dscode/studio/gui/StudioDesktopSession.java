@@ -15,6 +15,8 @@ import tools.dscode.studio.runtime.RuntimeBridgeStatus;
 import tools.dscode.studio.runtime.RuntimeControlResult;
 import tools.dscode.studio.runtime.RuntimeEventPage;
 import tools.dscode.studio.runtime.RuntimeLaunchResult;
+import tools.dscode.studio.runtime.RuntimeMappingSnapshotResult;
+import tools.dscode.studio.runtime.RuntimeMappingSnapshotSummary;
 import tools.dscode.studio.runtime.RuntimeScenarioStatus;
 import tools.dscode.studio.runtime.RuntimeValueResult;
 import tools.dscode.studio.workspace.WorkspaceEntry;
@@ -245,6 +247,41 @@ public final class StudioDesktopSession implements AutoCloseable {
                 input,
                 null
         );
+    }
+
+    public RuntimeMappingSnapshotResult runtimeMappingSnapshot(
+            String sessionId,
+            String runtimeId,
+            String scenarioId,
+            String mapReference
+    ) {
+        return runtimeBridge.mappingSnapshot(
+                sessionId,
+                runtimeId,
+                scenarioId,
+                mapReference,
+                null
+        );
+    }
+
+    public List<RuntimeMappingSnapshotSummary> runtimeMappingSnapshots(
+            String sessionId,
+            String runtimeId,
+            String scenarioId
+    ) {
+        return runtimeBridge.mappingSnapshots(
+                sessionId,
+                runtimeId,
+                scenarioId,
+                null
+        );
+    }
+
+    public RuntimeControlResult runtimeMappingRestore(
+            String sessionId,
+            String snapshotId
+    ) {
+        return runtimeBridge.mappingRestore(sessionId, snapshotId, null);
     }
 
     public String testBuildTool() {

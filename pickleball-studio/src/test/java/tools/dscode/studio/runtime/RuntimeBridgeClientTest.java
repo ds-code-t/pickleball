@@ -104,6 +104,74 @@ class RuntimeBridgeClientTest {
         assertEquals("scenario id", page.events().getFirst().scenarioId());
     }
 
+    @Test
+    void mappingSnapshotAndRestoreRoundTripStructuredState() throws Exception {
+        AtomicReference<Map<?, ?>> snapshotRequest = new AtomicReference<>();
+        AtomicReference<Map<?, ?>> restoreRequest = new AtomicReference<>();
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/v1/mappings/snapshot", exchange -> {
+            try (exchange) {
+                snapshotRequest.set(json.readValue(exchange.getRequestBody(), Map.class));
+                byte[] response = """
+                        {
+                          "status": "SUCCESS",
+                          "snapshot": {
+                            "version": 1,
+                            "mapReference": "OVERRIDE",
+                            "mapType": "OVERRIDE_MAP",
+                            "mapClass": "tools.dscode.common.mappings.NodeMap",
+                            "dataSources": ["SCENARIO"],
+                            "restorable": true,
+                            "values": {"status": "before"}
+                          },
+                          "error": null,
+                          "runtime": null
+                        }
+                        """.getBytes(StandardCharsets.UTF_8);
+                exchange.getResponseHeaders().set("Content-Type", "application/json");
+                exchange.sendResponseHeaders(200, response.length);
+                exchange.getResponseBody().write(response);
+            }
+        });
+        server.createContext("/v1/mappings/restore", exchange -> {
+            try (exchange) {
+                restoreRequest.set(json.readValue(exchange.getRequestBody(), Map.class));
+                byte[] response = "{\"status\":\"SUCCESS\",\"valueType\":\"java.lang.String\",\"valueText\":\"RESTORED\",\"error\":null,\"runtime\":null}"
+                        .getBytes(StandardCharsets.UTF_8);
+                exchange.getResponseHeaders().set("Content-Type", "application/json");
+                exchange.sendResponseHeaders(200, response.length);
+                exchange.getResponseBody().write(response);
+            }
+        });
+        server.start();
+
+        RuntimeMappingStateResult captured;
+        RuntimeControlResult restored;
+        try {
+            RuntimeBridgeClient client = client(
+                    server,
+                    List.of("mapping_snapshot", "mapping_restore")
+            );
+            captured = client.mappingSnapshot("scenario", "OVERRIDE", 5);
+            restored = client.mappingRestore("scenario", captured.snapshot(), 5);
+        } finally {
+            server.stop(0);
+        }
+
+        assertEquals("SUCCESS", captured.status());
+        assertEquals("before", captured.snapshot().values().get("status").asText());
+        assertEquals("RESTORED", restored.valueText());
+        assertEquals("scenario", snapshotRequest.get().get("scenarioId"));
+        assertEquals("OVERRIDE", snapshotRequest.get().get("mapReference"));
+
+        Map<?, ?> restore = restoreRequest.get();
+        assertEquals("scenario", restore.get("scenarioId"));
+        Map<?, ?> snapshot = assertInstanceOf(Map.class, restore.get("snapshot"));
+        assertEquals("OVERRIDE", snapshot.get("mapReference"));
+        Map<?, ?> values = assertInstanceOf(Map.class, snapshot.get("values"));
+        assertEquals("before", values.get("status"));
+    }
+
     private static RuntimeBridgeClient client(
             HttpServer server,
             List<String> capabilities

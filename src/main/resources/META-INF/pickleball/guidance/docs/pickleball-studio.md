@@ -379,7 +379,7 @@ runtime_mapping_put
 runtime_mapping_resolve
 ```
 
-Dedicated browser/service commands and mapping snapshot transfer remain later work. Browser and service behavior can continue to be explored through retry-friendly detached Pickleball steps where that already provides clear semantics.
+Dedicated browser/service commands remain later work. Phase 3F adds bounded materialized mapping snapshots and explicit restore for ordinary live `NodeMap` instances; browser and service behavior can continue to be explored through retry-friendly detached Pickleball steps where that already provides clear semantics.
 
 ## Phase 3C: desktop live runtime control
 
@@ -461,7 +461,29 @@ The desktop timeline:
 
 Switching runtime sessions, runtimes, or the event scenario filter resets the desktop cursor so evidence from two different streams is never combined in one view. The desktop view does not add persistence: history still disappears when the consumer runtime exits, and the local 1,000-event display bound may omit older events even while they remain in the consumer's 2,048-event ring.
 
-Phase 3E adds no MCP tools, so Studio remains at **31** tools.
+Phase 3E adds no MCP tools, so Studio remains at **31** tools. Phase 3F adds three mapping snapshot tools, bringing the current total to **34**.
+
+## Phase 3F: bounded live mapping snapshots and explicit restore
+
+Phase 3F builds on the Phase 3B mapping controls without introducing a second mapping model. A controller can capture one live `NodeMap` before an experiment, receive a Studio-owned `snapshotId`, mutate live state with the existing mapping tools or detached steps, and explicitly restore the captured state when appropriate.
+
+The new MCP tools are:
+
+```text
+runtime_mapping_snapshot
+runtime_mapping_snapshots
+runtime_mapping_restore
+```
+
+Capture and restore still execute through the selected scenario's command queue. The bridge remains protocol version `1`; the new endpoints/capabilities are additive. The consumer JVM does not keep a snapshot registry. `RuntimeBridgeService` owns a bounded in-memory store of at most **50 snapshots per runtime session**, and those snapshots disappear when Studio closes. Capture is also bounded to **512 KiB of compact UTF-8 JSON values per map** so a restorable capture always stays comfortably below the bridge's 1 MiB request limit.
+
+A captured state records the map reference, map type, concrete class, sorted data-source metadata, and materialized JSON object values. Any `NodeMap` subclass may be captured for inspection, but only an exact ordinary `NodeMap` is restorable. Specialized live subclasses are marked inspection-only because materialized JSON cannot reproduce their live cursor/reference semantics.
+
+Restore is deliberately conservative. A snapshot id is bound to its originally captured runtime/scenario/map target. Restore requires that the current target is still an ordinary `NodeMap` with matching class, map type, and data sources, then clears and repopulates that **same object**. This preserves object identity already referenced by the running `ParsingMap`. Restore is an explicit destructive overwrite of the current materialized values; there is no automatic rollback after a failed detached action.
+
+The desktop Runtime Control **Mappings** tab uses the same service/store. **Snapshot** captures the current map, the snapshot selector shows retained entries for the selected runtime/scenario, inspection-only captures are labeled, and **Restore Snapshot** restores by Studio snapshot id.
+
+Phase 3F adds three MCP tools, bringing Studio to **34** tools.
 
 ## Validation
 
@@ -472,9 +494,9 @@ Focused Studio validation:
 ./gradlew --rerun-tasks :pickleball-studio:verifyBundledStudio
 ```
 
-The Studio tests include real child-JVM process checks, managed incremental-output/cancellation and descendant-termination checks, synchronous plus managed Maven `--version` checks, cross-platform Gradle Wrapper fixture checks, a Gradle Tooling API project/source/task model fixture, Java/Gherkin source-outline and workspace-symbol navigation fixtures, non-headless-independent desktop-session/tree-model checks, runtime-bridge service/MCP registration checks, JSON-literal type-preservation checks for direct mapping writes, event-query/cursor client checks, desktop timeline cursor/gap/display-bound checks, and a desktop-facade controlled-run fixture that verifies bridge environment injection without requiring a live consumer JVM.
+The Studio tests include real child-JVM process checks, managed incremental-output/cancellation and descendant-termination checks, synchronous plus managed Maven `--version` checks, cross-platform Gradle Wrapper fixture checks, a Gradle Tooling API project/source/task model fixture, Java/Gherkin source-outline and workspace-symbol navigation fixtures, non-headless-independent desktop-session/tree-model checks, runtime-bridge service/MCP registration checks, JSON-literal type-preservation checks for direct mapping writes, event-query/cursor client checks, mapping snapshot transport/store checks, desktop timeline cursor/gap/display-bound checks, and a desktop-facade controlled-run fixture that verifies bridge environment injection without requiring a live consumer JVM.
 
-The Maven consumer additionally exercises the real loopback bridge against an active Pickleball scenario, including authenticated scenario targeting, bounded scenario-filtered event reads and cursor advancement while paused, live mapping write/read/resolve, retry-friendly detached failure, successful retry, and resume. The Tooling API test uses the Gradle installation already running the repository test build, so it does not require a host Gradle installation or a separate distribution download.
+The Maven consumer additionally exercises the real loopback bridge against an active Pickleball scenario, including authenticated scenario targeting, bounded scenario-filtered event reads and cursor advancement while paused, live mapping baseline capture/mutation/restore plus write/read/resolve, retry-friendly detached failure, successful retry, and resume. The Tooling API test uses the Gradle installation already running the repository test build, so it does not require a host Gradle installation or a separate distribution download.
 
 `verifyBundledStudio` checks both sides of the isolation contract:
 
@@ -492,14 +514,14 @@ After focused validation, run the normal root and Maven-consumer validation from
 
 ## Current boundaries
 
-Phase 3E does **not** yet implement:
+Phase 3F does **not** yet implement:
 
 - syntax highlighting, code completion, editor refactoring, or live parsing of unsaved buffers;
 - full Gradle external dependency/classpath import;
 - persistent process/activity history, runtime-control history, runtime-event history, or desktop layout/session restoration across Studio/runtime restarts;
 - interactive terminal stdin/PTY support;
 - full Java semantic/classpath reference resolution, usages, or Gherkin-to-Java step binding;
-- mapping snapshot transfer or dedicated browser/service/screenshot bridge commands beyond generic detached step execution;
+- persistent mapping snapshots, exact restoration of specialized live `NodeMap` subclasses, or dedicated browser/service/screenshot bridge commands beyond generic detached step execution;
 - remote/non-loopback runtime control.
 
 Those capabilities should continue to layer on the shared Studio service model and the explicit Phase 3 runtime bridge rather than bypassing either boundary.

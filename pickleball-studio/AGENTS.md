@@ -76,7 +76,7 @@ Phase 2G adds read-only Java/Gherkin definition navigation through `WorkspaceLan
 
 ## Desktop UI
 
-Phase 2H established the Swing desktop workspace/editor adapter. Phase 3C adds a modeless runtime-control adapter over the Phase 3 bridge. Phase 3E renders Phase 3D runtime evidence in that same desktop surface.
+Phase 2H established the Swing desktop workspace/editor adapter. Phase 3C adds a modeless runtime-control adapter over the Phase 3 bridge. Phase 3E renders Phase 3D runtime evidence in that same desktop surface. Phase 3F adds bounded mapping snapshot capture/list/restore through the same runtime service.
 
 - `StudioDesktopSession` is the desktop-facing facade over existing workspace, language, build, managed-process, and runtime-bridge services.
 - `StudioFrame`, `RuntimeControlDialog`, and other Swing classes must remain UI adapters; do not duplicate workspace boundary checks, source parsing, build command construction, process lifecycle, bridge HTTP/authentication, scenario-thread routing, or mapping semantics in widgets.
@@ -87,19 +87,21 @@ Phase 2H established the Swing desktop workspace/editor adapter. Phase 3C adds a
 - **Runtime > Runtime Control... > Start Control Run** is the explicit bridge-enabled desktop path and must delegate through `RuntimeBridgeService` via `StudioDesktopSession`.
 - Controlled-build output/cancellation must use `ManagedProcessService`, including bounded output and descendant cleanup.
 - Runtime/scenario selectors must use runtime descriptor/scenario discovery from `RuntimeBridgeService`; do not invent a Swing-only selection model.
-- Pause/resume, detached-step execution, and mapping get/put/resolve must target the selected scenario through the same runtime service methods used by MCP.
+- Pause/resume, detached-step execution, mapping get/put/resolve, and mapping snapshot capture/restore must target the selected scenario through the same runtime service methods used by MCP.
 - Hiding the runtime-control window must not silently cancel the managed build. Explicit cancellation remains the user action; finite pause leases remain the safety mechanism for abandoned pauses.
 - The desktop **Events** tab must read through `StudioDesktopSession.runtimeEvents(...)` / `RuntimeBridgeService.events(...)`; never add Swing-only bridge HTTP or event retention.
 - Desktop evidence follows the selected runtime and shows all scenarios by default; **Selected scenario only** may filter with the currently selected active `scenarioId`. Runtime/session/filter changes must reset the desktop cursor instead of mixing streams.
 - Preserve Phase 3D cursor/gap semantics exactly. Follow `nextSequence`, continue while `hasMore=true`, and surface `gap=true` rather than hiding missing retained history.
 - Keep the Swing loaded-event view bounded to 1000 events. This is a presentation bound only and must not be described as changing the consumer runtime's 2048-event retention.
 - **Clear View** is local-only and keeps the runtime cursor. **Reload Retained** resets the local cursor to zero and re-reads the currently retained consumer history.
+- The desktop Mapping Snapshot controls must use `RuntimeBridgeService`'s Studio-owned snapshot store; do not retain a second Swing snapshot history.
+- Snapshot selection is scoped to the selected runtime/scenario. Restore uses the selected stored snapshot id and therefore its captured target, not mutable text-field state.
 - The current editor is plain text. Do not claim syntax highlighting, completion, semantic Java resolution, Gherkin step binding, refactoring, persistent desktop session state, or an interactive PTY terminal until implemented explicitly.
 - Closing the UI may discard unsaved text only after explicit user confirmation.
 
 ## Live runtime bridge
 
-Phase 3A established the explicit Studio-JVM-to-consumer-test-JVM control boundary through `RuntimeBridgeService` and `tools.dscode.control.bridge`; Phase 3B added explicit scenario targeting and direct live mapping control; Phase 3C exposes those services through the desktop UI; Phase 3D adds bounded semantic runtime evidence on the same private transport; Phase 3E renders that evidence in the desktop without changing the transport.
+Phase 3A established the explicit Studio-JVM-to-consumer-test-JVM control boundary through `RuntimeBridgeService` and `tools.dscode.control.bridge`; Phase 3B added explicit scenario targeting and direct live mapping control; Phase 3C exposes those services through the desktop UI; Phase 3D adds bounded semantic runtime evidence on the same private transport; Phase 3E renders that evidence in the desktop; Phase 3F adds bounded Studio-owned mapping snapshots and explicit restore without changing protocol version `1`.
 
 - The bridge is opt-in per `runtime_start` or desktop **Start Control Run**; ordinary Maven/Gradle execution and the desktop **Run Tests** action must remain bridge-free.
 - Consumer bridge servers bind only to `127.0.0.1` on operating-system-assigned ports and require a per-session bearer token.
@@ -114,7 +116,7 @@ Phase 3A established the explicit Studio-JVM-to-consumer-test-JVM control bounda
 - Existing `ManagedProcessService` remains the owner of the launched build process, output, cancellation, and descendant cleanup.
 - Phase 3B exposes active-scenario discovery, explicit `scenarioId` targeting, status/pause/resume, generic retry-friendly detached step execution, and direct mapping get/put/resolve. Mapping commands must execute through the same scenario-thread queue and must not bypass `MappingControl` semantics.
 - Mapping values crossing the bridge may be structured only when they are JSON-compatible; arbitrary consumer objects get a bounded textual fallback instead of generic serialization.
-- `runtime_mapping_put` and the desktop Mapping Put action accept one JSON literal and deliberately mutate the selected live map; do not imply automatic rollback or snapshot semantics.
+- `runtime_mapping_put` and the desktop Mapping Put action accept one JSON literal and deliberately mutate the selected live map; do not imply automatic rollback. Phase 3F snapshot restore is a separate explicit operation.
 - Phase 3C desktop controls must preserve the bridge's logical `SUCCESS` / `FAILED` / `UNAVAILABLE` results rather than converting exploratory `FAILED` into a managed-process failure.
 - Phase 3D semantic evidence is retained in a runtime-scoped bounded ring of 2048 immutable snapshots. `runtime_events` is cursor-based, defaults to 100 events, accepts at most 500, and must report a retention `gap` when a nonzero cursor falls behind the ring.
 - Event snapshots may include sequence/timestamp/thread/scenario/hook/signature/step/phrase metadata only. Do not retain or serialize `ControlEvent.target`, `ControlEvent.arguments`, browser/service/mapping objects, or arbitrary consumer object graphs.
@@ -122,12 +124,17 @@ Phase 3A established the explicit Studio-JVM-to-consumer-test-JVM control bounda
 - Event reads are observation-only and must not use the scenario-thread command queue. Reading evidence must remain possible while a scenario is paused.
 - The event ring is runtime-scoped and may retain completed-scenario events until eviction or runtime shutdown; do not describe it as persistent after the consumer runtime exits.
 - Because `ControlRuntime` suppresses recursive observer dispatch for observer-triggered work, the event ring does not promise complete nested hook enumeration inside detached bridge commands. The explicit control-call result remains authoritative for those commands.
-- Do not claim dedicated browser/service/screenshot bridge commands, mapping snapshot transfer, unbounded/persistent runtime evidence, or remote control until implemented.
+- Phase 3F mapping capture/restore must run through the same scenario-thread command queue as other live mapping commands. The consumer bridge remains stateless about snapshot ids.
+- `RuntimeBridgeService` owns at most 50 mapping snapshots per Studio runtime session, in memory only; clear them on service shutdown. MCP and Swing must share this store. Consumer capture values are limited to 512 KiB of compact UTF-8 JSON so retained restorable state fits the bridge request bound.
+- Snapshot capture may materialize any `NodeMap` subclass for inspection, but restore is allowed only for exact ordinary `NodeMap` instances. Specialized subclasses are inspection-only.
+- Restore is bound to the captured runtime/scenario/map and must verify the live map class, map type, and data-source metadata before overwriting values. Restore must mutate the same live map object rather than replace it.
+- Snapshot JSON must not be described as recreating specialized live cursor/reference semantics, and restore is not automatic rollback.
+- Do not claim dedicated browser/service/screenshot bridge commands, persistent mapping snapshots, restoration of specialized live map semantics, unbounded/persistent runtime evidence, or remote control until implemented.
 - Runtime bridge transport is an internal Studio/Pickleball protocol. External AI clients should use Studio MCP rather than connecting to consumer bridge ports directly.
 
 ## MCP
 
-Phase 2B introduced Spring AI Streamable-HTTP through the WebMVC server starter. Phase 2C added one-shot process and Maven tools. Phase 2D added managed process lifecycle tools. Phase 2E added synchronous and managed Gradle Wrapper execution. Phase 2F adds read-only Gradle Tooling API model/navigation tools. Phase 2G adds read-only Java/Gherkin source navigation tools. Phase 2H added a Swing desktop adapter over those same services. Phase 3A added six runtime bridge tools; Phase 3B added four targeted-scenario/mapping tools, bringing the MCP contract to 30 tools. Phase 3C adds no MCP tools. Phase 3D adds `runtime_events`, bringing the MCP contract to 31 tools. Phase 3E adds no MCP tools.
+Phase 2B introduced Spring AI Streamable-HTTP through the WebMVC server starter. Phase 2C added one-shot process and Maven tools. Phase 2D added managed process lifecycle tools. Phase 2E added synchronous and managed Gradle Wrapper execution. Phase 2F adds read-only Gradle Tooling API model/navigation tools. Phase 2G adds read-only Java/Gherkin source navigation tools. Phase 2H added a Swing desktop adapter over those same services. Phase 3A added six runtime bridge tools; Phase 3B added four targeted-scenario/mapping tools, bringing the MCP contract to 30 tools. Phase 3C adds no MCP tools. Phase 3D adds `runtime_events`, bringing the MCP contract to 31 tools. Phase 3E adds no MCP tools. Phase 3F adds three mapping snapshot tools, bringing the MCP contract to 34 tools.
 
 - Bind the Studio MCP server to loopback only.
 - Keep the per-launch endpoint token behavior unless a later authentication design explicitly replaces it.
@@ -139,6 +146,7 @@ Phase 2B introduced Spring AI Streamable-HTTP through the WebMVC server starter.
 - Managed run ids and history belong to the running Studio server/JVM; do not imply persistence across Studio restarts.
 - Runtime control MCP tools are `runtime_start`, `runtime_list`, `runtime_status`, `runtime_scenarios`, `runtime_pause`, `runtime_resume`, `runtime_execute_step`, `runtime_mapping_get`, `runtime_mapping_put`, and `runtime_mapping_resolve`; they must remain adapters over `RuntimeBridgeService`.
 - Runtime evidence MCP is `runtime_events`; `RuntimeEvidenceMcpTools` must remain a thin read-only adapter over `RuntimeBridgeService.events(...)`, not a second retention implementation.
+- Runtime mapping snapshot MCP tools are `runtime_mapping_snapshot`, `runtime_mapping_snapshots`, and `runtime_mapping_restore`; `RuntimeMappingMcpTools` must remain a thin adapter over `RuntimeBridgeService`, not a second snapshot store.
 
 ## Current phase
 
@@ -168,6 +176,8 @@ Phase 3D adds runtime-scoped bounded semantic hook evidence with monotonic curso
 
 Phase 3E adds the desktop Events tab over that same evidence service, including runtime/scenario filtering, cursor continuation, retention-gap visibility, bounded loaded-event display, reload-retained, clear-view, and optional auto-tail behavior.
 
-Do not claim that syntax highlighting/completion, live unsaved-buffer parsing, full Gradle dependency/classpath import, persistent run/activity/runtime-control/runtime-event or desktop session state, interactive terminal input, semantic Java reference/type analysis, Gherkin step binding, mapping snapshot transfer, dedicated browser/service/screenshot bridge commands, or remote runtime control are implemented until those later slices are added.
+Phase 3F adds materialized live mapping capture, a bounded 50-per-session Studio snapshot store, explicit same-object restore for ordinary `NodeMap` instances, three MCP tools, and matching desktop Mappings-tab controls.
+
+Do not claim that syntax highlighting/completion, live unsaved-buffer parsing, full Gradle dependency/classpath import, persistent run/activity/runtime-control/runtime-event/mapping-snapshot or desktop session state, interactive terminal input, semantic Java reference/type analysis, Gherkin step binding, specialized live-map semantic restoration, dedicated browser/service/screenshot bridge commands, or remote runtime control are implemented until those later slices are added.
 
 See `docs/pickleball-studio.md`.

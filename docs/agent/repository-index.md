@@ -404,6 +404,8 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-control-api/src/main/java/tools/dscode/control/bridge/ControlBridgeEvent.java`
 - `pickleball-control-api/src/main/java/tools/dscode/control/bridge/ControlBridgeEventPage.java`
 - `pickleball-control-api/src/main/java/tools/dscode/control/bridge/ControlBridgeEventRecorder.java`
+- `pickleball-control-api/src/main/java/tools/dscode/control/bridge/ControlBridgeMappingSnapshot.java`
+- `pickleball-control-api/src/main/java/tools/dscode/control/bridge/ControlBridgeMappingSnapshotResult.java`
 - `pickleball-control-api/src/main/java/tools/dscode/control/bridge/ControlBridgeRuntime.java`
 - `pickleball-control-api/src/main/java/tools/dscode/control/bridge/ControlBridgeScenarioStatus.java`
 - `pickleball-control-api/src/main/java/tools/dscode/control/bridge/ControlBridgeStatus.java`
@@ -441,6 +443,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-studio/src/main/java/tools/dscode/studio/language/SourceSymbolKind.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/language/WorkspaceLanguageService.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/mcp/RuntimeEvidenceMcpTools.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/mcp/RuntimeMappingMcpTools.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/mcp/StudioMcpConfiguration.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/mcp/StudioMcpTools.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/mcp/StudioServer.java`
@@ -460,6 +463,12 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-studio/src/main/java/tools/dscode/studio/runtime/RuntimeEvent.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/runtime/RuntimeEventPage.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/runtime/RuntimeLaunchResult.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/runtime/RuntimeMappingSnapshot.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/runtime/RuntimeMappingSnapshotResult.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/runtime/RuntimeMappingSnapshotStore.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/runtime/RuntimeMappingSnapshotSummary.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/runtime/RuntimeMappingState.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/runtime/RuntimeMappingStateResult.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/runtime/RuntimeScenarioStatus.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/runtime/RuntimeValue.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/runtime/RuntimeValueResult.java`
@@ -484,6 +493,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-studio/src/test/java/tools/dscode/studio/process/WorkspaceProcessServiceTest.java`
 - `pickleball-studio/src/test/java/tools/dscode/studio/runtime/RuntimeBridgeClientTest.java`
 - `pickleball-studio/src/test/java/tools/dscode/studio/runtime/RuntimeBridgeServiceTest.java`
+- `pickleball-studio/src/test/java/tools/dscode/studio/runtime/RuntimeMappingSnapshotStoreTest.java`
 - `pickleball-studio/src/test/java/tools/dscode/studio/StudioApplicationTest.java`
 - `pickleball-studio/src/test/java/tools/dscode/studio/workspace/WorkspaceFileServiceTest.java`
 - `pickleball-studio/src/test/java/tools/dscode/studio/workspace/WorkspaceServiceTest.java`

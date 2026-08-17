@@ -123,12 +123,18 @@ public class StudioMcpConfiguration {
     }
 
     @Bean
+    RuntimeMappingMcpTools runtimeMappingMcpTools(RuntimeBridgeService runtimeBridgeService) {
+        return new RuntimeMappingMcpTools(runtimeBridgeService);
+    }
+
+    @Bean
     ToolCallbackProvider studioTools(
             StudioMcpTools studioMcpTools,
-            RuntimeEvidenceMcpTools runtimeEvidenceMcpTools
+            RuntimeEvidenceMcpTools runtimeEvidenceMcpTools,
+            RuntimeMappingMcpTools runtimeMappingMcpTools
     ) {
         return MethodToolCallbackProvider.builder()
-                .toolObjects(studioMcpTools, runtimeEvidenceMcpTools)
+                .toolObjects(studioMcpTools, runtimeEvidenceMcpTools, runtimeMappingMcpTools)
                 .build();
     }
 }

@@ -55,8 +55,9 @@ class StudioMcpToolsTest {
                         runtimeBridge
                 );
                 RuntimeEvidenceMcpTools evidence = new RuntimeEvidenceMcpTools(runtimeBridge);
+                RuntimeMappingMcpTools mapping = new RuntimeMappingMcpTools(runtimeBridge);
                 ToolCallbackProvider provider = MethodToolCallbackProvider.builder()
-                        .toolObjects(tools, evidence)
+                        .toolObjects(tools, evidence, mapping)
                         .build();
 
                 Map<String, ToolCallback> callbacks = Arrays.stream(provider.getToolCallbacks())
@@ -97,7 +98,10 @@ class StudioMcpToolsTest {
                                 "runtime_execute_step",
                                 "runtime_mapping_get",
                                 "runtime_mapping_put",
-                                "runtime_mapping_resolve"
+                                "runtime_mapping_resolve",
+                                "runtime_mapping_snapshot",
+                                "runtime_mapping_snapshots",
+                                "runtime_mapping_restore"
                         ),
                         callbacks.keySet()
                 );
