@@ -1,8 +1,49 @@
 # Component Scenarios
 
-> **Working feature examples:** [`component-scenarios.feature`](../maven-consumer-project/src/test/resources/features/component-scenarios.feature) contains a reusable component. [`reusable-scenario-selection.feature`](../maven-consumer-project/src/test/resources/features/reusable-scenario-selection.feature) demonstrates named selectors, escaped names, ordering, limits, and singular/plural behavior. [`scenario-data-references.feature`](../maven-consumer-project/src/test/resources/features/scenario-data-references.feature) demonstrates marker and data-file references.
+> **Working feature examples:** [`component-scenarios.feature`](../maven-consumer-project/src/test/resources/features/component-scenarios.feature) contains a reusable component. [`reusable-scenario-selection.feature`](../maven-consumer-project/src/test/resources/features/reusable-scenario-selection.feature) demonstrates named selectors, escaped names, ordering, limits, and singular/plural behavior. [`run-step-parameter-variations.feature`](../maven-consumer-project/src/test/resources/features/run-step-parameter-variations.feature) demonstrates the canonical table-driven `RUN` form, mixed run types, and shorthand variations. [`scenario-data-references.feature`](../maven-consumer-project/src/test/resources/features/scenario-data-references.feature) demonstrates marker and data-file references.
 
-Component scenarios are reusable, scenario-sized flows. Use `RUN COMPONENT SCENARIO` or `RUN COMPONENT SCENARIOS` when reusable components are stored separately from regular feature scenarios.
+Component scenarios are reusable, scenario-sized flows. `RUN` is the common dispatcher for regular scenarios, component scenarios, and service calls.
+
+## Preferred table-driven RUN form
+
+Prefer a single `RUN` step with one DataTable row per invocation. The `RunType` column tells Pickleball what each row runs, so related regular scenarios, components, and service calls can be composed in one concise step:
+
+```gherkin
+When RUN
+  | RunType            | RunKey | Run Tags          |
+  | SCENARIO           | setup  | %setup            |
+  | COMPONENT SCENARIO | login  | %login-component  |
+  | SERVICE CALL       | health | %health-full-url  |
+```
+
+`RunType` accepts six values:
+
+```text
+SCENARIO
+SCENARIOS
+COMPONENT SCENARIO
+COMPONENT SCENARIOS
+SERVICE CALL
+SERVICE CALLS
+```
+
+Multiplicity belongs to the resolved `RunType` for each row. Singular values allow at most one match for that row; plural values allow multiple matches for that row. Different rows in the same bare `RUN` may use different types and multiplicities.
+
+Inline step parameters are shorthand for values shared by the invocation rows, or for calls that do not need a DataTable. For example, these are concise forms when every row is a regular scenario:
+
+```gherkin
+When RUN SCENARIO
+  | Run Tags |
+  | %tagA    |
+```
+
+and when no table is needed:
+
+```gherkin
+When RUN SCENARIO: %tagA
+```
+
+A nonblank table `RunType` overrides the inline type for that row, including singular/plural multiplicity. A nonblank table `RunKey` similarly overrides the quoted inline key. Inline selectors continue to apply as shared shorthand to all table rows.
 
 Component lookup uses `pkb_componentpath`. When it is not configured, the path defaults to:
 
@@ -10,7 +51,7 @@ Component lookup uses `pkb_componentpath`. When it is not configured, the path d
 src/test/resources/component
 ```
 
-A nonblank `pkb_componentpath` value in an invocation table overrides the global setting for that row. `RUN SCENARIO` remains the regular-scenario form and uses the normal feature path.
+A nonblank `pkb_componentpath` value in an invocation table overrides the global setting for that row. Regular `SCENARIO` rows use the normal feature path, while `SERVICE CALL` rows use the service-call path.
 
 ## Named selector syntax
 
@@ -73,6 +114,8 @@ Every invocation-table column is passed to the scenario scan. Common options inc
 
 | Purpose | Pickleball option | Cucumber option |
 |---|---|---|
+| Run kind/cardinality | `RunType` | — |
+| Saved result key | `RunKey` | — |
 | Component feature path | `pkb_componentpath` | — |
 | Exact feature name | `pkb_featurename` | — |
 | Scenario-name regex | `pkb_name` | `cucumber.filter.name` |
@@ -82,20 +125,36 @@ Every invocation-table column is passed to the scenario scan. Common options inc
 | Start marker | `Step_Marker` | — |
 
 ```gherkin
-* RUN COMPONENT SCENARIOS
-    | pkb_featurename | pkb_name                  | pkb_order |
-    | Reusable flows  | ^Save customer component$ | lexical   |
+* RUN
+    | RunType            | pkb_featurename | pkb_name                  | pkb_order |
+    | COMPONENT SCENARIOS | Reusable flows   | ^Save customer component$ | lexical   |
 ```
 
 Inline path components overwrite their corresponding feature, scenario, and marker table selectors. An inline tag selector is combined with the row's existing tag selector behavior.
 
 ## Singular and plural cardinality
 
-`RUN COMPONENT SCENARIO` allows zero or one result. `RUN COMPONENT SCENARIOS` allows multiple results. Ordering and limits are applied before cardinality is checked.
+Cardinality is validated independently for each invocation row after ordering and limits are applied. `SCENARIO`, `COMPONENT SCENARIO`, and `SERVICE CALL` allow at most one match for their row. Their plural forms allow multiple matches.
 
-## RunMap keys
+An inline type supplies the default for rows without a nonblank `RunType`:
 
-A deferred component run can save the selected scenario root by reference:
+```gherkin
+* RUN COMPONENT SCENARIO
+    | Run Tags       |
+    | %save_customer |
+```
+
+A row can override that default, including its multiplicity:
+
+```gherkin
+* RUN COMPONENT SCENARIO
+    | RunType            | Run Tags       |
+    | COMPONENT SCENARIOS | %save_customer |
+```
+
+## RunMap keys and returned values
+
+A keyed `RUN` saves its result only after the selected scenario has completed. The saved value follows the same result contract as the synchronous convenience forms: if the completed scenario contains `RETURN`, that value is saved; otherwise the completed scenario-map root is saved.
 
 ```gherkin
 * RUN "savedCustomer" COMPONENT SCENARIO: %save_customer
@@ -109,7 +168,7 @@ A nonblank `RunKey` table value overrides the quoted key:
     | tableKey | Ava          |
 ```
 
-Only `tableKey` is used.
+Only `tableKey` is used. Result storage uses normal RunMap/NodeMap writes. Reusing an ordinary top-level `RunKey` appends another value to that key's collection; an unindexed read continues to resolve the latest value, while `#1`, `#2`, and other collection selectors can address earlier results.
 
 ## Synchronous convenience forms
 
@@ -120,7 +179,7 @@ Only `tableKey` is used.
 * COMPONENT: Reusable flows.Save customer component
 ```
 
-They accept the same invocation DataTable behavior, marker selection, passed values, and selected Scenario Outline Examples row. A nonblank `RunKey` stores the returned value.
+They accept the same invocation DataTable behavior, marker selection, passed values, and selected Scenario Outline Examples row. A nonblank `RunKey` stores the returned value with the same normal RunMap collection semantics used by keyed `RUN`.
 
 ## Start and end markers
 
@@ -142,9 +201,9 @@ Select a custom start marker with the third path component:
 Or supply it in a row:
 
 ```gherkin
-* RUN COMPONENT SCENARIO
-    | pkb_featurename | pkb_name        | Step_Marker    |
-    | Reusable flows  | ^Save customer$ | submit section |
+* RUN
+    | RunType            | pkb_featurename | pkb_name        | Step_Marker    |
+    | COMPONENT SCENARIO | Reusable flows  | ^Save customer$ | submit section |
 ```
 
 If both are supplied, the inline third component overrides `Step_Marker`.
@@ -211,14 +270,23 @@ Structured whole-document and nested object/array results remain Jackson `JsonNo
 
 ## Multiple invocation rows
 
+Each DataTable row is an independent invocation. Prefer bare `RUN` when rows differ in type or other parameters:
+
 ```gherkin
-* RUN COMPONENT SCENARIOS
+* RUN
+    | RunType            | Run Tags       | customerName | tier     |
+    | COMPONENT SCENARIO | %save_customer | Ava          | Premium  |
+    | COMPONENT SCENARIO | %save_customer | Ben          | Standard |
+```
+
+When all rows share a type, moving that common value into the step text is equivalent shorthand:
+
+```gherkin
+* RUN COMPONENT SCENARIO
     | Run Tags       | customerName | tier     |
     | %save_customer | Ava          | Premium  |
     | %save_customer | Ben          | Standard |
 ```
-
-Each row is a separate invocation.
 
 ## Define a component
 
@@ -238,6 +306,6 @@ The `%` prefix identifies a reusable component. Values come from the caller's in
 
 ## Nesting and reports
 
-The `RUN COMPONENT SCENARIO` or `RUN COMPONENT SCENARIOS` step remains the parent. Each selected component and its executable steps appear beneath it. Avoid component cycles.
+The outer `RUN` step remains the parent. Each selected scenario/component/service-call and its executable steps appear beneath it. Final result assignment is infrastructure finalization after the selected scenario subtree completes; it is not authored as another Gherkin child step. Avoid component cycles.
 
 [Previous: Block Conditionals](block-conditionals.md) · [Documentation home](README.md) · [Next: Service-call Scenarios](service-call-scenarios.md)

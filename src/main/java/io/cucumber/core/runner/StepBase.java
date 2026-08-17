@@ -50,6 +50,7 @@ public abstract class StepBase implements Cloneable {
     public List<StepBase> childSteps = new ArrayList<>();
     public List<StepBase> grandChildrenSteps = new ArrayList<>();
     public List<StepBase> attachedSteps = new ArrayList<>();
+    public List<StepExtension> finalizerSteps = new ArrayList<>();
 
     public StepBase parentStep;
     public StepBase previousSibling;
@@ -138,6 +139,18 @@ public abstract class StepBase implements Cloneable {
         }
     }
 
+    /**
+     * Registers work that runs after this step and its complete child/attached
+     * subtree have finished, but before the step's next sibling begins.
+     */
+    public void addFinalizerStep(StepExtension finalizerStep) {
+        if (finalizerStep == null) {
+            return;
+        }
+        finalizerStep.parentStep = this;
+        finalizerSteps.add(finalizerStep);
+    }
+
     // public enum ConditionalStates {
     //     SKIP, FALSE, TRUE
     // }
@@ -179,6 +192,7 @@ public abstract class StepBase implements Cloneable {
             copy.childSteps = deepCloneSteps(this.childSteps);
             copy.grandChildrenSteps = deepCloneSteps(this.grandChildrenSteps);
             copy.attachedSteps = deepCloneSteps(this.attachedSteps);
+            copy.finalizerSteps = deepCloneFinalizerSteps(this.finalizerSteps);
 
             // 3. Shallow-copy non-StepBase lists (new list, same elements)
             copy.inheritableDefinitionFlags = shallowCopyList(
@@ -213,6 +227,20 @@ public abstract class StepBase implements Cloneable {
         List<StepBase> result = new ArrayList<>(source.size());
         for (StepBase step : source) {
             result.add(step != null ? step.clone() : null);
+        }
+        return result;
+    }
+
+    private static List<StepExtension> deepCloneFinalizerSteps(
+            List<StepExtension> source
+    ) {
+        if (source == null) {
+            return null;
+        }
+
+        List<StepExtension> result = new ArrayList<>(source.size());
+        for (StepExtension step : source) {
+            result.add(step != null ? (StepExtension) step.clone() : null);
         }
         return result;
     }

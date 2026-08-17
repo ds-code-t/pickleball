@@ -52,6 +52,38 @@ When changing a consumer scenario:
 - Make the smallest change supported by evidence.
 - Rerun the narrowest useful scenario/tag selection first, then broaden validation when needed.
 
+### Preferred reusable RUN authoring
+
+When a scenario invokes reusable regular scenarios, component scenarios, or service calls, prefer one table-driven `RUN` step with one row per invocation. Rows may mix the runnable kinds in the same step:
+
+```gherkin
+When RUN
+  | RunType            | RunKey | Run Tags         |
+  | SCENARIO           | setup  | %setup           |
+  | COMPONENT SCENARIO | login  | %login-component |
+  | SERVICE CALL       | health | %health-full-url |
+```
+
+Treat `RunType` as the complete kind plus multiplicity. Valid values are `SCENARIO`, `SCENARIOS`, `COMPONENT SCENARIO`, `COMPONENT SCENARIOS`, `SERVICE CALL`, and `SERVICE CALLS`. Singular/plural validation is per row, not a property of the whole table. A nonblank table `RunType` overrides any inline type for that row.
+
+Use parameterized step text as shorthand when it eliminates the table or moves a value common to every row out of the table. For example:
+
+```gherkin
+When RUN SCENARIO
+  | Run Tags |
+  | %tagA    |
+```
+
+and:
+
+```gherkin
+When RUN SCENARIO: %tagA
+```
+
+The same rule applies to a quoted inline `RunKey`: table `RunKey` wins when nonblank; otherwise the inline key is the shared fallback. Do not expand a concise table into several adjacent `RUN` steps merely because the rows use different `RunType` values.
+
+A keyed deferred `RUN` stores its result only after the selected scenario subtree completes. Save explicit `RETURN` when present; otherwise save the completed default scenario root. Normal RunMap/NodeMap collection semantics apply, so repeating an ordinary top-level `RunKey` appends results and an unindexed read resolves the latest item. Do not assume a keyed `RUN` exposes a live pre-execution scenario-root reference.
+
 Use supporting guides as appropriate, especially `docs/dynamic-steps.md`, `docs/component-scenarios.md`, `docs/service-call-scenarios.md`, `docs/mapping-and-templating.md`, `docs/data-values-and-elements.md`, `docs/configuration.md`, and `docs/cucumber-compatibility.md`.
 
 ## Configuration and controlled RunVars
@@ -172,8 +204,8 @@ The exported `docs/` tree is the version-matched reference for all supported Pic
 - element vocabulary/selectors — `docs/custom-element-definitions.md`;
 - mappings/templates — `docs/mapping-and-templating.md`;
 - Data Elements and values — `docs/data-values-and-elements.md` and `docs/data-element-query-runtime.md`;
-- reusable component scenarios — `docs/component-scenarios.md`;
-- service calls — `docs/service-call-scenarios.md`;
+- reusable component scenarios and canonical `RUN` authoring — `docs/component-scenarios.md`;
+- service calls and `RUN`/`CALL:` result semantics — `docs/service-call-scenarios.md`;
 - nested flow and conditionals — `docs/nested-steps.md`, `docs/block-conditionals.md`;
 - keyboard expressions — `docs/key-parser-dsl.md`;
 - execution/configuration/profiles — `docs/configuration.md`, `docs/ai-run-configuration.md`;

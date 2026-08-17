@@ -1,6 +1,6 @@
 # Service-call Scenarios
 
-> **Working feature examples:** [`service-call-execution.feature`](../maven-consumer-project/src/test/resources/features/service-call-execution.feature) invokes reusable calls. [`reusable-scenario-selection.feature`](../maven-consumer-project/src/test/resources/features/reusable-scenario-selection.feature) covers named and qualified service-call selectors. [`service-call-definitions.feature`](../maven-consumer-project/src/test/resources/calls/service-call-definitions.feature) builds and executes requests.
+> **Working feature examples:** [`service-call-execution.feature`](../maven-consumer-project/src/test/resources/features/service-call-execution.feature) invokes reusable calls. [`run-step-parameter-variations.feature`](../maven-consumer-project/src/test/resources/features/run-step-parameter-variations.feature) demonstrates the canonical table-driven `RUN` form and per-row run types/cardinality. [`reusable-scenario-selection.feature`](../maven-consumer-project/src/test/resources/features/reusable-scenario-selection.feature) covers named and qualified service-call selectors. [`service-call-definitions.feature`](../maven-consumer-project/src/test/resources/calls/service-call-definitions.feature) builds and executes requests.
 
 Pickleball treats service calls as reusable scenarios. `ModularScenarios.java` owns selection and nested-scenario execution. `ServiceCallSteps.java` owns the synchronous convenience wrapper and HTTP execution.
 
@@ -8,9 +8,40 @@ Pickleball treats service calls as reusable scenarios. `ModularScenarios.java` o
 
 | Step | Purpose |
 |---|---|
-| `RUN ["key"] SERVICE CALL` / `RUN ["key"] SERVICE CALLS` | Select one or more call scenarios for deferred nested execution. |
+| `RUN` with `RunType=SERVICE CALL` / `SERVICE CALLS` | Preferred table-driven form; compose service calls with regular/component scenarios in one step. |
+| `RUN ["key"] SERVICE CALL` / `RUN ["key"] SERVICE CALLS` | Shorthand when the service-call type is common or no DataTable is needed. |
 | `CALL:` | Select exactly one call scenario, execute it synchronously, and return its result. |
 | `EXECUTE SERVICE CALL` | Execute mapped `REQUEST`, with optional `CONFIGURATION`, and populate `RESPONSE`. |
+
+## Preferred table-driven RUN form
+
+Use one DataTable row per invocation. A bare `RUN` can mix service calls with other runnable scenario kinds:
+
+```gherkin
+When RUN
+  | RunType            | RunKey | Run Tags         | endpoint              |
+  | SCENARIO           | setup  | %setup           |                       |
+  | COMPONENT SCENARIO | login  | %login-component |                       |
+  | SERVICE CALL       | health | %health-full-url | http://127.0.0.1:8765 |
+```
+
+`RunType` accepts `SCENARIO`, `SCENARIOS`, `COMPONENT SCENARIO`, `COMPONENT SCENARIOS`, `SERVICE CALL`, and `SERVICE CALLS`. Multiplicity belongs to each resolved row value: singular allows at most one match for that row, and plural allows multiple matches for that row.
+
+Inline syntax is shorthand for parameters common to all rows:
+
+```gherkin
+When RUN SERVICE CALL
+  | RunKey | Run Tags         | endpoint              |
+  | health | %health-full-url | http://127.0.0.1:8765 |
+```
+
+or, when no table is needed:
+
+```gherkin
+When RUN "health" SERVICE CALL: %health-full-url
+```
+
+A nonblank table `RunType` overrides the inline type for that row, including singular/plural multiplicity. A nonblank table `RunKey` overrides a quoted inline key.
 
 Call lookup uses `pkb_callpath`. When it is not configured, the path defaults to:
 
@@ -83,10 +114,27 @@ Embedded `$CALL:` expressions delegate to the same selection contract:
 <$CALL:Reusable service call definitions.ExplicitNullReturnCall>
 ```
 
+A keyed deferred `RUN` now uses the same result contract after its selected scenario completes. This makes the result of:
+
+```gherkin
+When RUN "KeyA" SERVICE CALL: %TagA
+```
+
+semantically equivalent to mapping the synchronous call result into the RunMap:
+
+```gherkin
+And MAP TABLE VALUES TO RUN MAP
+  | KeyA | <$CALL:%TagA> |
+```
+
+Both store explicit `RETURN` when present and otherwise store the completed scenario root.
+
 ## Invocation-table options
 
 | Purpose | Pickleball option | Cucumber option |
 |---|---|---|
+| Run kind/cardinality | `RunType` | — |
+| Saved result key | `RunKey` | — |
 | Call feature path | `pkb_callpath` | — |
 | Exact feature name | `pkb_featurename` | — |
 | Scenario-name regex | `pkb_name` | `cucumber.filter.name` |
@@ -95,11 +143,13 @@ Embedded `$CALL:` expressions delegate to the same selection contract:
 | Result limit | `pkb_limit` | `cucumber.execution.limit` |
 | Start marker | `Step_Marker` | — |
 
-Inline feature/scenario/marker components overwrite their equivalent table selector fields. A nonblank table `RunType` can override the inline run type, and `RunKey` keeps its existing precedence over a quoted key.
+Inline feature/scenario/marker components overwrite their equivalent table selector fields. A nonblank table `RunType` overrides the inline run type, and `RunKey` keeps its precedence over a quoted key.
 
 ## Singular and plural behavior
 
-`RUN SERVICE CALL` permits zero or one result. `RUN SERVICE CALLS` permits multiple results. `CALL:` requires exactly one result. Ordering and limit options are applied before cardinality validation.
+Cardinality is per resolved invocation row. `SERVICE CALL` permits at most one match for that row; `SERVICE CALLS` permits multiple matches for that row. Ordering and limit options are applied before the row's cardinality validation. `CALL:` still requires exactly one match.
+
+The same rule applies to regular/component rows in a mixed bare `RUN` table.
 
 ## RunMap keys
 
@@ -115,7 +165,9 @@ When RUN "quotedName" SERVICE CALL: %status-call
   | tableKey | http://127.0.0.1:8765 | 422    |
 ```
 
-Only `tableKey` is registered. The selected scenario root is registered by reference before its child steps execute, so later `REQUEST` and `RESPONSE` changes are visible through the entry.
+Only `tableKey` is used. The assignment happens after the selected scenario and its child/attached work have completed. If the scenario has `RETURN`, that value is saved; otherwise the completed scenario root is saved.
+
+Result assignment uses ordinary RunMap/NodeMap writes rather than live `putReference()` registration. Reusing an ordinary top-level `RunKey` appends results to the key's collection. An unindexed read resolves the latest item, while collection selectors such as `#1` and `#2` can address earlier results.
 
 ## Start markers
 

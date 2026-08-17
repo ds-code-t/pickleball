@@ -51,6 +51,8 @@ Add focused tests and an executable Maven consumer scenario for consumer-visible
 
 Update the canonical documentation in the same task. Documentation maintenance is part of the functionality change, not a separate optional step.
 
+When authoring reusable `RUN` examples, prefer one bare table-driven `RUN` with a `RunType` column and one row per invocation. Related rows may mix regular scenarios, component scenarios, and service calls. Use inline `RUN ...` type, quoted `RunKey`, and inline selector syntax as shorthand only when those values are common to the rows or eliminate the table. Preserve executable coverage for both the canonical table form and supported shorthand variations.
+
 ## 5. Maintain agent context
 
 Update `docs/agent/feature-map.md` when capability ownership, canonical examples, public syntax, or contracts change.

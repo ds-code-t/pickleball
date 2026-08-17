@@ -544,6 +544,7 @@ public class CurrentScenarioState extends ScenarioMapping {
         }
 
         if (stepExtension.lineData.stepExtension.overridePhrase != null && stepExtension.lineData.stepExtension.overridePhrase.result != null && (boolean) stepExtension.lineData.stepExtension.overridePhrase.result.value()) {
+            runFinalizerSteps(stepExtension);
             return;
         }
 
@@ -605,14 +606,32 @@ public class CurrentScenarioState extends ScenarioMapping {
     }
 
     /**
-     * A component ScenarioStep owns the END SCENARIO boundary. Clear that
-     * boundary before entering its sibling so synthetic finalizers and later
-     * component scenarios can execute normally.
+     * Finalizers belong to the completed step but are not part of its ordinary
+     * child/sibling chain. They run after attached/child work finishes and before
+     * the next sibling starts. Scenario END boundaries are cleared first so a
+     * component ScenarioStep can finalize normally.
      */
-    private void runNextSibling(StepExtension completedStep) {
+    private void runFinalizerSteps(StepExtension completedStep) {
         if (completedStep instanceof ScenarioStep) {
             endCurrentScenario = false;
         }
+        if (completedStep.skipped || completedStep.finalizerSteps.isEmpty()) {
+            return;
+        }
+
+        for (StepExtension finalizer : new ArrayList<>(completedStep.finalizerSteps)) {
+            finalizer.parentStep = completedStep;
+            finalizer.previousSibling = null;
+            finalizer.nextSibling = null;
+            finalizer.setNestingLevel(completedStep.getNestingLevel() + 1);
+            finalizer.setStepParsingMap(completedStep.getStepParsingMap());
+            finalizer.addStepFlags(ALWAYS_RUN);
+            runStep(finalizer);
+        }
+    }
+
+    private void runNextSibling(StepExtension completedStep) {
+        runFinalizerSteps(completedStep);
 
         if (completedStep.nextSibling != null) {
             runStep((StepExtension) completedStep.nextSibling);

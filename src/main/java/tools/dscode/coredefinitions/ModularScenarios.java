@@ -45,11 +45,10 @@ public class ModularScenarios extends CoreSteps {
     static final String DEFAULT_DATA_PATH = "src/test/resources/data";
     static final String DEFAULT_CALLS_PATH = "src/test/resources/calls";
     static final String DEFAULT_COMPONENT_PATH = "src/test/resources/component";
-    @Given("^RUN\\s*(?:\"([^\"]+)\"\\s+)?(?:(SCENARIO|COMPONENT SCENARIO|SERVICE CALL)(S)?)?(?::(.*))?$")
+    @Given("^RUN\\s*(?:\"([^\"]+)\"\\s+)?(?:(SCENARIOS?|COMPONENT SCENARIOS?|SERVICE CALLS?))?(?::(.*))?$")
     public static void runScenarios(
             String inlineRunKey,
             String runTypeText,
-            String pluralFlag,
             String inlineArgs,
             DataTable dataTable
     ) {
@@ -63,40 +62,28 @@ public class ModularScenarios extends CoreSteps {
         }
 
         List<PickleMatch> matches = new ArrayList<>();
-        List<RunType> runTypes = new ArrayList<>();
         for (Map<String, String> map : maps) {
-            RunType runType = resolveRunType(map, runTypeText);
-            runTypes.add(runType);
-            matches.addAll(
-                    collectMatches(
-                            List.of(map),
-                            runType,
-                            runType.matchType(),
-                            false
-                    )
+            RunSelection selection = resolveRunSelection(map, runTypeText);
+            RunType runType = selection.runType();
+            List<PickleMatch> rowMatches = collectMatches(
+                    List.of(map),
+                    runType,
+                    runType.matchType(),
+                    false
             );
+            validateRunSelectionMatchCount(
+                    rowMatches.stream()
+                            .map(match -> match.pickle().getName())
+                            .toList(),
+                    selection
+            );
+            matches.addAll(rowMatches);
         }
 
-        RunType firstRunType = runTypes.getFirst();
-        RunType commonRunType = runTypes.stream()
-                .allMatch(runType -> runType == firstRunType)
-                ? firstRunType
-                : null;
-
-        validateMatchCount(
-                matches.stream().map(match -> match.pickle().getName()).toList(),
-                "S".equals(pluralFlag),
-                commonRunType == null
-                        ? "RUN SCENARIO"
-                        : "RUN " + commonRunType.stepText(),
-                commonRunType == null
-                        ? "scenario"
-                        : commonRunType.matchType()
-        );
         appendMatches(
                 getRunningStep(),
                 matches,
-                (scenarioStep, passedValues) -> registerRunReference(
+                (scenarioStep, passedValues) -> registerRunResultFinalizer(
                         scenarioStep,
                         passedValues,
                         inlineRunKey
@@ -170,28 +157,46 @@ public class ModularScenarios extends CoreSteps {
         }
         return returnNode.isNull() ? null : scenarioMap.get(RETURN);
     }
-    private static void registerRunReference(
+    private static void registerRunResultFinalizer(
             ScenarioStep scenarioStep,
             Map<String, String> passedValues,
             String inlineRunKey
     ) {
-        String runKey = firstNonBlank(
-                resolve(scenarioStep, passedValues.get(RUN_KEY)),
-                resolve(scenarioStep, inlineRunKey)
-        );
-        if (!runKey.isBlank()) {
-            getRunMap().putReference(
-                    runKey,
-                    scenarioStep.getDefaultStepNodeMap().getRoot()
-            );
+        String tableRunKey = normalize(passedValues.get(RUN_KEY));
+        String fallbackRunKey = normalize(inlineRunKey);
+        if (tableRunKey.isBlank() && fallbackRunKey.isBlank()) {
+            return;
         }
+
+        scenarioStep.addFinalizerStep(
+                scenarioStep.createFinalizerStep(
+                        "Finalize RUN result",
+                        finalizerStep -> {
+                            ScenarioStep completedScenario =
+                                    finalizerStep.getClosestScenarioStepAncestor();
+                            if (completedScenario == null) {
+                                throw new IllegalStateException(
+                                        "RUN finalizer has no parent ScenarioStep"
+                                );
+                            }
+                            String runKey = firstNonBlank(
+                                    resolve(completedScenario, tableRunKey),
+                                    resolve(completedScenario, fallbackRunKey)
+                            );
+                            if (!runKey.isBlank()) {
+                                saveRunValue(
+                                        runKey,
+                                        scenarioReturnValue(
+                                                completedScenario.getDefaultStepNodeMap()
+                                        )
+                                );
+                            }
+                        }
+                )
+        );
     }
     private static void saveRunValue(String runKey, Object value) {
-        if (value instanceof JsonNode jsonNode) {
-            getRunMap().putReference(runKey, jsonNode);
-        } else {
-            getRunMap().put(runKey, value);
-        }
+        getRunMap().put(runKey, value);
     }
     private static void detachChild(
             StepExtension parent,
@@ -225,7 +230,7 @@ public class ModularScenarios extends CoreSteps {
         }
         return "";
     }
-    private static RunType resolveRunType(
+    private static RunSelection resolveRunSelection(
             Map<String, String> passedValues,
             String inlineRunType
     ) {
@@ -236,12 +241,12 @@ public class ModularScenarios extends CoreSteps {
         if (runTypeText.isBlank()) {
             throw missingRunType();
         }
-        return RunType.fromStepText(runTypeText);
+        return RunSelection.fromText(runTypeText);
     }
     private static IllegalArgumentException missingRunType() {
         return new IllegalArgumentException(
-                "RUN requires a RunType. Specify SCENARIO, COMPONENT SCENARIO, "
-                        + "or SERVICE CALL inline or with the DataTable RunType column."
+                "RUN requires a RunType. Specify SCENARIO(S), COMPONENT SCENARIO(S), "
+                        + "or SERVICE CALL(S) inline or with the DataTable RunType column."
         );
     }
     /**
@@ -717,6 +722,24 @@ public class ModularScenarios extends CoreSteps {
         scanOptions.remove(PKB_FEATURES);
         scanOptions.put(CUCUMBER_FEATURES, featuresPath);
     }
+    private static void validateRunSelectionMatchCount(
+            List<String> matchNames,
+            RunSelection selection
+    ) {
+        if (selection.allowMultiple() || matchNames.size() <= 1) {
+            return;
+        }
+        RunType runType = selection.runType();
+        throw new IllegalArgumentException(
+                "RunType " + runType.stepText()
+                        + " matched " + matchNames.size() + " "
+                        + runType.matchType() + "s after ordering and limit were applied: "
+                        + matchNames
+                        + ". Use " + runType.stepText() + "S for that invocation "
+                        + "in the RunType column or RUN step shorthand."
+        );
+    }
+
     static void validateMatchCount(
             List<String> matchNames,
             boolean allowMultiple,
@@ -982,6 +1005,22 @@ public class ModularScenarios extends CoreSteps {
 
         String convenienceStepText() {
             return convenienceStepText;
+        }
+    }
+    private record RunSelection(
+            RunType runType,
+            boolean allowMultiple
+    ) {
+        static RunSelection fromText(String text) {
+            String normalized = normalize(text).toUpperCase(Locale.ROOT);
+            boolean allowMultiple = normalized.endsWith("S");
+            String singular = allowMultiple
+                    ? normalized.substring(0, normalized.length() - 1)
+                    : normalized;
+            return new RunSelection(
+                    RunType.fromStepText(singular),
+                    allowMultiple
+            );
         }
     }
     record InlineArguments(

@@ -77,9 +77,8 @@ public class ServiceCallSteps extends CoreSteps {
         ScenarioStep scenarioStep = scenarioStep(getRunningStep());
         NodeMap serviceCallMap = scenarioStep.getDefaultStepNodeMap();
         ObjectNode serviceCallObject = serviceCallMap.getRoot();
-        // Deferred RUN execution may already expose this root by reference.
-        // A synchronous CALL may instead save its selected return value after
-        // completion. In both cases, initialize RESPONSE before validation.
+        // RUN/CALL result storage happens after the selected scenario completes.
+        // Initialize RESPONSE on the selected scenario root before validation.
         serviceCallObject.set(RESPONSE, MAPPER.createObjectNode());
         ObjectNode request = requiredObject(serviceCallMap, REQUEST);
         ObjectNode configuration = optionalObject(serviceCallMap, CONFIGURATION);
@@ -150,7 +149,7 @@ public class ServiceCallSteps extends CoreSteps {
     }
     /**
      * Resolves the service-call key and registers the ScenarioStep's root
-     * ObjectNode by reference in the calling scenario's RunMap.
+     * ObjectNode by reference for the deprecated SERVICE CALL compatibility step.
      */
     private static void registerServiceCallReference(
             ScenarioStep scenarioStep,
@@ -221,7 +220,8 @@ public class ServiceCallSteps extends CoreSteps {
             return objectNode;
         }
         throw new IllegalStateException(
-                "The service-call " + fieldName + " property must be an object"
+                "The service-call " + fieldName
+                        + " property must be an object"
         );
     }
 

@@ -21,6 +21,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -56,6 +57,7 @@ public class StepExtension extends StepData {
     private static final Pattern pattern = Pattern.compile("@\\[([^\\[\\]]*)\\]");
 
     public boolean waitForPageReady = true;
+    private Consumer<StepExtension> finalizerAction;
 
     public StepExtension(
             io.cucumber.core.runner.TestCase testCase,
@@ -159,7 +161,9 @@ public class StepExtension extends StepData {
         result = null;
         ExecutionMode executionMode = ExecutionMode.RUN;
 
-        if (logAndIgnore) {
+        if (finalizerAction != null) {
+            executingPickleStepTestStep = pickleStepTestStep;
+        } else if (logAndIgnore) {
             executingPickleStepTestStep = pickleStepTestStep;
             executionMode = ExecutionMode.SKIP;
         } else if (isDynamicStep) {
@@ -190,7 +194,9 @@ public class StepExtension extends StepData {
                 .start();
         setDefaultEntry(getRunningStep().stepEntry);
         lifecycle.fire(Phase.BEFORE_SCENARIO_STEP);
-        result = execute(executingPickleStepTestStep, executionMode);
+        result = finalizerAction == null
+                ? execute(executingPickleStepTestStep, executionMode)
+                : executeFinalizerAction();
         if (result.getError() != null) {
             stepEntry.error(stackTraceToString(result.getError())).timestamp();
         }
@@ -201,6 +207,20 @@ public class StepExtension extends StepData {
         lifecycle.fire(Phase.AFTER_SCENARIO_STEP);
         finalizeStepEntryLogging();
         return result;
+    }
+
+    private Result executeFinalizerAction() {
+        Instant start = Instant.now();
+        try {
+            finalizerAction.accept(this);
+            return new Result(Status.PASSED, Duration.between(start, Instant.now()), null);
+        } catch (Throwable throwable) {
+            return new Result(
+                    Status.FAILED,
+                    Duration.between(start, Instant.now()),
+                    throwable
+            );
+        }
     }
 
     public void finalizeStepEntryLogging() {
@@ -346,6 +366,23 @@ public class StepExtension extends StepData {
         modifiedStep.parentStep = parentStep;
         modifiedStep.nestingLevel = nestingLevel;
         return modifiedStep;
+    }
+
+    /**
+     * Creates an infrastructure finalizer backed by the existing placeholder
+     * definition. The runner executes its callback only after the owning step's
+     * full subtree has completed.
+     */
+    public StepExtension createFinalizerStep(
+            String loggingText,
+            Consumer<StepExtension> action
+    ) {
+        StepExtension finalizer = createNewStepExtension("|__");
+        finalizer.finalizerAction = action;
+        finalizer.overrideLoggingText = loggingText;
+        finalizer.waitForPageReady = false;
+        finalizer.pickleStepTestStep.setNoLogging(true);
+        return finalizer;
     }
 
     public String resolveStepFromString(String stepText) {
