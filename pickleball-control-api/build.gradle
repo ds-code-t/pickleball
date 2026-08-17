@@ -17,6 +17,13 @@ dependencies {
     // Internal source-module dependency only. Consumers receive these classes
     // from the main shaded Pickleball artifact.
     api project(':')
+
+    // Browser-evidence bridge code compiles against Selenium types exposed by
+    // the main project implementation without promoting Selenium to this
+    // internal module's public API.
+    compileOnly('org.seleniumhq.selenium:selenium-java') {
+        version { strictly('[4.44,5.0)') }
+    }
 }
 
 tasks.withType(JavaCompile).configureEach {

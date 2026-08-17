@@ -203,6 +203,34 @@ final class RuntimeBridgeClient {
         );
     }
 
+    RuntimeBrowserPageResult browserPage(
+            String scenarioId,
+            Integer timeoutSeconds
+    ) {
+        int timeout = timeoutSeconds == null ? 60 : timeoutSeconds;
+        return request(
+                "POST",
+                "/v1/browser/page",
+                new BrowserEvidenceRequest(scenarioId, timeoutSeconds),
+                RuntimeBrowserPageResult.class,
+                Duration.ofSeconds(Math.max(10, timeout + 5L))
+        );
+    }
+
+    RuntimeBrowserScreenshotBridgeResult browserScreenshot(
+            String scenarioId,
+            Integer timeoutSeconds
+    ) {
+        int timeout = timeoutSeconds == null ? 60 : timeoutSeconds;
+        return request(
+                "POST",
+                "/v1/browser/screenshot",
+                new BrowserEvidenceRequest(scenarioId, timeoutSeconds),
+                RuntimeBrowserScreenshotBridgeResult.class,
+                Duration.ofSeconds(Math.max(10, timeout + 5L))
+        );
+    }
+
     RuntimeMappingStateResult mappingSnapshot(
             String scenarioId,
             String mapReference,
@@ -319,6 +347,12 @@ final class RuntimeBridgeClient {
             String scenarioId,
             String text,
             String argument,
+            Integer timeoutSeconds
+    ) {
+    }
+
+    private record BrowserEvidenceRequest(
+            String scenarioId,
             Integer timeoutSeconds
     ) {
     }

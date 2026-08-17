@@ -1,0 +1,10 @@
+package tools.dscode.control.bridge;
+
+/** Logical result of capturing current browser screenshot evidence. */
+public record ControlBridgeBrowserScreenshotResult(
+        String status,
+        ControlBridgeBrowserScreenshot screenshot,
+        ControlBridgeError error,
+        ControlBridgeStatus runtime
+) {
+}

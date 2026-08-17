@@ -402,11 +402,26 @@ The bridge environment is added only through the opt-in managed-start overloads.
 
 Bridge metadata is separate from Pickleball execution RunVars. When a controller knows the intended Pickleball test settings, it should continue to supply those settings through the existing `pkb_runvars` controlled-run contract described in [AI Run Configuration](ai-run-configuration.md). `runtime_start` and the desktop controlled-run action do not reconstruct or replace that configuration model.
 
-## Current Phase 3F boundaries
+## Phase 3G browser evidence
 
-Phase 3F adds Studio-owned, bounded materialized mapping snapshots and explicit ordinary-`NodeMap` restore. It does **not** yet add:
+Phase 3G adds two additive protocol-1 capabilities and endpoints:
+
+- `browser_page` / `POST /v1/browser/page`
+- `browser_screenshot` / `POST /v1/browser/screenshot`
+
+Both accept `scenarioId` plus the normal scenario-command `timeoutSeconds`, use the existing explicit/unique scenario selection rules, and execute on that scenario thread through `ControlBridgeCoordinator`. They call `BrowserSteps.getCurrentDriverIfPresent()`, so evidence reads never create or register a browser. No browser means a logical `UNAVAILABLE` result rather than an implicit driver launch.
+
+`browser_page` returns bounded current-page evidence: URL, title, current/all window handles, current window dimensions, DOM source, and a truncation flag. DOM source is capped at 256 Ki characters. `browser_screenshot` returns at most 5 MiB of PNG bytes encoded only for the private loopback transport. `RuntimeBridgeService` immediately decodes a successful screenshot into the session `evidence` directory; the `runtime_browser_screenshot` MCP result exposes that file path rather than the transport base64. Studio keeps at most 50 browser screenshot files per runtime session and removes the oldest first.
+
+The browser evidence contract is intentionally read-only. Existing detached steps remain the mutation/control path. Phase 3G does not add a CSS/XPath selector API because that would compete with Pickleball's existing execution-dictionary locator semantics; element-targeted structured inspection should be added only after a shared resolver is available.
+
+The two new MCP tools bring the Studio total from 34 to **36**.
+
+## Current Phase 3G boundaries
+
+Phase 3G adds read-only browser page/screenshot evidence on top of Phase 3F mapping snapshots. It does **not** yet add:
 - unbounded or persisted event history after the consumer runtime exits;
-- dedicated browser, service-call, or screenshot bridge commands beyond generic detached step execution;
+- shared Pickleball element-targeted browser inspection or dedicated service-call bridge commands beyond generic detached step execution;
 - persistent mapping snapshots across Studio restarts or exact restoration of specialized live `NodeMap` subclasses;
 - arbitrary consumer-object serialization across the JVM boundary;
 - persistent runtime sessions or desktop control history after Studio exits;

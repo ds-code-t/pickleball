@@ -172,6 +172,74 @@ class RuntimeBridgeClientTest {
         assertEquals("before", values.get("status"));
     }
 
+    @Test
+    void browserEvidenceUsesScenarioTargetAndStructuredPayloads() throws Exception {
+        AtomicReference<Map<?, ?>> pageRequest = new AtomicReference<>();
+        AtomicReference<Map<?, ?>> screenshotRequest = new AtomicReference<>();
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/v1/browser/page", exchange -> {
+            try (exchange) {
+                pageRequest.set(json.readValue(exchange.getRequestBody(), Map.class));
+                byte[] response = """
+                        {
+                          "status":"SUCCESS",
+                          "page":{
+                            "url":"https://example.test/",
+                            "title":"Example",
+                            "windowHandle":"one",
+                            "windowHandles":["one"],
+                            "windowWidth":1280,
+                            "windowHeight":720,
+                            "pageSource":"<html></html>",
+                            "pageSourceTruncated":false
+                          },
+                          "error":null,
+                          "runtime":null
+                        }
+                        """.getBytes(StandardCharsets.UTF_8);
+                exchange.getResponseHeaders().set("Content-Type", "application/json");
+                exchange.sendResponseHeaders(200, response.length);
+                exchange.getResponseBody().write(response);
+            }
+        });
+        server.createContext("/v1/browser/screenshot", exchange -> {
+            try (exchange) {
+                screenshotRequest.set(json.readValue(exchange.getRequestBody(), Map.class));
+                byte[] response = """
+                        {
+                          "status":"SUCCESS",
+                          "screenshot":{
+                            "mimeType":"image/png",
+                            "byteSize":3,
+                            "base64":"AQID"
+                          },
+                          "error":null,
+                          "runtime":null
+                        }
+                        """.getBytes(StandardCharsets.UTF_8);
+                exchange.getResponseHeaders().set("Content-Type", "application/json");
+                exchange.sendResponseHeaders(200, response.length);
+                exchange.getResponseBody().write(response);
+            }
+        });
+        server.start();
+
+        try {
+            RuntimeBridgeClient client = client(server, List.of("browser_page", "browser_screenshot"));
+            RuntimeBrowserPageResult page = client.browserPage("scenario", 5);
+            RuntimeBrowserScreenshotBridgeResult screenshot = client.browserScreenshot("scenario", 5);
+
+            assertEquals("https://example.test/", page.page().url());
+            assertEquals("<html></html>", page.page().pageSource());
+            assertEquals(3, screenshot.screenshot().byteSize());
+            assertEquals("AQID", screenshot.screenshot().base64());
+            assertEquals("scenario", pageRequest.get().get("scenarioId"));
+            assertEquals("scenario", screenshotRequest.get().get("scenarioId"));
+        } finally {
+            server.stop(0);
+        }
+    }
+
     private static RuntimeBridgeClient client(
             HttpServer server,
             List<String> capabilities

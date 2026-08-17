@@ -14,11 +14,16 @@ import tools.dscode.common.treeparsing.parsedComponents.Phrase;
 import tools.dscode.control.api.ControlCallResult;
 import tools.dscode.control.api.DynamicControl;
 import tools.dscode.control.api.MappingControl;
+import tools.dscode.coredefinitions.BrowserSteps;
+import org.openqa.selenium.Dimension;
+import org.openqa.selenium.OutputType;
+import org.openqa.selenium.remote.RemoteWebDriver;
 
 import java.lang.reflect.Array;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.Comparator;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
@@ -48,6 +53,8 @@ final class ControlBridgeCoordinator implements ControlHookHandler, AutoCloseabl
 
     private static final int MAX_TEXT = 64 * 1024;
     private static final int MAX_MAPPING_SNAPSHOT_BYTES = 512 * 1024;
+    private static final int MAX_PAGE_SOURCE_CHARS = 256 * 1024;
+    private static final int MAX_SCREENSHOT_BYTES = 5 * 1024 * 1024;
     private static final Object NOT_JSON_COMPATIBLE = new Object();
 
     private final String runtimeId;
@@ -374,6 +381,42 @@ final class ControlBridgeCoordinator implements ControlHookHandler, AutoCloseabl
         );
     }
 
+    ControlBridgeBrowserPageResult browserPage(
+            String scenarioId,
+            Integer timeoutSeconds
+    ) {
+        ScenarioLane lane = selectedLane(normalizeScenarioId(scenarioId));
+        if (lane == null) {
+            return browserPageUnavailableForScenarioCommand(scenarioId);
+        }
+
+        return submit(
+                lane,
+                commandTimeout(timeoutSeconds),
+                () -> browserPageOnScenarioThread(lane),
+                (type, message) -> browserPageFailed(type, message, lane.status(lanes.size())),
+                message -> browserPageUnavailable(message, lane.status(lanes.size()))
+        );
+    }
+
+    ControlBridgeBrowserScreenshotResult browserScreenshot(
+            String scenarioId,
+            Integer timeoutSeconds
+    ) {
+        ScenarioLane lane = selectedLane(normalizeScenarioId(scenarioId));
+        if (lane == null) {
+            return browserScreenshotUnavailableForScenarioCommand(scenarioId);
+        }
+
+        return submit(
+                lane,
+                commandTimeout(timeoutSeconds),
+                () -> browserScreenshotOnScenarioThread(lane),
+                (type, message) -> browserScreenshotFailed(type, message, lane.status(lanes.size())),
+                message -> browserScreenshotUnavailable(message, lane.status(lanes.size()))
+        );
+    }
+
     ControlBridgeValueResult mappingResolve(
             String scenarioId,
             String input,
@@ -401,6 +444,117 @@ final class ControlBridgeCoordinator implements ControlHookHandler, AutoCloseabl
                 },
                 (type, message) -> valueFailed(type, message, lane.status(lanes.size())),
                 message -> valueUnavailable(message, lane.status(lanes.size()))
+        );
+    }
+
+    private ControlBridgeBrowserPageResult browserPageOnScenarioThread(ScenarioLane lane) {
+        RemoteWebDriver driver = BrowserSteps.getCurrentDriverIfPresent();
+        if (driver == null) {
+            return browserPageUnavailable(
+                    "The selected scenario has not created a browser.",
+                    lane.status(lanes.size())
+            );
+        }
+
+        String source = Objects.toString(driver.getPageSource(), "");
+        boolean truncated = source.length() > MAX_PAGE_SOURCE_CHARS;
+        if (truncated) {
+            source = source.substring(0, MAX_PAGE_SOURCE_CHARS);
+        }
+        Dimension size = driver.manage().window().getSize();
+        return new ControlBridgeBrowserPageResult(
+                "SUCCESS",
+                new ControlBridgeBrowserPage(
+                        clipped(driver.getCurrentUrl()),
+                        clipped(driver.getTitle()),
+                        clipped(driver.getWindowHandle()),
+                        driver.getWindowHandles().stream().sorted().map(ControlBridgeCoordinator::clipped).toList(),
+                        size.getWidth(),
+                        size.getHeight(),
+                        source,
+                        truncated
+                ),
+                null,
+                lane.status(lanes.size())
+        );
+    }
+
+    private ControlBridgeBrowserScreenshotResult browserScreenshotOnScenarioThread(ScenarioLane lane) {
+        RemoteWebDriver driver = BrowserSteps.getCurrentDriverIfPresent();
+        if (driver == null) {
+            return browserScreenshotUnavailable(
+                    "The selected scenario has not created a browser.",
+                    lane.status(lanes.size())
+            );
+        }
+
+        byte[] png = driver.getScreenshotAs(OutputType.BYTES);
+        if (png.length > MAX_SCREENSHOT_BYTES) {
+            return browserScreenshotUnavailable(
+                    "Browser screenshot exceeds " + MAX_SCREENSHOT_BYTES + " bytes.",
+                    lane.status(lanes.size())
+            );
+        }
+        return new ControlBridgeBrowserScreenshotResult(
+                "SUCCESS",
+                new ControlBridgeBrowserScreenshot(
+                        "image/png",
+                        png.length,
+                        Base64.getEncoder().encodeToString(png)
+                ),
+                null,
+                lane.status(lanes.size())
+        );
+    }
+
+    private ControlBridgeBrowserPageResult browserPageUnavailableForScenarioCommand(String scenarioId) {
+        return browserPageUnavailable(scenarioCommandUnavailableMessage(scenarioId, "Browser page evidence"));
+    }
+
+    private ControlBridgeBrowserScreenshotResult browserScreenshotUnavailableForScenarioCommand(String scenarioId) {
+        return browserScreenshotUnavailable(scenarioCommandUnavailableMessage(scenarioId, "Browser screenshot evidence"));
+    }
+
+    private String scenarioCommandUnavailableMessage(String scenarioId, String operation) {
+        String targetId = normalizeScenarioId(scenarioId);
+        if (targetId != null) {
+            return "No active scenario with id " + targetId + ".";
+        }
+        if (lanes.isEmpty()) {
+            return operation + " requires an active Pickleball scenario.";
+        }
+        return operation + " requires a scenarioId when multiple scenarios are active.";
+    }
+
+    private ControlBridgeBrowserPageResult browserPageUnavailable(String message) {
+        return browserPageUnavailable(message, status());
+    }
+
+    private ControlBridgeBrowserPageResult browserPageUnavailable(String message, ControlBridgeStatus runtime) {
+        return new ControlBridgeBrowserPageResult(
+                "UNAVAILABLE", null, new ControlBridgeError("UNAVAILABLE", message, ""), runtime
+        );
+    }
+
+    private ControlBridgeBrowserPageResult browserPageFailed(String type, String message, ControlBridgeStatus runtime) {
+        return new ControlBridgeBrowserPageResult(
+                "FAILED", null, new ControlBridgeError(type, clipped(message), ""), runtime
+        );
+    }
+
+    private ControlBridgeBrowserScreenshotResult browserScreenshotUnavailable(String message) {
+        return browserScreenshotUnavailable(message, status());
+    }
+
+    private ControlBridgeBrowserScreenshotResult browserScreenshotUnavailable(String message, ControlBridgeStatus runtime) {
+        return new ControlBridgeBrowserScreenshotResult(
+                "UNAVAILABLE", null, new ControlBridgeError("UNAVAILABLE", message, ""), runtime
+        );
+    }
+
+    private ControlBridgeBrowserScreenshotResult browserScreenshotFailed(String type, String message, ControlBridgeStatus runtime) {
+        return new ControlBridgeBrowserScreenshotResult(
+                "FAILED", null, new ControlBridgeError(type, clipped(message), ""), runtime
         );
     }
 

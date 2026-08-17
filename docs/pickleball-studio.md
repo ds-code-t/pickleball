@@ -485,6 +485,19 @@ The desktop Runtime Control **Mappings** tab uses the same service/store. **Snap
 
 Phase 3F adds three MCP tools, bringing Studio to **34** tools.
 
+## Phase 3G: read-only browser page and screenshot evidence
+
+Phase 3G adds browser evidence without creating a second browser-control language. Commands still run on the selected scenario thread through the existing bridge queue and use only the WebDriver already owned by that scenario. If the scenario has not created a browser, the result is `UNAVAILABLE`; Studio never creates one just to inspect it.
+
+The additive bridge capabilities are `browser_page` and `browser_screenshot`, with protocol version `1` unchanged. Studio MCP adds:
+
+- `runtime_browser_page` — URL, title, window identity/size, and bounded current DOM source; DOM source is clipped at 256 Ki characters and reports `pageSourceTruncated`;
+- `runtime_browser_screenshot` — captures a PNG capped at 5 MiB on the consumer side, transfers it only across the authenticated loopback bridge, then materializes it under the Studio bridge session `evidence` directory and returns the local file path rather than base64 through MCP. Studio retains at most 50 browser screenshots per runtime session, deleting the oldest screenshot files first.
+
+These are observation-only operations. Navigation, clicks, typing, service calls, and other mutations continue through retry-friendly detached Pickleball steps. Phase 3G deliberately does not expose a Studio-specific CSS/XPath element selector: Pickleball element matching is currently composed through its execution dictionary/XPath builders rather than a small stable public resolver. A later element-inspection slice should first extract a shared resolver so Studio and normal Pickleball syntax cannot diverge.
+
+Phase 3G adds two MCP tools, bringing Studio to **36** tools. The consumer control-bridge scenario is also tagged `@smoke` so the bridge contract is exercised by the supported smoke validation path.
+
 ## Validation
 
 Focused Studio validation:
@@ -514,14 +527,14 @@ After focused validation, run the normal root and Maven-consumer validation from
 
 ## Current boundaries
 
-Phase 3F does **not** yet implement:
+Phase 3G does **not** yet implement:
 
 - syntax highlighting, code completion, editor refactoring, or live parsing of unsaved buffers;
 - full Gradle external dependency/classpath import;
 - persistent process/activity history, runtime-control history, runtime-event history, or desktop layout/session restoration across Studio/runtime restarts;
 - interactive terminal stdin/PTY support;
 - full Java semantic/classpath reference resolution, usages, or Gherkin-to-Java step binding;
-- persistent mapping snapshots, exact restoration of specialized live `NodeMap` subclasses, or dedicated browser/service/screenshot bridge commands beyond generic detached step execution;
+- persistent mapping snapshots, exact restoration of specialized live `NodeMap` subclasses, shared Pickleball element-targeted browser inspection, or dedicated service-call bridge commands beyond generic detached step execution;
 - remote/non-loopback runtime control.
 
 Those capabilities should continue to layer on the shared Studio service model and the explicit Phase 3 runtime bridge rather than bypassing either boundary.

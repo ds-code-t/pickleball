@@ -397,6 +397,10 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-control-api/src/main/java/tools/dscode/control/api/ResolutionCandidate.java`
 - `pickleball-control-api/src/main/java/tools/dscode/control/api/ResolutionExplanation.java`
 - `pickleball-control-api/src/main/java/tools/dscode/control/bridge/ControlBridgeBootstrap.java`
+- `pickleball-control-api/src/main/java/tools/dscode/control/bridge/ControlBridgeBrowserPage.java`
+- `pickleball-control-api/src/main/java/tools/dscode/control/bridge/ControlBridgeBrowserPageResult.java`
+- `pickleball-control-api/src/main/java/tools/dscode/control/bridge/ControlBridgeBrowserScreenshot.java`
+- `pickleball-control-api/src/main/java/tools/dscode/control/bridge/ControlBridgeBrowserScreenshotResult.java`
 - `pickleball-control-api/src/main/java/tools/dscode/control/bridge/ControlBridgeCallResult.java`
 - `pickleball-control-api/src/main/java/tools/dscode/control/bridge/ControlBridgeCoordinator.java`
 - `pickleball-control-api/src/main/java/tools/dscode/control/bridge/ControlBridgeDescriptor.java`
@@ -442,6 +446,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-studio/src/main/java/tools/dscode/studio/language/SourceSymbol.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/language/SourceSymbolKind.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/language/WorkspaceLanguageService.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/mcp/RuntimeBrowserEvidenceMcpTools.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/mcp/RuntimeEvidenceMcpTools.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/mcp/RuntimeMappingMcpTools.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/mcp/StudioMcpConfiguration.java`
@@ -459,6 +464,12 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-studio/src/main/java/tools/dscode/studio/runtime/RuntimeBridgeError.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/runtime/RuntimeBridgeService.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/runtime/RuntimeBridgeStatus.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/runtime/RuntimeBrowserPage.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/runtime/RuntimeBrowserPageResult.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/runtime/RuntimeBrowserScreenshot.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/runtime/RuntimeBrowserScreenshotBridge.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/runtime/RuntimeBrowserScreenshotBridgeResult.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/runtime/RuntimeBrowserScreenshotResult.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/runtime/RuntimeControlResult.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/runtime/RuntimeEvent.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/runtime/RuntimeEventPage.java`

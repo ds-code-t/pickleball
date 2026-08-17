@@ -34,7 +34,9 @@ final class ControlBridgeRuntime implements AutoCloseable {
             "mapping_put",
             "mapping_resolve",
             "mapping_snapshot",
-            "mapping_restore"
+            "mapping_restore",
+            "browser_page",
+            "browser_screenshot"
     );
 
     private static final String HOST = "127.0.0.1";
@@ -245,6 +247,16 @@ final class ControlBridgeRuntime implements AutoCloseable {
                             request.snapshot(),
                             request.timeoutSeconds()
                     );
+                }));
+        server.createContext("/v1/browser/page", exchange ->
+                handle(exchange, "POST", () -> {
+                    BrowserEvidenceRequest request = readRequired(exchange, BrowserEvidenceRequest.class);
+                    return coordinator.browserPage(request.scenarioId(), request.timeoutSeconds());
+                }));
+        server.createContext("/v1/browser/screenshot", exchange ->
+                handle(exchange, "POST", () -> {
+                    BrowserEvidenceRequest request = readRequired(exchange, BrowserEvidenceRequest.class);
+                    return coordinator.browserScreenshot(request.scenarioId(), request.timeoutSeconds());
                 }));
     }
 
@@ -483,6 +495,12 @@ final class ControlBridgeRuntime implements AutoCloseable {
     private record MappingRestoreRequest(
             String scenarioId,
             ControlBridgeMappingSnapshot snapshot,
+            Integer timeoutSeconds
+    ) {
+    }
+
+    private record BrowserEvidenceRequest(
+            String scenarioId,
             Integer timeoutSeconds
     ) {
     }

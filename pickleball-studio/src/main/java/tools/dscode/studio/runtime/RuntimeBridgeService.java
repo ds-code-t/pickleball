@@ -22,6 +22,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public final class RuntimeBridgeService implements AutoCloseable {
     public static final int DEFAULT_RUNTIME_TIMEOUT_SECONDS = 3600;
+    public static final int MAX_BROWSER_SCREENSHOTS_PER_SESSION = 50;
 
     private static final String ENV_SESSION_DIR = "PKB_STUDIO_BRIDGE_SESSION_DIR";
     private static final String ENV_SESSION_ID = "PKB_STUDIO_BRIDGE_SESSION_ID";
@@ -288,6 +289,71 @@ public final class RuntimeBridgeService implements AutoCloseable {
         );
     }
 
+    public RuntimeBrowserPageResult browserPage(
+            String sessionId,
+            String runtimeId,
+            String scenarioId,
+            Integer timeoutSeconds
+    ) {
+        Session session = requireSession(sessionId);
+        return client(session, runtimeId).browserPage(scenarioId, timeoutSeconds);
+    }
+
+    public RuntimeBrowserScreenshotResult browserScreenshot(
+            String sessionId,
+            String runtimeId,
+            String scenarioId,
+            Integer timeoutSeconds
+    ) {
+        Session session = requireSession(sessionId);
+        RuntimeBrowserScreenshotBridgeResult result =
+                client(session, runtimeId).browserScreenshot(scenarioId, timeoutSeconds);
+        if (!"SUCCESS".equals(result.status()) || result.screenshot() == null) {
+            return new RuntimeBrowserScreenshotResult(
+                    result.status(), null, result.error(), result.runtime()
+            );
+        }
+
+        RuntimeBrowserScreenshotBridge screenshot = result.screenshot();
+        byte[] png;
+        try {
+            png = Base64.getDecoder().decode(screenshot.base64());
+        } catch (IllegalArgumentException failure) {
+            throw new IllegalStateException("Runtime bridge returned invalid screenshot data.", failure);
+        }
+        if (png.length != screenshot.byteSize()) {
+            throw new IllegalStateException("Runtime bridge screenshot byte count did not match payload.");
+        }
+
+        Path evidenceDirectory = session.directory.resolve("evidence");
+        synchronized (session) {
+            try {
+                Files.createDirectories(evidenceDirectory);
+                Path file = evidenceDirectory.resolve(
+                        "browser-%013d-%s-%s.png".formatted(
+                                System.currentTimeMillis(),
+                                runtimeId,
+                                UUID.randomUUID()
+                        )
+                );
+                Files.write(file, png);
+                trimBrowserScreenshots(evidenceDirectory);
+                return new RuntimeBrowserScreenshotResult(
+                        result.status(),
+                        new RuntimeBrowserScreenshot(
+                                screenshot.mimeType(),
+                                screenshot.byteSize(),
+                                file.toAbsolutePath().normalize().toString()
+                        ),
+                        result.error(),
+                        result.runtime()
+                );
+            } catch (IOException failure) {
+                throw new IllegalStateException("Could not save runtime browser screenshot evidence.", failure);
+            }
+        }
+    }
+
     public RuntimeMappingSnapshotResult mappingSnapshot(
             String sessionId,
             String runtimeId,
@@ -378,6 +444,20 @@ public final class RuntimeBridgeService implements AutoCloseable {
         }
         sessions.clear();
         mappingSnapshots.clear();
+    }
+
+    private void trimBrowserScreenshots(Path evidenceDirectory) throws IOException {
+        try (var files = Files.list(evidenceDirectory)) {
+            List<Path> screenshots = files
+                    .filter(path -> path.getFileName().toString().startsWith("browser-"))
+                    .filter(path -> path.getFileName().toString().endsWith(".png"))
+                    .sorted()
+                    .toList();
+            int excess = screenshots.size() - MAX_BROWSER_SCREENSHOTS_PER_SESSION;
+            for (int i = 0; i < excess; i++) {
+                Files.deleteIfExists(screenshots.get(i));
+            }
+        }
     }
 
     private RuntimeBridgeClient client(Session session, String runtimeId) {

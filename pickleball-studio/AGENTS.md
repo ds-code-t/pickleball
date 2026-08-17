@@ -76,7 +76,7 @@ Phase 2G adds read-only Java/Gherkin definition navigation through `WorkspaceLan
 
 ## Desktop UI
 
-Phase 2H established the Swing desktop workspace/editor adapter. Phase 3C adds a modeless runtime-control adapter over the Phase 3 bridge. Phase 3E renders Phase 3D runtime evidence in that same desktop surface. Phase 3F adds bounded mapping snapshot capture/list/restore through the same runtime service.
+Phase 2H established the Swing desktop workspace/editor adapter. Phase 3C adds a modeless runtime-control adapter over the Phase 3 bridge. Phase 3E renders Phase 3D runtime evidence in that same desktop surface. Phase 3F adds bounded mapping snapshot capture/list/restore through the same runtime service. Phase 3G adds read-only current-page and screenshot evidence through that runtime service.
 
 - `StudioDesktopSession` is the desktop-facing facade over existing workspace, language, build, managed-process, and runtime-bridge services.
 - `StudioFrame`, `RuntimeControlDialog`, and other Swing classes must remain UI adapters; do not duplicate workspace boundary checks, source parsing, build command construction, process lifecycle, bridge HTTP/authentication, scenario-thread routing, or mapping semantics in widgets.
@@ -101,7 +101,7 @@ Phase 2H established the Swing desktop workspace/editor adapter. Phase 3C adds a
 
 ## Live runtime bridge
 
-Phase 3A established the explicit Studio-JVM-to-consumer-test-JVM control boundary through `RuntimeBridgeService` and `tools.dscode.control.bridge`; Phase 3B added explicit scenario targeting and direct live mapping control; Phase 3C exposes those services through the desktop UI; Phase 3D adds bounded semantic runtime evidence on the same private transport; Phase 3E renders that evidence in the desktop; Phase 3F adds bounded Studio-owned mapping snapshots and explicit restore without changing protocol version `1`.
+Phase 3A established the explicit Studio-JVM-to-consumer-test-JVM control boundary through `RuntimeBridgeService` and `tools.dscode.control.bridge`; Phase 3B added explicit scenario targeting and direct live mapping control; Phase 3C exposes those services through the desktop UI; Phase 3D adds bounded semantic runtime evidence on the same private transport; Phase 3E renders that evidence in the desktop; Phase 3F adds bounded Studio-owned mapping snapshots and explicit restore; Phase 3G adds read-only browser page/screenshot evidence. Protocol version remains `1`.
 
 - The bridge is opt-in per `runtime_start` or desktop **Start Control Run**; ordinary Maven/Gradle execution and the desktop **Run Tests** action must remain bridge-free.
 - Consumer bridge servers bind only to `127.0.0.1` on operating-system-assigned ports and require a per-session bearer token.
@@ -129,12 +129,12 @@ Phase 3A established the explicit Studio-JVM-to-consumer-test-JVM control bounda
 - Snapshot capture may materialize any `NodeMap` subclass for inspection, but restore is allowed only for exact ordinary `NodeMap` instances. Specialized subclasses are inspection-only.
 - Restore is bound to the captured runtime/scenario/map and must verify the live map class, map type, and data-source metadata before overwriting values. Restore must mutate the same live map object rather than replace it.
 - Snapshot JSON must not be described as recreating specialized live cursor/reference semantics, and restore is not automatic rollback.
-- Do not claim dedicated browser/service/screenshot bridge commands, persistent mapping snapshots, restoration of specialized live map semantics, unbounded/persistent runtime evidence, or remote control until implemented.
+- Do not claim shared element-targeted browser inspection, dedicated service-call bridge commands, persistent mapping snapshots, restoration of specialized live map semantics, unbounded/persistent runtime evidence, or remote control until implemented.
 - Runtime bridge transport is an internal Studio/Pickleball protocol. External AI clients should use Studio MCP rather than connecting to consumer bridge ports directly.
 
 ## MCP
 
-Phase 2B introduced Spring AI Streamable-HTTP through the WebMVC server starter. Phase 2C added one-shot process and Maven tools. Phase 2D added managed process lifecycle tools. Phase 2E added synchronous and managed Gradle Wrapper execution. Phase 2F adds read-only Gradle Tooling API model/navigation tools. Phase 2G adds read-only Java/Gherkin source navigation tools. Phase 2H added a Swing desktop adapter over those same services. Phase 3A added six runtime bridge tools; Phase 3B added four targeted-scenario/mapping tools, bringing the MCP contract to 30 tools. Phase 3C adds no MCP tools. Phase 3D adds `runtime_events`, bringing the MCP contract to 31 tools. Phase 3E adds no MCP tools. Phase 3F adds three mapping snapshot tools, bringing the MCP contract to 34 tools.
+Phase 2B introduced Spring AI Streamable-HTTP through the WebMVC server starter. Phase 2C added one-shot process and Maven tools. Phase 2D added managed process lifecycle tools. Phase 2E added synchronous and managed Gradle Wrapper execution. Phase 2F adds read-only Gradle Tooling API model/navigation tools. Phase 2G adds read-only Java/Gherkin source navigation tools. Phase 2H added a Swing desktop adapter over those same services. Phase 3A added six runtime bridge tools; Phase 3B added four targeted-scenario/mapping tools, bringing the MCP contract to 30 tools. Phase 3C adds no MCP tools. Phase 3D adds `runtime_events`, bringing the MCP contract to 31 tools. Phase 3E adds no MCP tools. Phase 3F adds three mapping snapshot tools, bringing the MCP contract to 34 tools. Phase 3G adds `runtime_browser_page` and `runtime_browser_screenshot`, bringing the MCP contract to 36 tools.
 
 - Bind the Studio MCP server to loopback only.
 - Keep the per-launch endpoint token behavior unless a later authentication design explicitly replaces it.
@@ -147,6 +147,8 @@ Phase 2B introduced Spring AI Streamable-HTTP through the WebMVC server starter.
 - Runtime control MCP tools are `runtime_start`, `runtime_list`, `runtime_status`, `runtime_scenarios`, `runtime_pause`, `runtime_resume`, `runtime_execute_step`, `runtime_mapping_get`, `runtime_mapping_put`, and `runtime_mapping_resolve`; they must remain adapters over `RuntimeBridgeService`.
 - Runtime evidence MCP is `runtime_events`; `RuntimeEvidenceMcpTools` must remain a thin read-only adapter over `RuntimeBridgeService.events(...)`, not a second retention implementation.
 - Runtime mapping snapshot MCP tools are `runtime_mapping_snapshot`, `runtime_mapping_snapshots`, and `runtime_mapping_restore`; `RuntimeMappingMcpTools` must remain a thin adapter over `RuntimeBridgeService`, not a second snapshot store.
+- Runtime browser evidence MCP tools are `runtime_browser_page` and `runtime_browser_screenshot`; `RuntimeBrowserEvidenceMcpTools` must remain a thin adapter over `RuntimeBridgeService`. Evidence commands must use the selected scenario thread and `BrowserSteps.getCurrentDriverIfPresent()` semantics: never create a browser just to inspect it. Screenshot base64 is transport-only; MCP returns the Studio evidence file path. Keep browser screenshot files bounded to 50 per Studio runtime session and delete oldest first.
+- Do not add a Studio-only CSS/XPath element selector contract. Element-targeted evidence should reuse a shared Pickleball resolver once one is explicitly exposed. Browser mutation remains detached-step execution.
 
 ## Current phase
 
@@ -178,6 +180,8 @@ Phase 3E adds the desktop Events tab over that same evidence service, including 
 
 Phase 3F adds materialized live mapping capture, a bounded 50-per-session Studio snapshot store, explicit same-object restore for ordinary `NodeMap` instances, three MCP tools, and matching desktop Mappings-tab controls.
 
-Do not claim that syntax highlighting/completion, live unsaved-buffer parsing, full Gradle dependency/classpath import, persistent run/activity/runtime-control/runtime-event/mapping-snapshot or desktop session state, interactive terminal input, semantic Java reference/type analysis, Gherkin step binding, specialized live-map semantic restoration, dedicated browser/service/screenshot bridge commands, or remote runtime control are implemented until those later slices are added.
+Phase 3G adds selected-scenario read-only browser page/DOM evidence and screenshot-file evidence plus two MCP tools; it deliberately adds no browser mutation or independent element-selector syntax.
+
+Do not claim that syntax highlighting/completion, live unsaved-buffer parsing, full Gradle dependency/classpath import, persistent run/activity/runtime-control/runtime-event/mapping-snapshot or desktop session state, interactive terminal input, semantic Java reference/type analysis, Gherkin step binding, specialized live-map semantic restoration, shared element-targeted browser inspection, dedicated service-call bridge commands, or remote runtime control are implemented until those later slices are added.
 
 See `docs/pickleball-studio.md`.
