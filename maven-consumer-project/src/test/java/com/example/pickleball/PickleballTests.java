@@ -48,6 +48,9 @@ public final class PickleballTests extends PickleballRunner {
         dictionary.category("Radio Button")
                 .addBase("//input[@type='radio']");
 
+        dictionary.category("Close Button")
+                .addBase("//*[self::button and @aria-label='Close']");
+
         dictionary.category("Test Panel")
                 .inheritsFrom(ExecutionDictionary.CONTAINS_TEXT)
                 .addBase(

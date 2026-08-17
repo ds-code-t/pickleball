@@ -1,6 +1,6 @@
 # Dynamic Steps
 
-> **Working feature examples:** [`dynamic-steps.feature`](../maven-consumer-project/src/test/resources/features/dynamic-steps.feature) covers core element selection, actions, assertions, ordinals, and chained steps; [`forms-dynamic-steps.feature`](../maven-consumer-project/src/test/resources/features/forms-dynamic-steps.feature) covers form controls and pointer actions; [`mapping-and-resources.feature`](../maven-consumer-project/src/test/resources/features/mapping-and-resources.feature) covers comma-step `save` actions.
+> **Working feature examples:** [`dynamic-steps.feature`](../maven-consumer-project/src/test/resources/features/dynamic-steps.feature) covers core element selection, actions, assertions, ordinals, and chained steps; [`forms-dynamic-steps.feature`](../maven-consumer-project/src/test/resources/features/forms-dynamic-steps.feature) covers form controls and pointer actions; [`browser-action-contracts.feature`](../maven-consumer-project/src/test/resources/features/browser-action-contracts.feature) covers window switching and component closing; [`mapping-and-resources.feature`](../maven-consumer-project/src/test/resources/features/mapping-and-resources.feature) covers comma-step `save` actions.
 
 Dynamic steps let a feature describe browser behavior directly without adding one Java method for every Gherkin sentence.
 
@@ -90,7 +90,8 @@ Frequently used actions include:
 | `wait` | wait for a duration or condition |
 | `save` | store a value under a key for later template resolution |
 | `attach` | attach a file where supported |
-| `switch`, `close` | change or close a supported browser target |
+| `switch` | switch to a matching browser window or tab |
+| `close` | close a matched HTML component through its configured `Close Button` |
 | `accept`, `dismiss` | handle browser dialogs |
 | `press` | send a keyboard expression |
 
@@ -103,6 +104,21 @@ Examples:
 * , double click the "Interaction Target" Button
 * , accept the Alert
 ```
+
+Window selection is part of the `Window` element vocabulary. For example:
+
+```gherkin
+* , switch the New Window
+* , switch the Previous Window
+```
+
+`close` is an HTML-element action, not a WebDriver window-close operation. It searches inside the matched component for the project's configured `Close Button` category and clicks that control:
+
+```gherkin
+* , close the "Dismissible Notice" Test Panel
+```
+
+The executable consumer contract for both behaviors is in [`browser-action-contracts.feature`](../maven-consumer-project/src/test/resources/features/browser-action-contracts.feature), tagged `@contract-coverage-217`.
 
 ## Save actions
 
@@ -213,6 +229,7 @@ For child steps, use [Nested Steps](nested-steps.md). For report-focused branch 
 
 - [Core dynamic-step playground](../maven-consumer-project/src/test/resources/features/dynamic-steps.feature)
 - [Form actions, state assertions, chains, and pointer actions](../maven-consumer-project/src/test/resources/features/forms-dynamic-steps.feature)
+- [Window switching and component closing](../maven-consumer-project/src/test/resources/features/browser-action-contracts.feature)
 - [Saved values and supported mapping steps](../maven-consumer-project/src/test/resources/features/mapping-and-resources.feature)
 - [Contexts, ordinals, and project-specific elements](../maven-consumer-project/src/test/resources/features/catalog-context.feature)
 - [Dialogs](../maven-consumer-project/src/test/resources/features/dialogs.feature)

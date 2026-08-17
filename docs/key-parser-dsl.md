@@ -1,6 +1,6 @@
 # Keyboard Expressions
 
-> **Working feature example:** [`keyboard.feature`](../maven-consumer-project/src/test/resources/features/keyboard.feature) demonstrates modifier expressions, named keys, and keyboard input against a real page.
+> **Working feature example:** [`keyboard.feature`](../maven-consumer-project/src/test/resources/features/keyboard.feature) exercises sequential, simultaneous, held, multi-modifier, nested, named, navigation, and focus-changing keyboard expressions against a real browser page.
 
 Keyboard expressions describe exact key timing for shortcuts and multi-key interactions. Use them with the `press` action:
 
@@ -53,6 +53,8 @@ Held groups can be nested:
 ```text
 CONTROL+SHIFT[A B ALT[A B]]
 ```
+
+The consumer acceptance feature records browser `keydown` codes and active modifier state so these examples verify the actual Selenium interaction rather than parser recognition alone. The focused contract scenarios are tagged `@contract-coverage-217`.
 
 ## Key names and literal characters
 

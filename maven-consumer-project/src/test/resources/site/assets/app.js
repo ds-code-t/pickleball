@@ -154,9 +154,32 @@ function initKeyboardPage() {
     const input = byId("keyboard-input");
     if (!input) return;
 
+    const tabTarget = byId("keyboard-tab-target");
+    const keyDownCodes = [];
+    const pressedCodes = new Set();
+
     const updateValue = () => text("keyboard-value", `Keyboard Value: ${input.value || "(empty)"}`);
+
     input.addEventListener("input", updateValue);
-    input.addEventListener("keydown", (event) => text("last-key", `Last Key: ${event.key}`));
+    input.addEventListener("focus", () => text("focus-target", "Focus Target: Keyboard Input"));
+    input.addEventListener("keydown", (event) => {
+        pressedCodes.add(event.code);
+        keyDownCodes.push(event.code);
+
+        text("last-key", `Last Key: ${event.key}`);
+        text("key-down-codes", `Key Down Codes: ${keyDownCodes.join(" > ")}`);
+        text(
+            "last-key-state",
+            `Last Key State: ${event.code} active=${[...pressedCodes].join("+")} ctrl=${event.ctrlKey} shift=${event.shiftKey} alt=${event.altKey}`
+        );
+    });
+
+    document.addEventListener("keyup", (event) => pressedCodes.delete(event.code));
+
+    if (tabTarget) {
+        tabTarget.addEventListener("focus", () => text("focus-target", "Focus Target: Keyboard Tab Target"));
+    }
+
     updateValue();
 }
 
@@ -186,6 +209,15 @@ function initComponentsPage() {
         text("saved-customer", `Saved Customer: ${name.value || "(blank)"} | ${tier.value || "none"}`);
     });
     form.addEventListener("reset", () => window.setTimeout(() => text("saved-customer", "Saved Customer: none"), 0));
+
+    const notice = byId("dismissible-notice");
+    const closeButton = byId("dismiss-notice");
+    if (notice && closeButton) {
+        closeButton.addEventListener("click", () => {
+            notice.hidden = true;
+            text("component-close-state", "Close State: closed");
+        });
+    }
 }
 
 markCurrentNavigation();
