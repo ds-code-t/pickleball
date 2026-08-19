@@ -12,12 +12,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class WorkbenchApplicationTest {
 
     @Test
-    void helpIsAvailableWithoutAProject() {
+    void helpListsSynchronizationAndWorkerLifecycleCommands() {
         Output output = run("--help");
 
         assertEquals(0, output.exitCode());
-        assertTrue(output.stdout().contains("Pickleball Workbench"));
-        assertTrue(output.stdout().contains("--version"));
+        assertTrue(output.stdout().contains("sync <project>"));
+        assertTrue(output.stdout().contains("worker-check <project>"));
         assertEquals("", output.stderr());
     }
 
@@ -31,12 +31,20 @@ class WorkbenchApplicationTest {
     }
 
     @Test
-    void unimplementedCommandsFailClearly() {
-        Output output = run("sync");
+    void unknownCommandsFailClearly() {
+        Output output = run("unknown");
 
         assertEquals(2, output.exitCode());
         assertEquals("", output.stdout());
-        assertTrue(output.stderr().contains("not available in the foundation phase: sync"));
+        assertTrue(output.stderr().contains("Unknown Workbench command: unknown"));
+    }
+
+    @Test
+    void commandsRequireExactlyOneProject() {
+        Output output = run("sync");
+
+        assertEquals(1, output.exitCode());
+        assertTrue(output.stderr().contains("Usage: pickleball-workbench sync <project>"));
     }
 
     private static Output run(String... args) {
@@ -54,6 +62,5 @@ class WorkbenchApplicationTest {
         );
     }
 
-    private record Output(int exitCode, String stdout, String stderr) {
-    }
+    private record Output(int exitCode, String stdout, String stderr) { }
 }

@@ -24,6 +24,9 @@ import static io.cucumber.core.options.Constants.GLUE_PROPERTY_NAME;
 import static tools.dscode.common.reporting.logging.LogForwarder.logDebug;
 
 public final class DynamicSuiteBootstrap {
+    /** Internal direct-worker contract; not a Pickleball RunVar. */
+    public static final String WORKBENCH_TEST_OUTPUT_ROOT_PROPERTY =
+            "pickleball.workbench.testOutputRoot";
 
     private DynamicSuiteBootstrap() {
     }
@@ -311,7 +314,15 @@ public final class DynamicSuiteBootstrap {
         return result;
     }
 
-    private static boolean isPreferredTestOutputRoot(URI root) {
+    static boolean isPreferredTestOutputRoot(URI root) {
+        String configured = System.getProperty(WORKBENCH_TEST_OUTPUT_ROOT_PROPERTY);
+        if (configured != null && !configured.isBlank()) {
+            if (!"file".equalsIgnoreCase(root.getScheme())) return false;
+            Path expected = Path.of(configured).toAbsolutePath().normalize();
+            Path candidate = Path.of(root).toAbsolutePath().normalize();
+            return candidate.equals(expected);
+        }
+
         String s = root.toString().replace('\\', '/');
         return s.endsWith("/target/test-classes/")
                 || s.endsWith("/build/classes/java/test/")
@@ -385,17 +396,15 @@ public final class DynamicSuiteBootstrap {
         logDebug("[DynamicSuiteBootstrap] " + message);
     }
 
-
-
     private static final class DefaultDynamicSuite extends PickleballRunner {
         @Override
         public void globalTestDefaults() {
             // Intentionally empty.
         }
+
         @Override
         public void globalTestProperties() {
             // Intentionally empty.
         }
     }
-
 }

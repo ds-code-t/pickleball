@@ -38,3 +38,13 @@ During the Studio-to-Workbench migration, Pickleball may accept the old `PKB_STU
 When MCP mode is added, process stdout is protocol-only. Controller logs, worker stdout/stderr, and Pickleball runtime logging must be routed away from MCP stdout.
 
 Project-local `.pickleball/workbench/` content is disposable state and must not be treated as source.
+
+## Synchronization and worker lifecycle
+
+Workbench synchronization is build-tool-assisted, not a replacement build system. Use the selected Maven/Gradle wrapper to establish compiled main/test output, processed resources, and the effective test runtime classpath. Gradle synchronization must use build-native init-script/task injection rather than the Gradle Tooling API.
+
+`.pickleball/workbench/base/classes` is synchronization provenance/reset state and must never be on a worker runtime classpath. `.pickleball/workbench/live/classes` is the one merged project-owned runtime root; main output is materialized first and test output overlays it so one class/resource path is visible exactly once. External dependency entries stay referenced from their normal caches. The synchronization fingerprint covers both merged project output and dependency artifact contents, so replacing a same-version local dependency still changes the snapshot identity.
+
+The controller owns one interactive worker per selected project by default. Workers launch directly with Java from the existing Workbench snapshot, use the Pickleball-side `WorkbenchWorkerMain` bootstrap, and set `pickleball.workbench.testOutputRoot` so `DynamicSuiteBootstrap` intentionally scans the merged live root instead of relying on Maven/Gradle output suffixes.
+
+Interactive workers use a session-private anchor feature and the neutral `PKB_CONTROL_BRIDGE_*` environment contract. The anchor body must be a guaranteed no-op core step; controller operations happen while the scenario is paused, and completing the anchor must not introduce an unrelated mutation/failure. Pause leases remain finite; the controller renews the owned anchor lease while active. Graceful stop cancels renewal, resumes the anchor so normal lifecycle hooks can finish, explicitly closes the worker bridge after Cucumber returns, waits a bounded period, then terminates and only force-kills as a final fallback. Restart must reuse the existing manifest/classpath, require the previous worker to have stopped cleanly, and must not run Maven/Gradle.
