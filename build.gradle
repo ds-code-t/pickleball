@@ -488,7 +488,8 @@ def requested = gradle.startParameter.taskNames*.toLowerCase()
 def isMavenLocalPublish = requested.any { it.contains("publishtomavenlocal") }
 
 def isStagingPublish =
-        requested.any { it.contains("publishmavenpublicationtostagingrepository") } ||
+        requested.any { it.contains("centralbundlezip") } ||
+                requested.any { it.contains("publishmavenpublicationtostagingrepository") } ||
                 requested.any { it.contains("publishallpublicationstostagingrepository") } ||
                 requested.any { it.contains("closeandrelease") } ||
                 requested.any { it.contains("releasesonatype") } ||
@@ -534,7 +535,8 @@ def centralStagingDir = layout.buildDirectory.dir("maven-central-staging")
 tasks.register("generateCentralChecksums") {
     group = "publishing"
     description = "Generate .md5 and .sha1 checksums for Central upload bundle (excluding .asc and existing checksums)."
-    dependsOn "publishMavenPublicationToStagingRepository"
+    dependsOn "publishMavenPublicationToStagingRepository",
+            ":pickleball-workbench:publishMavenPublicationToStagingRepository"
 
     doLast {
         File root = centralStagingDir.get().asFile

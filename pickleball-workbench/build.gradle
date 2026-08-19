@@ -3,6 +3,7 @@ plugins {
     id 'application'
     id 'com.gradleup.shadow' version '9.6.1'
     id 'maven-publish'
+    id 'signing'
 }
 
 group = rootProject.group
@@ -149,6 +150,38 @@ publishing {
             }
         }
     }
+}
+
+def requested = gradle.startParameter.taskNames*.toLowerCase()
+def isMavenLocalPublish = requested.any { it.contains('publishtomavenlocal') }
+def isStagingPublish =
+        requested.any { it.contains('centralbundlezip') } ||
+                requested.any { it.contains('publishmavenpublicationtostagingrepository') } ||
+                requested.any { it.contains('publishallpublicationstostagingrepository') } ||
+                requested.any { it.contains('closeandrelease') } ||
+                requested.any { it.contains('releasesonatype') } ||
+                requested.any { it.contains('publishsonatype') }
+def signingIsRequired = isStagingPublish && !isMavenLocalPublish
+
+signing {
+    required = { signingIsRequired }
+
+    def key = (findProperty('signingKey') ?: System.getenv('SIGNING_KEY'))?.toString()
+    def pass = (findProperty('signingPassword') ?: System.getenv('SIGNING_PASSWORD'))?.toString()
+
+    if (signingIsRequired) {
+        if (!key) {
+            throw new GradleException(
+                    'Signing is required for staging publish, but no signingKey/SIGNING_KEY was provided.'
+            )
+        }
+        useInMemoryPgpKeys(key, pass)
+        sign(publishing.publications.named('maven').get())
+    }
+}
+
+tasks.withType(Sign).configureEach {
+    onlyIf { !isMavenLocalPublish }
 }
 
 def workbenchJar = tasks.named('shadowJar').flatMap { it.archiveFile }
