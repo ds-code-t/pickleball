@@ -8,6 +8,7 @@ import tools.dscode.control.bridge.ControlBridgeValueResult;
 import tools.dscode.workbench.mcp.WorkbenchMcpServer;
 import tools.dscode.workbench.sync.WorkbenchManifest;
 import tools.dscode.workbench.sync.WorkbenchSynchronizer;
+import tools.dscode.workbench.ui.WorkbenchUi;
 import tools.dscode.workbench.worker.WorkbenchLiveSession;
 import tools.dscode.workbench.worker.WorkbenchWorkerManager;
 import tools.dscode.workbench.worker.WorkbenchWorkerStatus;
@@ -54,6 +55,7 @@ public final class WorkbenchApplication {
                 case "status" -> status(args, out);
                 case "worker-check" -> workerCheck(args, out);
                 case "live-check" -> liveCheck(args, out);
+                case "ui" -> ui(args);
                 case "mcp" -> throw new IllegalArgumentException(
                         "MCP mode must be launched through the Workbench executable."
                 );
@@ -158,6 +160,12 @@ public final class WorkbenchApplication {
         out.println("Live output: " + manifest.liveOutput());
         out.println("Dependencies: " + manifest.dependencyClasspath().size());
         out.println("Fingerprint: " + manifest.fingerprint());
+        return 0;
+    }
+
+    private static int ui(String[] args) {
+        Path project = requiredProject(args, "ui");
+        WorkbenchUi.launch(project);
         return 0;
     }
 
@@ -413,11 +421,13 @@ public final class WorkbenchApplication {
         out.println("  java -jar pickleball-workbench-<version>.jar worker-check <project>");
         out.println("  java -jar pickleball-workbench-<version>.jar live-check <project>");
         out.println("  java -jar pickleball-workbench-<version>.jar mcp <project>");
+        out.println("  java -jar pickleball-workbench-<version>.jar ui <project>");
         out.println("  java -jar pickleball-workbench-<version>.jar --version");
         out.println();
         out.println("sync uses the selected project wrapper and materializes .pickleball/workbench.");
         out.println("worker-check starts, restarts, and gracefully stops direct consumer workers without rebuilding.");
         out.println("live-check exercises raw Gherkin, Step Override, and live runtime operations on one persistent worker.");
         out.println("mcp serves the same Workbench services over protocol-only stdio; diagnostics use stderr/log files.");
+        out.println("ui opens the thin Swing Workbench over the same controller services.");
     }
 }

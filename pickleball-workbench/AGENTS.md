@@ -22,7 +22,7 @@ Workbench-only dependencies, including the MCP SDK, belong only on the Workbench
 
 The Workbench controller owns synchronization, worker process/session lifecycle, bridge client behavior, MCP stdio, and the thin Swing UI. Pickleball owns consumer-worker behavior such as the bridge server/coordinator, DynamicControl/Gherkin execution, Step Override runtime, Mapping state, browser/service-call access, and woven Cucumber integration.
 
-`WorkbenchServices` is the shared plain-Java adapter boundary. `WorkbenchController` composes synchronization and `WorkbenchLiveSession`; MCP and the future Swing UI must delegate to that service surface instead of implementing their own worker ownership, bridge calls, Mapping semantics, Step Override behavior, or scenario retry rules.
+`WorkbenchServices` is the shared plain-Java adapter boundary. `WorkbenchController` composes synchronization and `WorkbenchLiveSession`; MCP and Swing must delegate to that service surface instead of implementing their own worker ownership, bridge calls, Mapping semantics, Step Override behavior, or scenario retry rules.
 
 The Workbench bridge client uses the public `tools.dscode.control.bridge.*` DTOs from the normal Pickleball artifact. Do not create a second controller-side model of Pickleball execution semantics.
 
@@ -38,6 +38,26 @@ PKB_CONTROL_BRIDGE_PAUSE_FIRST_SCENARIO
 During the Studio-to-Workbench migration, Pickleball may accept the old `PKB_STUDIO_BRIDGE_*` names as input aliases. New Workbench code must emit only the neutral `PKB_CONTROL_BRIDGE_*` names.
 
 Project-local `.pickleball/workbench/` content is disposable state and must not be treated as source.
+
+## Swing UI
+
+Phase 6B adds the thin Swing adapter under:
+
+```text
+tools.dscode.workbench.ui
+```
+
+Launch it with:
+
+```text
+java -jar pickleball-workbench-<version>.jar ui <project>
+```
+
+The UI must remain execution-oriented and use `WorkbenchServices` / `WorkbenchController`. Do not recreate the old Studio project IDE, file editor, generic process manager, generic Maven/Gradle UI, Gradle Tooling API browser, source navigator, or collaboration subsystem.
+
+Phase 6B-1 owns only the UI shell plus selected project, synchronization/status, worker start/restart/stop/status, and clean close. Blocking synchronization, process, bridge, screenshot, and service-call actions must not run on the Swing Event Dispatch Thread. Prefer headless-safe tests around presentation/controller delegation rather than tests requiring a visible desktop.
+
+Later Phase 6B increments may add live Gherkin, Mapping, Step Override authoring, events/evidence, browser/service evidence, and basic breakpoints, but those controls must continue to delegate to the shared Workbench service seam.
 
 ## MCP stdio
 

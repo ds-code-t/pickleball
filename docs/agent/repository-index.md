@@ -453,6 +453,9 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/sync/WorkbenchManifest.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/sync/WorkbenchProject.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/sync/WorkbenchSynchronizer.java`
+- `pickleball-workbench/src/main/java/tools/dscode/workbench/ui/WorkbenchFrame.java`
+- `pickleball-workbench/src/main/java/tools/dscode/workbench/ui/WorkbenchUi.java`
+- `pickleball-workbench/src/main/java/tools/dscode/workbench/ui/WorkbenchUiController.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/WorkbenchApplication.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/WorkbenchController.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/WorkbenchServices.java`
@@ -463,6 +466,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/mcp/WorkbenchMcpServerTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/sync/WorkbenchGradleSynchronizerIntegrationTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/sync/WorkbenchSynchronizerTest.java`
+- `pickleball-workbench/src/test/java/tools/dscode/workbench/ui/WorkbenchUiControllerTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/WorkbenchApplicationTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/worker/WorkbenchLiveSessionTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/worker/WorkbenchWorkerManagerTest.java`

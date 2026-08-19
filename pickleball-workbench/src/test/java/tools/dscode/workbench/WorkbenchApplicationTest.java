@@ -12,7 +12,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class WorkbenchApplicationTest {
 
     @Test
-    void helpListsSynchronizationWorkerLiveAndMcpCommands() {
+    void helpListsSynchronizationWorkerLiveMcpAndUiCommands() {
         Output output = run("--help");
 
         assertEquals(0, output.exitCode());
@@ -20,6 +20,7 @@ class WorkbenchApplicationTest {
         assertTrue(output.stdout().contains("worker-check <project>"));
         assertTrue(output.stdout().contains("live-check <project>"));
         assertTrue(output.stdout().contains("mcp <project>"));
+        assertTrue(output.stdout().contains("ui <project>"));
         assertEquals("", output.stderr());
     }
 
@@ -47,6 +48,15 @@ class WorkbenchApplicationTest {
 
         assertEquals(1, output.exitCode());
         assertTrue(output.stderr().contains("Usage: pickleball-workbench live-check <project>"));
+    }
+
+    @Test
+    void uiRequiresExactlyOneProjectBeforeLaunchingSwing() {
+        Output output = run("ui");
+
+        assertEquals(1, output.exitCode());
+        assertEquals("", output.stdout());
+        assertTrue(output.stderr().contains("Usage: pickleball-workbench ui <project>"));
     }
 
     @Test

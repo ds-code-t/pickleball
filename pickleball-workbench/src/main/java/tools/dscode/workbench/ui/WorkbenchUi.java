@@ -1,0 +1,39 @@
+package tools.dscode.workbench.ui;
+
+import tools.dscode.workbench.WorkbenchController;
+
+import javax.swing.*;
+import java.lang.reflect.InvocationTargetException;
+import java.nio.file.Path;
+
+/** Launches the thin Swing Workbench adapter for one consumer project. */
+public final class WorkbenchUi {
+    private WorkbenchUi() {
+    }
+
+    public static void launch(Path projectRoot) {
+        Runnable launch = () -> {
+            WorkbenchUiController controller = new WorkbenchUiController(
+                    projectRoot,
+                    new WorkbenchController(projectRoot)
+            );
+            new WorkbenchFrame(controller).setVisible(true);
+        };
+
+        if (SwingUtilities.isEventDispatchThread()) {
+            launch.run();
+            return;
+        }
+
+        try {
+            SwingUtilities.invokeAndWait(launch);
+        } catch (InterruptedException failure) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Workbench UI launch was interrupted.", failure);
+        } catch (InvocationTargetException failure) {
+            Throwable cause = failure.getCause();
+            if (cause instanceof RuntimeException runtime) throw runtime;
+            throw new IllegalStateException("Could not launch Workbench UI.", cause);
+        }
+    }
+}
