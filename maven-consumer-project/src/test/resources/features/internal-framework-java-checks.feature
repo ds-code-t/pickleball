@@ -4,6 +4,10 @@ Feature: Internal Pickleball Java checks
   Scenario: Run framework checks through the published Pickleball dependency
     * RUN INTERNAL PICKLEBALL JAVA TESTS
 
+  @all @regression @internal-java-checks @step-override
+  Scenario: Run Step Override checks
+    * RUN STEP OVERRIDE JAVA TESTS
+
   @all @regression @internal-java-checks @diagnostic-reporting
   Scenario: Run diagnostic reporting checks
     * RUN DIAGNOSTIC REPORTING JAVA TESTS

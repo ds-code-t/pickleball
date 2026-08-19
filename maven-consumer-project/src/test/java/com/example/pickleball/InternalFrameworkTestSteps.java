@@ -1,4 +1,3 @@
-
 package com.example.pickleball;
 
 import com.example.pickleball.support.InternalJavaTestRunner;
@@ -43,6 +42,11 @@ public final class InternalFrameworkTestSteps {
                 DynamicControlApiChecks.class,
                 ControlRuntimeObserverChecks.class
         );
+    }
+
+    @Given("^RUN STEP OVERRIDE JAVA TESTS$")
+    public static void runStepOverrideJavaTests() {
+        runAndAssert(StepOverrideChecks.class);
     }
 
     @Given("^RUN DIAGNOSTIC REPORTING JAVA TESTS$")

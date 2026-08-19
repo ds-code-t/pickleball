@@ -6,6 +6,7 @@ import io.cucumber.core.gherkin.Step;
 import io.cucumber.core.gherkin.StepType;
 import io.cucumber.core.stepexpression.Argument;
 import io.cucumber.plugin.event.Location;
+import tools.dscode.control.override.StepOverrideRegistry;
 
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
@@ -13,6 +14,7 @@ import java.lang.reflect.Proxy;
 import java.net.URI;
 import java.util.Collections;
 import java.util.Optional;
+
 
 public final class PickleStepDefinitionMatches {
 
@@ -40,6 +42,84 @@ public final class PickleStepDefinitionMatches {
             );
         } catch (Exception e) {
             throw new RuntimeException("Failed to construct PickleStepDefinitionMatch for method: " + method, e);
+        }
+    }
+
+    public static PickleStepDefinitionMatch fromStepOverride(
+            URI uri,
+            Step step,
+            StepOverrideRegistry.Match match
+    ) {
+        return new PickleStepDefinitionMatch(
+                Collections.<Argument>emptyList(),
+                new StepOverrideStepDefinition(step, match),
+                uri,
+                step
+        );
+    }
+
+    private static final class StepOverrideStepDefinition implements StepDefinition {
+        /**
+         * Retains the nested field shape consumed by Pickleball's woven
+         * PickleStepTestStep method discovery:
+         * definitionMatch.stepDefinition.stepDefinition.method
+         */
+        @SuppressWarnings("unused")
+        private final OverrideMethodReference stepDefinition;
+        private final StepOverrideRegistry.Match match;
+
+        private StepOverrideStepDefinition(Step step, StepOverrideRegistry.Match match) {
+            this.match = match;
+            this.stepDefinition = new OverrideMethodReference(dispatcherMethod());
+        }
+
+        @Override
+        public void execute(Object[] args) {
+            try {
+                StepOverrideDispatcher.execute();
+            } catch (Exception failure) {
+                throw new RuntimeException(
+                        "Step Override '" + match.rule().id() + "' failed",
+                        failure
+                );
+            }
+        }
+
+        @Override
+        public java.util.List<ParameterInfo> parameterInfos() {
+            return Collections.emptyList();
+        }
+
+        @Override
+        public String getPattern() {
+            return match.rule().pattern();
+        }
+
+        @Override
+        public boolean isDefinedAt(StackTraceElement stackTraceElement) {
+            return false;
+        }
+
+        @Override
+        public String getLocation() {
+            return "Pickleball Step Override[" + match.rule().id() + "]";
+        }
+
+        private static Method dispatcherMethod() {
+            try {
+                return StepOverrideDispatcher.class.getMethod("execute");
+            } catch (NoSuchMethodException failure) {
+                throw new IllegalStateException("Step Override dispatcher method is unavailable.", failure);
+            }
+        }
+    }
+
+    private static final class OverrideMethodReference {
+        @SuppressWarnings("unused")
+        private final Method method;
+
+        private OverrideMethodReference(Method method) {
+            this.method = method;
         }
     }
 
@@ -128,8 +208,5 @@ public final class PickleStepDefinitionMatches {
         public io.cucumber.core.gherkin.Argument getArgument() {
             return null;
         }
-
     }
-
-
 }

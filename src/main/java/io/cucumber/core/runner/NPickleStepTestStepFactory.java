@@ -13,6 +13,7 @@ import io.cucumber.messages.types.PickleStep;
 import io.cucumber.messages.types.PickleStepArgument;
 import tools.dscode.common.exceptions.StepCreationException;
 import tools.dscode.common.mappings.ParsingMap;
+import tools.dscode.control.override.StepOverrideRegistry;
 
 import java.lang.reflect.Method;
 import java.lang.reflect.Type;
@@ -35,6 +36,7 @@ import static io.cucumber.core.runner.GlobalState.getGherkinDialect;
 import static io.cucumber.core.runner.GlobalState.getGlobalCachingGlue;
 import static io.cucumber.core.runner.GlobalState.getGlobalRunner;
 import static io.cucumber.core.runner.PickleStepDefinitionMatches.fromStaticZeroArgMethod;
+import static io.cucumber.core.runner.PickleStepDefinitionMatches.fromStepOverride;
 import static io.cucumber.core.runner.modularexecutions.FilePathResolver.toAbsoluteFileUri;
 import static tools.dscode.common.GlobalConstants.NON_GLUE_STEP_PREFIX;
 import static tools.dscode.common.GlobalConstants.ROOT_STEP;
@@ -66,7 +68,6 @@ public class NPickleStepTestStepFactory {
         }
     }
 
-
     public static io.cucumber.core.runner.PickleStepTestStep resolvePickleStepTestStep(PickleStepTestStep pickleStepTestStep, ParsingMap parsingMap) {
         Step gherkinMessagesStep = pickleStepTestStep.getStep();
         String resolvedStepString = pickleStepTestStep.isNoStepTextResolution() ? pickleStepTestStep.getStepText() : parsingMap.resolveWholeText(pickleStepTestStep.getStepText());
@@ -92,7 +93,6 @@ public class NPickleStepTestStepFactory {
         return getPickleStepTestStepFromStrings(pickleStepTestStep, gherkinMessagesStep.getKeyword(), resolvedStepString, resolvedArgString);
     }
 
-
     public static io.cucumber.core.runner.PickleStepTestStep getPickleStepTestStepFromStrings(String keyword, String stepText, String argument) {
         Pickle pickle = createGherkinMessagesPickle(keyword, stepText, argument);
         Step onlyStep = pickle.getSteps().getFirst();
@@ -113,7 +113,6 @@ public class NPickleStepTestStepFactory {
 
         return createPickleStepTestStep(modelPickle.getUri(), copiedStep, pickleStepDefinitionMatch);
     }
-
 
     public static io.cucumber.core.runner.PickleStepTestStep getPickleStepTestStepFromStrings(PickleStepTestStep modelStep, String keyword, String stepText, String argument) {
         Pickle pickle = createGherkinMessagesPickle(keyword, stepText, argument);
@@ -145,14 +144,16 @@ public class NPickleStepTestStepFactory {
                 return fromStaticZeroArgMethod(scenarioStepMethod);
         }
 
+        Optional<StepOverrideRegistry.Match> stepOverride = StepOverrideRegistry.match(step.getText());
+        if (stepOverride.isPresent()) {
+            return fromStepOverride(uri, step, stepOverride.get());
+        }
+
         final CachingGlue globalGlue = getCurrentScenarioState().cachingGlue == null ? getGlobalCachingGlue() : getCurrentScenarioState().cachingGlue;
 
         synchronized (globalGlue) {
             PickleStepDefinitionMatch pickleStepDefinitionMatch = globalGlue.stepDefinitionMatch(uri, step);
             return pickleStepDefinitionMatch;
         }
-
     }
-
-
 }
