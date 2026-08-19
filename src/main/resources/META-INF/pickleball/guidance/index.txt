@@ -56,6 +56,7 @@ maven-consumer-project/src/test/resources/data/data-element-native-fixtures.feat
 maven-consumer-project/src/test/resources/data/data-reference-records.feature
 maven-consumer-project/src/test/resources/data/escaped-data-records.feature
 maven-consumer-project/src/test/resources/data/files/customerPayload.json
+maven-consumer-project/src/test/resources/features/browser-action-contracts.feature
 maven-consumer-project/src/test/resources/features/catalog-context.feature
 maven-consumer-project/src/test/resources/features/component-scenarios.feature
 maven-consumer-project/src/test/resources/features/configuration-system-properties.feature
@@ -97,4 +98,6 @@ maven-consumer-project/src/test/resources/site/dialogs.html
 maven-consumer-project/src/test/resources/site/forms.html
 maven-consumer-project/src/test/resources/site/index.html
 maven-consumer-project/src/test/resources/site/keyboard.html
+maven-consumer-project/src/test/resources/site/window-actions.html
+maven-consumer-project/src/test/resources/site/window-child.html
 maven-consumer-project/src/test/resources/site/workflow.html

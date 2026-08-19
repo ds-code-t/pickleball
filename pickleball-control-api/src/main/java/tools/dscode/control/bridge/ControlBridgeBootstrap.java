@@ -1,14 +1,19 @@
-
 package tools.dscode.control.bridge;
 
 import java.nio.file.Path;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
 public final class ControlBridgeBootstrap {
-    public static final String ENV_SESSION_DIR = "PKB_STUDIO_BRIDGE_SESSION_DIR";
-    public static final String ENV_SESSION_ID = "PKB_STUDIO_BRIDGE_SESSION_ID";
-    public static final String ENV_TOKEN = "PKB_STUDIO_BRIDGE_TOKEN";
-    public static final String ENV_PAUSE_FIRST_SCENARIO = "PKB_STUDIO_BRIDGE_PAUSE_FIRST_SCENARIO";
+    public static final String ENV_SESSION_DIR = "PKB_CONTROL_BRIDGE_SESSION_DIR";
+    public static final String ENV_SESSION_ID = "PKB_CONTROL_BRIDGE_SESSION_ID";
+    public static final String ENV_TOKEN = "PKB_CONTROL_BRIDGE_TOKEN";
+    public static final String ENV_PAUSE_FIRST_SCENARIO = "PKB_CONTROL_BRIDGE_PAUSE_FIRST_SCENARIO";
+
+    private static final String LEGACY_ENV_SESSION_DIR = "PKB_STUDIO_BRIDGE_SESSION_DIR";
+    private static final String LEGACY_ENV_SESSION_ID = "PKB_STUDIO_BRIDGE_SESSION_ID";
+    private static final String LEGACY_ENV_TOKEN = "PKB_STUDIO_BRIDGE_TOKEN";
+    private static final String LEGACY_ENV_PAUSE_FIRST_SCENARIO = "PKB_STUDIO_BRIDGE_PAUSE_FIRST_SCENARIO";
 
     private static final AtomicReference<ControlBridgeRuntime> ACTIVE = new AtomicReference<>();
 
@@ -16,15 +21,25 @@ public final class ControlBridgeBootstrap {
     }
 
     public static ControlBridgeDescriptor startFromEnvironment() {
-        String sessionDirectory = System.getenv(ENV_SESSION_DIR);
+        Map<String, String> environment = System.getenv();
+        String sessionDirectory = environmentValue(
+                environment, ENV_SESSION_DIR, LEGACY_ENV_SESSION_DIR
+        );
         if (sessionDirectory == null || sessionDirectory.isBlank()) {
             return null;
         }
 
-        String sessionId = requireEnvironment(ENV_SESSION_ID);
-        String token = requireEnvironment(ENV_TOKEN);
+        String sessionId = requireEnvironment(
+                environment, ENV_SESSION_ID, LEGACY_ENV_SESSION_ID
+        );
+        String token = requireEnvironment(
+                environment, ENV_TOKEN, LEGACY_ENV_TOKEN
+        );
+        String pauseValue = environmentValue(
+                environment, ENV_PAUSE_FIRST_SCENARIO, LEGACY_ENV_PAUSE_FIRST_SCENARIO
+        );
         boolean pauseFirstScenario = Boolean.parseBoolean(
-                System.getenv().getOrDefault(ENV_PAUSE_FIRST_SCENARIO, "false")
+                pauseValue == null ? "false" : pauseValue
         );
 
         return start(Path.of(sessionDirectory), sessionId, token, pauseFirstScenario);
@@ -72,13 +87,29 @@ public final class ControlBridgeBootstrap {
         return runtime == null ? null : runtime.descriptor();
     }
 
-    private static String requireEnvironment(String name) {
-        String value = System.getenv(name);
+    private static String requireEnvironment(
+            Map<String, String> environment,
+            String name,
+            String legacyName
+    ) {
+        String value = environmentValue(environment, name, legacyName);
         if (value == null || value.isBlank()) {
             throw new IllegalArgumentException(
-                    "Missing required Pickleball Studio bridge environment variable: " + name
+                    "Missing required Pickleball control bridge environment variable: " + name
             );
         }
         return value;
+    }
+
+    private static String environmentValue(
+            Map<String, String> environment,
+            String name,
+            String legacyName
+    ) {
+        String value = environment.get(name);
+        if (value != null && !value.isBlank()) {
+            return value;
+        }
+        return environment.get(legacyName);
     }
 }

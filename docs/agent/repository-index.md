@@ -427,6 +427,16 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-control-api/src/main/java/tools/dscode/control/bridge/ControlBridgeValue.java`
 - `pickleball-control-api/src/main/java/tools/dscode/control/bridge/ControlBridgeValueResult.java`
 
+## Pickleball Workbench module
+
+- `gradle/pickleball-published-variant.gradle`
+- `pickleball-workbench/AGENTS.md`
+- `pickleball-workbench/build.gradle`
+- `pickleball-workbench/src/main/java/tools/dscode/workbench/bridge/ControlBridgeClient.java`
+- `pickleball-workbench/src/main/java/tools/dscode/workbench/WorkbenchApplication.java`
+- `pickleball-workbench/src/test/java/tools/dscode/workbench/bridge/ControlBridgeClientTest.java`
+- `pickleball-workbench/src/test/java/tools/dscode/workbench/WorkbenchApplicationTest.java`
+
 ## Pickleball Studio module
 
 - `gradle/pickleball-studio.gradle`
@@ -580,6 +590,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 
 ## Maven consumer feature scenarios
 
+- `maven-consumer-project/src/test/resources/features/browser-action-contracts.feature`
 - `maven-consumer-project/src/test/resources/features/catalog-context.feature`
 - `maven-consumer-project/src/test/resources/features/component-scenarios.feature`
 - `maven-consumer-project/src/test/resources/features/configuration-system-properties.feature`
@@ -652,6 +663,8 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `maven-consumer-project/src/test/resources/site/forms.html`
 - `maven-consumer-project/src/test/resources/site/index.html`
 - `maven-consumer-project/src/test/resources/site/keyboard.html`
+- `maven-consumer-project/src/test/resources/site/window-actions.html`
+- `maven-consumer-project/src/test/resources/site/window-child.html`
 - `maven-consumer-project/src/test/resources/site/workflow.html`
 
 ## Agent contract and automation

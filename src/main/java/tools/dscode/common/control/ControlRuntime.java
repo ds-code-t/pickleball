@@ -1,4 +1,3 @@
-
 package tools.dscode.common.control;
 
 import java.lang.reflect.InvocationTargetException;
@@ -12,8 +11,9 @@ import java.util.function.Supplier;
  * A handler may block inside {@link ControlHookHandler#onHook(ControlEvent)} to pause execution.
  */
 public final class ControlRuntime {
-    private static final String STUDIO_BRIDGE_SESSION_DIR = "PKB_STUDIO_BRIDGE_SESSION_DIR";
-    private static final String STUDIO_BRIDGE_BOOTSTRAP =
+    private static final String CONTROL_BRIDGE_SESSION_DIR = "PKB_CONTROL_BRIDGE_SESSION_DIR";
+    private static final String LEGACY_STUDIO_BRIDGE_SESSION_DIR = "PKB_STUDIO_BRIDGE_SESSION_DIR";
+    private static final String CONTROL_BRIDGE_BOOTSTRAP =
             "tools.dscode.control.bridge.ControlBridgeBootstrap";
 
     private static final AtomicReference<ControlHookHandler> GLOBAL_HANDLER = new AtomicReference<>();
@@ -71,7 +71,7 @@ public final class ControlRuntime {
     }
 
     public static boolean hasHandler() {
-        ensureStudioBridge();
+        ensureControlBridge();
         return !isDispatching() && (currentHandler() != null || !OBSERVERS.isEmpty());
     }
 
@@ -89,7 +89,7 @@ public final class ControlRuntime {
             Object target,
             Object... arguments
     ) {
-        ensureStudioBridge();
+        ensureControlBridge();
         if (isDispatching()) {
             return ControlDecision.CONTINUE;
         }
@@ -112,7 +112,7 @@ public final class ControlRuntime {
             Object value,
             Object... arguments
     ) {
-        ensureStudioBridge();
+        ensureControlBridge();
         if (isDispatching()) {
             return value;
         }
@@ -218,13 +218,12 @@ public final class ControlRuntime {
         }
     }
 
-    private static void ensureStudioBridge() {
+    private static void ensureControlBridge() {
         if (BRIDGE_BOOTSTRAP_ATTEMPTED.get()) {
             return;
         }
 
-        String sessionDirectory = System.getenv(STUDIO_BRIDGE_SESSION_DIR);
-        if (sessionDirectory == null || sessionDirectory.isBlank()) {
+        if (!bridgeEnvironmentPresent()) {
             BRIDGE_BOOTSTRAP_ATTEMPTED.compareAndSet(false, true);
             return;
         }
@@ -234,7 +233,7 @@ public final class ControlRuntime {
         }
 
         try {
-            Class<?> bootstrap = Class.forName(STUDIO_BRIDGE_BOOTSTRAP);
+            Class<?> bootstrap = Class.forName(CONTROL_BRIDGE_BOOTSTRAP);
             bootstrap.getMethod("startFromEnvironment").invoke(null);
         } catch (InvocationTargetException failure) {
             reportBridgeBootstrapFailure(failure.getCause());
@@ -243,10 +242,19 @@ public final class ControlRuntime {
         }
     }
 
+    private static boolean bridgeEnvironmentPresent() {
+        String sessionDirectory = System.getenv(CONTROL_BRIDGE_SESSION_DIR);
+        if (sessionDirectory != null && !sessionDirectory.isBlank()) {
+            return true;
+        }
+        String legacySessionDirectory = System.getenv(LEGACY_STUDIO_BRIDGE_SESSION_DIR);
+        return legacySessionDirectory != null && !legacySessionDirectory.isBlank();
+    }
+
     private static void reportBridgeBootstrapFailure(Throwable failure) {
         String message = failure == null || failure.getMessage() == null
                 ? String.valueOf(failure)
                 : failure.getMessage();
-        System.err.println("Pickleball Studio control bridge could not start: " + message);
+        System.err.println("Pickleball control bridge could not start: " + message);
     }
 }

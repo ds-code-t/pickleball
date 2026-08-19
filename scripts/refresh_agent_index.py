@@ -53,6 +53,15 @@ GROUPS: tuple[tuple[str, tuple[str, ...]], ...] = (
         "pickleball-control-api/src/main/**/*",
         "pickleball-control-api/src/test/**/*",
     )),
+    ("Pickleball Workbench module", (
+        "gradle/pickleball-published-variant.gradle",
+        "pickleball-workbench/AGENTS.md",
+        "pickleball-workbench/build.gradle",
+        "pickleball-workbench/src/main/**/*",
+        "pickleball-workbench/src/test/**/*",
+    )),
+    # Retained only while the approved Workbench migration is in progress.
+    # Remove this group when the legacy Studio module is deleted.
     ("Pickleball Studio module", (
         "gradle/pickleball-studio.gradle",
         "pickleball-studio/AGENTS.md",
