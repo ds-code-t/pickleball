@@ -154,9 +154,16 @@ try {
 
         $MavenExe = Get-MavenExecutable -RequestedCommand $MavenCommand
         Write-Host "Using Maven command: $MavenExe"
-        & $MavenExe -f maven-consumer-project/pom.xml -U test `
-            -Dpkb_runvars.pkb_browser=CHROME_HEADLESS `
-            -Dpkb_runvars.pkb_tags=@all
+        $MavenArgs = @(
+            "-f",
+            "maven-consumer-project/pom.xml",
+            "-U",
+            "test",
+            "-Dpkb_runvars.pkb_browser=CHROME_HEADLESS",
+            "-Dpkb_runvars.pkb_tags=@all",
+            "-Dpkb_runvars.pkb_parallel=80"
+        )
+        & $MavenExe @MavenArgs
         if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
     }
 

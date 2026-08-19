@@ -1,0 +1,12 @@
+pickleball-studio/
+gradle/pickleball-studio.gradle
+src/main/java/tools/dscode/studio/launcher/
+src/test/java/tools/dscode/studio/launcher/
+docs/pickleball-studio.md
+docs/studio-runtime-bridge.md
+docs/studio-runtime-investigation.md
+docs/studio-collaboration.md
+src/main/resources/META-INF/pickleball/guidance/docs/pickleball-studio.md
+src/main/resources/META-INF/pickleball/guidance/docs/studio-runtime-bridge.md
+src/main/resources/META-INF/pickleball/guidance/docs/studio-runtime-investigation.md
+src/main/resources/META-INF/pickleball/guidance/docs/studio-collaboration.md

@@ -16,7 +16,7 @@ The normal `tools.dscode:pickleball` artifact must never depend on or embed Work
 
 Workbench must compile and run against the repository's published-equivalent shaded/woven Pickleball artifact through the dedicated root configuration. Do not replace that boundary with a naïve `implementation project(':')`, and do not add a dependency on the unpublished `pickleball-control-api` module.
 
-Workbench-only dependencies, including the MCP SDK, belong only on the Workbench classpath. Phase 6A uses the non-Spring MCP Java SDK core plus its Jackson 2 adapter; do not replace them with the convenience/Jackson 3 artifact or Spring transports without a new architecture decision. Do not move consumer-worker runtime semantics into the controller merely to simplify dependencies.
+Workbench-only dependencies, including the MCP SDK, belong only on the Workbench classpath. The MCP adapter uses the non-Spring MCP Java SDK core plus its Jackson 2 adapter; do not replace them with the convenience/Jackson 3 artifact or Spring transports without a new architecture decision. Do not move consumer-worker runtime semantics into the controller merely to simplify dependencies.
 
 ## Runtime ownership
 
@@ -35,13 +35,13 @@ PKB_CONTROL_BRIDGE_TOKEN
 PKB_CONTROL_BRIDGE_PAUSE_FIRST_SCENARIO
 ```
 
-During the Studio-to-Workbench migration, Pickleball may accept the old `PKB_STUDIO_BRIDGE_*` names as input aliases. New Workbench code must emit only the neutral `PKB_CONTROL_BRIDGE_*` names.
+Pickleball may accept the old `PKB_STUDIO_BRIDGE_*` names as deprecated compatibility input aliases. Workbench code must emit only the neutral `PKB_CONTROL_BRIDGE_*` names. The aliases must never require Studio code or dependencies.
 
 Project-local `.pickleball/workbench/` content is disposable state and must not be treated as source.
 
 ## Swing UI
 
-Phase 6B adds the thin Swing adapter under:
+The thin Swing adapter lives under:
 
 ```text
 tools.dscode.workbench.ui
@@ -53,19 +53,17 @@ Launch it with:
 java -jar pickleball-workbench-<version>.jar ui <project>
 ```
 
-The UI must remain execution-oriented and use `WorkbenchServices` / `WorkbenchController`. Do not recreate the old Studio project IDE, file editor, generic process manager, generic Maven/Gradle UI, Gradle Tooling API browser, source navigator, or collaboration subsystem.
+The UI must remain execution-oriented and use `WorkbenchServices` / `WorkbenchController`. Do not add a project IDE, file editor, generic process manager, generic Maven/Gradle UI, Gradle Tooling API browser, source navigator, or collaboration subsystem.
 
-Phase 6B-1 established the UI shell plus selected project, synchronization/status, worker start/restart/stop/status, and clean close. Phase 6B-2 added live raw Gherkin execution, result/status output, Mapping get/put/resolve, and incremental semantic-event refresh through `WorkbenchServices`. Phase 6B-3 completes the replacement UI surface with Step Override list/compile/remove/clear, richer semantic-event rendering, browser page and screenshot evidence, service-call evidence, and semantic breakpoint list/add/remove/clear.
+The UI covers project/synchronization status, worker lifecycle, live raw Gherkin, Mapping get/put/resolve, semantic events, Step Override list/compile/remove/clear, browser page/screenshot evidence, service-call evidence, and semantic breakpoint list/add/remove/clear.
 
 The Swing Mapping put control sends entered values as text; it does not create a second Mapping parser or state model. Step Override source is sent unchanged to worker-side compilation and must contain `{{CLASS_NAME}}`; the UI must never compile handlers in the controller JVM. Browser/service/screenshot controls only present bridge evidence already supplied by Pickleball. Breakpoint controls delegate the hook/filter/lease contract to the shared service and must not recreate coordinator semantics.
 
 Blocking synchronization, process, bridge, Mapping, event, screenshot, service-call, Step Override, and breakpoint actions must not run on the Swing Event Dispatch Thread. Live controls must target the controller-owned running/paused worker. Semantic-event cursors are worker-local and must reset when a fresh worker is started/restarted. Prefer headless-safe tests around presentation/controller delegation rather than tests requiring a visible desktop.
 
-Phase 7 must not begin until the complete Phase 6B UI surface has passed focused tests, the Workbench build, manual UI acceptance, persistent worker/live regression, applicable MCP regression, and documentation/context checks.
-
 ## MCP stdio
 
-Phase 6A provides:
+Workbench provides:
 
 ```text
 java -jar pickleball-workbench-<version>.jar mcp <project>
@@ -87,7 +85,7 @@ Workbench synchronization is build-tool-assisted, not a replacement build system
 
 The controller owns one interactive worker per selected project by default. Workers launch directly with Java from the existing Workbench snapshot, use the Pickleball-side `WorkbenchWorkerMain` bootstrap, and set `pickleball.workbench.testOutputRoot` so `DynamicSuiteBootstrap` intentionally scans the merged live root instead of relying on Maven/Gradle output suffixes.
 
-Interactive workers use a session-private anchor feature and the neutral `PKB_CONTROL_BRIDGE_*` environment contract. The anchor body must be a guaranteed no-op core step. The bridge's historical pause-first behavior stops first at `SCENARIO_START`, which occurs before `CurrentScenarioState.startScenarioRun()` finishes Pickleball scenario initialization; Workbench treats that pause only as a bootstrap rendezvous. Before returning an interactive worker, the controller installs a one-shot `BEFORE_STEP` breakpoint filtered to the anchor marker step `---pickleball-workbench-anchor`, resumes the bootstrap pause, and lets the root scenario step initialize normal logging/runtime state. It returns only after the marker itself is paused immediately before execution. Live controller operations must run only after that promotion. Pause leases remain finite; the controller renews the owned anchor lease while active. Graceful stop cancels renewal, resumes the anchor so normal lifecycle hooks can finish, waits a bounded period, then terminates and only force-kills as a final fallback. Restart must reuse the existing manifest/classpath, require the previous worker to have stopped cleanly, and must not run Maven/Gradle.
+Interactive workers use a session-private anchor feature and the neutral `PKB_CONTROL_BRIDGE_*` environment contract. The anchor body must be a guaranteed no-op core step. The bridge's pause-first behavior stops first at `SCENARIO_START`, which occurs before `CurrentScenarioState.startScenarioRun()` finishes Pickleball scenario initialization; Workbench treats that pause only as a bootstrap rendezvous. Before returning an interactive worker, the controller installs a one-shot `BEFORE_STEP` breakpoint filtered to the anchor marker step `---pickleball-workbench-anchor`, resumes the bootstrap pause, and lets the root scenario step initialize normal logging/runtime state. It returns only after the marker itself is paused immediately before execution. Live controller operations must run only after that promotion. Pause leases remain finite; the controller renews the owned anchor lease while active. Graceful stop cancels renewal, resumes the anchor so normal lifecycle hooks can finish, waits a bounded period, then terminates and only force-kills as a final fallback. Restart must reuse the existing manifest/classpath, require the previous worker to have stopped cleanly, and must not run Maven/Gradle.
 
 Worker JVM system-property overrides are explicit controller inputs. The default worker constructor supplies none and therefore preserves consumer configuration. Acceptance tooling may provide a narrow override, such as `pkb_browser=CHROME_HEADLESS`, without changing the synchronized snapshot.
 
@@ -97,7 +95,7 @@ Worker JVM system-property overrides are explicit controller inputs. The default
 
 Each live operation resolves the currently owned paused scenario, performs the bridge call for that scenario, and verifies afterward that the same process id, bridge runtime id, and scenario id remain active and paused. Normal live operations must not invoke Maven/Gradle, resynchronize the project, or restart the worker.
 
-Phase 5 adds first-class Step Override authoring to the same facade. `compileStepOverride(id, regex, source)` sends a REPLACE-mode REGEX rule to the consumer worker; the Java source must contain `{{CLASS_NAME}}`, and the worker owns class naming, compilation, classloading, registry lifetime, matching, capture extraction, and handler execution. `stepOverrides()`, `removeStepOverride(id)`, and `clearStepOverrides()` operate only on the currently owned scenario. Workbench must not compile handlers in the controller JVM.
+`compileStepOverride(id, regex, source)` sends a REPLACE-mode REGEX rule to the consumer worker; the Java source must contain `{{CLASS_NAME}}`, and the worker owns class naming, compilation, classloading, registry lifetime, matching, capture extraction, and handler execution. `stepOverrides()`, `removeStepOverride(id)`, and `clearStepOverrides()` operate only on the currently owned scenario. Workbench must not compile handlers in the controller JVM.
 
 With an active override, raw Gherkin may be override-only and need not match ordinary consumer glue. If no override matches, normal Cucumber glue matching remains authoritative. Removing or clearing an override restores that fallback immediately without rebuilding or restarting the worker.
 

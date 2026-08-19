@@ -1,14 +1,12 @@
 rootProject.name = 'pickleball'
 
 include 'pickleball-control-api'
-include 'pickleball-studio'
 include 'pickleball-workbench'
 
 gradle.beforeProject { project ->
     if (project.path == ':') {
         project.apply from: new File(settingsDir, 'gradle/pickleball-build-provenance.gradle')
         project.apply from: new File(settingsDir, 'gradle/consumer-guidance.gradle')
-        project.apply from: new File(settingsDir, 'gradle/pickleball-studio.gradle')
         project.apply from: new File(settingsDir, 'gradle/pickleball-published-variant.gradle')
     }
 }

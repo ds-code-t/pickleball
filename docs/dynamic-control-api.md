@@ -1,245 +1,89 @@
 # Dynamic Control API
 
-Pickleball exposes a small core interception contract plus a separately organized `pickleball-control-api` source module for dynamic tooling. The control API classes are bundled into the main `tools.dscode:pickleball` artifact; consumers do not add a second Maven dependency. The source module is intentionally independent of MCP, Spring AI, GUIs, and process orchestration so those layers can be added without coupling them to Pickleball core.
+Pickleball exposes a small core interception contract plus a separately organized `pickleball-control-api` source module for dynamic tooling. The control API classes are bundled into the main `tools.dscode:pickleball` artifact; consumers do not add a second Maven dependency. The source module is intentionally independent of MCP, Spring AI, GUIs, and process orchestration.
 
-## Artifact
+## Artifact and compatibility
 
-All consumers, including tooling that uses dynamic control, depend only on Pickleball:
+All consumers, including tooling that uses dynamic control, depend only on Pickleball. `pickleball-control-api` is an internal Gradle source module rather than a separately published Maven artifact.
 
-```xml
-<dependency>
-  <groupId>tools.dscode</groupId>
-  <artifactId>pickleball</artifactId>
-  <version>2.1.6</version>
-  <scope>test</scope>
-</dependency>
+Installing Pickleball with no control handler and never invoking the bundled control API preserves normal execution behavior. Dynamic execution, Mapping interception, bridge startup, browser/service evidence, breakpoints, and Step Overrides are opt-in.
+
+## Dynamic execution and Mapping
+
+`DynamicControl` executes Cucumber/Pickleball steps against the currently active Pickleball test context. Detached failures are returned as structured `FAILED` results instead of automatically failing the paused scenario, allowing controller tooling to inspect a failed hypothesis and try another action.
+
+`MappingControl` provides retry-friendly access to the live `ParsingMap` / `NodeMap` structures, caller-defined Mapping contexts, scoped overrides, snapshots, and resolution explanation. Live mutations are deliberate and are not automatically rolled back.
+
+The control API returns `SUCCESS`, `FAILED`, or `UNAVAILABLE` for exploratory operations. Calls without a required live Pickleball context return `UNAVAILABLE`.
+
+## Semantic hooks
+
+`ControlRuntime` exposes synchronous semantic hooks across scenario, step, phrase, Mapping, DOM, browser, driver, and service-call boundaries. Handlers may observe, pause by blocking, or use supported skip/value interception semantics. With no handler installed, original Pickleball behavior is retained.
+
+The bridge coordinator is an additive observer and does not replace the application's normal control handler.
+
+## Consumer-side Control Bridge
+
+Pickleball bundles a loopback-only Control Bridge server/coordinator used by Workbench to operate against a live consumer scenario. The bridge is not enabled during normal consumer execution unless its session environment is present.
+
+Canonical environment variables are:
+
+```text
+PKB_CONTROL_BRIDGE_SESSION_DIR
+PKB_CONTROL_BRIDGE_SESSION_ID
+PKB_CONTROL_BRIDGE_TOKEN
+PKB_CONTROL_BRIDGE_PAUSE_FIRST_SCENARIO
 ```
 
-`pickleball-control-api` remains a separate Gradle source module inside the Pickleball repository for organization and architectural separation. It is not published as a separate Maven artifact. Its `tools.dscode.control.api` classes are bundled into the main shaded Pickleball JAR and its Java sources are included in the main Pickleball sources JAR.
+For backward compatibility, Pickleball may accept the former `PKB_STUDIO_BRIDGE_*` names as deprecated input aliases. They are not canonical configuration and do not require the removed Studio application.
 
-## Compatibility rule
+Each participating consumer JVM binds to `127.0.0.1` on an operating-system-assigned port and writes a runtime descriptor into the session directory. Requests require the session bearer token and responses are marked `Cache-Control: no-store`.
 
-Installing Pickleball with no control handler and never calling the bundled control API preserves normal execution behavior. Normal scenario traversal continues to create, inherit, resolve, and mutate its `ParsingMap`/`NodeMap` state exactly as before. Mapping interception advice immediately proceeds with the original key/value/result when no handler is installed.
+The bridge keeps live operations on the real scenario thread through `ControlBridgeCoordinator`. This preserves access to thread-local Cucumber/Pickleball state, glue, browser, services, mappings, and other scenario resources.
 
-Dynamic mapping contexts, scoped map replacement, mapping snapshots, and value interception are opt-in control operations. They are never activated merely because the bundled control API classes are present on the classpath.
+Bridge capabilities include:
 
-## Dynamic execution
+- runtime/status and active-scenario discovery;
+- bounded semantic events;
+- finite-lease pause/resume;
+- retry-friendly detached step execution;
+- Mapping get/put/resolve/snapshot/restore;
+- browser page/screenshot evidence;
+- Pickleball-native element inspection;
+- existing Pickleball service-call execution/evidence;
+- semantic breakpoint management;
+- scenario-scoped Step Override management.
 
-`DynamicControl` creates and executes Cucumber/Pickleball steps against the currently active Pickleball test context. Detached calls reuse the active TestCase, glue, browser/service state, and other live scenario resources, but the exploratory step is not inserted into the scenario's parent/child/sibling traversal.
+Workbench owns the controller-side bridge client. MCP and Swing access these capabilities through `WorkbenchServices` / `WorkbenchController`; they do not connect to the bridge independently or implement a second runtime.
 
-```java
-ControlCallResult<Object> result = DynamicControl.executeStep(
-        ", verify \"ready\" equals \"ready\""
-);
-```
+## Scenario targeting and finite pauses
 
-A call failure is returned as `ControlCallResult` with status `FAILED` rather than being propagated through `CurrentScenarioState.runningStep`. This lets a controller try another action without automatically failing or terminating the paused scenario. Effects that occurred before failure are not rolled back. Detached failures also suppress the runner's raw `Throwable.printStackTrace()` output; the structured `ControlError` still retains the failure type, message, and stack trace, and normal scenario execution keeps its existing console behavior. This suppression is limited to the raw stack-trace dump; ordinary Pickleball log entries emitted by the attempted step before it fails remain available.
+A consumer runtime may observe more than one scenario thread. Controller calls may target a scenario id discovered from the bridge. A wrong or stale id returns `UNAVAILABLE`; the bridge does not guess.
 
-`createSteps` and `executeSteps` deliberately continue after individual failures and return one result per request. `executePickle` runs the compiled steps from a parsed Cucumber `Pickle`, while `executeTree` walks a temporary `StepExtension` tree in pre-order without entering normal scenario traversal.
+Pauses and breakpoint pauses use finite leases. Expiry resumes execution automatically. Workbench renews the pause it owns while its persistent interactive worker remains active and resumes before clean shutdown.
 
-Dynamic execution currently requires an active Pickleball test context. Calls made without one return `UNAVAILABLE` rather than synthesizing a Cucumber runtime.
+## Semantic event evidence
 
-## Caller-defined mapping contexts
+The bridge retains bounded immutable semantic hook metadata rather than arbitrary consumer object graphs. Event reads are read-only and do not require the scenario-thread command queue, so reading evidence cannot consume a hook or block a paused scenario.
 
-Detached execution can optionally use an exact caller-defined set of mapping sources instead of inheriting the live scenario `ParsingMap`.
+## Browser and service investigation
 
-```java
-NodeMap values = MappingControl.nodeMap(
-        MapConfigurations.MapType.OVERRIDE_MAP,
-        Map.of("status", "READY")
-);
+`ElementControl.inspect(...)` resolves through the active Pickleball `ExecutionDictionary`. It uses Pickleball element vocabulary rather than introducing raw CSS/XPath as a controller language. Inspection requires an existing scenario-owned browser and returns `UNAVAILABLE` rather than creating one.
 
-MappingContext context = MappingControl.single(values);
+`ServiceCallControl.execute(selector)` runs the same reusable service-call component selected by normal `CALL:` semantics. Existing Pickleball discovery, Mapping, request/configuration processing, REST/SOAP execution, response mapping, and failure behavior remain authoritative.
 
-ControlCallResult<Object> result = DynamicControl.executeStep(
-        ", verify \"<status>\" equals \"READY\"",
-        context
-);
-```
+## Semantic breakpoints
 
-`MappingControl.single(nodeMap)` supplies exactly one external `NodeMap` resolution source. Pickleball may still create temporary execution-local phrase state required to execute the dynamic step, but it does not pull the live scenario's STEP, PASSED, EXAMPLE, RUN, SINGLETON, DEFAULT, or other maps into that detached call.
+Semantic breakpoints are temporary filters over existing `ControlHook` boundaries. They may filter by scenario, hook, hook signature, current step text, and current phrase text. They use the same finite pause lane as ordinary control pauses and disappear with the consumer runtime.
 
-Convenience contexts are provided for common experiments:
+They are semantic Pickleball interception points, not arbitrary Java source breakpoints.
 
-```java
-MappingContext isolated = MappingControl.overrideOnly(
-        Map.of("status", "READY")
-);
+## Step Overrides
 
-MappingContext minimalWithGlobals = MappingControl.overrideWithGlobals(
-        Map.of("status", "READY")
-);
+The consumer worker also owns scenario-scoped Step Overrides. Workbench can compile/register REGEX/REPLACE rules through the bridge; matching and execution occur before ordinary Cucumber glue fallback. When no override matches, normal Cucumber matching remains authoritative. Removing or clearing an override restores ordinary fallback without restarting the worker.
 
-MappingContext custom = MappingControl.custom(map1, map2, map3);
-```
+Worker-side compilation requires `javax.tools.JavaCompiler`. Workbench sends a Java source template containing `{{CLASS_NAME}}`; the worker owns generated naming, compilation, classloading, matching, captures, replacement, and cleanup.
 
-`overrideWithGlobals` contains only a fresh OVERRIDE map followed by a detached snapshot of the current GLOBAL node. The snapshot prevents exploratory writes from modifying the shared live globals. `custom` preserves caller-specified map-type resolution order; multiple maps of the same type preserve their insertion order within that type.
+## Architecture boundary
 
-The same `MappingContext` can be supplied to `executeStep`, `executeSteps`, `executePickle`, or `executeTree`. Its `NodeMap` instances are reused across those calls, so deliberate writes to those isolated maps can persist across an investigation without leaking into the live scenario.
-
-A `MappingContext` controls the `NodeMap` sources used for ordinary mapping lookup. Existing explicit Pickleball resolver behavior such as `file:`, `data:`, and `pkb_*` remains available because those forms are handled outside ordinary `NodeMap` traversal. When a controller needs a fully emulated result for one of those forms, it can redirect the lookup input or replace the resolution result through the mapping interception hooks.
-
-## Direct Mapping control
-
-`MappingControl` exposes retry-friendly access to the mapping structures already used by Pickleball:
-
-```java
-MappingControl.current();
-MappingControl.currentNodeMap("OVERRIDE");
-MappingControl.currentNodeMap("RUN");
-MappingControl.currentNodeMap("STEP");
-MappingControl.currentNodeMap("PARENT.STEP");
-MappingControl.currentNodeMap("SCENARIO");
-
-MappingControl.get("OVERRIDE", "customer.status");
-MappingControl.put("OVERRIDE", "customer.status", "ACTIVE");
-```
-
-These methods return `ControlCallResult` rather than propagating ordinary exploratory errors.
-`currentNodeMapCopy(reference)` and `copy(nodeMap)` create detached materialized copies when a controller wants to seed an isolated context from live RUN/STEP/SCENARIO state without sharing the original mutable `NodeMap` reference.
-
-The existing OVERRIDE map is especially useful for low-cost hypothesis testing because it is normally first in Pickleball's resolution order. `overrideScope` temporarily mutates the live thread's existing OVERRIDE `NodeMap` and restores that same map object to its previous JSON state when closed:
-
-```java
-var scoped = MappingControl.overrideScope(Map.of(
-        "customer.status", "ACTIVE"
-));
-
-if (scoped.successful()) {
-    try (OverrideScope ignored = scoped.value()) {
-        // run exploratory calls against the temporary live override
-    }
-}
-```
-
-Restoring the existing object instead of replacing the ThreadLocal reference is important because active `ParsingMap` instances may already hold that `NodeMap` reference.
-
-## Temporarily swapping the running ParsingMap
-
-`MappingControl.useCurrent(context)` can temporarily replace the currently running `ParsingMap`'s map references. `MappingScope.close()` restores the exact previous live `NodeMap` objects and resolution order, including specialized maps such as live Data Element contexts.
-
-```java
-var scope = MappingControl.useCurrent(context);
-if (scope.successful()) {
-    try (MappingScope ignored = scope.value()) {
-        // direct calls in this block see the caller-defined map set
-    }
-}
-```
-
-`MappingControl.withCurrent(context, action)` provides the same behavior with automatic restoration around one action.
-
-This is distinct from snapshot restore: a live mapping scope preserves and reinstalls the original object references rather than materializing them into plain JSON maps.
-
-## Mapping snapshots
-
-`MappingControl.snapshot(...)` materializes the current resolution sources into a versioned JSON-friendly `MappingSnapshot`. Snapshots can be saved and loaded from files:
-
-```java
-MappingSnapshot snapshot = MappingControl.snapshotCurrent().value();
-MappingControl.saveSnapshot(snapshot, Path.of("mapping-state.json"));
-
-MappingSnapshot loaded = MappingControl.loadSnapshot(
-        Path.of("mapping-state.json")
-).value();
-
-MappingContext context = MappingControl.fromSnapshot(loaded).value();
-```
-
-A restored snapshot is intended for inspection and emulation. Ordinary JSON-backed `NodeMap` values round-trip naturally. Specialized live maps such as `DataContextNodeMap` are captured as their materialized state; a file cannot recreate their original live cursor/reference relationship. Use `MappingScope` when an exact live-object swap/restore is required.
-
-## Resolution explanation
-
-`MappingControl.explain(parsingMap, key)` walks ordinary resolution sources in their active order and reports which maps were inspected and which map supplied the first non-null value. This gives controller tooling a compact way to answer questions such as "why did this key resolve from STEP instead of RUN?" without dumping the entire map state.
-
-## Mapping interception hooks
-
-Core semantic hooks now include:
-
-- `BEFORE_MAPPING_RESOLVE` / `AFTER_MAPPING_RESOLVE`;
-- `BEFORE_MAPPING_LOOKUP` / `AFTER_MAPPING_LOOKUP`;
-- `BEFORE_MAPPING_WRITE` / `AFTER_MAPPING_WRITE`.
-
-As with the other hooks, `onHook` can observe or pause execution by blocking. Safe mapping boundaries also honor `ControlDecision.SKIP`: a skipped resolve returns the unresolved input, a skipped lookup behaves as a miss, and a skipped write does not mutate the target `NodeMap`.
-
-`ControlHookHandler` remains a functional interface. Existing lambdas only implement `onHook`. Controllers that need value replacement can additionally override `onValue(ControlValueEvent)`:
-
-```java
-ControlHookHandler handler = new ControlHookHandler() {
-    @Override
-    public ControlDecision onHook(ControlEvent event) {
-        return ControlDecision.CONTINUE;
-    }
-
-    @Override
-    public Object onValue(ControlValueEvent event) {
-        if (event.hook() == ControlHook.BEFORE_MAPPING_LOOKUP
-                && event.role().equals("key")
-                && event.value().equals("alias")) {
-            return "actualKey";
-        }
-        if (event.hook() == ControlHook.AFTER_MAPPING_RESOLVE
-                && event.role().equals("result")) {
-            return emulateValue(event.value());
-        }
-        return event.value();
-    }
-};
-```
-
-Mapping value roles are intentionally simple:
-
-- `input` — full text/value resolution input;
-- `key` — mapping lookup or write key;
-- `value` — value about to be written;
-- `result` — lookup or full resolution result.
-
-Handler exceptions are isolated by `ControlRuntime`; the original value is retained and the handler failure is available through `getLastHandlerFailure()`.
-Hook dispatch is also re-entrancy guarded: mapping reads/writes performed by the handler itself do not recursively invoke the handler again.
-
-## Other semantic control hooks
-
-The same core contract includes scenario start/end, before/after normal and detached steps, dynamic phrases, DOM synchronization, blur, page/entity readiness, framework fixed waits, WebElement access, browser interactions, WebDriver commands, service-call boundaries, and RemoteWebDriver construction.
-
-Handlers are synchronous. A handler can pause execution simply by blocking in `onHook` until its controller allows it to continue. `ControlDecision.SKIP` is honored at the safe Phase 1 boundaries documented above. Observational browser/service/driver hooks can pause and inspect but do not fabricate return values for arbitrary external operations.
-
-When no handler is installed, all interception paths immediately retain the original Pickleball behavior.
-
-## Detached running-step scope
-
-Detached dynamic phrases internally need `GlobalState.getRunningStep()` to point at the temporary step while the underlying Pickleball dynamic parser executes. `ControlExecutionScope` provides a thread-local override for that purpose. The override exists only for the duration of the detached call and is restored in `finally` cleanup.
-
-The active scenario's `currentPhrase` is also restored after an exploratory call, including after a failed phrase. Persistent browser, service, or deliberately live Mapping effects are not automatically rolled back.
-
-## Gherkin object utilities
-
-`GherkinControl` provides text-oriented convenience access to the same Cucumber Gherkin parser used by Pickleball:
-
-```java
-ControlCallResult<Feature> parsed = GherkinControl.parseFeature(featureText);
-List<Pickle> scenarios = GherkinControl.scenarios(parsed.value());
-List<Step> steps = GherkinControl.steps(scenarios.getFirst());
-String argument = GherkinControl.argumentText(steps.getFirst());
-```
-
-It returns native Cucumber feature/pickle/step objects rather than introducing a second Gherkin model.
-
-## Step construction and relationships
-
-`DynamicControl.createStep` resolves an arbitrary step against the active glue without executing it. `cloneStep` creates a detached single-step clone with replacement text. `addChild` / `addChildren` maintain direct parent, sibling, nesting, and ParsingMap relationships when composing temporary structures. `executeTree` executes those structures for effect in pre-order; it intentionally does not invoke `CurrentScenarioState.runStep`, so scenario traversal/failure bookkeeping remains isolated from exploratory calls.
-
-These helpers are preferred over mutating `parentStep`, `childSteps`, `previousSibling`, and `nextSibling` directly.
-
-## Error handling
-
-The control API distinguishes the result of an exploratory call from the scenario's own result:
-
-- `SUCCESS` — the control call completed.
-- `FAILED` — the attempted action threw or could not execute; `ControlError` contains type, message, and stack trace.
-- `UNAVAILABLE` — the required live Pickleball context does not exist.
-
-A failed exploratory call does not by itself update `CurrentScenarioState` hard/soft failure state. If a caller intentionally wants normal scenario failure semantics, it should execute through normal scenario traversal rather than the detached control API.
-
-## Scope of this phase
-
-This foundation intentionally does not include MCP, Spring AI, a controller process, workspace isolation, build orchestration, a GUI, Java-agent IPC, or general JVM hot replacement. Those components can consume this API and hook contract later without changing the normal core execution model.
+The control API and bridge intentionally remain independent of MCP, Spring, GUI frameworks, generic project IDE behavior, and build orchestration. Pickleball owns live execution semantics. Workbench is the external controller/adaptation layer.

@@ -2,7 +2,32 @@
 
 Pickleball Workbench is the separate executable companion for interactive Pickleball execution and investigation. It depends on the normal shaded/woven `tools.dscode:pickleball` artifact; normal Pickleball consumers do not depend on Workbench.
 
-The current migration surface includes project synchronization, a persistent consumer worker, live runtime control, Step Override authoring, lightweight MCP stdio, and the complete Phase 6B thin Swing execution UI. The old Studio remains temporarily present until Phase 7 removes it after this replacement surface is accepted.
+Workbench replaces the former Pickleball Studio application. The final surface is deliberately execution-oriented: project synchronization, a persistent consumer worker, live runtime control, Mapping, browser/service evidence, semantic breakpoints, Step Override authoring, lightweight non-Spring MCP stdio, and a thin Swing UI.
+
+## Architecture
+
+Dependency direction is strictly:
+
+```text
+pickleball-workbench -> pickleball
+```
+
+Pickleball owns scenario execution semantics, Cucumber integration, DynamicControl/Gherkin execution, Mapping, browser/service behavior, the consumer-side Control Bridge, semantic hooks/breakpoints, Step Overrides, and woven Cucumber/AspectJ behavior.
+
+Workbench owns synchronization, `.pickleball/workbench/` disposable state, worker lifecycle, the controller-side bridge client, `WorkbenchLiveSession`, `WorkbenchServices` / `WorkbenchController`, MCP stdio, and the thin Swing UI.
+
+MCP and Swing are adapters over the same Workbench service seam. They must not introduce a second runtime implementation.
+
+The canonical worker bridge environment is:
+
+```text
+PKB_CONTROL_BRIDGE_SESSION_DIR
+PKB_CONTROL_BRIDGE_SESSION_ID
+PKB_CONTROL_BRIDGE_TOKEN
+PKB_CONTROL_BRIDGE_PAUSE_FIRST_SCENARIO
+```
+
+Pickleball may accept `PKB_STUDIO_BRIDGE_*` as deprecated compatibility input aliases only. Workbench emits only the neutral names.
 
 ## Build and run
 
@@ -37,7 +62,7 @@ java -jar $workbenchJar ui ".\maven-consumer-project"
 
 The Swing UI is a presentation adapter over the same `WorkbenchServices` / `WorkbenchController` seam used by MCP. It does not own a second worker manager, bridge client, Mapping implementation, or Pickleball execution model.
 
-Phase 6B provides:
+The UI provides:
 
 - selected project display and synchronization/status refresh;
 - synchronize, start worker, restart fresh worker without rebuilding, and stop worker;
@@ -57,7 +82,7 @@ The Step Override editor sends its source template unchanged to the worker. The 
 
 Synchronization, worker actions, live bridge calls, Mapping operations, event refresh, Step Override actions, browser/screenshot evidence, service calls, and breakpoint actions run off the Swing Event Dispatch Thread. Live controls are enabled only while the Workbench-owned worker is running and paused.
 
-The UI is intentionally execution-oriented and is not a replacement IDE, file editor, generic process manager, generic Maven/Gradle task runner, source navigator, or collaboration system.
+The UI is intentionally not a project IDE, file editor, generic process manager, generic Maven/Gradle task runner, source navigator, or collaboration system.
 
 ## MCP stdio
 
@@ -67,7 +92,7 @@ Start the lightweight non-Spring MCP server for a synchronized consumer project:
 java -jar $workbenchJar mcp ".\maven-consumer-project"
 ```
 
-The server uses the official Java MCP SDK core and stdio transport with the Jackson 2 JSON adapter. MCP dependencies are Workbench-only and are shaded into the executable companion. Workbench deliberately does not use Spring Boot, Spring Framework, Spring AI, WebMVC, or Tomcat for this adapter. The executable remains alive for the stdio session and exits cleanly after the MCP client closes stdin.
+The server uses the official Java MCP SDK core and stdio transport with the Jackson 2 JSON adapter. MCP dependencies are Workbench-only and are shaded into the executable companion. Workbench deliberately does not use Spring Boot, Spring Framework, Spring AI, WebMVC, or Tomcat.
 
 ### Stdout contract
 
@@ -145,7 +170,7 @@ Controller/runtime failures are returned as MCP tool results with `isError=true`
 
 ## Scope boundary
 
-Workbench MCP and Swing intentionally do not expose a generic IDE or build system. They do not add generic file editing/search, arbitrary process management, generic Maven/Gradle task execution, Gradle Tooling API project browsing, source navigation, or the old Studio collaboration model.
+Workbench MCP and Swing intentionally do not expose a generic IDE or build system. They do not add generic file editing/search, arbitrary process management, generic Maven/Gradle task execution, Gradle Tooling API project browsing, source navigation, or collaboration tools.
 
 ## Dependency and artifact checks
 
@@ -158,13 +183,11 @@ The Workbench build keeps the published-equivalent Pickleball boundary and verif
 - the MCP convenience artifact / Jackson 3 path is not used;
 - the published Workbench POM still declares only `tools.dscode:pickleball`.
 
-Report the final executable size and resolved MCP SDK artifacts with:
+Report the executable size and resolved MCP SDK artifacts with:
 
 ```powershell
 .\gradlew.bat :pickleball-workbench:reportWorkbenchMcpImpact
 ```
-
-For a before/after Phase 6A measurement, record the Phase 5 JAR length before applying the Phase 6A overlay, then compare it with `Workbench executable bytes` from this task.
 
 The direct MCP dependencies are:
 
@@ -173,32 +196,7 @@ io.modelcontextprotocol.sdk:mcp-core:2.0.0
 io.modelcontextprotocol.sdk:mcp-json-jackson2:2.0.0
 ```
 
-Notable SDK runtime transitives include Reactor Core, SLF4J API, Jackson 2, and the JSON Schema validator used by the SDK. The SDK's servlet API dependency is provided scope rather than part of the Workbench runtime.
-
-## Phase 6B final validation
-
-Start with the exact headless-safe final UI delegation test:
-
-```powershell
-.\gradlew.bat :pickleball-workbench:test `
-  --tests "tools.dscode.workbench.ui.WorkbenchUiControllerTest.stepOverrideEvidenceAndBreakpointActionsDelegateToSharedWorkbenchServices"
-```
-
-Then run the complete UI controller test and Workbench application test:
-
-```powershell
-.\gradlew.bat :pickleball-workbench:test `
-  --tests "tools.dscode.workbench.ui.WorkbenchUiControllerTest" `
-  --tests "tools.dscode.workbench.WorkbenchApplicationTest"
-```
-
-Then build the Workbench:
-
-```powershell
-.\gradlew.bat :pickleball-workbench:build
-```
-
-Because Phase 6B only adds Swing presentation/controller delegation over already-tested Workbench services, it does not add a Maven consumer tag. Manually verify the UI against the synchronized Maven example:
+## Manual UI acceptance
 
 ```powershell
 $workbenchJar = ".\pickleball-workbench\build\libs\pickleball-workbench-2.1.8.jar"
@@ -213,38 +211,19 @@ Use the UI-owned worker for this smoke test; do not run `worker-check` or `live-
 4. **Step Overrides:** leave the prefilled id/regex/source, click **Compile / Replace**, and verify `Status: SUCCESS` plus one installed override. In **Live Gherkin**, execute `WORKBENCH UI OVERRIDE alpha`; then in **Mapping**, get `OVERRIDE / workbenchStepOverrideValue` and verify `ui-alpha`. Return to **Step Overrides**, click **Remove ID**, and verify the installed list is empty.
 5. **Evidence / Service Call:** execute `%health-full-url` and verify `Status: SUCCESS` and `HTTP status: 200`.
 6. **Evidence / Browser:** in **Live Gherkin**, execute `navigate to: URL.home`; then click **Read Page** and verify the URL/title/page source contains the Pickleball test page. Click **Capture Screenshot** and verify a PNG image is displayed.
-7. **Breakpoints:** with the prefilled `BEFORE_STEP`, `CONTROL API TEST STEP`, one-shot, and `120` second lease, click **Add** and verify one breakpoint is listed. Copy its generated id into **Breakpoint ID (for remove)**, click **Remove ID**, and verify the list is empty. This smoke test validates breakpoint management only; do not intentionally fire the breakpoint while validating the UI shell.
+7. **Breakpoints:** with the prefilled `BEFORE_STEP`, `CONTROL API TEST STEP`, one-shot, and `120` second lease, click **Add** and verify one breakpoint is listed. Copy its generated id into **Breakpoint ID (for remove)**, click **Remove ID**, and verify the list is empty.
 8. **Recent Events:** verify semantic events are present and include sequence, timestamp, hook, and step/phrase/signature detail.
 9. **Lifecycle:** note the PID, click **Restart Worker**, verify a different PID with `Paused: true`, execute one live step successfully, then click **Stop Worker** and verify `Not running (exit=0)`.
 
-After the manual UI smoke test, run the Phase 6B regression gate:
+## Regression
 
-```powershell
-.\gradlew.bat :pickleball-workbench:verifyWorkbenchMcpStdio
-
-java -jar $workbenchJar worker-check ".\maven-consumer-project"
-java -jar $workbenchJar live-check ".\maven-consumer-project"
-```
-
-Then validate repository context/guidance:
-
-```powershell
-python scripts/verify_agent_contract.py
-python scripts/refresh_agent_index.py --check
-python scripts/sync_consumer_guidance.py --check
-```
-
-No `@all` run is needed for Phase 6B because this phase does not change consumer-side Pickleball/bridge semantics. Once the focused tests, build, UI smoke test, MCP stdio check, worker/live regression, and context checks pass, Phase 6B is accepted and Phase 7 Studio removal may begin.
-
-## Phase 6A regression
-
-When shared controller/MCP behavior changes, re-run:
+For shared controller/MCP behavior:
 
 ```powershell
 .\gradlew.bat :pickleball-workbench:verifyWorkbenchMcpStdio
 ```
 
-Then re-run the persistent-worker/live regression against the synchronized Maven example when shared worker behavior was touched:
+For persistent worker/live behavior:
 
 ```powershell
 $workbenchJar = ".\pickleball-workbench\build\libs\pickleball-workbench-2.1.8.jar"
