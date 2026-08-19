@@ -2,7 +2,7 @@
 
 Pickleball Workbench is the separate executable companion for interactive Pickleball execution and investigation. It depends on the normal shaded/woven `tools.dscode:pickleball` artifact; normal Pickleball consumers do not depend on Workbench.
 
-The current migration surface includes project synchronization, a persistent consumer worker, live runtime control, Step Override authoring, lightweight MCP stdio, and the Phase 6B-2 thin Swing execution UI. The old Studio remains temporarily present until the later migration-removal phase.
+The current migration surface includes project synchronization, a persistent consumer worker, live runtime control, Step Override authoring, lightweight MCP stdio, and the complete Phase 6B thin Swing execution UI. The old Studio remains temporarily present until Phase 7 removes it after this replacement surface is accepted.
 
 ## Build and run
 
@@ -37,22 +37,27 @@ java -jar $workbenchJar ui ".\maven-consumer-project"
 
 The Swing UI is a presentation adapter over the same `WorkbenchServices` / `WorkbenchController` seam used by MCP. It does not own a second worker manager, bridge client, Mapping implementation, or Pickleball execution model.
 
-Phase 6B-2 provides:
+Phase 6B provides:
 
 - selected project display and synchronization/status refresh;
 - synchronize, start worker, restart fresh worker without rebuilding, and stop worker;
 - worker PID/runtime/scenario/pause status;
-- live raw Gherkin step input with optional argument text;
-- live result/status output;
+- live raw Gherkin step input with optional argument text and result/status output;
 - Mapping get, put, and resolve;
-- incremental semantic-event refresh for the active worker;
+- incremental semantic-event display with timestamp, hook, step/phrase, and signature detail;
+- Step Override list, worker-side compile/replace, remove, and clear;
+- browser page evidence and lightweight PNG screenshot display;
+- existing Pickleball service-call execution/evidence;
+- semantic breakpoint list, add, remove, and clear with hook/filter/one-shot/finite-lease controls;
 - clean Workbench shutdown when the window closes.
 
-The current Mapping put control stores the entered Swing value as text. MCP continues to support arbitrary JSON-compatible Mapping values through the same service method.
+The Mapping put control stores the entered Swing value as text. MCP continues to support arbitrary JSON-compatible Mapping values through the same service method.
 
-Synchronization, worker actions, live bridge calls, Mapping operations, and event refresh run off the Swing Event Dispatch Thread so they do not freeze the UI. Live controls are enabled only while the Workbench-owned worker is running and paused.
+The Step Override editor sends its source template unchanged to the worker. The source must contain `{{CLASS_NAME}}`; generated class naming, compilation, classloading, rule registration, matching, captures, replacement, and cleanup remain worker-side Pickleball responsibilities. Browser page, screenshot, service-call, event, and breakpoint controls expose the existing bridge contracts rather than reimplementing them in Swing.
 
-Phase 6B-3 will add Step Override authoring, richer events/evidence, browser/service evidence, and basic breakpoint controls over the same service seam. The UI is intentionally execution-oriented and is not a replacement IDE, file editor, generic process manager, or generic Maven/Gradle task runner.
+Synchronization, worker actions, live bridge calls, Mapping operations, event refresh, Step Override actions, browser/screenshot evidence, service calls, and breakpoint actions run off the Swing Event Dispatch Thread. Live controls are enabled only while the Workbench-owned worker is running and paused.
+
+The UI is intentionally execution-oriented and is not a replacement IDE, file editor, generic process manager, generic Maven/Gradle task runner, source navigator, or collaboration system.
 
 ## MCP stdio
 
@@ -170,13 +175,13 @@ io.modelcontextprotocol.sdk:mcp-json-jackson2:2.0.0
 
 Notable SDK runtime transitives include Reactor Core, SLF4J API, Jackson 2, and the JSON Schema validator used by the SDK. The SDK's servlet API dependency is provided scope rather than part of the Workbench runtime.
 
-## Phase 6B-2 validation
+## Phase 6B final validation
 
-Start with the exact headless-safe live/Mapping delegation test:
+Start with the exact headless-safe final UI delegation test:
 
 ```powershell
 .\gradlew.bat :pickleball-workbench:test `
-  --tests "tools.dscode.workbench.ui.WorkbenchUiControllerTest.liveGherkinAndMappingDelegateToSharedWorkbenchServicesAndRefreshEvents"
+  --tests "tools.dscode.workbench.ui.WorkbenchUiControllerTest.stepOverrideEvidenceAndBreakpointActionsDelegateToSharedWorkbenchServices"
 ```
 
 Then run the complete UI controller test and Workbench application test:
@@ -193,30 +198,43 @@ Then build the Workbench:
 .\gradlew.bat :pickleball-workbench:build
 ```
 
-Because this increment only adds Swing presentation/controller delegation over existing Workbench live services, it does not add a Maven consumer tag. Manually verify the UI against the synchronized Maven example:
+Because Phase 6B only adds Swing presentation/controller delegation over already-tested Workbench services, it does not add a Maven consumer tag. Manually verify the UI against the synchronized Maven example:
 
 ```powershell
 $workbenchJar = ".\pickleball-workbench\build\libs\pickleball-workbench-2.1.8.jar"
 java -jar $workbenchJar ui ".\maven-consumer-project"
 ```
 
-In the UI, start the worker and verify:
+Use the UI-owned worker for this smoke test; do not run `worker-check` or `live-check` concurrently with the UI.
 
-1. `CONTROL API TEST STEP` executes from **Live Gherkin** with `Status: SUCCESS`.
-2. **Mapping** put writes `OVERRIDE / workbenchLiveValue = first`.
-3. Mapping get returns `first`.
-4. Mapping resolve of `<workbenchLiveValue>` returns `first`.
-5. **Recent Events** receives semantic events while these actions reuse the same paused worker.
-6. Stop the worker or close the Workbench cleanly.
+1. **Status:** click **Start Worker** and verify `Paused: true` with a PID/runtime/scenario.
+2. **Live Gherkin:** execute `CONTROL API TEST STEP` and verify `Status: SUCCESS`.
+3. **Mapping:** put/get/resolve `OVERRIDE / workbenchLiveValue = first` and verify `first` is returned.
+4. **Step Overrides:** leave the prefilled id/regex/source, click **Compile / Replace**, and verify `Status: SUCCESS` plus one installed override. In **Live Gherkin**, execute `WORKBENCH UI OVERRIDE alpha`; then in **Mapping**, get `OVERRIDE / workbenchStepOverrideValue` and verify `ui-alpha`. Return to **Step Overrides**, click **Remove ID**, and verify the installed list is empty.
+5. **Evidence / Service Call:** execute `%health-full-url` and verify `Status: SUCCESS` and `HTTP status: 200`.
+6. **Evidence / Browser:** in **Live Gherkin**, execute `navigate to: URL.home`; then click **Read Page** and verify the URL/title/page source contains the Pickleball test page. Click **Capture Screenshot** and verify a PNG image is displayed.
+7. **Breakpoints:** with the prefilled `BEFORE_STEP`, `CONTROL API TEST STEP`, one-shot, and `120` second lease, click **Add** and verify one breakpoint is listed. Copy its generated id into **Breakpoint ID (for remove)**, click **Remove ID**, and verify the list is empty. This smoke test validates breakpoint management only; do not intentionally fire the breakpoint while validating the UI shell.
+8. **Recent Events:** verify semantic events are present and include sequence, timestamp, hook, and step/phrase/signature detail.
+9. **Lifecycle:** note the PID, click **Restart Worker**, verify a different PID with `Paused: true`, execute one live step successfully, then click **Stop Worker** and verify `Not running (exit=0)`.
 
-Then run the persistent-worker/live regression:
+After the manual UI smoke test, run the Phase 6B regression gate:
 
 ```powershell
+.\gradlew.bat :pickleball-workbench:verifyWorkbenchMcpStdio
+
 java -jar $workbenchJar worker-check ".\maven-consumer-project"
 java -jar $workbenchJar live-check ".\maven-consumer-project"
 ```
 
-No `@all` run is needed for this increment.
+Then validate repository context/guidance:
+
+```powershell
+python scripts/verify_agent_contract.py
+python scripts/refresh_agent_index.py --check
+python scripts/sync_consumer_guidance.py --check
+```
+
+No `@all` run is needed for Phase 6B because this phase does not change consumer-side Pickleball/bridge semantics. Once the focused tests, build, UI smoke test, MCP stdio check, worker/live regression, and context checks pass, Phase 6B is accepted and Phase 7 Studio removal may begin.
 
 ## Phase 6A regression
 

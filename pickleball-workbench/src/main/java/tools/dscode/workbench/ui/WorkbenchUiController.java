@@ -1,10 +1,20 @@
 package tools.dscode.workbench.ui;
 
+import tools.dscode.control.api.BoundedJsonEvidence;
+import tools.dscode.control.api.ServiceCallEvidence;
+import tools.dscode.control.bridge.ControlBridgeBreakpoint;
+import tools.dscode.control.bridge.ControlBridgeBrowserPage;
+import tools.dscode.control.bridge.ControlBridgeBrowserPageResult;
+import tools.dscode.control.bridge.ControlBridgeBrowserScreenshot;
+import tools.dscode.control.bridge.ControlBridgeBrowserScreenshotResult;
 import tools.dscode.control.bridge.ControlBridgeCallResult;
 import tools.dscode.control.bridge.ControlBridgeError;
 import tools.dscode.control.bridge.ControlBridgeEvent;
 import tools.dscode.control.bridge.ControlBridgeEventPage;
+import tools.dscode.control.bridge.ControlBridgeServiceCallResult;
 import tools.dscode.control.bridge.ControlBridgeStatus;
+import tools.dscode.control.bridge.ControlBridgeStepOverride;
+import tools.dscode.control.bridge.ControlBridgeStepOverrideResult;
 import tools.dscode.control.bridge.ControlBridgeValue;
 import tools.dscode.control.bridge.ControlBridgeValueResult;
 import tools.dscode.workbench.WorkbenchServices;
@@ -12,6 +22,8 @@ import tools.dscode.workbench.sync.WorkbenchManifest;
 import tools.dscode.workbench.worker.WorkbenchWorkerStatus;
 
 import java.nio.file.Path;
+import java.util.Base64;
+import java.util.List;
 
 /** Thin presentation adapter over the shared Workbench service surface. */
 final class WorkbenchUiController implements AutoCloseable {
@@ -93,6 +105,83 @@ final class WorkbenchUiController implements AutoCloseable {
         return new LiveActionResult(renderValueResult(result), refreshEvents());
     }
 
+    String stepOverrides() {
+        return renderStepOverrides(services.stepOverrides());
+    }
+
+    ManagementResult compileStepOverride(String id, String regex, String source) {
+        ControlBridgeStepOverrideResult result = services.compileStepOverride(
+                required(id, "Step Override id"),
+                required(regex, "Step Override regex"),
+                required(source, "Step Override source")
+        );
+        return new ManagementResult(renderStepOverrideResult(result), stepOverrides());
+    }
+
+    ManagementResult removeStepOverride(String id) {
+        boolean removed = services.removeStepOverride(required(id, "Step Override id"));
+        return new ManagementResult("Removed: " + removed, stepOverrides());
+    }
+
+    ManagementResult clearStepOverrides() {
+        int removed = services.clearStepOverrides();
+        return new ManagementResult("Removed: " + removed, stepOverrides());
+    }
+
+    LiveActionResult browserPage() {
+        ControlBridgeBrowserPageResult result = services.browserPage();
+        return new LiveActionResult(renderBrowserPageResult(result), refreshEvents());
+    }
+
+    ScreenshotResult browserScreenshot() {
+        ControlBridgeBrowserScreenshotResult result = services.browserScreenshot();
+        byte[] png = null;
+        ControlBridgeBrowserScreenshot screenshot = result.screenshot();
+        if (screenshot != null && screenshot.base64() != null && !screenshot.base64().isBlank()) {
+            png = Base64.getDecoder().decode(screenshot.base64());
+        }
+        return new ScreenshotResult(renderScreenshotResult(result), png, refreshEvents());
+    }
+
+    LiveActionResult serviceCall(String selector) {
+        ControlBridgeServiceCallResult result = services.serviceCall(required(selector, "Service-call selector"));
+        return new LiveActionResult(renderServiceCallResult(result), refreshEvents());
+    }
+
+    String breakpoints() {
+        return renderBreakpoints(services.breakpoints());
+    }
+
+    ManagementResult addBreakpoint(
+            String hook,
+            String signatureContains,
+            String stepContains,
+            String phraseContains,
+            boolean oneShot,
+            String leaseSeconds
+    ) {
+        Integer lease = integerOrNull(leaseSeconds, "Breakpoint lease seconds");
+        ControlBridgeBreakpoint breakpoint = services.addBreakpoint(
+                required(hook, "Breakpoint hook"),
+                blankToNull(signatureContains),
+                blankToNull(stepContains),
+                blankToNull(phraseContains),
+                oneShot,
+                lease
+        );
+        return new ManagementResult("Added: " + renderBreakpoint(breakpoint), breakpoints());
+    }
+
+    ManagementResult removeBreakpoint(String breakpointId) {
+        boolean removed = services.removeBreakpoint(required(breakpointId, "Breakpoint id"));
+        return new ManagementResult("Removed: " + removed, breakpoints());
+    }
+
+    ManagementResult clearBreakpoints() {
+        int removed = services.clearBreakpoints();
+        return new ManagementResult("Removed: " + removed, breakpoints());
+    }
+
     String refreshEvents() {
         ControlBridgeEventPage page = services.events(eventSequence, EVENT_PAGE_SIZE);
         eventSequence = page.nextSequence();
@@ -133,6 +222,112 @@ final class WorkbenchUiController implements AutoCloseable {
         return text.toString();
     }
 
+    private static String renderStepOverrideResult(ControlBridgeStepOverrideResult result) {
+        StringBuilder text = new StringBuilder("Status: ").append(result.status());
+        if (result.override() != null) {
+            text.append("\n").append(renderStepOverride(result.override()));
+        }
+        appendError(text, result.error());
+        appendRuntime(text, result.runtime());
+        return text.toString();
+    }
+
+    private static String renderStepOverrides(List<ControlBridgeStepOverride> overrides) {
+        if (overrides.isEmpty()) return "No Step Overrides.";
+        StringBuilder text = new StringBuilder();
+        for (ControlBridgeStepOverride override : overrides) {
+            if (!text.isEmpty()) text.append('\n');
+            text.append(renderStepOverride(override));
+        }
+        return text.toString();
+    }
+
+    private static String renderStepOverride(ControlBridgeStepOverride override) {
+        return override.id()
+                + " | " + override.patternType()
+                + " | " + override.pattern()
+                + " | " + override.handlerClass();
+    }
+
+    private static String renderBrowserPageResult(ControlBridgeBrowserPageResult result) {
+        StringBuilder text = new StringBuilder("Status: ").append(result.status());
+        ControlBridgeBrowserPage page = result.page();
+        if (page != null) {
+            text.append("\nURL: ").append(page.url());
+            text.append("\nTitle: ").append(page.title());
+            text.append("\nWindow: ").append(page.windowHandle());
+            text.append("\nWindows: ").append(page.windowHandles());
+            text.append("\nViewport: ").append(page.windowWidth()).append('x').append(page.windowHeight());
+            text.append("\nPage source");
+            if (page.pageSourceTruncated()) text.append(" (truncated)");
+            text.append(":\n").append(page.pageSource());
+        }
+        appendError(text, result.error());
+        appendRuntime(text, result.runtime());
+        return text.toString();
+    }
+
+    private static String renderScreenshotResult(ControlBridgeBrowserScreenshotResult result) {
+        StringBuilder text = new StringBuilder("Status: ").append(result.status());
+        ControlBridgeBrowserScreenshot screenshot = result.screenshot();
+        if (screenshot != null) {
+            text.append("\nScreenshot: ").append(screenshot.mimeType())
+                    .append(" | ").append(screenshot.byteSize()).append(" bytes");
+        }
+        appendError(text, result.error());
+        appendRuntime(text, result.runtime());
+        return text.toString();
+    }
+
+    private static String renderServiceCallResult(ControlBridgeServiceCallResult result) {
+        StringBuilder text = new StringBuilder("Status: ").append(result.status());
+        ServiceCallEvidence evidence = result.evidence();
+        if (evidence != null) {
+            text.append("\nSelector: ").append(evidence.selector());
+            text.append("\nHTTP status: ").append(evidence.statusCode());
+            appendJsonEvidence(text, "Request", evidence.request());
+            appendJsonEvidence(text, "Configuration", evidence.configuration());
+            appendJsonEvidence(text, "Response", evidence.response());
+        }
+        appendError(text, result.error());
+        appendRuntime(text, result.runtime());
+        return text.toString();
+    }
+
+    private static void appendJsonEvidence(StringBuilder text, String label, BoundedJsonEvidence evidence) {
+        if (evidence == null) return;
+        text.append("\n").append(label);
+        if (evidence.truncated()) text.append(" (truncated)");
+        text.append(" [").append(evidence.utf8Bytes()).append(" bytes]: ")
+                .append(evidence.value());
+    }
+
+    private static String renderBreakpoints(List<ControlBridgeBreakpoint> breakpoints) {
+        if (breakpoints.isEmpty()) return "No breakpoints.";
+        StringBuilder text = new StringBuilder();
+        for (ControlBridgeBreakpoint breakpoint : breakpoints) {
+            if (!text.isEmpty()) text.append('\n');
+            text.append(renderBreakpoint(breakpoint));
+        }
+        return text.toString();
+    }
+
+    private static String renderBreakpoint(ControlBridgeBreakpoint breakpoint) {
+        StringBuilder text = new StringBuilder(breakpoint.breakpointId())
+                .append(" | hook=").append(breakpoint.hook())
+                .append(" | oneShot=").append(breakpoint.oneShot())
+                .append(" | lease=").append(breakpoint.leaseSeconds()).append('s')
+                .append(" | hits=").append(breakpoint.hitCount());
+        appendFilter(text, "signature", breakpoint.signatureContains());
+        appendFilter(text, "step", breakpoint.stepContains());
+        appendFilter(text, "phrase", breakpoint.phraseContains());
+        return text.toString();
+    }
+
+    private static void appendFilter(StringBuilder text, String name, String value) {
+        if (value != null && !value.isBlank()) text.append(" | ").append(name).append("~").append(value);
+    }
+
     private static void appendError(StringBuilder text, ControlBridgeError error) {
         if (error == null) return;
         text.append("\nError");
@@ -153,13 +348,17 @@ final class WorkbenchUiController implements AutoCloseable {
         if (page.gap()) text.append("... earlier events expired ...\n");
         for (ControlBridgeEvent event : page.events()) {
             if (!text.isEmpty()) text.append('\n');
-            text.append('#').append(event.sequence()).append(' ').append(event.hook());
+            text.append('#').append(event.sequence())
+                    .append(' ').append(event.timestamp())
+                    .append(' ').append(event.hook());
             if (event.stepText() != null && !event.stepText().isBlank()) {
-                text.append(" | ").append(event.stepText());
-            } else if (event.phraseText() != null && !event.phraseText().isBlank()) {
-                text.append(" | ").append(event.phraseText());
-            } else if (event.signature() != null && !event.signature().isBlank()) {
-                text.append(" | ").append(event.signature());
+                text.append("\n  step: ").append(event.stepText());
+            }
+            if (event.phraseText() != null && !event.phraseText().isBlank()) {
+                text.append("\n  phrase: ").append(event.phraseText());
+            }
+            if (event.signature() != null && !event.signature().isBlank()) {
+                text.append("\n  signature: ").append(event.signature());
             }
         }
         if (page.hasMore()) text.append("\n... more events available ...");
@@ -177,7 +376,22 @@ final class WorkbenchUiController implements AutoCloseable {
         return value == null || value.isBlank() ? null : value;
     }
 
+    private static Integer integerOrNull(String value, String label) {
+        if (value == null || value.isBlank()) return null;
+        try {
+            return Integer.valueOf(value.trim());
+        } catch (NumberFormatException failure) {
+            throw new IllegalArgumentException(label + " must be an integer.");
+        }
+    }
+
     record LiveActionResult(String output, String events) {
+    }
+
+    record ManagementResult(String output, String listing) {
+    }
+
+    record ScreenshotResult(String output, byte[] png, String events) {
     }
 
     record State(

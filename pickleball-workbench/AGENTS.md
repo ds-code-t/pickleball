@@ -55,11 +55,13 @@ java -jar pickleball-workbench-<version>.jar ui <project>
 
 The UI must remain execution-oriented and use `WorkbenchServices` / `WorkbenchController`. Do not recreate the old Studio project IDE, file editor, generic process manager, generic Maven/Gradle UI, Gradle Tooling API browser, source navigator, or collaboration subsystem.
 
-Phase 6B-1 established the UI shell plus selected project, synchronization/status, worker start/restart/stop/status, and clean close. Phase 6B-2 adds live raw Gherkin execution, result/status output, Mapping get/put/resolve, and incremental semantic-event refresh through `WorkbenchServices`. The Swing Mapping put control currently sends entered values as text; it does not create a second Mapping parser or state model.
+Phase 6B-1 established the UI shell plus selected project, synchronization/status, worker start/restart/stop/status, and clean close. Phase 6B-2 added live raw Gherkin execution, result/status output, Mapping get/put/resolve, and incremental semantic-event refresh through `WorkbenchServices`. Phase 6B-3 completes the replacement UI surface with Step Override list/compile/remove/clear, richer semantic-event rendering, browser page and screenshot evidence, service-call evidence, and semantic breakpoint list/add/remove/clear.
 
-Blocking synchronization, process, bridge, Mapping, event, screenshot, and service-call actions must not run on the Swing Event Dispatch Thread. Live controls must target the controller-owned running/paused worker. Semantic-event cursors are worker-local and must reset when a fresh worker is started/restarted. Prefer headless-safe tests around presentation/controller delegation rather than tests requiring a visible desktop.
+The Swing Mapping put control sends entered values as text; it does not create a second Mapping parser or state model. Step Override source is sent unchanged to worker-side compilation and must contain `{{CLASS_NAME}}`; the UI must never compile handlers in the controller JVM. Browser/service/screenshot controls only present bridge evidence already supplied by Pickleball. Breakpoint controls delegate the hook/filter/lease contract to the shared service and must not recreate coordinator semantics.
 
-Phase 6B-3 may add Step Override authoring, richer events/evidence, browser/service evidence, and basic breakpoints, but those controls must continue to delegate to the shared Workbench service seam.
+Blocking synchronization, process, bridge, Mapping, event, screenshot, service-call, Step Override, and breakpoint actions must not run on the Swing Event Dispatch Thread. Live controls must target the controller-owned running/paused worker. Semantic-event cursors are worker-local and must reset when a fresh worker is started/restarted. Prefer headless-safe tests around presentation/controller delegation rather than tests requiring a visible desktop.
+
+Phase 7 must not begin until the complete Phase 6B UI surface has passed focused tests, the Workbench build, manual UI acceptance, persistent worker/live regression, applicable MCP regression, and documentation/context checks.
 
 ## MCP stdio
 

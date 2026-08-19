@@ -1,10 +1,19 @@
 package tools.dscode.workbench.ui;
 
 import org.junit.jupiter.api.Test;
+import tools.dscode.control.api.ServiceCallEvidence;
+import tools.dscode.control.bridge.ControlBridgeBreakpoint;
+import tools.dscode.control.bridge.ControlBridgeBrowserPage;
+import tools.dscode.control.bridge.ControlBridgeBrowserPageResult;
+import tools.dscode.control.bridge.ControlBridgeBrowserScreenshot;
+import tools.dscode.control.bridge.ControlBridgeBrowserScreenshotResult;
 import tools.dscode.control.bridge.ControlBridgeCallResult;
 import tools.dscode.control.bridge.ControlBridgeEvent;
 import tools.dscode.control.bridge.ControlBridgeEventPage;
+import tools.dscode.control.bridge.ControlBridgeServiceCallResult;
 import tools.dscode.control.bridge.ControlBridgeStatus;
+import tools.dscode.control.bridge.ControlBridgeStepOverride;
+import tools.dscode.control.bridge.ControlBridgeStepOverrideResult;
 import tools.dscode.control.bridge.ControlBridgeValue;
 import tools.dscode.control.bridge.ControlBridgeValueResult;
 import tools.dscode.workbench.WorkbenchServices;
@@ -14,8 +23,10 @@ import tools.dscode.workbench.worker.WorkbenchWorkerStatus;
 import java.lang.reflect.Proxy;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -82,7 +93,8 @@ class WorkbenchUiControllerTest {
         );
 
         assertTrue(step.output().contains("Status: SUCCESS"));
-        assertTrue(step.events().contains("#1 AFTER_STEP | CONTROL API TEST STEP"));
+        assertTrue(step.events().contains("#1 2026-08-19T00:00:00Z AFTER_STEP"));
+        assertTrue(step.events().contains("step: CONTROL API TEST STEP"));
         assertTrue(put.output().contains("Value (STRING): first"));
         assertTrue(get.output().contains("Value (STRING): first"));
         assertTrue(resolve.output().contains("Value (STRING): first"));
@@ -96,6 +108,79 @@ class WorkbenchUiControllerTest {
                 "mappingResolve:<workbenchLiveValue>",
                 "events:3"
         ), recording.calls);
+    }
+
+    @Test
+    void stepOverrideEvidenceAndBreakpointActionsDelegateToSharedWorkbenchServices() {
+        RecordingServices recording = new RecordingServices();
+        WorkbenchUiController controller = new WorkbenchUiController(
+                Path.of("consumer"),
+                recording.services()
+        );
+
+        assertEquals("No Step Overrides.", controller.stepOverrides());
+        WorkbenchUiController.ManagementResult compiled = controller.compileStepOverride(
+                "workbench-ui-generated",
+                "^WORKBENCH UI OVERRIDE ([A-Za-z]+)$",
+                "public final class {{CLASS_NAME}} {}"
+        );
+        WorkbenchUiController.ManagementResult removedOverride = controller.removeStepOverride(
+                "workbench-ui-generated"
+        );
+        controller.compileStepOverride(
+                "workbench-ui-generated",
+                "^WORKBENCH UI OVERRIDE ([A-Za-z]+)$",
+                "public final class {{CLASS_NAME}} {}"
+        );
+        WorkbenchUiController.ManagementResult clearedOverrides = controller.clearStepOverrides();
+
+        WorkbenchUiController.LiveActionResult page = controller.browserPage();
+        WorkbenchUiController.ScreenshotResult screenshot = controller.browserScreenshot();
+        WorkbenchUiController.LiveActionResult service = controller.serviceCall("%health-full-url");
+
+        assertEquals("No breakpoints.", controller.breakpoints());
+        WorkbenchUiController.ManagementResult addedBreakpoint = controller.addBreakpoint(
+                "BEFORE_STEP",
+                "",
+                "CONTROL API TEST STEP",
+                "",
+                true,
+                "120"
+        );
+        WorkbenchUiController.ManagementResult removedBreakpoint = controller.removeBreakpoint("bp-1");
+        controller.addBreakpoint("BEFORE_STEP", "", "CONTROL API TEST STEP", "", true, "120");
+        WorkbenchUiController.ManagementResult clearedBreakpoints = controller.clearBreakpoints();
+
+        assertTrue(compiled.output().contains("Status: SUCCESS"));
+        assertTrue(compiled.listing().contains("workbench-ui-generated | REGEX"));
+        assertTrue(removedOverride.output().contains("Removed: true"));
+        assertTrue(clearedOverrides.output().contains("Removed: 1"));
+        assertTrue(clearedOverrides.listing().contains("No Step Overrides."));
+
+        assertTrue(page.output().contains("URL: http://127.0.0.1:8080/"));
+        assertTrue(page.output().contains("Title: Pickleball Test Lab"));
+        assertTrue(screenshot.output().contains("Screenshot: image/png | 4 bytes"));
+        assertArrayEquals(new byte[]{1, 2, 3, 4}, screenshot.png());
+        assertTrue(service.output().contains("HTTP status: 200"));
+        assertTrue(service.output().contains("Selector: %health-full-url"));
+
+        assertTrue(addedBreakpoint.output().contains("Added: bp-1"));
+        assertTrue(addedBreakpoint.listing().contains("step~CONTROL API TEST STEP"));
+        assertTrue(removedBreakpoint.output().contains("Removed: true"));
+        assertTrue(clearedBreakpoints.output().contains("Removed: 1"));
+        assertTrue(clearedBreakpoints.listing().contains("No breakpoints."));
+
+        assertTrue(recording.calls.contains("stepOverrides"));
+        assertTrue(recording.calls.contains("compileStepOverride:workbench-ui-generated"));
+        assertTrue(recording.calls.contains("removeStepOverride:workbench-ui-generated"));
+        assertTrue(recording.calls.contains("clearStepOverrides"));
+        assertTrue(recording.calls.contains("browserPage"));
+        assertTrue(recording.calls.contains("browserScreenshot"));
+        assertTrue(recording.calls.contains("serviceCall:%health-full-url"));
+        assertTrue(recording.calls.contains("breakpoints"));
+        assertTrue(recording.calls.contains("addBreakpoint:BEFORE_STEP:CONTROL API TEST STEP:true:120"));
+        assertTrue(recording.calls.contains("removeBreakpoint:bp-1"));
+        assertTrue(recording.calls.contains("clearBreakpoints"));
     }
 
     @Test
@@ -183,6 +268,8 @@ class WorkbenchUiControllerTest {
 
     private static final class RecordingServices {
         private final List<String> calls = new ArrayList<>();
+        private final List<ControlBridgeStepOverride> overrides = new ArrayList<>();
+        private final List<ControlBridgeBreakpoint> breakpoints = new ArrayList<>();
         private RuntimeException synchronizationFailure;
         private WorkbenchWorkerStatus status = new WorkbenchWorkerStatus(
                 false, null, null, null, null, false, null
@@ -265,6 +352,105 @@ class WorkbenchUiControllerTest {
                                     false,
                                     false
                             );
+                        }
+                        case "stepOverrides" -> {
+                            calls.add("stepOverrides");
+                            yield List.copyOf(overrides);
+                        }
+                        case "compileStepOverride" -> {
+                            calls.add("compileStepOverride:" + args[0]);
+                            ControlBridgeStepOverride override = new ControlBridgeStepOverride(
+                                    (String) args[0], "REGEX", (String) args[1], "GeneratedHandler"
+                            );
+                            overrides.removeIf(existing -> existing.id().equals(args[0]));
+                            overrides.add(override);
+                            yield new ControlBridgeStepOverrideResult(
+                                    "SUCCESS", override, null, runtime()
+                            );
+                        }
+                        case "removeStepOverride" -> {
+                            calls.add("removeStepOverride:" + args[0]);
+                            yield overrides.removeIf(existing -> existing.id().equals(args[0]));
+                        }
+                        case "clearStepOverrides" -> {
+                            calls.add("clearStepOverrides");
+                            int count = overrides.size();
+                            overrides.clear();
+                            yield count;
+                        }
+                        case "browserPage" -> {
+                            calls.add("browserPage");
+                            yield new ControlBridgeBrowserPageResult(
+                                    "SUCCESS",
+                                    new ControlBridgeBrowserPage(
+                                            "http://127.0.0.1:8080/",
+                                            "Pickleball Test Lab",
+                                            "window-1",
+                                            List.of("window-1"),
+                                            1280,
+                                            720,
+                                            "<html>Pickleball Test Lab</html>",
+                                            false
+                                    ),
+                                    null,
+                                    runtime()
+                            );
+                        }
+                        case "browserScreenshot" -> {
+                            calls.add("browserScreenshot");
+                            byte[] png = {1, 2, 3, 4};
+                            yield new ControlBridgeBrowserScreenshotResult(
+                                    "SUCCESS",
+                                    new ControlBridgeBrowserScreenshot(
+                                            "image/png",
+                                            png.length,
+                                            Base64.getEncoder().encodeToString(png)
+                                    ),
+                                    null,
+                                    runtime()
+                            );
+                        }
+                        case "serviceCall" -> {
+                            calls.add("serviceCall:" + args[0]);
+                            yield new ControlBridgeServiceCallResult(
+                                    "SUCCESS",
+                                    new ServiceCallEvidence((String) args[0], null, null, null, 200),
+                                    null,
+                                    runtime()
+                            );
+                        }
+                        case "breakpoints" -> {
+                            calls.add("breakpoints");
+                            yield List.copyOf(breakpoints);
+                        }
+                        case "addBreakpoint" -> {
+                            calls.add("addBreakpoint:" + args[0] + ":" + args[2] + ":" + args[4] + ":" + args[5]);
+                            ControlBridgeBreakpoint breakpoint = new ControlBridgeBreakpoint(
+                                    "bp-1",
+                                    "scenario-101",
+                                    (String) args[0],
+                                    (String) args[1],
+                                    (String) args[2],
+                                    (String) args[3],
+                                    (Boolean) args[4],
+                                    args[5] == null ? 120 : (Integer) args[5],
+                                    0,
+                                    null,
+                                    null
+                            );
+                            breakpoints.clear();
+                            breakpoints.add(breakpoint);
+                            yield breakpoint;
+                        }
+                        case "removeBreakpoint" -> {
+                            calls.add("removeBreakpoint:" + args[0]);
+                            yield breakpoints.removeIf(existing -> existing.breakpointId().equals(args[0]));
+                        }
+                        case "clearBreakpoints" -> {
+                            calls.add("clearBreakpoints");
+                            int count = breakpoints.size();
+                            breakpoints.clear();
+                            yield count;
                         }
                         case "close" -> {
                             calls.add("close");
