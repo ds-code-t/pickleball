@@ -4,8 +4,14 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import tools.dscode.common.control.ControlRuntime;
+import tools.dscode.control.override.StepOverrideCompiler;
+import tools.dscode.control.override.StepOverridePatternType;
+import tools.dscode.control.override.StepOverrideRegistry;
+import tools.dscode.control.override.StepOverrideRule;
 
 import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.net.InetSocketAddress;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
@@ -27,7 +33,8 @@ final class ControlBridgeRuntime implements AutoCloseable {
             "status", "scenarios", "events", "pause", "resume", "execute_step",
             "mapping_get", "mapping_put", "mapping_resolve", "mapping_snapshot", "mapping_restore",
             "browser_page", "browser_screenshot",
-            "element_inspect", "service_call", "breakpoints"
+            "element_inspect", "service_call", "breakpoints",
+            "step_overrides", "step_override_compile"
     );
 
     private static final String HOST = "127.0.0.1";
@@ -198,6 +205,107 @@ final class ControlBridgeRuntime implements AutoCloseable {
         }));
         server.createContext("/v1/breakpoints/clear", exchange -> handle(exchange, "POST", () ->
                 Map.of("removed", coordinator.clearBreakpoints())));
+
+        server.createContext("/v1/step-overrides", exchange -> handle(exchange, "GET", () -> {
+            String scenarioId = queryParameter(exchange, "scenarioId");
+            if (!scenarioActive(scenarioId)) return new ControlBridgeStepOverride[0];
+            return StepOverrideRegistry.rules(scenarioId).stream()
+                    .map(ControlBridgeRuntime::overrideSnapshot)
+                    .toArray(ControlBridgeStepOverride[]::new);
+        }));
+        server.createContext("/v1/step-overrides/compile", exchange -> handle(exchange, "POST", () -> {
+            StepOverrideCompileRequest request = readRequired(exchange, StepOverrideCompileRequest.class);
+            return compileOverride(request);
+        }));
+        server.createContext("/v1/step-overrides/remove", exchange -> handle(exchange, "POST", () -> {
+            StepOverrideIdRequest request = readRequired(exchange, StepOverrideIdRequest.class);
+            if (!scenarioActive(request.scenarioId())) return Map.of("removed", false);
+            return Map.of("removed", StepOverrideRegistry.remove(request.scenarioId(), request.id()));
+        }));
+        server.createContext("/v1/step-overrides/clear", exchange -> handle(exchange, "POST", () -> {
+            StepOverrideScenarioRequest request = readRequired(exchange, StepOverrideScenarioRequest.class);
+            if (!scenarioActive(request.scenarioId())) return Map.of("removed", 0);
+            return Map.of("removed", StepOverrideRegistry.clear(request.scenarioId()));
+        }));
+    }
+
+    private ControlBridgeStepOverrideResult compileOverride(StepOverrideCompileRequest request) {
+        ControlBridgeStatus runtime = coordinator.status();
+        if (!scenarioActive(request.scenarioId())) {
+            return new ControlBridgeStepOverrideResult(
+                    "UNAVAILABLE", null,
+                    new ControlBridgeError(
+                            "UNAVAILABLE",
+                            "No active scenario with id " + request.scenarioId() + ".",
+                            ""
+                    ),
+                    runtime
+            );
+        }
+
+        StepOverridePatternType patternType;
+        try {
+            patternType = StepOverridePatternType.valueOf(
+                    request.patternType() == null ? "" : request.patternType().trim().toUpperCase()
+            );
+        } catch (IllegalArgumentException failure) {
+            return failedOverride(failure, runtime);
+        }
+
+        try {
+            StepOverrideRule rule = StepOverrideCompiler.compile(
+                    request.scenarioId(),
+                    request.id(),
+                    patternType,
+                    request.pattern(),
+                    request.source()
+            );
+            return new ControlBridgeStepOverrideResult(
+                    "SUCCESS", overrideSnapshot(rule), null, coordinator.status()
+            );
+        } catch (StepOverrideCompiler.CompilerUnavailableException failure) {
+            return new ControlBridgeStepOverrideResult(
+                    "UNAVAILABLE", null,
+                    bridgeError(failure),
+                    coordinator.status()
+            );
+        } catch (Throwable failure) {
+            return failedOverride(failure, coordinator.status());
+        }
+    }
+
+    private static ControlBridgeStepOverrideResult failedOverride(
+            Throwable failure,
+            ControlBridgeStatus runtime
+    ) {
+        return new ControlBridgeStepOverrideResult(
+                "FAILED", null, bridgeError(failure), runtime
+        );
+    }
+
+    private boolean scenarioActive(String scenarioId) {
+        if (scenarioId == null || scenarioId.isBlank()) return false;
+        return coordinator.scenarios().stream()
+                .anyMatch(scenario -> scenarioId.equals(scenario.scenarioId()));
+    }
+
+    private static ControlBridgeStepOverride overrideSnapshot(StepOverrideRule rule) {
+        return new ControlBridgeStepOverride(
+                rule.id(),
+                rule.patternType().name(),
+                rule.pattern(),
+                StepOverrideCompiler.handlerClassName(rule)
+        );
+    }
+
+    private static ControlBridgeError bridgeError(Throwable failure) {
+        StringWriter writer = new StringWriter();
+        failure.printStackTrace(new PrintWriter(writer));
+        return new ControlBridgeError(
+                failure.getClass().getName(),
+                safeMessage(failure),
+                writer.toString()
+        );
     }
 
     private void handle(HttpExchange exchange, String expectedMethod, RequestAction action) throws IOException {
@@ -335,4 +443,9 @@ final class ControlBridgeRuntime implements AutoCloseable {
             String phraseContains, Boolean oneShot, Integer leaseSeconds
     ) { }
     private record BreakpointIdRequest(String breakpointId) { }
+    private record StepOverrideCompileRequest(
+            String scenarioId, String id, String patternType, String pattern, String source
+    ) { }
+    private record StepOverrideIdRequest(String scenarioId, String id) { }
+    private record StepOverrideScenarioRequest(String scenarioId) { }
 }

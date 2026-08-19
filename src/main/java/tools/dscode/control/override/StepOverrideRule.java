@@ -7,7 +7,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /** One REPLACE-mode Step Override rule. */
-public final class StepOverrideRule {
+public final class StepOverrideRule implements AutoCloseable {
     private final String id;
     private final StepOverridePatternType patternType;
     private final String pattern;
@@ -58,6 +58,17 @@ public final class StepOverrideRule {
             captures.add(matcher.group(i));
         }
         return List.copyOf(captures);
+    }
+
+    @Override
+    public void close() {
+        if (handler instanceof AutoCloseable closeable) {
+            try {
+                closeable.close();
+            } catch (Exception ignored) {
+                // Removing an experimental override must not fail scenario cleanup.
+            }
+        }
     }
 
     private static String requireText(String value, String name) {
