@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -51,6 +52,8 @@ class ControlBridgeClientTest {
         assertTrue(client.scenarios().isEmpty());
         assertTrue(client.events(null, 0L, 10).events().isEmpty());
         assertTrue(client.breakpoints().isEmpty());
+        assertTrue(descriptor.capabilities().contains("step_overrides"));
+        assertTrue(descriptor.capabilities().contains("step_override_compile"));
 
         String missingScenario = UUID.randomUUID().toString();
         assertEquals("UNAVAILABLE", client.pause(missingScenario, 1, 30).status());
@@ -85,6 +88,28 @@ class ControlBridgeClientTest {
                 "UNAVAILABLE",
                 client.serviceCall(missingScenario, "%health-full-url", 1).status()
         );
+
+        assertTrue(client.stepOverrides(missingScenario).isEmpty());
+        assertEquals(
+                "UNAVAILABLE",
+                client.compileStepOverride(
+                        missingScenario,
+                        "missing",
+                        "^MISSING$",
+                        """
+                        import tools.dscode.control.override.StepOverrideContext;
+                        import tools.dscode.control.override.StepOverrideHandler;
+                        public final class {{CLASS_NAME}} implements StepOverrideHandler {
+                            public Object execute(StepOverrideContext context) {
+                                return null;
+                            }
+                        }
+                        """,
+                        1
+                ).status()
+        );
+        assertFalse(client.removeStepOverride(missingScenario, "missing"));
+        assertEquals(0, client.clearStepOverrides(missingScenario));
 
         ControlBridgeBreakpoint breakpoint = client.addBreakpoint(
                 null, "AFTER_STEP", null, "phase-2-marker", null, true, 30

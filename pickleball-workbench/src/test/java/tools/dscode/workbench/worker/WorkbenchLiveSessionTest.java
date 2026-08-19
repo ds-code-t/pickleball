@@ -16,11 +16,17 @@ class WorkbenchLiveSessionTest {
     @Test
     void liveOperationsRequirePausedOwnedWorker() {
         try (WorkbenchLiveSession live = new WorkbenchLiveSession(tempDir)) {
-            IllegalStateException failure = assertThrows(
+            IllegalStateException stepFailure = assertThrows(
                     IllegalStateException.class,
                     () -> live.executeStep("---not-running")
             );
-            assertTrue(failure.getMessage().contains("paused interactive worker"));
+            IllegalStateException overrideFailure = assertThrows(
+                    IllegalStateException.class,
+                    live::stepOverrides
+            );
+
+            assertTrue(stepFailure.getMessage().contains("paused interactive worker"));
+            assertTrue(overrideFailure.getMessage().contains("paused interactive worker"));
         }
     }
 }

@@ -1,15 +1,6 @@
 package tools.dscode.workbench.worker;
 
-import tools.dscode.control.bridge.ControlBridgeBreakpoint;
-import tools.dscode.control.bridge.ControlBridgeBrowserPageResult;
-import tools.dscode.control.bridge.ControlBridgeBrowserScreenshotResult;
-import tools.dscode.control.bridge.ControlBridgeCallResult;
-import tools.dscode.control.bridge.ControlBridgeElementInspectionResult;
-import tools.dscode.control.bridge.ControlBridgeEventPage;
-import tools.dscode.control.bridge.ControlBridgeMappingSnapshot;
-import tools.dscode.control.bridge.ControlBridgeMappingSnapshotResult;
-import tools.dscode.control.bridge.ControlBridgeServiceCallResult;
-import tools.dscode.control.bridge.ControlBridgeValueResult;
+import tools.dscode.control.bridge.*;
 import tools.dscode.workbench.bridge.ControlBridgeClient;
 
 import java.nio.file.Path;
@@ -104,13 +95,11 @@ public final class WorkbenchLiveSession implements AutoCloseable {
     }
 
     public ControlBridgeElementInspectionResult elementInspect(
-            String category,
-            String text,
-            String operation,
-            Integer maxElements
+            String category, String text, String operation, Integer maxElements
     ) {
         return call(binding -> binding.client().elementInspect(
-                binding.scenarioId(), category, text, operation, maxElements, COMMAND_TIMEOUT_SECONDS
+                binding.scenarioId(), category, text, operation, maxElements,
+                COMMAND_TIMEOUT_SECONDS
         ));
     }
 
@@ -139,8 +128,8 @@ public final class WorkbenchLiveSession implements AutoCloseable {
             Integer leaseSeconds
     ) {
         return call(binding -> binding.client().addBreakpoint(
-                binding.scenarioId(), hook, signatureContains, stepContains, phraseContains,
-                oneShot, leaseSeconds
+                binding.scenarioId(), hook, signatureContains, stepContains,
+                phraseContains, oneShot, leaseSeconds
         ));
     }
 
@@ -150,6 +139,36 @@ public final class WorkbenchLiveSession implements AutoCloseable {
 
     public int clearBreakpoints() {
         return call(binding -> binding.client().clearBreakpoints());
+    }
+
+    public List<ControlBridgeStepOverride> stepOverrides() {
+        return call(binding -> binding.client().stepOverrides(binding.scenarioId()));
+    }
+
+    /**
+     * Compiles and installs a REPLACE-mode REGEX Step Override into the active worker.
+     * Source must contain {@code {{CLASS_NAME}}} as the generated class-name token.
+     */
+    public ControlBridgeStepOverrideResult compileStepOverride(
+            String id,
+            String regex,
+            String source
+    ) {
+        return call(binding -> binding.client().compileStepOverride(
+                binding.scenarioId(), id, regex, source, COMMAND_TIMEOUT_SECONDS
+        ));
+    }
+
+    public boolean removeStepOverride(String id) {
+        return call(binding -> binding.client().removeStepOverride(
+                binding.scenarioId(), id
+        ));
+    }
+
+    public int clearStepOverrides() {
+        return call(binding -> binding.client().clearStepOverrides(
+                binding.scenarioId()
+        ));
     }
 
     @Override
@@ -164,7 +183,9 @@ public final class WorkbenchLiveSession implements AutoCloseable {
         if (!Objects.equals(before.pid(), after.pid())
                 || !Objects.equals(before.runtimeId(), after.runtimeId())
                 || !Objects.equals(before.scenarioId(), after.scenarioId())) {
-            throw new IllegalStateException("Live Workbench operation changed the active worker context.");
+            throw new IllegalStateException(
+                    "Live Workbench operation changed the active worker context."
+            );
         }
         return result;
     }
@@ -173,7 +194,9 @@ public final class WorkbenchLiveSession implements AutoCloseable {
         WorkbenchWorkerStatus status = requirePaused(workers.status());
         String scenarioId = workers.activeScenarioId();
         if (!Objects.equals(status.scenarioId(), scenarioId)) {
-            throw new IllegalStateException("Workbench worker status and active bridge scenario do not match.");
+            throw new IllegalStateException(
+                    "Workbench worker status and active bridge scenario do not match."
+            );
         }
         return new Binding(
                 workers.activeClient(), scenarioId, status.pid(), status.runtimeId()
@@ -182,8 +205,12 @@ public final class WorkbenchLiveSession implements AutoCloseable {
 
     private static WorkbenchWorkerStatus requirePaused(WorkbenchWorkerStatus status) {
         if (!status.running() || !status.paused()
-                || status.pid() == null || status.runtimeId() == null || status.scenarioId() == null) {
-            throw new IllegalStateException("Workbench live operations require a paused interactive worker.");
+                || status.pid() == null
+                || status.runtimeId() == null
+                || status.scenarioId() == null) {
+            throw new IllegalStateException(
+                    "Workbench live operations require a paused interactive worker."
+            );
         }
         return status;
     }
@@ -193,5 +220,5 @@ public final class WorkbenchLiveSession implements AutoCloseable {
             String scenarioId,
             Long pid,
             String runtimeId
-    ) { }
+    ) {}
 }

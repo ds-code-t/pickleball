@@ -50,6 +50,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/pickleball-studio.md`
 - `docs/README.md`
 - `docs/service-call-scenarios.md`
+- `docs/step-overrides.md`
 - `docs/studio-collaboration.md`
 - `docs/studio-runtime-bridge.md`
 - `docs/studio-runtime-investigation.md`
@@ -80,6 +81,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/aspectj/tools/dscode/common/reporting/diagnostic/DiagnosticRuntimeAspect.aj`
 - `src/main/aspectj/tools/dscode/common/reporting/diagnostic/ReportRetentionAspect.aj`
 - `src/main/aspectj/tools/dscode/common/variables/PlatformLogAspect.aj`
+- `src/main/aspectj/tools/dscode/control/override/StepOverrideLifecycleAspect.aj`
 - `src/main/aspectj/tools/dscode/testengine/PkbSystemPropertyValueAspect.aj`
 - `src/main/java/io/cucumber/core/feature/TestFeatureParser.java`
 - `src/main/java/io/cucumber/core/gherkin/messages/CucumberDeepCloneUtil.java`
@@ -107,6 +109,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/io/cucumber/core/runner/StepData.java`
 - `src/main/java/io/cucumber/core/runner/StepExtension.java`
 - `src/main/java/io/cucumber/core/runner/StepLogic.java`
+- `src/main/java/io/cucumber/core/runner/StepOverrideDispatcher.java`
 - `src/main/java/io/cucumber/core/runner/TypeSwitch.java`
 - `src/main/java/io/cucumber/core/runner/util/ArgumentUtility.java`
 - `src/main/java/io/cucumber/core/runner/util/CallScope.java`
@@ -337,6 +340,12 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/common/variables/PlatformSnapshot.java`
 - `src/main/java/tools/dscode/common/variables/RunVars.java`
 - `src/main/java/tools/dscode/common/variables/SysEnv.java`
+- `src/main/java/tools/dscode/control/override/StepOverrideCompiler.java`
+- `src/main/java/tools/dscode/control/override/StepOverrideContext.java`
+- `src/main/java/tools/dscode/control/override/StepOverrideHandler.java`
+- `src/main/java/tools/dscode/control/override/StepOverridePatternType.java`
+- `src/main/java/tools/dscode/control/override/StepOverrideRegistry.java`
+- `src/main/java/tools/dscode/control/override/StepOverrideRule.java`
 - `src/main/java/tools/dscode/coredefinitions/BrowserSteps.java`
 - `src/main/java/tools/dscode/coredefinitions/DataProcessingSteps.java`
 - `src/main/java/tools/dscode/coredefinitions/DataTableDefinitions.java`
@@ -380,6 +389,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 
 ## Framework tests
 
+- `src/test/java/tools/dscode/control/override/StepOverrideCompilerTest.java`
 - `src/test/java/tools/dscode/studio/launcher/StudioLauncherTest.java`
 - `src/test/java/tools/dscode/testengine/DynamicSuiteBootstrapWorkbenchRootTest.java`
 
@@ -426,6 +436,8 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-control-api/src/main/java/tools/dscode/control/bridge/ControlBridgeScenarioStatus.java`
 - `pickleball-control-api/src/main/java/tools/dscode/control/bridge/ControlBridgeServiceCallResult.java`
 - `pickleball-control-api/src/main/java/tools/dscode/control/bridge/ControlBridgeStatus.java`
+- `pickleball-control-api/src/main/java/tools/dscode/control/bridge/ControlBridgeStepOverride.java`
+- `pickleball-control-api/src/main/java/tools/dscode/control/bridge/ControlBridgeStepOverrideResult.java`
 - `pickleball-control-api/src/main/java/tools/dscode/control/bridge/ControlBridgeValue.java`
 - `pickleball-control-api/src/main/java/tools/dscode/control/bridge/ControlBridgeValueResult.java`
 
@@ -579,6 +591,8 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `maven-consumer-project/src/test/java/com/example/pickleball/MappingTypeSteps.java`
 - `maven-consumer-project/src/test/java/com/example/pickleball/PickleballTests.java`
 - `maven-consumer-project/src/test/java/com/example/pickleball/ScenarioDataSteps.java`
+- `maven-consumer-project/src/test/java/com/example/pickleball/StepOverrideBridgeTestSteps.java`
+- `maven-consumer-project/src/test/java/com/example/pickleball/StepOverrideChecks.java`
 - `maven-consumer-project/src/test/java/com/example/pickleball/support/InternalJavaTestRunner.java`
 - `maven-consumer-project/src/test/java/com/example/pickleball/support/LocalTestSite.java`
 - `maven-consumer-project/src/test/java/com/example/pickleball/tests/TokenizedQueryTest.java`
@@ -630,6 +644,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `maven-consumer-project/src/test/resources/features/scenario-marker-data.feature`
 - `maven-consumer-project/src/test/resources/features/scenario-step-markers.feature`
 - `maven-consumer-project/src/test/resources/features/service-call-execution.feature`
+- `maven-consumer-project/src/test/resources/features/step-override-bridge.feature`
 
 ## Maven consumer service-call definitions
 

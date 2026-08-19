@@ -3,6 +3,7 @@ package tools.dscode.workbench;
 import tools.dscode.control.bridge.ControlBridgeBrowserPageResult;
 import tools.dscode.control.bridge.ControlBridgeCallResult;
 import tools.dscode.control.bridge.ControlBridgeServiceCallResult;
+import tools.dscode.control.bridge.ControlBridgeStepOverrideResult;
 import tools.dscode.control.bridge.ControlBridgeValueResult;
 import tools.dscode.workbench.sync.WorkbenchManifest;
 import tools.dscode.workbench.sync.WorkbenchSynchronizer;
@@ -134,6 +135,53 @@ public final class WorkbenchApplication {
                 throw new IllegalStateException("Live browser evidence did not contain the consumer home page.");
             }
 
+            requireStepOverrideSuccess(
+                    live.compileStepOverride(
+                            "workbench-live-generated",
+                            "^WORKBENCH LIVE OVERRIDE ([A-Za-z]+)$",
+                            overrideSource("first-")
+                    ),
+                    "first Step Override compilation"
+            );
+            requireSuccess(
+                    live.executeStep("WORKBENCH LIVE OVERRIDE alpha"),
+                    "first override-only execution"
+            );
+            requireValue(
+                    live.mappingGet("OVERRIDE", "workbenchStepOverrideValue"),
+                    "first-alpha",
+                    "first Step Override effect"
+            );
+
+            requireStepOverrideSuccess(
+                    live.compileStepOverride(
+                            "workbench-live-generated",
+                            "^WORKBENCH LIVE OVERRIDE ([A-Za-z]+)$",
+                            overrideSource("second-")
+                    ),
+                    "replacement Step Override compilation"
+            );
+            requireSuccess(
+                    live.executeStep("WORKBENCH LIVE OVERRIDE beta"),
+                    "replacement override-only execution"
+            );
+            requireValue(
+                    live.mappingGet("OVERRIDE", "workbenchStepOverrideValue"),
+                    "second-beta",
+                    "replacement Step Override effect"
+            );
+            if (live.stepOverrides().size() != 1) {
+                throw new IllegalStateException("Workbench did not retain exactly one replacement Step Override.");
+            }
+            if (!live.removeStepOverride("workbench-live-generated")) {
+                throw new IllegalStateException("Workbench could not remove the generated Step Override.");
+            }
+            requireStatus(
+                    live.executeStep("WORKBENCH LIVE OVERRIDE gamma"),
+                    "FAILED",
+                    "override removal fallback"
+            );
+
             requireSuccess(
                     live.mappingPut("OVERRIDE", "workbenchLiveValue", "second"),
                     "second mapping write"
@@ -151,7 +199,7 @@ public final class WorkbenchApplication {
                 throw new IllegalStateException("Live operations did not remain on one persistent worker context.");
             }
 
-            out.println("Raw Gherkin, mapping, service-call, and browser operations reused one worker.");
+            out.println("Raw Gherkin, mapping, service-call, browser, and Step Override operations reused one worker.");
             out.println("Persistent context: pid=" + after.pid() + " runtime=" + after.runtimeId());
 
             requireCleanStop(live.stop());
@@ -160,8 +208,49 @@ public final class WorkbenchApplication {
         return 0;
     }
 
+    private static String overrideSource(String prefix) {
+        return """
+                package tools.dscode.workbench.generated;
+                import tools.dscode.control.api.MappingControl;
+                import tools.dscode.control.override.StepOverrideContext;
+                import tools.dscode.control.override.StepOverrideHandler;
+
+                public final class {{CLASS_NAME}} implements StepOverrideHandler {
+                    public Object execute(StepOverrideContext context) {
+                        MappingControl.put(
+                            "OVERRIDE",
+                            "workbenchStepOverrideValue",
+                            "%s" + context.captures().getFirst()
+                        );
+                        return null;
+                    }
+                }
+                """.formatted(prefix);
+    }
+
+    private static void requireStepOverrideSuccess(
+            ControlBridgeStepOverrideResult result,
+            String label
+    ) {
+        if (result == null || !"SUCCESS".equals(result.status()) || result.override() == null) {
+            throw new IllegalStateException(label + " failed" + failureDetail(
+                    result == null ? null : result.status(),
+                    result == null || result.error() == null ? null : result.error().type(),
+                    result == null || result.error() == null ? null : result.error().message()
+            ));
+        }
+    }
+
     private static void requireSuccess(ControlBridgeCallResult result, String label) {
-        if (result == null || !"SUCCESS".equals(result.status())) {
+        requireStatus(result, "SUCCESS", label);
+    }
+
+    private static void requireStatus(
+            ControlBridgeCallResult result,
+            String expectedStatus,
+            String label
+    ) {
+        if (result == null || !expectedStatus.equals(result.status())) {
             throw new IllegalStateException(label + " failed" + failureDetail(
                     result == null ? null : result.status(),
                     result == null || result.error() == null ? null : result.error().type(),
@@ -242,6 +331,6 @@ public final class WorkbenchApplication {
         out.println();
         out.println("sync uses the selected project wrapper and materializes .pickleball/workbench.");
         out.println("worker-check starts, restarts, and gracefully stops direct consumer workers without rebuilding.");
-        out.println("live-check exercises raw Gherkin and live runtime operations on one persistent worker.");
+        out.println("live-check exercises raw Gherkin, Step Override, and live runtime operations on one persistent worker.");
     }
 }

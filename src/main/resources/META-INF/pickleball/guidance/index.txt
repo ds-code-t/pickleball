@@ -29,6 +29,7 @@ docs/mapping-and-templating.md
 docs/nested-steps.md
 docs/pickleball-studio.md
 docs/service-call-scenarios.md
+docs/step-overrides.md
 docs/studio-collaboration.md
 docs/studio-runtime-bridge.md
 docs/studio-runtime-investigation.md
@@ -84,6 +85,7 @@ maven-consumer-project/src/test/resources/features/scenario-data-references.feat
 maven-consumer-project/src/test/resources/features/scenario-marker-data.feature
 maven-consumer-project/src/test/resources/features/scenario-step-markers.feature
 maven-consumer-project/src/test/resources/features/service-call-execution.feature
+maven-consumer-project/src/test/resources/features/step-override-bridge.feature
 maven-consumer-project/src/test/resources/files/customers.yaml
 maven-consumer-project/src/test/resources/pickleball.properties
 maven-consumer-project/src/test/resources/pickleball_local.properties
