@@ -12,12 +12,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class WorkbenchApplicationTest {
 
     @Test
-    void helpListsSynchronizationAndWorkerLifecycleCommands() {
+    void helpListsSynchronizationWorkerAndLiveCommands() {
         Output output = run("--help");
 
         assertEquals(0, output.exitCode());
         assertTrue(output.stdout().contains("sync <project>"));
         assertTrue(output.stdout().contains("worker-check <project>"));
+        assertTrue(output.stdout().contains("live-check <project>"));
         assertEquals("", output.stderr());
     }
 
@@ -41,10 +42,10 @@ class WorkbenchApplicationTest {
 
     @Test
     void commandsRequireExactlyOneProject() {
-        Output output = run("sync");
+        Output output = run("live-check");
 
         assertEquals(1, output.exitCode());
-        assertTrue(output.stderr().contains("Usage: pickleball-workbench sync <project>"));
+        assertTrue(output.stderr().contains("Usage: pickleball-workbench live-check <project>"));
     }
 
     private static Output run(String... args) {

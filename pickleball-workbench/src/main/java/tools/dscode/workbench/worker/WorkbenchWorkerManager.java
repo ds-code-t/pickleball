@@ -1,5 +1,6 @@
 package tools.dscode.workbench.worker;
 
+import tools.dscode.control.bridge.ControlBridgeBreakpoint;
 import tools.dscode.control.bridge.ControlBridgeCallResult;
 import tools.dscode.control.bridge.ControlBridgeScenarioStatus;
 import tools.dscode.workbench.bridge.ControlBridgeClient;
@@ -16,7 +17,9 @@ import java.security.SecureRandom;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Base64;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -26,16 +29,24 @@ import java.util.concurrent.TimeUnit;
 public final class WorkbenchWorkerManager implements AutoCloseable {
     static final int PAUSE_LEASE_SECONDS = 120;
     static final int LEASE_RENEW_SECONDS = 30;
+    static final String INTERACTIVE_PAUSE_HOOK = "BEFORE_STEP";
+    static final String INTERACTIVE_PAUSE_STEP = "---pickleball-workbench-anchor";
     static final Duration START_TIMEOUT = Duration.ofSeconds(30);
     static final Duration GRACEFUL_STOP_TIMEOUT = Duration.ofSeconds(10);
     static final Duration TERMINATE_TIMEOUT = Duration.ofSeconds(5);
 
     private final Path projectRoot;
+    private final Map<String, String> workerSystemProperties;
     private final SecureRandom random = new SecureRandom();
     private WorkerSession active;
 
     public WorkbenchWorkerManager(Path projectRoot) {
+        this(projectRoot, Map.of());
+    }
+
+    public WorkbenchWorkerManager(Path projectRoot, Map<String, String> workerSystemProperties) {
         this.projectRoot = projectRoot.toAbsolutePath().normalize();
+        this.workerSystemProperties = Map.copyOf(workerSystemProperties);
     }
 
     public synchronized WorkbenchWorkerStatus startInteractive() {
@@ -56,7 +67,9 @@ public final class WorkbenchWorkerManager implements AutoCloseable {
         createDirectories(sessionDirectory, stdout.getParent());
         writeAnchor(anchor);
 
-        ProcessBuilder builder = new ProcessBuilder(workerCommand(manifest, classpath, anchor))
+        ProcessBuilder builder = new ProcessBuilder(workerCommand(
+                manifest, classpath, anchor, workerSystemProperties
+        ))
                 .directory(projectRoot.toFile())
                 .redirectOutput(stdout.toFile())
                 .redirectError(stderr.toFile());
@@ -128,6 +141,14 @@ public final class WorkbenchWorkerManager implements AutoCloseable {
         );
     }
 
+    synchronized ControlBridgeClient activeClient() {
+        return requireActive().client();
+    }
+
+    synchronized String activeScenarioId() {
+        return requireActive().scenarioId();
+    }
+
     public synchronized WorkbenchWorkerStatus stop() {
         WorkerSession session = active;
         active = null;
@@ -159,6 +180,14 @@ public final class WorkbenchWorkerManager implements AutoCloseable {
         stop();
     }
 
+    private WorkerSession requireActive() {
+        WorkerSession session = active;
+        if (session == null || !session.process().isAlive()) {
+            throw new IllegalStateException("Workbench does not own an active interactive worker for " + projectRoot);
+        }
+        return session;
+    }
+
     private static WorkbenchWorkerStatus stoppedStatus(WorkerSession session) {
         boolean running = session.process().isAlive();
         Integer exitCode = running ? null : session.process().exitValue();
@@ -178,10 +207,22 @@ public final class WorkbenchWorkerManager implements AutoCloseable {
             List<String> classpath,
             Path anchorFeature
     ) {
+        return workerCommand(manifest, classpath, anchorFeature, Map.of());
+    }
+
+    static List<String> workerCommand(
+            WorkbenchManifest manifest,
+            List<String> classpath,
+            Path anchorFeature,
+            Map<String, String> systemProperties
+    ) {
         List<String> command = new ArrayList<>();
         command.add(javaExecutable().toString());
         command.add("-D" + DynamicSuiteBootstrap.WORKBENCH_TEST_OUTPUT_ROOT_PROPERTY
                 + "=" + manifest.liveOutputPath());
+        systemProperties.entrySet().stream()
+                .sorted(Map.Entry.comparingByKey(Comparator.naturalOrder()))
+                .forEach(entry -> command.add("-D" + entry.getKey() + "=" + entry.getValue()));
         command.add("-cp");
         command.add(String.join(File.pathSeparator, classpath));
         command.add("tools.dscode.testengine.WorkbenchWorkerMain");
@@ -210,22 +251,31 @@ public final class WorkbenchWorkerManager implements AutoCloseable {
 
             Path descriptor = firstDescriptor(sessionDirectory);
             if (descriptor != null) {
+                ControlBridgeClient client;
+                List<ControlBridgeScenarioStatus> scenarios;
                 try {
-                    ControlBridgeClient client = ControlBridgeClient.fromDescriptor(descriptor, token);
-                    for (ControlBridgeScenarioStatus scenario : client.scenarios()) {
-                        if (scenario.paused()) {
-                            ScheduledExecutorService renewal = Executors.newSingleThreadScheduledExecutor(runnable -> {
-                                Thread thread = new Thread(runnable, "pickleball-workbench-lease-" + sessionId);
-                                thread.setDaemon(true);
-                                return thread;
-                            });
-                            return new WorkerSession(
-                                    sessionId, process, client, scenario.scenarioId(), renewal, stdout, stderr
-                            );
-                        }
-                    }
+                    client = ControlBridgeClient.fromDescriptor(descriptor, token);
+                    scenarios = client.scenarios();
                 } catch (RuntimeException ignored) {
                     // Descriptor may have been published just before the HTTP server is ready.
+                    sleep(50);
+                    continue;
+                }
+
+                for (ControlBridgeScenarioStatus scenario : scenarios) {
+                    if (!scenario.paused()) continue;
+
+                    ControlBridgeScenarioStatus interactive = awaitInteractivePause(
+                            process, client, scenario, deadline, stdout, stderr
+                    );
+                    ScheduledExecutorService renewal = Executors.newSingleThreadScheduledExecutor(runnable -> {
+                        Thread thread = new Thread(runnable, "pickleball-workbench-lease-" + sessionId);
+                        thread.setDaemon(true);
+                        return thread;
+                    });
+                    return new WorkerSession(
+                            sessionId, process, client, interactive.scenarioId(), renewal, stdout, stderr
+                    );
                 }
             }
             sleep(50);
@@ -234,6 +284,69 @@ public final class WorkbenchWorkerManager implements AutoCloseable {
         throw new IllegalStateException(
                 "Timed out waiting for Workbench worker anchor to pause. stdout=" + stdout + ", stderr=" + stderr
         );
+    }
+
+
+    private static ControlBridgeScenarioStatus awaitInteractivePause(
+            Process process,
+            ControlBridgeClient client,
+            ControlBridgeScenarioStatus initialPause,
+            long deadline,
+            Path stdout,
+            Path stderr
+    ) {
+        if (isInteractivePause(initialPause)) {
+            return initialPause;
+        }
+
+        ControlBridgeBreakpoint breakpoint = client.addBreakpoint(
+                initialPause.scenarioId(),
+                INTERACTIVE_PAUSE_HOOK,
+                null,
+                INTERACTIVE_PAUSE_STEP,
+                null,
+                true,
+                PAUSE_LEASE_SECONDS
+        );
+        ControlBridgeCallResult resumed = client.resume(initialPause.scenarioId());
+        if (!"SUCCESS".equals(resumed.status())) {
+            client.removeBreakpoint(breakpoint.breakpointId());
+            throw new IllegalStateException(
+                    "Could not resume Workbench bootstrap pause before the interactive boundary. status="
+                            + resumed.status()
+            );
+        }
+
+        while (System.nanoTime() < deadline) {
+            if (!process.isAlive()) {
+                throw new IllegalStateException(
+                        "Workbench worker exited before reaching the interactive pause boundary. exit="
+                                + process.exitValue() + ", stdout=" + stdout + ", stderr=" + stderr
+                );
+            }
+            ControlBridgeScenarioStatus scenario = client.scenarios().stream()
+                    .filter(candidate -> initialPause.scenarioId().equals(candidate.scenarioId()))
+                    .findFirst()
+                    .orElse(null);
+            if (scenario != null && scenario.paused() && isInteractivePause(scenario)) {
+                return scenario;
+            }
+            sleep(25);
+        }
+
+        client.removeBreakpoint(breakpoint.breakpointId());
+        throw new IllegalStateException(
+                "Timed out waiting for Workbench worker interactive boundary "
+                        + INTERACTIVE_PAUSE_HOOK + ". stdout=" + stdout + ", stderr=" + stderr
+        );
+    }
+
+
+    private static boolean isInteractivePause(ControlBridgeScenarioStatus scenario) {
+        return scenario != null
+                && INTERACTIVE_PAUSE_HOOK.equals(scenario.lastHook())
+                && scenario.stepText() != null
+                && scenario.stepText().contains(INTERACTIVE_PAUSE_STEP);
     }
 
     private static void scheduleLeaseRenewal(WorkerSession session) {
@@ -251,7 +364,6 @@ public final class WorkbenchWorkerManager implements AutoCloseable {
             }
         }, LEASE_RENEW_SECONDS, LEASE_RENEW_SECONDS, TimeUnit.SECONDS);
     }
-
 
     private static void stopLeaseRenewal(ScheduledExecutorService renewal) {
         renewal.shutdownNow();

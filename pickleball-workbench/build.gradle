@@ -68,6 +68,15 @@ tasks.assemble {
     dependsOn tasks.shadowJar
 }
 
+// The Shadow plugin supplies the executable JAR used by the Application plugin's
+// distributions. Gradle 9 requires those consumers to declare the producer task.
+def workbenchShadowJarTask = tasks.named('shadowJar')
+['startScripts', 'distZip', 'distTar', 'installDist'].each { taskName ->
+    tasks.named(taskName) {
+        dependsOn workbenchShadowJarTask
+    }
+}
+
 publishing {
     repositories {
         maven {
