@@ -55,9 +55,11 @@ java -jar pickleball-workbench-<version>.jar ui <project>
 
 The UI must remain execution-oriented and use `WorkbenchServices` / `WorkbenchController`. Do not recreate the old Studio project IDE, file editor, generic process manager, generic Maven/Gradle UI, Gradle Tooling API browser, source navigator, or collaboration subsystem.
 
-Phase 6B-1 owns only the UI shell plus selected project, synchronization/status, worker start/restart/stop/status, and clean close. Blocking synchronization, process, bridge, screenshot, and service-call actions must not run on the Swing Event Dispatch Thread. Prefer headless-safe tests around presentation/controller delegation rather than tests requiring a visible desktop.
+Phase 6B-1 established the UI shell plus selected project, synchronization/status, worker start/restart/stop/status, and clean close. Phase 6B-2 adds live raw Gherkin execution, result/status output, Mapping get/put/resolve, and incremental semantic-event refresh through `WorkbenchServices`. The Swing Mapping put control currently sends entered values as text; it does not create a second Mapping parser or state model.
 
-Later Phase 6B increments may add live Gherkin, Mapping, Step Override authoring, events/evidence, browser/service evidence, and basic breakpoints, but those controls must continue to delegate to the shared Workbench service seam.
+Blocking synchronization, process, bridge, Mapping, event, screenshot, and service-call actions must not run on the Swing Event Dispatch Thread. Live controls must target the controller-owned running/paused worker. Semantic-event cursors are worker-local and must reset when a fresh worker is started/restarted. Prefer headless-safe tests around presentation/controller delegation rather than tests requiring a visible desktop.
+
+Phase 6B-3 may add Step Override authoring, richer events/evidence, browser/service evidence, and basic breakpoints, but those controls must continue to delegate to the shared Workbench service seam.
 
 ## MCP stdio
 

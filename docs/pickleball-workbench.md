@@ -2,7 +2,7 @@
 
 Pickleball Workbench is the separate executable companion for interactive Pickleball execution and investigation. It depends on the normal shaded/woven `tools.dscode:pickleball` artifact; normal Pickleball consumers do not depend on Workbench.
 
-The current migration surface includes project synchronization, a persistent consumer worker, live runtime control, Step Override authoring, lightweight MCP stdio, and the first thin Swing UI increment. The old Studio remains temporarily present until the later migration-removal phase.
+The current migration surface includes project synchronization, a persistent consumer worker, live runtime control, Step Override authoring, lightweight MCP stdio, and the Phase 6B-2 thin Swing execution UI. The old Studio remains temporarily present until the later migration-removal phase.
 
 ## Build and run
 
@@ -37,20 +37,22 @@ java -jar $workbenchJar ui ".\maven-consumer-project"
 
 The Swing UI is a presentation adapter over the same `WorkbenchServices` / `WorkbenchController` seam used by MCP. It does not own a second worker manager, bridge client, Mapping implementation, or Pickleball execution model.
 
-Phase 6B-1 provides:
+Phase 6B-2 provides:
 
-- selected project display;
-- synchronization/status refresh;
-- synchronize project;
-- start worker;
-- restart the worker in a fresh JVM without rebuilding;
-- stop worker;
+- selected project display and synchronization/status refresh;
+- synchronize, start worker, restart fresh worker without rebuilding, and stop worker;
 - worker PID/runtime/scenario/pause status;
+- live raw Gherkin step input with optional argument text;
+- live result/status output;
+- Mapping get, put, and resolve;
+- incremental semantic-event refresh for the active worker;
 - clean Workbench shutdown when the window closes.
 
-Synchronization and worker actions run off the Swing Event Dispatch Thread so build-wrapper and bridge/process work do not freeze the UI.
+The current Mapping put control stores the entered Swing value as text. MCP continues to support arbitrary JSON-compatible Mapping values through the same service method.
 
-Later Phase 6B increments will add live Gherkin, Mapping, Step Override authoring, events/evidence, and breakpoint controls over the same service seam. The UI is intentionally execution-oriented and is not a replacement IDE, file editor, generic process manager, or generic Maven/Gradle task runner.
+Synchronization, worker actions, live bridge calls, Mapping operations, and event refresh run off the Swing Event Dispatch Thread so they do not freeze the UI. Live controls are enabled only while the Workbench-owned worker is running and paused.
+
+Phase 6B-3 will add Step Override authoring, richer events/evidence, browser/service evidence, and basic breakpoint controls over the same service seam. The UI is intentionally execution-oriented and is not a replacement IDE, file editor, generic process manager, or generic Maven/Gradle task runner.
 
 ## MCP stdio
 
@@ -168,13 +170,13 @@ io.modelcontextprotocol.sdk:mcp-json-jackson2:2.0.0
 
 Notable SDK runtime transitives include Reactor Core, SLF4J API, Jackson 2, and the JSON Schema validator used by the SDK. The SDK's servlet API dependency is provided scope rather than part of the Workbench runtime.
 
-## Phase 6B-1 validation
+## Phase 6B-2 validation
 
-Start with the exact headless-safe UI/controller test:
+Start with the exact headless-safe live/Mapping delegation test:
 
 ```powershell
 .\gradlew.bat :pickleball-workbench:test `
-  --tests "tools.dscode.workbench.ui.WorkbenchUiControllerTest.workerLifecycleDelegatesToSharedWorkbenchServices"
+  --tests "tools.dscode.workbench.ui.WorkbenchUiControllerTest.liveGherkinAndMappingDelegateToSharedWorkbenchServicesAndRefreshEvents"
 ```
 
 Then run the complete UI controller test and Workbench application test:
@@ -191,14 +193,30 @@ Then build the Workbench:
 .\gradlew.bat :pickleball-workbench:build
 ```
 
-Because this increment only adds the Swing presentation/lifecycle adapter over existing Workbench services, it does not add a Maven consumer tag. If the packaged UI launches correctly, manually verify the shell with:
+Because this increment only adds Swing presentation/controller delegation over existing Workbench live services, it does not add a Maven consumer tag. Manually verify the UI against the synchronized Maven example:
 
 ```powershell
 $workbenchJar = ".\pickleball-workbench\build\libs\pickleball-workbench-2.1.8.jar"
 java -jar $workbenchJar ui ".\maven-consumer-project"
 ```
 
-The expected first-increment UI surface is project/synchronization status plus synchronize/start/restart/stop worker controls. Do not expect live Gherkin, Mapping, Step Override, evidence, or breakpoint controls until the later Phase 6B increments.
+In the UI, start the worker and verify:
+
+1. `CONTROL API TEST STEP` executes from **Live Gherkin** with `Status: SUCCESS`.
+2. **Mapping** put writes `OVERRIDE / workbenchLiveValue = first`.
+3. Mapping get returns `first`.
+4. Mapping resolve of `<workbenchLiveValue>` returns `first`.
+5. **Recent Events** receives semantic events while these actions reuse the same paused worker.
+6. Stop the worker or close the Workbench cleanly.
+
+Then run the persistent-worker/live regression:
+
+```powershell
+java -jar $workbenchJar worker-check ".\maven-consumer-project"
+java -jar $workbenchJar live-check ".\maven-consumer-project"
+```
+
+No `@all` run is needed for this increment.
 
 ## Phase 6A regression
 

@@ -1,12 +1,19 @@
 package tools.dscode.workbench.ui;
 
 import org.junit.jupiter.api.Test;
+import tools.dscode.control.bridge.ControlBridgeCallResult;
+import tools.dscode.control.bridge.ControlBridgeEvent;
+import tools.dscode.control.bridge.ControlBridgeEventPage;
+import tools.dscode.control.bridge.ControlBridgeStatus;
+import tools.dscode.control.bridge.ControlBridgeValue;
+import tools.dscode.control.bridge.ControlBridgeValueResult;
 import tools.dscode.workbench.WorkbenchServices;
 import tools.dscode.workbench.sync.WorkbenchManifest;
 import tools.dscode.workbench.worker.WorkbenchWorkerStatus;
 
 import java.lang.reflect.Proxy;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -33,6 +40,7 @@ class WorkbenchUiControllerTest {
         assertTrue(refreshed.synchronizedProject());
         assertTrue(synchronizedState.synchronizedProject());
         assertTrue(started.workerRunning());
+        assertTrue(started.liveReady());
         assertEquals(101L, started.workerStatus().pid());
         assertEquals(202L, restarted.workerStatus().pid());
         assertFalse(stopped.workerRunning());
@@ -46,6 +54,63 @@ class WorkbenchUiControllerTest {
                 "stopWorker",
                 "close"
         ), recording.calls);
+    }
+
+    @Test
+    void liveGherkinAndMappingDelegateToSharedWorkbenchServicesAndRefreshEvents() {
+        RecordingServices recording = new RecordingServices();
+        WorkbenchUiController controller = new WorkbenchUiController(
+                Path.of("consumer"),
+                recording.services()
+        );
+
+        WorkbenchUiController.LiveActionResult step = controller.executeStep(
+                "CONTROL API TEST STEP",
+                ""
+        );
+        WorkbenchUiController.LiveActionResult put = controller.mappingPut(
+                "OVERRIDE",
+                "workbenchLiveValue",
+                "first"
+        );
+        WorkbenchUiController.LiveActionResult get = controller.mappingGet(
+                "OVERRIDE",
+                "workbenchLiveValue"
+        );
+        WorkbenchUiController.LiveActionResult resolve = controller.mappingResolve(
+                "<workbenchLiveValue>"
+        );
+
+        assertTrue(step.output().contains("Status: SUCCESS"));
+        assertTrue(step.events().contains("#1 AFTER_STEP | CONTROL API TEST STEP"));
+        assertTrue(put.output().contains("Value (STRING): first"));
+        assertTrue(get.output().contains("Value (STRING): first"));
+        assertTrue(resolve.output().contains("Value (STRING): first"));
+        assertEquals(List.of(
+                "executeStep:CONTROL API TEST STEP:null",
+                "events:0",
+                "mappingPut:OVERRIDE:workbenchLiveValue:first",
+                "events:1",
+                "mappingGet:OVERRIDE:workbenchLiveValue",
+                "events:2",
+                "mappingResolve:<workbenchLiveValue>",
+                "events:3"
+        ), recording.calls);
+    }
+
+    @Test
+    void restartResetsSemanticEventCursorForFreshWorker() {
+        RecordingServices recording = new RecordingServices();
+        WorkbenchUiController controller = new WorkbenchUiController(
+                Path.of("consumer"),
+                recording.services()
+        );
+
+        controller.refreshEvents();
+        controller.restartWorker();
+        controller.refreshEvents();
+
+        assertEquals(List.of("events:0", "restartWorker", "events:0"), recording.calls);
     }
 
     @Test
@@ -97,39 +162,128 @@ class WorkbenchUiControllerTest {
         );
     }
 
+    private static ControlBridgeStatus runtime() {
+        return new ControlBridgeStatus(
+                1,
+                "runtime-101",
+                101L,
+                1,
+                1L,
+                "scenario-101",
+                "Workbench",
+                "CONTROL API TEST STEP",
+                null,
+                "AFTER_STEP",
+                "step-signature",
+                true,
+                false,
+                List.of("events")
+        );
+    }
+
     private static final class RecordingServices {
-        private final List<String> calls = new java.util.ArrayList<>();
+        private final List<String> calls = new ArrayList<>();
         private RuntimeException synchronizationFailure;
         private WorkbenchWorkerStatus status = new WorkbenchWorkerStatus(
                 false, null, null, null, null, false, null
         );
         private int starts;
+        private long eventSequence;
 
         WorkbenchServices services() {
             return (WorkbenchServices) Proxy.newProxyInstance(
                     WorkbenchServices.class.getClassLoader(),
                     new Class<?>[]{WorkbenchServices.class},
-                    (proxy, method, args) -> {
-                        calls.add(method.getName());
-                        return switch (method.getName()) {
-                            case "synchronizationStatus" -> {
-                                if (synchronizationFailure != null) throw synchronizationFailure;
-                                yield manifest();
-                            }
-                            case "synchronize" -> manifest();
-                            case "workerStatus" -> status;
-                            case "startWorker" -> status = running(++starts == 1 ? 101L : 202L);
-                            case "restartWorker" -> status = running(202L);
-                            case "stopWorker" -> status = new WorkbenchWorkerStatus(
+                    (proxy, method, args) -> switch (method.getName()) {
+                        case "synchronizationStatus" -> {
+                            calls.add("synchronizationStatus");
+                            if (synchronizationFailure != null) throw synchronizationFailure;
+                            yield manifest();
+                        }
+                        case "synchronize" -> {
+                            calls.add("synchronize");
+                            yield manifest();
+                        }
+                        case "workerStatus" -> {
+                            calls.add("workerStatus");
+                            yield status;
+                        }
+                        case "startWorker" -> {
+                            calls.add("startWorker");
+                            eventSequence = 0;
+                            yield status = running(++starts == 1 ? 101L : 202L);
+                        }
+                        case "restartWorker" -> {
+                            calls.add("restartWorker");
+                            eventSequence = 0;
+                            yield status = running(202L);
+                        }
+                        case "stopWorker" -> {
+                            calls.add("stopWorker");
+                            eventSequence = 0;
+                            yield status = new WorkbenchWorkerStatus(
                                     false, null, null, null, null, false, 0
                             );
-                            case "close" -> null;
-                            case "toString" -> "RecordingWorkbenchServices";
-                            case "hashCode" -> System.identityHashCode(proxy);
-                            case "equals" -> proxy == args[0];
-                            default -> throw new AssertionError("Unexpected service call: " + method.getName());
-                        };
+                        }
+                        case "executeStep" -> {
+                            calls.add("executeStep:" + args[0] + ":" + args[1]);
+                            yield new ControlBridgeCallResult(
+                                    "SUCCESS", "STRING", "executed", null, runtime()
+                            );
+                        }
+                        case "mappingPut" -> {
+                            calls.add("mappingPut:" + args[0] + ":" + args[1] + ":" + args[2]);
+                            yield valueResult("first");
+                        }
+                        case "mappingGet" -> {
+                            calls.add("mappingGet:" + args[0] + ":" + args[1]);
+                            yield valueResult("first");
+                        }
+                        case "mappingResolve" -> {
+                            calls.add("mappingResolve:" + args[0]);
+                            yield valueResult("first");
+                        }
+                        case "events" -> {
+                            long after = (Long) args[0];
+                            calls.add("events:" + after);
+                            long sequence = ++eventSequence;
+                            yield new ControlBridgeEventPage(
+                                    List.of(new ControlBridgeEvent(
+                                            sequence,
+                                            "2026-08-19T00:00:00Z",
+                                            1L,
+                                            "scenario-101",
+                                            "Workbench",
+                                            "AFTER_STEP",
+                                            "step-signature",
+                                            "CONTROL API TEST STEP",
+                                            null
+                                    )),
+                                    sequence,
+                                    1L,
+                                    sequence,
+                                    false,
+                                    false
+                            );
+                        }
+                        case "close" -> {
+                            calls.add("close");
+                            yield null;
+                        }
+                        case "toString" -> "RecordingWorkbenchServices";
+                        case "hashCode" -> System.identityHashCode(proxy);
+                        case "equals" -> proxy == args[0];
+                        default -> throw new AssertionError("Unexpected service call: " + method.getName());
                     }
+            );
+        }
+
+        private static ControlBridgeValueResult valueResult(String value) {
+            return new ControlBridgeValueResult(
+                    "SUCCESS",
+                    new ControlBridgeValue("STRING", true, value, value),
+                    null,
+                    runtime()
             );
         }
     }
