@@ -41,6 +41,9 @@ bin/
 ### Mac OS ###
 .DS_Store
 
+### Pickleball Workbench disposable local state ###
+.pickleball/workbench/
+
 ### Temporary agent and migration work ###
 .agent-work/
 .agent-bootstrap-backup-*/

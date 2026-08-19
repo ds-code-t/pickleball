@@ -1,0 +1,83 @@
+import org.gradle.api.artifacts.ExternalModuleDependency
+import org.gradle.api.attributes.Category
+import org.gradle.api.attributes.LibraryElements
+import org.gradle.api.attributes.Usage
+import org.gradle.api.attributes.java.TargetJvmVersion
+
+// Internal repository-only variant used by pickleball-workbench. It exposes
+// the actual shaded/woven Pickleball JAR plus the same external runtime modules
+// that the published Pickleball POM exposes. It intentionally does not expose
+// the root project's ordinary pre-publication runtimeElements variant.
+def bundledOrOverriddenGA = [
+        'org.aspectj:aspectjrt',
+        'io.cucumber:cucumber-bom',
+        'io.cucumber:cucumber-core',
+        'io.cucumber:cucumber-gherkin',
+        'io.cucumber:cucumber-gherkin-messages',
+        'io.cucumber:cucumber-java',
+        'io.cucumber:cucumber-plugin',
+        'io.cucumber:messages',
+        'io.cucumber:gherkin'
+] as Set<String>
+
+pluginManager.withPlugin('java-library') {
+    def publishedElements = configurations.maybeCreate('pickleballPublishedElements')
+    publishedElements.canBeConsumed = true
+    publishedElements.canBeResolved = false
+    publishedElements.visible = false
+    publishedElements.description = 'Published-equivalent shaded/woven Pickleball runtime for repository companion tools.'
+    publishedElements.attributes {
+        attribute(Usage.USAGE_ATTRIBUTE, objects.named(Usage, Usage.JAVA_RUNTIME))
+        attribute(Category.CATEGORY_ATTRIBUTE, objects.named(Category, Category.LIBRARY))
+        attribute(LibraryElements.LIBRARY_ELEMENTS_ATTRIBUTE, objects.named(LibraryElements, LibraryElements.JAR))
+        attribute(TargetJvmVersion.TARGET_JVM_VERSION_ATTRIBUTE, 21)
+    }
+
+    pluginManager.withPlugin('com.gradleup.shadow') {
+        publishedElements.outgoing.artifact(tasks.named('shadowJar')) {
+            builtBy tasks.named('shadowJar')
+        }
+    }
+
+    afterEvaluate {
+        // Mirror the root publication's external dependency contract without
+        // exporting local file dependencies or the unpublished control module.
+        // ExternalModuleDependency.copy() retains version constraints and
+        // per-dependency excludes (notably cucumber-junit-platform-engine).
+        configurations.runtimeClasspath.allDependencies
+                .findAll { it instanceof ExternalModuleDependency }
+                .each { ExternalModuleDependency dependency ->
+                    def ga = "${dependency.group}:${dependency.name}"
+                    if (!bundledOrOverriddenGA.contains(ga)) {
+                        dependencies.add(publishedElements.name, dependency.copy())
+                    }
+                }
+    }
+
+    tasks.register('verifyPickleballPublishedElements') {
+        group = 'verification'
+        description = 'Verifies the repository-only published-equivalent Pickleball variant.'
+
+        doLast {
+            def forbidden = publishedElements.allDependencies.findAll { dependency ->
+                dependency.group != null && bundledOrOverriddenGA.contains("${dependency.group}:${dependency.name}")
+            }
+            if (!forbidden.isEmpty()) {
+                throw new GradleException(
+                        'Published-equivalent Pickleball variant exposes bundled/woven modules: ' +
+                                forbidden.collect { "${it.group}:${it.name}" }.sort()
+                )
+            }
+
+            def projectDependencies = publishedElements.allDependencies.findAll {
+                it instanceof org.gradle.api.artifacts.ProjectDependency
+            }
+            if (!projectDependencies.isEmpty()) {
+                throw new GradleException(
+                        'Published-equivalent Pickleball variant must not expose project dependencies: ' +
+                                projectDependencies.collect { it.path }.sort()
+                )
+            }
+        }
+    }
+}
