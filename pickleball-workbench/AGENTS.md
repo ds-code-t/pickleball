@@ -16,11 +16,13 @@ The normal `tools.dscode:pickleball` artifact must never depend on or embed Work
 
 Workbench must compile and run against the repository's published-equivalent shaded/woven Pickleball artifact through the dedicated root configuration. Do not replace that boundary with a naïve `implementation project(':')`, and do not add a dependency on the unpublished `pickleball-control-api` module.
 
-Workbench-only dependencies, including the future MCP SDK, belong only on the Workbench classpath. Do not move consumer-worker runtime semantics into the controller merely to simplify dependencies.
+Workbench-only dependencies, including the MCP SDK, belong only on the Workbench classpath. Phase 6A uses the non-Spring MCP Java SDK core plus its Jackson 2 adapter; do not replace them with the convenience/Jackson 3 artifact or Spring transports without a new architecture decision. Do not move consumer-worker runtime semantics into the controller merely to simplify dependencies.
 
 ## Runtime ownership
 
 The Workbench controller owns synchronization, worker process/session lifecycle, bridge client behavior, MCP stdio, and the thin Swing UI. Pickleball owns consumer-worker behavior such as the bridge server/coordinator, DynamicControl/Gherkin execution, Step Override runtime, Mapping state, browser/service-call access, and woven Cucumber integration.
+
+`WorkbenchServices` is the shared plain-Java adapter boundary. `WorkbenchController` composes synchronization and `WorkbenchLiveSession`; MCP and the future Swing UI must delegate to that service surface instead of implementing their own worker ownership, bridge calls, Mapping semantics, Step Override behavior, or scenario retry rules.
 
 The Workbench bridge client uses the public `tools.dscode.control.bridge.*` DTOs from the normal Pickleball artifact. Do not create a second controller-side model of Pickleball execution semantics.
 
@@ -35,9 +37,23 @@ PKB_CONTROL_BRIDGE_PAUSE_FIRST_SCENARIO
 
 During the Studio-to-Workbench migration, Pickleball may accept the old `PKB_STUDIO_BRIDGE_*` names as input aliases. New Workbench code must emit only the neutral `PKB_CONTROL_BRIDGE_*` names.
 
-When MCP mode is added, process stdout is protocol-only. Controller logs, worker stdout/stderr, and Pickleball runtime logging must be routed away from MCP stdout.
-
 Project-local `.pickleball/workbench/` content is disposable state and must not be treated as source.
+
+## MCP stdio
+
+Phase 6A provides:
+
+```text
+java -jar pickleball-workbench-<version>.jar mcp <project>
+```
+
+The MCP adapter is `tools.dscode.workbench.mcp.WorkbenchMcpServer` plus `WorkbenchMcpTools`. It exposes project synchronization/status, interactive worker lifecycle, live Gherkin, Mapping operations, events/evidence, browser/service controls, semantic breakpoints, and Step Override authoring through `WorkbenchServices`.
+
+MCP stdout is a hard protocol boundary. `WorkbenchApplication` reserves the original process stdout for the stdio transport and redirects ordinary `System.out` output to stderr before constructing the MCP SDK/controller. The executable must explicitly remain alive for the stdio session until stdin reaches EOF; do not rely on MCP SDK worker-thread liveness to keep the JVM running. Workbench diagnostic text must use stderr or `.pickleball/workbench/logs/`; worker stdout/stderr remain separately redirected to worker log files. No banner, normal log, worker output, test output, or diagnostic chatter may be written to MCP stdout.
+
+MCP tool failures are represented as MCP tool results with `isError=true`; they must not escape as arbitrary stdout text. Keep protocol tests covering initialize, tool listing, representative controller calls, invalid requests, Step Override compile invocation, protocol-only output, and cleanup.
+
+Do not add generic IDE/file/build/process/collaboration tools to this MCP surface. Synchronization may invoke project wrappers through the existing synchronizer, but MCP must not become a generic Maven/Gradle execution API.
 
 ## Synchronization and worker lifecycle
 

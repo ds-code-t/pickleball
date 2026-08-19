@@ -69,6 +69,19 @@ These methods use the existing authenticated loopback control bridge and always 
 
 The corresponding bridge capabilities are `step_overrides` and `step_override_compile`, with management endpoints under `/v1/step-overrides`.
 
+## MCP authoring
+
+Workbench MCP exposes the same facade through:
+
+```text
+workbench_step_override_list
+workbench_step_override_compile
+workbench_step_override_remove
+workbench_step_override_clear
+```
+
+`workbench_step_override_compile` accepts the override id, regex, and the same Java source template containing `{{CLASS_NAME}}`. MCP does not compile or match handlers itself; it delegates through the shared Workbench controller to the paused worker, so replacement, classloader lifetime, capture handling, and ordinary Cucumber fallback remain worker-side Pickleball behavior.
+
 ## Lifetime and cleanup
 
 Overrides are scenario-scoped. Scenario teardown clears remaining rules, and restarting the worker provides a fresh JVM and classloader boundary. The generated-handler count is bounded per worker; restart the worker when the runtime reports that the generation limit has been reached.

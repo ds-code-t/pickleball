@@ -28,6 +28,7 @@ docs/key-parser-dsl.md
 docs/mapping-and-templating.md
 docs/nested-steps.md
 docs/pickleball-studio.md
+docs/pickleball-workbench.md
 docs/service-call-scenarios.md
 docs/step-overrides.md
 docs/studio-collaboration.md

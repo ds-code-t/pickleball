@@ -12,13 +12,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class WorkbenchApplicationTest {
 
     @Test
-    void helpListsSynchronizationWorkerAndLiveCommands() {
+    void helpListsSynchronizationWorkerLiveAndMcpCommands() {
         Output output = run("--help");
 
         assertEquals(0, output.exitCode());
         assertTrue(output.stdout().contains("sync <project>"));
         assertTrue(output.stdout().contains("worker-check <project>"));
         assertTrue(output.stdout().contains("live-check <project>"));
+        assertTrue(output.stdout().contains("mcp <project>"));
         assertEquals("", output.stderr());
     }
 
@@ -46,6 +47,22 @@ class WorkbenchApplicationTest {
 
         assertEquals(1, output.exitCode());
         assertTrue(output.stderr().contains("Usage: pickleball-workbench live-check <project>"));
+    }
+
+    @Test
+    void mcpRequiresExactlyOneProjectBeforeTouchingProtocolStreams() {
+        ByteArrayOutputStream stdout = new ByteArrayOutputStream();
+        ByteArrayOutputStream stderr = new ByteArrayOutputStream();
+        int exitCode;
+        try (PrintStream out = new PrintStream(stdout, true, StandardCharsets.UTF_8);
+             PrintStream err = new PrintStream(stderr, true, StandardCharsets.UTF_8)) {
+            exitCode = WorkbenchApplication.runMcpProcess(new String[]{"mcp"}, out, err);
+        }
+
+        assertEquals(1, exitCode);
+        assertEquals("", stdout.toString(StandardCharsets.UTF_8));
+        assertTrue(stderr.toString(StandardCharsets.UTF_8)
+                .contains("Usage: pickleball-workbench mcp <project>"));
     }
 
     private static Output run(String... args) {

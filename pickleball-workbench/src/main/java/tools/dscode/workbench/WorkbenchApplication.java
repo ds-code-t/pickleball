@@ -5,16 +5,21 @@ import tools.dscode.control.bridge.ControlBridgeCallResult;
 import tools.dscode.control.bridge.ControlBridgeServiceCallResult;
 import tools.dscode.control.bridge.ControlBridgeStepOverrideResult;
 import tools.dscode.control.bridge.ControlBridgeValueResult;
+import tools.dscode.workbench.mcp.WorkbenchMcpServer;
 import tools.dscode.workbench.sync.WorkbenchManifest;
 import tools.dscode.workbench.sync.WorkbenchSynchronizer;
 import tools.dscode.workbench.worker.WorkbenchLiveSession;
 import tools.dscode.workbench.worker.WorkbenchWorkerManager;
 import tools.dscode.workbench.worker.WorkbenchWorkerStatus;
 
+import java.io.FilterInputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.io.PrintStream;
 import java.nio.file.Path;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.CountDownLatch;
 
 /** Entry point for the standalone Pickleball Workbench controller. */
 public final class WorkbenchApplication {
@@ -23,6 +28,12 @@ public final class WorkbenchApplication {
     }
 
     public static void main(String[] args) {
+        if (args.length > 0 && "mcp".equals(args[0])) {
+            int exitCode = runMcpProcess(args, System.out, System.err);
+            if (exitCode != 0) System.exit(exitCode);
+            return;
+        }
+
         int exitCode = run(args, System.out, System.err);
         if (exitCode != 0) System.exit(exitCode);
     }
@@ -43,6 +54,9 @@ public final class WorkbenchApplication {
                 case "status" -> status(args, out);
                 case "worker-check" -> workerCheck(args, out);
                 case "live-check" -> liveCheck(args, out);
+                case "mcp" -> throw new IllegalArgumentException(
+                        "MCP mode must be launched through the Workbench executable."
+                );
                 default -> {
                     err.println("Unknown Workbench command: " + args[0]);
                     err.println("Run with --help for available commands.");
@@ -52,6 +66,77 @@ public final class WorkbenchApplication {
         } catch (RuntimeException failure) {
             err.println("Workbench " + args[0] + " failed: " + failure.getMessage());
             return 1;
+        }
+    }
+
+    static int runMcpProcess(String[] args, PrintStream protocolOut, PrintStream err) {
+        try {
+            Path project = requiredProject(args, "mcp");
+
+            // MCP stdio owns the original stdout stream. Redirect ordinary JVM stdout
+            // before constructing SDK/controller services so diagnostics cannot corrupt it.
+            System.setOut(err);
+            CountDownLatch inputClosed = new CountDownLatch(1);
+            InputStream input = new EofSignalingInputStream(System.in, inputClosed);
+            WorkbenchMcpServer server = new WorkbenchMcpServer(project, input, protocolOut);
+            Runtime.getRuntime().addShutdownHook(new Thread(
+                    server::close,
+                    "pickleball-workbench-mcp-shutdown"
+            ));
+
+            try {
+                inputClosed.await();
+            } catch (InterruptedException failure) {
+                Thread.currentThread().interrupt();
+                err.println("Workbench mcp interrupted.");
+                return 1;
+            } finally {
+                server.close();
+            }
+            return 0;
+        } catch (RuntimeException failure) {
+            err.println("Workbench mcp failed: " + failure.getMessage());
+            return 1;
+        }
+    }
+
+    private static final class EofSignalingInputStream extends FilterInputStream {
+        private final CountDownLatch inputClosed;
+
+        private EofSignalingInputStream(InputStream input, CountDownLatch inputClosed) {
+            super(input);
+            this.inputClosed = inputClosed;
+        }
+
+        @Override
+        public int read() throws IOException {
+            try {
+                return signal(super.read());
+            } catch (IOException failure) {
+                inputClosed.countDown();
+                throw failure;
+            }
+        }
+
+        @Override
+        public int read(byte[] buffer, int offset, int length) throws IOException {
+            try {
+                return signal(super.read(buffer, offset, length));
+            } catch (IOException failure) {
+                inputClosed.countDown();
+                throw failure;
+            }
+        }
+
+        @Override
+        public void close() throws IOException {
+            inputClosed.countDown();
+            super.close();
+        }
+
+        private int signal(int read) {
+            if (read < 0) inputClosed.countDown();
+            return read;
         }
     }
 
@@ -327,10 +412,12 @@ public final class WorkbenchApplication {
         out.println("  java -jar pickleball-workbench-<version>.jar status <project>");
         out.println("  java -jar pickleball-workbench-<version>.jar worker-check <project>");
         out.println("  java -jar pickleball-workbench-<version>.jar live-check <project>");
+        out.println("  java -jar pickleball-workbench-<version>.jar mcp <project>");
         out.println("  java -jar pickleball-workbench-<version>.jar --version");
         out.println();
         out.println("sync uses the selected project wrapper and materializes .pickleball/workbench.");
         out.println("worker-check starts, restarts, and gracefully stops direct consumer workers without rebuilding.");
         out.println("live-check exercises raw Gherkin, Step Override, and live runtime operations on one persistent worker.");
+        out.println("mcp serves the same Workbench services over protocol-only stdio; diagnostics use stderr/log files.");
     }
 }

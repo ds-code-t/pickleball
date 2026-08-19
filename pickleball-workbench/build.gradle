@@ -18,10 +18,17 @@ java {
     withJavadocJar()
 }
 
+def mcpSdkVersion = '2.0.0'
+
 dependencies {
     // Deliberately target the root project's published-equivalent shaded/woven
     // variant. Do not replace this with a naïve implementation project(':').
     implementation project(path: ':', configuration: 'pickleballPublishedElements')
+
+    // Keep MCP Workbench-only and non-Spring. Jackson 2 matches Pickleball's
+    // existing ObjectMapper usage without pulling the SDK convenience/Jackson 3 path.
+    implementation "io.modelcontextprotocol.sdk:mcp-core:${mcpSdkVersion}"
+    implementation "io.modelcontextprotocol.sdk:mcp-json-jackson2:${mcpSdkVersion}"
 
     testImplementation 'org.junit.jupiter:junit-jupiter:5.13.4'
     testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.13.4'
@@ -145,6 +152,13 @@ publishing {
 }
 
 def workbenchJar = tasks.named('shadowJar').flatMap { it.archiveFile }
+
+tasks.named('test') {
+    dependsOn tasks.shadowJar
+    doFirst {
+        systemProperty 'pickleball.workbench.test.jar', workbenchJar.get().asFile.absolutePath
+    }
+}
 def rootPickleballJar = rootProject.tasks.named('shadowJar').flatMap { it.archiveFile }
 
 tasks.register('verifyWorkbenchArtifact') {
@@ -162,16 +176,20 @@ tasks.register('verifyWorkbenchArtifact') {
             if (jar.getEntry('tools/dscode/workbench/WorkbenchApplication.class') == null) {
                 throw new GradleException('Workbench executable is missing WorkbenchApplication.class')
             }
+            if (jar.getEntry('tools/dscode/workbench/mcp/WorkbenchMcpServer.class') == null) {
+                throw new GradleException('Workbench executable is missing WorkbenchMcpServer.class')
+            }
         }
 
         new java.util.jar.JarFile(rootPickleballJar.get().asFile).withCloseable { jar ->
             def leaked = java.util.Collections.list(jar.entries()).findAll { entry ->
                 entry.name.startsWith('tools/dscode/workbench/') ||
-                        entry.name.startsWith('META-INF/pickleball/workbench/')
+                        entry.name.startsWith('META-INF/pickleball/workbench/') ||
+                        entry.name.startsWith('io/modelcontextprotocol/')
             }
             if (!leaked.isEmpty()) {
                 throw new GradleException(
-                        'Workbench content leaked into the normal Pickleball artifact: ' +
+                        'Workbench/MCP content leaked into the normal Pickleball artifact: ' +
                                 leaked.collect { it.name }.take(10)
                 )
             }
@@ -225,6 +243,21 @@ tasks.register('verifyWorkbenchRuntimeBoundary') {
         }
         if (!unpublishedControl.isEmpty()) {
             throw new GradleException('Workbench runtime depends on unpublished :pickleball-control-api')
+        }
+
+        def forbiddenMcpModules = artifacts.findAll { artifact ->
+            def component = artifact.id.componentIdentifier
+            component instanceof org.gradle.api.artifacts.component.ModuleComponentIdentifier &&
+                    component.group == 'io.modelcontextprotocol.sdk' &&
+                    (component.module == 'mcp' || component.module == 'mcp-json-jackson3')
+        }.collect { artifact ->
+            def component = artifact.id.componentIdentifier
+            "${component.group}:${component.module}:${component.version}"
+        }.sort()
+        if (!forbiddenMcpModules.isEmpty()) {
+            throw new GradleException(
+                    'Workbench MCP resolved the convenience/Jackson 3 path: ' + forbiddenMcpModules
+            )
         }
     }
 }
@@ -295,12 +328,161 @@ tasks.register('verifyWorkbenchEntrypoint', Exec) {
     }
 }
 
+tasks.register('verifyWorkbenchMcpStdio') {
+    group = 'verification'
+    description = 'Runs an interactive packaged stdio MCP handshake/tool-list probe and verifies stdout is JSON-RPC only.'
+    dependsOn tasks.shadowJar
+
+    doLast {
+        def launcher = javaToolchains.launcherFor {
+            languageVersion = JavaLanguageVersion.of(21)
+        }.get()
+        def process = new ProcessBuilder(
+                launcher.executablePath.asFile.absolutePath,
+                '-jar',
+                workbenchJar.get().asFile.absolutePath,
+                'mcp',
+                rootProject.projectDir.absolutePath
+        ).start()
+        def writer = process.outputStream.newWriter('UTF-8')
+        def reader = process.inputStream.newReader('UTF-8')
+        def stderr = new ByteArrayOutputStream()
+        def stderrThread = new Thread({
+            try {
+                process.errorStream.transferTo(stderr)
+            } catch (Exception ignored) {
+                // Process shutdown closes the stream.
+            }
+        }, 'workbench-mcp-probe-stderr')
+        stderrThread.daemon = true
+        stderrThread.start()
+        def reads = java.util.concurrent.Executors.newSingleThreadExecutor({ runnable ->
+            def thread = new Thread(runnable, 'workbench-mcp-probe-stdout')
+            thread.daemon = true
+            thread
+        } as java.util.concurrent.ThreadFactory)
+
+        def send = { Map message ->
+            writer.write(groovy.json.JsonOutput.toJson(message))
+            writer.write(System.lineSeparator())
+            writer.flush()
+        }
+        def readResponse = { int timeoutSeconds ->
+            def future = reads.submit({ reader.readLine() } as java.util.concurrent.Callable<String>)
+            try {
+                def line = future.get(timeoutSeconds, java.util.concurrent.TimeUnit.SECONDS)
+                if (line == null) {
+                    throw new GradleException(
+                            "Workbench MCP stdout closed before a response. stderr=${stderr.toString('UTF-8')}"
+                    )
+                }
+                try {
+                    return new groovy.json.JsonSlurper().parseText(line)
+                } catch (Exception failure) {
+                    throw new GradleException("Non-protocol output on Workbench MCP stdout: ${line}", failure)
+                }
+            } catch (java.util.concurrent.TimeoutException failure) {
+                throw new GradleException(
+                        "Timed out waiting for Workbench MCP response. stderr=${stderr.toString('UTF-8')}",
+                        failure
+                )
+            } finally {
+                if (!future.isDone()) future.cancel(true)
+            }
+        }
+
+        try {
+            send([
+                    jsonrpc: '2.0', id: 1, method: 'initialize', params: [
+                    protocolVersion: '2025-11-25', capabilities: [:],
+                    clientInfo: [name: 'gradle-probe', version: '1.0']
+            ]])
+            def initialized = readResponse(15)
+            if (initialized.id != 1 || initialized.result?.serverInfo?.name != 'pickleball-workbench') {
+                throw new GradleException("Unexpected Workbench MCP initialize response: ${initialized}")
+            }
+
+            send([jsonrpc: '2.0', method: 'notifications/initialized', params: [:]])
+            send([jsonrpc: '2.0', id: 2, method: 'tools/list', params: [:]])
+            def listed = readResponse(5)
+            def names = (listed.result?.tools ?: []).collect { it.name } as Set
+            if (!names.containsAll([
+                    'workbench_worker_status',
+                    'workbench_execute_step',
+                    'workbench_step_override_compile'
+            ])) {
+                throw new GradleException("Workbench MCP tool list is incomplete: ${names}")
+            }
+
+            writer.close()
+            if (!process.waitFor(5, java.util.concurrent.TimeUnit.SECONDS)) {
+                process.destroy()
+                if (!process.waitFor(2, java.util.concurrent.TimeUnit.SECONDS)) process.destroyForcibly()
+                throw new GradleException('Workbench MCP process did not exit after stdin closed.')
+            }
+            if (process.exitValue() != 0) {
+                throw new GradleException(
+                        "Workbench MCP process exited ${process.exitValue()}. stderr=${stderr.toString('UTF-8')}"
+                )
+            }
+            def extra = reader.readLine()
+            if (extra != null && !extra.isBlank()) {
+                throw new GradleException("Unexpected extra Workbench MCP stdout: ${extra}")
+            }
+        } finally {
+            reads.shutdownNow()
+            try { writer.close() } catch (Exception ignored) { }
+            process.destroyForcibly()
+            try { reader.close() } catch (Exception ignored) { }
+        }
+    }
+}
+
+tasks.register('reportWorkbenchMcpImpact') {
+    group = 'verification'
+    description = 'Reports Workbench executable size and resolved MCP dependency artifacts.'
+    dependsOn tasks.shadowJar
+
+    doLast {
+        def jarFile = workbenchJar.get().asFile
+        println "Workbench executable: ${jarFile.absolutePath}"
+        println "Workbench executable bytes: ${jarFile.length()}"
+
+        def mcpArtifacts = configurations.runtimeClasspath.incoming.artifacts.artifacts.findAll { artifact ->
+            def component = artifact.id.componentIdentifier
+            component instanceof org.gradle.api.artifacts.component.ModuleComponentIdentifier &&
+                    component.group == 'io.modelcontextprotocol.sdk'
+        }.collect { artifact ->
+            def component = artifact.id.componentIdentifier
+            "${component.group}:${component.module}:${component.version} (${artifact.file.length()} bytes)"
+        }.sort()
+
+        println 'Resolved MCP SDK artifacts:'
+        mcpArtifacts.each { println "  ${it}" }
+
+        def renderDependency
+        renderDependency = { dependency, String indent ->
+            println "${indent}${dependency.moduleGroup}:${dependency.moduleName}:${dependency.moduleVersion}"
+            dependency.children.toList().sort { a, b ->
+                "${a.moduleGroup}:${a.moduleName}" <=> "${b.moduleGroup}:${b.moduleName}"
+            }.each { child -> renderDependency(child, indent + '  ') }
+        }
+        println 'MCP dependency tree:'
+        configurations.runtimeClasspath.resolvedConfiguration.firstLevelModuleDependencies
+                .findAll { it.moduleGroup == 'io.modelcontextprotocol.sdk' }
+                .sort { a, b -> a.moduleName <=> b.moduleName }
+                .each { dependency -> renderDependency(dependency, '  ') }
+    }
+}
+
 tasks.named('test') {
     dependsOn rootProject.tasks.named('verifyPickleballPublishedElements')
     finalizedBy(
             tasks.named('verifyWorkbenchArtifact'),
             tasks.named('verifyWorkbenchRuntimeBoundary'),
             tasks.named('verifyWorkbenchPublishedDependencyContract'),
-            tasks.named('verifyWorkbenchEntrypoint')
+            tasks.named('verifyWorkbenchEntrypoint'),
+            tasks.named('verifyWorkbenchMcpStdio'),
+            tasks.named('reportWorkbenchMcpImpact')
     )
 }

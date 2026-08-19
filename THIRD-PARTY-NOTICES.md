@@ -91,6 +91,11 @@ The following components are licensed under the MIT License:
 - io.cucumber:gherkin:35.1.0
 - io.cucumber:cucumber-junit-platform-engine:7.27.2
 
+Pickleball Workbench additionally shades the official Java MCP SDK components:
+
+- io.modelcontextprotocol.sdk:mcp-core:2.0.0
+- io.modelcontextprotocol.sdk:mcp-json-jackson2:2.0.0
+
 Pickleball Studio source navigation also embeds `io.cucumber:gherkin:35.1.0` and
 `io.cucumber:messages:29.0.1` inside its isolated nested executable JAR.
 

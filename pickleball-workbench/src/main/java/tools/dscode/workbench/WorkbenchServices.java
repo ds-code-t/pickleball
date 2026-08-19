@@ -1,0 +1,83 @@
+package tools.dscode.workbench;
+
+import tools.dscode.control.bridge.ControlBridgeBreakpoint;
+import tools.dscode.control.bridge.ControlBridgeBrowserPageResult;
+import tools.dscode.control.bridge.ControlBridgeBrowserScreenshotResult;
+import tools.dscode.control.bridge.ControlBridgeCallResult;
+import tools.dscode.control.bridge.ControlBridgeElementInspectionResult;
+import tools.dscode.control.bridge.ControlBridgeEventPage;
+import tools.dscode.control.bridge.ControlBridgeMappingSnapshot;
+import tools.dscode.control.bridge.ControlBridgeMappingSnapshotResult;
+import tools.dscode.control.bridge.ControlBridgeServiceCallResult;
+import tools.dscode.control.bridge.ControlBridgeStepOverride;
+import tools.dscode.control.bridge.ControlBridgeStepOverrideResult;
+import tools.dscode.control.bridge.ControlBridgeValueResult;
+import tools.dscode.workbench.sync.WorkbenchManifest;
+import tools.dscode.workbench.worker.WorkbenchWorkerStatus;
+
+import java.util.List;
+
+/** Shared Workbench controller surface used by protocol and presentation adapters. */
+public interface WorkbenchServices extends AutoCloseable {
+    WorkbenchManifest synchronize();
+
+    WorkbenchManifest synchronizationStatus();
+
+    WorkbenchWorkerStatus startWorker();
+
+    WorkbenchWorkerStatus restartWorker();
+
+    WorkbenchWorkerStatus stopWorker();
+
+    WorkbenchWorkerStatus workerStatus();
+
+    ControlBridgeCallResult executeStep(String text, String argument);
+
+    ControlBridgeValueResult mappingGet(String mapReference, String key);
+
+    ControlBridgeValueResult mappingPut(String mapReference, String key, Object value);
+
+    ControlBridgeValueResult mappingResolve(String input);
+
+    ControlBridgeMappingSnapshotResult mappingSnapshot(String mapReference);
+
+    ControlBridgeCallResult mappingRestore(ControlBridgeMappingSnapshot snapshot);
+
+    ControlBridgeEventPage events(Long afterSequence, Integer limit);
+
+    ControlBridgeBrowserPageResult browserPage();
+
+    ControlBridgeBrowserScreenshotResult browserScreenshot();
+
+    ControlBridgeElementInspectionResult elementInspect(
+            String category, String text, String operation, Integer maxElements
+    );
+
+    ControlBridgeServiceCallResult serviceCall(String selector);
+
+    List<ControlBridgeBreakpoint> breakpoints();
+
+    ControlBridgeBreakpoint addBreakpoint(
+            String hook,
+            String signatureContains,
+            String stepContains,
+            String phraseContains,
+            boolean oneShot,
+            Integer leaseSeconds
+    );
+
+    boolean removeBreakpoint(String breakpointId);
+
+    int clearBreakpoints();
+
+    List<ControlBridgeStepOverride> stepOverrides();
+
+    ControlBridgeStepOverrideResult compileStepOverride(String id, String regex, String source);
+
+    boolean removeStepOverride(String id);
+
+    int clearStepOverrides();
+
+    @Override
+    void close();
+}
