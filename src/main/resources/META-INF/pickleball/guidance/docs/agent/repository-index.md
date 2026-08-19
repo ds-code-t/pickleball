@@ -47,14 +47,10 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/key-parser-dsl.md`
 - `docs/mapping-and-templating.md`
 - `docs/nested-steps.md`
-- `docs/pickleball-studio.md`
 - `docs/pickleball-workbench.md`
 - `docs/README.md`
 - `docs/service-call-scenarios.md`
 - `docs/step-overrides.md`
-- `docs/studio-collaboration.md`
-- `docs/studio-runtime-bridge.md`
-- `docs/studio-runtime-investigation.md`
 
 ## Framework Java and AspectJ source
 
@@ -370,8 +366,6 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/parallelutilities/Stagger.java`
 - `src/main/java/tools/dscode/pickleruntime/CucumberOptionResolver.java`
 - `src/main/java/tools/dscode/registry/GlobalRegistry.java`
-- `src/main/java/tools/dscode/studio/launcher/PickleballMain.java`
-- `src/main/java/tools/dscode/studio/launcher/StudioLauncher.java`
 - `src/main/java/tools/dscode/testengine/DynamicEngineDiscoveryRequest.java`
 - `src/main/java/tools/dscode/testengine/DynamicSuiteBootstrap.java`
 - `src/main/java/tools/dscode/testengine/DynamicSuiteConfigUtils.java`
@@ -391,7 +385,6 @@ This inventory helps coding agents discover relevant files. It does not replace 
 ## Framework tests
 
 - `src/test/java/tools/dscode/control/override/StepOverrideCompilerTest.java`
-- `src/test/java/tools/dscode/studio/launcher/StudioLauncherTest.java`
 - `src/test/java/tools/dscode/testengine/DynamicSuiteBootstrapWorkbenchRootTest.java`
 
 ## Control API module
