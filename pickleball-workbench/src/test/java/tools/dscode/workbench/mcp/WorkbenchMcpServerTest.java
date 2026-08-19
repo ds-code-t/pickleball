@@ -35,11 +35,18 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class WorkbenchMcpServerTest {
     private static final ObjectMapper JSON = new ObjectMapper();
-    private static final Duration STARTUP_TIMEOUT = Duration.ofSeconds(15);
+    private static final Duration STARTUP_TIMEOUT = Duration.ofSeconds(5);
     private static final Duration RESPONSE_TIMEOUT = Duration.ofSeconds(5);
 
     @TempDir
     Path project;
+
+    @Test
+    void packagedServerCompletesInitializeHandshake() throws Exception {
+        try (ProcessHarness harness = new ProcessHarness(project)) {
+            harness.initialize();
+        }
+    }
 
     @Test
     void packagedServerInitializesListsToolsInvokesControllerAndKeepsStdoutProtocolOnly()
@@ -214,8 +221,12 @@ class WorkbenchMcpServerTest {
                     + ",\"params\":" + paramsJson + "}");
         }
 
-        private void send(String line) throws Exception {
-            writer.write(line);
+        private void send(String json) throws Exception {
+            String frame = JSON.writeValueAsString(JSON.readTree(json));
+            if (frame.indexOf('\n') >= 0 || frame.indexOf('\r') >= 0) {
+                throw new AssertionError("MCP stdio frame contains an embedded newline: " + frame);
+            }
+            writer.write(frame);
             writer.newLine();
             writer.flush();
         }
