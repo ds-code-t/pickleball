@@ -2,10 +2,14 @@ package tools.dscode.testengine;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import tools.dscode.common.reporting.logging.Entry;
+import tools.dscode.common.reporting.logging.Level;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -31,6 +35,7 @@ class DynamicSuiteBootstrapWorkbenchRootTest {
             else System.setProperty(property, previous);
         }
     }
+
     @Test
     void ordinaryBuildOutputHeuristicsRemainWhenWorkbenchRootIsAbsent() throws Exception {
         String property = DynamicSuiteBootstrap.WORKBENCH_TEST_OUTPUT_ROOT_PROPERTY;
@@ -46,4 +51,27 @@ class DynamicSuiteBootstrapWorkbenchRootTest {
         }
     }
 
+    @Test
+    void liveDetachedTypedLoggingAllowsUntypedParent() {
+        Entry scenario = Entry.of("scenario");
+        Entry detached = scenario.child("Detached control step");
+
+        assertDoesNotThrow(() -> detached.logWithType("PHRASE", "assertion", Level.INFO));
+
+        assertEquals("PHRASE", detached.normalizedType);
+        assertEquals(1, detached.count);
+        assertEquals(1, detached.flatCount);
+    }
+
+    @Test
+    void sameTypeParentStillSharesNestedCounts() {
+        Entry parent = Entry.of("parent");
+        parent.logWithType("STEP", "parent", Level.INFO);
+        Entry child = parent.child("child");
+
+        child.logWithType("STEP", "child", Level.INFO);
+
+        assertEquals(2, child.count);
+        assertEquals(2, child.flatCount);
+    }
 }

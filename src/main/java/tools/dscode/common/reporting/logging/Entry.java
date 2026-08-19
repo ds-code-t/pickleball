@@ -163,10 +163,11 @@ public class Entry {
 
         return guarded(() -> {
             normalizedType = type.trim();
-            if(parent != null){
+            if (parent != null) {
                 typeFlatCounts = parent.typeFlatCounts;
-                if(parent.normalizedType.equals(normalizedType))
-                    typeCounts =  parent.typeCounts;
+                if (normalizedType.equals(parent.normalizedType)) {
+                    typeCounts = parent.typeCounts;
+                }
             }
             count = typeCounts
                     .computeIfAbsent(normalizedType, ignored -> new AtomicInteger())

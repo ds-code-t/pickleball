@@ -374,12 +374,14 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/testengine/PKB_props.java`
 - `src/main/java/tools/dscode/testengine/PkbPropertyValueNormalizer.java`
 - `src/main/java/tools/dscode/testengine/SensitiveConfiguration.java`
+- `src/main/java/tools/dscode/testengine/WorkbenchWorkerMain.java`
 - `src/main/resources/META-INF/services/org.junit.platform.engine.TestEngine`
 - `src/main/resources/META-INF/services/org.junit.platform.launcher.LauncherSessionListener`
 
 ## Framework tests
 
 - `src/test/java/tools/dscode/studio/launcher/StudioLauncherTest.java`
+- `src/test/java/tools/dscode/testengine/DynamicSuiteBootstrapWorkbenchRootTest.java`
 
 ## Control API module
 
@@ -433,9 +435,19 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-workbench/AGENTS.md`
 - `pickleball-workbench/build.gradle`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/bridge/ControlBridgeClient.java`
+- `pickleball-workbench/src/main/java/tools/dscode/workbench/sync/WorkbenchManifest.java`
+- `pickleball-workbench/src/main/java/tools/dscode/workbench/sync/WorkbenchProject.java`
+- `pickleball-workbench/src/main/java/tools/dscode/workbench/sync/WorkbenchSynchronizer.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/WorkbenchApplication.java`
+- `pickleball-workbench/src/main/java/tools/dscode/workbench/worker/WorkbenchLiveSession.java`
+- `pickleball-workbench/src/main/java/tools/dscode/workbench/worker/WorkbenchWorkerManager.java`
+- `pickleball-workbench/src/main/java/tools/dscode/workbench/worker/WorkbenchWorkerStatus.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/bridge/ControlBridgeClientTest.java`
+- `pickleball-workbench/src/test/java/tools/dscode/workbench/sync/WorkbenchGradleSynchronizerIntegrationTest.java`
+- `pickleball-workbench/src/test/java/tools/dscode/workbench/sync/WorkbenchSynchronizerTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/WorkbenchApplicationTest.java`
+- `pickleball-workbench/src/test/java/tools/dscode/workbench/worker/WorkbenchLiveSessionTest.java`
+- `pickleball-workbench/src/test/java/tools/dscode/workbench/worker/WorkbenchWorkerManagerTest.java`
 
 ## Pickleball Studio module
 
