@@ -1,5 +1,5 @@
 @all @smoke @control-bridge @phase3h @phase4
-Feature: Pickleball Studio control bridge
+Feature: Pickleball Workbench consumer-worker control bridge
 
   Scenario: Paused runtime supports retry-friendly investigation and control
     Given BEGIN CONTROL BRIDGE IPC TEST
