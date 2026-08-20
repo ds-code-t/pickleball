@@ -2,7 +2,7 @@
 
 Pickleball Workbench is the separate executable companion for interactive Pickleball execution and investigation. It depends on the normal shaded/woven `tools.dscode:pickleball` artifact; normal Pickleball consumers do not depend on Workbench.
 
-Workbench replaces the former Pickleball Studio application. The final surface is deliberately execution-oriented: project synchronization, a persistent consumer worker, live runtime control, Mapping, browser/service evidence, semantic breakpoints, Step Override authoring, lightweight non-Spring MCP stdio, and a thin Swing UI.
+Workbench replaces the former Pickleball Studio application. The supported architecture is deliberately execution-oriented: project synchronization, a persistent consumer worker, live runtime control, Mapping, browser/service evidence, semantic breakpoints, Step Override authoring, lightweight non-Spring MCP stdio, and a Swing UI over the same service seam.
 
 ## Architecture
 
@@ -14,7 +14,7 @@ pickleball-workbench -> pickleball
 
 Pickleball owns scenario execution semantics, Cucumber integration, DynamicControl/Gherkin execution, Mapping, browser/service behavior, the consumer-side Control Bridge, semantic hooks/breakpoints, Step Overrides, and woven Cucumber/AspectJ behavior.
 
-Workbench owns synchronization, `.pickleball/workbench/` disposable state, worker lifecycle, the controller-side bridge client, `WorkbenchLiveSession`, `WorkbenchServices` / `WorkbenchController`, MCP stdio, and the thin Swing UI.
+Workbench owns synchronization, `.pickleball/workbench/` disposable state, worker lifecycle, the controller-side bridge client, `WorkbenchLiveSession`, `WorkbenchServices` / `WorkbenchController`, MCP stdio, the headless live-scenario presentation model, and the Swing adapter.
 
 MCP and Swing are adapters over the same Workbench service seam. They must not introduce a second runtime implementation.
 
@@ -43,10 +43,10 @@ The executable is:
 pickleball-workbench/build/libs/pickleball-workbench-<version>.jar
 ```
 
-Synchronize a consumer project before starting a worker:
+Synchronize a consumer project before starting a worker manually:
 
 ```powershell
-$workbenchJar = ".\pickleball-workbench\build\libs\pickleball-workbench-2.1.8.jar"
+$workbenchJar = ".\pickleball-workbench\build\libs\pickleball-workbench-<version>.jar"
 java -jar $workbenchJar sync ".\maven-consumer-project"
 ```
 
@@ -54,20 +54,107 @@ Synchronization uses the selected project wrapper to establish compiled output a
 
 ## Swing UI
 
-Start the thin Workbench UI for one consumer project:
+Start Workbench for one consumer project:
 
 ```powershell
 java -jar $workbenchJar ui ".\maven-consumer-project"
 ```
 
-The Swing UI is a presentation adapter over the same `WorkbenchServices` / `WorkbenchController` seam used by MCP. It does not own a second worker manager, bridge client, Mapping implementation, or Pickleball execution model.
+The Swing UI is a presentation adapter over the same `WorkbenchServices` / `WorkbenchController` seam used by MCP. It does not own a second worker manager, bridge client, Mapping implementation, Gherkin execution engine, or Pickleball runtime model.
 
-The UI provides:
+### Player-style layout
+
+The primary workspace is now arranged as an interactive scenario player:
+
+```text
+┌─────────────────────────────────────────────────────────────────────┐
+│ Project / readiness        ⏮  ◀  ▶  ⏸  ■          Player status  │
+├───────────────────────────────┬─────────────────────────────────────┤
+│ LIVE SCENARIO EDITOR          │ Mapping | Terminal | Diagnostic Log │
+│                               │                                     │
+│ Feature: ...                  │ selected right-side workspace       │
+│ Scenario: ...                 │                                     │
+│ ▶ next playhead step          │                                     │
+│   selected/other line         │                                     │
+├───────────────────────────────┤                                     │
+│ Step Editor / Command   ▶     │                                     │
+│ [ live command text       ]   │                                     │
+└───────────────────────────────┴─────────────────────────────────────┘
+│ Workbench/session activity                                         │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+The left side contains only the Live Scenario Editor and compact Step Editor / Command. The right side has one tabbed workspace for Mapping, Terminal, and Diagnostic Log Explorer. Low-level lifecycle controls are available from the **Session** menu. Existing investigation tools are available from **Tools > Advanced Controls** so the underlying capabilities are preserved without dominating the normal workflow.
+
+### Live scenario buffer and player state
+
+`LiveScenarioPlayer` is a headless Workbench-side presentation model. It owns only:
+
+- stable line identities independent of display line number;
+- the live session buffer;
+- selected line;
+- playhead insertion point;
+- pending/executed/failed presentation status;
+- player states `STOPPED`, `PAUSED`, `RUNNING`, and `WAITING_FOR_STEP`.
+
+Selection and playhead are independent. Selecting another line does not move the playhead. New Step Editor commands are inserted at the playhead insertion point, not at the text caret or selected line.
+
+The initial buffer is an interactive session buffer; it is not automatically written back to consumer `.feature` files.
+
+Step Editor gestures are intentionally explicit:
+
+```text
+Enter       insert a new command at the playhead
+Ctrl+Enter  update the selected pending executable step
+▶           execute the Step Editor text in isolation through the existing live service
+```
+
+Executed or failed buffer steps cannot be edited in place in this phase because the UI must not imply that browser, service, or other external side effects were undone.
+
+The **First** and **Step Back** controls are navigation-only in this phase. They do not claim to rewind Pickleball runtime state or undo external side effects.
+
+### Phase 1 execution boundary
+
+The current player-style increment establishes the new layout and headless player/buffer state without inventing new Pickleball runtime semantics.
+
+The main Play/Pause/Stop controls currently update the buffer/player state model only. Automatic buffered execution, wait-at-end execution, and add-and-continue behavior are the next implementation phase. That loop must be wired through an explicit Pickleball-owned Gherkin/runtime contract; Swing must not strip `Given`/`When`/`Then`, create a second step matcher, or otherwise guess how displayed Gherkin maps to detached step execution.
+
+The small Step Editor Play button continues to use the existing `WorkbenchServices.executeStep` contract unchanged. It pauses the main player state before isolated execution and does not automatically resume it afterward.
+
+### Mapping tab
+
+There is no GUI-defined `Current Scope` concept.
+
+The target Mapping design is a single NodeMap selector populated from the real `ParsingMap` associated with the selected step, with common NodeMaps remaining available across the live scenario. The GUI must not hard-code names or recreate inheritance rules.
+
+The Phase 1 UI therefore leaves the NodeMap selector unavailable until the required Pickleball-side ParsingMap inspection contract exists. Existing Mapping get/put/resolve controls remain available as compatibility controls. The Swing Mapping put control continues to send entered values as text; MCP continues to support arbitrary JSON-compatible Mapping values through the shared service method.
+
+Structural NodeMap browsing/mutation is a later phase and must be implemented against real worker-side Pickleball state.
+
+### Terminal and Diagnostic Log Explorer
+
+The Terminal tab currently displays Workbench UI activity only. Worker log streaming, level filtering, search, and auto-scroll belong to the Terminal phase and must use the appropriate worker/Workbench logging source without violating the MCP stdout contract.
+
+The Diagnostic Log Explorer tab is intentionally a placeholder in Phase 1. Its implementation must reuse Pickleball's retained diagnostic model and follow the existing evidence escalation order:
+
+1. `run-catalog.json`
+2. selected `run-index.json` / `clusters.json`
+3. scenario `summary.json`
+4. relevant `events.jsonl`
+5. existing comparison/fingerprint metadata
+6. PNG only when visual content must be inspected
+7. raw trace only when structured evidence is insufficient
+
+The Swing UI must not create a competing diagnostic storage format or fake retained-run data.
+
+### Existing advanced capabilities
+
+The redesign preserves the underlying existing capabilities:
 
 - selected project display and synchronization/status refresh;
 - synchronize, start worker, restart fresh worker without rebuilding, and stop worker;
 - worker PID/runtime/scenario/pause status;
-- live raw Gherkin step input with optional argument text and result/status output;
+- live raw Gherkin execution;
 - Mapping get, put, and resolve;
 - incremental semantic-event display with timestamp, hook, step/phrase, and signature detail;
 - Step Override list, worker-side compile/replace, remove, and clear;
@@ -76,13 +163,11 @@ The UI provides:
 - semantic breakpoint list, add, remove, and clear with hook/filter/one-shot/finite-lease controls;
 - clean Workbench shutdown when the window closes.
 
-The Mapping put control stores the entered Swing value as text. MCP continues to support arbitrary JSON-compatible Mapping values through the same service method.
-
-The Step Override editor sends its source template unchanged to the worker. The source must contain `{{CLASS_NAME}}`; generated class naming, compilation, classloading, rule registration, matching, captures, replacement, and cleanup remain worker-side Pickleball responsibilities. Browser page, screenshot, service-call, event, and breakpoint controls expose the existing bridge contracts rather than reimplementing them in Swing.
+The Step Override editor sends its source template unchanged to the worker. The source must contain `{{CLASS_NAME}}`; generated class naming, compilation, classloading, rule registration, matching, captures, replacement, and cleanup remain worker-side Pickleball responsibilities. Browser page, screenshot, service-call, event, and breakpoint controls expose existing bridge contracts rather than reimplementing them in Swing.
 
 Synchronization, worker actions, live bridge calls, Mapping operations, event refresh, Step Override actions, browser/screenshot evidence, service calls, and breakpoint actions run off the Swing Event Dispatch Thread. Live controls are enabled only while the Workbench-owned worker is running and paused.
 
-The UI is intentionally not a project IDE, file editor, generic process manager, generic Maven/Gradle task runner, source navigator, or collaboration system.
+The UI is intentionally not a project IDE, general feature-file editor, generic process manager, generic Maven/Gradle task runner, source navigator, or collaboration system.
 
 ## MCP stdio
 
@@ -196,26 +281,32 @@ io.modelcontextprotocol.sdk:mcp-core:2.0.0
 io.modelcontextprotocol.sdk:mcp-json-jackson2:2.0.0
 ```
 
-## Manual UI acceptance
+## Manual UI acceptance for the Phase 1 player foundation
 
 ```powershell
-$workbenchJar = ".\pickleball-workbench\build\libs\pickleball-workbench-2.1.8.jar"
+$workbenchJar = ".\pickleball-workbench\build\libs\pickleball-workbench-<version>.jar"
 java -jar $workbenchJar ui ".\maven-consumer-project"
 ```
 
-Use the UI-owned worker for this smoke test; do not run `worker-check` or `live-check` concurrently with the UI.
+Use the UI-owned worker for runtime checks; do not run `worker-check` or `live-check` concurrently with the UI.
 
-1. **Status:** click **Start Worker** and verify `Paused: true` with a PID/runtime/scenario.
-2. **Live Gherkin:** execute `CONTROL API TEST STEP` and verify `Status: SUCCESS`.
-3. **Mapping:** put/get/resolve `OVERRIDE / workbenchLiveValue = first` and verify `first` is returned.
-4. **Step Overrides:** leave the prefilled id/regex/source, click **Compile / Replace**, and verify `Status: SUCCESS` plus one installed override. In **Live Gherkin**, execute `WORKBENCH UI OVERRIDE alpha`; then in **Mapping**, get `OVERRIDE / workbenchStepOverrideValue` and verify `ui-alpha`. Return to **Step Overrides**, click **Remove ID**, and verify the installed list is empty.
-5. **Evidence / Service Call:** execute `%health-full-url` and verify `Status: SUCCESS` and `HTTP status: 200`.
-6. **Evidence / Browser:** in **Live Gherkin**, execute `navigate to: URL.home`; then click **Read Page** and verify the URL/title/page source contains the Pickleball test page. Click **Capture Screenshot** and verify a PNG image is displayed.
-7. **Breakpoints:** with the prefilled `BEFORE_STEP`, `CONTROL API TEST STEP`, one-shot, and `120` second lease, click **Add** and verify one breakpoint is listed. Copy its generated id into **Breakpoint ID (for remove)**, click **Remove ID**, and verify the list is empty.
-8. **Recent Events:** verify semantic events are present and include sequence, timestamp, hook, and step/phrase/signature detail.
-9. **Lifecycle:** note the PID, click **Restart Worker**, verify a different PID with `Paused: true`, execute one live step successfully, then click **Stop Worker** and verify `Not running (exit=0)`.
+1. Verify the top-level layout has the Live Scenario Editor and compact Step Editor on the left, and exactly Mapping / Terminal / Diagnostic Log Explorer on the right.
+2. Insert multiple commands with Enter and verify each is inserted at the visible playhead while selection can remain on another line.
+3. Select a pending command, change its text, press Ctrl+Enter, and verify its displayed line updates without changing its stable position semantics.
+4. Use First and Step Back and verify the playhead indicator moves independently from the selection. Treat these as navigation-only; no runtime rewind is claimed.
+5. Use Play/Pause/Stop and verify player presentation states, including `Waiting for next step...` when Play has no next buffered command. Do not treat this as Phase 2 automatic runtime execution.
+6. Open **Session**, synchronize/start a worker, select or enter a valid existing live raw Gherkin command, click the small Step Editor Play button, and verify it delegates isolated execution and leaves the main player paused.
+7. Verify Mapping has no `Current Scope` control and no hard-coded NodeMap choices. Existing get/put/resolve controls remain usable with a paused worker.
+8. Verify **Tools > Advanced Controls** still exposes Status, Recent Events, Step Overrides, Evidence, and Breakpoints.
+9. Verify blocking runtime actions leave the Swing UI responsive.
 
 ## Regression
+
+For the player state model and Swing/controller behavior:
+
+```powershell
+.\gradlew.bat :pickleball-workbench:test
+```
 
 For shared controller/MCP behavior:
 
@@ -226,7 +317,7 @@ For shared controller/MCP behavior:
 For persistent worker/live behavior:
 
 ```powershell
-$workbenchJar = ".\pickleball-workbench\build\libs\pickleball-workbench-2.1.8.jar"
+$workbenchJar = ".\pickleball-workbench\build\libs\pickleball-workbench-<version>.jar"
 
 java -jar $workbenchJar sync ".\maven-consumer-project"
 java -jar $workbenchJar worker-check ".\maven-consumer-project"

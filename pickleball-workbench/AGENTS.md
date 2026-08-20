@@ -47,19 +47,46 @@ The thin Swing adapter lives under:
 tools.dscode.workbench.ui
 ```
 
-Launch it with:
+The headless live-scenario presentation model lives under:
+
+```text
+tools.dscode.workbench.player
+```
+
+Launch the UI with:
 
 ```text
 java -jar pickleball-workbench-<version>.jar ui <project>
 ```
 
-The UI must remain execution-oriented and use `WorkbenchServices` / `WorkbenchController`. Do not add a project IDE, file editor, generic process manager, generic Maven/Gradle UI, Gradle Tooling API browser, source navigator, or collaboration subsystem.
+The UI is player-style and execution-oriented. Its primary layout is:
 
-The UI covers project/synchronization status, worker lifecycle, live raw Gherkin, Mapping get/put/resolve, semantic events, Step Override list/compile/remove/clear, browser page/screenshot evidence, service-call evidence, and semantic breakpoint list/add/remove/clear.
+```text
+left:  Live Scenario Editor + compact Step Editor / Command
+right: Mapping | Terminal | Diagnostic Log Explorer
+```
+
+Low-level lifecycle controls live under the Session menu and existing investigation controls remain available under Advanced Controls rather than dominating the permanent workspace.
+
+`LiveScenarioPlayer` owns presentation/session-buffer state only: stable line IDs, selected line, playhead insertion point, pending/executed/failed visual status, and `STOPPED` / `PAUSED` / `RUNNING` / `WAITING_FOR_STEP`. It must remain headless-testable and must not parse/execute Pickleball steps, implement runtime rewind, model Mapping inheritance, or become Swing component state.
+
+Selection and playhead are separate. Inserting a Step Editor command occurs at the playhead insertion point and does not depend on the selected line. Enter inserts a new command; Ctrl+Enter updates the selected pending step. Already executed or failed buffer steps are not edited in place because the UI must not imply that browser/service/external side effects were undone.
+
+The small Step Editor Play button delegates the text unchanged through the existing `WorkbenchUiController.executeStep` / `WorkbenchServices.executeStep` path and leaves the main player paused. Do not strip Gherkin keywords or add a Swing-side step matcher. A future main player execution loop must use an explicit Pickleball-owned Gherkin/runtime contract rather than guessing how display lines map to detached step text.
+
+### Current player implementation phase
+
+The first player-style increment intentionally establishes presentation/state only. The main Play/Pause/Stop controls currently drive the headless buffer/player state; automatic buffered runtime execution belongs to the next phase after a safe Pickleball-owned full-Gherkin execution contract is selected and tested.
+
+The Mapping tab must not hard-code NodeMap names. Until the ParsingMap-aware bridge/service contract is implemented, the NodeMap selector remains unavailable and the existing Mapping get/put/resolve controls remain as compatibility controls. Do not create a fake ParsingMap in Swing.
+
+The Terminal tab currently shows Workbench UI activity only. Actual worker log streaming/filtering is a separate phase and must not be implemented by redirecting MCP stdout. The Diagnostic Log Explorer is also a placeholder until it is bound to Pickleball's existing retained diagnostic artifacts and evidence-escalation model. Do not populate either tab with fake production data.
+
+Existing capabilities remain available: project/synchronization status, worker lifecycle, live raw Gherkin, Mapping get/put/resolve, semantic events, Step Override list/compile/remove/clear, browser page/screenshot evidence, service-call evidence, and semantic breakpoint list/add/remove/clear.
 
 The Swing Mapping put control sends entered values as text; it does not create a second Mapping parser or state model. Step Override source is sent unchanged to worker-side compilation and must contain `{{CLASS_NAME}}`; the UI must never compile handlers in the controller JVM. Browser/service/screenshot controls only present bridge evidence already supplied by Pickleball. Breakpoint controls delegate the hook/filter/lease contract to the shared service and must not recreate coordinator semantics.
 
-Blocking synchronization, process, bridge, Mapping, event, screenshot, service-call, Step Override, and breakpoint actions must not run on the Swing Event Dispatch Thread. Live controls must target the controller-owned running/paused worker. Semantic-event cursors are worker-local and must reset when a fresh worker is started/restarted. Prefer headless-safe tests around presentation/controller delegation rather than tests requiring a visible desktop.
+Blocking synchronization, process, bridge, Mapping, event, screenshot, service-call, Step Override, and breakpoint actions must not run on the Swing Event Dispatch Thread. Live controls must target the controller-owned running/paused worker. Semantic-event cursors are worker-local and must reset when a fresh worker is started/restarted. Prefer headless-safe tests around player state and presentation/controller delegation rather than tests requiring a visible desktop.
 
 ## MCP stdio
 

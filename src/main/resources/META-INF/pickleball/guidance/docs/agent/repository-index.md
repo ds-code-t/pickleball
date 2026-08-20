@@ -443,6 +443,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/bridge/ControlBridgeClient.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/mcp/WorkbenchMcpServer.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/mcp/WorkbenchMcpTools.java`
+- `pickleball-workbench/src/main/java/tools/dscode/workbench/player/LiveScenarioPlayer.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/sync/WorkbenchManifest.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/sync/WorkbenchProject.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/sync/WorkbenchSynchronizer.java`
@@ -457,6 +458,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/worker/WorkbenchWorkerStatus.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/bridge/ControlBridgeClientTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/mcp/WorkbenchMcpServerTest.java`
+- `pickleball-workbench/src/test/java/tools/dscode/workbench/player/LiveScenarioPlayerTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/sync/WorkbenchGradleSynchronizerIntegrationTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/sync/WorkbenchSynchronizerTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/ui/WorkbenchUiControllerTest.java`
