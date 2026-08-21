@@ -14,6 +14,8 @@ java {
 }
 
 dependencies {
+    implementation project(':pickleball-control-protocol')
+
     // Internal source-module dependency only. Consumers receive these classes
     // from the main shaded Pickleball artifact.
     api project(':')

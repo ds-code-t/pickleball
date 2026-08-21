@@ -53,6 +53,11 @@ GROUPS: tuple[tuple[str, tuple[str, ...]], ...] = (
         "pickleball-control-api/src/main/**/*",
         "pickleball-control-api/src/test/**/*",
     )),
+    ("Neutral control protocol module", (
+        "pickleball-control-protocol/build.gradle",
+        "pickleball-control-protocol/src/main/**/*",
+        "pickleball-control-protocol/src/test/**/*",
+    )),
     ("Pickleball Workbench module", (
         "gradle/pickleball-published-variant.gradle",
         "pickleball-workbench/AGENTS.md",

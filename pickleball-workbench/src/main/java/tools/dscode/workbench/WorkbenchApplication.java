@@ -1,10 +1,10 @@
 package tools.dscode.workbench;
 
-import tools.dscode.control.bridge.ControlBridgeBrowserPageResult;
-import tools.dscode.control.bridge.ControlBridgeCallResult;
-import tools.dscode.control.bridge.ControlBridgeServiceCallResult;
-import tools.dscode.control.bridge.ControlBridgeStepOverrideResult;
-import tools.dscode.control.bridge.ControlBridgeValueResult;
+import tools.dscode.control.protocol.ControlBridgeBrowserPageResult;
+import tools.dscode.control.protocol.ControlBridgeCallResult;
+import tools.dscode.control.protocol.ControlBridgeServiceCallResult;
+import tools.dscode.control.protocol.ControlBridgeStepOverrideResult;
+import tools.dscode.control.protocol.ControlBridgeValueResult;
 import tools.dscode.workbench.mcp.WorkbenchMcpServer;
 import tools.dscode.workbench.sync.WorkbenchManifest;
 import tools.dscode.workbench.sync.WorkbenchSynchronizer;
@@ -29,6 +29,14 @@ public final class WorkbenchApplication {
     }
 
     public static void main(String[] args) {
+        try {
+            WorkbenchRuntimeBoundary.verify();
+        } catch (IllegalStateException isolationFailure) {
+            System.err.println("Workbench controller isolation failed: " + isolationFailure.getMessage());
+            System.exit(1);
+            return;
+        }
+
         if (args.length > 0 && "mcp".equals(args[0])) {
             int exitCode = runMcpProcess(args, System.out, System.err);
             if (exitCode != 0) System.exit(exitCode);

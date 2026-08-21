@@ -96,4 +96,4 @@ The focused consumer tag is:
 @step-override
 ```
 
-Run it with the normal parallel consumer acceptance settings. Workbench `live-check` also compiles an override, executes override-only Gherkin, replaces the generated implementation, removes it, verifies fallback behavior, and confirms the same persistent worker context was retained.
+For a bridge/protocol-only change, the smallest tag is `@step-override-bridge`; use `@step-override` when worker matching/compiler semantics changed too. Set `pkb_parallel=80` when practical and do not substitute `@all` for focused Workbench validation. Workbench `live-check` also compiles an override, executes override-only Gherkin, replaces the generated implementation, removes it, verifies fallback behavior, and confirms the same persistent worker context was retained.

@@ -27,6 +27,8 @@ Use this checklist for changes to Pickleball behavior. Coding agents should comp
 - [ ] Cover meaningful edge and compatibility cases.
 - [ ] When an agent launches Pickleball tests with known execution settings, use `pkb_runvars` as the authoritative input unless the test intentionally exercises normal JVM/profile precedence.
 - [ ] Never supply `pkb_run_profile` as test input; it is derived output.
+- [ ] For Workbench/protocol/worker changes, preserve the JDK-only shared protocol, core-free controller artifact/process, separate consumer worker, consumer-authoritative classpath, and opaque nested payload.
+- [ ] Never restore a root/`tools.dscode:pickleball`/behavioral-control dependency to Workbench to fix compilation.
 
 ## Maintain knowledge
 
@@ -42,7 +44,10 @@ Use this checklist for changes to Pickleball behavior. Coding agents should comp
 - [ ] Run `python scripts/sync_consumer_guidance.py --check`.
 - [ ] Run `./gradlew test`.
 - [ ] For consumer-visible changes, run `./gradlew publishToMavenLocal`.
-- [ ] For consumer-visible changes, run `./maven-consumer-project/mvnw -f maven-consumer-project/pom.xml -U test -Dpkb_runvars.pkb_browser=CHROME_HEADLESS -Dpkb_runvars.pkb_tags=@all`.
+- [ ] For broad consumer-visible changes outside Workbench/controller isolation, run `./maven-consumer-project/mvnw -f maven-consumer-project/pom.xml -U test -Dpkb_runvars.pkb_browser=CHROME_HEADLESS -Dpkb_runvars.pkb_tags=@all`.
+- [ ] For Workbench/controller isolation changes, never run `@all`; run only affected `@control-bridge` and/or `@step-override-bridge` scenarios with `-Dpkb_runvars.pkb_parallel=80` where practical.
+- [ ] For Workbench boundary changes, run `./gradlew verifyStrictControllerIsolation :pickleball-workbench:test`.
+- [ ] Prefer the equivalent focused turnkey command `scripts/agent_validate.sh --workbench` (PowerShell: `.\scripts\agent_validate.ps1 -Workbench`) when the environment supports the complete flow.
 - [ ] Report anything not run and the reason.
 
 ## Report

@@ -75,6 +75,23 @@ or use the included wrappers:
 
 `PickleballTests` starts the test server on `127.0.0.1:8765` before Cucumber and stops it afterward.
 
+## Launch the dependency-matched Workbench
+
+The test-scoped Pickleball dependency already contains its controller-only Workbench payload. Start the launcher from the resolved test classpath without finding a Maven cache entry or declaring a second version:
+
+```bash
+./mvnw -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java \
+  -Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher \
+  -Dexec.classpathScope=test \
+  "-Dexec.args=ui ."
+```
+
+```powershell
+.\mvnw.cmd -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java "-Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher" "-Dexec.classpathScope=test" "-Dexec.args=ui ."
+```
+
+The launcher verifies and extracts the opaque payload beneath `.pickleball/workbench/controller/<sha256>/`, then creates a separate Workbench JVM. Workbench captures this project's compiled outputs and effective test runtime before creating a separate worker JVM. Only the worker loads the consumer-resolved Pickleball runtime; the Workbench artifact and process contain no core implementation. UI and MCP both use the same controller/live session. See `docs/pickleball-workbench.md` for commands, lifecycle, protocol compatibility, and isolation checks.
+
 Runner defaults include:
 
 - glue `com.example.pickleball`;
@@ -127,6 +144,8 @@ The executable project covers Selenium navigation/selection/actions/assertions/d
 ## Focused runs
 
 Common suite tags include `@all`, `@regression`, `@smoke`, `@browser`, and `@data`. Functional areas include `@navigation`, `@forms`, `@catalog`, `@mapping`, `@resources`, `@workflow`, `@keyboard`, `@dialogs`, and `@components`.
+
+Controller/protocol migration checks must remain focused: use `@control-bridge` and/or `@step-override-bridge`, set `pkb_parallel=80` when practical, and do not run `@all` for Workbench isolation work.
 
 ```bash
 mvn test -Dpkb_tags="@forms and @state-assertions"

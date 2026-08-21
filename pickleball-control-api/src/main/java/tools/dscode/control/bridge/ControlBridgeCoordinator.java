@@ -15,12 +15,34 @@ import tools.dscode.common.control.ControlHookHandler;
 import tools.dscode.common.mappings.NodeMap;
 import tools.dscode.common.treeparsing.parsedComponents.Phrase;
 import tools.dscode.control.api.ControlCallResult;
+import tools.dscode.control.api.BoundedJsonEvidence;
 import tools.dscode.control.api.DynamicControl;
 import tools.dscode.control.api.ElementControl;
+import tools.dscode.control.api.ElementEvidence;
 import tools.dscode.control.api.ElementInspection;
 import tools.dscode.control.api.MappingControl;
 import tools.dscode.control.api.ServiceCallControl;
 import tools.dscode.control.api.ServiceCallEvidence;
+import tools.dscode.control.protocol.ControlBridgeBoundedJsonEvidence;
+import tools.dscode.control.protocol.ControlBridgeBreakpoint;
+import tools.dscode.control.protocol.ControlBridgeBrowserPage;
+import tools.dscode.control.protocol.ControlBridgeBrowserPageResult;
+import tools.dscode.control.protocol.ControlBridgeBrowserScreenshot;
+import tools.dscode.control.protocol.ControlBridgeBrowserScreenshotResult;
+import tools.dscode.control.protocol.ControlBridgeCallResult;
+import tools.dscode.control.protocol.ControlBridgeElementEvidence;
+import tools.dscode.control.protocol.ControlBridgeElementInspection;
+import tools.dscode.control.protocol.ControlBridgeElementInspectionResult;
+import tools.dscode.control.protocol.ControlBridgeError;
+import tools.dscode.control.protocol.ControlBridgeMappingSnapshot;
+import tools.dscode.control.protocol.ControlBridgeMappingSnapshotResult;
+import tools.dscode.control.protocol.ControlBridgeScenarioStatus;
+import tools.dscode.control.protocol.ControlBridgeServiceCallEvidence;
+import tools.dscode.control.protocol.ControlBridgeServiceCallResult;
+import tools.dscode.control.protocol.ControlBridgeStatus;
+import tools.dscode.control.protocol.ControlBridgeValue;
+import tools.dscode.control.protocol.ControlBridgeValueResult;
+import tools.dscode.control.protocol.ControlProtocol;
 import tools.dscode.coredefinitions.BrowserSteps;
 
 import java.lang.reflect.Array;
@@ -50,6 +72,8 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.Supplier;
+
+import static tools.dscode.common.mappings.ValueFormatting.MAPPER;
 
 final class ControlBridgeCoordinator implements ControlHookHandler, AutoCloseable {
     static final int DEFAULT_WAIT_SECONDS = 30;
@@ -128,7 +152,7 @@ final class ControlBridgeCoordinator implements ControlHookHandler, AutoCloseabl
         int activeCount = lanes.size();
         if (selected == null) {
             return new ControlBridgeStatus(
-                    ControlBridgeRuntime.PROTOCOL_VERSION,
+                    ControlProtocol.CURRENT_VERSION,
                     runtimeId,
                     pid,
                     activeCount,
@@ -589,7 +613,10 @@ final class ControlBridgeCoordinator implements ControlHookHandler, AutoCloseabl
                         map.getClass().getName(),
                         dataSources(map),
                         map.getClass() == NodeMap.class,
-                        values
+                        MAPPER.convertValue(
+                                values,
+                                new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() { }
+                        )
                 ),
                 null,
                 runtime
@@ -618,7 +645,7 @@ final class ControlBridgeCoordinator implements ControlHookHandler, AutoCloseabl
         if (!target.getMapType().name().equals(snapshot.mapType())) return unavailable("The live map type no longer matches the captured snapshot.", lane.status(lanes.size()));
         if (!dataSources(target).equals(snapshot.dataSources())) return unavailable("The live map data sources no longer match the captured snapshot.", lane.status(lanes.size()));
 
-        ObjectNode values = snapshot.values().deepCopy();
+        ObjectNode values = MAPPER.valueToTree(snapshot.values());
         values.remove(NodeMap.MAP_TYPE_KEY);
         var mapType = target.getMapType();
         target.clearValues();
@@ -699,7 +726,7 @@ final class ControlBridgeCoordinator implements ControlHookHandler, AutoCloseabl
         var error = result.error();
         return new ControlBridgeElementInspectionResult(
                 result.status().name(),
-                result.value(),
+                protocolElementInspection(result.value()),
                 error == null ? null : bridgeError(error.type(), error.message(), error.stackTrace()),
                 lane.status(lanes.size())
         );
@@ -710,7 +737,7 @@ final class ControlBridgeCoordinator implements ControlHookHandler, AutoCloseabl
         var error = result.error();
         return new ControlBridgeServiceCallResult(
                 result.status().name(),
-                result.value(),
+                protocolServiceCallEvidence(result.value()),
                 error == null ? null : bridgeError(error.type(), error.message(), error.stackTrace()),
                 lane.status(lanes.size())
         );
@@ -718,6 +745,70 @@ final class ControlBridgeCoordinator implements ControlHookHandler, AutoCloseabl
 
     private static ControlBridgeError bridgeError(String type, String message, String stackTrace) {
         return new ControlBridgeError(type, clipped(message), clipped(stackTrace));
+    }
+
+    private static ControlBridgeElementInspection protocolElementInspection(
+            ElementInspection inspection
+    ) {
+        if (inspection == null) return null;
+        return new ControlBridgeElementInspection(
+                inspection.category(),
+                inspection.text(),
+                inspection.operation(),
+                inspection.resolvedXPath(),
+                inspection.matchCount(),
+                inspection.evidenceTruncated(),
+                inspection.elements() == null
+                        ? List.of()
+                        : inspection.elements().stream()
+                                .map(ControlBridgeCoordinator::protocolElementEvidence)
+                                .toList()
+        );
+    }
+
+    private static ControlBridgeElementEvidence protocolElementEvidence(ElementEvidence evidence) {
+        return new ControlBridgeElementEvidence(
+                evidence.index(),
+                evidence.tagName(),
+                evidence.text(),
+                evidence.value(),
+                evidence.displayed(),
+                evidence.enabled(),
+                evidence.selected(),
+                evidence.x(),
+                evidence.y(),
+                evidence.width(),
+                evidence.height(),
+                evidence.attributes(),
+                evidence.outerHtml(),
+                evidence.outerHtmlTruncated()
+        );
+    }
+
+    private static ControlBridgeServiceCallEvidence protocolServiceCallEvidence(
+            ServiceCallEvidence evidence
+    ) {
+        if (evidence == null) return null;
+        return new ControlBridgeServiceCallEvidence(
+                evidence.selector(),
+                protocolBoundedEvidence(evidence.request()),
+                protocolBoundedEvidence(evidence.configuration()),
+                protocolBoundedEvidence(evidence.response()),
+                evidence.statusCode()
+        );
+    }
+
+    private static ControlBridgeBoundedJsonEvidence protocolBoundedEvidence(
+            BoundedJsonEvidence evidence
+    ) {
+        if (evidence == null) return null;
+        return new ControlBridgeBoundedJsonEvidence(
+                evidence.value() == null
+                        ? null
+                        : MAPPER.convertValue(evidence.value(), Object.class),
+                evidence.utf8Bytes(),
+                evidence.truncated()
+        );
     }
 
     private ControlBridgeCallResult success(String value, ControlBridgeStatus runtime) {
@@ -821,7 +912,7 @@ final class ControlBridgeCoordinator implements ControlHookHandler, AutoCloseabl
         if (value == null || value instanceof String || value instanceof Number || value instanceof Boolean) return value;
         if (value instanceof Character character) return character.toString();
         if (value instanceof Enum<?> enumValue) return enumValue.name();
-        if (value instanceof JsonNode) return value;
+        if (value instanceof JsonNode) return MAPPER.convertValue(value, Object.class);
         if (path.put(value, Boolean.TRUE) != null) return NOT_JSON_COMPATIBLE;
         try {
             if (value instanceof Map<?, ?> map) {
@@ -959,7 +1050,7 @@ final class ControlBridgeCoordinator implements ControlHookHandler, AutoCloseabl
 
         private ControlBridgeStatus status(int activeCount) {
             return new ControlBridgeStatus(
-                    ControlBridgeRuntime.PROTOCOL_VERSION,
+                    ControlProtocol.CURRENT_VERSION,
                     runtimeId, pid, activeCount, threadId,
                     scenarioId, scenarioName, stepText, phraseText,
                     lastHook, lastSignature, paused, pauseRequested, capabilities

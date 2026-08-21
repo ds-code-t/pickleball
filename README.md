@@ -17,6 +17,7 @@ Pickleball also adds:
 - reusable component scenarios and REST or SOAP service-call scenarios;
 - composable execution profiles through `pkb_profile`, controlled execution input through `pkb_runvars`, and deterministic final RunVar output through `pkb_run_profile`;
 - configurable `pkb_configpath` loading with recommended `<config:...>` references and legacy `<configs...>` compatibility;
+- a dependency-matched Workbench controller embedded as an opaque payload, with all Pickleball execution isolated in a separate consumer worker JVM;
 - optional `pkb_reportingmode=diagnostic` evidence capture with lightweight run/scenario indexes, losslessly compressed deep trace evidence, Git/source provenance, structured step/capability metadata, binary screenshots, compact visual fingerprints, failure clustering, cross-run comparison, and configurable evidence retention; and
 - a small consumer setup consisting primarily of the Pickleball dependency and one test runner.
 
@@ -24,4 +25,4 @@ Pickleball remains compatible with standard Cucumber features such as tags, Scen
 
 The working [`maven-consumer-project`](docs/consumer-project.md) starts a loopback test server during the run. Its scenarios exercise both Selenium against a local HTML test site and service calls against local REST and SOAP endpoints.
 
-[Read the Pickleball documentation](docs/README.md) · [Consumer project guide](docs/consumer-project.md) · [Execution configuration](docs/configuration.md) · [AI run configuration](docs/ai-run-configuration.md) · [Diagnostic lineage metadata](docs/diagnostic-lineage-metadata.md) · [Diagnostic reporting](docs/diagnostic-reporting.md)
+[Read the Pickleball documentation](docs/README.md) · [Pickleball Workbench](docs/pickleball-workbench.md) · [Consumer project guide](docs/consumer-project.md) · [Execution configuration](docs/configuration.md) · [AI run configuration](docs/ai-run-configuration.md) · [Diagnostic lineage metadata](docs/diagnostic-lineage-metadata.md) · [Diagnostic reporting](docs/diagnostic-reporting.md)

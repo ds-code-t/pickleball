@@ -1,6 +1,6 @@
 package tools.dscode.workbench;
 
-import tools.dscode.control.bridge.*;
+import tools.dscode.control.protocol.*;
 import tools.dscode.workbench.sync.WorkbenchManifest;
 import tools.dscode.workbench.sync.WorkbenchSynchronizer;
 import tools.dscode.workbench.worker.WorkbenchLiveSession;

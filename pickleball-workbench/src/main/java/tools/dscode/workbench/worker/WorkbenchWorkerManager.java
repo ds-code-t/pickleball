@@ -1,12 +1,13 @@
 package tools.dscode.workbench.worker;
 
-import tools.dscode.control.bridge.ControlBridgeBreakpoint;
-import tools.dscode.control.bridge.ControlBridgeCallResult;
-import tools.dscode.control.bridge.ControlBridgeScenarioStatus;
+import tools.dscode.control.protocol.ControlBridgeBreakpoint;
+import tools.dscode.control.protocol.ControlBridgeCallResult;
+import tools.dscode.control.protocol.ControlBridgeDescriptor;
+import tools.dscode.control.protocol.ControlBridgeScenarioStatus;
+import tools.dscode.control.protocol.ControlProtocol;
 import tools.dscode.workbench.bridge.ControlBridgeClient;
 import tools.dscode.workbench.sync.WorkbenchManifest;
 import tools.dscode.workbench.sync.WorkbenchSynchronizer;
-import tools.dscode.testengine.DynamicSuiteBootstrap;
 
 import java.io.File;
 import java.io.IOException;
@@ -73,16 +74,16 @@ public final class WorkbenchWorkerManager implements AutoCloseable {
                 .directory(projectRoot.toFile())
                 .redirectOutput(stdout.toFile())
                 .redirectError(stderr.toFile());
-        builder.environment().put("PKB_CONTROL_BRIDGE_SESSION_DIR", sessionDirectory.toString());
-        builder.environment().put("PKB_CONTROL_BRIDGE_SESSION_ID", sessionId);
-        builder.environment().put("PKB_CONTROL_BRIDGE_TOKEN", token);
-        builder.environment().put("PKB_CONTROL_BRIDGE_PAUSE_FIRST_SCENARIO", "true");
+        builder.environment().put(ControlProtocol.SESSION_DIRECTORY_ENV, sessionDirectory.toString());
+        builder.environment().put(ControlProtocol.SESSION_ID_ENV, sessionId);
+        builder.environment().put(ControlProtocol.SESSION_TOKEN_ENV, token);
+        builder.environment().put(ControlProtocol.PAUSE_FIRST_SCENARIO_ENV, "true");
 
         Process process = null;
         try {
             process = builder.start();
             WorkerSession session = awaitBridge(
-                    process, sessionId, token, sessionDirectory, stdout, stderr
+                    process, sessionId, token, sessionDirectory, stdout, stderr, manifest, classpath
             );
             active = session;
             scheduleLeaseRenewal(session);
@@ -218,14 +219,14 @@ public final class WorkbenchWorkerManager implements AutoCloseable {
     ) {
         List<String> command = new ArrayList<>();
         command.add(javaExecutable().toString());
-        command.add("-D" + DynamicSuiteBootstrap.WORKBENCH_TEST_OUTPUT_ROOT_PROPERTY
+        command.add("-D" + ControlProtocol.WORKBENCH_TEST_OUTPUT_ROOT_PROPERTY
                 + "=" + manifest.liveOutputPath());
         systemProperties.entrySet().stream()
                 .sorted(Map.Entry.comparingByKey(Comparator.naturalOrder()))
                 .forEach(entry -> command.add("-D" + entry.getKey() + "=" + entry.getValue()));
         command.add("-cp");
         command.add(String.join(File.pathSeparator, classpath));
-        command.add("tools.dscode.testengine.WorkbenchWorkerMain");
+        command.add(ControlProtocol.WORKER_MAIN_CLASS);
         command.add("--tags");
         command.add("@pickleball-workbench-anchor");
         command.add(anchorFeature.toAbsolutePath().normalize().toUri().toString());
@@ -238,7 +239,9 @@ public final class WorkbenchWorkerManager implements AutoCloseable {
             String token,
             Path sessionDirectory,
             Path stdout,
-            Path stderr
+            Path stderr,
+            WorkbenchManifest manifest,
+            List<String> classpath
     ) {
         long deadline = System.nanoTime() + START_TIMEOUT.toNanos();
         while (System.nanoTime() < deadline) {
@@ -252,12 +255,27 @@ public final class WorkbenchWorkerManager implements AutoCloseable {
             Path descriptor = firstDescriptor(sessionDirectory);
             if (descriptor != null) {
                 ControlBridgeClient client;
-                List<ControlBridgeScenarioStatus> scenarios;
                 try {
                     client = ControlBridgeClient.fromDescriptor(descriptor, token);
+                } catch (IllegalArgumentException incompatibleDescriptor) {
+                    // A complete descriptor with an incompatible protocol or host is
+                    // never made valid by retrying the same consumer process.
+                    throw incompatibleDescriptor;
+                } catch (RuntimeException ignored) {
+                    // A descriptor is atomically published, but tolerate a short read race.
+                    sleep(50);
+                    continue;
+                }
+
+                // Origin and process-boundary failures are permanent safety failures.
+                // Keep this outside the startup retry block so they are reported clearly.
+                verifyConsumerRuntime(client.descriptor(), manifest, classpath);
+
+                List<ControlBridgeScenarioStatus> scenarios;
+                try {
                     scenarios = client.scenarios();
                 } catch (RuntimeException ignored) {
-                    // Descriptor may have been published just before the HTTP server is ready.
+                    // Descriptor publication can precede the first accepted HTTP request.
                     sleep(50);
                     continue;
                 }
@@ -284,6 +302,108 @@ public final class WorkbenchWorkerManager implements AutoCloseable {
         throw new IllegalStateException(
                 "Timed out waiting for Workbench worker anchor to pause. stdout=" + stdout + ", stderr=" + stderr
         );
+    }
+
+    static void verifyConsumerRuntime(
+            ControlBridgeDescriptor descriptor,
+            WorkbenchManifest manifest,
+            List<String> classpath
+    ) {
+        if (descriptor.pid() <= 0) {
+            throw new IllegalStateException("Consumer worker reported an invalid process id.");
+        }
+        if (descriptor.pid() == ProcessHandle.current().pid()) {
+            throw new IllegalStateException(
+                    "Consumer worker must run in a process distinct from the Workbench controller."
+            );
+        }
+        if (descriptor.runtimeCodeSource() == null
+                || descriptor.runtimeCodeSource().isBlank()
+                || "unknown".equals(descriptor.runtimeCodeSource())) {
+            throw new IllegalStateException(
+                    "Consumer worker did not report the Pickleball runtime code source."
+            );
+        }
+
+        Path runtimeSource = canonicalPath(Path.of(descriptor.runtimeCodeSource()));
+        Path consumerProject = canonicalPath(Path.of(manifest.projectRoot()));
+        List<Path> capturedClasspath = classpath.stream()
+                .map(Path::of)
+                .map(path -> path.isAbsolute() ? path : consumerProject.resolve(path))
+                .map(WorkbenchWorkerManager::canonicalPath)
+                .toList();
+        long runtimeSourceMatches = capturedClasspath.stream()
+                .filter(runtimeSource::equals)
+                .count();
+        if (runtimeSourceMatches == 0) {
+            throw new IllegalStateException(
+                    "Consumer worker loaded Pickleball outside the synchronized test runtime classpath: "
+                            + runtimeSource
+            );
+        }
+        if (runtimeSourceMatches != 1) {
+            throw new IllegalStateException(
+                    "Consumer worker Pickleball code source must appear exactly once on the "
+                            + "synchronized test runtime classpath: " + runtimeSource
+            );
+        }
+
+        Path controllerSource = codeSource(WorkbenchWorkerManager.class);
+        boolean controllerOnWorkerClasspath = capturedClasspath.stream().anyMatch(path ->
+                (controllerSource != null && controllerSource.equals(path))
+                        || (path.getFileName() != null
+                        && path.getFileName().toString().matches(
+                                "(?i)pickleball-workbench(?:-[^/]*)?\\.jar"
+                        ))
+        );
+        if (controllerOnWorkerClasspath) {
+            throw new IllegalStateException(
+                    "Consumer worker classpath must not contain the Workbench controller artifact."
+            );
+        }
+        if (controllerSource != null && controllerSource.equals(runtimeSource)) {
+            throw new IllegalStateException(
+                    "Consumer worker must not load Pickleball core from the Workbench controller artifact."
+            );
+        }
+
+        if (manifest.pickleballVersion() == null || manifest.pickleballVersion().isBlank()) {
+            throw new IllegalStateException(
+                    "Synchronized Workbench manifest did not record its Pickleball version."
+            );
+        }
+        if (descriptor.runtimeVersion() == null || descriptor.runtimeVersion().isBlank()) {
+            throw new IllegalStateException(
+                    "Consumer worker did not report its Pickleball runtime version."
+            );
+        }
+        if (!"development".equals(manifest.pickleballVersion())
+                && !"development".equals(descriptor.runtimeVersion())
+                && !manifest.pickleballVersion().equals(descriptor.runtimeVersion())) {
+            throw new IllegalStateException(
+                    "Consumer worker Pickleball version " + descriptor.runtimeVersion()
+                            + " does not match synchronized version " + manifest.pickleballVersion() + "."
+            );
+        }
+    }
+
+    private static Path codeSource(Class<?> type) {
+        try {
+            var source = type.getProtectionDomain().getCodeSource();
+            if (source == null || source.getLocation() == null) return null;
+            return canonicalPath(Path.of(source.getLocation().toURI()));
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    private static Path canonicalPath(Path path) {
+        Path normalized = path.toAbsolutePath().normalize();
+        try {
+            return normalized.toRealPath();
+        } catch (IOException ignored) {
+            return normalized;
+        }
     }
 
 

@@ -39,6 +39,7 @@ REQUIRED_FILES = (
     "docs/agent/change-checklist.md",
     "docs/agent/prompt-examples.md",
     "docs/agent/repository-index.md",
+    "pickleball-workbench/AGENTS.md",
     "gradle/consumer-guidance.gradle",
     "scripts/refresh_agent_index.py",
     "scripts/sync_consumer_guidance.py",
@@ -103,15 +104,24 @@ BEHAVIOR_PREFIXES = (
     "src/main/java/",
     "src/main/aspectj/",
     "src/main/resources/",
+    "pickleball-control-protocol/src/main/",
+    "pickleball-control-api/src/main/",
+    "pickleball-workbench/src/main/",
 )
 BEHAVIOR_FILES = {
     "build.gradle",
     "settings.gradle",
     "gradle/consumer-guidance.gradle",
+    "pickleball-control-protocol/build.gradle",
+    "pickleball-control-api/build.gradle",
+    "pickleball-workbench/build.gradle",
     "gradle.properties",
 }
 TEST_PREFIXES = (
     "src/test/",
+    "pickleball-control-protocol/src/test/",
+    "pickleball-control-api/src/test/",
+    "pickleball-workbench/src/test/",
     "maven-consumer-project/src/test/java/",
     "maven-consumer-project/src/test/resources/features/",
     "maven-consumer-project/src/test/resources/calls/",
@@ -123,9 +133,99 @@ DOC_PREFIXES = (
 )
 DOC_FILES = {
     "README.md",
+    "pickleball-workbench/AGENTS.md",
     "maven-consumer-project/README.md",
     "maven-consumer-project/AGENTS.md",
 }
+
+WORKBENCH_CONTRACT_FILES = (
+    "AGENTS.md",
+    "pickleball-workbench/AGENTS.md",
+    "docs/agent/feature-map.md",
+)
+
+
+def validate_workbench_controller_contract(errors: list[str]) -> None:
+    required_fragments = (
+        "pickleball-control-protocol",
+        "Pickleball may contain Workbench",
+        "Workbench must not contain Pickleball",
+        "@control-bridge",
+        "pkb_parallel=80",
+    )
+    forbidden_fragments = (
+        "pickleball-workbench -> pickleball",
+        "Workbench POM contract is exactly `tools.dscode:pickleball`",
+        "uses the public `tools.dscode.control.bridge.*`",
+    )
+
+    for relative in WORKBENCH_CONTRACT_FILES:
+        path = ROOT / relative
+        if not path.is_file():
+            continue
+        text = path.read_text(encoding="utf-8")
+        for required in required_fragments:
+            if required not in text:
+                errors.append(
+                    f"Workbench controller guidance must retain {required!r}: {relative}"
+                )
+        for forbidden in forbidden_fragments:
+            if forbidden in text:
+                errors.append(
+                    f"Workbench controller guidance retains the obsolete dependency rule "
+                    f"{forbidden!r}: {relative}"
+                )
+
+
+def validate_workbench_source_boundary(errors: list[str]) -> None:
+    build = ROOT / "pickleball-workbench" / "build.gradle"
+    if build.is_file():
+        text = build.read_text(encoding="utf-8")
+        if "implementation project(':pickleball-control-protocol')" not in text:
+            errors.append(
+                "Workbench must depend on exactly the neutral protocol project: "
+                "pickleball-workbench/build.gradle"
+            )
+        for forbidden in (
+            "pickleballPublishedElements",
+            "project(path: ':'",
+            "implementation project(':')",
+            "tools.dscode:pickleball",
+        ):
+            if forbidden in text:
+                errors.append(
+                    f"Workbench build restores a forbidden core dependency ({forbidden}): "
+                    "pickleball-workbench/build.gradle"
+                )
+
+    workbench_sources = ROOT / "pickleball-workbench" / "src" / "main" / "java"
+    if workbench_sources.is_dir():
+        for source in workbench_sources.rglob("*.java"):
+            for line in source.read_text(encoding="utf-8").splitlines():
+                if not line.startswith((
+                    "import tools.dscode.",
+                    "import static tools.dscode.",
+                )):
+                    continue
+                imported = line.removeprefix("import ").removeprefix("static ")
+                if imported.startswith("tools.dscode.workbench.") or imported.startswith(
+                    "tools.dscode.control.protocol."
+                ):
+                    continue
+                errors.append(
+                    "Workbench source imports a Pickleball execution package: "
+                    f"{source.relative_to(ROOT)} -> {line.strip()}"
+                )
+
+    protocol_sources = ROOT / "pickleball-control-protocol" / "src" / "main" / "java"
+    if protocol_sources.is_dir():
+        for source in protocol_sources.rglob("*.java"):
+            for line in source.read_text(encoding="utf-8").splitlines():
+                if line.startswith("import ") and not line.startswith("import java."):
+                    errors.append(
+                        "Neutral protocol source has a non-JDK import: "
+                        f"{source.relative_to(ROOT)} -> {line.strip()}"
+                    )
 
 
 def env_true(name: str) -> bool:
@@ -397,6 +497,8 @@ def main() -> int:
     validate_consumer_tracked_artifacts(errors)
     validate_consumer_ignore(errors)
     validate_packaged_guidance(errors)
+    validate_workbench_controller_contract(errors)
+    validate_workbench_source_boundary(errors)
 
     if args.base_ref:
         changed = git_changed_files(args.base_ref)

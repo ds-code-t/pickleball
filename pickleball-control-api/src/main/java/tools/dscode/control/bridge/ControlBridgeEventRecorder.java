@@ -7,6 +7,8 @@ import tools.dscode.common.control.ControlDecision;
 import tools.dscode.common.control.ControlEvent;
 import tools.dscode.common.control.ControlHookHandler;
 import tools.dscode.common.treeparsing.parsedComponents.Phrase;
+import tools.dscode.control.protocol.ControlBridgeEvent;
+import tools.dscode.control.protocol.ControlBridgeEventPage;
 
 import java.time.Instant;
 import java.util.ArrayDeque;

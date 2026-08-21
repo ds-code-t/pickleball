@@ -1,6 +1,6 @@
 package tools.dscode.workbench.worker;
 
-import tools.dscode.control.bridge.*;
+import tools.dscode.control.protocol.*;
 import tools.dscode.workbench.bridge.ControlBridgeClient;
 
 import java.nio.file.Path;

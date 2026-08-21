@@ -1,22 +1,22 @@
 package tools.dscode.workbench.ui;
 
-import tools.dscode.control.api.BoundedJsonEvidence;
-import tools.dscode.control.api.ServiceCallEvidence;
-import tools.dscode.control.bridge.ControlBridgeBreakpoint;
-import tools.dscode.control.bridge.ControlBridgeBrowserPage;
-import tools.dscode.control.bridge.ControlBridgeBrowserPageResult;
-import tools.dscode.control.bridge.ControlBridgeBrowserScreenshot;
-import tools.dscode.control.bridge.ControlBridgeBrowserScreenshotResult;
-import tools.dscode.control.bridge.ControlBridgeCallResult;
-import tools.dscode.control.bridge.ControlBridgeError;
-import tools.dscode.control.bridge.ControlBridgeEvent;
-import tools.dscode.control.bridge.ControlBridgeEventPage;
-import tools.dscode.control.bridge.ControlBridgeServiceCallResult;
-import tools.dscode.control.bridge.ControlBridgeStatus;
-import tools.dscode.control.bridge.ControlBridgeStepOverride;
-import tools.dscode.control.bridge.ControlBridgeStepOverrideResult;
-import tools.dscode.control.bridge.ControlBridgeValue;
-import tools.dscode.control.bridge.ControlBridgeValueResult;
+import tools.dscode.control.protocol.ControlBridgeBoundedJsonEvidence;
+import tools.dscode.control.protocol.ControlBridgeBreakpoint;
+import tools.dscode.control.protocol.ControlBridgeBrowserPage;
+import tools.dscode.control.protocol.ControlBridgeBrowserPageResult;
+import tools.dscode.control.protocol.ControlBridgeBrowserScreenshot;
+import tools.dscode.control.protocol.ControlBridgeBrowserScreenshotResult;
+import tools.dscode.control.protocol.ControlBridgeCallResult;
+import tools.dscode.control.protocol.ControlBridgeError;
+import tools.dscode.control.protocol.ControlBridgeEvent;
+import tools.dscode.control.protocol.ControlBridgeEventPage;
+import tools.dscode.control.protocol.ControlBridgeServiceCallEvidence;
+import tools.dscode.control.protocol.ControlBridgeServiceCallResult;
+import tools.dscode.control.protocol.ControlBridgeStatus;
+import tools.dscode.control.protocol.ControlBridgeStepOverride;
+import tools.dscode.control.protocol.ControlBridgeStepOverrideResult;
+import tools.dscode.control.protocol.ControlBridgeValue;
+import tools.dscode.control.protocol.ControlBridgeValueResult;
 import tools.dscode.workbench.WorkbenchServices;
 import tools.dscode.workbench.sync.WorkbenchManifest;
 import tools.dscode.workbench.worker.WorkbenchWorkerStatus;
@@ -281,7 +281,7 @@ final class WorkbenchUiController implements AutoCloseable {
 
     private static String renderServiceCallResult(ControlBridgeServiceCallResult result) {
         StringBuilder text = new StringBuilder("Status: ").append(result.status());
-        ServiceCallEvidence evidence = result.evidence();
+        ControlBridgeServiceCallEvidence evidence = result.evidence();
         if (evidence != null) {
             text.append("\nSelector: ").append(evidence.selector());
             text.append("\nHTTP status: ").append(evidence.statusCode());
@@ -294,7 +294,11 @@ final class WorkbenchUiController implements AutoCloseable {
         return text.toString();
     }
 
-    private static void appendJsonEvidence(StringBuilder text, String label, BoundedJsonEvidence evidence) {
+    private static void appendJsonEvidence(
+            StringBuilder text,
+            String label,
+            ControlBridgeBoundedJsonEvidence evidence
+    ) {
         if (evidence == null) return;
         text.append("\n").append(label);
         if (evidence.truncated()) text.append(" (truncated)");

@@ -1,5 +1,7 @@
 package tools.dscode.testengine;
 
+import tools.dscode.control.protocol.ControlProtocol;
+
 import org.junit.platform.commons.support.ReflectionSupport;
 import org.junit.platform.engine.EngineDiscoveryRequest;
 import org.junit.platform.engine.discovery.ClassSelector;
@@ -26,7 +28,7 @@ import static tools.dscode.common.reporting.logging.LogForwarder.logDebug;
 public final class DynamicSuiteBootstrap {
     /** Internal direct-worker contract; not a Pickleball RunVar. */
     public static final String WORKBENCH_TEST_OUTPUT_ROOT_PROPERTY =
-            "pickleball.workbench.testOutputRoot";
+            ControlProtocol.WORKBENCH_TEST_OUTPUT_ROOT_PROPERTY;
 
     private DynamicSuiteBootstrap() {
     }

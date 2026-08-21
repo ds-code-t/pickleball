@@ -3,7 +3,7 @@ package tools.dscode.workbench.mcp;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.modelcontextprotocol.server.McpServerFeatures;
 import io.modelcontextprotocol.spec.McpSchema;
-import tools.dscode.control.bridge.ControlBridgeMappingSnapshot;
+import tools.dscode.control.protocol.ControlBridgeMappingSnapshot;
 import tools.dscode.workbench.WorkbenchServices;
 
 import java.util.ArrayList;

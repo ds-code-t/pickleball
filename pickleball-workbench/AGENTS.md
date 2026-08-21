@@ -4,19 +4,23 @@ Root `AGENTS.md` remains authoritative. Read it and `docs/agent/feature-map.md` 
 
 ## Module role
 
-`pickleball-workbench` is the separate executable companion for interactive Pickleball tooling. The dependency direction is strictly:
+`pickleball-workbench` is the external controller/control plane for interactive Pickleball tooling. It is not a Pickleball runtime. The dependency and distribution graph is strictly:
 
 ```text
-pickleball-workbench -> pickleball
+pickleball core/worker --------> pickleball-control-protocol
+pickleball-workbench ----------> pickleball-control-protocol
+published pickleball JAR ------> opaque completed Workbench JAR bytes
 ```
 
-The normal `tools.dscode:pickleball` artifact must never depend on or embed Workbench classes or Workbench-only dependencies.
+The final line is an assembly input, not a Java/runtime dependency. Pickleball may contain Workbench for delivery; Workbench must not contain Pickleball for execution.
 
 ## Build boundary
 
-Workbench must compile and run against the repository's published-equivalent shaded/woven Pickleball artifact through the dedicated root configuration. Do not replace that boundary with a naïve `implementation project(':')`, and do not add a dependency on the unpublished `pickleball-control-api` module.
+Workbench must compile and run without resolving the root project, `tools.dscode:pickleball`, a published-equivalent/shaded root configuration, or the behavioral `pickleball-control-api`. Its only project dependency is the JDK-only `pickleball-control-protocol` module. Never restore `implementation project(':')`, `pickleballPublishedElements`, a Pickleball Maven dependency, or core shading to fix compilation.
 
-Workbench-only dependencies, including the MCP SDK, belong only on the Workbench classpath. The MCP adapter uses the non-Spring MCP Java SDK core plus its Jackson 2 adapter; do not replace them with the convenience/Jackson 3 artifact or Spring transports without a new architecture decision. Do not move consumer-worker runtime semantics into the controller merely to simplify dependencies.
+The protocol module owns only stable wire DTOs, request/response envelopes, transport constants, capability lists, and explicit version negotiation. It owns no bridge server, bootstrap, mapping logic, Cucumber/Selenium/service behavior, filesystem synchronization, UI, or MCP behavior. When a new runtime capability is required, implement it in core/worker and expose neutral wire data; do not move the behavior into Workbench or protocol.
+
+Workbench-only dependencies, including Jackson and the MCP SDK, belong only on the Workbench classpath. The executable and every nested JAR/service descriptor must remain free of Pickleball core, `pickleball-control-api`, bridge-server/worker implementation, consumer classes, Cucumber, Selenium, and REST-assured. The MCP adapter uses the non-Spring MCP Java SDK core plus its Jackson 2 adapter; do not replace them with the convenience/Jackson 3 artifact or Spring transports without a new architecture decision.
 
 ## Runtime ownership
 
@@ -24,7 +28,7 @@ The Workbench controller owns synchronization, worker process/session lifecycle,
 
 `WorkbenchServices` is the shared plain-Java adapter boundary. `WorkbenchController` composes synchronization and `WorkbenchLiveSession`; MCP and Swing must delegate to that service surface instead of implementing their own worker ownership, bridge calls, Mapping semantics, Step Override behavior, or scenario retry rules.
 
-The Workbench bridge client uses the public `tools.dscode.control.bridge.*` DTOs from the normal Pickleball artifact. Do not create a second controller-side model of Pickleball execution semantics.
+The Workbench bridge client uses only `tools.dscode.control.protocol.*`. Worker-side `ControlBridgeRuntime`, `ControlBridgeCoordinator`, bootstrap, adapters, step compilation, mappings, and execution semantics stay in Pickleball. Workbench may hold the worker entry-point class name as `ControlProtocol.WORKER_MAIN_CLASS`; it must never import or load that class.
 
 The canonical consumer-worker bridge environment is:
 
@@ -110,7 +114,7 @@ Workbench synchronization is build-tool-assisted, not a replacement build system
 
 `.pickleball/workbench/base/classes` is synchronization provenance/reset state and must never be on a worker runtime classpath. `.pickleball/workbench/live/classes` is the one merged project-owned runtime root; main output is materialized first and test output overlays it so one class/resource path is visible exactly once. External dependency entries stay referenced from their normal caches. The synchronization fingerprint covers both merged project output and dependency artifact contents, so replacing a same-version local dependency still changes the snapshot identity.
 
-The controller owns one interactive worker per selected project by default. Workers launch directly with Java from the existing Workbench snapshot, use the Pickleball-side `WorkbenchWorkerMain` bootstrap, and set `pickleball.workbench.testOutputRoot` so `DynamicSuiteBootstrap` intentionally scans the merged live root instead of relying on Maven/Gradle output suffixes.
+The controller owns one interactive worker per selected project by default. Workers launch directly with Java from the existing Workbench snapshot, use the Pickleball-side worker class-name contract, and set the protocol-owned `pickleball.workbench.testOutputRoot` property so core intentionally scans the merged live root instead of relying on Maven/Gradle output suffixes. The worker PID must differ from the controller PID; its reported Pickleball code source must be exactly one captured consumer classpath entry; its version must match the synchronized manifest; and its classpath must exclude the Workbench controller artifact. Incompatible protocol/capability/origin checks fail clearly and never fall back to a bundled runtime.
 
 Interactive workers use a session-private anchor feature and the neutral `PKB_CONTROL_BRIDGE_*` environment contract. The anchor body must be a guaranteed no-op core step. The bridge's pause-first behavior stops first at `SCENARIO_START`, which occurs before `CurrentScenarioState.startScenarioRun()` finishes Pickleball scenario initialization; Workbench treats that pause only as a bootstrap rendezvous. Before returning an interactive worker, the controller installs a one-shot `BEFORE_STEP` breakpoint filtered to the anchor marker step `---pickleball-workbench-anchor`, resumes the bootstrap pause, and lets the root scenario step initialize normal logging/runtime state. It returns only after the marker itself is paused immediately before execution. Live controller operations must run only after that promotion. Pause leases remain finite; the controller renews the owned anchor lease while active. Graceful stop cancels renewal, resumes the anchor so normal lifecycle hooks can finish, waits a bounded period, then terminates and only force-kills as a final fallback. Restart must reuse the existing manifest/classpath, require the previous worker to have stopped cleanly, and must not run Maven/Gradle.
 
@@ -118,7 +122,7 @@ Worker JVM system-property overrides are explicit controller inputs. The default
 
 ## Live runtime operations
 
-`WorkbenchLiveSession` is the controller-side scenario-bound facade for operations on the persistent paused worker. It delegates to `ControlBridgeClient` and the published Pickleball bridge DTOs; it must not reimplement Gherkin matching, mappings, browser behavior, service calls, semantic hook behavior, or Step Override matching/compilation.
+`WorkbenchLiveSession` is the controller-side scenario-bound facade for operations on the persistent paused worker. It delegates to `ControlBridgeClient` and neutral protocol DTOs; it must not reimplement Gherkin matching, mappings, browser behavior, service calls, semantic hook behavior, or Step Override matching/compilation.
 
 Each live operation resolves the currently owned paused scenario, performs the bridge call for that scenario, and verifies afterward that the same process id, bridge runtime id, and scenario id remain active and paused. Normal live operations must not invoke Maven/Gradle, resynchronize the project, or restart the worker.
 
@@ -127,3 +131,9 @@ Each live operation resolves the currently owned paused scenario, performs the b
 With an active override, raw Gherkin may be override-only and need not match ordinary consumer glue. If no override matches, normal Cucumber glue matching remains authoritative. Removing or clearing an override restores that fallback immediately without rebuilding or restarting the worker.
 
 `live-check` is the direct acceptance probe for this contract. Against the Maven example consumer it executes consumer and Pickleball Gherkin, mutates/resolves the live mapping, performs the existing `%health-full-url` service call, reads browser evidence, compiles and replaces one generated Step Override, executes override-only Gherkin, removes the override, verifies fallback behavior, confirms one PID/runtime/scenario was retained, then resumes and requires a clean exit.
+
+## Isolation verification and scenario scope
+
+Keep `verifyWorkbenchArtifact`, `verifyWorkbenchRuntimeBoundary`, `verifyWorkbenchPublishedDependencyContract`, root `verifyEmbeddedWorkbench`, and root `verifyStrictControllerIsolation` aligned with this contract. The checks must inspect resolved provenance, top-level and nested JAR entries, service providers, exact opaque payload count/bytes, controller/runtime class visibility, PIDs, classpaths, runtime origin, protocol version, and capabilities. Do not weaken denylist checks when packages move; update them and retain provenance checks.
+
+For Workbench/control-bridge changes, run only affected focused Cucumber tags—normally `@control-bridge` and/or `@step-override-bridge`—with `-Dpkb_runvars.pkb_parallel=80` where practical. Never use `@all` for this migration or as a substitute for targeted validation. Record commands honestly.

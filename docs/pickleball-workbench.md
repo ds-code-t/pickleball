@@ -1,20 +1,26 @@
 # Pickleball Workbench
 
-Pickleball Workbench is the separate executable companion for interactive Pickleball execution and investigation. It depends on the normal shaded/woven `tools.dscode:pickleball` artifact; normal Pickleball consumers do not depend on Workbench.
+Pickleball Workbench is the external controller for interactive Pickleball execution and investigation. Its executable contains controller code, GUI/MCP adapters, synchronization support, JSON transport, and the neutral wire protocol—but no Pickleball core/runtime. Real execution occurs only in a separate consumer worker using the consumer project's compiled output and resolved test runtime.
 
 Workbench replaces the former Pickleball Studio application. The supported architecture is deliberately execution-oriented: project synchronization, a persistent consumer worker, live runtime control, Mapping, browser/service evidence, semantic breakpoints, Step Override authoring, lightweight non-Spring MCP stdio, and a Swing UI over the same service seam.
 
 ## Architecture
 
-Dependency direction is strictly:
+Source dependencies and distribution are strictly separated:
 
 ```text
-pickleball-workbench -> pickleball
+pickleball core/worker --------> JDK-only control protocol
+pickleball-workbench ----------> JDK-only control protocol
+published pickleball JAR ------> opaque Workbench executable bytes
 ```
+
+The distribution arrow is an assembly input, not a Workbench-to-core Java dependency. **Pickleball may contain Workbench; Workbench must not contain Pickleball.** Separate JVMs are required, but they are not sufficient: dependency graphs, class visibility, JAR entries, nested JARs, service providers, and runtime origins are checked too.
 
 Pickleball owns scenario execution semantics, Cucumber integration, DynamicControl/Gherkin execution, Mapping, browser/service behavior, the consumer-side Control Bridge, semantic hooks/breakpoints, Step Overrides, and woven Cucumber/AspectJ behavior.
 
-Workbench owns synchronization, `.pickleball/workbench/` disposable state, worker lifecycle, the controller-side bridge client, `WorkbenchLiveSession`, `WorkbenchServices` / `WorkbenchController`, MCP stdio, the headless live-scenario presentation model, and the Swing adapter.
+Workbench owns synchronization, `.pickleball/workbench/` disposable state, worker lifecycle, the protocol client, `WorkbenchLiveSession`, `WorkbenchServices` / `WorkbenchController`, MCP stdio, the headless live-scenario presentation model, and the Swing adapter. It does not import the worker entry point; it launches the protocol's class-name string on the captured consumer classpath.
+
+`pickleball-control-protocol` owns only immutable wire records, request/response envelopes, transport constants, capabilities, and version/minimum-version negotiation. Worker-side bridge server/coordinator/bootstrap and all translation to runtime operations remain in Pickleball core.
 
 MCP and Swing are adapters over the same Workbench service seam. They must not introduce a second runtime implementation.
 
@@ -29,12 +35,55 @@ PKB_CONTROL_BRIDGE_PAUSE_FIRST_SCENARIO
 
 Pickleball may accept `PKB_STUDIO_BRIDGE_*` as deprecated compatibility input aliases only. Workbench emits only the neutral names.
 
-## Build and run
+## Launch from a consumer project
 
-Build the executable companion:
+The normal `tools.dscode:pickleball:<version>` test dependency already carries the matching controller at:
+
+```text
+META-INF/pickleball/workbench/pickleball-workbench.jar
+```
+
+Run the small launcher from the consumer test classpath. For Maven consumers, this command requires no cache path, separate Workbench dependency, or separately selected version:
+
+```bash
+mvn -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java \
+  -Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher \
+  -Dexec.classpathScope=test \
+  "-Dexec.args=ui ."
+```
 
 ```powershell
-.\gradlew.bat :pickleball-workbench:build
+mvn -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java "-Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher" "-Dexec.classpathScope=test" "-Dexec.args=ui ."
+```
+
+With no launcher arguments, `ui` and the current directory are selected automatically. Other Workbench commands are forwarded in the same form, for example `"-Dexec.args=sync ."` or `"-Dexec.args=mcp ."`.
+
+Gradle consumers can expose the same dependency-owned launcher without resolving a cache path or adding a Workbench dependency:
+
+```groovy
+tasks.register('pickleballWorkbench', JavaExec) {
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'tools.dscode.launcher.PickleballWorkbenchLauncher'
+    args 'ui', projectDir.absolutePath
+}
+```
+
+Run it with `./gradlew pickleballWorkbench` (or `gradlew.bat pickleballWorkbench`). The task uses the consumer's resolved test runtime only to locate the tiny launcher and nested bytes; actual controller code still starts in a separate `java -jar` process.
+
+The launcher reads the nested payload, limits its size, calculates SHA-256, and extracts it atomically to:
+
+```text
+.pickleball/workbench/controller/<sha256>/pickleball-workbench.jar
+```
+
+It verifies existing/extracted bytes, starts `java -jar` in a new Workbench JVM, inherits stdio, and propagates non-zero exit status. The content-addressed path prevents a stale payload from silently replacing the version carried by the consumer dependency.
+
+## Maintainer build and direct run
+
+Build the standalone controller and strict isolation checks:
+
+```powershell
+.\gradlew.bat :pickleball-workbench:build verifyStrictControllerIsolation
 ```
 
 The executable is:
@@ -43,7 +92,7 @@ The executable is:
 pickleball-workbench/build/libs/pickleball-workbench-<version>.jar
 ```
 
-Synchronize a consumer project before starting a worker manually:
+Synchronize a consumer project before starting a worker manually from repository output:
 
 ```powershell
 $workbenchJar = ".\pickleball-workbench\build\libs\pickleball-workbench-<version>.jar"
@@ -51,6 +100,8 @@ java -jar $workbenchJar sync ".\maven-consumer-project"
 ```
 
 Synchronization uses the selected project wrapper to establish compiled output and the effective test runtime classpath. `.pickleball/workbench/base/classes` is provenance only; the worker runs against the merged `.pickleball/workbench/live/classes` state plus captured external dependencies.
+
+At worker connection time, Workbench requires a different PID, compatible protocol range and capabilities, a Pickleball code source that is exactly one captured consumer classpath entry, the synchronized Pickleball version (except explicit development output), and no Workbench controller artifact on the worker classpath. It fails clearly instead of falling back to a bundled runtime.
 
 ## Swing UI
 
@@ -259,14 +310,18 @@ Workbench MCP and Swing intentionally do not expose a generic IDE or build syste
 
 ## Dependency and artifact checks
 
-The Workbench build keeps the published-equivalent Pickleball boundary and verifies that:
+The build proves the controller boundary with `verifyStrictControllerIsolation` and its component tasks:
 
-- the Workbench executable contains the MCP adapter;
-- normal Pickleball contains neither Workbench classes nor MCP SDK classes;
-- Workbench does not resolve the unpublished `pickleball-control-api` project;
-- separate unwoven Cucumber modules do not appear on the Workbench runtime;
+- `pickleball-control-protocol` has no non-JDK dependency;
+- the only Workbench project dependency is `pickleball-control-protocol`;
+- the Workbench compile/runtime graph contains no root Pickleball, behavioral control API, Cucumber, Selenium, or REST-assured path;
+- the Workbench executable contains its controller, GUI, MCP, protocol client, and runtime isolation guard;
+- top-level and nested Workbench entries and service descriptors contain no core/worker implementation or nested Pickleball runtime;
+- the published Workbench POM has no dependencies;
 - the MCP convenience artifact / Jackson 3 path is not used;
-- the published Workbench POM still declares only `tools.dscode:pickleball`.
+- the outer Pickleball JAR contains exactly one opaque Workbench payload whose bytes equal the standalone output;
+- Workbench/MCP entries are not flattened into the outer runtime namespace; and
+- the nested payload has the expected Workbench `Main-Class`.
 
 Report the executable size and resolved MCP SDK artifacts with:
 
@@ -308,6 +363,12 @@ For the player state model and Swing/controller behavior:
 .\gradlew.bat :pickleball-workbench:test
 ```
 
+For protocol, dependency, nested-artifact, and process-boundary checks:
+
+```powershell
+.\gradlew.bat verifyStrictControllerIsolation
+```
+
 For shared controller/MCP behavior:
 
 ```powershell
@@ -323,3 +384,12 @@ java -jar $workbenchJar sync ".\maven-consumer-project"
 java -jar $workbenchJar worker-check ".\maven-consumer-project"
 java -jar $workbenchJar live-check ".\maven-consumer-project"
 ```
+
+For changed consumer bridge behavior, use only the affected focused tags—never `@all`—and use parallelism 80 where practical:
+
+```powershell
+.\maven-consumer-project\mvnw.cmd -f maven-consumer-project\pom.xml -U test "-Dpkb_runvars.pkb_browser=CHROME_HEADLESS" "-Dpkb_runvars.pkb_parallel=80" "-Dpkb_runvars.pkb_tags=@control-bridge"
+.\maven-consumer-project\mvnw.cmd -f maven-consumer-project\pom.xml -U test "-Dpkb_runvars.pkb_browser=CHROME_HEADLESS" "-Dpkb_runvars.pkb_parallel=80" "-Dpkb_runvars.pkb_tags=@step-override-bridge"
+```
+
+Run these invocations sequentially because the scenarios deliberately verify the process-global bridge bootstrap.

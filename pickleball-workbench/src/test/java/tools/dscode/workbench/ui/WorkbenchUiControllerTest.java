@@ -1,21 +1,22 @@
 package tools.dscode.workbench.ui;
 
 import org.junit.jupiter.api.Test;
-import tools.dscode.control.api.ServiceCallEvidence;
-import tools.dscode.control.bridge.ControlBridgeBreakpoint;
-import tools.dscode.control.bridge.ControlBridgeBrowserPage;
-import tools.dscode.control.bridge.ControlBridgeBrowserPageResult;
-import tools.dscode.control.bridge.ControlBridgeBrowserScreenshot;
-import tools.dscode.control.bridge.ControlBridgeBrowserScreenshotResult;
-import tools.dscode.control.bridge.ControlBridgeCallResult;
-import tools.dscode.control.bridge.ControlBridgeEvent;
-import tools.dscode.control.bridge.ControlBridgeEventPage;
-import tools.dscode.control.bridge.ControlBridgeServiceCallResult;
-import tools.dscode.control.bridge.ControlBridgeStatus;
-import tools.dscode.control.bridge.ControlBridgeStepOverride;
-import tools.dscode.control.bridge.ControlBridgeStepOverrideResult;
-import tools.dscode.control.bridge.ControlBridgeValue;
-import tools.dscode.control.bridge.ControlBridgeValueResult;
+import tools.dscode.control.protocol.ControlBridgeBreakpoint;
+import tools.dscode.control.protocol.ControlBridgeBrowserPage;
+import tools.dscode.control.protocol.ControlBridgeBrowserPageResult;
+import tools.dscode.control.protocol.ControlBridgeBrowserScreenshot;
+import tools.dscode.control.protocol.ControlBridgeBrowserScreenshotResult;
+import tools.dscode.control.protocol.ControlBridgeCallResult;
+import tools.dscode.control.protocol.ControlBridgeEvent;
+import tools.dscode.control.protocol.ControlBridgeEventPage;
+import tools.dscode.control.protocol.ControlBridgeServiceCallEvidence;
+import tools.dscode.control.protocol.ControlBridgeServiceCallResult;
+import tools.dscode.control.protocol.ControlBridgeStatus;
+import tools.dscode.control.protocol.ControlBridgeStepOverride;
+import tools.dscode.control.protocol.ControlBridgeStepOverrideResult;
+import tools.dscode.control.protocol.ControlBridgeValue;
+import tools.dscode.control.protocol.ControlBridgeValueResult;
+import tools.dscode.control.protocol.ControlProtocol;
 import tools.dscode.workbench.WorkbenchServices;
 import tools.dscode.workbench.sync.WorkbenchManifest;
 import tools.dscode.workbench.worker.WorkbenchWorkerStatus;
@@ -249,7 +250,7 @@ class WorkbenchUiControllerTest {
 
     private static ControlBridgeStatus runtime() {
         return new ControlBridgeStatus(
-                1,
+                ControlProtocol.CURRENT_VERSION,
                 "runtime-101",
                 101L,
                 1,
@@ -414,7 +415,9 @@ class WorkbenchUiControllerTest {
                             calls.add("serviceCall:" + args[0]);
                             yield new ControlBridgeServiceCallResult(
                                     "SUCCESS",
-                                    new ServiceCallEvidence((String) args[0], null, null, null, 200),
+                                    new ControlBridgeServiceCallEvidence(
+                                            (String) args[0], null, null, null, 200
+                                    ),
                                     null,
                                     runtime()
                             );

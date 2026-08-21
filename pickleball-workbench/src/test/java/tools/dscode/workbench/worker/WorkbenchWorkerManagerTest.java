@@ -2,8 +2,9 @@ package tools.dscode.workbench.worker;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import tools.dscode.control.protocol.ControlBridgeDescriptor;
+import tools.dscode.control.protocol.ControlProtocol;
 import tools.dscode.workbench.sync.WorkbenchManifest;
-import tools.dscode.testengine.DynamicSuiteBootstrap;
 
 import java.io.File;
 import java.nio.file.Path;
@@ -12,6 +13,7 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class WorkbenchWorkerManagerTest {
@@ -35,7 +37,7 @@ class WorkbenchWorkerManagerTest {
 
         assertTrue(command.get(0).endsWith(WorkbenchProjectOs.javaName()));
         assertTrue(command.contains(
-                "-D" + DynamicSuiteBootstrap.WORKBENCH_TEST_OUTPUT_ROOT_PROPERTY + "=" + live
+                "-D" + ControlProtocol.WORKBENCH_TEST_OUTPUT_ROOT_PROPERTY + "=" + live
         ));
         int classpathIndex = command.indexOf("-cp") + 1;
         assertEquals(
@@ -46,7 +48,7 @@ class WorkbenchWorkerManagerTest {
                 .map(Path::of)
                 .map(path -> path.toAbsolutePath().normalize())
                 .anyMatch(path -> path.startsWith(project.resolve(".pickleball/workbench/base"))));
-        assertTrue(command.contains("tools.dscode.testengine.WorkbenchWorkerMain"));
+        assertTrue(command.contains(ControlProtocol.WORKER_MAIN_CLASS));
         int tagIndex = command.indexOf("--tags");
         assertEquals("@pickleball-workbench-anchor", command.get(tagIndex + 1));
         assertEquals(anchor.toUri().toString(), command.getLast());
@@ -67,7 +69,7 @@ class WorkbenchWorkerManagerTest {
         );
 
         int outputRoot = command.indexOf(
-                "-D" + DynamicSuiteBootstrap.WORKBENCH_TEST_OUTPUT_ROOT_PROPERTY + "=" + live
+                "-D" + ControlProtocol.WORKBENCH_TEST_OUTPUT_ROOT_PROPERTY + "=" + live
         );
         assertEquals("-Dpkb_browser=CHROME_HEADLESS", command.get(outputRoot + 1));
         assertEquals("-Dpkb_tags=@smoke", command.get(outputRoot + 2));
@@ -88,6 +90,110 @@ class WorkbenchWorkerManagerTest {
         assertTrue(feature.contains("Given ---pickleball-workbench-anchor"));
         assertFalse(feature.contains("save "));
         assertFalse(feature.contains("@all"));
+    }
+
+    @Test
+    void consumerRuntimeMustBeASeparateProcessLoadedFromCapturedClasspath() {
+        Path project = tempDir.resolve("consumer").toAbsolutePath().normalize();
+        Path live = project.resolve(".pickleball/workbench/live/classes");
+        Path dependency = tempDir.resolve("pickleball.jar").toAbsolutePath().normalize();
+        WorkbenchManifest manifest = manifest(project, live, dependency);
+        ControlBridgeDescriptor descriptor = descriptor(
+                ProcessHandle.current().pid() + 1,
+                dependency,
+                "2.1.8"
+        );
+
+        WorkbenchWorkerManager.verifyConsumerRuntime(
+                descriptor,
+                manifest,
+                List.of(live.toString(), dependency.toString())
+        );
+    }
+
+    @Test
+    void consumerRuntimeRejectsControllerPidUncapturedOriginAndVersionDrift() {
+        Path project = tempDir.resolve("consumer").toAbsolutePath().normalize();
+        Path live = project.resolve(".pickleball/workbench/live/classes");
+        Path dependency = tempDir.resolve("pickleball.jar").toAbsolutePath().normalize();
+        Path foreign = tempDir.resolve("controller/pickleball.jar").toAbsolutePath().normalize();
+        Path controllerJar = tempDir.resolve("pickleball-workbench-2.1.8.jar")
+                .toAbsolutePath()
+                .normalize();
+        WorkbenchManifest manifest = manifest(project, live, dependency);
+        List<String> classpath = List.of(live.toString(), dependency.toString());
+
+        IllegalStateException pidFailure = assertThrows(
+                IllegalStateException.class,
+                () -> WorkbenchWorkerManager.verifyConsumerRuntime(
+                        descriptor(ProcessHandle.current().pid(), dependency, "2.1.8"),
+                        manifest,
+                        classpath
+                )
+        );
+        IllegalStateException originFailure = assertThrows(
+                IllegalStateException.class,
+                () -> WorkbenchWorkerManager.verifyConsumerRuntime(
+                        descriptor(ProcessHandle.current().pid() + 1, foreign, "2.1.8"),
+                        manifest,
+                        classpath
+                )
+        );
+        IllegalStateException versionFailure = assertThrows(
+                IllegalStateException.class,
+                () -> WorkbenchWorkerManager.verifyConsumerRuntime(
+                        descriptor(ProcessHandle.current().pid() + 1, dependency, "9.9.9"),
+                        manifest,
+                        classpath
+                )
+        );
+        IllegalStateException controllerLeakFailure = assertThrows(
+                IllegalStateException.class,
+                () -> WorkbenchWorkerManager.verifyConsumerRuntime(
+                        descriptor(ProcessHandle.current().pid() + 1, dependency, "2.1.8"),
+                        manifest,
+                        List.of(live.toString(), dependency.toString(), controllerJar.toString())
+                )
+        );
+        IllegalStateException duplicateOriginFailure = assertThrows(
+                IllegalStateException.class,
+                () -> WorkbenchWorkerManager.verifyConsumerRuntime(
+                        descriptor(ProcessHandle.current().pid() + 1, dependency, "2.1.8"),
+                        manifest,
+                        List.of(live.toString(), dependency.toString(), dependency.toString())
+                )
+        );
+        IllegalStateException missingVersionFailure = assertThrows(
+                IllegalStateException.class,
+                () -> WorkbenchWorkerManager.verifyConsumerRuntime(
+                        descriptor(ProcessHandle.current().pid() + 1, dependency, null),
+                        manifest,
+                        classpath
+                )
+        );
+
+        assertTrue(pidFailure.getMessage().contains("distinct"));
+        assertTrue(originFailure.getMessage().contains("outside the synchronized"));
+        assertTrue(versionFailure.getMessage().contains("does not match"));
+        assertTrue(controllerLeakFailure.getMessage().contains("must not contain"));
+        assertTrue(duplicateOriginFailure.getMessage().contains("exactly once"));
+        assertTrue(missingVersionFailure.getMessage().contains("did not report"));
+    }
+
+    private ControlBridgeDescriptor descriptor(long pid, Path runtimeSource, String version) {
+        return new ControlBridgeDescriptor(
+                ControlProtocol.CURRENT_VERSION,
+                ControlProtocol.MINIMUM_COMPATIBLE_VERSION,
+                "session",
+                "runtime",
+                pid,
+                "127.0.0.1",
+                1,
+                "2026-08-20T00:00:00Z",
+                version,
+                runtimeSource.toString(),
+                ControlProtocol.WORKER_CAPABILITIES
+        );
     }
 
     private WorkbenchManifest manifest(Path project, Path live, Path dependency) {

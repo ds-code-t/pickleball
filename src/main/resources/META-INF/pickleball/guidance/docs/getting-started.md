@@ -15,7 +15,7 @@ A consumer normally needs the Pickleball test dependency and one runner extendin
 ```xml
 <properties>
     <maven.compiler.release>21</maven.compiler.release>
-    <pickleball.version>2.1.5</pickleball.version>
+    <pickleball.version>2.1.9</pickleball.version>
 </properties>
 
 <dependency>
@@ -82,6 +82,19 @@ Named profile definitions use the same shared/local idea: define shared profiles
 ```bash
 mvn test
 ```
+
+## Launch the matching Workbench
+
+The Pickleball dependency carries its version-matched, controller-only Workbench as an opaque nested executable. Launch it from the consumer test classpath; do not add or version a second Workbench dependency:
+
+```bash
+mvn -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java \
+  -Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher \
+  -Dexec.classpathScope=test \
+  "-Dexec.args=ui ."
+```
+
+The launcher extracts verified bytes beneath `.pickleball/workbench/controller/<sha256>/` and starts a separate controller JVM. Workbench then synchronizes the project and starts a second, consumer-owned worker JVM from the resolved test runtime. Core, Cucumber, Selenium, service behavior, mappings, and steps execute only in that worker. See [Pickleball Workbench](pickleball-workbench.md).
 
 Filter normally with RunVars such as:
 

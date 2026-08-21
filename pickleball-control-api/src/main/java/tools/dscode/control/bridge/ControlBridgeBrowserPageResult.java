@@ -1,6 +1,7 @@
 package tools.dscode.control.bridge;
 
-/** Logical result of reading current browser page evidence. */
+/** @deprecated Wire controllers use {@code tools.dscode.control.protocol}. */
+@Deprecated(forRemoval = false)
 public record ControlBridgeBrowserPageResult(
         String status,
         ControlBridgeBrowserPage page,

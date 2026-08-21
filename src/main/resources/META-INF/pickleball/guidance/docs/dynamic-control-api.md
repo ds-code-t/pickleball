@@ -1,6 +1,6 @@
 # Dynamic Control API
 
-Pickleball exposes a small core interception contract plus a separately organized `pickleball-control-api` source module for dynamic tooling. The control API classes are bundled into the main `tools.dscode:pickleball` artifact; consumers do not add a second Maven dependency. The source module is intentionally independent of MCP, Spring AI, GUIs, and process orchestration.
+Pickleball exposes a small core interception contract plus a separately organized `pickleball-control-api` source module for dynamic tooling. The behavioral control API classes are bundled into the main `tools.dscode:pickleball` artifact; consumers do not add a second Maven dependency. Versioned wire records live separately in the JDK-only `pickleball-control-protocol` module so the Workbench controller never depends on behavioral runtime classes.
 
 ## Artifact and compatibility
 
@@ -39,6 +39,8 @@ For backward compatibility, Pickleball may accept the former `PKB_STUDIO_BRIDGE_
 
 Each participating consumer JVM binds to `127.0.0.1` on an operating-system-assigned port and writes a runtime descriptor into the session directory. Requests require the session bearer token and responses are marked `Cache-Control: no-store`.
 
+The descriptor advertises the current and minimum-compatible protocol versions, capabilities, PID, Pickleball implementation version, and runtime code source. Workbench rejects incompatible capabilities/versions, a same-process worker, a runtime origin outside the synchronized consumer classpath, version drift, or a worker classpath containing the controller. It never falls back to executing a Workbench-bundled runtime.
+
 The bridge keeps live operations on the real scenario thread through `ControlBridgeCoordinator`. This preserves access to thread-local Cucumber/Pickleball state, glue, browser, services, mappings, and other scenario resources.
 
 Bridge capabilities include:
@@ -54,7 +56,7 @@ Bridge capabilities include:
 - semantic breakpoint management;
 - scenario-scoped Step Override management.
 
-Workbench owns the controller-side bridge client. MCP and Swing access these capabilities through `WorkbenchServices` / `WorkbenchController`; they do not connect to the bridge independently or implement a second runtime.
+Workbench owns the controller-side protocol client. MCP and Swing access these capabilities through `WorkbenchServices` / `WorkbenchController`; they do not connect to the bridge independently or implement a second runtime. Workbench imports only `tools.dscode.control.protocol.*`; bridge server/coordinator/bootstrap and conversion to runtime objects remain worker-side.
 
 ## Scenario targeting and finite pauses
 
@@ -86,4 +88,4 @@ Worker-side compilation requires `javax.tools.JavaCompiler`. Workbench sends a J
 
 ## Architecture boundary
 
-The control API and bridge intentionally remain independent of MCP, Spring, GUI frameworks, generic project IDE behavior, and build orchestration. Pickleball owns live execution semantics. Workbench is the external controller/adaptation layer.
+The control API and bridge intentionally remain independent of MCP, Spring, GUI frameworks, generic project IDE behavior, and build orchestration. Pickleball owns live execution semantics. Workbench is the external controller/adaptation layer and its artifact contains no Pickleball core, behavioral control API, Cucumber, Selenium, or service runtime. The only shared code is the dependency-neutral wire protocol.

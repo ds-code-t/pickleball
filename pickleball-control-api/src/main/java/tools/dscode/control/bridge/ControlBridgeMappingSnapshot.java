@@ -4,7 +4,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import java.util.List;
 
-/** Materialized state for one live NodeMap captured through the Studio bridge. */
+/** Legacy materialized state for one live NodeMap captured through the control bridge. */
 public record ControlBridgeMappingSnapshot(
         int version,
         String mapReference,

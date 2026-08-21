@@ -1,6 +1,7 @@
 package tools.dscode.control.bridge;
 
-/** Logical result of capturing one live NodeMap snapshot. */
+/** @deprecated Wire controllers use {@code tools.dscode.control.protocol}. */
+@Deprecated(forRemoval = false)
 public record ControlBridgeMappingSnapshotResult(
         String status,
         ControlBridgeMappingSnapshot snapshot,

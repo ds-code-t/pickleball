@@ -362,6 +362,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/coredefinitions/TableSteps.java`
 - `src/main/java/tools/dscode/coredefinitions/UtilitySteps.java`
 - `src/main/java/tools/dscode/cucumberextended/utilities/StringUtilities.java`
+- `src/main/java/tools/dscode/launcher/PickleballWorkbenchLauncher.java`
 - `src/main/java/tools/dscode/misc/DummySteps.java`
 - `src/main/java/tools/dscode/parallelutilities/Stagger.java`
 - `src/main/java/tools/dscode/pickleruntime/CucumberOptionResolver.java`
@@ -385,6 +386,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 ## Framework tests
 
 - `src/test/java/tools/dscode/control/override/StepOverrideCompilerTest.java`
+- `src/test/java/tools/dscode/launcher/PickleballWorkbenchLauncherTest.java`
 - `src/test/java/tools/dscode/testengine/DynamicSuiteBootstrapWorkbenchRootTest.java`
 
 ## Control API module
@@ -435,6 +437,38 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-control-api/src/main/java/tools/dscode/control/bridge/ControlBridgeValue.java`
 - `pickleball-control-api/src/main/java/tools/dscode/control/bridge/ControlBridgeValueResult.java`
 
+## Neutral control protocol module
+
+- `pickleball-control-protocol/build.gradle`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/ControlBridgeBoundedJsonEvidence.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/ControlBridgeBreakpoint.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/ControlBridgeBrowserPage.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/ControlBridgeBrowserPageResult.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/ControlBridgeBrowserScreenshot.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/ControlBridgeBrowserScreenshotResult.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/ControlBridgeCallResult.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/ControlBridgeDescriptor.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/ControlBridgeElementEvidence.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/ControlBridgeElementInspection.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/ControlBridgeElementInspectionResult.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/ControlBridgeError.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/ControlBridgeEvent.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/ControlBridgeEventPage.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/ControlBridgeJson.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/ControlBridgeMappingSnapshot.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/ControlBridgeMappingSnapshotResult.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/ControlBridgeRequests.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/ControlBridgeResponses.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/ControlBridgeScenarioStatus.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/ControlBridgeServiceCallEvidence.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/ControlBridgeServiceCallResult.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/ControlBridgeStatus.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/ControlBridgeStepOverride.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/ControlBridgeStepOverrideResult.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/ControlBridgeValue.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/ControlBridgeValueResult.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/ControlProtocol.java`
+
 ## Pickleball Workbench module
 
 - `gradle/pickleball-published-variant.gradle`
@@ -452,6 +486,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/ui/WorkbenchUiController.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/WorkbenchApplication.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/WorkbenchController.java`
+- `pickleball-workbench/src/main/java/tools/dscode/workbench/WorkbenchRuntimeBoundary.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/WorkbenchServices.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/worker/WorkbenchLiveSession.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/worker/WorkbenchWorkerManager.java`
@@ -463,6 +498,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/sync/WorkbenchSynchronizerTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/ui/WorkbenchUiControllerTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/WorkbenchApplicationTest.java`
+- `pickleball-workbench/src/test/java/tools/dscode/workbench/WorkbenchRuntimeBoundaryTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/worker/WorkbenchLiveSessionTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/worker/WorkbenchWorkerManagerTest.java`
 
@@ -563,7 +599,6 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `maven-consumer-project/src/test/resources/files/customers.yaml`
 - `maven-consumer-project/src/test/resources/pickleball.properties`
 - `maven-consumer-project/src/test/resources/pickleball_local.properties`
-- `maven-consumer-project/src/test/resources/pickleball_local2.properties`
 - `maven-consumer-project/src/test/resources/profiles.yaml`
 - `maven-consumer-project/src/test/resources/profiles_local.yaml`
 
