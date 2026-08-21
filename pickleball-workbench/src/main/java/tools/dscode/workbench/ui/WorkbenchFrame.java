@@ -1,32 +1,44 @@
 package tools.dscode.workbench.ui;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.dscode.control.protocol.ControlBridgeMappingSnapshot;
 import tools.dscode.workbench.player.LiveScenarioPlayer;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
 import java.awt.*;
 import java.awt.event.KeyEvent;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ExecutionException;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 /** Player-style Swing presentation adapter over the shared Workbench service seam. */
 final class WorkbenchFrame extends JFrame {
+    private static final int MAPPING_SAVE_DELAY_MS = 650;
+
     private final WorkbenchUiController controller;
     private final LiveScenarioPlayer player = LiveScenarioPlayer.interactiveBuffer();
+    private final ObjectMapper json = new ObjectMapper();
 
     private final DefaultListModel<LiveScenarioPlayer.Line> scenarioModel = new DefaultListModel<>();
     private final JList<LiveScenarioPlayer.Line> scenarioList = new JList<>(scenarioModel);
     private final JTextField stepText = new JTextField();
 
-    private final JButton firstButton = playerButton("⏮", "First step (navigation only; does not undo runtime side effects)");
-    private final JButton backButton = playerButton("◀", "Previous step (navigation only; does not undo runtime side effects)");
-    private final JButton playButton = playerButton("▶", "Phase 1 player-state control; runtime run loop is added in Phase 2");
-    private final JButton pauseButton = playerButton("⏸", "Pause player advancement at the next safe boundary");
-    private final JButton playerStopButton = playerButton("■", "Stop the live player state");
-    private final JButton isolatedStepButton = smallPlayerButton("▶", "Execute the Step Editor text in isolation");
+    private final JButton playButton = playerButton("▶", "Run the scenario from the first step in a fresh scenario context");
+    private final JButton pauseButton = playerButton("⏸", "Pause after the current in-flight step");
+    private final JButton playerStopButton = playerButton("■", "Stop automatic scenario advancement");
+    private final JButton stepOnlyButton =
+            smallPlayerButton("▶ Step", "Execute only the Step Editor text in the current paused scenario context");
+    private final JButton fromHereButton =
+            smallPlayerButton("▶ From Here", "Start a fresh scenario context and run from the selected step");
 
     private final JLabel projectLabel = new JLabel("Project: loading...");
     private final JLabel readinessLabel = new JLabel("Loading status...");
@@ -39,63 +51,38 @@ final class WorkbenchFrame extends JFrame {
     private final JMenuItem restartItem = new JMenuItem("Restart Worker");
     private final JMenuItem stopItem = new JMenuItem("Stop Worker");
 
-    private final JButton mappingGetButton = new JButton("Get");
-    private final JButton mappingPutButton = new JButton("Put");
-    private final JButton mappingResolveButton = new JButton("Resolve");
-    private final JComboBox<String> nodeMapSelector = new JComboBox<>();
-    private final JTextField mappingReference = new JTextField("OVERRIDE");
-    private final JTextField mappingKey = new JTextField("workbenchLiveValue");
-    private final JTextField mappingValue = new JTextField("first");
-    private final JTextField mappingInput = new JTextField("<workbenchLiveValue>");
-    private final JTextArea mappingOutput = outputArea();
+    private final JComboBox<WorkbenchUiController.MappingCatalogEntry> nodeMapSelector =
+            new JComboBox<>();
+    private final JTextArea mappingEditor = new JTextArea();
+    private final JLabel mappingStatus = new JLabel("Start the live worker to inspect Mapping.");
+    private final Timer mappingSaveTimer = new Timer(
+            MAPPING_SAVE_DELAY_MS,
+            event -> saveEditedMapping()
+    );
 
     private final JTextArea terminalArea = outputArea();
 
-    private final JTextArea statusArea = outputArea();
-    private final JButton eventsRefreshButton = new JButton("Refresh Events");
-    private final JTextArea eventsArea = outputArea();
-
-    private final JButton overrideCompileButton = new JButton("Compile / Replace");
-    private final JButton overrideRefreshButton = new JButton("Refresh List");
-    private final JButton overrideRemoveButton = new JButton("Remove ID");
-    private final JButton overrideClearButton = new JButton("Clear All");
-    private final JTextField overrideId = new JTextField("workbench-ui-generated");
-    private final JTextField overrideRegex = new JTextField("^WORKBENCH UI OVERRIDE ([A-Za-z]+)$");
-    private final JTextArea overrideSource = new JTextArea(defaultOverrideSource(), 16, 70);
-    private final JTextArea overrideOutput = outputArea();
-    private final JTextArea overrideList = outputArea();
-
-    private final JButton browserPageButton = new JButton("Read Page");
-    private final JButton browserScreenshotButton = new JButton("Capture Screenshot");
-    private final JTextArea browserOutput = outputArea();
-    private final JTabbedPane browserEvidenceTabs = new JTabbedPane();
-    private final JLabel screenshotLabel = new JLabel("No screenshot captured.", SwingConstants.CENTER);
-    private final JButton serviceCallButton = new JButton("Execute Service Call");
-    private final JTextField serviceSelector = new JTextField("%health-full-url");
-    private final JTextArea serviceOutput = outputArea();
-
-    private final JButton breakpointAddButton = new JButton("Add");
-    private final JButton breakpointRefreshButton = new JButton("Refresh List");
-    private final JButton breakpointRemoveButton = new JButton("Remove ID");
-    private final JButton breakpointClearButton = new JButton("Clear All");
-    private final JTextField breakpointId = new JTextField();
-    private final JTextField breakpointHook = new JTextField("BEFORE_STEP");
-    private final JTextField breakpointSignature = new JTextField();
-    private final JTextField breakpointStep = new JTextField("CONTROL API TEST STEP");
-    private final JTextField breakpointPhrase = new JTextField();
-    private final JCheckBox breakpointOneShot = new JCheckBox("One shot", true);
-    private final JTextField breakpointLease = new JTextField("120");
-    private final JTextArea breakpointOutput = outputArea();
-    private final JTextArea breakpointList = outputArea();
-
     private WorkbenchUiController.State lastState;
-    private JDialog advancedDialog;
+    private ControlBridgeMappingSnapshot loadedMapping;
+    private boolean loadingMapping;
+    private boolean refreshingCatalog;
+    private boolean mappingSaveBusy;
+    private long mappingEditGeneration;
+
+    private boolean playbackPreparing;
+    private boolean playbackBusy;
+    private Long executingStepId;
+    private boolean pendingFreshRun;
+    private Long pendingFreshRunStepId;
+    private String pendingIsolatedStep;
     private boolean syncingScenarioSelection;
     private boolean closing;
 
     WorkbenchFrame(WorkbenchUiController controller) {
         super("Pickleball Workbench");
         this.controller = controller;
+
+        mappingSaveTimer.setRepeats(false);
 
         setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
         setMinimumSize(new Dimension(1100, 720));
@@ -107,17 +94,22 @@ final class WorkbenchFrame extends JFrame {
         root.setBorder(new EmptyBorder(8, 8, 8, 8));
         root.add(playerBar(), BorderLayout.NORTH);
 
-        JSplitPane workspace = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, leftWorkspace(), rightWorkspace());
+        JSplitPane workspace = new JSplitPane(
+                JSplitPane.HORIZONTAL_SPLIT,
+                leftWorkspace(),
+                rightWorkspace()
+        );
         workspace.setResizeWeight(0.52);
         workspace.setDividerLocation(760);
         root.add(workspace, BorderLayout.CENTER);
         root.add(footer(), BorderLayout.SOUTH);
         setContentPane(root);
 
-        wirePlayerActions();
-        wireRuntimeActions();
         configureScenarioEditor();
         configureStepEditor();
+        configureMappingEditor();
+        wirePlayerActions();
+        wireSessionActions();
         syncScenarioView();
         updatePlayerView(null);
 
@@ -167,18 +159,9 @@ final class WorkbenchFrame extends JFrame {
         bar.add(project, BorderLayout.WEST);
 
         JPanel controls = new JPanel(new FlowLayout(FlowLayout.CENTER, 6, 0));
-        controls.add(firstButton);
-        controls.add(backButton);
         controls.add(playButton);
         controls.add(pauseButton);
         controls.add(playerStopButton);
-        controls.add(Box.createHorizontalStrut(8));
-        controls.add(new JLabel("Speed:"));
-        JComboBox<String> speed = new JComboBox<>(new String[]{"0.5x", "1.0x", "2.0x"});
-        speed.setSelectedItem("1.0x");
-        speed.setEnabled(false);
-        speed.setToolTipText("Runtime playback speed is introduced with the Phase 2 execution loop.");
-        controls.add(speed);
         bar.add(controls, BorderLayout.CENTER);
 
         JPanel state = new JPanel(new FlowLayout(FlowLayout.RIGHT, 6, 0));
@@ -206,10 +189,8 @@ final class WorkbenchFrame extends JFrame {
         panel.add(new JScrollPane(scenarioList), BorderLayout.CENTER);
 
         JPanel legend = new JPanel(new FlowLayout(FlowLayout.LEFT, 18, 2));
-        legend.add(new JLabel("▶ Playhead"));
-        legend.add(new JLabel("Selected line = highlight"));
-        legend.add(new JLabel("Executed = dimmed"));
-        legend.add(new JLabel("Failed = red"));
+        legend.add(new JLabel("▶ Current execution"));
+        legend.add(new JLabel("Selection = edit / From Here"));
         panel.add(legend, BorderLayout.SOUTH);
         return panel;
     }
@@ -222,14 +203,15 @@ final class WorkbenchFrame extends JFrame {
         ));
 
         JPanel header = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 0));
-        JLabel title = new JLabel("Step Editor / Command");
+        JLabel title = new JLabel("Step Editor");
         title.setFont(title.getFont().deriveFont(Font.BOLD));
         header.add(title);
-        header.add(isolatedStepButton);
+        header.add(stepOnlyButton);
+        header.add(fromHereButton);
+        header.add(new JLabel("Enter = insert after selection   Ctrl+Enter = update selected step"));
         panel.add(header, BorderLayout.NORTH);
 
         stepText.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 14));
-        stepText.setToolTipText("Enter inserts ahead of the playhead. Ctrl+Enter updates the selected pending step.");
         panel.add(stepText, BorderLayout.CENTER);
         return panel;
     }
@@ -242,6 +224,11 @@ final class WorkbenchFrame extends JFrame {
         return tabs;
     }
 
+    /**
+     * Mapping deliberately has no get/put/resolve workflow. The selected current
+     * NodeMap is represented as one editable JSON object snapshot and valid edits
+     * are restored automatically after a short debounce.
+     */
     private JPanel mappingPanel() {
         JPanel panel = new JPanel(new BorderLayout(6, 6));
         panel.setBorder(new EmptyBorder(8, 8, 8, 8));
@@ -249,36 +236,17 @@ final class WorkbenchFrame extends JFrame {
         JPanel selector = new JPanel(new BorderLayout(6, 0));
         selector.add(new JLabel("NodeMap:"), BorderLayout.WEST);
         nodeMapSelector.setEnabled(false);
-        nodeMapSelector.setToolTipText("Populated from the selected step ParsingMap after the Phase 3 bridge contract is added.");
         selector.add(nodeMapSelector, BorderLayout.CENTER);
-        JLabel pending = new JLabel("ParsingMap inspection API required");
-        pending.setForeground(Color.GRAY);
-        selector.add(pending, BorderLayout.EAST);
         panel.add(selector, BorderLayout.NORTH);
 
-        JPanel legacy = new JPanel(new BorderLayout(6, 6));
-        legacy.setBorder(BorderFactory.createTitledBorder("Existing Mapping operations"));
+        mappingEditor.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 13));
+        mappingEditor.setTabSize(2);
+        mappingEditor.setLineWrap(false);
+        mappingEditor.setEnabled(false);
+        panel.add(new JScrollPane(mappingEditor), BorderLayout.CENTER);
 
-        JPanel fields = new JPanel(new GridLayout(4, 2, 6, 6));
-        fields.add(new JLabel("Mapping reference"));
-        fields.add(mappingReference);
-        fields.add(new JLabel("Key"));
-        fields.add(mappingKey);
-        fields.add(new JLabel("Value (text)"));
-        fields.add(mappingValue);
-        fields.add(new JLabel("Resolve input"));
-        fields.add(mappingInput);
-        legacy.add(fields, BorderLayout.NORTH);
-
-        JPanel actions = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        actions.add(mappingGetButton);
-        actions.add(mappingPutButton);
-        actions.add(mappingResolveButton);
-        legacy.add(actions, BorderLayout.CENTER);
-        legacy.add(new JScrollPane(mappingOutput), BorderLayout.SOUTH);
-        mappingOutput.setRows(10);
-
-        panel.add(legacy, BorderLayout.CENTER);
+        mappingStatus.setBorder(new EmptyBorder(2, 2, 2, 2));
+        panel.add(mappingStatus, BorderLayout.SOUTH);
         return panel;
     }
 
@@ -286,13 +254,13 @@ final class WorkbenchFrame extends JFrame {
         JPanel panel = new JPanel(new BorderLayout(6, 6));
         panel.setBorder(new EmptyBorder(8, 8, 8, 8));
 
-        JPanel top = new JPanel(new BorderLayout(6, 0));
-        JLabel note = new JLabel("Workbench activity; worker log streaming is introduced in Phase 4.");
-        note.setForeground(Color.GRAY);
-        top.add(note, BorderLayout.CENTER);
+        JPanel top = new JPanel(new BorderLayout());
+        JLabel note = new JLabel("Live player and Workbench activity");
+        top.add(note, BorderLayout.WEST);
         JButton clear = new JButton("Clear");
         clear.addActionListener(event -> terminalArea.setText(""));
         top.add(clear, BorderLayout.EAST);
+
         panel.add(top, BorderLayout.NORTH);
         panel.add(new JScrollPane(terminalArea), BorderLayout.CENTER);
         return panel;
@@ -305,14 +273,20 @@ final class WorkbenchFrame extends JFrame {
         message.setText("""
                 Diagnostic Log Explorer foundation
 
-                Phase 5 will bind this tab to Pickleball's retained diagnostic artifacts using the existing
-                run-catalog -> run-index/clusters -> summary -> events -> visual evidence escalation model.
-
-                No fake run catalog or competing diagnostic storage is created by the Swing UI.
+                This tab remains intentionally separate from the live scenario player.
+                It should continue to bind to Pickleball's retained diagnostic artifacts
+                rather than inventing a second diagnostic store in Workbench.
                 """);
         message.setCaretPosition(0);
         panel.add(new JScrollPane(message), BorderLayout.CENTER);
         return panel;
+    }
+
+    private JPanel footer() {
+        JPanel footer = new JPanel(new BorderLayout());
+        activityLabel.setBorder(new EmptyBorder(2, 4, 2, 4));
+        footer.add(activityLabel, BorderLayout.CENTER);
+        return footer;
     }
 
     private void configureScenarioEditor() {
@@ -321,10 +295,14 @@ final class WorkbenchFrame extends JFrame {
             LiveScenarioPlayer.Line selected = scenarioList.getSelectedValue();
             if (selected == null) {
                 player.clearSelection();
+                updateFromHereAvailability();
                 return;
             }
             player.select(selected.id());
-            if (selected.executable()) stepText.setText(selected.text());
+            if (selected.executable()) {
+                stepText.setText(selected.text());
+            }
+            updateFromHereAvailability();
         });
     }
 
@@ -342,102 +320,238 @@ final class WorkbenchFrame extends JFrame {
         });
     }
 
+    private void configureMappingEditor() {
+        nodeMapSelector.addActionListener(event -> {
+            if (refreshingCatalog) return;
+            WorkbenchUiController.MappingCatalogEntry selected =
+                    (WorkbenchUiController.MappingCatalogEntry) nodeMapSelector.getSelectedItem();
+            if (selected != null) loadMapping(selected);
+        });
+
+        mappingEditor.getDocument().addDocumentListener(new DocumentListener() {
+            @Override
+            public void insertUpdate(DocumentEvent event) {
+                mappingChanged();
+            }
+
+            @Override
+            public void removeUpdate(DocumentEvent event) {
+                mappingChanged();
+            }
+
+            @Override
+            public void changedUpdate(DocumentEvent event) {
+                mappingChanged();
+            }
+        });
+    }
+
     private void wirePlayerActions() {
-        firstButton.addActionListener(event -> {
-            player.movePlayheadToFirstStep();
-            updatePlayerView("Playhead moved to first step. Navigation does not undo runtime side effects.");
-        });
-        backButton.addActionListener(event -> {
-            player.movePlayheadToPreviousStep();
-            updatePlayerView("Playhead moved back. Navigation does not undo runtime side effects.");
-        });
-        playButton.addActionListener(event -> {
-            player.play();
-            updatePlayerView("Player state updated. Buffered automatic execution is implemented in Phase 2.");
-        });
+        playButton.addActionListener(event -> runScenarioFromBeginning());
         pauseButton.addActionListener(event -> {
             player.pause();
-            updatePlayerView("Player paused.");
+            updatePlayerView(playbackBusy
+                    ? "Pause requested; the current step will finish first."
+                    : "Scenario playback paused.");
         });
         playerStopButton.addActionListener(event -> {
             player.stop();
-            updatePlayerView("Player stopped. Worker lifecycle remains available from Session.");
+            pendingFreshRun = false;
+            pendingFreshRunStepId = null;
+            pendingIsolatedStep = null;
+            updatePlayerView(playbackBusy
+                    ? "Scenario playback stopped; the current step will finish but no next step will start."
+                    : "Scenario playback stopped.");
         });
-        isolatedStepButton.addActionListener(event -> executeIsolatedStep());
+        stepOnlyButton.addActionListener(event -> executeStepOnly());
+        fromHereButton.addActionListener(event -> runScenarioFromSelectedStep());
     }
 
-    private void wireRuntimeActions() {
-        syncItem.addActionListener(event -> runStateAction("Synchronizing project", controller::synchronize));
-        refreshItem.addActionListener(event -> runStateAction("Refreshing status", controller::refresh));
-        startItem.addActionListener(event -> runStateAction("Starting worker", controller::startWorker));
-        restartItem.addActionListener(event -> runStateAction("Restarting worker", controller::restartWorker));
-        stopItem.addActionListener(event -> runStateAction("Stopping worker", controller::stopWorker));
+    private void wireSessionActions() {
+        syncItem.addActionListener(event ->
+                runStateAction("Synchronizing project", controller::synchronize));
+        refreshItem.addActionListener(event ->
+                runStateAction("Refreshing status", controller::refresh));
+        startItem.addActionListener(event ->
+                runStateAction("Starting worker", controller::startWorker));
+        restartItem.addActionListener(event ->
+                runStateAction("Restarting worker", controller::restartWorker));
+        stopItem.addActionListener(event -> {
+            player.stop();
+            runStateAction("Stopping worker", controller::stopWorker);
+        });
+    }
 
-        mappingGetButton.addActionListener(event -> runLiveAction(
-                "Reading Mapping value",
-                () -> controller.mappingGet(mappingReference.getText(), mappingKey.getText()),
-                mappingOutput::setText
-        ));
-        mappingPutButton.addActionListener(event -> runLiveAction(
-                "Writing Mapping value",
-                () -> controller.mappingPut(mappingReference.getText(), mappingKey.getText(), mappingValue.getText()),
-                mappingOutput::setText
-        ));
-        mappingResolveButton.addActionListener(event -> runLiveAction(
-                "Resolving Mapping input",
-                () -> controller.mappingResolve(mappingInput.getText()),
-                mappingOutput::setText
-        ));
-        eventsRefreshButton.addActionListener(event -> runTextAction(
-                "Refreshing semantic events",
-                controller::refreshEvents,
-                this::appendEvents
-        ));
+    private void runScenarioFromBeginning() {
+        requestFreshRun(null);
+    }
 
-        overrideCompileButton.addActionListener(event -> runManagementAction(
-                "Compiling Step Override",
-                () -> controller.compileStepOverride(overrideId.getText(), overrideRegex.getText(), overrideSource.getText()),
-                overrideOutput,
-                overrideList
-        ));
-        overrideRefreshButton.addActionListener(event -> runTextAction(
-                "Refreshing Step Overrides", controller::stepOverrides, overrideList::setText));
-        overrideRemoveButton.addActionListener(event -> runManagementAction(
-                "Removing Step Override", () -> controller.removeStepOverride(overrideId.getText()), overrideOutput, overrideList));
-        overrideClearButton.addActionListener(event -> runManagementAction(
-                "Clearing Step Overrides", controller::clearStepOverrides, overrideOutput, overrideList));
+    private void runScenarioFromSelectedStep() {
+        LiveScenarioPlayer.Line selected = player.selectedLine().orElse(null);
+        if (selected == null || !selected.executable()) {
+            showFailure("Could not run from selected step",
+                    new IllegalStateException("Select an executable scenario step first."));
+            return;
+        }
+        requestFreshRun(selected.id());
+    }
 
-        browserPageButton.addActionListener(event -> runLiveAction(
-                "Reading browser page evidence", controller::browserPage, browserOutput::setText));
-        browserScreenshotButton.addActionListener(event -> runBackground(
-                "Capturing browser screenshot", controller::browserScreenshot, this::applyScreenshot));
-        serviceCallButton.addActionListener(event -> runLiveAction(
-                "Executing service call", () -> controller.serviceCall(serviceSelector.getText()), serviceOutput::setText));
+    private void requestFreshRun(Long startStepId) {
+        pendingIsolatedStep = null;
+        if (playbackBusy || playbackPreparing) {
+            pendingFreshRun = true;
+            pendingFreshRunStepId = startStepId;
+            player.stop();
+            updatePlayerView(startStepId == null
+                    ? "Run from start queued after the current operation."
+                    : "Run from selected step queued after the current operation.");
+            return;
+        }
+        startFreshRunNow(startStepId);
+    }
 
-        breakpointAddButton.addActionListener(event -> runManagementAction(
-                "Adding breakpoint",
-                () -> controller.addBreakpoint(
-                        breakpointHook.getText(), breakpointSignature.getText(), breakpointStep.getText(),
-                        breakpointPhrase.getText(), breakpointOneShot.isSelected(), breakpointLease.getText()),
-                breakpointOutput,
-                breakpointList
-        ));
-        breakpointRefreshButton.addActionListener(event -> runTextAction(
-                "Refreshing breakpoints", controller::breakpoints, breakpointList::setText));
-        breakpointRemoveButton.addActionListener(event -> runManagementAction(
-                "Removing breakpoint", () -> controller.removeBreakpoint(breakpointId.getText()), breakpointOutput, breakpointList));
-        breakpointClearButton.addActionListener(event -> runManagementAction(
-                "Clearing breakpoints", controller::clearBreakpoints, breakpointOutput, breakpointList));
+    private void startFreshRunNow(Long startStepId) {
+        try {
+            if (startStepId == null) {
+                player.startFromBeginning();
+                updatePlayerView("Starting a fresh scenario run from the first step...");
+            } else {
+                player.select(startStepId);
+                player.startFromSelectedStep();
+                selectLine(startStepId);
+                updatePlayerView("Starting a fresh scenario run from the selected step...");
+            }
+        } catch (RuntimeException failure) {
+            showFailure("Could not start scenario playback", failure);
+            return;
+        }
+        prepareFreshLiveSession(this::schedulePlaybackStep);
+    }
+
+    private void prepareFreshLiveSession(Runnable readyAction) {
+        if (playbackPreparing) return;
+        playbackPreparing = true;
+        activityLabel.setText("Preparing fresh scenario context...");
+        runTask(
+                controller::prepareFreshLiveSession,
+                state -> {
+                    playbackPreparing = false;
+                    applyState(state);
+                    if (runPendingFreshRun()) return;
+                    if (readyAction != null) readyAction.run();
+                    runPendingIsolatedStep();
+                },
+                failure -> {
+                    playbackPreparing = false;
+                    player.pause();
+                    updatePlayerView("Fresh scenario preparation failed.");
+                    showFailure("Could not prepare fresh live session", failure);
+                }
+        );
+    }
+
+    private void prepareLiveSession(Runnable readyAction) {
+        if (playbackPreparing) return;
+        playbackPreparing = true;
+        activityLabel.setText("Preparing live session...");
+        runTask(
+                controller::prepareLiveSession,
+                state -> {
+                    playbackPreparing = false;
+                    applyState(state);
+                    if (runPendingFreshRun()) return;
+                    if (readyAction != null) {
+                        readyAction.run();
+                    } else {
+                        refreshMappingCatalog();
+                    }
+                    runPendingIsolatedStep();
+                },
+                failure -> {
+                    playbackPreparing = false;
+                    player.pause();
+                    updatePlayerView("Live session preparation failed.");
+                    showFailure("Could not prepare live session", failure);
+                }
+        );
+    }
+
+    /** Executes one scenario line per background task so pause/stop remain responsive. */
+    private void schedulePlaybackStep() {
+        if (playbackPreparing || playbackBusy || mappingSaveBusy || refreshingCatalog) return;
+        if (player.state() != LiveScenarioPlayer.State.RUNNING) {
+            updatePlayerView(null);
+            return;
+        }
+
+        LiveScenarioPlayer.Line step = player.nextStep().orElse(null);
+        if (step == null) {
+            updatePlayerView("Scenario is waiting for another step.");
+            return;
+        }
+
+        playbackBusy = true;
+        executingStepId = step.id();
+        updatePlayerView("Executing: " + step.text());
+        runTask(
+                () -> controller.executePlayerStep(step.text()),
+                result -> {
+                    playbackBusy = false;
+                    executingStepId = null;
+                    appendTerminal(step.text(), result.output(), result.events());
+
+                    if (result.successful()) {
+                        player.markCurrentStepExecuted(step.id());
+                    } else {
+                        player.markCurrentStepFailed(step.id());
+                        player.select(step.id());
+                        selectLine(step.id());
+                    }
+                    syncScenarioView();
+                    updatePlayerView(
+                            result.successful()
+                                    ? null
+                                    : "Step failed. Scenario playback paused on the failed step."
+                    );
+                    if (runPendingFreshRun()) return;
+                    if (player.state() != LiveScenarioPlayer.State.RUNNING) {
+                        refreshMappingCatalog();
+                    }
+                    if (!runPendingIsolatedStep()) {
+                        schedulePlaybackStep();
+                    }
+                },
+                failure -> {
+                    playbackBusy = false;
+                    executingStepId = null;
+                    player.markCurrentStepFailed(step.id());
+                    player.select(step.id());
+                    syncScenarioView();
+                    selectLine(step.id());
+                    updatePlayerView("Step execution failed. Scenario playback paused.");
+                    showFailure("Could not execute live step", failure);
+                    if (!runPendingFreshRun()) runPendingIsolatedStep();
+                }
+        );
     }
 
     private void insertStep() {
         try {
             LiveScenarioPlayer.Line inserted = player.insertStep(stepText.getText());
+            stepText.setText("");
+            player.select(inserted.id());
             syncScenarioView();
-            appendTerminal("Inserted live buffer step #" + inserted.id() + ": " + inserted.text());
-            updatePlayerView(null);
+            selectLine(inserted.id());
+            updatePlayerView("Inserted step after the selected line.");
+            if (player.state() == LiveScenarioPlayer.State.RUNNING) {
+                if (lastState == null || !lastState.liveReady()) {
+                    prepareLiveSession(this::schedulePlaybackStep);
+                } else {
+                    schedulePlaybackStep();
+                }
+            }
         } catch (RuntimeException failure) {
-            showFailure("Insert step", failure);
+            showFailure("Could not insert step", failure);
         }
     }
 
@@ -445,245 +559,314 @@ final class WorkbenchFrame extends JFrame {
         try {
             LiveScenarioPlayer.Line updated = player.updateSelectedStep(stepText.getText());
             syncScenarioView();
-            appendTerminal("Updated pending live buffer step #" + updated.id() + ": " + updated.text());
-            updatePlayerView(null);
+            selectLine(updated.id());
+            updatePlayerView("Updated selected step.");
         } catch (RuntimeException failure) {
-            showFailure("Update selected step", failure);
+            showFailure("Could not update selected step", failure);
         }
     }
 
-    private void executeIsolatedStep() {
+    private void executeStepOnly() {
         String text = stepText.getText();
         if (text == null || text.isBlank()) {
-            showFailure("Execute isolated step", new IllegalArgumentException("Gherkin step must not be blank."));
+            showFailure("Could not execute step",
+                    new IllegalArgumentException("Step Editor text must not be blank."));
             return;
         }
+
         player.pauseForIsolatedExecution();
-        updatePlayerView("Main player paused for isolated execution.");
-        runLiveAction(
-                "Executing isolated Gherkin",
-                () -> controller.executeStep(text, ""),
-                output -> appendTerminal("Isolated step\n" + output)
+        updatePlayerView("Scenario playback paused for Step Only execution.");
+
+        if (playbackBusy || playbackPreparing) {
+            pendingIsolatedStep = text;
+            activityLabel.setText("Step Only execution queued after the current operation.");
+            return;
+        }
+        executeStepOnlyNow(text);
+    }
+
+    private void executeStepOnlyNow(String text) {
+        Runnable execute = () -> {
+            playbackBusy = true;
+            runTask(
+                    () -> controller.executePlayerStep(text),
+                    result -> {
+                        playbackBusy = false;
+                        appendTerminal("[step only] " + text, result.output(), result.events());
+                        updatePlayerView("Step Only finished; automatic scenario playback remains paused.");
+                        if (!runPendingFreshRun()) refreshMappingCatalog();
+                    },
+                    failure -> {
+                        playbackBusy = false;
+                        showFailure("Could not execute step", failure);
+                        runPendingFreshRun();
+                    }
+            );
+        };
+
+        if (lastState != null && lastState.liveReady()) {
+            execute.run();
+        } else {
+            prepareLiveSession(execute);
+        }
+    }
+
+    private boolean runPendingFreshRun() {
+        if (!pendingFreshRun || playbackBusy || playbackPreparing) return false;
+        Long startStepId = pendingFreshRunStepId;
+        pendingFreshRun = false;
+        pendingFreshRunStepId = null;
+        startFreshRunNow(startStepId);
+        return true;
+    }
+
+    private boolean runPendingIsolatedStep() {
+        if (pendingIsolatedStep == null || playbackBusy || playbackPreparing || pendingFreshRun) return false;
+        String text = pendingIsolatedStep;
+        pendingIsolatedStep = null;
+        executeStepOnlyNow(text);
+        return true;
+    }
+
+    private void mappingChanged() {
+        if (loadingMapping || loadedMapping == null || !loadedMapping.restorable()) return;
+        if (player.state() == LiveScenarioPlayer.State.RUNNING
+                || player.state() == LiveScenarioPlayer.State.WAITING_FOR_STEP) {
+            player.pause();
+            updatePlayerView("Player paused for live Mapping edit.");
+        }
+        mappingEditGeneration++;
+        mappingStatus.setText("Editing " + loadedMapping.mapType() + "...");
+        mappingSaveTimer.restart();
+    }
+
+    private void refreshMappingCatalog() {
+        if (refreshingCatalog || lastState == null || !lastState.liveReady()) {
+            if (lastState == null || !lastState.liveReady()) {
+                nodeMapSelector.setEnabled(false);
+                mappingEditor.setEnabled(false);
+            }
+            return;
+        }
+
+        refreshingCatalog = true;
+        WorkbenchUiController.MappingCatalogEntry previous =
+                (WorkbenchUiController.MappingCatalogEntry) nodeMapSelector.getSelectedItem();
+        String previousReference = previous == null ? null : previous.reference();
+
+        runTask(
+                controller::mappingCatalog,
+                entries -> {
+                    refreshingCatalog = false;
+                    nodeMapSelector.removeAllItems();
+                    WorkbenchUiController.MappingCatalogEntry selected = null;
+                    for (WorkbenchUiController.MappingCatalogEntry entry : entries) {
+                        nodeMapSelector.addItem(entry);
+                        if (Objects.equals(previousReference, entry.reference())) selected = entry;
+                    }
+                    nodeMapSelector.setEnabled(!entries.isEmpty());
+                    if (selected == null && !entries.isEmpty()) selected = entries.getFirst();
+                    if (selected != null) {
+                        nodeMapSelector.setSelectedItem(selected);
+                        loadMapping(selected);
+                    } else {
+                        loadedMapping = null;
+                        setMappingEditor("", false);
+                        mappingStatus.setText("No NodeMaps are available in the current ParsingMap.");
+                    }
+                    schedulePlaybackStep();
+                },
+                failure -> {
+                    refreshingCatalog = false;
+                    nodeMapSelector.setEnabled(false);
+                    mappingEditor.setEnabled(false);
+                    mappingStatus.setText("Could not read current ParsingMap: " + failure.getMessage());
+                    schedulePlaybackStep();
+                }
         );
     }
 
+    private void loadMapping(WorkbenchUiController.MappingCatalogEntry entry) {
+        if (entry == null || lastState == null || !lastState.liveReady()) return;
+        mappingStatus.setText("Loading " + entry.label() + "...");
+        runTask(
+                () -> controller.mappingSnapshot(entry.reference()),
+                snapshot -> {
+                    loadedMapping = snapshot;
+                    try {
+                        String formatted = json.writerWithDefaultPrettyPrinter()
+                                .writeValueAsString(snapshot.values());
+                        setMappingEditor(formatted, snapshot.restorable());
+                        mappingStatus.setText(
+                                snapshot.restorable()
+                                        ? "Live JSON snapshot. Valid edits are applied automatically."
+                                        : "Inspection only: this NodeMap implementation is not safely restorable."
+                        );
+                    } catch (Exception failure) {
+                        showFailure("Could not render NodeMap JSON", failure);
+                    }
+                },
+                failure -> {
+                    loadedMapping = null;
+                    setMappingEditor("", false);
+                    mappingStatus.setText("Could not load NodeMap: " + failure.getMessage());
+                }
+        );
+    }
+
+    private void saveEditedMapping() {
+        if (loadedMapping == null || !loadedMapping.restorable() || mappingSaveBusy) return;
+        if (playbackBusy || playbackPreparing) {
+            mappingStatus.setText("Waiting for the current player operation before applying Mapping edit...");
+            mappingSaveTimer.restart();
+            return;
+        }
+
+        Map<String, Object> values;
+        try {
+            values = json.readValue(
+                    mappingEditor.getText(),
+                    new TypeReference<Map<String, Object>>() { }
+            );
+        } catch (Exception invalidJson) {
+            mappingStatus.setText("Invalid JSON — edit has not been applied.");
+            return;
+        }
+
+        long generation = mappingEditGeneration;
+        ControlBridgeMappingSnapshot snapshot = loadedMapping;
+        mappingSaveBusy = true;
+        mappingStatus.setText("Applying live Mapping edit...");
+        runTask(
+                () -> controller.restoreMapping(snapshot, values),
+                output -> {
+                    mappingSaveBusy = false;
+                    appendTerminal("[Mapping] " + snapshot.mapType(), output, "");
+                    if (generation == mappingEditGeneration) {
+                        mappingStatus.setText("Saved to live " + snapshot.mapType() + ".");
+                    } else {
+                        mappingSaveTimer.restart();
+                    }
+                    schedulePlaybackStep();
+                },
+                failure -> {
+                    mappingSaveBusy = false;
+                    mappingStatus.setText("Mapping edit was not applied: " + failure.getMessage());
+                }
+        );
+    }
+
+    private void setMappingEditor(String text, boolean editable) {
+        loadingMapping = true;
+        try {
+            mappingEditor.setText(text);
+            mappingEditor.setCaretPosition(0);
+            mappingEditor.setEnabled(true);
+            mappingEditor.setEditable(editable);
+        } finally {
+            loadingMapping = false;
+        }
+    }
+
     private void syncScenarioView() {
-        Long selectedId = player.selectedId().isPresent() ? player.selectedId().getAsLong() : null;
+        Long selected = player.selectedId().isPresent()
+                ? player.selectedId().getAsLong()
+                : null;
         syncingScenarioSelection = true;
         try {
             scenarioModel.clear();
-            int selectedIndex = -1;
-            int index = 0;
             for (LiveScenarioPlayer.Line line : player.lines()) {
                 scenarioModel.addElement(line);
-                if (selectedId != null && line.id() == selectedId) selectedIndex = index;
-                index++;
             }
-            if (selectedIndex >= 0) scenarioList.setSelectedIndex(selectedIndex);
+            if (selected != null) selectLine(selected);
         } finally {
             syncingScenarioSelection = false;
         }
         scenarioList.repaint();
+        updateFromHereAvailability();
+    }
+
+    private void updateFromHereAvailability() {
+        fromHereButton.setEnabled(
+                player.selectedLine().map(LiveScenarioPlayer.Line::executable).orElse(false)
+        );
+    }
+
+    private void selectLine(long id) {
+        for (int i = 0; i < scenarioModel.size(); i++) {
+            if (scenarioModel.get(i).id() == id) {
+                scenarioList.setSelectedIndex(i);
+                scenarioList.ensureIndexIsVisible(i);
+                return;
+            }
+        }
     }
 
     private void updatePlayerView(String activity) {
         playerStatusLabel.setText(switch (player.state()) {
             case STOPPED -> "Stopped";
             case PAUSED -> "Paused";
-            case RUNNING -> "Running";
-            case WAITING_FOR_STEP -> "Waiting for next step...";
+            case RUNNING -> playbackBusy ? "Running" : "Playing";
+            case WAITING_FOR_STEP -> "Waiting for step";
         });
-        if (activity != null && !activity.isBlank()) {
-            activityLabel.setText(activity);
-            appendTerminal(activity);
+        if (activity != null && !activity.isBlank()) activityLabel.setText(activity);
+        syncScenarioView();
+    }
+
+    private void appendTerminal(String heading, String output, String events) {
+        if (!terminalArea.getText().isEmpty()) terminalArea.append("\n\n");
+        terminalArea.append(heading + "\n");
+        if (output != null && !output.isBlank()) terminalArea.append(output + "\n");
+        if (events != null && !events.isBlank()) {
+            terminalArea.append("Events\n" + events + "\n");
         }
-        scenarioList.repaint();
-        restoreControls();
+        terminalArea.setCaretPosition(terminalArea.getDocument().getLength());
     }
 
-    private JPanel footer() {
-        JPanel panel = new JPanel(new BorderLayout(8, 0));
-        panel.add(activityLabel, BorderLayout.WEST);
-        JLabel hint = new JLabel("Session lifecycle: Session menu   •   Existing investigation tools: Tools > Advanced Controls");
-        hint.setForeground(Color.GRAY);
-        panel.add(hint, BorderLayout.EAST);
-        return panel;
-    }
-
-    private void showAdvancedControls() {
-        if (advancedDialog == null) {
-            advancedDialog = new JDialog(this, "Workbench Advanced Controls", false);
-            advancedDialog.setDefaultCloseOperation(WindowConstants.HIDE_ON_CLOSE);
-            advancedDialog.setSize(980, 720);
-            advancedDialog.setLocationRelativeTo(this);
-
-            JTabbedPane tabs = new JTabbedPane();
-            tabs.addTab("Status", new JScrollPane(statusArea));
-            tabs.addTab("Recent Events", eventsPanel());
-            tabs.addTab("Step Overrides", stepOverridePanel());
-            tabs.addTab("Evidence", evidencePanel());
-            tabs.addTab("Breakpoints", breakpointPanel());
-            advancedDialog.setContentPane(tabs);
-        }
-        advancedDialog.setVisible(true);
-        advancedDialog.toFront();
-    }
-
-    private JPanel eventsPanel() {
-        JPanel panel = new JPanel(new BorderLayout(6, 6));
-        panel.setBorder(new EmptyBorder(8, 8, 8, 8));
-        panel.add(eventsRefreshButton, BorderLayout.NORTH);
-        panel.add(new JScrollPane(eventsArea), BorderLayout.CENTER);
-        return panel;
-    }
-
-    private JPanel stepOverridePanel() {
-        JPanel fields = new JPanel(new GridLayout(2, 2, 6, 6));
-        fields.add(new JLabel("ID"));
-        fields.add(overrideId);
-        fields.add(new JLabel("Regex"));
-        fields.add(overrideRegex);
-
-        JPanel source = new JPanel(new BorderLayout(6, 6));
-        source.setBorder(new EmptyBorder(8, 8, 8, 8));
-        source.add(fields, BorderLayout.NORTH);
-        source.add(new JScrollPane(overrideSource), BorderLayout.CENTER);
-
-        JPanel actions = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        actions.add(overrideCompileButton);
-        actions.add(overrideRefreshButton);
-        actions.add(overrideRemoveButton);
-        actions.add(overrideClearButton);
-        source.add(actions, BorderLayout.SOUTH);
-
-        JTabbedPane outputs = new JTabbedPane();
-        outputs.addTab("Result", new JScrollPane(overrideOutput));
-        outputs.addTab("Installed", new JScrollPane(overrideList));
-
-        JSplitPane split = new JSplitPane(JSplitPane.VERTICAL_SPLIT, source, outputs);
-        split.setResizeWeight(0.62);
-        JPanel panel = new JPanel(new BorderLayout());
-        panel.add(split, BorderLayout.CENTER);
-        return panel;
-    }
-
-    private JPanel evidencePanel() {
-        JTabbedPane tabs = new JTabbedPane();
-        tabs.addTab("Browser", browserEvidencePanel());
-        tabs.addTab("Service Call", serviceEvidencePanel());
-        JPanel panel = new JPanel(new BorderLayout());
-        panel.add(tabs, BorderLayout.CENTER);
-        return panel;
-    }
-
-    private JPanel browserEvidencePanel() {
-        JPanel actions = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        actions.add(browserPageButton);
-        actions.add(browserScreenshotButton);
-
-        screenshotLabel.setVerticalAlignment(SwingConstants.TOP);
-        JScrollPane screenshotScroll = new JScrollPane(screenshotLabel);
-        screenshotScroll.getVerticalScrollBar().setUnitIncrement(16);
-        screenshotScroll.getHorizontalScrollBar().setUnitIncrement(16);
-
-        browserEvidenceTabs.addTab("Page Evidence", new JScrollPane(browserOutput));
-        browserEvidenceTabs.addTab("Screenshot", screenshotScroll);
-
-        JPanel panel = new JPanel(new BorderLayout(6, 6));
-        panel.setBorder(new EmptyBorder(8, 8, 8, 8));
-        panel.add(actions, BorderLayout.NORTH);
-        panel.add(browserEvidenceTabs, BorderLayout.CENTER);
-        return panel;
-    }
-
-    private JPanel serviceEvidencePanel() {
-        JPanel controls = new JPanel(new BorderLayout(6, 6));
-        controls.add(new JLabel("Selector"), BorderLayout.WEST);
-        controls.add(serviceSelector, BorderLayout.CENTER);
-        controls.add(serviceCallButton, BorderLayout.EAST);
-
-        JPanel panel = new JPanel(new BorderLayout(6, 6));
-        panel.setBorder(new EmptyBorder(8, 8, 8, 8));
-        panel.add(controls, BorderLayout.NORTH);
-        panel.add(new JScrollPane(serviceOutput), BorderLayout.CENTER);
-        return panel;
-    }
-
-    private JPanel breakpointPanel() {
-        JPanel fields = new JPanel(new GridLayout(7, 2, 6, 6));
-        fields.add(new JLabel("Breakpoint ID (for remove)"));
-        fields.add(breakpointId);
-        fields.add(new JLabel("Hook"));
-        fields.add(breakpointHook);
-        fields.add(new JLabel("Signature contains"));
-        fields.add(breakpointSignature);
-        fields.add(new JLabel("Step contains"));
-        fields.add(breakpointStep);
-        fields.add(new JLabel("Phrase contains"));
-        fields.add(breakpointPhrase);
-        fields.add(new JLabel("Lease seconds"));
-        fields.add(breakpointLease);
-        fields.add(new JLabel("Behavior"));
-        fields.add(breakpointOneShot);
-
-        JPanel controls = new JPanel(new BorderLayout());
-        controls.setBorder(new EmptyBorder(8, 8, 8, 8));
-        controls.add(fields, BorderLayout.CENTER);
-        JPanel actions = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        actions.add(breakpointAddButton);
-        actions.add(breakpointRefreshButton);
-        actions.add(breakpointRemoveButton);
-        actions.add(breakpointClearButton);
-        controls.add(actions, BorderLayout.SOUTH);
-
-        JTabbedPane outputs = new JTabbedPane();
-        outputs.addTab("Result", new JScrollPane(breakpointOutput));
-        outputs.addTab("Installed", new JScrollPane(breakpointList));
-
-        JSplitPane split = new JSplitPane(JSplitPane.VERTICAL_SPLIT, controls, outputs);
-        split.setResizeWeight(0.5);
-        JPanel panel = new JPanel(new BorderLayout());
-        panel.add(split, BorderLayout.CENTER);
-        return panel;
-    }
-
-    private void runStateAction(String label, Supplier<WorkbenchUiController.State> action) {
-        runBackground(label, action, this::applyState);
-    }
-
-    private void runLiveAction(
+    private void runStateAction(
             String label,
-            Supplier<WorkbenchUiController.LiveActionResult> action,
-            Consumer<String> output
+            Supplier<WorkbenchUiController.State> action
     ) {
-        runBackground(label, action, result -> {
-            output.accept(result.output());
-            appendEvents(result.events());
-        });
-    }
-
-    private void runManagementAction(
-            String label,
-            Supplier<WorkbenchUiController.ManagementResult> action,
-            JTextArea output,
-            JTextArea listing
-    ) {
-        runBackground(label, action, result -> {
-            output.setText(result.output());
-            listing.setText(result.listing());
-        });
-    }
-
-    private void runTextAction(String label, Supplier<String> action, Consumer<String> output) {
-        runBackground(label, action, output);
-    }
-
-    private <T> void runBackground(String label, Supplier<T> action, Consumer<T> success) {
-        if (closing) return;
-        setControlsEnabled(false);
         activityLabel.setText(label + "...");
-        appendTerminal(label + "...");
+        runTask(
+                action,
+                state -> {
+                    applyState(state);
+                    activityLabel.setText(label + " complete.");
+                    if (state.liveReady()) refreshMappingCatalog();
+                },
+                failure -> showFailure(label + " failed", failure)
+        );
+    }
 
+    private void applyState(WorkbenchUiController.State state) {
+        lastState = state;
+        projectLabel.setText("Project: " + state.projectRoot().getFileName());
+        readinessLabel.setText(
+                state.liveReady()
+                        ? "Live worker ready"
+                        : state.synchronizedProject()
+                                ? "Synchronized"
+                                : "Not synchronized"
+        );
+        syncItem.setEnabled(!state.workerRunning());
+        startItem.setEnabled(state.synchronizedProject() && !state.workerRunning());
+        restartItem.setEnabled(state.workerRunning());
+        stopItem.setEnabled(state.workerRunning());
+
+        if (!state.liveReady()) {
+            nodeMapSelector.setEnabled(false);
+            loadedMapping = null;
+            setMappingEditor("", false);
+            mappingStatus.setText("Start the live worker to inspect Mapping.");
+        }
+    }
+
+    private <T> void runTask(
+            Supplier<T> action,
+            Consumer<T> success,
+            Consumer<Throwable> failure
+    ) {
         new SwingWorker<T, Void>() {
             @Override
             protected T doInBackground() {
@@ -694,206 +877,286 @@ final class WorkbenchFrame extends JFrame {
             protected void done() {
                 try {
                     success.accept(get());
-                    activityLabel.setText(label + " complete.");
-                    appendTerminal(label + " complete.");
-                } catch (InterruptedException failure) {
+                } catch (InterruptedException interrupted) {
                     Thread.currentThread().interrupt();
-                    showFailure(label, failure);
-                } catch (ExecutionException failure) {
-                    showFailure(label, failure.getCause());
-                } finally {
-                    restoreControls();
+                    failure.accept(interrupted);
+                } catch (ExecutionException execution) {
+                    failure.accept(execution.getCause() == null ? execution : execution.getCause());
+                } catch (RuntimeException runtime) {
+                    failure.accept(runtime);
                 }
             }
         }.execute();
     }
 
-    private void applyState(WorkbenchUiController.State state) {
-        lastState = state;
-        projectLabel.setText("Project: " + displayProject(state));
-        readinessLabel.setText(readiness(state));
-        statusArea.setText(state.render());
-        statusArea.setCaretPosition(0);
-        if (!state.workerRunning()) {
-            screenshotLabel.setIcon(null);
-            screenshotLabel.setText("No screenshot captured.");
-        }
-    }
-
-    private static String displayProject(WorkbenchUiController.State state) {
-        return state.projectRoot().getFileName() == null
-                ? state.projectRoot().toString()
-                : state.projectRoot().getFileName().toString();
-    }
-
-    private static String readiness(WorkbenchUiController.State state) {
-        if (!state.synchronizedProject()) return "Synchronization required";
-        if (!state.workerRunning()) return "Synchronized";
-        return state.liveReady() ? "Ready" : "Worker running";
-    }
-
-    private void applyScreenshot(WorkbenchUiController.ScreenshotResult result) {
-        browserOutput.setText(result.output());
-        appendEvents(result.events());
-        if (result.png() == null || result.png().length == 0) {
-            screenshotLabel.setIcon(null);
-            screenshotLabel.setText("No screenshot returned.");
-            return;
-        }
-        screenshotLabel.setText(null);
-        screenshotLabel.setIcon(new ImageIcon(result.png()));
-        browserEvidenceTabs.setSelectedIndex(1);
-    }
-
-    private void appendEvents(String text) {
-        if (text == null || text.isBlank()) return;
-        if (!eventsArea.getText().isBlank()) eventsArea.append("\n\n");
-        eventsArea.append(text);
-        eventsArea.setCaretPosition(eventsArea.getDocument().getLength());
-    }
-
-    private void appendTerminal(String text) {
-        if (text == null || text.isBlank()) return;
-        if (!terminalArea.getText().isBlank()) terminalArea.append("\n");
-        terminalArea.append(text.stripTrailing() + "\n");
-        terminalArea.setCaretPosition(terminalArea.getDocument().getLength());
-    }
-
     private void showFailure(String label, Throwable failure) {
-        String message = failure == null ? null : failure.getMessage();
-        String detail = (message == null || message.isBlank()) ? String.valueOf(failure) : message;
-        activityLabel.setText(label + " failed: " + detail);
-        appendTerminal(label + " failed: " + detail);
+        String message = failure == null
+                ? label
+                : label + ": " + Objects.toString(failure.getMessage(), failure.getClass().getSimpleName());
+        activityLabel.setText(message);
+        JOptionPane.showMessageDialog(
+                this,
+                message,
+                "Pickleball Workbench",
+                JOptionPane.ERROR_MESSAGE
+        );
     }
 
-    private void restoreControls() {
-        if (closing) return;
-        boolean running = lastState != null && lastState.workerRunning();
-        boolean liveReady = lastState != null && lastState.liveReady();
+    /**
+     * Existing non-Mapping investigation features remain available without
+     * competing with the primary player workspace.
+     */
+    private void showAdvancedControls() {
+        JDialog dialog = new JDialog(this, "Advanced Controls", false);
+        dialog.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
+        dialog.setSize(900, 700);
+        dialog.setLocationRelativeTo(this);
 
-        syncItem.setEnabled(!running);
-        refreshItem.setEnabled(true);
-        startItem.setEnabled(lastState != null && lastState.synchronizedProject() && !running);
-        restartItem.setEnabled(running);
-        stopItem.setEnabled(running);
-
-        boolean hasSteps = player.lines().stream().anyMatch(LiveScenarioPlayer.Line::executable);
-        firstButton.setEnabled(hasSteps);
-        backButton.setEnabled(hasSteps);
-        playButton.setEnabled(true);
-        pauseButton.setEnabled(player.state() == LiveScenarioPlayer.State.RUNNING
-                || player.state() == LiveScenarioPlayer.State.WAITING_FOR_STEP);
-        playerStopButton.setEnabled(player.state() != LiveScenarioPlayer.State.STOPPED);
-        isolatedStepButton.setEnabled(liveReady);
-        stepText.setEnabled(true);
-        scenarioList.setEnabled(true);
-
-        mappingGetButton.setEnabled(liveReady);
-        mappingPutButton.setEnabled(liveReady);
-        mappingResolveButton.setEnabled(liveReady);
-        eventsRefreshButton.setEnabled(liveReady);
-        overrideCompileButton.setEnabled(liveReady);
-        overrideRefreshButton.setEnabled(liveReady);
-        overrideRemoveButton.setEnabled(liveReady);
-        overrideClearButton.setEnabled(liveReady);
-        browserPageButton.setEnabled(liveReady);
-        browserScreenshotButton.setEnabled(liveReady);
-        serviceCallButton.setEnabled(liveReady);
-        breakpointAddButton.setEnabled(liveReady);
-        breakpointRefreshButton.setEnabled(liveReady);
-        breakpointRemoveButton.setEnabled(liveReady);
-        breakpointClearButton.setEnabled(liveReady);
+        JTabbedPane tabs = new JTabbedPane();
+        tabs.addTab("Status / Events", advancedStatusPanel());
+        tabs.addTab("Step Overrides", advancedOverridesPanel());
+        tabs.addTab("Browser / Service", advancedBrowserServicePanel());
+        tabs.addTab("Breakpoints", advancedBreakpointsPanel());
+        dialog.setContentPane(tabs);
+        dialog.setVisible(true);
     }
 
-    private void setControlsEnabled(boolean enabled) {
-        syncItem.setEnabled(enabled);
-        refreshItem.setEnabled(enabled);
-        startItem.setEnabled(enabled);
-        restartItem.setEnabled(enabled);
-        stopItem.setEnabled(enabled);
+    private JComponent advancedStatusPanel() {
+        JPanel panel = new JPanel(new BorderLayout(6, 6));
+        panel.setBorder(new EmptyBorder(8, 8, 8, 8));
+        JTextArea output = outputArea();
+        JButton refresh = new JButton("Refresh status and events");
+        refresh.addActionListener(event -> runTask(
+                () -> {
+                    WorkbenchUiController.State state = controller.refresh();
+                    String events = state.liveReady() ? controller.refreshEvents() : "";
+                    return state.render() + (events.isBlank() ? "" : "\nEvents\n" + events);
+                },
+                output::setText,
+                failure -> showFailure("Advanced status refresh failed", failure)
+        ));
+        panel.add(refresh, BorderLayout.NORTH);
+        panel.add(new JScrollPane(output), BorderLayout.CENTER);
+        return panel;
+    }
 
-        firstButton.setEnabled(enabled);
-        backButton.setEnabled(enabled);
-        playButton.setEnabled(enabled);
-        pauseButton.setEnabled(enabled);
-        playerStopButton.setEnabled(enabled);
-        isolatedStepButton.setEnabled(enabled);
-        stepText.setEnabled(enabled);
-        scenarioList.setEnabled(enabled);
+    private JComponent advancedOverridesPanel() {
+        JPanel panel = new JPanel(new BorderLayout(6, 6));
+        panel.setBorder(new EmptyBorder(8, 8, 8, 8));
+        JTextField id = new JTextField("workbench-ui-generated");
+        JTextField regex = new JTextField("^WORKBENCH UI OVERRIDE ([A-Za-z]+)$");
+        JTextArea source = new JTextArea(defaultOverrideSource(), 14, 60);
+        JTextArea output = outputArea();
 
-        mappingGetButton.setEnabled(enabled);
-        mappingPutButton.setEnabled(enabled);
-        mappingResolveButton.setEnabled(enabled);
-        eventsRefreshButton.setEnabled(enabled);
-        overrideCompileButton.setEnabled(enabled);
-        overrideRefreshButton.setEnabled(enabled);
-        overrideRemoveButton.setEnabled(enabled);
-        overrideClearButton.setEnabled(enabled);
-        browserPageButton.setEnabled(enabled);
-        browserScreenshotButton.setEnabled(enabled);
-        serviceCallButton.setEnabled(enabled);
-        breakpointAddButton.setEnabled(enabled);
-        breakpointRefreshButton.setEnabled(enabled);
-        breakpointRemoveButton.setEnabled(enabled);
-        breakpointClearButton.setEnabled(enabled);
+        JPanel fields = new JPanel(new GridLayout(2, 2, 6, 6));
+        fields.add(new JLabel("ID"));
+        fields.add(id);
+        fields.add(new JLabel("Regex"));
+        fields.add(regex);
+
+        JPanel buttons = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        JButton compile = new JButton("Compile / Replace");
+        JButton list = new JButton("Refresh List");
+        JButton remove = new JButton("Remove ID");
+        JButton clear = new JButton("Clear All");
+        buttons.add(compile);
+        buttons.add(list);
+        buttons.add(remove);
+        buttons.add(clear);
+
+        compile.addActionListener(event -> runTask(
+                () -> controller.compileStepOverride(id.getText(), regex.getText(), source.getText()),
+                result -> output.setText(result.output() + "\n\n" + result.listing()),
+                failure -> showFailure("Step Override compile failed", failure)
+        ));
+        list.addActionListener(event -> runTask(
+                controller::stepOverrides,
+                output::setText,
+                failure -> showFailure("Step Override list failed", failure)
+        ));
+        remove.addActionListener(event -> runTask(
+                () -> controller.removeStepOverride(id.getText()),
+                result -> output.setText(result.output() + "\n\n" + result.listing()),
+                failure -> showFailure("Step Override remove failed", failure)
+        ));
+        clear.addActionListener(event -> runTask(
+                controller::clearStepOverrides,
+                result -> output.setText(result.output() + "\n\n" + result.listing()),
+                failure -> showFailure("Step Override clear failed", failure)
+        ));
+
+        JPanel north = new JPanel(new BorderLayout(6, 6));
+        north.add(fields, BorderLayout.NORTH);
+        north.add(buttons, BorderLayout.SOUTH);
+        panel.add(north, BorderLayout.NORTH);
+
+        JSplitPane split = new JSplitPane(
+                JSplitPane.VERTICAL_SPLIT,
+                new JScrollPane(source),
+                new JScrollPane(output)
+        );
+        split.setResizeWeight(0.55);
+        panel.add(split, BorderLayout.CENTER);
+        return panel;
+    }
+
+    private JComponent advancedBrowserServicePanel() {
+        JPanel panel = new JPanel(new BorderLayout(6, 6));
+        panel.setBorder(new EmptyBorder(8, 8, 8, 8));
+        JTextArea output = outputArea();
+        JTextField selector = new JTextField("%health-full-url");
+        JButton page = new JButton("Read Page");
+        JButton screenshot = new JButton("Capture Screenshot");
+        JButton service = new JButton("Execute Service Call");
+
+        JPanel buttons = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        buttons.add(page);
+        buttons.add(screenshot);
+        buttons.add(new JLabel("Service:"));
+        selector.setPreferredSize(new Dimension(220, selector.getPreferredSize().height));
+        buttons.add(selector);
+        buttons.add(service);
+
+        page.addActionListener(event -> runTask(
+                controller::browserPage,
+                result -> output.setText(result.output()),
+                failure -> showFailure("Browser page read failed", failure)
+        ));
+        screenshot.addActionListener(event -> runTask(
+                controller::browserScreenshot,
+                result -> output.setText(result.output()),
+                failure -> showFailure("Browser screenshot failed", failure)
+        ));
+        service.addActionListener(event -> runTask(
+                () -> controller.serviceCall(selector.getText()),
+                result -> output.setText(result.output()),
+                failure -> showFailure("Service call failed", failure)
+        ));
+
+        panel.add(buttons, BorderLayout.NORTH);
+        panel.add(new JScrollPane(output), BorderLayout.CENTER);
+        return panel;
+    }
+
+    private JComponent advancedBreakpointsPanel() {
+        JPanel panel = new JPanel(new BorderLayout(6, 6));
+        panel.setBorder(new EmptyBorder(8, 8, 8, 8));
+
+        JTextField id = new JTextField();
+        JTextField hook = new JTextField("BEFORE_STEP");
+        JTextField signature = new JTextField();
+        JTextField step = new JTextField("CONTROL API TEST STEP");
+        JTextField phrase = new JTextField();
+        JTextField lease = new JTextField("120");
+        JCheckBox oneShot = new JCheckBox("One shot", true);
+        JTextArea output = outputArea();
+
+        JPanel fields = new JPanel(new GridLayout(6, 2, 6, 6));
+        fields.add(new JLabel("Breakpoint ID"));
+        fields.add(id);
+        fields.add(new JLabel("Hook"));
+        fields.add(hook);
+        fields.add(new JLabel("Signature contains"));
+        fields.add(signature);
+        fields.add(new JLabel("Step contains"));
+        fields.add(step);
+        fields.add(new JLabel("Phrase contains"));
+        fields.add(phrase);
+        fields.add(new JLabel("Lease seconds"));
+        fields.add(lease);
+
+        JPanel buttons = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        JButton add = new JButton("Add");
+        JButton list = new JButton("Refresh List");
+        JButton remove = new JButton("Remove ID");
+        JButton clear = new JButton("Clear All");
+        buttons.add(oneShot);
+        buttons.add(add);
+        buttons.add(list);
+        buttons.add(remove);
+        buttons.add(clear);
+
+        add.addActionListener(event -> runTask(
+                () -> controller.addBreakpoint(
+                        hook.getText(),
+                        signature.getText(),
+                        step.getText(),
+                        phrase.getText(),
+                        oneShot.isSelected(),
+                        lease.getText()
+                ),
+                result -> output.setText(result.output() + "\n\n" + result.listing()),
+                failure -> showFailure("Breakpoint add failed", failure)
+        ));
+        list.addActionListener(event -> runTask(
+                controller::breakpoints,
+                output::setText,
+                failure -> showFailure("Breakpoint list failed", failure)
+        ));
+        remove.addActionListener(event -> runTask(
+                () -> controller.removeBreakpoint(id.getText()),
+                result -> output.setText(result.output() + "\n\n" + result.listing()),
+                failure -> showFailure("Breakpoint remove failed", failure)
+        ));
+        clear.addActionListener(event -> runTask(
+                controller::clearBreakpoints,
+                result -> output.setText(result.output() + "\n\n" + result.listing()),
+                failure -> showFailure("Breakpoint clear failed", failure)
+        ));
+
+        JPanel north = new JPanel(new BorderLayout(6, 6));
+        north.add(fields, BorderLayout.CENTER);
+        north.add(buttons, BorderLayout.SOUTH);
+        panel.add(north, BorderLayout.NORTH);
+        panel.add(new JScrollPane(output), BorderLayout.CENTER);
+        return panel;
     }
 
     private void closeWorkbench() {
         if (closing) return;
         closing = true;
-        setControlsEnabled(false);
-        activityLabel.setText("Stopping Workbench resources...");
-
-        new SwingWorker<Void, Void>() {
-            @Override
-            protected Void doInBackground() {
-                controller.close();
-                return null;
-            }
-
-            @Override
-            protected void done() {
-                try {
-                    get();
-                } catch (InterruptedException failure) {
-                    Thread.currentThread().interrupt();
-                } catch (ExecutionException failure) {
-                    Throwable cause = failure.getCause();
-                    System.err.println("Workbench UI close failed: "
-                            + (cause == null ? failure.getMessage() : cause.getMessage()));
-                } finally {
+        player.stop();
+        mappingSaveTimer.stop();
+        activityLabel.setText("Closing Workbench...");
+        runTask(
+                () -> {
+                    controller.close();
+                    return Boolean.TRUE;
+                },
+                ignored -> {
+                    dispose();
+                },
+                failure -> {
                     dispose();
                 }
-            }
-        }.execute();
-    }
-
-    private static JButton playerButton(String glyph, String tooltip) {
-        JButton button = new JButton(glyph);
-        button.setToolTipText(tooltip);
-        button.setPreferredSize(new Dimension(46, 32));
-        return button;
-    }
-
-    private static JButton smallPlayerButton(String glyph, String tooltip) {
-        JButton button = new JButton(glyph);
-        button.setToolTipText(tooltip);
-        button.setMargin(new Insets(1, 7, 1, 7));
-        button.setFocusable(false);
-        return button;
+        );
     }
 
     private static JTextArea outputArea() {
         JTextArea area = new JTextArea();
         area.setEditable(false);
         area.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 12));
-        area.setMargin(new Insets(8, 8, 8, 8));
+        area.setLineWrap(false);
         return area;
+    }
+
+    private static JButton playerButton(String text, String tooltip) {
+        JButton button = new JButton(text);
+        button.setToolTipText(tooltip);
+        button.setFocusable(false);
+        return button;
+    }
+
+    private static JButton smallPlayerButton(String text, String tooltip) {
+        JButton button = playerButton(text, tooltip);
+        button.setMargin(new Insets(1, 7, 1, 7));
+        return button;
     }
 
     private static String defaultOverrideSource() {
         return """
                 package tools.dscode.workbench.generated;
+
                 import tools.dscode.control.api.MappingControl;
                 import tools.dscode.control.override.StepOverrideContext;
                 import tools.dscode.control.override.StepOverrideHandler;
@@ -902,8 +1165,8 @@ final class WorkbenchFrame extends JFrame {
                     public Object execute(StepOverrideContext context) {
                         MappingControl.put(
                             "OVERRIDE",
-                            "workbenchStepOverrideValue",
-                            "ui-" + context.captures().getFirst()
+                            "workbenchUiOverrideValue",
+                            context.captures().isEmpty() ? "matched" : context.captures().getFirst()
                         );
                         return null;
                     }
@@ -920,24 +1183,18 @@ final class WorkbenchFrame extends JFrame {
                 boolean selected,
                 boolean focus
         ) {
-            JLabel label = (JLabel) super.getListCellRendererComponent(list, value, index, selected, focus);
-            LiveScenarioPlayer.Line line = (LiveScenarioPlayer.Line) value;
-            boolean playhead = index == player.playheadIndex();
-            label.setText("%s%3d   %s".formatted(playhead ? "▶ " : "  ", index + 1, line.text()));
+            JLabel label = (JLabel) super.getListCellRendererComponent(
+                    list, value, index, selected, focus
+            );
+            if (!(value instanceof LiveScenarioPlayer.Line line)) return label;
 
-            if (!selected) {
-                if (line.executionStatus() == LiveScenarioPlayer.ExecutionStatus.EXECUTED) {
-                    label.setForeground(Color.GRAY);
-                } else if (line.executionStatus() == LiveScenarioPlayer.ExecutionStatus.FAILED) {
-                    label.setForeground(new Color(180, 55, 55));
-                } else if (playhead) {
-                    label.setForeground(new Color(40, 140, 70));
-                } else if (line.type() == LiveScenarioPlayer.LineType.COMMENT) {
-                    label.setForeground(Color.GRAY);
-                }
+            Long activeId = executingStepId;
+            if (activeId == null && player.state() == LiveScenarioPlayer.State.RUNNING) {
+                activeId = player.nextStep().map(LiveScenarioPlayer.Line::id).orElse(null);
             }
+            String marker = Objects.equals(activeId, line.id()) ? "▶ " : "  ";
+            label.setText(marker + line.text());
             return label;
         }
     }
-
 }

@@ -340,7 +340,7 @@ tasks.register('verifyEmbeddedWorkbench') {
     dependsOn tasks.shadowJar, ':pickleball-workbench:verifyWorkbenchArtifact'
 
     doLast {
-        File outerFile = tasks.shadowJar.get().archiveFile.get().asFile
+        File outerFile = tasks.named('shadowJar').get().archiveFile.get().asFile
         File standaloneFile = standaloneWorkbenchJar.get().asFile
         byte[] standaloneBytes = standaloneFile.bytes
 

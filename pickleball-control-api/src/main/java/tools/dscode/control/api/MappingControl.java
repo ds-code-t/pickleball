@@ -1,5 +1,6 @@
 package tools.dscode.control.api;
 
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.cucumber.core.runner.GlobalState;
 import tools.dscode.common.mappings.GlobalMappings;
@@ -7,10 +8,12 @@ import tools.dscode.common.mappings.MapConfigurations;
 import tools.dscode.common.mappings.MappingProcessor;
 import tools.dscode.common.mappings.NodeMap;
 import tools.dscode.common.mappings.ParsingMap;
+import tools.dscode.control.protocol.ControlProtocol;
 
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.IdentityHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -89,11 +92,24 @@ public final class MappingControl {
         return attempt(ParsingMap::getRunningParsingMap);
     }
 
+    /**
+     * Resolves normal Pickleball NodeMap references plus the two neutral Workbench
+     * references defined in {@link ControlProtocol}. The Workbench references are
+     * intentionally resolved here, inside the consumer worker, so controller code
+     * never needs ParsingMap/NodeMap classes or a shared execution classpath.
+     */
     public static ControlCallResult<NodeMap> currentNodeMap(String reference) {
         if (reference == null || reference.isBlank()) {
             return ControlCallResult.unavailable("NodeMap reference must not be blank.");
         }
-        return attempt(() -> NodeMap.getNodeMap(reference));
+        String normalized = reference.trim();
+        if (ControlProtocol.CURRENT_NODE_MAP_CATALOG_REFERENCE.equals(normalized)) {
+            return attempt(MappingControl::currentNodeMapCatalog);
+        }
+        if (normalized.startsWith(ControlProtocol.CURRENT_NODE_MAP_REFERENCE_PREFIX)) {
+            return attempt(() -> currentNodeMapByIndex(normalized));
+        }
+        return attempt(() -> NodeMap.getNodeMap(normalized));
     }
 
     public static ControlCallResult<NodeMap> currentNodeMapCopy(String reference) {
@@ -186,14 +202,14 @@ public final class MappingControl {
 
     public static ControlCallResult<String> resolveText(MappingContext context, String input) {
         if (context == null) {
-            return ControlCallResult.unavailable("mapping context must not be null");
+            return ControlCallResult.unavailable("mappingContext must not be null");
         }
         return attempt(() -> context.parsingMap().resolveWholeText(input));
     }
 
     public static ControlCallResult<Object> resolveValue(MappingContext context, String input) {
         if (context == null) {
-            return ControlCallResult.unavailable("mapping context must not be null");
+            return ControlCallResult.unavailable("mappingContext must not be null");
         }
         return attempt(() -> context.parsingMap().resolveWholeValue(input));
     }
@@ -352,6 +368,62 @@ public final class MappingControl {
         LinkedHashSet<MapConfigurations.MapType> order = new LinkedHashSet<>();
         maps.stream().filter(Objects::nonNull).map(NodeMap::getMapType).forEach(order::add);
         return List.copyOf(order);
+    }
+
+    private static NodeMap currentNodeMapCatalog() {
+        List<NodeMap> maps = distinctCurrentNodeMaps();
+        ObjectNode root = MAPPER.createObjectNode();
+        ArrayNode entries = root.putArray("maps");
+        for (int index = 0; index < maps.size(); index++) {
+            NodeMap map = maps.get(index);
+            ObjectNode entry = entries.addObject();
+            entry.put("reference", ControlProtocol.CURRENT_NODE_MAP_REFERENCE_PREFIX + index);
+            entry.put("label", map.getMapType().name());
+            entry.put("mapType", map.getMapType().name());
+            entry.put("mapClass", map.getClass().getName());
+            entry.put("restorable", map.getClass() == NodeMap.class);
+            ArrayNode sources = entry.putArray("dataSources");
+            map.getDataSources().stream()
+                    .map(Enum::name)
+                    .sorted()
+                    .forEach(sources::add);
+        }
+
+        /*
+         * Anonymous subclass intentionally makes the catalog inspection-only.
+         * The bridge's existing snapshot logic marks only exact NodeMap instances
+         * as restorable.
+         */
+        return new NodeMap(MapConfigurations.MapType.DEFAULT, root) { };
+    }
+
+    private static NodeMap currentNodeMapByIndex(String reference) {
+        String indexText = reference.substring(ControlProtocol.CURRENT_NODE_MAP_REFERENCE_PREFIX.length());
+        int index;
+        try {
+            index = Integer.parseInt(indexText);
+        } catch (NumberFormatException failure) {
+            throw new IllegalArgumentException("Invalid current NodeMap reference: " + reference, failure);
+        }
+        List<NodeMap> maps = distinctCurrentNodeMaps();
+        if (index < 0 || index >= maps.size()) {
+            throw new IllegalArgumentException(
+                    "Current NodeMap reference is no longer available: " + reference
+            );
+        }
+        return maps.get(index);
+    }
+
+    private static List<NodeMap> distinctCurrentNodeMaps() {
+        ParsingMap parsingMap = ParsingMap.getRunningParsingMap();
+        Set<NodeMap> seen = java.util.Collections.newSetFromMap(new IdentityHashMap<>());
+        List<NodeMap> maps = new ArrayList<>();
+        for (NodeMap map : parsingMap.getMapsForResolution()) {
+            if (map != null && seen.add(map)) {
+                maps.add(map);
+            }
+        }
+        return List.copyOf(maps);
     }
 
     private static NodeMap requireMap(NodeMap map) {

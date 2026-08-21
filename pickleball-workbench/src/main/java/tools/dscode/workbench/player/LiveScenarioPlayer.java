@@ -9,8 +9,9 @@ import java.util.OptionalLong;
 /**
  * Headless presentation model for the Workbench live scenario buffer.
  *
- * <p>This class owns only interactive-buffer state. It does not parse or execute
- * Pickleball steps, mutate Mapping state, or implement runtime rewind semantics.</p>
+ * <p>The editor selection is the user's navigation model. The execution cursor
+ * is internal and exists only while a run is active; it is not a separately
+ * editable playhead.</p>
  */
 public final class LiveScenarioPlayer {
     public enum State {
@@ -28,18 +29,10 @@ public final class LiveScenarioPlayer {
         TEXT
     }
 
-    public enum ExecutionStatus {
-        NONE,
-        PENDING,
-        EXECUTED,
-        FAILED
-    }
-
-    public record Line(long id, String text, LineType type, ExecutionStatus executionStatus) {
+    public record Line(long id, String text, LineType type) {
         public Line {
             Objects.requireNonNull(text, "text");
             Objects.requireNonNull(type, "type");
-            Objects.requireNonNull(executionStatus, "executionStatus");
         }
 
         public boolean executable() {
@@ -50,7 +43,7 @@ public final class LiveScenarioPlayer {
     private final List<Line> lines = new ArrayList<>();
     private long nextId = 1;
     private Long selectedId;
-    private int playheadIndex;
+    private int executionIndex;
     private State state = State.STOPPED;
 
     public LiveScenarioPlayer(List<String> initialLines) {
@@ -59,16 +52,20 @@ public final class LiveScenarioPlayer {
                 addInitialLine(text == null ? "" : text);
             }
         }
-        playheadIndex = findNextExecutableIndex(0);
+        executionIndex = findNextExecutableIndex(0);
     }
 
+    /** A consumer-independent Pickleball-core smoke scenario. */
     public static LiveScenarioPlayer interactiveBuffer() {
         return new LiveScenarioPlayer(List.of(
                 "Feature: Workbench Live Scenario",
                 "",
-                "Scenario: Interactive session",
+                "Scenario: Quick player smoke test",
+                "  Given ---workbench-player-smoke-1",
+                "  And ---workbench-player-smoke-2",
+                "  Then ---workbench-player-smoke-3",
                 "",
-                "# Enter a live Gherkin step in the Step Editor below."
+                "# Global Play starts fresh from the first step. Select a step for From Here."
         ));
     }
 
@@ -90,14 +87,9 @@ public final class LiveScenarioPlayer {
     }
 
     public Optional<Line> nextStep() {
-        if (playheadIndex >= lines.size()) return Optional.empty();
-        Line line = lines.get(playheadIndex);
+        if (executionIndex >= lines.size()) return Optional.empty();
+        Line line = lines.get(executionIndex);
         return line.executable() ? Optional.of(line) : Optional.empty();
-    }
-
-    /** Returns the display index of the next executable step, or {@code lines().size()} at end-of-buffer. */
-    public int playheadIndex() {
-        return playheadIndex;
     }
 
     public void select(long id) {
@@ -109,40 +101,55 @@ public final class LiveScenarioPlayer {
         selectedId = null;
     }
 
+    /** Starts a new buffer run at the first executable step. */
+    public void startFromBeginning() {
+        executionIndex = findNextExecutableIndex(0);
+        state = executionIndex < lines.size() ? State.RUNNING : State.WAITING_FOR_STEP;
+    }
+
+    /** Starts a new buffer run at the selected executable step. */
+    public void startFromSelectedStep() {
+        Line selected = selectedLine().orElseThrow(() ->
+                new IllegalStateException("Select a scenario step to run from here."));
+        if (!selected.executable()) {
+            throw new IllegalStateException("Select an executable scenario step to run from here.");
+        }
+        executionIndex = requireLineIndex(selected.id());
+        state = State.RUNNING;
+    }
+
     /**
-     * Inserts a new live command at the playhead insertion point.
-     * The inserted line receives a stable id and becomes the next executable step.
+     * Inserts a new command directly after the selected line. With no selection,
+     * it is appended after the last executable scenario step.
      */
     public Line insertStep(String text) {
         String stepText = requiredText(text, "Step");
-        int insertAt = Math.min(playheadIndex, lines.size());
-        Line inserted = new Line(nextId++, stepText, LineType.STEP, ExecutionStatus.PENDING);
+        int insertAt = insertionIndex();
+        int appendAt = insertionAfterLastExecutable();
+        Line inserted = new Line(nextId++, stepText, LineType.STEP);
         lines.add(insertAt, inserted);
-        playheadIndex = insertAt;
-        if (state == State.WAITING_FOR_STEP) state = State.RUNNING;
+
+        if (state == State.WAITING_FOR_STEP && insertAt == appendAt) {
+            executionIndex = insertAt;
+            state = State.RUNNING;
+        } else if (insertAt < executionIndex) {
+            executionIndex++;
+        }
         return inserted;
     }
 
-    /**
-     * Updates the selected pending buffer step while preserving its durable id.
-     * Already executed/failed steps are intentionally not editable because this
-     * presentation model does not imply runtime rewind or side-effect rollback.
-     */
+    /** Updates the selected executable step while preserving its stable id. */
     public Line updateSelectedStep(String text) {
         String stepText = requiredText(text, "Step");
         Line selected = selectedLine().orElseThrow(() ->
-                new IllegalStateException("Select an executable pending step to update."));
-        if (!selected.executable() || selected.executionStatus() != ExecutionStatus.PENDING) {
-            throw new IllegalStateException("Only pending executable steps can be updated.");
+                new IllegalStateException("Select an executable step to update."));
+        if (!selected.executable()) {
+            throw new IllegalStateException("Only executable scenario steps can be updated.");
         }
         int index = requireLineIndex(selected.id());
-        Line updated = new Line(selected.id(), stepText, LineType.STEP, ExecutionStatus.PENDING);
+        Line updated = new Line(selected.id(), stepText, LineType.STEP);
         lines.set(index, updated);
         return updated;
-    }
-
-    public void play() {
-        state = nextStep().isPresent() ? State.RUNNING : State.WAITING_FOR_STEP;
     }
 
     public void pause() {
@@ -155,52 +162,42 @@ public final class LiveScenarioPlayer {
         state = State.STOPPED;
     }
 
-    /** Isolated execution always leaves the main live player paused. */
+    /** Step-only execution always leaves automatic scenario playback paused. */
     public void pauseForIsolatedExecution() {
         state = State.PAUSED;
     }
 
-    /** Marks the current playhead step executed and advances to the next executable buffer line. */
+    /** Advances a successful run to the next executable line. */
     public void markCurrentStepExecuted(long stepId) {
         int index = requireCurrentStep(stepId);
-        Line current = lines.get(index);
-        lines.set(index, new Line(current.id(), current.text(), current.type(), ExecutionStatus.EXECUTED));
-        playheadIndex = findNextExecutableIndex(index + 1);
-        if (state == State.RUNNING && playheadIndex >= lines.size()) {
+        executionIndex = findNextExecutableIndex(index + 1);
+        if (state == State.RUNNING && executionIndex >= lines.size()) {
             state = State.WAITING_FOR_STEP;
         }
     }
 
-    /** Marks the current playhead step failed and pauses without advancing it. */
+    /** Leaves a failed run paused on its failed line. */
     public void markCurrentStepFailed(long stepId) {
-        int index = requireCurrentStep(stepId);
-        Line current = lines.get(index);
-        lines.set(index, new Line(current.id(), current.text(), current.type(), ExecutionStatus.FAILED));
-        playheadIndex = index;
+        executionIndex = requireCurrentStep(stepId);
         state = State.PAUSED;
     }
 
-    /** Navigation only. Does not reset execution status or claim to undo runtime side effects. */
-    public void movePlayheadToFirstStep() {
-        playheadIndex = findNextExecutableIndex(0);
+    private int insertionIndex() {
+        if (selectedId != null) {
+            return requireLineIndex(selectedId) + 1;
+        }
+        return insertionAfterLastExecutable();
     }
 
-    /** Navigation only. Does not reset execution status or claim to undo runtime side effects. */
-    public void movePlayheadToPreviousStep() {
-        int from = Math.min(playheadIndex - 1, lines.size() - 1);
-        for (int i = from; i >= 0; i--) {
-            if (lines.get(i).executable()) {
-                playheadIndex = i;
-                return;
-            }
+    private int insertionAfterLastExecutable() {
+        for (int i = lines.size() - 1; i >= 0; i--) {
+            if (lines.get(i).executable()) return i + 1;
         }
-        movePlayheadToFirstStep();
+        return lines.size();
     }
 
     private void addInitialLine(String text) {
-        LineType type = classify(text);
-        ExecutionStatus status = type == LineType.STEP ? ExecutionStatus.PENDING : ExecutionStatus.NONE;
-        lines.add(new Line(nextId++, text, type, status));
+        lines.add(new Line(nextId++, text, classify(text)));
     }
 
     private int findNextExecutableIndex(int from) {
@@ -211,11 +208,11 @@ public final class LiveScenarioPlayer {
     }
 
     private int requireCurrentStep(long id) {
-        if (playheadIndex >= lines.size() || !lines.get(playheadIndex).executable()
-                || lines.get(playheadIndex).id() != id) {
-            throw new IllegalStateException("Step " + id + " is not the current playhead step.");
+        if (executionIndex >= lines.size() || !lines.get(executionIndex).executable()
+                || lines.get(executionIndex).id() != id) {
+            throw new IllegalStateException("Step " + id + " is not the current execution step.");
         }
-        return playheadIndex;
+        return executionIndex;
     }
 
     private int requireLineIndex(long id) {

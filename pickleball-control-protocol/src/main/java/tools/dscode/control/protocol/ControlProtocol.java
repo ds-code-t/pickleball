@@ -13,6 +13,16 @@ public final class ControlProtocol {
     public static final String EMBEDDED_WORKBENCH_RESOURCE =
             "META-INF/pickleball/workbench/pickleball-workbench.jar";
 
+    /*
+     * Reserved neutral references used over the existing Mapping snapshot/restore
+     * contract. The worker resolves these against the currently running ParsingMap;
+     * the Workbench never imports ParsingMap or NodeMap classes.
+     */
+    public static final String CURRENT_NODE_MAP_CATALOG_REFERENCE =
+            "__pickleball_workbench_current_nodemap_catalog__";
+    public static final String CURRENT_NODE_MAP_REFERENCE_PREFIX =
+            "__pickleball_workbench_current_nodemap__:";
+
     public static final String SESSION_DIRECTORY_ENV = "PKB_CONTROL_BRIDGE_SESSION_DIR";
     public static final String SESSION_ID_ENV = "PKB_CONTROL_BRIDGE_SESSION_ID";
     public static final String SESSION_TOKEN_ENV = "PKB_CONTROL_BRIDGE_TOKEN";

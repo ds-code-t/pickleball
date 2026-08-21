@@ -1,6 +1,8 @@
 package tools.dscode.control.api;
 
+import io.cucumber.core.gherkin.Feature;
 import io.cucumber.core.gherkin.Pickle;
+import io.cucumber.core.gherkin.Step;
 import io.cucumber.core.runner.CurrentScenarioState;
 import io.cucumber.core.runner.GlobalState;
 import io.cucumber.core.runner.StepExtension;
@@ -29,11 +31,22 @@ public final class DynamicControl {
         return createStep(text, "");
     }
 
+    /**
+     * Creates a detached Pickleball step.
+     *
+     * <p>Controller callers may supply either the historical raw step text or one
+     * complete Gherkin step line such as {@code Given CONTROL API TEST STEP}.
+     * Gherkin parsing deliberately happens here in the consumer worker, never in
+     * Workbench, so the controller remains independent of Cucumber/Pickleball.</p>
+     */
     public static ControlCallResult<StepExtension> createStep(String text, String argument) {
         if (GlobalState.getCurrentScenarioState() == null || GlobalState.getTestCase() == null) {
             return ControlCallResult.unavailable("Dynamic step creation requires an active Pickleball test context.");
         }
-        return attempt(() -> getCustomStep(text, argument));
+        return attempt(() -> {
+            DynamicStepSpec normalized = normalizeWorkbenchStep(text, argument);
+            return getCustomStep(normalized.text(), normalized.argument());
+        });
     }
 
     /** Creates a detached step with an exact caller-defined mapping source set. */
@@ -57,7 +70,6 @@ public final class DynamicControl {
             return created.value();
         });
     }
-
 
     /** Creates every requested step and keeps going after individual failures. */
     public static List<ControlCallResult<StepExtension>> createSteps(List<DynamicStepSpec> steps) {
@@ -177,7 +189,6 @@ public final class DynamicControl {
         return List.copyOf(results);
     }
 
-
     /** Executes a parsed Cucumber scenario/background-expanded Pickle as detached steps. */
     public static List<ControlCallResult<Object>> executePickle(Pickle pickle) {
         if (pickle == null) {
@@ -254,7 +265,6 @@ public final class DynamicControl {
         });
     }
 
-
     public static ControlCallResult<List<StepExtension>> addChildren(
             StepExtension parent,
             List<StepExtension> children
@@ -307,6 +317,55 @@ public final class DynamicControl {
             return ControlCallResult.unavailable("No scenario is currently active.");
         }
         return attempt(() -> getRunningParsingMap());
+    }
+
+    private static DynamicStepSpec normalizeWorkbenchStep(String text, String argument) {
+        String raw = text == null ? "" : text;
+        String trimmed = raw.strip();
+        if (!looksLikeGherkinStep(trimmed)) {
+            return new DynamicStepSpec(raw, argument);
+        }
+
+        String source = """
+                Feature: Workbench detached step
+                  Scenario: Live step
+                    %s
+                """.formatted(trimmed);
+        ControlCallResult<Feature> parsed = GherkinControl.parseFeature(source);
+        if (!parsed.successful()) {
+            String message = parsed.error() == null
+                    ? "Could not parse the supplied Gherkin step."
+                    : parsed.error().message();
+            throw new IllegalArgumentException(message);
+        }
+
+        List<Pickle> pickles = GherkinControl.scenarios(parsed.value());
+        if (pickles.size() != 1) {
+            throw new IllegalArgumentException("A live Workbench command must contain exactly one Gherkin step.");
+        }
+        List<Step> steps = GherkinControl.steps(pickles.getFirst());
+        if (steps.size() != 1) {
+            throw new IllegalArgumentException("A live Workbench command must contain exactly one Gherkin step.");
+        }
+
+        Step step = steps.getFirst();
+        String suppliedArgument = argument == null ? "" : argument;
+        String parsedArgument = GherkinControl.argumentText(step);
+        return new DynamicStepSpec(
+                step.getText(),
+                suppliedArgument.isBlank() ? parsedArgument : suppliedArgument
+        );
+    }
+
+    private static boolean looksLikeGherkinStep(String text) {
+        return startsWithAny(text, "Given ", "When ", "Then ", "And ", "But ", "* ");
+    }
+
+    private static boolean startsWithAny(String value, String... prefixes) {
+        for (String prefix : prefixes) {
+            if (value.startsWith(prefix)) return true;
+        }
+        return false;
     }
 
     private static <T> ControlCallResult<T> attempt(Supplier<T> action) {
