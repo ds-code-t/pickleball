@@ -69,6 +69,41 @@ class WorkbenchUiControllerTest {
     }
 
     @Test
+    void isolatedPlayerStepSendsDisplayedGherkinUnchanged() {
+        RecordingServices recording = new RecordingServices();
+        WorkbenchUiController controller = new WorkbenchUiController(
+                Path.of("consumer"),
+                recording.services()
+        );
+
+        WorkbenchUiController.PlayerStepResult result = controller.executePlayerStep(
+                "  Given navigate to: URL.home"
+        );
+
+        assertTrue(result.successful());
+        assertTrue(recording.calls.contains("executeStep:  Given navigate to: URL.home:"));
+    }
+
+    @Test
+    void freshScenarioPlaybackRestartsTheWorkerOnTheSharedServiceSeam() {
+        RecordingServices recording = new RecordingServices();
+        WorkbenchUiController controller = new WorkbenchUiController(
+                Path.of("consumer"),
+                recording.services()
+        );
+
+        controller.refresh();
+        controller.startWorker();
+        recording.calls.clear();
+        WorkbenchUiController.State fresh = controller.prepareFreshLiveSession();
+
+        assertTrue(fresh.liveReady());
+        assertTrue(recording.calls.contains("synchronizationStatus"));
+        assertTrue(recording.calls.contains("restartWorker"));
+        assertFalse(recording.calls.stream().anyMatch(call -> call.startsWith("executeStep")));
+    }
+
+    @Test
     void liveGherkinAndMappingDelegateToSharedWorkbenchServicesAndRefreshEvents() {
         RecordingServices recording = new RecordingServices();
         WorkbenchUiController controller = new WorkbenchUiController(

@@ -9,8 +9,13 @@ import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
+import javax.swing.text.BadLocationException;
+import javax.swing.text.DefaultHighlighter;
+import javax.swing.text.Highlighter;
 import java.awt.*;
 import java.awt.event.KeyEvent;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.util.List;
@@ -28,8 +33,10 @@ final class WorkbenchFrame extends JFrame {
     private final LiveScenarioPlayer player = LiveScenarioPlayer.interactiveBuffer();
     private final ObjectMapper json = new ObjectMapper();
 
-    private final DefaultListModel<LiveScenarioPlayer.Line> scenarioModel = new DefaultListModel<>();
-    private final JList<LiveScenarioPlayer.Line> scenarioList = new JList<>(scenarioModel);
+    private static final Color PLAYHEAD_COLOR = new Color(255, 228, 150);
+    private final JTextArea scenarioEditor = new JTextArea();
+    private final Highlighter.HighlightPainter playheadPainter =
+            new DefaultHighlighter.DefaultHighlightPainter(PLAYHEAD_COLOR);
     private final JTextField stepText = new JTextField();
 
     private final JButton playButton = playerButton("▶", "Run the scenario from the first step in a fresh scenario context");
@@ -75,7 +82,7 @@ final class WorkbenchFrame extends JFrame {
     private boolean pendingFreshRun;
     private Long pendingFreshRunStepId;
     private String pendingIsolatedStep;
-    private boolean syncingScenarioSelection;
+    private boolean syncingScenarioDocument;
     private boolean closing;
 
     WorkbenchFrame(WorkbenchUiController controller) {
@@ -182,15 +189,15 @@ final class WorkbenchFrame extends JFrame {
         JPanel panel = new JPanel(new BorderLayout(0, 4));
         panel.setBorder(BorderFactory.createTitledBorder("Live Scenario Editor"));
 
-        scenarioList.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 14));
-        scenarioList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-        scenarioList.setFixedCellHeight(26);
-        scenarioList.setCellRenderer(new ScenarioRenderer());
-        panel.add(new JScrollPane(scenarioList), BorderLayout.CENTER);
+        scenarioEditor.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 14));
+        scenarioEditor.setLineWrap(false);
+        scenarioEditor.setTabSize(2);
+        panel.add(new JScrollPane(scenarioEditor), BorderLayout.CENTER);
 
         JPanel legend = new JPanel(new FlowLayout(FlowLayout.LEFT, 18, 2));
-        legend.add(new JLabel("▶ Current execution"));
-        legend.add(new JLabel("Selection = edit / From Here"));
+        legend.add(new JLabel("Click a step to move the playhead"));
+        legend.add(new JLabel("Global Play starts from the first step"));
+        legend.add(new JLabel("Edit Gherkin in place"));
         panel.add(legend, BorderLayout.SOUTH);
         return panel;
     }
@@ -208,7 +215,7 @@ final class WorkbenchFrame extends JFrame {
         header.add(title);
         header.add(stepOnlyButton);
         header.add(fromHereButton);
-        header.add(new JLabel("Enter = insert after selection   Ctrl+Enter = update selected step"));
+        header.add(new JLabel("Enter = append/insert   Ctrl+Enter = update selected line"));
         panel.add(header, BorderLayout.NORTH);
 
         stepText.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 14));
@@ -290,19 +297,28 @@ final class WorkbenchFrame extends JFrame {
     }
 
     private void configureScenarioEditor() {
-        scenarioList.addListSelectionListener(event -> {
-            if (event.getValueIsAdjusting() || syncingScenarioSelection) return;
-            LiveScenarioPlayer.Line selected = scenarioList.getSelectedValue();
-            if (selected == null) {
-                player.clearSelection();
-                updateFromHereAvailability();
-                return;
+        scenarioEditor.getDocument().addDocumentListener(new DocumentListener() {
+            @Override
+            public void insertUpdate(DocumentEvent event) {
+                scenarioDocumentChanged();
             }
-            player.select(selected.id());
-            if (selected.executable()) {
-                stepText.setText(selected.text());
+
+            @Override
+            public void removeUpdate(DocumentEvent event) {
+                scenarioDocumentChanged();
             }
-            updateFromHereAvailability();
+
+            @Override
+            public void changedUpdate(DocumentEvent event) {
+                scenarioDocumentChanged();
+            }
+        });
+        scenarioEditor.addCaretListener(event -> seekPlayheadToCaret());
+        scenarioEditor.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mousePressed(MouseEvent event) {
+                seekPlayheadToCaret();
+            }
         });
     }
 
@@ -387,7 +403,9 @@ final class WorkbenchFrame extends JFrame {
     }
 
     private void runScenarioFromSelectedStep() {
-        LiveScenarioPlayer.Line selected = player.selectedLine().orElse(null);
+        LiveScenarioPlayer.Line selected = player.selectedLine()
+                .or(player::playheadLine)
+                .orElse(null);
         if (selected == null || !selected.executable()) {
             showFailure("Could not run from selected step",
                     new IllegalStateException("Select an executable scenario step first."));
@@ -416,9 +434,9 @@ final class WorkbenchFrame extends JFrame {
                 player.startFromBeginning();
                 updatePlayerView("Starting a fresh scenario run from the first step...");
             } else {
-                player.select(startStepId);
+                player.clickLine(startStepId);
                 player.startFromSelectedStep();
-                selectLine(startStepId);
+                showLine(startStepId);
                 updatePlayerView("Starting a fresh scenario run from the selected step...");
             }
         } catch (RuntimeException failure) {
@@ -504,8 +522,8 @@ final class WorkbenchFrame extends JFrame {
                         player.markCurrentStepExecuted(step.id());
                     } else {
                         player.markCurrentStepFailed(step.id());
-                        player.select(step.id());
-                        selectLine(step.id());
+                        player.clickLine(step.id());
+                        showLine(step.id());
                     }
                     syncScenarioView();
                     updatePlayerView(
@@ -525,9 +543,9 @@ final class WorkbenchFrame extends JFrame {
                     playbackBusy = false;
                     executingStepId = null;
                     player.markCurrentStepFailed(step.id());
-                    player.select(step.id());
+                    player.clickLine(step.id());
                     syncScenarioView();
-                    selectLine(step.id());
+                    showLine(step.id());
                     updatePlayerView("Step execution failed. Scenario playback paused.");
                     showFailure("Could not execute live step", failure);
                     if (!runPendingFreshRun()) runPendingIsolatedStep();
@@ -539,10 +557,14 @@ final class WorkbenchFrame extends JFrame {
         try {
             LiveScenarioPlayer.Line inserted = player.insertStep(stepText.getText());
             stepText.setText("");
-            player.select(inserted.id());
+            player.clickLine(inserted.id());
             syncScenarioView();
-            selectLine(inserted.id());
-            updatePlayerView("Inserted step after the selected line.");
+            showLine(inserted.id());
+            updatePlayerView(
+                    player.state() == LiveScenarioPlayer.State.RUNNING
+                            ? "Appended step and continued live playback."
+                            : "Inserted step into the live scenario."
+            );
             if (player.state() == LiveScenarioPlayer.State.RUNNING) {
                 if (lastState == null || !lastState.liveReady()) {
                     prepareLiveSession(this::schedulePlaybackStep);
@@ -559,8 +581,8 @@ final class WorkbenchFrame extends JFrame {
         try {
             LiveScenarioPlayer.Line updated = player.updateSelectedStep(stepText.getText());
             syncScenarioView();
-            selectLine(updated.id());
-            updatePlayerView("Updated selected step.");
+            showLine(updated.id());
+            updatePlayerView("Updated selected line in place.");
         } catch (RuntimeException failure) {
             showFailure("Could not update selected step", failure);
         }
@@ -768,37 +790,115 @@ final class WorkbenchFrame extends JFrame {
         }
     }
 
-    private void syncScenarioView() {
-        Long selected = player.selectedId().isPresent()
-                ? player.selectedId().getAsLong()
-                : null;
-        syncingScenarioSelection = true;
-        try {
-            scenarioModel.clear();
-            for (LiveScenarioPlayer.Line line : player.lines()) {
-                scenarioModel.addElement(line);
+    private void scenarioDocumentChanged() {
+        if (syncingScenarioDocument) return;
+        player.replaceDocument(List.of(scenarioEditor.getText().split("\n", -1)));
+        seekPlayheadToCaret();
+        updateFromHereAvailability();
+        refreshPlayheadHighlight();
+        if (player.state() == LiveScenarioPlayer.State.RUNNING) {
+            if (lastState == null || !lastState.liveReady()) {
+                prepareLiveSession(this::schedulePlaybackStep);
+            } else {
+                schedulePlaybackStep();
             }
-            if (selected != null) selectLine(selected);
-        } finally {
-            syncingScenarioSelection = false;
         }
-        scenarioList.repaint();
+    }
+
+    private void seekPlayheadToCaret() {
+        if (syncingScenarioDocument) return;
+        int lineIndex = lineIndexAtCaret();
+        List<LiveScenarioPlayer.Line> lines = player.lines();
+        if (lineIndex < 0 || lineIndex >= lines.size()) {
+            updateFromHereAvailability();
+            refreshPlayheadHighlight();
+            return;
+        }
+        LiveScenarioPlayer.Line line = lines.get(lineIndex);
+        player.clickLine(line.id());
+        if (line.executable()) {
+            stepText.setText(line.text());
+        }
+        updateFromHereAvailability();
+        refreshPlayheadHighlight();
+    }
+
+    private void syncScenarioView() {
+        String document = player.documentText();
+        if (!Objects.equals(scenarioEditor.getText(), document)) {
+            syncingScenarioDocument = true;
+            try {
+                int caret = Math.min(scenarioEditor.getCaretPosition(), document.length());
+                scenarioEditor.setText(document);
+                scenarioEditor.setCaretPosition(Math.max(0, caret));
+            } finally {
+                syncingScenarioDocument = false;
+            }
+        }
+        refreshPlayheadHighlight();
         updateFromHereAvailability();
     }
 
     private void updateFromHereAvailability() {
         fromHereButton.setEnabled(
-                player.selectedLine().map(LiveScenarioPlayer.Line::executable).orElse(false)
+                player.selectedLine()
+                        .or(player::playheadLine)
+                        .map(LiveScenarioPlayer.Line::executable)
+                        .orElse(false)
         );
     }
 
-    private void selectLine(long id) {
-        for (int i = 0; i < scenarioModel.size(); i++) {
-            if (scenarioModel.get(i).id() == id) {
-                scenarioList.setSelectedIndex(i);
-                scenarioList.ensureIndexIsVisible(i);
+    private void showLine(long id) {
+        List<LiveScenarioPlayer.Line> lines = player.lines();
+        for (int i = 0; i < lines.size(); i++) {
+            if (lines.get(i).id() == id) {
+                try {
+                    int start = scenarioEditor.getLineStartOffset(i);
+                    syncingScenarioDocument = true;
+                    try {
+                        scenarioEditor.setCaretPosition(start);
+                    } finally {
+                        syncingScenarioDocument = false;
+                    }
+                    scenarioEditor.getCaret().setVisible(true);
+                } catch (BadLocationException ignored) {
+                    // The document can briefly lag the model during a rebuild.
+                }
+                refreshPlayheadHighlight();
                 return;
             }
+        }
+    }
+
+    private int lineIndexAtCaret() {
+        try {
+            return scenarioEditor.getLineOfOffset(scenarioEditor.getCaretPosition());
+        } catch (BadLocationException ignored) {
+            return -1;
+        }
+    }
+
+    private void refreshPlayheadHighlight() {
+        Highlighter highlighter = scenarioEditor.getHighlighter();
+        highlighter.removeAllHighlights();
+        Long playhead = player.playheadId().isPresent() ? player.playheadId().getAsLong() : null;
+        if (playhead == null && executingStepId != null) playhead = executingStepId;
+        if (playhead == null && player.state() == LiveScenarioPlayer.State.RUNNING) {
+            playhead = player.nextStep().map(LiveScenarioPlayer.Line::id).orElse(null);
+        }
+        if (playhead == null) return;
+
+        List<LiveScenarioPlayer.Line> lines = player.lines();
+        for (int i = 0; i < lines.size(); i++) {
+            if (lines.get(i).id() != playhead) continue;
+            try {
+                int start = scenarioEditor.getLineStartOffset(i);
+                int end = scenarioEditor.getLineEndOffset(i);
+                highlighter.addHighlight(start, end, playheadPainter);
+            } catch (BadLocationException ignored) {
+                return;
+            }
+            return;
         }
     }
 
@@ -1174,27 +1274,4 @@ final class WorkbenchFrame extends JFrame {
                 """;
     }
 
-    private final class ScenarioRenderer extends DefaultListCellRenderer {
-        @Override
-        public Component getListCellRendererComponent(
-                JList<?> list,
-                Object value,
-                int index,
-                boolean selected,
-                boolean focus
-        ) {
-            JLabel label = (JLabel) super.getListCellRendererComponent(
-                    list, value, index, selected, focus
-            );
-            if (!(value instanceof LiveScenarioPlayer.Line line)) return label;
-
-            Long activeId = executingStepId;
-            if (activeId == null && player.state() == LiveScenarioPlayer.State.RUNNING) {
-                activeId = player.nextStep().map(LiveScenarioPlayer.Line::id).orElse(null);
-            }
-            String marker = Objects.equals(activeId, line.id()) ? "▶ " : "  ";
-            label.setText(marker + line.text());
-            return label;
-        }
-    }
 }

@@ -47,6 +47,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/key-parser-dsl.md`
 - `docs/mapping-and-templating.md`
 - `docs/nested-steps.md`
+- `docs/pickleball-workbench-player.md`
 - `docs/pickleball-workbench.md`
 - `docs/README.md`
 - `docs/service-call-scenarios.md`
