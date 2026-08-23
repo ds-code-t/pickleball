@@ -72,17 +72,17 @@ right: Mapping | Terminal | Diagnostic Log Explorer
 
 Low-level lifecycle controls live under the Session menu and existing investigation controls remain available under Advanced Controls rather than dominating the permanent workspace.
 
-`LiveScenarioPlayer` owns presentation/session-buffer state only: stable line IDs, selected line, playhead insertion point, pending/executed/failed visual status, and `STOPPED` / `PAUSED` / `RUNNING` / `WAITING_FOR_STEP`. It must remain headless-testable and must not parse/execute Pickleball steps, implement runtime rewind, model Mapping inheritance, or become Swing component state.
+`LiveScenarioPlayer` owns presentation/session-buffer state only: stable line IDs, the editable Gherkin document, selected line, playhead, and `STOPPED` / `PAUSED` / `RUNNING` / `WAITING_FOR_STEP`. It must remain headless-testable and must not parse/execute Pickleball steps, implement runtime rewind, model Mapping inheritance, or become Swing component state.
 
-Selection and playhead are separate. Inserting a Step Editor command occurs at the playhead insertion point and does not depend on the selected line. Enter inserts a new command; Ctrl+Enter updates the selected pending step. Already executed or failed buffer steps are not edited in place because the UI must not imply that browser/service/external side effects were undone.
+The playhead is the user-visible needle. Clicking a scenario line instantly seeks it. Global Play always starts from the first executable step in a fresh worker context, not from the playhead. The Live Scenario Editor is an in-place Gherkin document; users may edit any line, including previously executed text. The default buffer is a Workbench-owned browser demo against `URL.home` and is not written back to consumer `.feature` files.
 
-The small Step Editor Play button delegates the text unchanged through the existing `WorkbenchUiController.executeStep` / `WorkbenchServices.executeStep` path and leaves the main player paused. Do not strip Gherkin keywords or add a Swing-side step matcher. A future main player execution loop must use an explicit Pickleball-owned Gherkin/runtime contract rather than guessing how display lines map to detached step text.
+The Step Editor has two play actions: **Step** executes only the editor text through `WorkbenchServices.executeStep` and leaves automatic playback paused; **From Here** restarts into a fresh scenario context and runs from the selected/playhead step through the rest of the buffer. Enter while waiting at end appends the step and continues the live run. Do not strip Gherkin keywords or add a Swing-side step matcher. Worker-side `DynamicControl` / `GherkinControl` remain the only Gherkin interpreters.
 
 ### Current player implementation phase
 
-The first player-style increment intentionally establishes presentation/state only. The main Play/Pause/Stop controls currently drive the headless buffer/player state; automatic buffered runtime execution belongs to the next phase after a safe Pickleball-owned full-Gherkin execution contract is selected and tested.
+Buffered Play / From Here / add-and-continue now execute through the existing live `executeStep` contract. Swing remains a presentation adapter: it sends displayed Gherkin unchanged and never owns a second worker manager, Mapping implementation, or Pickleball runtime.
 
-The Mapping tab must not hard-code NodeMap names. Until the ParsingMap-aware bridge/service contract is implemented, the NodeMap selector remains unavailable and the existing Mapping get/put/resolve controls remain as compatibility controls. Do not create a fake ParsingMap in Swing.
+The Mapping tab must not hard-code NodeMap names. It is one current-ParsingMap NodeMap selector plus a JSON object editor restored through `mappingRestore`. Do not create a fake ParsingMap in Swing.
 
 The Terminal tab currently shows Workbench UI activity only. Actual worker log streaming/filtering is a separate phase and must not be implemented by redirecting MCP stdout. The Diagnostic Log Explorer is also a placeholder until it is bound to Pickleball's existing retained diagnostic artifacts and evidence-escalation model. Do not populate either tab with fake production data.
 

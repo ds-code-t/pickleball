@@ -38,6 +38,7 @@ When these docs are materialized from the Maven dependency with `DiagnosticCli e
 - [Dynamic control API](dynamic-control-api.md) — optional retry-friendly dynamic Gherkin execution, isolated/scoped ParsingMap control, snapshots, value interception, synchronous semantic hooks, and the consumer-side Control Bridge used by Workbench.
 - [Step Overrides](step-overrides.md) — live REGEX/REPLACE step implementation authoring in a persistent worker, including generated Java handlers and Workbench management.
 - [Pickleball Workbench](pickleball-workbench.md) — dependency-matched external controller embedded opaquely in Pickleball, with a neutral versioned protocol, strict core-free artifact/process boundary, consumer-classpath worker, MCP stdio, and Swing UI.
+- [Workbench live player](pickleball-workbench-player.md) — click-to-seek playhead, Play from start, Step vs From Here, wait-at-end add-and-continue, in-place Gherkin editing, and the default local-site demo.
 - [Diagnostic lineage and metadata](diagnostic-lineage-metadata.md) — distinguish lineage annotations, execution/evidence RunVars, controls, and derived evidence.
 - [Diagnostic reporting](diagnostic-reporting.md) — sparse-first AI evidence, source provenance, step/capability metadata, trace evidence, screenshots/fingerprints, comparison, and retention.
 - [AI diagnostic reporting plan](ai-diagnostic-reporting-plan.md) — current sparse-first investigation and controlled-rerun architecture.

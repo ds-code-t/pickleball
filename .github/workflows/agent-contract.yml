@@ -47,7 +47,11 @@ jobs:
         run: python scripts/refresh_agent_index.py --check
 
       - name: Test and publish framework locally
-        run: ./gradlew test publishToMavenLocal
+        run: |
+          chmod +x gradlew
+          ./gradlew test publishToMavenLocal
 
       - name: Test Maven consumer project
-        run: bash ./maven-consumer-project/mvnw -f maven-consumer-project/pom.xml -U test -Dpkb_browser=CHROME_HEADLESS
+        run: |
+          chmod +x maven-consumer-project/mvnw
+          bash ./maven-consumer-project/mvnw -f maven-consumer-project/pom.xml -U test -Dpkb_browser=CHROME_HEADLESS

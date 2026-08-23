@@ -118,21 +118,20 @@ The Swing UI is a presentation adapter over the same `WorkbenchServices` / `Work
 The primary workspace is now arranged as an interactive scenario player:
 
 ```text
-┌─────────────────────────────────────────────────────────────────────┐
-│ Project / readiness        ⏮  ◀  ▶  ⏸  ■          Player status  │
-├───────────────────────────────┬─────────────────────────────────────┤
-│ LIVE SCENARIO EDITOR          │ Mapping | Terminal | Diagnostic Log │
-│                               │                                     │
-│ Feature: ...                  │ selected right-side workspace       │
-│ Scenario: ...                 │                                     │
-│ ▶ next playhead step          │                                     │
-│   selected/other line         │                                     │
-├───────────────────────────────┤                                     │
-│ Step Editor / Command   ▶     │                                     │
-│ [ live command text       ]   │                                     │
-└───────────────────────────────┴─────────────────────────────────────┘
-│ Workbench/session activity                                         │
-└─────────────────────────────────────────────────────────────────────┘
++-------------------------------------------------------------------+
+| Project / readiness           Play  Pause  Stop    Player status  |
++----------------------------------+--------------------------------+
+| LIVE SCENARIO EDITOR             | Mapping | Terminal | Diagnostic|
+| (in-place Gherkin text)          |                                |
+| Feature: ...                     | selected right-side workspace  |
+| Scenario: ...                    |                                |
+| highlighted playhead step        |                                |
++----------------------------------+                                |
+| Step Editor  [Step]  [From Here] |                                |
+| [ live command text           ]  |                                |
++----------------------------------+--------------------------------+
+| Workbench/session activity                                        |
++-------------------------------------------------------------------+
 ```
 
 The left side contains only the Live Scenario Editor and compact Step Editor / Command. The right side has one tabbed workspace for Mapping, Terminal, and Diagnostic Log Explorer. Low-level lifecycle controls are available from the **Session** menu. Existing investigation tools are available from **Tools > Advanced Controls** so the underlying capabilities are preserved without dominating the normal workflow.
@@ -142,51 +141,67 @@ The left side contains only the Live Scenario Editor and compact Step Editor / C
 `LiveScenarioPlayer` is a headless Workbench-side presentation model. It owns only:
 
 - stable line identities independent of display line number;
-- the live session buffer;
+- the live session buffer as editable Gherkin text;
 - selected line;
-- playhead insertion point;
-- pending/executed/failed presentation status;
+- playhead (the user-visible needle);
 - player states `STOPPED`, `PAUSED`, `RUNNING`, and `WAITING_FOR_STEP`.
 
-Selection and playhead are independent. Selecting another line does not move the playhead. New Step Editor commands are inserted at the playhead insertion point, not at the text caret or selected line.
+The Live Scenario Editor is a regular in-place Gherkin editor. Users can type at any line, including text that already ran. Stable line ids are preserved across in-place edits so the player can keep selection, playhead, and execution cursor coherent. The buffer is a session document; Workbench does not write it back to consumer `.feature` files.
 
-The initial buffer is an interactive session buffer; it is not automatically written back to consumer `.feature` files.
+The playhead behaves like an audio-player needle:
 
-Step Editor gestures are intentionally explicit:
+- clicking a scenario line instantly seeks the playhead to that line;
+- while a run is active, the playhead follows the current/next executable step after each success;
+- **Pause** and **Stop** do not claim to rewind browser, Mapping, service, or other worker side effects.
+
+Global **Play** always starts a fresh interactive scenario context and runs from the first executable step, even if the playhead is elsewhere. Fresh **Play** / **From Here** runs restart the consumer worker so prior side effects do not masquerade as the start of a scenario.
+
+### Step Editor play actions
+
+The Step Editor exposes two distinct play actions on the same `WorkbenchServices.executeStep` seam used by MCP:
 
 ```text
-Enter       insert a new command at the playhead
-Ctrl+Enter  update the selected pending executable step
-▶           execute the Step Editor text in isolation through the existing live service
+▶ Step       execute only the Step Editor text in the current paused live context
+▶ From Here  start a fresh scenario context and run from the selected/playhead step through the rest of the buffer
+Enter        insert a step (append-and-run while waiting at end)
+Ctrl+Enter   update the selected line in place
 ```
 
-Executed or failed buffer steps cannot be edited in place in this phase because the UI must not imply that browser, service, or other external side effects were undone.
+**Step** pauses automatic playback, sends the displayed Gherkin unchanged, and leaves the main player paused. **From Here** treats the selected executable step as the first step of a new run.
 
-The **First** and **Step Back** controls are navigation-only in this phase. They do not claim to rewind Pickleball runtime state or undo external side effects.
+Workbench never strips `Given` / `When` / `Then` / `And` / `But` / `*` and does not contain a second Gherkin matcher. If a displayed line starts with one of those keywords, worker-side `DynamicControl` parses that one line through `GherkinControl` and executes the resulting detached step. Historical raw detached-step text remains supported.
 
-### Phase 1 execution boundary
+### Stay in play / add-and-continue
 
-The current player-style increment establishes the new layout and headless player/buffer state without inventing new Pickleball runtime semantics.
+Reaching the end of the buffer does not drop out of play. The player remains `WAITING_FOR_STEP`. Typing a new step in the Step Editor and pressing **Enter** appends that step to the end of the live scenario and queues it through the same `executeStep` contract. Adding an executable line at the end of the in-place editor while waiting does the same. Inserting a line earlier in the document does not replay later steps.
 
-The main Play/Pause/Stop controls currently update the buffer/player state model only. Automatic buffered execution, wait-at-end execution, and add-and-continue behavior are the next implementation phase. That loop must be wired through an explicit Pickleball-owned Gherkin/runtime contract; Swing must not strip `Given`/`When`/`Then`, create a second step matcher, or otherwise guess how displayed Gherkin maps to detached step execution.
+### Default demo scenario
 
-The small Step Editor Play button continues to use the existing `WorkbenchServices.executeStep` contract unchanged. It pauses the main player state before isolated execution and does not automatically resume it afterward.
+A new Workbench session loads a Workbench-owned sample, not a blank buffer and not a consumer `.feature` file. The default scenario is a small browser demo against the existing Maven consumer local test site:
+
+```gherkin
+Feature: Workbench Live Scenario
+
+Scenario: Open the local test site
+  Given navigate to: URL.home
+  When , ensure "Pickleball Test Lab" Text is displayed
+  And , click the "Open Forms Playground" Link
+  Then , ensure "Forms Playground" Text is displayed
+```
+
+`URL.home` comes from the consumer's ordinary config mapping. The sample does not hard-code machine-specific filesystem paths. Once a worker is up, **Play** exercises real browser navigation and a click on the local test site.
 
 ### Mapping tab
 
-There is no GUI-defined `Current Scope` concept.
+There is no GUI-defined `Current Scope` concept. The Mapping tab is one NodeMap selector populated from the current worker-side `ParsingMap`, plus one JSON object editor for the selected NodeMap root. Valid JSON edits are restored through the existing `mappingRestore` service. The GUI must not hard-code NodeMap names or recreate inheritance rules.
 
-The target Mapping design is a single NodeMap selector populated from the real `ParsingMap` associated with the selected step, with common NodeMaps remaining available across the live scenario. The GUI must not hard-code names or recreate inheritance rules.
-
-The Phase 1 UI therefore leaves the NodeMap selector unavailable until the required Pickleball-side ParsingMap inspection contract exists. Existing Mapping get/put/resolve controls remain available as compatibility controls. The Swing Mapping put control continues to send entered values as text; MCP continues to support arbitrary JSON-compatible Mapping values through the shared service method.
-
-Structural NodeMap browsing/mutation is a later phase and must be implemented against real worker-side Pickleball state.
+NodeMap implementations that are not exact ordinary `NodeMap` instances remain inspection-only. MCP continues to support arbitrary JSON-compatible Mapping values through the shared service methods.
 
 ### Terminal and Diagnostic Log Explorer
 
 The Terminal tab currently displays Workbench UI activity only. Worker log streaming, level filtering, search, and auto-scroll belong to the Terminal phase and must use the appropriate worker/Workbench logging source without violating the MCP stdout contract.
 
-The Diagnostic Log Explorer tab is intentionally a placeholder in Phase 1. Its implementation must reuse Pickleball's retained diagnostic model and follow the existing evidence escalation order:
+The Diagnostic Log Explorer tab remains a placeholder until it is bound to Pickleball's retained diagnostic artifacts. Its implementation must reuse Pickleball's retained diagnostic model and follow the existing evidence escalation order:
 
 1. `run-catalog.json`
 2. selected `run-index.json` / `clusters.json`
@@ -218,7 +233,7 @@ The Step Override editor sends its source template unchanged to the worker. The 
 
 Synchronization, worker actions, live bridge calls, Mapping operations, event refresh, Step Override actions, browser/screenshot evidence, service calls, and breakpoint actions run off the Swing Event Dispatch Thread. Live controls are enabled only while the Workbench-owned worker is running and paused.
 
-The UI is intentionally not a project IDE, general feature-file editor, generic process manager, generic Maven/Gradle task runner, source navigator, or collaboration system.
+The UI is intentionally not a project IDE, generic process manager, generic Maven/Gradle task runner, source navigator, or collaboration system. The Live Scenario Editor is a session-scoped Gherkin player/editor, not a workspace file explorer and not an automatic writer of consumer `.feature` files.
 
 ## MCP stdio
 
@@ -336,7 +351,7 @@ io.modelcontextprotocol.sdk:mcp-core:2.0.0
 io.modelcontextprotocol.sdk:mcp-json-jackson2:2.0.0
 ```
 
-## Manual UI acceptance for the Phase 1 player foundation
+## Manual UI acceptance for the live player/editor
 
 ```powershell
 $workbenchJar = ".\pickleball-workbench\build\libs\pickleball-workbench-<version>.jar"
@@ -346,14 +361,17 @@ java -jar $workbenchJar ui ".\maven-consumer-project"
 Use the UI-owned worker for runtime checks; do not run `worker-check` or `live-check` concurrently with the UI.
 
 1. Verify the top-level layout has the Live Scenario Editor and compact Step Editor on the left, and exactly Mapping / Terminal / Diagnostic Log Explorer on the right.
-2. Insert multiple commands with Enter and verify each is inserted at the visible playhead while selection can remain on another line.
-3. Select a pending command, change its text, press Ctrl+Enter, and verify its displayed line updates without changing its stable position semantics.
-4. Use First and Step Back and verify the playhead indicator moves independently from the selection. Treat these as navigation-only; no runtime rewind is claimed.
-5. Use Play/Pause/Stop and verify player presentation states, including `Waiting for next step...` when Play has no next buffered command. Do not treat this as Phase 2 automatic runtime execution.
-6. Open **Session**, synchronize/start a worker, select or enter a valid existing live raw Gherkin command, click the small Step Editor Play button, and verify it delegates isolated execution and leaves the main player paused.
-7. Verify Mapping has no `Current Scope` control and no hard-coded NodeMap choices. Existing get/put/resolve controls remain usable with a paused worker.
-8. Verify **Tools > Advanced Controls** still exposes Status, Recent Events, Step Overrides, Evidence, and Breakpoints.
-9. Verify blocking runtime actions leave the Swing UI responsive.
+2. Confirm the default buffer is the Workbench demo scenario and includes `navigate to: URL.home` plus a click on the local test site.
+3. Click different scenario steps and verify the playhead highlight moves immediately to the clicked line.
+4. Edit previously typed or previously executed Gherkin directly in the Live Scenario Editor and verify the line text updates in place.
+5. Press global **Play** after seeking the playhead to a later step and verify execution still starts from the first executable step in a fresh worker context.
+6. Use **From Here** on a later executable step and verify playback starts there and continues through the rest of the buffer.
+7. Use **Step** in the Step Editor and verify isolated `executeStep` execution that leaves automatic playback paused.
+8. Let a run reach the end and verify the player stays in **Waiting for step**. Type a new step and press Enter; the step is appended and executed without dropping out of play.
+9. Treat **Pause** / **Stop** as presentation/control of automatic advancement only; they do not rewind browser or service side effects.
+10. Verify Mapping has no `Current Scope` control and no hard-coded NodeMap choices. The NodeMap JSON editor remains usable with a paused worker.
+11. Verify **Tools > Advanced Controls** still exposes Status, Recent Events, Step Overrides, Evidence, and Breakpoints.
+12. Verify blocking runtime actions leave the Swing UI responsive.
 
 ## Regression
 
