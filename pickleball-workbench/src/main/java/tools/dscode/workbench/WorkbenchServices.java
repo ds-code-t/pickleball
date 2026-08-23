@@ -13,9 +13,12 @@ import tools.dscode.control.protocol.ControlBridgeStepOverride;
 import tools.dscode.control.protocol.ControlBridgeStepOverrideResult;
 import tools.dscode.control.protocol.ControlBridgeValueResult;
 import tools.dscode.workbench.sync.WorkbenchManifest;
+import tools.dscode.workbench.terminal.WorkerLogFiles;
 import tools.dscode.workbench.worker.WorkbenchWorkerStatus;
 
+import java.nio.file.Path;
 import java.util.List;
+import java.util.Optional;
 
 /** Shared Workbench controller surface used by protocol and presentation adapters. */
 public interface WorkbenchServices extends AutoCloseable {
@@ -30,6 +33,10 @@ public interface WorkbenchServices extends AutoCloseable {
     WorkbenchWorkerStatus stopWorker();
 
     WorkbenchWorkerStatus workerStatus();
+
+    Path projectRoot();
+
+    Optional<WorkerLogFiles> workerLogFiles();
 
     ControlBridgeCallResult executeStep(String text, String argument);
 

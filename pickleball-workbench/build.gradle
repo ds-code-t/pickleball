@@ -20,11 +20,38 @@ java {
 }
 
 def mcpSdkVersion = '2.0.0'
+def javafxVersion = '21.0.6'
+def javafxModules = ['base', 'graphics', 'controls', 'swing', 'media', 'web']
+def javafxPlatforms = ['linux', 'win', 'mac', 'mac-aarch64']
+def javafxCompilePlatform = {
+    def os = org.gradle.internal.os.OperatingSystem.current()
+    def arch = System.getProperty('os.arch', '')
+    boolean arm = arch.contains('aarch64') || arch.contains('arm64')
+    if (os.windows) return 'win'
+    if (os.macOsX) return arm ? 'mac-aarch64' : 'mac'
+    return 'linux'
+}()
+
+configurations {
+    javafxNatives
+}
 
 dependencies {
     // Workbench shares only the JDK-only wire contract with the consumer worker.
     // It must never compile or run against the root Pickleball runtime.
     implementation project(':pickleball-control-protocol')
+
+    // OpenJFX WebView is Workbench-only presentation. It is not a Pickleball
+    // runtime dependency and is preferred over JCEF so natives stay in Maven
+    // artifacts that can be shaded into the controller executable.
+    javafxModules.each { module ->
+        implementation "org.openjfx:javafx-${module}:${javafxVersion}:${javafxCompilePlatform}"
+    }
+    javafxPlatforms.each { platform ->
+        javafxModules.each { module ->
+            javafxNatives "org.openjfx:javafx-${module}:${javafxVersion}:${platform}"
+        }
+    }
 
     // Controller-side JSON transport. This is declared directly instead of
     // inheriting it through Pickleball core.
@@ -60,13 +87,57 @@ tasks.jar {
     enabled = false
 }
 
+def javafxNativeStage = tasks.register('stageJavaFxNatives') {
+    def outputDir = layout.buildDirectory.dir('javafx-natives')
+    outputs.dir(outputDir)
+    doLast {
+        def dest = outputDir.get().asFile
+        dest.deleteDir()
+        dest.mkdirs()
+        configurations.javafxNatives.resolvedConfiguration.resolvedArtifacts.each { artifact ->
+            String classifier = artifact.classifier ?: 'unknown'
+            def target = new File(dest, classifier)
+            target.mkdirs()
+            copy {
+                from zipTree(artifact.file)
+                into target
+                include '**/*.so'
+                include '**/*.dll'
+                include '**/*.dylib'
+                include '**/*.jnilib'
+                includeEmptyDirs = false
+                eachFile { details ->
+                    details.path = details.name
+                }
+            }
+            new File(target, '.keep').text = ''
+        }
+    }
+}
+
+tasks.named('processResources') {
+    dependsOn javafxNativeStage
+    from(layout.buildDirectory.dir('javafx-natives')) {
+        into 'javafx-natives'
+    }
+}
+
 tasks.shadowJar {
+    dependsOn javafxNativeStage
     archiveBaseName.set('pickleball-workbench')
     archiveVersion.set(project.version.toString())
     archiveClassifier.set('')
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
     mergeServiceFiles()
     zip64 = true
+    exclude 'module-info.class'
+    exclude { details ->
+        String path = details.path ?: ''
+        String name = details.name ?: ''
+        boolean nativeLib = name.endsWith('.so') || name.endsWith('.dll') ||
+                name.endsWith('.dylib') || name.endsWith('.jnilib')
+        nativeLib && !path.startsWith('javafx-natives/')
+    }
 
     manifest {
         attributes(
@@ -216,8 +287,8 @@ tasks.register('verifyWorkbenchArtifact') {
         def forbidden = []
 
         def scanNestedJar
-        scanNestedJar = { byte[] bytes, String source ->
-            new java.util.zip.ZipInputStream(new ByteArrayInputStream(bytes)).withCloseable { nested ->
+        scanNestedJar = { InputStream input, String source ->
+            new java.util.zip.ZipInputStream(input).withCloseable { nested ->
                 java.util.zip.ZipEntry entry
                 while ((entry = nested.nextEntry) != null) {
                     String name = entry.name
@@ -225,7 +296,10 @@ tasks.register('verifyWorkbenchArtifact') {
                         forbidden.add("${source}!/${name}")
                     }
                     if (!entry.directory && name.endsWith('.jar')) {
-                        scanNestedJar(nested.readAllBytes(), "${source}!/${name}")
+                        scanNestedJar(
+                                new ByteArrayInputStream(nested.readAllBytes()),
+                                "${source}!/${name}"
+                        )
                     } else if (!entry.directory && name.startsWith('META-INF/services/')) {
                         String providers = new String(
                                 nested.readAllBytes(),
@@ -276,7 +350,9 @@ tasks.register('verifyWorkbenchArtifact') {
                     forbidden.add(name)
                 }
                 if (!entry.directory && name.endsWith('.jar')) {
-                    scanNestedJar(jar.getInputStream(entry).readAllBytes(), name)
+                    jar.getInputStream(entry).withCloseable { stream ->
+                        scanNestedJar(stream, name)
+                    }
                 } else if (!entry.directory && name.startsWith('META-INF/services/')) {
                     String providers = jar.getInputStream(entry).getText('UTF-8')
                     if (providers.readLines().collect { line ->

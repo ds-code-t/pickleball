@@ -10,7 +10,7 @@ This file records the live-player behavior added on top of those unchanged bound
 
 The playhead is the user-visible needle. Clicking a scenario line instantly seeks it, like clicking a waveform. Global Play ignores the playhead and always starts from the first executable buffer step in a fresh interactive worker context.
 
-The Live Scenario Editor is an in-place Gherkin document. Users can type at any line, including previously executed text. Stable line identities are preserved for same-index edits. The buffer is session-owned and is not written back to consumer `.feature` files.
+The Live Scenario Editor is an in-place Gherkin document shown as WebView blocks whose text is Gherkin. Users can type at any block, including previously executed text. Stable line identities are preserved for same-index edits. The buffer is session-owned and is not written back to consumer `.feature` files unless the user uses explicit Save. The left rail picks features/scenarios from the synchronized consumer project.
 
 The Step Editor exposes two distinct execution actions:
 
@@ -32,7 +32,7 @@ The Workbench sends displayed Gherkin unchanged. Full `Given`/`When`/`Then`/`And
 The primary Mapping tab has no get/put/resolve form. It is:
 
 - one current-ParsingMap NodeMap dropdown;
-- one JSON object editor for the selected NodeMap root.
+- a typed property tree (string / numeric / boolean / object-as-JSON / object-as-XML) persisted through `mappingPut` and `mappingRestore`.
 
 Current NodeMaps are discovered worker-side through `MappingControl` using the reserved neutral references in `ControlProtocol`. Workbench sees only `ControlBridgeMappingSnapshot` data and must never import `ParsingMap`, `NodeMap`, or other Pickleball runtime classes.
 

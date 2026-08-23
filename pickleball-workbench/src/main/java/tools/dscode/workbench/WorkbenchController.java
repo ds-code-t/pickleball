@@ -3,11 +3,13 @@ package tools.dscode.workbench;
 import tools.dscode.control.protocol.*;
 import tools.dscode.workbench.sync.WorkbenchManifest;
 import tools.dscode.workbench.sync.WorkbenchSynchronizer;
+import tools.dscode.workbench.terminal.WorkerLogFiles;
 import tools.dscode.workbench.worker.WorkbenchLiveSession;
 import tools.dscode.workbench.worker.WorkbenchWorkerStatus;
 
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Optional;
 
 /** Plain-Java controller shared by Workbench adapters. */
 public final class WorkbenchController implements WorkbenchServices {
@@ -52,6 +54,16 @@ public final class WorkbenchController implements WorkbenchServices {
     @Override
     public WorkbenchWorkerStatus workerStatus() {
         return live.status();
+    }
+
+    @Override
+    public Path projectRoot() {
+        return projectRoot;
+    }
+
+    @Override
+    public Optional<WorkerLogFiles> workerLogFiles() {
+        return live.workerLogFiles();
     }
 
     @Override

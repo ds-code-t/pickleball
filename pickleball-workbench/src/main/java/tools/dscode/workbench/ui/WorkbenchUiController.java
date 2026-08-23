@@ -21,7 +21,9 @@ import tools.dscode.control.protocol.ControlBridgeValue;
 import tools.dscode.control.protocol.ControlBridgeValueResult;
 import tools.dscode.control.protocol.ControlProtocol;
 import tools.dscode.workbench.WorkbenchServices;
+import tools.dscode.workbench.mapping.MappingValueCodec;
 import tools.dscode.workbench.sync.WorkbenchManifest;
+import tools.dscode.workbench.terminal.WorkerLogFiles;
 import tools.dscode.workbench.worker.WorkbenchWorkerStatus;
 
 import java.nio.file.Path;
@@ -30,6 +32,7 @@ import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 
 /** Thin presentation adapter over the shared Workbench service surface. */
 final class WorkbenchUiController implements AutoCloseable {
@@ -227,12 +230,28 @@ final class WorkbenchUiController implements AutoCloseable {
     }
 
     LiveActionResult mappingPut(String mapReference, String key, String value) {
+        return mappingPutValue(mapReference, key, value == null ? "" : value);
+    }
+
+    LiveActionResult mappingPutTyped(String mapReference, String key, String type, String text) {
+        return mappingPutValue(mapReference, key, MappingValueCodec.decode(type, text));
+    }
+
+    LiveActionResult mappingPutValue(String mapReference, String key, Object value) {
         ControlBridgeValueResult result = services.mappingPut(
                 required(mapReference, "Mapping reference"),
                 required(key, "Mapping key"),
-                value == null ? "" : value
+                value
         );
         return new LiveActionResult(renderValueResult(result), refreshEvents());
+    }
+
+    Path projectRoot() {
+        return projectRoot;
+    }
+
+    Optional<WorkerLogFiles> workerLogFiles() {
+        return services.workerLogFiles();
     }
 
     LiveActionResult mappingResolve(String input) {

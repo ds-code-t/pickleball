@@ -66,15 +66,16 @@ java -jar pickleball-workbench-<version>.jar ui <project>
 The UI is player-style and execution-oriented. Its primary layout is:
 
 ```text
-left:  Live Scenario Editor + compact Step Editor / Command
-right: Mapping | Terminal | Diagnostic Log Explorer
+left rail: project feature / scenario picker
+center:    Live Gherkin block editor (JavaFX WebView) + compact Step Editor / Command
+right:     Mapping | Terminal | Diagnostic Log Explorer
 ```
 
 Low-level lifecycle controls live under the Session menu and existing investigation controls remain available under Advanced Controls rather than dominating the permanent workspace.
 
 `LiveScenarioPlayer` owns presentation/session-buffer state only: stable line IDs, the editable Gherkin document, selected line, playhead, and `STOPPED` / `PAUSED` / `RUNNING` / `WAITING_FOR_STEP`. It must remain headless-testable and must not parse/execute Pickleball steps, implement runtime rewind, model Mapping inheritance, or become Swing component state.
 
-The playhead is the user-visible needle. Clicking a scenario line instantly seeks it. Global Play always starts from the first executable step in a fresh worker context, not from the playhead. The Live Scenario Editor is an in-place Gherkin document; users may edit any line, including previously executed text. The default buffer is a Workbench-owned browser demo against `URL.home` and is not written back to consumer `.feature` files.
+The playhead is the user-visible needle. Clicking a scenario line instantly seeks it. Global Play always starts from the first executable step in a fresh worker context, not from the playhead. The Live Scenario Editor is an in-place Gherkin document presented as snap-together blocks whose text is Gherkin, including `Given` / `When` / `Then`. Users may edit any block, including previously executed text. The picker loads consumer scenarios into the live buffer. The default buffer is a Workbench-owned browser demo against `URL.home`. Workbench does not write `.feature` files unless the user uses explicit **Save**. WebView JavaScript must not execute Gherkin.
 
 The Step Editor has two play actions: **Step** executes only the editor text through `WorkbenchServices.executeStep` and leaves automatic playback paused; **From Here** restarts into a fresh scenario context and runs from the selected/playhead step through the rest of the buffer. Enter while waiting at end appends the step and continues the live run. Do not strip Gherkin keywords or add a Swing-side step matcher. Worker-side `DynamicControl` / `GherkinControl` remain the only Gherkin interpreters.
 
@@ -82,9 +83,11 @@ The Step Editor has two play actions: **Step** executes only the editor text thr
 
 Buffered Play / From Here / add-and-continue now execute through the existing live `executeStep` contract. Swing remains a presentation adapter: it sends displayed Gherkin unchanged and never owns a second worker manager, Mapping implementation, or Pickleball runtime.
 
-The Mapping tab must not hard-code NodeMap names. It is one current-ParsingMap NodeMap selector plus a JSON object editor restored through `mappingRestore`. Do not create a fake ParsingMap in Swing.
+The Mapping tab must not hard-code NodeMap names. It is one current-ParsingMap NodeMap selector plus a structured property tree. Typed edits go through `mappingPut`; renames/object replacement use `mappingRestore`. Do not create a fake ParsingMap in Swing or WebView.
 
-The Terminal tab currently shows Workbench UI activity only. Actual worker log streaming/filtering is a separate phase and must not be implemented by redirecting MCP stdout. The Diagnostic Log Explorer is also a placeholder until it is bound to Pickleball's existing retained diagnostic artifacts and evidence-escalation model. Do not populate either tab with fake production data.
+The Terminal tab tails the existing worker stdout/stderr files and filters TRACE–ERROR. Do not implement it by redirecting MCP stdout or inventing log lines. The Diagnostic Log Explorer binds to Pickleball's retained diagnostic artifacts and evidence-escalation model. Do not populate either tab with fake production data.
+
+Heavy panels use Workbench-only OpenJFX `WebView` (`JFXPanel`). That choice is documented in `docs/pickleball-workbench.md`. Do not add JCEF or Pickleball-core UI dependencies.
 
 Existing capabilities remain available: project/synchronization status, worker lifecycle, live raw Gherkin, Mapping get/put/resolve, semantic events, Step Override list/compile/remove/clear, browser page/screenshot evidence, service-call evidence, and semantic breakpoint list/add/remove/clear.
 

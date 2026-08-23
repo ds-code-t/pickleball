@@ -3,6 +3,7 @@ package tools.dscode.launcher;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.io.ByteArrayInputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -52,6 +53,14 @@ class PickleballWorkbenchLauncherTest {
         assertEquals(Path.of("").toAbsolutePath().normalize().toString(), defaults[1]);
         assertEquals("mcp", implicitProject[0]);
         assertEquals(Path.of("").toAbsolutePath().normalize().toString(), implicitProject[1]);
+
+        byte[] streamed = {9, 8, 7, 6};
+        Path fromStream = PickleballWorkbenchLauncher.extractPayload(
+                tempDir,
+                new ByteArrayInputStream(streamed)
+        );
+        assertArrayEquals(streamed, Files.readAllBytes(fromStream));
+        assertTrue(PickleballWorkbenchLauncher.MAX_PAYLOAD_BYTES >= 164L * 1024 * 1024);
     }
 
     private static String javaExecutableName() {

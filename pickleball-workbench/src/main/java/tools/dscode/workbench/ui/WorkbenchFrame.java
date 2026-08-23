@@ -3,7 +3,19 @@ package tools.dscode.workbench.ui;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import tools.dscode.control.protocol.ControlBridgeMappingSnapshot;
+import tools.dscode.workbench.catalog.ConsumerFeatureCatalog;
+import tools.dscode.workbench.diagnostics.DiagnosticEvidenceNavigator;
+import tools.dscode.workbench.mapping.MappingTreeModel;
+import tools.dscode.workbench.mapping.MappingValueCodec;
+import tools.dscode.workbench.player.LivePlaybackCoordinator;
 import tools.dscode.workbench.player.LiveScenarioPlayer;
+import tools.dscode.workbench.sync.WorkbenchManifest;
+import tools.dscode.workbench.ui.web.DiagnosticExplorerHost;
+import tools.dscode.workbench.ui.web.GherkinEditorHost;
+import tools.dscode.workbench.ui.web.JavaFxSupport;
+import tools.dscode.workbench.ui.web.MappingEditorHost;
+import tools.dscode.workbench.ui.web.WebViewPanel;
+import tools.dscode.workbench.ui.web.WorkbenchWebJson;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
@@ -18,6 +30,11 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Base64;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -31,7 +48,21 @@ final class WorkbenchFrame extends JFrame {
 
     private final WorkbenchUiController controller;
     private final LiveScenarioPlayer player = LiveScenarioPlayer.interactiveBuffer();
+    private final LivePlaybackCoordinator playback = new LivePlaybackCoordinator(player);
     private final ObjectMapper json = new ObjectMapper();
+    private final FeaturePickerPanel picker = new FeaturePickerPanel();
+    private final TerminalPanel terminal = new TerminalPanel();
+    private final GherkinEditorHost gherkinHost = new GherkinEditorHost();
+    private final MappingEditorHost mappingHost = new MappingEditorHost();
+    private final DiagnosticExplorerHost diagnosticHost = new DiagnosticExplorerHost();
+    private WebViewPanel gherkinView;
+    private WebViewPanel mappingView;
+    private WebViewPanel diagnosticView;
+    private JComponent pickerSplit;
+    private final JToggleButton pickerToggle = new JToggleButton("Features");
+    private List<WorkbenchUiController.MappingCatalogEntry> mappingEntries = List.of();
+    private MappingTreeModel mappingModel;
+    private DiagnosticEvidenceNavigator diagnosticNavigator;
 
     private static final Color PLAYHEAD_COLOR = new Color(255, 228, 150);
     private final JTextArea scenarioEditor = new JTextArea();
@@ -67,7 +98,7 @@ final class WorkbenchFrame extends JFrame {
             event -> saveEditedMapping()
     );
 
-    private final JTextArea terminalArea = outputArea();
+    private final JLabel webViewNote = WorkbenchTheme.muted("");
 
     private WorkbenchUiController.State lastState;
     private ControlBridgeMappingSnapshot loadedMapping;
@@ -90,35 +121,53 @@ final class WorkbenchFrame extends JFrame {
         this.controller = controller;
 
         mappingSaveTimer.setRepeats(false);
+        WorkbenchTheme.install();
+        getContentPane().setBackground(WorkbenchTheme.BACKGROUND);
 
         setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
-        setMinimumSize(new Dimension(1100, 720));
-        setSize(1480, 900);
+        setMinimumSize(new Dimension(1180, 740));
+        setSize(1560, 920);
         setLocationByPlatform(true);
         setJMenuBar(menuBar());
+        configureWebViews();
 
-        JPanel root = new JPanel(new BorderLayout(8, 8));
-        root.setBorder(new EmptyBorder(8, 8, 8, 8));
+        JPanel root = new JPanel(new BorderLayout(10, 10));
+        root.setBackground(WorkbenchTheme.BACKGROUND);
+        root.setBorder(new EmptyBorder(10, 12, 10, 12));
         root.add(playerBar(), BorderLayout.NORTH);
 
-        JSplitPane workspace = new JSplitPane(
+        JSplitPane editorAndRight = new JSplitPane(
                 JSplitPane.HORIZONTAL_SPLIT,
                 leftWorkspace(),
                 rightWorkspace()
         );
-        workspace.setResizeWeight(0.52);
-        workspace.setDividerLocation(760);
-        root.add(workspace, BorderLayout.CENTER);
+        WorkbenchTheme.styleSplit(editorAndRight);
+        editorAndRight.setResizeWeight(0.56);
+        editorAndRight.setDividerLocation(820);
+
+        JSplitPane withPicker = new JSplitPane(
+                JSplitPane.HORIZONTAL_SPLIT,
+                picker,
+                editorAndRight
+        );
+        WorkbenchTheme.styleSplit(withPicker);
+        withPicker.setResizeWeight(0.18);
+        withPicker.setDividerLocation(280);
+        pickerSplit = withPicker;
+        root.add(withPicker, BorderLayout.CENTER);
         root.add(footer(), BorderLayout.SOUTH);
         setContentPane(root);
 
         configureScenarioEditor();
         configureStepEditor();
         configureMappingEditor();
+        configurePicker();
         wirePlayerActions();
         wireSessionActions();
         syncScenarioView();
         updatePlayerView(null);
+        refreshFeatureCatalog();
+        terminal.start();
 
         addWindowListener(new WindowAdapter() {
             @Override
@@ -159,20 +208,29 @@ final class WorkbenchFrame extends JFrame {
 
     private JPanel playerBar() {
         JPanel bar = new JPanel(new BorderLayout(12, 0));
+        bar.setBackground(WorkbenchTheme.SURFACE);
+        bar.setBorder(WorkbenchTheme.cardBorder());
 
         JPanel project = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
+        project.setOpaque(false);
+        pickerToggle.setSelected(true);
+        pickerToggle.setFocusable(false);
+        pickerToggle.addActionListener(event -> togglePicker());
+        project.add(pickerToggle);
         project.add(projectLabel);
         project.add(readinessLabel);
         bar.add(project, BorderLayout.WEST);
 
-        JPanel controls = new JPanel(new FlowLayout(FlowLayout.CENTER, 6, 0));
+        JPanel controls = new JPanel(new FlowLayout(FlowLayout.CENTER, 8, 0));
+        controls.setOpaque(false);
         controls.add(playButton);
         controls.add(pauseButton);
         controls.add(playerStopButton);
         bar.add(controls, BorderLayout.CENTER);
 
         JPanel state = new JPanel(new FlowLayout(FlowLayout.RIGHT, 6, 0));
-        state.add(new JLabel("Status:"));
+        state.setOpaque(false);
+        state.add(WorkbenchTheme.muted("Status"));
         state.add(playerStatusLabel);
         bar.add(state, BorderLayout.EAST);
         return bar;
@@ -187,17 +245,27 @@ final class WorkbenchFrame extends JFrame {
 
     private JComponent scenarioPanel() {
         JPanel panel = new JPanel(new BorderLayout(0, 4));
-        panel.setBorder(BorderFactory.createTitledBorder("Live Scenario Editor"));
+        panel.setBackground(WorkbenchTheme.SURFACE);
+        panel.setBorder(WorkbenchTheme.cardBorder());
+        panel.add(WorkbenchTheme.heading("Live Scenario Editor"), BorderLayout.NORTH);
 
         scenarioEditor.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 14));
         scenarioEditor.setLineWrap(false);
         scenarioEditor.setTabSize(2);
-        panel.add(new JScrollPane(scenarioEditor), BorderLayout.CENTER);
+        JPanel editorHost = new JPanel(new CardLayout());
+        editorHost.setOpaque(false);
+        editorHost.add(new JScrollPane(scenarioEditor), "text");
+        if (gherkinView != null) {
+            editorHost.add(gherkinView, "web");
+            ((CardLayout) editorHost.getLayout()).show(editorHost, "web");
+        }
+        panel.add(editorHost, BorderLayout.CENTER);
 
         JPanel legend = new JPanel(new FlowLayout(FlowLayout.LEFT, 18, 2));
-        legend.add(new JLabel("Click a step to move the playhead"));
-        legend.add(new JLabel("Global Play starts from the first step"));
-        legend.add(new JLabel("Edit Gherkin in place"));
+        legend.setOpaque(false);
+        legend.add(WorkbenchTheme.muted("Blocks are Gherkin text"));
+        legend.add(WorkbenchTheme.muted("Play starts from the first step"));
+        legend.add(WorkbenchTheme.muted("Click a block to move the playhead"));
         panel.add(legend, BorderLayout.SOUTH);
         return panel;
     }
@@ -226,8 +294,11 @@ final class WorkbenchFrame extends JFrame {
     private JComponent rightWorkspace() {
         JTabbedPane tabs = new JTabbedPane();
         tabs.addTab("Mapping", mappingPanel());
-        tabs.addTab("Terminal", terminalPanel());
+        tabs.addTab("Terminal", terminal);
         tabs.addTab("Diagnostic Log Explorer", diagnosticsPanel());
+        tabs.addChangeListener(event -> {
+            if (tabs.getSelectedIndex() == 2) refreshDiagnostics();
+        });
         return tabs;
     }
 
@@ -254,35 +325,31 @@ final class WorkbenchFrame extends JFrame {
 
         mappingStatus.setBorder(new EmptyBorder(2, 2, 2, 2));
         panel.add(mappingStatus, BorderLayout.SOUTH);
-        return panel;
-    }
-
-    private JPanel terminalPanel() {
-        JPanel panel = new JPanel(new BorderLayout(6, 6));
-        panel.setBorder(new EmptyBorder(8, 8, 8, 8));
-
-        JPanel top = new JPanel(new BorderLayout());
-        JLabel note = new JLabel("Live player and Workbench activity");
-        top.add(note, BorderLayout.WEST);
-        JButton clear = new JButton("Clear");
-        clear.addActionListener(event -> terminalArea.setText(""));
-        top.add(clear, BorderLayout.EAST);
-
-        panel.add(top, BorderLayout.NORTH);
-        panel.add(new JScrollPane(terminalArea), BorderLayout.CENTER);
+        if (mappingView != null) {
+            JPanel wrap = new JPanel(new BorderLayout());
+            wrap.add(mappingView, BorderLayout.CENTER);
+            wrap.add(mappingStatus, BorderLayout.SOUTH);
+            return wrap;
+        }
         return panel;
     }
 
     private JPanel diagnosticsPanel() {
         JPanel panel = new JPanel(new BorderLayout());
+        panel.setBackground(WorkbenchTheme.SURFACE);
+        if (diagnosticView != null) {
+            panel.add(diagnosticView, BorderLayout.CENTER);
+            return panel;
+        }
         panel.setBorder(new EmptyBorder(16, 16, 16, 16));
         JTextArea message = outputArea();
         message.setText("""
-                Diagnostic Log Explorer foundation
+                Diagnostic Log Explorer
 
-                This tab remains intentionally separate from the live scenario player.
-                It should continue to bind to Pickleball's retained diagnostic artifacts
-                rather than inventing a second diagnostic store in Workbench.
+                JavaFX WebView is unavailable in this process, so the explorer
+                cannot open the timeline UI. Workbench still reads Pickleball's
+                retained diagnostic artifacts from reports/diagnostic-runs and
+                does not invent a second store.
                 """);
         message.setCaretPosition(0);
         panel.add(new JScrollPane(message), BorderLayout.CENTER);
@@ -293,6 +360,7 @@ final class WorkbenchFrame extends JFrame {
         JPanel footer = new JPanel(new BorderLayout());
         activityLabel.setBorder(new EmptyBorder(2, 4, 2, 4));
         footer.add(activityLabel, BorderLayout.CENTER);
+        footer.add(webViewNote, BorderLayout.EAST);
         return footer;
     }
 
@@ -334,6 +402,252 @@ final class WorkbenchFrame extends JFrame {
                 updateSelectedStep();
             }
         });
+    }
+
+    private void configureWebViews() {
+        if (!JavaFxSupport.available()) {
+            webViewNote.setText("JavaFX WebView unavailable: " + JavaFxSupport.failure()
+                    + ". Using the text fallback. OpenJFX is Workbench-only.");
+            return;
+        }
+        try {
+            gherkinHost.onDocument(this::applyEditorLines);
+            gherkinHost.onSeek(id -> {
+                player.clickLine(id);
+                updateFromHereAvailability();
+                refreshPlayheadHighlight();
+            });
+            gherkinHost.onAddStep(this::insertStep);
+            gherkinHost.onReady(this::pushGherkinView);
+            gherkinView = new WebViewPanel(
+                    "/tools/dscode/workbench/ui/web/gherkin-editor.html",
+                    "gherkinHost",
+                    gherkinHost
+            );
+
+            mappingHost.onSelect(reference -> {
+                for (WorkbenchUiController.MappingCatalogEntry entry : mappingEntries) {
+                    if (entry.reference().equals(reference)) {
+                        nodeMapSelector.setSelectedItem(entry);
+                        loadMapping(entry);
+                        return;
+                    }
+                }
+            });
+            mappingHost.onEdit(this::applyMappingPropertyEdit);
+            mappingHost.onReady(this::pushMappingView);
+            mappingView = new WebViewPanel(
+                    "/tools/dscode/workbench/ui/web/mapping-editor.html",
+                    "mappingHost",
+                    mappingHost
+            );
+
+            diagnosticHost.onSelectRun(this::showDiagnosticRun);
+            diagnosticHost.onReady(this::refreshDiagnostics);
+            diagnosticView = new WebViewPanel(
+                    "/tools/dscode/workbench/ui/web/diagnostic-explorer.html",
+                    "diagnosticHost",
+                    diagnosticHost
+            );
+        } catch (RuntimeException failure) {
+            gherkinView = null;
+            mappingView = null;
+            diagnosticView = null;
+            webViewNote.setText("JavaFX WebView failed to start: " + failure.getMessage());
+        }
+    }
+
+    private void configurePicker() {
+        picker.onScenarioSelected(scenario -> {
+            playback.loadScenario(scenario.lines(), scenario.file());
+            picker.setSaveEnabled(true);
+            syncScenarioView();
+            updatePlayerView("Loaded " + scenario.displayLabel() + " into the live session buffer.");
+        });
+        picker.onSave(this::saveLoadedFeature);
+    }
+
+    private void refreshFeatureCatalog() {
+        WorkbenchManifest manifest = null;
+        try {
+            manifest = WorkbenchManifest.read(controller.projectRoot());
+        } catch (RuntimeException ignored) {
+            // The picker can still scan conventional project feature folders.
+        }
+        picker.setCatalog(ConsumerFeatureCatalog.scan(controller.projectRoot(), manifest));
+        diagnosticNavigator = new DiagnosticEvidenceNavigator(controller.projectRoot());
+    }
+
+    private void togglePicker() {
+        if (!(pickerSplit instanceof JSplitPane split)) return;
+        if (pickerToggle.isSelected()) {
+            split.setDividerLocation(280);
+            picker.setVisible(true);
+        } else {
+            split.setDividerLocation(0);
+            picker.setVisible(false);
+        }
+        split.revalidate();
+    }
+
+    private void applyEditorLines(List<String> lines) {
+        if (syncingScenarioDocument) return;
+        player.replaceDocument(lines);
+        updateFromHereAvailability();
+        if (player.state() == LiveScenarioPlayer.State.RUNNING) {
+            if (lastState == null || !lastState.liveReady()) {
+                prepareLiveSession(this::schedulePlaybackStep);
+            } else {
+                schedulePlaybackStep();
+            }
+        }
+    }
+
+    private void pushGherkinView() {
+        if (gherkinView == null) return;
+        gherkinView.evalJsonCall("window.setEditorState", WorkbenchWebJson.editorState(player, executingStepId));
+    }
+
+    private void pushMappingView() {
+        if (mappingView == null) return;
+        WorkbenchUiController.MappingCatalogEntry selected =
+                (WorkbenchUiController.MappingCatalogEntry) nodeMapSelector.getSelectedItem();
+        mappingView.evalJsonCall(
+                "window.setMappingState",
+                WorkbenchWebJson.mappingState(
+                        mappingEntries.stream()
+                                .map(entry -> new WorkbenchWebJson.MapChoice(
+                                        entry.reference(), entry.label(), entry.restorable()))
+                                .toList(),
+                        selected == null ? null : new WorkbenchWebJson.MapChoice(
+                                selected.reference(), selected.label(), selected.restorable()),
+                        mappingModel,
+                        mappingStatus.getText()
+                )
+        );
+    }
+
+    private void applyMappingPropertyEdit(MappingEditorHost.PropertyEdit edit) {
+        if (lastState == null || !lastState.liveReady() || loadedMapping == null) return;
+        try {
+            if (edit.oldKey() == null || edit.oldKey().isBlank() || edit.oldKey().equals(edit.key())) {
+                runTask(
+                        () -> controller.mappingPutTyped(edit.mapReference(), edit.key(), edit.type(), edit.text()),
+                        result -> {
+                            terminal.appendExecution("[Mapping] " + edit.key(), result.output(), result.events());
+                            mappingStatus.setText("Saved " + edit.key() + " through mappingPut.");
+                            if (mappingModel != null) {
+                                mappingModel = mappingModel.upsert(
+                                        edit.key(),
+                                        MappingValueCodec.parseType(edit.type()),
+                                        edit.text()
+                                );
+                            }
+                            pushMappingView();
+                        },
+                        failure -> showFailure("Mapping property edit failed", failure)
+                );
+                return;
+            }
+            MappingTreeModel updated = (mappingModel == null
+                    ? new MappingTreeModel(edit.mapReference(), loadedMapping.mapType(), true, Map.of())
+                    : mappingModel)
+                    .rename(edit.oldKey(), edit.key())
+                    .upsert(edit.key(), MappingValueCodec.parseType(edit.type()), edit.text());
+            runTask(
+                    () -> controller.restoreMapping(loadedMapping, updated.values()),
+                    output -> {
+                        mappingModel = updated;
+                        terminal.appendExecution("[Mapping] " + loadedMapping.mapType(), output, "");
+                        mappingStatus.setText("Renamed property saved through mappingRestore.");
+                        pushMappingView();
+                    },
+                    failure -> showFailure("Mapping restore failed", failure)
+            );
+        } catch (RuntimeException failure) {
+            mappingStatus.setText(failure.getMessage());
+        }
+    }
+
+    private void saveLoadedFeature() {
+        Path origin = playback.originFile().orElse(null);
+        if (origin == null) {
+            showFailure("Could not save", new IllegalStateException("The default demo is session-only."));
+            return;
+        }
+        try {
+            Files.writeString(origin, player.documentText() + System.lineSeparator());
+            updatePlayerView("Saved live buffer to " + origin.getFileName() + ".");
+        } catch (Exception failure) {
+            showFailure("Could not save feature file", failure);
+        }
+    }
+
+    private void refreshDiagnostics() {
+        if (diagnosticView == null) return;
+        if (diagnosticNavigator == null) {
+            diagnosticNavigator = new DiagnosticEvidenceNavigator(controller.projectRoot());
+        }
+        List<DiagnosticEvidenceNavigator.CatalogRun> runs = diagnosticNavigator.catalogRuns();
+        if (runs.isEmpty()) {
+            diagnosticView.evalJsonCall("window.setDiagnosticState", WorkbenchWebJson.write(Map.of(
+                    "runs", List.of(),
+                    "frames", List.of(),
+                    "layers", List.of(),
+                    "gap", diagnosticNavigator.available()
+                            ? "The catalog has no retained runs."
+                            : "No reports/diagnostic-runs/run-catalog.json in this consumer project."
+            )));
+            return;
+        }
+        showDiagnosticRun(runs.getFirst().runId());
+    }
+
+    private void showDiagnosticRun(String runId) {
+        if (diagnosticView == null || diagnosticNavigator == null) return;
+        DiagnosticEvidenceNavigator.CatalogRun selected = diagnosticNavigator.catalogRuns().stream()
+                .filter(run -> run.runId().equals(runId))
+                .findFirst()
+                .orElse(null);
+        if (selected == null) return;
+        DiagnosticEvidenceNavigator.Timeline timeline = diagnosticNavigator.timeline(selected.runRoot());
+        List<Map<String, Object>> frames = new ArrayList<>();
+        for (DiagnosticEvidenceNavigator.ScreenshotFrame frame : timeline.frames()) {
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("stepText", frame.stepText());
+            item.put("scenarioId", frame.scenarioId());
+            try {
+                byte[] bytes = Files.readAllBytes(frame.file());
+                item.put("dataUri", "data:image/png;base64," + Base64.getEncoder().encodeToString(bytes));
+            } catch (Exception ignored) {
+                continue;
+            }
+            frames.add(item);
+        }
+        String scenarioId = timeline.frames().isEmpty() ? "" : timeline.frames().getFirst().scenarioId();
+        List<Map<String, Object>> layers = new ArrayList<>();
+        for (var layer : diagnosticNavigator.layers(selected.runRoot(), scenarioId)) {
+            layers.add(Map.of(
+                    "layer", layer.layer().name(),
+                    "present", layer.present(),
+                    "excerpt", layer.excerpt() == null ? "" : layer.excerpt()
+            ));
+        }
+        List<Map<String, Object>> runs = new ArrayList<>();
+        for (var run : diagnosticNavigator.catalogRuns()) {
+            runs.add(Map.of(
+                    "runId", run.runId(),
+                    "label", run.runId(),
+                    "selected", run.runId().equals(runId)
+            ));
+        }
+        diagnosticView.evalJsonCall("window.setDiagnosticState", WorkbenchWebJson.write(Map.of(
+                "runs", runs,
+                "frames", frames,
+                "layers", layers,
+                "index", 0,
+                "gap", frames.isEmpty() ? "This retained run has no PNG frames." : ""
+        )));
     }
 
     private void configureMappingEditor() {
@@ -686,6 +1000,7 @@ final class WorkbenchFrame extends JFrame {
                         nodeMapSelector.addItem(entry);
                         if (Objects.equals(previousReference, entry.reference())) selected = entry;
                     }
+                    mappingEntries = List.copyOf(entries);
                     nodeMapSelector.setEnabled(!entries.isEmpty());
                     if (selected == null && !entries.isEmpty()) selected = entries.getFirst();
                     if (selected != null) {
@@ -715,15 +1030,22 @@ final class WorkbenchFrame extends JFrame {
                 () -> controller.mappingSnapshot(entry.reference()),
                 snapshot -> {
                     loadedMapping = snapshot;
+                    mappingModel = new MappingTreeModel(
+                            snapshot.mapReference(),
+                            snapshot.mapType(),
+                            snapshot.restorable(),
+                            snapshot.values()
+                    );
                     try {
                         String formatted = json.writerWithDefaultPrettyPrinter()
                                 .writeValueAsString(snapshot.values());
                         setMappingEditor(formatted, snapshot.restorable());
                         mappingStatus.setText(
                                 snapshot.restorable()
-                                        ? "Live JSON snapshot. Valid edits are applied automatically."
+                                        ? "Live NodeMap from the worker ParsingMap. Edits use mappingPut / mappingRestore."
                                         : "Inspection only: this NodeMap implementation is not safely restorable."
                         );
+                        pushMappingView();
                     } catch (Exception failure) {
                         showFailure("Could not render NodeMap JSON", failure);
                     }
@@ -837,6 +1159,7 @@ final class WorkbenchFrame extends JFrame {
         }
         refreshPlayheadHighlight();
         updateFromHereAvailability();
+        pushGherkinView();
     }
 
     private void updateFromHereAvailability() {
@@ -914,13 +1237,8 @@ final class WorkbenchFrame extends JFrame {
     }
 
     private void appendTerminal(String heading, String output, String events) {
-        if (!terminalArea.getText().isEmpty()) terminalArea.append("\n\n");
-        terminalArea.append(heading + "\n");
-        if (output != null && !output.isBlank()) terminalArea.append(output + "\n");
-        if (events != null && !events.isBlank()) {
-            terminalArea.append("Events\n" + events + "\n");
-        }
-        terminalArea.setCaretPosition(terminalArea.getDocument().getLength());
+        terminal.appendExecution(heading, output, events);
+        controller.workerLogFiles().ifPresent(terminal::setFiles);
     }
 
     private void runStateAction(
@@ -933,7 +1251,11 @@ final class WorkbenchFrame extends JFrame {
                 state -> {
                     applyState(state);
                     activityLabel.setText(label + " complete.");
-                    if (state.liveReady()) refreshMappingCatalog();
+                    if (state.liveReady()) {
+                        refreshMappingCatalog();
+                        controller.workerLogFiles().ifPresent(terminal::setFiles);
+                    }
+                    refreshFeatureCatalog();
                 },
                 failure -> showFailure(label + " failed", failure)
         );
@@ -1217,6 +1539,7 @@ final class WorkbenchFrame extends JFrame {
         closing = true;
         player.stop();
         mappingSaveTimer.stop();
+        terminal.stop();
         activityLabel.setText("Closing Workbench...");
         runTask(
                 () -> {
@@ -1241,10 +1564,7 @@ final class WorkbenchFrame extends JFrame {
     }
 
     private static JButton playerButton(String text, String tooltip) {
-        JButton button = new JButton(text);
-        button.setToolTipText(tooltip);
-        button.setFocusable(false);
-        return button;
+        return WorkbenchTheme.flatButton(text, tooltip);
     }
 
     private static JButton smallPlayerButton(String text, String tooltip) {

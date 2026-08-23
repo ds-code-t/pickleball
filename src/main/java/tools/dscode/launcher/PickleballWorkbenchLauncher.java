@@ -2,12 +2,15 @@ package tools.dscode.launcher;
 
 import tools.dscode.control.protocol.ControlProtocol;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.security.DigestInputStream;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
@@ -20,7 +23,12 @@ import java.util.Set;
  * consumer's Pickleball dependency and always launches it in a separate JVM.
  */
 public final class PickleballWorkbenchLauncher {
-    private static final int MAX_PAYLOAD_BYTES = 100 * 1024 * 1024;
+    /**
+     * Safety cap for the opaque controller JAR. OpenJFX WebView natives make
+     * the payload larger than a plain Java executable, so this is a stream
+     * limit rather than an in-memory buffer size.
+     */
+    static final long MAX_PAYLOAD_BYTES = 512L * 1024 * 1024;
     private static final Set<String> PROJECT_COMMANDS = Set.of(
             "sync", "status", "worker-check", "live-check", "ui", "mcp"
     );
@@ -32,7 +40,7 @@ public final class PickleballWorkbenchLauncher {
         String[] forwarded = normalizedArguments(args);
         Path project = projectRoot(forwarded);
         try {
-            Path controllerJar = extractPayload(project, readEmbeddedPayload());
+            Path controllerJar = extractEmbeddedPayload(project);
             Process process = new ProcessBuilder(command(controllerJar, forwarded))
                     .directory(project.toFile())
                     .inheritIO()
@@ -49,7 +57,7 @@ public final class PickleballWorkbenchLauncher {
         }
     }
 
-    static byte[] readEmbeddedPayload() {
+    static Path extractEmbeddedPayload(Path projectRoot) throws IOException {
         ClassLoader loader = PickleballWorkbenchLauncher.class.getClassLoader();
         try (InputStream input = loader.getResourceAsStream(ControlProtocol.EMBEDDED_WORKBENCH_RESOURCE)) {
             if (input == null) {
@@ -57,18 +65,22 @@ public final class PickleballWorkbenchLauncher {
                         "Pickleball artifact is missing " + ControlProtocol.EMBEDDED_WORKBENCH_RESOURCE
                 );
             }
-            byte[] payload = input.readNBytes(MAX_PAYLOAD_BYTES + 1);
-            if (payload.length > MAX_PAYLOAD_BYTES) {
-                throw new IllegalStateException("Embedded Workbench payload exceeds the safety limit.");
-            }
-            return payload;
-        } catch (IOException failure) {
-            throw new IllegalStateException("Could not read the embedded Workbench payload.", failure);
+            return extractPayload(projectRoot, input);
         }
     }
 
     static Path extractPayload(Path projectRoot, byte[] payload) throws IOException {
         if (payload == null || payload.length == 0) {
+            throw new IllegalArgumentException("Workbench payload must not be empty.");
+        }
+        if (payload.length > MAX_PAYLOAD_BYTES) {
+            throw new IllegalStateException("Embedded Workbench payload exceeds the safety limit.");
+        }
+        return extractPayload(projectRoot, new ByteArrayInputStream(payload));
+    }
+
+    static Path extractPayload(Path projectRoot, InputStream payload) throws IOException {
+        if (payload == null) {
             throw new IllegalArgumentException("Workbench payload must not be empty.");
         }
         Path project = projectRoot.toAbsolutePath().normalize();
@@ -77,21 +89,24 @@ public final class PickleballWorkbenchLauncher {
                     "Consumer project directory does not exist: " + project
             );
         }
-        String checksum = sha256(payload);
-        Path directory = project.resolve(".pickleball")
+        Path staging = project.resolve(".pickleball")
                 .resolve("workbench")
-                .resolve("controller")
-                .resolve(checksum);
-        Path target = directory.resolve("pickleball-workbench.jar");
-        Files.createDirectories(directory);
-
-        if (Files.isRegularFile(target) && checksum.equals(sha256(Files.readAllBytes(target)))) {
-            return target;
-        }
-
-        Path temporary = Files.createTempFile(directory, "pickleball-workbench-", ".tmp");
+                .resolve("controller");
+        Files.createDirectories(staging);
+        Path temporary = Files.createTempFile(staging, "pickleball-workbench-", ".tmp");
         try {
-            Files.write(temporary, payload);
+            HashedCopy copy = copyAndHash(payload, temporary);
+            if (copy.bytes == 0) {
+                throw new IllegalArgumentException("Workbench payload must not be empty.");
+            }
+            Path directory = staging.resolve(copy.checksum);
+            Path target = directory.resolve("pickleball-workbench.jar");
+            Files.createDirectories(directory);
+
+            if (Files.isRegularFile(target) && copy.checksum.equals(sha256File(target))) {
+                return target;
+            }
+
             try {
                 Files.move(
                         temporary,
@@ -102,14 +117,14 @@ public final class PickleballWorkbenchLauncher {
             } catch (AtomicMoveNotSupportedException ignored) {
                 Files.move(temporary, target, StandardCopyOption.REPLACE_EXISTING);
             }
+
+            if (!copy.checksum.equals(sha256File(target))) {
+                throw new IllegalStateException("Extracted Workbench payload failed checksum verification.");
+            }
+            return target;
         } finally {
             Files.deleteIfExists(temporary);
         }
-
-        if (!checksum.equals(sha256(Files.readAllBytes(target)))) {
-            throw new IllegalStateException("Extracted Workbench payload failed checksum verification.");
-        }
-        return target;
     }
 
     static List<String> command(Path controllerJar, String[] args) {
@@ -148,11 +163,41 @@ public final class PickleballWorkbenchLauncher {
         return Path.of(System.getProperty("java.home"), "bin", executable);
     }
 
-    private static String sha256(byte[] bytes) {
+    private static HashedCopy copyAndHash(InputStream input, Path target) throws IOException {
+        MessageDigest digest = sha256Digest();
+        long written = 0;
+        try (DigestInputStream digested = new DigestInputStream(input, digest);
+             OutputStream output = Files.newOutputStream(target)) {
+            byte[] buffer = new byte[65536];
+            int read;
+            while ((read = digested.read(buffer)) >= 0) {
+                written += read;
+                if (written > MAX_PAYLOAD_BYTES) {
+                    throw new IllegalStateException("Embedded Workbench payload exceeds the safety limit.");
+                }
+                output.write(buffer, 0, read);
+            }
+        }
+        return new HashedCopy(written, HexFormat.of().formatHex(digest.digest()));
+    }
+
+    private static String sha256File(Path file) throws IOException {
+        MessageDigest digest = sha256Digest();
+        try (InputStream input = Files.newInputStream(file);
+             DigestInputStream digested = new DigestInputStream(input, digest)) {
+            digested.transferTo(OutputStream.nullOutputStream());
+        }
+        return HexFormat.of().formatHex(digest.digest());
+    }
+
+    private static MessageDigest sha256Digest() {
         try {
-            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));
+            return MessageDigest.getInstance("SHA-256");
         } catch (NoSuchAlgorithmException impossible) {
             throw new IllegalStateException("SHA-256 is unavailable.", impossible);
         }
+    }
+
+    private record HashedCopy(long bytes, String checksum) {
     }
 }

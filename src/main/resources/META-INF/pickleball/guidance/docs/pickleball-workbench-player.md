@@ -21,13 +21,21 @@ consumer worker JVM
   -> owns Pickleball, Cucumber, DynamicControl, Mapping/ParsingMap/NodeMap, browser, and service behavior
 ```
 
-The player and Mapping editor do not change this boundary. Swing is a presentation adapter over `WorkbenchServices` / `WorkbenchController`. Automatic buffered execution and add-and-continue use the existing `executeStep` worker contract; Workbench does not invent a second Gherkin matcher.
+The player, picker, Mapping editor, Terminal, and Diagnostic explorer do not change this boundary. Swing and WebView are presentation adapters over `WorkbenchServices` / `WorkbenchController`. Automatic buffered execution and add-and-continue use the existing `executeStep` worker contract; Workbench does not invent a second Gherkin matcher. WebView JavaScript never executes Gherkin.
+
+## Feature and scenario picker
+
+The expandable left rail lists `.feature` files from the synchronized consumer project: manifest source roots, conventional `src/test/resources/features`, live merged `features/` resources, and an explicit project-owned `pkb_features` value when present. It does not crawl an unrelated git worktree.
+
+Toggle browse mode between Gherkin Feature name and file name + directory path. Click selects or deselects features. The scenario list then shows scenarios under the selection. With no feature selected, the search bar filters every scenario in that project catalog. Clicking a scenario loads it into the live editor. The default demo remains loaded until a scenario is chosen. **Save** is the only write-back path.
 
 ## Live Scenario Editor
 
-The left-side editor is a session-scoped Gherkin text editor with a player playhead. Clicking a line instantly seeks the playhead, like clicking a waveform. The execution cursor is internal to an active run.
+The center editor is an embedded HTML/JS block editor in JavaFX `WebView`. Blocks are Gherkin text, including `Given` / `When` / `Then`. Nested steps and `IF` / `ELSE` snap as parent/child using leading colons. Clicking a block instantly seeks the playhead, like clicking a waveform. The execution cursor is internal to an active run.
 
-The initial buffer is Workbench-owned sample content. It is not written back to consumer `.feature` files. The default demo is a small browser scenario against the Maven consumer local test site:
+Workbench chose OpenJFX `WebView` + `JFXPanel` over JCEF so the browser panel stays a Workbench-only Maven dependency that shades into the controller JAR. JDK 21 does not ship a modern browser component. If JavaFX cannot start, the same `LiveScenarioPlayer` buffer remains editable as plain Gherkin text.
+
+The initial buffer is Workbench-owned sample content. It is not written back to consumer `.feature` files unless you use **Save** on a picker-loaded scenario. The default demo is a small browser scenario against the Maven consumer local test site:
 
 ```gherkin
 Feature: Workbench Live Scenario
@@ -69,12 +77,12 @@ Historical raw detached-step input remains supported.
 
 ## Mapping tab
 
-The Mapping tab is an object editor rather than a get/put/resolve form.
+The Mapping tab is a structured object/property editor rather than a get/put/resolve form.
 
 It contains:
 
 1. A **NodeMap** dropdown populated from the actual NodeMaps in the current worker-side `ParsingMap`.
-2. One editable JSON text area containing the materialized root object of the selected NodeMap.
+2. A property tree for that NodeMap. Each row edits key, value text, and type (`string`, `numeric`, `boolean`, `object-as-JSON`, `object-as-XML`).
 
 The dropdown is populated through the existing Mapping snapshot contract using a reserved neutral protocol reference. The worker resolves the reserved reference to a catalog generated from the current `ParsingMap`; the Workbench sees only neutral snapshot data.
 
@@ -84,15 +92,20 @@ Each catalog entry uses a second reserved reference that resolves back to the sa
 
 For an ordinary restorable NodeMap:
 
-- change scalar values directly;
-- add or delete properties;
-- add or edit nested objects;
-- add or edit arrays;
-- assign an object as a value by entering its JSON object structure.
+- change scalar values in place and choose their type;
+- add or rename properties;
+- assign JSON or XML object text, which is decoded and sent as a structured `mappingPut` value;
+- rename keys through `mappingRestore` of the current object.
 
-After a short debounce, valid JSON is restored through the existing `mapping_restore` bridge operation. Invalid intermediate JSON is not sent to the worker.
+Invalid typed text is not sent to the worker. NodeMap implementations that are not exact ordinary `NodeMap` instances remain inspection-only, preserving the existing restore safety rule.
 
-NodeMap implementations that are not exact ordinary `NodeMap` instances remain inspection-only, preserving the existing restore safety rule.
+## Terminal
+
+The Terminal tails the worker stdout/stderr files Workbench already creates under `.pickleball/workbench/logs/`. Filter by `TRACE`, `DEBUG`, `INFO`, `WARNING`, or `ERROR`. Logs continue as the playhead moves. This is not MCP stdout and is not a fabricated Workbench-only activity dump. Unmarked worker output is shown at `INFO`.
+
+## Diagnostic Log Explorer
+
+The explorer is a rewind/play/focus timeline of retained Pickleball diagnostic runs. Screenshot frames are shown with the Gherkin step that was running when they were taken. Denser layers follow the repository evidence order and only open when the retained files exist. If `reports/diagnostic-runs/run-catalog.json` is missing, the panel stays empty and says so.
 
 ## Focused validation
 
@@ -102,7 +115,7 @@ The included consumer `@control-bridge` scenario verifies:
 - the current ParsingMap catalog contains at least one NodeMap;
 - a catalog reference resolves back to a live NodeMap.
 
-Workbench player/editor unit tests cover click-to-seek, global Play from start, the two Step Editor play actions, wait-at-end / Enter-to-append-and-run, in-place edit of previously executed text, and the non-empty browser demo seed.
+Workbench player/editor unit tests cover picker selection/search, block buffer ↔ player model, click-to-seek, global Play from start, the two Step Editor play actions, wait-at-end / Enter-to-append-and-run, in-place edit of previously executed text, typed Mapping edits through `WorkbenchServices`, and the non-empty browser demo seed.
 
 Workbench changes should continue to use the repository's focused validation policy:
 

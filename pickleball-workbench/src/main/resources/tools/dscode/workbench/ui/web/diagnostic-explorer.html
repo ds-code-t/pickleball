@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Diagnostic Log Explorer</title>
+  <link rel="stylesheet" href="diagnostic-explorer.css">
+</head>
+<body>
+  <div class="toolbar">
+    <label>Run
+      <select id="runs"></select>
+    </label>
+    <button type="button" id="prev">◀</button>
+    <button type="button" id="play">Play</button>
+    <button type="button" id="next">▶</button>
+    <span id="status" class="status"></span>
+  </div>
+  <div class="stage">
+    <img id="frame" alt="Retained diagnostic screenshot">
+    <div id="step" class="step"></div>
+  </div>
+  <div class="layers">
+    <div class="layer-title">Evidence layers</div>
+    <div id="layers"></div>
+    <pre id="excerpt"></pre>
+  </div>
+  <script src="diagnostic-explorer.js"></script>
+</body>
+</html>

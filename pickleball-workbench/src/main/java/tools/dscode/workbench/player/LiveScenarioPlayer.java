@@ -80,6 +80,27 @@ public final class LiveScenarioPlayer {
         return new LiveScenarioPlayer(DEFAULT_DEMO_SCENARIO);
     }
 
+    /**
+     * Replaces the session buffer with a newly loaded scenario and returns to
+     * {@link State#STOPPED}. Used by the feature/scenario picker. The origin
+     * file is presentation metadata only; this model never writes {@code .feature}
+     * files.
+     */
+    public void loadDocument(List<String> texts) {
+        lines.clear();
+        nextId = 1;
+        selectedId = null;
+        playheadId = null;
+        lastExecutedId = null;
+        executionIndex = 0;
+        state = State.STOPPED;
+        List<String> incoming = texts == null || texts.isEmpty() ? List.of("") : texts;
+        for (String text : incoming) {
+            addInitialLine(text == null ? "" : text);
+        }
+        initializeCursors();
+    }
+
     public List<Line> lines() {
         return List.copyOf(lines);
     }

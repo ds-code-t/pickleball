@@ -342,7 +342,15 @@ tasks.register('verifyEmbeddedWorkbench') {
     doLast {
         File outerFile = tasks.named('shadowJar').get().archiveFile.get().asFile
         File standaloneFile = standaloneWorkbenchJar.get().asFile
-        byte[] standaloneBytes = standaloneFile.bytes
+        def sha256 = { InputStream input ->
+            def digest = java.security.MessageDigest.getInstance('SHA-256')
+            byte[] buf = new byte[65536]
+            int read
+            while ((read = input.read(buf)) >= 0) {
+                digest.update(buf, 0, read)
+            }
+            digest.digest()
+        }
 
         new java.util.jar.JarFile(outerFile).withCloseable { outer ->
             def payloadEntries = java.util.Collections.list(outer.entries()).findAll { entry ->
@@ -355,8 +363,15 @@ tasks.register('verifyEmbeddedWorkbench') {
                 )
             }
 
-            byte[] embeddedBytes = outer.getInputStream(payloadEntries.first()).readAllBytes()
-            if (!java.util.Arrays.equals(standaloneBytes, embeddedBytes)) {
+            byte[] standaloneHash
+            standaloneFile.withInputStream { input ->
+                standaloneHash = sha256(input)
+            }
+            byte[] embeddedHash
+            outer.getInputStream(payloadEntries.first()).withCloseable { input ->
+                embeddedHash = sha256(input)
+            }
+            if (!java.util.Arrays.equals(standaloneHash, embeddedHash)) {
                 throw new GradleException(
                         'Embedded Workbench payload bytes do not match the standalone controller build.'
                 )
@@ -373,10 +388,9 @@ tasks.register('verifyEmbeddedWorkbench') {
                 )
             }
 
-            new java.util.jar.JarInputStream(new ByteArrayInputStream(embeddedBytes)).withCloseable { nested ->
-                def manifest = nested.manifest
-                if (manifest?.mainAttributes?.getValue('Main-Class')
-                        != 'tools.dscode.workbench.WorkbenchApplication') {
+            new java.util.jar.JarFile(standaloneFile).withCloseable { nested ->
+                def mainClass = nested.manifest?.mainAttributes?.getValue('Main-Class')
+                if (mainClass != 'tools.dscode.workbench.WorkbenchApplication') {
                     throw new GradleException('Embedded Workbench payload has an unexpected Main-Class.')
                 }
             }

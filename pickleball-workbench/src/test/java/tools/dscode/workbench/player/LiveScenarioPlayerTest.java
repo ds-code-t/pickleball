@@ -13,6 +13,16 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class LiveScenarioPlayerTest {
     @Test
+    void loadDocumentReplacesTheSessionBufferAndStopsPlayback() {
+        LiveScenarioPlayer player = LiveScenarioPlayer.interactiveBuffer();
+        player.startFromBeginning();
+        player.loadDocument(List.of("Feature: Picker", "  Given stay in session"));
+        assertEquals(LiveScenarioPlayer.State.STOPPED, player.state());
+        assertEquals("Feature: Picker\n  Given stay in session", player.documentText());
+        assertTrue(player.lines().get(1).executable());
+    }
+
+    @Test
     void defaultDemoScenarioIsNonEmptyAndIncludesBrowserInteraction() {
         List<String> demo = LiveScenarioPlayer.DEFAULT_DEMO_SCENARIO;
         assertFalse(demo.isEmpty());

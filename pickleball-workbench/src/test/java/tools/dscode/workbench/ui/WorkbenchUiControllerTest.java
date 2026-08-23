@@ -147,6 +147,42 @@ class WorkbenchUiControllerTest {
     }
 
     @Test
+    void typedMappingEditsGoThroughSharedWorkbenchServices() {
+        RecordingServices recording = new RecordingServices();
+        WorkbenchUiController controller = new WorkbenchUiController(
+                Path.of("consumer"),
+                recording.services()
+        );
+
+        WorkbenchUiController.LiveActionResult numeric = controller.mappingPutTyped(
+                "OVERRIDE",
+                "count",
+                "numeric",
+                "42"
+        );
+        WorkbenchUiController.LiveActionResult flag = controller.mappingPutTyped(
+                "OVERRIDE",
+                "ready",
+                "boolean",
+                "true"
+        );
+        WorkbenchUiController.LiveActionResult json = controller.mappingPutTyped(
+                "OVERRIDE",
+                "payload",
+                "object-as-json",
+                "{\"city\":\"Austin\"}"
+        );
+
+        assertTrue(numeric.output().contains("Status: SUCCESS"));
+        assertTrue(flag.output().contains("Status: SUCCESS"));
+        assertTrue(json.output().contains("Status: SUCCESS"));
+        assertEquals("mappingPut:OVERRIDE:count:42", recording.calls.get(0));
+        assertEquals("mappingPut:OVERRIDE:ready:true", recording.calls.get(2));
+        assertTrue(recording.calls.get(4).startsWith("mappingPut:OVERRIDE:payload:"));
+        assertTrue(recording.calls.get(4).contains("Austin"));
+    }
+
+    @Test
     void stepOverrideEvidenceAndBreakpointActionsDelegateToSharedWorkbenchServices() {
         RecordingServices recording = new RecordingServices();
         WorkbenchUiController controller = new WorkbenchUiController(
@@ -489,6 +525,11 @@ class WorkbenchUiControllerTest {
                             int count = breakpoints.size();
                             breakpoints.clear();
                             yield count;
+                        }
+                        case "projectRoot" -> Path.of("consumer");
+                        case "workerLogFiles" -> {
+                            calls.add("workerLogFiles");
+                            yield java.util.Optional.empty();
                         }
                         case "close" -> {
                             calls.add("close");

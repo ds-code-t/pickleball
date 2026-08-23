@@ -13,6 +13,7 @@ public final class WorkbenchUi {
 
     public static void launch(Path projectRoot) {
         Runnable launch = () -> {
+            WorkbenchTheme.install();
             WorkbenchUiController controller = new WorkbenchUiController(
                     projectRoot,
                     new WorkbenchController(projectRoot)

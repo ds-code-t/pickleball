@@ -2,11 +2,13 @@ package tools.dscode.workbench.worker;
 
 import tools.dscode.control.protocol.*;
 import tools.dscode.workbench.bridge.ControlBridgeClient;
+import tools.dscode.workbench.terminal.WorkerLogFiles;
 
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.function.Function;
 
 /**
@@ -36,6 +38,10 @@ public final class WorkbenchLiveSession implements AutoCloseable {
 
     public WorkbenchWorkerStatus status() {
         return workers.status();
+    }
+
+    public Optional<WorkerLogFiles> workerLogFiles() {
+        return workers.workerLogFiles();
     }
 
     public WorkbenchWorkerStatus stop() {

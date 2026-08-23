@@ -8,6 +8,7 @@ import tools.dscode.control.protocol.ControlProtocol;
 import tools.dscode.workbench.bridge.ControlBridgeClient;
 import tools.dscode.workbench.sync.WorkbenchManifest;
 import tools.dscode.workbench.sync.WorkbenchSynchronizer;
+import tools.dscode.workbench.terminal.WorkerLogFiles;
 
 import java.io.File;
 import java.io.IOException;
@@ -21,6 +22,7 @@ import java.util.Base64;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -148,6 +150,12 @@ public final class WorkbenchWorkerManager implements AutoCloseable {
 
     synchronized String activeScenarioId() {
         return requireActive().scenarioId();
+    }
+
+    public synchronized Optional<WorkerLogFiles> workerLogFiles() {
+        WorkerSession session = active;
+        if (session == null) return Optional.empty();
+        return Optional.of(new WorkerLogFiles(session.stdout(), session.stderr()));
     }
 
     public synchronized WorkbenchWorkerStatus stop() {
