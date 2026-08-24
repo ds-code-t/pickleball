@@ -1,6 +1,7 @@
 package tools.dscode.workbench.ui;
 
 import tools.dscode.workbench.WorkbenchController;
+import tools.dscode.workbench.mcp.WorkbenchAttachServer;
 
 import javax.swing.*;
 import java.lang.reflect.InvocationTargetException;
@@ -14,11 +15,11 @@ public final class WorkbenchUi {
     public static void launch(Path projectRoot) {
         Runnable launch = () -> {
             WorkbenchTheme.install();
-            WorkbenchUiController controller = new WorkbenchUiController(
-                    projectRoot,
-                    new WorkbenchController(projectRoot)
-            );
-            new WorkbenchFrame(controller).setVisible(true);
+            WorkbenchController services = new WorkbenchController(projectRoot);
+            services.attachUi();
+            WorkbenchAttachServer attach = WorkbenchAttachServer.start(services, projectRoot);
+            WorkbenchUiController controller = new WorkbenchUiController(projectRoot, services);
+            new WorkbenchFrame(controller, attach).setVisible(true);
         };
 
         if (SwingUtilities.isEventDispatchThread()) {

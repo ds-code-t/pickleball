@@ -22,7 +22,7 @@ Workbench owns synchronization, `.pickleball/workbench/` disposable state, worke
 
 `pickleball-control-protocol` owns only immutable wire records, request/response envelopes, transport constants, capabilities, and version/minimum-version negotiation. Worker-side bridge server/coordinator/bootstrap and all translation to runtime operations remain in Pickleball core.
 
-MCP and Swing are adapters over the same Workbench service seam. They must not introduce a second runtime implementation.
+MCP and Swing are adapters over the same Workbench service seam. They must not introduce a second runtime implementation. A visible UI keeps one Workbench JVM and one consumer worker. An AI agent attaches to that live session through a localhost HTTP JSON facade; it must not start a second Workbench or a second worker.
 
 The canonical worker bridge environment is:
 
@@ -149,7 +149,7 @@ The right side remains Mapping, Terminal, and Diagnostic Log Explorer. Low-level
 - playhead (the user-visible needle);
 - player states `STOPPED`, `PAUSED`, `RUNNING`, and `WAITING_FOR_STEP`.
 
-The Live Scenario Editor is a session-scoped Gherkin document presented as snap-together blocks. Users can type Gherkin into a block, including text that already ran. Stable line ids are preserved across in-place edits so the player can keep selection, playhead, and execution cursor coherent. Loading a picker scenario replaces the live buffer only. The default remains session/live; **Save** writes back to the originating `.feature` file when one was loaded. The Workbench-owned demo has no save path.
+The Live Scenario Editor is a session-scoped Gherkin document presented as snap-together blocks. Users can type Gherkin into a block, including text that already ran. Stable line ids are preserved across in-place edits so the player can keep selection, playhead, and execution cursor coherent. Loading a picker scenario replaces the live buffer only. The default remains session/live. **Save** is confirmation-gated: it copies the live scenario into the originating `.feature` file and scenario only after Allow. The Workbench-owned demo has no save path. Workbench never writes `.feature` files on picker load or on Deny.
 
 The playhead behaves like an audio-player needle:
 
@@ -242,6 +242,63 @@ Synchronization, worker actions, live bridge calls, Mapping operations, event re
 
 The UI is intentionally not a project IDE, generic process manager, generic Maven/Gradle task runner, source navigator, or collaboration system. The Live Scenario Editor is a session-scoped Gherkin player/editor, not a workspace file explorer and not an automatic writer of consumer `.feature` files.
 
+### Watched AI-agent control lease
+
+Workbench owns one control lease for the live session. Swing and MCP/HTTP adapters share it; the lease is not Swing-only state.
+
+- Holder is `HUMAN` when the UI is up, or `AGENT` after an attached agent requests control.
+- The snapshot also carries the agent display name, `currentAction` banner text, and at most one pending permission request.
+
+While the human holds the lease, Swing play/edit/mapping/save/worker controls stay enabled. Agent mutating calls fail clearly until `workbench_request_control`.
+
+While an agent holds the lease, the human can watch the same window. Play, edit, Mapping writes, Save, and worker lifecycle controls lock. The WebView editors stay mounted and become read-only; they are not torn down. A banner names the agent and shows `currentAction`. **Take control** stays enabled. Take control returns the lease to `HUMAN`, unlocks Swing, and fails any in-flight agent permission wait so a blocked Save does not write.
+
+The agent should update `currentAction` as it works. Playhead, Mapping, Terminal, and screenshots follow because the agent uses the same `LiveScenarioPlayer` / worker as the UI. Testing the live scenario (`executeStep`, play, Mapping reads, evidence) is allowed on the agent lease. Copying the live scenario into the original `.feature` is not; that goes through `workbench_request_save` and waits for Allow/Deny in the Swing banner.
+
+Human **Save** uses the same service. After a picker scenario was loaded, Swing asks: copy these live steps into file X / scenario Y? Deny writes nothing. The demo buffer stays unsavable.
+
+### Attaching an agent to a visible UI
+
+UI mode cannot share process stdout with stdio MCP. Starting `mcp` while the UI is already running would be a second Workbench JVM. Instead, `ui` starts a 127.0.0.1-only JSON attach endpoint over the same `WorkbenchServices` / `WorkbenchMcpTools` methods and writes disposable discovery state:
+
+```text
+.pickleball/workbench/attach.json
+```
+
+Example:
+
+```json
+{
+  "url": "http://127.0.0.1:51234",
+  "token": "hex-session-token",
+  "pid": 12345,
+  "project": "/path/to/maven-consumer-project",
+  "mode": "ui-attach",
+  "bind": "127.0.0.1"
+}
+```
+
+A Copilot or other MCP-style client finds that file in the consumer project, then:
+
+1. `GET {url}/health` — liveness, no token.
+2. `GET {url}/lease` and `GET {url}/player` — `Authorization: Bearer <token>` or `X-Workbench-Token`.
+3. `POST {url}/tools/workbench_request_control` with `{"agentName":"Copilot"}`.
+4. Use the existing live tools (`workbench_execute_step`, Mapping, evidence, worker) while holding the lease, and `workbench_set_current_action` so the human can watch.
+5. `POST {url}/tools/workbench_request_save` to ask to copy the live scenario into the original feature. The call blocks until the human clicks Allow or Deny, or Take control.
+
+Headless `java -jar pickleball-workbench-<version>.jar mcp <project>` stays stdio JSON-RPC only. That client may hold the lease without a banner. Save is still a distinct explicit tool and never an implicit write.
+
+From `maven-consumer-project`:
+
+```bash
+mvn -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java \
+  -Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher \
+  -Dexec.classpathScope=test \
+  "-Dexec.args=ui ."
+```
+
+Then point the agent at `.pickleball/workbench/attach.json`. Do not launch a second `mcp` process against the same live UI session.
+
 ## MCP stdio
 
 Start the lightweight non-Spring MCP server for a synchronized consumer project:
@@ -283,9 +340,16 @@ workbench_worker_stop
 workbench_worker_status
 ```
 
-Live runtime and Mapping:
+Live runtime, Mapping, and watched-agent control:
 
 ```text
+workbench_request_control
+workbench_release_control
+workbench_set_current_action
+workbench_control_lease
+workbench_player_state
+workbench_player_replace_document
+workbench_request_save
 workbench_execute_step
 workbench_mapping_get
 workbench_mapping_put
@@ -323,6 +387,8 @@ workbench_step_override_clear
 ```
 
 `workbench_step_override_compile` sends the Java source template to the consumer worker. The source must contain `{{CLASS_NAME}}`; worker-side Pickleball remains responsible for compilation, generated classloaders, matching, replacement, captures, and execution.
+
+Mutating live tools require the agent control lease. `workbench_request_save` never writes the original feature until the human Allows it in the UI, or until the explicit stdio tool call itself is the headless approval. Deny, Take control, and an unsavable demo buffer leave the file unchanged.
 
 Controller/runtime failures are returned as MCP tool results with `isError=true`. They are not printed as arbitrary protocol output.
 
@@ -381,6 +447,10 @@ Use the UI-owned worker for runtime checks; do not run `worker-check` or `live-c
 12. Verify Diagnostic Log Explorer lists retained runs from `reports/diagnostic-runs` only, or shows an honest empty state.
 13. Verify **Tools > Advanced Controls** still exposes Status, Recent Events, Step Overrides, Evidence, and Breakpoints.
 14. Verify blocking runtime actions leave the Swing UI responsive.
+15. Load a picker scenario, click **Save**, and cancel the confirmation; the original `.feature` file must be unchanged. Confirming copies only that scenario back into the originating file.
+16. Attach an agent to `.pickleball/workbench/attach.json`, call `workbench_request_control`, and verify the banner plus locked play/edit/mapping/save/worker controls. **Take control** remains enabled.
+17. While the agent holds the lease, `workbench_request_save` shows Allow/Deny. Deny writes nothing. Take control cancels the wait without writing.
+18. The default demo remains unsavable for both human Save and agent `workbench_request_save`.
 
 ## Regression
 

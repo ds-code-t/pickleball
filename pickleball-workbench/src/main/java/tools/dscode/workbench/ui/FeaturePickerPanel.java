@@ -43,6 +43,7 @@ final class FeaturePickerPanel extends JPanel {
     private Consumer<ConsumerFeatureCatalog.ScenarioEntry> onScenario;
     private Runnable onSave;
     private boolean syncing;
+    private boolean locked;
 
     FeaturePickerPanel() {
         super(new BorderLayout(8, 8));
@@ -79,7 +80,7 @@ final class FeaturePickerPanel extends JPanel {
         featureList.addMouseListener(new MouseAdapter() {
             @Override
             public void mousePressed(MouseEvent event) {
-                if (catalog == null) return;
+                if (catalog == null || locked) return;
                 int index = featureList.locationToIndex(event.getPoint());
                 if (index < 0) return;
                 ConsumerFeatureCatalog.FeatureEntry feature = featureModel.get(index);
@@ -94,7 +95,7 @@ final class FeaturePickerPanel extends JPanel {
         scenarioList.addListSelectionListener(event -> {
             if (event.getValueIsAdjusting()) return;
             ConsumerFeatureCatalog.ScenarioEntry selected = scenarioList.getSelectedValue();
-            if (selected != null && onScenario != null) onScenario.accept(selected);
+            if (selected != null && onScenario != null && !locked) onScenario.accept(selected);
         });
         search.getDocument().addDocumentListener(new DocumentListener() {
             @Override public void insertUpdate(DocumentEvent event) { filterChanged(); }
@@ -103,7 +104,7 @@ final class FeaturePickerPanel extends JPanel {
         });
         saveButton.setEnabled(false);
         saveButton.addActionListener(event -> {
-            if (onSave != null) onSave.run();
+            if (onSave != null && !locked) onSave.run();
         });
     }
 
@@ -146,8 +147,21 @@ final class FeaturePickerPanel extends JPanel {
         this.onSave = onSave;
     }
 
+    private boolean saveEnabled;
+
     void setSaveEnabled(boolean enabled) {
-        saveButton.setEnabled(enabled);
+        saveEnabled = enabled;
+        saveButton.setEnabled(enabled && !locked);
+    }
+
+    void setLocked(boolean locked) {
+        this.locked = locked;
+        saveButton.setEnabled(saveEnabled && !locked);
+        featureList.setEnabled(!locked);
+        scenarioList.setEnabled(!locked);
+        search.setEnabled(!locked);
+        featureNameMode.setEnabled(!locked);
+        filePathMode.setEnabled(!locked);
     }
 
     private JPanel header() {

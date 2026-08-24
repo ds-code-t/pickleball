@@ -64,6 +64,9 @@ class WorkbenchMcpServerTest {
             assertTrue(toolNames.contains("workbench_breakpoint_add"));
             assertTrue(toolNames.contains("workbench_step_override_compile"));
             assertTrue(toolNames.contains("workbench_step_override_clear"));
+            assertTrue(toolNames.contains("workbench_request_control"));
+            assertTrue(toolNames.contains("workbench_player_state"));
+            assertTrue(toolNames.contains("workbench_request_save"));
 
             JsonNode status = harness.toolCall(3, "workbench_worker_status", "{}");
             assertFalse(status.at("/result/isError").asBoolean());

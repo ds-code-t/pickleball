@@ -19,11 +19,16 @@ public final class WorkbenchWebJson {
     }
 
     public static String editorState(LiveScenarioPlayer player, Long executingId) {
+        return editorState(player, executingId, false);
+    }
+
+    public static String editorState(LiveScenarioPlayer player, Long executingId, boolean locked) {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("roots", blocks(GherkinBlockDocument.fromPlayer(player).roots()));
         payload.put("selectedId", player.selectedId().isPresent() ? player.selectedId().getAsLong() : null);
         payload.put("playheadId", player.playheadId().isPresent() ? player.playheadId().getAsLong() : null);
         payload.put("executingId", executingId);
+        payload.put("locked", locked);
         return write(payload);
     }
 
@@ -32,6 +37,16 @@ public final class WorkbenchWebJson {
             MapChoice selected,
             MappingTreeModel model,
             String status
+    ) {
+        return mappingState(entries, selected, model, status, false);
+    }
+
+    public static String mappingState(
+            List<MapChoice> entries,
+            MapChoice selected,
+            MappingTreeModel model,
+            String status,
+            boolean locked
     ) {
         Map<String, Object> payload = new LinkedHashMap<>();
         List<Map<String, Object>> maps = new ArrayList<>();
@@ -57,6 +72,7 @@ public final class WorkbenchWebJson {
             }
         }
         payload.put("properties", properties);
+        payload.put("locked", locked);
         return write(payload);
     }
 

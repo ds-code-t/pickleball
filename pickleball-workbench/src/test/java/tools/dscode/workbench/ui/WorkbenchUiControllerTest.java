@@ -18,6 +18,13 @@ import tools.dscode.control.protocol.ControlBridgeValue;
 import tools.dscode.control.protocol.ControlBridgeValueResult;
 import tools.dscode.control.protocol.ControlProtocol;
 import tools.dscode.workbench.WorkbenchServices;
+import tools.dscode.workbench.player.LivePlaybackCoordinator;
+import tools.dscode.workbench.player.LiveScenarioPlayer;
+import tools.dscode.workbench.player.WorkbenchPlayerState;
+import tools.dscode.workbench.player.WorkbenchSavePreview;
+import tools.dscode.workbench.player.WorkbenchSaveResult;
+import tools.dscode.workbench.lease.WorkbenchControlLease;
+import tools.dscode.workbench.lease.WorkbenchControlLeaseSnapshot;
 import tools.dscode.workbench.sync.WorkbenchManifest;
 import tools.dscode.workbench.worker.WorkbenchWorkerStatus;
 
@@ -342,6 +349,9 @@ class WorkbenchUiControllerTest {
         private final List<String> calls = new ArrayList<>();
         private final List<ControlBridgeStepOverride> overrides = new ArrayList<>();
         private final List<ControlBridgeBreakpoint> breakpoints = new ArrayList<>();
+        private final LiveScenarioPlayer player = LiveScenarioPlayer.interactiveBuffer();
+        private final LivePlaybackCoordinator playback = new LivePlaybackCoordinator(player);
+        private final WorkbenchControlLease lease = new WorkbenchControlLease();
         private RuntimeException synchronizationFailure;
         private WorkbenchWorkerStatus status = new WorkbenchWorkerStatus(
                 false, null, null, null, null, false, null
@@ -527,6 +537,49 @@ class WorkbenchUiControllerTest {
                             yield count;
                         }
                         case "projectRoot" -> Path.of("consumer");
+                        case "player" -> player;
+                        case "playback" -> playback;
+                        case "playerState" -> new WorkbenchPlayerState(
+                                player.documentText(),
+                                player.lines().stream().map(LiveScenarioPlayer.Line::text).toList(),
+                                player.state(),
+                                player.playheadId().isPresent() ? player.playheadId().getAsLong() : null,
+                                player.playheadLine().map(LiveScenarioPlayer.Line::text).orElse(""),
+                                player.selectedId().isPresent() ? player.selectedId().getAsLong() : null,
+                                playback.origin().file() == null ? "" : playback.origin().file().toString(),
+                                playback.origin().scenarioName(),
+                                playback.origin().savable()
+                        );
+                        case "controlLease" -> lease;
+                        case "controlLeaseSnapshot" -> lease.snapshot();
+                        case "requestControl" -> lease.requestControl((String) args[0]);
+                        case "releaseControl" -> lease.releaseControl();
+                        case "takeControl" -> lease.takeControl();
+                        case "setCurrentAction" -> lease.setCurrentAction((String) args[0]);
+                        case "answerPermission" -> {
+                            lease.answerPermission((String) args[0], (Boolean) args[1]);
+                            yield null;
+                        }
+                        case "attachUi" -> {
+                            lease.attachUi();
+                            yield null;
+                        }
+                        case "detachUi" -> {
+                            lease.detachUi();
+                            yield null;
+                        }
+                        case "addLeaseListener" -> {
+                            lease.addListener((java.util.function.Consumer<WorkbenchControlLeaseSnapshot>) args[0]);
+                            yield null;
+                        }
+                        case "removeLeaseListener" -> {
+                            lease.removeListener((java.util.function.Consumer<WorkbenchControlLeaseSnapshot>) args[0]);
+                            yield null;
+                        }
+                        case "addPlayerListener", "removePlayerListener", "loadPickerScenario",
+                             "loadDefaultDemo", "replaceLiveDocument" -> null;
+                        case "savePreview" -> WorkbenchSavePreview.unsavable("session-only");
+                        case "requestSave", "commitSave" -> WorkbenchSaveResult.unsavable("session-only");
                         case "workerLogFiles" -> {
                             calls.add("workerLogFiles");
                             yield java.util.Optional.empty();

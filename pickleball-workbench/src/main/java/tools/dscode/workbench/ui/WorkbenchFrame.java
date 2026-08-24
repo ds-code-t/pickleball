@@ -5,10 +5,15 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import tools.dscode.control.protocol.ControlBridgeMappingSnapshot;
 import tools.dscode.workbench.catalog.ConsumerFeatureCatalog;
 import tools.dscode.workbench.diagnostics.DiagnosticEvidenceNavigator;
+import tools.dscode.workbench.lease.WorkbenchControlLeaseSnapshot;
+import tools.dscode.workbench.lease.WorkbenchPermissionRequest;
 import tools.dscode.workbench.mapping.MappingTreeModel;
 import tools.dscode.workbench.mapping.MappingValueCodec;
+import tools.dscode.workbench.mcp.WorkbenchAttachServer;
 import tools.dscode.workbench.player.LivePlaybackCoordinator;
 import tools.dscode.workbench.player.LiveScenarioPlayer;
+import tools.dscode.workbench.player.WorkbenchSavePreview;
+import tools.dscode.workbench.player.WorkbenchSaveResult;
 import tools.dscode.workbench.sync.WorkbenchManifest;
 import tools.dscode.workbench.ui.web.DiagnosticExplorerHost;
 import tools.dscode.workbench.ui.web.GherkinEditorHost;
@@ -47,8 +52,9 @@ final class WorkbenchFrame extends JFrame {
     private static final int MAPPING_SAVE_DELAY_MS = 650;
 
     private final WorkbenchUiController controller;
-    private final LiveScenarioPlayer player = LiveScenarioPlayer.interactiveBuffer();
-    private final LivePlaybackCoordinator playback = new LivePlaybackCoordinator(player);
+    private final WorkbenchAttachServer attach;
+    private final LiveScenarioPlayer player;
+    private final LivePlaybackCoordinator playback;
     private final ObjectMapper json = new ObjectMapper();
     private final FeaturePickerPanel picker = new FeaturePickerPanel();
     private final TerminalPanel terminal = new TerminalPanel();
@@ -82,6 +88,18 @@ final class WorkbenchFrame extends JFrame {
     private final JLabel readinessLabel = new JLabel("Loading status...");
     private final JLabel playerStatusLabel = new JLabel("Stopped");
     private final JLabel activityLabel = new JLabel("Ready");
+    private final JPanel agentBanner = new JPanel(new BorderLayout(12, 0));
+    private final JLabel agentBannerLabel = new JLabel();
+    private final JButton takeControlButton = WorkbenchTheme.accentButton(
+            "Take control",
+            "Return live Workbench controls to the human and cancel in-flight agent permission waits"
+    );
+    private final JPanel permissionBar = new JPanel(new BorderLayout(12, 0));
+    private final JLabel permissionLabel = new JLabel();
+    private final JButton allowButton = WorkbenchTheme.accentButton("Allow", "Allow the agent to copy the live scenario into the original feature file");
+    private final JButton denyButton = WorkbenchTheme.flatButton("Deny", "Deny the write; the original feature file is left unchanged");
+    private WorkbenchControlLeaseSnapshot lastLease;
+    private String pendingPermissionId;
 
     private final JMenuItem syncItem = new JMenuItem("Synchronize");
     private final JMenuItem refreshItem = new JMenuItem("Refresh Status");
@@ -117,8 +135,15 @@ final class WorkbenchFrame extends JFrame {
     private boolean closing;
 
     WorkbenchFrame(WorkbenchUiController controller) {
+        this(controller, null);
+    }
+
+    WorkbenchFrame(WorkbenchUiController controller, WorkbenchAttachServer attach) {
         super("Pickleball Workbench");
         this.controller = controller;
+        this.attach = attach;
+        this.player = controller.player();
+        this.playback = controller.playback();
 
         mappingSaveTimer.setRepeats(false);
         WorkbenchTheme.install();
@@ -134,7 +159,7 @@ final class WorkbenchFrame extends JFrame {
         JPanel root = new JPanel(new BorderLayout(10, 10));
         root.setBackground(WorkbenchTheme.BACKGROUND);
         root.setBorder(new EmptyBorder(10, 12, 10, 12));
-        root.add(playerBar(), BorderLayout.NORTH);
+        root.add(topChrome(), BorderLayout.NORTH);
 
         JSplitPane editorAndRight = new JSplitPane(
                 JSplitPane.HORIZONTAL_SPLIT,
@@ -168,6 +193,14 @@ final class WorkbenchFrame extends JFrame {
         updatePlayerView(null);
         refreshFeatureCatalog();
         terminal.start();
+
+        configureAgentChrome();
+        controller.addLeaseListener(snapshot -> SwingUtilities.invokeLater(() -> applyLease(snapshot)));
+        controller.addPlayerListener(() -> SwingUtilities.invokeLater(() -> {
+            syncScenarioView();
+            updatePlayerView(null);
+        }));
+        applyLease(controller.controlLease());
 
         addWindowListener(new WindowAdapter() {
             @Override
@@ -204,6 +237,57 @@ final class WorkbenchFrame extends JFrame {
         bar.add(tools);
 
         return bar;
+    }
+
+    private JComponent topChrome() {
+        JPanel north = new JPanel();
+        north.setOpaque(false);
+        north.setLayout(new BoxLayout(north, BoxLayout.Y_AXIS));
+        north.add(agentBanner);
+        north.add(Box.createVerticalStrut(6));
+        north.add(permissionBar);
+        north.add(Box.createVerticalStrut(6));
+        north.add(playerBar());
+        return north;
+    }
+
+    private void configureAgentChrome() {
+        agentBanner.setBackground(new Color(0xFE, 0xF3, 0xC7));
+        agentBanner.setBorder(WorkbenchTheme.cardBorder());
+        agentBannerLabel.setForeground(WorkbenchTheme.TEXT);
+        agentBannerLabel.setFont(agentBannerLabel.getFont().deriveFont(Font.BOLD, 13f));
+        takeControlButton.addActionListener(event -> {
+            controller.takeControl();
+            applyLease(controller.controlLease());
+            updatePlayerView("You took control of Workbench.");
+        });
+        agentBanner.add(agentBannerLabel, BorderLayout.CENTER);
+        agentBanner.add(takeControlButton, BorderLayout.EAST);
+        agentBanner.setVisible(false);
+
+        permissionBar.setBackground(new Color(0xDB, 0xEA, 0xFE));
+        permissionBar.setBorder(WorkbenchTheme.cardBorder());
+        permissionLabel.setForeground(WorkbenchTheme.TEXT);
+        JPanel permissionButtons = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
+        permissionButtons.setOpaque(false);
+        allowButton.addActionListener(event -> answerPermission(true));
+        denyButton.addActionListener(event -> answerPermission(false));
+        permissionButtons.add(allowButton);
+        permissionButtons.add(denyButton);
+        permissionBar.add(permissionLabel, BorderLayout.CENTER);
+        permissionBar.add(permissionButtons, BorderLayout.EAST);
+        permissionBar.setVisible(false);
+    }
+
+    private void answerPermission(boolean allow) {
+        if (pendingPermissionId == null) return;
+        String id = pendingPermissionId;
+        pendingPermissionId = null;
+        controller.answerPermission(id, allow);
+        applyLease(controller.controlLease());
+        updatePlayerView(allow
+                ? "Allowed the agent Save request."
+                : "Denied the agent Save request. The original feature file was not changed.");
     }
 
     private JPanel playerBar() {
@@ -413,6 +497,7 @@ final class WorkbenchFrame extends JFrame {
         try {
             gherkinHost.onDocument(this::applyEditorLines);
             gherkinHost.onSeek(id -> {
+                if (humanControlsLocked()) return;
                 player.clickLine(id);
                 updateFromHereAvailability();
                 refreshPlayheadHighlight();
@@ -459,7 +544,13 @@ final class WorkbenchFrame extends JFrame {
 
     private void configurePicker() {
         picker.onScenarioSelected(scenario -> {
-            playback.loadScenario(scenario.lines(), scenario.file());
+            controller.loadPickerScenario(
+                    scenario.lines(),
+                    scenario.file(),
+                    scenario.name(),
+                    scenario.startLine(),
+                    scenario.endLine()
+            );
             picker.setSaveEnabled(true);
             syncScenarioView();
             updatePlayerView("Loaded " + scenario.displayLabel() + " into the live session buffer.");
@@ -491,7 +582,7 @@ final class WorkbenchFrame extends JFrame {
     }
 
     private void applyEditorLines(List<String> lines) {
-        if (syncingScenarioDocument) return;
+        if (syncingScenarioDocument || humanControlsLocked()) return;
         player.replaceDocument(lines);
         updateFromHereAvailability();
         if (player.state() == LiveScenarioPlayer.State.RUNNING) {
@@ -505,7 +596,11 @@ final class WorkbenchFrame extends JFrame {
 
     private void pushGherkinView() {
         if (gherkinView == null) return;
-        gherkinView.evalJsonCall("window.setEditorState", WorkbenchWebJson.editorState(player, executingStepId));
+        gherkinView.evalJsonCall("window.setEditorState", WorkbenchWebJson.editorState(
+                player,
+                executingStepId,
+                humanControlsLocked()
+        ));
     }
 
     private void pushMappingView() {
@@ -522,12 +617,14 @@ final class WorkbenchFrame extends JFrame {
                         selected == null ? null : new WorkbenchWebJson.MapChoice(
                                 selected.reference(), selected.label(), selected.restorable()),
                         mappingModel,
-                        mappingStatus.getText()
+                        mappingStatus.getText(),
+                        humanControlsLocked()
                 )
         );
     }
 
     private void applyMappingPropertyEdit(MappingEditorHost.PropertyEdit edit) {
+        if (humanControlsLocked()) return;
         if (lastState == null || !lastState.liveReady() || loadedMapping == null) return;
         try {
             if (edit.oldKey() == null || edit.oldKey().isBlank() || edit.oldKey().equals(edit.key())) {
@@ -570,15 +667,31 @@ final class WorkbenchFrame extends JFrame {
     }
 
     private void saveLoadedFeature() {
-        Path origin = playback.originFile().orElse(null);
-        if (origin == null) {
-            showFailure("Could not save", new IllegalStateException("The default demo is session-only."));
+        if (humanControlsLocked()) return;
+        WorkbenchSavePreview preview = controller.savePreview();
+        if (!preview.savable()) {
+            showFailure("Could not save", new IllegalStateException(preview.summary()));
+            return;
+        }
+        int choice = JOptionPane.showConfirmDialog(
+                this,
+                preview.summary() + "\n\nWorkbench will not write the original feature file unless you confirm.",
+                "Save live scenario",
+                JOptionPane.OK_CANCEL_OPTION,
+                JOptionPane.QUESTION_MESSAGE
+        );
+        if (choice != JOptionPane.OK_OPTION) {
+            updatePlayerView("Save cancelled. The original feature file was not changed.");
             return;
         }
         try {
-            Files.writeString(origin, player.documentText() + System.lineSeparator());
-            updatePlayerView("Saved live buffer to " + origin.getFileName() + ".");
-        } catch (Exception failure) {
+            WorkbenchSaveResult result = controller.commitSave();
+            if (result.written()) {
+                updatePlayerView(result.message());
+            } else {
+                showFailure("Could not save", new IllegalStateException(result.message()));
+            }
+        } catch (RuntimeException failure) {
             showFailure("Could not save feature file", failure);
         }
     }
@@ -679,12 +792,14 @@ final class WorkbenchFrame extends JFrame {
     private void wirePlayerActions() {
         playButton.addActionListener(event -> runScenarioFromBeginning());
         pauseButton.addActionListener(event -> {
+            if (humanControlsLocked()) return;
             player.pause();
             updatePlayerView(playbackBusy
                     ? "Pause requested; the current step will finish first."
                     : "Scenario playback paused.");
         });
         playerStopButton.addActionListener(event -> {
+            if (humanControlsLocked()) return;
             player.stop();
             pendingFreshRun = false;
             pendingFreshRunStepId = null;
@@ -729,6 +844,7 @@ final class WorkbenchFrame extends JFrame {
     }
 
     private void requestFreshRun(Long startStepId) {
+        if (humanControlsLocked()) return;
         pendingIsolatedStep = null;
         if (playbackBusy || playbackPreparing) {
             pendingFreshRun = true;
@@ -868,6 +984,7 @@ final class WorkbenchFrame extends JFrame {
     }
 
     private void insertStep() {
+        if (humanControlsLocked()) return;
         try {
             LiveScenarioPlayer.Line inserted = player.insertStep(stepText.getText());
             stepText.setText("");
@@ -892,6 +1009,7 @@ final class WorkbenchFrame extends JFrame {
     }
 
     private void updateSelectedStep() {
+        if (humanControlsLocked()) return;
         try {
             LiveScenarioPlayer.Line updated = player.updateSelectedStep(stepText.getText());
             syncScenarioView();
@@ -903,6 +1021,7 @@ final class WorkbenchFrame extends JFrame {
     }
 
     private void executeStepOnly() {
+        if (humanControlsLocked()) return;
         String text = stepText.getText();
         if (text == null || text.isBlank()) {
             showFailure("Could not execute step",
@@ -965,6 +1084,7 @@ final class WorkbenchFrame extends JFrame {
     }
 
     private void mappingChanged() {
+        if (humanControlsLocked()) return;
         if (loadingMapping || loadedMapping == null || !loadedMapping.restorable()) return;
         if (player.state() == LiveScenarioPlayer.State.RUNNING
                 || player.state() == LiveScenarioPlayer.State.WAITING_FOR_STEP) {
@@ -1113,7 +1233,7 @@ final class WorkbenchFrame extends JFrame {
     }
 
     private void scenarioDocumentChanged() {
-        if (syncingScenarioDocument) return;
+        if (syncingScenarioDocument || humanControlsLocked()) return;
         player.replaceDocument(List.of(scenarioEditor.getText().split("\n", -1)));
         seekPlayheadToCaret();
         updateFromHereAvailability();
@@ -1128,7 +1248,7 @@ final class WorkbenchFrame extends JFrame {
     }
 
     private void seekPlayheadToCaret() {
-        if (syncingScenarioDocument) return;
+        if (syncingScenarioDocument || humanControlsLocked()) return;
         int lineIndex = lineIndexAtCaret();
         List<LiveScenarioPlayer.Line> lines = player.lines();
         if (lineIndex < 0 || lineIndex >= lines.size()) {
@@ -1164,7 +1284,8 @@ final class WorkbenchFrame extends JFrame {
 
     private void updateFromHereAvailability() {
         fromHereButton.setEnabled(
-                player.selectedLine()
+                !humanControlsLocked()
+                        && player.selectedLine()
                         .or(player::playheadLine)
                         .map(LiveScenarioPlayer.Line::executable)
                         .orElse(false)
@@ -1282,6 +1403,59 @@ final class WorkbenchFrame extends JFrame {
             setMappingEditor("", false);
             mappingStatus.setText("Start the live worker to inspect Mapping.");
         }
+        if (humanControlsLocked()) {
+            applyLease(lastLease);
+        }
+    }
+
+    private boolean humanControlsLocked() {
+        return lastLease != null && lastLease.agentHolds();
+    }
+
+    private void applyLease(WorkbenchControlLeaseSnapshot snapshot) {
+        lastLease = snapshot;
+        boolean locked = snapshot != null && snapshot.agentHolds();
+        agentBanner.setVisible(locked);
+        if (locked) {
+            agentBannerLabel.setText(snapshot.bannerText());
+        }
+        WorkbenchPermissionRequest pending = snapshot == null ? null : snapshot.pendingPermission();
+        permissionBar.setVisible(pending != null);
+        if (pending != null) {
+            pendingPermissionId = pending.id();
+            permissionLabel.setText(pending.summary());
+        } else {
+            pendingPermissionId = null;
+        }
+
+        picker.setLocked(locked);
+        scenarioEditor.setEditable(!locked);
+        stepText.setEditable(!locked);
+        playButton.setEnabled(!locked);
+        pauseButton.setEnabled(!locked);
+        playerStopButton.setEnabled(!locked);
+        stepOnlyButton.setEnabled(!locked);
+        takeControlButton.setEnabled(locked);
+        if (locked) {
+            fromHereButton.setEnabled(false);
+            syncItem.setEnabled(false);
+            startItem.setEnabled(false);
+            restartItem.setEnabled(false);
+            stopItem.setEnabled(false);
+            nodeMapSelector.setEnabled(false);
+            mappingEditor.setEnabled(false);
+        } else if (lastState != null) {
+            syncItem.setEnabled(!lastState.workerRunning());
+            startItem.setEnabled(lastState.synchronizedProject() && !lastState.workerRunning());
+            restartItem.setEnabled(lastState.workerRunning());
+            stopItem.setEnabled(lastState.workerRunning());
+            if (lastState.liveReady()) {
+                nodeMapSelector.setEnabled(nodeMapSelector.getItemCount() > 0);
+            }
+        }
+        updateFromHereAvailability();
+        pushGherkinView();
+        pushMappingView();
     }
 
     private <T> void runTask(
@@ -1543,6 +1717,7 @@ final class WorkbenchFrame extends JFrame {
         activityLabel.setText("Closing Workbench...");
         runTask(
                 () -> {
+                    if (attach != null) attach.close();
                     controller.close();
                     return Boolean.TRUE;
                 },

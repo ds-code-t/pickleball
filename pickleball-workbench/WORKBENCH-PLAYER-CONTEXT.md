@@ -10,7 +10,7 @@ This file records the live-player behavior added on top of those unchanged bound
 
 The playhead is the user-visible needle. Clicking a scenario line instantly seeks it, like clicking a waveform. Global Play ignores the playhead and always starts from the first executable buffer step in a fresh interactive worker context.
 
-The Live Scenario Editor is an in-place Gherkin document shown as WebView blocks whose text is Gherkin. Users can type at any block, including previously executed text. Stable line identities are preserved for same-index edits. The buffer is session-owned and is not written back to consumer `.feature` files unless the user uses explicit Save. The left rail picks features/scenarios from the synchronized consumer project.
+The Live Scenario Editor is an in-place Gherkin document shown as WebView blocks whose text is Gherkin. Users can type at any block, including previously executed text. Stable line identities are preserved for same-index edits. The buffer is session-owned and is not written back to consumer `.feature` files unless **Save** is explicitly approved. Human Save confirms before copying into the original scenario. An attached AI agent can request the controller-owned control lease, lock Swing while the human watches, and must ask permission to write the original feature. Take control always returns the floor to the human.
 
 The Step Editor exposes two distinct execution actions:
 

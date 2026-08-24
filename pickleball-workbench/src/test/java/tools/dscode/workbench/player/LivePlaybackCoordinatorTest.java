@@ -62,5 +62,6 @@ class LivePlaybackCoordinatorTest {
 
         coordinator.loadDefaultDemo();
         assertTrue(coordinator.player().documentText().contains("navigate to: URL.home"));
+        assertTrue(coordinator.origin().savable() == false);
     }
 }
