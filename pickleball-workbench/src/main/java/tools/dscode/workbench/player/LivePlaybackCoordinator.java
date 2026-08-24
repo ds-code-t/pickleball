@@ -106,4 +106,24 @@ public final class LivePlaybackCoordinator {
     public boolean running() {
         return player.state() == LiveScenarioPlayer.State.RUNNING;
     }
+
+    /**
+     * Single owner for playhead follow after a worker {@code executeStep}.
+     * Advances only while {@link LiveScenarioPlayer.State#RUNNING} and only when
+     * the executed text is the current next step. Isolated Step Only pauses first,
+     * so it does not move the playhead. Attached-agent {@code execute_step} uses
+     * this same follow while a UI Play run is in progress.
+     */
+    public void followExecutedStep(String text, boolean successful) {
+        LiveScenarioPlayer.Line next = player.nextStep().orElse(null);
+        if (next == null || text == null || !next.text().equals(text)
+                || player.state() != LiveScenarioPlayer.State.RUNNING) {
+            return;
+        }
+        if (successful) {
+            player.markCurrentStepExecuted(next.id());
+        } else {
+            player.markCurrentStepFailed(next.id());
+        }
+    }
 }

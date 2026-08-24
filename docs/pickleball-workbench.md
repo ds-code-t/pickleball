@@ -154,7 +154,7 @@ The Live Scenario Editor is a session-scoped Gherkin document presented as snap-
 The playhead behaves like an audio-player needle:
 
 - clicking a scenario line instantly seeks the playhead to that line;
-- while a run is active, the playhead follows the current/next executable step after each success;
+- while a run is active, `executeStep` advances the playhead once on success (or pauses it on failure); the UI Play loop continues from that new next step without remaking the same mark;
 - **Pause** and **Stop** do not claim to rewind browser, Mapping, service, or other worker side effects.
 
 Global **Play** always starts a fresh interactive scenario context and runs from the first executable step, even if the playhead is elsewhere. Fresh **Play** / **From Here** runs restart the consumer worker so prior side effects do not masquerade as the start of a scenario.

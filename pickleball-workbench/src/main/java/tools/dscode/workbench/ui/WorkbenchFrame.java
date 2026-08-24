@@ -948,10 +948,10 @@ final class WorkbenchFrame extends JFrame {
                     executingStepId = null;
                     appendTerminal(step.text(), result.output(), result.events());
 
-                    if (result.successful()) {
-                        player.markCurrentStepExecuted(step.id());
-                    } else {
-                        player.markCurrentStepFailed(step.id());
+                    // executeStep already advanced or paused the playhead while RUNNING.
+                    // Do not remake that mark here; a leftover mark of the captured id
+                    // used to abort automatic playback after the first successful step.
+                    if (!result.successful()) {
                         player.clickLine(step.id());
                         showLine(step.id());
                     }

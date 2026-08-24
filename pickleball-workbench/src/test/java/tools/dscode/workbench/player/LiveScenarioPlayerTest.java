@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import java.util.ArrayList;
 import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -225,5 +226,33 @@ class LiveScenarioPlayerTest {
         assertEquals(LiveScenarioPlayer.State.WAITING_FOR_STEP, player.state());
         assertTrue(player.nextStep().isEmpty());
         assertNotEquals("And inserted in middle", player.lines().getFirst().text());
+    }
+
+    @Test
+    void leftoverPlayheadMarksAreIdempotentAndDoNotThrow() {
+        LiveScenarioPlayer player = new LiveScenarioPlayer(List.of(
+                "Given first",
+                "And second",
+                "Then third"
+        ));
+        player.startFromBeginning();
+        long first = player.nextStep().orElseThrow().id();
+        long second = player.lines().get(1).id();
+
+        assertDoesNotThrow(() -> player.markCurrentStepExecuted(first));
+        assertDoesNotThrow(() -> player.markCurrentStepExecuted(first));
+        assertDoesNotThrow(() -> player.markCurrentStepExecuted(second + 99));
+
+        assertEquals(second, player.nextStep().orElseThrow().id());
+        assertEquals(LiveScenarioPlayer.State.RUNNING, player.state());
+
+        assertDoesNotThrow(() -> player.markCurrentStepFailed(first));
+        assertEquals(LiveScenarioPlayer.State.RUNNING, player.state());
+        assertEquals(second, player.nextStep().orElseThrow().id());
+
+        assertDoesNotThrow(() -> player.markCurrentStepFailed(second));
+        assertDoesNotThrow(() -> player.markCurrentStepFailed(second));
+        assertEquals(LiveScenarioPlayer.State.PAUSED, player.state());
+        assertEquals(second, player.nextStep().orElseThrow().id());
     }
 }
