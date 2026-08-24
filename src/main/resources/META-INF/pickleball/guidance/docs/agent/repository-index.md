@@ -477,6 +477,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-workbench/build.gradle`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/bridge/ControlBridgeClient.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/catalog/ConsumerFeatureCatalog.java`
+- `pickleball-workbench/src/main/java/tools/dscode/workbench/catalog/ScenarioFilter.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/diagnostics/DiagnosticEvidenceNavigator.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/lease/WorkbenchCallContext.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/lease/WorkbenchControlLease.java`
@@ -492,6 +493,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/mcp/WorkbenchMcpServer.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/mcp/WorkbenchMcpTools.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/player/GherkinBlockDocument.java`
+- `pickleball-workbench/src/main/java/tools/dscode/workbench/player/LiveEditorView.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/player/LiveFeatureSave.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/player/LivePlaybackCoordinator.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/player/LiveScenarioPlayer.java`
@@ -534,12 +536,14 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-workbench/src/main/resources/tools/dscode/workbench/ui/web/mapping-editor.js`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/bridge/ControlBridgeClientTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/catalog/ConsumerFeatureCatalogTest.java`
+- `pickleball-workbench/src/test/java/tools/dscode/workbench/catalog/ScenarioFilterTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/diagnostics/DiagnosticEvidenceNavigatorTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/lease/WorkbenchControlLeaseTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/mapping/MappingValueCodecTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/mcp/WorkbenchAttachServerTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/mcp/WorkbenchMcpServerTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/player/GherkinBlockDocumentTest.java`
+- `pickleball-workbench/src/test/java/tools/dscode/workbench/player/LiveEditorViewTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/player/LiveFeatureSaveTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/player/LivePlaybackCoordinatorTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/player/LiveScenarioPlayerTest.java`

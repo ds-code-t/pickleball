@@ -10,6 +10,7 @@ import tools.dscode.workbench.lease.WorkbenchPermissionRequest;
 import tools.dscode.workbench.mapping.MappingTreeModel;
 import tools.dscode.workbench.mapping.MappingValueCodec;
 import tools.dscode.workbench.mcp.WorkbenchAttachServer;
+import tools.dscode.workbench.player.LiveEditorView;
 import tools.dscode.workbench.player.LivePlaybackCoordinator;
 import tools.dscode.workbench.player.LiveScenarioPlayer;
 import tools.dscode.workbench.player.WorkbenchSavePreview;
@@ -65,7 +66,11 @@ final class WorkbenchFrame extends JFrame {
     private WebViewPanel mappingView;
     private WebViewPanel diagnosticView;
     private JComponent pickerSplit;
-    private final JToggleButton pickerToggle = new JToggleButton("Features");
+    private JPanel editorHost;
+    private LiveEditorView editorView = LiveEditorView.blocksUnavailable();
+    private final JToggleButton textViewButton = new JToggleButton("Text");
+    private final JToggleButton blocksViewButton = new JToggleButton("Blocks");
+    private final JToggleButton pickerToggle = new JToggleButton("Scenarios");
     private List<WorkbenchUiController.MappingCatalogEntry> mappingEntries = List.of();
     private MappingTreeModel mappingModel;
     private DiagnosticEvidenceNavigator diagnosticNavigator;
@@ -331,27 +336,80 @@ final class WorkbenchFrame extends JFrame {
         JPanel panel = new JPanel(new BorderLayout(0, 4));
         panel.setBackground(WorkbenchTheme.SURFACE);
         panel.setBorder(WorkbenchTheme.cardBorder());
-        panel.add(WorkbenchTheme.heading("Live Scenario Editor"), BorderLayout.NORTH);
+
+        JPanel header = new JPanel(new BorderLayout(8, 0));
+        header.setOpaque(false);
+        header.add(WorkbenchTheme.heading("Live Scenario Editor"), BorderLayout.WEST);
+        header.add(editorViewToggle(), BorderLayout.EAST);
+        panel.add(header, BorderLayout.NORTH);
 
         scenarioEditor.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 14));
         scenarioEditor.setLineWrap(false);
         scenarioEditor.setTabSize(2);
-        JPanel editorHost = new JPanel(new CardLayout());
+        editorHost = new JPanel(new CardLayout());
         editorHost.setOpaque(false);
         editorHost.add(new JScrollPane(scenarioEditor), "text");
         if (gherkinView != null) {
             editorHost.add(gherkinView, "web");
-            ((CardLayout) editorHost.getLayout()).show(editorHost, "web");
         }
         panel.add(editorHost, BorderLayout.CENTER);
 
         JPanel legend = new JPanel(new FlowLayout(FlowLayout.LEFT, 18, 2));
         legend.setOpaque(false);
-        legend.add(WorkbenchTheme.muted("Blocks are Gherkin text"));
+        legend.add(WorkbenchTheme.muted("Same live buffer in Text or Blocks"));
         legend.add(WorkbenchTheme.muted("Play starts from the first step"));
-        legend.add(WorkbenchTheme.muted("Click a block to move the playhead"));
+        legend.add(WorkbenchTheme.muted("Click to move the playhead"));
         panel.add(legend, BorderLayout.SOUTH);
+        applyEditorView();
         return panel;
+    }
+
+    private JPanel editorViewToggle() {
+        JPanel toggle = new JPanel(new GridLayout(1, 2, 0, 0));
+        toggle.setOpaque(false);
+        ButtonGroup group = new ButtonGroup();
+        textViewButton.setFocusable(false);
+        blocksViewButton.setFocusable(false);
+        textViewButton.setToolTipText("View and edit the live scenario as ordinary Gherkin text.");
+        blocksViewButton.setToolTipText(editorView.canShowBlocks()
+                ? "View and edit the same live buffer as Gherkin blocks."
+                : "Block view requires JavaFX WebView, which is not available in this process.");
+        textViewButton.addActionListener(event -> {
+            if (humanControlsLocked()) {
+                applyEditorView();
+                return;
+            }
+            editorView.showText();
+            applyEditorView();
+        });
+        blocksViewButton.addActionListener(event -> {
+            if (humanControlsLocked()) {
+                applyEditorView();
+                return;
+            }
+            editorView.showBlocks();
+            applyEditorView();
+        });
+        group.add(textViewButton);
+        group.add(blocksViewButton);
+        toggle.add(textViewButton);
+        toggle.add(blocksViewButton);
+        toggle.setBorder(BorderFactory.createLineBorder(WorkbenchTheme.BORDER));
+        return toggle;
+    }
+
+    private void applyEditorView() {
+        if (editorHost == null) return;
+        boolean blocks = editorView.showingBlocks() && gherkinView != null;
+        CardLayout cards = (CardLayout) editorHost.getLayout();
+        cards.show(editorHost, blocks ? "web" : "text");
+        textViewButton.setSelected(!blocks);
+        blocksViewButton.setSelected(blocks);
+        blocksViewButton.setEnabled(editorView.canShowBlocks() && !humanControlsLocked());
+        textViewButton.setEnabled(!humanControlsLocked());
+        if (blocks) {
+            pushGherkinView();
+        }
     }
 
     private JComponent stepPanel() {
@@ -490,8 +548,9 @@ final class WorkbenchFrame extends JFrame {
 
     private void configureWebViews() {
         if (!JavaFxSupport.available()) {
+            editorView = LiveEditorView.blocksUnavailable();
             webViewNote.setText("JavaFX WebView unavailable: " + JavaFxSupport.failure()
-                    + ". Using the text fallback. OpenJFX is Workbench-only.");
+                    + ". Using the text fallback. OpenJFX is Workbench-only. Block view is unavailable.");
             return;
         }
         try {
@@ -534,11 +593,14 @@ final class WorkbenchFrame extends JFrame {
                     "diagnosticHost",
                     diagnosticHost
             );
+            editorView = LiveEditorView.blocksAvailable();
         } catch (RuntimeException failure) {
             gherkinView = null;
             mappingView = null;
             diagnosticView = null;
-            webViewNote.setText("JavaFX WebView failed to start: " + failure.getMessage());
+            editorView = LiveEditorView.blocksUnavailable();
+            webViewNote.setText("JavaFX WebView failed to start: " + failure.getMessage()
+                    + ". Using the text fallback. Block view is unavailable.");
         }
     }
 
@@ -1429,12 +1491,15 @@ final class WorkbenchFrame extends JFrame {
         }
 
         picker.setLocked(locked);
+        pickerToggle.setEnabled(!locked);
         scenarioEditor.setEditable(!locked);
         stepText.setEditable(!locked);
         playButton.setEnabled(!locked);
         pauseButton.setEnabled(!locked);
         playerStopButton.setEnabled(!locked);
         stepOnlyButton.setEnabled(!locked);
+        textViewButton.setEnabled(!locked);
+        blocksViewButton.setEnabled(editorView.canShowBlocks() && !locked);
         takeControlButton.setEnabled(locked);
         if (locked) {
             fromHereButton.setEnabled(false);

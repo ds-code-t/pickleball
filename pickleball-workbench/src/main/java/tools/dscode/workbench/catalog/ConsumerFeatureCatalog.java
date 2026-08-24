@@ -10,7 +10,6 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Stream;
@@ -24,8 +23,10 @@ import java.util.stream.Stream;
  * value when it is already present in project-owned configuration. It does
  * not crawl a git worktree or invent a second project model.</p>
  *
- * <p>Feature/Scenario titles are read as Gherkin structure labels for browsing
- * only. This class does not match or execute steps.</p>
+ * <p>Feature/Scenario titles and Gherkin tags are read as structure labels for
+ * browsing only. Feature, Rule, scenario/outline, and Examples tags are
+ * inherited the same way Cucumber does. This class does not match or execute
+ * steps and does not call Cucumber.</p>
  */
 public final class ConsumerFeatureCatalog {
     public enum BrowseMode {
@@ -39,7 +40,8 @@ public final class ConsumerFeatureCatalog {
             String featureName,
             String directoryPath,
             String fileName,
-            List<ScenarioEntry> scenarios
+            List<ScenarioEntry> scenarios,
+            List<String> tags
     ) {
         public FeatureEntry {
             Objects.requireNonNull(file, "file");
@@ -48,6 +50,7 @@ public final class ConsumerFeatureCatalog {
             directoryPath = directoryPath == null ? "" : directoryPath;
             fileName = fileName == null ? file.getFileName().toString() : fileName;
             scenarios = List.copyOf(scenarios == null ? List.of() : scenarios);
+            tags = ScenarioFilter.copyTags(tags);
         }
 
         public String browseLabel(BrowseMode mode) {
@@ -65,7 +68,9 @@ public final class ConsumerFeatureCatalog {
             String relativePath,
             int startLine,
             int endLine,
-            List<String> lines
+            List<String> lines,
+            List<String> tags,
+            List<String> effectiveTags
     ) {
         public ScenarioEntry {
             name = name == null ? "" : name;
@@ -73,6 +78,8 @@ public final class ConsumerFeatureCatalog {
             Objects.requireNonNull(file, "file");
             relativePath = relativePath == null ? "" : relativePath;
             lines = List.copyOf(lines == null ? List.of() : lines);
+            tags = ScenarioFilter.copyTags(tags);
+            effectiveTags = ScenarioFilter.copyTags(effectiveTags);
         }
 
         public String displayLabel() {
@@ -83,8 +90,8 @@ public final class ConsumerFeatureCatalog {
     private final Path projectRoot;
     private final List<FeatureEntry> features;
     private final Set<Path> selectedFeatures = new LinkedHashSet<>();
+    private final ScenarioFilter filter = new ScenarioFilter();
     private BrowseMode browseMode = BrowseMode.FEATURE_NAME;
-    private String scenarioQuery = "";
 
     public ConsumerFeatureCatalog(Path projectRoot, WorkbenchManifest manifest) {
         this(projectRoot, discover(projectRoot, manifest));
@@ -111,12 +118,16 @@ public final class ConsumerFeatureCatalog {
         this.browseMode = browseMode == null ? BrowseMode.FEATURE_NAME : browseMode;
     }
 
+    public ScenarioFilter filter() {
+        return filter;
+    }
+
     public String scenarioQuery() {
-        return scenarioQuery;
+        return filter.nameQuery();
     }
 
     public void setScenarioQuery(String scenarioQuery) {
-        this.scenarioQuery = scenarioQuery == null ? "" : scenarioQuery;
+        filter.setNameQuery(scenarioQuery);
     }
 
     public List<FeatureEntry> features() {
@@ -163,20 +174,26 @@ public final class ConsumerFeatureCatalog {
     }
 
     /**
-     * Scenarios under the selected features, or every project scenario when
-     * nothing is selected. The search bar then filters that list.
+     * Scenarios that pass the optional feature-file filter. With no feature
+     * selected, every catalog scenario is a candidate; name/tag filters then
+     * apply to that pool.
      */
-    public List<ScenarioEntry> visibleScenarios() {
+    public List<ScenarioEntry> candidateScenarios() {
         List<ScenarioEntry> pool = new ArrayList<>();
         for (FeatureEntry feature : features) {
             if (selectedFeatures.isEmpty() || selectedFeatures.contains(feature.file())) {
                 pool.addAll(feature.scenarios());
             }
         }
-        String query = scenarioQuery.strip().toLowerCase(Locale.ROOT);
-        if (!query.isEmpty()) {
-            pool.removeIf(scenario -> !matches(scenario, query));
-        }
+        return List.copyOf(pool);
+    }
+
+    /**
+     * Candidate scenarios after the primary name/tag filter. Feature-file
+     * selection is optional and does not restrict the pool when empty.
+     */
+    public List<ScenarioEntry> visibleScenarios() {
+        List<ScenarioEntry> pool = new ArrayList<>(filter.apply(candidateScenarios()));
         pool.sort(Comparator
                 .comparing(ScenarioEntry::featureName, String.CASE_INSENSITIVE_ORDER)
                 .thenComparing(ScenarioEntry::name, String.CASE_INSENSITIVE_ORDER));
@@ -285,27 +302,68 @@ public final class ConsumerFeatureCatalog {
     static FeatureEntry readFeature(Path projectRoot, Path file) throws IOException {
         List<String> lines = Files.readAllLines(file, StandardCharsets.UTF_8);
         String featureName = "";
+        List<String> featureTags = List.of();
+        List<String> ruleTags = List.of();
+        List<String> pendingTags = new ArrayList<>();
         String currentScenario = null;
         int scenarioStart = -1;
+        boolean currentIsOutline = false;
+        List<String> currentOwnTags = List.of();
+        LinkedHashSet<String> currentExampleTags = new LinkedHashSet<>();
         List<String> header = new ArrayList<>();
         List<ScenarioEntry> scenarios = new ArrayList<>();
         for (int i = 0; i < lines.size(); i++) {
             String trimmed = lines.get(i).strip();
+            if (ScenarioFilter.isGherkinTagLine(trimmed)) {
+                pendingTags.addAll(ScenarioFilter.parseGherkinTagLine(trimmed));
+                continue;
+            }
+            if (trimmed.isEmpty() || trimmed.startsWith("#")) {
+                continue;
+            }
             if (startsWithKeyword(trimmed, "Feature:")) {
                 featureName = trimmed.substring("Feature:".length()).strip();
+                featureTags = List.copyOf(pendingTags);
+                ruleTags = List.of();
+                pendingTags.clear();
                 header.add(lines.get(i));
-            } else if (startsWithKeyword(trimmed, "Scenario Outline:") || startsWithKeyword(trimmed, "Scenario:")) {
+            } else if (startsWithKeyword(trimmed, "Rule:")) {
+                ruleTags = List.copyOf(pendingTags);
+                pendingTags.clear();
+            } else if (startsWithKeyword(trimmed, "Scenario Outline:")
+                    || startsWithKeyword(trimmed, "Scenario Template:")
+                    || startsWithKeyword(trimmed, "Scenario:")) {
                 if (currentScenario != null) {
-                    scenarios.add(scenario(projectRoot, file, featureName, currentScenario, scenarioStart, i - 1, lines, header));
+                    scenarios.add(scenario(
+                            projectRoot, file, featureName, featureTags, ruleTags,
+                            currentScenario, currentOwnTags, currentExampleTags,
+                            scenarioStart, i - 1, lines, header
+                    ));
                 }
+                currentIsOutline = startsWithKeyword(trimmed, "Scenario Outline:")
+                        || startsWithKeyword(trimmed, "Scenario Template:");
                 currentScenario = trimmed.contains(":")
                         ? trimmed.substring(trimmed.indexOf(':') + 1).strip()
                         : trimmed;
                 scenarioStart = i;
+                currentOwnTags = List.copyOf(pendingTags);
+                currentExampleTags.clear();
+                pendingTags.clear();
+            } else if (startsWithKeyword(trimmed, "Examples:") || startsWithKeyword(trimmed, "Example:")) {
+                if (currentIsOutline) {
+                    currentExampleTags.addAll(pendingTags);
+                }
+                pendingTags.clear();
+            } else {
+                pendingTags.clear();
             }
         }
         if (currentScenario != null) {
-            scenarios.add(scenario(projectRoot, file, featureName, currentScenario, scenarioStart, lines.size() - 1, lines, header));
+            scenarios.add(scenario(
+                    projectRoot, file, featureName, featureTags, ruleTags,
+                    currentScenario, currentOwnTags, currentExampleTags,
+                    scenarioStart, lines.size() - 1, lines, header
+            ));
         }
         Path relative = relativeTo(projectRoot, file);
         String relativePath = relative.toString().replace('\\', '/');
@@ -316,7 +374,8 @@ public final class ConsumerFeatureCatalog {
                 featureName,
                 parent == null ? "" : parent.toString().replace('\\', '/'),
                 file.getFileName().toString(),
-                scenarios
+                scenarios,
+                featureTags
         );
     }
 
@@ -324,7 +383,11 @@ public final class ConsumerFeatureCatalog {
             Path projectRoot,
             Path file,
             String featureName,
+            List<String> featureTags,
+            List<String> ruleTags,
             String name,
+            List<String> ownTags,
+            Set<String> exampleTags,
             int start,
             int end,
             List<String> lines,
@@ -341,6 +404,11 @@ public final class ConsumerFeatureCatalog {
         while (!body.isEmpty() && body.getLast().isBlank()) {
             body.removeLast();
         }
+        LinkedHashSet<String> effective = new LinkedHashSet<>();
+        effective.addAll(featureTags);
+        effective.addAll(ruleTags);
+        effective.addAll(ownTags);
+        if (exampleTags != null) effective.addAll(exampleTags);
         return new ScenarioEntry(
                 name,
                 featureName,
@@ -348,14 +416,10 @@ public final class ConsumerFeatureCatalog {
                 relativeTo(projectRoot, file).toString().replace('\\', '/'),
                 start + 1,
                 end + 1,
-                body
+                body,
+                ownTags,
+                List.copyOf(effective)
         );
-    }
-
-    private static boolean matches(ScenarioEntry scenario, String query) {
-        return scenario.name().toLowerCase(Locale.ROOT).contains(query)
-                || scenario.featureName().toLowerCase(Locale.ROOT).contains(query)
-                || scenario.relativePath().toLowerCase(Locale.ROOT).contains(query);
     }
 
     private static boolean startsWithKeyword(String trimmed, String keyword) {
