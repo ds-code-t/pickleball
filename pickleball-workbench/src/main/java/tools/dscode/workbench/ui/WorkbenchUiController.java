@@ -21,7 +21,12 @@ import tools.dscode.control.protocol.ControlBridgeValue;
 import tools.dscode.control.protocol.ControlBridgeValueResult;
 import tools.dscode.control.protocol.ControlProtocol;
 import tools.dscode.workbench.WorkbenchServices;
+import tools.dscode.workbench.lease.WorkbenchControlLeaseSnapshot;
 import tools.dscode.workbench.mapping.MappingValueCodec;
+import tools.dscode.workbench.player.LivePlaybackCoordinator;
+import tools.dscode.workbench.player.LiveScenarioPlayer;
+import tools.dscode.workbench.player.WorkbenchSavePreview;
+import tools.dscode.workbench.player.WorkbenchSaveResult;
 import tools.dscode.workbench.sync.WorkbenchManifest;
 import tools.dscode.workbench.terminal.WorkerLogFiles;
 import tools.dscode.workbench.worker.WorkbenchWorkerStatus;
@@ -248,6 +253,52 @@ final class WorkbenchUiController implements AutoCloseable {
 
     Path projectRoot() {
         return projectRoot;
+    }
+
+    LiveScenarioPlayer player() {
+        return services.player();
+    }
+
+    LivePlaybackCoordinator playback() {
+        return services.playback();
+    }
+
+    WorkbenchControlLeaseSnapshot controlLease() {
+        return services.controlLeaseSnapshot();
+    }
+
+    WorkbenchControlLeaseSnapshot takeControl() {
+        return services.takeControl();
+    }
+
+    void answerPermission(String requestId, boolean allow) {
+        services.answerPermission(requestId, allow);
+    }
+
+    WorkbenchSavePreview savePreview() {
+        return services.savePreview();
+    }
+
+    WorkbenchSaveResult commitSave() {
+        return services.commitSave();
+    }
+
+    void loadPickerScenario(
+            java.util.List<String> lines,
+            Path originFile,
+            String scenarioName,
+            int startLine,
+            int endLine
+    ) {
+        services.loadPickerScenario(lines, originFile, scenarioName, startLine, endLine);
+    }
+
+    void addLeaseListener(java.util.function.Consumer<WorkbenchControlLeaseSnapshot> listener) {
+        services.addLeaseListener(listener);
+    }
+
+    void addPlayerListener(Runnable listener) {
+        services.addPlayerListener(listener);
     }
 
     Optional<WorkerLogFiles> workerLogFiles() {

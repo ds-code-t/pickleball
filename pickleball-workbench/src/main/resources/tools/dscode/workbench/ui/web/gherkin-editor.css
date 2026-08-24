@@ -90,3 +90,7 @@ button {
   border-left: 2px solid #e5e7eb;
 }
 .ghost { opacity: 0.45; }
+body.locked .gherkin { caret-color: transparent; }
+body.locked .handle { cursor: default; }
+body.locked button { opacity: 0.5; pointer-events: none; }
+body.locked { cursor: default; }

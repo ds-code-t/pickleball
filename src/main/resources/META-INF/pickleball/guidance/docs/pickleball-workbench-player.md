@@ -35,7 +35,7 @@ The center editor is an embedded HTML/JS block editor in JavaFX `WebView`. Block
 
 Workbench chose OpenJFX `WebView` + `JFXPanel` over JCEF so the browser panel stays a Workbench-only Maven dependency that shades into the controller JAR. JDK 21 does not ship a modern browser component. If JavaFX cannot start, the same `LiveScenarioPlayer` buffer remains editable as plain Gherkin text.
 
-The initial buffer is Workbench-owned sample content. It is not written back to consumer `.feature` files unless you use **Save** on a picker-loaded scenario. The default demo is a small browser scenario against the Maven consumer local test site:
+The initial buffer is Workbench-owned sample content. It is not written back to consumer `.feature` files unless you use **Save** on a picker-loaded scenario and confirm the copy. The default demo is a small browser scenario against the Maven consumer local test site:
 
 ```gherkin
 Feature: Workbench Live Scenario
@@ -107,6 +107,17 @@ The Terminal tails the worker stdout/stderr files Workbench already creates unde
 
 The explorer is a rewind/play/focus timeline of retained Pickleball diagnostic runs. Screenshot frames are shown with the Gherkin step that was running when they were taken. Denser layers follow the repository evidence order and only open when the retained files exist. If `reports/diagnostic-runs/run-catalog.json` is missing, the panel stays empty and says so.
 
+## Watched-agent control lease
+
+The live player is a collaborative testing space, not a second editor. Swing and an attached agent share one `LiveScenarioPlayer` in the Workbench controller.
+
+- A human can work alone: edit/play the live buffer, then **Save** asks before copying into the original scenario in the original `.feature` file.
+- An agent attaches to the running UI through `.pickleball/workbench/attach.json` (localhost JSON tools over the same `WorkbenchServices`). It must not start a second Workbench JVM or worker.
+- After `workbench_request_control`, Swing play/edit/mapping/save/worker controls lock. A banner shows the agent name and `currentAction`. **Take control** always works and cancels in-flight Save permission waits.
+- `workbench_request_save` is the only original-feature write path for the agent. With the UI attached it blocks on Allow/Deny. Deny writes nothing. Headless stdio MCP may hold the lease without a banner; Save is still an explicit tool.
+
+See [pickleball-workbench.md](pickleball-workbench.md) for attach discovery, tool names, and stdout rules.
+
 ## Focused validation
 
 The included consumer `@control-bridge` scenario verifies:
@@ -115,7 +126,7 @@ The included consumer `@control-bridge` scenario verifies:
 - the current ParsingMap catalog contains at least one NodeMap;
 - a catalog reference resolves back to a live NodeMap.
 
-Workbench player/editor unit tests cover picker selection/search, block buffer ↔ player model, click-to-seek, global Play from start, the two Step Editor play actions, wait-at-end / Enter-to-append-and-run, in-place edit of previously executed text, typed Mapping edits through `WorkbenchServices`, and the non-empty browser demo seed.
+Workbench player/editor unit tests cover picker selection/search, block buffer ↔ player model, click-to-seek, global Play from start, the two Step Editor play actions, wait-at-end / Enter-to-append-and-run, in-place edit of previously executed text, typed Mapping edits through `WorkbenchServices`, the non-empty browser demo seed, control-lease lock/Take control, permission grant/deny, and Save not writing without approval.
 
 Workbench changes should continue to use the repository's focused validation policy:
 

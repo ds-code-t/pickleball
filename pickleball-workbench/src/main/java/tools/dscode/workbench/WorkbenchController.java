@@ -1,6 +1,19 @@
 package tools.dscode.workbench;
 
 import tools.dscode.control.protocol.*;
+import tools.dscode.workbench.lease.WorkbenchControlLease;
+import tools.dscode.workbench.lease.WorkbenchControlLeaseSnapshot;
+import tools.dscode.workbench.lease.WorkbenchPermissionCancelledException;
+import tools.dscode.workbench.lease.WorkbenchPermissionDecision;
+import tools.dscode.workbench.lease.WorkbenchPermissionKind;
+import tools.dscode.workbench.lease.WorkbenchPermissionRequest;
+import tools.dscode.workbench.player.LiveFeatureSave;
+import tools.dscode.workbench.player.LivePlaybackCoordinator;
+import tools.dscode.workbench.player.LiveScenarioPlayer;
+import tools.dscode.workbench.player.ScenarioOrigin;
+import tools.dscode.workbench.player.WorkbenchPlayerState;
+import tools.dscode.workbench.player.WorkbenchSavePreview;
+import tools.dscode.workbench.player.WorkbenchSaveResult;
 import tools.dscode.workbench.sync.WorkbenchManifest;
 import tools.dscode.workbench.sync.WorkbenchSynchronizer;
 import tools.dscode.workbench.terminal.WorkerLogFiles;
@@ -10,21 +23,191 @@ import tools.dscode.workbench.worker.WorkbenchWorkerStatus;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.Consumer;
+import java.util.function.Supplier;
 
 /** Plain-Java controller shared by Workbench adapters. */
 public final class WorkbenchController implements WorkbenchServices {
     private final Path projectRoot;
     private final WorkbenchSynchronizer synchronizer;
     private final WorkbenchLiveSession live;
+    private final LiveScenarioPlayer player;
+    private final LivePlaybackCoordinator playback;
+    private final WorkbenchControlLease lease;
+    private final List<Runnable> playerListeners = new CopyOnWriteArrayList<>();
 
     public WorkbenchController(Path projectRoot) {
         this.projectRoot = projectRoot.toAbsolutePath().normalize();
         this.synchronizer = new WorkbenchSynchronizer();
         this.live = new WorkbenchLiveSession(this.projectRoot);
+        this.player = LiveScenarioPlayer.interactiveBuffer();
+        this.playback = new LivePlaybackCoordinator(this.player);
+        this.lease = new WorkbenchControlLease();
+    }
+
+    @Override
+    public LiveScenarioPlayer player() {
+        return player;
+    }
+
+    @Override
+    public LivePlaybackCoordinator playback() {
+        return playback;
+    }
+
+    @Override
+    public WorkbenchPlayerState playerState() {
+        ScenarioOrigin origin = playback.origin();
+        LiveScenarioPlayer.Line playhead = player.playheadLine().orElse(null);
+        return new WorkbenchPlayerState(
+                player.documentText(),
+                player.lines().stream().map(LiveScenarioPlayer.Line::text).toList(),
+                player.state(),
+                player.playheadId().isPresent() ? player.playheadId().getAsLong() : null,
+                playhead == null ? "" : playhead.text(),
+                player.selectedId().isPresent() ? player.selectedId().getAsLong() : null,
+                origin.file() == null ? "" : origin.file().toString(),
+                origin.scenarioName(),
+                origin.savable()
+        );
+    }
+
+    @Override
+    public WorkbenchControlLease controlLease() {
+        return lease;
+    }
+
+    @Override
+    public WorkbenchControlLeaseSnapshot controlLeaseSnapshot() {
+        return lease.snapshot();
+    }
+
+    @Override
+    public WorkbenchControlLeaseSnapshot requestControl(String agentDisplayName) {
+        return lease.requestControl(agentDisplayName);
+    }
+
+    @Override
+    public WorkbenchControlLeaseSnapshot releaseControl() {
+        return lease.releaseControl();
+    }
+
+    @Override
+    public WorkbenchControlLeaseSnapshot takeControl() {
+        return lease.takeControl();
+    }
+
+    @Override
+    public WorkbenchControlLeaseSnapshot setCurrentAction(String text) {
+        return lease.setCurrentAction(text);
+    }
+
+    @Override
+    public void answerPermission(String requestId, boolean allow) {
+        lease.answerPermission(requestId, allow);
+    }
+
+    @Override
+    public void attachUi() {
+        lease.attachUi();
+    }
+
+    @Override
+    public void detachUi() {
+        lease.detachUi();
+    }
+
+    @Override
+    public void addLeaseListener(Consumer<WorkbenchControlLeaseSnapshot> listener) {
+        lease.addListener(listener);
+    }
+
+    @Override
+    public void removeLeaseListener(Consumer<WorkbenchControlLeaseSnapshot> listener) {
+        lease.removeListener(listener);
+    }
+
+    @Override
+    public void addPlayerListener(Runnable listener) {
+        playerListeners.add(listener);
+    }
+
+    @Override
+    public void removePlayerListener(Runnable listener) {
+        playerListeners.remove(listener);
+    }
+
+    @Override
+    public void loadPickerScenario(
+            List<String> lines,
+            Path originFile,
+            String scenarioName,
+            int startLine,
+            int endLine
+    ) {
+        requireMutating();
+        playback.loadScenario(lines, originFile, scenarioName, startLine, endLine);
+        notifyPlayer();
+    }
+
+    @Override
+    public void loadDefaultDemo() {
+        requireMutating();
+        playback.loadDefaultDemo();
+        notifyPlayer();
+    }
+
+    @Override
+    public void replaceLiveDocument(List<String> lines) {
+        requireMutating();
+        playback.replaceFromLines(lines);
+        notifyPlayer();
+    }
+
+    @Override
+    public WorkbenchSavePreview savePreview() {
+        return LiveFeatureSave.preview(playback);
+    }
+
+    @Override
+    public WorkbenchSaveResult requestSave() {
+        requireMutating();
+        WorkbenchSavePreview preview = LiveFeatureSave.preview(playback);
+        if (!preview.savable()) {
+            return WorkbenchSaveResult.unsavable(preview.summary());
+        }
+        WorkbenchPermissionRequest request = new WorkbenchPermissionRequest(
+                WorkbenchControlLease.newPermissionId(),
+                WorkbenchPermissionKind.SAVE,
+                preview.summary(),
+                preview.featurePath() == null ? "" : preview.featurePath().toString(),
+                preview.scenarioName()
+        );
+        try {
+            WorkbenchPermissionDecision decision = lease.awaitPermission(request);
+            if (decision != WorkbenchPermissionDecision.ALLOW) {
+                return WorkbenchSaveResult.denied();
+            }
+            return LiveFeatureSave.write(playback);
+        } catch (WorkbenchPermissionCancelledException cancelled) {
+            return WorkbenchSaveResult.cancelled(cancelled.getMessage());
+        }
+    }
+
+    @Override
+    public WorkbenchSaveResult commitSave() {
+        requireMutating();
+        WorkbenchSavePreview preview = LiveFeatureSave.preview(playback);
+        if (!preview.savable()) {
+            return WorkbenchSaveResult.unsavable(preview.summary());
+        }
+        return LiveFeatureSave.write(playback);
     }
 
     @Override
     public WorkbenchManifest synchronize() {
+        requireMutating();
         if (live.status().running()) {
             throw new IllegalStateException("Stop the Workbench worker before synchronizing the project.");
         }
@@ -38,17 +221,17 @@ public final class WorkbenchController implements WorkbenchServices {
 
     @Override
     public WorkbenchWorkerStatus startWorker() {
-        return live.start();
+        return mutating(live::start);
     }
 
     @Override
     public WorkbenchWorkerStatus restartWorker() {
-        return live.restart();
+        return mutating(live::restart);
     }
 
     @Override
     public WorkbenchWorkerStatus stopWorker() {
-        return live.stop();
+        return mutating(live::stop);
     }
 
     @Override
@@ -68,7 +251,10 @@ public final class WorkbenchController implements WorkbenchServices {
 
     @Override
     public ControlBridgeCallResult executeStep(String text, String argument) {
-        return live.executeStep(text, argument == null ? "" : argument);
+        requireMutating();
+        ControlBridgeCallResult result = live.executeStep(text, argument == null ? "" : argument);
+        maybeAdvancePlayhead(text, "SUCCESS".equals(result.status()));
+        return result;
     }
 
     @Override
@@ -78,7 +264,7 @@ public final class WorkbenchController implements WorkbenchServices {
 
     @Override
     public ControlBridgeValueResult mappingPut(String mapReference, String key, Object value) {
-        return live.mappingPut(mapReference, key, value);
+        return mutating(() -> live.mappingPut(mapReference, key, value));
     }
 
     @Override
@@ -93,7 +279,7 @@ public final class WorkbenchController implements WorkbenchServices {
 
     @Override
     public ControlBridgeCallResult mappingRestore(ControlBridgeMappingSnapshot snapshot) {
-        return live.mappingRestore(snapshot);
+        return mutating(() -> live.mappingRestore(snapshot));
     }
 
     @Override
@@ -120,7 +306,7 @@ public final class WorkbenchController implements WorkbenchServices {
 
     @Override
     public ControlBridgeServiceCallResult serviceCall(String selector) {
-        return live.serviceCall(selector);
+        return mutating(() -> live.serviceCall(selector));
     }
 
     @Override
@@ -137,19 +323,19 @@ public final class WorkbenchController implements WorkbenchServices {
             boolean oneShot,
             Integer leaseSeconds
     ) {
-        return live.addBreakpoint(
+        return mutating(() -> live.addBreakpoint(
                 hook, signatureContains, stepContains, phraseContains, oneShot, leaseSeconds
-        );
+        ));
     }
 
     @Override
     public boolean removeBreakpoint(String breakpointId) {
-        return live.removeBreakpoint(breakpointId);
+        return mutating(() -> live.removeBreakpoint(breakpointId));
     }
 
     @Override
     public int clearBreakpoints() {
-        return live.clearBreakpoints();
+        return mutating(live::clearBreakpoints);
     }
 
     @Override
@@ -159,21 +345,58 @@ public final class WorkbenchController implements WorkbenchServices {
 
     @Override
     public ControlBridgeStepOverrideResult compileStepOverride(String id, String regex, String source) {
-        return live.compileStepOverride(id, regex, source);
+        return mutating(() -> live.compileStepOverride(id, regex, source));
     }
 
     @Override
     public boolean removeStepOverride(String id) {
-        return live.removeStepOverride(id);
+        return mutating(() -> live.removeStepOverride(id));
     }
 
     @Override
     public int clearStepOverrides() {
-        return live.clearStepOverrides();
+        return mutating(live::clearStepOverrides);
     }
 
     @Override
     public void close() {
+        lease.detachUi();
         live.close();
+    }
+
+    private void maybeAdvancePlayhead(String text, boolean successful) {
+        LiveScenarioPlayer.Line next = player.nextStep().orElse(null);
+        if (next != null && text != null && next.text().equals(text)
+                && player.state() == LiveScenarioPlayer.State.RUNNING) {
+            try {
+                if (successful) {
+                    player.markCurrentStepExecuted(next.id());
+                } else {
+                    player.markCurrentStepFailed(next.id());
+                }
+            } catch (RuntimeException ignored) {
+                // Playhead follow is best-effort presentation; worker execution already finished.
+            }
+        }
+        notifyPlayer();
+    }
+
+    private <T> T mutating(Supplier<T> action) {
+        requireMutating();
+        return action.get();
+    }
+
+    private void requireMutating() {
+        lease.requireMutatingAccess();
+    }
+
+    private void notifyPlayer() {
+        for (Runnable listener : playerListeners) {
+            try {
+                listener.run();
+            } catch (RuntimeException ignored) {
+                // Presentation listeners must not break live execution.
+            }
+        }
     }
 }

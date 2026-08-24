@@ -34,7 +34,7 @@
     wrap.className = "row";
     var key = document.createElement("input");
     key.value = property.key;
-    key.disabled = !model.restorable;
+    key.disabled = !model.restorable || !!model.locked;
     var type = document.createElement("select");
     ["string", "numeric", "boolean", "object-as-json", "object-as-xml"].forEach(function (name) {
       var option = document.createElement("option");
@@ -43,10 +43,10 @@
       if (name === property.type) option.selected = true;
       type.appendChild(option);
     });
-    type.disabled = !model.restorable;
+    type.disabled = !model.restorable || !!model.locked;
     var value = document.createElement("textarea");
     value.value = property.text;
-    value.disabled = !model.restorable;
+    value.disabled = !model.restorable || !!model.locked;
     function commit() {
       if (!window.mappingHost || !window.mappingHost.propertyChanged) return;
       window.mappingHost.propertyChanged(JSON.stringify({
@@ -70,12 +70,13 @@
   }
 
   maps.addEventListener("change", function () {
+    if (model.locked) return;
     if (window.mappingHost && window.mappingHost.selectMap) {
       window.mappingHost.selectMap(maps.value);
     }
   });
   document.getElementById("add").addEventListener("click", function () {
-    if (!model.restorable) return;
+    if (!model.restorable || model.locked) return;
     var key = "newProperty";
     var n = 1;
     while (model.properties.some(function (item) { return item.key === key; })) {
@@ -97,6 +98,11 @@
   window.setMappingState = function (json) {
     model = typeof json === "string" ? JSON.parse(json) : json;
     status.textContent = model.status || "";
+    document.body.classList.toggle("locked", !!model.locked);
+    var add = document.getElementById("add");
+    if (add) add.disabled = !!model.locked || !model.restorable;
+    var mapsEl = document.getElementById("maps");
+    if (mapsEl) mapsEl.disabled = !!model.locked;
     render();
   };
 

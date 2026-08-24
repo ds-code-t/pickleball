@@ -12,6 +12,13 @@ import tools.dscode.control.protocol.ControlBridgeServiceCallResult;
 import tools.dscode.control.protocol.ControlBridgeStepOverride;
 import tools.dscode.control.protocol.ControlBridgeStepOverrideResult;
 import tools.dscode.control.protocol.ControlBridgeValueResult;
+import tools.dscode.workbench.lease.WorkbenchControlLease;
+import tools.dscode.workbench.lease.WorkbenchControlLeaseSnapshot;
+import tools.dscode.workbench.player.LivePlaybackCoordinator;
+import tools.dscode.workbench.player.LiveScenarioPlayer;
+import tools.dscode.workbench.player.WorkbenchPlayerState;
+import tools.dscode.workbench.player.WorkbenchSavePreview;
+import tools.dscode.workbench.player.WorkbenchSaveResult;
 import tools.dscode.workbench.sync.WorkbenchManifest;
 import tools.dscode.workbench.terminal.WorkerLogFiles;
 import tools.dscode.workbench.worker.WorkbenchWorkerStatus;
@@ -19,9 +26,60 @@ import tools.dscode.workbench.worker.WorkbenchWorkerStatus;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Consumer;
 
 /** Shared Workbench controller surface used by protocol and presentation adapters. */
 public interface WorkbenchServices extends AutoCloseable {
+    LiveScenarioPlayer player();
+
+    LivePlaybackCoordinator playback();
+
+    WorkbenchPlayerState playerState();
+
+    WorkbenchControlLease controlLease();
+
+    WorkbenchControlLeaseSnapshot controlLeaseSnapshot();
+
+    WorkbenchControlLeaseSnapshot requestControl(String agentDisplayName);
+
+    WorkbenchControlLeaseSnapshot releaseControl();
+
+    WorkbenchControlLeaseSnapshot takeControl();
+
+    WorkbenchControlLeaseSnapshot setCurrentAction(String text);
+
+    void answerPermission(String requestId, boolean allow);
+
+    void attachUi();
+
+    void detachUi();
+
+    void addLeaseListener(Consumer<WorkbenchControlLeaseSnapshot> listener);
+
+    void removeLeaseListener(Consumer<WorkbenchControlLeaseSnapshot> listener);
+
+    void addPlayerListener(Runnable listener);
+
+    void removePlayerListener(Runnable listener);
+
+    void loadPickerScenario(
+            List<String> lines,
+            Path originFile,
+            String scenarioName,
+            int startLine,
+            int endLine
+    );
+
+    void loadDefaultDemo();
+
+    void replaceLiveDocument(List<String> lines);
+
+    WorkbenchSavePreview savePreview();
+
+    WorkbenchSaveResult requestSave();
+
+    WorkbenchSaveResult commitSave();
+
     WorkbenchManifest synchronize();
 
     WorkbenchManifest synchronizationStatus();

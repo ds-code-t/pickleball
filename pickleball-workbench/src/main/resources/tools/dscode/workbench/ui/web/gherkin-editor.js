@@ -1,6 +1,6 @@
 (function () {
   var board = document.getElementById("board");
-  var state = { roots: [], selectedId: null, playheadId: null, executingId: null, suppress: false };
+  var state = { roots: [], selectedId: null, playheadId: null, executingId: null, suppress: false, locked: false };
   var dragging = null;
 
   function classify(text) {
@@ -31,7 +31,7 @@
     card.dataset.id = String(block.id);
     if (block.id === state.playheadId) card.classList.add("playhead");
     if (block.id === state.executingId) card.classList.add("executing");
-    card.draggable = true;
+    card.draggable = !state.locked;
 
     var row = document.createElement("div");
     row.className = "row";
@@ -42,6 +42,7 @@
     input.className = "gherkin";
     input.value = block.text;
     input.spellcheck = false;
+    input.readOnly = !!state.locked;
     input.addEventListener("input", function () {
       block.text = input.value;
       autosize(input);
@@ -69,6 +70,10 @@
     });
 
     card.addEventListener("dragstart", function (event) {
+      if (state.locked) {
+        event.preventDefault();
+        return;
+      }
       dragging = { id: block.id };
       card.classList.add("ghost");
       event.dataTransfer.setData("text/plain", String(block.id));
@@ -190,7 +195,7 @@
   }
 
   function report() {
-    if (state.suppress || !window.gherkinHost || !window.gherkinHost.documentChanged) return;
+    if (state.locked || state.suppress || !window.gherkinHost || !window.gherkinHost.documentChanged) return;
     var lines = [];
     flatten(state.roots, 0, lines);
     window.gherkinHost.documentChanged(JSON.stringify({
@@ -201,7 +206,7 @@
   }
 
   function reportSeek() {
-    if (state.suppress || !window.gherkinHost || !window.gherkinHost.seek) return;
+    if (state.locked || state.suppress || !window.gherkinHost || !window.gherkinHost.seek) return;
     window.gherkinHost.seek(state.selectedId == null ? -1 : state.selectedId);
   }
 
@@ -212,11 +217,16 @@
     state.selectedId = payload.selectedId;
     state.playheadId = payload.playheadId;
     state.executingId = payload.executingId;
+    state.locked = !!payload.locked;
+    document.body.classList.toggle("locked", state.locked);
+    var add = document.getElementById("add-block");
+    if (add) add.disabled = state.locked;
     render();
     state.suppress = false;
   };
 
   document.getElementById("add-block").addEventListener("click", function () {
+    if (state.locked) return;
     if (window.gherkinHost && window.gherkinHost.requestAddStep) {
       window.gherkinHost.requestAddStep();
     }

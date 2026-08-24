@@ -11,7 +11,7 @@ import java.util.Optional;
  */
 public final class LivePlaybackCoordinator {
     private final LiveScenarioPlayer player;
-    private java.nio.file.Path originFile;
+    private ScenarioOrigin origin = ScenarioOrigin.none();
 
     public LivePlaybackCoordinator(LiveScenarioPlayer player) {
         this.player = Objects.requireNonNull(player, "player");
@@ -21,21 +21,41 @@ public final class LivePlaybackCoordinator {
         return player;
     }
 
+    public ScenarioOrigin origin() {
+        return origin;
+    }
+
     public Optional<java.nio.file.Path> originFile() {
-        return Optional.ofNullable(originFile);
+        return origin.originFile();
     }
 
     public void clearOrigin() {
-        originFile = null;
+        origin = ScenarioOrigin.none();
+    }
+
+    public void updateOrigin(ScenarioOrigin origin) {
+        this.origin = origin == null ? ScenarioOrigin.none() : origin;
     }
 
     public void loadDefaultDemo() {
-        originFile = null;
+        origin = ScenarioOrigin.none();
         player.loadDocument(LiveScenarioPlayer.DEFAULT_DEMO_SCENARIO);
     }
 
-    public void loadScenario(List<String> lines, java.nio.file.Path origin) {
-        originFile = origin;
+    public void loadScenario(List<String> lines, java.nio.file.Path originFile) {
+        loadScenario(lines, originFile, "", 0, 0);
+    }
+
+    public void loadScenario(
+            List<String> lines,
+            java.nio.file.Path originFile,
+            String scenarioName,
+            int startLine,
+            int endLine
+    ) {
+        origin = originFile == null
+                ? ScenarioOrigin.none()
+                : new ScenarioOrigin(originFile, scenarioName, startLine, endLine);
         player.loadDocument(lines);
     }
 

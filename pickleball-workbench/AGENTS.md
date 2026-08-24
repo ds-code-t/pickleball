@@ -24,9 +24,9 @@ Workbench-only dependencies, including Jackson and the MCP SDK, belong only on t
 
 ## Runtime ownership
 
-The Workbench controller owns synchronization, worker process/session lifecycle, bridge client behavior, MCP stdio, and the thin Swing UI. Pickleball owns consumer-worker behavior such as the bridge server/coordinator, DynamicControl/Gherkin execution, Step Override runtime, Mapping state, browser/service-call access, and woven Cucumber integration.
+The Workbench controller owns synchronization, worker process/session lifecycle, bridge client behavior, MCP stdio, the localhost UI-attach endpoint, the watched-agent control lease, and the thin Swing UI. Pickleball owns consumer-worker behavior such as the bridge server/coordinator, DynamicControl/Gherkin execution, Step Override runtime, Mapping state, browser/service-call access, and woven Cucumber integration.
 
-`WorkbenchServices` is the shared plain-Java adapter boundary. `WorkbenchController` composes synchronization and `WorkbenchLiveSession`; MCP and Swing must delegate to that service surface instead of implementing their own worker ownership, bridge calls, Mapping semantics, Step Override behavior, or scenario retry rules.
+`WorkbenchServices` is the shared plain-Java adapter boundary. `WorkbenchController` composes synchronization, `WorkbenchLiveSession`, `LiveScenarioPlayer`, and the control lease; MCP, HTTP attach, and Swing must delegate to that service surface instead of implementing their own worker ownership, bridge calls, Mapping semantics, Step Override behavior, scenario retry rules, or a second live Gherkin document.
 
 The Workbench bridge client uses only `tools.dscode.control.protocol.*`. Worker-side `ControlBridgeRuntime`, `ControlBridgeCoordinator`, bootstrap, adapters, step compilation, mappings, and execution semantics stay in Pickleball. Workbench may hold the worker entry-point class name as `ControlProtocol.WORKER_MAIN_CLASS`; it must never import or load that class.
 
@@ -75,7 +75,7 @@ Low-level lifecycle controls live under the Session menu and existing investigat
 
 `LiveScenarioPlayer` owns presentation/session-buffer state only: stable line IDs, the editable Gherkin document, selected line, playhead, and `STOPPED` / `PAUSED` / `RUNNING` / `WAITING_FOR_STEP`. It must remain headless-testable and must not parse/execute Pickleball steps, implement runtime rewind, model Mapping inheritance, or become Swing component state.
 
-The playhead is the user-visible needle. Clicking a scenario line instantly seeks it. Global Play always starts from the first executable step in a fresh worker context, not from the playhead. The Live Scenario Editor is an in-place Gherkin document presented as snap-together blocks whose text is Gherkin, including `Given` / `When` / `Then`. Users may edit any block, including previously executed text. The picker loads consumer scenarios into the live buffer. The default buffer is a Workbench-owned browser demo against `URL.home`. Workbench does not write `.feature` files unless the user uses explicit **Save**. WebView JavaScript must not execute Gherkin.
+The playhead is the user-visible needle. Clicking a scenario line instantly seeks it. Global Play always starts from the first executable step in a fresh worker context, not from the playhead. The Live Scenario Editor is an in-place Gherkin document presented as snap-together blocks whose text is Gherkin, including `Given` / `When` / `Then`. Users may edit any block, including previously executed text. The picker loads consumer scenarios into the live buffer. The default buffer is a Workbench-owned browser demo against `URL.home`. Workbench does not write `.feature` files unless **Save** is explicitly approved. Human Save asks before copying the live scenario into the original scenario in the original `.feature` file. An attached agent must use `workbench_request_save` and wait for Allow/Deny when the UI is present. Deny and Take control write nothing. WebView JavaScript must not execute Gherkin.
 
 The Step Editor has two play actions: **Step** executes only the editor text through `WorkbenchServices.executeStep` and leaves automatic playback paused; **From Here** restarts into a fresh scenario context and runs from the selected/playhead step through the rest of the buffer. Enter while waiting at end appends the step and continues the live run. Do not strip Gherkin keywords or add a Swing-side step matcher. Worker-side `DynamicControl` / `GherkinControl` remain the only Gherkin interpreters.
 
@@ -103,7 +103,9 @@ Workbench provides:
 java -jar pickleball-workbench-<version>.jar mcp <project>
 ```
 
-The MCP adapter is `tools.dscode.workbench.mcp.WorkbenchMcpServer` plus `WorkbenchMcpTools`. It exposes project synchronization/status, interactive worker lifecycle, live Gherkin, Mapping operations, events/evidence, browser/service controls, semantic breakpoints, and Step Override authoring through `WorkbenchServices`.
+The MCP adapter is `tools.dscode.workbench.mcp.WorkbenchMcpServer` plus `WorkbenchMcpTools`. It exposes project synchronization/status, interactive worker lifecycle, live Gherkin, Mapping operations, events/evidence, browser/service controls, semantic breakpoints, Step Override authoring, the watched-agent control lease, player-state inspection, and gated Save through `WorkbenchServices`.
+
+UI mode cannot share process stdout with stdio MCP. `ui` therefore starts a 127.0.0.1-only JSON attach facade (`WorkbenchAttachServer`) over the same tools and writes `.pickleball/workbench/attach.json` so a Copilot/MCP client can join the visible session. Bind localhost only. Do not launch a second `mcp` process against a running UI.
 
 MCP stdout is a hard protocol boundary. `WorkbenchApplication` reserves the original process stdout for the stdio transport and redirects ordinary `System.out` output to stderr before constructing the MCP SDK/controller. The executable must explicitly remain alive for the stdio session until stdin reaches EOF; do not rely on MCP SDK worker-thread liveness to keep the JVM running. Workbench diagnostic text must use stderr or `.pickleball/workbench/logs/`; worker stdout/stderr remain separately redirected to worker log files. No banner, normal log, worker output, test output, or diagnostic chatter may be written to MCP stdout.
 

@@ -574,7 +574,10 @@ tasks.register('verifyWorkbenchMcpStdio') {
             if (!names.containsAll([
                     'workbench_worker_status',
                     'workbench_execute_step',
-                    'workbench_step_override_compile'
+                    'workbench_step_override_compile',
+                    'workbench_request_control',
+                    'workbench_player_state',
+                    'workbench_request_save'
             ])) {
                 throw new GradleException("Workbench MCP tool list is incomplete: ${names}")
             }
