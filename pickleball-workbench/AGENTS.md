@@ -66,8 +66,8 @@ java -jar pickleball-workbench-<version>.jar ui <project>
 The UI is player-style and execution-oriented. Its primary layout is:
 
 ```text
-left rail: project feature / scenario picker
-center:    Live Gherkin block editor (JavaFX WebView) + compact Step Editor / Command
+left rail: scenario name/tag filters + results; optional feature-file filter
+center:    Live Gherkin editor (Text | Blocks) + compact Step Editor / Command
 right:     Mapping | Terminal | Diagnostic Log Explorer
 ```
 
@@ -75,7 +75,7 @@ Low-level lifecycle controls live under the Session menu and existing investigat
 
 `LiveScenarioPlayer` owns presentation/session-buffer state only: stable line IDs, the editable Gherkin document, selected line, playhead, and `STOPPED` / `PAUSED` / `RUNNING` / `WAITING_FOR_STEP`. It must remain headless-testable and must not parse/execute Pickleball steps, implement runtime rewind, model Mapping inheritance, or become Swing component state.
 
-The playhead is the user-visible needle. Clicking a scenario line instantly seeks it. Global Play always starts from the first executable step in a fresh worker context, not from the playhead. The Live Scenario Editor is an in-place Gherkin document presented as snap-together blocks whose text is Gherkin, including `Given` / `When` / `Then`. Users may edit any block, including previously executed text. The picker loads consumer scenarios into the live buffer. The default buffer is a Workbench-owned browser demo against `URL.home`. Workbench does not write `.feature` files unless **Save** is explicitly approved. Human Save asks before copying the live scenario into the original scenario in the original `.feature` file. An attached agent must use `workbench_request_save` and wait for Allow/Deny when the UI is present. Deny and Take control write nothing. WebView JavaScript must not execute Gherkin.
+The playhead is the user-visible needle. Clicking a scenario line instantly seeks it. Global Play always starts from the first executable step in a fresh worker context, not from the playhead. The Live Scenario Editor is an in-place Gherkin document presented as snap-together blocks whose text is Gherkin, including `Given` / `When` / `Then`. Users may edit any block, including previously executed text. The picker loads consumer scenarios into the live buffer after filtering by scenario name (starts with / contains / ends with / full match; default contains; all case-insensitive) and Cucumber tags (include AND, exclude NOT, with Feature/Rule/outline/Examples inheritance parsed from the `.feature` files). Feature-file selection is a collapsed secondary filter; with none selected, name/tag apply to every catalog scenario. The default buffer is a Workbench-owned browser demo against `URL.home`. Workbench does not write `.feature` files unless **Save** is explicitly approved. Human Save asks before copying the live scenario into the original scenario in the original `.feature` file. An attached agent must use `workbench_request_save` and wait for Allow/Deny when the UI is present. Deny and Take control write nothing. A prominent **Text | Blocks** toggle shows the same live buffer as ordinary Gherkin or as the WebView block editor without losing playhead, selection, or document text. If JavaFX/WebView is unavailable, Text is the fallback and Blocks stays honestly unavailable. WebView JavaScript must not execute Gherkin.
 
 The Step Editor has two play actions: **Step** executes only the editor text through `WorkbenchServices.executeStep` and leaves automatic playback paused; **From Here** restarts into a fresh scenario context and runs from the selected/playhead step through the rest of the buffer. Enter while waiting at end appends the step and continues the live run. Do not strip Gherkin keywords or add a Swing-side step matcher. Worker-side `DynamicControl` / `GherkinControl` remain the only Gherkin interpreters.
 
@@ -93,7 +93,7 @@ Existing capabilities remain available: project/synchronization status, worker l
 
 The Swing Mapping put control sends entered values as text; it does not create a second Mapping parser or state model. Step Override source is sent unchanged to worker-side compilation and must contain `{{CLASS_NAME}}`; the UI must never compile handlers in the controller JVM. Browser/service/screenshot controls only present bridge evidence already supplied by Pickleball. Breakpoint controls delegate the hook/filter/lease contract to the shared service and must not recreate coordinator semantics.
 
-Blocking synchronization, process, bridge, Mapping, event, screenshot, service-call, Step Override, and breakpoint actions must not run on the Swing Event Dispatch Thread. Live controls must target the controller-owned running/paused worker. Semantic-event cursors are worker-local and must reset when a fresh worker is started/restarted. Prefer headless-safe tests around player state and presentation/controller delegation rather than tests requiring a visible desktop.
+Blocking synchronization, process, bridge, Mapping, event, screenshot, service-call, Step Override, and breakpoint actions must not run on the Swing Event Dispatch Thread. Live controls must target the controller-owned running/paused worker. When an agent holds the control lease, lock picker/filter fields, scenario list, feature-filter disclosure, the Text | Blocks toggle, and the live editor the same way other play/edit controls lock. Semantic-event cursors are worker-local and must reset when a fresh worker is started/restarted. Prefer headless-safe tests around player state, catalog/filter models, editor-view toggling, and presentation/controller delegation rather than tests requiring a visible desktop.
 
 ## MCP stdio
 

@@ -119,23 +119,28 @@ The primary workspace is an interactive Gherkin player with a project feature pi
 
 ```text
 +-------------------------------------------------------------------------+
-| Features | Project / readiness     Play  Pause  Stop     Player status  |
-+----------+---------------------------+----------------------------------+
-| Feature /| LIVE GHERKIN EDITOR       | Mapping | Terminal | Diagnostic  |
-| file     | (WebView block editor)    | WebView tree / typed values      |
-| picker   | highlighted playhead      | worker log / retained-run frames |
-| + search |                           |                                  |
-+----------+---------------------------+                                  |
-|          | Step Editor [Step] [From  |                                  |
-|          | Here] [ live command ]    |                                  |
-+----------+---------------------------+----------------------------------+
+| Scenarios | Project / readiness      Play  Pause  Stop    Player status |
++-----------+--------------------------+----------------------------------+
+| Name +    | LIVE GHERKIN EDITOR      | Mapping | Terminal | Diagnostic  |
+| match mode| [Text | Blocks]          | WebView tree / typed values      |
+| tags AND  | playhead on same buffer  | worker log / retained-run frames |
+| tags NOT  |                          |                                  |
+| scenario  |                          |                                  |
+| list      |                          |                                  |
+| (feature  |                          |                                  |
+|  filter   |                          |                                  |
+|  hidden)  |                          |                                  |
++-----------+--------------------------+                                  |
+|           | Step Editor [Step] [From |                                  |
+|           | Here] [ live command ]   |                                  |
++-----------+--------------------------+----------------------------------+
 | Footer activity                                                         |
 +-------------------------------------------------------------------------+
 ```
 
-The expandable left rail lists feature files from the synchronized consumer project. Browse by Gherkin Feature name or by file name + directory path. Click toggles feature selection. The scenario list is limited to selected features, or to every project scenario when nothing is selected; the search bar filters that list. Clicking a scenario loads it into the live session buffer. Workbench does not write `.feature` files unless you use the explicit **Save** control.
+The left rail is a scenario filter, not a feature-file browser. Primary controls are scenario name (starts with / contains / ends with / full match; default contains; all four are case-insensitive against the Gherkin Scenario / Scenario Outline title), tags the scenario must have (AND), and tags it must not have (NOT). Include/exclude fields accept any number of tags, with or without a leading `@`, split on commas and/or whitespace. Empty include/exclude means no tag constraint. Feature-level tags, optional Rule tags, the scenario/outline's own tags, and Examples tags on an outline are inherited the same way Cucumber does; Workbench parses those tags from the catalog `.feature` files and does not call Cucumber. Feature-file selection is collapsed behind **Filter by feature** (Gherkin Feature name vs file path lives in that panel). Default: no feature filter, so name/tag apply to every catalog scenario in the synchronized project. Clicking a result still loads that scenario into the live session buffer. Workbench does not write `.feature` files unless you use the explicit **Save** control.
 
-The center editor is an embedded HTML/JS block editor hosted in JavaFX `WebView` (`JFXPanel`). Blocks are Gherkin text — including `Given` / `When` / `Then` — not a second language compiled to Gherkin. Nested steps and `IF` / `ELSE` blocks snap as parent/child using Pickleball's leading-colon grammar. The play header is unchanged: click-to-seek, global **Play** from the first step in a fresh worker context, **Step** = isolated `executeStep`, **From Here** = selected/playhead through the rest, stay in play at end, Enter append-and-run. JavaScript never executes Gherkin.
+The center editor shows the same `LiveScenarioPlayer` buffer as ordinary Gherkin text or as the embedded HTML/JS block editor hosted in JavaFX `WebView` (`JFXPanel`). A prominent **Text | Blocks** toggle next to the editor heading switches views without losing playhead, selection, or document text. Blocks are Gherkin text — including `Given` / `When` / `Then` — not a second language compiled to Gherkin. Nested steps and `IF` / `ELSE` blocks snap as parent/child using Pickleball's leading-colon grammar. The play header is unchanged: click-to-seek, global **Play** from the first step in a fresh worker context, **Step** = isolated `executeStep`, **From Here** = selected/playhead through the rest, stay in play at end, Enter append-and-run. JavaScript never executes Gherkin. If JavaFX cannot start, Text is already the fallback and Blocks stays disabled/unavailable.
 
 The right side remains Mapping, Terminal, and Diagnostic Log Explorer. Low-level lifecycle controls stay under **Session**. Existing investigation tools stay under **Tools > Advanced Controls**.
 
@@ -202,7 +207,7 @@ NodeMap implementations that are not exact ordinary `NodeMap` instances remain i
 
 ### WebView packaging
 
-JDK 21 does not ship a modern browser panel. Workbench embeds OpenJFX `WebView` through `JFXPanel` for the Gherkin editor, Mapping tree, and Diagnostic explorer. That choice stays Workbench-only: Maven-central JavaFX modules are shaded into the controller executable, including platform natives under `javafx-natives/<platform>/`. JCEF was not used because Chromium natives are harder to keep isolation-clean and do not package as ordinary Workbench dependencies. If JavaFX cannot start, the live editor falls back to the existing in-place text buffer on the same `LiveScenarioPlayer` model.
+JDK 21 does not ship a modern browser panel. Workbench embeds OpenJFX `WebView` through `JFXPanel` for the Gherkin editor, Mapping tree, and Diagnostic explorer. That choice stays Workbench-only: Maven-central JavaFX modules are shaded into the controller executable, including platform natives under `javafx-natives/<platform>/`. JCEF was not used because Chromium natives are harder to keep isolation-clean and do not package as ordinary Workbench dependencies. If JavaFX cannot start, the live editor stays on the existing in-place text buffer on the same `LiveScenarioPlayer` model; the **Text | Blocks** toggle remains visible and Blocks is disabled so the fallback is honest.
 
 ### Terminal and Diagnostic Log Explorer
 
@@ -251,7 +256,7 @@ Workbench owns one control lease for the live session. Swing and MCP/HTTP adapte
 
 While the human holds the lease, Swing play/edit/mapping/save/worker controls stay enabled. Agent mutating calls fail clearly until `workbench_request_control`.
 
-While an agent holds the lease, the human can watch the same window. Play, edit, Mapping writes, Save, and worker lifecycle controls lock. The WebView editors stay mounted and become read-only; they are not torn down. A banner names the agent and shows `currentAction`. **Take control** stays enabled. Take control returns the lease to `HUMAN`, unlocks Swing, and fails any in-flight agent permission wait so a blocked Save does not write.
+While an agent holds the lease, the human can watch the same window. Play, edit, picker/filter, editor view toggle, Mapping writes, Save, and worker lifecycle controls lock. The WebView editors stay mounted and become read-only; they are not torn down. A banner names the agent and shows `currentAction`. **Take control** stays enabled. Take control returns the lease to `HUMAN`, unlocks Swing, and fails any in-flight agent permission wait so a blocked Save does not write.
 
 The agent should update `currentAction` as it works. Playhead, Mapping, Terminal, and screenshots follow because the agent uses the same `LiveScenarioPlayer` / worker as the UI. Testing the live scenario (`executeStep`, play, Mapping reads, evidence) is allowed on the agent lease. Copying the live scenario into the original `.feature` is not; that goes through `workbench_request_save` and waits for Allow/Deny in the Swing banner.
 
@@ -433,24 +438,28 @@ java -jar $workbenchJar ui ".\maven-consumer-project"
 
 Use the UI-owned worker for runtime checks; do not run `worker-check` or `live-check` concurrently with the UI.
 
-1. Verify the top-level layout has an expandable Features picker, the Live Gherkin Editor and compact Step Editor in the center, and exactly Mapping / Terminal / Diagnostic Log Explorer on the right.
+1. Verify the top-level layout has a scenario name/tag filter rail (feature-file filter collapsed), the Live Gherkin Editor with a **Text | Blocks** toggle and compact Step Editor in the center, and exactly Mapping / Terminal / Diagnostic Log Explorer on the right.
 2. Confirm the default buffer is the Workbench demo scenario and includes `navigate to: URL.home` plus a click on the local test site when no picker scenario is selected.
-3. Click different scenario blocks and verify the playhead highlight moves immediately to the clicked step.
-4. Edit previously typed or previously executed Gherkin directly in the Live Scenario Editor and verify the line text updates in place.
-5. Press global **Play** after seeking the playhead to a later step and verify execution still starts from the first executable step in a fresh worker context.
-6. Use **From Here** on a later executable step and verify playback starts there and continues through the rest of the buffer.
-7. Use **Step** in the Step Editor and verify isolated `executeStep` execution that leaves automatic playback paused.
-8. Let a run reach the end and verify the player stays in **Waiting for step**. Type a new step and press Enter; the step is appended and executed without dropping out of play.
-9. Treat **Pause** / **Stop** as presentation/control of automatic advancement only; they do not rewind browser or service side effects.
-10. Verify Mapping has no `Current Scope` control and no hard-coded NodeMap choices. Top-level properties come from the worker ParsingMap and accept typed in-place edits.
-11. Verify Terminal filters worker log files by level and continues as steps run, without writing to MCP stdout.
-12. Verify Diagnostic Log Explorer lists retained runs from `reports/diagnostic-runs` only, or shows an honest empty state.
-13. Verify **Tools > Advanced Controls** still exposes Status, Recent Events, Step Overrides, Evidence, and Breakpoints.
-14. Verify blocking runtime actions leave the Swing UI responsive.
-15. Load a picker scenario, click **Save**, and cancel the confirmation; the original `.feature` file must be unchanged. Confirming copies only that scenario back into the originating file.
-16. Attach an agent to `.pickleball/workbench/attach.json`, call `workbench_request_control`, and verify the banner plus locked play/edit/mapping/save/worker controls. **Take control** remains enabled.
-17. While the agent holds the lease, `workbench_request_save` shows Allow/Deny. Deny writes nothing. Take control cancels the wait without writing.
-18. The default demo remains unsavable for both human Save and agent `workbench_request_save`.
+3. Filter scenarios by name using contains (default) and the other match modes; confirm matching is case-insensitive and applies to the Scenario / Scenario Outline title.
+4. Filter with include tags (AND) and exclude tags (NOT), with and without `@`, and confirm Feature-level tags apply to scenarios in that feature.
+5. Confirm **Filter by feature** is collapsed by default and that name/tag filters then apply to every catalog scenario. Opening it still supports multi-select and Feature name vs file path.
+6. Click a filtered scenario and verify it loads into the live buffer. Switch **Text | Blocks** and verify playhead, selection, and document text are unchanged. If WebView is unavailable, Blocks is disabled and Text remains the editor.
+7. Click different scenario blocks/lines and verify the playhead highlight moves immediately to the clicked step.
+8. Edit previously typed or previously executed Gherkin directly in the Live Scenario Editor and verify the line text updates in place.
+9. Press global **Play** after seeking the playhead to a later step and verify execution still starts from the first executable step in a fresh worker context.
+10. Use **From Here** on a later executable step and verify playback starts there and continues through the rest of the buffer.
+11. Use **Step** in the Step Editor and verify isolated `executeStep` execution that leaves automatic playback paused.
+12. Let a run reach the end and verify the player stays in **Waiting for step**. Type a new step and press Enter; the step is appended and executed without dropping out of play.
+13. Treat **Pause** / **Stop** as presentation/control of automatic advancement only; they do not rewind browser or service side effects.
+14. Verify Mapping has no `Current Scope` control and no hard-coded NodeMap choices. Top-level properties come from the worker ParsingMap and accept typed in-place edits.
+15. Verify Terminal filters worker log files by level and continues as steps run, without writing to MCP stdout.
+16. Verify Diagnostic Log Explorer lists retained runs from `reports/diagnostic-runs` only, or shows an honest empty state.
+17. Verify **Tools > Advanced Controls** still exposes Status, Recent Events, Step Overrides, Evidence, and Breakpoints.
+18. Verify blocking runtime actions leave the Swing UI responsive.
+19. Load a picker scenario, click **Save**, and cancel the confirmation; the original `.feature` file must be unchanged. Confirming copies only that scenario back into the originating file.
+20. Attach an agent to `.pickleball/workbench/attach.json`, call `workbench_request_control`, and verify the banner plus locked play/edit/picker/filter/editor-view/mapping/save/worker controls. **Take control** remains enabled.
+21. While the agent holds the lease, `workbench_request_save` shows Allow/Deny. Deny writes nothing. Take control cancels the wait without writing.
+22. The default demo remains unsavable for both human Save and agent `workbench_request_save`.
 
 ## Regression
 

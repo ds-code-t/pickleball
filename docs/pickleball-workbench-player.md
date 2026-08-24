@@ -25,15 +25,17 @@ The player, picker, Mapping editor, Terminal, and Diagnostic explorer do not cha
 
 ## Feature and scenario picker
 
-The expandable left rail lists `.feature` files from the synchronized consumer project: manifest source roots, conventional `src/test/resources/features`, live merged `features/` resources, and an explicit project-owned `pkb_features` value when present. It does not crawl an unrelated git worktree.
+The left rail lists scenarios from `.feature` files in the synchronized consumer project: manifest source roots, conventional `src/test/resources/features`, live merged `features/` resources, and an explicit project-owned `pkb_features` value when present. It does not crawl an unrelated git worktree.
 
-Toggle browse mode between Gherkin Feature name and file name + directory path. Click selects or deselects features. The scenario list then shows scenarios under the selection. With no feature selected, the search bar filters every scenario in that project catalog. Clicking a scenario loads it into the live editor. The default demo remains loaded until a scenario is chosen. **Save** is the only write-back path.
+Name and tag filtering is the primary UI. Type a scenario name and choose a match mode: starts with, contains (default), ends with, or full match. All four modes are case-insensitive and match only the Gherkin `Scenario` / `Scenario Outline` title. Include tags must all be present (AND). Exclude tags drop a scenario if it has any of them (NOT). Tag fields accept values with or without a leading `@` and split on commas and/or whitespace. Empty include/exclude means no tag constraint. Feature, Rule, scenario/outline, and Examples tags are inherited as Cucumber does; Workbench parses them from the same catalog files and does not call Cucumber from the controller JVM.
+
+Feature-file selection is secondary and collapsed behind **Filter by feature**. With no feature selected, name/tag filters apply to every catalog scenario. Opening that panel still toggles browse mode between Gherkin Feature name and file name + directory path, and click still selects or deselects features. Clicking a scenario loads it into the live editor. The default demo remains loaded until a scenario is chosen. **Save** is the only write-back path.
 
 ## Live Scenario Editor
 
-The center editor is an embedded HTML/JS block editor in JavaFX `WebView`. Blocks are Gherkin text, including `Given` / `When` / `Then`. Nested steps and `IF` / `ELSE` snap as parent/child using leading colons. Clicking a block instantly seeks the playhead, like clicking a waveform. The execution cursor is internal to an active run.
+The center editor is an embedded HTML/JS block editor in JavaFX `WebView`, or ordinary Gherkin text on the same `LiveScenarioPlayer` buffer. A prominent **Text | Blocks** toggle next to the editor heading switches those views without losing playhead, selection, or document text. Play, Step, and From Here keep using the same `LiveScenarioPlayer`. Blocks are Gherkin text, including `Given` / `When` / `Then`. Nested steps and `IF` / `ELSE` snap as parent/child using leading colons. Clicking a block or line instantly seeks the playhead, like clicking a waveform. The execution cursor is internal to an active run.
 
-Workbench chose OpenJFX `WebView` + `JFXPanel` over JCEF so the browser panel stays a Workbench-only Maven dependency that shades into the controller JAR. JDK 21 does not ship a modern browser component. If JavaFX cannot start, the same `LiveScenarioPlayer` buffer remains editable as plain Gherkin text.
+Workbench chose OpenJFX `WebView` + `JFXPanel` over JCEF so the browser panel stays a Workbench-only Maven dependency that shades into the controller JAR. JDK 21 does not ship a modern browser component. If JavaFX cannot start, the same `LiveScenarioPlayer` buffer remains editable as plain Gherkin text and Blocks is shown as unavailable.
 
 The initial buffer is Workbench-owned sample content. It is not written back to consumer `.feature` files unless you use **Save** on a picker-loaded scenario and confirm the copy. The default demo is a small browser scenario against the Maven consumer local test site:
 
@@ -114,7 +116,7 @@ The live player is a collaborative testing space, not a second editor. Swing and
 
 - A human can work alone: edit/play the live buffer, then **Save** asks before copying into the original scenario in the original `.feature` file.
 - An agent attaches to the running UI through `.pickleball/workbench/attach.json` (localhost JSON tools over the same `WorkbenchServices`). It must not start a second Workbench JVM or worker.
-- After `workbench_request_control`, Swing play/edit/mapping/save/worker controls lock. A banner shows the agent name and `currentAction`. **Take control** always works and cancels in-flight Save permission waits.
+- After `workbench_request_control`, Swing play/edit/picker/filter/editor-view/mapping/save/worker controls lock. A banner shows the agent name and `currentAction`. **Take control** always works and cancels in-flight Save permission waits.
 - `workbench_request_save` is the only original-feature write path for the agent. With the UI attached it blocks on Allow/Deny. Deny writes nothing. Headless stdio MCP may hold the lease without a banner; Save is still an explicit tool.
 
 See [pickleball-workbench.md](pickleball-workbench.md) for attach discovery, tool names, and stdout rules.
@@ -127,7 +129,7 @@ The included consumer `@control-bridge` scenario verifies:
 - the current ParsingMap catalog contains at least one NodeMap;
 - a catalog reference resolves back to a live NodeMap.
 
-Workbench player/editor unit tests cover picker selection/search, block buffer ↔ player model, click-to-seek, global Play from start, the two Step Editor play actions, wait-at-end / Enter-to-append-and-run, in-place edit of previously executed text, leftover Play-loop playhead marks after `executeStep`, typed Mapping edits through `WorkbenchServices`, the non-empty browser demo seed, control-lease lock/Take control, permission grant/deny, and Save not writing without approval.
+Workbench player/editor unit tests cover picker name/tag/feature filtering (including Feature-level tag inheritance), block buffer ↔ player model, Text | Blocks view toggling without changing document text or playhead id, click-to-seek, global Play from start, the two Step Editor play actions, wait-at-end / Enter-to-append-and-run, in-place edit of previously executed text, leftover Play-loop playhead marks after `executeStep`, typed Mapping edits through `WorkbenchServices`, the non-empty browser demo seed, control-lease lock/Take control, permission grant/deny, and Save not writing without approval.
 
 Workbench changes should continue to use the repository's focused validation policy:
 
