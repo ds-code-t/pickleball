@@ -30,7 +30,7 @@ public final class LiveEditorView {
         return new LiveEditorView(false);
     }
 
-    public boolean blocksAvailable() {
+    public boolean canShowBlocks() {
         return blocksAvailable;
     }
 

@@ -371,7 +371,7 @@ final class WorkbenchFrame extends JFrame {
         textViewButton.setFocusable(false);
         blocksViewButton.setFocusable(false);
         textViewButton.setToolTipText("View and edit the live scenario as ordinary Gherkin text.");
-        blocksViewButton.setToolTipText(editorView.blocksAvailable()
+        blocksViewButton.setToolTipText(editorView.canShowBlocks()
                 ? "View and edit the same live buffer as Gherkin blocks."
                 : "Block view requires JavaFX WebView, which is not available in this process.");
         textViewButton.addActionListener(event -> {
@@ -405,7 +405,7 @@ final class WorkbenchFrame extends JFrame {
         cards.show(editorHost, blocks ? "web" : "text");
         textViewButton.setSelected(!blocks);
         blocksViewButton.setSelected(blocks);
-        blocksViewButton.setEnabled(editorView.blocksAvailable() && !humanControlsLocked());
+        blocksViewButton.setEnabled(editorView.canShowBlocks() && !humanControlsLocked());
         textViewButton.setEnabled(!humanControlsLocked());
         if (blocks) {
             pushGherkinView();
@@ -1499,7 +1499,7 @@ final class WorkbenchFrame extends JFrame {
         playerStopButton.setEnabled(!locked);
         stepOnlyButton.setEnabled(!locked);
         textViewButton.setEnabled(!locked);
-        blocksViewButton.setEnabled(editorView.blocksAvailable() && !locked);
+        blocksViewButton.setEnabled(editorView.canShowBlocks() && !locked);
         takeControlButton.setEnabled(locked);
         if (locked) {
             fromHereButton.setEnabled(false);

@@ -40,7 +40,7 @@ class LiveEditorViewTest {
     @Test
     void unavailableBlocksStayOnTextAndRefuseBlockMode() {
         LiveEditorView view = LiveEditorView.blocksUnavailable();
-        assertFalse(view.blocksAvailable());
+        assertFalse(view.canShowBlocks());
         assertEquals(LiveEditorView.Mode.TEXT, view.mode());
         assertFalse(view.showBlocks());
         assertEquals(LiveEditorView.Mode.TEXT, view.mode());
