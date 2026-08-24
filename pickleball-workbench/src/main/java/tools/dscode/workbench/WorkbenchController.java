@@ -365,18 +365,10 @@ public final class WorkbenchController implements WorkbenchServices {
     }
 
     private void maybeAdvancePlayhead(String text, boolean successful) {
-        LiveScenarioPlayer.Line next = player.nextStep().orElse(null);
-        if (next != null && text != null && next.text().equals(text)
-                && player.state() == LiveScenarioPlayer.State.RUNNING) {
-            try {
-                if (successful) {
-                    player.markCurrentStepExecuted(next.id());
-                } else {
-                    player.markCurrentStepFailed(next.id());
-                }
-            } catch (RuntimeException ignored) {
-                // Playhead follow is best-effort presentation; worker execution already finished.
-            }
+        try {
+            playback.followExecutedStep(text, successful);
+        } catch (RuntimeException ignored) {
+            // Playhead follow is best-effort presentation; worker execution already finished.
         }
         notifyPlayer();
     }

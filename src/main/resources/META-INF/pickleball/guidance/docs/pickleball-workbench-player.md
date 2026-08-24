@@ -59,6 +59,7 @@ Scenario: Open the local test site
   - **Step** executes only the Step Editor text against the current paused live context and leaves automatic scenario playback paused.
   - **From Here** creates a fresh interactive scenario context and treats the selected/playhead executable step as the first step of that run, then continues through the remaining buffer.
 - Fresh scenario playback restarts the consumer worker so browser, Mapping, service, and other side effects from a previous run do not leak into a new **Play** or **From Here** run.
+- Automatic **Play** / **From Here** send each executable live-buffer line through `executeStep`. While the player is `RUNNING`, that controller call is the single playhead owner: success advances to the next executable line, failure pauses on the failed line. The Swing Play loop then refreshes and schedules the next line without remaking the same mark. An attached agent `execute_step` uses the same follow so the spectator playhead stays aligned. Isolated **Step** pauses first, so it does not move the playhead. Marking an already-consumed step is a no-op, so a leftover UI callback cannot abort playback after a successful worker step.
 - Reaching the end while playing changes the player to **Waiting for step** rather than stopping. Typing a new step and pressing **Enter** appends it to the end of the live scenario and executes it as part of the same live run.
 - **Ctrl+Enter** updates the selected line in place. The whole-scenario editor also accepts ordinary typing at any line.
 - The editor highlights the current playhead line. Successful lines do not retain checkmarks or become locked.
@@ -126,7 +127,7 @@ The included consumer `@control-bridge` scenario verifies:
 - the current ParsingMap catalog contains at least one NodeMap;
 - a catalog reference resolves back to a live NodeMap.
 
-Workbench player/editor unit tests cover picker selection/search, block buffer ↔ player model, click-to-seek, global Play from start, the two Step Editor play actions, wait-at-end / Enter-to-append-and-run, in-place edit of previously executed text, typed Mapping edits through `WorkbenchServices`, the non-empty browser demo seed, control-lease lock/Take control, permission grant/deny, and Save not writing without approval.
+Workbench player/editor unit tests cover picker selection/search, block buffer ↔ player model, click-to-seek, global Play from start, the two Step Editor play actions, wait-at-end / Enter-to-append-and-run, in-place edit of previously executed text, leftover Play-loop playhead marks after `executeStep`, typed Mapping edits through `WorkbenchServices`, the non-empty browser demo seed, control-lease lock/Take control, permission grant/deny, and Save not writing without approval.
 
 Workbench changes should continue to use the repository's focused validation policy:
 

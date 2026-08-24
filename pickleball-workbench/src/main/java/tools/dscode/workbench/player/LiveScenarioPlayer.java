@@ -283,9 +283,16 @@ public final class LiveScenarioPlayer {
         state = State.PAUSED;
     }
 
-    /** Advances a successful run to the next executable line and stays in play at end. */
+    /**
+     * Advances a successful run to the next executable line and stays in play at end.
+     * Already-consumed or stale ids are ignored so a leftover Play-loop callback
+     * cannot abort automatic playback.
+     */
     public void markCurrentStepExecuted(long stepId) {
-        int index = requireCurrentStep(stepId);
+        int index = currentExecutableIndex(stepId);
+        if (index < 0) {
+            return;
+        }
         lastExecutedId = stepId;
         executionIndex = findNextExecutableIndex(index + 1);
         if (executionIndex < lines.size()) {
@@ -295,9 +302,16 @@ public final class LiveScenarioPlayer {
         }
     }
 
-    /** Leaves a failed run paused on its failed line. */
+    /**
+     * Leaves a failed run paused on its failed line. Already-consumed or stale
+     * ids are ignored.
+     */
     public void markCurrentStepFailed(long stepId) {
-        executionIndex = requireCurrentStep(stepId);
+        int index = currentExecutableIndex(stepId);
+        if (index < 0) {
+            return;
+        }
+        executionIndex = index;
         playheadId = stepId;
         selectedId = stepId;
         state = State.PAUSED;
@@ -357,10 +371,10 @@ public final class LiveScenarioPlayer {
         return lines.size();
     }
 
-    private int requireCurrentStep(long id) {
+    private int currentExecutableIndex(long id) {
         if (executionIndex >= lines.size() || !lines.get(executionIndex).executable()
                 || lines.get(executionIndex).id() != id) {
-            throw new IllegalStateException("Step " + id + " is not the current execution step.");
+            return -1;
         }
         return executionIndex;
     }
