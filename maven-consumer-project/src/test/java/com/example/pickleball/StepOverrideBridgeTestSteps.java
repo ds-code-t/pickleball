@@ -4,12 +4,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.cucumber.java.After;
 import io.cucumber.java.en.Given;
 import tools.dscode.control.bridge.ControlBridgeBootstrap;
-import tools.dscode.control.bridge.ControlBridgeCallResult;
-import tools.dscode.control.bridge.ControlBridgeDescriptor;
-import tools.dscode.control.bridge.ControlBridgeScenarioStatus;
-import tools.dscode.control.bridge.ControlBridgeStepOverride;
-import tools.dscode.control.bridge.ControlBridgeStepOverrideResult;
-import tools.dscode.control.bridge.ControlBridgeValueResult;
+import tools.dscode.control.protocol.ControlBridgeCallResult;
+import tools.dscode.control.protocol.ControlBridgeDescriptor;
+import tools.dscode.control.protocol.ControlBridgeScenarioStatus;
+import tools.dscode.control.protocol.ControlBridgeStepOverride;
+import tools.dscode.control.protocol.ControlBridgeStepOverrideResult;
+import tools.dscode.control.protocol.ControlBridgeValueResult;
 
 import java.io.IOException;
 import java.net.URI;

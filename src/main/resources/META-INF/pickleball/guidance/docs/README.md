@@ -2,7 +2,7 @@
 
 Pickleball extends Cucumber with a dynamic feature-file language while preserving normal Cucumber behavior. The pages below describe the supported authoring model and link to real executable examples in [`maven-consumer-project`](consumer-project.md).
 
-When these docs are materialized from the Maven dependency with `DiagnosticCli export-guidance`, links to `../maven-consumer-project/...` resolve to the version-matched, read-only reference snapshot exported beside the docs. Human readers and AI agents can therefore inspect the same working features, configuration, calls, data, runner, and local test-site examples without checking out the Pickleball source repository.
+When these docs are materialized from the Maven dependency with `DiagnosticCli export-guidance`, links to `../maven-consumer-project/...` resolve to the version-matched, read-only reference snapshot exported beside the docs. Human readers can inspect those working features, configuration, calls, data, runner, and local test-site examples without checking out the Pickleball source repository. Consumer AI agents should follow `.pickleball/AGENT-GUIDE.md` first and open a specific guide only when needed.
 
 ## Start here
 
@@ -37,7 +37,8 @@ When these docs are materialized from the Maven dependency with `DiagnosticCli e
 - [AI and automation run configuration](ai-run-configuration.md) — controlled `pkb_runvars`, inherited execution context, retained `pkb_run_profile`, `pkb_configpath`, protected values, and deterministic diagnostic reruns.
 - [Dynamic control API](dynamic-control-api.md) — optional retry-friendly dynamic Gherkin execution, isolated/scoped ParsingMap control, snapshots, value interception, synchronous semantic hooks, and the consumer-side Control Bridge used by Workbench.
 - [Step Overrides](step-overrides.md) — live REGEX/REPLACE step implementation authoring in a persistent worker, including generated Java handlers and Workbench management.
-- [Pickleball Workbench](pickleball-workbench.md) — separate executable companion with synchronization, persistent live worker control, browser/service evidence, semantic breakpoints, Step Override authoring, lightweight non-Spring MCP stdio, and thin Swing UI.
+- [Pickleball Workbench](pickleball-workbench.md) — dependency-matched external controller embedded opaquely in Pickleball, with a neutral versioned protocol, strict core-free artifact/process boundary, consumer-classpath worker, MCP stdio, and Swing UI.
+- [Workbench live player](pickleball-workbench-player.md) — click-to-seek playhead, Play from start, Step vs From Here, wait-at-end add-and-continue, in-place Gherkin editing, and the default local-site demo.
 - [Diagnostic lineage and metadata](diagnostic-lineage-metadata.md) — distinguish lineage annotations, execution/evidence RunVars, controls, and derived evidence.
 - [Diagnostic reporting](diagnostic-reporting.md) — sparse-first AI evidence, source provenance, step/capability metadata, trace evidence, screenshots/fingerprints, comparison, and retention.
 - [AI diagnostic reporting plan](ai-diagnostic-reporting-plan.md) — current sparse-first investigation and controlled-rerun architecture.

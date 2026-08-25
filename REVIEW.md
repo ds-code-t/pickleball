@@ -13,6 +13,16 @@ Review changes against the following repository requirements.
 - Flag consumer-visible behavior changes without a Maven consumer scenario when one is practical.
 - Check supporting service definitions, test data, configuration, local endpoints, and pages.
 - Flag weakened or removed assertions that merely hide failures.
+- For Workbench/protocol changes, require focused `@control-bridge` and/or `@step-override-bridge` coverage with `pkb_parallel=80` where practical; flag `@all` as the migration-validation tag.
+
+## Workbench controller isolation
+
+- Reject any Workbench compile/runtime dependency on root Pickleball, `tools.dscode:pickleball`, a published-equivalent variant, behavioral `pickleball-control-api`, Cucumber, Selenium, or REST-assured.
+- Require shared Java types to stay in the JDK-only `pickleball-control-protocol`; worker bridge behavior and runtime translation stay in core.
+- Require the Workbench artifact/process to be core-free and the separate worker to load Pickleball only from the consumer's captured test-runtime classpath.
+- Require dependency provenance, nested JAR/service scans, distinct PID, runtime code-source/version checks, worker exclusion of the controller artifact, and clear incompatibility failure.
+- Require the outer Pickleball JAR to contain exactly one byte-identical opaque Workbench payload without flattened Workbench/MCP classes. Pickleball may contain Workbench; Workbench must not contain Pickleball.
+
 ## Documentation and maintained context
 
 - Flag changes to behavior, syntax, inputs, outputs, defaults, constraints, errors, edge cases, or compatibility that do not update the canonical documentation.

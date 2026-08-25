@@ -1,0 +1,36 @@
+html, body {
+  margin: 0;
+  height: 100%;
+  background: #f8fafc;
+  color: #111827;
+  font: 13px/1.4 "Segoe UI", "SF Pro Text", sans-serif;
+}
+.toolbar {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 12px;
+  border-bottom: 1px solid #dbe2ea;
+  background: #fff;
+}
+select, input, textarea, button {
+  border: 1px solid #d7dee7;
+  border-radius: 8px;
+  padding: 5px 8px;
+  font: inherit;
+}
+.status { color: #6b7280; }
+.tree { padding: 12px; }
+.row {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) 140px minmax(160px, 2fr);
+  gap: 8px;
+  margin-bottom: 8px;
+  align-items: start;
+}
+textarea {
+  min-height: 34px;
+  font: 12px/1.4 ui-monospace, Consolas, monospace;
+  width: 100%;
+}
+.empty { color: #6b7280; padding: 18px; }

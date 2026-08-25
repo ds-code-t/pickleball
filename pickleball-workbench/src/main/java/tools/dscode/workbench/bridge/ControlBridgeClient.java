@@ -1,7 +1,10 @@
 package tools.dscode.workbench.bridge;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import tools.dscode.control.bridge.*;
+import tools.dscode.control.protocol.*;
+
+import static tools.dscode.control.protocol.ControlBridgeRequests.*;
+import static tools.dscode.control.protocol.ControlBridgeResponses.*;
 
 import java.io.IOException;
 import java.net.URI;
@@ -19,13 +22,12 @@ import java.util.Objects;
 /**
  * Workbench-side HTTP client for the consumer-hosted Pickleball control bridge.
  *
- * <p>The client uses the bridge DTOs published inside {@code tools.dscode:pickleball};
- * it does not duplicate Pickleball runtime semantics in the controller.</p>
+ * <p>The client depends only on the neutral control-protocol DTOs. Pickleball
+ * runtime semantics remain exclusively in the consumer worker.</p>
  */
 public final class ControlBridgeClient {
     private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(5);
     private static final Duration READ_TIMEOUT = Duration.ofSeconds(10);
-    private static final int PROTOCOL_VERSION = 1;
 
     private final ObjectMapper json;
     private final HttpClient http;
@@ -47,7 +49,7 @@ public final class ControlBridgeClient {
             ObjectMapper json,
             HttpClient http
     ) {
-        this.descriptor = descriptor;
+        this.descriptor = validateDescriptor(descriptor);
         this.token = token;
         this.json = json;
         this.http = http;
@@ -362,17 +364,50 @@ public final class ControlBridgeClient {
     }
 
     private URI uri(String path) {
+        return URI.create("http://" + descriptor.host() + ":" + descriptor.port() + path);
+    }
+
+    private static ControlBridgeDescriptor validateDescriptor(ControlBridgeDescriptor descriptor) {
+        Objects.requireNonNull(descriptor, "descriptor");
         if (!"127.0.0.1".equals(descriptor.host())) {
             throw new IllegalArgumentException(
                     "Control bridge descriptor is not loopback-bound: " + descriptor.host()
             );
         }
-        if (descriptor.protocolVersion() != PROTOCOL_VERSION) {
+        if (descriptor.port() <= 0 || descriptor.port() > 65_535) {
             throw new IllegalArgumentException(
-                    "Unsupported control bridge protocol: " + descriptor.protocolVersion()
+                    "Control bridge descriptor has an invalid loopback port: " + descriptor.port()
             );
         }
-        return URI.create("http://" + descriptor.host() + ":" + descriptor.port() + path);
+        if (descriptor.sessionId() == null || descriptor.sessionId().isBlank()
+                || descriptor.runtimeId() == null || descriptor.runtimeId().isBlank()) {
+            throw new IllegalArgumentException(
+                    "Control bridge descriptor must identify its session and runtime."
+            );
+        }
+        boolean validWorkerRange = descriptor.minimumCompatibleProtocolVersion() > 0
+                && descriptor.protocolVersion() >= descriptor.minimumCompatibleProtocolVersion();
+        boolean compatible = validWorkerRange
+                && descriptor.protocolVersion() >= ControlProtocol.MINIMUM_COMPATIBLE_VERSION
+                && descriptor.minimumCompatibleProtocolVersion() <= ControlProtocol.CURRENT_VERSION;
+        if (!compatible) {
+            throw new IllegalArgumentException(
+                    "Incompatible control bridge protocol: worker=" + descriptor.protocolVersion()
+                            + " (minimum " + descriptor.minimumCompatibleProtocolVersion() + ")"
+                            + ", controller=" + ControlProtocol.CURRENT_VERSION
+                            + " (minimum " + ControlProtocol.MINIMUM_COMPATIBLE_VERSION + ")."
+            );
+        }
+
+        List<String> missing = ControlProtocol.CONTROLLER_REQUIRED_CAPABILITIES.stream()
+                .filter(capability -> !descriptor.capabilities().contains(capability))
+                .toList();
+        if (!missing.isEmpty()) {
+            throw new IllegalArgumentException(
+                    "Consumer worker is missing required Workbench capabilities: " + missing
+            );
+        }
+        return descriptor;
     }
 
     private static int commandTimeout(Integer timeoutSeconds) {
@@ -398,44 +433,4 @@ public final class ControlBridgeClient {
         return value.trim();
     }
 
-    private record PauseRequest(String scenarioId, Integer waitSeconds, Integer leaseSeconds) {}
-    private record ResumeRequest(String scenarioId) {}
-    private record ExecuteStepRequest(
-            String scenarioId, String text, String argument, Integer timeoutSeconds
-    ) {}
-    private record MappingGetRequest(
-            String scenarioId, String mapReference, String key, Integer timeoutSeconds
-    ) {}
-    private record MappingPutRequest(
-            String scenarioId, String mapReference, String key, Object value, Integer timeoutSeconds
-    ) {}
-    private record MappingResolveRequest(
-            String scenarioId, String input, Integer timeoutSeconds
-    ) {}
-    private record MappingSnapshotRequest(
-            String scenarioId, String mapReference, Integer timeoutSeconds
-    ) {}
-    private record MappingRestoreRequest(
-            String scenarioId, ControlBridgeMappingSnapshot snapshot, Integer timeoutSeconds
-    ) {}
-    private record BrowserEvidenceRequest(String scenarioId, Integer timeoutSeconds) {}
-    private record ElementInspectionRequest(
-            String scenarioId, String category, String text, String operation,
-            Integer maxElements, Integer timeoutSeconds
-    ) {}
-    private record ServiceCallRequest(
-            String scenarioId, String selector, Integer timeoutSeconds
-    ) {}
-    private record BreakpointAddRequest(
-            String scenarioId, String hook, String signatureContains, String stepContains,
-            String phraseContains, Boolean oneShot, Integer leaseSeconds
-    ) {}
-    private record BreakpointIdRequest(String breakpointId) {}
-    private record StepOverrideCompileRequest(
-            String scenarioId, String id, String patternType, String pattern, String source
-    ) {}
-    private record StepOverrideIdRequest(String scenarioId, String id) {}
-    private record StepOverrideScenarioRequest(String scenarioId) {}
-    private record Removal(boolean removed) {}
-    private record ClearResult(int removed) {}
 }

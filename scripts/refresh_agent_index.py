@@ -31,6 +31,7 @@ GROUPS: tuple[tuple[str, tuple[str, ...]], ...] = (
         "gradlew",
         "gradlew.bat",
         "maven-consumer-project/AGENTS.md",
+        "maven-consumer-project/.github/copilot-instructions.md",
         "maven-consumer-project/pom.xml",
         "maven-consumer-project/README.md",
         "maven-consumer-project/mvnw",
@@ -52,6 +53,11 @@ GROUPS: tuple[tuple[str, tuple[str, ...]], ...] = (
         "pickleball-control-api/build.gradle",
         "pickleball-control-api/src/main/**/*",
         "pickleball-control-api/src/test/**/*",
+    )),
+    ("Neutral control protocol module", (
+        "pickleball-control-protocol/build.gradle",
+        "pickleball-control-protocol/src/main/**/*",
+        "pickleball-control-protocol/src/test/**/*",
     )),
     ("Pickleball Workbench module", (
         "gradle/pickleball-published-variant.gradle",

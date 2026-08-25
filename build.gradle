@@ -7,7 +7,7 @@ plugins {
 }
 
 group = 'tools.dscode'
-version = '2.1.8'
+version = '2.1.9'
 
 repositories {
     mavenCentral()
@@ -70,6 +70,10 @@ configurations {
 }
 
 dependencies {
+    // Shared wire DTOs/constants only. The protocol module is JDK-only and its
+    // classes are embedded in the published Pickleball artifact below.
+    implementation project(':pickleball-control-protocol')
+
     api("io.cucumber:cucumber-junit-platform-engine:${cucumberVersion}") {
         // Prevent consumers from pulling the UNWOVEN cucumber internals transitively
         exclude group: "io.cucumber", module: "cucumber-core"
@@ -142,6 +146,7 @@ tasks.withType(JavaCompile).configureEach {
 tasks.register('ajcMain', JavaExec) {
     group = 'build'
     description = 'Compile Java + AspectJ (main) with ajc'
+    dependsOn ':pickleball-control-protocol:jar'
 
     def outDir = sourceSets.main.java.destinationDirectory.get().asFile
     inputs.files(sourceSets.main.java)
@@ -246,6 +251,10 @@ tasks.register('expandWoven') {
 
 def myLicense = file("LICENSE").canonicalFile
 def myNotice  = file("NOTICE").canonicalFile
+def embeddedWorkbenchResource = 'META-INF/pickleball/workbench/pickleball-workbench.jar'
+def standaloneWorkbenchJar = project(':pickleball-workbench').layout.buildDirectory.file(
+        "libs/pickleball-workbench-${project.version}.jar"
+)
 
 tasks.shadowJar {
     configurations = [project.configurations.ajcRuntime]
@@ -285,11 +294,19 @@ tasks.shadowJar {
     from("NOTICE") { into "META-INF" }
     from("THIRD-PARTY-NOTICES.md") { into "META-INF" }
 
-    dependsOn 'ajcMain', 'expandWoven', 'classes'
+    dependsOn 'ajcMain', 'expandWoven', 'classes', ':pickleball-workbench:shadowJar'
 
     archiveBaseName.set('pickleball')
     archiveVersion.set(project.version.toString())
     archiveClassifier.set('')
+
+    manifest {
+        attributes(
+                'Implementation-Title': 'Pickleball',
+                'Implementation-Version': project.version.toString(),
+                'Pickleball-Workbench-Resource': embeddedWorkbenchResource
+        )
+    }
 
     from(sourceSets.main.output) {
         includeEmptyDirs = false
@@ -304,10 +321,97 @@ tasks.shadowJar {
     // put woven classes LAST so they overwrite any originals
     from(wovenExpanded)
 
+    // Workbench is delivered outward as one opaque controller-only executable.
+    // Never expand this payload into the consumer-visible runtime namespace.
+    from(standaloneWorkbenchJar) {
+        into 'META-INF/pickleball/workbench'
+        rename { 'pickleball-workbench.jar' }
+    }
+
     mergeServiceFiles()
 
     exclude 'META-INF/*.SF', 'META-INF/*.RSA', 'META-INF/*.DSA'
     zip64 = true
+}
+
+tasks.register('verifyEmbeddedWorkbench') {
+    group = 'verification'
+    description = 'Verifies the outer Pickleball JAR embeds exactly the controller-only Workbench payload.'
+    dependsOn tasks.shadowJar, ':pickleball-workbench:verifyWorkbenchArtifact'
+
+    doLast {
+        File outerFile = tasks.named('shadowJar').get().archiveFile.get().asFile
+        File standaloneFile = standaloneWorkbenchJar.get().asFile
+        def sha256 = { InputStream input ->
+            def digest = java.security.MessageDigest.getInstance('SHA-256')
+            byte[] buf = new byte[65536]
+            int read
+            while ((read = input.read(buf)) >= 0) {
+                digest.update(buf, 0, read)
+            }
+            digest.digest()
+        }
+
+        new java.util.jar.JarFile(outerFile).withCloseable { outer ->
+            def payloadEntries = java.util.Collections.list(outer.entries()).findAll { entry ->
+                !entry.directory && entry.name.startsWith('META-INF/pickleball/workbench/')
+            }
+            if (payloadEntries*.name != [embeddedWorkbenchResource]) {
+                throw new GradleException(
+                        "Expected exactly one opaque Workbench payload at ${embeddedWorkbenchResource}: " +
+                                payloadEntries*.name
+                )
+            }
+
+            byte[] standaloneHash
+            standaloneFile.withInputStream { input ->
+                standaloneHash = sha256(input)
+            }
+            byte[] embeddedHash
+            outer.getInputStream(payloadEntries.first()).withCloseable { input ->
+                embeddedHash = sha256(input)
+            }
+            if (!java.util.Arrays.equals(standaloneHash, embeddedHash)) {
+                throw new GradleException(
+                        'Embedded Workbench payload bytes do not match the standalone controller build.'
+                )
+            }
+
+            def flattened = java.util.Collections.list(outer.entries()).findAll { entry ->
+                entry.name.startsWith('tools/dscode/workbench/') ||
+                        entry.name.startsWith('io/modelcontextprotocol/')
+            }
+            if (!flattened.isEmpty()) {
+                throw new GradleException(
+                        'Workbench/controller dependencies were flattened into Pickleball: ' +
+                                flattened*.name.take(20)
+                )
+            }
+
+            new java.util.jar.JarFile(standaloneFile).withCloseable { nested ->
+                def mainClass = nested.manifest?.mainAttributes?.getValue('Main-Class')
+                if (mainClass != 'tools.dscode.workbench.WorkbenchApplication') {
+                    throw new GradleException('Embedded Workbench payload has an unexpected Main-Class.')
+                }
+            }
+        }
+    }
+}
+
+tasks.register('verifyStrictControllerIsolation') {
+    group = 'verification'
+    description = 'Verifies the neutral protocol, controller-only Workbench, and opaque outer payload.'
+    dependsOn(
+            ':pickleball-control-protocol:verifyProtocolIsolation',
+            ':pickleball-workbench:verifyWorkbenchArtifact',
+            ':pickleball-workbench:verifyWorkbenchRuntimeBoundary',
+            ':pickleball-workbench:verifyWorkbenchPublishedDependencyContract',
+            tasks.named('verifyEmbeddedWorkbench')
+    )
+}
+
+tasks.named('check') {
+    dependsOn tasks.named('verifyStrictControllerIsolation')
 }
 
 // Disable the plain jar so only the shaded jar is produced/published

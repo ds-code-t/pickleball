@@ -69,11 +69,13 @@ Diagnostic lineage is metadata, not part of the execution RunVars. Supply `pkb_i
 Use all relevant evidence rather than trusting one file in isolation:
 
 - Current implementation under `src/main/java` and `src/main/aspectj`
+- Dependency-neutral controller/worker wire contracts under `pickleball-control-protocol`; this module must remain JDK-only
 - Dynamic-control companion source module under `pickleball-control-api`; its classes are bundled into the main `tools.dscode:pickleball` artifact and are not a separate consumer dependency
+- Controller-only Workbench source under `pickleball-workbench`; it may depend on `pickleball-control-protocol` but never on Pickleball core or `pickleball-control-api`
 - Consumer-hosted internal Java checks under `maven-consumer-project/src/test/java`
 - Executable consumer examples under `maven-consumer-project/src/test`
 - `README.md` and the guides under `docs`
-- Build and dependency configuration in `build.gradle`, `settings.gradle`, `pickleball-control-api/build.gradle`, and `maven-consumer-project/pom.xml`
+- Build and dependency configuration in `build.gradle`, `settings.gradle`, `pickleball-control-protocol/build.gradle`, `pickleball-control-api/build.gradle`, `pickleball-workbench/build.gradle`, and `maven-consumer-project/pom.xml`
 - `docs/agent/feature-map.md` for navigation, not as a replacement for source inspection
 
 When implementation, tests, examples, and documentation disagree:
@@ -89,7 +91,9 @@ When implementation, tests, examples, and documentation disagree:
 - `src/main/java` — framework implementation and Cucumber integrations
 - `src/main/aspectj` — AspectJ integrations and weaving behavior
 - `src/main/resources` — framework resources
+- `pickleball-control-protocol` — JDK-only versioned wire records, capability/version constants, request envelopes, and response envelopes shared by core/worker and Workbench; no runtime behavior
 - `pickleball-control-api` — internal companion source module for retry-friendly detached execution, Gherkin utilities, ParsingMap/NodeMap inspection and emulation, and dynamic controller tooling; bundled into the main Pickleball artifact rather than published separately
+- `pickleball-workbench` — controller-only GUI/MCP/synchronization/process client; its executable must contain no Pickleball, Cucumber, Selenium, REST-assured, worker, or behavioral control-API implementation
 - `src/test` — reserved for tests that must run inside the framework build
 - `docs` — detailed user-facing documentation
 - `maven-consumer-project` — executable Maven consumer example
@@ -167,6 +171,16 @@ Internal Java checks should normally live in `maven-consumer-project` and be exe
 
 Tests must cover the requested behavior and meaningful compatibility or edge cases. Do not weaken or delete assertions merely to make a change pass.
 
+For Workbench, control-protocol, worker bridge, launcher, or nested-payload changes, never use `@all` as migration validation. Run only the smallest affected tags (currently `@control-bridge` and/or `@step-override-bridge`) and set `-Dpkb_runvars.pkb_parallel=80` when the focused environment can safely benefit. Preserve this rule in future Workbench plans and handovers.
+
+### Workbench controller-isolation invariant
+
+Pickleball Workbench is the control plane, not a second Pickleball runtime. The only shared Java boundary is `pickleball-control-protocol`. Workbench must not compile against, resolve, shade, load, or execute the root Pickleball project, `tools.dscode:pickleball`, `pickleball-control-api`, the consumer's classes, or runtime libraries such as Cucumber, Selenium, and REST-assured. Never “fix” a Workbench compilation problem by restoring `implementation project(':')`, `pickleballPublishedElements`, a Pickleball Maven dependency, or core shading.
+
+Only the separate consumer worker JVM executes Pickleball. `WorkbenchWorkerManager` must launch `ControlProtocol.WORKER_MAIN_CLASS` by name on the consumer build's captured test-runtime classpath, and must verify the worker PID, Pickleball code source, synchronized version, and absence of the Workbench controller artifact. Commands and state cross the local authenticated versioned protocol, not direct Java calls.
+
+The published Pickleball JAR embeds the completed controller-only Workbench JAR as exactly one opaque payload at `META-INF/pickleball/workbench/pickleball-workbench.jar`. It must not flatten Workbench/MCP classes into the outer runtime, and the nested Workbench must not contain core. The ownership mnemonic is: **Pickleball may contain Workbench; Workbench must not contain Pickleball.**
+
 ## Build and validation
 
 Use Java 21.
@@ -177,13 +191,34 @@ Framework validation:
 ./gradlew test
 ```
 
+Strict controller/artifact validation:
+
+```shell
+./gradlew verifyStrictControllerIsolation :pickleball-workbench:test
+```
+
 Windows:
 
 ```powershell
 .\gradlew.bat test
 ```
 
-For consumer-visible changes, publish the current framework artifact locally and run the Maven consumer:
+Workbench/control-bridge scenario validation must stay focused:
+
+```shell
+./maven-consumer-project/mvnw -f maven-consumer-project/pom.xml -U test -Dpkb_runvars.pkb_browser=CHROME_HEADLESS -Dpkb_runvars.pkb_parallel=80 -Dpkb_runvars.pkb_tags=@control-bridge
+./maven-consumer-project/mvnw -f maven-consumer-project/pom.xml -U test -Dpkb_runvars.pkb_browser=CHROME_HEADLESS -Dpkb_runvars.pkb_parallel=80 -Dpkb_runvars.pkb_tags=@step-override-bridge
+```
+
+Run the two commands sequentially because both scenarios intentionally exercise the process-global bridge bootstrap.
+
+Or use the focused turnkey validator:
+
+```shell
+scripts/agent_validate.sh --workbench
+```
+
+For broad consumer-visible changes outside the Workbench/controller-isolation surface, publish the current framework artifact locally and run the Maven consumer. The focused Workbench rule above takes precedence for that surface:
 
 ```shell
 ./gradlew test publishToMavenLocal
@@ -227,6 +262,7 @@ If a required validation cannot run, state exactly what was not run and why. Nev
 - Do not edit generated build output.
 - Preserve backward compatibility unless the user explicitly approves a breaking change.
 - Dynamic-control additions must remain opt-in: no handler/API call means normal scenario traversal, ParsingMap construction/order, NodeMap references, resolution, and writes retain their pre-control behavior.
+- Workbench changes must preserve strict physical, dependency, process, and classpath isolation; separate JVMs alone are not sufficient.
 - Follow existing code style and patterns before introducing new abstractions.
 - Do not replace executable examples with prose.
 - Never store secrets, credentials, machine-specific paths, or private data in agent instruction files.
@@ -281,6 +317,7 @@ A functionality change is complete only when:
 - Applicable compatibility has been preserved or a breaking change is clearly identified.
 - Relevant consumer-hosted internal Java checks exist and pass.
 - Relevant consumer scenarios exist and pass when applicable.
+- Workbench/core changes retain the neutral protocol boundary, controller-only artifact scan, opaque nested payload, and consumer-owned worker runtime.
 - Documentation matches the resulting behavior.
 - The feature map remains accurate.
 - The generated repository index is current.

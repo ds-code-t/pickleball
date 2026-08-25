@@ -10,6 +10,7 @@ This directory supports repository-native AI coding agents. It is not a runtime 
 - `/docs/agent/feature-map.md` — living map from capabilities to implementation, tests, consumer examples, and documentation
 - `/docs/agent/change-checklist.md` — explicit change-completion checklist
 - `/docs/agent/repository-index.md` — generated inventory of relevant files
+- `/pickleball-workbench/AGENTS.md` — strict controller/core dependency, artifact, process, worker-classpath, protocol, and focused-test invariants
 - `/docs/ai-run-configuration.md` — controlled execution through `pkb_runvars`, canonical `pkb_run_profile`, inherited execution context, `pkb_configpath`, replay, and protected values
 - `/docs/diagnostic-lineage-metadata.md` — investigation lineage and derived diagnostic metadata
 - `/REVIEW.md` — review-time checks for compatibility, tests, consumer examples, and documentation omissions
@@ -19,7 +20,9 @@ Agent adapters should remain small and point back to the canonical contract rath
 
 The nested `/maven-consumer-project/AGENTS.md` is intentionally only a dependency-owned guidance bootstrap. It materializes version-matched guidance and directs the consumer agent to `.pickleball/AGENT-GUIDE.md`. Refresh/version/manifest semantics, authoring rules, configuration, diagnostics, and troubleshooting belong in the exported dependency guidance.
 
-The nested `/maven-consumer-project/README.md` is ordinary sample-project documentation and should not duplicate the AI guidance lifecycle.
+The nested `/maven-consumer-project/.github/copilot-instructions.md` is the same one-line bootstrap for IntelliJ Copilot Chat, which reads that file rather than `AGENTS.md`.
+
+The nested `/maven-consumer-project/README.md` is ordinary sample-project documentation. It may point humans and agents at `AGENTS.md` for guidance export, but should not duplicate the AI guidance lifecycle.
 
 `export-guidance .pickleball` is deliberately unconditional before Pickleball work. A successful export writes `.pickleball/GUIDANCE-MANIFEST.json` last, removes obsolete previously managed files, and refreshes current dependency guidance. Git-ignore handling is best effort. If export fails, existing `.pickleball` content is potentially stale.
 
@@ -58,6 +61,8 @@ A functionality-change agent should:
 7. Remove disposable working files.
 8. Report results.
 
+Workbench work has an additional hard boundary: `pickleball-workbench` may share only the JDK-only `pickleball-control-protocol`; all execution remains in the consumer worker. The outer Pickleball JAR may carry the completed Workbench as opaque bytes, but Workbench must never contain or load Pickleball. Future agents must not restore the removed root/published-equivalent dependency. Use `verifyStrictControllerIsolation` and focused `@control-bridge` / `@step-override-bridge` scenarios with `pkb_parallel=80`, never `@all`, for this boundary.
+
 For AI-launched tests with known settings, default to `pkb_runvars`. Use ordinary JVM RunVars or named profiles instead only when intentionally exercising those resolution paths. For controlled reruns, follow `/docs/ai-run-configuration.md` and `/docs/diagnostic-lineage-metadata.md`: replay retained `runProfile` through `pkb_runvars`, change only intentional RunVars, keep lineage separate, and verify `runProfileFingerprint`. `pkb_changed_variables` names RunVars only, not source changes or profile controls.
 
 This is task-time automation, not a passive background documentation watcher.
@@ -91,6 +96,16 @@ Windows:
 
 ```powershell
 .\scripts\agent_validate.ps1
+```
+
+Workbench/controller isolation uses the dedicated focused mode, which runs strict artifact/dependency checks and then runs `@control-bridge` and `@step-override-bridge` sequentially, each with `pkb_parallel=80`:
+
+```shell
+scripts/agent_validate.sh --workbench
+```
+
+```powershell
+.\scripts\agent_validate.ps1 -Workbench
 ```
 
 ## Enforcement levels

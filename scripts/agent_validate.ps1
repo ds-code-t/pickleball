@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param(
     [switch]$Quick,
+    [switch]$Workbench,
     [string]$MavenCommand
 )
 
@@ -145,10 +146,36 @@ try {
     Invoke-Python scripts/refresh_agent_index.py --check
     Invoke-Python scripts/sync_consumer_guidance.py --check
 
-    & .\gradlew.bat test
-    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    if ($Quick -and $Workbench) {
+        throw "Choose either -Quick or -Workbench, not both."
+    }
 
-    if (-not $Quick) {
+    if ($Workbench) {
+        & .\gradlew.bat verifyStrictControllerIsolation :pickleball-workbench:test publishToMavenLocal
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+        $MavenExe = Get-MavenExecutable -RequestedCommand $MavenCommand
+        Write-Host "Using Maven command: $MavenExe"
+        foreach ($FocusedTag in @("@control-bridge", "@step-override-bridge")) {
+            $MavenArgs = @(
+                "-f",
+                "maven-consumer-project/pom.xml",
+                "-U",
+                "test",
+                "-Dpkb_runvars.pkb_browser=CHROME_HEADLESS",
+                "-Dpkb_runvars.pkb_parallel=80",
+                "-Dpkb_runvars.pkb_tags=$FocusedTag"
+            )
+            & $MavenExe @MavenArgs
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+        }
+    }
+    else {
+        & .\gradlew.bat test
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    }
+
+    if (-not $Quick -and -not $Workbench) {
         & .\gradlew.bat publishToMavenLocal
         if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
@@ -167,7 +194,7 @@ try {
         if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
     }
 
-    $Mode = if ($Quick) { "quick" } else { "full" }
+    $Mode = if ($Quick) { "quick" } elseif ($Workbench) { "workbench" } else { "full" }
     Write-Host "Pickleball validation completed ($Mode mode)."
 }
 finally {

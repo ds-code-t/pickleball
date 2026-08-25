@@ -1,29 +1,43 @@
 package tools.dscode.workbench.ui;
 
-import tools.dscode.control.api.BoundedJsonEvidence;
-import tools.dscode.control.api.ServiceCallEvidence;
-import tools.dscode.control.bridge.ControlBridgeBreakpoint;
-import tools.dscode.control.bridge.ControlBridgeBrowserPage;
-import tools.dscode.control.bridge.ControlBridgeBrowserPageResult;
-import tools.dscode.control.bridge.ControlBridgeBrowserScreenshot;
-import tools.dscode.control.bridge.ControlBridgeBrowserScreenshotResult;
-import tools.dscode.control.bridge.ControlBridgeCallResult;
-import tools.dscode.control.bridge.ControlBridgeError;
-import tools.dscode.control.bridge.ControlBridgeEvent;
-import tools.dscode.control.bridge.ControlBridgeEventPage;
-import tools.dscode.control.bridge.ControlBridgeServiceCallResult;
-import tools.dscode.control.bridge.ControlBridgeStatus;
-import tools.dscode.control.bridge.ControlBridgeStepOverride;
-import tools.dscode.control.bridge.ControlBridgeStepOverrideResult;
-import tools.dscode.control.bridge.ControlBridgeValue;
-import tools.dscode.control.bridge.ControlBridgeValueResult;
+import tools.dscode.control.protocol.ControlBridgeBoundedJsonEvidence;
+import tools.dscode.control.protocol.ControlBridgeBreakpoint;
+import tools.dscode.control.protocol.ControlBridgeBrowserPage;
+import tools.dscode.control.protocol.ControlBridgeBrowserPageResult;
+import tools.dscode.control.protocol.ControlBridgeBrowserScreenshot;
+import tools.dscode.control.protocol.ControlBridgeBrowserScreenshotResult;
+import tools.dscode.control.protocol.ControlBridgeCallResult;
+import tools.dscode.control.protocol.ControlBridgeError;
+import tools.dscode.control.protocol.ControlBridgeEvent;
+import tools.dscode.control.protocol.ControlBridgeEventPage;
+import tools.dscode.control.protocol.ControlBridgeMappingSnapshot;
+import tools.dscode.control.protocol.ControlBridgeMappingSnapshotResult;
+import tools.dscode.control.protocol.ControlBridgeServiceCallEvidence;
+import tools.dscode.control.protocol.ControlBridgeServiceCallResult;
+import tools.dscode.control.protocol.ControlBridgeStatus;
+import tools.dscode.control.protocol.ControlBridgeStepOverride;
+import tools.dscode.control.protocol.ControlBridgeStepOverrideResult;
+import tools.dscode.control.protocol.ControlBridgeValue;
+import tools.dscode.control.protocol.ControlBridgeValueResult;
+import tools.dscode.control.protocol.ControlProtocol;
 import tools.dscode.workbench.WorkbenchServices;
+import tools.dscode.workbench.lease.WorkbenchControlLeaseSnapshot;
+import tools.dscode.workbench.mapping.MappingValueCodec;
+import tools.dscode.workbench.player.LivePlaybackCoordinator;
+import tools.dscode.workbench.player.LiveScenarioPlayer;
+import tools.dscode.workbench.player.WorkbenchSavePreview;
+import tools.dscode.workbench.player.WorkbenchSaveResult;
 import tools.dscode.workbench.sync.WorkbenchManifest;
+import tools.dscode.workbench.terminal.WorkerLogFiles;
 import tools.dscode.workbench.worker.WorkbenchWorkerStatus;
 
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
 
 /** Thin presentation adapter over the shared Workbench service surface. */
 final class WorkbenchUiController implements AutoCloseable {
@@ -78,9 +92,138 @@ final class WorkbenchUiController implements AutoCloseable {
         return state();
     }
 
+    /**
+     * One-action player preparation. Existing synchronized state is reused, but a
+     * protocol-mismatched worker forces one resynchronization and startup retry.
+     */
+    State prepareLiveSession() {
+        State current = refresh();
+        if (!current.synchronizedProject()) {
+            current = synchronize();
+        }
+        if (!current.workerRunning()) {
+            try {
+                current = startWorker();
+            } catch (RuntimeException failure) {
+                if (!isProtocolMismatch(failure)) throw failure;
+                current = synchronize();
+                current = startWorker();
+            }
+        }
+        if (!current.liveReady()) {
+            throw new IllegalStateException(
+                    "The Workbench consumer worker did not reach a paused interactive boundary."
+            );
+        }
+        return current;
+    }
+
+    /**
+     * Prepares a fresh interactive scenario context for scenario playback. Existing
+     * synchronized output is reused, but an active worker is restarted so prior
+     * browser, Mapping, service, and other scenario side effects do not leak into
+     * a new Run or From Here action.
+     */
+    State prepareFreshLiveSession() {
+        State current = refresh();
+        if (!current.synchronizedProject()) {
+            current = synchronize();
+        }
+        try {
+            current = current.workerRunning() ? restartWorker() : startWorker();
+        } catch (RuntimeException failure) {
+            if (!isProtocolMismatch(failure)) throw failure;
+            current = synchronize();
+            current = startWorker();
+        }
+        if (!current.liveReady()) {
+            throw new IllegalStateException(
+                    "The Workbench consumer worker did not reach a fresh paused interactive boundary."
+            );
+        }
+        return current;
+    }
+
+    private static boolean isProtocolMismatch(Throwable failure) {
+        Throwable current = failure;
+        while (current != null) {
+            String message = current.getMessage();
+            if (message != null && message.startsWith("Incompatible control bridge protocol:")) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
+    }
+
     LiveActionResult executeStep(String text, String argument) {
-        ControlBridgeCallResult result = services.executeStep(required(text, "Gherkin step"), blankToNull(argument));
+        ControlBridgeCallResult result = services.executeStep(
+                required(text, "Gherkin step"),
+                blankToNull(argument)
+        );
         return new LiveActionResult(renderCallResult(result), refreshEvents());
+    }
+
+    PlayerStepResult executePlayerStep(String text) {
+        ControlBridgeCallResult result = services.executeStep(required(text, "Gherkin step"), "");
+        String events = refreshEvents();
+        return new PlayerStepResult(
+                "SUCCESS".equals(result.status()),
+                renderCallResult(result),
+                events
+        );
+    }
+
+    List<MappingCatalogEntry> mappingCatalog() {
+        ControlBridgeMappingSnapshotResult result = services.mappingSnapshot(
+                ControlProtocol.CURRENT_NODE_MAP_CATALOG_REFERENCE
+        );
+        ControlBridgeMappingSnapshot snapshot = requireSnapshot(result, "NodeMap catalog");
+        Object value = snapshot.values().get("maps");
+        if (!(value instanceof List<?> list)) {
+            throw new IllegalStateException("Current ParsingMap catalog did not contain a maps list.");
+        }
+
+        List<MappingCatalogEntry> entries = new ArrayList<>();
+        for (Object item : list) {
+            if (!(item instanceof Map<?, ?> map)) continue;
+            String reference = Objects.toString(map.get("reference"), "");
+            String label = Objects.toString(map.get("label"), reference);
+            boolean restorable = Boolean.TRUE.equals(map.get("restorable"));
+            if (!reference.isBlank()) {
+                entries.add(new MappingCatalogEntry(reference, label, restorable));
+            }
+        }
+        return List.copyOf(entries);
+    }
+
+    ControlBridgeMappingSnapshot mappingSnapshot(String mapReference) {
+        return requireSnapshot(
+                services.mappingSnapshot(required(mapReference, "NodeMap reference")),
+                mapReference
+        );
+    }
+
+    String restoreMapping(ControlBridgeMappingSnapshot original, Map<String, Object> values) {
+        Objects.requireNonNull(original, "original");
+        Objects.requireNonNull(values, "values");
+        ControlBridgeMappingSnapshot edited = new ControlBridgeMappingSnapshot(
+                original.version(),
+                original.mapReference(),
+                original.mapType(),
+                original.mapClass(),
+                original.dataSources(),
+                original.restorable(),
+                values
+        );
+        ControlBridgeCallResult result = services.mappingRestore(edited);
+        if (!"SUCCESS".equals(result.status())) {
+            String message = result.error() == null
+                    ? result.status()
+                    : result.error().message();
+            throw new IllegalStateException("Mapping restore failed: " + message);
+        }
+        return renderCallResult(result);
     }
 
     LiveActionResult mappingGet(String mapReference, String key) {
@@ -92,12 +235,74 @@ final class WorkbenchUiController implements AutoCloseable {
     }
 
     LiveActionResult mappingPut(String mapReference, String key, String value) {
+        return mappingPutValue(mapReference, key, value == null ? "" : value);
+    }
+
+    LiveActionResult mappingPutTyped(String mapReference, String key, String type, String text) {
+        return mappingPutValue(mapReference, key, MappingValueCodec.decode(type, text));
+    }
+
+    LiveActionResult mappingPutValue(String mapReference, String key, Object value) {
         ControlBridgeValueResult result = services.mappingPut(
                 required(mapReference, "Mapping reference"),
                 required(key, "Mapping key"),
-                value == null ? "" : value
+                value
         );
         return new LiveActionResult(renderValueResult(result), refreshEvents());
+    }
+
+    Path projectRoot() {
+        return projectRoot;
+    }
+
+    LiveScenarioPlayer player() {
+        return services.player();
+    }
+
+    LivePlaybackCoordinator playback() {
+        return services.playback();
+    }
+
+    WorkbenchControlLeaseSnapshot controlLease() {
+        return services.controlLeaseSnapshot();
+    }
+
+    WorkbenchControlLeaseSnapshot takeControl() {
+        return services.takeControl();
+    }
+
+    void answerPermission(String requestId, boolean allow) {
+        services.answerPermission(requestId, allow);
+    }
+
+    WorkbenchSavePreview savePreview() {
+        return services.savePreview();
+    }
+
+    WorkbenchSaveResult commitSave() {
+        return services.commitSave();
+    }
+
+    void loadPickerScenario(
+            java.util.List<String> lines,
+            Path originFile,
+            String scenarioName,
+            int startLine,
+            int endLine
+    ) {
+        services.loadPickerScenario(lines, originFile, scenarioName, startLine, endLine);
+    }
+
+    void addLeaseListener(java.util.function.Consumer<WorkbenchControlLeaseSnapshot> listener) {
+        services.addLeaseListener(listener);
+    }
+
+    void addPlayerListener(Runnable listener) {
+        services.addPlayerListener(listener);
+    }
+
+    Optional<WorkerLogFiles> workerLogFiles() {
+        return services.workerLogFiles();
     }
 
     LiveActionResult mappingResolve(String input) {
@@ -197,6 +402,19 @@ final class WorkbenchUiController implements AutoCloseable {
         return new State(projectRoot, manifest, synchronizationError, workerStatus);
     }
 
+    private static ControlBridgeMappingSnapshot requireSnapshot(
+            ControlBridgeMappingSnapshotResult result,
+            String label
+    ) {
+        if (result != null && "SUCCESS".equals(result.status()) && result.snapshot() != null) {
+            return result.snapshot();
+        }
+        String message = result == null || result.error() == null
+                ? "no snapshot returned"
+                : result.error().message();
+        throw new IllegalStateException(label + " snapshot failed: " + message);
+    }
+
     private static String renderCallResult(ControlBridgeCallResult result) {
         StringBuilder text = new StringBuilder("Status: ").append(result.status());
         if (result.valueText() != null) {
@@ -281,7 +499,7 @@ final class WorkbenchUiController implements AutoCloseable {
 
     private static String renderServiceCallResult(ControlBridgeServiceCallResult result) {
         StringBuilder text = new StringBuilder("Status: ").append(result.status());
-        ServiceCallEvidence evidence = result.evidence();
+        ControlBridgeServiceCallEvidence evidence = result.evidence();
         if (evidence != null) {
             text.append("\nSelector: ").append(evidence.selector());
             text.append("\nHTTP status: ").append(evidence.statusCode());
@@ -294,7 +512,11 @@ final class WorkbenchUiController implements AutoCloseable {
         return text.toString();
     }
 
-    private static void appendJsonEvidence(StringBuilder text, String label, BoundedJsonEvidence evidence) {
+    private static void appendJsonEvidence(
+            StringBuilder text,
+            String label,
+            ControlBridgeBoundedJsonEvidence evidence
+    ) {
         if (evidence == null) return;
         text.append("\n").append(label);
         if (evidence.truncated()) text.append(" (truncated)");
@@ -386,6 +608,16 @@ final class WorkbenchUiController implements AutoCloseable {
     }
 
     record LiveActionResult(String output, String events) {
+    }
+
+    record PlayerStepResult(boolean successful, String output, String events) {
+    }
+
+    record MappingCatalogEntry(String reference, String label, boolean restorable) {
+        @Override
+        public String toString() {
+            return label;
+        }
     }
 
     record ManagementResult(String output, String listing) {

@@ -1,10 +1,10 @@
 package com.example.pickleball;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.cucumber.java.After;
 import io.cucumber.java.en.Given;
-import tools.dscode.control.bridge.*;
+import tools.dscode.control.bridge.ControlBridgeBootstrap;
+import tools.dscode.control.protocol.*;
 import tools.dscode.coredefinitions.BrowserSteps;
 
 import java.io.IOException;
@@ -210,6 +210,28 @@ public final class ControlBridgeTestSteps {
     @Given("^VERIFY CONTROL BRIDGE IPC TEST$")
     public void verifyControlBridgeIpcTest() throws Exception {
         ClientOutcome outcome = client.get(25, TimeUnit.SECONDS);
+        assertEquals(
+                ControlProtocol.CURRENT_VERSION,
+                descriptor.protocolVersion(),
+                "descriptor protocol version"
+        );
+        assertEquals(
+                ControlProtocol.MINIMUM_COMPATIBLE_VERSION,
+                descriptor.minimumCompatibleProtocolVersion(),
+                "descriptor minimum protocol version"
+        );
+        assertEquals(ProcessHandle.current().pid(), descriptor.pid(), "consumer runtime PID");
+        assertEquals("127.0.0.1", descriptor.host(), "loopback host");
+        assertTrue(
+                descriptor.runtimeCodeSource() != null
+                        && !descriptor.runtimeCodeSource().isBlank()
+                        && !"unknown".equals(descriptor.runtimeCodeSource()),
+                "consumer runtime code source"
+        );
+        assertTrue(
+                descriptor.capabilities().containsAll(ControlProtocol.WORKER_CAPABILITIES),
+                "descriptor capabilities"
+        );
         assertEquals(401, outcome.unauthorizedStatus(), "wrong/missing token status");
         assertEquals(getCurrentScenarioState().id.toString(), outcome.scenario().scenarioId(), "targeted scenario id");
         assertEquals("UNAVAILABLE", outcome.wrongTarget().status(), "wrong scenario target");
@@ -382,10 +404,11 @@ public final class ControlBridgeTestSteps {
         }
     }
 
-    private static void assertMaterializedMappingValue(JsonNode value, String expected, String label) {
-        assertTrue(value != null && value.isArray(), label + " should be a materialized collection");
-        assertTrue(value.size() > 0, label + " should not be empty");
-        assertEquals(expected, value.get(value.size() - 1).asText(), label);
+    private static void assertMaterializedMappingValue(Object value, String expected, String label) {
+        assertTrue(value instanceof List<?>, label + " should be a materialized collection");
+        List<?> values = (List<?>) value;
+        assertTrue(!values.isEmpty(), label + " should not be empty");
+        assertEquals(expected, values.getLast(), label);
     }
 
     private static void assertMappingValue(ControlBridgeValueResult result, Object expected, String label) {

@@ -9,6 +9,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `build.gradle`
 - `gradlew`
 - `gradlew.bat`
+- `maven-consumer-project/.github/copilot-instructions.md`
 - `maven-consumer-project/.mvn/wrapper/maven-wrapper.properties`
 - `maven-consumer-project/AGENTS.md`
 - `maven-consumer-project/mvnw`
@@ -47,6 +48,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/key-parser-dsl.md`
 - `docs/mapping-and-templating.md`
 - `docs/nested-steps.md`
+- `docs/pickleball-workbench-player.md`
 - `docs/pickleball-workbench.md`
 - `docs/README.md`
 - `docs/service-call-scenarios.md`
@@ -362,6 +364,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/coredefinitions/TableSteps.java`
 - `src/main/java/tools/dscode/coredefinitions/UtilitySteps.java`
 - `src/main/java/tools/dscode/cucumberextended/utilities/StringUtilities.java`
+- `src/main/java/tools/dscode/launcher/PickleballWorkbenchLauncher.java`
 - `src/main/java/tools/dscode/misc/DummySteps.java`
 - `src/main/java/tools/dscode/parallelutilities/Stagger.java`
 - `src/main/java/tools/dscode/pickleruntime/CucumberOptionResolver.java`
@@ -385,6 +388,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 ## Framework tests
 
 - `src/test/java/tools/dscode/control/override/StepOverrideCompilerTest.java`
+- `src/test/java/tools/dscode/launcher/PickleballWorkbenchLauncherTest.java`
 - `src/test/java/tools/dscode/testengine/DynamicSuiteBootstrapWorkbenchRootTest.java`
 
 ## Control API module
@@ -435,32 +439,128 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-control-api/src/main/java/tools/dscode/control/bridge/ControlBridgeValue.java`
 - `pickleball-control-api/src/main/java/tools/dscode/control/bridge/ControlBridgeValueResult.java`
 
+## Neutral control protocol module
+
+- `pickleball-control-protocol/build.gradle`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/ControlBridgeBoundedJsonEvidence.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/ControlBridgeBreakpoint.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/ControlBridgeBrowserPage.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/ControlBridgeBrowserPageResult.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/ControlBridgeBrowserScreenshot.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/ControlBridgeBrowserScreenshotResult.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/ControlBridgeCallResult.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/ControlBridgeDescriptor.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/ControlBridgeElementEvidence.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/ControlBridgeElementInspection.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/ControlBridgeElementInspectionResult.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/ControlBridgeError.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/ControlBridgeEvent.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/ControlBridgeEventPage.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/ControlBridgeJson.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/ControlBridgeMappingSnapshot.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/ControlBridgeMappingSnapshotResult.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/ControlBridgeRequests.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/ControlBridgeResponses.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/ControlBridgeScenarioStatus.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/ControlBridgeServiceCallEvidence.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/ControlBridgeServiceCallResult.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/ControlBridgeStatus.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/ControlBridgeStepOverride.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/ControlBridgeStepOverrideResult.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/ControlBridgeValue.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/ControlBridgeValueResult.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/ControlProtocol.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/InvestigationHandoff.java`
+
 ## Pickleball Workbench module
 
 - `gradle/pickleball-published-variant.gradle`
 - `pickleball-workbench/AGENTS.md`
 - `pickleball-workbench/build.gradle`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/bridge/ControlBridgeClient.java`
+- `pickleball-workbench/src/main/java/tools/dscode/workbench/catalog/ConsumerFeatureCatalog.java`
+- `pickleball-workbench/src/main/java/tools/dscode/workbench/catalog/ScenarioFilter.java`
+- `pickleball-workbench/src/main/java/tools/dscode/workbench/diagnostics/DiagnosticEvidenceNavigator.java`
+- `pickleball-workbench/src/main/java/tools/dscode/workbench/lease/WorkbenchCallContext.java`
+- `pickleball-workbench/src/main/java/tools/dscode/workbench/lease/WorkbenchControlLease.java`
+- `pickleball-workbench/src/main/java/tools/dscode/workbench/lease/WorkbenchControlLeaseSnapshot.java`
+- `pickleball-workbench/src/main/java/tools/dscode/workbench/lease/WorkbenchLeaseHolder.java`
+- `pickleball-workbench/src/main/java/tools/dscode/workbench/lease/WorkbenchPermissionCancelledException.java`
+- `pickleball-workbench/src/main/java/tools/dscode/workbench/lease/WorkbenchPermissionDecision.java`
+- `pickleball-workbench/src/main/java/tools/dscode/workbench/lease/WorkbenchPermissionKind.java`
+- `pickleball-workbench/src/main/java/tools/dscode/workbench/lease/WorkbenchPermissionRequest.java`
+- `pickleball-workbench/src/main/java/tools/dscode/workbench/mapping/MappingTreeModel.java`
+- `pickleball-workbench/src/main/java/tools/dscode/workbench/mapping/MappingValueCodec.java`
+- `pickleball-workbench/src/main/java/tools/dscode/workbench/mcp/WorkbenchAttachServer.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/mcp/WorkbenchMcpServer.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/mcp/WorkbenchMcpTools.java`
+- `pickleball-workbench/src/main/java/tools/dscode/workbench/player/GherkinBlockDocument.java`
+- `pickleball-workbench/src/main/java/tools/dscode/workbench/player/LiveEditorView.java`
+- `pickleball-workbench/src/main/java/tools/dscode/workbench/player/LiveFeatureSave.java`
+- `pickleball-workbench/src/main/java/tools/dscode/workbench/player/LivePlaybackCoordinator.java`
+- `pickleball-workbench/src/main/java/tools/dscode/workbench/player/LiveScenarioPlayer.java`
+- `pickleball-workbench/src/main/java/tools/dscode/workbench/player/ScenarioOrigin.java`
+- `pickleball-workbench/src/main/java/tools/dscode/workbench/player/WorkbenchPlayerState.java`
+- `pickleball-workbench/src/main/java/tools/dscode/workbench/player/WorkbenchSavePreview.java`
+- `pickleball-workbench/src/main/java/tools/dscode/workbench/player/WorkbenchSaveResult.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/sync/WorkbenchManifest.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/sync/WorkbenchProject.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/sync/WorkbenchSynchronizer.java`
+- `pickleball-workbench/src/main/java/tools/dscode/workbench/sync/WorkbenchSyncInputs.java`
+- `pickleball-workbench/src/main/java/tools/dscode/workbench/sync/WorkbenchSyncMode.java`
+- `pickleball-workbench/src/main/java/tools/dscode/workbench/sync/WorkbenchSyncPlanner.java`
+- `pickleball-workbench/src/main/java/tools/dscode/workbench/terminal/WorkerLogBuffer.java`
+- `pickleball-workbench/src/main/java/tools/dscode/workbench/terminal/WorkerLogFiles.java`
+- `pickleball-workbench/src/main/java/tools/dscode/workbench/ui/FeaturePickerPanel.java`
+- `pickleball-workbench/src/main/java/tools/dscode/workbench/ui/TerminalPanel.java`
+- `pickleball-workbench/src/main/java/tools/dscode/workbench/ui/web/DiagnosticExplorerHost.java`
+- `pickleball-workbench/src/main/java/tools/dscode/workbench/ui/web/GherkinEditorHost.java`
+- `pickleball-workbench/src/main/java/tools/dscode/workbench/ui/web/JavaFxSupport.java`
+- `pickleball-workbench/src/main/java/tools/dscode/workbench/ui/web/MappingEditorHost.java`
+- `pickleball-workbench/src/main/java/tools/dscode/workbench/ui/web/WebViewPanel.java`
+- `pickleball-workbench/src/main/java/tools/dscode/workbench/ui/web/WorkbenchWebJson.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/ui/WorkbenchFrame.java`
+- `pickleball-workbench/src/main/java/tools/dscode/workbench/ui/WorkbenchTheme.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/ui/WorkbenchUi.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/ui/WorkbenchUiController.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/WorkbenchApplication.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/WorkbenchController.java`
+- `pickleball-workbench/src/main/java/tools/dscode/workbench/WorkbenchRuntimeBoundary.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/WorkbenchServices.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/worker/WorkbenchLiveSession.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/worker/WorkbenchWorkerManager.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/worker/WorkbenchWorkerStatus.java`
+- `pickleball-workbench/src/main/resources/tools/dscode/workbench/ui/web/diagnostic-explorer.css`
+- `pickleball-workbench/src/main/resources/tools/dscode/workbench/ui/web/diagnostic-explorer.html`
+- `pickleball-workbench/src/main/resources/tools/dscode/workbench/ui/web/diagnostic-explorer.js`
+- `pickleball-workbench/src/main/resources/tools/dscode/workbench/ui/web/gherkin-editor.css`
+- `pickleball-workbench/src/main/resources/tools/dscode/workbench/ui/web/gherkin-editor.html`
+- `pickleball-workbench/src/main/resources/tools/dscode/workbench/ui/web/gherkin-editor.js`
+- `pickleball-workbench/src/main/resources/tools/dscode/workbench/ui/web/mapping-editor.css`
+- `pickleball-workbench/src/main/resources/tools/dscode/workbench/ui/web/mapping-editor.html`
+- `pickleball-workbench/src/main/resources/tools/dscode/workbench/ui/web/mapping-editor.js`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/bridge/ControlBridgeClientTest.java`
+- `pickleball-workbench/src/test/java/tools/dscode/workbench/catalog/ConsumerFeatureCatalogTest.java`
+- `pickleball-workbench/src/test/java/tools/dscode/workbench/catalog/ScenarioFilterTest.java`
+- `pickleball-workbench/src/test/java/tools/dscode/workbench/diagnostics/DiagnosticEvidenceNavigatorTest.java`
+- `pickleball-workbench/src/test/java/tools/dscode/workbench/diagnostics/InvestigationHandoffTest.java`
+- `pickleball-workbench/src/test/java/tools/dscode/workbench/lease/WorkbenchControlLeaseTest.java`
+- `pickleball-workbench/src/test/java/tools/dscode/workbench/mapping/MappingValueCodecTest.java`
+- `pickleball-workbench/src/test/java/tools/dscode/workbench/mcp/WorkbenchAttachServerTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/mcp/WorkbenchMcpServerTest.java`
+- `pickleball-workbench/src/test/java/tools/dscode/workbench/player/GherkinBlockDocumentTest.java`
+- `pickleball-workbench/src/test/java/tools/dscode/workbench/player/LiveEditorViewTest.java`
+- `pickleball-workbench/src/test/java/tools/dscode/workbench/player/LiveFeatureSaveTest.java`
+- `pickleball-workbench/src/test/java/tools/dscode/workbench/player/LivePlaybackCoordinatorTest.java`
+- `pickleball-workbench/src/test/java/tools/dscode/workbench/player/LiveScenarioPlayerTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/sync/WorkbenchGradleSynchronizerIntegrationTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/sync/WorkbenchSynchronizerTest.java`
+- `pickleball-workbench/src/test/java/tools/dscode/workbench/sync/WorkbenchSyncPlannerTest.java`
+- `pickleball-workbench/src/test/java/tools/dscode/workbench/terminal/WorkerLogBufferTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/ui/WorkbenchUiControllerTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/WorkbenchApplicationTest.java`
+- `pickleball-workbench/src/test/java/tools/dscode/workbench/WorkbenchControllerLeaseTest.java`
+- `pickleball-workbench/src/test/java/tools/dscode/workbench/WorkbenchRuntimeBoundaryTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/worker/WorkbenchLiveSessionTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/worker/WorkbenchWorkerManagerTest.java`
 
@@ -492,6 +592,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `maven-consumer-project/src/test/java/tools/dscode/common/mappings/MappingDataRefactorChecks.java`
 - `maven-consumer-project/src/test/java/tools/dscode/common/reporting/diagnostic/Diagnostic213CompletionChecks.java`
 - `maven-consumer-project/src/test/java/tools/dscode/common/reporting/diagnostic/DiagnosticReportingChecks.java`
+- `maven-consumer-project/src/test/java/tools/dscode/common/reporting/diagnostic/InvestigationHandoffChecks.java`
 - `maven-consumer-project/src/test/java/tools/dscode/common/reporting/diagnostic/PickleballGuidanceChecks.java`
 - `maven-consumer-project/src/test/java/tools/dscode/common/util/datetime/BusinessTemporalDeltaChecks.java`
 - `maven-consumer-project/src/test/java/tools/dscode/common/util/datetime/BusinessTimePostModifierChecks.java`
@@ -561,7 +662,6 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `maven-consumer-project/src/test/resources/files/customers.yaml`
 - `maven-consumer-project/src/test/resources/pickleball.properties`
 - `maven-consumer-project/src/test/resources/pickleball_local.properties`
-- `maven-consumer-project/src/test/resources/pickleball_local2.properties`
 - `maven-consumer-project/src/test/resources/profiles.yaml`
 - `maven-consumer-project/src/test/resources/profiles_local.yaml`
 

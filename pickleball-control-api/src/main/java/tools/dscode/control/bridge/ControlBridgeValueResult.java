@@ -1,6 +1,7 @@
 package tools.dscode.control.bridge;
 
-/** Structured value result for live mapping inspection and mutation. */
+/** @deprecated Wire controllers use {@code tools.dscode.control.protocol}. */
+@Deprecated(forRemoval = false)
 public record ControlBridgeValueResult(
         String status,
         ControlBridgeValue value,

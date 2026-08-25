@@ -26,11 +26,11 @@ Rerun export before Pickleball work even when `.pickleball` already exists. A su
 
 Compatibility note: an older Pickleball release whose exporter predates the manifest lifecycle may leave newer files or a newer manifest behind after a downgrade. Those leftovers are not authoritative for the downgraded dependency; prefer the dependency actually resolved on the test classpath and the files freshly exported by that dependency.
 
-AI agents should read `.pickleball/AGENT-GUIDE.md` first after a successful export. Human readers can start with `.pickleball/docs/README.md`; links from those guides to `maven-consumer-project` resolve to the exported version-matched reference files.
+AI agents should read `.pickleball/AGENT-GUIDE.md` first after a successful export. That guide's tool chooser is the agent path: headless Workbench MCP (`mcp .`), one bounded diagnostic `mvn test`, then edits to the real consumer source. Do not treat `.pickleball/maven-consumer-project/` as the project under test, and do not dump `docs/README.md` or the whole snapshot into first-read context. Human readers can start with `.pickleball/docs/README.md`; links from those guides to `maven-consumer-project` resolve to the exported version-matched reference files.
 
 ## Version-matched reference snapshot
 
-`export-guidance` also materializes a curated, read-only snapshot of the canonical Pickleball Maven consumer under `.pickleball/maven-consumer-project/`. It is intended for both human readers and AI agents that need concrete working examples in addition to prose documentation.
+`export-guidance` also materializes a curated, read-only snapshot of the canonical Pickleball Maven consumer under `.pickleball/maven-consumer-project/`. It is a version-matched **reference** of Pickleball's own example consumer for on-demand lookup, not a sandbox and not the consumer project under test. `export-guidance` does not copy the current consumer's own features into `.pickleball` for testing.
 
 The snapshot includes:
 
@@ -42,7 +42,7 @@ The snapshot includes:
 - static local test-site resources; and
 - the committed shared/local `profiles*.yaml` and `pickleball*.properties` examples.
 
-It intentionally excludes Maven wrappers, Git/IDE/generated artifacts, the consumer `AGENTS.md` bridge, internal Java verification classes, and maintainer-only `_local2` files. It is reference material, not another consumer project to edit or run. Make changes in the real consumer project; a future guidance export may replace every managed file in this snapshot.
+It intentionally excludes Maven wrappers, Git/IDE/generated artifacts, the consumer `AGENTS.md` and `.github/copilot-instructions.md` bridges, internal Java verification classes, and maintainer-only `_local2` files. It is reference material, not another consumer project to copy, edit, or run. Make changes in the real consumer project; a future guidance export may replace every managed file in this snapshot. `.pickleball/workbench/live/classes` is a compiled worker overlay, not an editor.
 
 ## Purpose
 
@@ -74,6 +74,23 @@ or use the included wrappers:
 ```
 
 `PickleballTests` starts the test server on `127.0.0.1:8765` before Cucumber and stops it afterward.
+
+## Launch the dependency-matched Workbench
+
+The test-scoped Pickleball dependency already contains its controller-only Workbench payload. Consumer AI agents start the **headless MCP** launcher from the resolved test classpath:
+
+```bash
+./mvnw -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java \
+  -Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher \
+  -Dexec.classpathScope=test \
+  "-Dexec.args=mcp ."
+```
+
+```powershell
+.\mvnw.cmd -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java "-Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher" "-Dexec.classpathScope=test" "-Dexec.args=mcp ."
+```
+
+Humans who want the Swing player can pass `ui .` instead. Agents for this release should not use the GUI, `ui .`, or `attach.json` as their path. The launcher verifies and extracts the opaque payload beneath `.pickleball/workbench/controller/<sha256>/`, then creates a separate Workbench JVM. Workbench captures this project's compiled outputs and effective test runtime before creating a separate worker JVM. Only the worker loads the consumer-resolved Pickleball runtime; the Workbench artifact and process contain no core implementation. See `docs/pickleball-workbench.md` for commands, lifecycle, protocol compatibility, and isolation checks. The live-loop order lives in `.pickleball/AGENT-GUIDE.md`.
 
 Runner defaults include:
 
@@ -128,9 +145,17 @@ The executable project covers Selenium navigation/selection/actions/assertions/d
 
 Common suite tags include `@all`, `@regression`, `@smoke`, `@browser`, and `@data`. Functional areas include `@navigation`, `@forms`, `@catalog`, `@mapping`, `@resources`, `@workflow`, `@keyboard`, `@dialogs`, and `@components`.
 
+Controller/protocol migration checks must remain focused: use `@control-bridge` and/or `@step-override-bridge`, set `pkb_parallel=80` when practical, and do not run `@all` for Workbench isolation work.
+
 ```bash
 mvn test -Dpkb_tags="@forms and @state-assertions"
 mvn test -Dpkb_tags="@workflow and @nested-steps and not @block-conditionals"
+```
+
+Human `PickleballTests` defaults remain `pretty` and `@all`. Agents launching a bounded confirmation should not reuse those defaults. Use a separate `pkb_runvars` command, for example:
+
+```bash
+mvn test -Dpkb_runvars="pkb_tags=@the-failing-tag, pkb_name=The failing scenario, pkb_browser=CHROME_HEADLESS, pkb_reportingmode=diagnostic, pkb_loglevel=warn, pkb_reportretention=failed"
 ```
 
 The consumer `pom.xml` also defines Maven profiles such as:
@@ -210,6 +235,7 @@ Do not recursively ingest an entire run.
 ```text
 DiagnosticCli compare-runs <left-run-index> <right-run-index> [output-json]
 DiagnosticCli compare-fingerprints <left.pkbf> <right.pkbf> [output-json]
+DiagnosticCli emit-investigation <investigation-json-or--> <consumer-project-root>
 DiagnosticCli rebuild <diagnostic-runs-root-or-run-root>
 ```
 
@@ -241,4 +267,4 @@ When evidence supports a bounded rerun:
 - Port `8765` must be available for the example test server.
 - Nested README/AGENTS files are minimal adapters; detailed guidance and version-matched reference examples are owned by Pickleball core and exported from the dependency.
 
-Use `docs/README.md` for the complete version-matched Pickleball syntax/documentation map and `maven-consumer-project/` for the corresponding working reference files.
+Human readers can use `docs/README.md` for the complete version-matched Pickleball syntax/documentation map and `maven-consumer-project/` for the corresponding working reference files. Agents should not treat those as first-read.

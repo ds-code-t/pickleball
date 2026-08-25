@@ -2,6 +2,7 @@ package tools.dscode.common.reporting.diagnostic;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
+import tools.dscode.control.protocol.InvestigationHandoff;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -47,6 +48,10 @@ public final class DiagnosticCli {
     }
 
     public static int run(String[] args, PrintStream out, PrintStream err) {
+        return run(args, out, err, System.in);
+    }
+
+    public static int run(String[] args, PrintStream out, PrintStream err, InputStream in) {
         try {
             if (args == null || args.length == 0) {
                 usage(err);
@@ -55,6 +60,7 @@ public final class DiagnosticCli {
             return switch (args[0]) {
                 case "guidance" -> guidance(args, out);
                 case "export-guidance" -> exportGuidance(args, out, err);
+                case "emit-investigation" -> emitInvestigation(args, out, in);
                 case "compare-runs" -> compareRuns(args, out);
                 case "compare-fingerprints" -> compareFingerprints(args, out);
                 case "rebuild" -> rebuild(args, out);
@@ -120,6 +126,35 @@ public final class DiagnosticCli {
         out.println("Manifest: " + root.resolve(GUIDANCE_MANIFEST));
         out.println("Read " + root.resolve(AGENT_GUIDE));
         return 0;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static int emitInvestigation(String[] args, PrintStream out, InputStream in) throws IOException {
+        requireLength(args, 3, 3, "emit-investigation <investigation-json-or--> <consumer-project-root>");
+        Path projectRoot = Path.of(args[2]).toAbsolutePath().normalize();
+        String jsonText = "-".equals(args[1])
+                ? new String(in.readAllBytes(), StandardCharsets.UTF_8)
+                : Files.readString(Path.of(args[1]), StandardCharsets.UTF_8);
+        if (jsonText == null || jsonText.isBlank()) {
+            throw new IllegalArgumentException("Investigation JSON is empty.");
+        }
+        Map<String, Object> raw;
+        try {
+            raw = JSON.readValue(jsonText, LinkedHashMap.class);
+        } catch (Exception failure) {
+            throw new IllegalArgumentException("Investigation JSON is invalid: " + failure.getMessage());
+        }
+        if (firstBlank(raw, "pickleballVersion")) {
+            raw.put("pickleballVersion", pickleballVersion());
+        }
+        InvestigationHandoff.EmitResult result = InvestigationHandoff.emit(projectRoot, raw);
+        out.println(result.reportPath());
+        return 0;
+    }
+
+    private static boolean firstBlank(Map<String, Object> raw, String key) {
+        Object value = raw.get(key);
+        return !(value instanceof String text) || text.isBlank();
     }
 
     private static void ensureGuidanceIgnored(Path root, PrintStream out, PrintStream err) {
@@ -257,6 +292,9 @@ public final class DiagnosticCli {
     private static void cleanupPreviousGuidance(Path root, List<String> currentFiles, PrintStream err) throws IOException {
         if (!Files.isDirectory(root)) return;
 
+        // .pickleball/investigations/ is unmanaged consumer-agent output. export-guidance
+        // must never list it in GUIDANCE-MANIFEST.json or delete it during cleanup.
+
         Path manifest = root.resolve(GUIDANCE_MANIFEST);
         if (Files.isRegularFile(manifest)) {
             Map<String, Object> previous;
@@ -278,7 +316,11 @@ public final class DiagnosticCli {
                     String relative = String.valueOf(entry).trim();
                     if (relative.isEmpty() || currentFiles.contains(relative)) continue;
                     Path target = previousGuidanceTarget(root, relative, err);
-                    if (target != null) Files.deleteIfExists(target);
+                    if (target == null) continue;
+                    // Agent investigation handoffs are unmanaged. Never delete them, even if a
+                    // previous manifest incorrectly listed a path under investigations/.
+                    if (InvestigationHandoff.isInvestigationsPath(root, target)) continue;
+                    Files.deleteIfExists(target);
                 }
                 removeEmptyDirectories(root);
             }
@@ -325,6 +367,7 @@ public final class DiagnosticCli {
             directories = paths
                     .filter(Files::isDirectory)
                     .filter(path -> !path.equals(root))
+                    .filter(path -> !InvestigationHandoff.isInvestigationsPath(root, path))
                     .sorted(Comparator.reverseOrder())
                     .toList();
         }
@@ -532,6 +575,7 @@ public final class DiagnosticCli {
         out.println("Pickleball diagnostic utility");
         out.println("  DiagnosticCli guidance");
         out.println("  DiagnosticCli export-guidance [output-directory]");
+        out.println("  DiagnosticCli emit-investigation <investigation-json-or--> <consumer-project-root>");
         out.println("  DiagnosticCli compare-runs <left-run-index> <right-run-index> [output-json]");
         out.println("  DiagnosticCli compare-fingerprints <left.pkbf> <right.pkbf> [output-json]");
         out.println("  DiagnosticCli rebuild <diagnostic-runs-root-or-run-root>");

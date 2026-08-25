@@ -20,11 +20,42 @@ java {
 }
 
 def mcpSdkVersion = '2.0.0'
+def javafxVersion = '21.0.6'
+def javafxModules = ['base', 'graphics', 'controls', 'swing', 'media', 'web']
+def javafxPlatforms = ['linux', 'win', 'mac', 'mac-aarch64']
+def javafxCompilePlatform = {
+    def os = org.gradle.internal.os.OperatingSystem.current()
+    def arch = System.getProperty('os.arch', '')
+    boolean arm = arch.contains('aarch64') || arch.contains('arm64')
+    if (os.windows) return 'win'
+    if (os.macOsX) return arm ? 'mac-aarch64' : 'mac'
+    return 'linux'
+}()
+
+configurations {
+    javafxNatives
+}
 
 dependencies {
-    // Deliberately target the root project's published-equivalent shaded/woven
-    // variant. Do not replace this with a naïve implementation project(':').
-    implementation project(path: ':', configuration: 'pickleballPublishedElements')
+    // Workbench shares only the JDK-only wire contract with the consumer worker.
+    // It must never compile or run against the root Pickleball runtime.
+    implementation project(':pickleball-control-protocol')
+
+    // OpenJFX WebView is Workbench-only presentation. It is not a Pickleball
+    // runtime dependency and is preferred over JCEF so natives stay in Maven
+    // artifacts that can be shaded into the controller executable.
+    javafxModules.each { module ->
+        implementation "org.openjfx:javafx-${module}:${javafxVersion}:${javafxCompilePlatform}"
+    }
+    javafxPlatforms.each { platform ->
+        javafxModules.each { module ->
+            javafxNatives "org.openjfx:javafx-${module}:${javafxVersion}:${platform}"
+        }
+    }
+
+    // Controller-side JSON transport. This is declared directly instead of
+    // inheriting it through Pickleball core.
+    implementation 'com.fasterxml.jackson.core:jackson-databind:2.20.0'
 
     // Keep MCP Workbench-only and non-Spring. Jackson 2 matches Pickleball's
     // existing ObjectMapper usage without pulling the SDK convenience/Jackson 3 path.
@@ -33,6 +64,7 @@ dependencies {
 
     testImplementation 'org.junit.jupiter:junit-jupiter:5.13.4'
     testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.13.4'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher:1.13.4'
 }
 
 application {
@@ -55,13 +87,57 @@ tasks.jar {
     enabled = false
 }
 
+def javafxNativeStage = tasks.register('stageJavaFxNatives') {
+    def outputDir = layout.buildDirectory.dir('javafx-natives')
+    outputs.dir(outputDir)
+    doLast {
+        def dest = outputDir.get().asFile
+        dest.deleteDir()
+        dest.mkdirs()
+        configurations.javafxNatives.resolvedConfiguration.resolvedArtifacts.each { artifact ->
+            String classifier = artifact.classifier ?: 'unknown'
+            def target = new File(dest, classifier)
+            target.mkdirs()
+            copy {
+                from zipTree(artifact.file)
+                into target
+                include '**/*.so'
+                include '**/*.dll'
+                include '**/*.dylib'
+                include '**/*.jnilib'
+                includeEmptyDirs = false
+                eachFile { details ->
+                    details.path = details.name
+                }
+            }
+            new File(target, '.keep').text = ''
+        }
+    }
+}
+
+tasks.named('processResources') {
+    dependsOn javafxNativeStage
+    from(layout.buildDirectory.dir('javafx-natives')) {
+        into 'javafx-natives'
+    }
+}
+
 tasks.shadowJar {
+    dependsOn javafxNativeStage
     archiveBaseName.set('pickleball-workbench')
     archiveVersion.set(project.version.toString())
     archiveClassifier.set('')
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
     mergeServiceFiles()
     zip64 = true
+    exclude 'module-info.class'
+    exclude { details ->
+        String path = details.path ?: ''
+        String name = details.name ?: ''
+        boolean nativeLib = name.endsWith('.so') || name.endsWith('.dll') ||
+                name.endsWith('.dylib') || name.endsWith('.jnilib')
+        nativeLib && !path.startsWith('javafx-natives/')
+    }
 
     manifest {
         attributes(
@@ -132,8 +208,8 @@ publishing {
                 }
             }
 
-            // The executable shades its implementation libraries. Its only
-            // published dependency contract is the normal Pickleball artifact.
+            // The executable shades all controller dependencies. It has no
+            // published dependency on Pickleball core or the protocol module.
             pom.withXml {
                 def pomNode = asNode()
                 def depsNodeList = pomNode.get('dependencies') as groovy.util.NodeList
@@ -141,12 +217,6 @@ publishing {
                         ? (groovy.util.Node) depsNodeList[0]
                         : pomNode.appendNode('dependencies')
                 depsNode.children().clear()
-
-                def dependency = depsNode.appendNode('dependency')
-                dependency.appendNode('groupId', rootProject.group.toString())
-                dependency.appendNode('artifactId', 'pickleball')
-                dependency.appendNode('version', rootProject.version.toString())
-                dependency.appendNode('scope', 'compile')
             }
         }
     }
@@ -192,15 +262,61 @@ tasks.named('test') {
         systemProperty 'pickleball.workbench.test.jar', workbenchJar.get().asFile.absolutePath
     }
 }
-def rootPickleballJar = rootProject.tasks.named('shadowJar').flatMap { it.archiveFile }
-
 tasks.register('verifyWorkbenchArtifact') {
     group = 'verification'
-    description = 'Verifies the Workbench executable JAR and one-way packaging boundary.'
-    dependsOn tasks.shadowJar, rootProject.tasks.named('shadowJar')
+    description = 'Verifies the Workbench executable contains controller code and no Pickleball runtime.'
+    dependsOn tasks.shadowJar
 
     doLast {
         def jarFile = workbenchJar.get().asFile
+        def forbiddenPrefixes = [
+                'tools/dscode/testengine/',
+                'tools/dscode/common/',
+                'tools/dscode/coredefinitions/',
+                'tools/dscode/pickleruntime/',
+                'tools/dscode/control/api/',
+                'tools/dscode/control/bridge/',
+                'tools/dscode/control/override/',
+                'io/cucumber/',
+                'org/openqa/selenium/',
+                'io/restassured/'
+        ]
+        def forbiddenProviderPrefixes = forbiddenPrefixes.collect { prefix ->
+            prefix.replace('/', '.')
+        }
+        def forbidden = []
+
+        def scanNestedJar
+        scanNestedJar = { InputStream input, String source ->
+            new java.util.zip.ZipInputStream(input).withCloseable { nested ->
+                java.util.zip.ZipEntry entry
+                while ((entry = nested.nextEntry) != null) {
+                    String name = entry.name
+                    if (forbiddenPrefixes.any { name.startsWith(it) }) {
+                        forbidden.add("${source}!/${name}")
+                    }
+                    if (!entry.directory && name.endsWith('.jar')) {
+                        scanNestedJar(
+                                new ByteArrayInputStream(nested.readAllBytes()),
+                                "${source}!/${name}"
+                        )
+                    } else if (!entry.directory && name.startsWith('META-INF/services/')) {
+                        String providers = new String(
+                                nested.readAllBytes(),
+                                java.nio.charset.StandardCharsets.UTF_8
+                        )
+                        if (providers.readLines().collect { line ->
+                            line.replaceFirst(/#.*/, '').trim()
+                        }.any { provider ->
+                            forbiddenProviderPrefixes.any { provider.startsWith(it) }
+                        }) {
+                            forbidden.add("${source}!/${name} -> ${providers.trim()}")
+                        }
+                    }
+                }
+            }
+        }
+
         new java.util.jar.JarFile(jarFile).withCloseable { jar ->
             def mainClass = jar.manifest?.mainAttributes?.getValue('Main-Class')
             if (mainClass != application.mainClass.get()) {
@@ -209,95 +325,116 @@ tasks.register('verifyWorkbenchArtifact') {
             if (jar.getEntry('tools/dscode/workbench/WorkbenchApplication.class') == null) {
                 throw new GradleException('Workbench executable is missing WorkbenchApplication.class')
             }
+            if (jar.getEntry('tools/dscode/workbench/WorkbenchRuntimeBoundary.class') == null) {
+                throw new GradleException('Workbench executable is missing its runtime isolation guard')
+            }
+            if (jar.getEntry('tools/dscode/workbench/WorkbenchController.class') == null) {
+                throw new GradleException('Workbench executable is missing its shared controller service')
+            }
+            if (jar.getEntry('tools/dscode/workbench/bridge/ControlBridgeClient.class') == null) {
+                throw new GradleException('Workbench executable is missing its neutral protocol client')
+            }
+            if (jar.getEntry('tools/dscode/workbench/ui/WorkbenchUi.class') == null) {
+                throw new GradleException('Workbench executable is missing its GUI adapter')
+            }
             if (jar.getEntry('tools/dscode/workbench/mcp/WorkbenchMcpServer.class') == null) {
                 throw new GradleException('Workbench executable is missing WorkbenchMcpServer.class')
             }
-        }
+            if (jar.getEntry('tools/dscode/control/protocol/ControlProtocol.class') == null) {
+                throw new GradleException('Workbench executable is missing the neutral control protocol')
+            }
 
-        new java.util.jar.JarFile(rootPickleballJar.get().asFile).withCloseable { jar ->
-            def leaked = java.util.Collections.list(jar.entries()).findAll { entry ->
-                entry.name.startsWith('tools/dscode/workbench/') ||
-                        entry.name.startsWith('META-INF/pickleball/workbench/') ||
-                        entry.name.startsWith('io/modelcontextprotocol/')
+            java.util.Collections.list(jar.entries()).each { entry ->
+                String name = entry.name
+                if (forbiddenPrefixes.any { name.startsWith(it) }) {
+                    forbidden.add(name)
+                }
+                if (!entry.directory && name.endsWith('.jar')) {
+                    jar.getInputStream(entry).withCloseable { stream ->
+                        scanNestedJar(stream, name)
+                    }
+                } else if (!entry.directory && name.startsWith('META-INF/services/')) {
+                    String providers = jar.getInputStream(entry).getText('UTF-8')
+                    if (providers.readLines().collect { line ->
+                        line.replaceFirst(/#.*/, '').trim()
+                    }.any { provider ->
+                        forbiddenProviderPrefixes.any { provider.startsWith(it) }
+                    }) {
+                        forbidden.add("${name} -> ${providers.trim()}")
+                    }
+                }
             }
-            if (!leaked.isEmpty()) {
-                throw new GradleException(
-                        'Workbench/MCP content leaked into the normal Pickleball artifact: ' +
-                                leaked.collect { it.name }.take(10)
-                )
-            }
+        }
+        if (!forbidden.isEmpty()) {
+            throw new GradleException(
+                    'Pickleball runtime content leaked into the controller-only Workbench JAR: ' +
+                            forbidden.take(20)
+            )
         }
     }
 }
 
 tasks.register('verifyWorkbenchRuntimeBoundary') {
     group = 'verification'
-    description = 'Verifies Workbench resolves the shaded Pickleball artifact without unpublished/control or unwoven Cucumber variants.'
-    dependsOn rootProject.tasks.named('shadowJar')
+    description = 'Verifies Workbench compile/runtime graphs resolve only the neutral protocol and controller libraries.'
+    dependsOn ':pickleball-control-protocol:verifyProtocolIsolation'
 
     doLast {
-        def artifacts = configurations.runtimeClasspath.incoming.artifacts.artifacts
-        def files = artifacts.collect { it.file.canonicalFile } as Set
-        def expectedPickleball = rootPickleballJar.get().asFile.canonicalFile
-        if (!files.contains(expectedPickleball)) {
-            throw new GradleException(
-                    "Workbench runtime does not contain the published-equivalent Pickleball JAR: ${expectedPickleball}"
-            )
-        }
+        ['compileClasspath', 'runtimeClasspath'].each { configurationName ->
+            def artifacts = configurations.named(configurationName).get()
+                    .incoming.artifacts.artifacts
+            def projectDependencies = artifacts.findAll { artifact ->
+                def component = artifact.id.componentIdentifier
+                component instanceof org.gradle.api.artifacts.component.ProjectComponentIdentifier
+            }.collect { artifact ->
+                def component = artifact.id.componentIdentifier
+                component.projectPath
+            }.sort()
+            if (projectDependencies != [':pickleball-control-protocol']) {
+                throw new GradleException(
+                        "Workbench ${configurationName} project dependencies must be exactly " +
+                                ':pickleball-control-protocol: ' + projectDependencies
+                )
+            }
 
-        def forbiddenModules = [
-                'io.cucumber:cucumber-core',
-                'io.cucumber:cucumber-gherkin',
-                'io.cucumber:cucumber-gherkin-messages',
-                'io.cucumber:cucumber-java',
-                'io.cucumber:cucumber-plugin',
-                'io.cucumber:messages',
-                'io.cucumber:gherkin'
-        ] as Set
+            def forbiddenModules = artifacts.findAll { artifact ->
+                def component = artifact.id.componentIdentifier
+                if (!(component instanceof org.gradle.api.artifacts.component.ModuleComponentIdentifier)) {
+                    return false
+                }
+                component.group == 'io.cucumber' ||
+                        component.group == 'org.seleniumhq.selenium' ||
+                        component.group == 'io.rest-assured' ||
+                        (component.group == 'tools.dscode' && component.module == 'pickleball') ||
+                        (component.group == 'io.modelcontextprotocol.sdk' &&
+                                (component.module == 'mcp' || component.module == 'mcp-json-jackson3'))
+            }.collect { artifact ->
+                def component = artifact.id.componentIdentifier
+                "${component.group}:${component.module}:${component.version}"
+            }.sort()
+            if (!forbiddenModules.isEmpty()) {
+                throw new GradleException(
+                        "Workbench ${configurationName} resolved forbidden execution-plane modules: " +
+                                forbiddenModules
+                )
+            }
 
-        def leakedModules = artifacts.findAll { artifact ->
-            def component = artifact.id.componentIdentifier
-            component instanceof org.gradle.api.artifacts.component.ModuleComponentIdentifier &&
-                    forbiddenModules.contains("${component.group}:${component.module}")
-        }.collect { artifact ->
-            def component = artifact.id.componentIdentifier
-            "${component.group}:${component.module}:${component.version}"
-        }.sort()
-        if (!leakedModules.isEmpty()) {
-            throw new GradleException(
-                    'Workbench runtime resolved unwoven Cucumber modules outside pickleball.jar: ' + leakedModules
-            )
-        }
-
-        def unpublishedControl = artifacts.findAll { artifact ->
-            def component = artifact.id.componentIdentifier
-            component instanceof org.gradle.api.artifacts.component.ProjectComponentIdentifier &&
-                    component.projectPath == ':pickleball-control-api'
-        }
-        if (!unpublishedControl.isEmpty()) {
-            throw new GradleException('Workbench runtime depends on unpublished :pickleball-control-api')
-        }
-
-        def forbiddenMcpModules = artifacts.findAll { artifact ->
-            def component = artifact.id.componentIdentifier
-            component instanceof org.gradle.api.artifacts.component.ModuleComponentIdentifier &&
-                    component.group == 'io.modelcontextprotocol.sdk' &&
-                    (component.module == 'mcp' || component.module == 'mcp-json-jackson3')
-        }.collect { artifact ->
-            def component = artifact.id.componentIdentifier
-            "${component.group}:${component.module}:${component.version}"
-        }.sort()
-        if (!forbiddenMcpModules.isEmpty()) {
-            throw new GradleException(
-                    'Workbench MCP resolved the convenience/Jackson 3 path: ' + forbiddenMcpModules
-            )
+            def forbiddenFiles = artifacts.collect { it.file.name }.findAll { name ->
+                name ==~ /pickleball-\d.*\.jar/
+            }
+            if (!forbiddenFiles.isEmpty()) {
+                throw new GradleException(
+                        "Workbench ${configurationName} resolved a Pickleball core JAR: " +
+                                forbiddenFiles
+                )
+            }
         }
     }
 }
 
 tasks.register('verifyWorkbenchPublishedDependencyContract') {
     group = 'verification'
-    description = 'Verifies the Workbench POM declares only tools.dscode:pickleball.'
+    description = 'Verifies the self-contained Workbench POM declares no Pickleball dependency.'
     dependsOn tasks.named('generatePomFileForMavenPublication')
 
     doLast {
@@ -320,12 +457,7 @@ tasks.register('verifyWorkbenchPublishedDependencyContract') {
                     xpath.evaluate('scope', dependency)
             ]
         }
-        def expected = [[
-                rootProject.group.toString(),
-                'pickleball',
-                rootProject.version.toString(),
-                'compile'
-        ]]
+        def expected = []
         if (dependencies != expected) {
             throw new GradleException("Unexpected Workbench published dependencies: ${dependencies}; expected ${expected}")
         }
@@ -442,7 +574,10 @@ tasks.register('verifyWorkbenchMcpStdio') {
             if (!names.containsAll([
                     'workbench_worker_status',
                     'workbench_execute_step',
-                    'workbench_step_override_compile'
+                    'workbench_step_override_compile',
+                    'workbench_request_control',
+                    'workbench_player_state',
+                    'workbench_request_save'
             ])) {
                 throw new GradleException("Workbench MCP tool list is incomplete: ${names}")
             }
@@ -509,7 +644,6 @@ tasks.register('reportWorkbenchMcpImpact') {
 }
 
 tasks.named('test') {
-    dependsOn rootProject.tasks.named('verifyPickleballPublishedElements')
     finalizedBy(
             tasks.named('verifyWorkbenchArtifact'),
             tasks.named('verifyWorkbenchRuntimeBoundary'),

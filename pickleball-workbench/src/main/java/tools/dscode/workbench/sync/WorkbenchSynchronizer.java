@@ -33,19 +33,47 @@ public final class WorkbenchSynchronizer {
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final String GRADLE_METADATA_PREFIX = "PKB_WORKBENCH_METADATA=";
 
+    @FunctionalInterface
+    interface CommandRunner {
+        String run(WorkbenchProject project, List<String> args, Path log);
+    }
+
+    private final CommandRunner commandRunner;
+
+    public WorkbenchSynchronizer() {
+        this(null);
+    }
+
+    WorkbenchSynchronizer(CommandRunner commandRunner) {
+        this.commandRunner = commandRunner == null ? this::runProcess : commandRunner;
+    }
+
     public WorkbenchManifest sync(Path requestedProject) {
         WorkbenchProject project = WorkbenchProject.locate(requestedProject);
         Path stateRoot = WorkbenchManifest.workbenchRoot(project.root());
+        WorkbenchManifest previous = WorkbenchManifest.readIfPresent(stateRoot);
+        WorkbenchSyncInputs inputs = WorkbenchSyncInputs.capture(project, previous);
+        WorkbenchSyncMode mode = WorkbenchSyncPlanner.decide(
+                previous, inputs, WorkbenchSyncInputs.snapshotReady(stateRoot)
+        );
+        if (mode == WorkbenchSyncMode.RESOURCES_ONLY
+                && !WorkbenchSyncInputs.compiledOutputsPresent(previous)) {
+            mode = WorkbenchSyncMode.FULL;
+        }
+        if (mode == WorkbenchSyncMode.SKIPPED) {
+            return skip(previous, inputs, stateRoot);
+        }
+
         Path logs = stateRoot.resolve("logs");
         Path staging = stateRoot.resolve(".sync-" + UUID.randomUUID());
         createDirectories(logs, staging);
 
         Path log = logs.resolve("sync-" + System.currentTimeMillis() + ".log");
         try {
-            SyncMetadata metadata = project.type() == WorkbenchProject.Type.MAVEN
-                    ? synchronizeMaven(project, staging, log)
-                    : synchronizeGradle(project, staging, log);
-            return materialize(project, metadata, staging, stateRoot);
+            SyncMetadata metadata = mode == WorkbenchSyncMode.RESOURCES_ONLY
+                    ? synchronizeResources(project, previous, log)
+                    : synchronizeFull(project, staging, log);
+            return materialize(project, metadata, staging, stateRoot, mode);
         } finally {
             deleteTree(staging);
         }
@@ -56,6 +84,22 @@ public final class WorkbenchSynchronizer {
             SyncMetadata metadata,
             Path staging,
             Path stateRoot
+    ) {
+        return materialize(
+                project,
+                metadata,
+                staging,
+                stateRoot,
+                WorkbenchSyncMode.FULL
+        );
+    }
+
+    static WorkbenchManifest materialize(
+            WorkbenchProject project,
+            SyncMetadata metadata,
+            Path staging,
+            Path stateRoot,
+            WorkbenchSyncMode mode
     ) {
         Path stagedBase = staging.resolve("base");
         Path stagedBaseClasses = stagedBase.resolve("classes");
@@ -84,6 +128,9 @@ public final class WorkbenchSynchronizer {
         );
 
         List<String> dependencies = distinctExisting(metadata.dependencies());
+        WorkbenchSyncInputs stored = WorkbenchSyncInputs.capture(
+                project, metadata.sourceRoots(), dependencies
+        );
         String fingerprint = fingerprint(stagedBaseClasses, dependencies);
         Path finalBaseClasses = stateRoot.resolve("base").resolve("classes").toAbsolutePath().normalize();
         Path finalLiveClasses = stateRoot.resolve("live").resolve("classes").toAbsolutePath().normalize();
@@ -116,7 +163,12 @@ public final class WorkbenchSynchronizer {
                 dependencies,
                 implementationVersion(),
                 System.getProperty("java.version", "unknown"),
-                System.getProperty("java.home", "unknown")
+                System.getProperty("java.home", "unknown"),
+                mode == null ? WorkbenchSyncMode.FULL.name() : mode.name(),
+                stored.javaFingerprint(),
+                stored.resourceFingerprint(),
+                stored.buildFingerprint(),
+                stored.dependencyFingerprint()
         );
 
         Path stagedManifest = staging.resolve("manifest.json");
@@ -156,10 +208,47 @@ public final class WorkbenchSynchronizer {
         }
     }
 
-    private SyncMetadata synchronizeMaven(WorkbenchProject project, Path staging, Path log) {
+    private WorkbenchManifest skip(
+            WorkbenchManifest previous,
+            WorkbenchSyncInputs inputs,
+            Path stateRoot
+    ) {
+        WorkbenchManifest updated = previous.withSkip(Instant.now().toString(), inputs);
+        updated.write(stateRoot.resolve("manifest.json"));
+        return updated;
+    }
+
+    private SyncMetadata synchronizeFull(WorkbenchProject project, Path staging, Path log) {
+        return project.type() == WorkbenchProject.Type.MAVEN
+                ? synchronizeMavenFull(project, staging, log)
+                : synchronizeGradleFull(project, staging, log);
+    }
+
+    private SyncMetadata synchronizeResources(
+            WorkbenchProject project,
+            WorkbenchManifest previous,
+            Path log
+    ) {
+        if (project.type() == WorkbenchProject.Type.MAVEN) {
+            commandRunner.run(project, mavenResourceArgs(project), log);
+        } else {
+            commandRunner.run(project, gradleResourceArgs(), log);
+        }
+        return metadataFrom(previous);
+    }
+
+    private SyncMetadata synchronizeMavenFull(WorkbenchProject project, Path staging, Path log) {
         Path dependencyClasspath = staging.resolve("maven-classpath.txt");
         Path effectivePom = staging.resolve("effective-pom.xml");
-        List<String> args = List.of(
+        commandRunner.run(project, mavenFullArgs(project, dependencyClasspath, effectivePom), log);
+
+        MavenMetadata pom = parseEffectivePom(project.root(), effectivePom);
+        List<String> dependencies = readClasspathValue(dependencyClasspath);
+        return new SyncMetadata(pom.sourceRoots(), pom.outputs(), dependencies);
+    }
+
+    static List<String> mavenFullArgs(WorkbenchProject project, Path dependencyClasspath, Path effectivePom) {
+        return List.of(
                 "-f", project.root().resolve("pom.xml").toString(),
                 "-DskipTests",
                 "test-compile",
@@ -170,14 +259,37 @@ public final class WorkbenchSynchronizer {
                 "org.apache.maven.plugins:maven-help-plugin:3.5.1:effective-pom",
                 "-Doutput=" + effectivePom
         );
-        run(project, args, log);
-
-        MavenMetadata pom = parseEffectivePom(project.root(), effectivePom);
-        List<String> dependencies = readClasspathValue(dependencyClasspath);
-        return new SyncMetadata(pom.sourceRoots(), pom.outputs(), dependencies);
     }
 
-    private SyncMetadata synchronizeGradle(WorkbenchProject project, Path staging, Path log) {
+    static List<String> mavenResourceArgs(WorkbenchProject project) {
+        return List.of(
+                "-f", project.root().resolve("pom.xml").toString(),
+                "-DskipTests",
+                "process-resources",
+                "process-test-resources"
+        );
+    }
+
+    static List<String> gradleResourceArgs() {
+        return List.of(
+                "processResources",
+                "processTestResources",
+                "--console=plain",
+                "-q"
+        );
+    }
+
+    private static SyncMetadata metadataFrom(WorkbenchManifest previous) {
+        List<Path> sources = previous.sourceRoots().stream()
+                .map(value -> Path.of(value).toAbsolutePath().normalize())
+                .toList();
+        List<OutputPath> outputs = previous.outputRoots().stream()
+                .map(output -> new OutputPath(output.kind(), Path.of(output.path())))
+                .toList();
+        return new SyncMetadata(sources, outputs, previous.dependencyClasspath());
+    }
+
+    private SyncMetadata synchronizeGradleFull(WorkbenchProject project, Path staging, Path log) {
         Path initScript = staging.resolve("workbench-sync.init.gradle");
         writeString(initScript, gradleInitScript());
         List<String> args = List.of(
@@ -187,7 +299,7 @@ public final class WorkbenchSynchronizer {
                 "--console=plain",
                 "-q"
         );
-        String output = run(project, args, log);
+        String output = commandRunner.run(project, args, log);
         String metadataLine = output.lines()
                 .filter(line -> line.startsWith(GRADLE_METADATA_PREFIX))
                 .reduce((first, second) -> second)
@@ -234,7 +346,7 @@ public final class WorkbenchSynchronizer {
         }
     }
 
-    private String run(WorkbenchProject project, List<String> args, Path log) {
+    private String runProcess(WorkbenchProject project, List<String> args, Path log) {
         List<String> command = executableCommand(project.launcher(), args);
         ProcessBuilder builder = new ProcessBuilder(command)
                 .directory(project.buildRoot().toFile())

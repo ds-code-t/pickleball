@@ -39,6 +39,7 @@ REQUIRED_FILES = (
     "docs/agent/change-checklist.md",
     "docs/agent/prompt-examples.md",
     "docs/agent/repository-index.md",
+    "pickleball-workbench/AGENTS.md",
     "gradle/consumer-guidance.gradle",
     "scripts/refresh_agent_index.py",
     "scripts/sync_consumer_guidance.py",
@@ -46,6 +47,7 @@ REQUIRED_FILES = (
     "scripts/agent_validate.sh",
     "scripts/agent_validate.ps1",
     "maven-consumer-project/AGENTS.md",
+    "maven-consumer-project/.github/copilot-instructions.md",
     "maven-consumer-project/README.md",
     "maven-consumer-project/.gitignore",
     "maven-consumer-project/mvnw",
@@ -78,7 +80,6 @@ FORBIDDEN_TRACKED_CONSUMER_FILES = {
     "maven-consumer-project/GEMINI.md",
     "maven-consumer-project/REVIEW.md",
     "maven-consumer-project/.clinerules",
-    "maven-consumer-project/.github/copilot-instructions.md",
 }
 ADAPTER_FILES = (
     "CLAUDE.md",
@@ -103,15 +104,24 @@ BEHAVIOR_PREFIXES = (
     "src/main/java/",
     "src/main/aspectj/",
     "src/main/resources/",
+    "pickleball-control-protocol/src/main/",
+    "pickleball-control-api/src/main/",
+    "pickleball-workbench/src/main/",
 )
 BEHAVIOR_FILES = {
     "build.gradle",
     "settings.gradle",
     "gradle/consumer-guidance.gradle",
+    "pickleball-control-protocol/build.gradle",
+    "pickleball-control-api/build.gradle",
+    "pickleball-workbench/build.gradle",
     "gradle.properties",
 }
 TEST_PREFIXES = (
     "src/test/",
+    "pickleball-control-protocol/src/test/",
+    "pickleball-control-api/src/test/",
+    "pickleball-workbench/src/test/",
     "maven-consumer-project/src/test/java/",
     "maven-consumer-project/src/test/resources/features/",
     "maven-consumer-project/src/test/resources/calls/",
@@ -123,9 +133,100 @@ DOC_PREFIXES = (
 )
 DOC_FILES = {
     "README.md",
+    "pickleball-workbench/AGENTS.md",
     "maven-consumer-project/README.md",
     "maven-consumer-project/AGENTS.md",
+    "maven-consumer-project/.github/copilot-instructions.md",
 }
+
+WORKBENCH_CONTRACT_FILES = (
+    "AGENTS.md",
+    "pickleball-workbench/AGENTS.md",
+    "docs/agent/feature-map.md",
+)
+
+
+def validate_workbench_controller_contract(errors: list[str]) -> None:
+    required_fragments = (
+        "pickleball-control-protocol",
+        "Pickleball may contain Workbench",
+        "Workbench must not contain Pickleball",
+        "@control-bridge",
+        "pkb_parallel=80",
+    )
+    forbidden_fragments = (
+        "pickleball-workbench -> pickleball",
+        "Workbench POM contract is exactly `tools.dscode:pickleball`",
+        "uses the public `tools.dscode.control.bridge.*`",
+    )
+
+    for relative in WORKBENCH_CONTRACT_FILES:
+        path = ROOT / relative
+        if not path.is_file():
+            continue
+        text = path.read_text(encoding="utf-8")
+        for required in required_fragments:
+            if required not in text:
+                errors.append(
+                    f"Workbench controller guidance must retain {required!r}: {relative}"
+                )
+        for forbidden in forbidden_fragments:
+            if forbidden in text:
+                errors.append(
+                    f"Workbench controller guidance retains the obsolete dependency rule "
+                    f"{forbidden!r}: {relative}"
+                )
+
+
+def validate_workbench_source_boundary(errors: list[str]) -> None:
+    build = ROOT / "pickleball-workbench" / "build.gradle"
+    if build.is_file():
+        text = build.read_text(encoding="utf-8")
+        if "implementation project(':pickleball-control-protocol')" not in text:
+            errors.append(
+                "Workbench must depend on exactly the neutral protocol project: "
+                "pickleball-workbench/build.gradle"
+            )
+        for forbidden in (
+            "pickleballPublishedElements",
+            "project(path: ':'",
+            "implementation project(':')",
+            "tools.dscode:pickleball",
+        ):
+            if forbidden in text:
+                errors.append(
+                    f"Workbench build restores a forbidden core dependency ({forbidden}): "
+                    "pickleball-workbench/build.gradle"
+                )
+
+    workbench_sources = ROOT / "pickleball-workbench" / "src" / "main" / "java"
+    if workbench_sources.is_dir():
+        for source in workbench_sources.rglob("*.java"):
+            for line in source.read_text(encoding="utf-8").splitlines():
+                if not line.startswith((
+                    "import tools.dscode.",
+                    "import static tools.dscode.",
+                )):
+                    continue
+                imported = line.removeprefix("import ").removeprefix("static ")
+                if imported.startswith("tools.dscode.workbench.") or imported.startswith(
+                    "tools.dscode.control.protocol."
+                ):
+                    continue
+                errors.append(
+                    "Workbench source imports a Pickleball execution package: "
+                    f"{source.relative_to(ROOT)} -> {line.strip()}"
+                )
+
+    protocol_sources = ROOT / "pickleball-control-protocol" / "src" / "main" / "java"
+    if protocol_sources.is_dir():
+        for source in protocol_sources.rglob("*.java"):
+            for line in source.read_text(encoding="utf-8").splitlines():
+                if line.startswith("import ") and not line.startswith("import java."):
+                    errors.append(
+                        "Neutral protocol source has a non-JDK import: "
+                        f"{source.relative_to(ROOT)} -> {line.strip()}"
+                    )
 
 
 def env_true(name: str) -> bool:
@@ -178,42 +279,56 @@ def starts_with_any(path: str, prefixes: tuple[str, ...]) -> bool:
     return any(path.startswith(prefix) for prefix in prefixes)
 
 
+CONSUMER_BRIDGE_FILES = (
+    "maven-consumer-project/AGENTS.md",
+    "maven-consumer-project/.github/copilot-instructions.md",
+)
+
+
 def validate_consumer_bridge(errors: list[str]) -> None:
-    bridge = ROOT / "maven-consumer-project" / "AGENTS.md"
-    if not bridge.is_file():
-        return
+    texts: list[str] = []
+    for relative in CONSUMER_BRIDGE_FILES:
+        path = ROOT / relative
+        if not path.is_file():
+            continue
 
-    text = bridge.read_text(encoding="utf-8").strip()
-    nonblank_lines = [line for line in text.splitlines() if line.strip()]
-    if len(nonblank_lines) != 1:
+        text = path.read_text(encoding="utf-8").strip()
+        texts.append(text)
+        nonblank_lines = [line for line in text.splitlines() if line.strip()]
+        if len(nonblank_lines) != 1:
+            errors.append(
+                "Consumer guidance bridge must stay a single nonblank bootstrap line: "
+                + relative
+            )
+
+        for required in (
+            "DiagnosticCli",
+            "export-guidance",
+            ".pickleball/AGENT-GUIDE.md",
+        ):
+            if required not in text:
+                errors.append(
+                    f"Consumer guidance bridge must reference {required}: {relative}"
+                )
+
+        for forbidden in (
+            "GUIDANCE-MANIFEST.json",
+            ".git/info/exclude",
+            "pkb_changed_variables",
+            "runProfileFingerprint",
+            "Diagnostic investigation protocol",
+        ):
+            if forbidden in text:
+                errors.append(
+                    f"Consumer guidance bridge contains dependency-owned guidance ({forbidden}); "
+                    "keep only the bootstrap command and generated-guide pointer: "
+                    + relative
+                )
+
+    if len(texts) == len(CONSUMER_BRIDGE_FILES) and len(set(texts)) != 1:
         errors.append(
-            "Consumer AGENTS bridge must stay a single nonblank bootstrap line: "
-            "maven-consumer-project/AGENTS.md"
+            "Consumer AGENTS.md and .github/copilot-instructions.md bridges must be identical."
         )
-
-    for required in (
-        "DiagnosticCli",
-        "export-guidance",
-        ".pickleball/AGENT-GUIDE.md",
-    ):
-        if required not in text:
-            errors.append(
-                f"Consumer AGENTS bridge must reference {required}: "
-                "maven-consumer-project/AGENTS.md"
-            )
-
-    for forbidden in (
-        "GUIDANCE-MANIFEST.json",
-        ".git/info/exclude",
-        "pkb_changed_variables",
-        "runProfileFingerprint",
-        "Diagnostic investigation protocol",
-    ):
-        if forbidden in text:
-            errors.append(
-                f"Consumer AGENTS bridge contains dependency-owned guidance ({forbidden}); "
-                "keep only the bootstrap command and generated-guide pointer."
-            )
 
 
 def validate_consumer_readme(errors: list[str]) -> None:
@@ -222,6 +337,11 @@ def validate_consumer_readme(errors: list[str]) -> None:
         return
 
     text = readme.read_text(encoding="utf-8")
+    if "AGENTS.md" not in text:
+        errors.append(
+            "Consumer README must point to AGENTS.md for guidance export: "
+            "maven-consumer-project/README.md"
+        )
     for forbidden in (
         "export-guidance",
         ".pickleball/",
@@ -397,6 +517,8 @@ def main() -> int:
     validate_consumer_tracked_artifacts(errors)
     validate_consumer_ignore(errors)
     validate_packaged_guidance(errors)
+    validate_workbench_controller_contract(errors)
+    validate_workbench_source_boundary(errors)
 
     if args.base_ref:
         changed = git_changed_files(args.base_ref)

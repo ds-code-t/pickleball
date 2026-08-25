@@ -8,6 +8,16 @@ import tools.dscode.control.override.StepOverrideCompiler;
 import tools.dscode.control.override.StepOverridePatternType;
 import tools.dscode.control.override.StepOverrideRegistry;
 import tools.dscode.control.override.StepOverrideRule;
+import tools.dscode.control.protocol.ControlBridgeDescriptor;
+import tools.dscode.control.protocol.ControlBridgeError;
+import tools.dscode.control.protocol.ControlBridgeMappingSnapshot;
+import tools.dscode.control.protocol.ControlBridgeStatus;
+import tools.dscode.control.protocol.ControlBridgeStepOverride;
+import tools.dscode.control.protocol.ControlBridgeStepOverrideResult;
+import tools.dscode.control.protocol.ControlProtocol;
+
+import static tools.dscode.control.protocol.ControlBridgeRequests.*;
+import static tools.dscode.control.protocol.ControlBridgeResponses.*;
 
 import java.io.IOException;
 import java.io.PrintWriter;
@@ -28,15 +38,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 final class ControlBridgeRuntime implements AutoCloseable {
-    static final int PROTOCOL_VERSION = 1;
-    static final List<String> CAPABILITIES = List.of(
-            "status", "scenarios", "events", "pause", "resume", "execute_step",
-            "mapping_get", "mapping_put", "mapping_resolve", "mapping_snapshot", "mapping_restore",
-            "browser_page", "browser_screenshot",
-            "element_inspect", "service_call", "breakpoints",
-            "step_overrides", "step_override_compile"
-    );
-
     private static final String HOST = "127.0.0.1";
     private static final int MAX_REQUEST_BYTES = 1024 * 1024;
 
@@ -77,13 +78,15 @@ final class ControlBridgeRuntime implements AutoCloseable {
         try {
             Files.createDirectories(directory);
         } catch (IOException failure) {
-            throw new IllegalStateException("Could not create Pickleball Studio bridge session directory: " + directory, failure);
+            throw new IllegalStateException("Could not create Pickleball Workbench bridge session directory: " + directory, failure);
         }
 
         String runtimeId = UUID.randomUUID().toString();
         long pid = ProcessHandle.current().pid();
         ControlBridgeEventRecorder eventRecorder = new ControlBridgeEventRecorder();
-        ControlBridgeCoordinator coordinator = new ControlBridgeCoordinator(runtimeId, pid, CAPABILITIES, pauseFirstScenario);
+        ControlBridgeCoordinator coordinator = new ControlBridgeCoordinator(
+                runtimeId, pid, ControlProtocol.WORKER_CAPABILITIES, pauseFirstScenario
+        );
 
         HttpServer server = null;
         ExecutorService executor = null;
@@ -100,8 +103,17 @@ final class ControlBridgeRuntime implements AutoCloseable {
                     server,
                     executor,
                     new ControlBridgeDescriptor(
-                            PROTOCOL_VERSION, sessionId, runtimeId, pid, HOST,
-                            server.getAddress().getPort(), Instant.now().toString(), CAPABILITIES
+                            ControlProtocol.CURRENT_VERSION,
+                            ControlProtocol.MINIMUM_COMPATIBLE_VERSION,
+                            sessionId,
+                            runtimeId,
+                            pid,
+                            HOST,
+                            server.getAddress().getPort(),
+                            Instant.now().toString(),
+                            runtimeVersion(),
+                            runtimeCodeSource(),
+                            ControlProtocol.WORKER_CAPABILITIES
                     )
             );
             runtime.registerContexts();
@@ -120,7 +132,7 @@ final class ControlBridgeRuntime implements AutoCloseable {
             try { Files.deleteIfExists(descriptorFile); } catch (IOException ignored) { }
             throw failure instanceof RuntimeException runtimeFailure
                     ? runtimeFailure
-                    : new IllegalStateException("Could not start Pickleball Studio control bridge.", failure);
+                    : new IllegalStateException("Could not start Pickleball Workbench control bridge.", failure);
         }
     }
 
@@ -201,10 +213,10 @@ final class ControlBridgeRuntime implements AutoCloseable {
         }));
         server.createContext("/v1/breakpoints/remove", exchange -> handle(exchange, "POST", () -> {
             BreakpointIdRequest request = readRequired(exchange, BreakpointIdRequest.class);
-            return Map.of("removed", coordinator.removeBreakpoint(request.breakpointId()));
+            return new Removal(coordinator.removeBreakpoint(request.breakpointId()));
         }));
         server.createContext("/v1/breakpoints/clear", exchange -> handle(exchange, "POST", () ->
-                Map.of("removed", coordinator.clearBreakpoints())));
+                new ClearResult(coordinator.clearBreakpoints())));
 
         server.createContext("/v1/step-overrides", exchange -> handle(exchange, "GET", () -> {
             String scenarioId = queryParameter(exchange, "scenarioId");
@@ -219,13 +231,13 @@ final class ControlBridgeRuntime implements AutoCloseable {
         }));
         server.createContext("/v1/step-overrides/remove", exchange -> handle(exchange, "POST", () -> {
             StepOverrideIdRequest request = readRequired(exchange, StepOverrideIdRequest.class);
-            if (!scenarioActive(request.scenarioId())) return Map.of("removed", false);
-            return Map.of("removed", StepOverrideRegistry.remove(request.scenarioId(), request.id()));
+            if (!scenarioActive(request.scenarioId())) return new Removal(false);
+            return new Removal(StepOverrideRegistry.remove(request.scenarioId(), request.id()));
         }));
         server.createContext("/v1/step-overrides/clear", exchange -> handle(exchange, "POST", () -> {
             StepOverrideScenarioRequest request = readRequired(exchange, StepOverrideScenarioRequest.class);
-            if (!scenarioActive(request.scenarioId())) return Map.of("removed", 0);
-            return Map.of("removed", StepOverrideRegistry.clear(request.scenarioId()));
+            if (!scenarioActive(request.scenarioId())) return new ClearResult(0);
+            return new ClearResult(StepOverrideRegistry.clear(request.scenarioId()));
         }));
     }
 
@@ -401,7 +413,7 @@ final class ControlBridgeRuntime implements AutoCloseable {
             }
         } catch (IOException failure) {
             try { Files.deleteIfExists(temporary); } catch (IOException ignored) { }
-            throw new IllegalStateException("Could not publish Pickleball Studio bridge descriptor: " + descriptorFile, failure);
+            throw new IllegalStateException("Could not publish Pickleball Workbench bridge descriptor: " + descriptorFile, failure);
         }
     }
 
@@ -421,31 +433,22 @@ final class ControlBridgeRuntime implements AutoCloseable {
         return failure.getMessage() == null ? failure.getClass().getSimpleName() : failure.getMessage();
     }
 
+    private static String runtimeVersion() {
+        String version = ControlBridgeRuntime.class.getPackage().getImplementationVersion();
+        return version == null || version.isBlank() ? "development" : version;
+    }
+
+    private static String runtimeCodeSource() {
+        try {
+            var source = ControlBridgeRuntime.class.getProtectionDomain().getCodeSource();
+            if (source == null || source.getLocation() == null) return "unknown";
+            return Path.of(source.getLocation().toURI()).toAbsolutePath().normalize().toString();
+        } catch (Exception failure) {
+            return "unknown";
+        }
+    }
+
     @FunctionalInterface
     private interface RequestAction { Object run() throws Exception; }
 
-    private record PauseRequest(String scenarioId, Integer waitSeconds, Integer leaseSeconds) { }
-    private record ResumeRequest(String scenarioId) { }
-    private record ExecuteStepRequest(String scenarioId, String text, String argument, Integer timeoutSeconds) { }
-    private record MappingGetRequest(String scenarioId, String mapReference, String key, Integer timeoutSeconds) { }
-    private record MappingPutRequest(String scenarioId, String mapReference, String key, Object value, Integer timeoutSeconds) { }
-    private record MappingResolveRequest(String scenarioId, String input, Integer timeoutSeconds) { }
-    private record MappingSnapshotRequest(String scenarioId, String mapReference, Integer timeoutSeconds) { }
-    private record MappingRestoreRequest(String scenarioId, ControlBridgeMappingSnapshot snapshot, Integer timeoutSeconds) { }
-    private record BrowserEvidenceRequest(String scenarioId, Integer timeoutSeconds) { }
-    private record ElementInspectionRequest(
-            String scenarioId, String category, String text, String operation,
-            Integer maxElements, Integer timeoutSeconds
-    ) { }
-    private record ServiceCallRequest(String scenarioId, String selector, Integer timeoutSeconds) { }
-    private record BreakpointAddRequest(
-            String scenarioId, String hook, String signatureContains, String stepContains,
-            String phraseContains, Boolean oneShot, Integer leaseSeconds
-    ) { }
-    private record BreakpointIdRequest(String breakpointId) { }
-    private record StepOverrideCompileRequest(
-            String scenarioId, String id, String patternType, String pattern, String source
-    ) { }
-    private record StepOverrideIdRequest(String scenarioId, String id) { }
-    private record StepOverrideScenarioRequest(String scenarioId) { }
 }

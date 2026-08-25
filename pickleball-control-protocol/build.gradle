@@ -1,0 +1,50 @@
+plugins {
+    id 'java-library'
+}
+
+group = rootProject.group
+version = rootProject.version
+
+java {
+    toolchain { languageVersion = JavaLanguageVersion.of(21) }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+
+// The protocol is deliberately JDK-only. It is bundled into both the normal
+// Pickleball runtime and the controller-only Workbench executable.
+def protocolOutput = sourceSets.main.output
+def protocolSources = sourceSets.main.allJava
+def protocolClasses = tasks.named('classes')
+
+rootProject.tasks.named('shadowJar').configure {
+    dependsOn protocolClasses
+    from(protocolOutput)
+}
+
+rootProject.tasks.named('sourcesJar').configure {
+    from(protocolSources)
+}
+
+tasks.register('verifyProtocolIsolation') {
+    group = 'verification'
+    description = 'Verifies that the shared Workbench wire protocol remains JDK-only.'
+
+    doLast {
+        def declared = configurations
+                .findAll { it.name in ['api', 'implementation', 'compileOnly', 'runtimeOnly'] }
+                .collectMany { it.allDependencies }
+        if (!declared.isEmpty()) {
+            throw new GradleException(
+                    'pickleball-control-protocol must remain dependency-neutral: ' +
+                            declared.collect { "${it.group}:${it.name}:${it.version}" }.sort()
+            )
+        }
+    }
+}
+
+tasks.named('check') {
+    dependsOn tasks.named('verifyProtocolIsolation')
+}

@@ -40,8 +40,19 @@ public class PickleballGuidanceChecks {
         assertTrue(guide.contains("GUIDANCE-MANIFEST.json"));
         assertTrue(guide.contains("keep terminal logging minimal"));
         assertTrue(guide.contains("older Pickleball release whose exporter predates the manifest lifecycle"));
-        assertTrue(guide.contains("Generated Maven consumer reference"));
-        assertTrue(guide.contains("maven-consumer-project/"));
+            assertTrue(guide.contains("Generated Maven consumer reference"));
+            assertTrue(guide.contains("maven-consumer-project/"));
+            assertTrue(guide.contains("mcp ."));
+            assertTrue(guide.contains("workbench_sync"));
+            assertTrue(guide.contains("workbench_execute_step"));
+            assertTrue(guide.contains("workbench_diagnostic_catalog"));
+            assertTrue(guide.contains("workbench_investigation_emit"));
+            assertTrue(guide.contains("emit-investigation"));
+            assertTrue(guide.contains("pkb_reportingmode=diagnostic"));
+            assertTrue(guide.contains("pkb_reportretention=failed"));
+            String chooser = guide.substring(0, guide.indexOf("Generated guidance lifecycle"));
+            assertFalse(chooser.contains("attach.json"));
+            assertFalse(chooser.contains("ui ."));
     }
 
     @Test
@@ -112,6 +123,7 @@ public class PickleballGuidanceChecks {
             ));
             assertTrue(managedFiles.stream().noneMatch(path -> path.contains("_local2")));
             assertFalse(managedFiles.contains("maven-consumer-project/AGENTS.md"));
+            assertFalse(managedFiles.contains("maven-consumer-project/.github/copilot-instructions.md"));
             assertFalse(managedFiles.contains("maven-consumer-project/mvnw"));
             assertFalse(managedFiles.contains(
                     "maven-consumer-project/src/test/java/tools/dscode/common/reporting/diagnostic/PickleballGuidanceChecks.java"
@@ -124,6 +136,11 @@ public class PickleballGuidanceChecks {
             assertTrue(guide.contains("keep terminal logging minimal"));
             assertTrue(guide.contains("older Pickleball release whose exporter predates the manifest lifecycle"));
             assertTrue(guide.contains("read-only reference snapshot"));
+            assertTrue(guide.contains("mcp ."));
+            assertTrue(guide.contains("workbench_diagnostic_catalog"));
+            assertTrue(guide.contains("workbench_investigation_emit"));
+            assertTrue(guide.contains("pkb_reportretention=failed"));
+            assertTrue(guide.contains("Do not copy, modify, or execute files"));
 
             String consumerProject = Files.readString(root.resolve("docs/consumer-project.md"));
             assertTrue(consumerProject.contains("keep console verbosity low"));
@@ -195,6 +212,49 @@ public class PickleballGuidanceChecks {
             assertFalse(Files.exists(obsolete));
             assertTrue(Files.isRegularFile(unmanaged));
             assertEquals("keep me", Files.readString(unmanaged, StandardCharsets.UTF_8));
+        } finally {
+            deleteTree(consumer);
+        }
+    }
+
+    @Test
+    void exportDoesNotDeleteUnmanagedInvestigationsDirectory() throws Exception {
+        Path consumer = Files.createTempDirectory("pickleball-guidance-investigations");
+        Path root = consumer.resolve(".pickleball");
+        try {
+            assertEquals(0, DiagnosticCli.run(
+                    new String[]{"export-guidance", root.toString()},
+                    System.out,
+                    System.err
+            ));
+
+            Path investigation = root.resolve("investigations/keep-me/investigation.json");
+            Path report = root.resolve("investigations/keep-me/report.html");
+            Path empty = root.resolve("investigations/empty");
+            Files.createDirectories(investigation.getParent());
+            Files.createDirectories(empty);
+            Files.writeString(investigation, "{\"pkb_investigation_id\":\"keep-me\"}", StandardCharsets.UTF_8);
+            Files.writeString(report, "<html>keep</html>", StandardCharsets.UTF_8);
+
+            Map<String, Object> manifest = readManifest(root);
+            List<String> managedFiles = new ArrayList<>(asStringList(manifest.get("files")));
+            managedFiles.add("investigations/keep-me/investigation.json");
+            managedFiles.add("investigations/keep-me/report.html");
+            manifest.put("files", managedFiles);
+            JSON.writeValue(root.resolve("GUIDANCE-MANIFEST.json").toFile(), manifest);
+
+            assertEquals(0, DiagnosticCli.run(
+                    new String[]{"export-guidance", root.toString()},
+                    System.out,
+                    System.err
+            ));
+
+            assertTrue(Files.isRegularFile(investigation));
+            assertTrue(Files.isRegularFile(report));
+            assertTrue(Files.isDirectory(empty));
+            assertEquals("{\"pkb_investigation_id\":\"keep-me\"}", Files.readString(investigation, StandardCharsets.UTF_8));
+            Map<String, Object> next = readManifest(root);
+            assertFalse(asStringList(next.get("files")).stream().anyMatch(path -> path.contains("investigations/")));
         } finally {
             deleteTree(consumer);
         }

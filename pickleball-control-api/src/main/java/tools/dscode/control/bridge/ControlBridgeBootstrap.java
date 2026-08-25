@@ -1,14 +1,17 @@
 package tools.dscode.control.bridge;
 
+import tools.dscode.control.protocol.ControlBridgeDescriptor;
+import tools.dscode.control.protocol.ControlProtocol;
+
 import java.nio.file.Path;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
 public final class ControlBridgeBootstrap {
-    public static final String ENV_SESSION_DIR = "PKB_CONTROL_BRIDGE_SESSION_DIR";
-    public static final String ENV_SESSION_ID = "PKB_CONTROL_BRIDGE_SESSION_ID";
-    public static final String ENV_TOKEN = "PKB_CONTROL_BRIDGE_TOKEN";
-    public static final String ENV_PAUSE_FIRST_SCENARIO = "PKB_CONTROL_BRIDGE_PAUSE_FIRST_SCENARIO";
+    public static final String ENV_SESSION_DIR = ControlProtocol.SESSION_DIRECTORY_ENV;
+    public static final String ENV_SESSION_ID = ControlProtocol.SESSION_ID_ENV;
+    public static final String ENV_TOKEN = ControlProtocol.SESSION_TOKEN_ENV;
+    public static final String ENV_PAUSE_FIRST_SCENARIO = ControlProtocol.PAUSE_FIRST_SCENARIO_ENV;
 
     private static final String LEGACY_ENV_SESSION_DIR = "PKB_STUDIO_BRIDGE_SESSION_DIR";
     private static final String LEGACY_ENV_SESSION_ID = "PKB_STUDIO_BRIDGE_SESSION_ID";

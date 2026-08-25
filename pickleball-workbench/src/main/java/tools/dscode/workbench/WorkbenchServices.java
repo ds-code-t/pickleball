@@ -1,24 +1,86 @@
 package tools.dscode.workbench;
 
-import tools.dscode.control.bridge.ControlBridgeBreakpoint;
-import tools.dscode.control.bridge.ControlBridgeBrowserPageResult;
-import tools.dscode.control.bridge.ControlBridgeBrowserScreenshotResult;
-import tools.dscode.control.bridge.ControlBridgeCallResult;
-import tools.dscode.control.bridge.ControlBridgeElementInspectionResult;
-import tools.dscode.control.bridge.ControlBridgeEventPage;
-import tools.dscode.control.bridge.ControlBridgeMappingSnapshot;
-import tools.dscode.control.bridge.ControlBridgeMappingSnapshotResult;
-import tools.dscode.control.bridge.ControlBridgeServiceCallResult;
-import tools.dscode.control.bridge.ControlBridgeStepOverride;
-import tools.dscode.control.bridge.ControlBridgeStepOverrideResult;
-import tools.dscode.control.bridge.ControlBridgeValueResult;
+import tools.dscode.control.protocol.ControlBridgeBreakpoint;
+import tools.dscode.control.protocol.ControlBridgeBrowserPageResult;
+import tools.dscode.control.protocol.ControlBridgeBrowserScreenshotResult;
+import tools.dscode.control.protocol.ControlBridgeCallResult;
+import tools.dscode.control.protocol.ControlBridgeElementInspectionResult;
+import tools.dscode.control.protocol.ControlBridgeEventPage;
+import tools.dscode.control.protocol.ControlBridgeMappingSnapshot;
+import tools.dscode.control.protocol.ControlBridgeMappingSnapshotResult;
+import tools.dscode.control.protocol.ControlBridgeServiceCallResult;
+import tools.dscode.control.protocol.ControlBridgeStepOverride;
+import tools.dscode.control.protocol.ControlBridgeStepOverrideResult;
+import tools.dscode.control.protocol.ControlBridgeValueResult;
+import tools.dscode.workbench.lease.WorkbenchControlLease;
+import tools.dscode.workbench.lease.WorkbenchControlLeaseSnapshot;
+import tools.dscode.workbench.player.LivePlaybackCoordinator;
+import tools.dscode.workbench.player.LiveScenarioPlayer;
+import tools.dscode.workbench.player.WorkbenchPlayerState;
+import tools.dscode.workbench.player.WorkbenchSavePreview;
+import tools.dscode.workbench.player.WorkbenchSaveResult;
 import tools.dscode.workbench.sync.WorkbenchManifest;
+import tools.dscode.workbench.terminal.WorkerLogFiles;
 import tools.dscode.workbench.worker.WorkbenchWorkerStatus;
 
+import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.function.Consumer;
 
 /** Shared Workbench controller surface used by protocol and presentation adapters. */
 public interface WorkbenchServices extends AutoCloseable {
+    LiveScenarioPlayer player();
+
+    LivePlaybackCoordinator playback();
+
+    WorkbenchPlayerState playerState();
+
+    WorkbenchControlLease controlLease();
+
+    WorkbenchControlLeaseSnapshot controlLeaseSnapshot();
+
+    WorkbenchControlLeaseSnapshot requestControl(String agentDisplayName);
+
+    WorkbenchControlLeaseSnapshot releaseControl();
+
+    WorkbenchControlLeaseSnapshot takeControl();
+
+    WorkbenchControlLeaseSnapshot setCurrentAction(String text);
+
+    void answerPermission(String requestId, boolean allow);
+
+    void attachUi();
+
+    void detachUi();
+
+    void addLeaseListener(Consumer<WorkbenchControlLeaseSnapshot> listener);
+
+    void removeLeaseListener(Consumer<WorkbenchControlLeaseSnapshot> listener);
+
+    void addPlayerListener(Runnable listener);
+
+    void removePlayerListener(Runnable listener);
+
+    void loadPickerScenario(
+            List<String> lines,
+            Path originFile,
+            String scenarioName,
+            int startLine,
+            int endLine
+    );
+
+    void loadDefaultDemo();
+
+    void replaceLiveDocument(List<String> lines);
+
+    WorkbenchSavePreview savePreview();
+
+    WorkbenchSaveResult requestSave();
+
+    WorkbenchSaveResult commitSave();
+
     WorkbenchManifest synchronize();
 
     WorkbenchManifest synchronizationStatus();
@@ -30,6 +92,10 @@ public interface WorkbenchServices extends AutoCloseable {
     WorkbenchWorkerStatus stopWorker();
 
     WorkbenchWorkerStatus workerStatus();
+
+    Path projectRoot();
+
+    Optional<WorkerLogFiles> workerLogFiles();
 
     ControlBridgeCallResult executeStep(String text, String argument);
 
@@ -77,6 +143,14 @@ public interface WorkbenchServices extends AutoCloseable {
     boolean removeStepOverride(String id);
 
     int clearStepOverrides();
+
+    Object diagnosticCatalog();
+
+    Object diagnosticRun(String runId);
+
+    Object diagnosticScenarioSummary(String runId, String scenarioId);
+
+    Object emitInvestigation(Map<String, ?> investigation);
 
     @Override
     void close();

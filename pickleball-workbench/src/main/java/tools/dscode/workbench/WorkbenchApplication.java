@@ -1,10 +1,10 @@
 package tools.dscode.workbench;
 
-import tools.dscode.control.bridge.ControlBridgeBrowserPageResult;
-import tools.dscode.control.bridge.ControlBridgeCallResult;
-import tools.dscode.control.bridge.ControlBridgeServiceCallResult;
-import tools.dscode.control.bridge.ControlBridgeStepOverrideResult;
-import tools.dscode.control.bridge.ControlBridgeValueResult;
+import tools.dscode.control.protocol.ControlBridgeBrowserPageResult;
+import tools.dscode.control.protocol.ControlBridgeCallResult;
+import tools.dscode.control.protocol.ControlBridgeServiceCallResult;
+import tools.dscode.control.protocol.ControlBridgeStepOverrideResult;
+import tools.dscode.control.protocol.ControlBridgeValueResult;
 import tools.dscode.workbench.mcp.WorkbenchMcpServer;
 import tools.dscode.workbench.sync.WorkbenchManifest;
 import tools.dscode.workbench.sync.WorkbenchSynchronizer;
@@ -29,6 +29,14 @@ public final class WorkbenchApplication {
     }
 
     public static void main(String[] args) {
+        try {
+            WorkbenchRuntimeBoundary.verify();
+        } catch (IllegalStateException isolationFailure) {
+            System.err.println("Workbench controller isolation failed: " + isolationFailure.getMessage());
+            System.exit(1);
+            return;
+        }
+
         if (args.length > 0 && "mcp".equals(args[0])) {
             int exitCode = runMcpProcess(args, System.out, System.err);
             if (exitCode != 0) System.exit(exitCode);
@@ -428,6 +436,7 @@ public final class WorkbenchApplication {
         out.println("worker-check starts, restarts, and gracefully stops direct consumer workers without rebuilding.");
         out.println("live-check exercises raw Gherkin, Step Override, and live runtime operations on one persistent worker.");
         out.println("mcp serves the same Workbench services over protocol-only stdio; diagnostics use stderr/log files.");
+        out.println("ui opens the thin Swing Workbench over the same controller services and writes a localhost agent-attach endpoint to .pickleball/workbench/attach.json.");
         out.println("ui opens the thin Swing Workbench over the same controller services.");
     }
 }

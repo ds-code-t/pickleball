@@ -119,12 +119,43 @@ Supported command-line operations:
 ```text
 DiagnosticCli guidance
 DiagnosticCli export-guidance [output-directory]
+DiagnosticCli emit-investigation <investigation-json-or--> <consumer-project-root>
 DiagnosticCli compare-runs <left-run-index> <right-run-index> [output-json]
 DiagnosticCli compare-fingerprints <left.pkbf> <right.pkbf> [output-json]
 DiagnosticCli rebuild <diagnostic-runs-root-or-run-root>
 ```
 
 Prefer `DiagnosticCli` over custom Maven-classpath/JShell workflows for routine comparison and recovery.
+
+`emit-investigation` writes a small human handoff under the consumer project:
+
+```text
+.pickleball/investigations/<pkb_investigation_id>/
+    investigation.json    # source of truth
+    report.html           # one-page local render
+```
+
+Input is investigation JSON from a file or stdin (`-`) plus the consumer project root. The command prints the project-relative `report.html` path. JSON is the source of truth. HTML renders that JSON plus at most two screenshots *linked* from the existing diagnostic pack; extra screenshot paths are ignored, and a missing image becomes a short note rather than a failed emit. The writer does not copy `reports/diagnostic-runs/` and does not change `pkb_diagnostic_output`. Headless Workbench MCP exposes the same emit as `workbench_investigation_emit` and returns only that relative report path.
+
+Suggested investigation JSON fields, using existing lineage/diagnostic names where they already exist:
+
+```text
+pkb_investigation_id
+createdAt
+scenario.name / scenario.feature / scenario.scenarioId
+outcome          # cause-only | cause-and-fix
+cause
+fix              # text, or "not fixed"
+category         # selector | gherkin | java | data | other
+failureSignature
+failureSite
+runId
+runIndexPath     # pointer, not a copy
+screenshots      # at most two project-relative PNG paths
+pickleballVersion
+```
+
+`export-guidance` does not manage or delete `.pickleball/investigations/`.
 
 ## Outcomes and completion
 
