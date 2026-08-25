@@ -112,6 +112,7 @@ public class PickleballGuidanceChecks {
             ));
             assertTrue(managedFiles.stream().noneMatch(path -> path.contains("_local2")));
             assertFalse(managedFiles.contains("maven-consumer-project/AGENTS.md"));
+            assertFalse(managedFiles.contains("maven-consumer-project/.github/copilot-instructions.md"));
             assertFalse(managedFiles.contains("maven-consumer-project/mvnw"));
             assertFalse(managedFiles.contains(
                     "maven-consumer-project/src/test/java/tools/dscode/common/reporting/diagnostic/PickleballGuidanceChecks.java"

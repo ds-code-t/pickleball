@@ -31,6 +31,7 @@ GROUPS: tuple[tuple[str, tuple[str, ...]], ...] = (
         "gradlew",
         "gradlew.bat",
         "maven-consumer-project/AGENTS.md",
+        "maven-consumer-project/.github/copilot-instructions.md",
         "maven-consumer-project/pom.xml",
         "maven-consumer-project/README.md",
         "maven-consumer-project/mvnw",
