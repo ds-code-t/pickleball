@@ -143,6 +143,12 @@ public interface WorkbenchServices extends AutoCloseable {
 
     int clearStepOverrides();
 
+    Object diagnosticCatalog();
+
+    Object diagnosticRun(String runId);
+
+    Object diagnosticScenarioSummary(String runId, String scenarioId);
+
     @Override
     void close();
 }

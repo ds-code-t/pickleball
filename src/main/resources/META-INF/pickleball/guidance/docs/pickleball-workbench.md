@@ -43,20 +43,22 @@ The normal `tools.dscode:pickleball:<version>` test dependency already carries t
 META-INF/pickleball/workbench/pickleball-workbench.jar
 ```
 
-Run the small launcher from the consumer test classpath. For Maven consumers, this command requires no cache path, separate Workbench dependency, or separately selected version:
+Run the small launcher from the consumer test classpath. For Maven consumers, this command requires no cache path, separate Workbench dependency, or separately selected version.
+
+Consumer AI agents use headless MCP:
 
 ```bash
 mvn -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java \
   -Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher \
   -Dexec.classpathScope=test \
-  "-Dexec.args=ui ."
+  "-Dexec.args=mcp ."
 ```
 
 ```powershell
-mvn -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java "-Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher" "-Dexec.classpathScope=test" "-Dexec.args=ui ."
+mvn -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java "-Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher" "-Dexec.classpathScope=test" "-Dexec.args=mcp ."
 ```
 
-With no launcher arguments, `ui` and the current directory are selected automatically. Other Workbench commands are forwarded in the same form, for example `"-Dexec.args=sync ."` or `"-Dexec.args=mcp ."`.
+Humans who want the Swing player can pass `ui .` instead. With no launcher arguments, `ui` and the current directory are selected automatically for that human default. Other Workbench commands are forwarded in the same form, for example `"-Dexec.args=sync ."`. Agents for this release should not use the GUI, `ui .`, or `.pickleball/workbench/attach.json` as their path; see `.pickleball/AGENT-GUIDE.md`.
 
 Gradle consumers can expose the same dependency-owned launcher without resolving a cache path or adding a Workbench dependency:
 
@@ -64,7 +66,7 @@ Gradle consumers can expose the same dependency-owned launcher without resolving
 tasks.register('pickleballWorkbench', JavaExec) {
     classpath = sourceSets.test.runtimeClasspath
     mainClass = 'tools.dscode.launcher.PickleballWorkbenchLauncher'
-    args 'ui', projectDir.absolutePath
+    args 'mcp', projectDir.absolutePath // consumer agents; pass 'ui' for the Swing player
 }
 ```
 
@@ -99,7 +101,15 @@ $workbenchJar = ".\pickleball-workbench\build\libs\pickleball-workbench-<version
 java -jar $workbenchJar sync ".\maven-consumer-project"
 ```
 
-Synchronization uses the selected project wrapper to establish compiled output and the effective test runtime classpath. `.pickleball/workbench/base/classes` is provenance only; the worker runs against the merged `.pickleball/workbench/live/classes` state plus captured external dependencies.
+Synchronization uses the selected project wrapper to establish compiled output and the effective test runtime classpath. It keeps `-DskipTests` (Surefire never runs during sync). Input fingerprints of Java sources, resources, build files, and dependency artifacts decide how much of the wrapper to run:
+
+- **Skip** when those inputs match the last recorded input fingerprints and the live snapshot is present. The output `fingerprint` in `manifest.json` is provenance over merged classes plus dependency bytes; it is not the skip key.
+- **Resources-only** when only feature/config/data (test resources) changed: Maven `process-resources` / `process-test-resources`, or Gradle `processResources` / `processTestResources`, without `test-compile` / `testClasses`. If compiled outputs were cleaned, sync escalates to a full compile so live classes are not wiped.
+- **Full** when Java sources, the build descriptor, or dependency artifact bytes changed, or when no prior snapshot exists.
+
+Live Gherkin buffer edits never require sync and never write the original `.feature` until explicit Save. Worker restart without rebuild already exists. Step Overrides stay worker-side compile.
+
+`.pickleball/workbench/base/classes` is provenance only; the worker runs against the merged `.pickleball/workbench/live/classes` state plus captured external dependencies. Do not use `live/classes` as an editor.
 
 At worker connection time, Workbench requires a different PID, compatible protocol range and capabilities, a Pickleball code source that is exactly one captured consumer classpath entry, the synchronized Pickleball version (except explicit development output), and no Workbench controller artifact on the worker classpath. It fails clearly instead of falling back to a bundled runtime.
 
@@ -264,6 +274,8 @@ Human **Save** uses the same service. After a picker scenario was loaded, Swing 
 
 ### Attaching an agent to a visible UI
 
+The Swing UI is a human player. Consumer AI agents for this release should start headless `mcp .` instead of attaching to a GUI.
+
 UI mode cannot share process stdout with stdio MCP. Starting `mcp` while the UI is already running would be a second Workbench JVM. Instead, `ui` starts a 127.0.0.1-only JSON attach endpoint over the same `WorkbenchServices` / `WorkbenchMcpTools` methods and writes disposable discovery state:
 
 ```text
@@ -291,26 +303,19 @@ A Copilot or other MCP-style client finds that file in the consumer project, the
 4. Use the existing live tools (`workbench_execute_step`, Mapping, evidence, worker) while holding the lease, and `workbench_set_current_action` so the human can watch.
 5. `POST {url}/tools/workbench_request_save` to ask to copy the live scenario into the original feature. The call blocks until the human clicks Allow or Deny, or Take control.
 
-Headless `java -jar pickleball-workbench-<version>.jar mcp <project>` stays stdio JSON-RPC only. That client may hold the lease without a banner. Save is still a distinct explicit tool and never an implicit write.
+Headless `java -jar pickleball-workbench-<version>.jar mcp <project>` stays stdio JSON-RPC only. That is the consumer-agent path. That client may hold the lease without a banner. Save is still a distinct explicit tool and never an implicit write.
 
-From `maven-consumer-project`:
-
-```bash
-mvn -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java \
-  -Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher \
-  -Dexec.classpathScope=test \
-  "-Dexec.args=ui ."
-```
-
-Then point the agent at `.pickleball/workbench/attach.json`. Do not launch a second `mcp` process against the same live UI session.
+A human-watched UI session is optional and separate. From `maven-consumer-project`, a person may start `ui .` and then a watcher can join `.pickleball/workbench/attach.json`. Do not launch a second `mcp` process against the same live UI session, and do not treat that attach file as the default agent path.
 
 ## MCP stdio
 
-Start the lightweight non-Spring MCP server for a synchronized consumer project:
+Start the lightweight non-Spring MCP server for a consumer project. This is the consumer-agent path:
 
 ```powershell
 java -jar $workbenchJar mcp ".\maven-consumer-project"
 ```
+
+Or, from a Maven consumer test classpath, `"-Dexec.args=mcp ."`. Do not document or use the Swing GUI as the agent path.
 
 The server uses the official Java MCP SDK core and stdio transport with the Jackson 2 JSON adapter. MCP dependencies are Workbench-only and are shaded into the executable companion. Workbench deliberately does not use Spring Boot, Spring Framework, Spring AI, WebMVC, or Tomcat.
 
@@ -344,6 +349,8 @@ workbench_worker_restart
 workbench_worker_stop
 workbench_worker_status
 ```
+
+`workbench_sync` uses the skip / resources-only / full rules above. Live buffer edits do not require it.
 
 Live runtime, Mapping, and watched-agent control:
 
@@ -389,6 +396,14 @@ workbench_step_override_list
 workbench_step_override_compile
 workbench_step_override_remove
 workbench_step_override_clear
+```
+
+Sparse diagnostic readers (do not glob `reports/diagnostic-runs`; these return JSON only and do not dump events, traces, or PNG bytes):
+
+```text
+workbench_diagnostic_catalog
+workbench_diagnostic_run
+workbench_diagnostic_summary
 ```
 
 `workbench_step_override_compile` sends the Java source template to the consumer worker. The source must contain `{{CLASS_NAME}}`; worker-side Pickleball remains responsible for compilation, generated classloaders, matching, replacement, captures, and execution.

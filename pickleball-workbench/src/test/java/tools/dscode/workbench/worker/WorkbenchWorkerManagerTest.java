@@ -5,6 +5,7 @@ import org.junit.jupiter.api.io.TempDir;
 import tools.dscode.control.protocol.ControlBridgeDescriptor;
 import tools.dscode.control.protocol.ControlProtocol;
 import tools.dscode.workbench.sync.WorkbenchManifest;
+import tools.dscode.workbench.sync.WorkbenchSyncMode;
 
 import java.io.File;
 import java.nio.file.Path;
@@ -211,7 +212,12 @@ class WorkbenchWorkerManagerTest {
                 List.of(dependency.toString()),
                 "2.1.8",
                 "21",
-                System.getProperty("java.home")
+                System.getProperty("java.home"),
+                WorkbenchSyncMode.FULL.name(),
+                "java-fp",
+                "resource-fp",
+                "build-fp",
+                "dep-fp"
         );
     }
 

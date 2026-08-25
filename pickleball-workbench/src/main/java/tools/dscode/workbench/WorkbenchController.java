@@ -16,6 +16,7 @@ import tools.dscode.workbench.player.WorkbenchSavePreview;
 import tools.dscode.workbench.player.WorkbenchSaveResult;
 import tools.dscode.workbench.sync.WorkbenchManifest;
 import tools.dscode.workbench.sync.WorkbenchSynchronizer;
+import tools.dscode.workbench.diagnostics.DiagnosticEvidenceNavigator;
 import tools.dscode.workbench.terminal.WorkerLogFiles;
 import tools.dscode.workbench.worker.WorkbenchLiveSession;
 import tools.dscode.workbench.worker.WorkbenchWorkerStatus;
@@ -35,6 +36,7 @@ public final class WorkbenchController implements WorkbenchServices {
     private final LiveScenarioPlayer player;
     private final LivePlaybackCoordinator playback;
     private final WorkbenchControlLease lease;
+    private final DiagnosticEvidenceNavigator diagnostics;
     private final List<Runnable> playerListeners = new CopyOnWriteArrayList<>();
 
     public WorkbenchController(Path projectRoot) {
@@ -44,6 +46,7 @@ public final class WorkbenchController implements WorkbenchServices {
         this.player = LiveScenarioPlayer.interactiveBuffer();
         this.playback = new LivePlaybackCoordinator(this.player);
         this.lease = new WorkbenchControlLease();
+        this.diagnostics = new DiagnosticEvidenceNavigator(this.projectRoot);
     }
 
     @Override
@@ -356,6 +359,21 @@ public final class WorkbenchController implements WorkbenchServices {
     @Override
     public int clearStepOverrides() {
         return mutating(live::clearStepOverrides);
+    }
+
+    @Override
+    public Object diagnosticCatalog() {
+        return diagnostics.catalogDocument();
+    }
+
+    @Override
+    public Object diagnosticRun(String runId) {
+        return diagnostics.runDocument(runId);
+    }
+
+    @Override
+    public Object diagnosticScenarioSummary(String runId, String scenarioId) {
+        return diagnostics.scenarioSummaryDocument(runId, scenarioId);
     }
 
     @Override

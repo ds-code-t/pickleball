@@ -2,7 +2,53 @@
 
 This is the canonical AI-agent contract for projects that consume Pickleball as a Maven dependency.
 
-A consumer project may contain only a short `AGENTS.md` bridge. That bridge can use Pickleball's `DiagnosticCli export-guidance` command to materialize the version-matched guidance embedded in the installed Pickleball dependency. When this file is materialized as `.pickleball/AGENT-GUIDE.md`, supporting documentation is under `.pickleball/docs/` and a curated reference snapshot of Pickleball's executable Maven consumer is under `.pickleball/maven-consumer-project/`.
+A consumer project may contain only a short `AGENTS.md` bridge. That bridge can use Pickleball's `DiagnosticCli export-guidance` command to materialize the version-matched guidance embedded in the installed Pickleball dependency. When this file is materialized as `.pickleball/AGENT-GUIDE.md`, supporting documentation is under `.pickleball/docs/` and a curated reference snapshot of Pickleball's executable Maven consumer is under `.pickleball/maven-consumer-project/`. Full `docs/` and the snapshot stay exported for on-demand lookup. Do not dump them into first-read context.
+
+## Tool chooser
+
+Use this order. Consumer AI agents for this Pickleball release use headless Workbench MCP (`mcp .`). Do not start the Workbench GUI.
+
+1. **Live headless MCP** — isolate a failing step in a paused worker. Reuse compilation, rewrite Gherkin in the live buffer, and inspect the page and semantic events in the same browser/Mapping state.
+2. **One diagnostic `mvn test`** — after the live loop has isolated the failure, run one bounded confirmation with `pkb_runvars` so an evidence pack is retained.
+3. **Edit real consumer source** — change the project's own features/Java only after the live buffer is right. Explicit Save is what writes a `.feature` file.
+
+Do not copy consumer features into `.pickleball` as a sandbox.
+
+### Live isolation loop
+
+From the consumer project, with Pickleball on the test classpath:
+
+1. Start the launcher with `mcp .` (not a GUI command).
+2. Call `workbench_sync` once. The synchronizer skips Maven/Gradle when Java/build/dependencies are unchanged, and refreshes test resources without a full `test-compile` when only features/config/data changed.
+3. `workbench_worker_start` — reuse the compiled live classpath; do not rebuild to start a worker.
+4. `workbench_request_control`
+5. Isolate with `workbench_execute_step` and/or `workbench_player_replace_document`.
+6. Inspect with `workbench_browser_page`, `workbench_element_inspect`, and `workbench_events`.
+7. When you need a retained evidence pack, run **one** diagnostic `mvn test` with `pkb_runvars` (below). Read that pack with `workbench_diagnostic_catalog`, `workbench_diagnostic_run`, and `workbench_diagnostic_summary` instead of globbing `reports/diagnostic-runs`.
+
+`workbench_execute_step` failure does not end the worker. Insert, nest, or retry in the same paused browser/Mapping state. Live buffer edits do not require `workbench_sync` and do not write the original `.feature` until explicit Save (`workbench_request_save`).
+
+Worker restart without rebuild already exists (`workbench_worker_restart`). Step Overrides compile worker-side (`workbench_step_override_compile`); they do not require Maven.
+
+### Generated trees are not the project
+
+- `.pickleball/maven-consumer-project/` is a version-matched **read-only** reference snapshot of Pickleball's own example consumer. Do not copy, edit, or execute it as the project under test.
+- `.pickleball/workbench/live/classes` is the compiled overlay for the worker classpath. Do not use it as an editor.
+- `export-guidance` does **not** copy this consumer's own features into `.pickleball` for testing. It still materializes full `docs/` plus the example-consumer snapshot for on-demand/human use.
+
+## First-read
+
+Keep first-read small. After a successful export:
+
+1. Follow the consumer project's own instructions first; they remain authoritative for project-specific behavior.
+2. Stay in this guide's tool chooser and live loop.
+3. Inspect the **real** consumer `pom.xml`, Pickleball runner subclass, features, configuration, data, mappings, and test support before changing them.
+4. Open a specific exported guide only when that topic is needed, for example `docs/dynamic-steps.md`, `docs/diagnostic-reporting.md`, `docs/configuration.md`, or `docs/ai-run-configuration.md`.
+5. Do not assume the Pickleball core source repository is present. A normal consumer may only have the Maven dependency.
+
+Do not read `docs/README.md`, the whole `maven-consumer-project/` snapshot, or Workbench GUI pages as first actions. Those remain available on demand.
+
+The exported documentation and Maven consumer reference are version-matched to the Pickleball artifact on the consumer's test classpath. Prefer them over instructions or examples copied from another release.
 
 ## Generated guidance lifecycle
 
@@ -19,26 +65,13 @@ The exporter does not create/commit a new `.gitignore`, alter the Git index, or 
 
 Compatibility note: an older Pickleball release whose exporter predates the manifest lifecycle may leave newer files behind after a downgrade. Those leftovers are not authoritative for the downgraded dependency. Prefer the dependency actually resolved on the test classpath and files freshly exported by that dependency.
 
-## First actions
-
-For Pickleball scenario authoring, configuration, execution, diagnostics, or troubleshooting:
-
-1. Follow the consumer project's own instructions first; they remain authoritative for project-specific behavior.
-2. Read this guide before changing Pickleball scenarios or diagnosing a Pickleball run.
-3. Use `docs/README.md` as the documentation map.
-4. Inspect the consumer project's `pom.xml`, Pickleball runner subclass, features, configuration, data, mappings, and test support before changing them.
-5. Use `maven-consumer-project/` as a version-matched read-only reference when a documented syntax/configuration example or working Pickleball consumer structure is useful.
-6. Do not assume the Pickleball core source repository is present. A normal consumer may only have the Maven dependency.
-
-The exported documentation and Maven consumer reference are version-matched to the Pickleball artifact on the consumer's test classpath. Prefer them over instructions or examples copied from another release.
-
 ## Generated Maven consumer reference
 
-`.pickleball/maven-consumer-project/` is a generated, read-only reference snapshot of the canonical Maven consumer used by Pickleball itself. It preserves repository-relative paths so links from the exported Markdown documentation continue to resolve locally.
+`.pickleball/maven-consumer-project/` is a generated, read-only reference snapshot of the canonical Maven consumer used by Pickleball itself. It preserves repository-relative paths so links from the exported Markdown documentation continue to resolve locally. It is not the consumer project under test and is not a writable sandbox.
 
 The snapshot intentionally includes the consumer `pom.xml`, Pickleball runner, local browser/service test server, executable feature files, service-call definitions, configuration/data fixtures, local test-site resources, and the committed shared/local profile and property examples. It intentionally excludes Maven wrappers, Git/IDE/generated artifacts, the consumer `AGENTS.md` bridge, internal Java verification classes, and maintainer-only `_local2` files.
 
-Use the snapshot to answer questions such as how a working feature, profile, property file, service call, configuration resource, browser fixture, or runner is structured. Do not modify or execute files under `.pickleball/maven-consumer-project/` as the consumer project's implementation. Make requested changes in the consumer project's own source tree. A later `export-guidance` run may overwrite or remove every managed reference file.
+Use the snapshot only to answer questions such as how a working feature, profile, property file, service call, configuration resource, browser fixture, or runner is structured. Do not copy, modify, or execute files under `.pickleball/maven-consumer-project/` as the project under test. Make requested changes in the consumer project's own source tree. A later `export-guidance` run may overwrite or remove every managed reference file. `export-guidance` does not copy the consumer's own features into `.pickleball` for testing.
 
 ## Scenario authoring and fixes
 
@@ -100,6 +133,22 @@ Never supply `pkb_run_profile` or `pkb_run_profile.<pkb_var>` as input. They are
 
 When you launch Pickleball tests and the intended execution settings are known, use `pkb_runvars` as the authoritative input. Put intentional tag/name selection, browser, evidence/logging controls, and other non-secret RunVar changes inside `pkb_runvars`; do not default to ambient optional project settings or separate JVM `-Dpkb_*` RunVars. Use `pkb_profile` or ordinary JVM RunVar overrides only when the task specifically tests those configuration semantics or the user asks for them. Keep protected secrets and diagnostic lineage outside `pkb_runvars`.
 
+For an agent's bounded confirmation `mvn test` (not the human runner defaults), include diagnostic evidence controls and keep the selection narrow. Documented AI defaults:
+
+```text
+pkb_reportingmode=diagnostic
+pkb_loglevel=warn
+pkb_reportretention=failed
+```
+
+Use the narrowest `pkb_tags` / `pkb_name` that isolate the failure. Do not add the `pretty` plugin; it is console noise for agents. `pkb_reportretention=failed` keeps dense evidence for failing scenarios and does not retain it for passing ones.
+
+These are documented agent defaults, not `PickleballTests` human defaults (`pretty`, `@all`). Example confirmation after a live-loop isolation:
+
+```text
+mvn test -Dpkb_runvars="pkb_tags=@the-failing-tag, pkb_name=The failing scenario, pkb_browser=CHROME_HEADLESS, pkb_reportingmode=diagnostic, pkb_loglevel=warn, pkb_reportretention=failed"
+```
+
 A selected profile or partial `pkb_runvars` input inherits only missing project execution-context RunVars:
 
 ```text
@@ -138,6 +187,8 @@ Use this escalation order:
 7. `trace.jsonl.gz` or interrupted `trace.jsonl` only when structured/INFO+ evidence is insufficient.
 
 Stop reading as soon as the current layer answers the investigation. Do not recursively ingest an entire diagnostic run.
+
+From headless Workbench MCP, use `workbench_diagnostic_catalog`, `workbench_diagnostic_run`, and `workbench_diagnostic_summary` for layers 1–3 instead of globbing `reports/diagnostic-runs`. Those tools return sparse JSON only and do not dump `events.jsonl`, traces, or screenshot bytes.
 
 ## Visual evidence rules
 
@@ -198,7 +249,7 @@ See `docs/ai-run-configuration.md` for the full profile/RunVar contract and `doc
 
 ## Pickleball syntax documentation
 
-The exported `docs/` tree is the version-matched reference for all supported Pickleball behavior and syntax. Use `docs/README.md` to select the relevant guide. Its links to the working consumer resolve into the exported `maven-consumer-project/` reference snapshot. In particular:
+The exported `docs/` tree is the version-matched reference for all supported Pickleball behavior and syntax. Open a specific guide when the live loop or a diagnostic layer requires that topic; do not start by reading `docs/README.md` as a dump. Its links to the working consumer resolve into the exported `maven-consumer-project/` reference snapshot. In particular:
 
 - dynamic Gherkin/action/assertion syntax — `docs/dynamic-steps.md`;
 - element vocabulary/selectors — `docs/custom-element-definitions.md`;
@@ -217,7 +268,7 @@ Do not guess Pickleball syntax when the version-matched guide or executable cons
 
 ## Human-readable consumer guidance
 
-Use `docs/consumer-project.md` for the Maven consumer layout, local test site, common tag entry points, diagnostic usage, and example commands. Use `docs/README.md` to navigate the complete bundled documentation. Human readers can open files under `maven-consumer-project/` directly in the IDE to inspect the version-matched working features, configuration, calls, data, runner, and test-site examples linked from those guides.
+Use `docs/consumer-project.md` on demand for the Maven consumer layout, local test site, common tag entry points, diagnostic usage, and example commands. Human readers can start with `docs/README.md` and open files under `maven-consumer-project/` in the IDE to inspect the version-matched working features, configuration, calls, data, runner, and test-site examples. Agents should not treat those as first-read.
 
 ## When the core Pickleball repository is also present
 

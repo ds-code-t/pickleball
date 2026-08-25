@@ -99,6 +99,66 @@ public final class DiagnosticEvidenceNavigator {
         return List.copyOf(runs);
     }
 
+    public JsonNode catalogDocument() {
+        Path catalog = diagnosticRoot.resolve("run-catalog.json");
+        var result = JSON.createObjectNode();
+        result.put("available", Files.isRegularFile(catalog));
+        result.put("path", catalog.toString());
+        if (Files.isRegularFile(catalog)) {
+            result.set("catalog", readJson(catalog));
+        }
+        return result;
+    }
+
+    public JsonNode runDocument(String runId) {
+        Path runRoot = resolveContained(diagnosticRoot, runId, "runId");
+        Path index = runRoot.resolve("run-index.json");
+        Path clusters = runRoot.resolve("clusters.json");
+        var result = JSON.createObjectNode();
+        result.put("runId", runId);
+        result.put("runRoot", runRoot.toString());
+        result.put("indexPresent", Files.isRegularFile(index));
+        result.put("clustersPresent", Files.isRegularFile(clusters));
+        if (Files.isRegularFile(index)) {
+            result.set("runIndex", readJson(index));
+        }
+        if (Files.isRegularFile(clusters)) {
+            result.set("clusters", readJson(clusters));
+        }
+        return result;
+    }
+
+    public JsonNode scenarioSummaryDocument(String runId, String scenarioId) {
+        Path runRoot = resolveContained(diagnosticRoot, runId, "runId");
+        Path scenarioDir = resolveContained(runRoot.resolve("scenarios"), scenarioId, "scenarioId");
+        Path summary = scenarioDir.resolve("summary.json");
+        if (!Files.isRegularFile(summary)) {
+            throw new IllegalArgumentException("No summary.json for scenario " + scenarioId + " in run " + runId);
+        }
+        var result = JSON.createObjectNode();
+        result.put("runId", runId);
+        result.put("scenarioId", scenarioId);
+        result.put("path", summary.toString());
+        result.set("summary", readJson(summary));
+        return result;
+    }
+
+    private static Path resolveContained(Path root, String name, String label) {
+        if (name == null || name.isBlank()) {
+            throw new IllegalArgumentException(label + " must not be blank.");
+        }
+        if (name.equals(".") || name.equals("..")
+                || name.contains("/") || name.contains("\\") || name.contains("..")) {
+            throw new IllegalArgumentException(label + " must be a simple directory name.");
+        }
+        Path base = root.toAbsolutePath().normalize();
+        Path resolved = base.resolve(name).normalize();
+        if (!resolved.startsWith(base)) {
+            throw new IllegalArgumentException(label + " is outside the diagnostic store.");
+        }
+        return resolved;
+    }
+
     public Timeline timeline(Path runRoot) {
         Path root = runRoot.toAbsolutePath().normalize();
         JsonNode index = readJsonIfPresent(root.resolve("run-index.json"));
