@@ -71,6 +71,7 @@ class WorkbenchMcpServerTest {
             assertTrue(toolNames.contains("workbench_diagnostic_catalog"));
             assertTrue(toolNames.contains("workbench_diagnostic_run"));
             assertTrue(toolNames.contains("workbench_diagnostic_summary"));
+            assertTrue(toolNames.contains("workbench_investigation_emit"));
 
             JsonNode status = harness.toolCall(3, "workbench_worker_status", "{}");
             assertFalse(status.at("/result/isError").asBoolean());
@@ -150,12 +151,17 @@ class WorkbenchMcpServerTest {
                 assertEquals("scenario-1", args[1]);
                 return Map.of("summary", Map.of("outcome", "FAILED"));
             }
+            if ("emitInvestigation".equals(method)) {
+                assertEquals("form-1", ((Map<?, ?>) args[0]).get("pkb_investigation_id"));
+                return Map.of("reportPath", ".pickleball/investigations/form-1/report.html");
+            }
             if ("close".equals(method)) return null;
             return null;
         });
 
         WorkbenchMcpTools tools = new WorkbenchMcpTools(services, JSON);
         assertTrue(tools.names().contains("workbench_diagnostic_catalog"));
+        assertTrue(tools.names().contains("workbench_investigation_emit"));
         Object catalog = tools.call("workbench_diagnostic_catalog", Map.of());
         assertTrue(catalogCalled.get());
         assertTrue(JSON.writeValueAsString(catalog).contains("run-1"));
@@ -168,6 +174,16 @@ class WorkbenchMcpServerTest {
                 "scenarioId", "scenario-1"
         ));
         assertTrue(JSON.writeValueAsString(summary).contains("FAILED"));
+        Object emitted = tools.call("workbench_investigation_emit", Map.of(
+                "investigation", Map.of(
+                        "pkb_investigation_id", "form-1",
+                        "cause", "Selector drifted."
+                )
+        ));
+        String emittedJson = JSON.writeValueAsString(emitted);
+        assertTrue(emittedJson.contains(".pickleball/investigations/form-1/report.html"));
+        assertFalse(emittedJson.contains("Selector drifted."));
+        assertFalse(emittedJson.contains(".png"));
     }
 
     private static WorkbenchServices fakeServices(FakeInvocation invocation) {

@@ -406,6 +406,12 @@ workbench_diagnostic_run
 workbench_diagnostic_summary
 ```
 
+Human investigation handoff (writes `.pickleball/investigations/<id>/` and returns the relative `report.html` path only):
+
+```text
+workbench_investigation_emit
+```
+
 `workbench_step_override_compile` sends the Java source template to the consumer worker. The source must contain `{{CLASS_NAME}}`; worker-side Pickleball remains responsible for compilation, generated classloaders, matching, replacement, captures, and execution.
 
 Mutating live tools require the agent control lease. `workbench_request_save` never writes the original feature until the human Allows it in the UI, or until the explicit stdio tool call itself is the headless approval. Deny, Take control, and an unsavable demo buffer leave the file unchanged.

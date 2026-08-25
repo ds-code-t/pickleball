@@ -10,7 +10,8 @@ Use this order. Consumer AI agents for this Pickleball release use headless Work
 
 1. **Live headless MCP** — isolate a failing step in a paused worker. Reuse compilation, rewrite Gherkin in the live buffer, and inspect the page and semantic events in the same browser/Mapping state.
 2. **One diagnostic `mvn test`** — after the live loop has isolated the failure, run one bounded confirmation with `pkb_runvars` so an evidence pack is retained.
-3. **Edit real consumer source** — change the project's own features/Java only after the live buffer is right. Explicit Save is what writes a `.feature` file.
+3. **Emit the human handoff** — write `.pickleball/investigations/<id>/` then in chat print only `.pickleball/investigations/<id>/report.html`.
+4. **Edit real consumer source** — change the project's own features/Java only after the live buffer is right. Explicit Save is what writes a `.feature` file.
 
 Do not copy consumer features into `.pickleball` as a sandbox.
 
@@ -25,6 +26,7 @@ From the consumer project, with Pickleball on the test classpath:
 5. Isolate with `workbench_execute_step` and/or `workbench_player_replace_document`.
 6. Inspect with `workbench_browser_page`, `workbench_element_inspect`, and `workbench_events`.
 7. When you need a retained evidence pack, run **one** diagnostic `mvn test` with `pkb_runvars` (below). Read that pack with `workbench_diagnostic_catalog`, `workbench_diagnostic_run`, and `workbench_diagnostic_summary` instead of globbing `reports/diagnostic-runs`.
+8. Emit the human handoff with `workbench_investigation_emit` or `DiagnosticCli emit-investigation`. In chat print only `.pickleball/investigations/<id>/report.html`. Do not paste the report body, cause/fix essays, or screenshots into the chat panel.
 
 `workbench_execute_step` failure does not end the worker. Insert, nest, or retry in the same paused browser/Mapping state. Live buffer edits do not require `workbench_sync` and do not write the original `.feature` until explicit Save (`workbench_request_save`).
 
@@ -34,6 +36,7 @@ Worker restart without rebuild already exists (`workbench_worker_restart`). Step
 
 - `.pickleball/maven-consumer-project/` is a version-matched **read-only** reference snapshot of Pickleball's own example consumer. Do not copy, edit, or execute it as the project under test.
 - `.pickleball/workbench/live/classes` is the compiled overlay for the worker classpath. Do not use it as an editor.
+- `.pickleball/investigations/` is unmanaged consumer-agent output. `export-guidance` leaves it alone.
 - `export-guidance` does **not** copy this consumer's own features into `.pickleball` for testing. It still materializes full `docs/` plus the example-consumer snapshot for on-demand/human use.
 
 ## First-read
@@ -58,7 +61,7 @@ A successful `export-guidance .pickleball` run:
 
 - overwrites the current version's managed guidance files, documentation, and Maven consumer reference snapshot;
 - writes `.pickleball/GUIDANCE-MANIFEST.json` last, recording the exporting Pickleball version and managed files;
-- removes files managed by the previous manifest that are no longer shipped, while leaving unrelated files alone; and
+- removes files managed by the previous manifest that are no longer shipped, while leaving unrelated files alone, including `.pickleball/investigations/`; and
 - best-effort ensures `.pickleball` is ignored by Git, preferring an existing `.gitignore` and then repository-local `.git/info/exclude`.
 
 The exporter does not create/commit a new `.gitignore`, alter the Git index, or untrack files that were already committed. If export fails, treat any existing `.pickleball` contents as potentially stale. The manifest records the last completed export; it is not a substitute for rerunning the exporter.
@@ -190,6 +193,8 @@ Stop reading as soon as the current layer answers the investigation. Do not recu
 
 From headless Workbench MCP, use `workbench_diagnostic_catalog`, `workbench_diagnostic_run`, and `workbench_diagnostic_summary` for layers 1–3 instead of globbing `reports/diagnostic-runs`. Those tools return sparse JSON only and do not dump `events.jsonl`, traces, or screenshot bytes.
 
+After isolation and the diagnostic rerun, emit a small human handoff. JSON is the source of truth; HTML is a local render of that JSON plus at most two screenshots linked from the existing diagnostic pack. Do not copy the diagnostic run into `.pickleball/investigations/`. In chat print only the project-relative `report.html` path.
+
 ## Visual evidence rules
 
 - Never open a PNG merely to determine whether two screenshots differ.
@@ -208,12 +213,13 @@ From a Maven consumer where Pickleball is on the test classpath:
 ```text
 DiagnosticCli guidance
 DiagnosticCli export-guidance [output-directory]
+DiagnosticCli emit-investigation <investigation-json-or--> <consumer-project-root>
 DiagnosticCli compare-runs <left-run-index> <right-run-index> [output-json]
 DiagnosticCli compare-fingerprints <left.pkbf> <right.pkbf> [output-json]
 DiagnosticCli rebuild <diagnostic-runs-root-or-run-root>
 ```
 
-Use `guidance` to print this guide and `export-guidance` to materialize the complete version-matched documentation plus curated Maven consumer reference. Prefer `DiagnosticCli` over constructing Maven classpaths and JShell scripts for routine diagnostic operations.
+Use `guidance` to print this guide and `export-guidance` to materialize the complete version-matched documentation plus curated Maven consumer reference. Prefer `DiagnosticCli` over constructing Maven classpaths and JShell scripts for routine diagnostic operations. `emit-investigation` writes `.pickleball/investigations/<id>/investigation.json` and `report.html` and prints the relative HTML path.
 
 ## Controlled diagnostic reruns
 

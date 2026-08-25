@@ -21,8 +21,10 @@ import tools.dscode.workbench.terminal.WorkerLogFiles;
 import tools.dscode.workbench.worker.WorkbenchLiveSession;
 import tools.dscode.workbench.worker.WorkbenchWorkerStatus;
 
+import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
@@ -374,6 +376,15 @@ public final class WorkbenchController implements WorkbenchServices {
     @Override
     public Object diagnosticScenarioSummary(String runId, String scenarioId) {
         return diagnostics.scenarioSummaryDocument(runId, scenarioId);
+    }
+
+    @Override
+    public Object emitInvestigation(Map<String, ?> investigation) {
+        try {
+            return InvestigationHandoff.emit(projectRoot, investigation).sparseResult();
+        } catch (IOException failure) {
+            throw new IllegalStateException("Could not emit investigation handoff.", failure);
+        }
     }
 
     @Override
