@@ -209,6 +209,16 @@ final class WorkbenchMcpTools {
                         "scenarioId", stringProperty("Scenario directory name under that run.")
                 ), "runId", "scenarioId"),
                 args -> services.diagnosticScenarioSummary(text(args, "runId"), text(args, "scenarioId")));
+        add("workbench_investigation_emit",
+                "Write .pickleball/investigations/<id>/{investigation.json,report.html} from investigation JSON. Returns the relative report.html path only. Does not copy the diagnostic pack or embed PNG bytes.",
+                schema(Map.of(
+                        "investigation", Map.of(
+                                "type", "object",
+                                "description", "Investigation JSON object. Source of truth written to investigation.json.",
+                                "additionalProperties", true
+                        )
+                ), "investigation"),
+                args -> services.emitInvestigation(investigationObject(args.get("investigation"))));
     }
 
     private void add(
@@ -305,6 +315,28 @@ final class WorkbenchMcpTools {
     private static boolean bool(Map<String, Object> args, String name, boolean defaultValue) {
         Object value = args.get(name);
         return value instanceof Boolean bool ? bool : defaultValue;
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> investigationObject(Object value) {
+        if (value == null) {
+            throw new IllegalArgumentException("investigation must be a JSON object.");
+        }
+        Object parsed = value;
+        if (parsed instanceof String text) {
+            if (text.isBlank()) {
+                throw new IllegalArgumentException("investigation must be a JSON object.");
+            }
+            try {
+                parsed = json.readValue(text, LinkedHashMap.class);
+            } catch (Exception failure) {
+                throw new IllegalArgumentException("investigation must be a JSON object.");
+            }
+        }
+        if (!(parsed instanceof Map<?, ?>)) {
+            throw new IllegalArgumentException("investigation must be a JSON object.");
+        }
+        return json.convertValue(parsed, LinkedHashMap.class);
     }
 
     private record ToolBinding(

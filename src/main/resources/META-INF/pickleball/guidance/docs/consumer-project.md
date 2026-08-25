@@ -235,6 +235,7 @@ Do not recursively ingest an entire run.
 ```text
 DiagnosticCli compare-runs <left-run-index> <right-run-index> [output-json]
 DiagnosticCli compare-fingerprints <left.pkbf> <right.pkbf> [output-json]
+DiagnosticCli emit-investigation <investigation-json-or--> <consumer-project-root>
 DiagnosticCli rebuild <diagnostic-runs-root-or-run-root>
 ```
 

@@ -25,6 +25,7 @@ import tools.dscode.workbench.worker.WorkbenchWorkerStatus;
 
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.function.Consumer;
 
@@ -148,6 +149,8 @@ public interface WorkbenchServices extends AutoCloseable {
     Object diagnosticRun(String runId);
 
     Object diagnosticScenarioSummary(String runId, String scenarioId);
+
+    Object emitInvestigation(Map<String, ?> investigation);
 
     @Override
     void close();
