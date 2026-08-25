@@ -2,7 +2,7 @@
 
 Pickleball extends Cucumber with a dynamic feature-file language while preserving normal Cucumber behavior. The pages below describe the supported authoring model and link to real executable examples in [`maven-consumer-project`](consumer-project.md).
 
-When these docs are materialized from the Maven dependency with `DiagnosticCli export-guidance`, links to `../maven-consumer-project/...` resolve to the version-matched, read-only reference snapshot exported beside the docs. Human readers and AI agents can therefore inspect the same working features, configuration, calls, data, runner, and local test-site examples without checking out the Pickleball source repository.
+When these docs are materialized from the Maven dependency with `DiagnosticCli export-guidance`, links to `../maven-consumer-project/...` resolve to the version-matched, read-only reference snapshot exported beside the docs. Human readers can inspect those working features, configuration, calls, data, runner, and local test-site examples without checking out the Pickleball source repository. Consumer AI agents should follow `.pickleball/AGENT-GUIDE.md` first and open a specific guide only when needed.
 
 ## Start here
 

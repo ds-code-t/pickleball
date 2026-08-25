@@ -1,12 +1,15 @@
 package tools.dscode.workbench.sync;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 
 /** Persisted synchronization provenance for one selected consumer project/module. */
+@JsonIgnoreProperties(ignoreUnknown = true)
 public record WorkbenchManifest(
         int schemaVersion,
         String projectRoot,
@@ -21,16 +24,69 @@ public record WorkbenchManifest(
         List<String> dependencyClasspath,
         String pickleballVersion,
         String javaVersion,
-        String javaHome
+        String javaHome,
+        String syncMode,
+        String javaInputFingerprint,
+        String resourceInputFingerprint,
+        String buildInputFingerprint,
+        String dependencyInputFingerprint
 ) {
     public static final int CURRENT_SCHEMA = 1;
     private static final ObjectMapper JSON = new ObjectMapper();
 
     public WorkbenchManifest {
-        sourceRoots = List.copyOf(sourceRoots);
-        outputRoots = List.copyOf(outputRoots);
-        outputMappings = List.copyOf(outputMappings);
-        dependencyClasspath = List.copyOf(dependencyClasspath);
+        sourceRoots = List.copyOf(sourceRoots == null ? List.of() : sourceRoots);
+        outputRoots = List.copyOf(outputRoots == null ? List.of() : outputRoots);
+        outputMappings = List.copyOf(outputMappings == null ? List.of() : outputMappings);
+        dependencyClasspath = List.copyOf(dependencyClasspath == null ? List.of() : dependencyClasspath);
+        syncMode = syncMode == null || syncMode.isBlank() ? WorkbenchSyncMode.FULL.name() : syncMode;
+        javaInputFingerprint = javaInputFingerprint == null ? "" : javaInputFingerprint;
+        resourceInputFingerprint = resourceInputFingerprint == null ? "" : resourceInputFingerprint;
+        buildInputFingerprint = buildInputFingerprint == null ? "" : buildInputFingerprint;
+        dependencyInputFingerprint = dependencyInputFingerprint == null ? "" : dependencyInputFingerprint;
+    }
+
+    public boolean hasInputFingerprints() {
+        return !javaInputFingerprint.isBlank()
+                && !resourceInputFingerprint.isBlank()
+                && !buildInputFingerprint.isBlank()
+                && !dependencyInputFingerprint.isBlank();
+    }
+
+    public WorkbenchManifest withSkip(String synchronizedAt, WorkbenchSyncInputs inputs) {
+        return new WorkbenchManifest(
+                schemaVersion,
+                projectRoot,
+                projectType,
+                buildTool,
+                sourceRoots,
+                outputRoots,
+                outputMappings,
+                liveOutput,
+                synchronizedAt,
+                fingerprint,
+                dependencyClasspath,
+                pickleballVersion,
+                javaVersion,
+                javaHome,
+                WorkbenchSyncMode.SKIPPED.name(),
+                inputs.javaFingerprint(),
+                inputs.resourceFingerprint(),
+                inputs.buildFingerprint(),
+                inputs.dependencyFingerprint()
+        );
+    }
+
+    static WorkbenchManifest readIfPresent(Path stateRoot) {
+        Path file = stateRoot.resolve("manifest.json");
+        if (!Files.isRegularFile(file)) return null;
+        try {
+            WorkbenchManifest manifest = JSON.readValue(file.toFile(), WorkbenchManifest.class);
+            if (manifest.schemaVersion() != CURRENT_SCHEMA) return null;
+            return manifest;
+        } catch (IOException ignored) {
+            return null;
+        }
     }
 
     public static WorkbenchManifest read(Path projectRoot) {

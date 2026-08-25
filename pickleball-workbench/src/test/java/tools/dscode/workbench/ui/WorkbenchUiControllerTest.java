@@ -26,6 +26,7 @@ import tools.dscode.workbench.player.WorkbenchSaveResult;
 import tools.dscode.workbench.lease.WorkbenchControlLease;
 import tools.dscode.workbench.lease.WorkbenchControlLeaseSnapshot;
 import tools.dscode.workbench.sync.WorkbenchManifest;
+import tools.dscode.workbench.sync.WorkbenchSyncMode;
 import tools.dscode.workbench.worker.WorkbenchWorkerStatus;
 
 import java.lang.reflect.Proxy;
@@ -310,7 +311,12 @@ class WorkbenchUiControllerTest {
                 List.of(),
                 "2.1.8",
                 "21",
-                Path.of("java-home").toAbsolutePath().normalize().toString()
+                Path.of("java-home").toAbsolutePath().normalize().toString(),
+                WorkbenchSyncMode.FULL.name(),
+                "java-fp",
+                "resource-fp",
+                "build-fp",
+                "dep-fp"
         );
     }
 

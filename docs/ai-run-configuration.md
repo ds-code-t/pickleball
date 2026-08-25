@@ -243,6 +243,12 @@ Example compact rerun:
 -Dpkb_changed_variables=pkb_browser
 ```
 
+For an agent's bounded confirmation `mvn test` (not `PickleballTests` human defaults of `pretty` / `@all`), include diagnostic evidence controls and keep selection narrow:
+
+```text
+-Dpkb_runvars="pkb_tags=@the-failing-tag, pkb_name=The failing scenario, pkb_browser=CHROME_HEADLESS, pkb_reportingmode=diagnostic, pkb_loglevel=warn, pkb_reportretention=failed"
+```
+
 Lineage metadata is not execution configuration:
 
 ```text

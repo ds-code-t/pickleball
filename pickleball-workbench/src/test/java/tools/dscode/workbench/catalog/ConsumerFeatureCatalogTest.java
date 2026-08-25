@@ -3,6 +3,7 @@ package tools.dscode.workbench.catalog;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import tools.dscode.workbench.sync.WorkbenchManifest;
+import tools.dscode.workbench.sync.WorkbenchSyncMode;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -226,7 +227,12 @@ class ConsumerFeatureCatalogTest {
                 List.of(),
                 "2.1.9",
                 "21",
-                "/usr/lib/jvm"
+                "/usr/lib/jvm",
+                WorkbenchSyncMode.FULL.name(),
+                "java-fp",
+                "resource-fp",
+                "build-fp",
+                "dep-fp"
         );
 
         ConsumerFeatureCatalog catalog = ConsumerFeatureCatalog.scan(project, manifest);

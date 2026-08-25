@@ -40,8 +40,17 @@ public class PickleballGuidanceChecks {
         assertTrue(guide.contains("GUIDANCE-MANIFEST.json"));
         assertTrue(guide.contains("keep terminal logging minimal"));
         assertTrue(guide.contains("older Pickleball release whose exporter predates the manifest lifecycle"));
-        assertTrue(guide.contains("Generated Maven consumer reference"));
-        assertTrue(guide.contains("maven-consumer-project/"));
+            assertTrue(guide.contains("Generated Maven consumer reference"));
+            assertTrue(guide.contains("maven-consumer-project/"));
+            assertTrue(guide.contains("mcp ."));
+            assertTrue(guide.contains("workbench_sync"));
+            assertTrue(guide.contains("workbench_execute_step"));
+            assertTrue(guide.contains("workbench_diagnostic_catalog"));
+            assertTrue(guide.contains("pkb_reportingmode=diagnostic"));
+            assertTrue(guide.contains("pkb_reportretention=failed"));
+            String chooser = guide.substring(0, guide.indexOf("Generated guidance lifecycle"));
+            assertFalse(chooser.contains("attach.json"));
+            assertFalse(chooser.contains("ui ."));
     }
 
     @Test
@@ -125,6 +134,10 @@ public class PickleballGuidanceChecks {
             assertTrue(guide.contains("keep terminal logging minimal"));
             assertTrue(guide.contains("older Pickleball release whose exporter predates the manifest lifecycle"));
             assertTrue(guide.contains("read-only reference snapshot"));
+            assertTrue(guide.contains("mcp ."));
+            assertTrue(guide.contains("workbench_diagnostic_catalog"));
+            assertTrue(guide.contains("pkb_reportretention=failed"));
+            assertTrue(guide.contains("Do not copy, modify, or execute files"));
 
             String consumerProject = Files.readString(root.resolve("docs/consumer-project.md"));
             assertTrue(consumerProject.contains("keep console verbosity low"));
