@@ -47,6 +47,7 @@ REQUIRED_FILES = (
     "scripts/agent_validate.sh",
     "scripts/agent_validate.ps1",
     "maven-consumer-project/AGENTS.md",
+    "maven-consumer-project/.github/copilot-instructions.md",
     "maven-consumer-project/README.md",
     "maven-consumer-project/.gitignore",
     "maven-consumer-project/mvnw",
@@ -79,7 +80,6 @@ FORBIDDEN_TRACKED_CONSUMER_FILES = {
     "maven-consumer-project/GEMINI.md",
     "maven-consumer-project/REVIEW.md",
     "maven-consumer-project/.clinerules",
-    "maven-consumer-project/.github/copilot-instructions.md",
 }
 ADAPTER_FILES = (
     "CLAUDE.md",
@@ -136,6 +136,7 @@ DOC_FILES = {
     "pickleball-workbench/AGENTS.md",
     "maven-consumer-project/README.md",
     "maven-consumer-project/AGENTS.md",
+    "maven-consumer-project/.github/copilot-instructions.md",
 }
 
 WORKBENCH_CONTRACT_FILES = (
@@ -278,42 +279,56 @@ def starts_with_any(path: str, prefixes: tuple[str, ...]) -> bool:
     return any(path.startswith(prefix) for prefix in prefixes)
 
 
+CONSUMER_BRIDGE_FILES = (
+    "maven-consumer-project/AGENTS.md",
+    "maven-consumer-project/.github/copilot-instructions.md",
+)
+
+
 def validate_consumer_bridge(errors: list[str]) -> None:
-    bridge = ROOT / "maven-consumer-project" / "AGENTS.md"
-    if not bridge.is_file():
-        return
+    texts: list[str] = []
+    for relative in CONSUMER_BRIDGE_FILES:
+        path = ROOT / relative
+        if not path.is_file():
+            continue
 
-    text = bridge.read_text(encoding="utf-8").strip()
-    nonblank_lines = [line for line in text.splitlines() if line.strip()]
-    if len(nonblank_lines) != 1:
+        text = path.read_text(encoding="utf-8").strip()
+        texts.append(text)
+        nonblank_lines = [line for line in text.splitlines() if line.strip()]
+        if len(nonblank_lines) != 1:
+            errors.append(
+                "Consumer guidance bridge must stay a single nonblank bootstrap line: "
+                + relative
+            )
+
+        for required in (
+            "DiagnosticCli",
+            "export-guidance",
+            ".pickleball/AGENT-GUIDE.md",
+        ):
+            if required not in text:
+                errors.append(
+                    f"Consumer guidance bridge must reference {required}: {relative}"
+                )
+
+        for forbidden in (
+            "GUIDANCE-MANIFEST.json",
+            ".git/info/exclude",
+            "pkb_changed_variables",
+            "runProfileFingerprint",
+            "Diagnostic investigation protocol",
+        ):
+            if forbidden in text:
+                errors.append(
+                    f"Consumer guidance bridge contains dependency-owned guidance ({forbidden}); "
+                    "keep only the bootstrap command and generated-guide pointer: "
+                    + relative
+                )
+
+    if len(texts) == len(CONSUMER_BRIDGE_FILES) and len(set(texts)) != 1:
         errors.append(
-            "Consumer AGENTS bridge must stay a single nonblank bootstrap line: "
-            "maven-consumer-project/AGENTS.md"
+            "Consumer AGENTS.md and .github/copilot-instructions.md bridges must be identical."
         )
-
-    for required in (
-        "DiagnosticCli",
-        "export-guidance",
-        ".pickleball/AGENT-GUIDE.md",
-    ):
-        if required not in text:
-            errors.append(
-                f"Consumer AGENTS bridge must reference {required}: "
-                "maven-consumer-project/AGENTS.md"
-            )
-
-    for forbidden in (
-        "GUIDANCE-MANIFEST.json",
-        ".git/info/exclude",
-        "pkb_changed_variables",
-        "runProfileFingerprint",
-        "Diagnostic investigation protocol",
-    ):
-        if forbidden in text:
-            errors.append(
-                f"Consumer AGENTS bridge contains dependency-owned guidance ({forbidden}); "
-                "keep only the bootstrap command and generated-guide pointer."
-            )
 
 
 def validate_consumer_readme(errors: list[str]) -> None:
@@ -322,6 +337,11 @@ def validate_consumer_readme(errors: list[str]) -> None:
         return
 
     text = readme.read_text(encoding="utf-8")
+    if "AGENTS.md" not in text:
+        errors.append(
+            "Consumer README must point to AGENTS.md for guidance export: "
+            "maven-consumer-project/README.md"
+        )
     for forbidden in (
         "export-guidance",
         ".pickleball/",

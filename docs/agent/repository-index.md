@@ -9,6 +9,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `build.gradle`
 - `gradlew`
 - `gradlew.bat`
+- `maven-consumer-project/.github/copilot-instructions.md`
 - `maven-consumer-project/.mvn/wrapper/maven-wrapper.properties`
 - `maven-consumer-project/AGENTS.md`
 - `maven-consumer-project/mvnw`

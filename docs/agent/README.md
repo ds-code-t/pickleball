@@ -20,7 +20,9 @@ Agent adapters should remain small and point back to the canonical contract rath
 
 The nested `/maven-consumer-project/AGENTS.md` is intentionally only a dependency-owned guidance bootstrap. It materializes version-matched guidance and directs the consumer agent to `.pickleball/AGENT-GUIDE.md`. Refresh/version/manifest semantics, authoring rules, configuration, diagnostics, and troubleshooting belong in the exported dependency guidance.
 
-The nested `/maven-consumer-project/README.md` is ordinary sample-project documentation and should not duplicate the AI guidance lifecycle.
+The nested `/maven-consumer-project/.github/copilot-instructions.md` is the same one-line bootstrap for IntelliJ Copilot Chat, which reads that file rather than `AGENTS.md`.
+
+The nested `/maven-consumer-project/README.md` is ordinary sample-project documentation. It may point humans and agents at `AGENTS.md` for guidance export, but should not duplicate the AI guidance lifecycle.
 
 `export-guidance .pickleball` is deliberately unconditional before Pickleball work. A successful export writes `.pickleball/GUIDANCE-MANIFEST.json` last, removes obsolete previously managed files, and refreshes current dependency guidance. Git-ignore handling is best effort. If export fails, existing `.pickleball` content is potentially stale.
 

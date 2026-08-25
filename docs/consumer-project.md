@@ -42,7 +42,7 @@ The snapshot includes:
 - static local test-site resources; and
 - the committed shared/local `profiles*.yaml` and `pickleball*.properties` examples.
 
-It intentionally excludes Maven wrappers, Git/IDE/generated artifacts, the consumer `AGENTS.md` bridge, internal Java verification classes, and maintainer-only `_local2` files. It is reference material, not another consumer project to edit or run. Make changes in the real consumer project; a future guidance export may replace every managed file in this snapshot.
+It intentionally excludes Maven wrappers, Git/IDE/generated artifacts, the consumer `AGENTS.md` and `.github/copilot-instructions.md` bridges, internal Java verification classes, and maintainer-only `_local2` files. It is reference material, not another consumer project to edit or run. Make changes in the real consumer project; a future guidance export may replace every managed file in this snapshot.
 
 ## Purpose
 
