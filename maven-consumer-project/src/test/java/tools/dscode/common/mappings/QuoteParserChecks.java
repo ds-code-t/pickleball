@@ -36,8 +36,7 @@ public class QuoteParserChecks {
 
         String json = "{\"payload\":\"" + huge + "\"}";
         QuoteParser parsed = new QuoteParser(json);
-        assertEquals(1, parsed.size());
-        assertEquals(huge, parsed.values().iterator().next());
+        assertEquals(List.of("payload", huge), List.copyOf(parsed.values()));
         assertEquals(json, parsed.restore());
     }
 
