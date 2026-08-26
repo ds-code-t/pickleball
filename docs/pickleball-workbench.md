@@ -58,7 +58,7 @@ mvn -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java \
 mvn -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java "-Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher" "-Dexec.classpathScope=test" "-Dexec.args=mcp ."
 ```
 
-Humans who want the Swing player can pass `ui .` instead. With no launcher arguments, `ui` and the current directory are selected automatically for that human default. Other Workbench commands are forwarded in the same form, for example `"-Dexec.args=sync ."`. Agents for this release should not use the GUI, `ui .`, or `.pickleball/workbench/attach.json` as their path; see `.pickleball/AGENT-GUIDE.md`.
+Humans who want the Swing player can pass `ui .` instead. With no launcher arguments, `ui` and the current directory are selected automatically for that human default. Other Workbench commands are forwarded in the same form, for example `"-Dexec.args=sync ."`. Consumer agents start `mcp .` when isolating a known failure. They may run a diagnostic `mvn test` first to discover which of several scenarios fail. Missing `workbench_*` tools means start this stdio server, not skip Workbench. Agents for this release should not use the GUI, `ui .`, or `.pickleball/workbench/attach.json` as their path; see `.pickleball/AGENT-GUIDE.md`.
 
 Gradle consumers can expose the same dependency-owned launcher without resolving a cache path or adding a Workbench dependency:
 
@@ -321,7 +321,7 @@ Start the lightweight non-Spring MCP server for a consumer project. This is the 
 java -jar $workbenchJar mcp ".\maven-consumer-project"
 ```
 
-Or, from a Maven consumer test classpath, `"-Dexec.args=mcp ."`. Do not document or use the Swing GUI as the agent path.
+Or, from a Maven consumer test classpath, `"-Dexec.args=mcp ."`. Consumer agents start this stdio server when isolating a known failure. They may first run a diagnostic `mvn test` to discover which scenarios fail. Missing `workbench_*` tools means start this server (preferably as an IDE-owned MCP process), not skip Workbench. Do not document or use the Swing GUI, `ui .`, or `.pickleball/workbench/attach.json` as the agent path.
 
 The server uses the official Java MCP SDK core and stdio transport with the Jackson 2 JSON adapter. MCP dependencies are Workbench-only and are shaded into the executable companion. Workbench deliberately does not use Spring Boot, Spring Framework, Spring AI, WebMVC, or Tomcat.
 

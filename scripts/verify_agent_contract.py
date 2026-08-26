@@ -295,21 +295,46 @@ def validate_consumer_bridge(errors: list[str]) -> None:
         text = path.read_text(encoding="utf-8").strip()
         texts.append(text)
         nonblank_lines = [line for line in text.splitlines() if line.strip()]
-        if len(nonblank_lines) != 1:
+        if not (3 <= len(nonblank_lines) <= 8):
             errors.append(
-                "Consumer guidance bridge must stay a single nonblank bootstrap line: "
+                "Consumer guidance bridge must keep the export-guidance one-liner plus a short "
+                "discover-vs-isolate pointer (not the full guide): "
                 + relative
             )
 
+        first_line = nonblank_lines[0] if nonblank_lines else ""
         for required in (
             "DiagnosticCli",
             "export-guidance",
             ".pickleball/AGENT-GUIDE.md",
         ):
+            if required not in first_line:
+                errors.append(
+                    f"Consumer guidance bridge one-liner must reference {required}: {relative}"
+                )
+
+        for required in (
+            "mcp .",
+            "workbench_",
+            "mvn test",
+            "diagnostic",
+        ):
             if required not in text:
                 errors.append(
-                    f"Consumer guidance bridge must reference {required}: {relative}"
+                    f"Consumer guidance bridge must state the discover-vs-isolate split ({required}): "
+                    + relative
                 )
+
+        lowered = text.lower()
+        if "do not skip workbench" not in lowered:
+            errors.append(
+                "Consumer guidance bridge must say not to skip Workbench when MCP is disconnected: "
+                + relative
+            )
+        if "do not start the gui" not in lowered:
+            errors.append(
+                "Consumer guidance bridge must say not to start the GUI: " + relative
+            )
 
         for forbidden in (
             "GUIDANCE-MANIFEST.json",
@@ -317,11 +342,13 @@ def validate_consumer_bridge(errors: list[str]) -> None:
             "pkb_changed_variables",
             "runProfileFingerprint",
             "Diagnostic investigation protocol",
+            "attach.json",
+            "ui .",
         ):
             if forbidden in text:
                 errors.append(
                     f"Consumer guidance bridge contains dependency-owned guidance ({forbidden}); "
-                    "keep only the bootstrap command and generated-guide pointer: "
+                    "keep only the bootstrap command and a short discover-vs-isolate pointer: "
                     + relative
                 )
 
