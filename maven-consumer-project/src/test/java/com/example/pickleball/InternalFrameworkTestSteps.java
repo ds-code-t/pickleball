@@ -10,6 +10,7 @@ import tools.dscode.common.dataelements.DataElementPhaseOneChecks;
 import tools.dscode.common.dataelements.DataElementPhaseThreeChecks;
 import tools.dscode.common.dataelements.DataElementPhaseTwoChecks;
 import tools.dscode.common.mappings.MappingDataRefactorChecks;
+import tools.dscode.common.mappings.QuoteParserChecks;
 import tools.dscode.common.reporting.diagnostic.Diagnostic213CompletionChecks;
 import tools.dscode.common.reporting.diagnostic.DiagnosticReportingChecks;
 import tools.dscode.common.reporting.diagnostic.InvestigationHandoffChecks;
@@ -29,12 +30,18 @@ public final class InternalFrameworkTestSteps {
     private InternalFrameworkTestSteps() {
     }
 
+    @Given("^RUN QUOTE PARSER JAVA TESTS$")
+    public static void runQuoteParserJavaTests() {
+        runAndAssert(QuoteParserChecks.class);
+    }
+
     @Given("^RUN INTERNAL PICKLEBALL JAVA TESTS$")
     public static void runInternalPickleballJavaTests() {
         runAndAssert(
                 ScenarioStepChecks.class,
                 ScenarioStepDataChecks.class,
                 MappingDataRefactorChecks.class,
+                QuoteParserChecks.class,
                 ModularScenariosChecks.class,
                 BusinessTemporalDeltaChecks.class,
                 BusinessTimePostModifierChecks.class,
