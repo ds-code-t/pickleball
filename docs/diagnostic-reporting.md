@@ -140,7 +140,7 @@ Input is investigation JSON from a file or stdin (`-`) plus the consumer project
 Suggested investigation JSON fields, using existing lineage/diagnostic names where they already exist:
 
 ```text
-pkb_investigation_id
+pkb_investigation_id   # or investigationId
 createdAt
 scenario.name / scenario.feature / scenario.scenarioId
 outcome          # cause-only | cause-and-fix
@@ -149,11 +149,13 @@ fix              # text, or "not fixed"
 category         # selector | gherkin | java | data | other
 failureSignature
 failureSite
-runId
+runId            # or diagnosticRunId
 runIndexPath     # pointer, not a copy
 screenshots      # at most two project-relative PNG paths
 pickleballVersion
 ```
+
+Canonical names are `pkb_investigation_id` and `runId`. `investigationId` and `diagnosticRunId` are accepted aliases and are written back under the canonical names.
 
 `export-guidance` does not manage or delete `.pickleball/investigations/`.
 

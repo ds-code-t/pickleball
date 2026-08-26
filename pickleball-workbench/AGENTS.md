@@ -129,7 +129,7 @@ Worker JVM system-property overrides are explicit controller inputs. The default
 
 `WorkbenchLiveSession` is the controller-side scenario-bound facade for operations on the persistent paused worker. It delegates to `ControlBridgeClient` and neutral protocol DTOs; it must not reimplement Gherkin matching, mappings, browser behavior, service calls, semantic hook behavior, or Step Override matching/compilation.
 
-Each live operation resolves the currently owned paused scenario, performs the bridge call for that scenario, and verifies afterward that the same process id, bridge runtime id, and scenario id remain active and paused. Normal live operations must not invoke Maven/Gradle, resynchronize the project, or restart the worker.
+Each live operation resolves the currently owned paused scenario, performs the bridge call for that scenario, and verifies afterward that the same process id, bridge runtime id, and scenario id remain active and paused. A `FAILED` `executeStep` result is still a completed live call: the worker stays paused and available. Normal live operations must not invoke Maven/Gradle, resynchronize the project, or restart the worker.
 
 `compileStepOverride(id, regex, source)` sends a REPLACE-mode REGEX rule to the consumer worker; the Java source must contain `{{CLASS_NAME}}`, and the worker owns class naming, compilation, classloading, registry lifetime, matching, capture extraction, and handler execution. `stepOverrides()`, `removeStepOverride(id)`, and `clearStepOverrides()` operate only on the currently owned scenario. Workbench must not compile handlers in the controller JVM.
 

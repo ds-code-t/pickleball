@@ -371,6 +371,10 @@ workbench_mapping_restore
 workbench_events
 ```
 
+`workbench_execute_step` returns a structured `SUCCESS` / `FAILED` / `UNAVAILABLE` result. A FAILED Gherkin hypothesis leaves the same paused worker available so the agent can inspect, insert, nest, or retry. That result is not an MCP `isError` and does not stop the worker. MCP `isError=true` is for controller/runtime problems such as a missing paused worker.
+
+`workbench_events` is a paged read: pass `afterSequence` and a small `limit` (default 100, maximum 500). Do not request the full retained event history when a page answers the question.
+
 Browser/service evidence:
 
 ```text
@@ -379,6 +383,8 @@ workbench_browser_screenshot
 workbench_element_inspect
 workbench_service_call
 ```
+
+Prefer `workbench_browser_page` and `workbench_element_inspect` over `workbench_browser_screenshot` unless the image itself is required. Screenshot bytes are expensive in agent context.
 
 Semantic breakpoints:
 
@@ -416,7 +422,7 @@ workbench_investigation_emit
 
 Mutating live tools require the agent control lease. `workbench_request_save` never writes the original feature until the human Allows it in the UI, or until the explicit stdio tool call itself is the headless approval. Deny, Take control, and an unsavable demo buffer leave the file unchanged.
 
-Controller/runtime failures are returned as MCP tool results with `isError=true`. They are not printed as arbitrary protocol output.
+Controller/runtime failures are returned as MCP tool results with `isError=true`. They are not printed as arbitrary protocol output. Exploratory `FAILED` step, mapping, browser, or service-call results remain ordinary JSON tool results with `isError=false`.
 
 ## Scope boundary
 

@@ -50,7 +50,7 @@ final class WorkbenchMcpTools {
     }
 
     private void register() {
-        add("workbench_sync", "Synchronize the selected consumer project.", schema(Map.of()),
+        add("workbench_sync", "Synchronize the selected consumer project. Skips Maven/Gradle when Java/build/dependencies are unchanged; resources-only refresh when only features/config/data changed. Live buffer edits do not require this.", schema(Map.of()),
                 args -> services.synchronize());
         add("workbench_sync_status", "Read the current Workbench synchronization manifest.", schema(Map.of()),
                 args -> services.synchronizationStatus());
@@ -95,7 +95,7 @@ final class WorkbenchMcpTools {
                 schema(Map.of()),
                 args -> services.requestSave());
 
-        add("workbench_execute_step", "Execute raw Gherkin in the paused live scenario.",
+        add("workbench_execute_step", "Execute raw Gherkin in the paused live scenario. A FAILED result leaves the worker paused so you can inspect or retry; it is not an MCP error and does not stop the worker.",
                 schema(Map.of(
                         "text", stringProperty("Gherkin step text."),
                         "argument", stringProperty("Optional DocString-style argument text.")
@@ -125,7 +125,7 @@ final class WorkbenchMcpTools {
                 schema(Map.of("snapshot", objectProperty("Snapshot returned by workbench_mapping_snapshot.")), "snapshot"),
                 args -> services.mappingRestore(json.convertValue(args.get("snapshot"), ControlBridgeMappingSnapshot.class)));
 
-        add("workbench_events", "Read semantic runtime events for the active scenario.",
+        add("workbench_events", "Read semantic runtime events for the active scenario. Page with afterSequence and a small limit (default 100, max 500).",
                 schema(Map.of(
                         "afterSequence", integerProperty("Return events after this sequence number."),
                         "limit", integerProperty("Maximum events to return.")
@@ -133,7 +133,7 @@ final class WorkbenchMcpTools {
                 args -> services.events(longValue(args, "afterSequence"), integer(args, "limit")));
         add("workbench_browser_page", "Read current browser page evidence.", schema(Map.of()),
                 args -> services.browserPage());
-        add("workbench_browser_screenshot", "Capture current browser screenshot evidence.", schema(Map.of()),
+        add("workbench_browser_screenshot", "Capture current browser screenshot evidence. Prefer workbench_browser_page or workbench_element_inspect unless the image itself is required.", schema(Map.of()),
                 args -> services.browserScreenshot());
         add("workbench_element_inspect", "Inspect browser elements using Pickleball element vocabulary.",
                 schema(Map.of(

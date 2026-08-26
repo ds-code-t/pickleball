@@ -24,11 +24,11 @@ From the consumer project, with Pickleball on the test classpath:
 3. `workbench_worker_start` — reuse the compiled live classpath; do not rebuild to start a worker.
 4. `workbench_request_control`
 5. Isolate with `workbench_execute_step` and/or `workbench_player_replace_document`.
-6. Inspect with `workbench_browser_page`, `workbench_element_inspect`, and `workbench_events`.
+6. Inspect with `workbench_browser_page`, `workbench_element_inspect`, and paged `workbench_events`. Prefer those over `workbench_browser_screenshot`; screenshot bytes are expensive in agent context.
 7. When you need a retained evidence pack, run **one** diagnostic `mvn test` with `pkb_runvars` (below). Read that pack with `workbench_diagnostic_catalog`, `workbench_diagnostic_run`, and `workbench_diagnostic_summary` instead of globbing `reports/diagnostic-runs`.
 8. Emit the human handoff with `workbench_investigation_emit` or `DiagnosticCli emit-investigation`. In chat print only `.pickleball/investigations/<id>/report.html`. Do not paste the report body, cause/fix essays, or screenshots into the chat panel.
 
-`workbench_execute_step` failure does not end the worker. Insert, nest, or retry in the same paused browser/Mapping state. Live buffer edits do not require `workbench_sync` and do not write the original `.feature` until explicit Save (`workbench_request_save`).
+`workbench_execute_step` returns a structured `SUCCESS` / `FAILED` / `UNAVAILABLE` result. A FAILED Gherkin hypothesis does not end the worker, does not fail the paused scenario, and is not an MCP `isError`. Insert, nest, or retry in the same paused browser/Mapping state. MCP `isError=true` is for controller/runtime problems such as a missing paused worker; do not restart the worker merely because a step failed. Page `workbench_events` with `afterSequence` and a small `limit` (default 100, max 500). Live buffer edits do not require `workbench_sync` and do not write the original `.feature` until explicit Save (`workbench_request_save`).
 
 Worker restart without rebuild already exists (`workbench_worker_restart`). Step Overrides compile worker-side (`workbench_step_override_compile`); they do not require Maven.
 
