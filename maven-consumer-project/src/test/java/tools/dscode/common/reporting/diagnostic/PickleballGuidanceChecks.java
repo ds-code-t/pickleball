@@ -50,6 +50,9 @@ public class PickleballGuidanceChecks {
             assertTrue(guide.contains("emit-investigation"));
             assertTrue(guide.contains("pkb_reportingmode=diagnostic"));
             assertTrue(guide.contains("pkb_reportretention=failed"));
+            assertTrue(guide.contains("does not end the worker"));
+            assertTrue(guide.contains("is not an MCP"));
+            assertTrue(guide.contains("afterSequence"));
             String chooser = guide.substring(0, guide.indexOf("Generated guidance lifecycle"));
             assertFalse(chooser.contains("attach.json"));
             assertFalse(chooser.contains("ui ."));

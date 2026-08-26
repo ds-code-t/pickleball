@@ -5,6 +5,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.modelcontextprotocol.spec.McpSchema;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import tools.dscode.control.protocol.ControlBridgeCallResult;
+import tools.dscode.control.protocol.ControlBridgeError;
+import tools.dscode.control.protocol.ControlBridgeStatus;
+import tools.dscode.control.protocol.ControlProtocol;
 import tools.dscode.workbench.WorkbenchServices;
 
 import java.io.BufferedReader;
@@ -135,6 +139,83 @@ class WorkbenchMcpServerTest {
     }
 
     @Test
+    void executeStepFailureIsAResultNotAnMcpErrorAndDoesNotStopTheWorker() throws Exception {
+        AtomicInteger stops = new AtomicInteger();
+        AtomicBoolean executed = new AtomicBoolean();
+        WorkbenchServices services = fakeServices((method, args) -> {
+            if ("executeStep".equals(method)) {
+                executed.set(true);
+                assertEquals(", verify \"left\" equals \"right\"", args[0]);
+                return new ControlBridgeCallResult(
+                        "FAILED",
+                        null,
+                        null,
+                        new ControlBridgeError("ASSERTION", "left was not right", ""),
+                        pausedRuntime()
+                );
+            }
+            if ("stopWorker".equals(method) || "restartWorker".equals(method) || "close".equals(method)) {
+                if ("stopWorker".equals(method) || "restartWorker".equals(method)) {
+                    stops.incrementAndGet();
+                }
+                return null;
+            }
+            return null;
+        });
+
+        WorkbenchMcpTools tools = new WorkbenchMcpTools(services, JSON);
+        var specification = tools.specifications().stream()
+                .filter(spec -> "workbench_execute_step".equals(spec.tool().name()))
+                .findFirst()
+                .orElseThrow();
+        assertTrue(specification.tool().description().contains("does not stop the worker"));
+
+        var result = specification.callHandler().apply(null, new McpSchema.CallToolRequest(
+                "workbench_execute_step",
+                Map.of("text", ", verify \"left\" equals \"right\""),
+                null
+        ));
+        assertFalse(Boolean.TRUE.equals(result.isError()));
+        String text = ((McpSchema.TextContent) result.content().getFirst()).text();
+        assertTrue(text.contains("FAILED"));
+        assertTrue(text.contains("left was not right"));
+        assertTrue(executed.get());
+        assertEquals(0, stops.get());
+    }
+
+    @Test
+    void executeStepControllerExceptionIsMcpErrorAndDoesNotStopTheWorker() throws Exception {
+        AtomicInteger stops = new AtomicInteger();
+        WorkbenchServices services = fakeServices((method, args) -> {
+            if ("executeStep".equals(method)) {
+                throw new IllegalStateException("Workbench live operations require a paused interactive worker.");
+            }
+            if ("stopWorker".equals(method) || "restartWorker".equals(method)) {
+                stops.incrementAndGet();
+                return null;
+            }
+            if ("close".equals(method)) return null;
+            return null;
+        });
+
+        WorkbenchMcpTools tools = new WorkbenchMcpTools(services, JSON);
+        var result = tools.specifications().stream()
+                .filter(spec -> "workbench_execute_step".equals(spec.tool().name()))
+                .findFirst()
+                .orElseThrow()
+                .callHandler()
+                .apply(null, new McpSchema.CallToolRequest(
+                        "workbench_execute_step",
+                        Map.of("text", "CONTROL API TEST STEP"),
+                        null
+                ));
+        assertTrue(Boolean.TRUE.equals(result.isError()));
+        String text = ((McpSchema.TextContent) result.content().getFirst()).text();
+        assertTrue(text.contains("paused interactive worker"));
+        assertEquals(0, stops.get());
+    }
+
+    @Test
     void diagnosticToolsDelegateToSharedServicesAndStaySparse() throws Exception {
         AtomicBoolean catalogCalled = new AtomicBoolean();
         WorkbenchServices services = fakeServices((method, args) -> {
@@ -204,6 +285,25 @@ class WorkbenchMcpServerTest {
 
     private static String resultText(JsonNode response) {
         return response.at("/result/content/0/text").asText();
+    }
+
+    private static ControlBridgeStatus pausedRuntime() {
+        return new ControlBridgeStatus(
+                ControlProtocol.CURRENT_VERSION,
+                "runtime",
+                42L,
+                1,
+                1L,
+                "scenario-1",
+                "Live",
+                ", verify \"left\" equals \"right\"",
+                null,
+                "AFTER_STEP",
+                "step-signature",
+                true,
+                false,
+                ControlProtocol.WORKER_CAPABILITIES
+        );
     }
 
     @FunctionalInterface

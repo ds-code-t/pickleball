@@ -117,6 +117,23 @@ class LivePlaybackCoordinatorTest {
     }
 
     @Test
+    void failedExecuteStepPausesOnTheFailedStepWithoutAdvancing() {
+        LivePlaybackCoordinator coordinator = new LivePlaybackCoordinator(new LiveScenarioPlayer(List.of(
+                "Given first",
+                "And second"
+        )));
+        LiveScenarioPlayer player = coordinator.player();
+        coordinator.playFromStart();
+        LiveScenarioPlayer.Line first = player.nextStep().orElseThrow();
+
+        coordinator.followExecutedStep(first.text(), false);
+
+        assertEquals(LiveScenarioPlayer.State.PAUSED, player.state());
+        assertEquals(first.id(), player.nextStep().orElseThrow().id());
+        assertEquals(first.id(), player.playheadId().orElseThrow());
+    }
+
+    @Test
     void isolatedStepOnlyDoesNotAdvanceThePlayhead() {
         LivePlaybackCoordinator coordinator = new LivePlaybackCoordinator(new LiveScenarioPlayer(List.of(
                 "Given first",
