@@ -55,9 +55,18 @@ public class PickleballGuidanceChecks {
             assertTrue(guide.contains("afterSequence"));
             assertTrue(guide.contains("docs/pickleball-workbench.md"));
             assertTrue(guide.contains("DiagnosticCli help"));
+            assertTrue(guide.contains("**Discover**"));
+            assertTrue(guide.contains("**Isolate / debug a known failing scenario**"));
+            assertTrue(guide.contains("Missing `workbench_*` tools is a reason to start Workbench MCP"));
+            assertTrue(guide.contains("not a reason to skip it"));
+            assertTrue(guide.contains("PickleballWorkbenchLauncher"));
+            assertTrue(guide.contains("does not auto-watch"));
+            assertTrue(guide.contains("pkb_parallel"));
             String chooser = guide.substring(0, guide.indexOf("Generated guidance lifecycle"));
             assertFalse(chooser.contains("attach.json"));
             assertFalse(chooser.contains("ui ."));
+            assertTrue(chooser.contains("This is not a skip of Workbench"));
+            assertTrue(chooser.contains("do not keep using `mvn test` for isolation/debug"));
     }
 
     @Test
@@ -203,11 +212,15 @@ public class PickleballGuidanceChecks {
             assertTrue(guide.contains("workbench_investigation_emit"));
             assertTrue(guide.contains("pkb_reportretention=failed"));
             assertTrue(guide.contains("Do not copy, modify, or execute files"));
+            assertTrue(guide.contains("Missing `workbench_*` tools is a reason to start Workbench MCP"));
+            assertTrue(guide.contains("PickleballWorkbenchLauncher"));
 
             String consumerProject = Files.readString(root.resolve("docs/consumer-project.md"));
             assertTrue(consumerProject.contains("keep console verbosity low"));
             assertTrue(consumerProject.contains("older Pickleball release whose exporter predates the manifest lifecycle"));
             assertTrue(consumerProject.contains("Version-matched reference snapshot"));
+            assertTrue(consumerProject.contains("discover which scenarios fail"));
+            assertTrue(consumerProject.contains("do not skip Workbench because MCP is disconnected"));
         } finally {
             deleteTree(root);
         }
