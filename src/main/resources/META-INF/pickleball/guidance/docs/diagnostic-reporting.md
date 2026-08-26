@@ -125,6 +125,8 @@ DiagnosticCli compare-fingerprints <left.pkbf> <right.pkbf> [output-json]
 DiagnosticCli rebuild <diagnostic-runs-root-or-run-root>
 ```
 
+`DiagnosticCli help`, `--help`, and `-h` print this same command list.
+
 Prefer `DiagnosticCli` over custom Maven-classpath/JShell workflows for routine comparison and recovery.
 
 `emit-investigation` writes a small human handoff under the consumer project:

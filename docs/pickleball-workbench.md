@@ -101,6 +101,12 @@ $workbenchJar = ".\pickleball-workbench\build\libs\pickleball-workbench-<version
 java -jar $workbenchJar sync ".\maven-consumer-project"
 ```
 
+Read the last synchronization manifest without invoking Maven/Gradle:
+
+```powershell
+java -jar $workbenchJar status ".\maven-consumer-project"
+```
+
 Synchronization uses the selected project wrapper to establish compiled output and the effective test runtime classpath. It keeps `-DskipTests` (Surefire never runs during sync). Input fingerprints of Java sources, resources, build files, and dependency artifacts decide how much of the wrapper to run:
 
 - **Skip** when those inputs match the last recorded input fingerprints and the live snapshot is present. The output `fingerprint` in `manifest.json` is provenance over merged classes plus dependency bytes; it is not the skip key.

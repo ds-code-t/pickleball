@@ -219,6 +219,8 @@ DiagnosticCli compare-fingerprints <left.pkbf> <right.pkbf> [output-json]
 DiagnosticCli rebuild <diagnostic-runs-root-or-run-root>
 ```
 
+`DiagnosticCli help`, `--help`, and `-h` print this same command list.
+
 Use `guidance` to print this guide and `export-guidance` to materialize the complete version-matched documentation plus curated Maven consumer reference. Prefer `DiagnosticCli` over constructing Maven classpaths and JShell scripts for routine diagnostic operations. `emit-investigation` writes `.pickleball/investigations/<id>/investigation.json` and `report.html` and prints the relative HTML path.
 
 ## Controlled diagnostic reruns
@@ -268,6 +270,7 @@ The exported `docs/` tree is the version-matched reference for all supported Pic
 - execution/configuration/profiles — `docs/configuration.md`, `docs/ai-run-configuration.md`;
 - resource/config mapping — `docs/config-files-and-resource-mapping.md`;
 - Cucumber compatibility — `docs/cucumber-compatibility.md`;
+- Workbench MCP tools, skip / resources-only sync, and the live worker — `docs/pickleball-workbench.md`;
 - diagnostics and lineage — `docs/diagnostic-reporting.md`, `docs/diagnostic-lineage-metadata.md`.
 
 Do not guess Pickleball syntax when the version-matched guide or executable consumer reference can answer it.

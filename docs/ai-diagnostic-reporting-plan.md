@@ -138,4 +138,6 @@ DiagnosticCli compare-fingerprints <left.pkbf> <right.pkbf> [output-json]
 DiagnosticCli rebuild <diagnostic-runs-root-or-run-root>
 ```
 
+`DiagnosticCli help`, `--help`, and `-h` print this same command list.
+
 See `docs/diagnostic-reporting.md` for evidence use, `docs/ai-run-configuration.md` for controlled execution, and `docs/diagnostic-lineage-metadata.md` for investigation metadata.
