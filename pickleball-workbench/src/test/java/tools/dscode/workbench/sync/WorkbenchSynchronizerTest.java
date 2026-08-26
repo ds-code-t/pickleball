@@ -7,6 +7,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -252,6 +253,92 @@ class WorkbenchSynchronizerTest {
         assertEquals(WorkbenchSyncMode.FULL.name(), second.syncMode());
         assertEquals(2, runner.invocations.size());
         assertTrue(runner.invocations.get(1).contains("test-compile"));
+    }
+
+    @Test
+    void refreshesResourcesWithoutTestCompileWhenOnlyConfigChanges() throws Exception {
+        MavenFixture fixture = MavenFixture.create(tempDir.resolve("config-consumer"));
+        Files.createDirectories(fixture.projectRoot.resolve("src/test/resources/configs"));
+        Files.writeString(
+                fixture.projectRoot.resolve("src/test/resources/configs/app.yaml"),
+                "url: first\n",
+                StandardCharsets.UTF_8
+        );
+        RecordingRunner runner = fixture.runner();
+        WorkbenchSynchronizer synchronizer = new WorkbenchSynchronizer(runner);
+        WorkbenchManifest first = synchronizer.sync(fixture.projectRoot);
+        assertEquals(WorkbenchSyncMode.FULL.name(), first.syncMode());
+
+        Files.writeString(
+                fixture.projectRoot.resolve("src/test/resources/configs/app.yaml"),
+                "url: second\n",
+                StandardCharsets.UTF_8
+        );
+        WorkbenchManifest second = synchronizer.sync(fixture.projectRoot);
+        assertEquals(WorkbenchSyncMode.RESOURCES_ONLY.name(), second.syncMode());
+        assertEquals(2, runner.invocations.size());
+        assertTrue(runner.invocations.get(1).contains("process-test-resources"));
+        assertFalse(runner.invocations.get(1).contains("test-compile"));
+        assertTrue(Files.exists(Path.of(second.liveOutput()).resolve("Runner.class")));
+    }
+
+    @Test
+    void refreshesResourcesWithoutTestCompileWhenOnlyDataChanges() throws Exception {
+        MavenFixture fixture = MavenFixture.create(tempDir.resolve("data-consumer"));
+        Files.createDirectories(fixture.projectRoot.resolve("src/test/resources/data"));
+        Files.writeString(
+                fixture.projectRoot.resolve("src/test/resources/data/sample.json"),
+                "{\"n\":1}\n",
+                StandardCharsets.UTF_8
+        );
+        RecordingRunner runner = fixture.runner();
+        WorkbenchSynchronizer synchronizer = new WorkbenchSynchronizer(runner);
+        WorkbenchManifest first = synchronizer.sync(fixture.projectRoot);
+        assertEquals(WorkbenchSyncMode.FULL.name(), first.syncMode());
+
+        Files.writeString(
+                fixture.projectRoot.resolve("src/test/resources/data/sample.json"),
+                "{\"n\":2}\n",
+                StandardCharsets.UTF_8
+        );
+        WorkbenchManifest second = synchronizer.sync(fixture.projectRoot);
+        assertEquals(WorkbenchSyncMode.RESOURCES_ONLY.name(), second.syncMode());
+        assertEquals(2, runner.invocations.size());
+        assertTrue(runner.invocations.get(1).contains("process-test-resources"));
+        assertFalse(runner.invocations.get(1).contains("test-compile"));
+    }
+
+    @Test
+    void escalatesResourcesOnlyToFullWhenCompiledOutputsAreMissing() throws Exception {
+        MavenFixture fixture = MavenFixture.create(tempDir.resolve("cleaned-consumer"));
+        RecordingRunner runner = fixture.runner();
+        WorkbenchSynchronizer synchronizer = new WorkbenchSynchronizer(runner);
+        WorkbenchManifest first = synchronizer.sync(fixture.projectRoot);
+        assertEquals(WorkbenchSyncMode.FULL.name(), first.syncMode());
+
+        Files.writeString(
+                fixture.projectRoot.resolve("src/test/resources/features/demo.feature"),
+                "Feature: cleaned\n",
+                StandardCharsets.UTF_8
+        );
+        Path testClasses = fixture.projectRoot.resolve("target/test-classes");
+        deleteTree(testClasses);
+        assertFalse(Files.isDirectory(testClasses));
+
+        WorkbenchManifest second = synchronizer.sync(fixture.projectRoot);
+        assertEquals(WorkbenchSyncMode.FULL.name(), second.syncMode());
+        assertEquals(2, runner.invocations.size());
+        assertTrue(runner.invocations.get(1).contains("test-compile"));
+        assertTrue(Files.exists(Path.of(second.liveOutput()).resolve("Runner.class")));
+    }
+
+    private static void deleteTree(Path root) throws Exception {
+        if (root == null || !Files.exists(root)) return;
+        try (var paths = Files.walk(root)) {
+            for (Path path : paths.sorted(Comparator.reverseOrder()).toList()) {
+                Files.deleteIfExists(path);
+            }
+        }
     }
 
     private static final class RecordingRunner implements WorkbenchSynchronizer.CommandRunner {

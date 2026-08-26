@@ -53,9 +53,68 @@ public class PickleballGuidanceChecks {
             assertTrue(guide.contains("does not end the worker"));
             assertTrue(guide.contains("is not an MCP"));
             assertTrue(guide.contains("afterSequence"));
+            assertTrue(guide.contains("docs/pickleball-workbench.md"));
+            assertTrue(guide.contains("DiagnosticCli help"));
             String chooser = guide.substring(0, guide.indexOf("Generated guidance lifecycle"));
             assertFalse(chooser.contains("attach.json"));
             assertFalse(chooser.contains("ui ."));
+    }
+
+    @Test
+    void diagnosticCliHelpListsCommandsAndUnknownCommandsFailClearly() {
+        ByteArrayOutputStream emptyOut = new ByteArrayOutputStream();
+        ByteArrayOutputStream emptyErr = new ByteArrayOutputStream();
+        assertEquals(2, DiagnosticCli.run(
+                new String[]{},
+                new PrintStream(emptyOut, true, StandardCharsets.UTF_8),
+                new PrintStream(emptyErr, true, StandardCharsets.UTF_8)
+        ));
+        assertEquals("", emptyOut.toString(StandardCharsets.UTF_8));
+        assertTrue(emptyErr.toString(StandardCharsets.UTF_8).contains("DiagnosticCli guidance"));
+
+        ByteArrayOutputStream helpOut = new ByteArrayOutputStream();
+        ByteArrayOutputStream helpErr = new ByteArrayOutputStream();
+        assertEquals(0, DiagnosticCli.run(
+                new String[]{"help"},
+                new PrintStream(helpOut, true, StandardCharsets.UTF_8),
+                new PrintStream(helpErr, true, StandardCharsets.UTF_8)
+        ));
+        String help = helpOut.toString(StandardCharsets.UTF_8);
+        assertEquals("", helpErr.toString(StandardCharsets.UTF_8));
+        assertTrue(help.contains("DiagnosticCli guidance"));
+        assertTrue(help.contains("DiagnosticCli export-guidance"));
+        assertTrue(help.contains("DiagnosticCli emit-investigation"));
+        assertTrue(help.contains("DiagnosticCli compare-runs"));
+        assertTrue(help.contains("DiagnosticCli compare-fingerprints"));
+        assertTrue(help.contains("DiagnosticCli rebuild"));
+
+        ByteArrayOutputStream dashedOut = new ByteArrayOutputStream();
+        assertEquals(0, DiagnosticCli.run(
+                new String[]{"--help"},
+                new PrintStream(dashedOut, true, StandardCharsets.UTF_8),
+                System.err
+        ));
+        assertEquals(help, dashedOut.toString(StandardCharsets.UTF_8));
+
+        ByteArrayOutputStream shortOut = new ByteArrayOutputStream();
+        assertEquals(0, DiagnosticCli.run(
+                new String[]{"-h"},
+                new PrintStream(shortOut, true, StandardCharsets.UTF_8),
+                System.err
+        ));
+        assertEquals(help, shortOut.toString(StandardCharsets.UTF_8));
+
+        ByteArrayOutputStream unknownOut = new ByteArrayOutputStream();
+        ByteArrayOutputStream unknownErr = new ByteArrayOutputStream();
+        assertEquals(2, DiagnosticCli.run(
+                new String[]{"not-a-command"},
+                new PrintStream(unknownOut, true, StandardCharsets.UTF_8),
+                new PrintStream(unknownErr, true, StandardCharsets.UTF_8)
+        ));
+        assertEquals("", unknownOut.toString(StandardCharsets.UTF_8));
+        String errors = unknownErr.toString(StandardCharsets.UTF_8);
+        assertTrue(errors.contains("Unknown diagnostic command: not-a-command"));
+        assertTrue(errors.contains("DiagnosticCli guidance"));
     }
 
     @Test

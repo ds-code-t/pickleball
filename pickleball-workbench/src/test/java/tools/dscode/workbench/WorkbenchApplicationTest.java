@@ -17,11 +17,35 @@ class WorkbenchApplicationTest {
 
         assertEquals(0, output.exitCode());
         assertTrue(output.stdout().contains("sync <project>"));
+        assertTrue(output.stdout().contains("status <project>"));
         assertTrue(output.stdout().contains("worker-check <project>"));
         assertTrue(output.stdout().contains("live-check <project>"));
         assertTrue(output.stdout().contains("mcp <project>"));
         assertTrue(output.stdout().contains("ui <project>"));
         assertEquals("", output.stderr());
+    }
+
+    @Test
+    void helpAliasesPrintTheSameCommandList() {
+        Output dashed = run("--help");
+        Output shortFlag = run("-h");
+        Output word = run("help");
+
+        assertEquals(0, shortFlag.exitCode());
+        assertEquals(0, word.exitCode());
+        assertEquals(dashed.stdout(), shortFlag.stdout());
+        assertEquals(dashed.stdout(), word.stdout());
+        assertEquals("", shortFlag.stderr());
+        assertEquals("", word.stderr());
+    }
+
+    @Test
+    void statusRequiresExactlyOneProject() {
+        Output output = run("status");
+
+        assertEquals(1, output.exitCode());
+        assertEquals("", output.stdout());
+        assertTrue(output.stderr().contains("Usage: pickleball-workbench status <project>"));
     }
 
     @Test
@@ -31,6 +55,20 @@ class WorkbenchApplicationTest {
         assertEquals(0, output.exitCode());
         assertEquals("Pickleball Workbench development" + System.lineSeparator(), output.stdout());
         assertEquals("", output.stderr());
+    }
+
+    @Test
+    void versionAliasesPrintTheSameVersion() {
+        Output dashed = run("--version");
+        Output shortFlag = run("-V");
+        Output word = run("version");
+
+        assertEquals(0, shortFlag.exitCode());
+        assertEquals(0, word.exitCode());
+        assertEquals(dashed.stdout(), shortFlag.stdout());
+        assertEquals(dashed.stdout(), word.stdout());
+        assertEquals("", shortFlag.stderr());
+        assertEquals("", word.stderr());
     }
 
     @Test
