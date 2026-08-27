@@ -140,8 +140,8 @@ public final class DiagnosticCli {
         out.println("pkb_runvars=" + plan.runVars());
         out.println();
         out.println("Browser: " + plan.browser().browser() + " (" + plan.browser().reason() + ").");
-        out.println("Multi-scenario Discover/Confirm use this high pkb_parallel. Isolate stays one paused scenario — do not parallelize isolate.");
-        out.println("The agent-facing entry is Pickleball Workbench (`hint` / `discover` / `isolate` / `confirm`), not a separate DiagnosticCli story. After Discover, isolate and confirm replay the retained pkb_run_profile through pkb_runvars. Never supply pkb_run_profile as input.");
+        out.println("Multi-scenario Discover/Confirm use this high pkb_parallel. Live isolate stays one paused scenario and is only for an already-running Workbench.");
+        out.println("The agent-facing entry is Pickleball Workbench (`hint` / `discover` / `confirm`), not a separate DiagnosticCli story. After Discover, confirm (and live isolate, if workbench_* is already in session) replay the retained pkb_run_profile through pkb_runvars. Never supply pkb_run_profile as input.");
         out.println();
         out.println("After Discover, read reports/diagnostic-runs/run-catalog.json, then only the relevant run-index.json / summary.json.");
         out.println("NEXT: run discover");
@@ -601,7 +601,7 @@ public final class DiagnosticCli {
         out.println("  DiagnosticCli compare-runs <left-run-index> <right-run-index> [output-json]");
         out.println("  DiagnosticCli compare-fingerprints <left.pkbf> <right.pkbf> [output-json]");
         out.println("  DiagnosticCli rebuild <diagnostic-runs-root-or-run-root>");
-        out.println("Agents should run export-guidance, hint, discover, isolate, and confirm through PickleballWorkbenchLauncher.");
+        out.println("Agents should run export-guidance, hint, discover, and confirm through PickleballWorkbenchLauncher. Live isolate only if workbench_* tools are already in the session.");
     }
 
     private record GitLayout(Path repositoryRoot, Path gitDirectory, Path commonGitDirectory) {

@@ -56,10 +56,9 @@ public class PickleballGuidanceChecks {
             assertTrue(guide.contains("docs/pickleball-workbench.md"));
             assertTrue(guide.contains("DiagnosticCli help"));
             assertTrue(guide.contains("**Discover**"));
-            assertTrue(guide.contains("**Isolate**"));
             assertTrue(guide.contains("**Confirm**"));
             assertTrue(guide.contains("Do not register IDE MCP"));
-            assertTrue(guide.contains("tell the human"));
+            assertTrue(guide.contains("already in this session") || guide.contains("already present"));
             assertTrue(guide.contains("run-catalog.json"));
             assertTrue(guide.contains("PickleballWorkbenchLauncher"));
             assertTrue(guide.contains("does not auto-watch") || guide.contains("workbench_sync"));
@@ -78,12 +77,18 @@ public class PickleballGuidanceChecks {
                     guide.indexOf("### Live isolation loop")
             );
             assertTrue(chooserList.contains("discover"));
-            assertTrue(chooserList.contains("isolate"));
             assertTrue(chooserList.contains("confirm"));
             assertTrue(chooserList.contains("run-catalog.json"));
             assertTrue(chooserList.contains("Do not start a live worker to run the whole suite")
                     || chooserList.contains("Do not start a live worker"));
             assertTrue(chooserList.contains("pkb_run_profile"));
+            assertTrue(chooserList.contains("-Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher"));
+            assertTrue(chooserList.contains("-Dexec.args=discover"));
+            assertTrue(chooserList.contains("change") && chooserList.contains("exec.args"));
+            assertFalse(chooserList.contains("-Dexec.args=isolate"));
+            assertFalse(chooserList.contains("PickleballWorkbenchLauncher isolate"));
+            assertFalse(chooserList.contains("**Isolate**"));
+            assertTrue(chooserList.contains("already") && chooserList.contains("workbench_*"));
             assertFalse(chooserList.contains("Access probe"));
             assertFalse(chooserList.contains("CLI/Maven-primary"));
             assertTrue(guide.contains("Maintainer-only: pointer-eval harness"));
@@ -94,8 +99,14 @@ public class PickleballGuidanceChecks {
             );
             assertTrue(liveLoop.contains("isolate"));
             assertTrue(liveLoop.contains("workbench_*") || liveLoop.contains("workbench_sync"));
+            assertTrue(liveLoop.contains("already"));
             assertTrue(liveLoop.contains("optional host wiring") || chooser.contains("optional host wiring"));
-    }
+            assertFalse(liveLoop.contains("Prefer Workbench CLI `isolate`"));
+            String maintainer = guide.substring(guide.indexOf("## Maintainer-only: pointer-eval harness"));
+            assertTrue(maintainer.contains("@agent-pointer-eval"));
+            assertTrue(guide.indexOf("## Maintainer-only: pointer-eval harness")
+                    > guide.indexOf("## When the core Pickleball repository is also present"));
+        }
 
     @Test
     void diagnosticCliHelpListsCommandsAndUnknownCommandsFailClearly() {
@@ -277,11 +288,13 @@ public class PickleballGuidanceChecks {
             assertTrue(guide.contains("workbench_investigation_emit"));
             assertTrue(guide.contains("pkb_reportretention=failed"));
             assertTrue(guide.contains("Do not copy, modify, or execute files"));
-            assertTrue(guide.contains("tell the human"));
+            assertTrue(guide.contains("already in this session") || guide.contains("already present"));
             assertTrue(guide.contains("one front door"));
             assertTrue(guide.contains("PickleballWorkbenchLauncher"));
             assertTrue(guide.contains("Maintainer-only: pointer-eval harness"));
             assertTrue(guide.contains("@agent-pointer-eval"));
+            assertTrue(guide.contains("-Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher"));
+            assertFalse(guide.contains("PickleballWorkbenchLauncher isolate"));
 
             String consumerProject = Files.readString(root.resolve("docs/consumer-project.md"));
             assertTrue(consumerProject.contains("keep console verbosity low"));

@@ -1,17 +1,24 @@
 package tools.dscode.workbench;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.io.TempDir;
+import tools.dscode.control.protocol.ControlProtocol;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class WorkbenchApplicationTest {
+    @TempDir
+    Path tempDir;
 
     @Test
     void helpListsSynchronizationWorkerLiveMcpAndUiCommands() {
@@ -93,6 +100,55 @@ class WorkbenchApplicationTest {
 
         assertEquals(1, output.exitCode());
         assertTrue(output.stderr().contains("Usage: pickleball-workbench isolate <project>"));
+    }
+
+    @Test
+    @Timeout(value = 5, unit = TimeUnit.SECONDS)
+    void isolateWithoutInteractiveTtyDoesNotHangAndPointsToConfirm() throws Exception {
+        Path snapshot = tempDir.resolve(ControlProtocol.LAST_DISCOVER_SNAPSHOT_RELATIVE);
+        Files.createDirectories(snapshot.getParent());
+        Files.writeString(snapshot, """
+                {
+                  "schemaVersion": 1,
+                  "source": "workbench-discover",
+                  "runId": "run-1",
+                  "runProfile": "pkb_browser=CHROME_HEADLESS, pkb_parallel=4, pkb_reportingmode=diagnostic",
+                  "runVars": {
+                    "pkb_browser": "CHROME_HEADLESS",
+                    "pkb_parallel": "4",
+                    "pkb_reportingmode": "diagnostic"
+                  }
+                }
+                """);
+
+        ByteArrayOutputStream stdout = new ByteArrayOutputStream();
+        ByteArrayOutputStream stderr = new ByteArrayOutputStream();
+        int exitCode;
+        try (PrintStream out = new PrintStream(stdout, true, StandardCharsets.UTF_8);
+             PrintStream err = new PrintStream(stderr, true, StandardCharsets.UTF_8)) {
+            exitCode = WorkbenchApplication.isolate(
+                    new String[]{"isolate", tempDir.toString(), "--tags=@failing"},
+                    out,
+                    err,
+                    false
+            );
+        }
+        Output output = new Output(
+                exitCode,
+                stdout.toString(StandardCharsets.UTF_8),
+                stderr.toString(StandardCharsets.UTF_8)
+        );
+
+        assertEquals(2, output.exitCode());
+        assertTrue(output.stderr().contains("already-running Workbench"));
+        assertTrue(output.stderr().contains("pre-attached workbench_*")
+                || output.stderr().contains("workbench_*"));
+        assertTrue(output.stderr().contains("confirm") || output.stdout().contains("confirm"));
+        assertTrue(output.stdout().contains("NEXT: confirm"));
+        assertFalse(output.stdout().contains("NEXT: execute_step"));
+        assertFalse(output.stderr().contains("NEXT: execute_step"));
+        assertFalse(output.stdout().contains("Workbench isolate worker:"));
+        assertFalse(output.stderr().toLowerCase().contains("intellij"));
     }
 
     @Test

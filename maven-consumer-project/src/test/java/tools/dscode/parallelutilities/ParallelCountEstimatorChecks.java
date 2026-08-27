@@ -2,6 +2,9 @@ package tools.dscode.parallelutilities;
 
 import org.junit.jupiter.api.Test;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -48,10 +51,34 @@ public final class ParallelCountEstimatorChecks {
     @Test
     void recommendedDiscoverRunVarsIncludeEstimatedParallel() {
         String runVars = ParallelCountEstimator.recommendedDiscoverRunVars();
-        assertTrue(runVars.contains("pkb_browser=CHROME_HEADLESS"));
+        assertTrue(runVars.contains("pkb_browser="));
         assertTrue(runVars.contains("pkb_parallel=" + ParallelCountEstimator.estimate()));
         assertTrue(runVars.contains("pkb_reportingmode=diagnostic"));
         assertFalse(runVars.contains("pkb_parallel=80"));
         assertFalse(runVars.contains("pkb_parallel=auto"));
+    }
+
+    @Test
+    void recommendedDiscoverRunVarsUseBrowserLadder() throws Exception {
+        Path project = Files.createTempDirectory("pkb-discover-runvars-");
+        try {
+            Path resources = project.resolve("src/test/resources");
+            Files.createDirectories(resources);
+            Files.writeString(resources.resolve("pickleball.properties"), "pkb_browser=GRID_EDGE\n");
+            String runVars = ParallelCountEstimator.recommendedDiscoverRunVars(project);
+            assertTrue(runVars.contains("pkb_browser=GRID_EDGE"));
+            assertFalse(runVars.contains("pkb_browser=CHROME_HEADLESS"));
+        } finally {
+            deleteTree(project);
+        }
+    }
+
+    private static void deleteTree(Path root) throws Exception {
+        if (root == null || !Files.exists(root)) return;
+        try (var paths = Files.walk(root)) {
+            for (Path path : paths.sorted((a, b) -> b.compareTo(a)).toList()) {
+                Files.deleteIfExists(path);
+            }
+        }
     }
 }
