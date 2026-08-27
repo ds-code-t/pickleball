@@ -437,6 +437,5 @@ public final class WorkbenchApplication {
         out.println("live-check exercises raw Gherkin, Step Override, and live runtime operations on one persistent worker.");
         out.println("mcp serves the same Workbench services over protocol-only stdio; diagnostics use stderr/log files.");
         out.println("ui opens the thin Swing Workbench over the same controller services and writes a localhost agent-attach endpoint to .pickleball/workbench/attach.json.");
-        out.println("ui opens the thin Swing Workbench over the same controller services.");
     }
 }

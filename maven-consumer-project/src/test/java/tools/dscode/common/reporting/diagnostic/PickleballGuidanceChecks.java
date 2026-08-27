@@ -66,7 +66,19 @@ public class PickleballGuidanceChecks {
             assertFalse(chooser.contains("attach.json"));
             assertFalse(chooser.contains("ui ."));
             assertTrue(chooser.contains("This is not a skip of Workbench"));
-            assertTrue(chooser.contains("do not keep using `mvn test` for isolation/debug"));
+            assertTrue(chooser.contains("Do not keep using `mvn test` for isolation/debug"));
+            String chooserList = guide.substring(
+                    guide.indexOf("## Tool chooser"),
+                    guide.indexOf("### Live isolation loop")
+            );
+            assertFalse(chooserList.contains("classpathScope"));
+            assertTrue(chooserList.contains("after discovery has named the trouble spots"));
+            String liveLoop = guide.substring(
+                    guide.indexOf("### Live isolation loop"),
+                    guide.indexOf("Generated guidance lifecycle")
+            );
+            assertTrue(liveLoop.contains("PickleballWorkbenchLauncher"));
+            assertTrue(liveLoop.contains("classpathScope=test"));
     }
 
     @Test

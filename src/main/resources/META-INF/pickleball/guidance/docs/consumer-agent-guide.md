@@ -9,7 +9,7 @@ A consumer project may contain only a short `AGENTS.md` bridge. That bridge can 
 Use this order. Consumer AI agents for this Pickleball release use headless Workbench MCP (`mcp .`) to isolate a known failure. Do not start the Workbench GUI.
 
 1. **Discover** — when you do not yet know which scenarios fail, or you need many/parallel scenarios: run one diagnostic `mvn test` with `pkb_runvars` (`pkb_reportingmode=diagnostic`, `pkb_loglevel=warn`, `pkb_reportretention=failed`, the narrowest useful `pkb_tags`/`pkb_name`, and `pkb_parallel` when the project supports it). This is not a skip of Workbench; it is how you find failures. Do not start Workbench just to run the whole suite.
-2. **Isolate / debug a known failing scenario** — use live headless Workbench MCP. If `workbench_*` MCP tools are not available in this session, start headless Workbench MCP first (`mcp .` via the documented Maven exec of `tools.dscode.launcher.PickleballWorkbenchLauncher`, `classpathScope=test`, args `mcp .`) and treat that as a required setup step — do not keep using `mvn test` for isolation/debug merely because MCP is disconnected. Prefer the IDE launching that command as an MCP stdio server (Copilot/Cursor MCP config) over a throwaway terminal you then ignore; stdio MCP only becomes tools if the IDE owns the process. After it is up: `workbench_sync` once, `workbench_worker_start`, `workbench_request_control`, then `workbench_execute_step` / `workbench_player_replace_document` / inspect.
+2. **Isolate / debug a known failing scenario** — after discovery has named the trouble spots, use live headless Workbench MCP (`mcp .`) on those scenarios. If `workbench_*` tools are missing, start that stdio server as an IDE-owned MCP process (not a throwaway terminal, not the GUI). Do not keep using `mvn test` for isolation/debug merely because MCP is disconnected. Follow the live isolation loop below.
 3. **Confirm after isolation** — one bounded diagnostic `mvn test` with the existing AI defaults (`pkb_reportingmode=diagnostic`, `pkb_loglevel=warn`, `pkb_reportretention=failed`, narrowest useful `pkb_tags`/`pkb_name`).
 4. **Emit the human handoff, then edit real consumer source** — write `.pickleball/investigations/<id>/` then in chat print only `.pickleball/investigations/<id>/report.html`. Change the project's own features/Java only after the live buffer is right. Explicit Save is what writes a `.feature` file.
 
@@ -21,7 +21,7 @@ Do not copy consumer features into `.pickleball` as a sandbox.
 
 From the consumer project, with Pickleball on the test classpath:
 
-1. If `workbench_*` tools are not already in this session, start the launcher with `mcp .` (not a GUI command). Prefer the IDE owning that process as an MCP stdio server.
+1. If `workbench_*` tools are not already in this session, start the launcher with `mcp .` via the documented Maven exec of `tools.dscode.launcher.PickleballWorkbenchLauncher`, `classpathScope=test`, args `mcp .` (not a GUI command). Prefer the IDE owning that process as an MCP stdio server; stdio MCP only becomes tools if the IDE owns the process.
 2. Call `workbench_sync` once. The agent must call it; Workbench does not auto-watch. Full compile when there is no live classpath or when Java/`pom`/dependencies changed; resources-only for feature/config/data; skip when unchanged. Live buffer edits need no sync.
 3. `workbench_worker_start` — reuse the compiled live classpath; do not rebuild to start a worker.
 4. `workbench_request_control`
