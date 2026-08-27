@@ -57,8 +57,12 @@ public class PickleballGuidanceChecks {
             assertTrue(guide.contains("DiagnosticCli help"));
             assertTrue(guide.contains("**Discover**"));
             assertTrue(guide.contains("**Isolate / debug a known failing scenario**"));
-            assertTrue(guide.contains("Missing `workbench_*` tools is a reason to start Workbench MCP"));
-            assertTrue(guide.contains("not a reason to skip it"));
+            assertTrue(guide.contains("Access probe"));
+            assertTrue(guide.contains("CLI/Maven-primary"));
+            assertTrue(guide.contains("self-register"));
+            assertTrue(guide.contains("IDE-owned stdio"));
+            assertTrue(guide.contains("tell the human"));
+            assertTrue(guide.contains("run-catalog.json"));
             assertTrue(guide.contains("PickleballWorkbenchLauncher"));
             assertTrue(guide.contains("does not auto-watch"));
             assertTrue(guide.contains("pkb_parallel"));
@@ -72,21 +76,16 @@ public class PickleballGuidanceChecks {
                     guide.indexOf("### Live isolation loop")
             );
             assertFalse(chooserList.contains("classpathScope"));
-            assertTrue(
-                    chooserList.contains("Do not `workbench_worker_start` yet")
-                            || chooserList.contains("Do not start a worker yet")
-            );
-            assertTrue(
-                    chooserList.contains("run-catalog.json")
-                            || chooserList.contains("workbench_diagnostic_catalog")
-            );
+            assertTrue(chooserList.contains("run-catalog.json"));
             assertTrue(chooserList.contains("after discovery has named the trouble spots"));
+            assertTrue(chooserList.contains("Do not start a worker just to run the whole suite"));
             String liveLoop = guide.substring(
                     guide.indexOf("### Live isolation loop"),
                     guide.indexOf("Generated guidance lifecycle")
             );
             assertTrue(liveLoop.contains("PickleballWorkbenchLauncher"));
             assertTrue(liveLoop.contains("classpathScope=test"));
+            assertTrue(liveLoop.contains("optional host wiring"));
     }
 
     @Test
@@ -112,6 +111,7 @@ public class PickleballGuidanceChecks {
         assertEquals("", helpErr.toString(StandardCharsets.UTF_8));
         assertTrue(help.contains("DiagnosticCli guidance"));
         assertTrue(help.contains("DiagnosticCli export-guidance"));
+        assertTrue(help.contains("DiagnosticCli discover-hint"));
         assertTrue(help.contains("DiagnosticCli emit-investigation"));
         assertTrue(help.contains("DiagnosticCli compare-runs"));
         assertTrue(help.contains("DiagnosticCli compare-fingerprints"));
@@ -147,16 +147,41 @@ public class PickleballGuidanceChecks {
     }
 
     @Test
+    void discoverHintPrintsDiagnosticMvnTestAndRunCatalogNext() {
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        ByteArrayOutputStream errors = new ByteArrayOutputStream();
+        assertEquals(0, DiagnosticCli.run(
+                new String[]{"discover-hint"},
+                new PrintStream(output, true, StandardCharsets.UTF_8),
+                new PrintStream(errors, true, StandardCharsets.UTF_8)
+        ));
+        assertEquals("", errors.toString(StandardCharsets.UTF_8));
+        String text = output.toString(StandardCharsets.UTF_8);
+        assertTrue(text.contains("mvn test"));
+        assertTrue(text.contains("pkb_runvars"));
+        assertTrue(text.contains("pkb_reportingmode=diagnostic"));
+        assertTrue(text.contains("pkb_parallel"));
+        assertTrue(text.contains("reports/diagnostic-runs/run-catalog.json"));
+        assertTrue(text.contains("NEXT: run the diagnostic mvn test above, then open run-catalog.json"));
+        assertFalse(text.toLowerCase().contains("mcp"));
+    }
+
+    @Test
     void dependencyExportsVersionMatchedGuidanceAndManifest() throws Exception {
         Path root = Files.createTempDirectory("pickleball-guidance");
         try {
+            ByteArrayOutputStream exportOut = new ByteArrayOutputStream();
             int status = DiagnosticCli.run(
                     new String[]{"export-guidance", root.toString()},
-                    System.out,
+                    new PrintStream(exportOut, true, StandardCharsets.UTF_8),
                     System.err
             );
 
             assertEquals(0, status);
+            String exportText = exportOut.toString(StandardCharsets.UTF_8);
+            assertTrue(exportText.contains("NEXT: follow AGENT-GUIDE Discover"));
+            assertTrue(exportText.contains("run-catalog.json"));
+            assertFalse(exportText.contains("mcp ."));
             assertTrue(Files.isRegularFile(root.resolve("AGENT-GUIDE.md")));
             assertTrue(Files.isRegularFile(root.resolve("GUIDANCE-MANIFEST.json")));
             assertTrue(Files.isRegularFile(root.resolve("docs/README.md")));
@@ -232,7 +257,8 @@ public class PickleballGuidanceChecks {
             assertTrue(guide.contains("workbench_investigation_emit"));
             assertTrue(guide.contains("pkb_reportretention=failed"));
             assertTrue(guide.contains("Do not copy, modify, or execute files"));
-            assertTrue(guide.contains("Missing `workbench_*` tools is a reason to start Workbench MCP"));
+            assertTrue(guide.contains("tell the human"));
+            assertTrue(guide.contains("CLI/Maven-primary"));
             assertTrue(guide.contains("PickleballWorkbenchLauncher"));
 
             String consumerProject = Files.readString(root.resolve("docs/consumer-project.md"));
@@ -240,7 +266,7 @@ public class PickleballGuidanceChecks {
             assertTrue(consumerProject.contains("older Pickleball release whose exporter predates the manifest lifecycle"));
             assertTrue(consumerProject.contains("Version-matched reference snapshot"));
             assertTrue(consumerProject.contains("discover which scenarios fail"));
-            assertTrue(consumerProject.contains("do not skip Workbench because MCP is disconnected"));
+            assertTrue(consumerProject.contains("do not self-register IDE MCP"));
         } finally {
             deleteTree(root);
         }

@@ -60,6 +60,7 @@ public final class DiagnosticCli {
             return switch (args[0]) {
                 case "guidance" -> guidance(args, out);
                 case "export-guidance" -> exportGuidance(args, out, err);
+                case "discover-hint" -> discoverHint(args, out);
                 case "emit-investigation" -> emitInvestigation(args, out, in);
                 case "compare-runs" -> compareRuns(args, out);
                 case "compare-fingerprints" -> compareFingerprints(args, out);
@@ -125,6 +126,17 @@ public final class DiagnosticCli {
         out.println("Pickleball version: " + version);
         out.println("Manifest: " + root.resolve(GUIDANCE_MANIFEST));
         out.println("Read " + root.resolve(AGENT_GUIDE));
+        out.println("NEXT: follow AGENT-GUIDE Discover — run a diagnostic mvn test, then open run-catalog.json");
+        return 0;
+    }
+
+    private static int discoverHint(String[] args, PrintStream out) {
+        requireLength(args, 1, 1, "discover-hint");
+        out.println("Recommended diagnostic Discover command (`pkb_runvars`; parallel is OK when the project supports it):");
+        out.println("mvn test -Dpkb_runvars=\"pkb_browser=CHROME_HEADLESS, pkb_reportingmode=diagnostic, pkb_loglevel=warn, pkb_reportretention=failed, pkb_parallel=80\"");
+        out.println();
+        out.println("After the run, read reports/diagnostic-runs/run-catalog.json, then only the relevant run-index.json / summary.json.");
+        out.println("NEXT: run the diagnostic mvn test above, then open run-catalog.json");
         return 0;
     }
 
@@ -575,6 +587,7 @@ public final class DiagnosticCli {
         out.println("Pickleball diagnostic utility");
         out.println("  DiagnosticCli guidance");
         out.println("  DiagnosticCli export-guidance [output-directory]");
+        out.println("  DiagnosticCli discover-hint");
         out.println("  DiagnosticCli emit-investigation <investigation-json-or--> <consumer-project-root>");
         out.println("  DiagnosticCli compare-runs <left-run-index> <right-run-index> [output-json]");
         out.println("  DiagnosticCli compare-fingerprints <left.pkbf> <right.pkbf> [output-json]");

@@ -26,7 +26,7 @@ Rerun export before Pickleball work even when `.pickleball` already exists. A su
 
 Compatibility note: an older Pickleball release whose exporter predates the manifest lifecycle may leave newer files or a newer manifest behind after a downgrade. Those leftovers are not authoritative for the downgraded dependency; prefer the dependency actually resolved on the test classpath and the files freshly exported by that dependency.
 
-AI agents should read `.pickleball/AGENT-GUIDE.md` first after a successful export. When `workbench_*` tools are missing, start idle headless Workbench MCP (`mcp .`) without starting a worker, then discover which scenarios fail with a diagnostic `mvn test`. That guide's tool chooser is the agent path: one diagnostic `mvn test` to discover which scenarios fail when that is still unknown; live headless Workbench MCP (`mcp .`) to isolate a known failure (start the stdio server if `workbench_*` tools are missing; do not skip Workbench because MCP is disconnected); one bounded diagnostic confirmation; then edits to the real consumer source. Do not treat `.pickleball/maven-consumer-project/` as the project under test, and do not dump `docs/README.md` or the whole snapshot into first-read context. Human readers can start with `.pickleball/docs/README.md`; links from those guides to `maven-consumer-project` resolve to the exported version-matched reference files.
+AI agents should read `.pickleball/AGENT-GUIDE.md` first after a successful export. Agents discover which scenarios fail with a diagnostic `mvn test`; MCP is optional if already connected, and agents do not self-register IDE MCP. That guide's tool chooser is the agent path: one diagnostic `mvn test` to discover which scenarios fail when that is still unknown; live Workbench only when `workbench_*` tools are already available or a Workbench CLI session exists; one bounded diagnostic confirmation; then edits to the real consumer source. Do not treat `.pickleball/maven-consumer-project/` as the project under test, and do not dump `docs/README.md` or the whole snapshot into first-read context. Human readers can start with `.pickleball/docs/README.md`; links from those guides to `maven-consumer-project` resolve to the exported version-matched reference files.
 
 ## Version-matched reference snapshot
 
@@ -77,7 +77,7 @@ or use the included wrappers:
 
 ## Launch the dependency-matched Workbench
 
-The test-scoped Pickleball dependency already contains its controller-only Workbench payload. Consumer AI agents start the **headless MCP** launcher from the resolved test classpath:
+The test-scoped Pickleball dependency already contains its controller-only Workbench payload. Hosts that already run Workbench MCP can launch it from the resolved test classpath:
 
 ```bash
 ./mvnw -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java \
@@ -233,6 +233,7 @@ Do not recursively ingest an entire run.
 ### Diagnostic CLI
 
 ```text
+DiagnosticCli discover-hint
 DiagnosticCli compare-runs <left-run-index> <right-run-index> [output-json]
 DiagnosticCli compare-fingerprints <left.pkbf> <right.pkbf> [output-json]
 DiagnosticCli emit-investigation <investigation-json-or--> <consumer-project-root>

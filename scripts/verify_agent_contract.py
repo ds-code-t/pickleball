@@ -313,9 +313,12 @@ def validate_consumer_bridge(errors: list[str]) -> None:
                     f"Consumer guidance bridge one-liner must reference {required}: {relative}"
                 )
 
+        if "mcp ." not in text and "workbench_" not in text:
+            errors.append(
+                "Consumer guidance bridge must mention MCP (`mcp .`) or Workbench tools "
+                "(`workbench_`): " + relative
+            )
         for required in (
-            "mcp .",
-            "workbench_",
             "mvn test",
             "diagnostic",
         ):
@@ -328,8 +331,7 @@ def validate_consumer_bridge(errors: list[str]) -> None:
         lowered = text.lower()
         if "do not skip workbench" not in lowered:
             errors.append(
-                "Consumer guidance bridge must say not to skip Workbench when MCP is disconnected: "
-                + relative
+                "Consumer guidance bridge must say not to skip Workbench: " + relative
             )
         if "do not start the gui" not in lowered:
             errors.append(

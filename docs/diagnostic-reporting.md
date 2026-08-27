@@ -119,6 +119,7 @@ Supported command-line operations:
 ```text
 DiagnosticCli guidance
 DiagnosticCli export-guidance [output-directory]
+DiagnosticCli discover-hint
 DiagnosticCli emit-investigation <investigation-json-or--> <consumer-project-root>
 DiagnosticCli compare-runs <left-run-index> <right-run-index> [output-json]
 DiagnosticCli compare-fingerprints <left.pkbf> <right.pkbf> [output-json]

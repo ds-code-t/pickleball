@@ -6,24 +6,30 @@ A consumer project may contain only a short `AGENTS.md` bridge. That bridge can 
 
 ## Tool chooser
 
-If `workbench_*` tools are not already in this session, start headless Workbench MCP (`mcp .`) as an IDE-owned stdio server. Do not start the GUI. Do not `workbench_worker_start` yet. An idle MCP server is enough for sparse diagnostic reads.
+### Access probe
 
-Use this order. Consumer AI agents for this Pickleball release use headless Workbench MCP (`mcp .`) to isolate a known failure. Do not start the Workbench GUI.
+Prefer shell and Maven. This path is CLI/Maven-primary. Do not configure or self-register IDE MCP. Do not start an IDE-owned stdio server.
 
-1. **Discover** — when you do not yet know which scenarios fail, or you need many/parallel scenarios: run one diagnostic `mvn test` with `pkb_runvars` (`pkb_reportingmode=diagnostic`, `pkb_loglevel=warn`, `pkb_reportretention=failed`, the narrowest useful `pkb_tags`/`pkb_name`, and `pkb_parallel` when the project supports it). This is not a skip of Workbench; it is how you find failures. Do not start a worker just to run the whole suite. After the run, if `workbench_*` tools are connected, read the pack with `workbench_diagnostic_catalog`, `workbench_diagnostic_run`, and `workbench_diagnostic_summary`; otherwise open `run-catalog.json`, then only the relevant `run-index.json` / `summary.json`. Do not ingest `events.jsonl` or screenshots to find which scenarios failed. Do not `workbench_worker_start` to read the catalog.
-2. **Isolate / debug a known failing scenario** — after discovery has named the trouble spots, use live headless Workbench MCP (`mcp .`) on those scenarios. If `workbench_*` tools are missing, start that stdio server as an IDE-owned MCP process (not a throwaway terminal, not the GUI). Do not keep using `mvn test` for isolation/debug merely because MCP is disconnected. Follow the live isolation loop below.
+If `workbench_*` tools are already present in this session, you may use them as an optional alias for the same live isolation loop. If they are absent, do not try to make the IDE own a stdio process. Continue with Discover using `mvn test` and the diagnostic JSON files. For Isolate, follow CLI/Workbench steps in the live loop when a Workbench session already exists; otherwise stop and tell the human that live isolate needs either pre-wired `workbench_*` MCP tools or a Workbench CLI session. Do not silently use `mvn test` as isolate/debug.
+
+Use this order. Consumer AI agents for this Pickleball release discover failures with diagnostic `mvn test`. Live Workbench MCP is an optional alias when `workbench_*` tools are already connected. Do not start the Workbench GUI.
+
+1. **Discover** — when you do not yet know which scenarios fail, or you need many/parallel scenarios: run one diagnostic `mvn test` with `pkb_runvars` (`pkb_reportingmode=diagnostic`, `pkb_loglevel=warn`, `pkb_reportretention=failed`, the narrowest useful `pkb_tags`/`pkb_name`, and `pkb_parallel` when the project supports it). This is not a skip of Workbench; it is how you find failures. Do not start a worker just to run the whole suite. After the run, open `run-catalog.json`, then only the relevant `run-index.json` / `summary.json`. If `workbench_*` tools already exist, you may instead read the pack with `workbench_diagnostic_catalog`, `workbench_diagnostic_run`, and `workbench_diagnostic_summary`. Do not ingest `events.jsonl` or screenshots to find which scenarios failed. Do not `workbench_worker_start` to read the catalog.
+2. **Isolate / debug a known failing scenario** — after discovery has named the trouble spots, isolate those scenarios with live Workbench. If `workbench_*` tools are already present, use the live MCP loop below. If they are absent, do not invent IDE MCP and do not start an IDE-owned stdio server. Stop and tell the human that live isolate needs either pre-wired `workbench_*` MCP tools or a Workbench CLI session. Do not keep using `mvn test` for isolation/debug.
 3. **Confirm after isolation** — one bounded diagnostic `mvn test` with the existing AI defaults (`pkb_reportingmode=diagnostic`, `pkb_loglevel=warn`, `pkb_reportretention=failed`, narrowest useful `pkb_tags`/`pkb_name`).
 4. **Emit the human handoff, then edit real consumer source** — write `.pickleball/investigations/<id>/` then in chat print only `.pickleball/investigations/<id>/report.html`. Change the project's own features/Java only after the live buffer is right. Explicit Save is what writes a `.feature` file.
 
-Missing `workbench_*` tools is a reason to start Workbench MCP, not a reason to skip it. A multi-scenario diagnostic test is a reason to run `mvn test` first, not a reason to skip Workbench afterward.
+Discover must work with zero MCP. Missing `workbench_*` tools is not a reason to skip Discover, and it is not a reason to self-register IDE MCP. A multi-scenario diagnostic test is a reason to run `mvn test` first; do not start a worker to run the whole suite.
 
 Do not copy consumer features into `.pickleball` as a sandbox.
 
 ### Live isolation loop
 
+This loop isolates a **known** failing scenario after Discover. Hosts that already run Workbench MCP may wire `tools.dscode.launcher.PickleballWorkbenchLauncher` with `classpathScope=test` and args `mcp .` (not a GUI command). That is optional host wiring, not an agent setup step. Agents must not configure, self-register, or start an IDE-owned stdio MCP process.
+
 From the consumer project, with Pickleball on the test classpath:
 
-1. If `workbench_*` tools are not already in this session, start the launcher with `mcp .` via the documented Maven exec of `tools.dscode.launcher.PickleballWorkbenchLauncher`, `classpathScope=test`, args `mcp .` (not a GUI command). Prefer the IDE owning that process as an MCP stdio server; stdio MCP only becomes tools if the IDE owns the process. If MCP is already connected from setup, skip to `workbench_sync` / `workbench_worker_start`.
+1. If `workbench_*` tools are already in this session, continue with `workbench_sync` / `workbench_worker_start`. If they are absent, do not invent IDE MCP. Stop and tell the human that live isolate needs either pre-wired `workbench_*` MCP tools or a Workbench CLI session.
 2. Call `workbench_sync` once. The agent must call it; Workbench does not auto-watch. Full compile when there is no live classpath or when Java/`pom`/dependencies changed; resources-only for feature/config/data; skip when unchanged. Live buffer edits need no sync.
 3. `workbench_worker_start` — reuse the compiled live classpath; do not rebuild to start a worker.
 4. `workbench_request_control`
@@ -48,7 +54,7 @@ Worker restart without rebuild already exists (`workbench_worker_restart`). Step
 Keep first-read small. After a successful export:
 
 1. Follow the consumer project's own instructions first; they remain authoritative for project-specific behavior.
-2. Stay in this guide's tool chooser: start idle headless Workbench MCP (`mcp .`) when `workbench_*` tools are missing (no worker yet), then discover with a diagnostic `mvn test` when the failing scenario is unknown or isolate a known failure with the live MCP loop.
+2. Stay in this guide's tool chooser: Discover with a diagnostic `mvn test` when the failing scenario is unknown (zero MCP is enough). Isolate a known failure with already-connected `workbench_*` tools or a Workbench CLI session; do not self-register IDE MCP.
 3. Inspect the **real** consumer `pom.xml`, Pickleball runner subclass, features, configuration, data, mappings, and test support before changing them.
 4. Open a specific exported guide only when that topic is needed, for example `docs/dynamic-steps.md`, `docs/diagnostic-reporting.md`, `docs/configuration.md`, or `docs/ai-run-configuration.md`.
 5. Do not assume the Pickleball core source repository is present. A normal consumer may only have the Maven dependency.
@@ -217,6 +223,7 @@ From a Maven consumer where Pickleball is on the test classpath:
 ```text
 DiagnosticCli guidance
 DiagnosticCli export-guidance [output-directory]
+DiagnosticCli discover-hint
 DiagnosticCli emit-investigation <investigation-json-or--> <consumer-project-root>
 DiagnosticCli compare-runs <left-run-index> <right-run-index> [output-json]
 DiagnosticCli compare-fingerprints <left.pkbf> <right.pkbf> [output-json]
@@ -225,7 +232,7 @@ DiagnosticCli rebuild <diagnostic-runs-root-or-run-root>
 
 `DiagnosticCli help`, `--help`, and `-h` print this same command list.
 
-Use `guidance` to print this guide and `export-guidance` to materialize the complete version-matched documentation plus curated Maven consumer reference. Prefer `DiagnosticCli` over constructing Maven classpaths and JShell scripts for routine diagnostic operations. `emit-investigation` writes `.pickleball/investigations/<id>/investigation.json` and `report.html` and prints the relative HTML path.
+Use `guidance` to print this guide, `export-guidance` to materialize the complete version-matched documentation plus curated Maven consumer reference, and `discover-hint` for the diagnostic `mvn test` one-liner plus `run-catalog.json` next step. Prefer `DiagnosticCli` over constructing Maven classpaths and JShell scripts for routine diagnostic operations. `emit-investigation` writes `.pickleball/investigations/<id>/investigation.json` and `report.html` and prints the relative HTML path.
 
 ## Controlled diagnostic reruns
 

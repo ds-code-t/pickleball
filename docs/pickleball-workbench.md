@@ -45,7 +45,7 @@ META-INF/pickleball/workbench/pickleball-workbench.jar
 
 Run the small launcher from the consumer test classpath. For Maven consumers, this command requires no cache path, separate Workbench dependency, or separately selected version.
 
-Consumer AI agents use headless MCP:
+Hosts that already run Workbench MCP can launch it from the consumer test classpath:
 
 ```bash
 mvn -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java \
@@ -58,7 +58,7 @@ mvn -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java \
 mvn -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java "-Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher" "-Dexec.classpathScope=test" "-Dexec.args=mcp ."
 ```
 
-Humans who want the Swing player can pass `ui .` instead. With no launcher arguments, `ui` and the current directory are selected automatically for that human default. Other Workbench commands are forwarded in the same form, for example `"-Dexec.args=sync ."`. Consumer agents start `mcp .` when isolating a known failure. They may run a diagnostic `mvn test` first to discover which of several scenarios fail. Missing `workbench_*` tools means start this stdio server, not skip Workbench. Agents for this release should not use the GUI, `ui .`, or `.pickleball/workbench/attach.json` as their path; see `.pickleball/AGENT-GUIDE.md`.
+Humans who want the Swing player can pass `ui .` instead. With no launcher arguments, `ui` and the current directory are selected automatically for that human default. Other Workbench commands are forwarded in the same form, for example `"-Dexec.args=sync ."`. Agents discover unknown failures with a diagnostic `mvn test`. Headless `mcp .` is optional host wiring when `workbench_*` tools are already connected; agents must not self-register IDE MCP. Agents for this release should not use the GUI, `ui .`, or `.pickleball/workbench/attach.json` as their path; see `.pickleball/AGENT-GUIDE.md`.
 
 Gradle consumers can expose the same dependency-owned launcher without resolving a cache path or adding a Workbench dependency:
 
@@ -66,7 +66,7 @@ Gradle consumers can expose the same dependency-owned launcher without resolving
 tasks.register('pickleballWorkbench', JavaExec) {
     classpath = sourceSets.test.runtimeClasspath
     mainClass = 'tools.dscode.launcher.PickleballWorkbenchLauncher'
-    args 'mcp', projectDir.absolutePath // consumer agents; pass 'ui' for the Swing player
+    args 'mcp', projectDir.absolutePath // optional host MCP; pass 'ui' for the Swing player
 }
 ```
 
@@ -280,7 +280,7 @@ Human **Save** uses the same service. After a picker scenario was loaded, Swing 
 
 ### Attaching an agent to a visible UI
 
-The Swing UI is a human player. Consumer AI agents for this release should start headless `mcp .` instead of attaching to a GUI.
+The Swing UI is a human player. Consumer AI agents for this release should not attach to a GUI. Headless `mcp .` is optional when the host already exposes `workbench_*` tools.
 
 UI mode cannot share process stdout with stdio MCP. Starting `mcp` while the UI is already running would be a second Workbench JVM. Instead, `ui` starts a 127.0.0.1-only JSON attach endpoint over the same `WorkbenchServices` / `WorkbenchMcpTools` methods and writes disposable discovery state:
 
@@ -315,13 +315,13 @@ A human-watched UI session is optional and separate. From `maven-consumer-projec
 
 ## MCP stdio
 
-Start the lightweight non-Spring MCP server for a consumer project. This is the consumer-agent path:
+Start the lightweight non-Spring MCP server for a consumer project. This is optional host wiring when `workbench_*` tools are already connected, not an agent setup step:
 
 ```powershell
 java -jar $workbenchJar mcp ".\maven-consumer-project"
 ```
 
-Or, from a Maven consumer test classpath, `"-Dexec.args=mcp ."`. Consumer agents start this stdio server when isolating a known failure. They may first run a diagnostic `mvn test` to discover which scenarios fail. Missing `workbench_*` tools means start this server (preferably as an IDE-owned MCP process), not skip Workbench. Do not document or use the Swing GUI, `ui .`, or `.pickleball/workbench/attach.json` as the agent path.
+Or, from a Maven consumer test classpath, `"-Dexec.args=mcp ."`. That launcher is optional host wiring for environments that already run MCP. Agents discover unknown failures with a diagnostic `mvn test` and `run-catalog.json` (zero MCP is enough). They must not self-register IDE MCP or start an IDE-owned stdio server. Isolate a known failure with already-connected `workbench_*` tools or a Workbench CLI session. Do not document or use the Swing GUI, `ui .`, or `.pickleball/workbench/attach.json` as the agent path.
 
 The server uses the official Java MCP SDK core and stdio transport with the Jackson 2 JSON adapter. MCP dependencies are Workbench-only and are shaded into the executable companion. Workbench deliberately does not use Spring Boot, Spring Framework, Spring AI, WebMVC, or Tomcat.
 
