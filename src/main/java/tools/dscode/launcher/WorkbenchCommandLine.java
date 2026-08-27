@@ -1,5 +1,6 @@
 package tools.dscode.launcher;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -76,7 +77,12 @@ final class WorkbenchCommandLine {
                 rest.add(token);
                 continue;
             }
-            if (project == null) {
+            // Maven exec splits unquoted --name=The failing scenario into extra tokens.
+            if (name != null && !looksLikeProject(token)) {
+                name = name + " " + token;
+                continue;
+            }
+            if (project == null && looksLikeProject(token)) {
                 project = Path.of(token).toAbsolutePath().normalize();
                 continue;
             }
@@ -109,5 +115,12 @@ final class WorkbenchCommandLine {
     private static boolean looksLikePath(String token) {
         String lower = token.toLowerCase(Locale.ROOT);
         return lower.startsWith("-d") || token.contains("/") || token.contains("\\");
+    }
+
+    private static boolean looksLikeProject(String token) {
+        if (token == null || token.isBlank()) return false;
+        if (".".equals(token) || "..".equals(token)) return true;
+        if (token.contains("/") || token.contains("\\")) return true;
+        return Files.isDirectory(Path.of(token));
     }
 }

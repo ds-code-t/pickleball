@@ -245,6 +245,8 @@ public final class WorkbenchApplication {
                 name = token.substring("--name=".length());
             } else if ("--name".equals(token) && index + 1 < args.length) {
                 name = args[++index];
+            } else if (name != null && !token.startsWith("-")) {
+                name = name + " " + token;
             }
         }
         return new IsolateArgs(Path.of(args[1]), tags, name);

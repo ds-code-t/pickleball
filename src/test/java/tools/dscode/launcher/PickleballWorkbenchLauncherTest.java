@@ -71,6 +71,21 @@ class PickleballWorkbenchLauncherTest {
         assertEquals("export-guidance", exportGuidance[0]);
         assertEquals(".pickleball", exportGuidance[1]);
 
+        String[] isolateName = PickleballWorkbenchLauncher.normalizedArguments(
+                new String[]{"isolate", "--name=The", "failing", "scenario"}
+        );
+        assertEquals("isolate", isolateName[0]);
+        assertEquals(Path.of("").toAbsolutePath().normalize().toString(), isolateName[1]);
+        assertEquals("--name", isolateName[2]);
+        assertEquals("The failing scenario", isolateName[3]);
+
+        WorkbenchCommandLine.Parsed confirm = WorkbenchCommandLine.parse(
+                new String[]{"confirm", "--name=Agent", "pointer", "eval", "failing", "fruit", "mismatch"}
+        );
+        assertEquals("confirm", confirm.command());
+        assertEquals("Agent pointer eval failing fruit mismatch", confirm.name());
+        assertEquals(Path.of("").toAbsolutePath().normalize(), confirm.project());
+
         byte[] streamed = {9, 8, 7, 6};
         Path fromStream = PickleballWorkbenchLauncher.extractPayload(
                 tempDir,

@@ -31,6 +31,11 @@ public final class WorkbenchAgentCommandChecks {
         assertEquals("@one", isolate[3]);
         assertEquals("export-guidance", exportGuidance[0]);
         assertEquals(".pickleball", exportGuidance[1]);
+
+        String[] isolateName = PickleballWorkbenchLauncher.normalizedArguments(
+                new String[]{"isolate", "--name=The", "failing", "scenario"}
+        );
+        assertEquals("The failing scenario", isolateName[3]);
     }
 
     @Test

@@ -153,7 +153,7 @@ Use the narrowest `pkb_tags` / `pkb_name` that isolate the failure. Do not add t
 These are documented agent defaults, not `PickleballTests` human defaults (`pretty`, `@all`, often headed Chrome). Example confirmation after isolation:
 
 ```text
-PickleballWorkbenchLauncher confirm --tags=@the-failing-tag --name=The failing scenario
+PickleballWorkbenchLauncher confirm --tags=@the-failing-tag --name='The failing scenario'
 ```
 
 After any diagnostic run, read `pkb_run_profile` from the pack. That is the complete resolved RunVar list, including inherited execution-context paths and the integer parallel count. Do not treat omitted `pkb_runvars` keys as equal to project `pickleball.properties`. Isolate and confirm replay that retained profile through `pkb_runvars`; they do not silently re-resolve from project defaults.

@@ -155,7 +155,7 @@ mvn test -Dpkb_tags="@workflow and @nested-steps and not @block-conditionals"
 Human `PickleballTests` defaults remain `pretty` and `@all`. Agents launching a bounded confirmation should not reuse those defaults. Use Workbench `confirm`, or a separate `pkb_runvars` command that honors the browser ladder:
 
 ```bash
-PickleballWorkbenchLauncher confirm --tags=@the-failing-tag --name=The failing scenario
+PickleballWorkbenchLauncher confirm --tags=@the-failing-tag --name='The failing scenario'
 ```
 
 After the run, read `pkb_run_profile` from `run-catalog.json` / `run-index.json` / `summary.json`. That is the complete resolved RunVar list. Do not assume omitted `pkb_runvars` keys equal project `pickleball.properties`.

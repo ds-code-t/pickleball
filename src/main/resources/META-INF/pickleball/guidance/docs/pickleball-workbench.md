@@ -57,7 +57,7 @@ mvn -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java \
 ```bash
 "-Dexec.args=hint"
 "-Dexec.args=discover --tags=@smoke"
-"-Dexec.args=isolate --name=The failing scenario"
+"-Dexec.args=isolate --name='The failing scenario'"
 "-Dexec.args=confirm --tags=@smoke"
 ```
 
