@@ -329,12 +329,12 @@ The existing path semantics for `pkb_features`, `pkb_datapath`, `pkb_callpath`, 
 | `pkb_tags` | `@smoke and not @slow` | Cucumber tag expression |
 | `pkb_name` | `Checkout.*` | scenario-name expression |
 | `pkb_environment` | `QA` | project environment label |
-| `pkb_browser` | `chrome` | browser configuration |
+| `pkb_browser` | `chrome` | browser configuration name looked up under the `configs` mapping (`CHROME_HEADLESS` uses the consumer yaml when present, otherwise Pickleball's bundled headless Chrome) |
 | `pkb_profile` | `qa,browser_firefox` | selected named profile(s) |
 | `pkb_runvars` | `pkb_tags=@smoke, pkb_browser=chrome` | compact controlled RunVar input |
 | `pkb_runvars.<pkb_var>` | `pkb_runvars.pkb_browser=chrome` | expanded controlled RunVar member |
 | `pkb_run_profile` | generated assignment string | canonical resolved RunVar output; external input rejected |
-| `pkb_parallel` | `4` | parallel scenario count |
+| `pkb_parallel` | `4`, `auto` | parallel scenario count; `auto` resolves at run start to a conservative JVM estimate and stamps the integer into `pkb_run_profile` |
 | `pkb_loglevel` | `debug` | console log level |
 | `pkb_reportingmode` | `diagnostic` | diagnostic evidence pipeline |
 | `pkb_reportretention` | `all`, `failed`, `none` | automatic evidence/report retention |
@@ -343,6 +343,29 @@ The existing path semantics for `pkb_features`, `pkb_datapath`, `pkb_callpath`, 
 | `pkb_gitsnapshot` | `metadata`, `diff`, `none` | diagnostic Git/source provenance |
 
 Other existing `pkb_*` RunVars retain their previous behavior unless specifically documented otherwise.
+
+## Conservative `pkb_parallel`
+
+`pkb_parallel` is an explicit positive integer unless the value is `auto`.
+
+`auto` is resolved at run start from JVM-visible resources only (`Runtime.availableProcessors()` and `Runtime.maxMemory()`). No OS-specific native calls. The conservative estimate is:
+
+```text
+max(2, min(availableProcessors, floor(maxMemoryMB / 512), 24))
+```
+
+Chrome workers are RAM-heavy, so a 32-core / 64GiB box does not blindly pick 32 workers; the hard cap is 24, and heap can cap lower. Tiny heaps resolve to 2. An explicit numeric `pkb_parallel` is never overwritten. Omitting `pkb_parallel` does not enable parallel execution.
+
+The resolved integer is stamped into the final RunVars and `pkb_run_profile`. `DiagnosticCli discover-hint` prints that estimated number in the recommended Discover `pkb_runvars` command.
+
+## Bundled `CHROME_HEADLESS`
+
+`pkb_browser` names a configuration object under the loaded `configs` mapping. Resolution for `CHROME_HEADLESS`:
+
+1. If the consumer `pkb_configpath` / configs mapping already contains `CHROME_HEADLESS` (or a case-insensitive named browser yaml such as `CHROME_HEADLESS.yaml`), that local override wins, including headed chrome.yaml-style configs.
+2. Otherwise Pickleball injects a framework-bundled `CHROME_HEADLESS` resource from `META-INF/pickleball/configs/CHROME_HEADLESS.yaml` inside the Pickleball JAR.
+
+The bundled headless config uses `--headless=new`, a fixed `--window-size=1920,1080`, no `MAXIMIZE`, and `QUIT_LOCAL_DRIVER`. Consumer `CHROME`, `EDGE`, `GRID`, and `SAUCE` yaml files are unchanged. Agents can set `pkb_browser=CHROME_HEADLESS` without copying yaml into the project.
 
 ## Cucumber aliases
 

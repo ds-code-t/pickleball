@@ -96,7 +96,8 @@ public final class DiagnosticIndexRebuilder {
                     Map<String, Object> summary = new LinkedHashMap<>();
                     for (String key : List.of(
                             "runId", "outcome", "completion", "startedAt", "reportRetention",
-                            "configurationHash", "comparisonMetadata", "counts", "lineage"
+                            "configurationHash", "runProfile", "runProfileFingerprint",
+                            "comparisonMetadata", "counts", "lineage"
                     )) {
                         summary.put(key, index.get(key));
                     }
@@ -225,8 +226,34 @@ public final class DiagnosticIndexRebuilder {
             } catch (Throwable ignored) {
             }
         }
+        copyRunProfileIfMissing(summary, scenarioRoot);
         writeAtomic(summaryPath, summary);
         return summary;
+    }
+
+    private static void copyRunProfileIfMissing(Map<String, Object> summary, Path scenarioRoot) {
+        if (!text(summary.get("runProfile")).isBlank()) {
+            return;
+        }
+        Path scenariosRoot = scenarioRoot.getParent();
+        Path runRoot = scenariosRoot == null ? null : scenariosRoot.getParent();
+        if (runRoot == null) {
+            return;
+        }
+        for (String name : List.of("configuration.json", "run-index.json")) {
+            Path source = runRoot.resolve(name);
+            if (!Files.isRegularFile(source)) {
+                continue;
+            }
+            try {
+                Object runProfile = readMap(source).get("runProfile");
+                if (runProfile != null && !text(runProfile).isBlank()) {
+                    summary.put("runProfile", runProfile);
+                    return;
+                }
+            } catch (IOException ignored) {
+            }
+        }
     }
 
     private static List<Map<String, Object>> recoverRepresentatives(List<Map<String, Object>> screenshots) {

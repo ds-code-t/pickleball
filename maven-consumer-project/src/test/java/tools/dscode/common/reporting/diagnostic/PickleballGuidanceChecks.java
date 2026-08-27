@@ -66,6 +66,8 @@ public class PickleballGuidanceChecks {
             assertTrue(guide.contains("PickleballWorkbenchLauncher"));
             assertTrue(guide.contains("does not auto-watch"));
             assertTrue(guide.contains("pkb_parallel"));
+            assertTrue(guide.contains("CHROME_HEADLESS"));
+            assertTrue(guide.contains("pkb_run_profile"));
             String chooser = guide.substring(0, guide.indexOf("Generated guidance lifecycle"));
             assertFalse(chooser.contains("attach.json"));
             assertFalse(chooser.contains("ui ."));
@@ -79,6 +81,11 @@ public class PickleballGuidanceChecks {
             assertTrue(chooserList.contains("run-catalog.json"));
             assertTrue(chooserList.contains("after discovery has named the trouble spots"));
             assertTrue(chooserList.contains("Do not start a worker just to run the whole suite"));
+            assertTrue(chooserList.contains("CHROME_HEADLESS"));
+            assertTrue(chooserList.contains("pkb_parallel"));
+            assertTrue(chooserList.contains("do not parallelize isolate")
+                    || chooserList.contains("Do not parallelize isolate"));
+            assertTrue(chooserList.contains("pkb_run_profile"));
             assertTrue(guide.contains("Maintainer pointer-eval harness"));
             assertTrue(guide.contains("@agent-pointer-eval"));
             String liveLoop = guide.substring(
@@ -161,8 +168,15 @@ public class PickleballGuidanceChecks {
         String text = output.toString(StandardCharsets.UTF_8);
         assertTrue(text.contains("mvn test"));
         assertTrue(text.contains("pkb_runvars"));
+        assertTrue(text.contains("pkb_browser=CHROME_HEADLESS"));
+        assertTrue(text.contains("pkb_parallel=" + tools.dscode.parallelutilities.ParallelCountEstimator.estimate()));
         assertTrue(text.contains("pkb_reportingmode=diagnostic"));
-        assertTrue(text.contains("pkb_parallel"));
+        assertTrue(text.contains("pkb_loglevel=warn"));
+        assertTrue(text.contains("pkb_reportretention=failed"));
+        assertTrue(text.contains("pkb_run_profile"));
+        assertFalse(text.contains("pkb_parallel=80"));
+        assertFalse(text.contains("when the project supports it"));
+        assertFalse(text.contains("when the project supports it"));
         assertTrue(text.contains("reports/diagnostic-runs/run-catalog.json"));
         assertTrue(text.contains("NEXT: run the diagnostic mvn test above, then open run-catalog.json"));
         assertFalse(text.toLowerCase().contains("mcp"));

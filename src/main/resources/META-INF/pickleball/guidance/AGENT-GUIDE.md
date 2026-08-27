@@ -14,9 +14,9 @@ If `workbench_*` tools are already present in this session, you may use them as 
 
 Use this order. Consumer AI agents for this Pickleball release discover failures with diagnostic `mvn test`. Live Workbench MCP is an optional alias when `workbench_*` tools are already connected. Do not start the Workbench GUI.
 
-1. **Discover** — when you do not yet know which scenarios fail, or you need many/parallel scenarios: run one diagnostic `mvn test` with `pkb_runvars` (`pkb_reportingmode=diagnostic`, `pkb_loglevel=warn`, `pkb_reportretention=failed`, the narrowest useful `pkb_tags`/`pkb_name`, and `pkb_parallel` when the project supports it). This is not a skip of Workbench; it is how you find failures. Do not start a worker just to run the whole suite. After the run, open `run-catalog.json`, then only the relevant `run-index.json` / `summary.json`. If `workbench_*` tools already exist, you may instead read the pack with `workbench_diagnostic_catalog`, `workbench_diagnostic_run`, and `workbench_diagnostic_summary`. Do not ingest `events.jsonl` or screenshots to find which scenarios failed. Do not `workbench_worker_start` to read the catalog.
+1. **Discover** — when you do not yet know which scenarios fail, or you need many/parallel scenarios: run one diagnostic `mvn test` with a **complete** `pkb_runvars` that always includes `pkb_browser=CHROME_HEADLESS`, a high `pkb_parallel` (the conservative JVM estimate printed by `discover-hint`, or `pkb_parallel=auto`), `pkb_reportingmode=diagnostic`, `pkb_loglevel=warn`, `pkb_reportretention=failed`, plus the narrowest useful `pkb_tags`/`pkb_name`. Multi-scenario Discover and Confirm MUST use headless Chrome and high parallelism. Isolate / live Workbench stays one paused scenario; do not parallelize isolate. Use headed Chrome only when the scenario actually needs a window. Set those keys explicitly so project headed-chrome / pretty / `@all` defaults do not sneak in. Execution-context keys (`pkb_glue`, `pkb_features`, `pkb_datapath`, `pkb_callpath`, `pkb_componentpath`, `pkb_configpath`) may still inherit; after the run, read `pkb_run_profile` from `run-catalog.json` / `run-index.json` / `summary.json` as the complete resolved list, including inherited glue/features and the integer `pkb_parallel`. Do not assume omitted keys equal project pickleball.properties. This is not a skip of Workbench; it is how you find failures. Do not start a worker just to run the whole suite. After the run, open `run-catalog.json`, then only the relevant `run-index.json` / `summary.json`. If `workbench_*` tools already exist, you may instead read the pack with `workbench_diagnostic_catalog`, `workbench_diagnostic_run`, and `workbench_diagnostic_summary`. Do not ingest `events.jsonl` or screenshots to find which scenarios failed. Do not `workbench_worker_start` to read the catalog.
 2. **Isolate / debug a known failing scenario** — after discovery has named the trouble spots, isolate those scenarios with live Workbench. If `workbench_*` tools are already present, use the live MCP loop below. If they are absent, do not invent IDE MCP and do not start an IDE-owned stdio server. Stop and tell the human that live isolate needs either pre-wired `workbench_*` MCP tools or a Workbench CLI session. Do not keep using `mvn test` for isolation/debug.
-3. **Confirm after isolation** — one bounded diagnostic `mvn test` with the existing AI defaults (`pkb_reportingmode=diagnostic`, `pkb_loglevel=warn`, `pkb_reportretention=failed`, narrowest useful `pkb_tags`/`pkb_name`).
+3. **Confirm after isolation** — one bounded diagnostic `mvn test` with the same complete AI `pkb_runvars` (`pkb_browser=CHROME_HEADLESS`, high `pkb_parallel` when more than one scenario, `pkb_reportingmode=diagnostic`, `pkb_loglevel=warn`, `pkb_reportretention=failed`, narrowest useful `pkb_tags`/`pkb_name`).
 4. **Emit the human handoff, then edit real consumer source** — write `.pickleball/investigations/<id>/` then in chat print only `.pickleball/investigations/<id>/report.html`. Change the project's own features/Java only after the live buffer is right. Explicit Save is what writes a `.feature` file.
 
 Discover must work with zero MCP. Missing `workbench_*` tools is not a reason to skip Discover, and it is not a reason to self-register IDE MCP. A multi-scenario diagnostic test is a reason to run `mvn test` first; do not start a worker to run the whole suite.
@@ -146,21 +146,25 @@ Never supply `pkb_run_profile` or `pkb_run_profile.<pkb_var>` as input. They are
 
 When you launch Pickleball tests and the intended execution settings are known, use `pkb_runvars` as the authoritative input. Put intentional tag/name selection, browser, evidence/logging controls, and other non-secret RunVar changes inside `pkb_runvars`; do not default to ambient optional project settings or separate JVM `-Dpkb_*` RunVars. Use `pkb_profile` or ordinary JVM RunVar overrides only when the task specifically tests those configuration semantics or the user asks for them. Keep protected secrets and diagnostic lineage outside `pkb_runvars`.
 
-For an agent's bounded confirmation `mvn test` (not the human runner defaults), include diagnostic evidence controls and keep the selection narrow. Documented AI defaults:
+For an agent's bounded confirmation `mvn test` (not the human runner defaults), include diagnostic evidence controls, headless Chrome, and high parallelism when more than one scenario will run. Documented AI Discover/Confirm `pkb_runvars`:
 
 ```text
+pkb_browser=CHROME_HEADLESS
+pkb_parallel=<conservative JVM estimate or auto>
 pkb_reportingmode=diagnostic
 pkb_loglevel=warn
 pkb_reportretention=failed
 ```
 
-Use the narrowest `pkb_tags` / `pkb_name` that isolate the failure. Do not add the `pretty` plugin; it is console noise for agents. `pkb_reportretention=failed` keeps dense evidence for failing scenarios and does not retain it for passing ones.
+Use the narrowest `pkb_tags` / `pkb_name` that isolate the failure. Do not add the `pretty` plugin; it is console noise for agents. `pkb_reportretention=failed` keeps dense evidence for failing scenarios and does not retain it for passing ones. `DiagnosticCli discover-hint` prints the estimated integer `pkb_parallel` for the current JVM. `pkb_parallel=auto` also resolves to that estimate at run start and stamps the integer into `pkb_run_profile`.
 
-These are documented agent defaults, not `PickleballTests` human defaults (`pretty`, `@all`). Example confirmation after a live-loop isolation:
+These are documented agent defaults, not `PickleballTests` human defaults (`pretty`, `@all`, often headed Chrome). Example confirmation after a live-loop isolation:
 
 ```text
-mvn test -Dpkb_runvars="pkb_tags=@the-failing-tag, pkb_name=The failing scenario, pkb_browser=CHROME_HEADLESS, pkb_reportingmode=diagnostic, pkb_loglevel=warn, pkb_reportretention=failed"
+mvn test -Dpkb_runvars="pkb_tags=@the-failing-tag, pkb_name=The failing scenario, pkb_browser=CHROME_HEADLESS, pkb_parallel=auto, pkb_reportingmode=diagnostic, pkb_loglevel=warn, pkb_reportretention=failed"
 ```
+
+After any diagnostic run, read `pkb_run_profile` from the pack. That is the complete resolved RunVar list, including inherited execution-context paths and the integer parallel count. Do not treat omitted `pkb_runvars` keys as equal to project `pickleball.properties`.
 
 A selected profile or partial `pkb_runvars` input inherits only missing project execution-context RunVars:
 
@@ -191,9 +195,9 @@ For AI-controlled diagnostic runs, keep terminal logging minimal. Diagnostic mod
 
 Use this escalation order:
 
-1. `run-catalog.json` to choose relevant runs.
-2. Selected `run-index.json` and `clusters.json` for outcomes, scenario identity, failure grouping, capabilities, retention, step rollups, profile fingerprints, and representative visual references.
-3. Selected scenario `summary.json` when additional sparse detail is needed.
+1. `run-catalog.json` to choose relevant runs. Each catalog entry includes the retained `pkb_run_profile` when present.
+2. Selected `run-index.json` and `clusters.json` for outcomes, scenario identity, failure grouping, capabilities, retention, step rollups, the complete `runProfile`, profile fingerprints, and representative visual references.
+3. Selected scenario `summary.json` when additional sparse detail is needed, including the same `runProfile`.
 4. Relevant `events.jsonl` only when exact step/lifecycle/order/INFO+ detail remains unanswered.
 5. Existing `comparisonToPrevious` or Pickleball run/fingerprint comparison before opening screenshots.
 6. A representative PNG only when semantic visual meaning must be understood.
@@ -232,7 +236,7 @@ DiagnosticCli rebuild <diagnostic-runs-root-or-run-root>
 
 `DiagnosticCli help`, `--help`, and `-h` print this same command list.
 
-Use `guidance` to print this guide, `export-guidance` to materialize the complete version-matched documentation plus curated Maven consumer reference, and `discover-hint` for the diagnostic `mvn test` one-liner plus `run-catalog.json` next step. Prefer `DiagnosticCli` over constructing Maven classpaths and JShell scripts for routine diagnostic operations. `emit-investigation` writes `.pickleball/investigations/<id>/investigation.json` and `report.html` and prints the relative HTML path.
+Use `guidance` to print this guide, `export-guidance` to materialize the complete version-matched documentation plus curated Maven consumer reference, and `discover-hint` for the complete diagnostic `mvn test` `pkb_runvars` one-liner (headless Chrome, estimated `pkb_parallel`, diagnostic evidence controls) plus `run-catalog.json` / `pkb_run_profile` next step. Prefer `DiagnosticCli` over constructing Maven classpaths and JShell scripts for routine diagnostic operations. `emit-investigation` writes `.pickleball/investigations/<id>/investigation.json` and `report.html` and prints the relative HTML path.
 
 ## Controlled diagnostic reruns
 

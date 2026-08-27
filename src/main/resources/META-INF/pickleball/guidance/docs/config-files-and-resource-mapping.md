@@ -51,6 +51,10 @@ run:     pkb_runvars=pkb_configpath=,pkb_browser=firefox
 
 The controlled run uses the default `configs` resource root because the blank value intentionally suppresses the project path.
 
+## Bundled browser configs
+
+Named browser yaml files under the configured config path remain the local override, including headed `CHROME.yaml`. When `CHROME_HEADLESS` is absent from that mapping, Pickleball fills it from the JAR resource `META-INF/pickleball/configs/CHROME_HEADLESS.yaml` so agents can set `pkb_browser=CHROME_HEADLESS` without copying yaml. See [Execution Configuration](configuration.md).
+
 ## Initialization order
 
 Run configuration is resolved before the final config source is bound:

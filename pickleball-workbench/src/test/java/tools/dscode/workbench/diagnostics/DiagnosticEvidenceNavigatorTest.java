@@ -57,16 +57,16 @@ class DiagnosticEvidenceNavigatorTest {
         Path scenario = run.resolve("scenarios/scenario-1");
         Files.createDirectories(scenario.resolve("screenshots"));
         Files.writeString(root.resolve("run-catalog.json"), """
-                {"runs":[{"runId":"run-1","outcome":"FAILED"}]}
+                {"runs":[{"runId":"run-1","outcome":"FAILED","runProfile":"pkb_browser=CHROME_HEADLESS, pkb_parallel=4"}]}
                 """);
         Files.writeString(run.resolve("run-index.json"), """
-                {"runId":"run-1","outcome":"FAILED","scenarioCount":1}
+                {"runId":"run-1","outcome":"FAILED","scenarioCount":1,"runProfile":"pkb_browser=CHROME_HEADLESS, pkb_parallel=4"}
                 """);
         Files.writeString(run.resolve("clusters.json"), """
                 {"clusters":[{"id":"c1","size":1}]}
                 """);
         Files.writeString(scenario.resolve("summary.json"), """
-                {"scenarioId":"scenario-1","outcome":"FAILED","lastStepText":"Then stay"}
+                {"scenarioId":"scenario-1","outcome":"FAILED","lastStepText":"Then stay","runProfile":"pkb_browser=CHROME_HEADLESS, pkb_parallel=4"}
                 """);
         Files.writeString(scenario.resolve("events.jsonl"), "{\"stepText\":\"secret-event\"}\n");
         Files.write(scenario.resolve("screenshots/frame-1.png"), new byte[]{9, 9, 9});
@@ -74,16 +74,19 @@ class DiagnosticEvidenceNavigatorTest {
         DiagnosticEvidenceNavigator navigator = new DiagnosticEvidenceNavigator(project);
         String catalog = navigator.catalogDocument().toString();
         assertTrue(catalog.contains("run-1"));
+        assertTrue(catalog.contains("pkb_parallel=4"));
         assertFalse(catalog.contains("secret-event"));
 
         String runDocument = navigator.runDocument("run-1").toString();
         assertTrue(runDocument.contains("FAILED"));
+        assertTrue(runDocument.contains("pkb_parallel=4"));
         assertTrue(runDocument.contains("\"clusters\""));
         assertFalse(runDocument.contains("secret-event"));
         assertFalse(runDocument.contains("frame-1.png"));
 
         String summary = navigator.scenarioSummaryDocument("run-1", "scenario-1").toString();
         assertTrue(summary.contains("Then stay"));
+        assertTrue(summary.contains("pkb_parallel=4"));
         assertFalse(summary.contains("secret-event"));
         assertFalse(summary.contains("frame-1.png"));
     }

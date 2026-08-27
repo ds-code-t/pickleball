@@ -583,6 +583,15 @@ public class Diagnostic213CompletionChecks {
             Map<String, Object> rebuiltComparison = (Map<String, Object>) rebuilt.get("comparisonMetadata");
             assertEquals(fingerprint, rebuiltComparison.get("runProfileFingerprint"));
             assertEquals(Boolean.TRUE, rebuiltComparison.get("directRunProfile"));
+
+            @SuppressWarnings("unchecked")
+            Map<String, Object> catalog = JSON.readValue(
+                    runRoot.getParent().resolve("run-catalog.json").toFile(), LinkedHashMap.class);
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> catalogRuns = (List<Map<String, Object>>) catalog.get("runs");
+            assertFalse(catalogRuns.isEmpty());
+            assertEquals(runProfile, catalogRuns.getFirst().get("runProfile"));
+            assertEquals(fingerprint, catalogRuns.getFirst().get("runProfileFingerprint"));
         } finally {
             deleteTree(root);
         }

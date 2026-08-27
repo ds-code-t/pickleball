@@ -243,10 +243,10 @@ Example compact rerun:
 -Dpkb_changed_variables=pkb_browser
 ```
 
-For an agent's bounded confirmation `mvn test` (not `PickleballTests` human defaults of `pretty` / `@all`), include diagnostic evidence controls and keep selection narrow:
+For an agent's bounded confirmation `mvn test` (not `PickleballTests` human defaults of `pretty` / `@all`), include diagnostic evidence controls, headless Chrome, and high parallelism when more than one scenario will run:
 
 ```text
--Dpkb_runvars="pkb_tags=@the-failing-tag, pkb_name=The failing scenario, pkb_browser=CHROME_HEADLESS, pkb_reportingmode=diagnostic, pkb_loglevel=warn, pkb_reportretention=failed"
+-Dpkb_runvars="pkb_tags=@the-failing-tag, pkb_name=The failing scenario, pkb_browser=CHROME_HEADLESS, pkb_parallel=auto, pkb_reportingmode=diagnostic, pkb_loglevel=warn, pkb_reportretention=failed"
 ```
 
 Lineage metadata is not execution configuration:
@@ -320,3 +320,21 @@ When operating in a consumer project:
 - never expose protected values;
 - keep diagnostic lineage outside the RunVar set;
 - prefer the retained run profile over manually reconstructing configuration from many source layers.
+
+## AI agents
+
+Set a **complete** Discover `pkb_runvars` rather than a partial overlay:
+
+```text
+pkb_browser=CHROME_HEADLESS
+pkb_parallel=<conservative JVM estimate or auto>
+pkb_reportingmode=diagnostic
+pkb_loglevel=warn
+pkb_reportretention=failed
+```
+
+plus the narrowest useful `pkb_tags` / `pkb_name`. `DiagnosticCli discover-hint` prints the estimated integer parallel count for the current JVM. Multi-scenario Discover/Confirm must use headless Chrome and high parallelism. Isolate / live Workbench stays one paused scenario.
+
+After the run, inspect `pkb_run_profile` from `run-catalog.json`, `run-index.json`, or `summary.json`. That output is the complete resolved RunVar list after inheritance (glue/features/data/call/component/configpath) and after `pkb_parallel=auto` is stamped as an integer. Do not assume omitted `pkb_runvars` keys equal project `pickleball.properties` — optional keys such as headed Chrome, `pretty`, and `pkb_tags=@all` do not leak into a controlled run, which is why agents must set the Discover keys explicitly.
+
+Never supply `pkb_run_profile` as input. Workbench MCP `workbench_diagnostic_catalog`, `workbench_diagnostic_run`, and `workbench_diagnostic_summary` return the same retained `runProfile` when present. The consumer worker resolves the same snapshot internally through `PickleballRunner`; it does not accept `pkb_run_profile` as input.

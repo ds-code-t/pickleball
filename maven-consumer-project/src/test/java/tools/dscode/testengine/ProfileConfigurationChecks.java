@@ -563,6 +563,30 @@ public final class ProfileConfigurationChecks {
         }
     }
 
+    @Test
+    void autoParallelResolvesToEstimatedIntegerInFinalRunVars() {
+        LinkedHashMap<String, String> values = baseValues();
+        values.put(PKB_RUN_VARS, "pkb_tags=@direct, pkb_parallel=auto");
+
+        PickleballProfiles.apply(values);
+
+        String resolved = values.get(PKB_PARALLEL);
+        assertEquals(Integer.toString(tools.dscode.parallelutilities.ParallelCountEstimator.estimate()), resolved);
+        assertFalse("auto".equalsIgnoreCase(resolved));
+        assertTrue(PickleballProfiles.serializeRunProfile(values).contains("pkb_parallel=" + resolved));
+    }
+
+    @Test
+    void explicitNumericParallelIsNotOverwritten() {
+        LinkedHashMap<String, String> values = baseValues();
+        values.put(PKB_RUN_VARS, "pkb_tags=@direct, pkb_parallel=9");
+
+        PickleballProfiles.apply(values);
+
+        assertEquals("9", values.get(PKB_PARALLEL));
+        assertTrue(PickleballProfiles.serializeRunProfile(values).contains("pkb_parallel=9"));
+    }
+
     private static LinkedHashMap<String, String> baseValues() {
         LinkedHashMap<String, String> values = new LinkedHashMap<>();
         values.put(PKB_GLUE, "com.example.pickleball");
