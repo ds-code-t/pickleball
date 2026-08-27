@@ -6,9 +6,11 @@ A consumer project may contain only a short `AGENTS.md` bridge. That bridge can 
 
 ## Tool chooser
 
+If `workbench_*` tools are not already in this session, start headless Workbench MCP (`mcp .`) as an IDE-owned stdio server. Do not start the GUI. Do not `workbench_worker_start` yet. An idle MCP server is enough for sparse diagnostic reads.
+
 Use this order. Consumer AI agents for this Pickleball release use headless Workbench MCP (`mcp .`) to isolate a known failure. Do not start the Workbench GUI.
 
-1. **Discover** — when you do not yet know which scenarios fail, or you need many/parallel scenarios: run one diagnostic `mvn test` with `pkb_runvars` (`pkb_reportingmode=diagnostic`, `pkb_loglevel=warn`, `pkb_reportretention=failed`, the narrowest useful `pkb_tags`/`pkb_name`, and `pkb_parallel` when the project supports it). This is not a skip of Workbench; it is how you find failures. Do not start Workbench just to run the whole suite.
+1. **Discover** — when you do not yet know which scenarios fail, or you need many/parallel scenarios: run one diagnostic `mvn test` with `pkb_runvars` (`pkb_reportingmode=diagnostic`, `pkb_loglevel=warn`, `pkb_reportretention=failed`, the narrowest useful `pkb_tags`/`pkb_name`, and `pkb_parallel` when the project supports it). This is not a skip of Workbench; it is how you find failures. Do not start a worker just to run the whole suite. After the run, if `workbench_*` tools are connected, read the pack with `workbench_diagnostic_catalog`, `workbench_diagnostic_run`, and `workbench_diagnostic_summary`; otherwise open `run-catalog.json`, then only the relevant `run-index.json` / `summary.json`. Do not ingest `events.jsonl` or screenshots to find which scenarios failed. Do not `workbench_worker_start` to read the catalog.
 2. **Isolate / debug a known failing scenario** — after discovery has named the trouble spots, use live headless Workbench MCP (`mcp .`) on those scenarios. If `workbench_*` tools are missing, start that stdio server as an IDE-owned MCP process (not a throwaway terminal, not the GUI). Do not keep using `mvn test` for isolation/debug merely because MCP is disconnected. Follow the live isolation loop below.
 3. **Confirm after isolation** — one bounded diagnostic `mvn test` with the existing AI defaults (`pkb_reportingmode=diagnostic`, `pkb_loglevel=warn`, `pkb_reportretention=failed`, narrowest useful `pkb_tags`/`pkb_name`).
 4. **Emit the human handoff, then edit real consumer source** — write `.pickleball/investigations/<id>/` then in chat print only `.pickleball/investigations/<id>/report.html`. Change the project's own features/Java only after the live buffer is right. Explicit Save is what writes a `.feature` file.
@@ -21,7 +23,7 @@ Do not copy consumer features into `.pickleball` as a sandbox.
 
 From the consumer project, with Pickleball on the test classpath:
 
-1. If `workbench_*` tools are not already in this session, start the launcher with `mcp .` via the documented Maven exec of `tools.dscode.launcher.PickleballWorkbenchLauncher`, `classpathScope=test`, args `mcp .` (not a GUI command). Prefer the IDE owning that process as an MCP stdio server; stdio MCP only becomes tools if the IDE owns the process.
+1. If `workbench_*` tools are not already in this session, start the launcher with `mcp .` via the documented Maven exec of `tools.dscode.launcher.PickleballWorkbenchLauncher`, `classpathScope=test`, args `mcp .` (not a GUI command). Prefer the IDE owning that process as an MCP stdio server; stdio MCP only becomes tools if the IDE owns the process. If MCP is already connected from setup, skip to `workbench_sync` / `workbench_worker_start`.
 2. Call `workbench_sync` once. The agent must call it; Workbench does not auto-watch. Full compile when there is no live classpath or when Java/`pom`/dependencies changed; resources-only for feature/config/data; skip when unchanged. Live buffer edits need no sync.
 3. `workbench_worker_start` — reuse the compiled live classpath; do not rebuild to start a worker.
 4. `workbench_request_control`
@@ -46,7 +48,7 @@ Worker restart without rebuild already exists (`workbench_worker_restart`). Step
 Keep first-read small. After a successful export:
 
 1. Follow the consumer project's own instructions first; they remain authoritative for project-specific behavior.
-2. Stay in this guide's tool chooser: discover with a diagnostic `mvn test` when the failing scenario is unknown; isolate a known failure with the live headless MCP loop.
+2. Stay in this guide's tool chooser: start idle headless Workbench MCP (`mcp .`) when `workbench_*` tools are missing (no worker yet), then discover with a diagnostic `mvn test` when the failing scenario is unknown or isolate a known failure with the live MCP loop.
 3. Inspect the **real** consumer `pom.xml`, Pickleball runner subclass, features, configuration, data, mappings, and test support before changing them.
 4. Open a specific exported guide only when that topic is needed, for example `docs/dynamic-steps.md`, `docs/diagnostic-reporting.md`, `docs/configuration.md`, or `docs/ai-run-configuration.md`.
 5. Do not assume the Pickleball core source repository is present. A normal consumer may only have the Maven dependency.

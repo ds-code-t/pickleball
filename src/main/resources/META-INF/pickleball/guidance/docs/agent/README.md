@@ -18,7 +18,7 @@ This directory supports repository-native AI coding agents. It is not a runtime 
 
 Agent adapters should remain small and point back to the canonical contract rather than copying the full project description.
 
-The nested `/maven-consumer-project/AGENTS.md` is a dependency-owned guidance bootstrap plus a short discover-vs-isolate pointer. It materializes version-matched guidance, directs the consumer agent to `.pickleball/AGENT-GUIDE.md`, and states that a diagnostic `mvn test` finds which scenarios fail while headless Workbench MCP (`mcp .`) isolates a known failure. Refresh/version/manifest semantics, authoring rules, configuration, diagnostics, and troubleshooting belong in the exported dependency guidance.
+The nested `/maven-consumer-project/AGENTS.md` is a dependency-owned guidance bootstrap plus a short discover-vs-isolate pointer. It materializes version-matched guidance, directs the consumer agent to `.pickleball/AGENT-GUIDE.md`, and states that a diagnostic `mvn test` finds which scenarios fail while headless Workbench MCP (`mcp .`) isolates a known failure. It also starts idle MCP (no worker) before testing. Refresh/version/manifest semantics, authoring rules, configuration, diagnostics, and troubleshooting belong in the exported dependency guidance.
 
 The nested `/maven-consumer-project/.github/copilot-instructions.md` is the same bootstrap-plus-pointer for IntelliJ Copilot Chat, which reads that file rather than `AGENTS.md`.
 

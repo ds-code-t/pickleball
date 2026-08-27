@@ -72,6 +72,14 @@ public class PickleballGuidanceChecks {
                     guide.indexOf("### Live isolation loop")
             );
             assertFalse(chooserList.contains("classpathScope"));
+            assertTrue(
+                    chooserList.contains("Do not `workbench_worker_start` yet")
+                            || chooserList.contains("Do not start a worker yet")
+            );
+            assertTrue(
+                    chooserList.contains("run-catalog.json")
+                            || chooserList.contains("workbench_diagnostic_catalog")
+            );
             assertTrue(chooserList.contains("after discovery has named the trouble spots"));
             String liveLoop = guide.substring(
                     guide.indexOf("### Live isolation loop"),
