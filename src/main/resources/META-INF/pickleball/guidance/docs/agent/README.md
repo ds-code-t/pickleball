@@ -18,9 +18,9 @@ This directory supports repository-native AI coding agents. It is not a runtime 
 
 Agent adapters should remain small and point back to the canonical contract rather than copying the full project description.
 
-The nested `/maven-consumer-project/AGENTS.md` is a dependency-owned guidance bootstrap plus a short discover-vs-isolate pointer. It materializes version-matched guidance, directs the consumer agent to `.pickleball/AGENT-GUIDE.md`, and states that agents discover with a diagnostic `mvn test`; MCP is optional if already connected, and agents do not self-register IDE MCP. Refresh/version/manifest semantics, authoring rules, configuration, diagnostics, and troubleshooting belong in the exported dependency guidance.
+The nested `/maven-consumer-project/AGENTS.md` is a dependency-owned Workbench bootstrap plus a short Discover/Isolate/Confirm pointer. It materializes version-matched guidance through `PickleballWorkbenchLauncher export-guidance`, directs the consumer agent to `.pickleball/AGENT-GUIDE.md`, and tells agents to use Workbench `hint` / `discover` / `isolate` / `confirm`. Do not start the GUI. Do not register IDE MCP. Refresh/version/manifest semantics, authoring rules, configuration, diagnostics, and troubleshooting belong in the exported dependency guidance.
 
-The nested `/maven-consumer-project/.github/copilot-instructions.md` is the same bootstrap-plus-pointer for IntelliJ Copilot Chat, which reads that file rather than `AGENTS.md`.
+The nested `/maven-consumer-project/.github/copilot-instructions.md` is identical to `AGENTS.md` so Copilot Chat sees the same Workbench pointer.
 
 The nested `/maven-consumer-project/README.md` is ordinary sample-project documentation. It may point humans and agents at `AGENTS.md` for guidance export, but should not duplicate the AI guidance lifecycle.
 

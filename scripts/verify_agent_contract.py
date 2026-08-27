@@ -297,48 +297,63 @@ def validate_consumer_bridge(errors: list[str]) -> None:
         nonblank_lines = [line for line in text.splitlines() if line.strip()]
         if not (3 <= len(nonblank_lines) <= 8):
             errors.append(
-                "Consumer guidance bridge must keep the export-guidance one-liner plus a short "
-                "discover-vs-isolate pointer (not the full guide): "
+                "Consumer guidance bridge must keep the Workbench export-guidance one-liner plus a short "
+                "Discover/Isolate/Confirm pointer (not the full guide): "
                 + relative
             )
 
         first_line = nonblank_lines[0] if nonblank_lines else ""
         for required in (
-            "DiagnosticCli",
+            "PickleballWorkbenchLauncher",
             "export-guidance",
             ".pickleball/AGENT-GUIDE.md",
+            "classpathScope=test",
         ):
             if required not in first_line:
                 errors.append(
                     f"Consumer guidance bridge one-liner must reference {required}: {relative}"
                 )
 
-        if "mcp ." not in text and "workbench_" not in text:
-            errors.append(
-                "Consumer guidance bridge must mention MCP (`mcp .`) or Workbench tools "
-                "(`workbench_`): " + relative
-            )
-        for required in (
-            "mvn test",
-            "diagnostic",
-        ):
-            if required not in text:
-                errors.append(
-                    f"Consumer guidance bridge must state the discover-vs-isolate split ({required}): "
-                    + relative
-                )
-
         lowered = text.lower()
-        if "do not skip workbench" not in lowered:
-            errors.append(
-                "Consumer guidance bridge must say not to skip Workbench: " + relative
-            )
         if "do not start the gui" not in lowered:
             errors.append(
                 "Consumer guidance bridge must say not to start the GUI: " + relative
             )
+        if "do not register ide mcp" not in lowered:
+            errors.append(
+                "Consumer guidance bridge must say not to register IDE MCP: " + relative
+            )
+        for required in (
+            "discover",
+            "isolate",
+            "confirm",
+            "workbench_",
+        ):
+            if required not in lowered:
+                errors.append(
+                    f"Consumer guidance bridge must mention {required}: " + relative
+                )
+
+        if "do not skip workbench" in lowered:
+            errors.append(
+                "Consumer guidance bridge must not say 'Do not skip Workbench': " + relative
+            )
+        if "parallel is ok when the project supports it" in lowered:
+            errors.append(
+                "Consumer guidance bridge must not say parallel is optional: " + relative
+            )
+        if "stdio" in lowered:
+            errors.append(
+                "Consumer guidance bridge must not mention IDE-owned stdio: " + relative
+            )
+        if "must" in lowered and "chrome_headless" in lowered:
+            errors.append(
+                "Consumer guidance bridge must not MUST-use CHROME_HEADLESS for all projects: "
+                + relative
+            )
 
         for forbidden in (
+            "DiagnosticCli",
             "GUIDANCE-MANIFEST.json",
             ".git/info/exclude",
             "pkb_changed_variables",
@@ -347,11 +362,12 @@ def validate_consumer_bridge(errors: list[str]) -> None:
             "attach.json",
             "ui .",
             "@agent-pointer-eval",
+            "IntelliJ",
         ):
             if forbidden in text:
                 errors.append(
                     f"Consumer guidance bridge contains dependency-owned guidance ({forbidden}); "
-                    "keep only the bootstrap command and a short discover-vs-isolate pointer: "
+                    "keep only the Workbench bootstrap command and a short Discover/Isolate/Confirm pointer: "
                     + relative
                 )
 

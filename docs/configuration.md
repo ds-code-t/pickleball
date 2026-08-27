@@ -356,7 +356,7 @@ max(2, min(availableProcessors, floor(maxMemoryMB / 512), 24))
 
 Chrome workers are RAM-heavy, so a 32-core / 64GiB box does not blindly pick 32 workers; the hard cap is 24, and heap can cap lower. Tiny heaps resolve to 2. An explicit numeric `pkb_parallel` is never overwritten. Omitting `pkb_parallel` does not enable parallel execution.
 
-The resolved integer is stamped into the final RunVars and `pkb_run_profile`. `DiagnosticCli discover-hint` prints that estimated number in the recommended Discover `pkb_runvars` command.
+The resolved integer is stamped into the final RunVars and `pkb_run_profile`. Workbench `hint` prints that estimated number in the recommended Discover `pkb_runvars` command.
 
 ## Bundled `CHROME_HEADLESS`
 
@@ -366,6 +366,16 @@ The resolved integer is stamped into the final RunVars and `pkb_run_profile`. `D
 2. Otherwise Pickleball injects a framework-bundled `CHROME_HEADLESS` resource from `META-INF/pickleball/configs/CHROME_HEADLESS.yaml` inside the Pickleball JAR.
 
 The bundled headless config uses `--headless=new`, a fixed `--window-size=1920,1080`, no `MAXIMIZE`, and `QUIT_LOCAL_DRIVER`. Consumer `CHROME`, `EDGE`, `GRID`, and `SAUCE` yaml files are unchanged. Agents can set `pkb_browser=CHROME_HEADLESS` without copying yaml into the project.
+
+## Agent Discover browser ladder
+
+Workbench Discover/Confirm do not blindly MUST-use `CHROME_HEADLESS` for every project:
+
+1. If `default_profile` / runner / retained `pkb_run_profile` `pkb_browser` is already a remote farm name (`SAUCE_*`, `GRID_*`, `REMOTE_*`, or clearly non-local), keep it. Those consumers run exclusively on the external farm.
+2. Otherwise prefer `CHROME_HEADLESS` (consumer yaml if present, else the JAR-bundled config above).
+3. If local headless cannot start and the project already defines and uses GRID/SAUCE/REMOTE as its `pkb_browser`, fall back to that project browser. Do not pick Sauce/Grid merely because unused yaml files exist in `configs/`.
+
+Isolate stays one scenario and does not raise `pkb_parallel`.
 
 ## Cucumber aliases
 

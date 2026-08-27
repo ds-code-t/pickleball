@@ -9,7 +9,7 @@ The nested consumer intentionally keeps its own Markdown minimal. Detailed usage
 From a Maven consumer with Pickleball on the test classpath:
 
 ```powershell
-mvn -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java "-Dexec.mainClass=tools.dscode.common.reporting.diagnostic.DiagnosticCli" "-Dexec.classpathScope=test" "-Dexec.args=export-guidance .pickleball"
+mvn -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java "-Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher" "-Dexec.classpathScope=test" "-Dexec.args=export-guidance .pickleball"
 ```
 
 Then read or browse:
@@ -26,7 +26,7 @@ Rerun export before Pickleball work even when `.pickleball` already exists. A su
 
 Compatibility note: an older Pickleball release whose exporter predates the manifest lifecycle may leave newer files or a newer manifest behind after a downgrade. Those leftovers are not authoritative for the downgraded dependency; prefer the dependency actually resolved on the test classpath and the files freshly exported by that dependency.
 
-AI agents should read `.pickleball/AGENT-GUIDE.md` first after a successful export. Agents discover which scenarios fail with a diagnostic `mvn test`; MCP is optional if already connected, and agents do not self-register IDE MCP. That guide's tool chooser is the agent path: one diagnostic `mvn test` to discover which scenarios fail when that is still unknown; live Workbench only when `workbench_*` tools are already available or a Workbench CLI session exists; one bounded diagnostic confirmation; then edits to the real consumer source. Do not treat `.pickleball/maven-consumer-project/` as the project under test, and do not dump `docs/README.md` or the whole snapshot into first-read context. Human readers can start with `.pickleball/docs/README.md`; links from those guides to `maven-consumer-project` resolve to the exported version-matched reference files.
+AI agents should read `.pickleball/AGENT-GUIDE.md` first after a successful export. Workbench is the one front door: `discover`, `isolate`, and `confirm`. Do not start the GUI. Do not register IDE MCP. If `workbench_*` tools are already connected they are an Isolate alias. Do not treat `.pickleball/maven-consumer-project/` as the project under test, and do not dump `docs/README.md` or the whole snapshot into first-read context. Human readers can start with `.pickleball/docs/README.md`; links from those guides to `maven-consumer-project` resolve to the exported version-matched reference files.
 
 ## Version-matched reference snapshot
 
@@ -152,10 +152,10 @@ mvn test -Dpkb_tags="@forms and @state-assertions"
 mvn test -Dpkb_tags="@workflow and @nested-steps and not @block-conditionals"
 ```
 
-Human `PickleballTests` defaults remain `pretty` and `@all`. Agents launching a bounded confirmation should not reuse those defaults. Use a separate `pkb_runvars` command, for example:
+Human `PickleballTests` defaults remain `pretty` and `@all`. Agents launching a bounded confirmation should not reuse those defaults. Use Workbench `confirm`, or a separate `pkb_runvars` command that honors the browser ladder:
 
 ```bash
-mvn test -Dpkb_runvars="pkb_tags=@the-failing-tag, pkb_name=The failing scenario, pkb_browser=CHROME_HEADLESS, pkb_parallel=auto, pkb_reportingmode=diagnostic, pkb_loglevel=warn, pkb_reportretention=failed"
+PickleballWorkbenchLauncher confirm --tags=@the-failing-tag --name=The failing scenario
 ```
 
 After the run, read `pkb_run_profile` from `run-catalog.json` / `run-index.json` / `summary.json`. That is the complete resolved RunVar list. Do not assume omitted `pkb_runvars` keys equal project `pickleball.properties`.
@@ -235,7 +235,8 @@ Do not recursively ingest an entire run.
 ### Diagnostic CLI
 
 ```text
-DiagnosticCli discover-hint
+PickleballWorkbenchLauncher hint
+PickleballWorkbenchLauncher discover
 DiagnosticCli compare-runs <left-run-index> <right-run-index> [output-json]
 DiagnosticCli compare-fingerprints <left.pkbf> <right.pkbf> [output-json]
 DiagnosticCli emit-investigation <investigation-json-or--> <consumer-project-root>

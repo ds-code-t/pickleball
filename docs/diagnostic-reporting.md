@@ -114,19 +114,19 @@ See `docs/ai-run-configuration.md` and `docs/diagnostic-lineage-metadata.md`.
 
 ## Diagnostic CLI
 
-Supported command-line operations:
+The agent-facing entry is Pickleball Workbench. DiagnosticCli remains the implementation behind export-guidance/hint and the comparison utilities:
 
 ```text
 DiagnosticCli guidance
 DiagnosticCli export-guidance [output-directory]
-DiagnosticCli discover-hint
+DiagnosticCli discover-hint [project]
 DiagnosticCli emit-investigation <investigation-json-or--> <consumer-project-root>
 DiagnosticCli compare-runs <left-run-index> <right-run-index> [output-json]
 DiagnosticCli compare-fingerprints <left.pkbf> <right.pkbf> [output-json]
 DiagnosticCli rebuild <diagnostic-runs-root-or-run-root>
 ```
 
-`DiagnosticCli help`, `--help`, and `-h` print this same command list.
+`DiagnosticCli help`, `--help`, and `-h` print this list and state that Workbench is the agent entry.
 
 Prefer `DiagnosticCli` over custom Maven-classpath/JShell workflows for routine comparison and recovery.
 

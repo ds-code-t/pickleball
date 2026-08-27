@@ -5,8 +5,10 @@ import org.junit.jupiter.api.Test;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class WorkbenchApplicationTest {
@@ -22,6 +24,8 @@ class WorkbenchApplicationTest {
         assertTrue(output.stdout().contains("live-check <project>"));
         assertTrue(output.stdout().contains("mcp <project>"));
         assertTrue(output.stdout().contains("ui <project>"));
+        assertTrue(output.stdout().contains("isolate <project>"));
+        assertTrue(output.stdout().contains("PickleballWorkbenchLauncher"));
         assertEquals("", output.stderr());
     }
 
@@ -69,6 +73,26 @@ class WorkbenchApplicationTest {
         assertEquals(dashed.stdout(), word.stdout());
         assertEquals("", shortFlag.stderr());
         assertEquals("", word.stderr());
+    }
+
+    @Test
+    void isolateWithoutSnapshotFailsClearlyWithoutSuggestingIdeMcp() {
+        Output output = run("isolate", Path.of("").toAbsolutePath().normalize().toString());
+
+        assertEquals(1, output.exitCode());
+        assertTrue(output.stderr().contains("Workbench CLI isolate failed"));
+        assertTrue(output.stderr().contains("no prior Discover snapshot")
+                || output.stderr().contains("No prior Discover snapshot"));
+        assertFalse(output.stderr().toLowerCase().contains("register mcp"));
+        assertFalse(output.stderr().toLowerCase().contains("intellij"));
+    }
+
+    @Test
+    void isolateRequiresAProject() {
+        Output output = run("isolate");
+
+        assertEquals(1, output.exitCode());
+        assertTrue(output.stderr().contains("Usage: pickleball-workbench isolate <project>"));
     }
 
     @Test

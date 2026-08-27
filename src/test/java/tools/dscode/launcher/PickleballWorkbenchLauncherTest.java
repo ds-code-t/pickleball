@@ -49,10 +49,27 @@ class PickleballWorkbenchLauncherTest {
         String[] implicitProject = PickleballWorkbenchLauncher.normalizedArguments(
                 new String[]{"mcp"}
         );
+        String[] isolate = PickleballWorkbenchLauncher.normalizedArguments(
+                new String[]{"isolate", "--tags=@failing"}
+        );
+        String[] discoverHint = PickleballWorkbenchLauncher.normalizedArguments(
+                new String[]{"hint"}
+        );
         assertEquals("ui", defaults[0]);
         assertEquals(Path.of("").toAbsolutePath().normalize().toString(), defaults[1]);
         assertEquals("mcp", implicitProject[0]);
         assertEquals(Path.of("").toAbsolutePath().normalize().toString(), implicitProject[1]);
+        assertEquals("isolate", isolate[0]);
+        assertEquals(Path.of("").toAbsolutePath().normalize().toString(), isolate[1]);
+        assertEquals("--tags", isolate[2]);
+        assertEquals("@failing", isolate[3]);
+        assertEquals("hint", discoverHint[0]);
+
+        String[] exportGuidance = PickleballWorkbenchLauncher.normalizedArguments(
+                new String[]{"export-guidance", ".pickleball"}
+        );
+        assertEquals("export-guidance", exportGuidance[0]);
+        assertEquals(".pickleball", exportGuidance[1]);
 
         byte[] streamed = {9, 8, 7, 6};
         Path fromStream = PickleballWorkbenchLauncher.extractPayload(

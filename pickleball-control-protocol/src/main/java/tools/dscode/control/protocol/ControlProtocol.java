@@ -12,6 +12,9 @@ public final class ControlProtocol {
             "pickleball.workbench.testOutputRoot";
     public static final String EMBEDDED_WORKBENCH_RESOURCE =
             "META-INF/pickleball/workbench/pickleball-workbench.jar";
+    /** Written by Workbench discover; isolate/confirm replay this snapshot as {@code pkb_runvars}. */
+    public static final String LAST_DISCOVER_SNAPSHOT_RELATIVE =
+            ".pickleball/workbench/last-discover.json";
 
     /*
      * Reserved neutral references used over the existing Mapping snapshot/restore

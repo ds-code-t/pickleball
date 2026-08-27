@@ -323,18 +323,18 @@ When operating in a consumer project:
 
 ## AI agents
 
-Set a **complete** Discover `pkb_runvars` rather than a partial overlay:
+The agent-facing entry is Pickleball Workbench (`hint`, `discover`, `isolate`, `confirm`). Set a **complete** Discover `pkb_runvars` rather than a partial overlay. Workbench `hint` prints the browser-ladder result and estimated integer parallel count. The browser ladder keeps a remote project `pkb_browser` (`SAUCE_*` / `GRID_*` / `REMOTE_*`); otherwise it prefers `CHROME_HEADLESS`. Unused Sauce/Grid yaml files are not auto-selected.
 
 ```text
-pkb_browser=CHROME_HEADLESS
+pkb_browser=<browser ladder>
 pkb_parallel=<conservative JVM estimate or auto>
 pkb_reportingmode=diagnostic
 pkb_loglevel=warn
 pkb_reportretention=failed
 ```
 
-plus the narrowest useful `pkb_tags` / `pkb_name`. `DiagnosticCli discover-hint` prints the estimated integer parallel count for the current JVM. Multi-scenario Discover/Confirm must use headless Chrome and high parallelism. Isolate / live Workbench stays one paused scenario.
+plus the narrowest useful `pkb_tags` / `pkb_name`. Multi-scenario Discover/Confirm use that high parallelism. Isolate / live Workbench stays one paused scenario.
 
-After the run, inspect `pkb_run_profile` from `run-catalog.json`, `run-index.json`, or `summary.json`. That output is the complete resolved RunVar list after inheritance (glue/features/data/call/component/configpath) and after `pkb_parallel=auto` is stamped as an integer. Do not assume omitted `pkb_runvars` keys equal project `pickleball.properties` — optional keys such as headed Chrome, `pretty`, and `pkb_tags=@all` do not leak into a controlled run, which is why agents must set the Discover keys explicitly.
+After Discover, inspect `pkb_run_profile` from `run-catalog.json`, `run-index.json`, or `summary.json`. Isolate and confirm replay that retained profile through `pkb_runvars`. If there is no prior Discover snapshot, Workbench says so; it does not silently re-resolve from project defaults.
 
 Never supply `pkb_run_profile` as input. Workbench MCP `workbench_diagnostic_catalog`, `workbench_diagnostic_run`, and `workbench_diagnostic_summary` return the same retained `runProfile` when present. The consumer worker resolves the same snapshot internally through `PickleballRunner`; it does not accept `pkb_run_profile` as input.

@@ -237,13 +237,17 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/common/mappings/ScenarioMapping.java`
 - `src/main/java/tools/dscode/common/mappings/StepMapping.java`
 - `src/main/java/tools/dscode/common/mappings/ValueFormatting.java`
+- `src/main/java/tools/dscode/common/reporting/diagnostic/AgentBrowserLadder.java`
+- `src/main/java/tools/dscode/common/reporting/diagnostic/AgentDiscoverPlanner.java`
 - `src/main/java/tools/dscode/common/reporting/diagnostic/ConfigurationProvenance.java`
+- `src/main/java/tools/dscode/common/reporting/diagnostic/ConsumerMavenTestRunner.java`
 - `src/main/java/tools/dscode/common/reporting/diagnostic/DiagnosticCli.java`
 - `src/main/java/tools/dscode/common/reporting/diagnostic/DiagnosticIndexRebuilder.java`
 - `src/main/java/tools/dscode/common/reporting/diagnostic/DiagnosticReporter.java`
 - `src/main/java/tools/dscode/common/reporting/diagnostic/DiagnosticRunComparator.java`
 - `src/main/java/tools/dscode/common/reporting/diagnostic/DiagnosticRuntime.java`
 - `src/main/java/tools/dscode/common/reporting/diagnostic/ExplicitReportRegistry.java`
+- `src/main/java/tools/dscode/common/reporting/diagnostic/LastDiscoverSnapshot.java`
 - `src/main/java/tools/dscode/common/reporting/diagnostic/ReportRetentionPolicy.java`
 - `src/main/java/tools/dscode/common/reporting/diagnostic/ScenarioIdentity.java`
 - `src/main/java/tools/dscode/common/reporting/diagnostic/SourceProvenance.java`
@@ -365,6 +369,8 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/coredefinitions/UtilitySteps.java`
 - `src/main/java/tools/dscode/cucumberextended/utilities/StringUtilities.java`
 - `src/main/java/tools/dscode/launcher/PickleballWorkbenchLauncher.java`
+- `src/main/java/tools/dscode/launcher/WorkbenchAgentCommands.java`
+- `src/main/java/tools/dscode/launcher/WorkbenchCommandLine.java`
 - `src/main/java/tools/dscode/misc/DummySteps.java`
 - `src/main/java/tools/dscode/parallelutilities/ParallelCountEstimator.java`
 - `src/main/java/tools/dscode/parallelutilities/Stagger.java`
@@ -389,8 +395,11 @@ This inventory helps coding agents discover relevant files. It does not replace 
 
 ## Framework tests
 
+- `src/test/java/tools/dscode/common/reporting/diagnostic/AgentBrowserLadderTest.java`
+- `src/test/java/tools/dscode/common/reporting/diagnostic/AgentDiscoverPlannerTest.java`
 - `src/test/java/tools/dscode/control/override/StepOverrideCompilerTest.java`
 - `src/test/java/tools/dscode/launcher/PickleballWorkbenchLauncherTest.java`
+- `src/test/java/tools/dscode/launcher/WorkbenchAgentCommandsTest.java`
 - `src/test/java/tools/dscode/parallelutilities/ParallelCountEstimatorTest.java`
 - `src/test/java/tools/dscode/testengine/DynamicSuiteBootstrapWorkbenchRootTest.java`
 
@@ -484,6 +493,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/catalog/ConsumerFeatureCatalog.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/catalog/ScenarioFilter.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/diagnostics/DiagnosticEvidenceNavigator.java`
+- `pickleball-workbench/src/main/java/tools/dscode/workbench/discover/LastDiscoverSnapshot.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/lease/WorkbenchCallContext.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/lease/WorkbenchControlLease.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/lease/WorkbenchControlLeaseSnapshot.java`
@@ -547,6 +557,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/catalog/ScenarioFilterTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/diagnostics/DiagnosticEvidenceNavigatorTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/diagnostics/InvestigationHandoffTest.java`
+- `pickleball-workbench/src/test/java/tools/dscode/workbench/discover/LastDiscoverSnapshotTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/lease/WorkbenchControlLeaseTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/mapping/MappingValueCodecTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/mcp/WorkbenchAttachServerTest.java`
@@ -595,6 +606,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `maven-consumer-project/src/test/java/tools/dscode/common/driver/ChromeHeadlessConfigChecks.java`
 - `maven-consumer-project/src/test/java/tools/dscode/common/mappings/MappingDataRefactorChecks.java`
 - `maven-consumer-project/src/test/java/tools/dscode/common/mappings/QuoteParserChecks.java`
+- `maven-consumer-project/src/test/java/tools/dscode/common/reporting/diagnostic/AgentBrowserLadderChecks.java`
 - `maven-consumer-project/src/test/java/tools/dscode/common/reporting/diagnostic/Diagnostic213CompletionChecks.java`
 - `maven-consumer-project/src/test/java/tools/dscode/common/reporting/diagnostic/DiagnosticReportingChecks.java`
 - `maven-consumer-project/src/test/java/tools/dscode/common/reporting/diagnostic/InvestigationHandoffChecks.java`
@@ -603,6 +615,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `maven-consumer-project/src/test/java/tools/dscode/common/util/datetime/BusinessTimePostModifierChecks.java`
 - `maven-consumer-project/src/test/java/tools/dscode/coredefinitions/DataTableConversionChecks.java`
 - `maven-consumer-project/src/test/java/tools/dscode/coredefinitions/ModularScenariosChecks.java`
+- `maven-consumer-project/src/test/java/tools/dscode/launcher/WorkbenchAgentCommandChecks.java`
 - `maven-consumer-project/src/test/java/tools/dscode/parallelutilities/ParallelCountEstimatorChecks.java`
 - `maven-consumer-project/src/test/java/tools/dscode/testengine/PkbPropertyValueNormalizerChecks.java`
 - `maven-consumer-project/src/test/java/tools/dscode/testengine/ProfileConfigurationChecks.java`

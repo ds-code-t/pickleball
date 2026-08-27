@@ -60,7 +60,12 @@ public final class ParallelCountEstimator {
     }
 
     public static String recommendedDiscoverRunVars() {
-        return "pkb_browser=CHROME_HEADLESS, pkb_parallel=" + estimate()
+        return recommendedDiscoverRunVars("CHROME_HEADLESS");
+    }
+
+    public static String recommendedDiscoverRunVars(String browser) {
+        String selected = browser == null || browser.isBlank() ? "CHROME_HEADLESS" : browser.trim();
+        return "pkb_browser=" + selected + ", pkb_parallel=" + estimate()
                 + ", pkb_reportingmode=diagnostic, pkb_loglevel=warn, pkb_reportretention=failed";
     }
 }
