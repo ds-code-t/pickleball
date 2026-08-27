@@ -79,6 +79,8 @@ public class PickleballGuidanceChecks {
             assertTrue(chooserList.contains("run-catalog.json"));
             assertTrue(chooserList.contains("after discovery has named the trouble spots"));
             assertTrue(chooserList.contains("Do not start a worker just to run the whole suite"));
+            assertTrue(guide.contains("Maintainer pointer-eval harness"));
+            assertTrue(guide.contains("@agent-pointer-eval"));
             String liveLoop = guide.substring(
                     guide.indexOf("### Live isolation loop"),
                     guide.indexOf("Generated guidance lifecycle")
@@ -201,6 +203,9 @@ public class PickleballGuidanceChecks {
                     "maven-consumer-project/src/test/resources/features/dynamic-steps.feature"
             )));
             assertTrue(Files.isRegularFile(root.resolve(
+                    "maven-consumer-project/src/test/resources/features/agent-pointer-eval.feature"
+            )));
+            assertTrue(Files.isRegularFile(root.resolve(
                     "maven-consumer-project/src/test/resources/calls/service-call-definitions.feature"
             )));
             assertTrue(Files.isRegularFile(root.resolve(
@@ -237,6 +242,9 @@ public class PickleballGuidanceChecks {
             assertTrue(managedFiles.contains(
                     "maven-consumer-project/src/test/resources/features/dynamic-steps.feature"
             ));
+            assertTrue(managedFiles.contains(
+                    "maven-consumer-project/src/test/resources/features/agent-pointer-eval.feature"
+            ));
             assertTrue(managedFiles.stream().noneMatch(path -> path.contains("_local2")));
             assertFalse(managedFiles.contains("maven-consumer-project/AGENTS.md"));
             assertFalse(managedFiles.contains("maven-consumer-project/.github/copilot-instructions.md"));
@@ -260,6 +268,8 @@ public class PickleballGuidanceChecks {
             assertTrue(guide.contains("tell the human"));
             assertTrue(guide.contains("CLI/Maven-primary"));
             assertTrue(guide.contains("PickleballWorkbenchLauncher"));
+            assertTrue(guide.contains("Maintainer pointer-eval harness"));
+            assertTrue(guide.contains("@agent-pointer-eval"));
 
             String consumerProject = Files.readString(root.resolve("docs/consumer-project.md"));
             assertTrue(consumerProject.contains("keep console verbosity low"));

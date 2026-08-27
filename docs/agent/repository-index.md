@@ -604,6 +604,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 
 ## Maven consumer feature scenarios
 
+- `maven-consumer-project/src/test/resources/features/agent-pointer-eval.feature`
 - `maven-consumer-project/src/test/resources/features/browser-action-contracts.feature`
 - `maven-consumer-project/src/test/resources/features/catalog-context.feature`
 - `maven-consumer-project/src/test/resources/features/component-scenarios.feature`

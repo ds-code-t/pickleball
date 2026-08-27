@@ -346,6 +346,7 @@ def validate_consumer_bridge(errors: list[str]) -> None:
             "Diagnostic investigation protocol",
             "attach.json",
             "ui .",
+            "@agent-pointer-eval",
         ):
             if forbidden in text:
                 errors.append(
@@ -400,6 +401,7 @@ def validate_dependency_owned_guidance(errors: list[str]) -> None:
         "version-matched",
         "Generated Maven consumer reference",
         "maven-consumer-project/",
+        "@agent-pointer-eval",
     ):
         if required not in text:
             errors.append(
@@ -447,6 +449,98 @@ def validate_consumer_ignore(errors: list[str]) -> None:
             "Consumer .gitignore must ignore /.pickleball/: "
             "maven-consumer-project/.gitignore"
         )
+
+
+AGENT_POINTER_EVAL_FEATURE = (
+    "maven-consumer-project/src/test/resources/features/agent-pointer-eval.feature"
+)
+AGENT_POINTER_EVAL_TAG = "@agent-pointer-eval"
+MAVEN_SUITE_PROFILE_TAGS = {
+    "@all",
+    "@regression",
+    "@smoke",
+    "@browser",
+    "@data",
+    "@navigation",
+    "@forms",
+    "@catalog",
+    "@mapping",
+    "@resources",
+    "@workflow",
+    "@block-conditionals",
+    "@nested-steps",
+    "@keyboard",
+    "@dialogs",
+    "@components",
+}
+
+
+def parse_gherkin_tagged_elements(text: str) -> list[tuple[str, list[str]]]:
+    pending: list[str] = []
+    elements: list[tuple[str, list[str]]] = []
+    for raw in text.splitlines():
+        stripped = raw.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        if stripped.startswith("@"):
+            pending.extend(token for token in stripped.split() if token.startswith("@"))
+            continue
+        if (
+            stripped.startswith("Feature:")
+            or stripped.startswith("Scenario:")
+            or stripped.startswith("Scenario Outline:")
+        ):
+            elements.append((stripped, pending))
+            pending = []
+    return elements
+
+
+def validate_agent_pointer_eval_harness(errors: list[str]) -> None:
+    relative = AGENT_POINTER_EVAL_FEATURE
+    path = ROOT / relative
+    if not path.is_file():
+        errors.append("Missing opt-in consumer pointer-eval harness: " + relative)
+        return
+
+    elements = parse_gherkin_tagged_elements(path.read_text(encoding="utf-8"))
+    if not elements or not elements[0][0].startswith("Feature:"):
+        errors.append("Pointer-eval harness must declare a Feature: " + relative)
+        return
+
+    scenarios = [
+        element
+        for element in elements
+        if element[0].startswith("Scenario:") or element[0].startswith("Scenario Outline:")
+    ]
+    if len(scenarios) < 2:
+        errors.append(
+            "Pointer-eval harness must contain more than one Scenario so isolate can "
+            "target distinct names: " + relative
+        )
+
+    for name, tags in elements:
+        missing = AGENT_POINTER_EVAL_TAG not in tags
+        forbidden = sorted(tag for tag in tags if tag in MAVEN_SUITE_PROFILE_TAGS)
+        extras = [
+            tag
+            for tag in tags
+            if tag != AGENT_POINTER_EVAL_TAG and not tag.startswith(AGENT_POINTER_EVAL_TAG + "-")
+        ]
+        if missing:
+            errors.append(
+                f"Pointer-eval harness element must carry {AGENT_POINTER_EVAL_TAG}: "
+                f"{relative} -> {name}"
+            )
+        if forbidden:
+            errors.append(
+                "Pointer-eval harness must not carry Maven suite-profile tags "
+                f"{forbidden}: {relative} -> {name}"
+            )
+        if extras:
+            errors.append(
+                "Pointer-eval harness may only add unique @agent-pointer-eval-* tags, "
+                f"not {extras}: {relative} -> {name}"
+            )
 
 
 def validate_packaged_guidance(errors: list[str]) -> None:
@@ -542,6 +636,7 @@ def main() -> int:
     validate_consumer_bridge(errors)
     validate_consumer_readme(errors)
     validate_dependency_owned_guidance(errors)
+    validate_agent_pointer_eval_harness(errors)
     validate_consumer_reference_build_hook(errors)
     validate_consumer_tracked_artifacts(errors)
     validate_consumer_ignore(errors)

@@ -295,3 +295,15 @@ Use `docs/consumer-project.md` on demand for the Maven consumer layout, local te
 If the consumer is nested inside the Pickleball source repository, repository-level `AGENTS.md` may impose additional maintainer rules for framework changes. Those core-maintainer rules are additive and do not replace this consumer-facing contract.
 
 For a normal external consumer, do not assume those core files exist.
+
+## Maintainer pointer-eval harness
+
+Pickleball's example Maven consumer includes an opt-in mixed pass/fail suite tagged only `@agent-pointer-eval` (`maven-consumer-project/src/test/resources/features/agent-pointer-eval.feature`). It is not part of `@all`, `@regression`, or the other Maven suite-profile tags. The failures are intentional canned fixtures for scoring whether a consumer AI agent follows the short `AGENTS.md` pointer into this guide and then uses discover-then-isolate. Do not treat those failures as product bugs, and do not "fix" the feature unless a human asked to change the harness.
+
+Run it explicitly:
+
+```text
+mvn test -Dpkb_runvars="pkb_tags=@agent-pointer-eval, pkb_browser=CHROME_HEADLESS"
+```
+
+or `-Dpkb_tags=@agent-pointer-eval`. Do not add this tag to consumer `AGENTS.md` or Copilot pointer files.
