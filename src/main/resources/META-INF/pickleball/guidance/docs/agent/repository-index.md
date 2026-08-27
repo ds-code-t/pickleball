@@ -366,6 +366,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/cucumberextended/utilities/StringUtilities.java`
 - `src/main/java/tools/dscode/launcher/PickleballWorkbenchLauncher.java`
 - `src/main/java/tools/dscode/misc/DummySteps.java`
+- `src/main/java/tools/dscode/parallelutilities/ParallelCountEstimator.java`
 - `src/main/java/tools/dscode/parallelutilities/Stagger.java`
 - `src/main/java/tools/dscode/pickleruntime/CucumberOptionResolver.java`
 - `src/main/java/tools/dscode/registry/GlobalRegistry.java`
@@ -382,6 +383,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/testengine/PkbPropertyValueNormalizer.java`
 - `src/main/java/tools/dscode/testengine/SensitiveConfiguration.java`
 - `src/main/java/tools/dscode/testengine/WorkbenchWorkerMain.java`
+- `src/main/resources/META-INF/pickleball/configs/CHROME_HEADLESS.yaml`
 - `src/main/resources/META-INF/services/org.junit.platform.engine.TestEngine`
 - `src/main/resources/META-INF/services/org.junit.platform.launcher.LauncherSessionListener`
 
@@ -389,6 +391,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 
 - `src/test/java/tools/dscode/control/override/StepOverrideCompilerTest.java`
 - `src/test/java/tools/dscode/launcher/PickleballWorkbenchLauncherTest.java`
+- `src/test/java/tools/dscode/parallelutilities/ParallelCountEstimatorTest.java`
 - `src/test/java/tools/dscode/testengine/DynamicSuiteBootstrapWorkbenchRootTest.java`
 
 ## Control API module
@@ -589,6 +592,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `maven-consumer-project/src/test/java/tools/dscode/common/dataelements/DataElementPhaseOneChecks.java`
 - `maven-consumer-project/src/test/java/tools/dscode/common/dataelements/DataElementPhaseThreeChecks.java`
 - `maven-consumer-project/src/test/java/tools/dscode/common/dataelements/DataElementPhaseTwoChecks.java`
+- `maven-consumer-project/src/test/java/tools/dscode/common/driver/ChromeHeadlessConfigChecks.java`
 - `maven-consumer-project/src/test/java/tools/dscode/common/mappings/MappingDataRefactorChecks.java`
 - `maven-consumer-project/src/test/java/tools/dscode/common/mappings/QuoteParserChecks.java`
 - `maven-consumer-project/src/test/java/tools/dscode/common/reporting/diagnostic/Diagnostic213CompletionChecks.java`
@@ -599,6 +603,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `maven-consumer-project/src/test/java/tools/dscode/common/util/datetime/BusinessTimePostModifierChecks.java`
 - `maven-consumer-project/src/test/java/tools/dscode/coredefinitions/DataTableConversionChecks.java`
 - `maven-consumer-project/src/test/java/tools/dscode/coredefinitions/ModularScenariosChecks.java`
+- `maven-consumer-project/src/test/java/tools/dscode/parallelutilities/ParallelCountEstimatorChecks.java`
 - `maven-consumer-project/src/test/java/tools/dscode/testengine/PkbPropertyValueNormalizerChecks.java`
 - `maven-consumer-project/src/test/java/tools/dscode/testengine/ProfileConfigurationChecks.java`
 
