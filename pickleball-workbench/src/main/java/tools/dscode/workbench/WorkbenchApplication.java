@@ -63,7 +63,7 @@ public final class WorkbenchApplication {
                 case "status" -> status(args, out);
                 case "worker-check" -> workerCheck(args, out);
                 case "live-check" -> liveCheck(args, out);
-                case "isolate" -> isolate(args, out, err);
+                case "isolate" -> isolate(args, out, err, stdinIsInteractiveTty());
                 case "ui" -> ui(args);
                 case "mcp" -> throw new IllegalArgumentException(
                         "MCP mode must be launched through the Workbench executable."
@@ -183,7 +183,7 @@ public final class WorkbenchApplication {
         return 0;
     }
 
-    private static int isolate(String[] args, PrintStream out, PrintStream err) {
+    static int isolate(String[] args, PrintStream out, PrintStream err, boolean interactiveStdin) {
         IsolateArgs parsed = isolateArgs(args);
         Map<String, String> workerProperties;
         try {
@@ -197,7 +197,7 @@ public final class WorkbenchApplication {
         }
 
         boolean once = Boolean.getBoolean("pickleball.workbench.isolate.once");
-        if (!once && !stdinIsInteractiveTty()) {
+        if (!once && !interactiveStdin) {
             err.println("Live isolate holds a paused worker for execute_step.");
             err.println("That needs an already-running Workbench (pre-attached workbench_* tools or an interactive TTY session).");
             err.println("Maven one-shot isolate is not the no-MCP agent path. Do not register IDE MCP. Do not start the GUI.");
@@ -234,7 +234,24 @@ public final class WorkbenchApplication {
     }
 
     static boolean stdinIsInteractiveTty() {
-        return System.console() != null;
+        if (System.console() == null) return false;
+        try {
+            ProcessBuilder builder = new ProcessBuilder("sh", "-c", "test -t 0");
+            builder.redirectInput(ProcessBuilder.Redirect.INHERIT);
+            builder.redirectOutput(ProcessBuilder.Redirect.DISCARD);
+            builder.redirectError(ProcessBuilder.Redirect.DISCARD);
+            Process process = builder.start();
+            if (!process.waitFor(2, java.util.concurrent.TimeUnit.SECONDS)) {
+                process.destroyForcibly();
+                return false;
+            }
+            return process.exitValue() == 0;
+        } catch (InterruptedException failure) {
+            Thread.currentThread().interrupt();
+            return false;
+        } catch (Exception ignored) {
+            return true;
+        }
     }
 
     private record IsolateArgs(Path project, String tags, String name) {

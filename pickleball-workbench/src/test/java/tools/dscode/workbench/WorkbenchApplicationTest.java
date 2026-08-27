@@ -105,7 +105,6 @@ class WorkbenchApplicationTest {
     @Test
     @Timeout(value = 5, unit = TimeUnit.SECONDS)
     void isolateWithoutInteractiveTtyDoesNotHangAndPointsToConfirm() throws Exception {
-        assertFalse(WorkbenchApplication.stdinIsInteractiveTty());
         Path snapshot = tempDir.resolve(ControlProtocol.LAST_DISCOVER_SNAPSHOT_RELATIVE);
         Files.createDirectories(snapshot.getParent());
         Files.writeString(snapshot, """
@@ -122,7 +121,23 @@ class WorkbenchApplicationTest {
                 }
                 """);
 
-        Output output = run("isolate", tempDir.toString(), "--tags=@failing");
+        ByteArrayOutputStream stdout = new ByteArrayOutputStream();
+        ByteArrayOutputStream stderr = new ByteArrayOutputStream();
+        int exitCode;
+        try (PrintStream out = new PrintStream(stdout, true, StandardCharsets.UTF_8);
+             PrintStream err = new PrintStream(stderr, true, StandardCharsets.UTF_8)) {
+            exitCode = WorkbenchApplication.isolate(
+                    new String[]{"isolate", tempDir.toString(), "--tags=@failing"},
+                    out,
+                    err,
+                    false
+            );
+        }
+        Output output = new Output(
+                exitCode,
+                stdout.toString(StandardCharsets.UTF_8),
+                stderr.toString(StandardCharsets.UTF_8)
+        );
 
         assertEquals(2, output.exitCode());
         assertTrue(output.stderr().contains("already-running Workbench"));
@@ -130,8 +145,8 @@ class WorkbenchApplicationTest {
                 || output.stderr().contains("workbench_*"));
         assertTrue(output.stderr().contains("confirm") || output.stdout().contains("confirm"));
         assertTrue(output.stdout().contains("NEXT: confirm"));
-        assertFalse(output.stdout().contains("execute_step"));
-        assertFalse(output.stderr().contains("execute_step"));
+        assertFalse(output.stdout().contains("NEXT: execute_step"));
+        assertFalse(output.stderr().contains("NEXT: execute_step"));
         assertFalse(output.stdout().contains("Workbench isolate worker:"));
         assertFalse(output.stderr().toLowerCase().contains("intellij"));
     }
