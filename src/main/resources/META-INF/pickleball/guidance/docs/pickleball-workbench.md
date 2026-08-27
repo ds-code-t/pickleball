@@ -45,7 +45,7 @@ META-INF/pickleball/workbench/pickleball-workbench.jar
 
 Run the small launcher from the consumer test classpath. For Maven consumers, this command requires no cache path, separate Workbench dependency, or separately selected version.
 
-Workbench is the consumer AI-agent front door. Agents use `export-guidance`, `hint`, `discover`, `isolate`, and `confirm`. Do not start the GUI. Do not register IDE MCP.
+Workbench is the consumer AI-agent front door. Agents use `export-guidance`, `hint`, `discover`, and `confirm`. Live isolate only if `workbench_*` tools are already in this session. Do not start the GUI. Do not register IDE MCP.
 
 ```bash
 mvn -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java \
@@ -57,9 +57,10 @@ mvn -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java \
 ```bash
 "-Dexec.args=hint"
 "-Dexec.args=discover --tags=@smoke"
-"-Dexec.args=isolate --name='The failing scenario'"
-"-Dexec.args=confirm --tags=@smoke"
+"-Dexec.args=confirm --tags=@smoke --name='The failing scenario'"
 ```
+
+Same launcher; only change `-Dexec.args`. Do not Maven-exec `isolate` as a one-shot. Live isolate needs an already-running Workbench (pre-attached `workbench_*` or an interactive TTY session).
 
 `mcp` and `ui` remain host/human commands. Hosts that already run Workbench MCP can launch it from the consumer test classpath:
 
@@ -82,7 +83,7 @@ Gradle consumers can expose the same dependency-owned launcher without resolving
 tasks.register('pickleballWorkbench', JavaExec) {
     classpath = sourceSets.test.runtimeClasspath
     mainClass = 'tools.dscode.launcher.PickleballWorkbenchLauncher'
-    args 'mcp', projectDir.absolutePath // optional host MCP; pass 'ui' for the Swing player
+    args 'hint' // no-MCP Discover helper; pass 'discover' / 'confirm' for the agent path. Optional host MCP: 'mcp', projectDir.absolutePath. Humans: 'ui'.
 }
 ```
 
@@ -325,7 +326,7 @@ A Copilot or other MCP-style client finds that file in the consumer project, the
 4. Use the existing live tools (`workbench_execute_step`, Mapping, evidence, worker) while holding the lease, and `workbench_set_current_action` so the human can watch.
 5. `POST {url}/tools/workbench_request_save` to ask to copy the live scenario into the original feature. The call blocks until the human clicks Allow or Deny, or Take control.
 
-Headless `java -jar pickleball-workbench-<version>.jar mcp <project>` stays stdio JSON-RPC only. That is the consumer-agent path. That client may hold the lease without a banner. Save is still a distinct explicit tool and never an implicit write.
+Headless `java -jar pickleball-workbench-<version>.jar mcp <project>` stays stdio JSON-RPC only. That is optional host wiring when `workbench_*` tools are already connected, not the consumer-agent path. That client may hold the lease without a banner. Save is still a distinct explicit tool and never an implicit write.
 
 A human-watched UI session is optional and separate. From `maven-consumer-project`, a person may start `ui .` and then a watcher can join `.pickleball/workbench/attach.json`. Do not launch a second `mcp` process against the same live UI session, and do not treat that attach file as the default agent path.
 
@@ -337,7 +338,7 @@ Start the lightweight non-Spring MCP server for a consumer project. This is opti
 java -jar $workbenchJar mcp ".\maven-consumer-project"
 ```
 
-Or, from a Maven consumer test classpath, `"-Dexec.args=mcp ."`. That launcher is optional host wiring for environments that already run MCP. Agents use Workbench `discover` / `isolate` / `confirm`. They must not self-register IDE MCP or start an IDE-owned stdio server. Isolate a known failure with Workbench CLI `isolate` or already-connected `workbench_*` tools. Do not document or use the Swing GUI, `ui .`, or `.pickleball/workbench/attach.json` as the agent path.
+Or, from a Maven consumer test classpath, `"-Dexec.args=mcp ."`. That launcher is optional host wiring for environments that already run MCP. Agents use Workbench `discover` / `confirm`. They must not self-register IDE MCP or start an IDE-owned stdio server. Live isolate only if `workbench_*` tools are already connected or stdin is an interactive TTY. Do not document or use the Swing GUI, `ui .`, or `.pickleball/workbench/attach.json` as the agent path.
 
 The server uses the official Java MCP SDK core and stdio transport with the Jackson 2 JSON adapter. MCP dependencies are Workbench-only and are shaded into the executable companion. Workbench deliberately does not use Spring Boot, Spring Framework, Spring AI, WebMVC, or Tomcat.
 

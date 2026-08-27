@@ -1,5 +1,9 @@
 package tools.dscode.parallelutilities;
 
+import tools.dscode.common.reporting.diagnostic.AgentBrowserLadder;
+
+import java.nio.file.Path;
+
 /**
  * Conservative high parallel-count estimate from JVM-visible CPU and heap.
  *
@@ -60,11 +64,16 @@ public final class ParallelCountEstimator {
     }
 
     public static String recommendedDiscoverRunVars() {
-        return recommendedDiscoverRunVars("CHROME_HEADLESS");
+        return recommendedDiscoverRunVars(Path.of("").toAbsolutePath().normalize());
+    }
+
+    /** Browser comes from {@link AgentBrowserLadder}, not a hardcoded headless Chrome. */
+    public static String recommendedDiscoverRunVars(Path projectRoot) {
+        return recommendedDiscoverRunVars(AgentBrowserLadder.select(projectRoot).browser());
     }
 
     public static String recommendedDiscoverRunVars(String browser) {
-        String selected = browser == null || browser.isBlank() ? "CHROME_HEADLESS" : browser.trim();
+        String selected = browser == null || browser.isBlank() ? AgentBrowserLadder.CHROME_HEADLESS : browser.trim();
         return "pkb_browser=" + selected + ", pkb_parallel=" + estimate()
                 + ", pkb_reportingmode=diagnostic, pkb_loglevel=warn, pkb_reportretention=failed";
     }

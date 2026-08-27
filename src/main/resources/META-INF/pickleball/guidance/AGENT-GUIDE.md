@@ -8,28 +8,33 @@ A consumer project may contain only a short `AGENTS.md` bridge. That bridge uses
 
 Pickleball Workbench is the one front door. It is a Java/Maven program, not an IDE feature and not a GUI requirement. Do not start the GUI. Do not register IDE MCP.
 
-If `workbench_*` tools are already present in this session, use them as an alias for the same Isolate loop. Otherwise keep using Workbench CLI verbs. Missing `workbench_*` tools is not a reason to skip Discover.
+No-MCP agent path: Workbench `discover` then `confirm` (narrow `--tags` / `--name`). Live isolate (paused worker + `execute_step`) only if `workbench_*` tools are already present in this session, or a human/host already has a Workbench session. Missing `workbench_*` tools is not a reason to skip Discover, and is not a reason to Maven-exec `isolate`.
 
-From the consumer project, with Pickleball on the test classpath (`classpathScope=test`):
+From the consumer project, with Pickleball on the test classpath (`classpathScope=test`), use the same Maven exec wrapper as the project pointer; only change `-Dexec.args`:
 
-1. **Discover** — `PickleballWorkbenchLauncher discover` (optional `--tags` / `--name`). Workbench applies complete AI `pkb_runvars`: browser ladder, high/auto parallel, diagnostic, warn, failed retention. It wraps consumer `mvn test`. Do not start a live worker to run the whole suite. Then read `run-catalog.json` and the retained `pkb_run_profile`.
-2. **Isolate** — `PickleballWorkbenchLauncher isolate` with `--tags` / `--name` for a known scenario. Replays the last Discover `pkb_run_profile` as `pkb_runvars` (never supply `pkb_run_profile` as input). One paused scenario; do not parallelize isolate. If isolate cannot obtain a live worker, tell the human that Workbench CLI isolate failed.
-3. **Confirm** — `PickleballWorkbenchLauncher confirm` with the same Discover snapshot and narrow tags/name.
-4. **Emit the human handoff, then edit real consumer source** — write `.pickleball/investigations/<id>/` then in chat print only `.pickleball/investigations/<id>/report.html`.
+```text
+mvn -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java "-Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher" "-Dexec.classpathScope=test" "-Dexec.args=discover"
+```
 
-`hint` (alias `discover-hint`) prints the recommended Discover `pkb_runvars` and `NEXT: run discover`. `mcp` and `ui` are host/human commands. Agents must not use `ui`. Hosts may already wire `mcp .`; that is optional host wiring, mentioned once, not an agent setup step.
+Same launcher for `hint`, `discover`, and `confirm` — change `exec.args` only.
+
+1. **Discover** — `-Dexec.args=discover` (optional `--tags` / `--name`). Workbench applies complete AI `pkb_runvars`: browser ladder, high/auto parallel, diagnostic, warn, failed retention. It wraps consumer `mvn test`. Do not start a live worker to run the whole suite. Then read `run-catalog.json` and the retained `pkb_run_profile`.
+2. **Confirm** — `-Dexec.args=confirm --tags=... --name=...` with the same Discover snapshot and narrow tags/name. This is the no-MCP path after Discover. Never supply `pkb_run_profile` as input.
+3. **Emit the human handoff, then edit real consumer source** — write `.pickleball/investigations/<id>/` then in chat print only `.pickleball/investigations/<id>/report.html`.
+
+`hint` (alias `discover-hint`) is `-Dexec.args=hint` and prints the recommended Discover `pkb_runvars` and `NEXT: run discover`. `mcp` and `ui` are host/human commands. Agents must not use `ui`. Hosts may already wire `mcp .`; that is optional host wiring, mentioned once, not an agent setup step.
 
 Do not copy consumer features into `.pickleball` as a sandbox.
 
 ### Live isolation loop
 
-This loop isolates a **known** failing scenario after Discover. Prefer Workbench CLI `isolate`. If `workbench_*` tools are already in this session, they are the same loop (`workbench_sync` / `workbench_worker_start` must use the Discover snapshot replayed as `pkb_runvars`).
+This loop is **not** the no-MCP Maven path. Use it only when `workbench_*` tools are already in this session, or a human/host already has a Workbench session. Do not Maven-exec `isolate` as a one-shot; there is no CLI `execute_step`, and non-TTY isolate will not hold a worker.
 
-1. Workbench `isolate` (CLI) or, when already connected, `workbench_sync` then `workbench_worker_start`.
+1. Already-connected `workbench_sync` then `workbench_worker_start` (Discover snapshot replayed as `pkb_runvars`), or interactive TTY Workbench CLI `isolate`.
 2. `workbench_request_control` when using the MCP alias.
 3. Isolate with `workbench_execute_step` and/or `workbench_player_replace_document`.
 4. Inspect with `workbench_browser_page`, `workbench_element_inspect`, and paged `workbench_events`. Prefer those over `workbench_browser_screenshot`.
-5. Confirm with Workbench `confirm`. Read the pack with `workbench_diagnostic_catalog`, `workbench_diagnostic_run`, and `workbench_diagnostic_summary` when those tools already exist.
+5. Confirm with Workbench `confirm` (`-Dexec.args=confirm --tags=... --name=...`). Read the pack with `workbench_diagnostic_catalog`, `workbench_diagnostic_run`, and `workbench_diagnostic_summary` when those tools already exist.
 6. Emit the human handoff with `workbench_investigation_emit` or `DiagnosticCli emit-investigation`. In chat print only `.pickleball/investigations/<id>/report.html`.
 
 `workbench_execute_step` returns a structured `SUCCESS` / `FAILED` / `UNAVAILABLE` result. A FAILED Gherkin hypothesis does not end the worker, does not fail the paused scenario, and is not an MCP `isError`. Page `workbench_events` with `afterSequence` and a small `limit` (default 100, max 500). Live buffer edits do not require `workbench_sync` and do not write the original `.feature` until explicit Save (`workbench_request_save`). Worker restart without rebuild already exists (`workbench_worker_restart`). Step Overrides compile worker-side (`workbench_step_override_compile`).
@@ -46,7 +51,7 @@ This loop isolates a **known** failing scenario after Discover. Prefer Workbench
 Keep first-read small. After a successful export:
 
 1. Follow the consumer project's own instructions first; they remain authoritative for project-specific behavior.
-2. Stay in this guide's tool chooser: Workbench `discover` when the failing scenario is unknown. Isolate a known failure with Workbench `isolate`, or with already-connected `workbench_*` tools as the same loop. Do not start the GUI.
+2. Stay in this guide's tool chooser: Workbench `discover` when the failing scenario is unknown, then `confirm` with narrow tags/name. Live isolate only if `workbench_*` tools are already in this session. Do not start the GUI.
 3. Inspect the **real** consumer `pom.xml`, Pickleball runner subclass, features, configuration, data, mappings, and test support before changing them.
 4. Open a specific exported guide only when that topic is needed, for example `docs/dynamic-steps.md`, `docs/diagnostic-reporting.md`, `docs/configuration.md`, or `docs/ai-run-configuration.md`.
 5. Do not assume the Pickleball core source repository is present. A normal consumer may only have the Maven dependency.
@@ -150,13 +155,13 @@ pkb_reportretention=failed
 
 Use the narrowest `pkb_tags` / `pkb_name` that isolate the failure. Do not add the `pretty` plugin; it is console noise for agents. `pkb_reportretention=failed` keeps dense evidence for failing scenarios and does not retain it for passing ones. Workbench `hint` prints the estimated integer `pkb_parallel` and the selected browser for the current project/JVM. `pkb_parallel=auto` also resolves to that estimate at run start and stamps the integer into `pkb_run_profile`.
 
-These are documented agent defaults, not `PickleballTests` human defaults (`pretty`, `@all`, often headed Chrome). Example confirmation after isolation:
+These are documented agent defaults, not `PickleballTests` human defaults (`pretty`, `@all`, often headed Chrome). Example confirmation after Discover:
 
 ```text
-PickleballWorkbenchLauncher confirm --tags=@the-failing-tag --name='The failing scenario'
+mvn -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java "-Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher" "-Dexec.classpathScope=test" "-Dexec.args=confirm --tags=@the-failing-tag --name='The failing scenario'"
 ```
 
-After any diagnostic run, read `pkb_run_profile` from the pack. That is the complete resolved RunVar list, including inherited execution-context paths and the integer parallel count. Do not treat omitted `pkb_runvars` keys as equal to project `pickleball.properties`. Isolate and confirm replay that retained profile through `pkb_runvars`; they do not silently re-resolve from project defaults.
+After any diagnostic run, read `pkb_run_profile` from the pack. That is the complete resolved RunVar list, including inherited execution-context paths and the integer parallel count. Do not treat omitted `pkb_runvars` keys as equal to project `pickleball.properties`. Confirm (and live isolate, if workbench_* is already in session) replay that retained profile through `pkb_runvars`; they do not silently re-resolve from project defaults.
 
 A selected profile or partial `pkb_runvars` input inherits only missing project execution-context RunVars:
 
@@ -214,15 +219,16 @@ After isolation and the diagnostic rerun, emit a small human handoff. JSON is th
 
 ## Diagnostic utility commands
 
-The agent-facing name is Workbench. From a Maven consumer where Pickleball is on the test classpath:
+The agent-facing name is Workbench. From a Maven consumer where Pickleball is on the test classpath, use the same launcher as the project pointer and only change `-Dexec.args`:
 
 ```text
-PickleballWorkbenchLauncher export-guidance .pickleball
-PickleballWorkbenchLauncher hint
-PickleballWorkbenchLauncher discover [--tags <expr>] [--name <expr>]
-PickleballWorkbenchLauncher isolate [--tags <expr>] [--name <expr>]
-PickleballWorkbenchLauncher confirm [--tags <expr>] [--name <expr>]
+mvn -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java "-Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher" "-Dexec.classpathScope=test" "-Dexec.args=export-guidance .pickleball"
+"-Dexec.args=hint"
+"-Dexec.args=discover [--tags <expr>] [--name <expr>]"
+"-Dexec.args=confirm [--tags <expr>] [--name <expr>]"
 ```
+
+Do not Maven-exec `isolate` unless stdin is an interactive TTY or `workbench_*` tools are already in this session.
 
 `DiagnosticCli` remains the implementation behind export-guidance/hint and the comparison/rebuild utilities:
 
@@ -238,7 +244,7 @@ DiagnosticCli rebuild <diagnostic-runs-root-or-run-root>
 
 `DiagnosticCli help`, `--help`, and `-h` print that DiagnosticCli list and state that Workbench is the agent entry.
 
-Use Workbench `export-guidance` to materialize the complete version-matched documentation plus curated Maven consumer reference, `hint` for the complete Discover `pkb_runvars` (browser ladder, estimated `pkb_parallel`, diagnostic evidence controls), and `discover` / `isolate` / `confirm` for the turnkey loop. `emit-investigation` writes `.pickleball/investigations/<id>/investigation.json` and `report.html` and prints the relative HTML path.
+Use Workbench `export-guidance` to materialize the complete version-matched documentation plus curated Maven consumer reference, `hint` for the complete Discover `pkb_runvars` (browser ladder, estimated `pkb_parallel`, diagnostic evidence controls), and `discover` / `confirm` for the no-MCP turnkey loop. Live isolate only if `workbench_*` tools are already in this session. `emit-investigation` writes `.pickleball/investigations/<id>/investigation.json` and `report.html` and prints the relative HTML path.
 
 ## Controlled diagnostic reruns
 
@@ -306,12 +312,12 @@ For a normal external consumer, do not assume those core files exist.
 
 This section is for Pickleball maintainers. It is not the product suite and is not first-read for consumer agents.
 
-Pickleball's example Maven consumer includes an opt-in mixed pass/fail suite tagged only `@agent-pointer-eval` (`maven-consumer-project/src/test/resources/features/agent-pointer-eval.feature`). It is not part of `@all`, `@regression`, or the other Maven suite-profile tags. The failures are intentional canned fixtures for scoring whether a consumer AI agent follows the short `AGENTS.md` pointer into this guide and then uses Workbench discover-then-isolate. Do not treat those failures as product bugs, and do not "fix" the feature unless a human asked to change the harness. During an eval, still follow Discover / Isolate / Confirm; do not ignore canned fails.
+Pickleball's example Maven consumer includes an opt-in mixed pass/fail suite tagged only `@agent-pointer-eval` (`maven-consumer-project/src/test/resources/features/agent-pointer-eval.feature`). It is not part of `@all`, `@regression`, or the other Maven suite-profile tags. The failures are intentional canned fixtures for scoring whether a consumer AI agent follows the short `AGENTS.md` pointer into this guide and then uses Workbench discover-then-confirm. Do not treat those failures as product bugs, and do not "fix" the feature unless a human asked to change the harness. During an eval, still follow Discover / Confirm; live isolate only if `workbench_*` tools are already in this session. Do not ignore canned fails.
 
 Run it explicitly:
 
 ```text
-PickleballWorkbenchLauncher discover --tags=@agent-pointer-eval
+mvn -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java "-Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher" "-Dexec.classpathScope=test" "-Dexec.args=discover --tags=@agent-pointer-eval"
 ```
 
 or `-Dpkb_runvars="pkb_tags=@agent-pointer-eval, pkb_browser=CHROME_HEADLESS"`. Do not add this tag to consumer `AGENTS.md` or Copilot pointer files.

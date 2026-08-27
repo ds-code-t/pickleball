@@ -86,6 +86,43 @@ class WorkbenchAgentCommandsTest {
     }
 
     @Test
+    void discoverNextIsConfirmNotIsolateMavenExec() throws Exception {
+        Path catalogDir = tempDir.resolve("reports/diagnostic-runs");
+        Files.createDirectories(catalogDir);
+        ByteArrayOutputStream stdout = new ByteArrayOutputStream();
+        int exit = WorkbenchAgentCommands.run(
+                new String[]{"discover", tempDir.toString(), "--tags=@smoke"},
+                new PrintStream(stdout, true, StandardCharsets.UTF_8),
+                System.err,
+                (project, command, out, err) -> {
+                    try {
+                        Files.writeString(catalogDir.resolve("run-catalog.json"), """
+                                {
+                                  "schemaVersion": 1,
+                                  "runs": [
+                                    {
+                                      "runId": "run-next",
+                                      "runProfile": "pkb_browser=CHROME_HEADLESS, pkb_parallel=4, pkb_reportingmode=diagnostic, pkb_tags=@smoke",
+                                      "lineage": { "runPurpose": "workbench-discover" }
+                                    }
+                                  ]
+                                }
+                                """);
+                    } catch (Exception failure) {
+                        throw new RuntimeException(failure);
+                    }
+                    return 0;
+                }
+        );
+
+        assertEquals(0, exit);
+        String text = stdout.toString(StandardCharsets.UTF_8);
+        assertTrue(text.contains("NEXT: confirm"));
+        assertFalse(text.contains("NEXT: isolate"));
+        assertFalse(text.contains("execute_step"));
+    }
+
+    @Test
     void confirmRequiresDiscoverSnapshot() {
         ByteArrayOutputStream stderr = new ByteArrayOutputStream();
         int exit = WorkbenchAgentCommands.run(

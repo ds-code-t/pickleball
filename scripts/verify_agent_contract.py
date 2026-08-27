@@ -324,15 +324,32 @@ def validate_consumer_bridge(errors: list[str]) -> None:
                 "Consumer guidance bridge must say not to register IDE MCP: " + relative
             )
         for required in (
+            "hint",
             "discover",
-            "isolate",
             "confirm",
+            "isolate",
             "workbench_",
         ):
             if required not in lowered:
                 errors.append(
                     f"Consumer guidance bridge must mention {required}: " + relative
                 )
+
+        if "already" not in lowered or "workbench_" not in lowered:
+            errors.append(
+                "Consumer guidance bridge must gate isolate on workbench_* already in session: "
+                + relative
+            )
+        if "hint`, `discover`, `isolate`, and `confirm`" in text:
+            errors.append(
+                "Consumer guidance bridge must not list isolate as a required first-path verb: "
+                + relative
+            )
+        if "-Dexec.args=isolate" in text:
+            errors.append(
+                "Consumer guidance bridge must not Maven-exec isolate as a first-path verb: "
+                + relative
+            )
 
         if "do not skip workbench" in lowered:
             errors.append(
@@ -418,11 +435,77 @@ def validate_dependency_owned_guidance(errors: list[str]) -> None:
         "Generated Maven consumer reference",
         "maven-consumer-project/",
         "@agent-pointer-eval",
+        "Maintainer-only: pointer-eval harness",
+        "-Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher",
     ):
         if required not in text:
             errors.append(
                 f"Dependency-owned consumer guide must retain lifecycle guidance ({required}): "
                 "docs/consumer-agent-guide.md"
+            )
+
+    chooser_start = text.find("## Tool chooser")
+    live_start = text.find("### Live isolation loop")
+    first_read = text.find("## First-read")
+    maintainer = text.find("## Maintainer-only: pointer-eval harness")
+    if chooser_start < 0 or live_start < 0 or first_read < 0 or maintainer < 0:
+        errors.append(
+            "docs/consumer-agent-guide.md must keep Tool chooser, Live isolation loop, "
+            "First-read, and Maintainer-only pointer-eval sections."
+        )
+        return
+
+    chooser = text[chooser_start:live_start]
+    live = text[live_start:first_read]
+    if "-Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher" not in chooser:
+        errors.append(
+            "AGENT-GUIDE tool chooser must show the same Maven exec wrapper as the pointer "
+            "(-Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher)."
+        )
+    if "-Dexec.args=discover" not in chooser:
+        errors.append(
+            "AGENT-GUIDE tool chooser must show -Dexec.args=discover, not a bare launcher verb."
+        )
+    if "PickleballWorkbenchLauncher discover" in chooser:
+        errors.append(
+            "AGENT-GUIDE tool chooser must not show bare PickleballWorkbenchLauncher discover; "
+            "use the Maven exec wrapper and change exec.args."
+        )
+    if "-Dexec.args=isolate" in chooser or "PickleballWorkbenchLauncher isolate" in chooser:
+        errors.append(
+            "AGENT-GUIDE tool chooser must not tell agents to Maven-exec isolate when "
+            "workbench_* tools are absent."
+        )
+    if "**Isolate**" in chooser:
+        errors.append(
+            "AGENT-GUIDE tool chooser must not list Isolate as a required no-MCP numbered step."
+        )
+    if "already" not in chooser.lower() or "workbench_*" not in chooser:
+        errors.append(
+            "AGENT-GUIDE tool chooser must say live isolate only if workbench_* is already present."
+        )
+    if "already" not in live.lower() or "workbench_*" not in live:
+        errors.append(
+            "AGENT-GUIDE live isolation loop must require an already-running Workbench / workbench_*."
+        )
+    if maintainer < text.find("## When the core Pickleball repository is also present"):
+        errors.append(
+            "@agent-pointer-eval guidance must stay maintainer-only at the bottom of "
+            "docs/consumer-agent-guide.md."
+        )
+
+    workbench = ROOT / "docs" / "pickleball-workbench.md"
+    if workbench.is_file():
+        workbench_text = workbench.read_text(encoding="utf-8")
+        if "That is the consumer-agent path" in workbench_text:
+            errors.append(
+                "docs/pickleball-workbench.md must not call mcp the consumer-agent path."
+            )
+        groovy = workbench_text
+        if "args 'mcp'" in groovy and "args 'hint'" not in groovy:
+            errors.append(
+                "docs/pickleball-workbench.md Gradle pickleballWorkbench example must not "
+                "default to mcp."
             )
 
 

@@ -103,7 +103,7 @@ Workbench provides:
 java -jar pickleball-workbench-<version>.jar mcp <project>
 ```
 
-The MCP adapter is `tools.dscode.workbench.mcp.WorkbenchMcpServer` plus `WorkbenchMcpTools`. It exposes project synchronization/status, interactive worker lifecycle, live Gherkin, Mapping operations, events/evidence, browser/service controls, semantic breakpoints, Step Override authoring, the watched-agent control lease, player-state inspection, gated Save, sparse diagnostic catalog/run/summary readers, and `workbench_investigation_emit` through `WorkbenchServices`. Consumer agents use this headless stdio server (`mcp .`), not the Swing GUI.
+The MCP adapter is `tools.dscode.workbench.mcp.WorkbenchMcpServer` plus `WorkbenchMcpTools`. It exposes project synchronization/status, interactive worker lifecycle, live Gherkin, Mapping operations, events/evidence, browser/service controls, semantic breakpoints, Step Override authoring, the watched-agent control lease, player-state inspection, gated Save, sparse diagnostic catalog/run/summary readers, and `workbench_investigation_emit` through `WorkbenchServices`. Consumer agents use Workbench `discover` / `confirm` as the Java/Maven front door, not this stdio server. Hosts may already wire `mcp .` as optional alias when `workbench_*` tools are already in the session. Agents must not self-register IDE MCP or start the GUI.
 
 UI mode cannot share process stdout with stdio MCP. `ui` therefore starts a 127.0.0.1-only JSON attach facade (`WorkbenchAttachServer`) over the same tools and writes `.pickleball/workbench/attach.json` so a Copilot/MCP client can join the visible session. Bind localhost only. Do not launch a second `mcp` process against a running UI.
 

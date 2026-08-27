@@ -196,6 +196,15 @@ public final class WorkbenchApplication {
             return 1;
         }
 
+        boolean once = Boolean.getBoolean("pickleball.workbench.isolate.once");
+        if (!once && !stdinIsInteractiveTty()) {
+            err.println("Live isolate holds a paused worker for execute_step.");
+            err.println("That needs an already-running Workbench (pre-attached workbench_* tools or an interactive TTY session).");
+            err.println("Maven one-shot isolate is not the no-MCP agent path. Do not register IDE MCP. Do not start the GUI.");
+            out.println("NEXT: confirm --tags/--name for the no-MCP path.");
+            return 2;
+        }
+
         try {
             new WorkbenchSynchronizer().sync(parsed.project());
             try (WorkbenchLiveSession live = new WorkbenchLiveSession(parsed.project(), workerProperties)) {
@@ -205,7 +214,7 @@ public final class WorkbenchApplication {
                         + " scenario=" + started.scenarioId());
                 out.println("Replayed pkb_runvars=" + workerProperties.get("pkb_runvars"));
                 out.println("Isolate stays one paused scenario. Do not start the GUI.");
-                if (Boolean.getBoolean("pickleball.workbench.isolate.once")) {
+                if (once) {
                     requireCleanStop(live.stop());
                     return 0;
                 }
@@ -222,6 +231,10 @@ public final class WorkbenchApplication {
             err.println("Do not register IDE MCP.");
             return 1;
         }
+    }
+
+    static boolean stdinIsInteractiveTty() {
+        return System.console() != null;
     }
 
     private record IsolateArgs(Path project, String tags, String name) {
@@ -512,7 +525,8 @@ public final class WorkbenchApplication {
         out.println("sync uses the selected project wrapper and materializes .pickleball/workbench.");
         out.println("worker-check starts, restarts, and gracefully stops direct consumer workers without rebuilding.");
         out.println("live-check exercises raw Gherkin, Step Override, and live runtime operations on one persistent worker.");
-        out.println("isolate starts/reuses a live worker from the last Discover snapshot replayed as pkb_runvars. Do not start ui for agents.");
+        out.println("isolate holds a paused worker from the last Discover snapshot when stdin is an interactive TTY, or when pickleball.workbench.isolate.once is set.");
+        out.println("Non-TTY Maven one-shot isolate does not hold a worker; NEXT is confirm --tags/--name. Live isolate needs an already-running Workbench (pre-attached workbench_* or interactive session). Do not start ui for agents.");
         out.println("mcp serves the same Workbench services over protocol-only stdio; optional host wiring, not an agent setup step.");
         out.println("ui opens the thin Swing Workbench over the same controller services and writes a localhost agent-attach endpoint to .pickleball/workbench/attach.json.");
     }
