@@ -1,0 +1,28 @@
+constructor: CREATE_LOCAL_DRIVER
+
+browser: chrome
+
+driver:
+  capabilities:
+    browserName: chrome
+    acceptInsecureCerts: true
+    pageLoadStrategy: normal
+  options:
+    args:
+      - "--headless=new"
+      - "--window-size=1920,1080"
+      - "--disable-notifications"
+      - "--disable-popup-blocking"
+      - "--remote-allow-origins=*"
+  service:
+    port: 0
+    verbose: false
+
+postActions:
+  - "CLEAR_COOKIES"
+  - "IMPLICIT_WAIT: 5000"
+  - "PAGE_LOAD_TIMEOUT: 30000"
+  - "SCRIPT_TIMEOUT: 30000"
+
+cleanup:
+  - "QUIT_LOCAL_DRIVER"

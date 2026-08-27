@@ -195,15 +195,15 @@ final class WorkbenchMcpTools {
                 args -> Map.of("removed", services.clearStepOverrides()));
 
         add("workbench_diagnostic_catalog",
-                "Read reports/diagnostic-runs/run-catalog.json as sparse JSON. Do not glob the diagnostic tree.",
+                "Read reports/diagnostic-runs/run-catalog.json as sparse JSON, including each run's pkb_run_profile when retained. Do not glob the diagnostic tree.",
                 schema(Map.of()),
                 args -> services.diagnosticCatalog());
         add("workbench_diagnostic_run",
-                "Read one run's run-index.json and clusters.json. Does not return events, traces, or screenshots.",
+                "Read one run's run-index.json and clusters.json, including the retained pkb_run_profile. Does not return events, traces, or screenshots.",
                 schema(Map.of("runId", stringProperty("Diagnostic run directory name from the catalog.")), "runId"),
                 args -> services.diagnosticRun(text(args, "runId")));
         add("workbench_diagnostic_summary",
-                "Read one scenario summary.json. Does not return events.jsonl, traces, or PNG bytes.",
+                "Read one scenario summary.json, including the retained pkb_run_profile. Does not return events.jsonl, traces, or PNG bytes.",
                 schema(Map.of(
                         "runId", stringProperty("Diagnostic run directory name from the catalog."),
                         "scenarioId", stringProperty("Scenario directory name under that run.")

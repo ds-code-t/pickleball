@@ -410,7 +410,7 @@ workbench_step_override_remove
 workbench_step_override_clear
 ```
 
-Sparse diagnostic readers (do not glob `reports/diagnostic-runs`; these return JSON only and do not dump events, traces, or PNG bytes):
+Sparse diagnostic readers (do not glob `reports/diagnostic-runs`; these return JSON only and do not dump events, traces, or PNG bytes). Catalog, run-index, and summary payloads include the retained `pkb_run_profile` when present:
 
 ```text
 workbench_diagnostic_catalog

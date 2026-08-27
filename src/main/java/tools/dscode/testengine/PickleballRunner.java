@@ -4,6 +4,7 @@ import com.epam.reportportal.utils.properties.PropertiesLoader;
 import io.cucumber.core.runner.CurrentScenarioState;
 import tools.dscode.common.mappings.ParsingMap;
 import tools.dscode.common.reporting.logging.Level;
+import tools.dscode.parallelutilities.ParallelCountEstimator;
 
 import java.io.InputStream;
 import java.net.URL;
@@ -332,13 +333,12 @@ public abstract class PickleballRunner {
 
         String parallel = get(PKB_PARALLEL);
         if (parallel != null && !parallel.isBlank()) {
-            String trimmed = parallel.trim();
-            Integer.parseInt(trimmed);
-            values.put(PKB_PARALLEL, trimmed);
+            String resolved = Integer.toString(ParallelCountEstimator.resolve(parallel));
+            values.put(PKB_PARALLEL, resolved);
             values.putIfAbsent(PARALLEL_EXECUTION_ENABLED_PROPERTY_NAME, "true");
             values.putIfAbsent(PARALLEL_CONFIG_STRATEGY_PROPERTY_NAME, "fixed");
-            values.putIfAbsent(PARALLEL_CONFIG_FIXED_PARALLELISM_PROPERTY_NAME, trimmed);
-            values.putIfAbsent(PARALLEL_CONFIG_FIXED_MAX_POOL_SIZE_PROPERTY_NAME, trimmed);
+            values.putIfAbsent(PARALLEL_CONFIG_FIXED_PARALLELISM_PROPERTY_NAME, resolved);
+            values.putIfAbsent(PARALLEL_CONFIG_FIXED_MAX_POOL_SIZE_PROPERTY_NAME, resolved);
         }
     }
 

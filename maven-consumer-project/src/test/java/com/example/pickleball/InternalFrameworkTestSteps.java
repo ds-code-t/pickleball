@@ -9,6 +9,7 @@ import tools.dscode.common.dataelements.DataElementPhaseFourAndSixChecks;
 import tools.dscode.common.dataelements.DataElementPhaseOneChecks;
 import tools.dscode.common.dataelements.DataElementPhaseThreeChecks;
 import tools.dscode.common.dataelements.DataElementPhaseTwoChecks;
+import tools.dscode.common.driver.ChromeHeadlessConfigChecks;
 import tools.dscode.common.mappings.MappingDataRefactorChecks;
 import tools.dscode.common.mappings.QuoteParserChecks;
 import tools.dscode.common.reporting.diagnostic.Diagnostic213CompletionChecks;
@@ -19,6 +20,7 @@ import tools.dscode.common.reporting.diagnostic.ReportRetentionPolicy;
 import tools.dscode.common.util.datetime.BusinessTemporalDeltaChecks;
 import tools.dscode.common.util.datetime.BusinessTimePostModifierChecks;
 import tools.dscode.coredefinitions.ModularScenariosChecks;
+import tools.dscode.parallelutilities.ParallelCountEstimatorChecks;
 import tools.dscode.testengine.PkbPropertyValueNormalizerChecks;
 import tools.dscode.testengine.ProfileConfigurationChecks;
 
@@ -47,6 +49,8 @@ public final class InternalFrameworkTestSteps {
                 BusinessTimePostModifierChecks.class,
                 PkbPropertyValueNormalizerChecks.class,
                 ProfileConfigurationChecks.class,
+                ParallelCountEstimatorChecks.class,
+                ChromeHeadlessConfigChecks.class,
                 DynamicControlApiChecks.class,
                 ControlRuntimeObserverChecks.class
         );

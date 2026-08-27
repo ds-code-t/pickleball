@@ -52,15 +52,15 @@ reports/diagnostic-runs/
 
 An interrupted scenario may retain raw `trace.jsonl` instead of the gzip form. `pkb_diagnostic_output` may move the diagnostic-runs root.
 
-`run-index.json` includes sparse scenario/outcome/comparison metadata plus the sanitized final `runProfile`, deterministic `runProfileFingerprint`, and compatibility field `directRunProfile`. The field name `directRunProfile` remains for diagnostic schema compatibility even though new direct controlled input is `pkb_runvars`.
+`run-index.json` includes sparse scenario/outcome/comparison metadata plus the sanitized final `runProfile`, deterministic `runProfileFingerprint`, and compatibility field `directRunProfile`. The field name `directRunProfile` remains for diagnostic schema compatibility even though new direct controlled input is `pkb_runvars`. `run-catalog.json` copies each run's `runProfile` / `runProfileFingerprint` when present. Scenario `summary.json` also includes the same `runProfile` so agents can inspect the complete resolved RunVar snapshot without opening `configuration.json`.
 
 ## AI evidence access protocol
 
 Use the shallowest evidence layer that completely answers the question:
 
-1. `run-catalog.json` — choose candidate runs.
-2. Selected `run-index.json` / `clusters.json` — outcomes, identities, failure groups, capabilities, retention, profile fingerprints, representative visuals.
-3. Selected scenario `summary.json` — additional sparse detail.
+1. `run-catalog.json` — choose candidate runs. Catalog entries include the retained `runProfile` when present.
+2. Selected `run-index.json` / `clusters.json` — outcomes, identities, failure groups, capabilities, retention, the complete `runProfile`, profile fingerprints, representative visuals.
+3. Selected scenario `summary.json` — additional sparse detail, including the same `runProfile`.
 4. Targeted `events.jsonl` — exact step/lifecycle/order/INFO+ detail only when needed.
 5. Existing `comparisonToPrevious`, run comparison, or fingerprint comparison.
 6. Representative PNG only when semantic visual meaning matters.

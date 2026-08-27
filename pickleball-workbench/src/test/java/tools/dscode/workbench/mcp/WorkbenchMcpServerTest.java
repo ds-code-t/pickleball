@@ -277,6 +277,12 @@ class WorkbenchMcpServerTest {
         WorkbenchMcpTools tools = new WorkbenchMcpTools(services, JSON);
         assertTrue(tools.names().contains("workbench_diagnostic_catalog"));
         assertTrue(tools.names().contains("workbench_investigation_emit"));
+        tools.specifications().stream()
+                .filter(spec -> spec.tool().name().startsWith("workbench_diagnostic_"))
+                .forEach(spec -> assertTrue(
+                        spec.tool().description().contains("pkb_run_profile"),
+                        spec.tool().name() + " should surface pkb_run_profile"
+                ));
         Object catalog = tools.call("workbench_diagnostic_catalog", Map.of());
         assertTrue(catalogCalled.get());
         assertTrue(JSON.writeValueAsString(catalog).contains("run-1"));

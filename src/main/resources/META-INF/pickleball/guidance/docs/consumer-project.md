@@ -155,8 +155,10 @@ mvn test -Dpkb_tags="@workflow and @nested-steps and not @block-conditionals"
 Human `PickleballTests` defaults remain `pretty` and `@all`. Agents launching a bounded confirmation should not reuse those defaults. Use a separate `pkb_runvars` command, for example:
 
 ```bash
-mvn test -Dpkb_runvars="pkb_tags=@the-failing-tag, pkb_name=The failing scenario, pkb_browser=CHROME_HEADLESS, pkb_reportingmode=diagnostic, pkb_loglevel=warn, pkb_reportretention=failed"
+mvn test -Dpkb_runvars="pkb_tags=@the-failing-tag, pkb_name=The failing scenario, pkb_browser=CHROME_HEADLESS, pkb_parallel=auto, pkb_reportingmode=diagnostic, pkb_loglevel=warn, pkb_reportretention=failed"
 ```
+
+After the run, read `pkb_run_profile` from `run-catalog.json` / `run-index.json` / `summary.json`. That is the complete resolved RunVar list. Do not assume omitted `pkb_runvars` keys equal project `pickleball.properties`.
 
 The consumer `pom.xml` also defines Maven profiles such as:
 

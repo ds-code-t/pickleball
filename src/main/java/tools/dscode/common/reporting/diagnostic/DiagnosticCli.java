@@ -3,6 +3,7 @@ package tools.dscode.common.reporting.diagnostic;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import tools.dscode.control.protocol.InvestigationHandoff;
+import tools.dscode.parallelutilities.ParallelCountEstimator;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -132,8 +133,12 @@ public final class DiagnosticCli {
 
     private static int discoverHint(String[] args, PrintStream out) {
         requireLength(args, 1, 1, "discover-hint");
-        out.println("Recommended diagnostic Discover command (`pkb_runvars`; parallel is OK when the project supports it):");
-        out.println("mvn test -Dpkb_runvars=\"pkb_browser=CHROME_HEADLESS, pkb_reportingmode=diagnostic, pkb_loglevel=warn, pkb_reportretention=failed, pkb_parallel=80\"");
+        String runVars = ParallelCountEstimator.recommendedDiscoverRunVars();
+        out.println("Recommended complete diagnostic Discover `pkb_runvars` (set these explicitly so headed Chrome / pretty / @all project defaults do not sneak in):");
+        out.println("mvn test -Dpkb_runvars=\"" + runVars + "\"");
+        out.println();
+        out.println("Multi-scenario Discover/Confirm must use CHROME_HEADLESS and this high pkb_parallel. Isolate / live Workbench stays one paused scenario — do not parallelize isolate. Headed Chrome only when the scenario actually needs a window.");
+        out.println("Execution-context keys (glue/features/data/call/component/configpath) may still inherit. After the run, read pkb_run_profile from run-catalog.json / run-index.json / summary.json for the complete resolved list, including inherited paths and the integer pkb_parallel. Do not assume omitted keys equal project pickleball.properties. Never supply pkb_run_profile as input.");
         out.println();
         out.println("After the run, read reports/diagnostic-runs/run-catalog.json, then only the relevant run-index.json / summary.json.");
         out.println("NEXT: run the diagnostic mvn test above, then open run-catalog.json");
