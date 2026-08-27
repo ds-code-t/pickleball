@@ -12,6 +12,7 @@ import tools.dscode.common.dataelements.DataElementPhaseTwoChecks;
 import tools.dscode.common.driver.ChromeHeadlessConfigChecks;
 import tools.dscode.common.mappings.MappingDataRefactorChecks;
 import tools.dscode.common.mappings.QuoteParserChecks;
+import tools.dscode.common.reporting.diagnostic.AgentBrowserLadderChecks;
 import tools.dscode.common.reporting.diagnostic.Diagnostic213CompletionChecks;
 import tools.dscode.common.reporting.diagnostic.DiagnosticReportingChecks;
 import tools.dscode.common.reporting.diagnostic.InvestigationHandoffChecks;
@@ -20,6 +21,7 @@ import tools.dscode.common.reporting.diagnostic.ReportRetentionPolicy;
 import tools.dscode.common.util.datetime.BusinessTemporalDeltaChecks;
 import tools.dscode.common.util.datetime.BusinessTimePostModifierChecks;
 import tools.dscode.coredefinitions.ModularScenariosChecks;
+import tools.dscode.launcher.WorkbenchAgentCommandChecks;
 import tools.dscode.parallelutilities.ParallelCountEstimatorChecks;
 import tools.dscode.testengine.PkbPropertyValueNormalizerChecks;
 import tools.dscode.testengine.ProfileConfigurationChecks;
@@ -68,7 +70,9 @@ public final class InternalFrameworkTestSteps {
                     DiagnosticReportingChecks.class,
                     Diagnostic213CompletionChecks.class,
                     PickleballGuidanceChecks.class,
-                    InvestigationHandoffChecks.class
+                    InvestigationHandoffChecks.class,
+                    AgentBrowserLadderChecks.class,
+                    WorkbenchAgentCommandChecks.class
             );
         } finally {
             ReportRetentionPolicy.clearThreadOverride();
