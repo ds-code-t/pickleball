@@ -10,6 +10,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -78,6 +79,17 @@ class PickleballWorkbenchLauncherTest {
         assertEquals(Path.of("").toAbsolutePath().normalize().toString(), isolateName[1]);
         assertEquals("--name", isolateName[2]);
         assertEquals("The failing scenario", isolateName[3]);
+
+        assertTrue(WorkbenchCommandLine.isSessionClientCommand("isolate"));
+        assertTrue(WorkbenchCommandLine.isSessionClientCommand("session-start"));
+        assertTrue(WorkbenchCommandLine.isSessionClientCommand("execute-step"));
+        assertTrue(WorkbenchCommandLine.isSessionClientCommand("status"));
+        assertTrue(WorkbenchCommandLine.isSessionClientCommand("events"));
+        assertTrue(WorkbenchCommandLine.isSessionClientCommand("stop"));
+        assertTrue(WorkbenchCommandLine.isSessionClientCommand("kill"));
+        assertFalse(WorkbenchCommandLine.isSessionClientCommand("session"));
+        assertFalse(WorkbenchCommandLine.isSessionClientCommand("hint"));
+        assertFalse(WorkbenchCommandLine.isAgentCoreCommand("isolate"));
 
         WorkbenchCommandLine.Parsed confirm = WorkbenchCommandLine.parse(
                 new String[]{"confirm", "--name=Agent", "pointer", "eval", "failing", "fruit", "mismatch"}

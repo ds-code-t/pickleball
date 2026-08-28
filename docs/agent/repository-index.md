@@ -371,6 +371,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/launcher/PickleballWorkbenchLauncher.java`
 - `src/main/java/tools/dscode/launcher/WorkbenchAgentCommands.java`
 - `src/main/java/tools/dscode/launcher/WorkbenchCommandLine.java`
+- `src/main/java/tools/dscode/launcher/WorkbenchSessionCommands.java`
 - `src/main/java/tools/dscode/misc/DummySteps.java`
 - `src/main/java/tools/dscode/parallelutilities/ParallelCountEstimator.java`
 - `src/main/java/tools/dscode/parallelutilities/Stagger.java`
@@ -400,6 +401,8 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/control/override/StepOverrideCompilerTest.java`
 - `src/test/java/tools/dscode/launcher/PickleballWorkbenchLauncherTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchAgentCommandsTest.java`
+- `src/test/java/tools/dscode/launcher/WorkbenchPointerContractTest.java`
+- `src/test/java/tools/dscode/launcher/WorkbenchSessionCommandsTest.java`
 - `src/test/java/tools/dscode/parallelutilities/ParallelCountEstimatorTest.java`
 - `src/test/java/tools/dscode/testengine/DynamicSuiteBootstrapWorkbenchRootTest.java`
 
@@ -505,6 +508,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/mapping/MappingTreeModel.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/mapping/MappingValueCodec.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/mcp/WorkbenchAttachServer.java`
+- `pickleball-workbench/src/main/java/tools/dscode/workbench/mcp/WorkbenchCommandQueue.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/mcp/WorkbenchMcpServer.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/mcp/WorkbenchMcpTools.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/player/GherkinBlockDocument.java`
@@ -561,6 +565,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/lease/WorkbenchControlLeaseTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/mapping/MappingValueCodecTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/mcp/WorkbenchAttachServerTest.java`
+- `pickleball-workbench/src/test/java/tools/dscode/workbench/mcp/WorkbenchCommandQueueTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/mcp/WorkbenchMcpServerTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/player/GherkinBlockDocumentTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/player/LiveEditorViewTest.java`

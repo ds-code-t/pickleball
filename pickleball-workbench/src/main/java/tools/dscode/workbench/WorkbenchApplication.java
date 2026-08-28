@@ -5,6 +5,9 @@ import tools.dscode.control.protocol.ControlBridgeCallResult;
 import tools.dscode.control.protocol.ControlBridgeServiceCallResult;
 import tools.dscode.control.protocol.ControlBridgeStepOverrideResult;
 import tools.dscode.control.protocol.ControlBridgeValueResult;
+import tools.dscode.workbench.lease.WorkbenchCallContext;
+import tools.dscode.workbench.lease.WorkbenchLeaseHolder;
+import tools.dscode.workbench.mcp.WorkbenchAttachServer;
 import tools.dscode.workbench.mcp.WorkbenchMcpServer;
 import tools.dscode.workbench.sync.WorkbenchManifest;
 import tools.dscode.workbench.sync.WorkbenchSynchronizer;
@@ -21,6 +24,7 @@ import java.nio.file.Path;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /** Entry point for the standalone Pickleball Workbench controller. */
 public final class WorkbenchApplication {
@@ -64,6 +68,7 @@ public final class WorkbenchApplication {
                 case "worker-check" -> workerCheck(args, out);
                 case "live-check" -> liveCheck(args, out);
                 case "isolate" -> isolate(args, out, err, stdinIsInteractiveTty());
+                case "session" -> session(args, out, err);
                 case "ui" -> ui(args);
                 case "mcp" -> throw new IllegalArgumentException(
                         "MCP mode must be launched through the Workbench executable."
@@ -184,7 +189,7 @@ public final class WorkbenchApplication {
     }
 
     static int isolate(String[] args, PrintStream out, PrintStream err, boolean interactiveStdin) {
-        IsolateArgs parsed = isolateArgs(args);
+        IsolateArgs parsed = projectCommandArgs(args, "isolate");
         Map<String, String> workerProperties;
         try {
             workerProperties = tools.dscode.workbench.discover.LastDiscoverSnapshot.workerSystemProperties(
@@ -192,16 +197,15 @@ public final class WorkbenchApplication {
             );
         } catch (RuntimeException failure) {
             err.println(failure.getMessage());
-            err.println("Workbench CLI isolate failed. Do not register IDE MCP.");
+            err.println("Workbench CLI isolate failed.");
             return 1;
         }
 
         boolean once = Boolean.getBoolean("pickleball.workbench.isolate.once");
         if (!once && !interactiveStdin) {
-            err.println("Live isolate holds a paused worker for execute_step.");
-            err.println("That needs an already-running Workbench (pre-attached workbench_* tools or an interactive TTY session).");
-            err.println("Maven one-shot isolate is not the no-MCP agent path. Do not register IDE MCP. Do not start the GUI.");
-            out.println("NEXT: confirm --tags/--name for the no-MCP path.");
+            err.println("Controller isolate holds a paused worker on an interactive TTY.");
+            err.println("Maven-exec isolate through PickleballWorkbenchLauncher starts a detached headless CLI session instead.");
+            err.println("Do not start the GUI.");
             return 2;
         }
 
@@ -228,8 +232,65 @@ public final class WorkbenchApplication {
             return 0;
         } catch (RuntimeException failure) {
             err.println("Workbench CLI isolate failed: " + failure.getMessage());
-            err.println("Do not register IDE MCP.");
             return 1;
+        }
+    }
+
+
+    static int session(String[] args, PrintStream out, PrintStream err) {
+        IsolateArgs parsed = projectCommandArgs(args, "session");
+        Map<String, String> workerProperties;
+        try {
+            workerProperties = tools.dscode.workbench.discover.LastDiscoverSnapshot.workerSystemProperties(
+                    parsed.project(), parsed.tags(), parsed.name()
+            );
+        } catch (RuntimeException failure) {
+            err.println(failure.getMessage());
+            return 1;
+        }
+
+        CountDownLatch done = new CountDownLatch(1);
+        AtomicBoolean stopping = new AtomicBoolean();
+        WorkbenchController controller = null;
+        WorkbenchAttachServer server = null;
+        try {
+            new WorkbenchSynchronizer().sync(parsed.project());
+            controller = new WorkbenchController(parsed.project(), workerProperties);
+            WorkbenchController live = controller;
+            WorkbenchCallContext.runAs(WorkbenchLeaseHolder.AGENT, () -> {
+                live.requestControl("cli-session");
+                WorkbenchWorkerStatus started = live.startWorker();
+                requireInteractiveWorker(started, "session");
+            });
+            Runnable stop = () -> {
+                if (!stopping.compareAndSet(false, true)) return;
+                try {
+                    WorkbenchCallContext.runAs(WorkbenchLeaseHolder.AGENT, live::stopWorker);
+                } catch (RuntimeException ignored) {
+                    // Best-effort worker stop on session shutdown.
+                }
+                done.countDown();
+            };
+            server = WorkbenchAttachServer.startCliSession(controller, parsed.project(), stop);
+            Runtime.getRuntime().addShutdownHook(new Thread(stop, "pickleball-workbench-session-shutdown"));
+            out.println("Workbench CLI session: pid=" + ProcessHandle.current().pid()
+                    + " url=" + server.url());
+            out.println("State: " + server.stateFile());
+            out.println("Replayed pkb_runvars=" + workerProperties.get("pkb_runvars"));
+            try {
+                done.await();
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+                err.println("Workbench session interrupted.");
+                return 1;
+            }
+            return 0;
+        } catch (RuntimeException failure) {
+            err.println("Workbench CLI session failed: " + failure.getMessage());
+            return 1;
+        } finally {
+            if (server != null) server.close();
+            if (controller != null) controller.close();
         }
     }
 
@@ -257,10 +318,10 @@ public final class WorkbenchApplication {
     private record IsolateArgs(Path project, String tags, String name) {
     }
 
-    private static IsolateArgs isolateArgs(String[] args) {
+    private static IsolateArgs projectCommandArgs(String[] args, String command) {
         if (args.length < 2 || args[1].isBlank() || args[1].startsWith("-")) {
             throw new IllegalArgumentException(
-                    "Usage: pickleball-workbench isolate <project> [--tags <expr>] [--name <expr>]"
+                    "Usage: pickleball-workbench " + command + " <project> [--tags <expr>] [--name <expr>]"
             );
         }
         String tags = null;
@@ -534,6 +595,7 @@ public final class WorkbenchApplication {
         out.println("  java -jar pickleball-workbench-<version>.jar worker-check <project>");
         out.println("  java -jar pickleball-workbench-<version>.jar live-check <project>");
         out.println("  java -jar pickleball-workbench-<version>.jar isolate <project> [--tags <expr>] [--name <expr>]");
+        out.println("  java -jar pickleball-workbench-<version>.jar session <project> [--tags <expr>] [--name <expr>]");
         out.println("  java -jar pickleball-workbench-<version>.jar mcp <project>");
         out.println("  java -jar pickleball-workbench-<version>.jar ui <project>");
         out.println("  java -jar pickleball-workbench-<version>.jar --version");
@@ -543,7 +605,8 @@ public final class WorkbenchApplication {
         out.println("worker-check starts, restarts, and gracefully stops direct consumer workers without rebuilding.");
         out.println("live-check exercises raw Gherkin, Step Override, and live runtime operations on one persistent worker.");
         out.println("isolate holds a paused worker from the last Discover snapshot when stdin is an interactive TTY, or when pickleball.workbench.isolate.once is set.");
-        out.println("Non-TTY Maven one-shot isolate does not hold a worker; NEXT is confirm --tags/--name. Live isolate needs an already-running Workbench (pre-attached workbench_* or interactive session). Do not start ui for agents.");
+        out.println("session is the headless long-lived CLI controller: sync, start the Discover-snapshot worker, and serve 127.0.0.1 HTTP plus a serial execute-step queue. State is .pickleball/workbench/cli-session.json.");
+        out.println("Consumer agents start session through PickleballWorkbenchLauncher isolate/session-start (detached). Do not start ui for agents.");
         out.println("mcp serves the same Workbench services over protocol-only stdio; optional host wiring, not an agent setup step.");
         out.println("ui opens the thin Swing Workbench over the same controller services and writes a localhost agent-attach endpoint to .pickleball/workbench/attach.json.");
     }

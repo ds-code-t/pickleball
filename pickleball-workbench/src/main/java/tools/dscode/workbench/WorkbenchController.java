@@ -42,9 +42,13 @@ public final class WorkbenchController implements WorkbenchServices {
     private final List<Runnable> playerListeners = new CopyOnWriteArrayList<>();
 
     public WorkbenchController(Path projectRoot) {
+        this(projectRoot, Map.of());
+    }
+
+    public WorkbenchController(Path projectRoot, Map<String, String> workerSystemProperties) {
         this.projectRoot = projectRoot.toAbsolutePath().normalize();
         this.synchronizer = new WorkbenchSynchronizer();
-        this.live = new WorkbenchLiveSession(this.projectRoot);
+        this.live = new WorkbenchLiveSession(this.projectRoot, workerSystemProperties == null ? Map.of() : workerSystemProperties);
         this.player = LiveScenarioPlayer.interactiveBuffer();
         this.playback = new LivePlaybackCoordinator(this.player);
         this.lease = new WorkbenchControlLease();

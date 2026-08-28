@@ -45,7 +45,7 @@ META-INF/pickleball/workbench/pickleball-workbench.jar
 
 Run the small launcher from the consumer test classpath. For Maven consumers, this command requires no cache path, separate Workbench dependency, or separately selected version.
 
-Workbench is the consumer AI-agent front door. Agents use `export-guidance`, `hint`, `discover`, and `confirm`. Live isolate only if `workbench_*` tools are already in this session. Do not start the GUI. Do not register IDE MCP.
+Workbench is the consumer AI-agent front door. Agents use `export-guidance`, `hint`, `discover`, and `confirm` to find failures, then `isolate` / `execute-step` / `status` / `events` / `stop` for live debug. Do not start the GUI.
 
 ```bash
 mvn -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java \
@@ -58,9 +58,11 @@ mvn -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java \
 "-Dexec.args=hint"
 "-Dexec.args=discover --tags=@smoke"
 "-Dexec.args=confirm --tags=@smoke --name='The failing scenario'"
+"-Dexec.args=isolate"
+"-Dexec.args=execute-step --text='Given stay'"
 ```
 
-Same launcher; only change `-Dexec.args`. Do not Maven-exec `isolate` as a one-shot. Live isolate needs an already-running Workbench (pre-attached `workbench_*` or an interactive TTY session).
+Same launcher; only change `-Dexec.args`. `isolate` starts a detached headless session; later execs are one-shot HTTP clients.
 
 `mcp` and `ui` remain host/human commands. Hosts that already run Workbench MCP can launch it from the consumer test classpath:
 
@@ -75,7 +77,7 @@ mvn -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java \
 mvn -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java "-Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher" "-Dexec.classpathScope=test" "-Dexec.args=mcp ."
 ```
 
-Humans who want the Swing player can pass `ui .` instead. With no launcher arguments, `ui` and the current directory are selected automatically for that human default. Other Workbench commands are forwarded in the same form, for example `"-Dexec.args=sync ."`. Headless `mcp .` is optional host wiring when `workbench_*` tools are already connected; agents must not self-register IDE MCP. Agents for this release should not use the GUI, `ui .`, or `.pickleball/workbench/attach.json` as their path; see `.pickleball/AGENT-GUIDE.md`.
+Humans who want the Swing player can pass `ui .` instead. With no launcher arguments, `ui` and the current directory are selected automatically for that human default. Other Workbench commands are forwarded in the same form, for example `"-Dexec.args=sync ."`. Headless `mcp .` is optional host wiring, not an agent setup step. Agents for this release should not use the GUI, `ui .`, or `.pickleball/workbench/attach.json` as their path; see `.pickleball/AGENT-GUIDE.md`.
 
 Gradle consumers can expose the same dependency-owned launcher without resolving a cache path or adding a Workbench dependency:
 
@@ -83,7 +85,7 @@ Gradle consumers can expose the same dependency-owned launcher without resolving
 tasks.register('pickleballWorkbench', JavaExec) {
     classpath = sourceSets.test.runtimeClasspath
     mainClass = 'tools.dscode.launcher.PickleballWorkbenchLauncher'
-    args 'hint' // no-MCP Discover helper; pass 'discover' / 'confirm' for the agent path. Optional host MCP: 'mcp', projectDir.absolutePath. Humans: 'ui'.
+    args 'hint' // Discover helper; pass 'discover' / 'confirm' / 'isolate' / 'execute-step'. Optional host: 'mcp', projectDir.absolutePath. Humans: 'ui'.
 }
 ```
 
@@ -326,7 +328,7 @@ A Copilot or other MCP-style client finds that file in the consumer project, the
 4. Use the existing live tools (`workbench_execute_step`, Mapping, evidence, worker) while holding the lease, and `workbench_set_current_action` so the human can watch.
 5. `POST {url}/tools/workbench_request_save` to ask to copy the live scenario into the original feature. The call blocks until the human clicks Allow or Deny, or Take control.
 
-Headless `java -jar pickleball-workbench-<version>.jar mcp <project>` stays stdio JSON-RPC only. That is optional host wiring when `workbench_*` tools are already connected, not the consumer-agent path. That client may hold the lease without a banner. Save is still a distinct explicit tool and never an implicit write.
+Headless `java -jar pickleball-workbench-<version>.jar mcp <project>` stays stdio JSON-RPC only. That is optional host wiring, not an agent setup step. The consumer-agent live path is launcher `isolate` then `execute-step`. That client may hold the lease without a banner. Save is still a distinct explicit tool and never an implicit write.
 
 A human-watched UI session is optional and separate. From `maven-consumer-project`, a person may start `ui .` and then a watcher can join `.pickleball/workbench/attach.json`. Do not launch a second `mcp` process against the same live UI session, and do not treat that attach file as the default agent path.
 
@@ -338,7 +340,7 @@ Start the lightweight non-Spring MCP server for a consumer project. This is opti
 java -jar $workbenchJar mcp ".\maven-consumer-project"
 ```
 
-Or, from a Maven consumer test classpath, `"-Dexec.args=mcp ."`. That launcher is optional host wiring for environments that already run MCP. Agents use Workbench `discover` / `confirm`. They must not self-register IDE MCP or start an IDE-owned stdio server. Live isolate only if `workbench_*` tools are already connected or stdin is an interactive TTY. Do not document or use the Swing GUI, `ui .`, or `.pickleball/workbench/attach.json` as the agent path.
+Or, from a Maven consumer test classpath, `"-Dexec.args=mcp ."`. That launcher is optional host wiring. Agents use Workbench `discover` / `confirm` to find failures and `isolate` / `execute-step` for live debug. Do not document or use the Swing GUI, `ui .`, or `.pickleball/workbench/attach.json` as the agent path.
 
 The server uses the official Java MCP SDK core and stdio transport with the Jackson 2 JSON adapter. MCP dependencies are Workbench-only and are shaded into the executable companion. Workbench deliberately does not use Spring Boot, Spring Framework, Spring AI, WebMVC, or Tomcat.
 

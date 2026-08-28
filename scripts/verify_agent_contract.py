@@ -319,35 +319,28 @@ def validate_consumer_bridge(errors: list[str]) -> None:
             errors.append(
                 "Consumer guidance bridge must say not to start the GUI: " + relative
             )
-        if "do not register ide mcp" not in lowered:
-            errors.append(
-                "Consumer guidance bridge must say not to register IDE MCP: " + relative
-            )
         for required in (
             "hint",
             "discover",
             "confirm",
             "isolate",
-            "workbench_",
+            "execute-step",
         ):
             if required not in lowered:
                 errors.append(
                     f"Consumer guidance bridge must mention {required}: " + relative
                 )
-
-        if "already" not in lowered or "workbench_" not in lowered:
+        if "ide mcp" in lowered or "register mcp" in lowered:
             errors.append(
-                "Consumer guidance bridge must gate isolate on workbench_* already in session: "
-                + relative
+                "Consumer guidance bridge must not mention IDE MCP: " + relative
             )
-        if "hint`, `discover`, `isolate`, and `confirm`" in text:
+        if "do not isolate" in lowered or "do not maven-exec isolate" in lowered:
+            errors.append(
+                "Consumer guidance bridge must not tell agents not to isolate: " + relative
+            )
+        if "`hint`, `discover`, `isolate`, and `confirm`" in text:
             errors.append(
                 "Consumer guidance bridge must not list isolate as a required first-path verb: "
-                + relative
-            )
-        if "-Dexec.args=isolate" in text:
-            errors.append(
-                "Consumer guidance bridge must not Maven-exec isolate as a first-path verb: "
                 + relative
             )
 
@@ -380,6 +373,7 @@ def validate_consumer_bridge(errors: list[str]) -> None:
             "ui .",
             "@agent-pointer-eval",
             "IntelliJ",
+            "stdio",
         ):
             if forbidden in text:
                 errors.append(
@@ -471,22 +465,25 @@ def validate_dependency_owned_guidance(errors: list[str]) -> None:
             "AGENT-GUIDE tool chooser must not show bare PickleballWorkbenchLauncher discover; "
             "use the Maven exec wrapper and change exec.args."
         )
-    if "-Dexec.args=isolate" in chooser or "PickleballWorkbenchLauncher isolate" in chooser:
+    if "-Dexec.args=isolate" not in chooser:
         errors.append(
-            "AGENT-GUIDE tool chooser must not tell agents to Maven-exec isolate when "
-            "workbench_* tools are absent."
+            "AGENT-GUIDE tool chooser must show -Dexec.args=isolate for live debug."
         )
-    if "**Isolate**" in chooser:
+    if "execute-step" not in chooser:
         errors.append(
-            "AGENT-GUIDE tool chooser must not list Isolate as a required no-MCP numbered step."
+            "AGENT-GUIDE tool chooser must mention execute-step for live debug."
         )
-    if "already" not in chooser.lower() or "workbench_*" not in chooser:
+    if "do not maven-exec isolate" in chooser.lower() or "do not isolate" in chooser.lower():
         errors.append(
-            "AGENT-GUIDE tool chooser must say live isolate only if workbench_* is already present."
+            "AGENT-GUIDE tool chooser must not tell agents not to isolate."
         )
-    if "already" not in live.lower() or "workbench_*" not in live:
+    if "register ide mcp" in chooser.lower() or "ide-owned stdio" in chooser.lower():
         errors.append(
-            "AGENT-GUIDE live isolation loop must require an already-running Workbench / workbench_*."
+            "AGENT-GUIDE tool chooser must not tell agents to register MCP."
+        )
+    if "execute-step" not in live or "isolate" not in live:
+        errors.append(
+            "AGENT-GUIDE live isolation loop must use isolate then execute-step."
         )
     if maintainer < text.find("## When the core Pickleball repository is also present"):
         errors.append(

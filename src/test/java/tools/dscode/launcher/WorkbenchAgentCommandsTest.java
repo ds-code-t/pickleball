@@ -118,8 +118,8 @@ class WorkbenchAgentCommandsTest {
         assertEquals(0, exit);
         String text = stdout.toString(StandardCharsets.UTF_8);
         assertTrue(text.contains("NEXT: confirm"));
-        assertFalse(text.contains("NEXT: isolate"));
-        assertFalse(text.contains("execute_step"));
+        assertTrue(text.contains("isolate"));
+        assertTrue(text.contains("execute-step"));
     }
 
     @Test

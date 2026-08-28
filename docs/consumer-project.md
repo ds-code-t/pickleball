@@ -26,7 +26,7 @@ Rerun export before Pickleball work even when `.pickleball` already exists. A su
 
 Compatibility note: an older Pickleball release whose exporter predates the manifest lifecycle may leave newer files or a newer manifest behind after a downgrade. Those leftovers are not authoritative for the downgraded dependency; prefer the dependency actually resolved on the test classpath and the files freshly exported by that dependency.
 
-AI agents should read `.pickleball/AGENT-GUIDE.md` first after a successful export. Workbench is the one front door: `discover` then `confirm`. Do not start the GUI. Do not register IDE MCP. Live isolate only if `workbench_*` tools are already connected. Do not treat `.pickleball/maven-consumer-project/` as the project under test, and do not dump `docs/README.md` or the whole snapshot into first-read context. Human readers can start with `.pickleball/docs/README.md`; links from those guides to `maven-consumer-project` resolve to the exported version-matched reference files.
+AI agents should read `.pickleball/AGENT-GUIDE.md` first after a successful export. Workbench is the one front door: `discover` then `confirm` to find failures, then `isolate` / `execute-step` for live debug. Do not start the GUI. Do not treat `.pickleball/maven-consumer-project/` as the project under test, and do not dump `docs/README.md` or the whole snapshot into first-read context. Human readers can start with `.pickleball/docs/README.md`; links from those guides to `maven-consumer-project` resolve to the exported version-matched reference files.
 
 ## Version-matched reference snapshot
 

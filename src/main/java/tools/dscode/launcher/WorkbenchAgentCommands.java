@@ -55,8 +55,8 @@ public final class WorkbenchAgentCommands {
         out.println("pkb_runvars=" + plan.runVars());
         out.println();
         out.println("Browser: " + plan.browser().browser() + " (" + plan.browser().reason() + ").");
-        out.println("Multi-scenario Discover/Confirm use this high pkb_parallel. Live isolate stays one paused scenario and is only for an already-running Workbench.");
-        out.println("After Discover, confirm (and live isolate, if workbench_* is already in session) replay the retained pkb_run_profile through pkb_runvars. Never supply pkb_run_profile as input.");
+        out.println("Multi-scenario Discover/Confirm use this high pkb_parallel. Live isolate starts a headless Workbench session; then use execute-step / status / events / stop. Same launcher, only change exec.args.");
+        out.println("After Discover, confirm (and isolate/execute-step for live debug) replay the retained pkb_run_profile through pkb_runvars. Never supply pkb_run_profile as input.");
         out.println();
         out.println("NEXT: run discover");
         return 0;
@@ -119,7 +119,7 @@ public final class WorkbenchAgentCommands {
             out.println("run-catalog.json: " + latest.catalog());
             out.println("retained pkb_run_profile: " + latest.runProfile());
             if (writeSnapshot) {
-                out.println("NEXT: confirm --tags/--name for the no-MCP path. Live isolate only if workbench_* tools are already in this session.");
+                out.println("NEXT: confirm --tags/--name. For live debug: isolate (starts session), then execute-step / status / events / stop.");
             }
             return mavenExit;
         } catch (Exception failure) {

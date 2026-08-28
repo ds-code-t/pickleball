@@ -32,6 +32,7 @@ class WorkbenchApplicationTest {
         assertTrue(output.stdout().contains("mcp <project>"));
         assertTrue(output.stdout().contains("ui <project>"));
         assertTrue(output.stdout().contains("isolate <project>"));
+        assertTrue(output.stdout().contains("session <project>"));
         assertTrue(output.stdout().contains("PickleballWorkbenchLauncher"));
         assertEquals("", output.stderr());
     }
@@ -103,8 +104,26 @@ class WorkbenchApplicationTest {
     }
 
     @Test
+    void sessionWithoutSnapshotFailsClearly() {
+        Output output = run("session", Path.of("").toAbsolutePath().normalize().toString());
+
+        assertEquals(1, output.exitCode());
+        assertTrue(output.stderr().contains("no prior Discover snapshot")
+                || output.stderr().contains("No prior Discover snapshot"));
+        assertFalse(output.stderr().toLowerCase().contains("intellij"));
+    }
+
+    @Test
+    void sessionRequiresAProject() {
+        Output output = run("session");
+
+        assertEquals(1, output.exitCode());
+        assertTrue(output.stderr().contains("Usage: pickleball-workbench session <project>"));
+    }
+
+    @Test
     @Timeout(value = 5, unit = TimeUnit.SECONDS)
-    void isolateWithoutInteractiveTtyDoesNotHangAndPointsToConfirm() throws Exception {
+    void isolateWithoutInteractiveTtyDoesNotHangAndPointsToLauncherSession() throws Exception {
         Path snapshot = tempDir.resolve(ControlProtocol.LAST_DISCOVER_SNAPSHOT_RELATIVE);
         Files.createDirectories(snapshot.getParent());
         Files.writeString(snapshot, """
@@ -140,15 +159,13 @@ class WorkbenchApplicationTest {
         );
 
         assertEquals(2, output.exitCode());
-        assertTrue(output.stderr().contains("already-running Workbench"));
-        assertTrue(output.stderr().contains("pre-attached workbench_*")
-                || output.stderr().contains("workbench_*"));
-        assertTrue(output.stderr().contains("confirm") || output.stdout().contains("confirm"));
-        assertTrue(output.stdout().contains("NEXT: confirm"));
-        assertFalse(output.stdout().contains("NEXT: execute_step"));
-        assertFalse(output.stderr().contains("NEXT: execute_step"));
-        assertFalse(output.stdout().contains("Workbench isolate worker:"));
+        assertTrue(output.stderr().contains("interactive TTY"));
+        assertTrue(output.stderr().contains("PickleballWorkbenchLauncher")
+                || output.stderr().contains("headless CLI session"));
+        assertFalse(output.stderr().toLowerCase().contains("register mcp"));
         assertFalse(output.stderr().toLowerCase().contains("intellij"));
+        assertFalse(output.stdout().contains("NEXT: execute_step"));
+        assertFalse(output.stdout().contains("Workbench isolate worker:"));
     }
 
     @Test

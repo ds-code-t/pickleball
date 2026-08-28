@@ -10,10 +10,13 @@ import java.util.Set;
 /** Parses Maven-exec-friendly Workbench launcher arguments. */
 final class WorkbenchCommandLine {
     static final Set<String> FORWARDED_COMMANDS = Set.of(
-            "sync", "status", "worker-check", "live-check", "ui", "mcp", "isolate"
+            "sync", "worker-check", "live-check", "ui", "mcp", "isolate", "session-start", "session"
     );
     static final Set<String> AGENT_CORE_COMMANDS = Set.of(
             "export-guidance", "hint", "discover-hint", "discover", "confirm"
+    );
+    static final Set<String> SESSION_CLIENT_COMMANDS = Set.of(
+            "isolate", "session-start", "execute-step", "status", "events", "stop", "kill"
     );
 
     private WorkbenchCommandLine() {
@@ -35,6 +38,10 @@ final class WorkbenchCommandLine {
 
     static boolean isForwardedCommand(String command) {
         return command != null && FORWARDED_COMMANDS.contains(command);
+    }
+
+    static boolean isSessionClientCommand(String command) {
+        return command != null && SESSION_CLIENT_COMMANDS.contains(command);
     }
 
     static Parsed parse(String[] args) {

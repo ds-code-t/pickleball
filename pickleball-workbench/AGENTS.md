@@ -24,7 +24,7 @@ Workbench-only dependencies, including Jackson and the MCP SDK, belong only on t
 
 ## Runtime ownership
 
-The Workbench controller owns synchronization, worker process/session lifecycle, bridge client behavior, MCP stdio, the localhost UI-attach endpoint, the watched-agent control lease, and the thin Swing UI. Pickleball owns consumer-worker behavior such as the bridge server/coordinator, DynamicControl/Gherkin execution, Step Override runtime, Mapping state, browser/service-call access, and woven Cucumber integration.
+The Workbench controller owns synchronization, worker process/session lifecycle, bridge client behavior, MCP stdio, the localhost UI-attach endpoint (`attach.json`), the headless CLI session (`session` command, `cli-session.json`, serial execute-step queue), the watched-agent control lease, and the thin Swing UI. Pickleball owns consumer-worker behavior such as the bridge server/coordinator, DynamicControl/Gherkin execution, Step Override runtime, Mapping state, browser/service-call access, and woven Cucumber integration.
 
 `WorkbenchServices` is the shared plain-Java adapter boundary. `WorkbenchController` composes synchronization, `WorkbenchLiveSession`, `LiveScenarioPlayer`, and the control lease; MCP, HTTP attach, and Swing must delegate to that service surface instead of implementing their own worker ownership, bridge calls, Mapping semantics, Step Override behavior, scenario retry rules, or a second live Gherkin document.
 
@@ -103,7 +103,7 @@ Workbench provides:
 java -jar pickleball-workbench-<version>.jar mcp <project>
 ```
 
-The MCP adapter is `tools.dscode.workbench.mcp.WorkbenchMcpServer` plus `WorkbenchMcpTools`. It exposes project synchronization/status, interactive worker lifecycle, live Gherkin, Mapping operations, events/evidence, browser/service controls, semantic breakpoints, Step Override authoring, the watched-agent control lease, player-state inspection, gated Save, sparse diagnostic catalog/run/summary readers, and `workbench_investigation_emit` through `WorkbenchServices`. Consumer agents use Workbench `discover` / `confirm` as the Java/Maven front door, not this stdio server. Hosts may already wire `mcp .` as optional alias when `workbench_*` tools are already in the session. Agents must not self-register IDE MCP or start the GUI.
+The MCP adapter is `tools.dscode.workbench.mcp.WorkbenchMcpServer` plus `WorkbenchMcpTools`. It exposes project synchronization/status, interactive worker lifecycle, live Gherkin, Mapping operations, events/evidence, browser/service controls, semantic breakpoints, Step Override authoring, the watched-agent control lease, player-state inspection, gated Save, sparse diagnostic catalog/run/summary readers, and `workbench_investigation_emit` through `WorkbenchServices`. Consumer agents use Workbench `discover` / `confirm` as the Java/Maven front door and launcher `isolate` / `execute-step` against the headless CLI session. Hosts may already wire `mcp .` as optional alias. Agents must not start the GUI.
 
 UI mode cannot share process stdout with stdio MCP. `ui` therefore starts a 127.0.0.1-only JSON attach facade (`WorkbenchAttachServer`) over the same tools and writes `.pickleball/workbench/attach.json` so a Copilot/MCP client can join the visible session. Bind localhost only. Do not launch a second `mcp` process against a running UI.
 

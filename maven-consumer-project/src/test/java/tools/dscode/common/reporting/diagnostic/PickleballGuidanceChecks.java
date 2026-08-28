@@ -42,7 +42,7 @@ public class PickleballGuidanceChecks {
         assertTrue(guide.contains("older Pickleball release whose exporter predates the manifest lifecycle"));
             assertTrue(guide.contains("Generated Maven consumer reference"));
             assertTrue(guide.contains("maven-consumer-project/"));
-            assertTrue(guide.contains("mcp ."));
+            assertTrue(guide.contains("-Dexec.args=isolate"));
             assertTrue(guide.contains("workbench_sync"));
             assertTrue(guide.contains("workbench_execute_step"));
             assertTrue(guide.contains("workbench_diagnostic_catalog"));
@@ -51,14 +51,14 @@ public class PickleballGuidanceChecks {
             assertTrue(guide.contains("pkb_reportingmode=diagnostic"));
             assertTrue(guide.contains("pkb_reportretention=failed"));
             assertTrue(guide.contains("does not end the worker"));
-            assertTrue(guide.contains("is not an MCP"));
+            assertTrue(guide.contains("does not end the worker"));
             assertTrue(guide.contains("afterSequence"));
             assertTrue(guide.contains("docs/pickleball-workbench.md"));
             assertTrue(guide.contains("DiagnosticCli help"));
             assertTrue(guide.contains("**Discover**"));
             assertTrue(guide.contains("**Confirm**"));
-            assertTrue(guide.contains("Do not register IDE MCP"));
-            assertTrue(guide.contains("already in this session") || guide.contains("already present"));
+            assertTrue(guide.contains("Do not start the GUI"));
+            assertTrue(guide.contains("execute-step"));
             assertTrue(guide.contains("run-catalog.json"));
             assertTrue(guide.contains("PickleballWorkbenchLauncher"));
             assertTrue(guide.contains("does not auto-watch") || guide.contains("workbench_sync"));
@@ -85,10 +85,10 @@ public class PickleballGuidanceChecks {
             assertTrue(chooserList.contains("-Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher"));
             assertTrue(chooserList.contains("-Dexec.args=discover"));
             assertTrue(chooserList.contains("change") && chooserList.contains("exec.args"));
-            assertFalse(chooserList.contains("-Dexec.args=isolate"));
-            assertFalse(chooserList.contains("PickleballWorkbenchLauncher isolate"));
-            assertFalse(chooserList.contains("**Isolate**"));
-            assertTrue(chooserList.contains("already") && chooserList.contains("workbench_*"));
+            assertTrue(chooserList.contains("-Dexec.args=isolate"));
+            assertTrue(chooserList.contains("execute-step"));
+            assertTrue(chooserList.contains("**Live debug**"));
+            assertFalse(chooserList.toLowerCase().contains("do not maven-exec isolate"));
             assertFalse(chooserList.contains("Access probe"));
             assertFalse(chooserList.contains("CLI/Maven-primary"));
             assertTrue(guide.contains("Maintainer-only: pointer-eval harness"));
@@ -98,10 +98,9 @@ public class PickleballGuidanceChecks {
                     guide.indexOf("Generated guidance lifecycle")
             );
             assertTrue(liveLoop.contains("isolate"));
-            assertTrue(liveLoop.contains("workbench_*") || liveLoop.contains("workbench_sync"));
-            assertTrue(liveLoop.contains("already"));
-            assertTrue(liveLoop.contains("optional host wiring") || chooser.contains("optional host wiring"));
-            assertFalse(liveLoop.contains("Prefer Workbench CLI `isolate`"));
+            assertTrue(liveLoop.contains("execute-step"));
+            assertTrue(liveLoop.contains("ACK SESSION") || liveLoop.contains("session"));
+            assertFalse(liveLoop.toLowerCase().contains("do not maven-exec isolate"));
             String maintainer = guide.substring(guide.indexOf("## Maintainer-only: pointer-eval harness"));
             assertTrue(maintainer.contains("@agent-pointer-eval"));
             assertTrue(guide.indexOf("## Maintainer-only: pointer-eval harness")
@@ -283,18 +282,17 @@ public class PickleballGuidanceChecks {
             assertTrue(guide.contains("keep terminal logging minimal"));
             assertTrue(guide.contains("older Pickleball release whose exporter predates the manifest lifecycle"));
             assertTrue(guide.contains("read-only reference snapshot"));
-            assertTrue(guide.contains("mcp ."));
+            assertTrue(guide.contains("-Dexec.args=isolate"));
             assertTrue(guide.contains("workbench_diagnostic_catalog"));
             assertTrue(guide.contains("workbench_investigation_emit"));
             assertTrue(guide.contains("pkb_reportretention=failed"));
             assertTrue(guide.contains("Do not copy, modify, or execute files"));
-            assertTrue(guide.contains("already in this session") || guide.contains("already present"));
             assertTrue(guide.contains("one front door"));
             assertTrue(guide.contains("PickleballWorkbenchLauncher"));
             assertTrue(guide.contains("Maintainer-only: pointer-eval harness"));
             assertTrue(guide.contains("@agent-pointer-eval"));
             assertTrue(guide.contains("-Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher"));
-            assertFalse(guide.contains("PickleballWorkbenchLauncher isolate"));
+            assertTrue(guide.contains("-Dexec.args=isolate"));
 
             String consumerProject = Files.readString(root.resolve("docs/consumer-project.md"));
             assertTrue(consumerProject.contains("keep console verbosity low"));
@@ -302,8 +300,8 @@ public class PickleballGuidanceChecks {
             assertTrue(consumerProject.contains("Version-matched reference snapshot"));
             assertTrue(consumerProject.contains("discover which scenarios fail")
                     || consumerProject.contains("one front door"));
-            assertTrue(consumerProject.contains("do not self-register IDE MCP")
-                    || consumerProject.contains("Do not register IDE MCP"));
+            assertTrue(consumerProject.contains("Do not start the GUI")
+                    || consumerProject.contains("one front door"));
         } finally {
             deleteTree(root);
         }

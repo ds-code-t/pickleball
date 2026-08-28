@@ -4,13 +4,13 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.Headers;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
+import tools.dscode.control.protocol.ControlProtocol;
 import tools.dscode.workbench.WorkbenchServices;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.SecureRandom;
@@ -24,19 +24,24 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Localhost-only JSON facade over the same {@link WorkbenchMcpTools} used by
- * stdio MCP. UI mode cannot share process stdout with stdio MCP, so an agent
- * attaches to the visible Workbench through this endpoint.
+ * stdio MCP. UI mode writes {@code attach.json}; the headless CLI session
+ * writes {@code cli-session.json} so the two do not fight.
  */
 public final class WorkbenchAttachServer implements AutoCloseable {
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final SecureRandom RANDOM = new SecureRandom();
 
+    public static final String UI_ATTACH_MODE = "ui-attach";
+    public static final String CLI_SESSION_MODE = "cli-session";
+
     private final WorkbenchServices services;
     private final Path projectRoot;
     private final Path stateFile;
     private final String token;
+    private final String mode;
     private final HttpServer http;
     private final WorkbenchMcpTools tools;
+    private final WorkbenchCommandQueue commands;
     private final ExecutorService executor;
     private final AtomicBoolean closed = new AtomicBoolean();
 
@@ -45,39 +50,91 @@ public final class WorkbenchAttachServer implements AutoCloseable {
             Path projectRoot,
             Path stateFile,
             String token,
+            String mode,
             HttpServer http,
             WorkbenchMcpTools tools,
+            WorkbenchCommandQueue commands,
             ExecutorService executor
     ) {
         this.services = services;
         this.projectRoot = projectRoot;
         this.stateFile = stateFile;
         this.token = token;
+        this.mode = mode;
         this.http = http;
         this.tools = tools;
+        this.commands = commands;
         this.executor = executor;
     }
 
     public static WorkbenchAttachServer start(WorkbenchServices services, Path projectRoot) {
+        return start(services, projectRoot, UI_ATTACH_MODE, attachStateFile(projectRoot), null, null);
+    }
+
+    public static WorkbenchAttachServer startCliSession(WorkbenchServices services, Path projectRoot) {
+        return startCliSession(services, projectRoot, null);
+    }
+
+    public static WorkbenchAttachServer startCliSession(
+            WorkbenchServices services,
+            Path projectRoot,
+            Runnable stopHandler
+    ) {
+        return startCliSession(services, projectRoot, stopHandler, null);
+    }
+
+    static WorkbenchAttachServer startCliSession(
+            WorkbenchServices services,
+            Path projectRoot,
+            Runnable stopHandler,
+            WorkbenchCommandQueue queue
+    ) {
+        return start(
+                services,
+                projectRoot,
+                CLI_SESSION_MODE,
+                cliSessionStateFile(projectRoot),
+                stopHandler,
+                queue
+        );
+    }
+
+    private static WorkbenchAttachServer start(
+            WorkbenchServices services,
+            Path projectRoot,
+            String mode,
+            Path stateFile,
+            Runnable stopHandler,
+            WorkbenchCommandQueue queue
+    ) {
         Objects.requireNonNull(services, "services");
         Path root = projectRoot.toAbsolutePath().normalize();
         try {
             HttpServer http = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
             String token = newToken();
             WorkbenchMcpTools tools = new WorkbenchMcpTools(services, JSON);
-            Path stateFile = attachStateFile(root);
+            WorkbenchCommandQueue commands = null;
+            if (CLI_SESSION_MODE.equals(mode)) {
+                commands = queue != null ? queue : new WorkbenchCommandQueue(
+                        text -> tools.call("workbench_execute_step", Map.of("text", text))
+                );
+                if (stopHandler != null) commands.setStopHandler(stopHandler);
+            }
             ExecutorService executor = Executors.newCachedThreadPool(runnable -> {
                 Thread thread = new Thread(runnable, "pickleball-workbench-attach");
                 thread.setDaemon(true);
                 return thread;
             });
             WorkbenchAttachServer server = new WorkbenchAttachServer(
-                    services, root, stateFile, token, http, tools, executor
+                    services, root, stateFile, token, mode, http, tools, commands, executor
             );
             http.createContext("/health", server::health);
             http.createContext("/lease", server::lease);
             http.createContext("/player", server::player);
             http.createContext("/tools", server::tools);
+            if (CLI_SESSION_MODE.equals(mode)) {
+                http.createContext("/commands", server::commands);
+            }
             http.setExecutor(executor);
             http.start();
             server.writeStateFile();
@@ -89,6 +146,10 @@ public final class WorkbenchAttachServer implements AutoCloseable {
 
     public static Path attachStateFile(Path projectRoot) {
         return projectRoot.resolve(".pickleball").resolve("workbench").resolve("attach.json");
+    }
+
+    public static Path cliSessionStateFile(Path projectRoot) {
+        return projectRoot.toAbsolutePath().normalize().resolve(ControlProtocol.CLI_SESSION_STATE_RELATIVE);
     }
 
     public String url() {
@@ -103,15 +164,24 @@ public final class WorkbenchAttachServer implements AutoCloseable {
         return stateFile;
     }
 
+    public String mode() {
+        return mode;
+    }
+
+    WorkbenchCommandQueue commandQueue() {
+        return commands;
+    }
+
     @Override
     public void close() {
         if (!closed.compareAndSet(false, true)) return;
         http.stop(0);
         executor.shutdownNow();
+        if (commands != null) commands.close();
         try {
             Files.deleteIfExists(stateFile);
         } catch (IOException ignored) {
-            // Disposable attach state.
+            // Disposable attach/session state.
         }
     }
 
@@ -123,7 +193,8 @@ public final class WorkbenchAttachServer implements AutoCloseable {
         send(exchange, 200, Map.of(
                 "status", "ok",
                 "url", url(),
-                "pid", ProcessHandle.current().pid()
+                "pid", ProcessHandle.current().pid(),
+                "mode", mode
         ));
     }
 
@@ -173,6 +244,39 @@ public final class WorkbenchAttachServer implements AutoCloseable {
         }
     }
 
+    private void commands(HttpExchange exchange) throws IOException {
+        if (!authorized(exchange)) return;
+        String path = exchange.getRequestURI().getPath();
+        try {
+            if ("/commands".equals(path) && "POST".equals(exchange.getRequestMethod())) {
+                Map<String, Object> body = readJsonObject(exchange.getRequestBody());
+                String op = string(body, "op");
+                if ("execute-step".equals(op)) {
+                    send(exchange, 200, commands.enqueueExecuteStep(string(body, "text"), string(body, "id")));
+                    return;
+                }
+                if ("stop".equals(op) || "kill".equals(op)) {
+                    send(exchange, 200, Map.of("ack", true, "status", "STOPPING", "op", op));
+                    commands.requestStop();
+                    return;
+                }
+                send(exchange, 400, Map.of("error", "Unknown command op: " + op));
+                return;
+            }
+            if (path.startsWith("/commands/") && path.length() > "/commands/".length()
+                    && "GET".equals(exchange.getRequestMethod())) {
+                send(exchange, 200, commands.status(path.substring("/commands/".length())));
+                return;
+            }
+            send(exchange, 405, Map.of("error", "POST /commands or GET /commands/{id}"));
+        } catch (IllegalArgumentException failure) {
+            send(exchange, 400, Map.of(
+                    "error", "IllegalArgumentException",
+                    "message", failure.getMessage()
+            ));
+        }
+    }
+
     private boolean authorized(HttpExchange exchange) throws IOException {
         String header = firstHeader(exchange.getRequestHeaders(), "Authorization");
         String tokenHeader = firstHeader(exchange.getRequestHeaders(), "X-Workbench-Token");
@@ -192,7 +296,7 @@ public final class WorkbenchAttachServer implements AutoCloseable {
         payload.put("token", token);
         payload.put("pid", ProcessHandle.current().pid());
         payload.put("project", projectRoot.toString());
-        payload.put("mode", "ui-attach");
+        payload.put("mode", mode);
         payload.put("bind", "127.0.0.1");
         Files.writeString(stateFile, JSON.writerWithDefaultPrettyPrinter().writeValueAsString(payload));
     }
@@ -212,6 +316,11 @@ public final class WorkbenchAttachServer implements AutoCloseable {
             return (Map<String, Object>) map;
         }
         throw new IllegalArgumentException("Tool arguments must be a JSON object.");
+    }
+
+    private static String string(Map<String, Object> body, String key) {
+        Object value = body.get(key);
+        return value == null ? null : value.toString();
     }
 
     private static void send(HttpExchange exchange, int status, Object body) throws IOException {

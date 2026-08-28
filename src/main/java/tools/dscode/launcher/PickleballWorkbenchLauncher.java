@@ -22,8 +22,10 @@ import java.util.List;
  * consumer's Pickleball dependency and always launches it in a separate JVM.
  *
  * <p>Agent-facing Discover/hint/export-guidance/confirm run in this consumer JVM
- * so they can reuse DiagnosticCli and wrap Maven. Isolate, UI, MCP, and sync
- * still extract and forward to the controller JAR.</p>
+ * so they can reuse DiagnosticCli and wrap Maven. Isolate/session-start,
+ * execute-step, status, events, and stop/kill are one-shot HTTP clients against
+ * a detached controller session. UI, MCP, and sync still extract and
+ * forward to the controller JAR.</p>
  */
 public final class PickleballWorkbenchLauncher {
     /**
@@ -40,6 +42,11 @@ public final class PickleballWorkbenchLauncher {
         WorkbenchCommandLine.Parsed parsed = WorkbenchCommandLine.parse(args);
         if (WorkbenchCommandLine.isAgentCoreCommand(parsed.command())) {
             int exitCode = WorkbenchAgentCommands.run(args, System.out, System.err);
+            if (exitCode != 0) System.exit(exitCode);
+            return;
+        }
+        if (WorkbenchCommandLine.isSessionClientCommand(parsed.command())) {
+            int exitCode = WorkbenchSessionCommands.run(args, System.out, System.err);
             if (exitCode != 0) System.exit(exitCode);
             return;
         }
