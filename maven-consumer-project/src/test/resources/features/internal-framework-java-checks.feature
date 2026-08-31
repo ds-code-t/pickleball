@@ -8,6 +8,10 @@ Feature: Internal Pickleball Java checks
   Scenario: Run quote-parser mapping checks
     * RUN QUOTE PARSER JAVA TESTS
 
+  @all @regression @internal-java-checks @it-placeholder
+  Scenario: Run it-placeholder parse checks
+    * RUN IT PLACEHOLDER JAVA TESTS
+
   @all @regression @internal-java-checks @step-override
   Scenario: Run Step Override checks
     * RUN STEP OVERRIDE JAVA TESTS

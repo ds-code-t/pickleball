@@ -18,6 +18,7 @@ import tools.dscode.common.reporting.diagnostic.DiagnosticReportingChecks;
 import tools.dscode.common.reporting.diagnostic.InvestigationHandoffChecks;
 import tools.dscode.common.reporting.diagnostic.PickleballGuidanceChecks;
 import tools.dscode.common.reporting.diagnostic.ReportRetentionPolicy;
+import tools.dscode.common.treeparsing.parsedComponents.phraseoperations.PlaceHolderMatchChecks;
 import tools.dscode.common.util.datetime.BusinessTemporalDeltaChecks;
 import tools.dscode.common.util.datetime.BusinessTimePostModifierChecks;
 import tools.dscode.coredefinitions.ModularScenariosChecks;
@@ -39,6 +40,11 @@ public final class InternalFrameworkTestSteps {
         runAndAssert(QuoteParserChecks.class);
     }
 
+    @Given("^RUN IT PLACEHOLDER JAVA TESTS$")
+    public static void runItPlaceholderJavaTests() {
+        runAndAssert(PlaceHolderMatchChecks.class);
+    }
+
     @Given("^RUN INTERNAL PICKLEBALL JAVA TESTS$")
     public static void runInternalPickleballJavaTests() {
         runAndAssert(
@@ -54,7 +60,8 @@ public final class InternalFrameworkTestSteps {
                 ParallelCountEstimatorChecks.class,
                 ChromeHeadlessConfigChecks.class,
                 DynamicControlApiChecks.class,
-                ControlRuntimeObserverChecks.class
+                ControlRuntimeObserverChecks.class,
+                PlaceHolderMatchChecks.class
         );
     }
 

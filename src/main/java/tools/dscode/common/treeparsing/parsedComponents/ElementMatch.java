@@ -118,11 +118,15 @@ public class ElementMatch {
     }
 
     protected ElementMatch(PhraseData phraseData) {
+        this(phraseData, -1, -1, "PlaceHolder");
+    }
+
+    protected ElementMatch(PhraseData phraseData, int startIndex, int position, String fullText) {
         this.parentPhrase = phraseData;
         isPlaceHolder = true;
-        this.startIndex = -1;
-        this.position = -1;
-        this.fullText = "PlaceHolder";
+        this.startIndex = startIndex;
+        this.position = position;
+        this.fullText = (fullText == null || fullText.isBlank()) ? "PlaceHolder" : fullText;
     }
 
 

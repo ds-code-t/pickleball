@@ -253,7 +253,7 @@ public abstract class PhraseData extends PassedData {
 
     public ElementMatch getElementMatch(MatchNode elementNode) {
         if (elementNode.getStringFromLocalState("type").equals(PLACE_HOLDER_MATCH)) {
-            return new PlaceHolderMatch(this);
+            return new PlaceHolderMatch(this, elementNode);
         }
         return ElementMatchFactory.create(this, elementNode);
     }

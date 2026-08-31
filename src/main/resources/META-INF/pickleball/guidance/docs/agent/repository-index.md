@@ -396,6 +396,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 
 ## Framework tests
 
+- `src/test/java/io/cucumber/core/gherkin/messages/NGherkinFactoryTest.java`
 - `src/test/java/tools/dscode/common/reporting/diagnostic/AgentBrowserLadderTest.java`
 - `src/test/java/tools/dscode/common/reporting/diagnostic/AgentDiscoverPlannerTest.java`
 - `src/test/java/tools/dscode/control/override/StepOverrideCompilerTest.java`
@@ -598,6 +599,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `maven-consumer-project/src/test/java/com/example/pickleball/ScenarioDataSteps.java`
 - `maven-consumer-project/src/test/java/com/example/pickleball/StepOverrideBridgeTestSteps.java`
 - `maven-consumer-project/src/test/java/com/example/pickleball/StepOverrideChecks.java`
+- `maven-consumer-project/src/test/java/com/example/pickleball/steps/CustomSteps.java`
 - `maven-consumer-project/src/test/java/com/example/pickleball/support/InternalJavaTestRunner.java`
 - `maven-consumer-project/src/test/java/com/example/pickleball/support/LocalTestSite.java`
 - `maven-consumer-project/src/test/java/com/example/pickleball/tests/TokenizedQueryTest.java`
@@ -616,6 +618,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `maven-consumer-project/src/test/java/tools/dscode/common/reporting/diagnostic/DiagnosticReportingChecks.java`
 - `maven-consumer-project/src/test/java/tools/dscode/common/reporting/diagnostic/InvestigationHandoffChecks.java`
 - `maven-consumer-project/src/test/java/tools/dscode/common/reporting/diagnostic/PickleballGuidanceChecks.java`
+- `maven-consumer-project/src/test/java/tools/dscode/common/treeparsing/parsedComponents/phraseoperations/PlaceHolderMatchChecks.java`
 - `maven-consumer-project/src/test/java/tools/dscode/common/util/datetime/BusinessTemporalDeltaChecks.java`
 - `maven-consumer-project/src/test/java/tools/dscode/common/util/datetime/BusinessTimePostModifierChecks.java`
 - `maven-consumer-project/src/test/java/tools/dscode/coredefinitions/DataTableConversionChecks.java`
@@ -627,6 +630,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 
 ## Maven consumer feature scenarios
 
+- `maven-consumer-project/src/test/resources/features/_localtests/test1.feature`
 - `maven-consumer-project/src/test/resources/features/agent-pointer-eval.feature`
 - `maven-consumer-project/src/test/resources/features/browser-action-contracts.feature`
 - `maven-consumer-project/src/test/resources/features/catalog-context.feature`
@@ -644,6 +648,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `maven-consumer-project/src/test/resources/features/dynamic-steps.feature`
 - `maven-consumer-project/src/test/resources/features/forms-dynamic-steps.feature`
 - `maven-consumer-project/src/test/resources/features/internal-framework-java-checks.feature`
+- `maven-consumer-project/src/test/resources/features/it-placeholder.feature`
 - `maven-consumer-project/src/test/resources/features/keyboard.feature`
 - `maven-consumer-project/src/test/resources/features/mapping-and-resources.feature`
 - `maven-consumer-project/src/test/resources/features/mapping-value-type-preservation.feature`
@@ -687,6 +692,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `maven-consumer-project/src/test/resources/files/customers.yaml`
 - `maven-consumer-project/src/test/resources/pickleball.properties`
 - `maven-consumer-project/src/test/resources/pickleball_local.properties`
+- `maven-consumer-project/src/test/resources/pickleball_local2.properties`
 - `maven-consumer-project/src/test/resources/profiles.yaml`
 - `maven-consumer-project/src/test/resources/profiles_local.yaml`
 

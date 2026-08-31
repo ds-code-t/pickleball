@@ -1,6 +1,6 @@
 # Dynamic Steps
 
-> **Working feature examples:** [`dynamic-steps.feature`](../maven-consumer-project/src/test/resources/features/dynamic-steps.feature) covers core element selection, actions, assertions, ordinals, and chained steps; [`forms-dynamic-steps.feature`](../maven-consumer-project/src/test/resources/features/forms-dynamic-steps.feature) covers form controls and pointer actions; [`browser-action-contracts.feature`](../maven-consumer-project/src/test/resources/features/browser-action-contracts.feature) covers window switching and component closing; [`mapping-and-resources.feature`](../maven-consumer-project/src/test/resources/features/mapping-and-resources.feature) covers comma-step `save` actions.
+> **Working feature examples:** [`dynamic-steps.feature`](../maven-consumer-project/src/test/resources/features/dynamic-steps.feature) covers core element selection, actions, assertions, ordinals, and chained steps; [`forms-dynamic-steps.feature`](../maven-consumer-project/src/test/resources/features/forms-dynamic-steps.feature) covers form controls and pointer actions; [`it-placeholder.feature`](../maven-consumer-project/src/test/resources/features/it-placeholder.feature) covers the `it` placeholder, including a trailing phrase after `click it`; [`browser-action-contracts.feature`](../maven-consumer-project/src/test/resources/features/browser-action-contracts.feature) covers window switching and component closing; [`mapping-and-resources.feature`](../maven-consumer-project/src/test/resources/features/mapping-and-resources.feature) covers comma-step `save` actions.
 
 Dynamic steps let a feature describe browser behavior directly without adding one Java method for every Gherkin sentence.
 
@@ -74,6 +74,24 @@ Context phrases restrict the next element lookup:
 ```
 
 Common context words include `in`, `inside`, `within`, `from`, `of`, `on`, `before`, `after`, `above`, `below`, `near`, `next to`, `following`, and `preceding`.
+
+## The `it` placeholder
+
+`it` refers to a previously named element. The word occupies a text span, so the action or assertion gathers from the correct side of the verb when another phrase follows. Replacement walks previous phrases, including a nested parent or ancestor step whose own elements do not satisfy the action.
+
+```gherkin
+* , if the "Submit Form" Button is displayed, click it
+* , if the "Submit Form" Button is displayed, click it, and wait 1 seconds.
+* , if the "Email" Radio Button is displayed, click it, and click the "Submit Form" Button
+* , if the "Account Type" Dropdown is displayed, select "Premium" in it
+* , in the "Profile Form" Test Panel, if the "Submit Form" Button is displayed:
+: * , click it
+* , if the "Submit Form" Button is displayed:
+: * , save "nested-marker" as "itAncestorMarker":
+:: * , click it
+```
+
+Quoted `"it"` remains ordinary text, not the placeholder. The executable consumer contract is the single scenario in [`it-placeholder.feature`](../maven-consumer-project/src/test/resources/features/it-placeholder.feature).
 
 ## Actions
 
@@ -229,6 +247,7 @@ For child steps, use [Nested Steps](nested-steps.md). For report-focused branch 
 
 - [Core dynamic-step playground](../maven-consumer-project/src/test/resources/features/dynamic-steps.feature)
 - [Form actions, state assertions, chains, and pointer actions](../maven-consumer-project/src/test/resources/features/forms-dynamic-steps.feature)
+- [The `it` placeholder, including a trailing phrase after `click it`](../maven-consumer-project/src/test/resources/features/it-placeholder.feature)
 - [Window switching and component closing](../maven-consumer-project/src/test/resources/features/browser-action-contracts.feature)
 - [Saved values and supported mapping steps](../maven-consumer-project/src/test/resources/features/mapping-and-resources.feature)
 - [Contexts, ordinals, and project-specific elements](../maven-consumer-project/src/test/resources/features/catalog-context.feature)

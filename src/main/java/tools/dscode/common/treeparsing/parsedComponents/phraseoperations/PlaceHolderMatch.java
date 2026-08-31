@@ -1,24 +1,30 @@
 package tools.dscode.common.treeparsing.parsedComponents.phraseoperations;
 
-import io.cucumber.core.runner.StepExtension;
-import io.cucumber.java.hu.Ha;
 import tools.dscode.common.assertions.ValueWrapper;
 import tools.dscode.common.seleniumextensions.ElementWrapper;
+import tools.dscode.common.treeparsing.MatchNode;
 import tools.dscode.common.treeparsing.parsedComponents.ElementMatch;
 import tools.dscode.common.treeparsing.parsedComponents.ElementType;
 import tools.dscode.common.treeparsing.parsedComponents.PhraseData;
 
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
-
-import static io.cucumber.core.runner.GlobalState.getRunningStep;
-import static tools.dscode.common.assertions.ValueWrapper.createValueWrapper;
 
 public class PlaceHolderMatch extends ElementMatch {
     public PlaceHolderMatch(PhraseData phraseData) {
         super(phraseData);
+
+        this.elementTypes = new HashSet<>();
+        this.isPlaceHolder = true;
+    }
+
+    public PlaceHolderMatch(PhraseData phraseData, MatchNode elementNode) {
+        super(
+                phraseData,
+                elementNode.start,
+                elementNode.position,
+                elementNode.getStringFromLocalState("fullText")
+        );
 
         this.elementTypes = new HashSet<>();
         this.isPlaceHolder = true;
