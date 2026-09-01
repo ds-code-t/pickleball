@@ -19,6 +19,22 @@ class InvestigationHandoffTest {
     Path project;
 
     @Test
+    void acceptsInvestigationIdAndDiagnosticRunIdAliases() {
+        Map<String, Object> raw = new LinkedHashMap<>();
+        raw.put("investigationId", "alias-1");
+        raw.put("cause", "The mapping key was wrong.");
+        raw.put("diagnosticRunId", "run-z");
+
+        InvestigationHandoff.Document document = InvestigationHandoff.normalize(raw, project);
+        assertEquals("alias-1", document.investigationId());
+        assertEquals("run-z", document.runId());
+        assertEquals("reports/diagnostic-runs/run-z/run-index.json", document.runIndexPath());
+        assertTrue(document.toMap().containsKey("pkb_investigation_id"));
+        assertFalse(document.toMap().containsKey("investigationId"));
+        assertFalse(document.toMap().containsKey("diagnosticRunId"));
+    }
+
+    @Test
     void htmlEscapesCauseAndCapsScreenshotsAndNotesMissingImages() throws Exception {
         Path run = project.resolve("reports/diagnostic-runs/run-1/scenarios/s1/screenshots");
         Files.createDirectories(run);

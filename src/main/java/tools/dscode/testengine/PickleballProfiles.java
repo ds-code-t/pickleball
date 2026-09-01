@@ -7,6 +7,7 @@ import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import tools.dscode.common.mappings.MapConfigurations;
 import tools.dscode.common.mappings.MappingProcessor;
 import tools.dscode.common.mappings.NodeMap;
+import tools.dscode.parallelutilities.ParallelCountEstimator;
 
 import java.io.InputStream;
 import java.net.URL;
@@ -36,6 +37,7 @@ import static tools.dscode.testengine.PKB_props.PKB_DATA_PATH;
 import static tools.dscode.testengine.PKB_props.PKB_FEATURES;
 import static tools.dscode.testengine.PKB_props.PKB_GLUE;
 import static tools.dscode.testengine.PKB_props.PKB_OPTIONS;
+import static tools.dscode.testengine.PKB_props.PKB_PARALLEL;
 import static tools.dscode.testengine.PKB_props.PKB_PREFIX;
 import static tools.dscode.testengine.PKB_props.PKB_PROFILE;
 import static tools.dscode.testengine.PKB_props.PKB_RUN_PROFILE;
@@ -132,6 +134,7 @@ final class PickleballProfiles {
 
         restoreProtectedReferences(composed, defaultProfile);
         ObjectNode resolved = resolveProfile(composed, registry, directReferenceContext);
+        stampResolvedParallel(resolved);
         Map<String, String> finalRunVars = toRunVarMap(resolved);
 
         clearManagedValues(values);
@@ -542,6 +545,21 @@ final class PickleballProfiles {
             }
         }
         return null;
+    }
+
+    private static void stampResolvedParallel(ObjectNode resolved) {
+        if (resolved == null || !resolved.has(PKB_PARALLEL)) {
+            return;
+        }
+        JsonNode configured = resolved.get(PKB_PARALLEL);
+        if (configured == null || configured.isNull()) {
+            return;
+        }
+        String text = configured.asText();
+        if (text == null || text.isBlank()) {
+            return;
+        }
+        resolved.put(PKB_PARALLEL, Integer.toString(ParallelCountEstimator.resolve(text)));
     }
 
     private static Map<String, String> toRunVarMap(ObjectNode profile) {

@@ -24,7 +24,7 @@ Workbench-only dependencies, including Jackson and the MCP SDK, belong only on t
 
 ## Runtime ownership
 
-The Workbench controller owns synchronization, worker process/session lifecycle, bridge client behavior, MCP stdio, the localhost UI-attach endpoint, the watched-agent control lease, and the thin Swing UI. Pickleball owns consumer-worker behavior such as the bridge server/coordinator, DynamicControl/Gherkin execution, Step Override runtime, Mapping state, browser/service-call access, and woven Cucumber integration.
+The Workbench controller owns synchronization, worker process/session lifecycle, bridge client behavior, MCP stdio, the localhost UI-attach endpoint (`attach.json`), the headless CLI session (`session` command, `cli-session.json`, serial execute-step queue), the watched-agent control lease, and the thin Swing UI. Pickleball owns consumer-worker behavior such as the bridge server/coordinator, DynamicControl/Gherkin execution, Step Override runtime, Mapping state, browser/service-call access, and woven Cucumber integration.
 
 `WorkbenchServices` is the shared plain-Java adapter boundary. `WorkbenchController` composes synchronization, `WorkbenchLiveSession`, `LiveScenarioPlayer`, and the control lease; MCP, HTTP attach, and Swing must delegate to that service surface instead of implementing their own worker ownership, bridge calls, Mapping semantics, Step Override behavior, scenario retry rules, or a second live Gherkin document.
 
@@ -103,7 +103,7 @@ Workbench provides:
 java -jar pickleball-workbench-<version>.jar mcp <project>
 ```
 
-The MCP adapter is `tools.dscode.workbench.mcp.WorkbenchMcpServer` plus `WorkbenchMcpTools`. It exposes project synchronization/status, interactive worker lifecycle, live Gherkin, Mapping operations, events/evidence, browser/service controls, semantic breakpoints, Step Override authoring, the watched-agent control lease, player-state inspection, gated Save, sparse diagnostic catalog/run/summary readers, and `workbench_investigation_emit` through `WorkbenchServices`. Consumer agents use this headless stdio server (`mcp .`), not the Swing GUI.
+The MCP adapter is `tools.dscode.workbench.mcp.WorkbenchMcpServer` plus `WorkbenchMcpTools`. It exposes project synchronization/status, interactive worker lifecycle, live Gherkin, Mapping operations, events/evidence, browser/service controls, semantic breakpoints, Step Override authoring, the watched-agent control lease, player-state inspection, gated Save, sparse diagnostic catalog/run/summary readers, and `workbench_investigation_emit` through `WorkbenchServices`. Consumer agents use Workbench `discover` / `confirm` as the Java/Maven front door and launcher `isolate` / `execute-step` against the headless CLI session. Hosts may already wire `mcp .` as optional alias. Agents must not start the GUI.
 
 UI mode cannot share process stdout with stdio MCP. `ui` therefore starts a 127.0.0.1-only JSON attach facade (`WorkbenchAttachServer`) over the same tools and writes `.pickleball/workbench/attach.json` so a Copilot/MCP client can join the visible session. Bind localhost only. Do not launch a second `mcp` process against a running UI.
 
@@ -129,7 +129,7 @@ Worker JVM system-property overrides are explicit controller inputs. The default
 
 `WorkbenchLiveSession` is the controller-side scenario-bound facade for operations on the persistent paused worker. It delegates to `ControlBridgeClient` and neutral protocol DTOs; it must not reimplement Gherkin matching, mappings, browser behavior, service calls, semantic hook behavior, or Step Override matching/compilation.
 
-Each live operation resolves the currently owned paused scenario, performs the bridge call for that scenario, and verifies afterward that the same process id, bridge runtime id, and scenario id remain active and paused. Normal live operations must not invoke Maven/Gradle, resynchronize the project, or restart the worker.
+Each live operation resolves the currently owned paused scenario, performs the bridge call for that scenario, and verifies afterward that the same process id, bridge runtime id, and scenario id remain active and paused. A `FAILED` `executeStep` result is still a completed live call: the worker stays paused and available. Normal live operations must not invoke Maven/Gradle, resynchronize the project, or restart the worker.
 
 `compileStepOverride(id, regex, source)` sends a REPLACE-mode REGEX rule to the consumer worker; the Java source must contain `{{CLASS_NAME}}`, and the worker owns class naming, compilation, classloading, registry lifetime, matching, capture extraction, and handler execution. `stepOverrides()`, `removeStepOverride(id)`, and `clearStepOverrides()` operate only on the currently owned scenario. Workbench must not compile handlers in the controller JVM.
 

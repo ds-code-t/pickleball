@@ -156,6 +156,16 @@ public final class PKB_props {
     /** Canonical deterministic serialization of the resolved RunVars actually used for this run. */
     public static String runProfile() { return get(PKB_RUN_PROFILE); }
 
+    /** Parse a compact RunVar assignment string such as a retained {@code pkb_run_profile}. */
+    public static LinkedHashMap<String, String> parseAssignments(String compact) {
+        return PickleballProfiles.parseAssignments(compact);
+    }
+
+    /** Serialize execution RunVars in the same deterministic compact form as {@code pkb_run_profile}. */
+    public static String serializeRunVars(Map<String, String> values) {
+        return PickleballProfiles.serializeRunProfile(values);
+    }
+
     /** Preferred direct RunVar input. Missing execution-context keys inherit; explicit blanks suppress inheritance. */
     public static void runVars(String assignments) {
         clearDirectRunControls();

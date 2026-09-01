@@ -52,15 +52,15 @@ reports/diagnostic-runs/
 
 An interrupted scenario may retain raw `trace.jsonl` instead of the gzip form. `pkb_diagnostic_output` may move the diagnostic-runs root.
 
-`run-index.json` includes sparse scenario/outcome/comparison metadata plus the sanitized final `runProfile`, deterministic `runProfileFingerprint`, and compatibility field `directRunProfile`. The field name `directRunProfile` remains for diagnostic schema compatibility even though new direct controlled input is `pkb_runvars`.
+`run-index.json` includes sparse scenario/outcome/comparison metadata plus the sanitized final `runProfile`, deterministic `runProfileFingerprint`, and compatibility field `directRunProfile`. The field name `directRunProfile` remains for diagnostic schema compatibility even though new direct controlled input is `pkb_runvars`. `run-catalog.json` copies each run's `runProfile` / `runProfileFingerprint` when present. Scenario `summary.json` also includes the same `runProfile` so agents can inspect the complete resolved RunVar snapshot without opening `configuration.json`.
 
 ## AI evidence access protocol
 
 Use the shallowest evidence layer that completely answers the question:
 
-1. `run-catalog.json` — choose candidate runs.
-2. Selected `run-index.json` / `clusters.json` — outcomes, identities, failure groups, capabilities, retention, profile fingerprints, representative visuals.
-3. Selected scenario `summary.json` — additional sparse detail.
+1. `run-catalog.json` — choose candidate runs. Catalog entries include the retained `runProfile` when present.
+2. Selected `run-index.json` / `clusters.json` — outcomes, identities, failure groups, capabilities, retention, the complete `runProfile`, profile fingerprints, representative visuals.
+3. Selected scenario `summary.json` — additional sparse detail, including the same `runProfile`.
 4. Targeted `events.jsonl` — exact step/lifecycle/order/INFO+ detail only when needed.
 5. Existing `comparisonToPrevious`, run comparison, or fingerprint comparison.
 6. Representative PNG only when semantic visual meaning matters.
@@ -114,16 +114,19 @@ See `docs/ai-run-configuration.md` and `docs/diagnostic-lineage-metadata.md`.
 
 ## Diagnostic CLI
 
-Supported command-line operations:
+The agent-facing entry is Pickleball Workbench. DiagnosticCli remains the implementation behind export-guidance/hint and the comparison utilities:
 
 ```text
 DiagnosticCli guidance
 DiagnosticCli export-guidance [output-directory]
+DiagnosticCli discover-hint [project]
 DiagnosticCli emit-investigation <investigation-json-or--> <consumer-project-root>
 DiagnosticCli compare-runs <left-run-index> <right-run-index> [output-json]
 DiagnosticCli compare-fingerprints <left.pkbf> <right.pkbf> [output-json]
 DiagnosticCli rebuild <diagnostic-runs-root-or-run-root>
 ```
+
+`DiagnosticCli help`, `--help`, and `-h` print this list and state that Workbench is the agent entry.
 
 Prefer `DiagnosticCli` over custom Maven-classpath/JShell workflows for routine comparison and recovery.
 
@@ -140,7 +143,7 @@ Input is investigation JSON from a file or stdin (`-`) plus the consumer project
 Suggested investigation JSON fields, using existing lineage/diagnostic names where they already exist:
 
 ```text
-pkb_investigation_id
+pkb_investigation_id   # or investigationId
 createdAt
 scenario.name / scenario.feature / scenario.scenarioId
 outcome          # cause-only | cause-and-fix
@@ -149,11 +152,13 @@ fix              # text, or "not fixed"
 category         # selector | gherkin | java | data | other
 failureSignature
 failureSite
-runId
+runId            # or diagnosticRunId
 runIndexPath     # pointer, not a copy
 screenshots      # at most two project-relative PNG paths
 pickleballVersion
 ```
+
+Canonical names are `pkb_investigation_id` and `runId`. `investigationId` and `diagnosticRunId` are accepted aliases and are written back under the canonical names.
 
 `export-guidance` does not manage or delete `.pickleball/investigations/`.
 

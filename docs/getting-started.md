@@ -15,7 +15,7 @@ A consumer normally needs the Pickleball test dependency and one runner extendin
 ```xml
 <properties>
     <maven.compiler.release>21</maven.compiler.release>
-    <pickleball.version>2.1.9</pickleball.version>
+    <pickleball.version>2.1.10</pickleball.version>
 </properties>
 
 <dependency>

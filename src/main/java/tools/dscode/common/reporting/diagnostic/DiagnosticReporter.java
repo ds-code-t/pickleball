@@ -681,7 +681,11 @@ final class DiagnosticReporter {
                             @SuppressWarnings("unchecked")
                             Map<String, Object> index = JSON.readValue(indexPath.toFile(), LinkedHashMap.class);
                             Map<String, Object> summary = new LinkedHashMap<>();
-                            for (String key : List.of("runId", "outcome", "completion", "startedAt", "reportRetention", "configurationHash", "comparisonMetadata", "counts", "lineage")) {
+                            for (String key : List.of(
+                                    "runId", "outcome", "completion", "startedAt", "reportRetention",
+                                    "configurationHash", "runProfile", "runProfileFingerprint",
+                                    "comparisonMetadata", "counts", "lineage"
+                            )) {
                                 summary.put(key, index.get(key));
                             }
                             summary.put("runIndex", path.getFileName() + "/run-index.json");
@@ -920,7 +924,11 @@ final class DiagnosticReporter {
 
     private void writeScenarioSummary(ScenarioSummary summary) {
         try {
-            writeJsonAtomic(summaryPath(summary.executionId), summary.fullMap());
+            Map<String, Object> body = summary.fullMap();
+            if (!runProfile.isBlank()) {
+                body.put("runProfile", runProfile);
+            }
+            writeJsonAtomic(summaryPath(summary.executionId), body);
         } catch (Throwable t) {
             failEvidence("write scenario summary", t);
         }

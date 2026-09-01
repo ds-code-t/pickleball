@@ -1,15 +1,24 @@
 package tools.dscode.workbench;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.io.TempDir;
+import tools.dscode.control.protocol.ControlProtocol;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class WorkbenchApplicationTest {
+    @TempDir
+    Path tempDir;
 
     @Test
     void helpListsSynchronizationWorkerLiveMcpAndUiCommands() {
@@ -17,11 +26,38 @@ class WorkbenchApplicationTest {
 
         assertEquals(0, output.exitCode());
         assertTrue(output.stdout().contains("sync <project>"));
+        assertTrue(output.stdout().contains("status <project>"));
         assertTrue(output.stdout().contains("worker-check <project>"));
         assertTrue(output.stdout().contains("live-check <project>"));
         assertTrue(output.stdout().contains("mcp <project>"));
         assertTrue(output.stdout().contains("ui <project>"));
+        assertTrue(output.stdout().contains("isolate <project>"));
+        assertTrue(output.stdout().contains("session <project>"));
+        assertTrue(output.stdout().contains("PickleballWorkbenchLauncher"));
         assertEquals("", output.stderr());
+    }
+
+    @Test
+    void helpAliasesPrintTheSameCommandList() {
+        Output dashed = run("--help");
+        Output shortFlag = run("-h");
+        Output word = run("help");
+
+        assertEquals(0, shortFlag.exitCode());
+        assertEquals(0, word.exitCode());
+        assertEquals(dashed.stdout(), shortFlag.stdout());
+        assertEquals(dashed.stdout(), word.stdout());
+        assertEquals("", shortFlag.stderr());
+        assertEquals("", word.stderr());
+    }
+
+    @Test
+    void statusRequiresExactlyOneProject() {
+        Output output = run("status");
+
+        assertEquals(1, output.exitCode());
+        assertEquals("", output.stdout());
+        assertTrue(output.stderr().contains("Usage: pickleball-workbench status <project>"));
     }
 
     @Test
@@ -31,6 +67,105 @@ class WorkbenchApplicationTest {
         assertEquals(0, output.exitCode());
         assertEquals("Pickleball Workbench development" + System.lineSeparator(), output.stdout());
         assertEquals("", output.stderr());
+    }
+
+    @Test
+    void versionAliasesPrintTheSameVersion() {
+        Output dashed = run("--version");
+        Output shortFlag = run("-V");
+        Output word = run("version");
+
+        assertEquals(0, shortFlag.exitCode());
+        assertEquals(0, word.exitCode());
+        assertEquals(dashed.stdout(), shortFlag.stdout());
+        assertEquals(dashed.stdout(), word.stdout());
+        assertEquals("", shortFlag.stderr());
+        assertEquals("", word.stderr());
+    }
+
+    @Test
+    void isolateWithoutSnapshotFailsClearlyWithoutSuggestingIdeMcp() {
+        Output output = run("isolate", Path.of("").toAbsolutePath().normalize().toString());
+
+        assertEquals(1, output.exitCode());
+        assertTrue(output.stderr().contains("Workbench CLI isolate failed"));
+        assertTrue(output.stderr().contains("no prior Discover snapshot")
+                || output.stderr().contains("No prior Discover snapshot"));
+        assertFalse(output.stderr().toLowerCase().contains("register mcp"));
+        assertFalse(output.stderr().toLowerCase().contains("intellij"));
+    }
+
+    @Test
+    void isolateRequiresAProject() {
+        Output output = run("isolate");
+
+        assertEquals(1, output.exitCode());
+        assertTrue(output.stderr().contains("Usage: pickleball-workbench isolate <project>"));
+    }
+
+    @Test
+    void sessionWithoutSnapshotFailsClearly() {
+        Output output = run("session", Path.of("").toAbsolutePath().normalize().toString());
+
+        assertEquals(1, output.exitCode());
+        assertTrue(output.stderr().contains("no prior Discover snapshot")
+                || output.stderr().contains("No prior Discover snapshot"));
+        assertFalse(output.stderr().toLowerCase().contains("intellij"));
+    }
+
+    @Test
+    void sessionRequiresAProject() {
+        Output output = run("session");
+
+        assertEquals(1, output.exitCode());
+        assertTrue(output.stderr().contains("Usage: pickleball-workbench session <project>"));
+    }
+
+    @Test
+    @Timeout(value = 5, unit = TimeUnit.SECONDS)
+    void isolateWithoutInteractiveTtyDoesNotHangAndPointsToLauncherSession() throws Exception {
+        Path snapshot = tempDir.resolve(ControlProtocol.LAST_DISCOVER_SNAPSHOT_RELATIVE);
+        Files.createDirectories(snapshot.getParent());
+        Files.writeString(snapshot, """
+                {
+                  "schemaVersion": 1,
+                  "source": "workbench-discover",
+                  "runId": "run-1",
+                  "runProfile": "pkb_browser=CHROME_HEADLESS, pkb_parallel=4, pkb_reportingmode=diagnostic",
+                  "runVars": {
+                    "pkb_browser": "CHROME_HEADLESS",
+                    "pkb_parallel": "4",
+                    "pkb_reportingmode": "diagnostic"
+                  }
+                }
+                """);
+
+        ByteArrayOutputStream stdout = new ByteArrayOutputStream();
+        ByteArrayOutputStream stderr = new ByteArrayOutputStream();
+        int exitCode;
+        try (PrintStream out = new PrintStream(stdout, true, StandardCharsets.UTF_8);
+             PrintStream err = new PrintStream(stderr, true, StandardCharsets.UTF_8)) {
+            exitCode = WorkbenchApplication.isolate(
+                    new String[]{"isolate", tempDir.toString(), "--tags=@failing"},
+                    out,
+                    err,
+                    false
+            );
+        }
+        Output output = new Output(
+                exitCode,
+                stdout.toString(StandardCharsets.UTF_8),
+                stderr.toString(StandardCharsets.UTF_8)
+        );
+
+        assertEquals(2, output.exitCode());
+        assertTrue(output.stderr().contains("interactive TTY"));
+        assertTrue(output.stderr().contains("PickleballWorkbenchLauncher")
+                || output.stderr().contains("headless CLI session"));
+        assertFalse(output.stderr().toLowerCase().contains("register mcp"));
+        assertFalse(output.stderr().toLowerCase().contains("intellij"));
+        assertFalse(output.stdout().contains("NEXT: execute_step"));
+        assertFalse(output.stdout().contains("Workbench isolate worker:"));
     }
 
     @Test

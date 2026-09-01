@@ -45,7 +45,26 @@ META-INF/pickleball/workbench/pickleball-workbench.jar
 
 Run the small launcher from the consumer test classpath. For Maven consumers, this command requires no cache path, separate Workbench dependency, or separately selected version.
 
-Consumer AI agents use headless MCP:
+Workbench is the consumer AI-agent front door. Agents use `export-guidance`, `hint`, `discover`, and `confirm` to find failures, then `isolate` / `execute-step` / `status` / `events` / `stop` for live debug. Do not start the GUI.
+
+```bash
+mvn -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java \
+  -Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher \
+  -Dexec.classpathScope=test \
+  "-Dexec.args=export-guidance .pickleball"
+```
+
+```bash
+"-Dexec.args=hint"
+"-Dexec.args=discover --tags=@smoke"
+"-Dexec.args=confirm --tags=@smoke --name='The failing scenario'"
+"-Dexec.args=isolate"
+"-Dexec.args=execute-step --text='Given stay'"
+```
+
+Same launcher; only change `-Dexec.args`. `isolate` starts a detached headless session; later execs are one-shot HTTP clients.
+
+`mcp` and `ui` remain host/human commands. Hosts that already run Workbench MCP can launch it from the consumer test classpath:
 
 ```bash
 mvn -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java \
@@ -58,7 +77,7 @@ mvn -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java \
 mvn -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java "-Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher" "-Dexec.classpathScope=test" "-Dexec.args=mcp ."
 ```
 
-Humans who want the Swing player can pass `ui .` instead. With no launcher arguments, `ui` and the current directory are selected automatically for that human default. Other Workbench commands are forwarded in the same form, for example `"-Dexec.args=sync ."`. Agents for this release should not use the GUI, `ui .`, or `.pickleball/workbench/attach.json` as their path; see `.pickleball/AGENT-GUIDE.md`.
+Humans who want the Swing player can pass `ui .` instead. With no launcher arguments, `ui` and the current directory are selected automatically for that human default. Other Workbench commands are forwarded in the same form, for example `"-Dexec.args=sync ."`. Headless `mcp .` is optional host wiring, not an agent setup step. Agents for this release should not use the GUI, `ui .`, or `.pickleball/workbench/attach.json` as their path; see `.pickleball/AGENT-GUIDE.md`.
 
 Gradle consumers can expose the same dependency-owned launcher without resolving a cache path or adding a Workbench dependency:
 
@@ -66,7 +85,7 @@ Gradle consumers can expose the same dependency-owned launcher without resolving
 tasks.register('pickleballWorkbench', JavaExec) {
     classpath = sourceSets.test.runtimeClasspath
     mainClass = 'tools.dscode.launcher.PickleballWorkbenchLauncher'
-    args 'mcp', projectDir.absolutePath // consumer agents; pass 'ui' for the Swing player
+    args 'hint' // Discover helper; pass 'discover' / 'confirm' / 'isolate' / 'execute-step'. Optional host: 'mcp', projectDir.absolutePath. Humans: 'ui'.
 }
 ```
 
@@ -99,6 +118,12 @@ Synchronize a consumer project before starting a worker manually from repository
 ```powershell
 $workbenchJar = ".\pickleball-workbench\build\libs\pickleball-workbench-<version>.jar"
 java -jar $workbenchJar sync ".\maven-consumer-project"
+```
+
+Read the last synchronization manifest without invoking Maven/Gradle:
+
+```powershell
+java -jar $workbenchJar status ".\maven-consumer-project"
 ```
 
 Synchronization uses the selected project wrapper to establish compiled output and the effective test runtime classpath. It keeps `-DskipTests` (Surefire never runs during sync). Input fingerprints of Java sources, resources, build files, and dependency artifacts decide how much of the wrapper to run:
@@ -274,7 +299,7 @@ Human **Save** uses the same service. After a picker scenario was loaded, Swing 
 
 ### Attaching an agent to a visible UI
 
-The Swing UI is a human player. Consumer AI agents for this release should start headless `mcp .` instead of attaching to a GUI.
+The Swing UI is a human player. Consumer AI agents for this release should not attach to a GUI. Headless `mcp .` is optional when the host already exposes `workbench_*` tools.
 
 UI mode cannot share process stdout with stdio MCP. Starting `mcp` while the UI is already running would be a second Workbench JVM. Instead, `ui` starts a 127.0.0.1-only JSON attach endpoint over the same `WorkbenchServices` / `WorkbenchMcpTools` methods and writes disposable discovery state:
 
@@ -303,19 +328,19 @@ A Copilot or other MCP-style client finds that file in the consumer project, the
 4. Use the existing live tools (`workbench_execute_step`, Mapping, evidence, worker) while holding the lease, and `workbench_set_current_action` so the human can watch.
 5. `POST {url}/tools/workbench_request_save` to ask to copy the live scenario into the original feature. The call blocks until the human clicks Allow or Deny, or Take control.
 
-Headless `java -jar pickleball-workbench-<version>.jar mcp <project>` stays stdio JSON-RPC only. That is the consumer-agent path. That client may hold the lease without a banner. Save is still a distinct explicit tool and never an implicit write.
+Headless `java -jar pickleball-workbench-<version>.jar mcp <project>` stays stdio JSON-RPC only. That is optional host wiring, not an agent setup step. The consumer-agent live path is launcher `isolate` then `execute-step`. That client may hold the lease without a banner. Save is still a distinct explicit tool and never an implicit write.
 
 A human-watched UI session is optional and separate. From `maven-consumer-project`, a person may start `ui .` and then a watcher can join `.pickleball/workbench/attach.json`. Do not launch a second `mcp` process against the same live UI session, and do not treat that attach file as the default agent path.
 
 ## MCP stdio
 
-Start the lightweight non-Spring MCP server for a consumer project. This is the consumer-agent path:
+Start the lightweight non-Spring MCP server for a consumer project. This is optional host wiring when `workbench_*` tools are already connected, not an agent setup step:
 
 ```powershell
 java -jar $workbenchJar mcp ".\maven-consumer-project"
 ```
 
-Or, from a Maven consumer test classpath, `"-Dexec.args=mcp ."`. Do not document or use the Swing GUI as the agent path.
+Or, from a Maven consumer test classpath, `"-Dexec.args=mcp ."`. That launcher is optional host wiring. Agents use Workbench `discover` / `confirm` to find failures and `isolate` / `execute-step` for live debug. Do not document or use the Swing GUI, `ui .`, or `.pickleball/workbench/attach.json` as the agent path.
 
 The server uses the official Java MCP SDK core and stdio transport with the Jackson 2 JSON adapter. MCP dependencies are Workbench-only and are shaded into the executable companion. Workbench deliberately does not use Spring Boot, Spring Framework, Spring AI, WebMVC, or Tomcat.
 
@@ -371,6 +396,10 @@ workbench_mapping_restore
 workbench_events
 ```
 
+`workbench_execute_step` returns a structured `SUCCESS` / `FAILED` / `UNAVAILABLE` result. A FAILED Gherkin hypothesis leaves the same paused worker available so the agent can inspect, insert, nest, or retry. That result is not an MCP `isError` and does not stop the worker. MCP `isError=true` is for controller/runtime problems such as a missing paused worker.
+
+`workbench_events` is a paged read: pass `afterSequence` and a small `limit` (default 100, maximum 500). Do not request the full retained event history when a page answers the question.
+
 Browser/service evidence:
 
 ```text
@@ -379,6 +408,8 @@ workbench_browser_screenshot
 workbench_element_inspect
 workbench_service_call
 ```
+
+Prefer `workbench_browser_page` and `workbench_element_inspect` over `workbench_browser_screenshot` unless the image itself is required. Screenshot bytes are expensive in agent context.
 
 Semantic breakpoints:
 
@@ -398,7 +429,7 @@ workbench_step_override_remove
 workbench_step_override_clear
 ```
 
-Sparse diagnostic readers (do not glob `reports/diagnostic-runs`; these return JSON only and do not dump events, traces, or PNG bytes):
+Sparse diagnostic readers (do not glob `reports/diagnostic-runs`; these return JSON only and do not dump events, traces, or PNG bytes). Catalog, run-index, and summary payloads include the retained `pkb_run_profile` when present:
 
 ```text
 workbench_diagnostic_catalog
@@ -416,7 +447,7 @@ workbench_investigation_emit
 
 Mutating live tools require the agent control lease. `workbench_request_save` never writes the original feature until the human Allows it in the UI, or until the explicit stdio tool call itself is the headless approval. Deny, Take control, and an unsavable demo buffer leave the file unchanged.
 
-Controller/runtime failures are returned as MCP tool results with `isError=true`. They are not printed as arbitrary protocol output.
+Controller/runtime failures are returned as MCP tool results with `isError=true`. They are not printed as arbitrary protocol output. Exploratory `FAILED` step, mapping, browser, or service-call results remain ordinary JSON tool results with `isError=false`.
 
 ## Scope boundary
 

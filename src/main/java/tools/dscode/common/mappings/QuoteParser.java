@@ -9,8 +9,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import static tools.dscode.common.GlobalConstants.BOOK_END;
 
@@ -23,16 +21,6 @@ import static tools.dscode.common.GlobalConstants.BOOK_END;
  * or `); triple uses the ' escape char
  */
 public final class QuoteParser extends LinkedHashMap<String, String> {
-    // Single-character bookends: ' " `
-    private static final String QUOTED_SINGLECHAR = "(?<!\\\\)(['\"`])((?:\\\\.|(?!\\1).)*?)(?<!\\\\)(?:\\\\\\\\)*\\1";
-    private static final Pattern P_SINGLECHAR = Pattern.compile(QUOTED_SINGLECHAR);
-
-    // Triple single quotes: '''
-    // Group(1) captures the literal ''' so we can negative-lookahead against
-    // it.
-    private static final String QUOTED_TRIPLE_SINGLE = "(?<!\\\\)(?:\\\\\\\\)*(''')((?:\\\\.|(?!\\1).)*?)(?<!\\\\)(?:\\\\\\\\)*\\1";
-    private static final Pattern P_TRIPLE_SINGLE = Pattern.compile(QUOTED_TRIPLE_SINGLE);
-
     // “Untypable” control pictures for placeholders
     private static final char MASK_CONTENT = '\u2404'; // ␄
     public static final char MASK_BOUNDARY = '\u2405'; // ␅
@@ -51,13 +39,13 @@ public final class QuoteParser extends LinkedHashMap<String, String> {
         this.original = input;
         AtomicInteger n = new AtomicInteger(1);
 
-        // Pass 1: mask ' " `
-        ParsePass pass1 = applyMaskingPass(input, P_SINGLECHAR, n);
-        // Pass 2: mask ''' on the residual (so ''' inside the earlier segments
-        // is ignored)
-        ParsePass pass2 = applyMaskingPass(pass1.out.toString(), P_TRIPLE_SINGLE, n);
+        // Pass 1: mask ' " `. Pass 2: mask ''' on the residual so triples
+        // inside earlier segments are ignored. Both passes are linear scans
+        // equivalent to the former quote-masking regexes, which recursed one
+        // Java stack frame per inner character and overflowed on large values.
+        ParsePass pass1 = maskSingleCharacterQuotes(input, n);
+        ParsePass pass2 = maskTripleSingleQuotes(pass1.out.toString(), n);
 
-        // Merge results
         this.masked = pass2.out.toString();
         super.putAll(pass1.captured);
         super.putAll(pass2.captured);
@@ -65,29 +53,153 @@ public final class QuoteParser extends LinkedHashMap<String, String> {
         delimiterOf.putAll(pass2.delimiterByPlaceholder);
     }
 
-    // Single masking pass over a particular pattern
-    private ParsePass applyMaskingPass(String in, Pattern pattern, AtomicInteger n) {
-        Matcher m = pattern.matcher(in);
-        StringBuffer out = new StringBuffer();
+    private static ParsePass maskSingleCharacterQuotes(String in, AtomicInteger n) {
+        StringBuffer out = new StringBuffer(in.length());
         Map<String, String> captured = new LinkedHashMap<>();
         Map<String, String> delims = new HashMap<>();
-
-        while (m.find()) {
-            String opening = m.group(1); // "'", "\"", "`", or "'''"
-            char escapeQuoteChar = opening.charAt(0); // the quote char to
-                                                      // unescape (single char)
-            String inner = unescapeSameQuote(m.group(2), escapeQuoteChar);
-
-            String placeholder = MASK_BOUNDARY
-                    + String.valueOf(MASK_CONTENT).repeat(n.getAndIncrement())
-                    + MASK_BOUNDARY;
-
-            captured.put(placeholder, inner);
-            delims.put(placeholder, opening);
-            m.appendReplacement(out, Matcher.quoteReplacement(placeholder));
+        int i = 0;
+        while (i < in.length()) {
+            char opening = in.charAt(i);
+            if (isSingleQuote(opening) && !precededByBackslash(in, i)) {
+                int close = findSingleQuoteClose(in, i, opening);
+                if (close >= 0) {
+                    int trailingBackslashes = countConsecutiveBackslashesBefore(in, close, i + 1);
+                    String inner = unescapeSameQuote(
+                            in.substring(i + 1, close - trailingBackslashes),
+                            opening);
+                    recordMaskedSpan(out, captured, delims, n, String.valueOf(opening), inner);
+                    i = close + 1;
+                    continue;
+                }
+            }
+            out.append(opening);
+            i++;
         }
-        m.appendTail(out);
         return new ParsePass(out, captured, delims);
+    }
+
+    private static ParsePass maskTripleSingleQuotes(String in, AtomicInteger n) {
+        StringBuffer out = new StringBuffer(in.length());
+        Map<String, String> captured = new LinkedHashMap<>();
+        Map<String, String> delims = new HashMap<>();
+        int i = 0;
+        while (i < in.length()) {
+            int opening = findTripleQuoteOpen(in, i);
+            if (opening >= 0) {
+                int contentStart = opening + TRIPLE_SINGLE.length();
+                int close = findTripleQuoteClose(in, contentStart);
+                if (close >= 0) {
+                    int trailingBackslashes = countConsecutiveBackslashesBefore(in, close, contentStart);
+                    String inner = unescapeSameQuote(
+                            in.substring(contentStart, close - trailingBackslashes),
+                            SINGLE);
+                    recordMaskedSpan(out, captured, delims, n, TRIPLE_SINGLE, inner);
+                    i = close + TRIPLE_SINGLE.length();
+                    continue;
+                }
+            }
+            out.append(in.charAt(i));
+            i++;
+        }
+        return new ParsePass(out, captured, delims);
+    }
+
+    private static void recordMaskedSpan(
+            StringBuffer out,
+            Map<String, String> captured,
+            Map<String, String> delims,
+            AtomicInteger n,
+            String opening,
+            String inner
+    ) {
+        String placeholder = MASK_BOUNDARY
+                + String.valueOf(MASK_CONTENT).repeat(n.getAndIncrement())
+                + MASK_BOUNDARY;
+        captured.put(placeholder, inner);
+        delims.put(placeholder, opening);
+        out.append(placeholder);
+    }
+
+    private static boolean isSingleQuote(char c) {
+        return c == SINGLE || c == DOUBLE || c == BACKTICK;
+    }
+
+    private static boolean precededByBackslash(String in, int index) {
+        return index > 0 && in.charAt(index - 1) == '\\';
+    }
+
+    private static boolean isRegexLineTerminator(char c) {
+        return c == '\n' || c == '\r' || c == '\u0085' || c == '\u2028' || c == '\u2029';
+    }
+
+    private static int countConsecutiveBackslashesBefore(String in, int index, int minIndex) {
+        int count = 0;
+        int i = index - 1;
+        while (i >= minIndex && in.charAt(i) == '\\') {
+            count++;
+            i--;
+        }
+        return count;
+    }
+
+    /**
+     * Leftmost closer matching the former single-quote regex: first unescaped
+     * matching quote, with no regex line terminator in the span. Trailing even
+     * backslashes before the closer are not part of the captured inner value.
+     */
+    private static int findSingleQuoteClose(String in, int open, char quote) {
+        int i = open + 1;
+        while (i < in.length()) {
+            char c = in.charAt(i);
+            if (isRegexLineTerminator(c)) {
+                return -1;
+            }
+            if (c == quote && (countConsecutiveBackslashesBefore(in, i, open + 1) % 2) == 0) {
+                return i;
+            }
+            i++;
+        }
+        return -1;
+    }
+
+    /**
+     * Leftmost {@code '''} start matching the former triple-quote regex,
+     * including its greedy even-backslash prefix. Returns the index of
+     * {@code '''}, or {@code -1} if this position cannot open a triple span.
+     */
+    private static int findTripleQuoteOpen(String in, int index) {
+        if (precededByBackslash(in, index)) {
+            return -1;
+        }
+        int backslashes = 0;
+        int i = index;
+        while (i < in.length() && in.charAt(i) == '\\') {
+            backslashes++;
+            i++;
+        }
+        int leadingPairs = backslashes - (backslashes % 2);
+        int opening = index + leadingPairs;
+        if (opening + TRIPLE_SINGLE.length() <= in.length()
+                && in.startsWith(TRIPLE_SINGLE, opening)) {
+            return opening;
+        }
+        return -1;
+    }
+
+    private static int findTripleQuoteClose(String in, int contentStart) {
+        int i = contentStart;
+        while (i < in.length()) {
+            char c = in.charAt(i);
+            if (isRegexLineTerminator(c)) {
+                return -1;
+            }
+            if (in.startsWith(TRIPLE_SINGLE, i)
+                    && (countConsecutiveBackslashesBefore(in, i, contentStart) % 2) == 0) {
+                return i;
+            }
+            i++;
+        }
+        return -1;
     }
 
     private static final class ParsePass {

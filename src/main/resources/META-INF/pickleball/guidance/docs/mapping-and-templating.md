@@ -244,6 +244,8 @@ Use `~unquoted;` when a quoted template position must insert a number, boolean, 
 
 Only one directly surrounding matching quote pair is removed. Without `~unquoted;`, the resolved value remains inside the surrounding quotes and is escaped as needed.
 
+Quoted `'`, `"`, and backtick spans are masked before `<...>` resolution so quote characters inside them are not treated as mapping syntax. Masking is a linear scan, so large quoted values resolve without depending on Java regex stack depth.
+
 ### Deferred nested references with `~unresolved;`
 
 Normal mapped strings are recursively resolved:

@@ -243,10 +243,10 @@ Example compact rerun:
 -Dpkb_changed_variables=pkb_browser
 ```
 
-For an agent's bounded confirmation `mvn test` (not `PickleballTests` human defaults of `pretty` / `@all`), include diagnostic evidence controls and keep selection narrow:
+For an agent's bounded confirmation `mvn test` (not `PickleballTests` human defaults of `pretty` / `@all`), include diagnostic evidence controls, headless Chrome, and high parallelism when more than one scenario will run:
 
 ```text
--Dpkb_runvars="pkb_tags=@the-failing-tag, pkb_name=The failing scenario, pkb_browser=CHROME_HEADLESS, pkb_reportingmode=diagnostic, pkb_loglevel=warn, pkb_reportretention=failed"
+-Dpkb_runvars="pkb_tags=@the-failing-tag, pkb_name=The failing scenario, pkb_browser=CHROME_HEADLESS, pkb_parallel=auto, pkb_reportingmode=diagnostic, pkb_loglevel=warn, pkb_reportretention=failed"
 ```
 
 Lineage metadata is not execution configuration:
@@ -320,3 +320,21 @@ When operating in a consumer project:
 - never expose protected values;
 - keep diagnostic lineage outside the RunVar set;
 - prefer the retained run profile over manually reconstructing configuration from many source layers.
+
+## AI agents
+
+The agent-facing entry is Pickleball Workbench (`hint`, `discover`, `confirm` to find failures; `isolate` / `execute-step` for live debug). Set a **complete** Discover `pkb_runvars` rather than a partial overlay. Workbench `hint` prints the browser-ladder result and estimated integer parallel count. The browser ladder keeps a remote project `pkb_browser` (`SAUCE_*` / `GRID_*` / `REMOTE_*`); otherwise it prefers `CHROME_HEADLESS`. Unused Sauce/Grid yaml files are not auto-selected.
+
+```text
+pkb_browser=<browser ladder>
+pkb_parallel=<conservative JVM estimate or auto>
+pkb_reportingmode=diagnostic
+pkb_loglevel=warn
+pkb_reportretention=failed
+```
+
+plus the narrowest useful `pkb_tags` / `pkb_name`. Multi-scenario Discover/Confirm use that high parallelism. Live isolate stays one paused scenario on a headless CLI session started with Maven-exec `isolate`.
+
+After Discover, inspect `pkb_run_profile` from `run-catalog.json`, `run-index.json`, or `summary.json`. Confirm and live isolate replay that retained profile through `pkb_runvars` (LastDiscoverSnapshot). If there is no prior Discover snapshot, Workbench says so; it does not silently re-resolve from project defaults.
+
+Never supply `pkb_run_profile` as input. Workbench MCP `workbench_diagnostic_catalog`, `workbench_diagnostic_run`, and `workbench_diagnostic_summary` return the same retained `runProfile` when present. The consumer worker resolves the same snapshot internally through `PickleballRunner`; it does not accept `pkb_run_profile` as input.

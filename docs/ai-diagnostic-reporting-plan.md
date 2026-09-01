@@ -132,10 +132,13 @@ For a source-only fix, reuse the retained RunVars unchanged and omit `pkb_change
 ```text
 DiagnosticCli guidance
 DiagnosticCli export-guidance [output-directory]
+DiagnosticCli discover-hint [project]
 DiagnosticCli emit-investigation <investigation-json-or--> <consumer-project-root>
 DiagnosticCli compare-runs <left-run-index> <right-run-index> [output-json]
 DiagnosticCli compare-fingerprints <left.pkbf> <right.pkbf> [output-json]
 DiagnosticCli rebuild <diagnostic-runs-root-or-run-root>
 ```
+
+`DiagnosticCli help`, `--help`, and `-h` print this list. The agent-facing entry is Pickleball Workbench.
 
 See `docs/diagnostic-reporting.md` for evidence use, `docs/ai-run-configuration.md` for controlled execution, and `docs/diagnostic-lineage-metadata.md` for investigation metadata.

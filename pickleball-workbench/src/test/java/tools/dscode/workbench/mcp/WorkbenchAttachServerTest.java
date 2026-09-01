@@ -95,4 +95,54 @@ class WorkbenchAttachServerTest {
             org.junit.jupiter.api.Assertions.assertFalse(controller.controlLeaseSnapshot().uiAttached());
         }
     }
+
+    @Test
+    void cliSessionWritesDedicatedStateFileAndQueuesExecuteStep() throws Exception {
+        try (WorkbenchController controller = new WorkbenchController(project);
+             WorkbenchAttachServer server = WorkbenchAttachServer.startCliSession(controller, project)) {
+            Path sessionFile = WorkbenchAttachServer.cliSessionStateFile(project);
+            assertTrue(Files.isRegularFile(sessionFile));
+            assertTrue(Files.notExists(WorkbenchAttachServer.attachStateFile(project)));
+            JsonNode state = JSON.readTree(Files.readString(sessionFile));
+            assertEquals(server.url(), state.get("url").asText());
+            assertEquals("cli-session", state.get("mode").asText());
+            assertEquals(server.token(), state.get("token").asText());
+
+            HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2)).build();
+            HttpResponse<String> ack = client.send(
+                    HttpRequest.newBuilder(URI.create(server.url() + "/commands"))
+                            .header("Authorization", "Bearer " + server.token())
+                            .header("Content-Type", "application/json")
+                            .POST(HttpRequest.BodyPublishers.ofString(
+                                    "{\"op\":\"execute-step\",\"text\":\"Given stay\",\"id\":\"step-1\"}"))
+                            .build(),
+                    HttpResponse.BodyHandlers.ofString()
+            );
+            assertEquals(200, ack.statusCode());
+            JsonNode body = JSON.readTree(ack.body());
+            assertEquals(true, body.get("ack").asBoolean());
+            assertEquals("step-1", body.get("id").asText());
+            assertTrue("QUEUED".equals(body.get("status").asText())
+                    || "RUNNING".equals(body.get("status").asText()));
+
+            JsonNode done = null;
+            for (int i = 0; i < 50; i++) {
+                HttpResponse<String> status = client.send(
+                        HttpRequest.newBuilder(URI.create(server.url() + "/commands/step-1"))
+                                .header("X-Workbench-Token", server.token())
+                                .GET()
+                                .build(),
+                        HttpResponse.BodyHandlers.ofString()
+                );
+                assertEquals(200, status.statusCode());
+                done = JSON.readTree(status.body());
+                String value = done.get("status").asText();
+                if ("SUCCESS".equals(value) || "FAILED".equals(value) || "TIMEOUT".equals(value)) break;
+                Thread.sleep(20);
+            }
+            assertEquals("step-1", done.get("id").asText());
+            assertEquals("FAILED", done.get("status").asText());
+        }
+        assertTrue(Files.notExists(WorkbenchAttachServer.cliSessionStateFile(project)));
+    }
 }

@@ -295,33 +295,90 @@ def validate_consumer_bridge(errors: list[str]) -> None:
         text = path.read_text(encoding="utf-8").strip()
         texts.append(text)
         nonblank_lines = [line for line in text.splitlines() if line.strip()]
-        if len(nonblank_lines) != 1:
+        if not (3 <= len(nonblank_lines) <= 8):
             errors.append(
-                "Consumer guidance bridge must stay a single nonblank bootstrap line: "
+                "Consumer guidance bridge must keep the Workbench export-guidance one-liner plus a short "
+                "Discover/Isolate/Confirm pointer (not the full guide): "
                 + relative
             )
 
+        first_line = nonblank_lines[0] if nonblank_lines else ""
         for required in (
-            "DiagnosticCli",
+            "PickleballWorkbenchLauncher",
             "export-guidance",
             ".pickleball/AGENT-GUIDE.md",
+            "classpathScope=test",
         ):
-            if required not in text:
+            if required not in first_line:
                 errors.append(
-                    f"Consumer guidance bridge must reference {required}: {relative}"
+                    f"Consumer guidance bridge one-liner must reference {required}: {relative}"
                 )
 
+        lowered = text.lower()
+        if "do not start the gui" not in lowered:
+            errors.append(
+                "Consumer guidance bridge must say not to start the GUI: " + relative
+            )
+        for required in (
+            "hint",
+            "discover",
+            "confirm",
+            "isolate",
+            "execute-step",
+        ):
+            if required not in lowered:
+                errors.append(
+                    f"Consumer guidance bridge must mention {required}: " + relative
+                )
+        if "ide mcp" in lowered or "register mcp" in lowered:
+            errors.append(
+                "Consumer guidance bridge must not mention IDE MCP: " + relative
+            )
+        if "do not isolate" in lowered or "do not maven-exec isolate" in lowered:
+            errors.append(
+                "Consumer guidance bridge must not tell agents not to isolate: " + relative
+            )
+        if "`hint`, `discover`, `isolate`, and `confirm`" in text:
+            errors.append(
+                "Consumer guidance bridge must not list isolate as a required first-path verb: "
+                + relative
+            )
+
+        if "do not skip workbench" in lowered:
+            errors.append(
+                "Consumer guidance bridge must not say 'Do not skip Workbench': " + relative
+            )
+        if "parallel is ok when the project supports it" in lowered:
+            errors.append(
+                "Consumer guidance bridge must not say parallel is optional: " + relative
+            )
+        if "stdio" in lowered:
+            errors.append(
+                "Consumer guidance bridge must not mention IDE-owned stdio: " + relative
+            )
+        if "must" in lowered and "chrome_headless" in lowered:
+            errors.append(
+                "Consumer guidance bridge must not MUST-use CHROME_HEADLESS for all projects: "
+                + relative
+            )
+
         for forbidden in (
+            "DiagnosticCli",
             "GUIDANCE-MANIFEST.json",
             ".git/info/exclude",
             "pkb_changed_variables",
             "runProfileFingerprint",
             "Diagnostic investigation protocol",
+            "attach.json",
+            "ui .",
+            "@agent-pointer-eval",
+            "IntelliJ",
+            "stdio",
         ):
             if forbidden in text:
                 errors.append(
                     f"Consumer guidance bridge contains dependency-owned guidance ({forbidden}); "
-                    "keep only the bootstrap command and generated-guide pointer: "
+                    "keep only the Workbench bootstrap command and a short Discover/Isolate/Confirm pointer: "
                     + relative
                 )
 
@@ -371,11 +428,81 @@ def validate_dependency_owned_guidance(errors: list[str]) -> None:
         "version-matched",
         "Generated Maven consumer reference",
         "maven-consumer-project/",
+        "@agent-pointer-eval",
+        "Maintainer-only: pointer-eval harness",
+        "-Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher",
     ):
         if required not in text:
             errors.append(
                 f"Dependency-owned consumer guide must retain lifecycle guidance ({required}): "
                 "docs/consumer-agent-guide.md"
+            )
+
+    chooser_start = text.find("## Tool chooser")
+    live_start = text.find("### Live isolation loop")
+    first_read = text.find("## First-read")
+    maintainer = text.find("## Maintainer-only: pointer-eval harness")
+    if chooser_start < 0 or live_start < 0 or first_read < 0 or maintainer < 0:
+        errors.append(
+            "docs/consumer-agent-guide.md must keep Tool chooser, Live isolation loop, "
+            "First-read, and Maintainer-only pointer-eval sections."
+        )
+        return
+
+    chooser = text[chooser_start:live_start]
+    live = text[live_start:first_read]
+    if "-Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher" not in chooser:
+        errors.append(
+            "AGENT-GUIDE tool chooser must show the same Maven exec wrapper as the pointer "
+            "(-Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher)."
+        )
+    if "-Dexec.args=discover" not in chooser:
+        errors.append(
+            "AGENT-GUIDE tool chooser must show -Dexec.args=discover, not a bare launcher verb."
+        )
+    if "PickleballWorkbenchLauncher discover" in chooser:
+        errors.append(
+            "AGENT-GUIDE tool chooser must not show bare PickleballWorkbenchLauncher discover; "
+            "use the Maven exec wrapper and change exec.args."
+        )
+    if "-Dexec.args=isolate" not in chooser:
+        errors.append(
+            "AGENT-GUIDE tool chooser must show -Dexec.args=isolate for live debug."
+        )
+    if "execute-step" not in chooser:
+        errors.append(
+            "AGENT-GUIDE tool chooser must mention execute-step for live debug."
+        )
+    if "do not maven-exec isolate" in chooser.lower() or "do not isolate" in chooser.lower():
+        errors.append(
+            "AGENT-GUIDE tool chooser must not tell agents not to isolate."
+        )
+    if "register ide mcp" in chooser.lower() or "ide-owned stdio" in chooser.lower():
+        errors.append(
+            "AGENT-GUIDE tool chooser must not tell agents to register MCP."
+        )
+    if "execute-step" not in live or "isolate" not in live:
+        errors.append(
+            "AGENT-GUIDE live isolation loop must use isolate then execute-step."
+        )
+    if maintainer < text.find("## When the core Pickleball repository is also present"):
+        errors.append(
+            "@agent-pointer-eval guidance must stay maintainer-only at the bottom of "
+            "docs/consumer-agent-guide.md."
+        )
+
+    workbench = ROOT / "docs" / "pickleball-workbench.md"
+    if workbench.is_file():
+        workbench_text = workbench.read_text(encoding="utf-8")
+        if "That is the consumer-agent path" in workbench_text:
+            errors.append(
+                "docs/pickleball-workbench.md must not call mcp the consumer-agent path."
+            )
+        groovy = workbench_text
+        if "args 'mcp'" in groovy and "args 'hint'" not in groovy:
+            errors.append(
+                "docs/pickleball-workbench.md Gradle pickleballWorkbench example must not "
+                "default to mcp."
             )
 
 
@@ -418,6 +545,98 @@ def validate_consumer_ignore(errors: list[str]) -> None:
             "Consumer .gitignore must ignore /.pickleball/: "
             "maven-consumer-project/.gitignore"
         )
+
+
+AGENT_POINTER_EVAL_FEATURE = (
+    "maven-consumer-project/src/test/resources/features/agent-pointer-eval.feature"
+)
+AGENT_POINTER_EVAL_TAG = "@agent-pointer-eval"
+MAVEN_SUITE_PROFILE_TAGS = {
+    "@all",
+    "@regression",
+    "@smoke",
+    "@browser",
+    "@data",
+    "@navigation",
+    "@forms",
+    "@catalog",
+    "@mapping",
+    "@resources",
+    "@workflow",
+    "@block-conditionals",
+    "@nested-steps",
+    "@keyboard",
+    "@dialogs",
+    "@components",
+}
+
+
+def parse_gherkin_tagged_elements(text: str) -> list[tuple[str, list[str]]]:
+    pending: list[str] = []
+    elements: list[tuple[str, list[str]]] = []
+    for raw in text.splitlines():
+        stripped = raw.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        if stripped.startswith("@"):
+            pending.extend(token for token in stripped.split() if token.startswith("@"))
+            continue
+        if (
+            stripped.startswith("Feature:")
+            or stripped.startswith("Scenario:")
+            or stripped.startswith("Scenario Outline:")
+        ):
+            elements.append((stripped, pending))
+            pending = []
+    return elements
+
+
+def validate_agent_pointer_eval_harness(errors: list[str]) -> None:
+    relative = AGENT_POINTER_EVAL_FEATURE
+    path = ROOT / relative
+    if not path.is_file():
+        errors.append("Missing opt-in consumer pointer-eval harness: " + relative)
+        return
+
+    elements = parse_gherkin_tagged_elements(path.read_text(encoding="utf-8"))
+    if not elements or not elements[0][0].startswith("Feature:"):
+        errors.append("Pointer-eval harness must declare a Feature: " + relative)
+        return
+
+    scenarios = [
+        element
+        for element in elements
+        if element[0].startswith("Scenario:") or element[0].startswith("Scenario Outline:")
+    ]
+    if len(scenarios) < 2:
+        errors.append(
+            "Pointer-eval harness must contain more than one Scenario so isolate can "
+            "target distinct names: " + relative
+        )
+
+    for name, tags in elements:
+        missing = AGENT_POINTER_EVAL_TAG not in tags
+        forbidden = sorted(tag for tag in tags if tag in MAVEN_SUITE_PROFILE_TAGS)
+        extras = [
+            tag
+            for tag in tags
+            if tag != AGENT_POINTER_EVAL_TAG and not tag.startswith(AGENT_POINTER_EVAL_TAG + "-")
+        ]
+        if missing:
+            errors.append(
+                f"Pointer-eval harness element must carry {AGENT_POINTER_EVAL_TAG}: "
+                f"{relative} -> {name}"
+            )
+        if forbidden:
+            errors.append(
+                "Pointer-eval harness must not carry Maven suite-profile tags "
+                f"{forbidden}: {relative} -> {name}"
+            )
+        if extras:
+            errors.append(
+                "Pointer-eval harness may only add unique @agent-pointer-eval-* tags, "
+                f"not {extras}: {relative} -> {name}"
+            )
 
 
 def validate_packaged_guidance(errors: list[str]) -> None:
@@ -513,6 +732,7 @@ def main() -> int:
     validate_consumer_bridge(errors)
     validate_consumer_readme(errors)
     validate_dependency_owned_guidance(errors)
+    validate_agent_pointer_eval_harness(errors)
     validate_consumer_reference_build_hook(errors)
     validate_consumer_tracked_artifacts(errors)
     validate_consumer_ignore(errors)

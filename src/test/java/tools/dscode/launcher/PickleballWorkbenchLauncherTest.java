@@ -10,6 +10,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -49,10 +50,53 @@ class PickleballWorkbenchLauncherTest {
         String[] implicitProject = PickleballWorkbenchLauncher.normalizedArguments(
                 new String[]{"mcp"}
         );
+        String[] isolate = PickleballWorkbenchLauncher.normalizedArguments(
+                new String[]{"isolate", "--tags=@failing"}
+        );
+        String[] discoverHint = PickleballWorkbenchLauncher.normalizedArguments(
+                new String[]{"hint"}
+        );
         assertEquals("ui", defaults[0]);
         assertEquals(Path.of("").toAbsolutePath().normalize().toString(), defaults[1]);
         assertEquals("mcp", implicitProject[0]);
         assertEquals(Path.of("").toAbsolutePath().normalize().toString(), implicitProject[1]);
+        assertEquals("isolate", isolate[0]);
+        assertEquals(Path.of("").toAbsolutePath().normalize().toString(), isolate[1]);
+        assertEquals("--tags", isolate[2]);
+        assertEquals("@failing", isolate[3]);
+        assertEquals("hint", discoverHint[0]);
+
+        String[] exportGuidance = PickleballWorkbenchLauncher.normalizedArguments(
+                new String[]{"export-guidance", ".pickleball"}
+        );
+        assertEquals("export-guidance", exportGuidance[0]);
+        assertEquals(".pickleball", exportGuidance[1]);
+
+        String[] isolateName = PickleballWorkbenchLauncher.normalizedArguments(
+                new String[]{"isolate", "--name=The", "failing", "scenario"}
+        );
+        assertEquals("isolate", isolateName[0]);
+        assertEquals(Path.of("").toAbsolutePath().normalize().toString(), isolateName[1]);
+        assertEquals("--name", isolateName[2]);
+        assertEquals("The failing scenario", isolateName[3]);
+
+        assertTrue(WorkbenchCommandLine.isSessionClientCommand("isolate"));
+        assertTrue(WorkbenchCommandLine.isSessionClientCommand("session-start"));
+        assertTrue(WorkbenchCommandLine.isSessionClientCommand("execute-step"));
+        assertTrue(WorkbenchCommandLine.isSessionClientCommand("status"));
+        assertTrue(WorkbenchCommandLine.isSessionClientCommand("events"));
+        assertTrue(WorkbenchCommandLine.isSessionClientCommand("stop"));
+        assertTrue(WorkbenchCommandLine.isSessionClientCommand("kill"));
+        assertFalse(WorkbenchCommandLine.isSessionClientCommand("session"));
+        assertFalse(WorkbenchCommandLine.isSessionClientCommand("hint"));
+        assertFalse(WorkbenchCommandLine.isAgentCoreCommand("isolate"));
+
+        WorkbenchCommandLine.Parsed confirm = WorkbenchCommandLine.parse(
+                new String[]{"confirm", "--name=Agent", "pointer", "eval", "failing", "fruit", "mismatch"}
+        );
+        assertEquals("confirm", confirm.command());
+        assertEquals("Agent pointer eval failing fruit mismatch", confirm.name());
+        assertEquals(Path.of("").toAbsolutePath().normalize(), confirm.project());
 
         byte[] streamed = {9, 8, 7, 6};
         Path fromStream = PickleballWorkbenchLauncher.extractPayload(

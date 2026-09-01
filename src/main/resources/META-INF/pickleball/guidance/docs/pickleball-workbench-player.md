@@ -1,6 +1,6 @@
 # Pickleball Workbench Live Player
 
-This document describes the live-player behavior implemented by the Workbench UI on the 2.1.9 line. The canonical Workbench guide is [pickleball-workbench.md](pickleball-workbench.md).
+This document describes the live-player behavior implemented by the Workbench UI on the 2.1.10 line. The canonical Workbench guide is [pickleball-workbench.md](pickleball-workbench.md).
 
 ## Architecture boundary
 

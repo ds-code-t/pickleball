@@ -9,7 +9,7 @@ The nested consumer intentionally keeps its own Markdown minimal. Detailed usage
 From a Maven consumer with Pickleball on the test classpath:
 
 ```powershell
-mvn -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java "-Dexec.mainClass=tools.dscode.common.reporting.diagnostic.DiagnosticCli" "-Dexec.classpathScope=test" "-Dexec.args=export-guidance .pickleball"
+mvn -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java "-Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher" "-Dexec.classpathScope=test" "-Dexec.args=export-guidance .pickleball"
 ```
 
 Then read or browse:
@@ -26,7 +26,7 @@ Rerun export before Pickleball work even when `.pickleball` already exists. A su
 
 Compatibility note: an older Pickleball release whose exporter predates the manifest lifecycle may leave newer files or a newer manifest behind after a downgrade. Those leftovers are not authoritative for the downgraded dependency; prefer the dependency actually resolved on the test classpath and the files freshly exported by that dependency.
 
-AI agents should read `.pickleball/AGENT-GUIDE.md` first after a successful export. That guide's tool chooser is the agent path: headless Workbench MCP (`mcp .`), one bounded diagnostic `mvn test`, then edits to the real consumer source. Do not treat `.pickleball/maven-consumer-project/` as the project under test, and do not dump `docs/README.md` or the whole snapshot into first-read context. Human readers can start with `.pickleball/docs/README.md`; links from those guides to `maven-consumer-project` resolve to the exported version-matched reference files.
+AI agents should read `.pickleball/AGENT-GUIDE.md` first after a successful export. Workbench is the one front door: `discover` then `confirm` to find failures, then `isolate` / `execute-step` for live debug. Do not start the GUI. Do not treat `.pickleball/maven-consumer-project/` as the project under test, and do not dump `docs/README.md` or the whole snapshot into first-read context. Human readers can start with `.pickleball/docs/README.md`; links from those guides to `maven-consumer-project` resolve to the exported version-matched reference files.
 
 ## Version-matched reference snapshot
 
@@ -77,20 +77,20 @@ or use the included wrappers:
 
 ## Launch the dependency-matched Workbench
 
-The test-scoped Pickleball dependency already contains its controller-only Workbench payload. Consumer AI agents start the **headless MCP** launcher from the resolved test classpath:
+The test-scoped Pickleball dependency already contains its controller-only Workbench payload. Agents use the same launcher as `AGENTS.md` and only change `-Dexec.args` (`hint`, `discover`, `confirm`). Hosts that already run Workbench MCP can launch it from the resolved test classpath:
 
 ```bash
 ./mvnw -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java \
   -Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher \
   -Dexec.classpathScope=test \
-  "-Dexec.args=mcp ."
+  "-Dexec.args=discover"
 ```
 
 ```powershell
-.\mvnw.cmd -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java "-Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher" "-Dexec.classpathScope=test" "-Dexec.args=mcp ."
+.\mvnw.cmd -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java "-Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher" "-Dexec.classpathScope=test" "-Dexec.args=discover"
 ```
 
-Humans who want the Swing player can pass `ui .` instead. Agents for this release should not use the GUI, `ui .`, or `attach.json` as their path. The launcher verifies and extracts the opaque payload beneath `.pickleball/workbench/controller/<sha256>/`, then creates a separate Workbench JVM. Workbench captures this project's compiled outputs and effective test runtime before creating a separate worker JVM. Only the worker loads the consumer-resolved Pickleball runtime; the Workbench artifact and process contain no core implementation. See `docs/pickleball-workbench.md` for commands, lifecycle, protocol compatibility, and isolation checks. The live-loop order lives in `.pickleball/AGENT-GUIDE.md`.
+Optional host MCP uses `"-Dexec.args=mcp ."`. Humans who want the Swing player can pass `ui .` instead. Agents for this release should not use the GUI, `ui .`, or `attach.json` as their path. The launcher verifies and extracts the opaque payload beneath `.pickleball/workbench/controller/<sha256>/`, then creates a separate Workbench JVM. Workbench captures this project's compiled outputs and effective test runtime before creating a separate worker JVM. Only the worker loads the consumer-resolved Pickleball runtime; the Workbench artifact and process contain no core implementation. See `docs/pickleball-workbench.md` for commands, lifecycle, protocol compatibility, and isolation checks. The live-loop order lives in `.pickleball/AGENT-GUIDE.md`.
 
 Runner defaults include:
 
@@ -152,11 +152,13 @@ mvn test -Dpkb_tags="@forms and @state-assertions"
 mvn test -Dpkb_tags="@workflow and @nested-steps and not @block-conditionals"
 ```
 
-Human `PickleballTests` defaults remain `pretty` and `@all`. Agents launching a bounded confirmation should not reuse those defaults. Use a separate `pkb_runvars` command, for example:
+Human `PickleballTests` defaults remain `pretty` and `@all`. Agents launching a bounded confirmation should not reuse those defaults. Use Workbench `confirm`, or a separate `pkb_runvars` command that honors the browser ladder:
 
 ```bash
-mvn test -Dpkb_runvars="pkb_tags=@the-failing-tag, pkb_name=The failing scenario, pkb_browser=CHROME_HEADLESS, pkb_reportingmode=diagnostic, pkb_loglevel=warn, pkb_reportretention=failed"
+PickleballWorkbenchLauncher confirm --tags=@the-failing-tag --name='The failing scenario'
 ```
+
+After the run, read `pkb_run_profile` from `run-catalog.json` / `run-index.json` / `summary.json`. That is the complete resolved RunVar list. Do not assume omitted `pkb_runvars` keys equal project `pickleball.properties`.
 
 The consumer `pom.xml` also defines Maven profiles such as:
 
@@ -233,6 +235,9 @@ Do not recursively ingest an entire run.
 ### Diagnostic CLI
 
 ```text
+mvn -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java "-Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher" "-Dexec.classpathScope=test" "-Dexec.args=hint"
+"-Dexec.args=discover"
+"-Dexec.args=confirm --tags=@the-failing-tag"
 DiagnosticCli compare-runs <left-run-index> <right-run-index> [output-json]
 DiagnosticCli compare-fingerprints <left.pkbf> <right.pkbf> [output-json]
 DiagnosticCli emit-investigation <investigation-json-or--> <consumer-project-root>

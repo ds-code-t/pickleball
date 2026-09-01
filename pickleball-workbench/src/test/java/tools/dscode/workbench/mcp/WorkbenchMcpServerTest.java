@@ -5,6 +5,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.modelcontextprotocol.spec.McpSchema;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import tools.dscode.control.protocol.ControlBridgeCallResult;
+import tools.dscode.control.protocol.ControlBridgeError;
+import tools.dscode.control.protocol.ControlBridgeStatus;
+import tools.dscode.control.protocol.ControlProtocol;
 import tools.dscode.workbench.WorkbenchServices;
 
 import java.io.BufferedReader;
@@ -38,9 +42,56 @@ class WorkbenchMcpServerTest {
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final Duration STARTUP_TIMEOUT = Duration.ofSeconds(5);
     private static final Duration RESPONSE_TIMEOUT = Duration.ofSeconds(5);
+    private static final List<String> DOCUMENTED_TOOLS = List.of(
+            "workbench_sync",
+            "workbench_sync_status",
+            "workbench_worker_start",
+            "workbench_worker_restart",
+            "workbench_worker_stop",
+            "workbench_worker_status",
+            "workbench_request_control",
+            "workbench_release_control",
+            "workbench_set_current_action",
+            "workbench_control_lease",
+            "workbench_player_state",
+            "workbench_player_replace_document",
+            "workbench_request_save",
+            "workbench_execute_step",
+            "workbench_mapping_get",
+            "workbench_mapping_put",
+            "workbench_mapping_resolve",
+            "workbench_mapping_snapshot",
+            "workbench_mapping_restore",
+            "workbench_events",
+            "workbench_browser_page",
+            "workbench_browser_screenshot",
+            "workbench_element_inspect",
+            "workbench_service_call",
+            "workbench_breakpoint_list",
+            "workbench_breakpoint_add",
+            "workbench_breakpoint_remove",
+            "workbench_breakpoint_clear",
+            "workbench_step_override_list",
+            "workbench_step_override_compile",
+            "workbench_step_override_remove",
+            "workbench_step_override_clear",
+            "workbench_diagnostic_catalog",
+            "workbench_diagnostic_run",
+            "workbench_diagnostic_summary",
+            "workbench_investigation_emit"
+    );
 
     @TempDir
     Path project;
+
+    @Test
+    void registeredToolsMatchTheDocumentedCatalog() {
+        WorkbenchMcpTools tools = new WorkbenchMcpTools(fakeServices((method, args) -> {
+            if ("close".equals(method)) return null;
+            return null;
+        }), JSON);
+        assertEquals(DOCUMENTED_TOOLS, tools.names());
+    }
 
     @Test
     void packagedServerCompletesInitializeHandshake() throws Exception {
@@ -58,20 +109,7 @@ class WorkbenchMcpServerTest {
             JsonNode listed = harness.request(2, "tools/list", "{}");
             Set<String> toolNames = new HashSet<>();
             listed.at("/result/tools").forEach(tool -> toolNames.add(tool.path("name").asText()));
-            assertTrue(toolNames.contains("workbench_worker_status"));
-            assertTrue(toolNames.contains("workbench_execute_step"));
-            assertTrue(toolNames.contains("workbench_mapping_snapshot"));
-            assertTrue(toolNames.contains("workbench_browser_screenshot"));
-            assertTrue(toolNames.contains("workbench_breakpoint_add"));
-            assertTrue(toolNames.contains("workbench_step_override_compile"));
-            assertTrue(toolNames.contains("workbench_step_override_clear"));
-            assertTrue(toolNames.contains("workbench_request_control"));
-            assertTrue(toolNames.contains("workbench_player_state"));
-            assertTrue(toolNames.contains("workbench_request_save"));
-            assertTrue(toolNames.contains("workbench_diagnostic_catalog"));
-            assertTrue(toolNames.contains("workbench_diagnostic_run"));
-            assertTrue(toolNames.contains("workbench_diagnostic_summary"));
-            assertTrue(toolNames.contains("workbench_investigation_emit"));
+            assertEquals(Set.copyOf(DOCUMENTED_TOOLS), toolNames);
 
             JsonNode status = harness.toolCall(3, "workbench_worker_status", "{}");
             assertFalse(status.at("/result/isError").asBoolean());
@@ -135,6 +173,83 @@ class WorkbenchMcpServerTest {
     }
 
     @Test
+    void executeStepFailureIsAResultNotAnMcpErrorAndDoesNotStopTheWorker() throws Exception {
+        AtomicInteger stops = new AtomicInteger();
+        AtomicBoolean executed = new AtomicBoolean();
+        WorkbenchServices services = fakeServices((method, args) -> {
+            if ("executeStep".equals(method)) {
+                executed.set(true);
+                assertEquals(", verify \"left\" equals \"right\"", args[0]);
+                return new ControlBridgeCallResult(
+                        "FAILED",
+                        null,
+                        null,
+                        new ControlBridgeError("ASSERTION", "left was not right", ""),
+                        pausedRuntime()
+                );
+            }
+            if ("stopWorker".equals(method) || "restartWorker".equals(method) || "close".equals(method)) {
+                if ("stopWorker".equals(method) || "restartWorker".equals(method)) {
+                    stops.incrementAndGet();
+                }
+                return null;
+            }
+            return null;
+        });
+
+        WorkbenchMcpTools tools = new WorkbenchMcpTools(services, JSON);
+        var specification = tools.specifications().stream()
+                .filter(spec -> "workbench_execute_step".equals(spec.tool().name()))
+                .findFirst()
+                .orElseThrow();
+        assertTrue(specification.tool().description().contains("does not stop the worker"));
+
+        var result = specification.callHandler().apply(null, new McpSchema.CallToolRequest(
+                "workbench_execute_step",
+                Map.of("text", ", verify \"left\" equals \"right\""),
+                null
+        ));
+        assertFalse(Boolean.TRUE.equals(result.isError()));
+        String text = ((McpSchema.TextContent) result.content().getFirst()).text();
+        assertTrue(text.contains("FAILED"));
+        assertTrue(text.contains("left was not right"));
+        assertTrue(executed.get());
+        assertEquals(0, stops.get());
+    }
+
+    @Test
+    void executeStepControllerExceptionIsMcpErrorAndDoesNotStopTheWorker() throws Exception {
+        AtomicInteger stops = new AtomicInteger();
+        WorkbenchServices services = fakeServices((method, args) -> {
+            if ("executeStep".equals(method)) {
+                throw new IllegalStateException("Workbench live operations require a paused interactive worker.");
+            }
+            if ("stopWorker".equals(method) || "restartWorker".equals(method)) {
+                stops.incrementAndGet();
+                return null;
+            }
+            if ("close".equals(method)) return null;
+            return null;
+        });
+
+        WorkbenchMcpTools tools = new WorkbenchMcpTools(services, JSON);
+        var result = tools.specifications().stream()
+                .filter(spec -> "workbench_execute_step".equals(spec.tool().name()))
+                .findFirst()
+                .orElseThrow()
+                .callHandler()
+                .apply(null, new McpSchema.CallToolRequest(
+                        "workbench_execute_step",
+                        Map.of("text", "CONTROL API TEST STEP"),
+                        null
+                ));
+        assertTrue(Boolean.TRUE.equals(result.isError()));
+        String text = ((McpSchema.TextContent) result.content().getFirst()).text();
+        assertTrue(text.contains("paused interactive worker"));
+        assertEquals(0, stops.get());
+    }
+
+    @Test
     void diagnosticToolsDelegateToSharedServicesAndStaySparse() throws Exception {
         AtomicBoolean catalogCalled = new AtomicBoolean();
         WorkbenchServices services = fakeServices((method, args) -> {
@@ -162,6 +277,12 @@ class WorkbenchMcpServerTest {
         WorkbenchMcpTools tools = new WorkbenchMcpTools(services, JSON);
         assertTrue(tools.names().contains("workbench_diagnostic_catalog"));
         assertTrue(tools.names().contains("workbench_investigation_emit"));
+        tools.specifications().stream()
+                .filter(spec -> spec.tool().name().startsWith("workbench_diagnostic_"))
+                .forEach(spec -> assertTrue(
+                        spec.tool().description().contains("pkb_run_profile"),
+                        spec.tool().name() + " should surface pkb_run_profile"
+                ));
         Object catalog = tools.call("workbench_diagnostic_catalog", Map.of());
         assertTrue(catalogCalled.get());
         assertTrue(JSON.writeValueAsString(catalog).contains("run-1"));
@@ -204,6 +325,25 @@ class WorkbenchMcpServerTest {
 
     private static String resultText(JsonNode response) {
         return response.at("/result/content/0/text").asText();
+    }
+
+    private static ControlBridgeStatus pausedRuntime() {
+        return new ControlBridgeStatus(
+                ControlProtocol.CURRENT_VERSION,
+                "runtime",
+                42L,
+                1,
+                1L,
+                "scenario-1",
+                "Live",
+                ", verify \"left\" equals \"right\"",
+                null,
+                "AFTER_STEP",
+                "step-signature",
+                true,
+                false,
+                ControlProtocol.WORKER_CAPABILITIES
+        );
     }
 
     @FunctionalInterface

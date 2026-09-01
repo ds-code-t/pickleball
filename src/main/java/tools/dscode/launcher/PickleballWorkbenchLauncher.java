@@ -16,11 +16,16 @@ import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
-import java.util.Set;
 
 /**
  * Extracts the version-matched, controller-only Workbench payload from the
  * consumer's Pickleball dependency and always launches it in a separate JVM.
+ *
+ * <p>Agent-facing Discover/hint/export-guidance/confirm run in this consumer JVM
+ * so they can reuse DiagnosticCli and wrap Maven. Isolate/session-start,
+ * execute-step, status, events, and stop/kill are one-shot HTTP clients against
+ * a detached controller session. UI, MCP, and sync still extract and
+ * forward to the controller JAR.</p>
  */
 public final class PickleballWorkbenchLauncher {
     /**
@@ -29,16 +34,25 @@ public final class PickleballWorkbenchLauncher {
      * limit rather than an in-memory buffer size.
      */
     static final long MAX_PAYLOAD_BYTES = 512L * 1024 * 1024;
-    private static final Set<String> PROJECT_COMMANDS = Set.of(
-            "sync", "status", "worker-check", "live-check", "ui", "mcp"
-    );
 
     private PickleballWorkbenchLauncher() {
     }
 
     public static void main(String[] args) {
-        String[] forwarded = normalizedArguments(args);
-        Path project = projectRoot(forwarded);
+        WorkbenchCommandLine.Parsed parsed = WorkbenchCommandLine.parse(args);
+        if (WorkbenchCommandLine.isAgentCoreCommand(parsed.command())) {
+            int exitCode = WorkbenchAgentCommands.run(args, System.out, System.err);
+            if (exitCode != 0) System.exit(exitCode);
+            return;
+        }
+        if (WorkbenchCommandLine.isSessionClientCommand(parsed.command())) {
+            int exitCode = WorkbenchSessionCommands.run(args, System.out, System.err);
+            if (exitCode != 0) System.exit(exitCode);
+            return;
+        }
+
+        String[] forwarded = parsed.forwarded() != null ? parsed.forwarded() : normalizedArguments(args);
+        Path project = parsed.project() != null ? parsed.project() : projectRoot(forwarded);
         try {
             Path controllerJar = extractEmbeddedPayload(project);
             Process process = new ProcessBuilder(command(controllerJar, forwarded))
@@ -137,20 +151,14 @@ public final class PickleballWorkbenchLauncher {
     }
 
     static String[] normalizedArguments(String[] args) {
-        Path currentProject = Path.of("").toAbsolutePath().normalize();
-        if (args == null || args.length == 0) {
-            return new String[]{"ui", currentProject.toString()};
-        }
-        if (args.length == 1 && PROJECT_COMMANDS.contains(args[0])) {
-            return new String[]{args[0], currentProject.toString()};
-        }
-        return args.clone();
+        return WorkbenchCommandLine.parse(args).forwarded();
     }
 
     private static Path projectRoot(String[] args) {
-        if (args.length == 2
-                && PROJECT_COMMANDS.contains(args[0])
-                && !args[1].isBlank()) {
+        if (args.length >= 2
+                && WorkbenchCommandLine.isForwardedCommand(args[0])
+                && !args[1].isBlank()
+                && !args[1].startsWith("-")) {
             return Path.of(args[1]).toAbsolutePath().normalize();
         }
         return Path.of("").toAbsolutePath().normalize();

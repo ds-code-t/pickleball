@@ -55,6 +55,8 @@ maven-consumer-project/src/test/resources/data/data-element-native-fixtures.feat
 maven-consumer-project/src/test/resources/data/data-reference-records.feature
 maven-consumer-project/src/test/resources/data/escaped-data-records.feature
 maven-consumer-project/src/test/resources/data/files/customerPayload.json
+maven-consumer-project/src/test/resources/features/_localtests/test1.feature
+maven-consumer-project/src/test/resources/features/agent-pointer-eval.feature
 maven-consumer-project/src/test/resources/features/browser-action-contracts.feature
 maven-consumer-project/src/test/resources/features/catalog-context.feature
 maven-consumer-project/src/test/resources/features/component-scenarios.feature
@@ -71,6 +73,7 @@ maven-consumer-project/src/test/resources/features/dialogs.feature
 maven-consumer-project/src/test/resources/features/dynamic-steps.feature
 maven-consumer-project/src/test/resources/features/forms-dynamic-steps.feature
 maven-consumer-project/src/test/resources/features/internal-framework-java-checks.feature
+maven-consumer-project/src/test/resources/features/it-placeholder.feature
 maven-consumer-project/src/test/resources/features/keyboard.feature
 maven-consumer-project/src/test/resources/features/mapping-and-resources.feature
 maven-consumer-project/src/test/resources/features/mapping-value-type-preservation.feature

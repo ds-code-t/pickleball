@@ -70,8 +70,11 @@ public final class WorkbenchWorkerManager implements AutoCloseable {
         createDirectories(sessionDirectory, stdout.getParent());
         writeAnchor(anchor);
 
+        Map<String, String> properties = workerSystemProperties.isEmpty()
+                ? tools.dscode.workbench.discover.LastDiscoverSnapshot.workerSystemPropertiesIfPresent(projectRoot)
+                : workerSystemProperties;
         ProcessBuilder builder = new ProcessBuilder(workerCommand(
-                manifest, classpath, anchor, workerSystemProperties
+                manifest, classpath, anchor, properties
         ))
                 .directory(projectRoot.toFile())
                 .redirectOutput(stdout.toFile())

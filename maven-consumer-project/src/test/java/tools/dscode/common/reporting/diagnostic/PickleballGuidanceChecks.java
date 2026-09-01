@@ -42,7 +42,7 @@ public class PickleballGuidanceChecks {
         assertTrue(guide.contains("older Pickleball release whose exporter predates the manifest lifecycle"));
             assertTrue(guide.contains("Generated Maven consumer reference"));
             assertTrue(guide.contains("maven-consumer-project/"));
-            assertTrue(guide.contains("mcp ."));
+            assertTrue(guide.contains("-Dexec.args=isolate"));
             assertTrue(guide.contains("workbench_sync"));
             assertTrue(guide.contains("workbench_execute_step"));
             assertTrue(guide.contains("workbench_diagnostic_catalog"));
@@ -50,22 +50,162 @@ public class PickleballGuidanceChecks {
             assertTrue(guide.contains("emit-investigation"));
             assertTrue(guide.contains("pkb_reportingmode=diagnostic"));
             assertTrue(guide.contains("pkb_reportretention=failed"));
+            assertTrue(guide.contains("does not end the worker"));
+            assertTrue(guide.contains("does not end the worker"));
+            assertTrue(guide.contains("afterSequence"));
+            assertTrue(guide.contains("docs/pickleball-workbench.md"));
+            assertTrue(guide.contains("DiagnosticCli help"));
+            assertTrue(guide.contains("**Discover**"));
+            assertTrue(guide.contains("**Confirm**"));
+            assertTrue(guide.contains("Do not start the GUI"));
+            assertTrue(guide.contains("execute-step"));
+            assertTrue(guide.contains("run-catalog.json"));
+            assertTrue(guide.contains("PickleballWorkbenchLauncher"));
+            assertTrue(guide.contains("does not auto-watch") || guide.contains("workbench_sync"));
+            assertTrue(guide.contains("pkb_parallel"));
+            assertTrue(guide.contains("CHROME_HEADLESS") || guide.contains("browser ladder"));
+            assertTrue(guide.contains("pkb_run_profile"));
             String chooser = guide.substring(0, guide.indexOf("Generated guidance lifecycle"));
             assertFalse(chooser.contains("attach.json"));
             assertFalse(chooser.contains("ui ."));
+            assertFalse(chooser.contains("This is not a skip of Workbench"));
+            assertFalse(chooser.contains("Do not skip Workbench"));
+            assertFalse(chooser.contains("MUST use headless Chrome"));
+            assertTrue(chooser.contains("one front door") || chooser.contains("Pickleball Workbench is the one front door"));
+            String chooserList = guide.substring(
+                    guide.indexOf("## Tool chooser"),
+                    guide.indexOf("### Live isolation loop")
+            );
+            assertTrue(chooserList.contains("discover"));
+            assertTrue(chooserList.contains("confirm"));
+            assertTrue(chooserList.contains("run-catalog.json"));
+            assertTrue(chooserList.contains("Do not start a live worker to run the whole suite")
+                    || chooserList.contains("Do not start a live worker"));
+            assertTrue(chooserList.contains("pkb_run_profile"));
+            assertTrue(chooserList.contains("-Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher"));
+            assertTrue(chooserList.contains("-Dexec.args=discover"));
+            assertTrue(chooserList.contains("change") && chooserList.contains("exec.args"));
+            assertTrue(chooserList.contains("-Dexec.args=isolate"));
+            assertTrue(chooserList.contains("execute-step"));
+            assertTrue(chooserList.contains("**Live debug**"));
+            assertFalse(chooserList.toLowerCase().contains("do not maven-exec isolate"));
+            assertFalse(chooserList.contains("Access probe"));
+            assertFalse(chooserList.contains("CLI/Maven-primary"));
+            assertTrue(guide.contains("Maintainer-only: pointer-eval harness"));
+            assertTrue(guide.contains("@agent-pointer-eval"));
+            String liveLoop = guide.substring(
+                    guide.indexOf("### Live isolation loop"),
+                    guide.indexOf("Generated guidance lifecycle")
+            );
+            assertTrue(liveLoop.contains("isolate"));
+            assertTrue(liveLoop.contains("execute-step"));
+            assertTrue(liveLoop.contains("ACK SESSION") || liveLoop.contains("session"));
+            assertFalse(liveLoop.toLowerCase().contains("do not maven-exec isolate"));
+            String maintainer = guide.substring(guide.indexOf("## Maintainer-only: pointer-eval harness"));
+            assertTrue(maintainer.contains("@agent-pointer-eval"));
+            assertTrue(guide.indexOf("## Maintainer-only: pointer-eval harness")
+                    > guide.indexOf("## When the core Pickleball repository is also present"));
+        }
+
+    @Test
+    void diagnosticCliHelpListsCommandsAndUnknownCommandsFailClearly() {
+        ByteArrayOutputStream emptyOut = new ByteArrayOutputStream();
+        ByteArrayOutputStream emptyErr = new ByteArrayOutputStream();
+        assertEquals(2, DiagnosticCli.run(
+                new String[]{},
+                new PrintStream(emptyOut, true, StandardCharsets.UTF_8),
+                new PrintStream(emptyErr, true, StandardCharsets.UTF_8)
+        ));
+        assertEquals("", emptyOut.toString(StandardCharsets.UTF_8));
+        assertTrue(emptyErr.toString(StandardCharsets.UTF_8).contains("DiagnosticCli guidance"));
+
+        ByteArrayOutputStream helpOut = new ByteArrayOutputStream();
+        ByteArrayOutputStream helpErr = new ByteArrayOutputStream();
+        assertEquals(0, DiagnosticCli.run(
+                new String[]{"help"},
+                new PrintStream(helpOut, true, StandardCharsets.UTF_8),
+                new PrintStream(helpErr, true, StandardCharsets.UTF_8)
+        ));
+        String help = helpOut.toString(StandardCharsets.UTF_8);
+        assertEquals("", helpErr.toString(StandardCharsets.UTF_8));
+        assertTrue(help.contains("DiagnosticCli guidance"));
+        assertTrue(help.contains("DiagnosticCli export-guidance"));
+        assertTrue(help.contains("DiagnosticCli discover-hint"));
+        assertTrue(help.contains("Pickleball Workbench") || help.contains("PickleballWorkbenchLauncher"));
+        assertTrue(help.contains("DiagnosticCli emit-investigation"));
+        assertTrue(help.contains("DiagnosticCli compare-runs"));
+        assertTrue(help.contains("DiagnosticCli compare-fingerprints"));
+        assertTrue(help.contains("DiagnosticCli rebuild"));
+
+        ByteArrayOutputStream dashedOut = new ByteArrayOutputStream();
+        assertEquals(0, DiagnosticCli.run(
+                new String[]{"--help"},
+                new PrintStream(dashedOut, true, StandardCharsets.UTF_8),
+                System.err
+        ));
+        assertEquals(help, dashedOut.toString(StandardCharsets.UTF_8));
+
+        ByteArrayOutputStream shortOut = new ByteArrayOutputStream();
+        assertEquals(0, DiagnosticCli.run(
+                new String[]{"-h"},
+                new PrintStream(shortOut, true, StandardCharsets.UTF_8),
+                System.err
+        ));
+        assertEquals(help, shortOut.toString(StandardCharsets.UTF_8));
+
+        ByteArrayOutputStream unknownOut = new ByteArrayOutputStream();
+        ByteArrayOutputStream unknownErr = new ByteArrayOutputStream();
+        assertEquals(2, DiagnosticCli.run(
+                new String[]{"not-a-command"},
+                new PrintStream(unknownOut, true, StandardCharsets.UTF_8),
+                new PrintStream(unknownErr, true, StandardCharsets.UTF_8)
+        ));
+        assertEquals("", unknownOut.toString(StandardCharsets.UTF_8));
+        String errors = unknownErr.toString(StandardCharsets.UTF_8);
+        assertTrue(errors.contains("Unknown diagnostic command: not-a-command"));
+        assertTrue(errors.contains("DiagnosticCli guidance"));
+    }
+
+    @Test
+    void discoverHintPrintsDiagnosticMvnTestAndRunCatalogNext() {
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        ByteArrayOutputStream errors = new ByteArrayOutputStream();
+        assertEquals(0, DiagnosticCli.run(
+                new String[]{"discover-hint"},
+                new PrintStream(output, true, StandardCharsets.UTF_8),
+                new PrintStream(errors, true, StandardCharsets.UTF_8)
+        ));
+        assertEquals("", errors.toString(StandardCharsets.UTF_8));
+        String text = output.toString(StandardCharsets.UTF_8);
+        assertTrue(text.contains("pkb_runvars"));
+        assertTrue(text.contains("pkb_browser=CHROME_HEADLESS"));
+        assertTrue(text.contains("pkb_parallel=" + tools.dscode.parallelutilities.ParallelCountEstimator.estimate()));
+        assertTrue(text.contains("pkb_reportingmode=diagnostic"));
+        assertTrue(text.contains("pkb_loglevel=warn"));
+        assertTrue(text.contains("pkb_reportretention=failed"));
+        assertTrue(text.contains("pkb_run_profile"));
+        assertFalse(text.contains("pkb_parallel=80"));
+        assertFalse(text.contains("when the project supports it"));
+        assertTrue(text.contains("NEXT: run discover"));
+        assertTrue(text.contains("Pickleball Workbench") || text.contains("Workbench"));
     }
 
     @Test
     void dependencyExportsVersionMatchedGuidanceAndManifest() throws Exception {
         Path root = Files.createTempDirectory("pickleball-guidance");
         try {
+            ByteArrayOutputStream exportOut = new ByteArrayOutputStream();
             int status = DiagnosticCli.run(
                     new String[]{"export-guidance", root.toString()},
-                    System.out,
+                    new PrintStream(exportOut, true, StandardCharsets.UTF_8),
                     System.err
             );
 
             assertEquals(0, status);
+            String exportText = exportOut.toString(StandardCharsets.UTF_8);
+            assertTrue(exportText.contains("NEXT: follow AGENT-GUIDE"));
+            assertTrue(exportText.contains("Workbench discover"));
+            assertFalse(exportText.contains("mcp ."));
             assertTrue(Files.isRegularFile(root.resolve("AGENT-GUIDE.md")));
             assertTrue(Files.isRegularFile(root.resolve("GUIDANCE-MANIFEST.json")));
             assertTrue(Files.isRegularFile(root.resolve("docs/README.md")));
@@ -83,6 +223,9 @@ public class PickleballGuidanceChecks {
             )));
             assertTrue(Files.isRegularFile(root.resolve(
                     "maven-consumer-project/src/test/resources/features/dynamic-steps.feature"
+            )));
+            assertTrue(Files.isRegularFile(root.resolve(
+                    "maven-consumer-project/src/test/resources/features/agent-pointer-eval.feature"
             )));
             assertTrue(Files.isRegularFile(root.resolve(
                     "maven-consumer-project/src/test/resources/calls/service-call-definitions.feature"
@@ -121,6 +264,9 @@ public class PickleballGuidanceChecks {
             assertTrue(managedFiles.contains(
                     "maven-consumer-project/src/test/resources/features/dynamic-steps.feature"
             ));
+            assertTrue(managedFiles.contains(
+                    "maven-consumer-project/src/test/resources/features/agent-pointer-eval.feature"
+            ));
             assertTrue(managedFiles.stream().noneMatch(path -> path.contains("_local2")));
             assertFalse(managedFiles.contains("maven-consumer-project/AGENTS.md"));
             assertFalse(managedFiles.contains("maven-consumer-project/.github/copilot-instructions.md"));
@@ -136,16 +282,26 @@ public class PickleballGuidanceChecks {
             assertTrue(guide.contains("keep terminal logging minimal"));
             assertTrue(guide.contains("older Pickleball release whose exporter predates the manifest lifecycle"));
             assertTrue(guide.contains("read-only reference snapshot"));
-            assertTrue(guide.contains("mcp ."));
+            assertTrue(guide.contains("-Dexec.args=isolate"));
             assertTrue(guide.contains("workbench_diagnostic_catalog"));
             assertTrue(guide.contains("workbench_investigation_emit"));
             assertTrue(guide.contains("pkb_reportretention=failed"));
             assertTrue(guide.contains("Do not copy, modify, or execute files"));
+            assertTrue(guide.contains("one front door"));
+            assertTrue(guide.contains("PickleballWorkbenchLauncher"));
+            assertTrue(guide.contains("Maintainer-only: pointer-eval harness"));
+            assertTrue(guide.contains("@agent-pointer-eval"));
+            assertTrue(guide.contains("-Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher"));
+            assertTrue(guide.contains("-Dexec.args=isolate"));
 
             String consumerProject = Files.readString(root.resolve("docs/consumer-project.md"));
             assertTrue(consumerProject.contains("keep console verbosity low"));
             assertTrue(consumerProject.contains("older Pickleball release whose exporter predates the manifest lifecycle"));
             assertTrue(consumerProject.contains("Version-matched reference snapshot"));
+            assertTrue(consumerProject.contains("discover which scenarios fail")
+                    || consumerProject.contains("one front door"));
+            assertTrue(consumerProject.contains("Do not start the GUI")
+                    || consumerProject.contains("one front door"));
         } finally {
             deleteTree(root);
         }

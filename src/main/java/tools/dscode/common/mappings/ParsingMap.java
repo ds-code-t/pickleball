@@ -28,6 +28,7 @@ import tools.dscode.common.mappings.queries.Tokenized;
 import tools.dscode.common.treeparsing.parsedComponents.DataElementMatch;
 import tools.dscode.common.treeparsing.parsedComponents.ElementMatch;
 
+import java.io.InputStream;
 import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -71,12 +72,64 @@ public class ParsingMap extends MappingProcessor {
     @Deprecated
     public static final String configsRoot = CONFIGS_MAP_ROOT;
 
+    public static final String BUNDLED_CHROME_HEADLESS_RESOURCE =
+            "META-INF/pickleball/configs/CHROME_HEADLESS.yaml";
+    public static final String CHROME_HEADLESS_CONFIG_KEY = "CHROME_HEADLESS";
+
     public static synchronized void initializeConfigs(String configuredPath) {
         String path = configuredPath == null || configuredPath.isBlank()
                 ? DEFAULT_CONFIG_PATH
                 : configuredPath.trim();
         JsonNode configsNode = loadConfigs(path);
-        GLOBALS.root.set(CONFIGS_MAP_ROOT, configsNode);
+        ObjectNode configs;
+        if (configsNode instanceof ObjectNode objectNode) {
+            configs = objectNode;
+        } else if (configsNode == null || configsNode.isNull()) {
+            configs = MAPPER.createObjectNode();
+        } else {
+            GLOBALS.root.set(CONFIGS_MAP_ROOT, configsNode);
+            return;
+        }
+        applyBundledBrowserDefaults(configs);
+        GLOBALS.root.set(CONFIGS_MAP_ROOT, configs);
+    }
+
+    static void applyBundledBrowserDefaults(ObjectNode configs) {
+        if (configs == null || hasConfigKeyIgnoreCase(configs, CHROME_HEADLESS_CONFIG_KEY)) {
+            return;
+        }
+        JsonNode bundled = loadBundledChromeHeadless();
+        if (bundled != null && !bundled.isNull()) {
+            configs.set(CHROME_HEADLESS_CONFIG_KEY, bundled);
+        }
+    }
+
+    private static boolean hasConfigKeyIgnoreCase(ObjectNode configs, String key) {
+        if (configs.has(key)) {
+            return true;
+        }
+        var names = configs.fieldNames();
+        while (names.hasNext()) {
+            if (names.next().equalsIgnoreCase(key)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static JsonNode loadBundledChromeHeadless() {
+        ClassLoader loader = Thread.currentThread().getContextClassLoader();
+        if (loader == null) {
+            loader = ParsingMap.class.getClassLoader();
+        }
+        try (InputStream in = loader.getResourceAsStream(BUNDLED_CHROME_HEADLESS_RESOURCE)) {
+            if (in == null) {
+                return null;
+            }
+            return FileAndDataParsing.YAML_MAPPER.readTree(in);
+        } catch (Exception ignored) {
+            return null;
+        }
     }
 
     private static JsonNode loadConfigs(String path) {
