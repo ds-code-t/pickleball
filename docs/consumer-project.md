@@ -262,7 +262,7 @@ When evidence supports a bounded rerun:
 
 ## Consumer-specific element vocabulary
 
-`PickleballTests` demonstrates extending the execution dictionary without custom Cucumber steps. The example registers categories such as `Radio Button`, `Test Panel`, `Product Card`, and `Status Badge`; the feature suite can continue using Pickleball's reusable dynamic steps.
+`PickleballTests` demonstrates extending the execution dictionary without custom Cucumber steps. The example registers `Test Panel`, `Product Card`, and `Status Badge`, and overlays the built-in `Close Button` for the local test site. The feature suite continues to use Pickleball's reusable dynamic steps, including built-in names such as `Radio Button`.
 
 ## Notes
 

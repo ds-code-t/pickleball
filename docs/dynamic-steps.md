@@ -25,9 +25,22 @@ An element can be described by its business-visible characteristics:
 * , ensure the last "Available" Status Badge is displayed
 ```
 
-Common element categories include `Button`, `Link`, `Textbox`, `Textarea`, `Dropdown`, `Checkbox`, `Text`, `Window`, and `Alert`. Projects can add names such as `Test Panel`, `Product Card`, or `Status Badge` in the runner.
+An element category is one or more capitalized words, each at least two letters: `Button`, `Radio Button`, `Product Card`. Plural aliases such as `Buttons` and `Textboxes` are registered as children of the singular name.
 
-The selector is assembled dynamically from the element category, text, state, ordinal, and context. Feature authors normally do not need to repeat XPath or CSS selectors.
+Built-in HTML categories include:
+
+| Group | Categories |
+|---|---|
+| Controls | `Button`, `Submit Button`, `Close Button`, `Link`, `Textbox`, `Date Textbox`, `Textarea`, `Dropdown`, `Option`, `Radio Button`, `Checkbox`, `Toggle` |
+| Structure | `Text`, `Icon` / `Image`, `Menu` / `Menu Item`, `Modal` / `Dialog`, `Tab` / `Tab Panel`, `Section` / `Question`, `Expandable Section`, `Expandable Header`, `Expandable Icon` |
+| Tables | `Table`, `Row`, `Header` / `Header Row`, `Cell`, `Column`, `Field` |
+| Other HTML | `IFrame` / `Frame`, `Loading` |
+
+`Window` and `Alert` are browser types, not HTML locators. They do not assemble an XPath.
+
+Projects can add names such as `Test Panel`, `Product Card`, or `Status Badge` in the runner. See [Custom element definitions](custom-element-definitions.md).
+
+The selector is assembled dynamically from the element category, text, state, ordinal, and context. Feature authors normally do not need to repeat XPath or CSS selectors. An unrecognized capitalized name still parses; unmatched names fall through generic name-attribute and descendant-text matching.
 
 ## Text matching
 
