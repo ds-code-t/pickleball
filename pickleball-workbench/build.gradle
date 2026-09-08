@@ -22,7 +22,7 @@ java {
 def mcpSdkVersion = '2.0.0'
 def javafxVersion = '21.0.6'
 def javafxModules = ['base', 'graphics', 'controls', 'swing', 'media', 'web']
-def javafxPlatforms = ['linux', 'win', 'mac', 'mac-aarch64']
+def jacksonVersion = '2.20.0'
 def javafxCompilePlatform = {
     def os = org.gradle.internal.os.OperatingSystem.current()
     def arch = System.getProperty('os.arch', '')
@@ -31,31 +31,41 @@ def javafxCompilePlatform = {
     if (os.macOsX) return arm ? 'mac-aarch64' : 'mac'
     return 'linux'
 }()
+def publishedWorkbenchLibraries = [
+        ['org.openjfx', 'javafx-base', javafxVersion],
+        ['org.openjfx', 'javafx-graphics', javafxVersion],
+        ['org.openjfx', 'javafx-controls', javafxVersion],
+        ['org.openjfx', 'javafx-swing', javafxVersion],
+        ['org.openjfx', 'javafx-media', javafxVersion],
+        ['org.openjfx', 'javafx-web', javafxVersion],
+        ['com.fasterxml.jackson.core', 'jackson-databind', jacksonVersion],
+        ['io.modelcontextprotocol.sdk', 'mcp-core', mcpSdkVersion],
+        ['io.modelcontextprotocol.sdk', 'mcp-json-jackson2', mcpSdkVersion]
+]
 
 configurations {
-    javafxNatives
+    workbenchEmbed {
+        canBeConsumed = false
+        canBeResolved = true
+    }
 }
 
 dependencies {
     // Workbench shares only the JDK-only wire contract with the consumer worker.
     // It must never compile or run against the root Pickleball runtime.
     implementation project(':pickleball-control-protocol')
+    workbenchEmbed project(':pickleball-control-protocol')
 
-    // OpenJFX WebView is Workbench-only presentation. It is not a Pickleball
-    // runtime dependency and is preferred over JCEF so natives stay in Maven
-    // artifacts that can be shaded into the controller executable.
+    // OpenJFX WebView is Workbench-only presentation. Ordinary platform JARs are
+    // resolved onto the forked controller classpath at launch; they are not
+    // shaded into the thin nested JAR.
     javafxModules.each { module ->
         implementation "org.openjfx:javafx-${module}:${javafxVersion}:${javafxCompilePlatform}"
-    }
-    javafxPlatforms.each { platform ->
-        javafxModules.each { module ->
-            javafxNatives "org.openjfx:javafx-${module}:${javafxVersion}:${platform}"
-        }
     }
 
     // Controller-side JSON transport. This is declared directly instead of
     // inheriting it through Pickleball core.
-    implementation 'com.fasterxml.jackson.core:jackson-databind:2.20.0'
+    implementation "com.fasterxml.jackson.core:jackson-databind:${jacksonVersion}"
 
     // Keep MCP Workbench-only and non-Spring. Jackson 2 matches Pickleball's
     // existing ObjectMapper usage without pulling the SDK convenience/Jackson 3 path.
@@ -87,57 +97,59 @@ tasks.jar {
     enabled = false
 }
 
-def javafxNativeStage = tasks.register('stageJavaFxNatives') {
-    def outputDir = layout.buildDirectory.dir('javafx-natives')
-    outputs.dir(outputDir)
+def generateWorkbenchRuntimeLibs = tasks.register('generateWorkbenchRuntimeLibs') {
+    group = 'build'
+    description = 'Generates the Workbench runtime-lib lockfile from resolved runtimeClasspath.'
+    def outputFile = layout.buildDirectory.file('generated/META-INF/pickleball/workbench-runtime-libs.txt')
+    outputs.file(outputFile)
+    inputs.files(configurations.runtimeClasspath)
     doLast {
-        def dest = outputDir.get().asFile
-        dest.deleteDir()
-        dest.mkdirs()
-        configurations.javafxNatives.resolvedConfiguration.resolvedArtifacts.each { artifact ->
-            String classifier = artifact.classifier ?: 'unknown'
-            def target = new File(dest, classifier)
-            target.mkdirs()
-            copy {
-                from zipTree(artifact.file)
-                into target
-                include '**/*.so'
-                include '**/*.dll'
-                include '**/*.dylib'
-                include '**/*.jnilib'
-                includeEmptyDirs = false
-                eachFile { details ->
-                    details.path = details.name
-                }
+        def rows = new LinkedHashSet<String>()
+        configurations.runtimeClasspath.incoming.artifacts.artifacts.each { artifact ->
+            def component = artifact.id.componentIdentifier
+            if (component instanceof org.gradle.api.artifacts.component.ProjectComponentIdentifier) {
+                return
             }
-            new File(target, '.keep').text = ''
+            if (!(component instanceof org.gradle.api.artifacts.component.ModuleComponentIdentifier)) {
+                return
+            }
+            String group = component.group
+            String module = component.module
+            String version = component.version
+            if (group == 'org.openjfx') {
+                rows.add("${group}:${module}:${version}:CLASSIFIER")
+            } else {
+                rows.add("${group}:${module}:${version}")
+            }
         }
+        def file = outputFile.get().asFile
+        file.parentFile.mkdirs()
+        def text = new StringBuilder()
+        text.append('# format=1\n')
+        text.append("# workbench-version=${project.version}\n")
+        text.append('# Generated from Workbench runtimeClasspath. Do not hand-edit.\n')
+        rows.sort().each { row ->
+            text.append(row).append('\n')
+        }
+        file.setText(text.toString(), 'UTF-8')
     }
 }
 
 tasks.named('processResources') {
-    dependsOn javafxNativeStage
-    from(layout.buildDirectory.dir('javafx-natives')) {
-        into 'javafx-natives'
+    dependsOn generateWorkbenchRuntimeLibs
+    from(layout.buildDirectory.dir('generated')) {
+        include 'META-INF/pickleball/workbench-runtime-libs.txt'
     }
 }
 
 tasks.shadowJar {
-    dependsOn javafxNativeStage
+    configurations = [project.configurations.workbenchEmbed]
     archiveBaseName.set('pickleball-workbench')
     archiveVersion.set(project.version.toString())
     archiveClassifier.set('')
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
     mergeServiceFiles()
-    zip64 = true
     exclude 'module-info.class'
-    exclude { details ->
-        String path = details.path ?: ''
-        String name = details.name ?: ''
-        boolean nativeLib = name.endsWith('.so') || name.endsWith('.dll') ||
-                name.endsWith('.dylib') || name.endsWith('.jnilib')
-        nativeLib && !path.startsWith('javafx-natives/')
-    }
 
     manifest {
         attributes(
@@ -208,8 +220,9 @@ publishing {
                 }
             }
 
-            // The executable shades all controller dependencies. It has no
-            // published dependency on Pickleball core or the protocol module.
+            // Protocol stays embedded in the thin JAR. First-level controller
+            // libraries are published so a Workbench POM consumer can resolve
+            // them; Pickleball itself never publishes these as transitives.
             pom.withXml {
                 def pomNode = asNode()
                 def depsNodeList = pomNode.get('dependencies') as groovy.util.NodeList
@@ -217,6 +230,12 @@ publishing {
                         ? (groovy.util.Node) depsNodeList[0]
                         : pomNode.appendNode('dependencies')
                 depsNode.children().clear()
+                publishedWorkbenchLibraries.each { published ->
+                    def dependency = depsNode.appendNode('dependency')
+                    dependency.appendNode('groupId', published[0])
+                    dependency.appendNode('artifactId', published[1])
+                    dependency.appendNode('version', published[2])
+                }
             }
         }
     }
@@ -256,10 +275,24 @@ tasks.withType(Sign).configureEach {
 
 def workbenchJar = tasks.named('shadowJar').flatMap { it.archiveFile }
 
+def workbenchLaunchClasspath = {
+    def files = new ArrayList<File>()
+    files.add(workbenchJar.get().asFile)
+    configurations.runtimeClasspath.incoming.artifacts.artifacts.each { artifact ->
+        def component = artifact.id.componentIdentifier
+        if (component instanceof org.gradle.api.artifacts.component.ProjectComponentIdentifier) {
+            return
+        }
+        files.add(artifact.file)
+    }
+    files.collect { it.absolutePath }.join(File.pathSeparator)
+}
+
 tasks.named('test') {
     dependsOn tasks.shadowJar
     doFirst {
         systemProperty 'pickleball.workbench.test.jar', workbenchJar.get().asFile.absolutePath
+        systemProperty 'pickleball.workbench.test.classpath', workbenchLaunchClasspath()
     }
 }
 tasks.register('verifyWorkbenchArtifact') {
@@ -269,6 +302,12 @@ tasks.register('verifyWorkbenchArtifact') {
 
     doLast {
         def jarFile = workbenchJar.get().asFile
+        long maxThinBytes = 16L * 1024 * 1024
+        if (jarFile.length() >= maxThinBytes) {
+            throw new GradleException(
+                    "Thin Workbench JAR exceeds ${maxThinBytes} bytes: ${jarFile.length()}"
+            )
+        }
         def forbiddenPrefixes = [
                 'tools/dscode/testengine/',
                 'tools/dscode/common/',
@@ -279,7 +318,11 @@ tasks.register('verifyWorkbenchArtifact') {
                 'tools/dscode/control/override/',
                 'io/cucumber/',
                 'org/openqa/selenium/',
-                'io/restassured/'
+                'io/restassured/',
+                'javafx/',
+                'javafx-natives/',
+                'io/modelcontextprotocol/',
+                'com/fasterxml/jackson/'
         ]
         def forbiddenProviderPrefixes = forbiddenPrefixes.collect { prefix ->
             prefix.replace('/', '.')
@@ -342,6 +385,25 @@ tasks.register('verifyWorkbenchArtifact') {
             }
             if (jar.getEntry('tools/dscode/control/protocol/ControlProtocol.class') == null) {
                 throw new GradleException('Workbench executable is missing the neutral control protocol')
+            }
+            def manifestEntry = jar.getEntry('META-INF/pickleball/workbench-runtime-libs.txt')
+            if (manifestEntry == null) {
+                throw new GradleException('Thin Workbench JAR is missing META-INF/pickleball/workbench-runtime-libs.txt')
+            }
+            String manifestText = jar.getInputStream(manifestEntry).getText('UTF-8')
+            if (!manifestText.contains('format=1') ||
+                    !manifestText.contains("workbench-version=${project.version}")) {
+                throw new GradleException('Workbench runtime-lib manifest is missing format=1 or workbench-version.')
+            }
+            def gavRows = manifestText.readLines().findAll { line ->
+                def trimmed = line.trim()
+                !trimmed.isEmpty() && !trimmed.startsWith('#')
+            }
+            if (gavRows.isEmpty()) {
+                throw new GradleException('Workbench runtime-lib manifest has no library rows.')
+            }
+            if (!gavRows.any { it.startsWith('org.openjfx:') && it.endsWith(':CLASSIFIER') }) {
+                throw new GradleException('Workbench runtime-lib manifest is missing CLASSIFIER JavaFX rows.')
             }
 
             java.util.Collections.list(jar.entries()).each { entry ->
@@ -434,7 +496,7 @@ tasks.register('verifyWorkbenchRuntimeBoundary') {
 
 tasks.register('verifyWorkbenchPublishedDependencyContract') {
     group = 'verification'
-    description = 'Verifies the self-contained Workbench POM declares no Pickleball dependency.'
+    description = 'Verifies the Workbench POM publishes the nine first-level controller libraries.'
     dependsOn tasks.named('generatePomFileForMavenPublication')
 
     doLast {
@@ -453,13 +515,23 @@ tasks.register('verifyWorkbenchPublishedDependencyContract') {
             [
                     xpath.evaluate('groupId', dependency),
                     xpath.evaluate('artifactId', dependency),
-                    xpath.evaluate('version', dependency),
-                    xpath.evaluate('scope', dependency)
+                    xpath.evaluate('version', dependency)
             ]
+        }.sort { a, b ->
+            "${a[0]}:${a[1]}:${a[2]}" <=> "${b[0]}:${b[1]}:${b[2]}"
         }
-        def expected = []
+        def expected = publishedWorkbenchLibraries.collect { [it[0], it[1], it[2]] }.sort { a, b ->
+            "${a[0]}:${a[1]}:${a[2]}" <=> "${b[0]}:${b[1]}:${b[2]}"
+        }
         if (dependencies != expected) {
             throw new GradleException("Unexpected Workbench published dependencies: ${dependencies}; expected ${expected}")
+        }
+        def forbidden = dependencies.findAll { triple ->
+            (triple[0] == 'tools.dscode' && (triple[1] == 'pickleball' || triple[1] == 'pickleball-control-protocol')) ||
+                    triple[1] == 'pickleball-control-protocol'
+        }
+        if (!forbidden.isEmpty()) {
+            throw new GradleException("Workbench POM must not publish protocol or Pickleball: ${forbidden}")
         }
     }
 }
@@ -478,8 +550,9 @@ tasks.register('verifyWorkbenchEntrypoint', Exec) {
         }.get()
         commandLine(
                 launcher.executablePath.asFile.absolutePath,
-                '-jar',
-                workbenchJar.get().asFile.absolutePath,
+                '-cp',
+                workbenchLaunchClasspath(),
+                'tools.dscode.workbench.WorkbenchApplication',
                 '--version'
         )
     }
@@ -504,8 +577,9 @@ tasks.register('verifyWorkbenchMcpStdio') {
         }.get()
         def process = new ProcessBuilder(
                 launcher.executablePath.asFile.absolutePath,
-                '-jar',
-                workbenchJar.get().asFile.absolutePath,
+                '-cp',
+                workbenchLaunchClasspath(),
+                'tools.dscode.workbench.WorkbenchApplication',
                 'mcp',
                 rootProject.projectDir.absolutePath
         ).start()

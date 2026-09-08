@@ -20,7 +20,7 @@ Workbench must compile and run without resolving the root project, `tools.dscode
 
 The protocol module owns only stable wire DTOs, request/response envelopes, transport constants, capability lists, and explicit version negotiation. It owns no bridge server, bootstrap, mapping logic, Cucumber/Selenium/service behavior, filesystem synchronization, UI, or MCP behavior. When a new runtime capability is required, implement it in core/worker and expose neutral wire data; do not move the behavior into Workbench or protocol.
 
-Workbench-only dependencies, including Jackson and the MCP SDK, belong only on the Workbench classpath. The executable and every nested JAR/service descriptor must remain free of Pickleball core, `pickleball-control-api`, bridge-server/worker implementation, consumer classes, Cucumber, Selenium, and REST-assured. The MCP adapter uses the non-Spring MCP Java SDK core plus its Jackson 2 adapter; do not replace them with the convenience/Jackson 3 artifact or Spring transports without a new architecture decision.
+Workbench-only dependencies, including Jackson and the MCP SDK, belong only on the Workbench compile/runtime classpath and the forked controller `-cp`. The thin JAR plus every nested JAR/service descriptor must remain free of Pickleball core, `pickleball-control-api`, bridge-server/worker implementation, consumer classes, Cucumber, Selenium, REST-assured, OpenJFX, MCP, and Jackson packages. The MCP adapter uses the non-Spring MCP Java SDK core plus its Jackson 2 adapter; do not replace them with the convenience/Jackson 3 artifact or Spring transports without a new architecture decision.
 
 ## Runtime ownership
 
@@ -60,7 +60,7 @@ tools.dscode.workbench.player
 Launch the UI with:
 
 ```text
-java -jar pickleball-workbench-<version>.jar ui <project>
+java -cp pickleball-workbench-<version>.jar:<resolved-libs> tools.dscode.workbench.WorkbenchApplication ui <project>
 ```
 
 The UI is player-style and execution-oriented. Its primary layout is:
@@ -100,7 +100,7 @@ Blocking synchronization, process, bridge, Mapping, event, screenshot, service-c
 Workbench provides:
 
 ```text
-java -jar pickleball-workbench-<version>.jar mcp <project>
+java -cp pickleball-workbench-<version>.jar:<resolved-libs> tools.dscode.workbench.WorkbenchApplication mcp <project>
 ```
 
 The MCP adapter is `tools.dscode.workbench.mcp.WorkbenchMcpServer` plus `WorkbenchMcpTools`. It exposes project synchronization/status, interactive worker lifecycle, live Gherkin, Mapping operations, events/evidence, browser/service controls, semantic breakpoints, Step Override authoring, the watched-agent control lease, player-state inspection, gated Save, sparse diagnostic catalog/run/summary readers, and `workbench_investigation_emit` through `WorkbenchServices`. Consumer agents use Workbench `discover` / `confirm` as the Java/Maven front door and launcher `isolate` / `execute-step` against the headless CLI session. Hosts may already wire `mcp .` as optional alias. Agents must not start the GUI.

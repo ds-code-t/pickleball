@@ -21,7 +21,7 @@ Review changes against the following repository requirements.
 - Require shared Java types to stay in the JDK-only `pickleball-control-protocol`; worker bridge behavior and runtime translation stay in core.
 - Require the Workbench artifact/process to be core-free and the separate worker to load Pickleball only from the consumer's captured test-runtime classpath.
 - Require dependency provenance, nested JAR/service scans, distinct PID, runtime code-source/version checks, worker exclusion of the controller artifact, and clear incompatibility failure.
-- Require the outer Pickleball JAR to contain exactly one byte-identical opaque Workbench payload without flattened Workbench/MCP classes. Pickleball may contain Workbench; Workbench must not contain Pickleball.
+- Require the outer Pickleball JAR to contain exactly one byte-identical opaque thin Workbench payload without flattened Workbench/MCP/JavaFX classes. Pickleball may contain Workbench; Workbench must not contain Pickleball.
 
 ## Documentation and maintained context
 

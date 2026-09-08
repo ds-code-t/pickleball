@@ -29,11 +29,12 @@ import java.util.List;
  */
 public final class PickleballWorkbenchLauncher {
     /**
-     * Safety cap for the opaque controller JAR. OpenJFX WebView natives make
-     * the payload larger than a plain Java executable, so this is a stream
-     * limit rather than an in-memory buffer size.
+     * Safety cap for the opaque thin controller JAR. Fat-jar regression guard:
+     * the nested payload is Workbench plus protocol only, so 32 MiB is enough.
      */
-    static final long MAX_PAYLOAD_BYTES = 512L * 1024 * 1024;
+    static final long MAX_PAYLOAD_BYTES = 32L * 1024 * 1024;
+
+    static final String WORKBENCH_MAIN_CLASS = "tools.dscode.workbench.WorkbenchApplication";
 
     private PickleballWorkbenchLauncher() {
     }
@@ -141,11 +142,29 @@ public final class PickleballWorkbenchLauncher {
         }
     }
 
+    /**
+     * Single fork seam for ui/mcp/sync/isolate session-start. Builds
+     * {@code java -cp <thinJar:libs...> tools.dscode.workbench.WorkbenchApplication <args>}.
+     */
     static List<String> command(Path controllerJar, String[] args) {
+        Path jar = controllerJar.toAbsolutePath().normalize();
+        WorkbenchRuntimeLibs.Manifest manifest = WorkbenchRuntimeLibs.withLaunchClassifier(
+                WorkbenchRuntimeLibs.readManifest(jar),
+                WorkbenchRuntimeLibs.platformKey()
+        );
+        Path libCache = WorkbenchRuntimeLibs.libCacheForController(jar, manifest.version());
+        List<Path> libs = WorkbenchRuntimeLibs.resolve(manifest, libCache);
+
+        StringBuilder classpath = new StringBuilder(jar.toString());
+        for (Path lib : libs) {
+            classpath.append(java.io.File.pathSeparator).append(lib.toAbsolutePath().normalize());
+        }
+
         List<String> command = new ArrayList<>();
         command.add(javaExecutable().toString());
-        command.add("-jar");
-        command.add(controllerJar.toAbsolutePath().normalize().toString());
+        command.add("-cp");
+        command.add(classpath.toString());
+        command.add(WORKBENCH_MAIN_CLASS);
         command.addAll(List.of(args));
         return List.copyOf(command);
     }

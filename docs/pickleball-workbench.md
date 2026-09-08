@@ -89,15 +89,15 @@ tasks.register('pickleballWorkbench', JavaExec) {
 }
 ```
 
-Run it with `./gradlew pickleballWorkbench` (or `gradlew.bat pickleballWorkbench`). The task uses the consumer's resolved test runtime only to locate the tiny launcher and nested bytes; actual controller code still starts in a separate `java -jar` process.
+Run it with `./gradlew pickleballWorkbench` (or `gradlew.bat pickleballWorkbench`). The task uses the consumer's resolved test runtime only to locate the tiny launcher and nested bytes; actual controller code still starts in a separate `java -cp` process.
 
-The launcher streams the nested payload (it does not load the controller JAR into a byte array), hashes SHA-256 while copying, and rejects payloads larger than 512 MiB. OpenJFX WebView natives make the executable larger than a plain Java controller. It extracts atomically to:
+The launcher streams the nested payload (it does not load the controller JAR into a byte array), hashes SHA-256 while copying, and rejects payloads larger than 32 MiB. The nested JAR is thin: Workbench classes plus shaded `pickleball-control-protocol` only. OpenJFX, MCP, and Jackson are resolved at launch into `.pickleball/workbench/lib/<version>/`. It extracts atomically to:
 
 ```text
 .pickleball/workbench/controller/<sha256>/pickleball-workbench.jar
 ```
 
-It verifies existing/extracted bytes, starts `java -jar` in a new Workbench JVM, inherits stdio, and propagates non-zero exit status. The content-addressed path prevents a stale payload from silently replacing the version carried by the consumer dependency.
+It verifies existing/extracted bytes, starts `java -cp <thinJar:resolved-libs> tools.dscode.workbench.WorkbenchApplication` in a new Workbench JVM, inherits stdio, and propagates non-zero exit status. The content-addressed path prevents a stale payload from silently replacing the version carried by the consumer dependency.
 
 ## Maintainer build and direct run
 
@@ -107,23 +107,24 @@ Build the standalone controller and strict isolation checks:
 .\gradlew.bat :pickleball-workbench:build verifyStrictControllerIsolation
 ```
 
-The executable is:
+The thin controller JAR is:
 
 ```text
 pickleball-workbench/build/libs/pickleball-workbench-<version>.jar
 ```
 
-Synchronize a consumer project before starting a worker manually from repository output:
+Synchronize a consumer project before starting a worker manually from repository output. Maintainer in-repo runs may put Workbench `runtimeClasspath` files on `-cp` next to the thin JAR; the consumer launcher must not use that compile classpath and instead resolves the generated lockfile:
 
 ```powershell
 $workbenchJar = ".\pickleball-workbench\build\libs\pickleball-workbench-<version>.jar"
-java -jar $workbenchJar sync ".\maven-consumer-project"
+$workbenchCp = "$workbenchJar;<resolved OpenJFX/MCP/Jackson controller libs>"
+java -cp $workbenchCp tools.dscode.workbench.WorkbenchApplication sync ".\maven-consumer-project"
 ```
 
 Read the last synchronization manifest without invoking Maven/Gradle:
 
 ```powershell
-java -jar $workbenchJar status ".\maven-consumer-project"
+java -cp $workbenchCp tools.dscode.workbench.WorkbenchApplication status ".\maven-consumer-project"
 ```
 
 Synchronization uses the selected project wrapper to establish compiled output and the effective test runtime classpath. It keeps `-DskipTests` (Surefire never runs during sync). Input fingerprints of Java sources, resources, build files, and dependency artifacts decide how much of the wrapper to run:
@@ -143,7 +144,7 @@ At worker connection time, Workbench requires a different PID, compatible protoc
 Start Workbench for one consumer project:
 
 ```powershell
-java -jar $workbenchJar ui ".\maven-consumer-project"
+java -cp $workbenchCp tools.dscode.workbench.WorkbenchApplication ui ".\maven-consumer-project"
 ```
 
 The Swing UI is a presentation adapter over the same `WorkbenchServices` / `WorkbenchController` seam used by MCP. It does not own a second worker manager, bridge client, Mapping implementation, Gherkin execution engine, or Pickleball runtime model.
@@ -242,7 +243,7 @@ NodeMap implementations that are not exact ordinary `NodeMap` instances remain i
 
 ### WebView packaging
 
-JDK 21 does not ship a modern browser panel. Workbench embeds OpenJFX `WebView` through `JFXPanel` for the Gherkin editor, Mapping tree, and Diagnostic explorer. That choice stays Workbench-only: Maven-central JavaFX modules are shaded into the controller executable, including platform natives under `javafx-natives/<platform>/`. JCEF was not used because Chromium natives are harder to keep isolation-clean and do not package as ordinary Workbench dependencies. If JavaFX cannot start, the live editor stays on the existing in-place text buffer on the same `LiveScenarioPlayer` model; the **Text | Blocks** toggle remains visible and Blocks is disabled so the fallback is honest.
+JDK 21 does not ship a modern browser panel. Workbench embeds OpenJFX `WebView` through `JFXPanel` for the Gherkin editor, Mapping tree, and Diagnostic explorer. That choice stays Workbench-only: Maven-central JavaFX modules are resolved onto the forked controller classpath at launch from ordinary platform JARs. They are not shaded into the thin nested JAR. JCEF was not used because Chromium natives are harder to keep isolation-clean and do not package as ordinary Workbench dependencies. If JavaFX cannot start, the live editor stays on the existing in-place text buffer on the same `LiveScenarioPlayer` model; the **Text | Blocks** toggle remains visible and Blocks is disabled so the fallback is honest.
 
 ### Terminal and Diagnostic Log Explorer
 
@@ -328,7 +329,7 @@ A Copilot or other MCP-style client finds that file in the consumer project, the
 4. Use the existing live tools (`workbench_execute_step`, Mapping, evidence, worker) while holding the lease, and `workbench_set_current_action` so the human can watch.
 5. `POST {url}/tools/workbench_request_save` to ask to copy the live scenario into the original feature. The call blocks until the human clicks Allow or Deny, or Take control.
 
-Headless `java -jar pickleball-workbench-<version>.jar mcp <project>` stays stdio JSON-RPC only. That is optional host wiring, not an agent setup step. The consumer-agent live path is launcher `isolate` then `execute-step`. That client may hold the lease without a banner. Save is still a distinct explicit tool and never an implicit write.
+Headless `java -cp <thin-jar>:<resolved-libs> tools.dscode.workbench.WorkbenchApplication mcp <project>` stays stdio JSON-RPC only. That is optional host wiring, not an agent setup step. The consumer-agent live path is launcher `isolate` then `execute-step`. That client may hold the lease without a banner. Save is still a distinct explicit tool and never an implicit write.
 
 A human-watched UI session is optional and separate. From `maven-consumer-project`, a person may start `ui .` and then a watcher can join `.pickleball/workbench/attach.json`. Do not launch a second `mcp` process against the same live UI session, and do not treat that attach file as the default agent path.
 
@@ -337,12 +338,12 @@ A human-watched UI session is optional and separate. From `maven-consumer-projec
 Start the lightweight non-Spring MCP server for a consumer project. This is optional host wiring when `workbench_*` tools are already connected, not an agent setup step:
 
 ```powershell
-java -jar $workbenchJar mcp ".\maven-consumer-project"
+java -cp $workbenchCp tools.dscode.workbench.WorkbenchApplication mcp ".\maven-consumer-project"
 ```
 
 Or, from a Maven consumer test classpath, `"-Dexec.args=mcp ."`. That launcher is optional host wiring. Agents use Workbench `discover` / `confirm` to find failures and `isolate` / `execute-step` for live debug. Do not document or use the Swing GUI, `ui .`, or `.pickleball/workbench/attach.json` as the agent path.
 
-The server uses the official Java MCP SDK core and stdio transport with the Jackson 2 JSON adapter. MCP dependencies are Workbench-only and are shaded into the executable companion. Workbench deliberately does not use Spring Boot, Spring Framework, Spring AI, WebMVC, or Tomcat.
+The server uses the official Java MCP SDK core and stdio transport with the Jackson 2 JSON adapter. MCP dependencies are Workbench-only and are resolved onto the forked controller classpath at launch; they are not shaded into the thin nested JAR. Workbench deliberately does not use Spring Boot, Spring Framework, Spring AI, WebMVC, or Tomcat.
 
 ### Stdout contract
 
@@ -485,7 +486,8 @@ io.modelcontextprotocol.sdk:mcp-json-jackson2:2.0.0
 
 ```powershell
 $workbenchJar = ".\pickleball-workbench\build\libs\pickleball-workbench-<version>.jar"
-java -jar $workbenchJar ui ".\maven-consumer-project"
+$workbenchCp = "$workbenchJar;<resolved OpenJFX/MCP/Jackson controller libs>"
+java -cp $workbenchCp tools.dscode.workbench.WorkbenchApplication ui ".\maven-consumer-project"
 ```
 
 Use the UI-owned worker for runtime checks; do not run `worker-check` or `live-check` concurrently with the UI.
@@ -537,10 +539,11 @@ For persistent worker/live behavior:
 
 ```powershell
 $workbenchJar = ".\pickleball-workbench\build\libs\pickleball-workbench-<version>.jar"
+$workbenchCp = "$workbenchJar;<resolved OpenJFX/MCP/Jackson controller libs>"
 
-java -jar $workbenchJar sync ".\maven-consumer-project"
-java -jar $workbenchJar worker-check ".\maven-consumer-project"
-java -jar $workbenchJar live-check ".\maven-consumer-project"
+java -cp $workbenchCp tools.dscode.workbench.WorkbenchApplication sync ".\maven-consumer-project"
+java -cp $workbenchCp tools.dscode.workbench.WorkbenchApplication worker-check ".\maven-consumer-project"
+java -cp $workbenchCp tools.dscode.workbench.WorkbenchApplication live-check ".\maven-consumer-project"
 ```
 
 For changed consumer bridge behavior, use only the affected focused tags—never `@all`—and use parallelism 80 where practical:

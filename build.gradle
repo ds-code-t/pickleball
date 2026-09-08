@@ -379,7 +379,9 @@ tasks.register('verifyEmbeddedWorkbench') {
 
             def flattened = java.util.Collections.list(outer.entries()).findAll { entry ->
                 entry.name.startsWith('tools/dscode/workbench/') ||
-                        entry.name.startsWith('io/modelcontextprotocol/')
+                        entry.name.startsWith('io/modelcontextprotocol/') ||
+                        entry.name.startsWith('javafx/') ||
+                        entry.name.startsWith('javafx-natives/')
             }
             if (!flattened.isEmpty()) {
                 throw new GradleException(

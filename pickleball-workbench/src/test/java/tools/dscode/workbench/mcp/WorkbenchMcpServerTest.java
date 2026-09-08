@@ -361,13 +361,20 @@ class WorkbenchMcpServerTest {
         private boolean closed;
 
         private ProcessHarness(Path project) throws Exception {
-            String jar = System.getProperty("pickleball.workbench.test.jar");
-            if (jar == null || jar.isBlank()) {
-                throw new IllegalStateException("pickleball.workbench.test.jar was not configured by Gradle.");
+            String classpath = System.getProperty("pickleball.workbench.test.classpath");
+            if (classpath == null || classpath.isBlank()) {
+                throw new IllegalStateException("pickleball.workbench.test.classpath was not configured by Gradle.");
             }
             String java = Path.of(System.getProperty("java.home"), "bin", isWindows() ? "java.exe" : "java")
                     .toString();
-            process = new ProcessBuilder(java, "-jar", jar, "mcp", project.toString()).start();
+            process = new ProcessBuilder(
+                    java,
+                    "-cp",
+                    classpath,
+                    "tools.dscode.workbench.WorkbenchApplication",
+                    "mcp",
+                    project.toString()
+            ).start();
             writer = new BufferedWriter(new OutputStreamWriter(process.getOutputStream(), StandardCharsets.UTF_8));
             reader = new BufferedReader(new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8));
             reads = Executors.newSingleThreadExecutor(runnable -> {

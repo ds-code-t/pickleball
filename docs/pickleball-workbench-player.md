@@ -9,7 +9,7 @@ The Workbench distribution and process model is unchanged:
 ```text
 published pickleball JAR
   -> embeds one opaque pickleball-workbench.jar
-  -> launcher extracts it and starts `java -jar` in a separate controller JVM
+  -> launcher extracts it and starts `java -cp` in a separate controller JVM
 
 Workbench controller JVM
   -> controller/UI/MCP only
@@ -35,7 +35,7 @@ Feature-file selection is secondary and collapsed behind **Filter by feature**. 
 
 The center editor is an embedded HTML/JS block editor in JavaFX `WebView`, or ordinary Gherkin text on the same `LiveScenarioPlayer` buffer. A prominent **Text | Blocks** toggle next to the editor heading switches those views without losing playhead, selection, or document text. Play, Step, and From Here keep using the same `LiveScenarioPlayer`. Blocks are Gherkin text, including `Given` / `When` / `Then`. Nested steps and `IF` / `ELSE` snap as parent/child using leading colons. Clicking a block or line instantly seeks the playhead, like clicking a waveform. The execution cursor is internal to an active run.
 
-Workbench chose OpenJFX `WebView` + `JFXPanel` over JCEF so the browser panel stays a Workbench-only Maven dependency that shades into the controller JAR. JDK 21 does not ship a modern browser component. If JavaFX cannot start, the same `LiveScenarioPlayer` buffer remains editable as plain Gherkin text and Blocks is shown as unavailable.
+Workbench chose OpenJFX `WebView` + `JFXPanel` over JCEF so the browser panel stays a Workbench-only Maven dependency resolved onto the forked controller classpath. JDK 21 does not ship a modern browser component. If JavaFX cannot start, the same `LiveScenarioPlayer` buffer remains editable as plain Gherkin text and Blocks is shown as unavailable.
 
 The initial buffer is Workbench-owned sample content. It is not written back to consumer `.feature` files unless you use **Save** on a picker-loaded scenario and confirm the copy. The default demo is a small browser scenario against the Maven consumer local test site:
 

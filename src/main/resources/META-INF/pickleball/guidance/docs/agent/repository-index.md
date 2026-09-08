@@ -53,6 +53,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/README.md`
 - `docs/service-call-scenarios.md`
 - `docs/step-overrides.md`
+- `docs/workbench-thin-packaging-roadmap.md`
 
 ## Framework Java and AspectJ source
 
@@ -371,6 +372,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/launcher/PickleballWorkbenchLauncher.java`
 - `src/main/java/tools/dscode/launcher/WorkbenchAgentCommands.java`
 - `src/main/java/tools/dscode/launcher/WorkbenchCommandLine.java`
+- `src/main/java/tools/dscode/launcher/WorkbenchRuntimeLibs.java`
 - `src/main/java/tools/dscode/launcher/WorkbenchSessionCommands.java`
 - `src/main/java/tools/dscode/misc/DummySteps.java`
 - `src/main/java/tools/dscode/parallelutilities/ParallelCountEstimator.java`
@@ -396,7 +398,6 @@ This inventory helps coding agents discover relevant files. It does not replace 
 
 ## Framework tests
 
-- `src/test/java/io/cucumber/core/gherkin/messages/NGherkinFactoryTest.java`
 - `src/test/java/tools/dscode/common/reporting/diagnostic/AgentBrowserLadderTest.java`
 - `src/test/java/tools/dscode/common/reporting/diagnostic/AgentDiscoverPlannerTest.java`
 - `src/test/java/tools/dscode/control/override/StepOverrideCompilerTest.java`
@@ -599,7 +600,6 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `maven-consumer-project/src/test/java/com/example/pickleball/ScenarioDataSteps.java`
 - `maven-consumer-project/src/test/java/com/example/pickleball/StepOverrideBridgeTestSteps.java`
 - `maven-consumer-project/src/test/java/com/example/pickleball/StepOverrideChecks.java`
-- `maven-consumer-project/src/test/java/com/example/pickleball/steps/CustomSteps.java`
 - `maven-consumer-project/src/test/java/com/example/pickleball/support/InternalJavaTestRunner.java`
 - `maven-consumer-project/src/test/java/com/example/pickleball/support/LocalTestSite.java`
 - `maven-consumer-project/src/test/java/com/example/pickleball/tests/TokenizedQueryTest.java`
@@ -630,7 +630,6 @@ This inventory helps coding agents discover relevant files. It does not replace 
 
 ## Maven consumer feature scenarios
 
-- `maven-consumer-project/src/test/resources/features/_localtests/test1.feature`
 - `maven-consumer-project/src/test/resources/features/agent-pointer-eval.feature`
 - `maven-consumer-project/src/test/resources/features/browser-action-contracts.feature`
 - `maven-consumer-project/src/test/resources/features/catalog-context.feature`
@@ -692,7 +691,6 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `maven-consumer-project/src/test/resources/files/customers.yaml`
 - `maven-consumer-project/src/test/resources/pickleball.properties`
 - `maven-consumer-project/src/test/resources/pickleball_local.properties`
-- `maven-consumer-project/src/test/resources/pickleball_local2.properties`
 - `maven-consumer-project/src/test/resources/profiles.yaml`
 - `maven-consumer-project/src/test/resources/profiles_local.yaml`
 
