@@ -72,8 +72,13 @@ class PickleballLocalStoreTest {
         for (String script : List.of(sh, cmd, ps)) {
             assertTrue(script.contains("current.json"));
             assertTrue(script.contains("pickleball-") && script.contains(".jar"));
+            assertTrue(script.contains(".gradle"));
             assertFalse(script.contains("/workspace/"));
             assertFalse(script.contains("2.1.11"));
         }
+        assertTrue(cmd.contains("build.gradle.kts"));
+        assertTrue(cmd.contains("SNAPSHOT"));
+        assertTrue(cmd.contains("PROJECT:~-1"));
+        assertTrue(ps.contains("SNAPSHOT"));
     }
 }

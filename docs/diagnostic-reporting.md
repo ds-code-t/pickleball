@@ -114,7 +114,7 @@ See `docs/ai-run-configuration.md` and `docs/diagnostic-lineage-metadata.md`.
 
 ## Diagnostic CLI
 
-The agent-facing entry is Pickleball Workbench. DiagnosticCli remains the implementation behind export-guidance/hint and the comparison utilities:
+The agent-facing entry is Pickleball Workbench. Workbench `export-guidance` (including `java -jar pickleball-<version>.jar export-guidance`) is JDK-only `PickleballLocalStore`. DiagnosticCli still implements hint and the comparison utilities, and its `export-guidance` command delegates to the same store:
 
 ```text
 DiagnosticCli guidance

@@ -236,7 +236,7 @@ mvn -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java "-Dexec.mainClass=tools.ds
 "-Dexec.args=stop"
 ```
 
-`DiagnosticCli` remains the implementation behind export-guidance/hint and the comparison/rebuild utilities:
+Workbench `export-guidance` copies bundled guidance through JDK-only `PickleballLocalStore` (also used by `java -jar pickleball-<version>.jar export-guidance .pickleball`). `DiagnosticCli.export-guidance` delegates to that store. Hint and the comparison/rebuild utilities still go through DiagnosticCli on a full consumer classpath:
 
 ```text
 DiagnosticCli guidance

@@ -5,7 +5,7 @@ import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
-import tools.dscode.control.protocol.ControlProtocol;
+import tools.dscode.control.protocol.PickleballLocalLayout;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -15,6 +15,7 @@ import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Locale;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
@@ -56,12 +57,12 @@ class WorkbenchSessionCommandsTest {
                     (proj, tags, name, log) -> {
                         FakeSession session = FakeSession.start(proj);
                         started.set(session);
-                        Process process = new ProcessBuilder("sleep", "30").start();
+                        Process process = startLongLivedChild();
                         child.set(process);
                         return process;
                     }
             );
-            assertEquals(0, output.exitCode);
+            assertEquals(0, output.exitCode, () -> output.stderr + output.stdout);
             assertTrue(output.stdout.contains("ACK SESSION pid="));
             assertFalse(output.stdout.contains("Workbench isolate worker:"));
         } finally {
@@ -103,6 +104,17 @@ class WorkbenchSessionCommandsTest {
     private record Output(int exitCode, String stdout, String stderr) {
     }
 
+    /**
+     * Placeholder controller process. Unix {@code sleep} is not on Windows PATH;
+     * session-start must return without waiting for this child to exit.
+     */
+    private static Process startLongLivedChild() throws IOException {
+        if (System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win")) {
+            return new ProcessBuilder("cmd.exe", "/c", "ping", "-n", "31", "127.0.0.1").start();
+        }
+        return new ProcessBuilder("sleep", "30").start();
+    }
+
     private static final class FakeSession implements AutoCloseable {
         private final HttpServer http;
         private final Path stateFile;
@@ -125,7 +137,7 @@ class WorkbenchSessionCommandsTest {
                 write(exchange, 200, "{\"id\":\"step-held\",\"status\":\"STILL_WORKING\"}");
             });
             http.start();
-            Path stateFile = project.resolve(ControlProtocol.CLI_SESSION_STATE_RELATIVE);
+            Path stateFile = PickleballLocalLayout.cliSessionState(project);
             Files.createDirectories(stateFile.getParent());
             String url = "http://127.0.0.1:" + http.getAddress().getPort();
             Files.writeString(stateFile, """

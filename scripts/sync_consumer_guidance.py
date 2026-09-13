@@ -37,7 +37,13 @@ MAX_REFERENCE_TOTAL_BYTES = 10 * 1024 * 1024
 
 
 def is_maintainer_local(path: Path) -> bool:
-    return "_local2" in path.stem
+    if "_local2" in path.stem:
+        return True
+    try:
+        relative = path.relative_to(CONSUMER_ROOT)
+    except ValueError:
+        return False
+    return any(part.startswith("_local") for part in relative.parts)
 
 
 def consumer_reference_sources() -> list[Path]:

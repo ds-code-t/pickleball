@@ -2,9 +2,10 @@ package tools.dscode.launcher;
 
 import tools.dscode.common.reporting.diagnostic.AgentDiscoverPlanner;
 import tools.dscode.common.reporting.diagnostic.ConsumerMavenTestRunner;
-import tools.dscode.common.reporting.diagnostic.DiagnosticCli;
 import tools.dscode.common.reporting.diagnostic.LastDiscoverSnapshot;
+import tools.dscode.control.protocol.PickleballLocalStore;
 
+import java.io.IOException;
 import java.io.PrintStream;
 import java.nio.file.Path;
 import java.util.List;
@@ -28,11 +29,7 @@ public final class WorkbenchAgentCommands {
         WorkbenchCommandLine.Parsed parsed = WorkbenchCommandLine.parse(args);
         try {
             return switch (parsed.command()) {
-                case "export-guidance" -> DiagnosticCli.run(
-                        new String[]{"export-guidance", parsed.outputDirectory().toString()},
-                        out,
-                        err
-                );
+                case "export-guidance" -> exportGuidance(parsed, out, err);
                 case "hint", "discover-hint" -> hint(parsed, out);
                 case "discover" -> discover(parsed, out, err, maven);
                 case "confirm" -> confirm(parsed, out, err, maven);
@@ -44,6 +41,14 @@ public final class WorkbenchAgentCommands {
         } catch (RuntimeException failure) {
             err.println("Workbench " + parsed.command() + " failed: " + failure.getMessage());
             return 1;
+        }
+    }
+
+    private static int exportGuidance(WorkbenchCommandLine.Parsed parsed, PrintStream out, PrintStream err) {
+        try {
+            return PickleballLocalStore.exportGuidance(parsed.outputDirectory(), out, err);
+        } catch (IOException failure) {
+            throw new IllegalStateException(failure.getMessage(), failure);
         }
     }
 

@@ -36,7 +36,7 @@ class WorkbenchAgentCommandsTest {
     }
 
     @Test
-    void exportGuidanceUsesDiagnosticCli() throws Exception {
+    void exportGuidanceUsesJdkLocalStore() throws Exception {
         Path outputDir = tempDir.resolve("guidance");
         Output output = run("export-guidance", outputDir.toString());
         assertEquals(0, output.exitCode());

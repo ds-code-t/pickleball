@@ -351,7 +351,7 @@ public final class PickleballLocalStore {
     static String cmdOpenScript() {
         return """
                 @echo off
-                setlocal EnableExtensions
+                setlocal EnableExtensions EnableDelayedExpansion
                 set "SCRIPT_DIR=%~dp0"
                 set "PROJECT="
                 set "WALK=%SCRIPT_DIR%"
@@ -369,32 +369,63 @@ public final class PickleballLocalStore {
                 if exist "%WALK%.pickleball\\" set "PROJECT=%WALK%" & goto found
                 if exist "%WALK%pom.xml" set "PROJECT=%WALK%" & goto found
                 if exist "%WALK%build.gradle" set "PROJECT=%WALK%" & goto found
+                if exist "%WALK%build.gradle.kts" set "PROJECT=%WALK%" & goto found
                 echo Pickleball Workbench: could not find a consumer project. 1>&2
                 exit /b 1
                 :found
+                if "!PROJECT:~-1!"=="\\" set "PROJECT=!PROJECT:~0,-1!"
                 if defined JAVA_HOME (
                   if exist "%JAVA_HOME%\\bin\\java.exe" (set "JAVA=%JAVA_HOME%\\bin\\java.exe") else set "JAVA=java"
                 ) else set "JAVA=java"
                 set "M2=%USERPROFILE%\\.m2\\repository"
                 set "JAR="
                 set "VERSION="
-                if exist "%PROJECT%.pickleball\\current.json" (
-                  for /f "usebackq tokens=2 delims=:" %%A in (`findstr pickleballVersion "%PROJECT%.pickleball\\current.json"`) do (
+                if exist "%PROJECT%\\.pickleball\\current.json" (
+                  for /f "usebackq tokens=2 delims=:" %%A in (`findstr pickleballVersion "%PROJECT%\\.pickleball\\current.json"`) do (
                     set "VERSION=%%~A"
                   )
                 )
                 if defined VERSION (
-                  set "VERSION=%VERSION:"=%"
-                  set "VERSION=%VERSION:,=%"
-                  set "VERSION=%VERSION: =%"
-                  set "CANDIDATE=%M2%\\tools\\dscode\\pickleball\\%VERSION%\\pickleball-%VERSION%.jar"
-                  if exist "%CANDIDATE%" set "JAR=%CANDIDATE%"
+                  set "VERSION=!VERSION:"=!"
+                  set "VERSION=!VERSION:,=!"
+                  set "VERSION=!VERSION: =!"
+                  set "CANDIDATE=%M2%\\tools\\dscode\\pickleball\\!VERSION!\\pickleball-!VERSION!.jar"
+                  if exist "!CANDIDATE!" set "JAR=!CANDIDATE!"
+                  if not defined JAR (
+                    set "GRADLE=%USERPROFILE%\\.gradle\\caches\\modules-2\\files-2.1\\tools.dscode\\pickleball\\!VERSION!"
+                    if exist "!GRADLE!" (
+                      for /r "!GRADLE!" %%F in (pickleball-!VERSION!.jar) do if exist "%%~F" set "JAR=%%~F"
+                    )
+                  )
                 )
                 if not defined JAR (
-                  for %%F in ("%SCRIPT_DIR%pickleball-*.jar") do if exist "%%~F" set "JAR=%%~F"
+                  for %%F in ("%SCRIPT_DIR%pickleball-*.jar") do (
+                    echo %%~nxF| findstr /i workbench >nul
+                    if errorlevel 1 if exist "%%~F" set "JAR=%%~F"
+                  )
                 )
                 if not defined JAR (
-                  for %%F in ("%PROJECT%pickleball-*.jar") do if exist "%%~F" set "JAR=%%~F"
+                  for %%F in ("%PROJECT%\\pickleball-*.jar") do (
+                    echo %%~nxF| findstr /i workbench >nul
+                    if errorlevel 1 if exist "%%~F" set "JAR=%%~F"
+                  )
+                )
+                if not defined JAR (
+                  for %%F in ("%CD%\\pickleball-*.jar") do (
+                    echo %%~nxF| findstr /i workbench >nul
+                    if errorlevel 1 if exist "%%~F" set "JAR=%%~F"
+                  )
+                )
+                if not defined JAR if exist "%M2%\\tools\\dscode\\pickleball\\" (
+                  for /d %%D in ("%M2%\\tools\\dscode\\pickleball\\*") do (
+                    echo %%~nxD| findstr /i SNAPSHOT >nul
+                    if errorlevel 1 if exist "%%D\\pickleball-%%~nxD.jar" set "JAR=%%D\\pickleball-%%~nxD.jar"
+                  )
+                  if not defined JAR (
+                    for /d %%D in ("%M2%\\tools\\dscode\\pickleball\\*") do (
+                      if exist "%%D\\pickleball-%%~nxD.jar" set "JAR=%%D\\pickleball-%%~nxD.jar"
+                    )
+                  )
                 )
                 if not defined JAR (
                   echo Pickleball Workbench: no pickleball-*.jar found. 1>&2
@@ -441,6 +472,14 @@ public final class PickleballLocalStore {
                     $version = $Matches[1]
                     $candidate = Join-Path $m2 "tools/dscode/pickleball/$version/pickleball-$version.jar"
                     if (Test-Path $candidate) { $jar = $candidate }
+                    if (-not $jar) {
+                      $gradle = Join-Path $HOME ".gradle/caches/modules-2/files-2.1/tools.dscode/pickleball/$version"
+                      if (Test-Path $gradle) {
+                        $hit = Get-ChildItem -Path $gradle -Recurse -Filter ("pickleball-" + $version + '.jar') -ErrorAction SilentlyContinue |
+                          Select-Object -First 1
+                        if ($hit) { $jar = $hit.FullName }
+                      }
+                    }
                   }
                 }
                 if (-not $jar) {

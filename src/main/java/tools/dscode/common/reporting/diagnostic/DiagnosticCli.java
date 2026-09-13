@@ -20,7 +20,6 @@ import java.util.Map;
 
 /** Command-line entry point for diagnostic comparison, recovery, and consumer guidance utilities. */
 public final class DiagnosticCli {
-    private static final ObjectMapper JSON = new ObjectMapper().enable(SerializationFeature.INDENT_OUTPUT);
     private static final String GUIDANCE_ROOT = "META-INF/pickleball/guidance/";
     private static final String AGENT_GUIDE = "AGENT-GUIDE.md";
 
@@ -116,7 +115,7 @@ public final class DiagnosticCli {
         }
         Map<String, Object> raw;
         try {
-            raw = JSON.readValue(jsonText, LinkedHashMap.class);
+            raw = json().readValue(jsonText, LinkedHashMap.class);
         } catch (Exception failure) {
             throw new IllegalArgumentException("Investigation JSON is invalid: " + failure.getMessage());
         }
@@ -203,7 +202,7 @@ public final class DiagnosticCli {
     }
 
     private static void writeResult(Map<String, Object> result, Path output, PrintStream out) throws IOException {
-        String json = JSON.writeValueAsString(result);
+        String json = json().writeValueAsString(result);
         if (output == null) {
             out.println(json);
             return;
@@ -211,6 +210,19 @@ public final class DiagnosticCli {
         if (output.getParent() != null) Files.createDirectories(output.getParent());
         Files.writeString(output, json + System.lineSeparator());
         out.println(output);
+    }
+
+    /**
+     * Jackson is a Maven-runtime dependency, not shaded into {@code java -jar}.
+     * Keep it off the class-init path so {@code guidance} / {@code export-guidance}
+     * stay JDK-only.
+     */
+    private static ObjectMapper json() {
+        return JsonHolder.JSON;
+    }
+
+    private static final class JsonHolder {
+        private static final ObjectMapper JSON = new ObjectMapper().enable(SerializationFeature.INDENT_OUTPUT);
     }
 
     private static void requireLength(String[] args, int min, int max, String usage) {
