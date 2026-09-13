@@ -123,10 +123,16 @@ def current_files() -> dict[str, bytes]:
     }
 
 
+def normalize_newlines(data: bytes) -> bytes:
+    return data.replace(b"\r\n", b"\n").replace(b"\r", b"\n")
+
+
 def check() -> int:
     expected = expected_files()
     current = current_files()
-    if current == expected:
+    if {path: normalize_newlines(body) for path, body in current.items()} == {
+        path: normalize_newlines(body) for path, body in expected.items()
+    }:
         print("Packaged consumer guidance is current.")
         return 0
 
@@ -134,7 +140,7 @@ def check() -> int:
     extra = sorted(set(current) - set(expected))
     changed = sorted(
         path for path in set(expected) & set(current)
-        if expected[path] != current[path]
+        if normalize_newlines(expected[path]) != normalize_newlines(current[path])
     )
 
     if missing:

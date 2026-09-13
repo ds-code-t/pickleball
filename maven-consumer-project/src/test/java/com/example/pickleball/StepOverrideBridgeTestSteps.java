@@ -146,8 +146,11 @@ public final class StepOverrideBridgeTestSteps {
 
     @After("@step-override-bridge")
     public void cleanup() {
+        if (descriptor == null) {
+            return;
+        }
         try {
-            if (descriptor != null && token != null) post("/v1/resume", Map.of());
+            if (token != null) post("/v1/resume", Map.of());
         } catch (Exception ignored) {
         } finally {
             ControlBridgeBootstrap.stop();

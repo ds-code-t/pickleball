@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
+import subprocess
 import sys
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -125,13 +126,37 @@ def is_included(path: Path) -> bool:
     return not any(part in EXCLUDED_PARTS for part in relative.parts)
 
 
+def git_ignored(relative_paths: list[str]) -> set[str]:
+    if not relative_paths:
+        return set()
+    try:
+        completed = subprocess.run(
+            ["git", "-C", str(ROOT), "check-ignore", "-z", "--stdin"],
+            input="".join(path + "\0" for path in relative_paths),
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except OSError:
+        return set()
+    return {
+        path.replace("\\", "/")
+        for path in completed.stdout.split("\0")
+        if path
+    }
+
+
 def collect(patterns: tuple[str, ...]) -> list[str]:
     found: set[str] = set()
     for pattern in patterns:
         for path in ROOT.glob(pattern):
             if is_included(path):
                 found.add(path.relative_to(ROOT).as_posix())
-    return sorted(found, key=lambda value: (value.lower(), value))
+    ignored = git_ignored(sorted(found))
+    return sorted(
+        (path for path in found if path not in ignored),
+        key=lambda value: (value.lower(), value),
+    )
 
 
 def render() -> str:
