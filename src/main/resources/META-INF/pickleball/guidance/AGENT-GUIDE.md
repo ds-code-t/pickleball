@@ -65,18 +65,22 @@ Treat `.pickleball` as generated dependency guidance, not as a durable source of
 
 A successful `export-guidance .pickleball` run:
 
-- overwrites the current version's managed guidance files, documentation, and Maven consumer reference snapshot;
-- writes `.pickleball/GUIDANCE-MANIFEST.json` last, recording the exporting Pickleball version and managed files;
-- removes files managed by the previous manifest that are no longer shipped, while leaving unrelated files alone, including `.pickleball/investigations/`; and
+- writes version-matched managed guidance files under `.pickleball/v/<pickleballVersion>/`, including documentation and the Maven consumer reference snapshot;
+- copies root `AGENT-GUIDE.md` and `GUIDANCE-MANIFEST.json` as aliases of that version so the well-known agent pointer stays stable;
+- writes relocatable Workbench openers under `.pickleball/open/`;
+- writes `.pickleball/current.json` last (`pickleballVersion`, `complete`, `updatedAt`) — a version pointer, not a path to the dependency jar;
+- removes files managed by the previous manifest that are no longer shipped in that version folder, while leaving unrelated files alone, including `.pickleball/investigations/` and any other `v/<other-version>/` trees; and
 - best-effort ensures `.pickleball` is ignored by Git, preferring an existing `.gitignore` and then repository-local `.git/info/exclude`.
 
-The exporter does not create/commit a new `.gitignore`, alter the Git index, or untrack files that were already committed. If export fails, treat any existing `.pickleball` contents as potentially stale. The manifest records the last completed export; it is not a substitute for rerunning the exporter.
+Any Pickleball execution (`PickleballRunner`, `java -jar pickleball.jar`, Workbench launcher) lazily materializes the running jar's version folder if it is missing. It unpacks from the running jar; it never copies a sibling version folder. Direct `java -jar pickleball-X.jar` pins `current.json` to X. Open scripts set `PKB_OPEN_BOOTSTRAP=1` so Java hops to the pinned jar when `current.json` is complete.
 
-Compatibility note: an older Pickleball release whose exporter predates the manifest lifecycle may leave newer files behind after a downgrade. Those leftovers are not authoritative for the downgraded dependency. Prefer the dependency actually resolved on the test classpath and files freshly exported by that dependency.
+The exporter does not create/commit a new `.gitignore`, alter the Git index, or untrack files that were already committed. If export fails, treat any existing `.pickleball` contents as potentially stale. `complete: false` or a missing `current.json` means do not trust the tree. The manifest records the last completed export; it is not a substitute for rerunning the exporter.
+
+Compatibility note: an older Pickleball release whose exporter predates the manifest lifecycle may leave newer files behind after a downgrade. Version folders keep each export isolated. Prefer the dependency actually resolved on the test classpath and files freshly exported by that dependency.
 
 ## Generated Maven consumer reference
 
-`.pickleball/maven-consumer-project/` is a generated, read-only reference snapshot of the canonical Maven consumer used by Pickleball itself. It preserves repository-relative paths so links from the exported Markdown documentation continue to resolve locally. It is not the consumer project under test and is not a writable sandbox.
+`.pickleball/v/<version>/maven-consumer-project/` (and the root alias path `.pickleball/maven-consumer-project/` on flat exports) is a generated, read-only reference snapshot of the canonical Maven consumer used by Pickleball itself. It preserves repository-relative paths so links from the exported Markdown documentation continue to resolve locally. It is not the consumer project under test and is not a writable sandbox.
 
 The snapshot intentionally includes the consumer `pom.xml`, Pickleball runner, local browser/service test server, executable feature files, service-call definitions, configuration/data fixtures, local test-site resources, and the committed shared/local profile and property examples. It intentionally excludes Maven wrappers, Git/IDE/generated artifacts, the consumer `AGENTS.md` bridge, internal Java verification classes, and maintainer-only `_local2` files.
 

@@ -12,10 +12,18 @@ public final class ControlProtocol {
             "pickleball.workbench.testOutputRoot";
     public static final String EMBEDDED_WORKBENCH_RESOURCE =
             "META-INF/pickleball/workbench/pickleball-workbench.jar";
-    /** Written by Workbench discover; isolate/confirm replay this snapshot as {@code pkb_runvars}. */
+    /**
+     * Legacy relative path for Discover snapshots. Live reads/writes go through
+     * {@link PickleballLocalLayout#lastDiscoverSnapshot(java.nio.file.Path)} so a
+     * versioned {@code v/<version>/workbench/} tree is used when {@code current.json}
+     * is complete.
+     */
     public static final String LAST_DISCOVER_SNAPSHOT_RELATIVE =
             ".pickleball/workbench/last-discover.json";
-    /** Headless CLI session state; distinct from UI attach.json. */
+    /**
+     * Legacy relative path for headless CLI session state. Live reads/writes go
+     * through {@link PickleballLocalLayout#cliSessionState(java.nio.file.Path)}.
+     */
     public static final String CLI_SESSION_STATE_RELATIVE =
             ".pickleball/workbench/cli-session.json";
 

@@ -2,7 +2,7 @@ package tools.dscode.launcher;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import tools.dscode.control.protocol.ControlProtocol;
+import tools.dscode.control.protocol.PickleballLocalLayout;
 
 import java.io.IOException;
 import java.io.PrintStream;
@@ -122,7 +122,7 @@ public final class WorkbenchSessionCommands {
             return 0;
         }
 
-        Path logFile = project.resolve(".pickleball").resolve("workbench").resolve("session.log");
+        Path logFile = PickleballLocalLayout.workbenchStateRoot(project).resolve("session.log");
         Process process;
         try {
             process = starter.start(project, parsed.tags(), parsed.name(), logFile);
@@ -328,7 +328,7 @@ public final class WorkbenchSessionCommands {
     }
 
     static Path sessionFile(Path project) {
-        return project.toAbsolutePath().normalize().resolve(ControlProtocol.CLI_SESSION_STATE_RELATIVE);
+        return PickleballLocalLayout.cliSessionState(project);
     }
 
     private static boolean pidAlive(long pid) {

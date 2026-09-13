@@ -2,6 +2,8 @@ package tools.dscode.launcher;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import tools.dscode.control.protocol.PickleballArtifactLocator;
+import tools.dscode.control.protocol.PickleballLocalLayout;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -73,6 +75,58 @@ class PickleballWorkbenchLauncherTest {
         assertFalse(classpath.contains("-jar"));
         assertEquals("tools.dscode.workbench.WorkbenchApplication", command.get(3));
         assertEquals(List.of("ui", tempDir.toString()), command.subList(4, command.size()));
+    }
+
+    @Test
+    void extractUsesVersionedWorkbenchWhenCurrentJsonIsComplete() throws Exception {
+        PickleballLocalLayout.writeCurrent(
+                tempDir.resolve(".pickleball"),
+                PickleballLocalLayout.CurrentPointer.completeNow("2.1.11")
+        );
+        Path extracted = PickleballWorkbenchLauncher.extractPayload(tempDir, new byte[]{1, 2, 3});
+        Path expected = tempDir.resolve(".pickleball/v/2.1.11/workbench/controller");
+        assertTrue(extracted.startsWith(expected));
+        assertTrue(extracted.getFileName().toString().equals("pickleball-workbench.jar"));
+    }
+
+    @Test
+    void bootstrapReexecHopsToPinnedJarAndSkipsWhenAlreadyOnIt() throws Exception {
+        Path m2 = tempDir.resolve("m2");
+        Path gradle = tempDir.resolve("gradle");
+        Path jar2111 = PickleballArtifactLocator.mavenJar(m2, "2.1.11");
+        Files.createDirectories(jar2111.getParent());
+        Files.writeString(jar2111, "2111");
+        Path jar2112 = PickleballArtifactLocator.mavenJar(m2, "2.1.12");
+        Files.createDirectories(jar2112.getParent());
+        Files.writeString(jar2112, "2112");
+        PickleballLocalLayout.writeCurrent(
+                tempDir.resolve(".pickleball"),
+                PickleballLocalLayout.CurrentPointer.completeNow("2.1.11")
+        );
+        PickleballArtifactLocator.Repositories repos =
+                new PickleballArtifactLocator.Repositories(m2, gradle);
+
+        assertEquals(
+                jar2111,
+                PickleballWorkbenchLauncher.reexecJar(tempDir, "2.1.12", true, false, repos).orElseThrow()
+        );
+        assertTrue(PickleballWorkbenchLauncher.reexecJar(tempDir, "2.1.11", true, false, repos).isEmpty());
+        assertTrue(PickleballWorkbenchLauncher.reexecJar(tempDir, "2.1.12", false, false, repos).isEmpty());
+        assertTrue(PickleballWorkbenchLauncher.reexecJar(tempDir, "2.1.12", true, true, repos).isEmpty());
+    }
+
+    @Test
+    void bootstrapWithoutCurrentHopsToLatestRelease() throws Exception {
+        Path m2 = tempDir.resolve("m2");
+        Path jar = PickleballArtifactLocator.mavenJar(m2, "2.1.11");
+        Files.createDirectories(jar.getParent());
+        Files.writeString(jar, "latest");
+        PickleballArtifactLocator.Repositories repos =
+                new PickleballArtifactLocator.Repositories(m2, tempDir.resolve("gradle"));
+        assertEquals(
+                jar,
+                PickleballWorkbenchLauncher.reexecJar(tempDir, "2.1.10", true, false, repos).orElseThrow()
+        );
     }
 
     @Test

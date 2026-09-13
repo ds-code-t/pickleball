@@ -20,7 +20,7 @@ Pickleball owns scenario execution semantics, Cucumber integration, DynamicContr
 
 Workbench owns synchronization, `.pickleball/workbench/` disposable state, worker lifecycle, the protocol client, `WorkbenchLiveSession`, `WorkbenchServices` / `WorkbenchController`, MCP stdio, the headless live-scenario presentation model, and the Swing adapter. It does not import the worker entry point; it launches the protocol's class-name string on the captured consumer classpath.
 
-`pickleball-control-protocol` owns only immutable wire records, request/response envelopes, transport constants, capabilities, and version/minimum-version negotiation. Worker-side bridge server/coordinator/bootstrap and all translation to runtime operations remain in Pickleball core.
+`pickleball-control-protocol` owns immutable wire records, request/response envelopes, transport constants, capabilities, version/minimum-version negotiation, and JDK-only `.pickleball` layout/store helpers (`PickleballLocalLayout`, `PickleballVersion`, `PickleballArtifactLocator`, `PickleballLocalStore`). Worker-side bridge server/coordinator/bootstrap and all translation to runtime operations remain in Pickleball core.
 
 MCP and Swing are adapters over the same Workbench service seam. They must not introduce a second runtime implementation. A visible UI keeps one Workbench JVM and one consumer worker. An AI agent attaches to that live session through a localhost HTTP JSON facade; it must not start a second Workbench or a second worker.
 
@@ -79,6 +79,8 @@ mvn -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java "-Dexec.mainClass=tools.ds
 
 Humans who want the Swing player can pass `ui .` instead. With no launcher arguments, `ui` and the current directory are selected automatically for that human default. Other Workbench commands are forwarded in the same form, for example `"-Dexec.args=sync ."`. Headless `mcp .` is optional host wiring, not an agent setup step. Agents for this release should not use the GUI, `ui .`, or `.pickleball/workbench/attach.json` as their path; see `.pickleball/AGENT-GUIDE.md`.
 
+The published Pickleball JAR is also executable. `java -jar pickleball-<version>.jar ui <project>` is the outer `Main-Class` (`PickleballWorkbenchLauncher`): it still extracts the nested controller and forks `java -cp`. It does not merge Workbench onto the Pickleball classpath. Relocatable openers under `.pickleball/open/` walk up to the consumer project, find Java, and resolve a pickleball jar from `current.json`, a sibling `pickleball-*.jar`, or Maven local / the Gradle cache. They do not bake in a project, m2, or version path. Direct `java -jar pickleball-X.jar` uses X and pins `current.json` to X so versions can be tested side by side under `.pickleball/v/<version>/`.
+
 Gradle consumers can expose the same dependency-owned launcher without resolving a cache path or adding a Workbench dependency:
 
 ```groovy
@@ -91,11 +93,13 @@ tasks.register('pickleballWorkbench', JavaExec) {
 
 Run it with `./gradlew pickleballWorkbench` (or `gradlew.bat pickleballWorkbench`). The task uses the consumer's resolved test runtime only to locate the tiny launcher and nested bytes; actual controller code still starts in a separate `java -cp` process.
 
-The launcher streams the nested payload (it does not load the controller JAR into a byte array), hashes SHA-256 while copying, and rejects payloads larger than 32 MiB. The nested JAR is thin: Workbench classes plus shaded `pickleball-control-protocol` only. OpenJFX, MCP, and Jackson are resolved at launch into `.pickleball/workbench/lib/<version>/`. It extracts atomically to:
+The launcher streams the nested payload (it does not load the controller JAR into a byte array), hashes SHA-256 while copying, and rejects payloads larger than 32 MiB. The nested JAR is thin: Workbench classes plus shaded `pickleball-control-protocol` only. OpenJFX, MCP, and Jackson are resolved at launch into `.pickleball/v/<version>/workbench/lib/<version>/` when `current.json` is complete (legacy `.pickleball/workbench/lib/<version>/` otherwise). It extracts atomically to:
 
 ```text
-.pickleball/workbench/controller/<sha256>/pickleball-workbench.jar
+.pickleball/v/<version>/workbench/controller/<sha256>/pickleball-workbench.jar
 ```
+
+Unversioned `.pickleball/workbench/controller/<sha256>/` remains the fallback when `current.json` is missing, so older trees keep working. `.pickleball/current.json` is a version pointer (`pickleballVersion`, `complete`, `updatedAt`), not a path to the dependency jar. Guidance, Workbench extract/live/base, Discover/session/attach state, and libs live under `v/<version>/`. Root `AGENT-GUIDE.md` and `GUIDANCE-MANIFEST.json` are aliases of the current version. Auto-materialize happens lazily from `PickleballRunner` and the launcher; it unpacks from the running jar and never copies a sibling version folder.
 
 It verifies existing/extracted bytes, starts `java -cp <thinJar:resolved-libs> tools.dscode.workbench.WorkbenchApplication` in a new Workbench JVM, inherits stdio, and propagates non-zero exit status. The content-addressed path prevents a stale payload from silently replacing the version carried by the consumer dependency.
 

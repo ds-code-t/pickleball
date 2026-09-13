@@ -91,7 +91,7 @@ When implementation, tests, examples, and documentation disagree:
 - `src/main/java` — framework implementation and Cucumber integrations
 - `src/main/aspectj` — AspectJ integrations and weaving behavior
 - `src/main/resources` — framework resources
-- `pickleball-control-protocol` — JDK-only versioned wire records, capability/version constants, request envelopes, and response envelopes shared by core/worker and Workbench; no runtime behavior
+- `pickleball-control-protocol` — JDK-only shared boundary for core/worker and Workbench: versioned wire records, capability/version constants, request/response envelopes, plus layout/store helpers (`PickleballLocalLayout`, `PickleballVersion`, `PickleballArtifactLocator`, `PickleballLocalStore`) so `.pickleball` paths stay dependency-free. No non-JDK libraries; no Pickleball/Cucumber/Selenium runtime.
 - `pickleball-control-api` — internal companion source module for retry-friendly detached execution, Gherkin utilities, ParsingMap/NodeMap inspection and emulation, and dynamic controller tooling; bundled into the main Pickleball artifact rather than published separately
 - `pickleball-workbench` — controller-only GUI/MCP/synchronization/process client; its executable must contain no Pickleball, Cucumber, Selenium, REST-assured, worker, or behavioral control-API implementation
 - `src/test` — reserved for tests that must run inside the framework build

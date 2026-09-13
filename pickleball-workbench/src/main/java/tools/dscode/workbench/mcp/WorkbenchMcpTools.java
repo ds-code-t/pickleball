@@ -210,7 +210,7 @@ final class WorkbenchMcpTools {
                 ), "runId", "scenarioId"),
                 args -> services.diagnosticScenarioSummary(text(args, "runId"), text(args, "scenarioId")));
         add("workbench_investigation_emit",
-                "Write .pickleball/investigations/<id>/{investigation.json,report.html} from investigation JSON. Returns the relative report.html path only. Does not copy the diagnostic pack or embed PNG bytes.",
+                "Write .pickleball/investigations/<id>/{investigation.json,report.html} from investigation JSON (versioned under v/<version>/investigations when current.json is complete). Returns the relative report.html path only. Does not copy the diagnostic pack or embed PNG bytes.",
                 schema(Map.of(
                         "investigation", Map.of(
                                 "type", "object",

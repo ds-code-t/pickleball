@@ -601,13 +601,13 @@ public final class WorkbenchApplication {
         out.println("  java -cp <thin-jar>:<resolved-libs> tools.dscode.workbench.WorkbenchApplication --version");
         out.println();
         out.println("Agent-facing Discover/hint/export-guidance/confirm run through PickleballWorkbenchLauncher.");
-        out.println("sync uses the selected project wrapper and materializes .pickleball/workbench.");
+        out.println("sync uses the selected project wrapper and materializes versioned .pickleball/v/<version>/workbench state (legacy .pickleball/workbench when current.json is absent).");
         out.println("worker-check starts, restarts, and gracefully stops direct consumer workers without rebuilding.");
         out.println("live-check exercises raw Gherkin, Step Override, and live runtime operations on one persistent worker.");
         out.println("isolate holds a paused worker from the last Discover snapshot when stdin is an interactive TTY, or when pickleball.workbench.isolate.once is set.");
-        out.println("session is the headless long-lived CLI controller: sync, start the Discover-snapshot worker, and serve 127.0.0.1 HTTP plus a serial execute-step queue. State is .pickleball/workbench/cli-session.json.");
+        out.println("session is the headless long-lived CLI controller: sync, start the Discover-snapshot worker, and serve 127.0.0.1 HTTP plus a serial execute-step queue. State is .pickleball/v/<version>/workbench/cli-session.json when current.json is complete.");
         out.println("Consumer agents start session through PickleballWorkbenchLauncher isolate/session-start (detached). Do not start ui for agents.");
         out.println("mcp serves the same Workbench services over protocol-only stdio; optional host wiring, not an agent setup step.");
-        out.println("ui opens the thin Swing Workbench over the same controller services and writes a localhost agent-attach endpoint to .pickleball/workbench/attach.json.");
+        out.println("ui opens the thin Swing Workbench over the same controller services and writes a localhost agent-attach endpoint to .pickleball/workbench/attach.json (versioned under v/<version>/ when current.json is complete).");
     }
 }

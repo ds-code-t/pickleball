@@ -24,7 +24,7 @@ The nested `/maven-consumer-project/.github/copilot-instructions.md` is identica
 
 The nested `/maven-consumer-project/README.md` is ordinary sample-project documentation. It may point humans and agents at `AGENTS.md` for guidance export, but should not duplicate the AI guidance lifecycle.
 
-`export-guidance .pickleball` is deliberately unconditional before Pickleball work. A successful export writes `.pickleball/GUIDANCE-MANIFEST.json` last, removes obsolete previously managed files, and refreshes current dependency guidance. Git-ignore handling is best effort. If export fails, existing `.pickleball` content is potentially stale.
+`export-guidance .pickleball` is deliberately unconditional before Pickleball work. A successful export writes versioned files under `.pickleball/v/<version>/`, relocatable openers under `.pickleball/open/`, and `.pickleball/current.json` last. It removes obsolete previously managed files from that version folder and refreshes current dependency guidance. Git-ignore handling is best effort. If export fails, existing `.pickleball` content is potentially stale.
 
 ## Configuration-development context
 

@@ -304,7 +304,8 @@ tasks.shadowJar {
         attributes(
                 'Implementation-Title': 'Pickleball',
                 'Implementation-Version': project.version.toString(),
-                'Pickleball-Workbench-Resource': embeddedWorkbenchResource
+                'Pickleball-Workbench-Resource': embeddedWorkbenchResource,
+                'Main-Class': 'tools.dscode.launcher.PickleballWorkbenchLauncher'
         )
     }
 
@@ -395,6 +396,14 @@ tasks.register('verifyEmbeddedWorkbench') {
                 if (mainClass != 'tools.dscode.workbench.WorkbenchApplication') {
                     throw new GradleException('Embedded Workbench payload has an unexpected Main-Class.')
                 }
+            }
+
+            def outerMain = outer.manifest?.mainAttributes?.getValue('Main-Class')
+            if (outerMain != 'tools.dscode.launcher.PickleballWorkbenchLauncher') {
+                throw new GradleException(
+                        'Outer Pickleball JAR Main-Class must be PickleballWorkbenchLauncher so java -jar can extract and fork Workbench: ' +
+                                outerMain
+                )
             }
         }
     }

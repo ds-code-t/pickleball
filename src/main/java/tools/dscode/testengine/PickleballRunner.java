@@ -4,6 +4,8 @@ import com.epam.reportportal.utils.properties.PropertiesLoader;
 import io.cucumber.core.runner.CurrentScenarioState;
 import tools.dscode.common.mappings.ParsingMap;
 import tools.dscode.common.reporting.logging.Level;
+import tools.dscode.control.protocol.PickleballLocalLayout;
+import tools.dscode.control.protocol.PickleballLocalStore;
 import tools.dscode.parallelutilities.ParallelCountEstimator;
 
 import java.io.InputStream;
@@ -109,6 +111,7 @@ public abstract class PickleballRunner {
 
         INSTANCE = this;
         debug("Registered singleton instance: " + getClass().getName());
+        PickleballLocalStore.ensureQuietly(PickleballLocalLayout.findProjectRoot(java.nio.file.Path.of("")));
 
         String configuredLogLevel = get(PKB_LOGLEVEL);
         String effectiveLogLevel = configuredLogLevel == null || configuredLogLevel.isBlank()

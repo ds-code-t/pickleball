@@ -401,6 +401,10 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/common/reporting/diagnostic/AgentBrowserLadderTest.java`
 - `src/test/java/tools/dscode/common/reporting/diagnostic/AgentDiscoverPlannerTest.java`
 - `src/test/java/tools/dscode/control/override/StepOverrideCompilerTest.java`
+- `src/test/java/tools/dscode/control/protocol/PickleballArtifactLocatorTest.java`
+- `src/test/java/tools/dscode/control/protocol/PickleballLocalLayoutTest.java`
+- `src/test/java/tools/dscode/control/protocol/PickleballLocalStoreTest.java`
+- `src/test/java/tools/dscode/control/protocol/PickleballVersionTest.java`
 - `src/test/java/tools/dscode/launcher/PickleballWorkbenchLauncherTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchAgentCommandsTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchPointerContractTest.java`
@@ -488,6 +492,10 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/ControlBridgeValueResult.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/ControlProtocol.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/InvestigationHandoff.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/PickleballArtifactLocator.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/PickleballLocalLayout.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/PickleballLocalStore.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/PickleballVersion.java`
 
 ## Pickleball Workbench module
 

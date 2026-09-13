@@ -138,6 +138,8 @@ Prefer `DiagnosticCli` over custom Maven-classpath/JShell workflows for routine 
     report.html           # one-page local render
 ```
 
+When `.pickleball/current.json` is complete, new handoffs go under `.pickleball/v/<version>/investigations/` instead. Legacy `.pickleball/investigations/` remains when no current pointer exists.
+
 Input is investigation JSON from a file or stdin (`-`) plus the consumer project root. The command prints the project-relative `report.html` path. JSON is the source of truth. HTML renders that JSON plus at most two screenshots *linked* from the existing diagnostic pack; extra screenshot paths are ignored, and a missing image becomes a short note rather than a failed emit. The writer does not copy `reports/diagnostic-runs/` and does not change `pkb_diagnostic_output`. Headless Workbench MCP exposes the same emit as `workbench_investigation_emit` and returns only that relative report path.
 
 Suggested investigation JSON fields, using existing lineage/diagnostic names where they already exist:
@@ -160,7 +162,7 @@ pickleballVersion
 
 Canonical names are `pkb_investigation_id` and `runId`. `investigationId` and `diagnosticRunId` are accepted aliases and are written back under the canonical names.
 
-`export-guidance` does not manage or delete `.pickleball/investigations/`.
+`export-guidance` does not manage or delete `.pickleball/investigations/` or versioned `v/<version>/investigations/`.
 
 ## Outcomes and completion
 

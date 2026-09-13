@@ -85,7 +85,7 @@ mvn test
 
 ## Launch the matching Workbench
 
-The Pickleball dependency carries its version-matched, controller-only Workbench as an opaque nested thin JAR. Launch it from the consumer test classpath; do not add or version a second Workbench dependency:
+The Pickleball dependency carries its version-matched, controller-only Workbench as an opaque nested thin JAR. Launch it from the consumer test classpath, or `java -jar` the published Pickleball artifact; do not add or version a second Workbench dependency:
 
 ```bash
 mvn -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java \
@@ -94,7 +94,11 @@ mvn -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java \
   "-Dexec.args=ui ."
 ```
 
-The launcher extracts verified bytes beneath `.pickleball/workbench/controller/<sha256>/`, resolves controller libraries into `.pickleball/workbench/lib/<version>/`, and starts a separate controller JVM with `java -cp`. Workbench then synchronizes the project and starts a second, consumer-owned worker JVM from the resolved test runtime. Core, Cucumber, Selenium, service behavior, mappings, and steps execute only in that worker. See [Pickleball Workbench](pickleball-workbench.md).
+```bash
+java -jar ~/.m2/repository/tools/dscode/pickleball/<version>/pickleball-<version>.jar ui .
+```
+
+After `export-guidance`, `.pickleball/open/pickleball-workbench.sh` (`.cmd` / `.ps1` on Windows) is a relocatable opener: copy it anywhere, it walks up for the project and resolves a pickleball jar. The launcher extracts verified bytes beneath `.pickleball/v/<version>/workbench/controller/<sha256>/` when `current.json` is complete (legacy `.pickleball/workbench/` otherwise), resolves controller libraries into the matching `lib/<version>/`, and starts a separate controller JVM with `java -cp`. Workbench then synchronizes the project and starts a second, consumer-owned worker JVM from the resolved test runtime. Core, Cucumber, Selenium, service behavior, mappings, and steps execute only in that worker. See [Pickleball Workbench](pickleball-workbench.md).
 
 Filter normally with RunVars such as:
 

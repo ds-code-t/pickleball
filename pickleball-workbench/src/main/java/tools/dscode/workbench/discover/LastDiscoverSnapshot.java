@@ -2,7 +2,7 @@ package tools.dscode.workbench.discover;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import tools.dscode.control.protocol.ControlProtocol;
+import tools.dscode.control.protocol.PickleballLocalLayout;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -36,7 +36,7 @@ public final class LastDiscoverSnapshot {
     }
 
     public static Path file(Path projectRoot) {
-        return projectRoot.toAbsolutePath().normalize().resolve(ControlProtocol.LAST_DISCOVER_SNAPSHOT_RELATIVE);
+        return PickleballLocalLayout.lastDiscoverSnapshot(projectRoot);
     }
 
     public static Snapshot read(Path projectRoot) {

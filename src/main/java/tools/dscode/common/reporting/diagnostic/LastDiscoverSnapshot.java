@@ -2,7 +2,7 @@ package tools.dscode.common.reporting.diagnostic;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
-import tools.dscode.control.protocol.ControlProtocol;
+import tools.dscode.control.protocol.PickleballLocalLayout;
 import tools.dscode.testengine.PKB_props;
 
 import java.io.IOException;
@@ -40,7 +40,7 @@ public final class LastDiscoverSnapshot {
     }
 
     public static Path file(Path projectRoot) {
-        return projectRoot.toAbsolutePath().normalize().resolve(ControlProtocol.LAST_DISCOVER_SNAPSHOT_RELATIVE);
+        return PickleballLocalLayout.lastDiscoverSnapshot(projectRoot);
     }
 
     public static Snapshot read(Path projectRoot) {

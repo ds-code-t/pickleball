@@ -99,8 +99,7 @@ public final class InvestigationHandoff {
             throw new IllegalArgumentException("Consumer project root not found: " + root);
         }
         Document document = normalize(raw, root);
-        Path directory = root.resolve(".pickleball")
-                .resolve(INVESTIGATIONS_DIRECTORY)
+        Path directory = PickleballLocalLayout.investigationsDirectory(root)
                 .resolve(document.investigationId());
         Files.createDirectories(directory);
 
@@ -156,8 +155,7 @@ public final class InvestigationHandoff {
 
     public static String renderHtml(Document document, Path projectRoot) {
         Path root = requireProjectRoot(projectRoot);
-        Path reportDir = root.resolve(".pickleball")
-                .resolve(INVESTIGATIONS_DIRECTORY)
+        Path reportDir = PickleballLocalLayout.investigationsDirectory(root)
                 .resolve(document.investigationId());
         return renderHtml(document, root, reportDir);
     }
@@ -243,7 +241,13 @@ public final class InvestigationHandoff {
         if (pickleballDirectory == null || path == null) return false;
         Path investigations = investigationsRoot(pickleballDirectory).toAbsolutePath().normalize();
         Path resolved = path.toAbsolutePath().normalize();
-        return resolved.equals(investigations) || resolved.startsWith(investigations);
+        if (resolved.equals(investigations) || resolved.startsWith(investigations)) return true;
+        Path pickleball = pickleballDirectory.toAbsolutePath().normalize();
+        Path versions = pickleball.resolve(PickleballLocalLayout.VERSIONS_DIRECTORY);
+        if (!resolved.startsWith(versions)) return false;
+        return resolved.getFileName() != null
+                && (INVESTIGATIONS_DIRECTORY.equals(resolved.getFileName().toString())
+                || resolved.toString().replace('\\', '/').contains("/" + INVESTIGATIONS_DIRECTORY + "/"));
     }
 
     private static Path requireProjectRoot(Path projectRoot) {
