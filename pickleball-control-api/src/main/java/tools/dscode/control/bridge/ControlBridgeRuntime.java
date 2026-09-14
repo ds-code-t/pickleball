@@ -164,6 +164,12 @@ final class ControlBridgeRuntime implements AutoCloseable {
             ExecuteStepRequest request = readRequired(exchange, ExecuteStepRequest.class);
             return coordinator.executeStep(request.scenarioId(), request.text(), request.argument(), request.timeoutSeconds());
         }));
+        server.createContext("/v1/steps/resolve", exchange -> handle(exchange, "POST", () -> {
+            ResolveStepRequest request = readRequired(exchange, ResolveStepRequest.class);
+            return coordinator.resolveStep(
+                    request.scenarioId(), request.text(), request.argument(), request.timeoutSeconds()
+            );
+        }));
         server.createContext("/v1/mappings/get", exchange -> handle(exchange, "POST", () -> {
             MappingGetRequest request = readRequired(exchange, MappingGetRequest.class);
             return coordinator.mappingGet(request.scenarioId(), request.mapReference(), request.key(), request.timeoutSeconds());

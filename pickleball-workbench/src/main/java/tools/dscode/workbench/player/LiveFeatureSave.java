@@ -9,8 +9,8 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * Copies the live session buffer into the originating scenario of the original
- * {@code .feature} file. Demo buffers have no save path. Picker load never writes.
+ * Writes the live editor buffer to the originating {@code .feature} file.
+ * Demo buffers have no save path. Picker load never writes.
  */
 public final class LiveFeatureSave {
     private LiveFeatureSave() {
@@ -24,14 +24,13 @@ public final class LiveFeatureSave {
                     "The default demo is session-only and has no original .feature file to write."
             );
         }
-        List<String> body = scenarioBody(playback.player().documentText());
+        List<String> body = splitPreserve(playback.player().documentText());
         String fileName = origin.file().getFileName().toString();
-        String scenario = origin.scenarioName().isBlank() ? "(unnamed scenario)" : origin.scenarioName();
         return new WorkbenchSavePreview(
                 true,
                 origin.file(),
                 origin.scenarioName(),
-                "Copy these live steps into file " + fileName + " / scenario " + scenario + "?",
+                "Save the editor buffer to " + fileName + "?",
                 body
         );
     }
@@ -44,15 +43,8 @@ public final class LiveFeatureSave {
         Path file = preview.featurePath();
         ScenarioOrigin origin = playback.origin();
         try {
-            List<String> original = Files.exists(file)
-                    ? Files.readAllLines(file, StandardCharsets.UTF_8)
-                    : new ArrayList<>();
-            List<String> replacement = preview.liveScenarioLines();
-            List<String> rewritten = splice(original, origin.startLine(), origin.endLine(), replacement);
             String newline = detectNewline(file);
-            Files.writeString(file, join(rewritten, newline), StandardCharsets.UTF_8);
-            int newEnd = origin.startLine() + replacement.size() - 1;
-            playback.updateOrigin(origin.withEndLine(Math.max(origin.startLine(), newEnd)));
+            Files.writeString(file, join(preview.liveScenarioLines(), newline), StandardCharsets.UTF_8);
             return WorkbenchSaveResult.written(file, origin.scenarioName());
         } catch (IOException failure) {
             throw new IllegalStateException("Could not write the originating feature file: " + file, failure);

@@ -10,6 +10,8 @@ import java.util.function.LongConsumer;
 public final class GherkinEditorHost {
     private Consumer<List<String>> onDocument;
     private LongConsumer onSeek;
+    private Consumer<String> onSelectionText;
+    private Consumer<String> onBlockAction;
     private Runnable onAddStep;
     private Runnable onReady;
 
@@ -19,6 +21,20 @@ public final class GherkinEditorHost {
 
     public void onSeek(LongConsumer onSeek) {
         this.onSeek = onSeek;
+    }
+
+    public void onSelectionText(Consumer<String> onSelectionText) {
+        this.onSelectionText = onSelectionText;
+    }
+
+    public void onBlockAction(Consumer<String> onBlockAction) {
+        this.onBlockAction = onBlockAction;
+    }
+
+    public void blockAction(String json) {
+        WebViewPanel.onSwing(() -> {
+            if (onBlockAction != null) onBlockAction.accept(json == null ? "" : json);
+        });
     }
 
     public void onAddStep(Runnable onAddStep) {
@@ -38,6 +54,23 @@ public final class GherkinEditorHost {
         }
         WebViewPanel.onSwing(() -> {
             if (onDocument != null) onDocument.accept(lines);
+        });
+    }
+
+    public void gherkinChanged(String text) {
+        String value = text == null ? "" : text.replace("\r\n", "\n").replace('\r', '\n');
+        List<String> lines = new ArrayList<>(List.of(value.split("\n", -1)));
+        if (!lines.isEmpty() && lines.getLast().isEmpty()) {
+            lines.removeLast();
+        }
+        WebViewPanel.onSwing(() -> {
+            if (onDocument != null) onDocument.accept(lines);
+        });
+    }
+
+    public void selectionText(String text) {
+        WebViewPanel.onSwing(() -> {
+            if (onSelectionText != null) onSelectionText.accept(text == null ? "" : text);
         });
     }
 

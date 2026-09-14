@@ -161,6 +161,21 @@ public final class WorkbenchController implements WorkbenchServices {
     }
 
     @Override
+    public void loadPickerScenario(
+            List<String> lines,
+            Path originFile,
+            String scenarioName,
+            int startLine,
+            int endLine,
+            int exampleRow,
+            String exampleLabel
+    ) {
+        requireMutating();
+        playback.loadScenario(lines, originFile, scenarioName, startLine, endLine, exampleRow, exampleLabel);
+        notifyPlayer();
+    }
+
+    @Override
     public void loadDefaultDemo() {
         requireMutating();
         playback.loadDefaultDemo();
@@ -264,6 +279,11 @@ public final class WorkbenchController implements WorkbenchServices {
         ControlBridgeCallResult result = live.executeStep(text, argument == null ? "" : argument);
         maybeAdvancePlayhead(text, "SUCCESS".equals(result.status()));
         return result;
+    }
+
+    @Override
+    public ControlBridgeStepResolution resolveStep(String text, String argument) {
+        return live.resolveStep(text, argument == null ? "" : argument);
     }
 
     @Override

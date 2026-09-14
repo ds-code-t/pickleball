@@ -10,6 +10,9 @@ public final class ControlBridgeRequests {
     public record ExecuteStepRequest(
             String scenarioId, String text, String argument, Integer timeoutSeconds
     ) { }
+    public record ResolveStepRequest(
+            String scenarioId, String text, String argument, Integer timeoutSeconds
+    ) { }
     public record MappingGetRequest(
             String scenarioId, String mapReference, String key, Integer timeoutSeconds
     ) { }

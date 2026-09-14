@@ -32,11 +32,19 @@ dependencies {
     // XPathy library. Keep it compile-only here so the control module does not
     // create a second public dependency contract.
     compileOnly rootProject.files('libs/xpathy-3.0.0.jar')
+
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.13.4'
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.13.4'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher:1.13.4'
 }
 
 tasks.withType(JavaCompile).configureEach {
     dependsOn rootProject.tasks.named('ajcMain')
     options.encoding = 'UTF-8'
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
 }
 
 // Keep the control API as a separate source module, but bundle its output into

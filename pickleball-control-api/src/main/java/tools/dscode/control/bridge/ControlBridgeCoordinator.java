@@ -40,6 +40,7 @@ import tools.dscode.control.protocol.ControlBridgeScenarioStatus;
 import tools.dscode.control.protocol.ControlBridgeServiceCallEvidence;
 import tools.dscode.control.protocol.ControlBridgeServiceCallResult;
 import tools.dscode.control.protocol.ControlBridgeStatus;
+import tools.dscode.control.protocol.ControlBridgeStepResolution;
 import tools.dscode.control.protocol.ControlBridgeValue;
 import tools.dscode.control.protocol.ControlBridgeValueResult;
 import tools.dscode.control.protocol.ControlProtocol;
@@ -250,6 +251,29 @@ final class ControlBridgeCoordinator implements ControlHookHandler, AutoCloseabl
                 () -> fromControlResult(DynamicControl.executeStep(text, argument == null ? "" : argument), lane),
                 (type, message) -> failed(type, message, lane.status(lanes.size())),
                 message -> unavailable(message, lane.status(lanes.size()))
+        );
+    }
+
+    ControlBridgeStepResolution resolveStep(
+            String scenarioId, String text, String argument, Integer timeoutSeconds
+    ) {
+        if (text == null || text.isBlank()) {
+            return ControlBridgeStepResolution.unmatched("Dynamic step text must not be blank.");
+        }
+        ScenarioLane lane = selectedLane(normalizeScenarioId(scenarioId));
+        if (lane == null) {
+            return ControlBridgeStepResolution.unmatched(
+                    scenarioCommandUnavailableMessage(scenarioId, "Step resolution")
+            );
+        }
+        return submit(
+                lane,
+                commandTimeout(timeoutSeconds),
+                () -> ControlBridgeStepResolver.resolve(text, argument == null ? "" : argument),
+                (type, message) -> ControlBridgeStepResolution.unmatched(
+                        (type == null ? "FAILED" : type) + ": " + (message == null ? "" : message)
+                ),
+                ControlBridgeStepResolution::unmatched
         );
     }
 

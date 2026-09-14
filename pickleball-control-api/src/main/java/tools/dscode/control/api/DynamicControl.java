@@ -94,6 +94,7 @@ public final class DynamicControl {
         if (!created.successful()) {
             return new ControlCallResult<>(created.status(), null, created.error());
         }
+        StepMapSeeds.apply(created.value().getDefaultStepNodeMap(), text);
         return executeStep(created.value());
     }
 
@@ -113,6 +114,7 @@ public final class DynamicControl {
         if (!created.successful()) {
             return new ControlCallResult<>(created.status(), null, created.error());
         }
+        StepMapSeeds.apply(created.value().getDefaultStepNodeMap(), text);
         return executeStep(created.value(), mappingContext);
     }
 
@@ -317,6 +319,14 @@ public final class DynamicControl {
             return ControlCallResult.unavailable("No scenario is currently active.");
         }
         return attempt(() -> getRunningParsingMap());
+    }
+
+    /**
+     * Same Gherkin-keyword stripping and argument extraction used by {@link #executeStep},
+     * without creating or running a step.
+     */
+    public static DynamicStepSpec matchingStep(String text, String argument) {
+        return normalizeWorkbenchStep(text, argument);
     }
 
     private static DynamicStepSpec normalizeWorkbenchStep(String text, String argument) {

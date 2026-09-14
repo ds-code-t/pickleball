@@ -5,6 +5,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -48,6 +49,11 @@ class DiagnosticEvidenceNavigatorTest {
         assertTrue(navigator.layers(run, "scenario-1").stream()
                 .anyMatch(layer -> layer.layer() == DiagnosticEvidenceNavigator.Layer.EVENTS && layer.present()));
         assertTrue(new DiagnosticEvidenceNavigator(project, project.resolve("missing")).catalogRuns().isEmpty());
+
+        List<DiagnosticEvidenceNavigator.ReplayBeat> beats = navigator.replay(run);
+        assertEquals(2, beats.size());
+        assertEquals("Given navigate to: URL.home", beats.getFirst().stepText());
+        assertEquals("Then stay", beats.get(1).stepText());
     }
 
     @Test

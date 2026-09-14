@@ -1,36 +1,96 @@
 html, body {
   margin: 0;
   height: 100%;
-  background: #f8fafc;
-  color: #111827;
+  background: #f4f6f8;
+  color: #1f2937;
   font: 13px/1.4 "Segoe UI", "SF Pro Text", sans-serif;
+}
+.layout {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  height: 100%;
+}
+.maps-pane {
+  border-right: 1px solid #d7dee7;
+  background: #fff;
+  overflow: auto;
+}
+.pane-title, .toolbar {
+  padding: 10px 12px;
+  font-weight: 700;
+  border-bottom: 1px solid #e5e7eb;
 }
 .toolbar {
   display: flex;
   gap: 10px;
   align-items: center;
-  padding: 10px 12px;
-  border-bottom: 1px solid #dbe2ea;
+  font-weight: 500;
   background: #fff;
 }
-select, input, textarea, button {
-  border: 1px solid #d7dee7;
+.map-list { padding: 8px; }
+.map-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  background: transparent;
+  padding: 8px 10px;
   border-radius: 8px;
-  padding: 5px 8px;
+  cursor: pointer;
+  color: inherit;
   font: inherit;
 }
-.status { color: #6b7280; }
-.tree { padding: 12px; }
-.row {
+.map-item:hover { background: #eef2f7; }
+.map-item.selected { background: #dbeafe; color: #1d4ed8; }
+.map-item.pending { font-style: italic; }
+.status { color: #6b7280; font-weight: 400; }
+.tree { padding: 12px 16px 24px; overflow: auto; }
+.node {
+  margin: 2px 0;
+}
+.node-row {
   display: grid;
-  grid-template-columns: minmax(120px, 1fr) 140px minmax(160px, 2fr);
-  gap: 8px;
-  margin-bottom: 8px;
-  align-items: start;
+  grid-template-columns: 18px minmax(90px, 1fr) 120px minmax(120px, 2fr) 28px;
+  gap: 6px;
+  align-items: center;
+}
+.node-row.root {
+  grid-template-columns: 18px 1fr;
+  font-weight: 700;
+  color: #1d4ed8;
+  padding: 4px 0 8px;
+}
+.toggle {
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  color: #6b7280;
+  font: 12px/1 monospace;
+}
+.children {
+  margin-left: 14px;
+  border-left: 1px solid #d7dee7;
+  padding-left: 10px;
+}
+input, textarea, select, button {
+  border: 1px solid #d7dee7;
+  border-radius: 8px;
+  padding: 4px 8px;
+  font: inherit;
 }
 textarea {
-  min-height: 34px;
+  min-height: 30px;
   font: 12px/1.4 ui-monospace, Consolas, monospace;
   width: 100%;
 }
+.remove {
+  border: 0;
+  background: transparent;
+  color: #b91c1c;
+  cursor: pointer;
+}
 .empty { color: #6b7280; padding: 18px; }
+body.locked .toolbar button,
+body.locked input,
+body.locked textarea,
+body.locked select { opacity: 0.65; }

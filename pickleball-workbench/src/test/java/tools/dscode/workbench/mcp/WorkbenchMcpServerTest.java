@@ -8,6 +8,7 @@ import org.junit.jupiter.api.io.TempDir;
 import tools.dscode.control.protocol.ControlBridgeCallResult;
 import tools.dscode.control.protocol.ControlBridgeError;
 import tools.dscode.control.protocol.ControlBridgeStatus;
+import tools.dscode.control.protocol.ControlBridgeStepResolution;
 import tools.dscode.control.protocol.ControlProtocol;
 import tools.dscode.workbench.WorkbenchServices;
 
@@ -57,6 +58,7 @@ class WorkbenchMcpServerTest {
             "workbench_player_replace_document",
             "workbench_request_save",
             "workbench_execute_step",
+            "workbench_step_resolve",
             "workbench_mapping_get",
             "workbench_mapping_put",
             "workbench_mapping_resolve",
@@ -247,6 +249,45 @@ class WorkbenchMcpServerTest {
         String text = ((McpSchema.TextContent) result.content().getFirst()).text();
         assertTrue(text.contains("paused interactive worker"));
         assertEquals(0, stops.get());
+    }
+
+    @Test
+    void stepResolveIsReadOnlyAndDoesNotExecute() throws Exception {
+        AtomicBoolean resolved = new AtomicBoolean();
+        AtomicBoolean executed = new AtomicBoolean();
+        WorkbenchServices services = fakeServices((method, args) -> {
+            if ("resolveStep".equals(method)) {
+                assertEquals("Given CONTROL API TEST STEP", args[0]);
+                resolved.set(true);
+                return new ControlBridgeStepResolution(
+                        ControlBridgeStepResolution.CONSUMER_GLUE,
+                        "^CONTROL API TEST STEP$",
+                        "com.example.pickleball.ControlApiSteps",
+                        "controlApiTestStep",
+                        "src/test/java/com/example/pickleball/ControlApiSteps.java",
+                        "com.example.pickleball.ControlApiSteps.controlApiTestStep()",
+                        ""
+                );
+            }
+            if ("executeStep".equals(method)) {
+                executed.set(true);
+                return null;
+            }
+            if ("close".equals(method)) return null;
+            return null;
+        });
+
+        WorkbenchMcpTools tools = new WorkbenchMcpTools(services, JSON);
+        var specification = tools.specifications().stream()
+                .filter(spec -> "workbench_step_resolve".equals(spec.tool().name()))
+                .findFirst()
+                .orElseThrow();
+        assertTrue(specification.tool().description().toLowerCase().contains("without executing"));
+
+        Object value = tools.call("workbench_step_resolve", Map.of("text", "Given CONTROL API TEST STEP"));
+        assertTrue(resolved.get());
+        assertFalse(executed.get());
+        assertTrue(JSON.writeValueAsString(value).contains("CONSUMER_GLUE"));
     }
 
     @Test

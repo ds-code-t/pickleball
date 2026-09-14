@@ -28,9 +28,8 @@ public final class JavaFxSupport {
     public static synchronized boolean ensureInitialized() {
         if (INITIALIZED.get()) return available;
         try {
-            if (System.getProperty("prism.order") == null) {
-                System.setProperty("prism.order", "sw");
-            }
+            // Do not default prism.order=sw. Software rendering makes JavaFX WebView
+            // stall on click/drag on Windows. Callers may still set prism.order.
             Platform.setImplicitExit(false);
             new JFXPanel();
             available = true;

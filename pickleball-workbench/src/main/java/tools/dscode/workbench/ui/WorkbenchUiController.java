@@ -283,6 +283,14 @@ final class WorkbenchUiController implements AutoCloseable {
         return services.commitSave();
     }
 
+    void loadDefaultDemo() {
+        services.loadDefaultDemo();
+    }
+
+    tools.dscode.control.protocol.ControlBridgeStepResolution resolveStep(String text, String argument) {
+        return services.resolveStep(text, argument == null ? "" : argument);
+    }
+
     void loadPickerScenario(
             java.util.List<String> lines,
             Path originFile,
@@ -291,6 +299,20 @@ final class WorkbenchUiController implements AutoCloseable {
             int endLine
     ) {
         services.loadPickerScenario(lines, originFile, scenarioName, startLine, endLine);
+    }
+
+    void loadPickerScenario(
+            java.util.List<String> lines,
+            Path originFile,
+            String scenarioName,
+            int startLine,
+            int endLine,
+            int exampleRow,
+            String exampleLabel
+    ) {
+        services.loadPickerScenario(
+                lines, originFile, scenarioName, startLine, endLine, exampleRow, exampleLabel
+        );
     }
 
     void addLeaseListener(java.util.function.Consumer<WorkbenchControlLeaseSnapshot> listener) {
@@ -613,7 +635,11 @@ final class WorkbenchUiController implements AutoCloseable {
     record PlayerStepResult(boolean successful, String output, String events) {
     }
 
-    record MappingCatalogEntry(String reference, String label, boolean restorable) {
+    record MappingCatalogEntry(String reference, String label, boolean restorable, boolean pending) {
+        MappingCatalogEntry(String reference, String label, boolean restorable) {
+            this(reference, label, restorable, false);
+        }
+
         @Override
         public String toString() {
             return label;

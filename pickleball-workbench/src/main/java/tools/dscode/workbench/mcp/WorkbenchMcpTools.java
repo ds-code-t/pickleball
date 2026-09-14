@@ -101,6 +101,12 @@ final class WorkbenchMcpTools {
                         "argument", stringProperty("Optional DocString-style argument text.")
                 ), "text"),
                 args -> services.executeStep(text(args, "text"), optionalText(args, "argument")));
+        add("workbench_step_resolve", "Resolve one Gherkin step to its Java step definition without executing it. Returns CONSUMER_GLUE, DYNAMIC, OVERRIDE, or UNMATCHED.",
+                schema(Map.of(
+                        "text", stringProperty("Gherkin step text, with or without Given/When/Then."),
+                        "argument", stringProperty("Optional DocString-style argument text.")
+                ), "text"),
+                args -> services.resolveStep(text(args, "text"), optionalText(args, "argument")));
 
         add("workbench_mapping_get", "Read one value from a Pickleball Mapping.",
                 schema(Map.of(

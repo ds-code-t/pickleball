@@ -3,14 +3,22 @@ package tools.dscode.workbench.ui;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import tools.dscode.control.protocol.ControlBridgeMappingSnapshot;
+import tools.dscode.control.protocol.PickleballVersion;
+import tools.dscode.control.protocol.ControlBridgeStepResolution;
+import tools.dscode.workbench.catalog.CatalogTargetResolver;
 import tools.dscode.workbench.catalog.ConsumerFeatureCatalog;
+import tools.dscode.workbench.catalog.JavaGlueIndex;
 import tools.dscode.workbench.diagnostics.DiagnosticEvidenceNavigator;
 import tools.dscode.workbench.lease.WorkbenchControlLeaseSnapshot;
 import tools.dscode.workbench.lease.WorkbenchPermissionRequest;
 import tools.dscode.workbench.mapping.MappingTreeModel;
 import tools.dscode.workbench.mapping.MappingValueCodec;
 import tools.dscode.workbench.mcp.WorkbenchAttachServer;
+import tools.dscode.workbench.player.EditorTabState;
+import tools.dscode.workbench.player.GherkinPlayPlan;
+import tools.dscode.workbench.player.GherkinReference;
 import tools.dscode.workbench.player.LiveEditorView;
+import tools.dscode.workbench.player.ScenarioOrigin;
 import tools.dscode.workbench.player.LivePlaybackCoordinator;
 import tools.dscode.workbench.player.LiveScenarioPlayer;
 import tools.dscode.workbench.player.WorkbenchSavePreview;
@@ -44,6 +52,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.ExecutionException;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
@@ -90,6 +99,9 @@ final class WorkbenchFrame extends JFrame {
             smallPlayerButton("▶ From Here", "Start a fresh scenario context and run from the selected step");
 
     private final JLabel projectLabel = new JLabel("Project: loading...");
+    private final JLabel versionLabel = new JLabel(
+            "Pickleball " + PickleballVersion.running(WorkbenchFrame.class)
+    );
     private final JLabel readinessLabel = new JLabel("Loading status...");
     private final JLabel playerStatusLabel = new JLabel("Stopped");
     private final JLabel activityLabel = new JLabel("Ready");
@@ -122,6 +134,11 @@ final class WorkbenchFrame extends JFrame {
     );
 
     private final JLabel webViewNote = WorkbenchTheme.muted("");
+    private WorkbenchUiSettings uiSettings = new WorkbenchUiSettings();
+    private JCheckBoxMenuItem blockLogMenuItem;
+    private JTabbedPane rightTabs;
+    private final JTextArea blockActionLog = new JTextArea();
+    private JComponent blockActionPanel;
 
     private WorkbenchUiController.State lastState;
     private ControlBridgeMappingSnapshot loadedMapping;
@@ -138,6 +155,16 @@ final class WorkbenchFrame extends JFrame {
     private String pendingIsolatedStep;
     private boolean syncingScenarioDocument;
     private boolean closing;
+    private final JTabbedPane editorTabs = new JTabbedPane();
+    private final JTextArea javaInspector = new JTextArea();
+    private final JButton openTargetButton = WorkbenchTheme.flatButton("Open target", "Open the component, scenario, service call, or data file referenced by the selected step");
+    private JavaGlueIndex glueIndex = new JavaGlueIndex(List.of());
+    private Path pinnedCallerFile;
+    private final List<EditorTabState> editorSessions = new ArrayList<>();
+    private boolean rebuildingTabs;
+    private int shownTabIndex;
+    private String lastPushedGherkin = "";
+    private Boolean lastPushedLock;
 
     WorkbenchFrame(WorkbenchUiController controller) {
         this(controller, null);
@@ -149,6 +176,8 @@ final class WorkbenchFrame extends JFrame {
         this.attach = attach;
         this.player = controller.player();
         this.playback = controller.playback();
+        editorSessions.add(new EditorTabState("Demo", null, player.documentText(), true));
+        uiSettings = WorkbenchUiSettings.load(controller.projectRoot());
 
         mappingSaveTimer.setRepeats(false);
         WorkbenchTheme.install();
@@ -159,7 +188,6 @@ final class WorkbenchFrame extends JFrame {
         setSize(1560, 920);
         setLocationByPlatform(true);
         setJMenuBar(menuBar());
-        configureWebViews();
 
         JPanel root = new JPanel(new BorderLayout(10, 10));
         root.setBackground(WorkbenchTheme.BACKGROUND);
@@ -175,9 +203,14 @@ final class WorkbenchFrame extends JFrame {
         editorAndRight.setResizeWeight(0.56);
         editorAndRight.setDividerLocation(820);
 
+        JSplitPane pickerAndGlue = new JSplitPane(JSplitPane.VERTICAL_SPLIT, picker, javaInspectorPanel());
+        WorkbenchTheme.styleSplit(pickerAndGlue);
+        pickerAndGlue.setResizeWeight(0.62);
+        pickerAndGlue.setDividerLocation(420);
+
         JSplitPane withPicker = new JSplitPane(
                 JSplitPane.HORIZONTAL_SPLIT,
-                picker,
+                pickerAndGlue,
                 editorAndRight
         );
         WorkbenchTheme.styleSplit(withPicker);
@@ -196,7 +229,6 @@ final class WorkbenchFrame extends JFrame {
         wireSessionActions();
         syncScenarioView();
         updatePlayerView(null);
-        refreshFeatureCatalog();
         terminal.start();
 
         configureAgentChrome();
@@ -234,6 +266,16 @@ final class WorkbenchFrame extends JFrame {
         session.add(restartItem);
         session.add(stopItem);
         bar.add(session);
+
+        JMenu view = new JMenu("View");
+        blockLogMenuItem = new JCheckBoxMenuItem("Block action log", uiSettings.showBlockActionLog);
+        blockLogMenuItem.addActionListener(event -> {
+            uiSettings.showBlockActionLog = blockLogMenuItem.isSelected();
+            uiSettings.save(controller.projectRoot());
+            applyBlockLogVisibility();
+        });
+        view.add(blockLogMenuItem);
+        bar.add(view);
 
         JMenu tools = new JMenu("Tools");
         JMenuItem advanced = new JMenuItem("Advanced Controls...");
@@ -307,6 +349,9 @@ final class WorkbenchFrame extends JFrame {
         pickerToggle.addActionListener(event -> togglePicker());
         project.add(pickerToggle);
         project.add(projectLabel);
+        versionLabel.setToolTipText("Pickleball version for this Workbench");
+        versionLabel.setForeground(WorkbenchTheme.TEXT);
+        project.add(versionLabel);
         project.add(readinessLabel);
         bar.add(project, BorderLayout.WEST);
 
@@ -339,9 +384,24 @@ final class WorkbenchFrame extends JFrame {
 
         JPanel header = new JPanel(new BorderLayout(8, 0));
         header.setOpaque(false);
-        header.add(WorkbenchTheme.heading("Live Scenario Editor"), BorderLayout.WEST);
+        header.add(WorkbenchTheme.heading("Gherkin editor"), BorderLayout.WEST);
         header.add(editorViewToggle(), BorderLayout.EAST);
-        panel.add(header, BorderLayout.NORTH);
+        editorTabs.setTabLayoutPolicy(JTabbedPane.SCROLL_TAB_LAYOUT);
+        editorTabs.addChangeListener(event -> {
+            if (rebuildingTabs) return;
+            int index = editorTabs.getSelectedIndex();
+            if (index < 0 || index == shownTabIndex) return;
+            if (shownTabIndex >= 0 && shownTabIndex < editorSessions.size()) {
+                editorSessions.get(shownTabIndex).setDocumentText(player.documentText());
+            }
+            showEditorTab(index);
+        });
+        rebuildTabStrip();
+        JPanel north = new JPanel(new BorderLayout(0, 4));
+        north.setOpaque(false);
+        north.add(header, BorderLayout.NORTH);
+        north.add(editorTabs, BorderLayout.SOUTH);
+        panel.add(north, BorderLayout.NORTH);
 
         scenarioEditor.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 14));
         scenarioEditor.setLineWrap(false);
@@ -356,9 +416,9 @@ final class WorkbenchFrame extends JFrame {
 
         JPanel legend = new JPanel(new FlowLayout(FlowLayout.LEFT, 18, 2));
         legend.setOpaque(false);
-        legend.add(WorkbenchTheme.muted("Same live buffer in Text or Blocks"));
-        legend.add(WorkbenchTheme.muted("Play starts from the first step"));
-        legend.add(WorkbenchTheme.muted("Click to move the playhead"));
+        legend.add(WorkbenchTheme.muted("Text and Blocks are the same Gherkin"));
+        legend.add(WorkbenchTheme.muted("Play uses Background + selected Examples row"));
+        legend.add(WorkbenchTheme.muted("Ctrl+click a RUN step to open its target"));
         panel.add(legend, BorderLayout.SOUTH);
         applyEditorView();
         return panel;
@@ -425,6 +485,7 @@ final class WorkbenchFrame extends JFrame {
         header.add(title);
         header.add(stepOnlyButton);
         header.add(fromHereButton);
+        header.add(openTargetButton);
         header.add(new JLabel("Enter = append/insert   Ctrl+Enter = update selected line"));
         panel.add(header, BorderLayout.NORTH);
 
@@ -434,14 +495,54 @@ final class WorkbenchFrame extends JFrame {
     }
 
     private JComponent rightWorkspace() {
-        JTabbedPane tabs = new JTabbedPane();
-        tabs.addTab("Mapping", mappingPanel());
-        tabs.addTab("Terminal", terminal);
-        tabs.addTab("Diagnostic Log Explorer", diagnosticsPanel());
-        tabs.addChangeListener(event -> {
-            if (tabs.getSelectedIndex() == 2) refreshDiagnostics();
+        rightTabs = new JTabbedPane();
+        rightTabs.addTab("Mapping", mappingPanel());
+        rightTabs.addTab("Terminal", terminal);
+        blockActionPanel = blockActionPanel();
+        rightTabs.addTab("Diagnostic Log Explorer", diagnosticsPanel());
+        rightTabs.addChangeListener(event -> {
+            if ("Diagnostic Log Explorer".equals(rightTabs.getTitleAt(rightTabs.getSelectedIndex()))) {
+                refreshDiagnostics();
+            }
         });
-        return tabs;
+        applyBlockLogVisibility();
+        return rightTabs;
+    }
+
+    private JComponent blockActionPanel() {
+        JPanel panel = new JPanel(new BorderLayout());
+        panel.setBackground(WorkbenchTheme.SURFACE);
+        blockActionLog.setEditable(false);
+        blockActionLog.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 12));
+        blockActionLog.setText("Block actions stay in this editor until a snap commits Gherkin.\n");
+        panel.add(new JScrollPane(blockActionLog), BorderLayout.CENTER);
+        return panel;
+    }
+
+    private void applyBlockLogVisibility() {
+        if (rightTabs == null || blockActionPanel == null) return;
+        int existing = rightTabs.indexOfComponent(blockActionPanel);
+        if (uiSettings.showBlockActionLog) {
+            if (existing < 0) {
+                int insert = Math.min(2, rightTabs.getTabCount());
+                rightTabs.insertTab("Block actions", null, blockActionPanel, "Cosmetic block editor events", insert);
+            }
+        } else if (existing >= 0) {
+            rightTabs.remove(existing);
+        }
+        if (blockLogMenuItem != null) {
+            blockLogMenuItem.setSelected(uiSettings.showBlockActionLog);
+        }
+    }
+
+    private void appendBlockAction(String json) {
+        if (blockActionLog == null) return;
+        String line = java.time.LocalTime.now().withNano(0) + "  " + json;
+        if (blockActionLog.getText().length() > 80_000) {
+            blockActionLog.setText(blockActionLog.getText().substring(40_000));
+        }
+        blockActionLog.append(line + "\n");
+        blockActionLog.setCaretPosition(blockActionLog.getDocument().getLength());
     }
 
     /**
@@ -523,16 +624,24 @@ final class WorkbenchFrame extends JFrame {
                 scenarioDocumentChanged();
             }
         });
-        scenarioEditor.addCaretListener(event -> seekPlayheadToCaret());
+        scenarioEditor.addCaretListener(event -> {
+            seekPlayheadToCaret();
+            resolveSelectedStep();
+        });
         scenarioEditor.addMouseListener(new MouseAdapter() {
             @Override
             public void mousePressed(MouseEvent event) {
                 seekPlayheadToCaret();
+                if (event.isControlDown() || event.isMetaDown()) {
+                    openSelectedTarget();
+                }
+                resolveSelectedStep();
             }
         });
     }
 
     private void configureStepEditor() {
+        openTargetButton.addActionListener(event -> openSelectedTarget());
         stepText.addActionListener(event -> insertStep());
         stepText.getInputMap(JComponent.WHEN_FOCUSED).put(
                 KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, KeyEvent.CTRL_DOWN_MASK),
@@ -546,7 +655,36 @@ final class WorkbenchFrame extends JFrame {
         });
     }
 
+    void installInteractiveViews() {
+        configureWebViews();
+        if (gherkinView != null && editorHost != null && gherkinView.getParent() == null) {
+            editorHost.add(gherkinView, "web");
+        }
+        if (mappingView != null && rightTabs != null) {
+            int mapping = rightTabs.indexOfTab("Mapping");
+            if (mapping >= 0) {
+                JPanel wrap = new JPanel(new BorderLayout());
+                wrap.add(mappingView, BorderLayout.CENTER);
+                wrap.add(mappingStatus, BorderLayout.SOUTH);
+                rightTabs.setComponentAt(mapping, wrap);
+            }
+        }
+        if (diagnosticView != null && rightTabs != null) {
+            int diagnostic = rightTabs.indexOfTab("Diagnostic Log Explorer");
+            if (diagnostic >= 0) {
+                JPanel wrap = new JPanel(new BorderLayout());
+                wrap.add(diagnosticView, BorderLayout.CENTER);
+                rightTabs.setComponentAt(diagnostic, wrap);
+            }
+        }
+        applyEditorView();
+        pushGherkinView();
+    }
+
     private void configureWebViews() {
+        if (gherkinView != null || mappingView != null || diagnosticView != null) {
+            return;
+        }
         if (!JavaFxSupport.available()) {
             editorView = LiveEditorView.blocksUnavailable();
             webViewNote.setText("JavaFX WebView unavailable: " + JavaFxSupport.failure()
@@ -560,11 +698,27 @@ final class WorkbenchFrame extends JFrame {
                 player.clickLine(id);
                 updateFromHereAvailability();
                 refreshPlayheadHighlight();
+                resolveSelectedStep();
+            });
+            gherkinHost.onSelectionText(text -> {
+                if (humanControlsLocked()) return;
+                String needle = text == null ? "" : text.strip();
+                if (needle.isBlank()) return;
+                for (LiveScenarioPlayer.Line line : player.lines()) {
+                    if (line.text().strip().equals(needle) || line.text().contains(needle)) {
+                        player.clickLine(line.id());
+                        updateFromHereAvailability();
+                        refreshPlayheadHighlight();
+                        resolveSelectedStep();
+                        return;
+                    }
+                }
             });
             gherkinHost.onAddStep(this::insertStep);
+            gherkinHost.onBlockAction(this::appendBlockAction);
             gherkinHost.onReady(this::pushGherkinView);
             gherkinView = new WebViewPanel(
-                    "/tools/dscode/workbench/ui/web/gherkin-editor.html",
+                    "/tools/dscode/workbench/ui/web/snap-editor/embed.html",
                     "gherkinHost",
                     gherkinHost
             );
@@ -606,16 +760,32 @@ final class WorkbenchFrame extends JFrame {
 
     private void configurePicker() {
         picker.onScenarioSelected(scenario -> {
+            flushActiveEditorTab();
+            List<String> fileLines = readFeatureFile(scenario.file(), scenario.lines());
             controller.loadPickerScenario(
-                    scenario.lines(),
+                    fileLines,
                     scenario.file(),
                     scenario.name(),
                     scenario.startLine(),
-                    scenario.endLine()
+                    scenario.endLine(),
+                    scenario.exampleRow(),
+                    scenario.exampleLabel()
             );
             picker.setSaveEnabled(true);
+            openEditorTab(
+                    scenario.file(),
+                    scenario.displayLabel(),
+                    scenario.name(),
+                    scenario.startLine(),
+                    scenario.endLine(),
+                    scenario.exampleRow(),
+                    scenario.exampleLabel(),
+                    player.documentText(),
+                    true
+            );
             syncScenarioView();
-            updatePlayerView("Loaded " + scenario.displayLabel() + " into the live session buffer.");
+            updatePlayerView("Loaded " + scenario.displayLabel() + ".");
+            resolveSelectedStep();
         });
         picker.onSave(this::saveLoadedFeature);
     }
@@ -629,6 +799,7 @@ final class WorkbenchFrame extends JFrame {
         }
         picker.setCatalog(ConsumerFeatureCatalog.scan(controller.projectRoot(), manifest));
         diagnosticNavigator = new DiagnosticEvidenceNavigator(controller.projectRoot());
+        glueIndex = JavaGlueIndex.scan(controller.projectRoot());
     }
 
     private void togglePicker() {
@@ -646,6 +817,13 @@ final class WorkbenchFrame extends JFrame {
     private void applyEditorLines(List<String> lines) {
         if (syncingScenarioDocument || humanControlsLocked()) return;
         player.replaceDocument(lines);
+        playback.rebuildPlan();
+        EditorTabState tab = activeEditorTab();
+        if (tab != null) {
+            boolean wasDirty = tab.dirty();
+            tab.setDocumentText(player.documentText());
+            if (tab.dirty() != wasDirty) rebuildTabStrip();
+        }
         updateFromHereAvailability();
         if (player.state() == LiveScenarioPlayer.State.RUNNING) {
             if (lastState == null || !lastState.liveReady()) {
@@ -658,11 +836,17 @@ final class WorkbenchFrame extends JFrame {
 
     private void pushGherkinView() {
         if (gherkinView == null) return;
-        gherkinView.evalJsonCall("window.setEditorState", WorkbenchWebJson.editorState(
-                player,
-                executingStepId,
-                humanControlsLocked()
-        ));
+        String text = player.documentText();
+        boolean locked = humanControlsLocked();
+        if (text.equals(lastPushedGherkin) && Boolean.valueOf(locked).equals(lastPushedLock)) {
+            return;
+        }
+        lastPushedGherkin = text;
+        lastPushedLock = locked;
+        gherkinView.evalJsonCall(
+                "window.setWorkbenchGherkin",
+                WorkbenchWebJson.write(Map.of("text", text, "locked", locked))
+        );
     }
 
     private void pushMappingView() {
@@ -674,10 +858,10 @@ final class WorkbenchFrame extends JFrame {
                 WorkbenchWebJson.mappingState(
                         mappingEntries.stream()
                                 .map(entry -> new WorkbenchWebJson.MapChoice(
-                                        entry.reference(), entry.label(), entry.restorable()))
+                                        entry.reference(), entry.label(), entry.restorable(), entry.pending()))
                                 .toList(),
                         selected == null ? null : new WorkbenchWebJson.MapChoice(
-                                selected.reference(), selected.label(), selected.restorable()),
+                                selected.reference(), selected.label(), selected.restorable(), selected.pending()),
                         mappingModel,
                         mappingStatus.getText(),
                         humanControlsLocked()
@@ -689,6 +873,20 @@ final class WorkbenchFrame extends JFrame {
         if (humanControlsLocked()) return;
         if (lastState == null || !lastState.liveReady() || loadedMapping == null) return;
         try {
+            if (edit.key() == null || edit.key().isBlank()) {
+                if (mappingModel == null || edit.oldKey() == null || edit.oldKey().isBlank()) return;
+                MappingTreeModel updated = mappingModel.remove(edit.oldKey());
+                runTask(
+                        () -> controller.restoreMapping(loadedMapping, updated.values()),
+                        output -> {
+                            mappingModel = updated;
+                            mappingStatus.setText("Removed " + edit.oldKey() + ".");
+                            pushMappingView();
+                        },
+                        failure -> showFailure("Mapping remove failed", failure)
+                );
+                return;
+            }
             if (edit.oldKey() == null || edit.oldKey().isBlank() || edit.oldKey().equals(edit.key())) {
                 runTask(
                         () -> controller.mappingPutTyped(edit.mapReference(), edit.key(), edit.type(), edit.text()),
@@ -785,21 +983,28 @@ final class WorkbenchFrame extends JFrame {
                 .findFirst()
                 .orElse(null);
         if (selected == null) return;
-        DiagnosticEvidenceNavigator.Timeline timeline = diagnosticNavigator.timeline(selected.runRoot());
-        List<Map<String, Object>> frames = new ArrayList<>();
-        for (DiagnosticEvidenceNavigator.ScreenshotFrame frame : timeline.frames()) {
+        List<Map<String, Object>> beats = new ArrayList<>();
+        for (DiagnosticEvidenceNavigator.ReplayBeat beat : diagnosticNavigator.replay(selected.runRoot())) {
             Map<String, Object> item = new LinkedHashMap<>();
-            item.put("stepText", frame.stepText());
-            item.put("scenarioId", frame.scenarioId());
-            try {
-                byte[] bytes = Files.readAllBytes(frame.file());
-                item.put("dataUri", "data:image/png;base64," + Base64.getEncoder().encodeToString(bytes));
-            } catch (Exception ignored) {
-                continue;
+            item.put("type", beat.type());
+            item.put("stepText", beat.stepText());
+            item.put("text", beat.text());
+            item.put("timestamp", beat.timestamp());
+            item.put("status", beat.status());
+            item.put("level", beat.level());
+            item.put("scenarioId", beat.scenarioId());
+            item.put("logLines", beat.logLines());
+            if (beat.screenshot() != null && Files.isRegularFile(beat.screenshot())) {
+                try {
+                    byte[] bytes = Files.readAllBytes(beat.screenshot());
+                    item.put("dataUri", "data:image/png;base64," + Base64.getEncoder().encodeToString(bytes));
+                } catch (Exception ignored) {
+                    // Screenshot bytes are optional; the step/log still replay.
+                }
             }
-            frames.add(item);
+            beats.add(item);
         }
-        String scenarioId = timeline.frames().isEmpty() ? "" : timeline.frames().getFirst().scenarioId();
+        String scenarioId = beats.isEmpty() ? "" : String.valueOf(beats.getFirst().get("scenarioId"));
         List<Map<String, Object>> layers = new ArrayList<>();
         for (var layer : diagnosticNavigator.layers(selected.runRoot(), scenarioId)) {
             layers.add(Map.of(
@@ -818,10 +1023,12 @@ final class WorkbenchFrame extends JFrame {
         }
         diagnosticView.evalJsonCall("window.setDiagnosticState", WorkbenchWebJson.write(Map.of(
                 "runs", runs,
-                "frames", frames,
-                "layers", layers,
+                "beats", beats,
+                "frames", beats,
                 "index", 0,
-                "gap", frames.isEmpty() ? "This retained run has no PNG frames." : ""
+                "gap", beats.isEmpty()
+                        ? "This retained run has no events.jsonl steps or PNG frames."
+                        : ""
         )));
     }
 
@@ -994,28 +1201,28 @@ final class WorkbenchFrame extends JFrame {
             return;
         }
 
-        LiveScenarioPlayer.Line step = player.nextStep().orElse(null);
-        if (step == null) {
+        GherkinPlayPlan.Step planned = playback.nextPlanStep().orElse(null);
+        if (planned == null) {
             updatePlayerView("Scenario is waiting for another step.");
             return;
         }
 
         playbackBusy = true;
-        executingStepId = step.id();
-        updatePlayerView("Executing: " + step.text());
+        executingStepId = planned.sourceLineId();
+        updatePlayerView("Executing: " + planned.executeText());
         runTask(
-                () -> controller.executePlayerStep(step.text()),
+                () -> controller.executePlayerStep(planned.executeText()),
                 result -> {
                     playbackBusy = false;
                     executingStepId = null;
-                    appendTerminal(step.text(), result.output(), result.events());
+                    appendTerminal(planned.executeText(), result.output(), result.events());
 
                     // executeStep already advanced or paused the playhead while RUNNING.
                     // Do not remake that mark here; a leftover mark of the captured id
                     // used to abort automatic playback after the first successful step.
                     if (!result.successful()) {
-                        player.clickLine(step.id());
-                        showLine(step.id());
+                        player.clickLine(planned.sourceLineId());
+                        showLine(planned.sourceLineId());
                     }
                     syncScenarioView();
                     updatePlayerView(
@@ -1034,10 +1241,10 @@ final class WorkbenchFrame extends JFrame {
                 failure -> {
                     playbackBusy = false;
                     executingStepId = null;
-                    player.markCurrentStepFailed(step.id());
-                    player.clickLine(step.id());
+                    player.markCurrentStepFailed(planned.sourceLineId());
+                    player.clickLine(planned.sourceLineId());
                     syncScenarioView();
-                    showLine(step.id());
+                    showLine(planned.sourceLineId());
                     updatePlayerView("Step execution failed. Scenario playback paused.");
                     showFailure("Could not execute live step", failure);
                     if (!runPendingFreshRun()) runPendingIsolatedStep();
@@ -1176,15 +1383,15 @@ final class WorkbenchFrame extends JFrame {
                 controller::mappingCatalog,
                 entries -> {
                     refreshingCatalog = false;
+                    mappingEntries = mergePendingStepMaps(entries);
                     nodeMapSelector.removeAllItems();
                     WorkbenchUiController.MappingCatalogEntry selected = null;
-                    for (WorkbenchUiController.MappingCatalogEntry entry : entries) {
+                    for (WorkbenchUiController.MappingCatalogEntry entry : mappingEntries) {
                         nodeMapSelector.addItem(entry);
                         if (Objects.equals(previousReference, entry.reference())) selected = entry;
                     }
-                    mappingEntries = List.copyOf(entries);
-                    nodeMapSelector.setEnabled(!entries.isEmpty());
-                    if (selected == null && !entries.isEmpty()) selected = entries.getFirst();
+                    nodeMapSelector.setEnabled(!mappingEntries.isEmpty());
+                    if (selected == null && !mappingEntries.isEmpty()) selected = mappingEntries.getFirst();
                     if (selected != null) {
                         nodeMapSelector.setSelectedItem(selected);
                         loadMapping(selected);
@@ -1203,6 +1410,30 @@ final class WorkbenchFrame extends JFrame {
                     schedulePlaybackStep();
                 }
         );
+    }
+
+    private List<WorkbenchUiController.MappingCatalogEntry> mergePendingStepMaps(
+            List<WorkbenchUiController.MappingCatalogEntry> live
+    ) {
+        List<WorkbenchUiController.MappingCatalogEntry> merged = new ArrayList<>(live == null ? List.of() : live);
+        java.util.LinkedHashSet<String> seen = new java.util.LinkedHashSet<>();
+        for (WorkbenchUiController.MappingCatalogEntry entry : merged) {
+            seen.add(entry.reference());
+        }
+        for (GherkinPlayPlan.Step step : playback.playPlan().steps()) {
+            String text = step.executeText();
+            if (text == null || text.isBlank()) continue;
+            String reference = tools.dscode.control.protocol.ControlProtocol.stepSeedReference(text);
+            if (!seen.add(reference)) continue;
+            String label = "STEP_MAP · " + abbreviateStep(text);
+            merged.add(new WorkbenchUiController.MappingCatalogEntry(reference, label, true, true));
+        }
+        return List.copyOf(merged);
+    }
+
+    private static String abbreviateStep(String text) {
+        String trimmed = text == null ? "" : text.strip();
+        return trimmed.length() <= 48 ? trimmed : trimmed.substring(0, 45) + "...";
     }
 
     private void loadMapping(WorkbenchUiController.MappingCatalogEntry entry) {
@@ -1297,6 +1528,13 @@ final class WorkbenchFrame extends JFrame {
     private void scenarioDocumentChanged() {
         if (syncingScenarioDocument || humanControlsLocked()) return;
         player.replaceDocument(List.of(scenarioEditor.getText().split("\n", -1)));
+        playback.rebuildPlan();
+        EditorTabState tab = activeEditorTab();
+        if (tab != null) {
+            boolean wasDirty = tab.dirty();
+            tab.setDocumentText(player.documentText());
+            if (tab.dirty() != wasDirty) rebuildTabStrip();
+        }
         seekPlayheadToCaret();
         updateFromHereAvailability();
         refreshPlayheadHighlight();
@@ -1548,6 +1786,358 @@ final class WorkbenchFrame extends JFrame {
                 }
             }
         }.execute();
+    }
+
+    private JComponent javaInspectorPanel() {
+        JPanel panel = new JPanel(new BorderLayout(0, 4));
+        panel.setBackground(WorkbenchTheme.SURFACE);
+        panel.setBorder(WorkbenchTheme.cardBorder());
+        panel.add(WorkbenchTheme.heading("Step definition"), BorderLayout.NORTH);
+        javaInspector.setEditable(false);
+        javaInspector.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 12));
+        javaInspector.setLineWrap(false);
+        javaInspector.setText("Select a Gherkin step to show its Java glue or Pickleball dynamic match.");
+        panel.add(new JScrollPane(javaInspector), BorderLayout.CENTER);
+        return panel;
+    }
+
+    private List<String> readFeatureFile(Path file, List<String> fallback) {
+        if (file != null && Files.isRegularFile(file)) {
+            try {
+                return Files.readAllLines(file);
+            } catch (java.io.IOException ignored) {
+                // Fall back to the catalog excerpt.
+            }
+        }
+        return fallback == null ? List.of() : fallback;
+    }
+
+    private EditorTabState activeEditorTab() {
+        int index = editorTabs.getSelectedIndex();
+        if (index < 0 || index >= editorSessions.size()) {
+            return editorSessions.isEmpty() ? null : editorSessions.getFirst();
+        }
+        return editorSessions.get(index);
+    }
+
+    private void flushActiveEditorTab() {
+        EditorTabState tab = activeEditorTab();
+        if (tab == null) return;
+        tab.setDocumentText(player.documentText());
+        ScenarioOrigin origin = playback.origin();
+        tab.setOrigin(
+                origin.file(),
+                origin.scenarioName(),
+                origin.startLine(),
+                origin.endLine(),
+                origin.exampleRow(),
+                origin.exampleLabel()
+        );
+    }
+
+    private void openEditorTab(
+            Path file,
+            String title,
+            String scenarioName,
+            int startLine,
+            int endLine,
+            int exampleRow,
+            String exampleLabel,
+            String documentText,
+            boolean pinIfFirst
+    ) {
+        for (int i = 0; i < editorSessions.size(); i++) {
+            EditorTabState existing = editorSessions.get(i);
+            if (existing.sameTarget(file, scenarioName, exampleRow)) {
+                if (!existing.dirty()) {
+                    existing.setDocumentText(documentText);
+                    existing.markClean();
+                }
+                showEditorTab(i);
+                return;
+            }
+        }
+        EditorTabState tab = new EditorTabState(title, file, documentText, false);
+        tab.setOrigin(file, scenarioName, startLine, endLine, exampleRow, exampleLabel);
+        tab.markClean();
+        if (pinIfFirst && pinnedCallerFile == null && file != null) {
+            for (EditorTabState open : editorSessions) open.setPinned(false);
+            pinnedCallerFile = file;
+            tab.setPinned(true);
+        }
+        editorSessions.add(tab);
+        rebuildTabStrip();
+        showEditorTab(editorSessions.size() - 1);
+    }
+
+    private void showEditorTab(int index) {
+        if (index < 0 || index >= editorSessions.size()) return;
+        EditorTabState tab = editorSessions.get(index);
+        controller.loadPickerScenario(
+                tab.lines(),
+                tab.file(),
+                tab.scenarioName(),
+                tab.startLine(),
+                tab.endLine(),
+                tab.exampleRow(),
+                tab.exampleLabel()
+        );
+        shownTabIndex = index;
+        if (editorTabs.getSelectedIndex() != index) {
+            rebuildingTabs = true;
+            try {
+                editorTabs.setSelectedIndex(index);
+            } finally {
+                rebuildingTabs = false;
+            }
+        }
+        picker.setSaveEnabled(tab.file() != null);
+        syncScenarioView();
+    }
+
+    private void closeEditorTab(int index) {
+        if (index < 0 || index >= editorSessions.size()) return;
+        EditorTabState tab = editorSessions.get(index);
+        if (tab.pinned() && editorSessions.size() > 1) {
+            updatePlayerView("The original caller tab stays open so you can return to it.");
+            return;
+        }
+        int next = Math.max(0, index - 1);
+        editorSessions.remove(index);
+        if (editorSessions.isEmpty()) {
+            EditorTabState demo = new EditorTabState("Demo", null, String.join("\n", LiveScenarioPlayer.DEFAULT_DEMO_SCENARIO), true);
+            editorSessions.add(demo);
+            controller.loadDefaultDemo();
+            next = 0;
+        }
+        rebuildTabStrip();
+        showEditorTab(Math.min(next, editorSessions.size() - 1));
+    }
+
+    private void moveEditorTab(int from, int to) {
+        if (from == to || from < 0 || to < 0 || from >= editorSessions.size() || to >= editorSessions.size()) {
+            return;
+        }
+        EditorTabState tab = editorSessions.remove(from);
+        editorSessions.add(to, tab);
+        rebuildTabStrip();
+        showEditorTab(to);
+    }
+
+    private void rebuildTabStrip() {
+        rebuildingTabs = true;
+        int selected = editorTabs.getSelectedIndex();
+        editorTabs.removeAll();
+        for (int i = 0; i < editorSessions.size(); i++) {
+            EditorTabState tab = editorSessions.get(i);
+            editorTabs.addTab(tab.tabTitle(), null);
+            editorTabs.setTabComponentAt(i, tabHeader(tab, i));
+        }
+        if (!editorSessions.isEmpty()) {
+            editorTabs.setSelectedIndex(Math.max(0, Math.min(selected, editorSessions.size() - 1)));
+        }
+        rebuildingTabs = false;
+    }
+
+    private JComponent tabHeader(EditorTabState tab, int index) {
+        JPanel header = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 0));
+        header.setOpaque(false);
+        JLabel title = new JLabel(tab.tabTitle());
+        title.setToolTipText(tab.file() == null ? "Session buffer" : tab.file().toString());
+        header.add(title);
+        JButton close = new JButton("×");
+        close.setMargin(new Insets(0, 4, 0, 4));
+        close.setBorder(BorderFactory.createEmptyBorder());
+        close.setContentAreaFilled(false);
+        close.setFocusable(false);
+        close.setToolTipText(tab.pinned() ? "Keep the original caller tab" : "Close tab");
+        close.setEnabled(!tab.pinned() || editorSessions.size() == 1);
+        close.addActionListener(event -> closeEditorTab(index));
+        header.add(close);
+        header.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mousePressed(MouseEvent event) {
+                editorTabs.setSelectedIndex(index);
+            }
+        });
+        header.addMouseMotionListener(new MouseAdapter() {
+            @Override
+            public void mouseDragged(MouseEvent event) {
+                Point onStrip = SwingUtilities.convertPoint(header, event.getPoint(), editorTabs);
+                int target = editorTabs.indexAtLocation(onStrip.x, onStrip.y);
+                if (target >= 0 && target != index) moveEditorTab(index, target);
+            }
+        });
+        return header;
+    }
+
+    private void resolveSelectedStep() {
+        LiveScenarioPlayer.Line selected = player.selectedLine().orElse(player.playheadLine().orElse(null));
+        if (selected == null) {
+            javaInspector.setText("Select a Gherkin step to show its Java glue or Pickleball dynamic match.");
+            return;
+        }
+        String text = selected.text();
+        JavaGlueIndex.Match glue = glueIndex.find(text).orElse(null);
+        if (glue != null) {
+            javaInspector.setText(
+                    "CONSUMER_GLUE\n"
+                            + glue.className() + "#" + glue.methodName() + "\n"
+                            + glue.file() + "\n\n"
+                            + glue.snippet()
+            );
+            return;
+        }
+        List<GherkinReference> refs = GherkinReference.parse(text, linesAfter(selected));
+        if (!refs.isEmpty()) {
+            StringBuilder out = new StringBuilder("REFERENCE\n");
+            for (GherkinReference ref : refs) {
+                out.append(ref.kind()).append("  ").append(ref.selector());
+                if (!ref.invocationValues().isEmpty()) {
+                    out.append("  ").append(ref.invocationValues());
+                }
+                out.append('\n');
+            }
+            out.append("\nCtrl+click or Open target to navigate. Dynamic Pickleball steps have no project method.");
+            javaInspector.setText(out.toString());
+            return;
+        }
+        javaInspector.setText(
+                "UNMATCHED or DYNAMIC\n"
+                        + text.strip()
+                        + "\n\nNo consumer @Given/@When/@Then matched this line. "
+                        + "Pickleball dynamic steps are interpreted by the worker, not a project method."
+        );
+        if (lastState != null && lastState.liveReady()) {
+            String requested = text;
+            runTask(
+                    () -> controller.resolveStep(requested, ""),
+                    resolution -> {
+                        if (!requested.equals(player.selectedLine().orElse(player.playheadLine().orElse(null)) == null
+                                ? ""
+                                : player.selectedLine().orElse(player.playheadLine().orElseThrow()).text())) {
+                            return;
+                        }
+                        showResolution(resolution, requested);
+                    },
+                    failure -> {
+                        // Keep the catalog/index text; worker resolve is optional.
+                    }
+            );
+        }
+    }
+
+    private void showResolution(ControlBridgeStepResolution resolution, String stepText) {
+        if (resolution == null) return;
+        StringBuilder out = new StringBuilder();
+        out.append(resolution.kind().isBlank() ? "UNMATCHED" : resolution.kind()).append('\n');
+        if (!resolution.className().isBlank()) {
+            out.append(resolution.className());
+            if (!resolution.methodName().isBlank()) out.append('#').append(resolution.methodName());
+            out.append('\n');
+        }
+        if (!resolution.sourcePath().isBlank()) out.append(resolution.sourcePath()).append('\n');
+        if (!resolution.pattern().isBlank()) out.append(resolution.pattern()).append('\n');
+        out.append('\n');
+        if (!resolution.snippet().isBlank()) {
+            out.append(resolution.snippet());
+        } else if (!resolution.detail().isBlank()) {
+            out.append(resolution.detail());
+        } else {
+            out.append(stepText.strip());
+        }
+        javaInspector.setText(out.toString());
+        if (!resolution.sourcePath().isBlank()) {
+            Path source = Path.of(resolution.sourcePath());
+            if (Files.isRegularFile(source)) {
+                try {
+                    javaInspector.setText(out + "\n\n" + Files.readString(source));
+                } catch (java.io.IOException ignored) {
+                    // Snippet is enough when the file cannot be read.
+                }
+            }
+        }
+    }
+
+    private List<String> linesAfter(LiveScenarioPlayer.Line selected) {
+        List<LiveScenarioPlayer.Line> lines = player.lines();
+        int index = -1;
+        for (int i = 0; i < lines.size(); i++) {
+            if (lines.get(i).id() == selected.id()) {
+                index = i;
+                break;
+            }
+        }
+        if (index < 0) return List.of();
+        List<String> following = new ArrayList<>();
+        for (int i = index + 1; i < lines.size(); i++) {
+            following.add(lines.get(i).text());
+        }
+        return following;
+    }
+
+    private void openSelectedTarget() {
+        if (humanControlsLocked()) return;
+        LiveScenarioPlayer.Line selected = player.selectedLine().orElse(player.playheadLine().orElse(null));
+        if (selected == null) return;
+        List<GherkinReference> refs = GherkinReference.parse(selected.text(), linesAfter(selected));
+        if (refs.isEmpty()) {
+            updatePlayerView("Selected line has no component, scenario, service-call, or data-file target.");
+            return;
+        }
+        GherkinReference ref = refs.getFirst();
+        Optional<CatalogTargetResolver.Target> target = CatalogTargetResolver.resolve(
+                controller.projectRoot(),
+                picker.catalog(),
+                ref
+        );
+        if (target.isEmpty()) {
+            updatePlayerView("Could not resolve " + ref.kind() + " " + ref.selector() + ".");
+            return;
+        }
+        CatalogTargetResolver.Target found = target.get();
+        flushActiveEditorTab();
+        if (found.scenario() != null) {
+            List<String> fileLines = readFeatureFile(found.file(), found.scenario().lines());
+            controller.loadPickerScenario(
+                    fileLines,
+                    found.file(),
+                    found.scenario().name(),
+                    found.scenario().startLine(),
+                    found.scenario().endLine(),
+                    found.scenario().exampleRow(),
+                    found.scenario().exampleLabel()
+            );
+            openEditorTab(
+                    found.file(),
+                    found.scenario().displayLabel(),
+                    found.scenario().name(),
+                    found.scenario().startLine(),
+                    found.scenario().endLine(),
+                    found.scenario().exampleRow(),
+                    found.scenario().exampleLabel(),
+                    player.documentText(),
+                    true
+            );
+        } else {
+            List<String> fileLines = readFeatureFile(found.file(), List.of());
+            controller.loadPickerScenario(fileLines, found.file(), found.file().getFileName().toString(), 1, fileLines.size());
+            openEditorTab(
+                    found.file(),
+                    found.file().getFileName().toString(),
+                    found.file().getFileName().toString(),
+                    1,
+                    fileLines.size(),
+                    0,
+                    "",
+                    player.documentText(),
+                    true
+            );
+        }
+        picker.setSaveEnabled(true);
+        syncScenarioView();
+        updatePlayerView("Opened " + found.detail() + ".");
+        resolveSelectedStep();
     }
 
     private void showFailure(String label, Throwable failure) {

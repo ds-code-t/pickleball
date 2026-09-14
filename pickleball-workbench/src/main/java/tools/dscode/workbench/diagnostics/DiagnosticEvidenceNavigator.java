@@ -40,6 +40,29 @@ public final class DiagnosticEvidenceNavigator {
             String scenarioId
     ) { }
 
+    public record ReplayBeat(
+            String type,
+            String stepText,
+            String timestamp,
+            String level,
+            String text,
+            String status,
+            Path screenshot,
+            String scenarioId,
+            List<String> logLines
+    ) {
+        public ReplayBeat {
+            type = type == null ? "" : type;
+            stepText = stepText == null ? "" : stepText;
+            timestamp = timestamp == null ? "" : timestamp;
+            level = level == null ? "" : level;
+            text = text == null ? "" : text;
+            status = status == null ? "" : status;
+            scenarioId = scenarioId == null ? "" : scenarioId;
+            logLines = List.copyOf(logLines == null ? List.of() : logLines);
+        }
+    }
+
     public record Timeline(
             Path runRoot,
             JsonNode runIndex,
@@ -157,6 +180,104 @@ public final class DiagnosticEvidenceNavigator {
             throw new IllegalArgumentException(label + " is outside the diagnostic store.");
         }
         return resolved;
+    }
+
+    public List<ReplayBeat> replay(Path runRoot) {
+        Path root = runRoot.toAbsolutePath().normalize();
+        Path scenarios = root.resolve("scenarios");
+        List<ReplayBeat> beats = new ArrayList<>();
+        if (!Files.isDirectory(scenarios)) return List.of();
+        try (var directories = Files.list(scenarios)) {
+            directories.filter(Files::isDirectory).sorted().forEach(scenarioDir ->
+                    beats.addAll(replayScenario(scenarioDir)));
+        } catch (IOException ignored) {
+            return List.copyOf(beats);
+        }
+        return List.copyOf(beats);
+    }
+
+    private List<ReplayBeat> replayScenario(Path scenarioDir) {
+        String scenarioId = scenarioDir.getFileName().toString();
+        Path events = scenarioDir.resolve("events.jsonl");
+        List<Path> pngs = screenshotFiles(scenarioDir.resolve("screenshots"));
+        int pngIndex = 0;
+        List<ReplayBeat> beats = new ArrayList<>();
+        String currentStep = "";
+        String currentStatus = "";
+        String currentTime = "";
+        List<String> logs = new ArrayList<>();
+        Path currentShot = null;
+        if (Files.isRegularFile(events)) {
+            try {
+                for (String line : Files.readAllLines(events)) {
+                    if (line.isBlank()) continue;
+                    JsonNode node = JSON.readTree(line);
+                    String type = text(node, "type");
+                    boolean stepEvent = "step".equals(type)
+                            || (type.isBlank() && !text(node, "stepText", "text", "step", "gherkin").isBlank());
+                    if (stepEvent) {
+                        if (!currentStep.isBlank() || !logs.isEmpty()) {
+                            beats.add(beat("step", currentStep, currentTime, "", currentStep, currentStatus,
+                                    currentShot, scenarioId, logs));
+                        }
+                        currentStep = text(node, "text", "stepText", "step", "gherkin");
+                        currentStatus = text(node, "status");
+                        currentTime = text(node, "timestamp");
+                        logs = new ArrayList<>();
+                        currentShot = null;
+                    } else if ("screenshot".equals(type)) {
+                        Path shot = pngIndex < pngs.size() ? pngs.get(pngIndex++) : null;
+                        currentShot = shot == null ? currentShot : shot;
+                    } else if ("log".equals(type)) {
+                        String message = text(node, "text", "message");
+                        String level = text(node, "level");
+                        if (!message.isBlank()) {
+                            logs.add((level.isBlank() ? "INFO" : level) + "  " + message);
+                        }
+                    }
+                }
+            } catch (IOException ignored) {
+                // Gap in retained events is shown as an empty replay, not invented steps.
+            }
+        }
+        if (!currentStep.isBlank() || !logs.isEmpty()) {
+            beats.add(beat("step", currentStep, currentTime, "", currentStep, currentStatus,
+                    currentShot, scenarioId, logs));
+        }
+        if (beats.isEmpty()) {
+            for (ScreenshotFrame frame : framesForScenario(scenarioDir)) {
+                beats.add(beat("step", frame.stepText(), frame.capturedAt(), "", frame.stepText(), "",
+                        frame.file(), scenarioId, List.of()));
+            }
+        }
+        return beats;
+    }
+
+    private static ReplayBeat beat(
+            String type,
+            String stepText,
+            String timestamp,
+            String level,
+            String text,
+            String status,
+            Path screenshot,
+            String scenarioId,
+            List<String> logs
+    ) {
+        return new ReplayBeat(type, stepText, timestamp, level, text, status, screenshot, scenarioId, logs);
+    }
+
+    private static List<Path> screenshotFiles(Path directory) {
+        if (!Files.isDirectory(directory)) return List.of();
+        List<Path> pngs = new ArrayList<>();
+        try (var files = Files.list(directory)) {
+            files.filter(path -> path.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".png"))
+                    .sorted()
+                    .forEach(pngs::add);
+        } catch (IOException ignored) {
+            return List.of();
+        }
+        return pngs;
     }
 
     public Timeline timeline(Path runRoot) {

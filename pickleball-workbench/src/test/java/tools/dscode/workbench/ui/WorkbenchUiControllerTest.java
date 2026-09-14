@@ -14,6 +14,7 @@ import tools.dscode.control.protocol.ControlBridgeServiceCallResult;
 import tools.dscode.control.protocol.ControlBridgeStatus;
 import tools.dscode.control.protocol.ControlBridgeStepOverride;
 import tools.dscode.control.protocol.ControlBridgeStepOverrideResult;
+import tools.dscode.control.protocol.ControlBridgeStepResolution;
 import tools.dscode.control.protocol.ControlBridgeValue;
 import tools.dscode.control.protocol.ControlBridgeValueResult;
 import tools.dscode.control.protocol.ControlProtocol;
@@ -404,6 +405,13 @@ class WorkbenchUiControllerTest {
                             calls.add("executeStep:" + args[0] + ":" + args[1]);
                             yield new ControlBridgeCallResult(
                                     "SUCCESS", "STRING", "executed", null, runtime()
+                            );
+                        }
+                        case "resolveStep" -> {
+                            calls.add("resolveStep:" + args[0] + ":" + args[1]);
+                            yield new ControlBridgeStepResolution(
+                                    ControlBridgeStepResolution.UNMATCHED,
+                                    "", "", "", "", "", "not resolved in test"
                             );
                         }
                         case "mappingPut" -> {

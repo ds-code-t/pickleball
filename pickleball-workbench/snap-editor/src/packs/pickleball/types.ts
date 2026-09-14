@@ -1,0 +1,13 @@
+export const FEATURE_TYPE = "pkb.feature";
+export const SCENARIO_TYPE = "pkb.scenario";
+export const STEP_TYPE = "pkb.step";
+export const PHRASE_TYPE = "pkb.phrase";
+export const IF_TYPE = "pkb.if";
+export const TAGS_TYPE = "pkb.tags";
+export const COMMENT_TYPE = "pkb.comment";
+export const BACKGROUND_TYPE = "pkb.background";
+export const RULE_TYPE = "pkb.rule";
+export const OUTLINE_TYPE = "pkb.outline";
+export const EXAMPLES_TYPE = "pkb.examples";
+export const TABLE_TYPE = "pkb.table";
+export const DOCSTRING_TYPE = "pkb.docstring";

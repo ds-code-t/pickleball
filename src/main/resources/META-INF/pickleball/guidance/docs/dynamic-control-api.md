@@ -49,6 +49,7 @@ Bridge capabilities include:
 - bounded semantic events;
 - finite-lease pause/resume;
 - retry-friendly detached step execution;
+- read-only step resolution (`/v1/steps/resolve`, capability `resolve_step`) to consumer glue, Pickleball dynamic/framework steps, Step Overrides, or unmatched text;
 - Mapping get/put/resolve/snapshot/restore;
 - browser page/screenshot evidence;
 - Pickleball-native element inspection;

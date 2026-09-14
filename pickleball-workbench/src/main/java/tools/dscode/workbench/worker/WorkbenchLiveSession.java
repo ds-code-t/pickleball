@@ -58,6 +58,12 @@ public final class WorkbenchLiveSession implements AutoCloseable {
         ));
     }
 
+    public ControlBridgeStepResolution resolveStep(String text, String argument) {
+        return call(binding -> binding.client().resolveStep(
+                binding.scenarioId(), text, argument, COMMAND_TIMEOUT_SECONDS
+        ));
+    }
+
     public ControlBridgeValueResult mappingGet(String mapReference, String key) {
         return call(binding -> binding.client().mappingGet(
                 binding.scenarioId(), mapReference, key, COMMAND_TIMEOUT_SECONDS

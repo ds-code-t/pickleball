@@ -135,6 +135,10 @@ final class FeaturePickerPanel extends JPanel {
         featureFilterPanel.setVisible(false);
     }
 
+    ConsumerFeatureCatalog catalog() {
+        return catalog;
+    }
+
     void setCatalog(ConsumerFeatureCatalog catalog) {
         this.catalog = catalog;
         featureModel.clear();

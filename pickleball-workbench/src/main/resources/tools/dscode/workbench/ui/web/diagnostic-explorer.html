@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>Diagnostic Log Explorer</title>
+  <title>Diagnostic replay</title>
   <link rel="stylesheet" href="diagnostic-explorer.css">
 </head>
 <body>
@@ -10,19 +10,21 @@
     <label>Run
       <select id="runs"></select>
     </label>
-    <button type="button" id="prev">◀</button>
+    <button type="button" id="prev">◀ Step</button>
     <button type="button" id="play">Play</button>
-    <button type="button" id="next">▶</button>
+    <button type="button" id="next">Step ▶</button>
     <span id="status" class="status"></span>
   </div>
-  <div class="stage">
-    <img id="frame" alt="Retained diagnostic screenshot">
-    <div id="step" class="step"></div>
-  </div>
-  <div class="layers">
-    <div class="layer-title">Evidence layers</div>
-    <div id="layers"></div>
-    <pre id="excerpt"></pre>
+  <div class="replay">
+    <aside class="beats">
+      <div class="pane-title">Scenario steps</div>
+      <div id="beats"></div>
+    </aside>
+    <section class="stage">
+      <img id="frame" alt="Retained diagnostic screenshot">
+      <div id="step" class="step"></div>
+      <pre id="log" class="log"></pre>
+    </section>
   </div>
   <script src="diagnostic-explorer.js"></script>
 </body>
