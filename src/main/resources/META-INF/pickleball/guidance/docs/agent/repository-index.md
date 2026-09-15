@@ -535,6 +535,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/player/GherkinBlockDocument.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/player/GherkinPlayPlan.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/player/GherkinReference.java`
+- `pickleball-workbench/src/main/java/tools/dscode/workbench/player/GherkinTextEditing.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/player/LiveEditorView.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/player/LiveFeatureSave.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/player/LivePlaybackCoordinator.java`
@@ -554,7 +555,6 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/ui/FeaturePickerPanel.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/ui/TerminalPanel.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/ui/web/DiagnosticExplorerHost.java`
-- `pickleball-workbench/src/main/java/tools/dscode/workbench/ui/web/GherkinEditorHost.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/ui/web/JavaFxSupport.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/ui/web/MappingEditorHost.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/ui/web/WebViewPanel.java`
@@ -574,15 +574,9 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-workbench/src/main/resources/tools/dscode/workbench/ui/web/diagnostic-explorer.css`
 - `pickleball-workbench/src/main/resources/tools/dscode/workbench/ui/web/diagnostic-explorer.html`
 - `pickleball-workbench/src/main/resources/tools/dscode/workbench/ui/web/diagnostic-explorer.js`
-- `pickleball-workbench/src/main/resources/tools/dscode/workbench/ui/web/gherkin-editor.css`
-- `pickleball-workbench/src/main/resources/tools/dscode/workbench/ui/web/gherkin-editor.html`
-- `pickleball-workbench/src/main/resources/tools/dscode/workbench/ui/web/gherkin-editor.js`
 - `pickleball-workbench/src/main/resources/tools/dscode/workbench/ui/web/mapping-editor.css`
 - `pickleball-workbench/src/main/resources/tools/dscode/workbench/ui/web/mapping-editor.html`
 - `pickleball-workbench/src/main/resources/tools/dscode/workbench/ui/web/mapping-editor.js`
-- `pickleball-workbench/src/main/resources/tools/dscode/workbench/ui/web/snap-editor/embed.html`
-- `pickleball-workbench/src/main/resources/tools/dscode/workbench/ui/web/snap-editor/snap-editor.css`
-- `pickleball-workbench/src/main/resources/tools/dscode/workbench/ui/web/snap-editor/snap-editor.js`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/bridge/ControlBridgeClientTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/catalog/ConsumerFeatureCatalogTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/catalog/JavaGlueIndexTest.java`
@@ -599,6 +593,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/player/GherkinBlockDocumentTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/player/GherkinPlayPlanTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/player/GherkinReferenceTest.java`
+- `pickleball-workbench/src/test/java/tools/dscode/workbench/player/GherkinTextEditingTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/player/LiveEditorViewTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/player/LiveFeatureSaveTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/player/LivePlaybackCoordinatorTest.java`
@@ -607,7 +602,6 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/sync/WorkbenchSynchronizerTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/sync/WorkbenchSyncPlannerTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/terminal/WorkerLogBufferTest.java`
-- `pickleball-workbench/src/test/java/tools/dscode/workbench/ui/web/SnapEditorEmbedResourceTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/ui/WorkbenchUiControllerTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/ui/WorkbenchUiSettingsTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/WorkbenchApplicationTest.java`

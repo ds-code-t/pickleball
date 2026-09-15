@@ -161,9 +161,9 @@ The primary workspace is an interactive Gherkin player with a project feature pi
 +-----------------------------------------------------------------------------------+
 | Scenarios | Project  Pickleball <version> / readiness   Play Pause Stop  Status   |
 +-----------+--------------------------------------------+--------------------------+
-| Name +    | LIVE GHERKIN EDITOR                        | Mapping | Terminal |     |
-| match mode| [Text | Blocks]                            | Block actions |          |
-| tags AND  | playhead on same buffer                    | Diagnostic Log Explorer  |
+| Name +    | LIVE GHERKIN TEXT EDITOR                   | Mapping | Terminal |     |
+| match mode| Tab = leading :  keyword autocomplete      | Diagnostic Log Explorer  |
+| tags AND  | playhead on the same buffer                |                          |
 | tags NOT  |                                            |                          |
 | scenario  |                                            |                          |
 | list      |                                            |                          |
@@ -179,9 +179,9 @@ The primary workspace is an interactive Gherkin player with a project feature pi
 
 The left rail is a scenario filter, not a feature-file browser. Primary controls are scenario name (starts with / contains / ends with / full match; default contains; all four are case-insensitive against the Gherkin Scenario / Scenario Outline title), tags the scenario must have (AND), and tags it must not have (NOT). Include/exclude fields accept any number of tags, with or without a leading `@`, split on commas and/or whitespace. Empty include/exclude means no tag constraint. Feature-level tags, optional Rule tags, the scenario/outline's own tags, and Examples tags on an outline are inherited the same way Cucumber does; Workbench parses those tags from the catalog `.feature` files and does not call Cucumber. Feature-file selection is collapsed behind **Filter by feature** (Gherkin Feature name vs file path lives in that panel). Default: no feature filter, so name/tag apply to every catalog scenario in the synchronized project. Scenario Outlines expand to selectable Examples rows. Clicking a result opens the **whole originating `.feature` file** in the editor and sets that scenario (and optional Examples row) as the play target. The caller tab stays pinned; Ctrl+click or **Open target** on a `RUN` / `CALL` / `data:/` step opens the callee in another tab. Below the picker, the **Step definition** panel shows consumer Java glue for the selected step when it can be resolved, or that the line is a Pickleball dynamic step / unmatched reference. Workbench does not write `.feature` files unless you use the explicit **Save** control, which writes the editor buffer to the original file.
 
-The center editor is one Gherkin document with **Text | Blocks**. Text is the file buffer. Blocks is the snap-editor Pickleball pack over that same text: import/export is a canonical, deterministic round-trip (tags, Background, Rule, Outline, Examples, tables, comments, nested colons, dynamic phrases, and `IF` / `ELSE` are kept; whitespace/indent may normalize). Blocks are Gherkin, including `Given` / `When` / `Then`, not a second language. Nested steps and `IF` / `ELSE` snap using Pickleball's leading-colon grammar. JavaScript never executes Gherkin. Hover, pickup, and projected snapping stay cosmetic inside the block editor; the live Gherkin buffer is unchanged until a block is dropped onto a **new** snap. Dropping with no snap, or snapping back to the original place, writes nothing. **Play** runs a derived plan: Feature/Rule Background steps, then the selected scenario's steps, with one selected Examples row substituted. **Step** remains isolated `executeStep`. **From Here** runs the plan from the selected template step. If JavaFX cannot start, Text is the fallback and Blocks stays disabled/unavailable. The default demo buffer still has no save path.
+The center editor is one ordinary Gherkin text document over `LiveScenarioPlayer`. Nested steps use Pickleball's leading-colon grammar: Tab at the start of a line, or while only leading colons/spaces sit before the caret, inserts one extra `:`; Shift-Tab removes one leading `:` if present. Mid-line Tab inserts a single space and does not move focus to another Swing control. Typing the first letters of a Gherkin keyword after optional leading colons/whitespace offers completion for Feature, Rule, Background, Scenario, Scenario Outline, Examples, Given, When, Then, And, But, `*`, and line-start control words IF / ELSE / ELSE-IF. Tab or Enter accepts the selected keyword and inserts a trailing space. When the completion popup is open, Tab accepts the completion; when it is not, Tab at the indent prefix inserts `:`. **Play** runs a derived plan: Feature/Rule Background steps, then the selected scenario's steps, with one selected Examples row substituted. **Step** remains isolated `executeStep`. **From Here** runs the plan from the selected template step. The default demo buffer still has no save path.
 
-The player bar shows the running Pickleball version next to the project name. The right side is Mapping, Terminal, **Block actions**, and Diagnostic Log Explorer. Block actions is a default diagnostic log of editor-local events (select, pickup, snap, drop, cancel). Hide it with **View > Block action log**; that preference is stored in `.pickleball/workbench/ui-settings.json` and is not a RunVar. Low-level lifecycle controls stay under **Session**. Existing investigation tools stay under **Tools > Advanced Controls**.
+The player bar shows the running Pickleball version next to the project name. The right side is Mapping, Terminal, and Diagnostic Log Explorer. Low-level lifecycle controls stay under **Session**. Existing investigation tools stay under **Tools > Advanced Controls**.
 
 ### Live scenario buffer and player state
 
@@ -193,7 +193,7 @@ The player bar shows the running Pickleball version next to the project name. Th
 - playhead (the user-visible needle);
 - player states `STOPPED`, `PAUSED`, `RUNNING`, and `WAITING_FOR_STEP`.
 
-The Live Scenario Editor is a session-scoped Gherkin document presented as snap-together blocks. Users can type Gherkin into a block, including text that already ran. Stable line ids are preserved across in-place edits so the player can keep selection, playhead, and execution cursor coherent. Loading a picker scenario replaces the live buffer only. The default remains session/live. **Save** is confirmation-gated: it copies the live scenario into the originating `.feature` file and scenario only after Allow. The Workbench-owned demo has no save path. Workbench never writes `.feature` files on picker load or on Deny.
+The Live Scenario Editor is a session-scoped Gherkin text document. Users can type Gherkin on any line, including text that already ran. Stable line ids are preserved across in-place edits so the player can keep selection, playhead, and execution cursor coherent. Loading a picker scenario replaces the live buffer only. The default remains session/live. **Save** is confirmation-gated: it copies the live scenario into the originating `.feature` file and scenario only after Allow. The Workbench-owned demo has no save path. Workbench never writes `.feature` files on picker load or on Deny.
 
 The playhead behaves like an audio-player needle:
 
@@ -246,7 +246,7 @@ NodeMap implementations that are not exact ordinary `NodeMap` instances remain i
 
 ### WebView packaging
 
-JDK 21 does not ship a modern browser panel. Workbench embeds OpenJFX `WebView` through `JFXPanel` for the Gherkin editor, Mapping tree, and Diagnostic explorer. That choice stays Workbench-only: Maven-central JavaFX modules are resolved onto the forked controller classpath at launch from ordinary platform JARs. They are not shaded into the thin nested JAR. JCEF was not used because Chromium natives are harder to keep isolation-clean and do not package as ordinary Workbench dependencies. If JavaFX cannot start, the live editor stays on the existing in-place text buffer on the same `LiveScenarioPlayer` model; the **Text | Blocks** toggle remains visible and Blocks is disabled so the fallback is honest.
+JDK 21 does not ship a modern browser panel. Workbench embeds OpenJFX `WebView` through `JFXPanel` for the Mapping tree and Diagnostic explorer. That choice stays Workbench-only: Maven-central JavaFX modules are resolved onto the forked controller classpath at launch from ordinary platform JARs. They are not shaded into the thin nested JAR. JCEF was not used because Chromium natives are harder to keep isolation-clean and do not package as ordinary Workbench dependencies. If JavaFX cannot start, Mapping and Diagnostic explorer use their text fallbacks. The live editor is always the in-place Gherkin text buffer on the same `LiveScenarioPlayer` model.
 
 A one-line JavaFX warning `Unsupported JavaFX configuration: classes were loaded from 'unnamed module'` is expected with that classpath launch. It is not a failure and does not mean Workbench is stuck. The window is shown first; JavaFX WebView is attached on the next Swing pulse so that warning cannot deadlock startup.
 
@@ -500,13 +500,13 @@ java -cp $workbenchCp tools.dscode.workbench.WorkbenchApplication ui ".\maven-co
 
 Use the UI-owned worker for runtime checks; do not run `worker-check` or `live-check` concurrently with the UI.
 
-1. Verify the top-level layout has a scenario name/tag filter rail (feature-file filter collapsed), the Live Gherkin Editor with a **Text | Blocks** toggle and compact Step Editor in the center, and exactly Mapping / Terminal / Diagnostic Log Explorer on the right.
+1. Verify the top-level layout has a scenario name/tag filter rail (feature-file filter collapsed), the Live Gherkin text editor and compact Step Editor in the center, and exactly Mapping / Terminal / Diagnostic Log Explorer on the right.
 2. Confirm the default buffer is the Workbench demo scenario and includes `navigate to: URL.home` plus a click on the local test site when no picker scenario is selected.
 3. Filter scenarios by name using contains (default) and the other match modes; confirm matching is case-insensitive and applies to the Scenario / Scenario Outline title.
 4. Filter with include tags (AND) and exclude tags (NOT), with and without `@`, and confirm Feature-level tags apply to scenarios in that feature.
 5. Confirm **Filter by feature** is collapsed by default and that name/tag filters then apply to every catalog scenario. Opening it still supports multi-select and Feature name vs file path.
-6. Click a filtered scenario and verify it loads into the live buffer. Switch **Text | Blocks** and verify playhead, selection, and document text are unchanged. If WebView is unavailable, Blocks is disabled and Text remains the editor.
-7. Click different scenario blocks/lines and verify the playhead highlight moves immediately to the clicked step.
+6. Click a filtered scenario and verify it loads into the live Gherkin text editor. Tab at the start of an empty or colon-only line inserts `:`; Shift-Tab removes one leading `:`; mid-line Tab does not prepend `:`. Typing `Gi` at line start offers Given completion.
+7. Click different scenario lines and verify the playhead highlight moves immediately to the clicked step.
 8. Edit previously typed or previously executed Gherkin directly in the Live Scenario Editor and verify the line text updates in place.
 9. Press global **Play** after seeking the playhead to a later step and verify execution still starts from the first executable step in a fresh worker context.
 10. Use **From Here** on a later executable step and verify playback starts there and continues through the rest of the buffer.

@@ -7,11 +7,12 @@ import java.util.Optional;
 import java.util.OptionalLong;
 
 /**
- * Nested block view of a live Gherkin buffer.
+ * Nested leading-colon view of a live Gherkin buffer.
  *
- * <p>Blocks <em>are</em> Gherkin text. Nesting is the existing Pickleball
- * leading-colon grammar; this class does not compile to another language and
- * does not strip {@code Given}/{@code When}/{@code Then}.</p>
+ * <p>This is an internal helper for interpreting Pickleball leading-colon
+ * nesting. It is not a visible editor. Nesting is the existing Pickleball
+ * grammar; this class does not compile to another language and does not
+ * strip {@code Given}/{@code When}/{@code Then}.</p>
  */
 public final class GherkinBlockDocument {
     public record Block(long id, String text, int nestLevel, List<Block> children) {

@@ -17,7 +17,7 @@ import tools.dscode.workbench.mcp.WorkbenchAttachServer;
 import tools.dscode.workbench.player.EditorTabState;
 import tools.dscode.workbench.player.GherkinPlayPlan;
 import tools.dscode.workbench.player.GherkinReference;
-import tools.dscode.workbench.player.LiveEditorView;
+import tools.dscode.workbench.player.GherkinTextEditing;
 import tools.dscode.workbench.player.ScenarioOrigin;
 import tools.dscode.workbench.player.LivePlaybackCoordinator;
 import tools.dscode.workbench.player.LiveScenarioPlayer;
@@ -25,7 +25,6 @@ import tools.dscode.workbench.player.WorkbenchSavePreview;
 import tools.dscode.workbench.player.WorkbenchSaveResult;
 import tools.dscode.workbench.sync.WorkbenchManifest;
 import tools.dscode.workbench.ui.web.DiagnosticExplorerHost;
-import tools.dscode.workbench.ui.web.GherkinEditorHost;
 import tools.dscode.workbench.ui.web.JavaFxSupport;
 import tools.dscode.workbench.ui.web.MappingEditorHost;
 import tools.dscode.workbench.ui.web.WebViewPanel;
@@ -39,6 +38,7 @@ import javax.swing.text.BadLocationException;
 import javax.swing.text.DefaultHighlighter;
 import javax.swing.text.Highlighter;
 import java.awt.*;
+import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
@@ -68,17 +68,11 @@ final class WorkbenchFrame extends JFrame {
     private final ObjectMapper json = new ObjectMapper();
     private final FeaturePickerPanel picker = new FeaturePickerPanel();
     private final TerminalPanel terminal = new TerminalPanel();
-    private final GherkinEditorHost gherkinHost = new GherkinEditorHost();
     private final MappingEditorHost mappingHost = new MappingEditorHost();
     private final DiagnosticExplorerHost diagnosticHost = new DiagnosticExplorerHost();
-    private WebViewPanel gherkinView;
     private WebViewPanel mappingView;
     private WebViewPanel diagnosticView;
     private JComponent pickerSplit;
-    private JPanel editorHost;
-    private LiveEditorView editorView = LiveEditorView.blocksUnavailable();
-    private final JToggleButton textViewButton = new JToggleButton("Text");
-    private final JToggleButton blocksViewButton = new JToggleButton("Blocks");
     private final JToggleButton pickerToggle = new JToggleButton("Scenarios");
     private List<WorkbenchUiController.MappingCatalogEntry> mappingEntries = List.of();
     private MappingTreeModel mappingModel;
@@ -88,6 +82,8 @@ final class WorkbenchFrame extends JFrame {
     private final JTextArea scenarioEditor = new JTextArea();
     private final Highlighter.HighlightPainter playheadPainter =
             new DefaultHighlighter.DefaultHighlightPainter(PLAYHEAD_COLOR);
+    private final JPopupMenu keywordPopup = new JPopupMenu();
+    private final JList<String> keywordList = new JList<>();
     private final JTextField stepText = new JTextField();
 
     private final JButton playButton = playerButton("▶", "Run the scenario from the first step in a fresh scenario context");
@@ -134,11 +130,7 @@ final class WorkbenchFrame extends JFrame {
     );
 
     private final JLabel webViewNote = WorkbenchTheme.muted("");
-    private WorkbenchUiSettings uiSettings = new WorkbenchUiSettings();
-    private JCheckBoxMenuItem blockLogMenuItem;
     private JTabbedPane rightTabs;
-    private final JTextArea blockActionLog = new JTextArea();
-    private JComponent blockActionPanel;
 
     private WorkbenchUiController.State lastState;
     private ControlBridgeMappingSnapshot loadedMapping;
@@ -163,8 +155,6 @@ final class WorkbenchFrame extends JFrame {
     private final List<EditorTabState> editorSessions = new ArrayList<>();
     private boolean rebuildingTabs;
     private int shownTabIndex;
-    private String lastPushedGherkin = "";
-    private Boolean lastPushedLock;
 
     WorkbenchFrame(WorkbenchUiController controller) {
         this(controller, null);
@@ -177,7 +167,6 @@ final class WorkbenchFrame extends JFrame {
         this.player = controller.player();
         this.playback = controller.playback();
         editorSessions.add(new EditorTabState("Demo", null, player.documentText(), true));
-        uiSettings = WorkbenchUiSettings.load(controller.projectRoot());
 
         mappingSaveTimer.setRepeats(false);
         WorkbenchTheme.install();
@@ -266,16 +255,6 @@ final class WorkbenchFrame extends JFrame {
         session.add(restartItem);
         session.add(stopItem);
         bar.add(session);
-
-        JMenu view = new JMenu("View");
-        blockLogMenuItem = new JCheckBoxMenuItem("Block action log", uiSettings.showBlockActionLog);
-        blockLogMenuItem.addActionListener(event -> {
-            uiSettings.showBlockActionLog = blockLogMenuItem.isSelected();
-            uiSettings.save(controller.projectRoot());
-            applyBlockLogVisibility();
-        });
-        view.add(blockLogMenuItem);
-        bar.add(view);
 
         JMenu tools = new JMenu("Tools");
         JMenuItem advanced = new JMenuItem("Advanced Controls...");
@@ -385,7 +364,6 @@ final class WorkbenchFrame extends JFrame {
         JPanel header = new JPanel(new BorderLayout(8, 0));
         header.setOpaque(false);
         header.add(WorkbenchTheme.heading("Gherkin editor"), BorderLayout.WEST);
-        header.add(editorViewToggle(), BorderLayout.EAST);
         editorTabs.setTabLayoutPolicy(JTabbedPane.SCROLL_TAB_LAYOUT);
         editorTabs.addChangeListener(event -> {
             if (rebuildingTabs) return;
@@ -406,70 +384,15 @@ final class WorkbenchFrame extends JFrame {
         scenarioEditor.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 14));
         scenarioEditor.setLineWrap(false);
         scenarioEditor.setTabSize(2);
-        editorHost = new JPanel(new CardLayout());
-        editorHost.setOpaque(false);
-        editorHost.add(new JScrollPane(scenarioEditor), "text");
-        if (gherkinView != null) {
-            editorHost.add(gherkinView, "web");
-        }
-        panel.add(editorHost, BorderLayout.CENTER);
+        panel.add(new JScrollPane(scenarioEditor), BorderLayout.CENTER);
 
         JPanel legend = new JPanel(new FlowLayout(FlowLayout.LEFT, 18, 2));
         legend.setOpaque(false);
-        legend.add(WorkbenchTheme.muted("Text and Blocks are the same Gherkin"));
+        legend.add(WorkbenchTheme.muted("Tab indents with :   Shift-Tab outdents"));
         legend.add(WorkbenchTheme.muted("Play uses Background + selected Examples row"));
         legend.add(WorkbenchTheme.muted("Ctrl+click a RUN step to open its target"));
         panel.add(legend, BorderLayout.SOUTH);
-        applyEditorView();
         return panel;
-    }
-
-    private JPanel editorViewToggle() {
-        JPanel toggle = new JPanel(new GridLayout(1, 2, 0, 0));
-        toggle.setOpaque(false);
-        ButtonGroup group = new ButtonGroup();
-        textViewButton.setFocusable(false);
-        blocksViewButton.setFocusable(false);
-        textViewButton.setToolTipText("View and edit the live scenario as ordinary Gherkin text.");
-        blocksViewButton.setToolTipText(editorView.canShowBlocks()
-                ? "View and edit the same live buffer as Gherkin blocks."
-                : "Block view requires JavaFX WebView, which is not available in this process.");
-        textViewButton.addActionListener(event -> {
-            if (humanControlsLocked()) {
-                applyEditorView();
-                return;
-            }
-            editorView.showText();
-            applyEditorView();
-        });
-        blocksViewButton.addActionListener(event -> {
-            if (humanControlsLocked()) {
-                applyEditorView();
-                return;
-            }
-            editorView.showBlocks();
-            applyEditorView();
-        });
-        group.add(textViewButton);
-        group.add(blocksViewButton);
-        toggle.add(textViewButton);
-        toggle.add(blocksViewButton);
-        toggle.setBorder(BorderFactory.createLineBorder(WorkbenchTheme.BORDER));
-        return toggle;
-    }
-
-    private void applyEditorView() {
-        if (editorHost == null) return;
-        boolean blocks = editorView.showingBlocks() && gherkinView != null;
-        CardLayout cards = (CardLayout) editorHost.getLayout();
-        cards.show(editorHost, blocks ? "web" : "text");
-        textViewButton.setSelected(!blocks);
-        blocksViewButton.setSelected(blocks);
-        blocksViewButton.setEnabled(editorView.canShowBlocks() && !humanControlsLocked());
-        textViewButton.setEnabled(!humanControlsLocked());
-        if (blocks) {
-            pushGherkinView();
-        }
     }
 
     private JComponent stepPanel() {
@@ -498,51 +421,13 @@ final class WorkbenchFrame extends JFrame {
         rightTabs = new JTabbedPane();
         rightTabs.addTab("Mapping", mappingPanel());
         rightTabs.addTab("Terminal", terminal);
-        blockActionPanel = blockActionPanel();
         rightTabs.addTab("Diagnostic Log Explorer", diagnosticsPanel());
         rightTabs.addChangeListener(event -> {
             if ("Diagnostic Log Explorer".equals(rightTabs.getTitleAt(rightTabs.getSelectedIndex()))) {
                 refreshDiagnostics();
             }
         });
-        applyBlockLogVisibility();
         return rightTabs;
-    }
-
-    private JComponent blockActionPanel() {
-        JPanel panel = new JPanel(new BorderLayout());
-        panel.setBackground(WorkbenchTheme.SURFACE);
-        blockActionLog.setEditable(false);
-        blockActionLog.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 12));
-        blockActionLog.setText("Block actions stay in this editor until a snap commits Gherkin.\n");
-        panel.add(new JScrollPane(blockActionLog), BorderLayout.CENTER);
-        return panel;
-    }
-
-    private void applyBlockLogVisibility() {
-        if (rightTabs == null || blockActionPanel == null) return;
-        int existing = rightTabs.indexOfComponent(blockActionPanel);
-        if (uiSettings.showBlockActionLog) {
-            if (existing < 0) {
-                int insert = Math.min(2, rightTabs.getTabCount());
-                rightTabs.insertTab("Block actions", null, blockActionPanel, "Cosmetic block editor events", insert);
-            }
-        } else if (existing >= 0) {
-            rightTabs.remove(existing);
-        }
-        if (blockLogMenuItem != null) {
-            blockLogMenuItem.setSelected(uiSettings.showBlockActionLog);
-        }
-    }
-
-    private void appendBlockAction(String json) {
-        if (blockActionLog == null) return;
-        String line = java.time.LocalTime.now().withNano(0) + "  " + json;
-        if (blockActionLog.getText().length() > 80_000) {
-            blockActionLog.setText(blockActionLog.getText().substring(40_000));
-        }
-        blockActionLog.append(line + "\n");
-        blockActionLog.setCaretPosition(blockActionLog.getDocument().getLength());
     }
 
     /**
@@ -608,15 +493,49 @@ final class WorkbenchFrame extends JFrame {
     }
 
     private void configureScenarioEditor() {
+        keywordList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        keywordList.setVisibleRowCount(8);
+        keywordList.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 13));
+        keywordList.setFocusable(false);
+        keywordPopup.setFocusable(false);
+        keywordPopup.add(new JScrollPane(keywordList));
+        keywordList.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent event) {
+                if (event.getClickCount() >= 1) {
+                    acceptKeywordCompletion();
+                }
+            }
+        });
+        scenarioEditor.setFocusTraversalKeys(KeyboardFocusManager.FORWARD_TRAVERSAL_KEYS, java.util.Set.of());
+        scenarioEditor.setFocusTraversalKeys(KeyboardFocusManager.BACKWARD_TRAVERSAL_KEYS, java.util.Set.of());
+        scenarioEditor.getInputMap(JComponent.WHEN_FOCUSED).put(
+                KeyStroke.getKeyStroke(KeyEvent.VK_TAB, 0), "gherkin-tab");
+        scenarioEditor.getInputMap(JComponent.WHEN_FOCUSED).put(
+                KeyStroke.getKeyStroke(KeyEvent.VK_TAB, KeyEvent.SHIFT_DOWN_MASK), "gherkin-shift-tab");
+        scenarioEditor.getActionMap().put("gherkin-tab", new AbstractAction() {
+            @Override
+            public void actionPerformed(java.awt.event.ActionEvent event) {
+                if (!humanControlsLocked()) handleEditorTab(false);
+            }
+        });
+        scenarioEditor.getActionMap().put("gherkin-shift-tab", new AbstractAction() {
+            @Override
+            public void actionPerformed(java.awt.event.ActionEvent event) {
+                if (!humanControlsLocked()) handleEditorTab(true);
+            }
+        });
         scenarioEditor.getDocument().addDocumentListener(new DocumentListener() {
             @Override
             public void insertUpdate(DocumentEvent event) {
                 scenarioDocumentChanged();
+                SwingUtilities.invokeLater(() -> refreshKeywordCompletions());
             }
 
             @Override
             public void removeUpdate(DocumentEvent event) {
                 scenarioDocumentChanged();
+                SwingUtilities.invokeLater(() -> refreshKeywordCompletions());
             }
 
             @Override
@@ -627,6 +546,25 @@ final class WorkbenchFrame extends JFrame {
         scenarioEditor.addCaretListener(event -> {
             seekPlayheadToCaret();
             resolveSelectedStep();
+        });
+        scenarioEditor.addKeyListener(new KeyAdapter() {
+            @Override
+            public void keyPressed(KeyEvent event) {
+                if (humanControlsLocked() || !keywordPopup.isVisible()) return;
+                if (event.getKeyCode() == KeyEvent.VK_ENTER) {
+                    acceptKeywordCompletion();
+                    event.consume();
+                } else if (event.getKeyCode() == KeyEvent.VK_ESCAPE) {
+                    hideKeywordCompletions();
+                    event.consume();
+                } else if (event.getKeyCode() == KeyEvent.VK_DOWN) {
+                    moveKeywordSelection(1);
+                    event.consume();
+                } else if (event.getKeyCode() == KeyEvent.VK_UP) {
+                    moveKeywordSelection(-1);
+                    event.consume();
+                }
+            }
         });
         scenarioEditor.addMouseListener(new MouseAdapter() {
             @Override
@@ -657,9 +595,6 @@ final class WorkbenchFrame extends JFrame {
 
     void installInteractiveViews() {
         configureWebViews();
-        if (gherkinView != null && editorHost != null && gherkinView.getParent() == null) {
-            editorHost.add(gherkinView, "web");
-        }
         if (mappingView != null && rightTabs != null) {
             int mapping = rightTabs.indexOfTab("Mapping");
             if (mapping >= 0) {
@@ -677,52 +612,18 @@ final class WorkbenchFrame extends JFrame {
                 rightTabs.setComponentAt(diagnostic, wrap);
             }
         }
-        applyEditorView();
-        pushGherkinView();
     }
 
     private void configureWebViews() {
-        if (gherkinView != null || mappingView != null || diagnosticView != null) {
+        if (mappingView != null || diagnosticView != null) {
             return;
         }
         if (!JavaFxSupport.available()) {
-            editorView = LiveEditorView.blocksUnavailable();
             webViewNote.setText("JavaFX WebView unavailable: " + JavaFxSupport.failure()
-                    + ". Using the text fallback. OpenJFX is Workbench-only. Block view is unavailable.");
+                    + ". Mapping and Diagnostic explorer use the text fallback. OpenJFX is Workbench-only.");
             return;
         }
         try {
-            gherkinHost.onDocument(this::applyEditorLines);
-            gherkinHost.onSeek(id -> {
-                if (humanControlsLocked()) return;
-                player.clickLine(id);
-                updateFromHereAvailability();
-                refreshPlayheadHighlight();
-                resolveSelectedStep();
-            });
-            gherkinHost.onSelectionText(text -> {
-                if (humanControlsLocked()) return;
-                String needle = text == null ? "" : text.strip();
-                if (needle.isBlank()) return;
-                for (LiveScenarioPlayer.Line line : player.lines()) {
-                    if (line.text().strip().equals(needle) || line.text().contains(needle)) {
-                        player.clickLine(line.id());
-                        updateFromHereAvailability();
-                        refreshPlayheadHighlight();
-                        resolveSelectedStep();
-                        return;
-                    }
-                }
-            });
-            gherkinHost.onAddStep(this::insertStep);
-            gherkinHost.onBlockAction(this::appendBlockAction);
-            gherkinHost.onReady(this::pushGherkinView);
-            gherkinView = new WebViewPanel(
-                    "/tools/dscode/workbench/ui/web/snap-editor/embed.html",
-                    "gherkinHost",
-                    gherkinHost
-            );
-
             mappingHost.onSelect(reference -> {
                 for (WorkbenchUiController.MappingCatalogEntry entry : mappingEntries) {
                     if (entry.reference().equals(reference)) {
@@ -747,14 +648,11 @@ final class WorkbenchFrame extends JFrame {
                     "diagnosticHost",
                     diagnosticHost
             );
-            editorView = LiveEditorView.blocksAvailable();
         } catch (RuntimeException failure) {
-            gherkinView = null;
             mappingView = null;
             diagnosticView = null;
-            editorView = LiveEditorView.blocksUnavailable();
             webViewNote.setText("JavaFX WebView failed to start: " + failure.getMessage()
-                    + ". Using the text fallback. Block view is unavailable.");
+                    + ". Mapping and Diagnostic explorer use the text fallback.");
         }
     }
 
@@ -814,40 +712,110 @@ final class WorkbenchFrame extends JFrame {
         split.revalidate();
     }
 
-    private void applyEditorLines(List<String> lines) {
-        if (syncingScenarioDocument || humanControlsLocked()) return;
-        player.replaceDocument(lines);
-        playback.rebuildPlan();
-        EditorTabState tab = activeEditorTab();
-        if (tab != null) {
-            boolean wasDirty = tab.dirty();
-            tab.setDocumentText(player.documentText());
-            if (tab.dirty() != wasDirty) rebuildTabStrip();
-        }
-        updateFromHereAvailability();
-        if (player.state() == LiveScenarioPlayer.State.RUNNING) {
-            if (lastState == null || !lastState.liveReady()) {
-                prepareLiveSession(this::schedulePlaybackStep);
-            } else {
-                schedulePlaybackStep();
+
+    private void handleEditorTab(boolean shift) {
+        CurrentLine current = currentEditorLine();
+        if (current == null) return;
+        boolean completionOpen = keywordPopup.isVisible() && keywordList.getSelectedValue() != null;
+        String selected = keywordList.getSelectedValue();
+        GherkinTextEditing.LineCaret edited;
+        if (shift) {
+            edited = GherkinTextEditing.outdent(current.text(), current.column());
+            hideKeywordCompletions();
+        } else {
+            edited = GherkinTextEditing.tab(current.text(), current.column(), completionOpen, selected);
+            if (completionOpen) {
+                hideKeywordCompletions();
             }
+        }
+        applyLineCaret(current.lineIndex(), edited);
+    }
+
+    private void refreshKeywordCompletions() {
+        if (syncingScenarioDocument || humanControlsLocked() || !scenarioEditor.isEditable()) {
+            hideKeywordCompletions();
+            return;
+        }
+        CurrentLine current = currentEditorLine();
+        if (current == null) {
+            hideKeywordCompletions();
+            return;
+        }
+        java.util.List<String> matches = GherkinTextEditing.completions(current.text(), current.column());
+        if (matches.isEmpty()) {
+            hideKeywordCompletions();
+            return;
+        }
+        keywordList.setListData(matches.toArray(String[]::new));
+        keywordList.setSelectedIndex(0);
+        try {
+            var view = scenarioEditor.modelToView2D(scenarioEditor.getCaretPosition());
+            if (view == null) {
+                hideKeywordCompletions();
+                return;
+            }
+            java.awt.Rectangle caret = view.getBounds();
+            keywordPopup.show(scenarioEditor, caret.x, caret.y + caret.height);
+        } catch (RuntimeException | BadLocationException ignored) {
+            hideKeywordCompletions();
         }
     }
 
-    private void pushGherkinView() {
-        if (gherkinView == null) return;
-        String text = player.documentText();
-        boolean locked = humanControlsLocked();
-        if (text.equals(lastPushedGherkin) && Boolean.valueOf(locked).equals(lastPushedLock)) {
+    private void acceptKeywordCompletion() {
+        String selected = keywordList.getSelectedValue();
+        CurrentLine current = currentEditorLine();
+        if (selected == null || current == null) {
+            hideKeywordCompletions();
             return;
         }
-        lastPushedGherkin = text;
-        lastPushedLock = locked;
-        gherkinView.evalJsonCall(
-                "window.setWorkbenchGherkin",
-                WorkbenchWebJson.write(Map.of("text", text, "locked", locked))
-        );
+        applyLineCaret(current.lineIndex(), GherkinTextEditing.acceptCompletion(
+                current.text(), current.column(), selected));
+        hideKeywordCompletions();
     }
+
+    private void hideKeywordCompletions() {
+        keywordPopup.setVisible(false);
+    }
+
+    private void moveKeywordSelection(int delta) {
+        int size = keywordList.getModel().getSize();
+        if (size <= 0) return;
+        int next = Math.max(0, Math.min(size - 1, keywordList.getSelectedIndex() + delta));
+        keywordList.setSelectedIndex(next);
+        keywordList.ensureIndexIsVisible(next);
+    }
+
+    private void applyLineCaret(int lineIndex, GherkinTextEditing.LineCaret edited) {
+        try {
+            int start = scenarioEditor.getLineStartOffset(lineIndex);
+            int end = scenarioEditor.getLineEndOffset(lineIndex);
+            if (end > start && "\n".equals(scenarioEditor.getText(end - 1, 1))) {
+                end--;
+            }
+            scenarioEditor.replaceRange(edited.line(), start, end);
+            scenarioEditor.setCaretPosition(start + edited.caretColumn());
+        } catch (BadLocationException ignored) {
+            // Document can briefly lag the caret during a rebuild.
+        }
+    }
+
+    private CurrentLine currentEditorLine() {
+        try {
+            int caret = scenarioEditor.getCaretPosition();
+            int lineIndex = scenarioEditor.getLineOfOffset(caret);
+            int start = scenarioEditor.getLineStartOffset(lineIndex);
+            int end = scenarioEditor.getLineEndOffset(lineIndex);
+            String text = scenarioEditor.getText(start, end - start);
+            if (text.endsWith("\n")) {
+                text = text.substring(0, text.length() - 1);
+            }
+            return new CurrentLine(lineIndex, text, caret - start);
+        } catch (BadLocationException ignored) {
+            return null;
+        }
+    }
+
+    private record CurrentLine(int lineIndex, String text, int column) { }
 
     private void pushMappingView() {
         if (mappingView == null) return;
@@ -1579,7 +1547,6 @@ final class WorkbenchFrame extends JFrame {
         }
         refreshPlayheadHighlight();
         updateFromHereAvailability();
-        pushGherkinView();
     }
 
     private void updateFromHereAvailability() {
@@ -1731,13 +1698,12 @@ final class WorkbenchFrame extends JFrame {
         picker.setLocked(locked);
         pickerToggle.setEnabled(!locked);
         scenarioEditor.setEditable(!locked);
+        if (locked) hideKeywordCompletions();
         stepText.setEditable(!locked);
         playButton.setEnabled(!locked);
         pauseButton.setEnabled(!locked);
         playerStopButton.setEnabled(!locked);
         stepOnlyButton.setEnabled(!locked);
-        textViewButton.setEnabled(!locked);
-        blocksViewButton.setEnabled(editorView.canShowBlocks() && !locked);
         takeControlButton.setEnabled(locked);
         if (locked) {
             fromHereButton.setEnabled(false);
@@ -1757,7 +1723,6 @@ final class WorkbenchFrame extends JFrame {
             }
         }
         updateFromHereAvailability();
-        pushGherkinView();
         pushMappingView();
     }
 

@@ -45,9 +45,6 @@ bin/
 .pickleball/
 
 ### Temporary agent and migration work ###
-pickleball-workbench/snap-editor/node_modules/
-pickleball-workbench/snap-editor/dist/
-
 .agent-work/
 .agent-bootstrap-backup-*/
 .datetime-update-backup/

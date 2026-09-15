@@ -1,6 +1,8 @@
 package tools.dscode.workbench.ui;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -8,9 +10,9 @@ import java.nio.file.Path;
 
 /** Workbench GUI preferences. Not part of the execution RunVar profile. */
 public final class WorkbenchUiSettings {
-    public boolean showBlockActionLog = true;
-
-    private static final ObjectMapper JSON = new ObjectMapper();
+    private static final ObjectMapper JSON = new ObjectMapper()
+            .disable(SerializationFeature.FAIL_ON_EMPTY_BEANS)
+            .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
 
     public static Path file(Path projectRoot) {
         return projectRoot.resolve(".pickleball").resolve("workbench").resolve("ui-settings.json");
