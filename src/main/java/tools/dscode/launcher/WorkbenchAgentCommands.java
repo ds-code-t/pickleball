@@ -26,7 +26,13 @@ public final class WorkbenchAgentCommands {
             PrintStream err,
             MavenRunner maven
     ) {
-        WorkbenchCommandLine.Parsed parsed = WorkbenchCommandLine.parse(args);
+        WorkbenchCommandLine.Parsed parsed;
+        try {
+            parsed = WorkbenchCommandLine.parse(args);
+        } catch (IllegalArgumentException failure) {
+            err.println(failure.getMessage());
+            return 2;
+        }
         try {
             return switch (parsed.command()) {
                 case "export-guidance" -> exportGuidance(parsed, out, err);
@@ -54,7 +60,7 @@ public final class WorkbenchAgentCommands {
 
     private static int hint(WorkbenchCommandLine.Parsed parsed, PrintStream out) {
         AgentDiscoverPlanner.Plan plan = AgentDiscoverPlanner.discover(
-                parsed.project(), parsed.tags(), parsed.name()
+                parsed.project(), parsed.tags(), parsed.name(), parsed.retention()
         );
         out.println("Recommended complete diagnostic Discover `pkb_runvars` (Workbench honors the project browser ladder; headed Chrome / pretty / @all project defaults do not sneak in):");
         out.println("pkb_runvars=" + plan.runVars());
@@ -74,7 +80,7 @@ public final class WorkbenchAgentCommands {
             MavenRunner maven
     ) {
         AgentDiscoverPlanner.Plan plan = AgentDiscoverPlanner.discover(
-                parsed.project(), parsed.tags(), parsed.name()
+                parsed.project(), parsed.tags(), parsed.name(), parsed.retention()
         );
         out.println("Workbench discover " + plan.browser().reason() + ".");
         out.println("pkb_runvars=" + plan.runVars());
@@ -91,7 +97,9 @@ public final class WorkbenchAgentCommands {
     ) {
         LastDiscoverSnapshot.Snapshot snapshot = LastDiscoverSnapshot.require(parsed.project());
         Map<String, String> retained = LastDiscoverSnapshot.retainedRunVars(snapshot);
-        String runVars = AgentDiscoverPlanner.confirmRunVars(retained, parsed.tags(), parsed.name());
+        String runVars = AgentDiscoverPlanner.confirmRunVars(
+                retained, parsed.tags(), parsed.name(), parsed.retention()
+        );
         out.println("Workbench confirm replaying Discover snapshot as pkb_runvars.");
         out.println("pkb_runvars=" + runVars);
         List<String> command = ConsumerMavenTestRunner.confirmCommand(parsed.project(), runVars);

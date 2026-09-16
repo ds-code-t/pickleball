@@ -407,6 +407,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/control/protocol/PickleballVersionTest.java`
 - `src/test/java/tools/dscode/launcher/PickleballWorkbenchLauncherTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchAgentCommandsTest.java`
+- `src/test/java/tools/dscode/launcher/WorkbenchCommandLineTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchPointerContractTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchSessionCommandsTest.java`
 - `src/test/java/tools/dscode/parallelutilities/ParallelCountEstimatorTest.java`

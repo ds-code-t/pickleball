@@ -16,7 +16,7 @@ mvn -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java "-Dexec.mainClass=tools.ds
 
 Same launcher for `hint`, `discover`, `confirm`, `isolate`, `execute-step`, `status`, `events`, and `stop` — change `exec.args` only.
 
-1. **Discover** — `-Dexec.args=discover` (optional `--tags` / `--name`). Workbench applies complete AI `pkb_runvars`: browser ladder, high/auto parallel, diagnostic, warn, failed retention. It wraps consumer `mvn test`. Do not start a live worker to run the whole suite. Then read `run-catalog.json` and the retained `pkb_run_profile`.
+1. **Discover** — `-Dexec.args=discover` (optional `--tags` / `--name` / `--retention`). Workbench applies complete AI `pkb_runvars`: browser ladder, high/auto parallel, diagnostic, warn, failed retention. Override retention with `--retention=all|failed|none` (`--retention <value>` also works). It wraps consumer `mvn test`. Do not start a live worker to run the whole suite. Then read `run-catalog.json` and the retained `pkb_run_profile`.
 2. **Confirm** — `-Dexec.args=confirm --tags=... --name=...` with the same Discover snapshot (LastDiscoverSnapshot replayed as `pkb_runvars`) and narrow tags/name. Never supply `pkb_run_profile` as input.
 3. **Live debug** — `-Dexec.args=isolate` (alias `session-start`) starts one long-lived headless Workbench session from the last Discover snapshot and prints `ACK SESSION`. Then `-Dexec.args=execute-step --text='...'`, `status`, `events`, and `stop`. Each Maven exec exits; the session stays up.
 4. **Emit the human handoff, then edit real consumer source** — write `.pickleball/investigations/<id>/` then in chat print only `.pickleball/investigations/<id>/report.html`.
@@ -156,7 +156,7 @@ pkb_loglevel=warn
 pkb_reportretention=failed
 ```
 
-Use the narrowest `pkb_tags` / `pkb_name` that isolate the failure. Do not add the `pretty` plugin; it is console noise for agents. `pkb_reportretention=failed` keeps dense evidence for failing scenarios and does not retain it for passing ones. Workbench `hint` prints the estimated integer `pkb_parallel` and the selected browser for the current project/JVM. `pkb_parallel=auto` also resolves to that estimate at run start and stamps the integer into `pkb_run_profile`.
+Use the narrowest `pkb_tags` / `pkb_name` that isolate the failure. Do not add the `pretty` plugin; it is console noise for agents. Discover defaults to `pkb_reportretention=failed`, which keeps dense evidence for failing scenarios and does not retain it for passing ones. Override with Workbench `--retention=all|failed|none`. Workbench `hint` prints the estimated integer `pkb_parallel` and the selected browser for the current project/JVM. `pkb_parallel=auto` also resolves to that estimate at run start and stamps the integer into `pkb_run_profile`.
 
 These are documented agent defaults, not `PickleballTests` human defaults (`pretty`, `@all`, often headed Chrome). Example confirmation after Discover:
 

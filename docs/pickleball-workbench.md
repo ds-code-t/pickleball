@@ -57,12 +57,15 @@ mvn -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java \
 ```bash
 "-Dexec.args=hint"
 "-Dexec.args=discover --tags=@smoke"
+"-Dexec.args=discover --tags=@smoke --retention=all"
 "-Dexec.args=confirm --tags=@smoke --name='The failing scenario'"
 "-Dexec.args=isolate"
 "-Dexec.args=execute-step --text='Given stay'"
 ```
 
 Same launcher; only change `-Dexec.args`. `isolate` starts a detached headless session; later execs are one-shot HTTP clients.
+
+`hint`, `discover`, and `confirm` accept `--tags` / `--name` plus `--retention=all|failed|none` (or `--retention <value>`). Discover and hint default to `failed`. Confirm without `--retention` keeps the Discover snapshot value. This overlay is launcher/planner-only; do not pass `--retention` to the Workbench controller `isolate` / `session` parser. Ordinary diagnostic runs still default to `pkb_reportretention=all`.
 
 `mcp` and `ui` remain host/human commands. Hosts that already run Workbench MCP can launch it from the consumer test classpath:
 

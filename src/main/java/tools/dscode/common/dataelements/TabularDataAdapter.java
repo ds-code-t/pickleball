@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import io.cucumber.core.runner.util.TableUtils;
 import io.cucumber.datatable.DataTable;
 
 import java.lang.reflect.Array;
@@ -48,7 +49,7 @@ public final class TabularDataAdapter {
 
     private static TabularMatrix fromDataTable(DataTable dataTable) {
         List<List<Object>> rows = new ArrayList<>();
-        for (List<String> row : dataTable.cells()) {
+        for (List<String> row : TableUtils.cellsWithRestoredBlanks(dataTable)) {
             rows.add(new ArrayList<>(row));
         }
         return TabularMatrix.fromRows(rows);

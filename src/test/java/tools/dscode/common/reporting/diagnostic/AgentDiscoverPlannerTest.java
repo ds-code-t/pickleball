@@ -30,9 +30,24 @@ class AgentDiscoverPlannerTest {
         assertTrue(plan.runVars().contains("pkb_browser=SAUCE_CHROME"));
         assertTrue(plan.runVars().contains("pkb_parallel=" + ParallelCountEstimator.estimate()));
         assertTrue(plan.runVars().contains("pkb_reportingmode=diagnostic"));
+        assertTrue(plan.runVars().contains("pkb_reportretention=failed"));
         assertTrue(plan.runVars().contains("pkb_tags=@smoke"));
         assertFalse(plan.runVars().contains("pkb_parallel=80"));
         assertFalse(plan.runVars().contains("pkb_run_profile="));
+    }
+
+    @Test
+    void discoverRetentionOverlayReplacesTheFailedDefault() throws Exception {
+        Path resources = tempDir.resolve("src/test/resources");
+        Files.createDirectories(resources);
+
+        String all = AgentDiscoverPlanner.discover(tempDir, null, null, "all").runVars();
+        String none = AgentDiscoverPlanner.discover(tempDir, null, null, "NONE").runVars();
+
+        assertTrue(all.contains("pkb_reportretention=all"));
+        assertFalse(all.contains("pkb_reportretention=failed"));
+        assertTrue(none.contains("pkb_reportretention=none"));
+        assertFalse(none.contains("pkb_reportretention=failed"));
     }
 
     @Test
@@ -58,6 +73,23 @@ class AgentDiscoverPlannerTest {
     }
 
     @Test
+    void isolateKeepsSnapshotRetentionUnlessOverlaidAndStillForcesParallelOne() {
+        LinkedHashMap<String, String> retained = new LinkedHashMap<>();
+        retained.put(PKB_props.PKB_BROWSER, "CHROME_HEADLESS");
+        retained.put(PKB_props.PKB_PARALLEL, "12");
+        retained.put(PKB_props.PKB_REPORT_RETENTION, "all");
+
+        String kept = AgentDiscoverPlanner.isolateRunVars(retained, null, null);
+        String overlaid = AgentDiscoverPlanner.isolateRunVars(retained, null, null, "none");
+
+        assertTrue(kept.contains("pkb_reportretention=all"));
+        assertTrue(kept.contains("pkb_parallel=1"));
+        assertFalse(kept.contains("pkb_parallel=12"));
+        assertTrue(overlaid.contains("pkb_reportretention=none"));
+        assertTrue(overlaid.contains("pkb_parallel=1"));
+    }
+
+    @Test
     void confirmReplaysSnapshotAndOverlaysSelection() {
         Map<String, String> retained = Map.of(
                 PKB_props.PKB_BROWSER, "GRID_CHROME",
@@ -68,6 +100,23 @@ class AgentDiscoverPlannerTest {
         assertTrue(confirm.contains("pkb_browser=GRID_CHROME"));
         assertTrue(confirm.contains("pkb_parallel=8"));
         assertTrue(confirm.contains("pkb_tags=@one"));
+    }
+
+    @Test
+    void confirmKeepsSnapshotRetentionUnlessOverlaid() {
+        Map<String, String> retained = Map.of(
+                PKB_props.PKB_BROWSER, "GRID_CHROME",
+                PKB_props.PKB_PARALLEL, "8",
+                PKB_props.PKB_REPORT_RETENTION, "all"
+        );
+        String kept = AgentDiscoverPlanner.confirmRunVars(retained, "@one", null);
+        String overlaid = AgentDiscoverPlanner.confirmRunVars(retained, "@one", null, "none");
+
+        assertTrue(kept.contains("pkb_reportretention=all"));
+        assertFalse(kept.contains("pkb_reportretention=failed"));
+        assertTrue(overlaid.contains("pkb_reportretention=none"));
+        assertTrue(overlaid.contains("pkb_tags=@one"));
+        assertTrue(overlaid.contains("pkb_parallel=8"));
     }
 
     @Test

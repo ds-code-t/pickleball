@@ -30,6 +30,7 @@ class WorkbenchAgentCommandsTest {
 
         assertEquals(0, output.exitCode());
         assertTrue(output.stdout().contains("pkb_browser=CHROME_HEADLESS"));
+        assertTrue(output.stdout().contains("pkb_reportretention=failed"));
         assertTrue(output.stdout().contains("NEXT: run discover"));
         assertFalse(output.stdout().contains("MUST"));
         assertFalse(output.stdout().contains("pkb_parallel=80"));
@@ -79,6 +80,8 @@ class WorkbenchAgentCommandsTest {
         assertEquals(1, exit);
         assertEquals(1, captured.size());
         assertTrue(captured.getFirst().stream().anyMatch(item -> item.startsWith("-Dpkb_runvars=")));
+        assertTrue(captured.getFirst().stream().anyMatch(item ->
+                item.startsWith("-Dpkb_runvars=") && item.contains("pkb_reportretention=failed")));
         assertTrue(captured.getFirst().contains("-Dpkb_run_purpose=workbench-discover"));
         LastDiscoverSnapshot.Snapshot snapshot = LastDiscoverSnapshot.read(tempDir);
         assertTrue(snapshot.hasRunVars());
@@ -120,6 +123,46 @@ class WorkbenchAgentCommandsTest {
         assertTrue(text.contains("NEXT: confirm"));
         assertTrue(text.contains("isolate"));
         assertTrue(text.contains("execute-step"));
+    }
+
+    @Test
+    void discoverRetentionAllWritesAll() throws Exception {
+        Path catalogDir = tempDir.resolve("reports/diagnostic-runs");
+        Files.createDirectories(catalogDir);
+        List<List<String>> captured = new ArrayList<>();
+        ByteArrayOutputStream stdout = new ByteArrayOutputStream();
+        int exit = WorkbenchAgentCommands.run(
+                new String[]{"discover", tempDir.toString(), "--tags=@smoke", "--retention=all"},
+                new PrintStream(stdout, true, StandardCharsets.UTF_8),
+                System.err,
+                (project, command, out, err) -> {
+                    captured.add(command);
+                    try {
+                        Files.writeString(catalogDir.resolve("run-catalog.json"), """
+                                {
+                                  "schemaVersion": 1,
+                                  "runs": [
+                                    {
+                                      "runId": "run-all",
+                                      "runProfile": "pkb_browser=CHROME_HEADLESS, pkb_parallel=4, pkb_reportingmode=diagnostic, pkb_reportretention=all, pkb_tags=@smoke",
+                                      "lineage": { "runPurpose": "workbench-discover" }
+                                    }
+                                  ]
+                                }
+                                """);
+                    } catch (Exception failure) {
+                        throw new RuntimeException(failure);
+                    }
+                    return 0;
+                }
+        );
+
+        assertEquals(0, exit);
+        String printed = stdout.toString(StandardCharsets.UTF_8);
+        assertTrue(printed.contains("pkb_reportretention=all"));
+        assertFalse(printed.contains("pkb_reportretention=failed"));
+        assertTrue(captured.getFirst().stream().anyMatch(item ->
+                item.startsWith("-Dpkb_runvars=") && item.contains("pkb_reportretention=all")));
     }
 
     @Test

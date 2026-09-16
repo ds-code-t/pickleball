@@ -26,6 +26,8 @@ The resolved state is exposed as `PickleballRunner.DIAGNOSTIC_MODE`.
 
 Explicit report steps are not suppressed by this setting.
 
+Workbench `discover` / `confirm` / `hint` default to `failed` even though ordinary diagnostic runs default to `all`. Override the Workbench overlay with `--retention=all|failed|none`. That flag does not change this table.
+
 ## Diagnostic layout
 
 Default root:

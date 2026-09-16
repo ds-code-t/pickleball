@@ -86,6 +86,7 @@ public class PickleballGuidanceChecks {
             assertTrue(chooserList.contains("pkb_run_profile"));
             assertTrue(chooserList.contains("-Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher"));
             assertTrue(chooserList.contains("-Dexec.args=discover"));
+            assertTrue(chooserList.contains("--retention"));
             assertTrue(chooserList.contains("change") && chooserList.contains("exec.args"));
             assertTrue(chooserList.contains("-Dexec.args=isolate"));
             assertTrue(chooserList.contains("execute-step"));

@@ -51,7 +51,14 @@ public final class PickleballWorkbenchLauncher {
     }
 
     public static void main(String[] args) {
-        WorkbenchCommandLine.Parsed parsed = WorkbenchCommandLine.parse(args);
+        WorkbenchCommandLine.Parsed parsed;
+        try {
+            parsed = WorkbenchCommandLine.parse(args);
+        } catch (IllegalArgumentException failure) {
+            System.err.println(failure.getMessage());
+            System.exit(2);
+            return;
+        }
         Path project = parsed.project() != null
                 ? parsed.project()
                 : PickleballLocalLayout.findProjectRoot(Path.of(""));

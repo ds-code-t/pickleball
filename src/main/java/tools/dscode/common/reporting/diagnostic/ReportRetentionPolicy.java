@@ -92,4 +92,26 @@ public final class ReportRetentionPolicy {
             return Mode.ALL;
         }
     }
+
+    /**
+     * Strict parse for Workbench {@code --retention}. Unknown values must not
+     * inherit {@link #parse(String)}'s unknown→{@code ALL} fallback, which would
+     * invert the Workbench Discover default of {@code failed}.
+     */
+    public static Mode parseExact(String value) {
+        if (value == null || value.isBlank()) {
+            throw unknownRetention(value);
+        }
+        try {
+            return Mode.valueOf(value.trim().toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException ignored) {
+            throw unknownRetention(value);
+        }
+    }
+
+    private static IllegalArgumentException unknownRetention(String value) {
+        return new IllegalArgumentException(
+                "Unknown --retention '" + value + "'; use all, failed, or none."
+        );
+    }
 }

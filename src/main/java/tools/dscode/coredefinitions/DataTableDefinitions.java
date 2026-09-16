@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import io.cucumber.core.runner.util.TableUtils;
 import io.cucumber.datatable.DataTable;
 import io.cucumber.java.DataTableType;
 import java.util.ArrayList;
@@ -21,7 +22,7 @@ public class DataTableDefinitions {
 
     @DataTableType
     public JsonNode jsonNode(DataTable table) {
-        List<List<String>> cells = table.cells();
+        List<List<String>> cells = TableUtils.cellsWithRestoredBlanks(table);
         if (cells.isEmpty()) {
             return JSON_MAPPER.createObjectNode();
         }
@@ -72,7 +73,7 @@ public class DataTableDefinitions {
 
     @DataTableType
     public Object object(DataTable table) {
-        List<List<String>> cells = table.cells();
+        List<List<String>> cells = TableUtils.cellsWithRestoredBlanks(table);
         if (cells.size() == 1) {
             return List.copyOf(cells.getFirst());
         }
@@ -220,7 +221,7 @@ public class DataTableDefinitions {
      * with zero data rows.
      */
     private static List<Map<String, String>> rowsAsStringMaps(DataTable table) {
-        List<List<String>> cells = table.cells();
+        List<List<String>> cells = TableUtils.cellsWithRestoredBlanks(table);
         if (cells.size() < 2) {
             return List.of();
         }
@@ -240,7 +241,7 @@ public class DataTableDefinitions {
     }
 
     private static List<String> firstColumnValues(DataTable table) {
-        List<List<String>> cells = table.cells();
+        List<List<String>> cells = TableUtils.cellsWithRestoredBlanks(table);
         if (cells.isEmpty()) {
             return List.of();
         }

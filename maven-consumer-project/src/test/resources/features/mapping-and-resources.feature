@@ -108,6 +108,21 @@ Feature: Use supported mapping steps and comma save actions
     And , ensure "<^~EMPTY~^>" equals ""
     And CLEAR SAVED VALUES
 
+  @all @regression @data @mapping @optional-keys
+  Scenario: Optional question-mark keys are a distinct slot and do not alias the unprefixed name
+    Given CLEAR SAVED VALUES
+    When , save "optional-default" as "?optionalKey"
+    Then , ensure "<optionalKey>" equals "optional-default"
+    And , ensure "<?optionalKey>" equals "optional-default"
+    When , save "direct-value" as "optionalKey"
+    Then , ensure "<optionalKey>" equals "direct-value"
+    And , ensure "<?optionalKey>" equals "optional-default"
+    And , ensure "<?neverDeclared>" equals ""
+    When , save "A" as "Col1"
+    Then , ensure "<Col1>" equals "A"
+    And , ensure "<?Col1>" equals ""
+    And CLEAR SAVED VALUES
+
   @all @regression @data @mapping @config-reference
   Scenario: Resolve recommended and legacy configuration references from the same mapping
     Then , ensure "<config:TEST_DATA.siteName>" equals "Pickleball Test Lab"

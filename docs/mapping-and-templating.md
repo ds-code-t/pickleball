@@ -333,6 +333,24 @@ The following references produce explicit special values:
 
 They represent explicit null, `NaN`, positive infinity, negative infinity, a tab character, and an empty string respectively.
 
+A blank Gherkin Data Table cell is the empty string `""`, not `<^~NULL~^>`. See [Blank table cells](data-values-and-elements.md#blank-table-cells).
+
+## Optional keys with ?
+
+`?` is part of the key. `Col1` and `?Col1` are different keys.
+
+Resolution order for an unprefixed name:
+
+1. Resolve `name`.
+2. If that value is missing, null, or blank, fall back to `?name`.
+3. If the query is already `?`-prefixed (`<?name>`, `` <?`name`> ``, or a `?`-property in a path), return that slot and never walk back to `name`.
+
+`<?name>` with only `name` stored therefore resolves to `""`. That is correct: the optional slot was never written. `<name>` with only `?name` stored returns the optional default. When both are set, the direct `name` value wins. An undeclared optional reference such as `<?neverDeclared>` terminates as `""`.
+
+This is not the expression-ternary `cond ? a : b` path. A `?` on a mapping key names an optional default slot; it is not a ternary operator.
+
+Component Examples can declare the optional default slot in the header, for example `| ?customerName |`, while the scenario body still uses `<customerName>`. See [Component Scenarios](component-scenarios.md).
+
 ## Source-qualified references
 
 Recognized lowercase source prefixes are resolved before ordinary map lookup.

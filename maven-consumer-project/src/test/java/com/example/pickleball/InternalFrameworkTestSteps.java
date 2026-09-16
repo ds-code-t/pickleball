@@ -21,6 +21,7 @@ import tools.dscode.common.reporting.diagnostic.ReportRetentionPolicy;
 import tools.dscode.common.treeparsing.parsedComponents.phraseoperations.PlaceHolderMatchChecks;
 import tools.dscode.common.util.datetime.BusinessTemporalDeltaChecks;
 import tools.dscode.common.util.datetime.BusinessTimePostModifierChecks;
+import tools.dscode.coredefinitions.DataTableConversionChecks;
 import tools.dscode.coredefinitions.ModularScenariosChecks;
 import tools.dscode.launcher.WorkbenchAgentCommandChecks;
 import tools.dscode.parallelutilities.ParallelCountEstimatorChecks;
@@ -51,6 +52,7 @@ public final class InternalFrameworkTestSteps {
                 ScenarioStepChecks.class,
                 ScenarioStepDataChecks.class,
                 MappingDataRefactorChecks.class,
+                DataTableConversionChecks.class,
                 QuoteParserChecks.class,
                 ModularScenariosChecks.class,
                 BusinessTemporalDeltaChecks.class,
@@ -84,6 +86,11 @@ public final class InternalFrameworkTestSteps {
         } finally {
             ReportRetentionPolicy.clearThreadOverride();
         }
+    }
+
+    @Given("^RUN DATA TABLE CONVERSION JAVA TESTS$")
+    public static void runDataTableConversionJavaTests() {
+        runAndAssert(DataTableConversionChecks.class);
     }
 
     @Given("^RUN DATA ELEMENT PHASE 1 JAVA TESTS$")

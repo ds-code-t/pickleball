@@ -165,6 +165,30 @@ public class TableUtils {
     public static LinkedListMultimap<String, String> toStringMultimap(List<?> keys, List<?> values) {
         return toMultimap(normalizeStringList(keys), normalizeStringList(values));
     }
+
+    /**
+     * Cucumber 7.27.2 rewrites empty Gherkin data-table cells to {@code null}
+     * before step definitions see the {@link DataTable}. Restore those blanks
+     * at the Gherkin-table boundary when cells become mapping, JSON, or Data
+     * Element values. Do not mutate the stored table.
+     */
+    public static List<List<String>> cellsWithRestoredBlanks(DataTable dataTable) {
+        if (dataTable == null) {
+            return List.of();
+        }
+        return restoreBlankCells(dataTable.cells());
+    }
+
+    /**
+     * Null or blank cells become {@code ""}. {@link DataTable#create} rejects
+     * null cells, so callers that need to unit-test Cucumber's null rewrite
+     * should pass a raw list rather than constructing a {@link DataTable}.
+     */
+    public static List<List<String>> restoreBlankCells(List<List<String>> cells) {
+        List<List<String>> restored = normalizeStringTable(cells);
+        return restored == null ? List.of() : restored;
+    }
+
     public static LinkedListMultimap<String, String> exampleHeaderValueStringMap(io.cucumber.core.gherkin.Pickle pickle) {
         if (pickle == null)
             return null;

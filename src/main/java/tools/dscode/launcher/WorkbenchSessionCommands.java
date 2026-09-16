@@ -58,7 +58,13 @@ public final class WorkbenchSessionCommands {
             DetachedStarter starter,
             HttpClient http
     ) {
-        WorkbenchCommandLine.Parsed parsed = WorkbenchCommandLine.parse(args);
+        WorkbenchCommandLine.Parsed parsed;
+        try {
+            parsed = WorkbenchCommandLine.parse(args);
+        } catch (IllegalArgumentException failure) {
+            err.println(failure.getMessage());
+            return 2;
+        }
         SessionFlags flags = SessionFlags.parse(args);
         try {
             return switch (parsed.command()) {
