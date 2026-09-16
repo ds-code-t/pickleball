@@ -78,7 +78,7 @@ final class WorkbenchFrame extends JFrame {
     private MappingTreeModel mappingModel;
     private DiagnosticEvidenceNavigator diagnosticNavigator;
 
-    private static final Color PLAYHEAD_COLOR = new Color(255, 228, 150);
+    private static final Color PLAYHEAD_COLOR = WorkbenchTheme.PLAYHEAD;
     private final JTextArea scenarioEditor = new JTextArea();
     private final Highlighter.HighlightPainter playheadPainter =
             new DefaultHighlighter.DefaultHighlightPainter(PLAYHEAD_COLOR);
@@ -86,9 +86,9 @@ final class WorkbenchFrame extends JFrame {
     private final JList<String> keywordList = new JList<>();
     private final JTextField stepText = new JTextField();
 
-    private final JButton playButton = playerButton("▶", "Run the scenario from the first step in a fresh scenario context");
-    private final JButton pauseButton = playerButton("⏸", "Pause after the current in-flight step");
-    private final JButton playerStopButton = playerButton("■", "Stop automatic scenario advancement");
+    private final JButton playButton = WorkbenchTheme.accentButton("▶ Play", "Run the scenario from the first step in a fresh scenario context");
+    private final JButton pauseButton = WorkbenchTheme.flatButton("Pause", "Pause after the current in-flight step");
+    private final JButton playerStopButton = WorkbenchTheme.flatButton("Stop", "Stop automatic scenario advancement");
     private final JButton stepOnlyButton =
             smallPlayerButton("▶ Step", "Execute only the Step Editor text in the current paused scenario context");
     private final JButton fromHereButton =
@@ -343,7 +343,8 @@ final class WorkbenchFrame extends JFrame {
 
         JPanel state = new JPanel(new FlowLayout(FlowLayout.RIGHT, 6, 0));
         state.setOpaque(false);
-        state.add(WorkbenchTheme.muted("Status"));
+        state.add(WorkbenchTheme.muted("Player"));
+        playerStatusLabel.setFont(playerStatusLabel.getFont().deriveFont(Font.BOLD, 13f));
         state.add(playerStatusLabel);
         bar.add(state, BorderLayout.EAST);
         return bar;
@@ -363,7 +364,7 @@ final class WorkbenchFrame extends JFrame {
 
         JPanel header = new JPanel(new BorderLayout(8, 0));
         header.setOpaque(false);
-        header.add(WorkbenchTheme.heading("Gherkin editor"), BorderLayout.WEST);
+        header.add(WorkbenchTheme.heading("Live Gherkin"), BorderLayout.WEST);
         editorTabs.setTabLayoutPolicy(JTabbedPane.SCROLL_TAB_LAYOUT);
         editorTabs.addChangeListener(event -> {
             if (rebuildingTabs) return;
@@ -384,11 +385,14 @@ final class WorkbenchFrame extends JFrame {
         scenarioEditor.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 14));
         scenarioEditor.setLineWrap(false);
         scenarioEditor.setTabSize(2);
-        panel.add(new JScrollPane(scenarioEditor), BorderLayout.CENTER);
+        WorkbenchTheme.styleEditor(scenarioEditor);
+        JScrollPane editorScroll = new JScrollPane(scenarioEditor);
+        WorkbenchTheme.styleScroll(editorScroll);
+        panel.add(editorScroll, BorderLayout.CENTER);
 
         JPanel legend = new JPanel(new FlowLayout(FlowLayout.LEFT, 18, 2));
         legend.setOpaque(false);
-        legend.add(WorkbenchTheme.muted("Tab indents with :   Shift-Tab outdents"));
+        legend.add(WorkbenchTheme.muted("Tab = nested :    Shift-Tab = outdent    keyword autocomplete on Given/When/Then"));
         legend.add(WorkbenchTheme.muted("Play uses Background + selected Examples row"));
         legend.add(WorkbenchTheme.muted("Ctrl+click a RUN step to open its target"));
         panel.add(legend, BorderLayout.SOUTH);
@@ -397,22 +401,20 @@ final class WorkbenchFrame extends JFrame {
 
     private JComponent stepPanel() {
         JPanel panel = new JPanel(new BorderLayout(6, 5));
-        panel.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createEtchedBorder(),
-                new EmptyBorder(5, 7, 7, 7)
-        ));
+        panel.setBackground(WorkbenchTheme.SURFACE);
+        panel.setBorder(WorkbenchTheme.cardBorder());
 
-        JPanel header = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 0));
-        JLabel title = new JLabel("Step Editor");
-        title.setFont(title.getFont().deriveFont(Font.BOLD));
-        header.add(title);
+        JPanel header = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
+        header.setOpaque(false);
+        header.add(WorkbenchTheme.heading("Step Editor"));
         header.add(stepOnlyButton);
         header.add(fromHereButton);
         header.add(openTargetButton);
-        header.add(new JLabel("Enter = append/insert   Ctrl+Enter = update selected line"));
+        header.add(WorkbenchTheme.muted("Enter = append/insert    Ctrl+Enter = update selected line"));
         panel.add(header, BorderLayout.NORTH);
 
         stepText.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 14));
+        WorkbenchTheme.styleEditor(stepText);
         panel.add(stepText, BorderLayout.CENTER);
         return panel;
     }
@@ -437,10 +439,12 @@ final class WorkbenchFrame extends JFrame {
      */
     private JPanel mappingPanel() {
         JPanel panel = new JPanel(new BorderLayout(6, 6));
+        panel.setBackground(WorkbenchTheme.SURFACE);
         panel.setBorder(new EmptyBorder(8, 8, 8, 8));
 
         JPanel selector = new JPanel(new BorderLayout(6, 0));
-        selector.add(new JLabel("NodeMap:"), BorderLayout.WEST);
+        selector.setOpaque(false);
+        selector.add(WorkbenchTheme.muted("NodeMap"), BorderLayout.WEST);
         nodeMapSelector.setEnabled(false);
         selector.add(nodeMapSelector, BorderLayout.CENTER);
         panel.add(selector, BorderLayout.NORTH);
@@ -449,9 +453,13 @@ final class WorkbenchFrame extends JFrame {
         mappingEditor.setTabSize(2);
         mappingEditor.setLineWrap(false);
         mappingEditor.setEnabled(false);
-        panel.add(new JScrollPane(mappingEditor), BorderLayout.CENTER);
+        WorkbenchTheme.styleEditor(mappingEditor);
+        JScrollPane mappingScroll = new JScrollPane(mappingEditor);
+        WorkbenchTheme.styleScroll(mappingScroll);
+        panel.add(mappingScroll, BorderLayout.CENTER);
 
         mappingStatus.setBorder(new EmptyBorder(2, 2, 2, 2));
+        mappingStatus.setForeground(WorkbenchTheme.MUTED);
         panel.add(mappingStatus, BorderLayout.SOUTH);
         if (mappingView != null) {
             JPanel wrap = new JPanel(new BorderLayout());
@@ -474,10 +482,10 @@ final class WorkbenchFrame extends JFrame {
         message.setText("""
                 Diagnostic Log Explorer
 
-                JavaFX WebView is unavailable in this process, so the explorer
-                cannot open the timeline UI. Workbench still reads Pickleball's
-                retained diagnostic artifacts from reports/diagnostic-runs and
-                does not invent a second store.
+                Replay a retained Pickleball run, one scenario step at a time.
+                JavaFX WebView is unavailable in this process, so the timeline
+                UI cannot open. Workbench still reads retained artifacts from
+                reports/diagnostic-runs and does not invent a second store.
                 """);
         message.setCaretPosition(0);
         panel.add(new JScrollPane(message), BorderLayout.CENTER);
@@ -486,7 +494,9 @@ final class WorkbenchFrame extends JFrame {
 
     private JPanel footer() {
         JPanel footer = new JPanel(new BorderLayout());
-        activityLabel.setBorder(new EmptyBorder(2, 4, 2, 4));
+        footer.setOpaque(false);
+        activityLabel.setForeground(WorkbenchTheme.MUTED);
+        activityLabel.setBorder(new EmptyBorder(4, 4, 0, 4));
         footer.add(activityLabel, BorderLayout.CENTER);
         footer.add(webViewNote, BorderLayout.EAST);
         return footer;
@@ -497,7 +507,12 @@ final class WorkbenchFrame extends JFrame {
         keywordList.setVisibleRowCount(8);
         keywordList.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 13));
         keywordList.setFocusable(false);
+        keywordList.setBackground(WorkbenchTheme.SURFACE);
+        keywordList.setForeground(WorkbenchTheme.TEXT);
+        keywordList.setSelectionBackground(WorkbenchTheme.ACCENT_SOFT);
+        keywordList.setSelectionForeground(WorkbenchTheme.TEXT);
         keywordPopup.setFocusable(false);
+        keywordPopup.setBorder(WorkbenchTheme.hairline());
         keywordPopup.add(new JScrollPane(keywordList));
         keywordList.addMouseListener(new MouseAdapter() {
             @Override
@@ -963,12 +978,15 @@ final class WorkbenchFrame extends JFrame {
             item.put("scenarioId", beat.scenarioId());
             item.put("logLines", beat.logLines());
             if (beat.screenshot() != null && Files.isRegularFile(beat.screenshot())) {
+                item.put("hasScreenshot", true);
                 try {
                     byte[] bytes = Files.readAllBytes(beat.screenshot());
                     item.put("dataUri", "data:image/png;base64," + Base64.getEncoder().encodeToString(bytes));
                 } catch (Exception ignored) {
                     // Screenshot bytes are optional; the step/log still replay.
                 }
+            } else {
+                item.put("hasScreenshot", false);
             }
             beats.add(item);
         }
@@ -983,11 +1001,12 @@ final class WorkbenchFrame extends JFrame {
         }
         List<Map<String, Object>> runs = new ArrayList<>();
         for (var run : diagnosticNavigator.catalogRuns()) {
-            runs.add(Map.of(
-                    "runId", run.runId(),
-                    "label", run.runId(),
-                    "selected", run.runId().equals(runId)
-            ));
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("runId", run.runId());
+            row.put("label", run.displayLabel());
+            row.put("outcome", run.outcome());
+            row.put("selected", run.runId().equals(runId));
+            runs.add(row);
         }
         diagnosticView.evalJsonCall("window.setDiagnosticState", WorkbenchWebJson.write(Map.of(
                 "runs", runs,
@@ -1620,6 +1639,12 @@ final class WorkbenchFrame extends JFrame {
             case RUNNING -> playbackBusy ? "Running" : "Playing";
             case WAITING_FOR_STEP -> "Waiting for step";
         });
+        playerStatusLabel.setForeground(switch (player.state()) {
+            case STOPPED -> WorkbenchTheme.MUTED;
+            case PAUSED -> WorkbenchTheme.WARNING;
+            case RUNNING -> WorkbenchTheme.SUCCESS;
+            case WAITING_FOR_STEP -> WorkbenchTheme.ACCENT;
+        });
         if (activity != null && !activity.isBlank()) activityLabel.setText(activity);
         syncScenarioView();
     }
@@ -1652,13 +1677,16 @@ final class WorkbenchFrame extends JFrame {
     private void applyState(WorkbenchUiController.State state) {
         lastState = state;
         projectLabel.setText("Project: " + state.projectRoot().getFileName());
-        readinessLabel.setText(
-                state.liveReady()
-                        ? "Live worker ready"
-                        : state.synchronizedProject()
-                                ? "Synchronized"
-                                : "Not synchronized"
-        );
+        if (state.liveReady()) {
+            readinessLabel.setText("Live worker ready");
+            readinessLabel.setForeground(WorkbenchTheme.SUCCESS);
+        } else if (state.synchronizedProject()) {
+            readinessLabel.setText("Synchronized");
+            readinessLabel.setForeground(WorkbenchTheme.MUTED);
+        } else {
+            readinessLabel.setText("Not synchronized");
+            readinessLabel.setForeground(WorkbenchTheme.WARNING);
+        }
         syncItem.setEnabled(!state.workerRunning());
         startItem.setEnabled(state.synchronizedProject() && !state.workerRunning());
         restartItem.setEnabled(state.workerRunning());
@@ -1761,8 +1789,11 @@ final class WorkbenchFrame extends JFrame {
         javaInspector.setEditable(false);
         javaInspector.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 12));
         javaInspector.setLineWrap(false);
+        WorkbenchTheme.styleEditor(javaInspector);
         javaInspector.setText("Select a Gherkin step to show its Java glue or Pickleball dynamic match.");
-        panel.add(new JScrollPane(javaInspector), BorderLayout.CENTER);
+        JScrollPane inspectorScroll = new JScrollPane(javaInspector);
+        WorkbenchTheme.styleScroll(inspectorScroll);
+        panel.add(inspectorScroll, BorderLayout.CENTER);
         return panel;
     }
 

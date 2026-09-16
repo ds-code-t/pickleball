@@ -31,7 +31,24 @@ public final class DiagnosticEvidenceNavigator {
         TRACE
     }
 
-    public record CatalogRun(String runId, Path runRoot, JsonNode raw) { }
+    public record CatalogRun(String runId, Path runRoot, JsonNode raw) {
+        public String displayLabel() {
+            StringBuilder label = new StringBuilder(runId == null ? "" : runId);
+            String outcome = DiagnosticEvidenceNavigator.text(raw, "outcome");
+            if (!outcome.isBlank()) {
+                label.append(" · ").append(outcome);
+            }
+            String purpose = DiagnosticEvidenceNavigator.text(raw, "purpose", "runPurpose");
+            if (!purpose.isBlank()) {
+                label.append(" · ").append(purpose);
+            }
+            return label.toString();
+        }
+
+        public String outcome() {
+            return DiagnosticEvidenceNavigator.text(raw, "outcome");
+        }
+    }
 
     public record ScreenshotFrame(
             Path file,

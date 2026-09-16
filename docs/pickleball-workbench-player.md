@@ -108,7 +108,7 @@ The Terminal tails the worker stdout/stderr files Workbench already creates unde
 
 ## Diagnostic Log Explorer
 
-The explorer is a rewind/play/focus timeline of retained Pickleball diagnostic runs. Screenshot frames are shown with the Gherkin step that was running when they were taken. Denser layers follow the repository evidence order and only open when the retained files exist. If `reports/diagnostic-runs/run-catalog.json` is missing, the panel stays empty and says so.
+The explorer is a rewind/play/focus timeline of retained Pickleball diagnostic runs. The run dropdown uses catalog ids plus retained outcome/purpose when those fields exist. Each step shows its Gherkin, INFO+ log, and the screenshot taken while that step ran — or an explicit gap when no PNG was retained. Play stops at the last step. Denser layers follow the repository evidence order and only open when the retained files exist. If `reports/diagnostic-runs/run-catalog.json` is missing, the panel stays empty and says so.
 
 ## Watched-agent control lease
 

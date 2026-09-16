@@ -3,28 +3,59 @@
 <head>
   <meta charset="utf-8">
   <title>Diagnostic replay</title>
+  <link rel="stylesheet" href="workbench-web.css">
   <link rel="stylesheet" href="diagnostic-explorer.css">
 </head>
 <body>
-  <div class="toolbar">
-    <label>Run
-      <select id="runs"></select>
-    </label>
-    <button type="button" id="prev">◀ Step</button>
-    <button type="button" id="play">Play</button>
-    <button type="button" id="next">Step ▶</button>
-    <span id="status" class="status"></span>
-  </div>
-  <div class="replay">
-    <aside class="beats">
-      <div class="pane-title">Scenario steps</div>
-      <div id="beats"></div>
-    </aside>
-    <section class="stage">
-      <img id="frame" alt="Retained diagnostic screenshot">
-      <div id="step" class="step"></div>
-      <pre id="log" class="log"></pre>
-    </section>
+  <div class="shell">
+    <header class="toolbar">
+      <label class="run-picker">Retained run
+        <select id="runs" aria-label="Retained diagnostic run"></select>
+      </label>
+      <div class="transport" role="group" aria-label="Replay controls">
+        <button type="button" class="wb-btn" id="prev" title="Previous step">◀ Previous</button>
+        <button type="button" class="wb-btn primary" id="play" title="Replay this retained run in order">Play</button>
+        <button type="button" class="wb-btn" id="next" title="Next step">Next ▶</button>
+      </div>
+      <div class="meter">
+        <div id="status" class="status">Choose a retained run to replay it step by step.</div>
+        <input id="scrub" type="range" min="0" max="0" value="0" aria-label="Step in this run">
+      </div>
+    </header>
+
+    <div id="empty" class="empty-state">
+      <h1>No retained diagnostic run</h1>
+      <p id="empty-copy">Workbench reads <code>reports/diagnostic-runs</code> from this consumer project. It does not invent results or a second diagnostic store.</p>
+    </div>
+
+    <div id="replay" class="replay" hidden>
+      <aside class="beats">
+        <div class="pane-title">Scenario steps</div>
+        <div id="beats"></div>
+      </aside>
+      <section class="stage">
+        <div class="frame-well">
+          <img id="frame" alt="Retained diagnostic screenshot for the current step">
+          <div id="frame-gap" class="frame-gap"></div>
+        </div>
+        <div class="step-card">
+          <div class="step-card-head">
+            <span id="step-status" class="badge"></span>
+            <span id="step-meta" class="step-meta"></span>
+          </div>
+          <div id="step" class="step"></div>
+        </div>
+        <div class="log-card">
+          <div class="pane-title">INFO+ log for this step</div>
+          <pre id="log" class="log"></pre>
+        </div>
+        <div class="layers-card">
+          <div class="pane-title">Evidence on disk</div>
+          <div id="layers" class="layers"></div>
+          <pre id="layer-excerpt" class="excerpt" hidden></pre>
+        </div>
+      </section>
+    </div>
   </div>
   <script src="diagnostic-explorer.js"></script>
 </body>

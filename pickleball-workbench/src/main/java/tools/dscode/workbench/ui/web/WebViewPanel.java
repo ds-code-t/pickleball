@@ -74,7 +74,7 @@ public final class WebViewPanel extends JPanel {
             throw new IllegalStateException("Missing Workbench WebView resource: " + resource);
         }
         engine.load(url.toExternalForm());
-        fxPanel.setScene(new Scene(view, Color.web("#f8fafc")));
+        fxPanel.setScene(new Scene(view, Color.web("#f4f6f8")));
     }
 
     private void installBridge() {

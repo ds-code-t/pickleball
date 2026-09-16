@@ -254,7 +254,7 @@ A one-line JavaFX warning `Unsupported JavaFX configuration: classes were loaded
 
 The Terminal tab presents the existing consumer-worker stdout/stderr capture files under `.pickleball/workbench/logs/` as a scenario-run log. A dropdown filters `TRACE`, `DEBUG`, `INFO`, `WARNING`, and `ERROR`. Lines continue as the playhead moves because the panel tails those files and also records `executeStep` / Mapping results. Workbench does not redirect MCP stdout. If a worker log line has no printed level, it is shown at `INFO` rather than invented. Structured Pickleball logger output is used when present; there is no second log fabricator.
 
-The Diagnostic Log Explorer is a WebView **replay** over Pickleball's retained diagnostic artifacts (`reports/diagnostic-runs`). It walks `events.jsonl` step by step: each beat shows the Gherkin step, INFO+ log lines captured for that step, and the screenshot taken while that step ran when a PNG exists. Play/Pause and Step ◀/▶ move through the run in order, like watching the original execution. It follows the existing evidence escalation order and does not create a competing store or fake retained-run data:
+The Diagnostic Log Explorer is a WebView **replay** over Pickleball's retained diagnostic artifacts (`reports/diagnostic-runs`). Choose a catalog run, then walk it like a recording: the left timeline lists scenario steps (with pass/fail and screenshot marks when retained), the stage shows the screenshot for the current step or an honest “no screenshot retained” gap, plus that step’s Gherkin and INFO+ log lines. Play/Pause advances in order and **stops on the last step** (it does not wrap). Previous/Next, the scrubber, and Left/Right arrows seek. Evidence-layer chips show which catalog/index/events/screenshot files exist on disk; they do not invent a competing store or fake retained-run data:
 
 1. `run-catalog.json`
 2. selected `run-index.json` / `clusters.json`
@@ -515,7 +515,7 @@ Use the UI-owned worker for runtime checks; do not run `worker-check` or `live-c
 13. Treat **Pause** / **Stop** as presentation/control of automatic advancement only; they do not rewind browser or service side effects.
 14. Verify Mapping has no `Current Scope` control and no hard-coded NodeMap choices. Top-level properties come from the worker ParsingMap and accept typed in-place edits.
 15. Verify Terminal filters worker log files by level and continues as steps run, without writing to MCP stdout.
-16. Verify Diagnostic Log Explorer lists retained runs from `reports/diagnostic-runs` only, or shows an honest empty state, and that Play/Step walks events with screenshots when present.
+16. Verify Diagnostic Log Explorer lists retained runs from `reports/diagnostic-runs` only, or shows an honest empty state. Play/Step walk events with screenshots when present, and a step without a PNG says so instead of leaving a blank stage.
 17. Verify **Tools > Advanced Controls** still exposes Status, Recent Events, Step Overrides, Evidence, and Breakpoints.
 18. Verify blocking runtime actions leave the Swing UI responsive.
 19. Load a picker scenario, click **Save**, and cancel the confirmation; the original `.feature` file must be unchanged. Confirming copies only that scenario back into the originating file.

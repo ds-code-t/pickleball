@@ -85,7 +85,7 @@ Buffered Play / From Here / add-and-continue now execute through the existing li
 
 The Mapping tab must not hard-code NodeMap names. It is one current-ParsingMap NodeMap selector plus a structured property tree. Typed edits go through `mappingPut`; renames/object replacement use `mappingRestore`. Do not create a fake ParsingMap in Swing or WebView.
 
-The Terminal tab tails the existing worker stdout/stderr files and filters TRACE–ERROR. Do not implement it by redirecting MCP stdout or inventing log lines. The Diagnostic Log Explorer binds to Pickleball's retained diagnostic artifacts and evidence-escalation model. Do not populate either tab with fake production data.
+The Terminal tab tails the existing worker stdout/stderr files and filters TRACE–ERROR. Do not implement it by redirecting MCP stdout or inventing log lines. The Diagnostic Log Explorer is a replay of retained Pickleball runs: scenario steps, INFO+ logs, screenshots when a PNG exists, and an honest gap when it does not. Do not populate either tab with fake production data.
 
 Heavy panels use Workbench-only OpenJFX `WebView` (`JFXPanel`). That choice is documented in `docs/pickleball-workbench.md`. Do not add JCEF or Pickleball-core UI dependencies.
 

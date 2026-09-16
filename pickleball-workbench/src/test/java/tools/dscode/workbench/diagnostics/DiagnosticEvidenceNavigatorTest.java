@@ -41,6 +41,8 @@ class DiagnosticEvidenceNavigatorTest {
         DiagnosticEvidenceNavigator navigator = new DiagnosticEvidenceNavigator(project);
         assertTrue(navigator.available());
         assertEquals("run-1", navigator.catalogRuns().getFirst().runId());
+        assertEquals("run-1 · PASSED", navigator.catalogRuns().getFirst().displayLabel());
+        assertEquals("PASSED", navigator.catalogRuns().getFirst().outcome());
 
         DiagnosticEvidenceNavigator.Timeline timeline = navigator.timeline(run);
         assertEquals(1, timeline.frames().size());
@@ -78,6 +80,7 @@ class DiagnosticEvidenceNavigatorTest {
         Files.write(scenario.resolve("screenshots/frame-1.png"), new byte[]{9, 9, 9});
 
         DiagnosticEvidenceNavigator navigator = new DiagnosticEvidenceNavigator(project);
+        assertEquals("run-1 · FAILED", navigator.catalogRuns().getFirst().displayLabel());
         String catalog = navigator.catalogDocument().toString();
         assertTrue(catalog.contains("run-1"));
         assertTrue(catalog.contains("pkb_parallel=4"));
