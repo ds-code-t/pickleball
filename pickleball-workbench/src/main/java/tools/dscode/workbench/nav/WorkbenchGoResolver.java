@@ -25,11 +25,14 @@ public final class WorkbenchGoResolver {
 
     public WorkbenchGoResult resolve(WorkbenchGoLink link) {
         WorkbenchGoLink request = link == null ? WorkbenchGoLink.fromMap(java.util.Map.of()) : link;
-        if (!"editor".equals(request.to()) && !"explorer".equals(request.to())) {
+        if ("mapping".equals(request.to()) || "report".equals(request.to()) || "terminal".equals(request.to())) {
             return WorkbenchGoResult.panel(request.to(), request.label());
         }
         String relative = sanitizeRelative(request.path());
         if (relative.isBlank()) {
+            if ("explorer".equals(request.to())) {
+                return WorkbenchGoResult.panel("explorer", request.label().isBlank() ? "Open explorer" : request.label());
+            }
             return WorkbenchGoResult.missing(request, "No file path on this target.");
         }
         if (isFrameworkPath(relative, request.kind())) {
@@ -105,8 +108,9 @@ public final class WorkbenchGoResolver {
             String message
     ) {
         public static WorkbenchGoResult peek(WorkbenchGoLink link, Path file, String relative, String message) {
+            String to = "explorer".equals(link.to()) ? "explorer" : "editor";
             return new WorkbenchGoResult(
-                    "editor", file, relative, link.line(), link.kind(),
+                    to, file, relative, link.line(), link.kind(),
                     link.label().isBlank() ? relative : link.label(),
                     true, true, false, false, true, message
             );

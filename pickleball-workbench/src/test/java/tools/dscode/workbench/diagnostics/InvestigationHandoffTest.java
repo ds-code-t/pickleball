@@ -102,6 +102,30 @@ class InvestigationHandoffTest {
     }
 
     @Test
+    void emitDerivesExecutionMapFromEventsWhenOmitted() throws Exception {
+        Path scenario = project.resolve("reports/diagnostic-runs/run-derive/scenarios/parent");
+        Files.createDirectories(scenario);
+        Files.writeString(scenario.resolve("events.jsonl"), """
+                {"type":"nested_scenario_start","eventSeq":10,"callee":{"scenarioName":"login"}}
+                {"type":"step","eventSeq":11,"text":"Given nested login","nestingLevel":1,"source":{"path":"features/login.feature","line":5}}
+                {"type":"nested_scenario_end","eventSeq":12,"invocationId":"inv-login"}
+                {"type":"step","eventSeq":13,"text":"When RUN COMPONENT SCENARIO: login","nestingLevel":0,"source":{"path":"features/parent.feature","line":10}}
+                """);
+        Map<String, Object> raw = new LinkedHashMap<>();
+        raw.put("pkb_investigation_id", "derived-map");
+        raw.put("cause", "The nested login left the catalog empty.");
+        raw.put("runId", "run-derive");
+
+        InvestigationHandoff.Document document = InvestigationHandoff.normalize(raw, project);
+        assertTrue(document.executionMap() instanceof java.util.List<?>);
+        String html = InvestigationHandoff.renderHtml(document, project);
+        assertTrue(html.contains("Given nested login"));
+        assertTrue(html.contains("When RUN COMPONENT SCENARIO: login"));
+        assertTrue(html.contains("wb://explorer?run=run-derive&amp;seq=13"));
+        assertFalse(html.toLowerCase().contains("mermaid"));
+    }
+
+    @Test
     void emitWritesJsonAndHtmlWithoutCopyingTheDiagnosticPack() throws Exception {
         Path shotDir = project.resolve("reports/diagnostic-runs/run-1/scenarios/s1/screenshots");
         Files.createDirectories(shotDir);

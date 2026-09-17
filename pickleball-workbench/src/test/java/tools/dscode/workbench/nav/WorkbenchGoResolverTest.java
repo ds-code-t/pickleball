@@ -75,4 +75,15 @@ class WorkbenchGoResolverTest {
         assertEquals("n1", link.nodeId());
         assertEquals("features/a.feature", link.path());
     }
+
+    @Test
+    void explorerWithoutPathIsAPanelTargetNotAMissingFile() {
+        WorkbenchGoResolver.WorkbenchGoResult result = new WorkbenchGoResolver(project).resolve(
+                WorkbenchGoLink.parse("wb://explorer?run=run-9&seq=12")
+        );
+        assertEquals("explorer", result.to());
+        assertFalse(result.missing());
+        assertTrue(result.movesUi());
+        assertNull(result.file());
+    }
 }

@@ -81,6 +81,7 @@ final class WorkbenchFrame extends JFrame {
     private MappingTreeModel mappingModel;
     private DiagnosticEvidenceNavigator diagnosticNavigator;
     private String currentDiagnosticRunId = "";
+    private long lastExplorerEventSeq;
     private final JComboBox<String> reportPicker = new JComboBox<>();
     private final JEditorPane reportView = new JEditorPane();
     private final Map<String, Path> reportFiles = new LinkedHashMap<>();
@@ -1034,10 +1035,17 @@ final class WorkbenchFrame extends JFrame {
             )));
             return;
         }
-        showDiagnosticRun(runs.getFirst().runId());
+        String runId = currentDiagnosticRunId;
+        boolean known = runId != null && !runId.isBlank()
+                && runs.stream().anyMatch(run -> run.runId().equals(runId));
+        showDiagnosticRun(known ? runId : runs.getFirst().runId(), lastExplorerEventSeq);
     }
 
     private void showDiagnosticRun(String runId) {
+        showDiagnosticRun(runId, 0);
+    }
+
+    private void showDiagnosticRun(String runId, long eventSeq) {
         if (diagnosticView == null || diagnosticNavigator == null) return;
         DiagnosticEvidenceNavigator.CatalogRun selected = diagnosticNavigator.catalogRuns().stream()
                 .filter(run -> run.runId().equals(runId))
@@ -1045,6 +1053,7 @@ final class WorkbenchFrame extends JFrame {
                 .orElse(null);
         if (selected == null) return;
         currentDiagnosticRunId = runId;
+        lastExplorerEventSeq = Math.max(0, eventSeq);
         DiagnosticEvidenceNavigator.ReplayModel replay = diagnosticNavigator.replayModel(selected.runRoot());
         List<Map<String, Object>> beats = new ArrayList<>();
         for (DiagnosticEvidenceNavigator.ReplayBeat beat : replay.beats()) {
@@ -1081,12 +1090,22 @@ final class WorkbenchFrame extends JFrame {
             row.put("selected", run.runId().equals(runId));
             runs.add(row);
         }
+        int index = 0;
+        if (eventSeq > 0) {
+            for (int i = 0; i < beats.size(); i++) {
+                Object seq = beats.get(i).get("eventSeq");
+                if (seq instanceof Number number && number.longValue() == eventSeq) {
+                    index = i;
+                    break;
+                }
+            }
+        }
         diagnosticView.evalJsonCall("window.setDiagnosticState", WorkbenchWebJson.write(Map.of(
                 "runs", runs,
                 "beats", beats,
                 "tree", tree,
                 "frames", beats,
-                "index", 0,
+                "index", index,
                 "gap", beats.isEmpty()
                         ? "This retained run has no events.jsonl steps or PNG frames."
                         : ""
@@ -1120,6 +1139,23 @@ final class WorkbenchFrame extends JFrame {
     }
 
     private void applyGoResult(WorkbenchGoResolver.WorkbenchGoResult target, WorkbenchGoLink link) {
+        if ("explorer".equals(link.to()) || "explorer".equals(target.to())) {
+            selectRightTab("Explorer");
+            if (!link.runId().isBlank()) {
+                showDiagnosticRun(link.runId(), link.eventSeq());
+            }
+        } else if ("report".equals(link.to()) || "report".equals(target.to())) {
+            selectRightTab("Report");
+            refreshReport();
+            if (!link.investigationId().isBlank()) {
+                reportPicker.setSelectedItem(link.investigationId());
+                showSelectedReport();
+            }
+        } else if ("mapping".equals(link.to()) || "mapping".equals(target.to())) {
+            selectRightTab("Mapping");
+        } else if ("terminal".equals(link.to()) || "terminal".equals(target.to())) {
+            selectRightTab("Terminal");
+        }
         if (target.outsideProject() || target.missing()) {
             updatePlayerView(target.message());
             if ("java".equalsIgnoreCase(link.kind())) {
@@ -1127,7 +1163,7 @@ final class WorkbenchFrame extends JFrame {
             }
             return;
         }
-        if (!"editor".equals(target.to())) {
+        if (!target.peek() || target.file() == null) {
             updatePlayerView(target.message());
             return;
         }
@@ -1153,6 +1189,12 @@ final class WorkbenchFrame extends JFrame {
         } catch (Exception failure) {
             updatePlayerView("Could not peek " + target.relativePath() + ".");
         }
+    }
+
+    private void selectRightTab(String title) {
+        if (rightTabs == null) return;
+        int index = rightTabs.indexOfTab(title);
+        if (index >= 0) rightTabs.setSelectedIndex(index);
     }
 
     private void openPeekTab(Path file, String title, String documentText, boolean pinCaller) {

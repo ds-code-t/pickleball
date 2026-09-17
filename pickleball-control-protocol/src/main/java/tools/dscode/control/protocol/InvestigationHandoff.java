@@ -174,7 +174,7 @@ public final class InvestigationHandoff {
                 firstText(raw, "bottomLine"),
                 firstText(raw, "failedStep"),
                 firstText(raw, "originatingCause"),
-                jsonValue(raw.get("executionMap")),
+                executionMapOrDerived(root, runId, raw.get("executionMap")),
                 jsonValue(raw.get("gitSuspects")),
                 jsonValue(raw.get("serviceCalls")),
                 jsonValue(raw.get("environmentDelta")),
@@ -228,7 +228,7 @@ public final class InvestigationHandoff {
             }
             html.append("</p>\n");
         }
-        appendExecutionMap(html, document.executionMap());
+        appendExecutionMap(html, document);
         html.append("</section>\n");
 
         String cause = document.originatingCause().isBlank() ? document.cause() : document.originatingCause();
@@ -465,7 +465,73 @@ public final class InvestigationHandoff {
         return value;
     }
 
-    private static void appendExecutionMap(StringBuilder html, Object executionMap) {
+    private static Object executionMapOrDerived(Path root, String runId, Object provided) {
+        if (provided instanceof List<?> list && !list.isEmpty()) return jsonValue(provided);
+        if (provided != null && !(provided instanceof List<?>)) return jsonValue(provided);
+        List<Map<String, Object>> derived = deriveExecutionMap(root, runId);
+        return derived == null || derived.isEmpty() ? null : derived;
+    }
+
+    static List<Map<String, Object>> deriveExecutionMap(Path projectRoot, String runId) {
+        if (projectRoot == null || runId == null || runId.isBlank() || runId.contains("..")
+                || runId.contains("/") || runId.contains("\\")) {
+            return List.of();
+        }
+        Path scenarios = projectRoot.resolve("reports").resolve("diagnostic-runs").resolve(runId).resolve("scenarios");
+        if (!Files.isDirectory(scenarios)) return List.of();
+        List<Map<String, Object>> rows = new ArrayList<>();
+        try (var directories = Files.list(scenarios)) {
+            for (Path scenarioDir : directories.filter(Files::isDirectory).sorted().toList()) {
+                Path events = scenarioDir.resolve("events.jsonl");
+                if (!Files.isRegularFile(events)) continue;
+                for (String line : Files.readAllLines(events, StandardCharsets.UTF_8)) {
+                    if (line.isBlank()) continue;
+                    Map<String, Object> row = executionRowFromEvent(line);
+                    if (row != null) rows.add(row);
+                }
+            }
+        } catch (IOException ignored) {
+            return rows;
+        }
+        return rows;
+    }
+
+    private static Map<String, Object> executionRowFromEvent(String line) {
+        String type = jsonString(line, "type");
+        if ("nested_scenario_end".equals(type) || "log".equals(type) || "screenshot".equals(type)
+                || "failure".equals(type) || "scenario_end".equals(type)) {
+            return null;
+        }
+        Map<String, Object> row = new LinkedHashMap<>();
+        long seq = jsonLong(line, "eventSeq");
+        if (seq > 0) row.put("eventSeq", seq);
+        String path = jsonString(line, "path");
+        if (path.isBlank()) path = nestedJsonString(line, "source", "path");
+        if (!path.isBlank()) row.put("path", path);
+        long sourceLine = jsonLong(line, "line");
+        if (sourceLine <= 0) sourceLine = nestedJsonLong(line, "source", "line");
+        if (sourceLine > 0) row.put("line", sourceLine);
+        if ("nested_scenario_start".equals(type)) {
+            String name = nestedJsonString(line, "callee", "scenarioName");
+            if (name.isBlank()) name = jsonString(line, "scenarioName");
+            row.put("kind", "component");
+            row.put("text", name.isBlank() ? "nested" : name);
+            row.put("indent", 1);
+            return row;
+        }
+        String text = jsonString(line, "text");
+        if (text.isBlank()) text = jsonString(line, "stepText");
+        if (text.isBlank() && !"step".equals(type) && !type.isBlank()) return null;
+        if (text.isBlank()) return null;
+        row.put("kind", "step");
+        row.put("text", text);
+        long nesting = jsonLong(line, "nestingLevel");
+        row.put("indent", Math.max(0, nesting));
+        return row;
+    }
+
+    private static void appendExecutionMap(StringBuilder html, Document document) {
+        Object executionMap = document.executionMap();
         if (!(executionMap instanceof List<?> items) || items.isEmpty()) return;
         html.append("<ul class=\"tree\">\n");
         for (Object item : items) {
@@ -481,13 +547,117 @@ public final class InvestigationHandoff {
                 String kind = firstText(map, "kind", "type");
                 String text = firstText(map, "text", "stepText", "label", "name");
                 if (!kind.isBlank()) html.append(escape(kind)).append(": ");
-                html.append(escape(text.isBlank() ? String.valueOf(item) : text));
+                String label = text.isBlank() ? String.valueOf(item) : text;
+                String href = explorerHref(document.runId(), map);
+                if (href.isBlank()) {
+                    html.append(escape(label));
+                } else {
+                    html.append("<a href=\"").append(escape(href)).append("\">").append(escape(label)).append("</a>");
+                }
             } else {
                 html.append(escape(String.valueOf(item)));
             }
             html.append("</li>\n");
         }
         html.append("</ul>\n");
+    }
+
+    private static String explorerHref(String runId, Map<?, ?> map) {
+        if (runId == null || runId.isBlank()) return "";
+        StringBuilder href = new StringBuilder("wb://explorer?run=").append(urlQuery(runId));
+        String seq = firstText(map, "eventSeq", "seq");
+        if (!seq.isBlank()) href.append("&seq=").append(urlQuery(seq));
+        String path = firstText(map, "path");
+        if (!path.isBlank()) href.append("&path=").append(urlQuery(path));
+        String line = firstText(map, "line");
+        if (!line.isBlank()) href.append("&line=").append(urlQuery(line));
+        String kind = firstText(map, "kind", "type");
+        if (!kind.isBlank()) href.append("&kind=").append(urlQuery(kind));
+        return href.toString();
+    }
+
+    private static String urlQuery(String value) {
+        if (value == null || value.isEmpty()) return "";
+        StringBuilder out = new StringBuilder();
+        for (int i = 0; i < value.length(); i++) {
+            char ch = value.charAt(i);
+            if ((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9')
+                    || ch == '-' || ch == '_' || ch == '.' || ch == '~' || ch == '/') {
+                out.append(ch);
+            } else if (ch == ' ') {
+                out.append("%20");
+            } else {
+                out.append('%');
+                out.append("0123456789ABCDEF".charAt((ch >> 4) & 0xF));
+                out.append("0123456789ABCDEF".charAt(ch & 0xF));
+            }
+        }
+        return out.toString();
+    }
+
+    private static String jsonString(String json, String field) {
+        if (json == null || field == null) return "";
+        String key = "\"" + field + "\"";
+        int at = indexOfField(json, key);
+        if (at < 0) return "";
+        int colon = json.indexOf(':', at + key.length());
+        if (colon < 0) return "";
+        int i = colon + 1;
+        while (i < json.length() && Character.isWhitespace(json.charAt(i))) i++;
+        if (i >= json.length() || json.charAt(i) != '"') return "";
+        i++;
+        StringBuilder text = new StringBuilder();
+        while (i < json.length()) {
+            char ch = json.charAt(i++);
+            if (ch == '\\' && i < json.length()) {
+                text.append(json.charAt(i++));
+            } else if (ch == '"') {
+                break;
+            } else {
+                text.append(ch);
+            }
+        }
+        return text.toString();
+    }
+
+    private static long jsonLong(String json, String field) {
+        if (json == null || field == null) return 0;
+        String key = "\"" + field + "\"";
+        int at = indexOfField(json, key);
+        if (at < 0) return 0;
+        int colon = json.indexOf(':', at + key.length());
+        if (colon < 0) return 0;
+        int i = colon + 1;
+        while (i < json.length() && Character.isWhitespace(json.charAt(i))) i++;
+        int start = i;
+        if (i < json.length() && json.charAt(i) == '-') i++;
+        while (i < json.length() && Character.isDigit(json.charAt(i))) i++;
+        if (start == i) return 0;
+        try {
+            return Long.parseLong(json.substring(start, i));
+        } catch (NumberFormatException ignored) {
+            return 0;
+        }
+    }
+
+    private static int indexOfField(String json, String key) {
+        int from = 0;
+        while (from < json.length()) {
+            int at = json.indexOf(key, from);
+            if (at < 0) return -1;
+            if (at == 0 || json.charAt(at - 1) != '\\') return at;
+            from = at + key.length();
+        }
+        return -1;
+    }
+
+    private static String nestedJsonString(String json, String object, String field) {
+        String value = jsonString(json, field);
+        return value;
+    }
+
+    private static long nestedJsonLong(String json, String object, String field) {
+        return jsonLong(json, field);
     }
 
     private static void appendObjectSection(StringBuilder html, String heading, Object value) {
