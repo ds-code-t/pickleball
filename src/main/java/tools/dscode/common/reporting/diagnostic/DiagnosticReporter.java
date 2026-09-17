@@ -70,6 +70,7 @@ final class DiagnosticReporter {
     private final ThreadLocal<Deque<StepContext>> steps = ThreadLocal.withInitial(ArrayDeque::new);
     private final Set<String> runCapabilities = ConcurrentHashMap.newKeySet();
     private final SourceProvenance sourceProvenance;
+    private final Map<String, SourceProvenance.ReferencedFile> referenced = new ConcurrentHashMap<>();
     private final boolean directRunProfile;
     private volatile boolean partial;
     private volatile boolean finished;
@@ -129,13 +130,15 @@ final class DiagnosticReporter {
         current.set(context);
         nested.get().clear();
         steps.get().clear();
+        Map<String, Object> featureSource = sourceProvenance.featureSource(identity.featureUri(), identity.scenarioLine());
         ScenarioSummary summary = new ScenarioSummary(
                 executionId,
                 identity,
                 context.startedAt,
                 configurationHash,
-                sourceProvenance.featureSource(identity.featureUri(), identity.scenarioLine())
+                featureSource
         );
+        noteReferenced("feature", featureSource.get("path"));
         scenarios.put(executionId, summary);
 
         append(runEvents, event("scenario_start", Map.of(
@@ -214,6 +217,7 @@ final class DiagnosticReporter {
         )));
 
         if (!summary.detailedEvidenceRetained) pruneDenseEvidence(context.root);
+        else writeReferencedPack();
         writeRunIndex("RUNNING", "IN_PROGRESS");
         current.remove();
         nested.remove();
@@ -307,6 +311,9 @@ final class DiagnosticReporter {
             data.put("errorMessage", sanitizeText(failure.getMessage()));
         }
         data.put("nativeCapabilitiesObserved", capabilities);
+        noteReferenced("feature", context.source == null ? null : context.source.get("path"));
+        noteDefinition(context.definition);
+        noteDataFromText(context.text);
         recordScenarioEvent("step", data);
     }
 
@@ -343,10 +350,12 @@ final class DiagnosticReporter {
         ScenarioIdentity caller = nested.get().isEmpty() ? context.identity : nested.get().peek().identity;
         NestedContext nestedContext = new NestedContext(UUID.randomUUID().toString(), callee);
         nested.get().push(nestedContext);
+        Map<String, Object> calleeMap = callee.asMap();
+        noteNestedCallee(calleeMap);
         recordScenarioEvent("nested_scenario_start", Map.of(
                 "invocationId", nestedContext.invocationId,
                 "caller", caller.asMap(),
-                "callee", callee.asMap()
+                "callee", calleeMap
         ));
     }
 
@@ -458,6 +467,7 @@ final class DiagnosticReporter {
             writeRunIndex(outcome, "COMPLETE");
             writeManifest(outcome, "COMPLETE", Instant.now());
             writeRunCatalog();
+            writeReferencedPack();
         } catch (Throwable t) {
             failEvidence("finish diagnostic run", t);
         }
@@ -582,6 +592,75 @@ final class DiagnosticReporter {
         sourceProvenanceHash = sha256Hex(JSON.writeValueAsBytes(provenance));
         provenance.put("sourceProvenanceHash", sourceProvenanceHash);
         writeJsonAtomic(runRoot.resolve("source-provenance.json"), provenance);
+    }
+
+    private void writeReferencedPack() {
+        try {
+            sourceProvenance.writeReferencedPack(runRoot, List.copyOf(referenced.values()));
+        } catch (Throwable t) {
+            failEvidence("write referenced source pack", t);
+        }
+    }
+
+    private void noteReferenced(String role, Object path) {
+        if (!(path instanceof String relative) || relative.isBlank()) return;
+        String normalized = relative.replace('\\', '/');
+        if (normalized.contains("..")) return;
+        referenced.putIfAbsent(normalized, new SourceProvenance.ReferencedFile(normalized, roleForPath(role, normalized)));
+    }
+
+    private void noteDefinition(Map<String, Object> definition) {
+        if (definition == null) return;
+        if (!"NON_PICKLEBALL".equals(String.valueOf(definition.getOrDefault("origin", "")))) return;
+        if (!"consumer".equals(String.valueOf(definition.getOrDefault("repository", "")))) return;
+        noteReferenced("java-step-definition", definition.get("sourcePath"));
+    }
+
+    private void noteNestedCallee(Map<String, Object> callee) {
+        if (callee == null) return;
+        String uri = String.valueOf(callee.getOrDefault("featureUri", ""));
+        Map<String, Object> source = sourceProvenance.featureSource(uri, longValue(callee.get("scenarioLine")));
+        String path = source.get("path") == null ? uri : String.valueOf(source.get("path"));
+        noteReferenced(roleForPath("component", path), path);
+    }
+
+    private void noteDataFromText(String text) {
+        if (text == null || text.isBlank()) return;
+        java.util.regex.Matcher matcher = Pattern.compile("data:/([^\\s'\"]+)|([\\w./\\\\-]+\\.(?:json|ya?ml))", Pattern.CASE_INSENSITIVE)
+                .matcher(text);
+        while (matcher.find()) {
+            String raw = matcher.group(1) != null ? matcher.group(1) : matcher.group(2);
+            if (raw == null || raw.isBlank()) continue;
+            String candidate = raw.replace('\\', '/');
+            for (String relative : List.of(
+                    candidate,
+                    "src/test/resources/" + candidate,
+                    "src/test/resources/data/" + candidate
+            )) {
+                if (sourceProvenance.resolveReferenced(relative) != null) {
+                    noteReferenced("data", relative);
+                    break;
+                }
+            }
+        }
+    }
+
+    private static String roleForPath(String requested, String path) {
+        String lower = path == null ? "" : path.toLowerCase(Locale.ROOT);
+        if (lower.endsWith(".json") || lower.endsWith(".yaml") || lower.endsWith(".yml")) return "data";
+        if ("java-step-definition".equals(requested) || lower.endsWith(".java")) return "java-step-definition";
+        if ("component".equals(requested)) return "component";
+        return requested == null || requested.isBlank() ? "feature" : requested;
+    }
+
+    private static long longValue(Object value) {
+        if (value instanceof Number number) return number.longValue();
+        if (value == null) return 0;
+        try {
+            return Long.parseLong(String.valueOf(value).trim());
+        } catch (NumberFormatException ignored) {
+            return 0;
+        }
     }
 
     private void writeManifest(String outcome, String completion, Instant endedAt) throws IOException {

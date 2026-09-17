@@ -10,10 +10,13 @@ import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
+import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
 import tools.dscode.common.variables.PlatformLogFormatter;
@@ -125,6 +128,82 @@ public class DiagnosticReportingChecks {
         );
         assertEquals("PICKLEBALL", pickleball.get("origin"));
         assertEquals("NON_PICKLEBALL", nonPickleball.get("origin"));
+    }
+
+    @Test
+    void referencedSourcePackCopiesCleanFilesWhenGitSnapshotIsNone() throws Exception {
+        Path repo = Files.createTempDirectory("pickleball-source-pack-none");
+        Path run = Files.createTempDirectory("pickleball-source-pack-run");
+        try {
+            Path feature = repo.resolve("features/parent.feature");
+            Path component = repo.resolve("features/login.feature");
+            Path data = repo.resolve("data/users.json");
+            Path java = repo.resolve("src/test/java/com/example/Steps.java");
+            Files.createDirectories(feature.getParent());
+            Files.createDirectories(java.getParent());
+            Files.createDirectories(data.getParent());
+            Files.writeString(feature, "Feature: parent\n");
+            Files.writeString(component, "Feature: login\n");
+            Files.writeString(data, "{\"ok\":true}\n");
+            Files.writeString(java, "package com.example;\nclass Steps {}\n");
+
+            SourceProvenance.testing(repo, repo, "none").writeReferencedPack(run, List.of(
+                    new SourceProvenance.ReferencedFile("features/parent.feature", "feature"),
+                    new SourceProvenance.ReferencedFile("features/login.feature", "component"),
+                    new SourceProvenance.ReferencedFile("data/users.json", "data"),
+                    new SourceProvenance.ReferencedFile("src/test/java/com/example/Steps.java", "java-step-definition")
+            ));
+
+            assertTrue(Files.isRegularFile(run.resolve("source/files/features/parent.feature")));
+            assertTrue(Files.isRegularFile(run.resolve("source/files/features/login.feature")));
+            assertTrue(Files.isRegularFile(run.resolve("source/files/data/users.json")));
+            assertTrue(Files.isRegularFile(run.resolve("source/files/src/test/java/com/example/Steps.java")));
+            String referenced = Files.readString(run.resolve("source/referenced.json"));
+            assertTrue(referenced.contains("\"role\": \"component\""));
+            assertTrue(referenced.contains("\"role\": \"data\""));
+            assertTrue(referenced.contains("\"vsHead\": \"no-git\""));
+            assertFalse(Files.exists(run.resolve("source/referenced.patch.gz")));
+        } finally {
+            deleteQuietly(repo);
+            deleteQuietly(run);
+        }
+    }
+
+    @Test
+    void referencedPatchIncludesOnlyAllowedDirtyFiles() throws Exception {
+        Path repo = Files.createTempDirectory("pickleball-source-pack-git");
+        Path run = Files.createTempDirectory("pickleball-source-pack-run-git");
+        try {
+            git(repo, "init");
+            git(repo, "config", "user.email", "pickleball@example.com");
+            git(repo, "config", "user.name", "Pickleball");
+            git(repo, "config", "core.autocrlf", "false");
+            Files.writeString(repo.resolve("allowed.feature"), "Feature: allowed\n");
+            Files.writeString(repo.resolve("unrelated.txt"), "keep me\n");
+            git(repo, "add", "allowed.feature", "unrelated.txt");
+            git(repo, "commit", "-m", "init");
+            Files.writeString(repo.resolve("allowed.feature"), "Feature: allowed dirty\n");
+            Files.writeString(repo.resolve("unrelated.txt"), "unrelated dirty\n");
+
+            SourceProvenance.testing(repo, repo, "metadata").writeReferencedPack(run, List.of(
+                    new SourceProvenance.ReferencedFile("allowed.feature", "feature")
+            ));
+
+            String referenced = Files.readString(run.resolve("source/referenced.json"));
+            assertTrue(referenced.contains("\"vsHead\": \"dirty\""));
+            assertTrue(Files.isRegularFile(run.resolve("source/files/allowed.feature")));
+            Path patch = run.resolve("source/referenced.patch.gz");
+            assertTrue(Files.isRegularFile(patch));
+            String diff;
+            try (GZIPInputStream in = new GZIPInputStream(Files.newInputStream(patch))) {
+                diff = new String(in.readAllBytes(), StandardCharsets.UTF_8);
+            }
+            assertTrue(diff.contains("allowed.feature"));
+            assertFalse(diff.contains("unrelated.txt"));
+        } finally {
+            deleteQuietly(repo);
+            deleteQuietly(run);
+        }
     }
 
     @Test
@@ -355,10 +434,36 @@ public class DiagnosticReportingChecks {
         );
     }
 
+    private static void git(Path root, String... arguments) throws Exception {
+        List<String> command = new ArrayList<>();
+        command.add("git");
+        command.add("-C");
+        command.add(root.toString());
+        command.addAll(List.of(arguments));
+        Process process = new ProcessBuilder(command).redirectErrorStream(true).start();
+        byte[] output = process.getInputStream().readAllBytes();
+        if (!process.waitFor(20, TimeUnit.SECONDS) || process.exitValue() != 0) {
+            throw new IllegalStateException("git " + String.join(" ", arguments) + " failed: "
+                    + new String(output, StandardCharsets.UTF_8));
+        }
+    }
+
+    private static void deleteQuietly(Path root) {
+        try {
+            deleteTree(root);
+        } catch (Exception ignored) {
+        }
+    }
+
     private static void deleteTree(Path root) throws Exception {
         if (!Files.exists(root)) return;
         try (var paths = Files.walk(root)) {
-            for (Path path : paths.sorted(Comparator.reverseOrder()).toList()) Files.deleteIfExists(path);
+            for (Path path : paths.sorted(Comparator.reverseOrder()).toList()) {
+                try {
+                    Files.deleteIfExists(path);
+                } catch (Exception ignored) {
+                }
+            }
         }
     }
 

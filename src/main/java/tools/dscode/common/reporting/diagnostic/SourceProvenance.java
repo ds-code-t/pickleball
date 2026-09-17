@@ -8,6 +8,7 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.security.MessageDigest;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -207,6 +208,167 @@ public final class SourceProvenance {
         try (GZIPOutputStream out = new GZIPOutputStream(Files.newOutputStream(target))) {
             out.write(text.getBytes(StandardCharsets.UTF_8));
         }
+    }
+
+    public record ReferencedFile(String path, String role) {
+        public ReferencedFile {
+            path = path == null ? "" : path.replace('\\', '/');
+            role = role == null || role.isBlank() ? "feature" : role;
+        }
+    }
+
+    static SourceProvenance testing(Path consumerRoot, Path projectRoot, String snapshotMode) {
+        Repository unavailable = Repository.unavailable("consumer");
+        return new SourceProvenance(
+                unavailable,
+                Repository.unavailable("pickleball"),
+                consumerRoot,
+                projectRoot == null ? consumerRoot : projectRoot,
+                snapshotMode == null || snapshotMode.isBlank() ? "metadata" : snapshotMode
+        );
+    }
+
+    public void writeReferencedPack(Path runRoot, List<ReferencedFile> files) throws IOException {
+        writeReferencedPack(runRoot, files, null);
+    }
+
+    public void writeReferencedPack(Path runRoot, List<ReferencedFile> files, String liveBufferFeature) throws IOException {
+        if (runRoot == null) return;
+        List<ReferencedFile> unique = dedupe(files);
+        Path sourceRoot = runRoot.resolve("source");
+        Path filesRoot = sourceRoot.resolve("files");
+        Files.createDirectories(filesRoot);
+
+        List<Map<String, String>> entries = new ArrayList<>();
+        List<String> gitPaths = new ArrayList<>();
+        boolean anyDirty = false;
+        for (ReferencedFile file : unique) {
+            if (file.path().isBlank() || file.path().contains("..")) continue;
+            Path resolved = resolveReferenced(file.path());
+            if (resolved == null || !Files.isRegularFile(resolved)) continue;
+            Path relative = Path.of(file.path()).normalize();
+            if (relative.isAbsolute() || relative.startsWith("..")) continue;
+            Path filesRootAbs = filesRoot.toAbsolutePath().normalize();
+            Path copy = filesRoot.resolve(relative).toAbsolutePath().normalize();
+            if (!copy.startsWith(filesRootAbs)) continue;
+            Files.createDirectories(copy.getParent());
+            Files.copy(resolved, copy, StandardCopyOption.REPLACE_EXISTING);
+            String vsHead = vsHead(file.path(), resolved);
+            if ("dirty".equals(vsHead) || "untracked".equals(vsHead)) anyDirty = true;
+            gitPaths.add(file.path());
+            Map<String, String> entry = new LinkedHashMap<>();
+            entry.put("path", file.path());
+            entry.put("role", file.role());
+            entry.put("sha256", sha256(resolved));
+            entry.put("vsHead", vsHead);
+            entries.add(entry);
+        }
+        if (liveBufferFeature != null && !liveBufferFeature.isBlank()) {
+            Path live = sourceRoot.resolve("live-buffer.feature");
+            Files.writeString(live, liveBufferFeature, StandardCharsets.UTF_8);
+            Map<String, String> entry = new LinkedHashMap<>();
+            entry.put("path", "live-buffer.feature");
+            entry.put("role", "live-buffer");
+            entry.put("sha256", sha256(live));
+            entry.put("vsHead", "untracked");
+            entries.add(entry);
+        }
+        if (entries.isEmpty()) return;
+        writeReferencedJson(sourceRoot.resolve("referenced.json"), entries);
+        if (anyDirty && !"none".equals(snapshotMode) && consumerRoot != null && !gitPaths.isEmpty()) {
+            writeFilteredPatch(sourceRoot.resolve("referenced.patch.gz"), gitPaths);
+        }
+    }
+
+    Path resolveReferenced(String relativePath) {
+        if (relativePath == null || relativePath.isBlank()) return null;
+        String normalized = relativePath.replace('\\', '/');
+        while (normalized.startsWith("./")) normalized = normalized.substring(2);
+        Path fromProject = existingFile(consumerProjectRoot, normalized);
+        if (fromProject != null) return fromProject;
+        Path fromGit = existingFile(consumerRoot, normalized);
+        if (fromGit != null) return fromGit;
+        return resolveFeaturePath(normalized);
+    }
+
+    private static Path existingFile(Path root, String relative) {
+        if (root == null) return null;
+        try {
+            Path resolved = root.resolve(relative).toAbsolutePath().normalize();
+            if (!resolved.startsWith(root.toAbsolutePath().normalize())) return null;
+            return Files.isRegularFile(resolved) ? resolved : null;
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
+    private String vsHead(String relativePath, Path resolved) {
+        if ("none".equals(snapshotMode) || consumerRoot == null) return "no-git";
+        String status = git(consumerRoot, "status", "--porcelain", "--untracked-files=normal", "--", relativePath);
+        if (status.isBlank()) {
+            String tracked = git(consumerRoot, "ls-files", "--", relativePath);
+            return tracked.isBlank() ? "untracked" : "clean";
+        }
+        String trimmed = status.trim();
+        if (trimmed.startsWith("??")) return "untracked";
+        return "dirty";
+    }
+
+    private void writeFilteredPatch(Path target, List<String> paths) throws IOException {
+        List<String> args = new ArrayList<>();
+        args.add("diff");
+        args.add("HEAD");
+        args.add("--");
+        args.addAll(paths);
+        String unstaged = git(consumerRoot, args.toArray(String[]::new));
+        List<String> cachedArgs = new ArrayList<>();
+        cachedArgs.add("diff");
+        cachedArgs.add("--cached");
+        cachedArgs.add("HEAD");
+        cachedArgs.add("--");
+        cachedArgs.addAll(paths);
+        String staged = git(consumerRoot, cachedArgs.toArray(String[]::new));
+        String text = unstaged;
+        if (!staged.isBlank()) {
+            text = text.isBlank() ? staged : text + "\n" + staged;
+        }
+        if (text.isBlank()) return;
+        Files.createDirectories(target.getParent());
+        try (GZIPOutputStream out = new GZIPOutputStream(Files.newOutputStream(target))) {
+            out.write(text.getBytes(StandardCharsets.UTF_8));
+        }
+    }
+
+    private static List<ReferencedFile> dedupe(List<ReferencedFile> files) {
+        Map<String, ReferencedFile> unique = new LinkedHashMap<>();
+        if (files == null) return List.of();
+        for (ReferencedFile file : files) {
+            if (file == null || file.path().isBlank()) continue;
+            unique.putIfAbsent(file.path(), file);
+        }
+        return List.copyOf(unique.values());
+    }
+
+    private static void writeReferencedJson(Path target, List<Map<String, String>> entries) throws IOException {
+        StringBuilder json = new StringBuilder();
+        json.append("{\n  \"schemaVersion\": 1,\n  \"files\": [\n");
+        for (int i = 0; i < entries.size(); i++) {
+            Map<String, String> entry = entries.get(i);
+            json.append("    {");
+            json.append("\"path\": \"").append(jsonEscape(entry.get("path"))).append("\", ");
+            json.append("\"role\": \"").append(jsonEscape(entry.get("role"))).append("\", ");
+            json.append("\"sha256\": \"").append(jsonEscape(entry.get("sha256"))).append("\", ");
+            json.append("\"vsHead\": \"").append(jsonEscape(entry.get("vsHead"))).append("\"}");
+            if (i + 1 < entries.size()) json.append(',');
+            json.append('\n');
+        }
+        json.append("  ]\n}\n");
+        Files.writeString(target, json.toString(), StandardCharsets.UTF_8);
+    }
+
+    private static String jsonEscape(String value) {
+        if (value == null) return "";
+        return value.replace("\\", "\\\\").replace("\"", "\\\"");
     }
 
     public String optionalSnapshotPath() {
