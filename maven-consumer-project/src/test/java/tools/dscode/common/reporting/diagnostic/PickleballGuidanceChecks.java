@@ -134,6 +134,7 @@ public class PickleballGuidanceChecks {
         assertTrue(help.contains("DiagnosticCli guidance"));
         assertTrue(help.contains("DiagnosticCli export-guidance"));
         assertTrue(help.contains("DiagnosticCli discover-hint"));
+        assertTrue(help.contains("DiagnosticCli resolve-runvars"));
         assertTrue(help.contains("Pickleball Workbench") || help.contains("PickleballWorkbenchLauncher"));
         assertTrue(help.contains("DiagnosticCli emit-investigation"));
         assertTrue(help.contains("DiagnosticCli compare-runs"));
@@ -187,10 +188,31 @@ public class PickleballGuidanceChecks {
         assertTrue(text.contains("pkb_loglevel=warn"));
         assertTrue(text.contains("pkb_reportretention=failed"));
         assertTrue(text.contains("pkb_run_profile"));
+        assertTrue(text.contains("Dry-run resolve"));
+        assertTrue(text.contains("pkb_overriderunvars") || text.contains("sealed"));
         assertFalse(text.contains("pkb_parallel=80"));
         assertFalse(text.contains("when the project supports it"));
         assertTrue(text.contains("NEXT: run discover"));
         assertTrue(text.contains("Pickleball Workbench") || text.contains("Workbench"));
+    }
+
+    @Test
+    void resolveRunVarsPrintsDryRunJsonWithoutStartingTests() {
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        ByteArrayOutputStream errors = new ByteArrayOutputStream();
+        assertEquals(0, DiagnosticCli.run(
+                new String[]{"resolve-runvars"},
+                new PrintStream(output, true, StandardCharsets.UTF_8),
+                new PrintStream(errors, true, StandardCharsets.UTF_8)
+        ));
+        assertEquals("", errors.toString(StandardCharsets.UTF_8));
+        String text = output.toString(StandardCharsets.UTF_8);
+        assertTrue(text.contains("Dry-run resolve"));
+        assertTrue(text.contains("\"sealed\""));
+        assertTrue(text.contains("runProfileFingerprint"));
+        assertTrue(text.contains("provenance"));
+        assertTrue(text.contains("pkb_overriderunvars"));
+        assertFalse(text.contains("NEXT: run discover"));
     }
 
     @Test

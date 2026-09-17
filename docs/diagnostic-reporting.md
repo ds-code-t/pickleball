@@ -87,6 +87,8 @@ or expanded members:
 
 Do not mix compact and expanded `pkb_runvars`. Never supply `pkb_run_profile` as input; it is derived output.
 
+To freeze a complete already-resolved map for one run, use optional sealed `pkb_overriderunvars` instead of composing `pkb_runvars` / `pkb_profile`. Preview with `DiagnosticCli resolve-runvars` / Workbench `hint` without starting tests, then launch `-Dpkb_overriderunvars=<compact complete map>` and compare `runProfileFingerprint`. Missing any of the six context keys is an error; blank tombstones are allowed. Sealed input ignores files, defaults, JVM `-D pkb_*` RunVars, profiles, inheritance, and templates for the Pickleball RunVar set (ignore-sources, not erase-process). Cucumber CLI tag/name/glue projection does not mutate a sealed set.
+
 A partial controlled input automatically inherits only missing project execution-context RunVars:
 
 ```text
@@ -122,6 +124,7 @@ The agent-facing entry is Pickleball Workbench. Workbench `export-guidance` (inc
 DiagnosticCli guidance
 DiagnosticCli export-guidance [output-directory]
 DiagnosticCli discover-hint [project]
+DiagnosticCli resolve-runvars [project]
 DiagnosticCli emit-investigation <investigation-json-or--> <consumer-project-root>
 DiagnosticCli compare-runs <left-run-index> <right-run-index> [output-json]
 DiagnosticCli compare-fingerprints <left.pkbf> <right.pkbf> [output-json]

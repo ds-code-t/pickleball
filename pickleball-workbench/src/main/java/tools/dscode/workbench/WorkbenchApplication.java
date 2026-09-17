@@ -216,7 +216,7 @@ public final class WorkbenchApplication {
                 requireInteractiveWorker(started, "isolate");
                 out.println("Workbench isolate worker: pid=" + started.pid()
                         + " scenario=" + started.scenarioId());
-                out.println("Replayed pkb_runvars=" + workerProperties.get("pkb_runvars"));
+                printReplayedRunVars(out, workerProperties);
                 out.println("Isolate stays one paused scenario. Do not start the GUI.");
                 if (once) {
                     requireCleanStop(live.stop());
@@ -276,7 +276,7 @@ public final class WorkbenchApplication {
             out.println("Workbench CLI session: pid=" + ProcessHandle.current().pid()
                     + " url=" + server.url());
             out.println("State: " + server.stateFile());
-            out.println("Replayed pkb_runvars=" + workerProperties.get("pkb_runvars"));
+            printReplayedRunVars(out, workerProperties);
             try {
                 done.await();
             } catch (InterruptedException interrupted) {
@@ -292,6 +292,14 @@ public final class WorkbenchApplication {
             if (server != null) server.close();
             if (controller != null) controller.close();
         }
+    }
+
+    private static void printReplayedRunVars(PrintStream out, Map<String, String> workerProperties) {
+        if (workerProperties != null && workerProperties.containsKey("pkb_overriderunvars")) {
+            out.println("Replayed pkb_overriderunvars=" + workerProperties.get("pkb_overriderunvars"));
+            return;
+        }
+        out.println("Replayed pkb_runvars=" + (workerProperties == null ? null : workerProperties.get("pkb_runvars")));
     }
 
     static boolean stdinIsInteractiveTty() {

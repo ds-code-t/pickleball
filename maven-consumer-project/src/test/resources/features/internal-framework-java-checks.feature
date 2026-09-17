@@ -43,3 +43,7 @@ Feature: Internal Pickleball Java checks
   @all @regression @internal-java-checks @data-element-phase-5
   Scenario: Run Data Element phase five copy-on-write checks
     * RUN DATA ELEMENT PHASE 5 JAVA TESTS
+
+  @runvar-override @configuration @internal-java-checks
+  Scenario: Sealed override RunVars ignore other sources
+    * RUN RUNVAR OVERRIDE JAVA TESTS

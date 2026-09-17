@@ -28,6 +28,7 @@ import tools.dscode.launcher.WorkbenchAgentCommandChecks;
 import tools.dscode.parallelutilities.ParallelCountEstimatorChecks;
 import tools.dscode.testengine.PkbPropertyValueNormalizerChecks;
 import tools.dscode.testengine.ProfileConfigurationChecks;
+import tools.dscode.testengine.RunVarOverrideChecks;
 
 import java.util.List;
 
@@ -60,6 +61,7 @@ public final class InternalFrameworkTestSteps {
                 BusinessTimePostModifierChecks.class,
                 PkbPropertyValueNormalizerChecks.class,
                 ProfileConfigurationChecks.class,
+                RunVarOverrideChecks.class,
                 ParallelCountEstimatorChecks.class,
                 ChromeHeadlessConfigChecks.class,
                 DynamicControlApiChecks.class,
@@ -97,6 +99,11 @@ public final class InternalFrameworkTestSteps {
         } finally {
             ReportRetentionPolicy.clearThreadOverride();
         }
+    }
+
+    @Given("^RUN RUNVAR OVERRIDE JAVA TESTS$")
+    public static void runRunVarOverrideJavaTests() {
+        runAndAssert(RunVarOverrideChecks.class);
     }
 
     @Given("^RUN DATA TABLE CONVERSION JAVA TESTS$")

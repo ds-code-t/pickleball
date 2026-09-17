@@ -851,19 +851,7 @@ final class DiagnosticReporter {
     }
 
     private static String runProfileFingerprint(Map<String, String> values) {
-        Map<String, String> runVars = new TreeMap<>();
-        if (values != null) {
-            values.forEach((key, value) -> {
-                if (PKB_props.isRunVariableKey(key) && value != null) {
-                    runVars.put(key.toLowerCase(Locale.ROOT), value);
-                }
-            });
-        }
-        try {
-            return sha256Hex(JSON.writeValueAsBytes(runVars));
-        } catch (IOException e) {
-            return "";
-        }
+        return PKB_props.runProfileFingerprint(values);
     }
 
     private String dependencyFingerprint() {

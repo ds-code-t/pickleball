@@ -370,7 +370,13 @@ final class WorkbenchFrame extends JFrame {
     private JComponent leftWorkspace() {
         JPanel left = new JPanel(new BorderLayout(0, 8));
         left.add(scenarioPanel(), BorderLayout.CENTER);
-        left.add(stepPanel(), BorderLayout.SOUTH);
+        JPanel south = new JPanel();
+        south.setOpaque(false);
+        south.setLayout(new BoxLayout(south, BoxLayout.Y_AXIS));
+        south.add(stepPanel());
+        south.add(Box.createVerticalStrut(8));
+        south.add(new RunVarOverridePanel(controller.projectRoot()));
+        left.add(south, BorderLayout.SOUTH);
         return left;
     }
 

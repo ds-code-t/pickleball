@@ -40,9 +40,12 @@ import static tools.dscode.testengine.PKB_props.PKB_GLUE;
 import static tools.dscode.testengine.PKB_props.PKB_LOGLEVEL;
 import static tools.dscode.testengine.PKB_props.PKB_NAME;
 import static tools.dscode.testengine.PKB_props.PKB_OPTIONS;
+import static tools.dscode.testengine.PKB_props.PKB_OVERRIDE_RUN_VARS;
 import static tools.dscode.testengine.PKB_props.PKB_PARALLEL;
 import static tools.dscode.testengine.PKB_props.PKB_PREFIX;
+import static tools.dscode.testengine.PKB_props.PKB_PROFILE;
 import static tools.dscode.testengine.PKB_props.PKB_RUN_PROFILE;
+import static tools.dscode.testengine.PKB_props.PKB_RUN_VARS;
 import static tools.dscode.testengine.PKB_props.PKB_TAGS;
 
 public abstract class PickleballRunner {
@@ -60,6 +63,7 @@ public abstract class PickleballRunner {
     private final Map<String, String> readOnlyValues = Collections.unmodifiableMap(values);
     private final LinkedHashMap<String, String> systemRunVarOverrides = new LinkedHashMap<>();
     private boolean directRunVars;
+    private boolean sealedRunVars;
 
     protected PickleballRunner() {
         debug("Constructing suite subclass: " + getClass().getName());
@@ -93,9 +97,11 @@ public abstract class PickleballRunner {
         syncCanonicalAndAliasKeys();
         syncReportPortalAliases(false);
 
+        suppressNonInvocationControlsWhenSealed();
         PickleballProfiles.Resolution profileResolution =
                 PickleballProfiles.apply(values, systemRunVarOverrides);
         directRunVars = profileResolution.direct();
+        sealedRunVars = profileResolution.sealed();
 
         applyPkbAliases();
         applyLegacyFrameworkDefaults();
@@ -130,6 +136,12 @@ public abstract class PickleballRunner {
         return current != null && current.directRunVars;
     }
 
+    /** True when the current runner was resolved from sealed {@code pkb_overriderunvars}. */
+    public static boolean isSealedRunVarsActive() {
+        PickleballRunner current = INSTANCE;
+        return current != null && current.sealedRunVars;
+    }
+
     /** @deprecated Use {@link #isDirectRunVarsActive()}. Retained for diagnostic compatibility. */
     @Deprecated
     public static boolean isDirectRunProfileActive() {
@@ -147,7 +159,7 @@ public abstract class PickleballRunner {
     }
 
     public synchronized void captureCucumberCliArgs(String[] argv) {
-        if (directRunVars) {
+        if (directRunVars || sealedRunVars) {
             return;
         }
 
@@ -297,6 +309,49 @@ public abstract class PickleballRunner {
         }
         debug("Applied " + count + " system property override(s), skipped "
                 + skipped + " derived internal key(s)");
+    }
+
+    /**
+     * File/default {@code pkb_profile} and {@code pkb_runvars} are ignored when sealed JVM input is
+     * present. Invocation-level {@code -Dpkb_profile} / {@code -Dpkb_runvars} stay so apply() can
+     * fail-closed on mixed controls.
+     */
+    private void suppressNonInvocationControlsWhenSealed() {
+        if (!sealedControlPresent(values)) {
+            return;
+        }
+        boolean profileFromJvm = notBlank(System.getProperty(PKB_PROFILE));
+        boolean runVarsFromJvm = notBlank(System.getProperty(PKB_RUN_VARS));
+        if (!runVarsFromJvm) {
+            for (String key : System.getProperties().stringPropertyNames()) {
+                if (PKB_props.isRunVarsMemberKey(key)) {
+                    runVarsFromJvm = true;
+                    break;
+                }
+            }
+        }
+        if (!profileFromJvm) {
+            values.remove(PKB_PROFILE);
+        }
+        if (!runVarsFromJvm) {
+            values.remove(PKB_RUN_VARS);
+            values.keySet().removeIf(PKB_props::isRunVarsMemberKey);
+        }
+    }
+
+    static boolean sealedControlPresent(Map<String, String> values) {
+        if (values == null) {
+            return false;
+        }
+        String compact = values.get(PKB_OVERRIDE_RUN_VARS);
+        if (compact != null && !compact.isBlank()) {
+            return true;
+        }
+        return values.keySet().stream().anyMatch(PKB_props::isOverrideRunVarsMemberKey);
+    }
+
+    private static boolean notBlank(String value) {
+        return value != null && !value.isBlank();
     }
 
     private void mergeReportPortalSourceProperties() {

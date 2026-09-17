@@ -32,8 +32,25 @@ class WorkbenchAgentCommandsTest {
         assertTrue(output.stdout().contains("pkb_browser=CHROME_HEADLESS"));
         assertTrue(output.stdout().contains("pkb_reportretention=failed"));
         assertTrue(output.stdout().contains("NEXT: run discover"));
+        assertTrue(output.stdout().contains("Dry-run resolve"));
+        assertTrue(output.stdout().contains("pkb_overriderunvars") || output.stdout().contains("sealed="));
         assertFalse(output.stdout().contains("MUST"));
         assertFalse(output.stdout().contains("pkb_parallel=80"));
+    }
+
+    @Test
+    void resolveRunVarsPrintsDryRunWithoutStartingTests() throws Exception {
+        Path resources = tempDir.resolve("src/test/resources");
+        Files.createDirectories(resources);
+        Files.writeString(resources.resolve("pickleball.properties"), "pkb_browser=chrome\n");
+
+        Output output = run("resolve-runvars", tempDir.toString());
+
+        assertEquals(0, output.exitCode());
+        assertTrue(output.stdout().contains("Dry-run resolve"));
+        assertTrue(output.stdout().contains("sealed="));
+        assertTrue(output.stdout().contains("pkb_overriderunvars"));
+        assertFalse(output.stdout().contains("NEXT: run discover"));
     }
 
     @Test

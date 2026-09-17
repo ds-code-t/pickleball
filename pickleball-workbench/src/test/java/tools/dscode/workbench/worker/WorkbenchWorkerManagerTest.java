@@ -98,6 +98,26 @@ class WorkbenchWorkerManagerTest {
     }
 
     @Test
+    void sealedSnapshotCommandUsesOverrideNotRunProfile() {
+        Path project = tempDir.resolve("consumer").toAbsolutePath().normalize();
+        Path live = project.resolve(".pickleball/workbench/live/classes");
+        Path dependency = tempDir.resolve("pickleball.jar").toAbsolutePath().normalize();
+        Path anchor = project.resolve(".pickleball/workbench/sessions/test/anchor.feature");
+        String compact = "pkb_browser=firefox, pkb_glue=com.example, pkb_features=classpath:features";
+
+        List<String> command = WorkbenchWorkerManager.workerCommand(
+                manifest(project, live, dependency),
+                List.of(live.toString(), dependency.toString()),
+                anchor,
+                Map.of("pkb_overriderunvars", compact)
+        );
+
+        assertTrue(command.contains("-Dpkb_overriderunvars=" + compact));
+        assertFalse(command.stream().anyMatch(item -> item.startsWith("-Dpkb_run_profile=")));
+        assertFalse(command.stream().anyMatch(item -> item.startsWith("-Dpkb_runvars=")));
+    }
+
+    @Test
     void interactiveWorkerUsesSafeAnchorStepPauseBoundary() {
         assertEquals("BEFORE_STEP", WorkbenchWorkerManager.INTERACTIVE_PAUSE_HOOK);
         assertEquals("---pickleball-workbench-anchor", WorkbenchWorkerManager.INTERACTIVE_PAUSE_STEP);

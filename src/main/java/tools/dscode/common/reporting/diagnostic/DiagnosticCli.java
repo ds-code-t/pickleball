@@ -6,6 +6,7 @@ import tools.dscode.control.protocol.InvestigationHandoff;
 import tools.dscode.control.protocol.PickleballLocalLayout;
 import tools.dscode.control.protocol.PickleballLocalStore;
 import tools.dscode.control.protocol.PickleballVersion;
+import tools.dscode.testengine.PKB_props;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -45,6 +46,7 @@ public final class DiagnosticCli {
                 case "guidance" -> guidance(args, out);
                 case "export-guidance" -> exportGuidance(args, out, err);
                 case "discover-hint", "hint" -> discoverHint(args, out);
+                case "resolve-runvars" -> resolveRunVars(args, out);
                 case "emit-investigation" -> emitInvestigation(args, out, in);
                 case "compare-runs" -> compareRuns(args, out);
                 case "compare-fingerprints" -> compareFingerprints(args, out);
@@ -85,7 +87,7 @@ public final class DiagnosticCli {
         return PickleballLocalStore.exportGuidance(root, out, err);
     }
 
-    private static int discoverHint(String[] args, PrintStream out) {
+    private static int discoverHint(String[] args, PrintStream out) throws IOException {
         requireLength(args, 1, 2, "discover-hint [project]");
         Path project = args.length == 2
                 ? Path.of(args[1]).toAbsolutePath().normalize()
@@ -94,13 +96,72 @@ public final class DiagnosticCli {
         out.println("Recommended complete diagnostic Discover `pkb_runvars` (Workbench honors the project browser ladder; headed Chrome / pretty / @all project defaults do not sneak in):");
         out.println("pkb_runvars=" + plan.runVars());
         out.println();
+        printDryRunResolve(project, out);
         out.println("Browser: " + plan.browser().browser() + " (" + plan.browser().reason() + ").");
         out.println("Multi-scenario Discover/Confirm use this high pkb_parallel. Live isolate starts a headless Workbench session; then use execute-step / status / events / stop.");
         out.println("The agent-facing entry is Pickleball Workbench (`hint` / `discover` / `confirm` / `isolate`), not a separate DiagnosticCli story. After Discover, confirm (and isolate/execute-step for live debug) replay the retained pkb_run_profile through pkb_runvars. Never supply pkb_run_profile as input.");
+        out.println("Sealed runs are opt-in: resolve → inspect → complete map including the six context keys → pkb_overriderunvars. Do not mix with pkb_runvars or pkb_profile. Compare runProfileFingerprint after the sealed run.");
         out.println();
         out.println("After Discover, read reports/diagnostic-runs/run-catalog.json, then only the relevant run-index.json / summary.json.");
         out.println("NEXT: run discover");
         return 0;
+    }
+
+    private static int resolveRunVars(String[] args, PrintStream out) throws IOException {
+        requireLength(args, 1, 2, "resolve-runvars [project]");
+        Path project = args.length == 2
+                ? Path.of(args[1]).toAbsolutePath().normalize()
+                : Path.of("").toAbsolutePath().normalize();
+        printDryRunResolve(project, out);
+        return 0;
+    }
+
+    private static void printDryRunResolve(Path project, PrintStream out) throws IOException {
+        LinkedHashMap<String, String> values = loadProjectPkbValues(project);
+        LinkedHashMap<String, String> jvm = new LinkedHashMap<>();
+        for (String key : System.getProperties().stringPropertyNames()) {
+            String normalized = key == null ? null : key.toLowerCase(java.util.Locale.ROOT);
+            if (normalized != null && normalized.startsWith("pkb_") && PKB_props.isRunVariableKey(normalized)) {
+                jvm.put(normalized, System.getProperty(key));
+            }
+            if (key != null && (key.toLowerCase(java.util.Locale.ROOT).startsWith("pkb_"))) {
+                values.put(key.toLowerCase(java.util.Locale.ROOT), System.getProperty(key));
+            }
+        }
+        PKB_props.ResolvedRunVars resolved = PKB_props.resolveRunVars(values, jvm);
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("sealed", resolved.sealed());
+        body.put("runProfile", resolved.runProfile());
+        body.put("runProfileFingerprint", resolved.fingerprint());
+        body.put("runVars", resolved.runVars());
+        body.put("provenance", resolved.provenance());
+        out.println("Dry-run resolve (does not start tests or browsers):");
+        out.println(json().writeValueAsString(body));
+        out.println("Sealed launch uses -Dpkb_overriderunvars=<complete compact map>, never -Dpkb_run_profile=.");
+        out.println();
+    }
+
+    private static LinkedHashMap<String, String> loadProjectPkbValues(Path project) {
+        LinkedHashMap<String, String> values = new LinkedHashMap<>();
+        loadPropertiesFile(values, project.resolve("src/test/resources/pickleball.properties"));
+        loadPropertiesFile(values, project.resolve("src/test/resources/pickleball_local.properties"));
+        return values;
+    }
+
+    private static void loadPropertiesFile(Map<String, String> values, Path file) {
+        if (!Files.isRegularFile(file)) {
+            return;
+        }
+        java.util.Properties props = new java.util.Properties();
+        try (InputStream in = Files.newInputStream(file)) {
+            props.load(in);
+        } catch (IOException ignored) {
+            return;
+        }
+        for (String key : props.stringPropertyNames()) {
+            if (key == null) continue;
+            values.put(key.toLowerCase(java.util.Locale.ROOT), props.getProperty(key));
+        }
     }
 
     @SuppressWarnings("unchecked")
@@ -237,6 +298,7 @@ public final class DiagnosticCli {
         out.println("  DiagnosticCli guidance");
         out.println("  DiagnosticCli export-guidance [output-directory]");
         out.println("  DiagnosticCli discover-hint [project]");
+        out.println("  DiagnosticCli resolve-runvars [project]");
         out.println("  DiagnosticCli emit-investigation <investigation-json-or--> <consumer-project-root>");
         out.println("  DiagnosticCli compare-runs <left-run-index> <right-run-index> [output-json]");
         out.println("  DiagnosticCli compare-fingerprints <left.pkbf> <right.pkbf> [output-json]");

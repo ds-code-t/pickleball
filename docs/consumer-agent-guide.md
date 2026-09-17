@@ -14,14 +14,14 @@ From the consumer project, with Pickleball on the test classpath (`classpathScop
 mvn -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java "-Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher" "-Dexec.classpathScope=test" "-Dexec.args=discover"
 ```
 
-Same launcher for `hint`, `discover`, `confirm`, `isolate`, `execute-step`, `status`, `events`, and `stop` — change `exec.args` only.
+Same launcher for `hint`, `discover`, `confirm`, `resolve-runvars`, `isolate`, `execute-step`, `status`, `events`, and `stop` — change `exec.args` only.
 
 1. **Discover** — `-Dexec.args=discover` (optional `--tags` / `--name` / `--retention`). Workbench applies complete AI `pkb_runvars`: browser ladder, high/auto parallel, diagnostic, warn, failed retention. Override retention with `--retention=all|failed|none` (`--retention <value>` also works). It wraps consumer `mvn test`. Do not start a live worker to run the whole suite. Then read `run-catalog.json` and the retained `pkb_run_profile`.
-2. **Confirm** — `-Dexec.args=confirm --tags=... --name=...` with the same Discover snapshot (LastDiscoverSnapshot replayed as `pkb_runvars`) and narrow tags/name. Never supply `pkb_run_profile` as input.
+2. **Confirm** — `-Dexec.args=confirm --tags=... --name=...` with the same Discover snapshot (ordinary LastDiscoverSnapshot replayed as `pkb_runvars`) and narrow tags/name. Never supply `pkb_run_profile` as input. A snapshot marked sealed is for the next worker/isolate launch as `-Dpkb_overriderunvars=<compact complete map>`, not Confirm.
 3. **Live debug** — `-Dexec.args=isolate` (alias `session-start`) starts one long-lived headless Workbench session from the last Discover snapshot and prints `ACK SESSION`. Then `-Dexec.args=execute-step --text='...'`, `status`, `events`, and `stop`. Each Maven exec exits; the session stays up.
 4. **Emit the human handoff, then edit real consumer source** — write `.pickleball/investigations/<id>/` then in chat print the six-line bottom-line block (Gherkin/business first) plus `.pickleball/investigations/<id>/report.html`. Do not dump MCP transcripts, TRACE, or PNG analysis.
 
-`hint` (alias `discover-hint`) is `-Dexec.args=hint` and prints the recommended Discover `pkb_runvars` and `NEXT: run discover`. `ui` is a host/human command. Agents must not use `ui`. If `workbench_*` tools already exist they are the same session, not a setup step.
+`hint` (alias `discover-hint`) is `-Dexec.args=hint` and prints the recommended Discover `pkb_runvars`, a dry-run resolve preview that does not start tests, and `NEXT: run discover`. Default Discover/Confirm stay on `pkb_runvars`. Sealed `pkb_overriderunvars` is opt-in: resolve → inspect → complete map (six context keys required) → `-Dpkb_overriderunvars=<compact>` → compare `runProfileFingerprint`. Do not mix sealed input with `pkb_runvars` or `pkb_profile`. `ui` is a host/human command. Agents must not use `ui`. If `workbench_*` tools already exist they are the same session, not a setup step.
 
 Do not copy consumer features into `.pickleball` as a sandbox.
 
@@ -164,7 +164,7 @@ These are documented agent defaults, not `PickleballTests` human defaults (`pret
 mvn -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java "-Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher" "-Dexec.classpathScope=test" "-Dexec.args=confirm --tags=@the-failing-tag --name='The failing scenario'"
 ```
 
-After any diagnostic run, read `pkb_run_profile` from the pack. That is the complete resolved RunVar list, including inherited execution-context paths and the integer parallel count. Do not treat omitted `pkb_runvars` keys as equal to project `pickleball.properties`. Confirm and live isolate replay that retained profile through `pkb_runvars`; they do not silently re-resolve from project defaults.
+After any diagnostic run, read `pkb_run_profile` from the pack. That is the complete resolved RunVar list, including inherited execution-context paths and the integer parallel count. Do not treat omitted `pkb_runvars` keys as equal to project `pickleball.properties`. Confirm stays on `pkb_runvars`. Live isolate/worker launch replays a sealed snapshot as `-Dpkb_overriderunvars=` and an ordinary snapshot as `-Dpkb_runvars=`; neither silently re-resolves from project defaults, and neither supplies `pkb_run_profile` as input.
 
 A selected profile or partial `pkb_runvars` input inherits only missing project execution-context RunVars:
 
@@ -308,6 +308,7 @@ Workbench `export-guidance` copies bundled guidance through JDK-only `Pickleball
 DiagnosticCli guidance
 DiagnosticCli export-guidance [output-directory]
 DiagnosticCli discover-hint [project]
+DiagnosticCli resolve-runvars [project]
 DiagnosticCli emit-investigation <investigation-json-or--> <consumer-project-root>
 DiagnosticCli compare-runs <left-run-index> <right-run-index> [output-json]
 DiagnosticCli compare-fingerprints <left.pkbf> <right.pkbf> [output-json]
@@ -336,6 +337,7 @@ When an investigation requires a rerun and the intended execution settings are k
 12. After the rerun, verify `runProfileFingerprint`, compatibility field `directRunProfile`, and actual source/comparison evidence before attributing differences.
 13. Use `runProfileFingerprint`, not `configurationHash`, as the equality signal for the final RunVar set.
 14. Never expand protected values into logs, prompts, committed files, or diagnostic evidence.
+15. To freeze a complete map, dry-run resolve without starting tests, inspect provenance, complete the six context keys, then launch sealed `-Dpkb_overriderunvars=<compact>`. Absent that input, resolution is unchanged. Do not mix sealed input with `pkb_runvars` or a composing `pkb_profile`. Compare `runProfileFingerprint` after the sealed run.
 
 Example controlled replay:
 

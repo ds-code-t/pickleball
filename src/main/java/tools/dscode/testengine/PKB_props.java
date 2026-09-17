@@ -1,6 +1,7 @@
 package tools.dscode.testengine;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
@@ -23,6 +24,8 @@ public final class PKB_props {
     public static final String PKB_PROFILE = PKB_PREFIX + "profile";
     public static final String PKB_RUN_VARS = PKB_PREFIX + "runvars";
     public static final String PKB_RUN_VARS_PREFIX = PKB_RUN_VARS + ".";
+    public static final String PKB_OVERRIDE_RUN_VARS = PKB_PREFIX + "overriderunvars";
+    public static final String PKB_OVERRIDE_RUN_VARS_PREFIX = PKB_OVERRIDE_RUN_VARS + ".";
     public static final String PKB_RUN_PROFILE = PKB_PREFIX + "run_profile";
     public static final String PKB_RUN_PROFILE_PREFIX = PKB_RUN_PROFILE + ".";
     public static final String PKB_RP_PREFIX = PKB_PREFIX + "rp_";
@@ -94,6 +97,8 @@ public final class PKB_props {
                 && !normalized.equals(PKB_PROFILE)
                 && !normalized.equals(PKB_RUN_VARS)
                 && !normalized.startsWith(PKB_RUN_VARS_PREFIX)
+                && !normalized.equals(PKB_OVERRIDE_RUN_VARS)
+                && !normalized.startsWith(PKB_OVERRIDE_RUN_VARS_PREFIX)
                 && !normalized.equals(PKB_RUN_PROFILE)
                 && !normalized.startsWith(PKB_RUN_PROFILE_PREFIX)
                 && !normalized.equals(PKB_OPTIONS)
@@ -104,6 +109,12 @@ public final class PKB_props {
     public static boolean isRunVarsMemberKey(String key) {
         String normalized = PickleballRunner.normalizePkbKey(key);
         return normalized != null && normalized.startsWith(PKB_RUN_VARS_PREFIX);
+    }
+
+    /** True for expanded sealed members such as {@code pkb_overriderunvars.pkb_browser}. */
+    public static boolean isOverrideRunVarsMemberKey(String key) {
+        String normalized = PickleballRunner.normalizePkbKey(key);
+        return normalized != null && normalized.startsWith(PKB_OVERRIDE_RUN_VARS_PREFIX);
     }
 
     /** True for reserved expanded internal-output names such as {@code pkb_run_profile.pkb_browser}. */
@@ -166,6 +177,47 @@ public final class PKB_props {
         return PickleballProfiles.serializeRunProfile(values);
     }
 
+    /** Fingerprint of the canonical execution RunVar set. Matches retained {@code runProfileFingerprint}. */
+    public static String runProfileFingerprint(Map<String, String> values) {
+        return PickleballProfiles.fingerprint(values);
+    }
+
+    /**
+     * Dry-run resolve of Pickleball RunVars. Does not start tests, browsers, or a {@code PickleballRunner}.
+     * Provenance values are {@code override}, {@code runvars}, {@code profile}, {@code jvm},
+     * {@code inherited-context}, {@code default}, or {@code properties}.
+     */
+    public static ResolvedRunVars resolveRunVars(Map<String, String> values) {
+        return resolveRunVars(values, Map.of());
+    }
+
+    /**
+     * Dry-run resolve with explicit JVM RunVar overlays, matching {@code PickleballProfiles.apply}.
+     * Does not start tests or browsers.
+     */
+    public static ResolvedRunVars resolveRunVars(
+            Map<String, String> values,
+            Map<String, String> runtimeRunVarOverrides
+    ) {
+        if (values == null) {
+            throw new IllegalArgumentException("values cannot be null");
+        }
+        LinkedHashMap<String, String> working = new LinkedHashMap<>();
+        values.forEach((key, value) -> working.put(key, value == null ? "" : value));
+        PickleballProfiles.Resolution resolution = PickleballProfiles.apply(
+                working,
+                runtimeRunVarOverrides == null ? Map.of() : runtimeRunVarOverrides
+        );
+        String profile = PickleballProfiles.serializeRunProfile(working);
+        return new ResolvedRunVars(
+                resolution.runVars(),
+                profile,
+                PickleballProfiles.fingerprint(working),
+                resolution.sealed(),
+                resolution.provenance()
+        );
+    }
+
     /** Preferred direct RunVar input. Missing execution-context keys inherit; explicit blanks suppress inheritance. */
     public static void runVars(String assignments) {
         clearDirectRunControls();
@@ -190,9 +242,43 @@ public final class PKB_props {
         });
     }
 
+    /**
+     * Compact sealed RunVar input. When non-blank, this run ignores profiles, {@code pkb_runvars},
+     * files, defaults, and ambient {@code -Dpkb_*} RunVars. Clears the expanded override form first.
+     */
+    public static void overrideRunVars(String assignments) {
+        clearOverrideRunControls();
+        put(PKB_OVERRIDE_RUN_VARS, assignments);
+    }
+
+    /**
+     * Expanded sealed RunVar input without compact assignment parsing. Clears the compact override form first.
+     */
+    public static void overrideRunVars(Map<String, String> runVars) {
+        if (runVars == null) {
+            throw new IllegalArgumentException("runVars cannot be null");
+        }
+        clearOverrideRunControls();
+        runVars.forEach((key, value) -> {
+            String profileKey = key == null ? null : key.trim();
+            String normalized = profileKey != null && profileKey.toLowerCase(java.util.Locale.ROOT).startsWith("rp.")
+                    ? PickleballProfiles.reportPortalAliasKey(profileKey)
+                    : PickleballRunner.normalizePkbKey(profileKey);
+            if (!isRunVariableKey(normalized)) {
+                throw new IllegalArgumentException("RunVar property '" + key + "' is not a Pickleball run variable.");
+            }
+            values().put(PKB_OVERRIDE_RUN_VARS_PREFIX + normalized, value == null ? "" : value);
+        });
+    }
+
     private static void clearDirectRunControls() {
         values().remove(PKB_RUN_VARS);
         values().keySet().removeIf(PKB_props::isRunVarsMemberKey);
+    }
+
+    private static void clearOverrideRunControls() {
+        values().remove(PKB_OVERRIDE_RUN_VARS);
+        values().keySet().removeIf(PKB_props::isOverrideRunVarsMemberKey);
     }
 
     public static String reportPortal(String nativePropertyName) {
@@ -222,4 +308,38 @@ public final class PKB_props {
     public static String debugBrowser() { return get(PKB_DEBUG_BROWSER); }
     public static void debugBrowser(String enable) { put(PKB_DEBUG_BROWSER, enable); }
     public static void debugBrowser(boolean enable) { put(PKB_DEBUG_BROWSER, Boolean.toString(enable)); }
+
+    /**
+     * Result of {@link #resolveRunVars(Map)} / {@link #resolveRunVars(Map, Map)}.
+     * Does not start tests. {@code provenance} is per execution RunVar.
+     */
+    public static final class ResolvedRunVars {
+        private final Map<String, String> runVars;
+        private final String runProfile;
+        private final String fingerprint;
+        private final boolean sealed;
+        private final Map<String, String> provenance;
+
+        ResolvedRunVars(
+                Map<String, String> runVars,
+                String runProfile,
+                String fingerprint,
+                boolean sealed,
+                Map<String, String> provenance
+        ) {
+            this.runVars = runVars == null ? Map.of() : Collections.unmodifiableMap(new LinkedHashMap<>(runVars));
+            this.runProfile = runProfile == null ? "" : runProfile;
+            this.fingerprint = fingerprint == null ? "" : fingerprint;
+            this.sealed = sealed;
+            this.provenance = provenance == null
+                    ? Map.of()
+                    : Collections.unmodifiableMap(new LinkedHashMap<>(provenance));
+        }
+
+        public Map<String, String> runVars() { return runVars; }
+        public String runProfile() { return runProfile; }
+        public String fingerprint() { return fingerprint; }
+        public boolean sealed() { return sealed; }
+        public Map<String, String> provenance() { return provenance; }
+    }
 }

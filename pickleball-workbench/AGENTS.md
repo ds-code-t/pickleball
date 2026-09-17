@@ -66,10 +66,12 @@ java -cp pickleball-workbench-<version>.jar:<resolved-libs> tools.dscode.workben
 The UI is player-style and execution-oriented. Its primary layout is:
 
 ```text
-left rail: scenario name/tag filters + results; optional feature-file filter
+left rail: scenario name/tag filters + results; optional feature-file filter; collapsible Sealed RunVars panel
 center:    Live Gherkin text editor + compact Step Editor / Command
 right:     Mapping | Terminal | Explorer | Report
 ```
+
+The Sealed RunVars panel is JDK/Workbench-only: it displays a map and writes LastDiscoverSnapshot `sealed=true` for the next worker `-Dpkb_overriderunvars=`. It must not import `PKB_props`, `PickleballProfiles`, or Pickleball core. Panel edits do not mutate an in-flight worker. Unused, it changes no behavior.
 
 Low-level lifecycle controls live under the Session menu and existing investigation controls remain available under Advanced Controls rather than dominating the permanent workspace.
 

@@ -165,6 +165,8 @@ PKB_props.runVars(Map.of(
 
 `PKB_props.runProfile()` is the read-only getter for the final canonical serialized RunVars. There are no direct `runProfile(String/Map)` input setters; external `pkb_run_profile` input is rejected. Use `pkb_runvars`.
 
+To freeze a complete already-resolved map for one run, use optional sealed `pkb_overriderunvars`. When it is absent or blank, resolution is unchanged. When it is present, that run ignores files, defaults, JVM `-D pkb_*` RunVars, profiles, `pkb_runvars`, inheritance, and templates for the Pickleball RunVar set (Maven/JVM/env still exist as the process). The six context keys must be present (blank tombstones allowed). Do not mix sealed input with `pkb_runvars` or a composing `pkb_profile`. Preview with `PKB_props.resolveRunVars` / `DiagnosticCli resolve-runvars` without starting tests, then launch `-Dpkb_overriderunvars=<compact complete map>` and compare `runProfileFingerprint`.
+
 See [Execution Configuration](configuration.md) and [AI Run Configuration](ai-run-configuration.md).
 
 ## Configuration mapping path

@@ -561,6 +561,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/terminal/WorkerLogBuffer.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/terminal/WorkerLogFiles.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/ui/FeaturePickerPanel.java`
+- `pickleball-workbench/src/main/java/tools/dscode/workbench/ui/RunVarOverridePanel.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/ui/TerminalPanel.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/ui/web/DiagnosticExplorerHost.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/ui/web/JavaFxSupport.java`
@@ -613,6 +614,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/sync/WorkbenchSynchronizerTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/sync/WorkbenchSyncPlannerTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/terminal/WorkerLogBufferTest.java`
+- `pickleball-workbench/src/test/java/tools/dscode/workbench/ui/RunVarOverridePanelTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/ui/web/WorkbenchWebResourceTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/ui/WorkbenchUiControllerTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/ui/WorkbenchUiSettingsTest.java`
@@ -666,6 +668,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `maven-consumer-project/src/test/java/tools/dscode/parallelutilities/ParallelCountEstimatorChecks.java`
 - `maven-consumer-project/src/test/java/tools/dscode/testengine/PkbPropertyValueNormalizerChecks.java`
 - `maven-consumer-project/src/test/java/tools/dscode/testengine/ProfileConfigurationChecks.java`
+- `maven-consumer-project/src/test/java/tools/dscode/testengine/RunVarOverrideChecks.java`
 
 ## Maven consumer feature scenarios
 

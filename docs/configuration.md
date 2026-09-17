@@ -80,11 +80,13 @@ pkb_profile
 pkb_profile_<name>
 pkb_runvars
 pkb_runvars.<pkb_var>
+pkb_overriderunvars
+pkb_overriderunvars.<pkb_var>
 pkb_run_profile
 pkb_options
 ```
 
-`pkb_run_profile` is the canonical resolved output and is reserved for Pickleball. External `pkb_run_profile` / `pkb_run_profile.<pkb_var>` input is rejected; use `pkb_runvars` / `pkb_runvars.<pkb_var>` instead.
+`pkb_run_profile` is the canonical resolved output and is reserved for Pickleball. External `pkb_run_profile` / `pkb_run_profile.<pkb_var>` input is rejected; use `pkb_runvars` / `pkb_runvars.<pkb_var>` for controlled runs, or `pkb_overriderunvars` / `pkb_overriderunvars.<pkb_var>` for a sealed complete map.
 
 Diagnostic lineage is separate metadata:
 
@@ -232,6 +234,34 @@ pkb_features=, pkb_browser=firefox
 
 The last form intentionally suppresses inherited `pkb_features`. The literal word `null` is ordinary text; it is not a compact-syntax null marker.
 
+## Sealed execution with `pkb_overriderunvars`
+
+`pkb_overriderunvars` is optional sealed input. It is **opt-in**. When compact input is missing/null/blank **and** there are no expanded `pkb_overriderunvars.*` members, sealed is OFF and current resolution is unchanged.
+
+When sealed is ON for that execution only, Pickleball ignores the normal sources for execution RunVars (JVM `-D pkb_*`, runner properties/defaults, property files, `default_profile`, `pkb_profile`, `pkb_runvars`, execution-context inheritance, and templates). Maven/JVM/env still exist as the process; they must not change the Pickleball RunVar set. This is ignore-sources, not erase-process.
+
+Fail-closed rules:
+
+- missing any of `pkb_glue`, `pkb_features`, `pkb_datapath`, `pkb_callpath`, `pkb_componentpath`, `pkb_configpath` is an error (blank is an allowed tombstone);
+- no templates in the sealed bag (`<default_profile.x>`, named-profile templates, `<config:...>` / `<configs...>`);
+- sealed + compact/expanded `pkb_runvars` is an error;
+- sealed + a `pkb_profile` selection meant to compose this run is an error;
+- compact + expanded `pkb_overriderunvars` together is an error;
+- omitted optional RunVars stay absent;
+- secrets stay `${protected:...}`;
+- Cucumber CLI tag/name/glue projection must not mutate the sealed set;
+- `pkb_parallel=auto` is the only allowed derived mutation (stamped as an integer into `pkb_run_profile`).
+
+Reuse the same compact/expanded assignment grammar as `pkb_runvars`. `pkb_overriderunvars` is INPUT. `pkb_run_profile` remains derived OUTPUT only.
+
+Dry-run without starting tests:
+
+```java
+PKB_props.ResolvedRunVars preview = PKB_props.resolveRunVars(values);
+```
+
+`DiagnosticCli resolve-runvars` and Workbench `hint` print that preview. Agents resolve → inspect → complete map → `pkb_overriderunvars` → compare fingerprint.
+
 ### Templates and runtime configs
 
 Controlled RunVars can reference profiles:
@@ -285,7 +315,7 @@ PKB_props.runVars(Map.of(
 String finalProfile = PKB_props.runProfile();
 ```
 
-`PKB_props.runProfile()` is a getter only.
+`PKB_props.runProfile()` is a getter only. For a complete frozen map, use `PKB_props.overrideRunVars(...)` and preview with `PKB_props.resolveRunVars(map)` without starting tests.
 
 ## `pkb_configpath` and the stable `configs` mapping
 
@@ -333,6 +363,8 @@ The existing path semantics for `pkb_features`, `pkb_datapath`, `pkb_callpath`, 
 | `pkb_profile` | `qa,browser_firefox` | selected named profile(s) |
 | `pkb_runvars` | `pkb_tags=@smoke, pkb_browser=chrome` | compact controlled RunVar input |
 | `pkb_runvars.<pkb_var>` | `pkb_runvars.pkb_browser=chrome` | expanded controlled RunVar member |
+| `pkb_overriderunvars` | complete compact map including the six context keys | optional sealed RunVar input; ignores other RunVar sources for that run |
+| `pkb_overriderunvars.<pkb_var>` | `pkb_overriderunvars.pkb_browser=chrome` | expanded sealed RunVar member; do not mix with compact |
 | `pkb_run_profile` | generated assignment string | canonical resolved RunVar output; external input rejected |
 | `pkb_parallel` | `4`, `auto` | parallel scenario count; `auto` resolves at run start to a conservative JVM estimate and stamps the integer into `pkb_run_profile` |
 | `pkb_loglevel` | `debug` | console log level |

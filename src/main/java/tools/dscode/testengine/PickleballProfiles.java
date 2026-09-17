@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.regex.Pattern;
 
 import static io.cucumber.core.options.Constants.FEATURES_PROPERTY_NAME;
@@ -37,6 +38,7 @@ import static tools.dscode.testengine.PKB_props.PKB_DATA_PATH;
 import static tools.dscode.testengine.PKB_props.PKB_FEATURES;
 import static tools.dscode.testengine.PKB_props.PKB_GLUE;
 import static tools.dscode.testengine.PKB_props.PKB_OPTIONS;
+import static tools.dscode.testengine.PKB_props.PKB_OVERRIDE_RUN_VARS;
 import static tools.dscode.testengine.PKB_props.PKB_PARALLEL;
 import static tools.dscode.testengine.PKB_props.PKB_PREFIX;
 import static tools.dscode.testengine.PKB_props.PKB_PROFILE;
@@ -93,6 +95,11 @@ final class PickleballProfiles {
             Map<String, String> runtimeRunVarOverrides
     ) {
         rejectExternalRunProfile(values);
+        DirectInput sealedInput = sealedInputFromValues(values);
+        if (sealedInput != null) {
+            return applySealed(values, sealedInput);
+        }
+
         String selectedProfiles = trimToNull(values.get(PKB_PROFILE));
         DirectInput topLevelDirect = directInputFromValues(values);
 
@@ -107,28 +114,37 @@ final class PickleballProfiles {
         ObjectNode composed;
         ObjectNode directReferenceContext = JSON.createObjectNode();
         boolean direct = topLevelDirect != null;
+        ProvenanceTracker provenance = new ProvenanceTracker();
+        provenance.stamp(defaultProfile, "default");
+        provenance.stamp(runtimeOverrides, "jvm");
 
         if (topLevelDirect != null) {
             composed = JSON.createObjectNode();
-            inheritExecutionContext(composed, defaultProfile);
+            inheritExecutionContext(composed, defaultProfile, provenance);
             mergeDeep(composed, runtimeOverrides);
+            provenance.stamp(runtimeOverrides, "jvm");
             mergeDeep(composed, topLevelDirect.profile());
+            provenance.stamp(topLevelDirect.profile(), "runvars");
         } else if (selectedProfiles == null) {
             composed = defaultProfile.deepCopy();
         } else {
             composed = composeSelectedProfiles(registry, selectedProfiles);
+            provenance.stamp(composed, "profile");
             JsonNode runVarsControl = composed.remove(PKB_RUN_VARS);
             if (runVarsControl != null && !runVarsControl.isNull()) {
                 directReferenceContext = composed.deepCopy();
                 ObjectNode controlledRunVars = directObject(runVarsControl, PKB_RUN_VARS);
                 composed = JSON.createObjectNode();
-                inheritExecutionContext(composed, defaultProfile);
+                inheritExecutionContext(composed, defaultProfile, provenance);
                 mergeDeep(composed, runtimeOverrides);
+                provenance.stamp(runtimeOverrides, "jvm");
                 mergeDeep(composed, controlledRunVars);
+                provenance.stamp(controlledRunVars, "runvars");
                 direct = true;
             } else {
-                inheritExecutionContext(composed, defaultProfile);
+                inheritExecutionContext(composed, defaultProfile, provenance);
                 mergeDeep(composed, runtimeOverrides);
+                provenance.stamp(runtimeOverrides, "jvm");
             }
         }
 
@@ -145,7 +161,28 @@ final class PickleballProfiles {
 
         profileRegistry = registry.deepCopy();
         runProfile = resolved.deepCopy();
-        return new Resolution(direct, selectedProfiles, finalRunVars);
+        return new Resolution(direct, false, selectedProfiles, finalRunVars, provenance.forRunVars(finalRunVars));
+    }
+
+    private static Resolution applySealed(LinkedHashMap<String, String> values, DirectInput sealedInput) {
+        rejectSealedConflicts(values);
+        ObjectNode defaultProfile = profileFromValues(values);
+        ObjectNode composed = sealedInput.profile().deepCopy();
+        rejectSealedPayload(composed);
+        requireSealedExecutionContext(composed);
+        restoreProtectedReferences(composed, defaultProfile);
+        ensureNoUnresolvedReferences(composed);
+        stampResolvedParallel(composed);
+        Map<String, String> finalRunVars = toRunVarMap(composed);
+        ProvenanceTracker provenance = new ProvenanceTracker();
+        provenance.stamp(composed, "override");
+
+        clearManagedValues(values);
+        values.putAll(finalRunVars);
+
+        profileRegistry = JSON.createObjectNode();
+        runProfile = composed.deepCopy();
+        return new Resolution(false, true, null, finalRunVars, provenance.forRunVars(finalRunVars));
     }
 
     static ObjectNode profileRegistry() {
@@ -211,6 +248,28 @@ final class PickleballProfiles {
         return out.toString();
     }
 
+    static String fingerprint(Map<String, String> values) {
+        Map<String, String> runVars = new TreeMap<>();
+        if (values != null) {
+            values.forEach((key, value) -> {
+                if (PKB_props.isRunVariableKey(key) && value != null) {
+                    runVars.put(key.toLowerCase(Locale.ROOT), value);
+                }
+            });
+        }
+        try {
+            byte[] hash = java.security.MessageDigest.getInstance("SHA-256")
+                    .digest(JSON.writeValueAsBytes(runVars));
+            StringBuilder out = new StringBuilder(64);
+            for (byte b : hash) {
+                out.append(String.format("%02x", b));
+            }
+            return out.toString();
+        } catch (Exception e) {
+            return "";
+        }
+    }
+
     static String reportPortalAliasKey(String canonicalKey) {
         if (canonicalKey == null) {
             return null;
@@ -245,6 +304,98 @@ final class PickleballProfiles {
             return new DirectInput(objectFromAssignments(compactRunVars, PKB_RUN_VARS, false));
         }
         return expandedRunVars.isEmpty() ? null : new DirectInput(expandedRunVars);
+    }
+
+    private static DirectInput sealedInputFromValues(Map<String, String> values) {
+        String compactOverride = trimToNull(values.get(PKB_OVERRIDE_RUN_VARS));
+        ObjectNode expandedOverride = expandedOverrideFromValues(values);
+
+        if (compactOverride != null && !expandedOverride.isEmpty()) {
+            throw directFormConflict(PKB_OVERRIDE_RUN_VARS, PKB_props.PKB_OVERRIDE_RUN_VARS_PREFIX);
+        }
+        if (compactOverride != null) {
+            return new DirectInput(objectFromAssignments(compactOverride, PKB_OVERRIDE_RUN_VARS, false));
+        }
+        return expandedOverride.isEmpty() ? null : new DirectInput(expandedOverride);
+    }
+
+    private static ObjectNode expandedOverrideFromValues(Map<String, String> values) {
+        ObjectNode profile = JSON.createObjectNode();
+        values.forEach((key, value) -> {
+            String normalizedKey = PickleballRunner.normalizePkbKey(key);
+            if (!PKB_props.isOverrideRunVarsMemberKey(normalizedKey)) {
+                return;
+            }
+            String runVar = normalizeProfileProperty(
+                    normalizedKey.substring(PKB_props.PKB_OVERRIDE_RUN_VARS_PREFIX.length()));
+            if (PKB_props.isRunMetadataKey(runVar)) {
+                throw new IllegalArgumentException(
+                        "Run metadata '" + runVar + "' must be supplied separately from Pickleball profiles.");
+            }
+            if (!PKB_props.isRunVariableKey(runVar)) {
+                throw new IllegalArgumentException(
+                        "Expanded sealed property '" + key + "' is not a Pickleball run variable.");
+            }
+            if (profile.has(runVar)) {
+                throw new IllegalArgumentException(
+                        "Expanded sealed RunVars define '" + runVar + "' more than once.");
+            }
+            profile.put(runVar, value == null ? "" : value);
+        });
+        return profile;
+    }
+
+    private static void rejectSealedConflicts(Map<String, String> values) {
+        if (directInputFromValues(values) != null) {
+            throw new IllegalArgumentException(
+                    "Cannot combine '" + PKB_OVERRIDE_RUN_VARS + "' with '" + PKB_RUN_VARS
+                            + "'. Sealed RunVars replace profile and runvars composition.");
+        }
+        if (trimToNull(values.get(PKB_PROFILE)) != null) {
+            throw new IllegalArgumentException(
+                    "Cannot combine '" + PKB_OVERRIDE_RUN_VARS + "' with '" + PKB_PROFILE
+                            + "'. Sealed RunVars replace profile composition.");
+        }
+    }
+
+    private static void rejectSealedPayload(ObjectNode composed) {
+        List<String> keys = new ArrayList<>();
+        composed.fieldNames().forEachRemaining(keys::add);
+        for (String key : keys) {
+            String normalized = normalizeProfileProperty(key);
+            if (PKB_props.isRunMetadataKey(normalized)
+                    || PKB_PROFILE.equals(normalized)
+                    || PKB_RUN_VARS.equals(normalized)
+                    || PKB_props.isRunVarsMemberKey(normalized)
+                    || PKB_OVERRIDE_RUN_VARS.equals(normalized)
+                    || PKB_props.isOverrideRunVarsMemberKey(normalized)
+                    || PKB_RUN_PROFILE.equals(normalized)
+                    || PKB_props.isRunProfileMemberKey(normalized)
+                    || PKB_OPTIONS.equals(normalized)) {
+                throw new IllegalArgumentException(
+                        "Sealed '" + PKB_OVERRIDE_RUN_VARS + "' cannot contain '" + key
+                                + "'. Supply only execution RunVars.");
+            }
+            if (!PKB_props.isRunVariableKey(normalized)) {
+                throw new IllegalArgumentException(
+                        "Sealed '" + PKB_OVERRIDE_RUN_VARS + "' property '" + key
+                                + "' is not a Pickleball run variable.");
+            }
+        }
+    }
+
+    private static void requireSealedExecutionContext(ObjectNode composed) {
+        List<String> missing = new ArrayList<>();
+        for (String key : EXECUTION_CONTEXT_KEYS) {
+            if (!composed.has(key)) {
+                missing.add(key);
+            }
+        }
+        if (!missing.isEmpty()) {
+            throw new IllegalArgumentException(
+                    "Sealed '" + PKB_OVERRIDE_RUN_VARS + "' is missing required execution-context key(s) "
+                            + missing + ". Blank values are allowed as tombstones; omitted keys are not inherited.");
+        }
     }
 
     private static void rejectExternalRunProfile(Map<String, String> values) {
@@ -310,6 +461,14 @@ final class PickleballProfiles {
     }
 
     private static void inheritExecutionContext(ObjectNode composed, ObjectNode defaultProfile) {
+        inheritExecutionContext(composed, defaultProfile, null);
+    }
+
+    private static void inheritExecutionContext(
+            ObjectNode composed,
+            ObjectNode defaultProfile,
+            ProvenanceTracker provenance
+    ) {
         for (String key : EXECUTION_CONTEXT_KEYS) {
             if (composed.has(key)) {
                 continue;
@@ -317,6 +476,9 @@ final class PickleballProfiles {
             JsonNode inherited = defaultProfile.get(key);
             if (inherited != null) {
                 composed.set(key, inherited.deepCopy());
+                if (provenance != null) {
+                    provenance.stampKey(key, "inherited-context");
+                }
             }
         }
     }
@@ -828,10 +990,51 @@ final class PickleballProfiles {
         return trimmed.isEmpty() ? null : trimmed;
     }
 
-    record Resolution(boolean direct, String selectedProfiles, Map<String, String> runVars) {
+    record Resolution(
+            boolean direct,
+            boolean sealed,
+            String selectedProfiles,
+            Map<String, String> runVars,
+            Map<String, String> provenance
+    ) {
+        Resolution {
+            runVars = runVars == null ? Map.of() : Map.copyOf(runVars);
+            provenance = provenance == null ? Map.of() : Map.copyOf(provenance);
+        }
     }
 
     private record DirectInput(ObjectNode profile) {
+    }
+
+    private static final class ProvenanceTracker {
+        private final LinkedHashMap<String, String> sources = new LinkedHashMap<>();
+
+        void stamp(ObjectNode node, String source) {
+            if (node == null) {
+                return;
+            }
+            node.fieldNames().forEachRemaining(key -> stampKey(key, source));
+        }
+
+        void stampKey(String key, String source) {
+            if (key == null || source == null) {
+                return;
+            }
+            String normalized = PickleballRunner.normalizePkbKey(key);
+            if (PKB_props.isRunVariableKey(normalized)) {
+                sources.put(normalized, source);
+            }
+        }
+
+        Map<String, String> forRunVars(Map<String, String> runVars) {
+            LinkedHashMap<String, String> out = new LinkedHashMap<>();
+            if (runVars == null) {
+                return out;
+            }
+            runVars.keySet().forEach(key ->
+                    out.put(key, sources.getOrDefault(key, "default")));
+            return out;
+        }
     }
 
     private static final class ProfileTemplateResolver extends MappingProcessor {

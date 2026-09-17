@@ -53,4 +53,13 @@ class WorkbenchCommandLineTest {
         );
         assertNull(parsed.retention());
     }
+
+    @Test
+    void resolveRunVarsIsAnAgentCoreCommand() {
+        WorkbenchCommandLine.Parsed parsed = WorkbenchCommandLine.parse(
+                new String[]{"resolve-runvars", "."}
+        );
+        assertEquals("resolve-runvars", parsed.command());
+        assertTrue(WorkbenchCommandLine.isAgentCoreCommand("resolve-runvars"));
+    }
 }
