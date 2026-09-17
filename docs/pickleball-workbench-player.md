@@ -106,9 +106,13 @@ Invalid typed text is not sent to the worker. NodeMap implementations that are n
 
 The Terminal tails the worker stdout/stderr files Workbench already creates under `.pickleball/workbench/logs/`. Filter by `TRACE`, `DEBUG`, `INFO`, `WARNING`, or `ERROR`. Logs continue as the playhead moves. This is not MCP stdout and is not a fabricated Workbench-only activity dump. Unmarked worker output is shown at `INFO`.
 
-## Diagnostic Log Explorer
+## Explorer and Report
 
-The explorer is a rewind/play/focus timeline of retained Pickleball diagnostic runs. The run dropdown uses catalog ids plus retained outcome/purpose when those fields exist. Each step shows its Gherkin, INFO+ log, and the screenshot taken while that step ran — or an explicit gap when no PNG was retained. Play stops at the last step. Denser layers follow the repository evidence order and only open when the retained files exist. If `reports/diagnostic-runs/run-catalog.json` is missing, the panel stays empty and says so.
+The explorer is a two-panel rewind/play/focus of retained Pickleball diagnostic runs. The run dropdown uses catalog ids plus retained outcome/purpose when those fields exist. The left panel is an indented execution tree (indent = call depth; nested COMPONENT children, then the next sibling after return). There are no return arrows and no Mermaid. Color is status at the playhead. Click seeks to that node's `eventSeq`. Ctrl+click / Open / double-click peeks the pack-local `source/files/` copy through `workbench_go` and does not replace the live buffer. The stage shows Gherkin, `source.path:line`, definition, INFO+ log, and the screenshot taken while that beat ran — or an explicit gap when no PNG was retained. Play stops at the last step. Speed changes the beat interval. Denser layers follow the repository evidence order and only open when the retained files exist. If `reports/diagnostic-runs/run-catalog.json` is missing, the panel stays empty and says so.
+
+Picker “Play this scenario” still replaces the live Gherkin buffer. Explorer and Report from a retained run are peek-only.
+
+The Report tab is the fourth right tab. It renders the same `investigation.json` as portable `report.html`: Gherkin/business bottom line first, then where, cause vs failed assertion, then lower-level Java/JSON/HTTP/git/environment. Clicks call `workbench_go`. Schema version 2 is additive; v1 still renders. Do not use Mermaid.
 
 ## Watched-agent control lease
 

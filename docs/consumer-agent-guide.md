@@ -19,7 +19,7 @@ Same launcher for `hint`, `discover`, `confirm`, `isolate`, `execute-step`, `sta
 1. **Discover** — `-Dexec.args=discover` (optional `--tags` / `--name` / `--retention`). Workbench applies complete AI `pkb_runvars`: browser ladder, high/auto parallel, diagnostic, warn, failed retention. Override retention with `--retention=all|failed|none` (`--retention <value>` also works). It wraps consumer `mvn test`. Do not start a live worker to run the whole suite. Then read `run-catalog.json` and the retained `pkb_run_profile`.
 2. **Confirm** — `-Dexec.args=confirm --tags=... --name=...` with the same Discover snapshot (LastDiscoverSnapshot replayed as `pkb_runvars`) and narrow tags/name. Never supply `pkb_run_profile` as input.
 3. **Live debug** — `-Dexec.args=isolate` (alias `session-start`) starts one long-lived headless Workbench session from the last Discover snapshot and prints `ACK SESSION`. Then `-Dexec.args=execute-step --text='...'`, `status`, `events`, and `stop`. Each Maven exec exits; the session stays up.
-4. **Emit the human handoff, then edit real consumer source** — write `.pickleball/investigations/<id>/` then in chat print only `.pickleball/investigations/<id>/report.html`.
+4. **Emit the human handoff, then edit real consumer source** — write `.pickleball/investigations/<id>/` then in chat print the six-line bottom-line block (Gherkin/business first) plus `.pickleball/investigations/<id>/report.html`. Do not dump MCP transcripts, TRACE, or PNG analysis.
 
 `hint` (alias `discover-hint`) is `-Dexec.args=hint` and prints the recommended Discover `pkb_runvars` and `NEXT: run discover`. `ui` is a host/human command. Agents must not use `ui`. If `workbench_*` tools already exist they are the same session, not a setup step.
 
@@ -34,7 +34,7 @@ After Discover has found the failing scenario, `isolate` starts a headless Workb
 3. `-Dexec.args=status` or `status <id>`; `-Dexec.args=events`.
 4. `-Dexec.args=stop` (or `kill`) when finished.
 5. Confirm with Workbench `confirm` (`-Dexec.args=confirm --tags=... --name=...`). Read the pack with `workbench_diagnostic_catalog`, `workbench_diagnostic_run`, and `workbench_diagnostic_summary` when those tools already exist.
-6. Emit the human handoff with `workbench_investigation_emit` or `DiagnosticCli emit-investigation`. In chat print only `.pickleball/investigations/<id>/report.html`.
+6. Emit the human handoff with `workbench_investigation_emit` or `DiagnosticCli emit-investigation`. In chat print the six-line bottom-line block, then the `report.html` path. If a UI session is attached, at most two `wb://` links may follow. If no UI, omit `wb://`.
 
 `execute-step` / `workbench_execute_step` returns a structured `SUCCESS` / `FAILED` / `UNAVAILABLE` result. A FAILED Gherkin hypothesis does not end the worker and does not fail the paused scenario. `workbench_step_resolve` maps one Gherkin step to its Java definition (or `DYNAMIC` / `OVERRIDE` / `UNMATCHED`) without executing it. Page events with `afterSequence` and a small `limit` (default 100, max 500). Live buffer edits do not require `workbench_sync` and do not write the original `.feature` until explicit Save (`workbench_request_save`). Worker restart without rebuild already exists (`workbench_worker_restart`). Step Overrides compile worker-side (`workbench_step_override_compile`).
 
@@ -207,7 +207,73 @@ Stop reading as soon as the current layer answers the investigation. Do not recu
 
 From a live Workbench session, use `workbench_diagnostic_catalog`, `workbench_diagnostic_run`, and `workbench_diagnostic_summary` for layers 1–3 instead of globbing `reports/diagnostic-runs`. Those tools return sparse JSON only and do not dump `events.jsonl`, traces, or screenshot bytes.
 
-After isolation and the diagnostic rerun, emit a small human handoff. JSON is the source of truth; HTML is a local render of that JSON plus at most two screenshots linked from the existing diagnostic pack. Do not copy the diagnostic run into `.pickleball/investigations/`. In chat print only the project-relative `report.html` path.
+After isolation and the diagnostic rerun, emit a small human handoff. JSON is the source of truth; HTML is a local render of that JSON plus at most two screenshots linked from the existing diagnostic pack. Do not copy the diagnostic run into `.pickleball/investigations/`. Do not embed PNG bytes in investigation JSON. Do not create a Git repo under `.pickleball`. Do not `git checkout` or reset the consumer HEAD from Workbench.
+
+### Bottom-line chat after emit
+
+Every human-facing explanation of a Pickleball test run ends with a **bottom line**. Humans must not scroll a long trace to reconstruct what happened.
+
+Mandatory reading order (same order in chat after emit, `report.html`, Workbench Report tab, and this guide):
+
+1. **Gherkin / business language** — what the scenario was trying to do, what went right or wrong, in user terms.
+2. **Where** — parent scenario `feature:line`, then nested COMPONENT / CALL / data files.
+3. **Cause vs failed assertion** — if an earlier step created the bad state, that earlier step is the cause.
+4. **Then** lower-level Java, JSON/YAML, HTTP, git, environment.
+
+After `workbench_investigation_emit`, print this block — not a dump:
+
+```text
+Bottom line: <one sentence in Gherkin/business language>
+Where: <feature:line Scenario "Name">
+        → COMPONENT "…"  <path:line>
+        → data  <json-or-yaml-path>
+Cause: <originating earlier step if cascade, else the failed step> — <why>
+Git:   <path @ commit date by author — suspect / not a suspect / not tested / not checked>
+Next:  <fix proposed | not fixed | needs a human decision>
+Report: .pickleball/investigations/<id>/report.html
+```
+
+If a UI session is attached, at most two `wb://` links may follow. If no UI, omit `wb://`. No MCP transcripts, TRACE dumps, or PNG analysis in chat.
+
+### Peek vs Play
+
+| Action | Effect |
+|---|---|
+| Picker “Play this scenario” | Replace the live Gherkin buffer. |
+| Explorer / Report / `workbench_go` from a **retained run** | Open a **peek** tab. Prefer the pack-local `source/files/` copy. Do **not** replace the live buffer. Do not write. |
+
+Java from a retained run: show the Step definition panel first. If `definition.sourcePath` is a real **consumer** file, open a **read-only Workbench text tab**. Never open framework sources from the JAR. Paths stay inside the consumer project. A missing target is a visible miss, not a blanked live editor.
+
+A local “revert” hypothesis pastes the pack copy into the live buffer and uses `execute-step`. Do not Save. Do not change HEAD.
+
+### `workbench_go`
+
+One navigation tool. Do not add generic IDE, git, or process MCP tools.
+
+```text
+workbench_go(link)
+```
+
+`link` fields: `to` (`explorer` | `editor` | `mapping` | `report` | `terminal`), `runId`, `eventSeq`, `nodeId`, `path`, `line`, `column`, `kind` (`feature` | `component` | `step` | `call` | `data` | `java`), `mapReference`, `key`, `investigationId`, `section`, `label`.
+
+The same fields parse from `wb://explorer?run=&seq=&node=` (and the other `to` values). UI attach plus a control lease are required to move the window. Headless: validate and echo the resolved target. `label` may feed `workbench_set_current_action`. The tool does not write files. Report clicks, explorer Open, and MCP share one Java resolver.
+
+### Source pack (read, do not check out)
+
+Dense retained runs copy only the files that scenario actually used under `reports/diagnostic-runs/<run>/source/`:
+
+```text
+referenced.json          # path, role, sha256, vsHead: clean|dirty|untracked|no-git
+referenced.patch.gz      # filtered `git diff HEAD -- <those paths>` when dirty
+files/<project-relative> # full copies of the allowed set (even when they match HEAD)
+live-buffer.feature      # only if isolate ran unsaved Gherkin that differs from disk
+```
+
+Allowed set: used `.feature` files (parent plus nested components named by events); consumer Java **step definition** sources named by `definition.sourcePath` (not helpers, not framework); JSON/YAML the scenario actually accessed.
+
+Keep existing `source-provenance.json` (`pkb_gitsnapshot=metadata|diff|none`, default `metadata`). Do not use whole-tree `consumer-working-tree.patch.gz` as recovery. There is no fourth `pkb_gitsnapshot` mode and no shadow git under `.pickleball`. Flush is `pkb_reportretention` / delete the run folder.
+
+Agent git suspects are a local procedure against the consumer repo (`git log -n 5 -- <path>`). There is no MCP git tool. Workbench never checks out the consumer repo.
 
 ## Visual evidence rules
 
@@ -250,7 +316,7 @@ DiagnosticCli rebuild <diagnostic-runs-root-or-run-root>
 
 `DiagnosticCli help`, `--help`, and `-h` print that DiagnosticCli list and state that Workbench is the agent entry.
 
-Use Workbench `export-guidance` to materialize the complete version-matched documentation plus curated Maven consumer reference, `hint` for the complete Discover `pkb_runvars` (browser ladder, estimated `pkb_parallel`, diagnostic evidence controls), `discover` / `confirm` to find failures, and `isolate` / `execute-step` / `status` / `events` / `stop` for live debug. `emit-investigation` writes `.pickleball/investigations/<id>/investigation.json` and `report.html` and prints the relative HTML path.
+Use Workbench `export-guidance` to materialize the complete version-matched documentation plus curated Maven consumer reference, `hint` for the complete Discover `pkb_runvars` (browser ladder, estimated `pkb_parallel`, diagnostic evidence controls), `discover` / `confirm` to find failures, and `isolate` / `execute-step` / `status` / `events` / `stop` for live debug. `emit-investigation` writes `.pickleball/investigations/<id>/investigation.json` and `report.html`. After emit, print the six-line bottom-line block and the relative HTML path. Use `workbench_go` only to navigate an attached leased UI or to validate a target headless; it does not write files.
 
 ## Controlled diagnostic reruns
 
