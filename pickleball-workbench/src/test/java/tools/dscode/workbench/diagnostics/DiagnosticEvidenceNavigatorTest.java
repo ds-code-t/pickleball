@@ -83,7 +83,8 @@ class DiagnosticEvidenceNavigatorTest {
                 {"type":"step","eventSeq":14,"text":"Then after run","nestingLevel":0,"status":"SKIPPED","source":{"path":"features/parent.feature","line":11}}
                 """);
 
-        DiagnosticEvidenceNavigator.ReplayModel model = new DiagnosticEvidenceNavigator(project).replayModel(run);
+        DiagnosticEvidenceNavigator navigator = new DiagnosticEvidenceNavigator(project);
+        DiagnosticEvidenceNavigator.ReplayModel model = navigator.replayModel(run);
         List<DiagnosticEvidenceNavigator.ReplayBeat> beats = model.beats();
         assertEquals(5, beats.size());
         assertEquals("nested_scenario_start", beats.getFirst().type());
@@ -116,6 +117,20 @@ class DiagnosticEvidenceNavigatorTest {
         assertEquals(1, component.children().size());
         assertEquals("Given nested login", component.children().getFirst().beat().stepText());
         assertEquals(component.nodeId(), component.children().getFirst().parentNodeId());
+
+        java.util.Map<String, Object> tree = navigator.treeMaps(model.roots(), model.beats()).getFirst();
+        assertEquals("scenario", tree.get("kind"));
+        assertEquals(Boolean.TRUE, tree.get("failed"));
+        @SuppressWarnings("unchecked")
+        java.util.List<java.util.Map<String, Object>> children =
+                (java.util.List<java.util.Map<String, Object>>) tree.get("children");
+        assertEquals("When RUN COMPONENT SCENARIO: login", children.getFirst().get("stepText"));
+        @SuppressWarnings("unchecked")
+        java.util.List<java.util.Map<String, Object>> nested =
+                (java.util.List<java.util.Map<String, Object>>) children.getFirst().get("children");
+        assertEquals("component", nested.getFirst().get("kind"));
+        assertEquals("login", nested.getFirst().get("stepText"));
+        assertEquals(0, nested.getFirst().get("beatIndex"));
     }
 
     @Test

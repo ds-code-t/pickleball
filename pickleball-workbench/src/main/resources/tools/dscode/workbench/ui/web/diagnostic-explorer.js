@@ -6,6 +6,8 @@
   var step = document.getElementById("step");
   var stepStatus = document.getElementById("step-status");
   var stepMeta = document.getElementById("step-meta");
+  var stepSource = document.getElementById("step-source");
+  var stepDefinition = document.getElementById("step-definition");
   var log = document.getElementById("log");
   var status = document.getElementById("status");
   var scrub = document.getElementById("scrub");
@@ -15,9 +17,10 @@
   var play = document.getElementById("play");
   var prev = document.getElementById("prev");
   var next = document.getElementById("next");
+  var speed = document.getElementById("speed");
   var layersEl = document.getElementById("layers");
   var excerptEl = document.getElementById("layer-excerpt");
-  var model = { runs: [], beats: [], layers: [], index: 0, playing: false, gap: "" };
+  var model = { runs: [], beats: [], tree: [], layers: [], index: 0, playing: false, gap: "", userExpanded: {} };
   var timer = null;
   var excerptLayer = "";
 
@@ -31,7 +34,7 @@
 
   function tone(statusText) {
     var value = String(statusText || "").toLowerCase();
-    if (value.indexOf("fail") >= 0 || value.indexOf("error") >= 0) return "is-fail";
+    if (value.indexOf("fail") >= 0 || value.indexOf("error") >= 0 || value.indexOf("ambiguous") >= 0) return "is-fail";
     if (value.indexOf("pass") >= 0 || value === "ok") return "is-pass";
     if (value.indexOf("skip") >= 0) return "is-skip";
     return "";
@@ -44,10 +47,29 @@
         .replace(/>/g, ">");
   }
 
+  function isEdge(beat) {
+    return beat && beat.type === "nested_scenario_end";
+  }
+
+  function playableIndexes() {
+    var out = [];
+    (model.beats || []).forEach(function (beat, index) {
+      if (!isEdge(beat)) out.push(index);
+    });
+    return out;
+  }
+
+  function playablePosition() {
+    var playable = playableIndexes();
+    var pos = playable.indexOf(model.index);
+    return pos < 0 ? 0 : pos;
+  }
+
   function groupedBeats() {
     var groups = [];
     var current = null;
     (model.beats || []).forEach(function (beat, index) {
+      if (isEdge(beat)) return;
       var id = beat.scenarioId || "";
       if (!current || current.id !== id) {
         current = { id: id, items: [] };
@@ -58,6 +80,39 @@
     return groups;
   }
 
+  function findPath(nodes, beatIndex, path) {
+    if (!nodes) return null;
+    for (var i = 0; i < nodes.length; i++) {
+      var node = nodes[i];
+      path.push(node);
+      if (node.beatIndex === beatIndex) return path.slice();
+      var found = findPath(node.children, beatIndex, path);
+      if (found) return found;
+      path.pop();
+    }
+    return null;
+  }
+
+  function playheadPathIds() {
+    var ids = {};
+    var path = findPath(model.tree || [], model.index, []);
+    if (!path) return ids;
+    path.forEach(function (node) {
+      if (node && node.nodeId) ids[node.nodeId] = true;
+    });
+    return ids;
+  }
+
+  function isExpanded(node, pathIds) {
+    if (!node || !node.children || !node.children.length) return false;
+    if (pathIds && pathIds[node.nodeId]) return true;
+    if (model.userExpanded && Object.prototype.hasOwnProperty.call(model.userExpanded, node.nodeId)) {
+      return !!model.userExpanded[node.nodeId];
+    }
+    if (node.kind === "scenario" && node.failed) return true;
+    return false;
+  }
+
   function stopPlay() {
     model.playing = false;
     play.textContent = "Play";
@@ -65,6 +120,141 @@
       clearInterval(timer);
       timer = null;
     }
+  }
+
+  function intervalMs() {
+    var value = speed && speed.value ? Number(speed.value) : 1400;
+    return value > 0 ? value : 1400;
+  }
+
+  function seekToBeatIndex(index) {
+    var playable = playableIndexes();
+    if (!playable.length) {
+      model.index = 0;
+      return;
+    }
+    if (playable.indexOf(index) >= 0) {
+      model.index = index;
+      return;
+    }
+    var nearest = playable[0];
+    for (var i = 0; i < playable.length; i++) {
+      if (playable[i] <= index) nearest = playable[i];
+    }
+    model.index = nearest;
+  }
+
+  function appendTree(nodes, depth, pathIds) {
+    if (!nodes) return;
+    nodes.forEach(function (node) {
+      if (!node || node.type === "nested_scenario_end") return;
+      var expanded = isExpanded(node, pathIds);
+      var hasKids = node.children && node.children.length;
+      var collapsedCallee = hasKids && !expanded && (node.kind === "component" || node.kind === "service-call");
+      var button = document.createElement("button");
+      button.type = "button";
+      var statusKind = tone(node.status);
+      button.className = "beat"
+          + (node.beatIndex === model.index ? " active" : "")
+          + (statusKind && node.beatIndex === model.index ? " " + statusKind : "")
+          + (collapsedCallee ? " collapsed-callee" : "");
+      button.style.paddingLeft = (8 + depth * 14) + "px";
+      var twist = document.createElement("button");
+      twist.type = "button";
+      twist.className = "twist";
+      twist.tabIndex = -1;
+      if (hasKids) {
+        twist.textContent = expanded ? "▾" : "▸";
+        twist.addEventListener("click", function (event) {
+          event.stopPropagation();
+          model.userExpanded = model.userExpanded || {};
+          model.userExpanded[node.nodeId] = !expanded;
+          render();
+        });
+      } else {
+        twist.textContent = "";
+      }
+      var kind = document.createElement("span");
+      kind.className = "kind";
+      kind.textContent = node.kind === "scenario" ? "scen" : (node.kind || "").slice(0, 4);
+      var copy = document.createElement("span");
+      copy.className = "copy";
+      var phrase = document.createElement("span");
+      phrase.className = "phrase";
+      phrase.textContent = node.stepText || node.kind || "(node)";
+      copy.appendChild(phrase);
+      var marks = document.createElement("span");
+      marks.className = "marks";
+      if (statusKind) {
+        var chip = document.createElement("span");
+        chip.className = "mark " + statusKind;
+        chip.textContent = node.status || (collapsedCallee ? "done" : "");
+        marks.appendChild(chip);
+      } else if (collapsedCallee) {
+        var done = document.createElement("span");
+        done.className = "mark";
+        done.textContent = "done";
+        marks.appendChild(done);
+      }
+      button.appendChild(twist);
+      button.appendChild(kind);
+      button.appendChild(copy);
+      button.appendChild(marks);
+      button.addEventListener("click", function () {
+        stopPlay();
+        if (typeof node.beatIndex === "number" && node.beatIndex >= 0) {
+          seekToBeatIndex(node.beatIndex);
+        } else if (node.children && node.children.length && typeof node.children[0].beatIndex === "number") {
+          seekToBeatIndex(node.children[0].beatIndex);
+        }
+        render();
+      });
+      beatsEl.appendChild(button);
+      if (node.beatIndex === model.index) {
+        try {
+          var top = button.offsetTop - 40;
+          if (top < beatsEl.scrollTop || top > beatsEl.scrollTop + beatsEl.clientHeight - 64) {
+            beatsEl.scrollTop = Math.max(0, top);
+          }
+        } catch (ignored) {}
+      }
+      if (hasKids && expanded) appendTree(node.children, depth + 1, pathIds);
+    });
+  }
+
+  function renderFlat() {
+    groupedBeats().forEach(function (group) {
+      if (group.id) {
+        var head = document.createElement("div");
+        head.className = "scenario-head";
+        head.textContent = "Scenario " + group.id;
+        beatsEl.appendChild(head);
+      }
+      group.items.forEach(function (item) {
+        var beat = item.beat;
+        var button = document.createElement("button");
+        button.type = "button";
+        var kind = tone(beat.status);
+        button.className = "beat" + (item.index === model.index ? " active" : "")
+            + (item.index === model.index && kind ? " " + kind : "");
+        button.style.paddingLeft = (12 + (Number(beat.nestingLevel) || 0) * 14) + "px";
+        var marks = "";
+        if (beat.hasScreenshot || beat.dataUri) marks += "<span class=\"mark shot\">shot</span>";
+        if (kind) marks += "<span class=\"mark " + kind + "\">" + escapeHtml(beat.status) + "</span>";
+        button.innerHTML =
+            "<span class=\"twist\"></span>"
+            + "<span class=\"num\">" + (item.index + 1) + "</span>"
+            + "<span class=\"copy\"><span class=\"phrase\">" + escapeHtml(beat.stepText || beat.text || "(event)") + "</span>"
+            + "<span class=\"meta\">" + escapeHtml(beat.timestamp || "") + "</span></span>"
+            + "<span class=\"marks\">" + marks + "</span>";
+        button.addEventListener("click", function () {
+          stopPlay();
+          seekToBeatIndex(item.index);
+          render();
+        });
+        beatsEl.appendChild(button);
+      });
+    });
   }
 
   function render() {
@@ -78,7 +268,8 @@
       if (run.selected) option.selected = true;
       runs.appendChild(option);
     });
-    var hasBeats = beats.length > 0;
+    var playable = playableIndexes();
+    var hasBeats = playable.length > 0;
     empty.hidden = hasBeats;
     replay.hidden = !hasBeats;
     if (!hasBeats) {
@@ -92,52 +283,20 @@
       stopPlay();
       return;
     }
+    if (playable.indexOf(model.index) < 0) seekToBeatIndex(model.index);
     play.disabled = false;
-    if (model.index < 0) model.index = 0;
-    if (model.index >= beats.length) model.index = beats.length - 1;
-    prev.disabled = model.index <= 0;
-    next.disabled = model.index >= beats.length - 1;
-    scrub.max = String(beats.length - 1);
-    scrub.value = String(model.index);
+    var pos = playablePosition();
+    prev.disabled = pos <= 0;
+    next.disabled = pos >= playable.length - 1;
+    scrub.max = String(playable.length - 1);
+    scrub.value = String(pos);
 
     beatsEl.innerHTML = "";
-    groupedBeats().forEach(function (group) {
-      if (group.id) {
-        var head = document.createElement("div");
-        head.className = "scenario-head";
-        head.textContent = "Scenario " + group.id;
-        beatsEl.appendChild(head);
-      }
-      group.items.forEach(function (item) {
-        var beat = item.beat;
-        var button = document.createElement("button");
-        button.type = "button";
-        button.className = "beat" + (item.index === model.index ? " active" : "");
-        var kind = tone(beat.status);
-        var marks = "";
-        if (beat.hasScreenshot || beat.dataUri) marks += "<span class=\"mark shot\">shot</span>";
-        if (kind) marks += "<span class=\"mark " + kind + "\">" + escapeHtml(beat.status) + "</span>";
-        button.innerHTML =
-            "<span class=\"num\">" + (item.index + 1) + "</span>"
-            + "<span class=\"copy\"><span class=\"phrase\">" + escapeHtml(beat.stepText || beat.text || "(event)") + "</span>"
-            + "<span class=\"meta\">" + escapeHtml(beat.timestamp || "") + "</span></span>"
-            + "<span class=\"marks\">" + marks + "</span>";
-        button.addEventListener("click", function () {
-          stopPlay();
-          model.index = item.index;
-          render();
-        });
-        beatsEl.appendChild(button);
-        if (item.index === model.index) {
-          try {
-            var top = button.offsetTop - 40;
-            if (top < beatsEl.scrollTop || top > beatsEl.scrollTop + beatsEl.clientHeight - 64) {
-              beatsEl.scrollTop = Math.max(0, top);
-            }
-          } catch (ignored) {}
-        }
-      });
-    });
+    if (model.tree && model.tree.length) {
+      appendTree(model.tree, 0, playheadPathIds());
+    } else {
+      renderFlat();
+    }
 
     var current = beats[model.index];
     if (current && current.dataUri) {
@@ -158,13 +317,27 @@
     step.textContent = current
         ? (current.stepText || current.text || "")
         : emptyMessage;
+    var sourceLabel = "";
+    if (current && current.sourcePath) {
+      sourceLabel = current.sourcePath + (current.sourceLine ? (":" + current.sourceLine) : "");
+    }
+    if (stepSource) stepSource.textContent = sourceLabel;
+    var definition = current && current.definition ? current.definition : {};
+    var definitionLabel = "";
+    if (definition.className || definition.method || definition.origin) {
+      definitionLabel = (definition.className || "")
+          + (definition.method ? ("#" + definition.method) : "")
+          + (definition.origin ? (" · " + definition.origin) : "")
+          + (definition.sourcePath ? (" · " + definition.sourcePath) : "");
+    }
+    if (stepDefinition) stepDefinition.textContent = definitionLabel;
     stepMeta.textContent = current && current.timestamp
-        ? ("Step " + (model.index + 1) + " of " + beats.length + " · " + current.timestamp)
-        : ("Step " + (model.index + 1) + " of " + beats.length);
+        ? ("Beat " + (pos + 1) + " of " + playable.length + " · " + current.timestamp)
+        : ("Beat " + (pos + 1) + " of " + playable.length);
     log.textContent = current && current.logLines && current.logLines.length
         ? current.logLines.join("\n")
         : "No INFO+ log lines retained for this step.";
-    status.textContent = "Step " + (model.index + 1) + " of " + beats.length
+    status.textContent = "Beat " + (pos + 1) + " of " + playable.length
         + (model.playing ? " · replaying" : "");
     renderLayers();
   }
@@ -206,21 +379,23 @@
   }
 
   function show(delta) {
-    if (!model.beats || !model.beats.length) return;
-    var nextIndex = model.index + delta;
-    if (nextIndex < 0) {
+    var playable = playableIndexes();
+    if (!playable.length) return;
+    var pos = playablePosition();
+    var nextPos = pos + delta;
+    if (nextPos < 0) {
       stopPlay();
-      model.index = 0;
+      model.index = playable[0];
       render();
       return;
     }
-    if (nextIndex >= model.beats.length) {
+    if (nextPos >= playable.length) {
       stopPlay();
-      model.index = model.beats.length - 1;
+      model.index = playable[playable.length - 1];
       render();
       return;
     }
-    model.index = nextIndex;
+    model.index = playable[nextPos];
     render();
   }
 
@@ -233,26 +408,43 @@
     show(1);
   });
   play.addEventListener("click", function () {
-    if (!model.beats || !model.beats.length) return;
+    var playable = playableIndexes();
+    if (!playable.length) return;
     if (model.playing) {
       stopPlay();
       render();
       return;
     }
-    if (model.index >= model.beats.length - 1) model.index = 0;
+    if (playablePosition() >= playable.length - 1) {
+      stopPlay();
+      render();
+      return;
+    }
     model.playing = true;
     play.textContent = "Pause";
     render();
-    timer = setInterval(function () { show(1); }, 1400);
+    timer = setInterval(function () { show(1); }, intervalMs());
   });
+  if (speed) {
+    speed.addEventListener("change", function () {
+      if (!model.playing) return;
+      if (timer) clearInterval(timer);
+      timer = setInterval(function () { show(1); }, intervalMs());
+    });
+  }
   scrub.addEventListener("input", function () {
     stopPlay();
-    model.index = Number(scrub.value) || 0;
+    var playable = playableIndexes();
+    var pos = Number(scrub.value) || 0;
+    if (pos < 0) pos = 0;
+    if (pos >= playable.length) pos = Math.max(0, playable.length - 1);
+    model.index = playable[pos] || 0;
     render();
   });
   runs.addEventListener("change", function () {
     stopPlay();
     excerptLayer = "";
+    model.userExpanded = {};
     if (window.diagnosticHost && window.diagnosticHost.selectRun) {
       window.diagnosticHost.selectRun(runs.value);
     }
@@ -276,14 +468,18 @@
   window.setDiagnosticState = function (json) {
     var next = typeof json === "string" ? JSON.parse(json) : json;
     next.beats = next.beats || next.frames || [];
+    next.tree = next.tree || [];
     next.layers = next.layers || [];
+    next.userExpanded = next.userExpanded || {};
     var sameRun = selectedRunId(model) && selectedRunId(model) === selectedRunId(next)
         && (model.beats || []).length === next.beats.length;
     var keepIndex = sameRun ? Math.min(model.index || 0, Math.max(0, next.beats.length - 1)) : (next.index || 0);
     var keepPlaying = sameRun && model.playing;
+    var keepExpanded = sameRun ? (model.userExpanded || {}) : {};
     model = next;
     model.index = keepIndex;
     model.playing = keepPlaying;
+    model.userExpanded = keepExpanded;
     if (!keepPlaying) stopPlay();
     render();
   };

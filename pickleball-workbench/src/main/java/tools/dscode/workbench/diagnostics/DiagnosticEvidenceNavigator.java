@@ -10,8 +10,10 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Deque;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 /**
  * Read-only navigator over Pickleball's retained diagnostic artifacts.
@@ -286,6 +288,80 @@ public final class DiagnosticEvidenceNavigator {
             return new ReplayModel(beats, roots);
         }
         return new ReplayModel(beats, roots);
+    }
+
+    public Map<String, Object> beatMap(ReplayBeat beat) {
+        Map<String, Object> item = new LinkedHashMap<>();
+        if (beat == null) return item;
+        item.put("type", beat.type());
+        item.put("stepText", beat.stepText());
+        item.put("text", beat.text());
+        item.put("timestamp", beat.timestamp());
+        item.put("status", beat.status());
+        item.put("level", beat.level());
+        item.put("scenarioId", beat.scenarioId());
+        item.put("logLines", beat.logLines());
+        item.put("eventSeq", beat.eventSeq());
+        item.put("nestingLevel", beat.nestingLevel());
+        item.put("nestedInvocationId", beat.nestedInvocationId());
+        item.put("sourcePath", beat.sourcePath());
+        item.put("sourceLine", beat.sourceLine());
+        item.put("kind", beat.kind());
+        item.put("nodeId", beat.nodeId());
+        item.put("parentNodeId", beat.parentNodeId());
+        ReplayDefinition definition = beat.definition();
+        Map<String, Object> definitionMap = new LinkedHashMap<>();
+        definitionMap.put("className", definition.className());
+        definitionMap.put("method", definition.method());
+        definitionMap.put("sourcePath", definition.sourcePath());
+        definitionMap.put("origin", definition.origin());
+        item.put("definition", definitionMap);
+        return item;
+    }
+
+    public List<Map<String, Object>> treeMaps(List<ReplayNode> roots, List<ReplayBeat> beats) {
+        Map<String, Integer> beatIndexByNodeId = new LinkedHashMap<>();
+        if (beats != null) {
+            for (int i = 0; i < beats.size(); i++) {
+                String nodeId = beats.get(i).nodeId();
+                if (!nodeId.isBlank()) beatIndexByNodeId.putIfAbsent(nodeId, i);
+            }
+        }
+        List<Map<String, Object>> trees = new ArrayList<>();
+        if (roots == null) return List.of();
+        for (ReplayNode root : roots) {
+            trees.add(treeMap(root, beatIndexByNodeId));
+        }
+        return List.copyOf(trees);
+    }
+
+    private Map<String, Object> treeMap(ReplayNode node, Map<String, Integer> beatIndexByNodeId) {
+        Map<String, Object> json = new LinkedHashMap<>();
+        ReplayBeat beat = node.beat();
+        json.put("nodeId", node.nodeId());
+        json.put("kind", node.kind());
+        json.put("parentNodeId", node.parentNodeId());
+        json.put("beatIndex", beatIndexByNodeId.getOrDefault(node.nodeId(), -1));
+        json.put("type", beat == null ? "" : beat.type());
+        json.put("stepText", beat == null ? "" : beat.stepText());
+        json.put("status", beat == null ? "" : beat.status());
+        json.put("eventSeq", beat == null ? 0L : beat.eventSeq());
+        json.put("sourcePath", beat == null ? "" : beat.sourcePath());
+        json.put("sourceLine", beat == null ? 0L : beat.sourceLine());
+        json.put("failed", nodeFailed(node));
+        json.put("children", node.children().stream().map(child -> treeMap(child, beatIndexByNodeId)).toList());
+        return json;
+    }
+
+    private static boolean nodeFailed(ReplayNode node) {
+        if (node == null) return false;
+        String status = node.beat() == null ? "" : node.beat().status();
+        String lower = status.toLowerCase(Locale.ROOT);
+        if (lower.contains("fail") || lower.contains("error") || lower.contains("ambiguous")) return true;
+        for (ReplayNode child : node.children()) {
+            if (nodeFailed(child)) return true;
+        }
+        return false;
     }
 
     private ReplayModel replayScenario(Path scenarioDir) {

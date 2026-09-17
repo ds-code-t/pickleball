@@ -966,17 +966,10 @@ final class WorkbenchFrame extends JFrame {
                 .findFirst()
                 .orElse(null);
         if (selected == null) return;
+        DiagnosticEvidenceNavigator.ReplayModel replay = diagnosticNavigator.replayModel(selected.runRoot());
         List<Map<String, Object>> beats = new ArrayList<>();
-        for (DiagnosticEvidenceNavigator.ReplayBeat beat : diagnosticNavigator.replay(selected.runRoot())) {
-            Map<String, Object> item = new LinkedHashMap<>();
-            item.put("type", beat.type());
-            item.put("stepText", beat.stepText());
-            item.put("text", beat.text());
-            item.put("timestamp", beat.timestamp());
-            item.put("status", beat.status());
-            item.put("level", beat.level());
-            item.put("scenarioId", beat.scenarioId());
-            item.put("logLines", beat.logLines());
+        for (DiagnosticEvidenceNavigator.ReplayBeat beat : replay.beats()) {
+            Map<String, Object> item = diagnosticNavigator.beatMap(beat);
             if (beat.screenshot() != null && Files.isRegularFile(beat.screenshot())) {
                 item.put("hasScreenshot", true);
                 try {
@@ -990,6 +983,7 @@ final class WorkbenchFrame extends JFrame {
             }
             beats.add(item);
         }
+        List<Map<String, Object>> tree = diagnosticNavigator.treeMaps(replay.roots(), replay.beats());
         String scenarioId = beats.isEmpty() ? "" : String.valueOf(beats.getFirst().get("scenarioId"));
         List<Map<String, Object>> layers = new ArrayList<>();
         for (var layer : diagnosticNavigator.layers(selected.runRoot(), scenarioId)) {
@@ -1011,6 +1005,7 @@ final class WorkbenchFrame extends JFrame {
         diagnosticView.evalJsonCall("window.setDiagnosticState", WorkbenchWebJson.write(Map.of(
                 "runs", runs,
                 "beats", beats,
+                "tree", tree,
                 "frames", beats,
                 "index", 0,
                 "gap", beats.isEmpty()

@@ -38,6 +38,27 @@
   display: flex;
   gap: 6px;
   justify-content: center;
+  align-items: center;
+}
+
+.speed-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-left: 8px;
+  color: var(--wb-muted);
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.speed-picker select {
+  font-weight: 500;
+  font-size: 12px;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--wb-text);
 }
 
 .meter {
@@ -104,7 +125,7 @@
 
 .beat {
   display: grid;
-  grid-template-columns: 28px 1fr auto;
+  grid-template-columns: 18px 28px 1fr auto;
   gap: 8px;
   width: 100%;
   text-align: left;
@@ -118,6 +139,27 @@
   border-left: 3px solid transparent;
   align-items: start;
 }
+.beat .twist {
+  border: 0;
+  background: transparent;
+  color: var(--wb-muted);
+  padding: 0;
+  width: 18px;
+  cursor: pointer;
+  font: 11px/1 var(--wb-mono);
+}
+.beat .kind {
+  color: var(--wb-muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  padding-top: 3px;
+}
+.beat.is-fail .phrase { color: var(--wb-danger); }
+.beat.is-pass .phrase { color: var(--wb-success); }
+.beat.is-skip .phrase { color: var(--wb-warning); }
+.beat.collapsed-callee .phrase { font-weight: 600; }
 
 .beat:hover { background: var(--wb-surface-alt); }
 .beat.active {
@@ -224,6 +266,11 @@
 .step {
   font: 13px/1.45 var(--wb-mono);
   color: var(--wb-text);
+}
+.step-source, .step-definition {
+  margin-top: 6px;
+  color: var(--wb-muted);
+  font: 12px/1.4 var(--wb-mono);
 }
 .log {
   margin: 0;

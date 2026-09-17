@@ -16,6 +16,14 @@
         <button type="button" class="wb-btn" id="prev" title="Previous step">◀ Previous</button>
         <button type="button" class="wb-btn primary" id="play" title="Replay this retained run in order">Play</button>
         <button type="button" class="wb-btn" id="next" title="Next step">Next ▶</button>
+        <label class="speed-picker">Speed
+          <select id="speed" aria-label="Replay speed">
+            <option value="2800">0.5×</option>
+            <option value="1400" selected>1×</option>
+            <option value="700">2×</option>
+            <option value="350">4×</option>
+          </select>
+        </label>
       </div>
       <div class="meter">
         <div id="status" class="status">Choose a retained run to replay it step by step.</div>
@@ -30,7 +38,7 @@
 
     <div id="replay" class="replay" hidden>
       <aside class="beats">
-        <div class="pane-title">Scenario steps</div>
+        <div class="pane-title">Execution tree</div>
         <div id="beats"></div>
       </aside>
       <section class="stage">
@@ -44,6 +52,8 @@
             <span id="step-meta" class="step-meta"></span>
           </div>
           <div id="step" class="step"></div>
+          <div id="step-source" class="step-source"></div>
+          <div id="step-definition" class="step-definition"></div>
         </div>
         <div class="log-card">
           <div class="pane-title">INFO+ log for this step</div>
