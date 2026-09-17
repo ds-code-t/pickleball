@@ -174,26 +174,37 @@ public class PickleballGuidanceChecks {
     void discoverHintPrintsDiagnosticMvnTestAndRunCatalogNext() {
         ByteArrayOutputStream output = new ByteArrayOutputStream();
         ByteArrayOutputStream errors = new ByteArrayOutputStream();
-        assertEquals(0, DiagnosticCli.run(
-                new String[]{"discover-hint"},
-                new PrintStream(output, true, StandardCharsets.UTF_8),
-                new PrintStream(errors, true, StandardCharsets.UTF_8)
-        ));
-        assertEquals("", errors.toString(StandardCharsets.UTF_8));
-        String text = output.toString(StandardCharsets.UTF_8);
-        assertTrue(text.contains("pkb_runvars"));
-        assertTrue(text.contains("pkb_browser=CHROME_HEADLESS"));
-        assertTrue(text.contains("pkb_parallel=" + tools.dscode.parallelutilities.ParallelCountEstimator.estimate()));
-        assertTrue(text.contains("pkb_reportingmode=diagnostic"));
-        assertTrue(text.contains("pkb_loglevel=warn"));
-        assertTrue(text.contains("pkb_reportretention=failed"));
-        assertTrue(text.contains("pkb_run_profile"));
-        assertTrue(text.contains("Dry-run resolve"));
-        assertTrue(text.contains("pkb_overriderunvars") || text.contains("sealed"));
-        assertFalse(text.contains("pkb_parallel=80"));
-        assertFalse(text.contains("when the project supports it"));
-        assertTrue(text.contains("NEXT: run discover"));
-        assertTrue(text.contains("Pickleball Workbench") || text.contains("Workbench"));
+        String previousParallel = System.getProperty("pkb_parallel");
+        String previousRunVarsParallel = System.getProperty("pkb_runvars.pkb_parallel");
+        System.setProperty("pkb_parallel", "80");
+        System.setProperty("pkb_runvars.pkb_parallel", "80");
+        try {
+            assertEquals(0, DiagnosticCli.run(
+                    new String[]{"discover-hint"},
+                    new PrintStream(output, true, StandardCharsets.UTF_8),
+                    new PrintStream(errors, true, StandardCharsets.UTF_8)
+            ));
+            assertEquals("", errors.toString(StandardCharsets.UTF_8));
+            String text = output.toString(StandardCharsets.UTF_8);
+            assertTrue(text.contains("pkb_runvars"));
+            assertTrue(text.contains("pkb_browser=CHROME_HEADLESS"));
+            assertTrue(text.contains("pkb_parallel=" + tools.dscode.parallelutilities.ParallelCountEstimator.estimate()));
+            assertTrue(text.contains("pkb_reportingmode=diagnostic"));
+            assertTrue(text.contains("pkb_loglevel=warn"));
+            assertTrue(text.contains("pkb_reportretention=failed"));
+            assertTrue(text.contains("pkb_run_profile"));
+            assertTrue(text.contains("Dry-run resolve"));
+            assertTrue(text.contains("pkb_overriderunvars") || text.contains("sealed"));
+            assertFalse(text.contains("pkb_parallel=80"));
+            assertFalse(text.contains("when the project supports it"));
+            assertTrue(text.contains("NEXT: run discover"));
+            assertTrue(text.contains("Pickleball Workbench") || text.contains("Workbench"));
+        } finally {
+            if (previousParallel == null) System.clearProperty("pkb_parallel");
+            else System.setProperty("pkb_parallel", previousParallel);
+            if (previousRunVarsParallel == null) System.clearProperty("pkb_runvars.pkb_parallel");
+            else System.setProperty("pkb_runvars.pkb_parallel", previousRunVarsParallel);
+        }
     }
 
     @Test

@@ -96,7 +96,7 @@ public final class DiagnosticCli {
         out.println("Recommended complete diagnostic Discover `pkb_runvars` (Workbench honors the project browser ladder; headed Chrome / pretty / @all project defaults do not sneak in):");
         out.println("pkb_runvars=" + plan.runVars());
         out.println();
-        printDryRunResolve(project, out);
+        printDryRunResolve(project, out, plan.runVars(), false);
         out.println("Browser: " + plan.browser().browser() + " (" + plan.browser().reason() + ").");
         out.println("Multi-scenario Discover/Confirm use this high pkb_parallel. Live isolate starts a headless Workbench session; then use execute-step / status / events / stop.");
         out.println("The agent-facing entry is Pickleball Workbench (`hint` / `discover` / `confirm` / `isolate`), not a separate DiagnosticCli story. After Discover, confirm (and isolate/execute-step for live debug) replay the retained pkb_run_profile through pkb_runvars. Never supply pkb_run_profile as input.");
@@ -112,21 +112,23 @@ public final class DiagnosticCli {
         Path project = args.length == 2
                 ? Path.of(args[1]).toAbsolutePath().normalize()
                 : Path.of("").toAbsolutePath().normalize();
-        printDryRunResolve(project, out);
+        printDryRunResolve(project, out, null, true);
         return 0;
     }
 
-    private static void printDryRunResolve(Path project, PrintStream out) throws IOException {
+    private static void printDryRunResolve(
+            Path project,
+            PrintStream out,
+            String recommendedRunVars,
+            boolean includeAmbient
+    ) throws IOException {
         LinkedHashMap<String, String> values = loadProjectPkbValues(project);
         LinkedHashMap<String, String> jvm = new LinkedHashMap<>();
-        for (String key : System.getProperties().stringPropertyNames()) {
-            String normalized = key == null ? null : key.toLowerCase(java.util.Locale.ROOT);
-            if (normalized != null && normalized.startsWith("pkb_") && PKB_props.isRunVariableKey(normalized)) {
-                jvm.put(normalized, System.getProperty(key));
-            }
-            if (key != null && (key.toLowerCase(java.util.Locale.ROOT).startsWith("pkb_"))) {
-                values.put(key.toLowerCase(java.util.Locale.ROOT), System.getProperty(key));
-            }
+        if (includeAmbient) {
+            PKB_props.copyJvmDryRunInputs(values, jvm, true, true);
+        }
+        if (recommendedRunVars != null && !recommendedRunVars.isBlank()) {
+            values.put(PKB_props.PKB_RUN_VARS, recommendedRunVars);
         }
         PKB_props.ResolvedRunVars resolved = PKB_props.resolveRunVars(values, jvm);
         Map<String, Object> body = new LinkedHashMap<>();

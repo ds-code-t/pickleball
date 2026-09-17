@@ -26,17 +26,26 @@ class WorkbenchAgentCommandsTest {
         Files.createDirectories(resources);
         Files.writeString(resources.resolve("pickleball.properties"), "pkb_browser=chrome\n");
 
-        Output output = run("hint", tempDir.toString());
+        String previousParallel = System.getProperty("pkb_parallel");
+        String previousRunVarsParallel = System.getProperty("pkb_runvars.pkb_parallel");
+        System.setProperty("pkb_parallel", "80");
+        System.setProperty("pkb_runvars.pkb_parallel", "80");
+        try {
+            Output output = run("hint", tempDir.toString());
 
-        assertEquals(0, output.exitCode());
-        assertTrue(output.stdout().contains("pkb_browser=CHROME_HEADLESS"));
-        assertTrue(output.stdout().contains("pkb_reportretention=failed"));
-        assertTrue(output.stdout().contains("NEXT: run discover"));
-        assertTrue(output.stdout().contains("Dry-run resolve"));
-        assertTrue(output.stdout().contains("pkb_overriderunvars") || output.stdout().contains("sealed="));
-        assertTrue(output.stdout().contains("provenance="));
-        assertFalse(output.stdout().contains("MUST"));
-        assertFalse(output.stdout().contains("pkb_parallel=80"));
+            assertEquals(0, output.exitCode());
+            assertTrue(output.stdout().contains("pkb_browser=CHROME_HEADLESS"));
+            assertTrue(output.stdout().contains("pkb_reportretention=failed"));
+            assertTrue(output.stdout().contains("NEXT: run discover"));
+            assertTrue(output.stdout().contains("Dry-run resolve"));
+            assertTrue(output.stdout().contains("pkb_overriderunvars") || output.stdout().contains("sealed="));
+            assertTrue(output.stdout().contains("provenance="));
+            assertFalse(output.stdout().contains("MUST"));
+            assertFalse(output.stdout().contains("pkb_parallel=80"));
+        } finally {
+            restoreProperty("pkb_parallel", previousParallel);
+            restoreProperty("pkb_runvars.pkb_parallel", previousRunVarsParallel);
+        }
     }
 
     @Test
@@ -207,6 +216,14 @@ class WorkbenchAgentCommandsTest {
                 new PrintStream(stderr, true, StandardCharsets.UTF_8)
         );
         return new Output(exit, stdout.toString(StandardCharsets.UTF_8), stderr.toString(StandardCharsets.UTF_8));
+    }
+
+    private static void restoreProperty(String key, String previous) {
+        if (previous == null) {
+            System.clearProperty(key);
+        } else {
+            System.setProperty(key, previous);
+        }
     }
 
     private record Output(int exitCode, String stdout, String stderr) { }

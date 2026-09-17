@@ -68,7 +68,7 @@ public final class WorkbenchAgentCommands {
         out.println("Recommended complete diagnostic Discover `pkb_runvars` (Workbench honors the project browser ladder; headed Chrome / pretty / @all project defaults do not sneak in):");
         out.println("pkb_runvars=" + plan.runVars());
         out.println();
-        printDryRunResolve(parsed.project(), out);
+        printDryRunResolve(parsed.project(), plan.runVars(), false, out);
         out.println("Browser: " + plan.browser().browser() + " (" + plan.browser().reason() + ").");
         out.println("Multi-scenario Discover/Confirm use this high pkb_parallel. Live isolate starts a headless Workbench session; then use execute-step / status / events / stop. Same launcher, only change exec.args.");
         out.println("After Discover, confirm (and isolate/execute-step for live debug) replay the retained pkb_run_profile through pkb_runvars. Never supply pkb_run_profile as input.");
@@ -79,23 +79,25 @@ public final class WorkbenchAgentCommands {
     }
 
     private static int resolveRunVars(WorkbenchCommandLine.Parsed parsed, PrintStream out) {
-        printDryRunResolve(parsed.project(), out);
+        printDryRunResolve(parsed.project(), null, true, out);
         return 0;
     }
 
-    private static void printDryRunResolve(Path project, PrintStream out) {
+    private static void printDryRunResolve(
+            Path project,
+            String recommendedRunVars,
+            boolean includeAmbient,
+            PrintStream out
+    ) {
         LinkedHashMap<String, String> values = new LinkedHashMap<>();
         loadProperties(values, project.resolve("src/test/resources/pickleball.properties"));
         loadProperties(values, project.resolve("src/test/resources/pickleball_local.properties"));
         LinkedHashMap<String, String> jvm = new LinkedHashMap<>();
-        for (String key : System.getProperties().stringPropertyNames()) {
-            if (key == null) continue;
-            String normalized = key.toLowerCase(java.util.Locale.ROOT);
-            if (!normalized.startsWith("pkb_")) continue;
-            values.put(normalized, System.getProperty(key));
-            if (PKB_props.isRunVariableKey(normalized)) {
-                jvm.put(normalized, System.getProperty(key));
-            }
+        if (includeAmbient) {
+            PKB_props.copyJvmDryRunInputs(values, jvm, true, true);
+        }
+        if (recommendedRunVars != null && !recommendedRunVars.isBlank()) {
+            values.put(PKB_props.PKB_RUN_VARS, recommendedRunVars);
         }
         PKB_props.ResolvedRunVars resolved = PKB_props.resolveRunVars(values, jvm);
         out.println("Dry-run resolve (does not start tests or browsers):");

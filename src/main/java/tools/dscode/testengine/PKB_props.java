@@ -219,6 +219,53 @@ public final class PKB_props {
         );
     }
 
+    /**
+     * Copy JVM {@code -Dpkb_*} inputs for a dry-run preview.
+     * Execution RunVars go to {@code jvm} when {@code includeExecutionOverlays} is true.
+     * {@code pkb_runvars} / {@code pkb_overriderunvars} / {@code pkb_profile} go to {@code values}
+     * when {@code includeControls} is true. Never copies {@code pkb_run_profile}, options, CLI, or lineage.
+     */
+    public static void copyJvmDryRunInputs(
+            Map<String, String> values,
+            Map<String, String> jvm,
+            boolean includeExecutionOverlays,
+            boolean includeControls
+    ) {
+        if (values == null || jvm == null) {
+            return;
+        }
+        for (String key : System.getProperties().stringPropertyNames()) {
+            if (key == null) continue;
+            String normalized = PickleballRunner.normalizePkbKey(key);
+            if (normalized == null || !normalized.startsWith(PKB_PREFIX)) continue;
+            String value = System.getProperty(key);
+            if (value == null) continue;
+            if (isRunMetadataKey(normalized)
+                    || normalized.equals(PKB_RUN_PROFILE)
+                    || isRunProfileMemberKey(normalized)
+                    || normalized.equals(PKB_OPTIONS)
+                    || normalized.equals(PKB_CUCUMBER_CLI_ARGS)
+                    || normalized.equals(PKB_CUCUMBER_CLI_FEATURE_SELECTORS)) {
+                continue;
+            }
+            if (includeExecutionOverlays && isRunVariableKey(normalized)) {
+                jvm.put(normalized, value);
+                continue;
+            }
+            if (!includeControls) {
+                continue;
+            }
+            if (normalized.equals(PKB_RUN_VARS)
+                    || isRunVarsMemberKey(normalized)
+                    || normalized.equals(PKB_OVERRIDE_RUN_VARS)
+                    || isOverrideRunVarsMemberKey(normalized)
+                    || normalized.equals(PKB_PROFILE)
+                    || normalized.startsWith(PKB_PROFILE + "_")) {
+                values.put(normalized, value);
+            }
+        }
+    }
+
     /** Preferred direct RunVar input. Missing execution-context keys inherit; explicit blanks suppress inheritance. */
     public static void runVars(String assignments) {
         clearDirectRunControls();
