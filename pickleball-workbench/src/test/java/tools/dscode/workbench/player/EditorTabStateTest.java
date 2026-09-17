@@ -20,5 +20,8 @@ class EditorTabStateTest {
         assertEquals("Login *", tab.tabTitle());
         assertTrue(tab.sameTarget(file, "Valid password", 0));
         assertFalse(tab.sameTarget(file, "Locked", 0));
+        tab.setPeek(true);
+        assertTrue(tab.peek());
+        assertTrue(tab.readOnly());
     }
 }

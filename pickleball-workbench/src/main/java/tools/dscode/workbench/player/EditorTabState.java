@@ -18,6 +18,8 @@ public final class EditorTabState {
     private String documentText;
     private boolean pinned;
     private boolean dirty;
+    private boolean peek;
+    private boolean readOnly;
 
     public EditorTabState(String title, Path file, String documentText, boolean pinned) {
         this.id = UUID.randomUUID().toString();
@@ -71,6 +73,19 @@ public final class EditorTabState {
 
     public boolean dirty() {
         return dirty;
+    }
+
+    public boolean peek() {
+        return peek;
+    }
+
+    public boolean readOnly() {
+        return readOnly || peek;
+    }
+
+    public void setPeek(boolean peek) {
+        this.peek = peek;
+        if (peek) this.readOnly = true;
     }
 
     public void setTitle(String title) {

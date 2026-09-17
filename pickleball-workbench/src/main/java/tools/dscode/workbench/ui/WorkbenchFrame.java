@@ -9,6 +9,8 @@ import tools.dscode.workbench.catalog.CatalogTargetResolver;
 import tools.dscode.workbench.catalog.ConsumerFeatureCatalog;
 import tools.dscode.workbench.catalog.JavaGlueIndex;
 import tools.dscode.workbench.diagnostics.DiagnosticEvidenceNavigator;
+import tools.dscode.workbench.nav.WorkbenchGoLink;
+import tools.dscode.workbench.nav.WorkbenchGoResolver;
 import tools.dscode.workbench.lease.WorkbenchControlLeaseSnapshot;
 import tools.dscode.workbench.lease.WorkbenchPermissionRequest;
 import tools.dscode.workbench.mapping.MappingTreeModel;
@@ -77,6 +79,7 @@ final class WorkbenchFrame extends JFrame {
     private List<WorkbenchUiController.MappingCatalogEntry> mappingEntries = List.of();
     private MappingTreeModel mappingModel;
     private DiagnosticEvidenceNavigator diagnosticNavigator;
+    private String currentDiagnosticRunId = "";
 
     private static final Color PLAYHEAD_COLOR = WorkbenchTheme.PLAYHEAD;
     private final JTextArea scenarioEditor = new JTextArea();
@@ -371,7 +374,10 @@ final class WorkbenchFrame extends JFrame {
             int index = editorTabs.getSelectedIndex();
             if (index < 0 || index == shownTabIndex) return;
             if (shownTabIndex >= 0 && shownTabIndex < editorSessions.size()) {
-                editorSessions.get(shownTabIndex).setDocumentText(player.documentText());
+                EditorTabState current = editorSessions.get(shownTabIndex);
+                if (!current.peek()) {
+                    current.setDocumentText(player.documentText());
+                }
             }
             showEditorTab(index);
         });
@@ -657,6 +663,7 @@ final class WorkbenchFrame extends JFrame {
             );
 
             diagnosticHost.onSelectRun(this::showDiagnosticRun);
+            diagnosticHost.onGo(this::goFromExplorer);
             diagnosticHost.onReady(this::refreshDiagnostics);
             diagnosticView = new WebViewPanel(
                     "/tools/dscode/workbench/ui/web/diagnostic-explorer.html",
@@ -966,6 +973,7 @@ final class WorkbenchFrame extends JFrame {
                 .findFirst()
                 .orElse(null);
         if (selected == null) return;
+        currentDiagnosticRunId = runId;
         DiagnosticEvidenceNavigator.ReplayModel replay = diagnosticNavigator.replayModel(selected.runRoot());
         List<Map<String, Object>> beats = new ArrayList<>();
         for (DiagnosticEvidenceNavigator.ReplayBeat beat : replay.beats()) {
@@ -1012,6 +1020,101 @@ final class WorkbenchFrame extends JFrame {
                         ? "This retained run has no events.jsonl steps or PNG frames."
                         : ""
         )));
+    }
+
+    private void goFromExplorer(String rawLink) {
+        WorkbenchGoLink link;
+        try {
+            if (rawLink != null && rawLink.trim().startsWith("{")) {
+                link = WorkbenchGoLink.fromMap(json.readValue(rawLink, new TypeReference<Map<String, Object>>() { }));
+            } else {
+                link = WorkbenchGoLink.parse(rawLink);
+            }
+        } catch (Exception failure) {
+            updatePlayerView("Could not parse explorer Open target.");
+            return;
+        }
+        if (link.runId().isBlank() && !currentDiagnosticRunId.isBlank()) {
+            link = WorkbenchGoLink.fromMap(mergeRun(link.toMap(), currentDiagnosticRunId));
+        }
+        WorkbenchGoResolver.WorkbenchGoResult target =
+                new WorkbenchGoResolver(controller.projectRoot()).resolve(link);
+        applyGoResult(target, link);
+    }
+
+    private static Map<String, Object> mergeRun(Map<String, Object> link, String runId) {
+        Map<String, Object> next = new LinkedHashMap<>(link);
+        next.put("runId", runId);
+        return next;
+    }
+
+    private void applyGoResult(WorkbenchGoResolver.WorkbenchGoResult target, WorkbenchGoLink link) {
+        if (target.outsideProject() || target.missing()) {
+            updatePlayerView(target.message());
+            if ("java".equalsIgnoreCase(link.kind())) {
+                javaInspector.setText((link.kind() + "\n" + link.path() + "\n\n" + target.message()).strip());
+            }
+            return;
+        }
+        if (!"editor".equals(target.to())) {
+            updatePlayerView(target.message());
+            return;
+        }
+        if ("java".equalsIgnoreCase(link.kind()) || "java".equalsIgnoreCase(target.kind())) {
+            javaInspector.setText(
+                    "CONSUMER_GLUE\n"
+                            + (target.relativePath() == null ? link.path() : target.relativePath())
+                            + (target.file() == null ? "" : ("\n" + target.file()))
+            );
+        }
+        if (target.file() == null || !Files.isRegularFile(target.file())) {
+            updatePlayerView(target.message());
+            return;
+        }
+        String live = player.documentText();
+        try {
+            String text = Files.readString(target.file());
+            openPeekTab(target.file(), target.label(), text, true);
+            updatePlayerView(target.message());
+            if (!Objects.equals(live, player.documentText())) {
+                player.replaceDocument(List.of(live.split("\n", -1)));
+            }
+        } catch (Exception failure) {
+            updatePlayerView("Could not peek " + target.relativePath() + ".");
+        }
+    }
+
+    private void openPeekTab(Path file, String title, String documentText, boolean pinCaller) {
+        if (shownTabIndex >= 0 && shownTabIndex < editorSessions.size()) {
+            EditorTabState current = editorSessions.get(shownTabIndex);
+            if (!current.peek()) current.setDocumentText(player.documentText());
+        }
+        if (pinCaller && pinnedCallerFile == null) {
+            for (EditorTabState open : editorSessions) {
+                if (!open.peek()) {
+                    open.setPinned(true);
+                    pinnedCallerFile = open.file();
+                    break;
+                }
+            }
+        }
+        for (int i = 0; i < editorSessions.size(); i++) {
+            EditorTabState existing = editorSessions.get(i);
+            if (existing.peek() && existing.file() != null && file != null
+                    && existing.file().toAbsolutePath().normalize().equals(file.toAbsolutePath().normalize())) {
+                existing.setDocumentText(documentText);
+                existing.markClean();
+                rebuildTabStrip();
+                showEditorTab(i);
+                return;
+            }
+        }
+        EditorTabState tab = new EditorTabState(title == null || title.isBlank() ? "Peek" : title, file, documentText, false);
+        tab.setPeek(true);
+        tab.markClean();
+        editorSessions.add(tab);
+        rebuildTabStrip();
+        showEditorTab(editorSessions.size() - 1);
     }
 
     private void configureMappingEditor() {
@@ -1864,6 +1967,28 @@ final class WorkbenchFrame extends JFrame {
     private void showEditorTab(int index) {
         if (index < 0 || index >= editorSessions.size()) return;
         EditorTabState tab = editorSessions.get(index);
+        shownTabIndex = index;
+        if (tab.peek()) {
+            syncingScenarioDocument = true;
+            try {
+                scenarioEditor.setText(tab.documentText());
+                scenarioEditor.setEditable(false);
+                scenarioEditor.setCaretPosition(0);
+            } finally {
+                syncingScenarioDocument = false;
+            }
+            picker.setSaveEnabled(false);
+            if (editorTabs.getSelectedIndex() != index) {
+                rebuildingTabs = true;
+                try {
+                    editorTabs.setSelectedIndex(index);
+                } finally {
+                    rebuildingTabs = false;
+                }
+            }
+            return;
+        }
+        scenarioEditor.setEditable(!humanControlsLocked());
         controller.loadPickerScenario(
                 tab.lines(),
                 tab.file(),
@@ -1873,7 +1998,6 @@ final class WorkbenchFrame extends JFrame {
                 tab.exampleRow(),
                 tab.exampleLabel()
         );
-        shownTabIndex = index;
         if (editorTabs.getSelectedIndex() != index) {
             rebuildingTabs = true;
             try {

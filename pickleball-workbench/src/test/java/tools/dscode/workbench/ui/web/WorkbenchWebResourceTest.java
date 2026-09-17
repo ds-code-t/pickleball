@@ -28,6 +28,7 @@ class WorkbenchWebResourceTest {
         assertTrue(diagnosticHtml.contains("id=\"frame\""));
         assertTrue(diagnosticHtml.contains("id=\"empty\""));
         assertTrue(diagnosticHtml.contains("id=\"speed\""));
+        assertTrue(diagnosticHtml.contains("id=\"open-target\""));
         assertTrue(diagnosticHtml.contains("Execution tree"));
         assertTrue(diagnosticHtml.contains("Retained run"));
         assertFalse(diagnosticHtml.contains("gherkin-editor"));
@@ -38,6 +39,7 @@ class WorkbenchWebResourceTest {
         assertTrue(diagnosticJs.contains("No screenshot was retained for this step."));
         assertTrue(diagnosticJs.contains("ArrowRight"));
         assertTrue(diagnosticJs.contains("isExpanded"));
+        assertTrue(diagnosticJs.contains("diagnosticHost.go"));
         assertTrue(diagnosticJs.contains("nested_scenario_end"));
         assertTrue(diagnosticJs.contains("playable.length - 1"));
         assertFalse(diagnosticJs.toLowerCase().contains("mermaid"));

@@ -17,6 +17,7 @@
   var play = document.getElementById("play");
   var prev = document.getElementById("prev");
   var next = document.getElementById("next");
+  var openTarget = document.getElementById("open-target");
   var speed = document.getElementById("speed");
   var layersEl = document.getElementById("layers");
   var excerptEl = document.getElementById("layer-excerpt");
@@ -127,6 +128,30 @@
     return value > 0 ? value : 1400;
   }
 
+  function nodeLink(node) {
+    return {
+      to: "editor",
+      runId: selectedRunId(model),
+      eventSeq: node && node.eventSeq ? node.eventSeq : 0,
+      nodeId: node && node.nodeId ? node.nodeId : "",
+      path: node && node.sourcePath ? node.sourcePath : "",
+      line: node && node.sourceLine ? node.sourceLine : 0,
+      kind: node && node.kind ? node.kind : "feature",
+      label: node && node.stepText ? node.stepText : ""
+    };
+  }
+
+  function goToNode(node) {
+    if (!node || !window.diagnosticHost || !window.diagnosticHost.go) return;
+    window.diagnosticHost.go(JSON.stringify(nodeLink(node)));
+  }
+
+  function currentTreeNode() {
+    var path = findPath(model.tree || [], model.index, []);
+    if (!path || !path.length) return null;
+    return path[path.length - 1];
+  }
+
   function seekToBeatIndex(index) {
     var playable = playableIndexes();
     if (!playable.length) {
@@ -200,14 +225,22 @@
       button.appendChild(kind);
       button.appendChild(copy);
       button.appendChild(marks);
-      button.addEventListener("click", function () {
+      button.addEventListener("click", function (event) {
         stopPlay();
+        if (event.ctrlKey || event.metaKey) {
+          goToNode(node);
+          return;
+        }
         if (typeof node.beatIndex === "number" && node.beatIndex >= 0) {
           seekToBeatIndex(node.beatIndex);
         } else if (node.children && node.children.length && typeof node.children[0].beatIndex === "number") {
           seekToBeatIndex(node.children[0].beatIndex);
         }
         render();
+      });
+      button.addEventListener("dblclick", function (event) {
+        event.preventDefault();
+        goToNode(node);
       });
       beatsEl.appendChild(button);
       if (node.beatIndex === model.index) {
@@ -407,6 +440,11 @@
     stopPlay();
     show(1);
   });
+  if (openTarget) {
+    openTarget.addEventListener("click", function () {
+      goToNode(currentTreeNode());
+    });
+  }
   play.addEventListener("click", function () {
     var playable = playableIndexes();
     if (!playable.length) return;
