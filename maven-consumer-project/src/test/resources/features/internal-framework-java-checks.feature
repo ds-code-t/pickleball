@@ -12,6 +12,10 @@ Feature: Internal Pickleball Java checks
   Scenario: Run it-placeholder parse checks
     * RUN IT PLACEHOLDER JAVA TESTS
 
+  @all @regression @internal-java-checks @log-assert-steps @assert-steps
+  Scenario: Run log and assert Java checks
+    * RUN LOG AND ASSERT JAVA TESTS
+
   @all @regression @internal-java-checks @step-override
   Scenario: Run Step Override checks
     * RUN STEP OVERRIDE JAVA TESTS

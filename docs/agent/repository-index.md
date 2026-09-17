@@ -46,6 +46,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/feature-status-notes.md`
 - `docs/getting-started.md`
 - `docs/key-parser-dsl.md`
+- `docs/log-and-assert-steps.md`
 - `docs/mapping-and-templating.md`
 - `docs/nested-steps.md`
 - `docs/pickleball-workbench-player.md`
@@ -133,6 +134,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/common/annotations/NoLogging.java`
 - `src/main/java/tools/dscode/common/annotations/Phase.java`
 - `src/main/java/tools/dscode/common/assertions/AssertionChain.java`
+- `src/main/java/tools/dscode/common/assertions/AssertionClauseSplitter.java`
 - `src/main/java/tools/dscode/common/assertions/ConditionRepeater.java`
 - `src/main/java/tools/dscode/common/assertions/ValueWrapper.java`
 - `src/main/java/tools/dscode/common/assertions/ValueWrapperCompareReducer.java`
@@ -358,6 +360,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/coredefinitions/DynamicSteps.java`
 - `src/main/java/tools/dscode/coredefinitions/FlagSteps.java`
 - `src/main/java/tools/dscode/coredefinitions/GeneralSteps.java`
+- `src/main/java/tools/dscode/coredefinitions/LogAndAssertSteps.java`
 - `src/main/java/tools/dscode/coredefinitions/MappingSteps.java`
 - `src/main/java/tools/dscode/coredefinitions/MessageAndLoggingSteps.java`
 - `src/main/java/tools/dscode/coredefinitions/MetaSteps.java`
@@ -398,6 +401,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 
 ## Framework tests
 
+- `src/test/java/tools/dscode/common/assertions/AssertionClauseSplitterTest.java`
 - `src/test/java/tools/dscode/common/reporting/diagnostic/AgentBrowserLadderTest.java`
 - `src/test/java/tools/dscode/common/reporting/diagnostic/AgentDiscoverPlannerTest.java`
 - `src/test/java/tools/dscode/control/override/StepOverrideCompilerTest.java`
@@ -628,6 +632,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `maven-consumer-project/src/test/java/com/example/pickleball/DiagnosticValidationSteps.java`
 - `maven-consumer-project/src/test/java/com/example/pickleball/DynamicControlApiChecks.java`
 - `maven-consumer-project/src/test/java/com/example/pickleball/InternalFrameworkTestSteps.java`
+- `maven-consumer-project/src/test/java/com/example/pickleball/LogAndAssertStepsChecks.java`
 - `maven-consumer-project/src/test/java/com/example/pickleball/MappingTypeSteps.java`
 - `maven-consumer-project/src/test/java/com/example/pickleball/PickleballTests.java`
 - `maven-consumer-project/src/test/java/com/example/pickleball/ScenarioDataSteps.java`
@@ -638,6 +643,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `maven-consumer-project/src/test/java/com/example/pickleball/tests/TokenizedQueryTest.java`
 - `maven-consumer-project/src/test/java/io/cucumber/core/runner/ScenarioStepChecks.java`
 - `maven-consumer-project/src/test/java/io/cucumber/core/runner/ScenarioStepDataChecks.java`
+- `maven-consumer-project/src/test/java/tools/dscode/common/assertions/AssertionClauseSplitterChecks.java`
 - `maven-consumer-project/src/test/java/tools/dscode/common/dataelements/DataElementPhaseFiveChecks.java`
 - `maven-consumer-project/src/test/java/tools/dscode/common/dataelements/DataElementPhaseFourAndSixChecks.java`
 - `maven-consumer-project/src/test/java/tools/dscode/common/dataelements/DataElementPhaseOneChecks.java`
@@ -682,6 +688,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `maven-consumer-project/src/test/resources/features/internal-framework-java-checks.feature`
 - `maven-consumer-project/src/test/resources/features/it-placeholder.feature`
 - `maven-consumer-project/src/test/resources/features/keyboard.feature`
+- `maven-consumer-project/src/test/resources/features/log-and-assert-steps.feature`
 - `maven-consumer-project/src/test/resources/features/mapping-and-resources.feature`
 - `maven-consumer-project/src/test/resources/features/mapping-value-type-preservation.feature`
 - `maven-consumer-project/src/test/resources/features/navigation.feature`

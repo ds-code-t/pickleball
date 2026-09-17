@@ -189,6 +189,8 @@ Use `ensure` for a hard assertion and `verify` for a soft assertion:
 * , verify the "Optional Warning" Text is not displayed
 ```
 
+Author-facing `ASSERT:` and `SOFT ASSERT:` are the uppercase short forms of those long-form steps. `IF:` only selects a branch and does not fail when the condition is false. See [Log and assert steps](log-and-assert-steps.md).
+
 Comparisons include:
 
 ```text

@@ -30,6 +30,7 @@ When these docs are materialized from the Maven dependency with Workbench `expor
 
 - [Nested steps](nested-steps.md) — arrange parent/child steps and pass conditions or page context downward.
 - [Block conditionals](block-conditionals.md) — choose one `IF:` / `ELSE-IF:` / `ELSE:` branch.
+- [Log and assert steps](log-and-assert-steps.md) — author-facing `TRACE:` / `INFO:` / `ERROR:` / `FAIL:` tokens and `ASSERT:` / `SOFT ASSERT:` clauses.
 
 ## Execution
 

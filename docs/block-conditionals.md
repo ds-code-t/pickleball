@@ -2,7 +2,7 @@
 
 > **Working feature example:** [`nested-and-block-conditionals.feature`](../maven-consumer-project/src/test/resources/features/nested-and-block-conditionals.feature) demonstrates `IF:`, `ELSE-IF:`, and `ELSE:` branches together with nested executable steps.
 
-Block conditionals choose one business path while normal reports emphasize the steps that actually ran.
+Block conditionals choose one business path while normal reports emphasize the steps that actually ran. A false `IF:` does not fail the scenario; use [`ASSERT:`](log-and-assert-steps.md) when a false condition should fail.
 
 Use uppercase `IF:`, `ELSE-IF:`, and `ELSE:`. Do not place the dynamic-step comma before the block keyword.
 
@@ -95,4 +95,6 @@ At the normal `info` level, the selected branch's business steps remain prominen
 
 See [nested-and-block-conditionals.feature](../maven-consumer-project/src/test/resources/features/nested-and-block-conditionals.feature).
 
-[Previous: Nested Steps](nested-steps.md) · [Documentation home](README.md) · [Next: Component Scenarios](component-scenarios.md)
+`IF:` only chooses a branch. For fail-on-false assertions with the same clause syntax, see [Log and assert steps](log-and-assert-steps.md).
+
+[Previous: Nested Steps](nested-steps.md) · [Documentation home](README.md) · [Next: Log and Assert Steps](log-and-assert-steps.md)
