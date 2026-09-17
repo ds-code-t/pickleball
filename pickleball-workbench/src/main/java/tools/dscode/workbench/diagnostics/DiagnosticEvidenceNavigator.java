@@ -6,8 +6,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.Deque;
 import java.util.List;
 import java.util.Locale;
 
@@ -57,6 +59,31 @@ public final class DiagnosticEvidenceNavigator {
             String scenarioId
     ) { }
 
+    public static final String KIND_SCENARIO = "scenario";
+    public static final String KIND_COMPONENT = "component";
+    public static final String KIND_SERVICE_CALL = "service-call";
+    public static final String KIND_STEP = "step";
+    public static final String KIND_DATA = "data";
+    public static final String KIND_JAVA = "java";
+
+    public record ReplayDefinition(
+            String className,
+            String method,
+            String sourcePath,
+            String origin
+    ) {
+        public ReplayDefinition {
+            className = className == null ? "" : className;
+            method = method == null ? "" : method;
+            sourcePath = sourcePath == null ? "" : sourcePath;
+            origin = origin == null ? "" : origin;
+        }
+
+        public static ReplayDefinition empty() {
+            return new ReplayDefinition("", "", "", "");
+        }
+    }
+
     public record ReplayBeat(
             String type,
             String stepText,
@@ -66,7 +93,16 @@ public final class DiagnosticEvidenceNavigator {
             String status,
             Path screenshot,
             String scenarioId,
-            List<String> logLines
+            List<String> logLines,
+            long eventSeq,
+            int nestingLevel,
+            String nestedInvocationId,
+            String sourcePath,
+            long sourceLine,
+            ReplayDefinition definition,
+            String kind,
+            String nodeId,
+            String parentNodeId
     ) {
         public ReplayBeat {
             type = type == null ? "" : type;
@@ -77,6 +113,37 @@ public final class DiagnosticEvidenceNavigator {
             status = status == null ? "" : status;
             scenarioId = scenarioId == null ? "" : scenarioId;
             logLines = List.copyOf(logLines == null ? List.of() : logLines);
+            eventSeq = Math.max(0, eventSeq);
+            nestingLevel = Math.max(0, nestingLevel);
+            nestedInvocationId = nestedInvocationId == null ? "" : nestedInvocationId;
+            sourcePath = sourcePath == null ? "" : sourcePath;
+            sourceLine = Math.max(0, sourceLine);
+            definition = definition == null ? ReplayDefinition.empty() : definition;
+            kind = kind == null || kind.isBlank() ? KIND_STEP : kind;
+            nodeId = nodeId == null ? "" : nodeId;
+            parentNodeId = parentNodeId == null ? "" : parentNodeId;
+        }
+    }
+
+    public record ReplayNode(
+            String nodeId,
+            String kind,
+            String parentNodeId,
+            ReplayBeat beat,
+            List<ReplayNode> children
+    ) {
+        public ReplayNode {
+            nodeId = nodeId == null ? "" : nodeId;
+            kind = kind == null || kind.isBlank() ? KIND_STEP : kind;
+            parentNodeId = parentNodeId == null ? "" : parentNodeId;
+            children = List.copyOf(children == null ? List.of() : children);
+        }
+    }
+
+    public record ReplayModel(List<ReplayBeat> beats, List<ReplayNode> roots) {
+        public ReplayModel {
+            beats = List.copyOf(beats == null ? List.of() : beats);
+            roots = List.copyOf(roots == null ? List.of() : roots);
         }
     }
 
@@ -200,30 +267,35 @@ public final class DiagnosticEvidenceNavigator {
     }
 
     public List<ReplayBeat> replay(Path runRoot) {
+        return replayModel(runRoot).beats();
+    }
+
+    public ReplayModel replayModel(Path runRoot) {
         Path root = runRoot.toAbsolutePath().normalize();
         Path scenarios = root.resolve("scenarios");
         List<ReplayBeat> beats = new ArrayList<>();
-        if (!Files.isDirectory(scenarios)) return List.of();
+        List<ReplayNode> roots = new ArrayList<>();
+        if (!Files.isDirectory(scenarios)) return new ReplayModel(List.of(), List.of());
         try (var directories = Files.list(scenarios)) {
-            directories.filter(Files::isDirectory).sorted().forEach(scenarioDir ->
-                    beats.addAll(replayScenario(scenarioDir)));
+            directories.filter(Files::isDirectory).sorted().forEach(scenarioDir -> {
+                ReplayModel model = replayScenario(scenarioDir);
+                beats.addAll(model.beats());
+                roots.addAll(model.roots());
+            });
         } catch (IOException ignored) {
-            return List.copyOf(beats);
+            return new ReplayModel(beats, roots);
         }
-        return List.copyOf(beats);
+        return new ReplayModel(beats, roots);
     }
 
-    private List<ReplayBeat> replayScenario(Path scenarioDir) {
+    private ReplayModel replayScenario(Path scenarioDir) {
         String scenarioId = scenarioDir.getFileName().toString();
         Path events = scenarioDir.resolve("events.jsonl");
         List<Path> pngs = screenshotFiles(scenarioDir.resolve("screenshots"));
         int pngIndex = 0;
-        List<ReplayBeat> beats = new ArrayList<>();
-        String currentStep = "";
-        String currentStatus = "";
-        String currentTime = "";
-        List<String> logs = new ArrayList<>();
-        Path currentShot = null;
+        List<DraftBeat> drafts = new ArrayList<>();
+        DraftBeat current = null;
+        long fallbackSeq = 1;
         if (Files.isRegularFile(events)) {
             try {
                 for (String line : Files.readAllLines(events)) {
@@ -232,24 +304,25 @@ public final class DiagnosticEvidenceNavigator {
                     String type = text(node, "type");
                     boolean stepEvent = "step".equals(type)
                             || (type.isBlank() && !text(node, "stepText", "text", "step", "gherkin").isBlank());
-                    if (stepEvent) {
-                        if (!currentStep.isBlank() || !logs.isEmpty()) {
-                            beats.add(beat("step", currentStep, currentTime, "", currentStep, currentStatus,
-                                    currentShot, scenarioId, logs));
+                    boolean nestedStart = "nested_scenario_start".equals(type);
+                    boolean nestedEnd = "nested_scenario_end".equals(type);
+                    if (stepEvent || nestedStart || nestedEnd) {
+                        if (current != null) {
+                            drafts.add(current);
+                            current = null;
                         }
-                        currentStep = text(node, "text", "stepText", "step", "gherkin");
-                        currentStatus = text(node, "status");
-                        currentTime = text(node, "timestamp");
-                        logs = new ArrayList<>();
-                        currentShot = null;
+                        long eventSeq = longField(node, "eventSeq");
+                        if (eventSeq <= 0) eventSeq = fallbackSeq;
+                        fallbackSeq = Math.max(fallbackSeq, eventSeq) + 1;
+                        current = draftFromEvent(node, type, stepEvent, nestedStart, nestedEnd, eventSeq, scenarioId);
                     } else if ("screenshot".equals(type)) {
                         Path shot = pngIndex < pngs.size() ? pngs.get(pngIndex++) : null;
-                        currentShot = shot == null ? currentShot : shot;
+                        if (current != null && shot != null) current.screenshot = shot;
                     } else if ("log".equals(type)) {
                         String message = text(node, "text", "message");
                         String level = text(node, "level");
-                        if (!message.isBlank()) {
-                            logs.add((level.isBlank() ? "INFO" : level) + "  " + message);
+                        if (!message.isBlank() && current != null && isInfoPlus(level)) {
+                            current.logs.add((level.isBlank() ? "INFO" : level) + "  " + message);
                         }
                     }
                 }
@@ -257,31 +330,247 @@ public final class DiagnosticEvidenceNavigator {
                 // Gap in retained events is shown as an empty replay, not invented steps.
             }
         }
-        if (!currentStep.isBlank() || !logs.isEmpty()) {
-            beats.add(beat("step", currentStep, currentTime, "", currentStep, currentStatus,
-                    currentShot, scenarioId, logs));
-        }
-        if (beats.isEmpty()) {
+        if (current != null) drafts.add(current);
+        if (drafts.isEmpty()) {
             for (ScreenshotFrame frame : framesForScenario(scenarioDir)) {
-                beats.add(beat("step", frame.stepText(), frame.capturedAt(), "", frame.stepText(), "",
-                        frame.file(), scenarioId, List.of()));
+                DraftBeat draft = new DraftBeat();
+                draft.type = "step";
+                draft.kind = KIND_STEP;
+                draft.stepText = frame.stepText();
+                draft.text = frame.stepText();
+                draft.timestamp = frame.capturedAt();
+                draft.screenshot = frame.file();
+                draft.scenarioId = scenarioId;
+                draft.eventSeq = fallbackSeq++;
+                draft.nodeId = nodeId(scenarioId, draft.eventSeq, drafts.size());
+                drafts.add(draft);
             }
         }
-        return beats;
+        return buildTree(scenarioId, drafts);
     }
 
-    private static ReplayBeat beat(
+    private static DraftBeat draftFromEvent(
+            JsonNode node,
             String type,
-            String stepText,
-            String timestamp,
-            String level,
-            String text,
-            String status,
-            Path screenshot,
-            String scenarioId,
-            List<String> logs
+            boolean stepEvent,
+            boolean nestedStart,
+            boolean nestedEnd,
+            long eventSeq,
+            String scenarioId
     ) {
-        return new ReplayBeat(type, stepText, timestamp, level, text, status, screenshot, scenarioId, logs);
+        DraftBeat draft = new DraftBeat();
+        draft.eventSeq = eventSeq;
+        draft.scenarioId = scenarioId;
+        draft.timestamp = text(node, "timestamp");
+        draft.status = text(node, "status", "outcome");
+        draft.nestingLevel = (int) longField(node, "nestingLevel");
+        draft.nestedInvocationId = text(node, "nestedInvocationId", "invocationId");
+        JsonNode source = node.get("source");
+        draft.sourcePath = text(source, "path");
+        draft.sourceLine = longField(source, "line");
+        JsonNode definition = node.get("definition");
+        draft.definitionClass = text(definition, "class");
+        draft.definitionMethod = text(definition, "method");
+        draft.definitionSourcePath = text(definition, "sourcePath");
+        draft.definitionOrigin = text(definition, "origin");
+        if (nestedStart) {
+            draft.type = "nested_scenario_start";
+            JsonNode callee = node.get("callee");
+            draft.stepText = nestedLabel(callee);
+            draft.text = draft.stepText;
+            draft.kind = nestedKind(callee);
+            if (draft.sourcePath.isBlank()) {
+                draft.sourcePath = featurePath(text(callee, "featureUri"));
+            }
+            if (draft.sourceLine <= 0) {
+                draft.sourceLine = longField(callee, "scenarioLine");
+            }
+            if (draft.nestedInvocationId.isBlank()) {
+                draft.nestedInvocationId = text(node, "invocationId");
+            }
+        } else if (nestedEnd) {
+            draft.type = "nested_scenario_end";
+            draft.kind = KIND_STEP;
+            JsonNode callee = node.get("callee");
+            draft.stepText = nestedLabel(callee);
+            draft.text = draft.stepText;
+        } else {
+            draft.type = stepEvent && type.isBlank() ? "step" : (type.isBlank() ? "step" : type);
+            draft.stepText = text(node, "text", "stepText", "step", "gherkin");
+            draft.text = draft.stepText;
+            draft.kind = stepKind(draft.stepText);
+        }
+        draft.nodeId = nodeId(scenarioId, eventSeq, 0);
+        return draft;
+    }
+
+    private static ReplayModel buildTree(String scenarioId, List<DraftBeat> drafts) {
+        DraftBeat scenario = new DraftBeat();
+        scenario.type = "scenario";
+        scenario.kind = KIND_SCENARIO;
+        scenario.scenarioId = scenarioId;
+        scenario.stepText = scenarioId;
+        scenario.text = scenarioId;
+        scenario.nodeId = "scenario:" + scenarioId;
+
+        Deque<DraftBeat> stack = new ArrayDeque<>();
+        stack.push(scenario);
+        List<DraftBeat> pendingNested = new ArrayList<>();
+
+        for (DraftBeat draft : drafts) {
+            if ("nested_scenario_start".equals(draft.type)) {
+                DraftBeat parent = stack.peek();
+                parent.children.add(draft);
+                draft.parent = parent;
+                stack.push(draft);
+            } else if ("nested_scenario_end".equals(draft.type)) {
+                if (stack.size() > 1) {
+                    DraftBeat finished = stack.pop();
+                    finished.status = draft.status.isBlank() ? finished.status : draft.status;
+                    pendingNested.add(finished);
+                }
+            } else {
+                DraftBeat parent = stack.peek();
+                if (!pendingNested.isEmpty() && stack.size() == 1) {
+                    parent.children.removeAll(pendingNested);
+                    for (DraftBeat nested : pendingNested) {
+                        nested.parent = draft;
+                        draft.children.add(nested);
+                    }
+                    pendingNested.clear();
+                    if (isServiceCallText(draft.stepText) && draft.children.size() == 1
+                            && KIND_COMPONENT.equals(draft.children.getFirst().kind)) {
+                        draft.children.getFirst().kind = KIND_SERVICE_CALL;
+                    }
+                }
+                parent.children.add(draft);
+                draft.parent = parent;
+            }
+        }
+
+        List<ReplayBeat> beats = new ArrayList<>();
+        for (DraftBeat draft : drafts) {
+            beats.add(draft.freeze());
+        }
+        return new ReplayModel(beats, List.of(scenario.freezeNode()));
+    }
+
+    private static String nodeId(String scenarioId, long eventSeq, int fallbackIndex) {
+        if (eventSeq > 0) return scenarioId + ":" + eventSeq;
+        return scenarioId + ":i" + fallbackIndex;
+    }
+
+    private static String nestedLabel(JsonNode callee) {
+        String name = text(callee, "scenarioName", "name");
+        if (!name.isBlank()) return name;
+        String uri = text(callee, "featureUri", "uri");
+        return uri.isBlank() ? "nested" : uri;
+    }
+
+    private static String nestedKind(JsonNode callee) {
+        String uri = text(callee, "featureUri", "uri").replace('\\', '/').toLowerCase(Locale.ROOT);
+        if (uri.contains("/calls/") || uri.endsWith(".yaml") || uri.endsWith(".yml") || uri.endsWith(".json")) {
+            return KIND_SERVICE_CALL;
+        }
+        return KIND_COMPONENT;
+    }
+
+    private static String stepKind(String stepText) {
+        String text = stepText == null ? "" : stepText;
+        String lower = text.toLowerCase(Locale.ROOT);
+        if (lower.contains("data:/") || lower.contains("data:")) return KIND_DATA;
+        return KIND_STEP;
+    }
+
+    private static boolean isServiceCallText(String stepText) {
+        return stepText != null && stepText.toUpperCase(Locale.ROOT).contains("SERVICE CALL");
+    }
+
+    private static boolean isInfoPlus(String level) {
+        if (level == null || level.isBlank()) return true;
+        String normalized = level.trim().toUpperCase(Locale.ROOT);
+        return !"TRACE".equals(normalized) && !"DEBUG".equals(normalized);
+    }
+
+    private static String featurePath(String featureUri) {
+        if (featureUri == null || featureUri.isBlank()) return "";
+        String normalized = featureUri.replace('\\', '/');
+        if (normalized.startsWith("classpath:")) normalized = normalized.substring("classpath:".length());
+        int marker = normalized.indexOf("/src/test/resources/");
+        if (marker >= 0) return normalized.substring(marker + "/src/test/resources/".length());
+        marker = normalized.indexOf("/src/main/resources/");
+        if (marker >= 0) return normalized.substring(marker + "/src/main/resources/".length());
+        while (normalized.startsWith("/")) normalized = normalized.substring(1);
+        return normalized;
+    }
+
+    private static long longField(JsonNode node, String field) {
+        if (node == null || field == null || !node.has(field) || node.get(field).isNull()) return 0;
+        JsonNode value = node.get(field);
+        if (value.isNumber()) return value.longValue();
+        try {
+            String text = value.asText();
+            if (text == null || text.isBlank()) return 0;
+            return Long.parseLong(text.trim());
+        } catch (NumberFormatException ignored) {
+            return 0;
+        }
+    }
+
+    private static final class DraftBeat {
+        String type = "";
+        String stepText = "";
+        String timestamp = "";
+        String level = "";
+        String text = "";
+        String status = "";
+        Path screenshot;
+        String scenarioId = "";
+        final List<String> logs = new ArrayList<>();
+        long eventSeq;
+        int nestingLevel;
+        String nestedInvocationId = "";
+        String sourcePath = "";
+        long sourceLine;
+        String definitionClass = "";
+        String definitionMethod = "";
+        String definitionSourcePath = "";
+        String definitionOrigin = "";
+        String kind = KIND_STEP;
+        String nodeId = "";
+        DraftBeat parent;
+        final List<DraftBeat> children = new ArrayList<>();
+
+        ReplayBeat freeze() {
+            return new ReplayBeat(
+                    type,
+                    stepText,
+                    timestamp,
+                    level,
+                    text,
+                    status,
+                    screenshot,
+                    scenarioId,
+                    logs,
+                    eventSeq,
+                    nestingLevel,
+                    nestedInvocationId,
+                    sourcePath,
+                    sourceLine,
+                    new ReplayDefinition(definitionClass, definitionMethod, definitionSourcePath, definitionOrigin),
+                    kind,
+                    nodeId,
+                    parent == null ? "" : parent.nodeId
+            );
+        }
+
+        ReplayNode freezeNode() {
+            List<ReplayNode> frozenChildren = new ArrayList<>();
+            for (DraftBeat child : children) {
+                frozenChildren.add(child.freezeNode());
+            }
+            return new ReplayNode(nodeId, kind, parent == null ? "" : parent.nodeId, freeze(), frozenChildren);
+        }
     }
 
     private static List<Path> screenshotFiles(Path directory) {
