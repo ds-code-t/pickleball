@@ -94,6 +94,15 @@ final class PickleballProfiles {
             LinkedHashMap<String, String> values,
             Map<String, String> runtimeRunVarOverrides
     ) {
+        return apply(values, runtimeRunVarOverrides, Map.of(), runVarMap(values));
+    }
+
+    static Resolution apply(
+            LinkedHashMap<String, String> values,
+            Map<String, String> runtimeRunVarOverrides,
+            Map<String, String> defaultRunVars,
+            Map<String, String> propertyRunVars
+    ) {
         rejectExternalRunProfile(values);
         DirectInput sealedInput = sealedInputFromValues(values);
         if (sealedInput != null) {
@@ -115,7 +124,8 @@ final class PickleballProfiles {
         ObjectNode directReferenceContext = JSON.createObjectNode();
         boolean direct = topLevelDirect != null;
         ProvenanceTracker provenance = new ProvenanceTracker();
-        provenance.stamp(defaultProfile, "default");
+        provenance.stamp(profileFromValues(defaultRunVars), "default");
+        provenance.stamp(profileFromValues(propertyRunVars), "properties");
         provenance.stamp(runtimeOverrides, "jvm");
 
         if (topLevelDirect != null) {
@@ -127,6 +137,8 @@ final class PickleballProfiles {
             provenance.stamp(topLevelDirect.profile(), "runvars");
         } else if (selectedProfiles == null) {
             composed = defaultProfile.deepCopy();
+            mergeDeep(composed, runtimeOverrides);
+            provenance.stamp(runtimeOverrides, "jvm");
         } else {
             composed = composeSelectedProfiles(registry, selectedProfiles);
             provenance.stamp(composed, "profile");
@@ -162,6 +174,20 @@ final class PickleballProfiles {
         profileRegistry = registry.deepCopy();
         runProfile = resolved.deepCopy();
         return new Resolution(direct, false, selectedProfiles, finalRunVars, provenance.forRunVars(finalRunVars));
+    }
+
+    private static Map<String, String> runVarMap(Map<String, String> values) {
+        LinkedHashMap<String, String> out = new LinkedHashMap<>();
+        if (values == null) {
+            return out;
+        }
+        values.forEach((key, value) -> {
+            String normalized = PickleballRunner.normalizePkbKey(key);
+            if (PKB_props.isRunVariableKey(normalized) && value != null) {
+                out.put(normalized, value);
+            }
+        });
+        return out;
     }
 
     private static Resolution applySealed(LinkedHashMap<String, String> values, DirectInput sealedInput) {
@@ -410,8 +436,10 @@ final class PickleballProfiles {
     private static IllegalArgumentException internalRunProfileInputError(String key) {
         return new IllegalArgumentException(
                 "'" + key + "' is an internal Pickleball property and cannot be supplied. "
-                        + "Use '" + PKB_RUN_VARS + "' or '" + PKB_RUN_VARS
-                        + ".<pkb_var>' to configure controlled RunVars.");
+                        + "Use '" + PKB_RUN_VARS + "' / '" + PKB_RUN_VARS
+                        + ".<pkb_var>' for controlled RunVars, or '" + PKB_OVERRIDE_RUN_VARS
+                        + "' / '" + PKB_OVERRIDE_RUN_VARS
+                        + ".<pkb_var>' for a sealed complete map.");
     }
 
     private static IllegalArgumentException directFormConflict(String compact, String expandedPrefix) {

@@ -1,9 +1,16 @@
 package tools.dscode.workbench.ui;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import tools.dscode.workbench.discover.LastDiscoverSnapshot;
+
+import java.nio.file.Path;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class RunVarOverridePanelTest {
     @Test
@@ -28,5 +35,23 @@ class RunVarOverridePanelTest {
         assertEquals(RunVarOverridePanel.Kind.TEXT, RunVarOverridePanel.kindFor("pkb_tags", "@smoke"));
         assertEquals(RunVarOverridePanel.Kind.TEXT, RunVarOverridePanel.kindFor("pkb_glue", "com.example"));
         assertNull(RunVarOverridePanel.enumChoices("pkb_tags"));
+    }
+
+    @Test
+    void applySealedWritesSnapshotForNextWorkerLaunch(@TempDir Path tempDir) {
+        LastDiscoverSnapshot.writeSealed(tempDir, Map.of(
+                "pkb_glue", "com.example",
+                "pkb_features", "classpath:features",
+                "pkb_browser", "firefox"
+        ));
+        RunVarOverridePanel panel = new RunVarOverridePanel(tempDir);
+        panel.applySealed();
+
+        LastDiscoverSnapshot.Snapshot snapshot = LastDiscoverSnapshot.read(tempDir);
+        assertTrue(snapshot.sealed());
+        Map<String, String> properties = LastDiscoverSnapshot.workerSystemPropertiesIfPresent(tempDir);
+        assertTrue(properties.containsKey("pkb_overriderunvars"));
+        assertFalse(properties.containsKey("pkb_runvars"));
+        assertTrue(properties.get("pkb_overriderunvars").contains("pkb_browser=firefox"));
     }
 }

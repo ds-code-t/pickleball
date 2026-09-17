@@ -17,6 +17,8 @@ import static tools.dscode.testengine.PKB_props.PKB_DATA_PATH;
 import static tools.dscode.testengine.PKB_props.PKB_ENVIRONMENT;
 import static tools.dscode.testengine.PKB_props.PKB_FEATURES;
 import static tools.dscode.testengine.PKB_props.PKB_GLUE;
+import static tools.dscode.testengine.PKB_props.PKB_INVESTIGATION_ID;
+import static tools.dscode.testengine.PKB_props.PKB_OPTIONS;
 import static tools.dscode.testengine.PKB_props.PKB_OVERRIDE_RUN_VARS;
 import static tools.dscode.testengine.PKB_props.PKB_OVERRIDE_RUN_VARS_PREFIX;
 import static tools.dscode.testengine.PKB_props.PKB_PARALLEL;
@@ -251,6 +253,148 @@ public final class RunVarOverrideChecks {
 
         assertFalse(values.containsKey(PKB_PARALLEL));
         assertFalse(values.containsKey(PKB_ENVIRONMENT));
+    }
+
+    @Test
+    void dryRunProvenanceUsesPropertiesAndJvmTokens() {
+        LinkedHashMap<String, String> values = baseValues();
+        PKB_props.ResolvedRunVars preview = PKB_props.resolveRunVars(
+                values,
+                Map.of(PKB_BROWSER, "firefox")
+        );
+
+        assertFalse(preview.sealed());
+        assertEquals("properties", preview.provenance().get(PKB_GLUE));
+        assertEquals("properties", preview.provenance().get(PKB_TAGS));
+        assertEquals("jvm", preview.provenance().get(PKB_BROWSER));
+        assertEquals("firefox", preview.runVars().get(PKB_BROWSER));
+    }
+
+    @Test
+    void applyDistinguishesDefaultFromPropertiesProvenance() {
+        LinkedHashMap<String, String> values = baseValues();
+        Map<String, String> defaults = Map.of(PKB_GLUE, "com.example.defaults", PKB_ENVIRONMENT, "DEV");
+        Map<String, String> properties = Map.of(PKB_TAGS, "@all", PKB_BROWSER, "CHROME_HEADLESS");
+
+        PickleballProfiles.Resolution resolution = PickleballProfiles.apply(
+                values,
+                Map.of(PKB_BROWSER, "firefox"),
+                defaults,
+                properties
+        );
+
+        assertEquals("default", resolution.provenance().get(PKB_GLUE));
+        assertEquals("properties", resolution.provenance().get(PKB_TAGS));
+        assertEquals("jvm", resolution.provenance().get(PKB_BROWSER));
+        assertEquals("firefox", values.get(PKB_BROWSER));
+    }
+
+    @Test
+    void dryRunDirectRunVarsProvenanceOverwritesProperties() {
+        LinkedHashMap<String, String> values = baseValues();
+        values.put(PKB_RUN_VARS, "pkb_tags=@direct");
+
+        PKB_props.ResolvedRunVars preview = PKB_props.resolveRunVars(
+                values,
+                Map.of(PKB_BROWSER, "firefox")
+        );
+
+        assertEquals("runvars", preview.provenance().get(PKB_TAGS));
+        assertEquals("inherited-context", preview.provenance().get(PKB_GLUE));
+        assertEquals("jvm", preview.provenance().get(PKB_BROWSER));
+        assertEquals("@direct", preview.runVars().get(PKB_TAGS));
+    }
+
+    @Test
+    void cucumberCliProjectionIsSuppressedWhenSealedOrDirect() {
+        assertTrue(PickleballRunner.suppressCucumberCliProjection(true, false));
+        assertTrue(PickleballRunner.suppressCucumberCliProjection(false, true));
+        assertTrue(PickleballRunner.suppressCucumberCliProjection(true, true));
+        assertFalse(PickleballRunner.suppressCucumberCliProjection(false, false));
+    }
+
+    @Test
+    void sealedPlusExpandedRunVarsIsAnError() {
+        LinkedHashMap<String, String> values = baseValues();
+        values.put(PKB_OVERRIDE_RUN_VARS, PickleballProfiles.serializeRunProfile(sealedBag()));
+        values.put(PKB_RUN_VARS_PREFIX + PKB_TAGS, "@direct");
+
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> PickleballProfiles.apply(values)
+        );
+        assertTrue(exception.getMessage().contains(PKB_OVERRIDE_RUN_VARS));
+        assertTrue(exception.getMessage().contains(PKB_RUN_VARS));
+    }
+
+    @Test
+    void sealedRejectsLineageAndOptionsInPayload() {
+        LinkedHashMap<String, String> values = baseValues();
+        values.put(PKB_OVERRIDE_RUN_VARS, "pkb_glue=com.example.pickleball, pkb_features=classpath:features, "
+                + "pkb_datapath=src/test/resources/data, pkb_callpath=src/test/resources/calls, "
+                + "pkb_componentpath=src/test/resources/component, pkb_configpath=configs, "
+                + PKB_INVESTIGATION_ID + "=inv-1");
+
+        IllegalArgumentException lineage = assertThrows(
+                IllegalArgumentException.class,
+                () -> PickleballProfiles.apply(values)
+        );
+        assertTrue(lineage.getMessage().contains(PKB_INVESTIGATION_ID)
+                || lineage.getMessage().contains("Run metadata"));
+
+        LinkedHashMap<String, String> optionsValues = baseValues();
+        optionsValues.put(PKB_OVERRIDE_RUN_VARS, "pkb_glue=com.example.pickleball, pkb_features=classpath:features, "
+                + "pkb_datapath=src/test/resources/data, pkb_callpath=src/test/resources/calls, "
+                + "pkb_componentpath=src/test/resources/component, pkb_configpath=configs, "
+                + PKB_OPTIONS + "=--tags @all");
+        IllegalArgumentException options = assertThrows(
+                IllegalArgumentException.class,
+                () -> PickleballProfiles.apply(optionsValues)
+        );
+        assertTrue(options.getMessage().contains(PKB_OPTIONS)
+                || options.getMessage().contains("not a supported profile property")
+                || options.getMessage().contains("cannot contain"));
+    }
+
+    @Test
+    void blankCompactOverrideLeavesSealedOff() {
+        LinkedHashMap<String, String> values = baseValues();
+        values.put(PKB_OVERRIDE_RUN_VARS, "   ");
+        values.put(PKB_RUN_VARS, "pkb_tags=@direct");
+
+        PickleballProfiles.Resolution resolution = PickleballProfiles.apply(values);
+
+        assertFalse(resolution.sealed());
+        assertTrue(resolution.direct());
+        assertEquals("@direct", values.get(PKB_TAGS));
+    }
+
+    @Test
+    void fileSourcedProfileAndRunVarsAreStrippedWhenSealedIsPresent() {
+        LinkedHashMap<String, String> values = baseValues();
+        values.put(PKB_OVERRIDE_RUN_VARS, PickleballProfiles.serializeRunProfile(sealedBag()));
+        values.put(PKB_PROFILE, "qa");
+        values.put(PKB_RUN_VARS, "pkb_tags=@direct");
+
+        PickleballRunner.stripNonInvocationControlsWhenSealed(values, false, false);
+
+        assertFalse(values.containsKey(PKB_PROFILE));
+        assertFalse(values.containsKey(PKB_RUN_VARS));
+        PickleballProfiles.Resolution resolution = PickleballProfiles.apply(values);
+        assertTrue(resolution.sealed());
+        assertEquals("@sealed", values.get(PKB_TAGS));
+    }
+
+    @Test
+    void invocationLevelProfileStaysSoApplyCanFailClosed() {
+        LinkedHashMap<String, String> values = baseValues();
+        values.put(PKB_OVERRIDE_RUN_VARS, PickleballProfiles.serializeRunProfile(sealedBag()));
+        values.put(PKB_PROFILE, "qa");
+
+        PickleballRunner.stripNonInvocationControlsWhenSealed(values, true, false);
+
+        assertEquals("qa", values.get(PKB_PROFILE));
+        assertThrows(IllegalArgumentException.class, () -> PickleballProfiles.apply(values));
     }
 
     private static LinkedHashMap<String, String> sealedBag() {

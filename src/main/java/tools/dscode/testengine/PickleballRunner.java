@@ -62,6 +62,8 @@ public abstract class PickleballRunner {
     protected final LinkedHashMap<String, String> values = new LinkedHashMap<>();
     private final Map<String, String> readOnlyValues = Collections.unmodifiableMap(values);
     private final LinkedHashMap<String, String> systemRunVarOverrides = new LinkedHashMap<>();
+    private final LinkedHashMap<String, String> propertyFileRunVars = new LinkedHashMap<>();
+    private LinkedHashMap<String, String> defaultRunVars = new LinkedHashMap<>();
     private boolean directRunVars;
     private boolean sealedRunVars;
 
@@ -72,6 +74,7 @@ public abstract class PickleballRunner {
 
         globalTestDefaults();
         normalizeReportPortalValues();
+        defaultRunVars = snapshotRunVars();
         debug("Values after globalTestDefaults(): " + values);
 
         mergeResourcePropertiesOverwriting("pickleball.properties");
@@ -99,7 +102,7 @@ public abstract class PickleballRunner {
 
         suppressNonInvocationControlsWhenSealed();
         PickleballProfiles.Resolution profileResolution =
-                PickleballProfiles.apply(values, systemRunVarOverrides);
+                PickleballProfiles.apply(values, systemRunVarOverrides, defaultRunVars, propertyFileRunVars);
         directRunVars = profileResolution.direct();
         sealedRunVars = profileResolution.sealed();
 
@@ -159,7 +162,7 @@ public abstract class PickleballRunner {
     }
 
     public synchronized void captureCucumberCliArgs(String[] argv) {
-        if (directRunVars || sealedRunVars) {
+        if (suppressCucumberCliProjection(directRunVars, sealedRunVars)) {
             return;
         }
 
@@ -174,6 +177,21 @@ public abstract class PickleballRunner {
 
         refreshRunProfile();
         refreshPkbOptions();
+    }
+
+    /** Direct {@code pkb_runvars} and sealed {@code pkb_overriderunvars} must not be mutated by Cucumber CLI. */
+    static boolean suppressCucumberCliProjection(boolean directRunVars, boolean sealedRunVars) {
+        return directRunVars || sealedRunVars;
+    }
+
+    private LinkedHashMap<String, String> snapshotRunVars() {
+        LinkedHashMap<String, String> out = new LinkedHashMap<>();
+        values.forEach((key, value) -> {
+            if (PKB_props.isRunVariableKey(key) && value != null) {
+                out.put(key, value);
+            }
+        });
+        return out;
     }
 
     private void applyLegacyFrameworkDefaults() {
@@ -280,7 +298,12 @@ public abstract class PickleballRunner {
                 Properties props = new Properties();
                 try (InputStream in = url.openStream()) { props.load(in); }
                 for (String key : props.stringPropertyNames()) {
-                    values.put(normalizeConfigurationKey(key), props.getProperty(key));
+                    String normalized = normalizeConfigurationKey(key);
+                    String value = props.getProperty(key);
+                    values.put(normalized, value);
+                    if (PKB_props.isRunVariableKey(normalized)) {
+                        propertyFileRunVars.put(normalized, value);
+                    }
                 }
             }
             debug("Loaded " + count + " resource(s) named " + resourceName);
@@ -317,9 +340,6 @@ public abstract class PickleballRunner {
      * fail-closed on mixed controls.
      */
     private void suppressNonInvocationControlsWhenSealed() {
-        if (!sealedControlPresent(values)) {
-            return;
-        }
         boolean profileFromJvm = notBlank(System.getProperty(PKB_PROFILE));
         boolean runVarsFromJvm = notBlank(System.getProperty(PKB_RUN_VARS));
         if (!runVarsFromJvm) {
@@ -329,6 +349,17 @@ public abstract class PickleballRunner {
                     break;
                 }
             }
+        }
+        stripNonInvocationControlsWhenSealed(values, profileFromJvm, runVarsFromJvm);
+    }
+
+    static void stripNonInvocationControlsWhenSealed(
+            Map<String, String> values,
+            boolean profileFromJvm,
+            boolean runVarsFromJvm
+    ) {
+        if (!sealedControlPresent(values)) {
+            return;
         }
         if (!profileFromJvm) {
             values.remove(PKB_PROFILE);

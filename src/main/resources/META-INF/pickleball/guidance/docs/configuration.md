@@ -260,7 +260,7 @@ Dry-run without starting tests:
 PKB_props.ResolvedRunVars preview = PKB_props.resolveRunVars(values);
 ```
 
-`DiagnosticCli resolve-runvars` and Workbench `hint` print that preview. Agents resolve → inspect → complete map → `pkb_overriderunvars` → compare fingerprint.
+`DiagnosticCli resolve-runvars` and Workbench `hint` print that preview, including per-key provenance (`override`, `runvars`, `profile`, `jvm`, `inherited-context`, `default`, `properties`). Agents resolve → inspect → complete map → `pkb_overriderunvars` → compare fingerprint.
 
 ### Templates and runtime configs
 

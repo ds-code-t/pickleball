@@ -34,6 +34,7 @@ class WorkbenchAgentCommandsTest {
         assertTrue(output.stdout().contains("NEXT: run discover"));
         assertTrue(output.stdout().contains("Dry-run resolve"));
         assertTrue(output.stdout().contains("pkb_overriderunvars") || output.stdout().contains("sealed="));
+        assertTrue(output.stdout().contains("provenance="));
         assertFalse(output.stdout().contains("MUST"));
         assertFalse(output.stdout().contains("pkb_parallel=80"));
     }
@@ -50,6 +51,7 @@ class WorkbenchAgentCommandsTest {
         assertTrue(output.stdout().contains("Dry-run resolve"));
         assertTrue(output.stdout().contains("sealed="));
         assertTrue(output.stdout().contains("pkb_overriderunvars"));
+        assertTrue(output.stdout().contains("provenance="));
         assertFalse(output.stdout().contains("NEXT: run discover"));
     }
 

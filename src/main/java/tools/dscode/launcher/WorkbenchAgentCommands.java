@@ -102,6 +102,7 @@ public final class WorkbenchAgentCommands {
         out.println("sealed=" + resolved.sealed());
         out.println("pkb_run_profile=" + resolved.runProfile());
         out.println("runProfileFingerprint=" + resolved.fingerprint());
+        out.println("provenance=" + resolved.provenance());
         out.println("Sealed launch uses -Dpkb_overriderunvars=<complete compact map>, never -Dpkb_run_profile=.");
         out.println();
     }

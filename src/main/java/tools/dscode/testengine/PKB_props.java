@@ -193,7 +193,8 @@ public final class PKB_props {
 
     /**
      * Dry-run resolve with explicit JVM RunVar overlays, matching {@code PickleballProfiles.apply}.
-     * Does not start tests or browsers.
+     * Does not start tests or browsers. {@code values} are stamped {@code properties};
+     * {@code runtimeRunVarOverrides} are stamped {@code jvm}.
      */
     public static ResolvedRunVars resolveRunVars(
             Map<String, String> values,

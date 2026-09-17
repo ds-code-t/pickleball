@@ -381,6 +381,20 @@ preview.sealed();
 preview.provenance(); // override | runvars | profile | jvm | inherited-context | default | properties
 ```
 
+Per-key provenance tokens:
+
+| Token | Source |
+|---|---|
+| `override` | sealed `pkb_overriderunvars` |
+| `runvars` | compact or expanded `pkb_runvars` |
+| `profile` | selected named `pkb_profile` |
+| `jvm` | JVM `-Dpkb_*` overlays passed to resolve |
+| `inherited-context` | one of the six execution-context keys inherited because the controlled/profile map omitted it |
+| `default` | `globalTestDefaults()` snapshot captured before property files |
+| `properties` | `pickleball.properties` / `pickleball_local.properties` (and the values bag in a dry-run that loads those files) |
+
+A later `runvars` / `profile` / `inherited-context` / `jvm` stamp overwrites the same key. Unstamped keys fall back to `default`. Dry-run `PKB_props.resolveRunVars(values, jvm)` stamps `values` as `properties` and the second map as `jvm`.
+
 Canonical output getter:
 
 ```java
