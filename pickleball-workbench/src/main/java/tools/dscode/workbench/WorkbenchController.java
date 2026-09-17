@@ -7,6 +7,7 @@ import tools.dscode.workbench.lease.WorkbenchPermissionCancelledException;
 import tools.dscode.workbench.lease.WorkbenchPermissionDecision;
 import tools.dscode.workbench.lease.WorkbenchPermissionKind;
 import tools.dscode.workbench.lease.WorkbenchPermissionRequest;
+import tools.dscode.workbench.player.LiveBufferSidecar;
 import tools.dscode.workbench.player.LiveFeatureSave;
 import tools.dscode.workbench.player.LivePlaybackCoordinator;
 import tools.dscode.workbench.player.LiveScenarioPlayer;
@@ -176,6 +177,7 @@ public final class WorkbenchController implements WorkbenchServices {
     ) {
         requireMutating();
         playback.loadScenario(lines, originFile, scenarioName, startLine, endLine, exampleRow, exampleLabel);
+        publishLiveBufferSidecar();
         notifyPlayer();
     }
 
@@ -183,6 +185,7 @@ public final class WorkbenchController implements WorkbenchServices {
     public void loadDefaultDemo() {
         requireMutating();
         playback.loadDefaultDemo();
+        LiveBufferSidecar.publish(projectRoot, null, player.documentText());
         notifyPlayer();
     }
 
@@ -190,6 +193,7 @@ public final class WorkbenchController implements WorkbenchServices {
     public void replaceLiveDocument(List<String> lines) {
         requireMutating();
         playback.replaceFromLines(lines);
+        publishLiveBufferSidecar();
         notifyPlayer();
     }
 
@@ -217,7 +221,7 @@ public final class WorkbenchController implements WorkbenchServices {
             if (decision != WorkbenchPermissionDecision.ALLOW) {
                 return WorkbenchSaveResult.denied();
             }
-            return LiveFeatureSave.write(playback);
+            return writeLiveFeature();
         } catch (WorkbenchPermissionCancelledException cancelled) {
             return WorkbenchSaveResult.cancelled(cancelled.getMessage());
         }
@@ -230,7 +234,15 @@ public final class WorkbenchController implements WorkbenchServices {
         if (!preview.savable()) {
             return WorkbenchSaveResult.unsavable(preview.summary());
         }
-        return LiveFeatureSave.write(playback);
+        return writeLiveFeature();
+    }
+
+    private WorkbenchSaveResult writeLiveFeature() {
+        WorkbenchSaveResult result = LiveFeatureSave.write(playback);
+        if (result.written()) {
+            publishLiveBufferSidecar();
+        }
+        return result;
     }
 
     @Override
@@ -280,9 +292,15 @@ public final class WorkbenchController implements WorkbenchServices {
     @Override
     public ControlBridgeCallResult executeStep(String text, String argument) {
         requireMutating();
+        publishLiveBufferSidecar();
         ControlBridgeCallResult result = live.executeStep(text, argument == null ? "" : argument);
         maybeAdvancePlayhead(text, "SUCCESS".equals(result.status()));
         return result;
+    }
+
+    private void publishLiveBufferSidecar() {
+        ScenarioOrigin origin = playback.origin();
+        LiveBufferSidecar.publish(projectRoot, origin.file(), player.documentText());
     }
 
     @Override

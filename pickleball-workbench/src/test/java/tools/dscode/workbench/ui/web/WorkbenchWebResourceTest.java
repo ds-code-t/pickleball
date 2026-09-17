@@ -40,6 +40,7 @@ class WorkbenchWebResourceTest {
         assertTrue(diagnosticJs.contains("ArrowRight"));
         assertTrue(diagnosticJs.contains("isExpanded"));
         assertTrue(diagnosticJs.contains("diagnosticHost.go"));
+        assertTrue(diagnosticJs.contains("nextLen > prevLen"));
         assertTrue(diagnosticJs.contains("nested_scenario_end"));
         assertTrue(diagnosticJs.contains("playable.length - 1"));
         assertFalse(diagnosticJs.toLowerCase().contains("mermaid"));

@@ -509,9 +509,18 @@
     next.tree = next.tree || [];
     next.layers = next.layers || [];
     next.userExpanded = next.userExpanded || {};
-    var sameRun = selectedRunId(model) && selectedRunId(model) === selectedRunId(next)
-        && (model.beats || []).length === next.beats.length;
-    var keepIndex = sameRun ? Math.min(model.index || 0, Math.max(0, next.beats.length - 1)) : (next.index || 0);
+    var sameRun = selectedRunId(model) && selectedRunId(model) === selectedRunId(next);
+    var prevLen = (model.beats || []).length;
+    var nextLen = next.beats.length;
+    var atEnd = prevLen > 0 && (model.index || 0) >= prevLen - 1;
+    var keepIndex;
+    if (!sameRun) {
+      keepIndex = next.index || 0;
+    } else if (atEnd && nextLen > prevLen) {
+      keepIndex = Math.max(0, nextLen - 1);
+    } else {
+      keepIndex = Math.min(model.index || 0, Math.max(0, nextLen - 1));
+    }
     var keepPlaying = sameRun && model.playing;
     var keepExpanded = sameRun ? (model.userExpanded || {}) : {};
     model = next;

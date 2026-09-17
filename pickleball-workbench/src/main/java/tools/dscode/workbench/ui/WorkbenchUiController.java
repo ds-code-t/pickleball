@@ -428,6 +428,15 @@ final class WorkbenchUiController implements AutoCloseable {
         return renderEvents(page);
     }
 
+    boolean workerRunning() {
+        WorkbenchWorkerStatus status = services.workerStatus();
+        return status != null && status.running();
+    }
+
+    ControlBridgeEventPage liveEvents(long afterSequence) {
+        return services.events(afterSequence, EVENT_PAGE_SIZE);
+    }
+
     @Override
     public void close() {
         services.close();

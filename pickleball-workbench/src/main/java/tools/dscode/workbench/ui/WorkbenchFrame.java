@@ -2,6 +2,8 @@ package tools.dscode.workbench.ui;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.dscode.control.protocol.ControlBridgeEvent;
+import tools.dscode.control.protocol.ControlBridgeEventPage;
 import tools.dscode.control.protocol.ControlBridgeMappingSnapshot;
 import tools.dscode.control.protocol.PickleballLocalLayout;
 import tools.dscode.control.protocol.PickleballVersion;
@@ -82,6 +84,11 @@ final class WorkbenchFrame extends JFrame {
     private DiagnosticEvidenceNavigator diagnosticNavigator;
     private String currentDiagnosticRunId = "";
     private long lastExplorerEventSeq;
+    private static final String LIVE_ISOLATE_RUN = "live-isolate";
+    private final List<Map<String, Object>> liveIsolateBeats = new ArrayList<>();
+    private long liveIsolateAfter;
+    private boolean liveIsolateWorkerSeen;
+    private final Timer diagnosticTailTimer = new Timer(1200, event -> tailDiagnostics());
     private final JComboBox<String> reportPicker = new JComboBox<>();
     private final JEditorPane reportView = new JEditorPane();
     private final Map<String, Path> reportFiles = new LinkedHashMap<>();
@@ -438,12 +445,15 @@ final class WorkbenchFrame extends JFrame {
         rightTabs.addTab("Terminal", terminal);
         rightTabs.addTab("Explorer", diagnosticsPanel());
         rightTabs.addTab("Report", reportPanel());
+        diagnosticTailTimer.setRepeats(true);
         rightTabs.addChangeListener(event -> {
             String title = rightTabs.getTitleAt(rightTabs.getSelectedIndex());
             if ("Explorer".equals(title) || "Diagnostic Log Explorer".equals(title)) {
                 refreshDiagnostics();
-            } else if ("Report".equals(title)) {
-                refreshReport();
+                if (!diagnosticTailTimer.isRunning()) diagnosticTailTimer.start();
+            } else {
+                diagnosticTailTimer.stop();
+                if ("Report".equals(title)) refreshReport();
             }
         });
         return rightTabs;
@@ -734,7 +744,10 @@ final class WorkbenchFrame extends JFrame {
                     mappingHost
             );
 
-            diagnosticHost.onSelectRun(this::showDiagnosticRun);
+            diagnosticHost.onSelectRun(runId -> {
+                if (LIVE_ISOLATE_RUN.equals(runId)) showLiveIsolate();
+                else showDiagnosticRun(runId);
+            });
             diagnosticHost.onGo(this::goFromExplorer);
             diagnosticHost.onReady(this::refreshDiagnostics);
             diagnosticView = new WebViewPanel(
@@ -1024,6 +1037,11 @@ final class WorkbenchFrame extends JFrame {
             diagnosticNavigator = new DiagnosticEvidenceNavigator(controller.projectRoot());
         }
         List<DiagnosticEvidenceNavigator.CatalogRun> runs = diagnosticNavigator.catalogRuns();
+        pullLiveIsolateEvents();
+        if (runs.isEmpty() && !liveIsolateBeats.isEmpty()) {
+            showLiveIsolate();
+            return;
+        }
         if (runs.isEmpty()) {
             diagnosticView.evalJsonCall("window.setDiagnosticState", WorkbenchWebJson.write(Map.of(
                     "runs", List.of(),
@@ -1087,8 +1105,18 @@ final class WorkbenchFrame extends JFrame {
             row.put("runId", run.runId());
             row.put("label", run.displayLabel());
             row.put("outcome", run.outcome());
+            row.put("inProgress", run.inProgress());
             row.put("selected", run.runId().equals(runId));
             runs.add(row);
+        }
+        if (!liveIsolateBeats.isEmpty() && runs.stream().noneMatch(row -> LIVE_ISOLATE_RUN.equals(row.get("runId")))) {
+            Map<String, Object> live = new LinkedHashMap<>();
+            live.put("runId", LIVE_ISOLATE_RUN);
+            live.put("label", "Live isolate · IN_PROGRESS");
+            live.put("outcome", "RUNNING");
+            live.put("inProgress", true);
+            live.put("selected", false);
+            runs.add(live);
         }
         int index = 0;
         if (eventSeq > 0) {
@@ -1108,7 +1136,116 @@ final class WorkbenchFrame extends JFrame {
                 "index", index,
                 "gap", beats.isEmpty()
                         ? "This retained run has no events.jsonl steps or PNG frames."
-                        : ""
+                        : "",
+                "inProgress", selected.inProgress()
+        )));
+    }
+
+    private void tailDiagnostics() {
+        if (diagnosticView == null || rightTabs == null) return;
+        int selectedTab = rightTabs.getSelectedIndex();
+        if (selectedTab < 0) return;
+        String title = rightTabs.getTitleAt(selectedTab);
+        if (!"Explorer".equals(title) && !"Diagnostic Log Explorer".equals(title)) return;
+        pullLiveIsolateEvents();
+        if (LIVE_ISOLATE_RUN.equals(currentDiagnosticRunId)) {
+            showLiveIsolate();
+            return;
+        }
+        if (diagnosticNavigator == null) {
+            diagnosticNavigator = new DiagnosticEvidenceNavigator(controller.projectRoot());
+        }
+        List<DiagnosticEvidenceNavigator.CatalogRun> catalog = diagnosticNavigator.catalogRuns();
+        DiagnosticEvidenceNavigator.CatalogRun selected = catalog.stream()
+                .filter(run -> run.runId().equals(currentDiagnosticRunId))
+                .findFirst()
+                .orElse(null);
+        if (selected != null && selected.inProgress()) {
+            showDiagnosticRun(selected.runId(), lastExplorerEventSeq);
+            return;
+        }
+        if (selected != null) {
+            return;
+        }
+        DiagnosticEvidenceNavigator.CatalogRun inProgress = catalog.stream()
+                .filter(DiagnosticEvidenceNavigator.CatalogRun::inProgress)
+                .findFirst()
+                .orElse(null);
+        if (inProgress != null) {
+            showDiagnosticRun(inProgress.runId(), lastExplorerEventSeq);
+        } else if (!liveIsolateBeats.isEmpty()) {
+            showLiveIsolate();
+        }
+    }
+
+    private void pullLiveIsolateEvents() {
+        if (!controller.workerRunning()) {
+            liveIsolateWorkerSeen = false;
+            return;
+        }
+        if (!liveIsolateWorkerSeen) {
+            liveIsolateBeats.clear();
+            liveIsolateAfter = 0;
+            liveIsolateWorkerSeen = true;
+        }
+        try {
+            ControlBridgeEventPage page = controller.liveEvents(liveIsolateAfter);
+            for (ControlBridgeEvent event : page.events()) {
+                String text = event.stepText() == null || event.stepText().isBlank()
+                        ? event.phraseText()
+                        : event.stepText();
+                if (text == null || text.isBlank()) continue;
+                Map<String, Object> beat = new LinkedHashMap<>();
+                beat.put("type", "live");
+                beat.put("kind", "step");
+                beat.put("stepText", text);
+                beat.put("text", text);
+                beat.put("timestamp", event.timestamp() == null ? "" : event.timestamp());
+                beat.put("status", event.hook() == null ? "" : event.hook());
+                beat.put("scenarioId", event.scenarioId() == null ? "" : event.scenarioId());
+                beat.put("eventSeq", event.sequence());
+                beat.put("logLines", List.of());
+                beat.put("hasScreenshot", false);
+                liveIsolateBeats.add(beat);
+            }
+            liveIsolateAfter = page.nextSequence();
+        } catch (RuntimeException ignored) {
+            // Live tail is best-effort; retained packs still replay.
+        }
+    }
+
+    private void showLiveIsolate() {
+        if (diagnosticView == null) return;
+        currentDiagnosticRunId = LIVE_ISOLATE_RUN;
+        List<Map<String, Object>> runs = new ArrayList<>();
+        if (diagnosticNavigator != null) {
+            for (var run : diagnosticNavigator.catalogRuns()) {
+                Map<String, Object> row = new LinkedHashMap<>();
+                row.put("runId", run.runId());
+                row.put("label", run.displayLabel());
+                row.put("outcome", run.outcome());
+                row.put("inProgress", run.inProgress());
+                row.put("selected", false);
+                runs.add(row);
+            }
+        }
+        Map<String, Object> live = new LinkedHashMap<>();
+        live.put("runId", LIVE_ISOLATE_RUN);
+        live.put("label", "Live isolate · IN_PROGRESS");
+        live.put("outcome", "RUNNING");
+        live.put("inProgress", true);
+        live.put("selected", true);
+        runs.add(live);
+        diagnosticView.evalJsonCall("window.setDiagnosticState", WorkbenchWebJson.write(Map.of(
+                "runs", runs,
+                "beats", liveIsolateBeats,
+                "tree", List.of(),
+                "frames", liveIsolateBeats,
+                "index", Math.max(0, liveIsolateBeats.size() - 1),
+                "gap", liveIsolateBeats.isEmpty()
+                        ? "The isolate worker has no semantic events yet."
+                        : "",
+                "inProgress", true
         )));
     }
 
@@ -2592,6 +2729,7 @@ final class WorkbenchFrame extends JFrame {
     }
 
     private void closeWorkbench() {
+        diagnosticTailTimer.stop();
         if (closing) return;
         closing = true;
         player.stop();

@@ -21,6 +21,8 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.zip.GZIPOutputStream;
 
+import tools.dscode.control.protocol.PickleballLocalLayout;
+
 import static tools.dscode.testengine.PKB_props.PKB_GIT_SNAPSHOT;
 
 /**
@@ -228,8 +230,21 @@ public final class SourceProvenance {
         );
     }
 
+    public String isolateLiveBufferIfDifferent() {
+        if (consumerProjectRoot == null) return null;
+        Path sidecar = PickleballLocalLayout.workbenchStateRoot(consumerProjectRoot).resolve("live-buffer.feature");
+        if (!Files.isRegularFile(sidecar)) return null;
+        try {
+            String live = Files.readString(sidecar, StandardCharsets.UTF_8);
+            if (live.isBlank()) return null;
+            return live.replace("\r\n", "\n").replace('\r', '\n');
+        } catch (IOException ignored) {
+            return null;
+        }
+    }
+
     public void writeReferencedPack(Path runRoot, List<ReferencedFile> files) throws IOException {
-        writeReferencedPack(runRoot, files, null);
+        writeReferencedPack(runRoot, files, isolateLiveBufferIfDifferent());
     }
 
     public void writeReferencedPack(Path runRoot, List<ReferencedFile> files, String liveBufferFeature) throws IOException {

@@ -596,7 +596,11 @@ final class DiagnosticReporter {
 
     private void writeReferencedPack() {
         try {
-            sourceProvenance.writeReferencedPack(runRoot, List.copyOf(referenced.values()));
+            sourceProvenance.writeReferencedPack(
+                    runRoot,
+                    List.copyOf(referenced.values()),
+                    sourceProvenance.isolateLiveBufferIfDifferent()
+            );
         } catch (Throwable t) {
             failEvidence("write referenced source pack", t);
         }

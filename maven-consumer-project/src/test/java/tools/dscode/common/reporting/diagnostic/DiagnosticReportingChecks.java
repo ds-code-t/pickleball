@@ -20,6 +20,7 @@ import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
 import tools.dscode.common.variables.PlatformLogFormatter;
+import tools.dscode.control.protocol.PickleballLocalLayout;
 import tools.dscode.coredefinitions.ServiceCallSteps;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -163,6 +164,39 @@ public class DiagnosticReportingChecks {
             assertTrue(referenced.contains("\"role\": \"data\""));
             assertTrue(referenced.contains("\"vsHead\": \"no-git\""));
             assertFalse(Files.exists(run.resolve("source/referenced.patch.gz")));
+        } finally {
+            deleteQuietly(repo);
+            deleteQuietly(run);
+        }
+    }
+
+    @Test
+    void referencedPackCopiesLiveBufferSidecarWhenPresent() throws Exception {
+        Path repo = Files.createTempDirectory("pickleball-live-buffer");
+        Path run = Files.createTempDirectory("pickleball-live-buffer-run");
+        try {
+            Path feature = repo.resolve("features/parent.feature");
+            Files.createDirectories(feature.getParent());
+            Files.writeString(feature, "Feature: parent\n");
+            SourceProvenance provenance = SourceProvenance.testing(repo, repo, "none");
+            provenance.writeReferencedPack(run, List.of(
+                    new SourceProvenance.ReferencedFile("features/parent.feature", "feature")
+            ));
+            assertFalse(Files.exists(run.resolve("source/live-buffer.feature")));
+
+            Path sidecar = PickleballLocalLayout.workbenchStateRoot(repo).resolve("live-buffer.feature");
+            Files.createDirectories(sidecar.getParent());
+            Files.writeString(sidecar, "Feature: parent\nScenario: unsaved isolate step\n");
+            provenance.writeReferencedPack(run, List.of(
+                    new SourceProvenance.ReferencedFile("features/parent.feature", "feature")
+            ));
+
+            Path live = run.resolve("source/live-buffer.feature");
+            assertTrue(Files.isRegularFile(live));
+            assertTrue(Files.readString(live).contains("unsaved isolate step"));
+            String referenced = Files.readString(run.resolve("source/referenced.json"));
+            assertTrue(referenced.contains("\"role\": \"live-buffer\""));
+            assertTrue(referenced.contains("\"path\": \"live-buffer.feature\""));
         } finally {
             deleteQuietly(repo);
             deleteQuietly(run);

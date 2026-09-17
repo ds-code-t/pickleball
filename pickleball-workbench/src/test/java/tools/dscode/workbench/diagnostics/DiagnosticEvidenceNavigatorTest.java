@@ -208,4 +208,20 @@ class DiagnosticEvidenceNavigatorTest {
         assertFalse(summary.contains("secret-event"));
         assertFalse(summary.contains("frame-1.png"));
     }
+
+    @Test
+    void catalogRunIsInProgressWhenCompletionIsInProgress() throws Exception {
+        Path root = project.resolve("reports/diagnostic-runs");
+        Files.createDirectories(root);
+        Files.writeString(root.resolve("run-catalog.json"), """
+                {"runs":[
+                  {"runId":"run-live","outcome":"RUNNING","completion":"IN_PROGRESS"},
+                  {"runId":"run-done","outcome":"PASSED","completion":"COMPLETE"}
+                ]}
+                """);
+        DiagnosticEvidenceNavigator navigator = new DiagnosticEvidenceNavigator(project);
+        assertEquals("run-live", navigator.catalogRuns().getFirst().runId());
+        assertTrue(navigator.catalogRuns().getFirst().inProgress());
+        assertFalse(navigator.catalogRuns().get(1).inProgress());
+    }
 }

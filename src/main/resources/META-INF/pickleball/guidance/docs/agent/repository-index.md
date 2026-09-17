@@ -539,6 +539,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/player/GherkinPlayPlan.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/player/GherkinReference.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/player/GherkinTextEditing.java`
+- `pickleball-workbench/src/main/java/tools/dscode/workbench/player/LiveBufferSidecar.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/player/LiveEditorView.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/player/LiveFeatureSave.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/player/LivePlaybackCoordinator.java`
@@ -599,6 +600,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/player/GherkinPlayPlanTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/player/GherkinReferenceTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/player/GherkinTextEditingTest.java`
+- `pickleball-workbench/src/test/java/tools/dscode/workbench/player/LiveBufferSidecarTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/player/LiveEditorViewTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/player/LiveFeatureSaveTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/player/LivePlaybackCoordinatorTest.java`

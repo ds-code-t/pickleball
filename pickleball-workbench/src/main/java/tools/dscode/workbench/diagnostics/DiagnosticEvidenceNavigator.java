@@ -52,6 +52,16 @@ public final class DiagnosticEvidenceNavigator {
         public String outcome() {
             return DiagnosticEvidenceNavigator.text(raw, "outcome");
         }
+
+        public String completion() {
+            return DiagnosticEvidenceNavigator.text(raw, "completion");
+        }
+
+        public boolean inProgress() {
+            String completion = completion();
+            return "IN_PROGRESS".equalsIgnoreCase(completion)
+                    || "RUNNING".equalsIgnoreCase(outcome());
+        }
     }
 
     public record ScreenshotFrame(
