@@ -80,7 +80,8 @@ class WorkbenchMcpServerTest {
             "workbench_diagnostic_catalog",
             "workbench_diagnostic_run",
             "workbench_diagnostic_summary",
-            "workbench_investigation_emit"
+            "workbench_investigation_emit",
+            "workbench_go"
     );
 
     @TempDir

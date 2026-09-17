@@ -5,6 +5,7 @@ import io.modelcontextprotocol.server.McpServerFeatures;
 import io.modelcontextprotocol.spec.McpSchema;
 import tools.dscode.control.protocol.ControlBridgeMappingSnapshot;
 import tools.dscode.workbench.WorkbenchServices;
+import tools.dscode.workbench.nav.WorkbenchGoLink;
 import tools.dscode.workbench.lease.WorkbenchCallContext;
 import tools.dscode.workbench.lease.WorkbenchLeaseHolder;
 
@@ -225,6 +226,31 @@ final class WorkbenchMcpTools {
                         )
                 ), "investigation"),
                 args -> services.emitInvestigation(investigationObject(args.get("investigation"))));
+        add("workbench_go",
+                "Navigate Explorer, peek a retained-run file, or switch Report/Mapping/Terminal. UI attach plus a control lease are required to move the window. Headless: validate and echo the resolved target. Does not write files.",
+                schema(Map.of(
+                        "link", Map.of(
+                                "type", "object",
+                                "description", "Navigation link: to, runId, eventSeq, nodeId, path, line, column, kind, mapReference, key, investigationId, section, label.",
+                                "additionalProperties", true
+                        ),
+                        "wb", stringProperty("Optional wb://explorer?run=&seq=&node= URI with the same fields.")
+                )),
+                args -> {
+                    Object raw = args.get("link");
+                    if (raw instanceof Map<?, ?> map) {
+                        Map<String, Object> copy = new LinkedHashMap<>();
+                        map.forEach((key, value) -> {
+                            if (key != null) copy.put(String.valueOf(key), value);
+                        });
+                        return services.go(copy);
+                    }
+                    String wb = text(args, "wb");
+                    if (!wb.isBlank()) {
+                        return services.go(WorkbenchGoLink.parse(wb).toMap());
+                    }
+                    return services.go(Map.of());
+                });
     }
 
     private void add(

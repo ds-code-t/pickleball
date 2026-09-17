@@ -532,6 +532,8 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/mcp/WorkbenchCommandQueue.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/mcp/WorkbenchMcpServer.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/mcp/WorkbenchMcpTools.java`
+- `pickleball-workbench/src/main/java/tools/dscode/workbench/nav/WorkbenchGoLink.java`
+- `pickleball-workbench/src/main/java/tools/dscode/workbench/nav/WorkbenchGoResolver.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/player/EditorTabState.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/player/GherkinBlockDocument.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/player/GherkinPlayPlan.java`
@@ -591,6 +593,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/mcp/WorkbenchAttachServerTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/mcp/WorkbenchCommandQueueTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/mcp/WorkbenchMcpServerTest.java`
+- `pickleball-workbench/src/test/java/tools/dscode/workbench/nav/WorkbenchGoResolverTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/player/EditorTabStateTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/player/GherkinBlockDocumentTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/player/GherkinPlayPlanTest.java`

@@ -3,6 +3,7 @@ package tools.dscode.workbench.ui;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import tools.dscode.control.protocol.ControlBridgeMappingSnapshot;
+import tools.dscode.control.protocol.PickleballLocalLayout;
 import tools.dscode.control.protocol.PickleballVersion;
 import tools.dscode.control.protocol.ControlBridgeStepResolution;
 import tools.dscode.workbench.catalog.CatalogTargetResolver;
@@ -80,6 +81,9 @@ final class WorkbenchFrame extends JFrame {
     private MappingTreeModel mappingModel;
     private DiagnosticEvidenceNavigator diagnosticNavigator;
     private String currentDiagnosticRunId = "";
+    private final JComboBox<String> reportPicker = new JComboBox<>();
+    private final JEditorPane reportView = new JEditorPane();
+    private final Map<String, Path> reportFiles = new LinkedHashMap<>();
 
     private static final Color PLAYHEAD_COLOR = WorkbenchTheme.PLAYHEAD;
     private final JTextArea scenarioEditor = new JTextArea();
@@ -230,6 +234,8 @@ final class WorkbenchFrame extends JFrame {
             updatePlayerView(null);
         }));
         applyLease(controller.controlLease());
+        controller.setUiGoHandler(link -> SwingUtilities.invokeLater(() ->
+                applyGoResult(new WorkbenchGoResolver(controller.projectRoot()).resolve(link), link)));
 
         addWindowListener(new WindowAdapter() {
             @Override
@@ -429,10 +435,14 @@ final class WorkbenchFrame extends JFrame {
         rightTabs = new JTabbedPane();
         rightTabs.addTab("Mapping", mappingPanel());
         rightTabs.addTab("Terminal", terminal);
-        rightTabs.addTab("Diagnostic Log Explorer", diagnosticsPanel());
+        rightTabs.addTab("Explorer", diagnosticsPanel());
+        rightTabs.addTab("Report", reportPanel());
         rightTabs.addChangeListener(event -> {
-            if ("Diagnostic Log Explorer".equals(rightTabs.getTitleAt(rightTabs.getSelectedIndex()))) {
+            String title = rightTabs.getTitleAt(rightTabs.getSelectedIndex());
+            if ("Explorer".equals(title) || "Diagnostic Log Explorer".equals(title)) {
                 refreshDiagnostics();
+            } else if ("Report".equals(title)) {
+                refreshReport();
             }
         });
         return rightTabs;
@@ -496,6 +506,66 @@ final class WorkbenchFrame extends JFrame {
         message.setCaretPosition(0);
         panel.add(new JScrollPane(message), BorderLayout.CENTER);
         return panel;
+    }
+
+    private JPanel reportPanel() {
+        JPanel panel = new JPanel(new BorderLayout(6, 6));
+        panel.setBackground(WorkbenchTheme.SURFACE);
+        panel.setBorder(new EmptyBorder(8, 8, 8, 8));
+        reportView.setContentType("text/html");
+        reportView.setEditable(false);
+        reportView.addHyperlinkListener(event -> {
+            if (event.getEventType() != javax.swing.event.HyperlinkEvent.EventType.ACTIVATED) return;
+            String spec = event.getDescription() == null ? "" : event.getDescription();
+            if (spec.startsWith("wb://")) goFromExplorer(spec);
+        });
+        reportPicker.addActionListener(event -> showSelectedReport());
+        JButton refresh = WorkbenchTheme.flatButton("Refresh", "Reload investigation reports");
+        refresh.addActionListener(event -> refreshReport());
+        JPanel north = new JPanel(new BorderLayout(8, 0));
+        north.setOpaque(false);
+        north.add(reportPicker, BorderLayout.CENTER);
+        north.add(refresh, BorderLayout.EAST);
+        panel.add(north, BorderLayout.NORTH);
+        panel.add(new JScrollPane(reportView), BorderLayout.CENTER);
+        return panel;
+    }
+
+    private void refreshReport() {
+        reportFiles.clear();
+        reportPicker.removeAllItems();
+        Path investigations = PickleballLocalLayout.investigationsDirectory(controller.projectRoot());
+        if (Files.isDirectory(investigations)) {
+            try (var directories = Files.list(investigations)) {
+                directories.filter(Files::isDirectory).sorted().forEach(directory -> {
+                    Path html = directory.resolve("report.html");
+                    if (Files.isRegularFile(html)) {
+                        String id = directory.getFileName().toString();
+                        reportFiles.put(id, html);
+                        reportPicker.addItem(id);
+                    }
+                });
+            } catch (Exception ignored) {
+            }
+        }
+        if (reportFiles.isEmpty()) {
+            reportView.setText("<html><body><p>No investigation reports under .pickleball/investigations.</p></body></html>");
+            return;
+        }
+        showSelectedReport();
+    }
+
+    private void showSelectedReport() {
+        Object selected = reportPicker.getSelectedItem();
+        if (selected == null) return;
+        Path html = reportFiles.get(selected.toString());
+        if (html == null || !Files.isRegularFile(html)) return;
+        try {
+            reportView.setText(Files.readString(html));
+            reportView.setCaretPosition(0);
+        } catch (Exception failure) {
+            reportView.setText("<html><body><p>Could not read report.</p></body></html>");
+        }
     }
 
     private JPanel footer() {
@@ -626,7 +696,8 @@ final class WorkbenchFrame extends JFrame {
             }
         }
         if (diagnosticView != null && rightTabs != null) {
-            int diagnostic = rightTabs.indexOfTab("Diagnostic Log Explorer");
+            int diagnostic = rightTabs.indexOfTab("Explorer");
+            if (diagnostic < 0) diagnostic = rightTabs.indexOfTab("Diagnostic Log Explorer");
             if (diagnostic >= 0) {
                 JPanel wrap = new JPanel(new BorderLayout());
                 wrap.add(diagnosticView, BorderLayout.CENTER);

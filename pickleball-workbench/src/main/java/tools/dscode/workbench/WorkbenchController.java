@@ -17,6 +17,9 @@ import tools.dscode.workbench.player.WorkbenchSaveResult;
 import tools.dscode.workbench.sync.WorkbenchManifest;
 import tools.dscode.workbench.sync.WorkbenchSynchronizer;
 import tools.dscode.workbench.diagnostics.DiagnosticEvidenceNavigator;
+import tools.dscode.workbench.lease.WorkbenchLeaseHolder;
+import tools.dscode.workbench.nav.WorkbenchGoLink;
+import tools.dscode.workbench.nav.WorkbenchGoResolver;
 import tools.dscode.workbench.terminal.WorkerLogFiles;
 import tools.dscode.workbench.worker.WorkbenchLiveSession;
 import tools.dscode.workbench.worker.WorkbenchWorkerStatus;
@@ -40,6 +43,7 @@ public final class WorkbenchController implements WorkbenchServices {
     private final WorkbenchControlLease lease;
     private final DiagnosticEvidenceNavigator diagnostics;
     private final List<Runnable> playerListeners = new CopyOnWriteArrayList<>();
+    private volatile Consumer<WorkbenchGoLink> uiGo;
 
     public WorkbenchController(Path projectRoot) {
         this(projectRoot, Map.of());
@@ -409,6 +413,36 @@ public final class WorkbenchController implements WorkbenchServices {
         } catch (IOException failure) {
             throw new IllegalStateException("Could not emit investigation handoff.", failure);
         }
+    }
+
+    public void setUiGoHandler(Consumer<WorkbenchGoLink> uiGo) {
+        this.uiGo = uiGo;
+    }
+
+    @Override
+    public Object go(Map<String, ?> link) {
+        WorkbenchGoLink parsed = WorkbenchGoLink.fromMap(link);
+        WorkbenchGoResolver.WorkbenchGoResult resolved = new WorkbenchGoResolver(projectRoot).resolve(parsed);
+        Map<String, Object> echo = new java.util.LinkedHashMap<>(parsed.toMap());
+        echo.put("to", resolved.to());
+        echo.put("path", resolved.relativePath());
+        echo.put("message", resolved.message());
+        echo.put("missing", resolved.missing());
+        echo.put("outsideProject", resolved.outsideProject());
+        echo.put("peek", resolved.peek());
+        echo.put("file", resolved.file() == null ? "" : resolved.file().toString());
+        WorkbenchControlLeaseSnapshot snapshot = controlLeaseSnapshot();
+        boolean mayMove = snapshot.uiAttached() && snapshot.holder() == WorkbenchLeaseHolder.AGENT;
+        if (mayMove && resolved.movesUi() && uiGo != null) {
+            uiGo.accept(parsed);
+            echo.put("movedUi", true);
+        } else {
+            echo.put("movedUi", false);
+        }
+        if (!parsed.label().isBlank() && snapshot.agentHolds()) {
+            setCurrentAction(parsed.label());
+        }
+        return echo;
     }
 
     @Override

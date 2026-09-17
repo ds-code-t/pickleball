@@ -26,7 +26,7 @@ import java.util.regex.Pattern;
  */
 public final class InvestigationHandoff {
     public static final int MAX_SCREENSHOTS = 2;
-    public static final int SCHEMA_VERSION = 1;
+    public static final int SCHEMA_VERSION = 2;
     public static final String INVESTIGATIONS_DIRECTORY = "investigations";
     public static final String RELATIVE_ROOT = ".pickleball/" + INVESTIGATIONS_DIRECTORY;
     public static final String NOT_FIXED = "not fixed";
@@ -55,10 +55,22 @@ public final class InvestigationHandoff {
             String runId,
             String runIndexPath,
             List<String> screenshots,
-            String pickleballVersion
+            String pickleballVersion,
+            String bottomLine,
+            String failedStep,
+            String originatingCause,
+            Object executionMap,
+            Object gitSuspects,
+            Object serviceCalls,
+            Object environmentDelta,
+            Object narrative,
+            Object links
     ) {
         public Document {
             screenshots = List.copyOf(screenshots == null ? List.of() : screenshots);
+            bottomLine = bottomLine == null ? "" : bottomLine;
+            failedStep = failedStep == null ? "" : failedStep;
+            originatingCause = originatingCause == null ? "" : originatingCause;
         }
 
         public Map<String, Object> toMap() {
@@ -81,6 +93,15 @@ public final class InvestigationHandoff {
             putIfPresent(map, "runIndexPath", runIndexPath);
             map.put("screenshots", screenshots);
             putIfPresent(map, "pickleballVersion", pickleballVersion);
+            putIfPresent(map, "bottomLine", bottomLine);
+            putIfPresent(map, "failedStep", failedStep);
+            putIfPresent(map, "originatingCause", originatingCause);
+            if (executionMap != null) map.put("executionMap", executionMap);
+            if (gitSuspects != null) map.put("gitSuspects", gitSuspects);
+            if (serviceCalls != null) map.put("serviceCalls", serviceCalls);
+            if (environmentDelta != null) map.put("environmentDelta", environmentDelta);
+            if (narrative != null) map.put("narrative", narrative);
+            if (links != null) map.put("links", links);
             return map;
         }
     }
@@ -149,7 +170,16 @@ public final class InvestigationHandoff {
                 runId,
                 runIndexPath == null ? "" : runIndexPath,
                 screenshotPaths(root, raw.get("screenshots")),
-                firstText(raw, "pickleballVersion")
+                firstText(raw, "pickleballVersion"),
+                firstText(raw, "bottomLine"),
+                firstText(raw, "failedStep"),
+                firstText(raw, "originatingCause"),
+                jsonValue(raw.get("executionMap")),
+                jsonValue(raw.get("gitSuspects")),
+                jsonValue(raw.get("serviceCalls")),
+                jsonValue(raw.get("environmentDelta")),
+                jsonValue(raw.get("narrative")),
+                jsonValue(raw.get("links"))
         );
     }
 
@@ -175,8 +205,14 @@ public final class InvestigationHandoff {
         html.append("section{margin:1.25rem 0}\n");
         html.append("img{max-width:100%;height:auto;border:1px solid #ccc}\n");
         html.append("pre{white-space:pre-wrap;overflow-wrap:anywhere}\n");
+        html.append("ul.tree{list-style:none;padding-left:1.2rem}\n");
+        html.append("ul.tree ul{padding-left:1.2rem}\n");
         html.append("</style>\n</head><body>\n");
         html.append("<h1>").append(escape(title)).append("</h1>\n");
+        String bottom = document.bottomLine().isBlank() ? document.cause() : document.bottomLine();
+        if (!bottom.isBlank()) {
+            html.append("<p><strong>Bottom line:</strong> ").append(escape(bottom)).append("</p>\n");
+        }
         html.append("<p class=\"meta\">Investigation ").append(escape(document.investigationId()));
         html.append(" · ").append(escape(document.outcome()));
         if (!document.createdAt().isBlank()) {
@@ -184,8 +220,27 @@ public final class InvestigationHandoff {
         }
         html.append("</p>\n");
 
-        section(html, "Cause", document.cause());
-        section(html, "Fix", document.fix());
+        html.append("<section><h2>Where</h2>\n");
+        if (!document.feature().isBlank() || !document.scenarioName().isBlank()) {
+            html.append("<p>").append(escape(document.feature()));
+            if (!document.scenarioName().isBlank()) {
+                html.append(" Scenario \"").append(escape(document.scenarioName())).append('"');
+            }
+            html.append("</p>\n");
+        }
+        appendExecutionMap(html, document.executionMap());
+        html.append("</section>\n");
+
+        String cause = document.originatingCause().isBlank() ? document.cause() : document.originatingCause();
+        section(html, "Cause", cause);
+        if (!document.failedStep().isBlank()) {
+            section(html, "Failed assertion", document.failedStep());
+        }
+        section(html, "Next", document.fix());
+        appendObjectSection(html, "Git suspects", document.gitSuspects());
+        appendObjectSection(html, "Service calls", document.serviceCalls());
+        appendObjectSection(html, "Environment", document.environmentDelta());
+        appendNarrative(html, document.narrative());
 
         html.append("<section><h2>Scenario</h2>\n<dl>\n");
         definition(html, "Name", document.scenarioName());
@@ -402,6 +457,56 @@ public final class InvestigationHandoff {
             return text.toString();
         }
         return String.valueOf(failureSite);
+    }
+
+    private static Object jsonValue(Object value) {
+        if (value == null) return null;
+        if (!isJsonValue(value)) return String.valueOf(value);
+        return value;
+    }
+
+    private static void appendExecutionMap(StringBuilder html, Object executionMap) {
+        if (!(executionMap instanceof List<?> items) || items.isEmpty()) return;
+        html.append("<ul class=\"tree\">\n");
+        for (Object item : items) {
+            html.append("<li>");
+            if (item instanceof Map<?, ?> map) {
+                String indent = firstText(map, "indent", "depth");
+                int depth = 0;
+                try {
+                    if (!indent.isBlank()) depth = Integer.parseInt(indent);
+                } catch (NumberFormatException ignored) {
+                }
+                html.append("&nbsp;".repeat(Math.max(0, depth) * 2));
+                String kind = firstText(map, "kind", "type");
+                String text = firstText(map, "text", "stepText", "label", "name");
+                if (!kind.isBlank()) html.append(escape(kind)).append(": ");
+                html.append(escape(text.isBlank() ? String.valueOf(item) : text));
+            } else {
+                html.append(escape(String.valueOf(item)));
+            }
+            html.append("</li>\n");
+        }
+        html.append("</ul>\n");
+    }
+
+    private static void appendObjectSection(StringBuilder html, String heading, Object value) {
+        if (value == null) return;
+        if (value instanceof String text && text.isBlank()) return;
+        if (value instanceof List<?> list && list.isEmpty()) return;
+        if (value instanceof Map<?, ?> map && map.isEmpty()) return;
+        html.append("<section><h2>").append(escape(heading)).append("</h2>\n<pre>");
+        html.append(escape(value instanceof String text ? text : encodePretty(value)));
+        html.append("</pre>\n</section>\n");
+    }
+
+    private static void appendNarrative(StringBuilder html, Object narrative) {
+        if (!(narrative instanceof List<?> items) || items.isEmpty()) return;
+        html.append("<section><h2>Narrative</h2>\n");
+        for (Object item : items) {
+            html.append("<p>").append(escape(String.valueOf(item))).append("</p>\n");
+        }
+        html.append("</section>\n");
     }
 
     private static String firstText(Map<?, ?> map, String... keys) {

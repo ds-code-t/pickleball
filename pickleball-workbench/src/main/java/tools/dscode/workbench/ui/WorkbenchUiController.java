@@ -20,7 +20,9 @@ import tools.dscode.control.protocol.ControlBridgeStepOverrideResult;
 import tools.dscode.control.protocol.ControlBridgeValue;
 import tools.dscode.control.protocol.ControlBridgeValueResult;
 import tools.dscode.control.protocol.ControlProtocol;
+import tools.dscode.workbench.WorkbenchController;
 import tools.dscode.workbench.WorkbenchServices;
+import tools.dscode.workbench.nav.WorkbenchGoLink;
 import tools.dscode.workbench.lease.WorkbenchControlLeaseSnapshot;
 import tools.dscode.workbench.mapping.MappingValueCodec;
 import tools.dscode.workbench.player.LivePlaybackCoordinator;
@@ -38,6 +40,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Consumer;
 
 /** Thin presentation adapter over the shared Workbench service surface. */
 final class WorkbenchUiController implements AutoCloseable {
@@ -325,6 +328,16 @@ final class WorkbenchUiController implements AutoCloseable {
 
     Optional<WorkerLogFiles> workerLogFiles() {
         return services.workerLogFiles();
+    }
+
+    void setUiGoHandler(Consumer<WorkbenchGoLink> handler) {
+        if (services instanceof WorkbenchController controller) {
+            controller.setUiGoHandler(handler);
+        }
+    }
+
+    Object go(Map<String, ?> link) {
+        return services.go(link);
     }
 
     LiveActionResult mappingResolve(String input) {

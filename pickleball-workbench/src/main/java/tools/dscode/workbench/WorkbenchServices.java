@@ -167,6 +167,8 @@ public interface WorkbenchServices extends AutoCloseable {
 
     Object emitInvestigation(Map<String, ?> investigation);
 
+    Object go(Map<String, ?> link);
+
     @Override
     void close();
 }
