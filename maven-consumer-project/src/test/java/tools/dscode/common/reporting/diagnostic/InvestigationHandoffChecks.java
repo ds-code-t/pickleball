@@ -49,6 +49,54 @@ public class InvestigationHandoffChecks {
             assertTrue(html.contains("Screenshot missing: reports/diagnostic-runs/run-1/scenarios/s1/screenshots/gone.png"));
             assertFalse(html.contains("third.png"));
             assertFalse(html.contains("<input>"));
+            assertTrue(html.contains("Bottom line:"));
+            assertFalse(html.toLowerCase().contains("mermaid"));
+        } finally {
+            deleteTree(project);
+        }
+    }
+
+    @Test
+    void v2EmitSucceedsWithoutNarrativeAndKeepsV1Fields() throws Exception {
+        Path project = Files.createTempDirectory("pickleball-investigation-v2");
+        try {
+            Map<String, Object> raw = new LinkedHashMap<>();
+            raw.put("pkb_investigation_id", "v2-no-narrative");
+            raw.put("cause", "The component returned no rows.");
+            raw.put("bottomLine", "Login COMPONENT left the catalog empty.");
+            raw.put("executionMap", List.of("When RUN COMPONENT SCENARIO: login", "Given nested login"));
+            InvestigationHandoff.EmitResult emitted = InvestigationHandoff.emit(project, raw);
+            String json = Files.readString(emitted.jsonFile());
+            assertTrue(json.contains("\"schemaVersion\": 2"));
+            assertTrue(json.contains("Login COMPONENT left the catalog empty."));
+            assertFalse(json.contains("\"narrative\""));
+            String html = Files.readString(emitted.htmlFile());
+            assertTrue(html.contains("Login COMPONENT left the catalog empty."));
+            assertTrue(html.contains("When RUN COMPONENT SCENARIO: login"));
+        } finally {
+            deleteTree(project);
+        }
+    }
+
+    @Test
+    void emitDerivesExecutionMapAndWritesExplorerLinksWhenMapIsOmitted() throws Exception {
+        Path project = Files.createTempDirectory("pickleball-investigation-derived");
+        try {
+            Path scenario = project.resolve("reports/diagnostic-runs/run-d/scenarios/s1");
+            Files.createDirectories(scenario);
+            Files.writeString(scenario.resolve("events.jsonl"), """
+                    {"type":"step","eventSeq":4,"text":"When RUN COMPONENT SCENARIO: login","source":{"path":"features/parent.feature","line":10}}
+                    {"type":"nested_scenario_start","eventSeq":2,"callee":{"scenarioName":"login"}}
+                    """, StandardCharsets.UTF_8);
+            Map<String, Object> raw = new LinkedHashMap<>();
+            raw.put("pkb_investigation_id", "derived-links");
+            raw.put("cause", "Login did not return.");
+            raw.put("runId", "run-d");
+            InvestigationHandoff.Document document = InvestigationHandoff.normalize(raw, project);
+            String html = InvestigationHandoff.renderHtml(document, project);
+            assertTrue(html.contains("When RUN COMPONENT SCENARIO: login"));
+            assertTrue(html.contains("wb://explorer?run=run-d"));
+            assertTrue(html.contains("wb://explorer?run=run-d&amp;seq=") || html.contains("wb://explorer?run=run-d&seq="));
         } finally {
             deleteTree(project);
         }

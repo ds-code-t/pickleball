@@ -5,6 +5,7 @@ import io.modelcontextprotocol.server.McpServerFeatures;
 import io.modelcontextprotocol.spec.McpSchema;
 import tools.dscode.control.protocol.ControlBridgeMappingSnapshot;
 import tools.dscode.workbench.WorkbenchServices;
+import tools.dscode.workbench.nav.WorkbenchGoLink;
 import tools.dscode.workbench.lease.WorkbenchCallContext;
 import tools.dscode.workbench.lease.WorkbenchLeaseHolder;
 
@@ -101,6 +102,12 @@ final class WorkbenchMcpTools {
                         "argument", stringProperty("Optional DocString-style argument text.")
                 ), "text"),
                 args -> services.executeStep(text(args, "text"), optionalText(args, "argument")));
+        add("workbench_step_resolve", "Resolve one Gherkin step to its Java step definition without executing it. Returns CONSUMER_GLUE, DYNAMIC, OVERRIDE, or UNMATCHED.",
+                schema(Map.of(
+                        "text", stringProperty("Gherkin step text, with or without Given/When/Then."),
+                        "argument", stringProperty("Optional DocString-style argument text.")
+                ), "text"),
+                args -> services.resolveStep(text(args, "text"), optionalText(args, "argument")));
 
         add("workbench_mapping_get", "Read one value from a Pickleball Mapping.",
                 schema(Map.of(
@@ -210,7 +217,7 @@ final class WorkbenchMcpTools {
                 ), "runId", "scenarioId"),
                 args -> services.diagnosticScenarioSummary(text(args, "runId"), text(args, "scenarioId")));
         add("workbench_investigation_emit",
-                "Write .pickleball/investigations/<id>/{investigation.json,report.html} from investigation JSON. Returns the relative report.html path only. Does not copy the diagnostic pack or embed PNG bytes.",
+                "Write .pickleball/investigations/<id>/{investigation.json,report.html} from investigation JSON (versioned under v/<version>/investigations when current.json is complete). Returns the relative report.html path only. Does not copy the diagnostic pack or embed PNG bytes.",
                 schema(Map.of(
                         "investigation", Map.of(
                                 "type", "object",
@@ -219,6 +226,31 @@ final class WorkbenchMcpTools {
                         )
                 ), "investigation"),
                 args -> services.emitInvestigation(investigationObject(args.get("investigation"))));
+        add("workbench_go",
+                "Navigate Explorer, peek a retained-run file, or switch Report/Mapping/Terminal. UI attach plus a control lease are required to move the window. Headless: validate and echo the resolved target. Does not write files.",
+                schema(Map.of(
+                        "link", Map.of(
+                                "type", "object",
+                                "description", "Navigation link: to, runId, eventSeq, nodeId, path, line, column, kind, mapReference, key, investigationId, section, label.",
+                                "additionalProperties", true
+                        ),
+                        "wb", stringProperty("Optional wb://explorer?run=&seq=&node= URI with the same fields.")
+                )),
+                args -> {
+                    Object raw = args.get("link");
+                    if (raw instanceof Map<?, ?> map) {
+                        Map<String, Object> copy = new LinkedHashMap<>();
+                        map.forEach((key, value) -> {
+                            if (key != null) copy.put(String.valueOf(key), value);
+                        });
+                        return services.go(copy);
+                    }
+                    String wb = text(args, "wb");
+                    if (!wb.isBlank()) {
+                        return services.go(WorkbenchGoLink.parse(wb).toMap());
+                    }
+                    return services.go(Map.of());
+                });
     }
 
     private void add(

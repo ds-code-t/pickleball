@@ -1,0 +1,88 @@
+:root {
+  --wb-bg: #f4f6f8;
+  --wb-surface: #ffffff;
+  --wb-surface-alt: #eef2f7;
+  --wb-border: #d7dee7;
+  --wb-text: #1f2937;
+  --wb-muted: #6b7280;
+  --wb-accent: #2563eb;
+  --wb-accent-soft: #dbeafe;
+  --wb-playhead: #fef3c7;
+  --wb-danger: #b91c1c;
+  --wb-danger-soft: #fee2e2;
+  --wb-success: #047857;
+  --wb-success-soft: #d1fae5;
+  --wb-warning: #b45309;
+  --wb-warning-soft: #fef3c7;
+  --wb-mono: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  --wb-sans: "Segoe UI", "SF Pro Text", system-ui, sans-serif;
+  --wb-radius: 8px;
+}
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: var(--wb-bg);
+  color: var(--wb-text);
+  font: 13px/1.45 var(--wb-sans);
+}
+
+button, select, input, textarea {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+select, input[type="text"], textarea, .wb-field {
+  border: 1px solid var(--wb-border);
+  background: var(--wb-surface);
+  border-radius: var(--wb-radius);
+  padding: 5px 8px;
+}
+
+.wb-btn {
+  border: 1px solid var(--wb-border);
+  background: var(--wb-surface);
+  border-radius: var(--wb-radius);
+  padding: 6px 12px;
+}
+
+.wb-btn.primary {
+  background: var(--wb-accent);
+  border-color: #1d4ed8;
+  color: #fff;
+}
+
+.wb-btn:hover:not(:disabled) {
+  background: var(--wb-surface-alt);
+}
+
+.wb-btn.primary:hover:not(:disabled) {
+  background: #1d4ed8;
+}
+
+.pane-title {
+  padding: 10px 12px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  border-bottom: 1px solid var(--wb-border);
+  color: var(--wb-text);
+}
+
+.status {
+  color: var(--wb-muted);
+  font-weight: 400;
+}
+
+.empty {
+  color: var(--wb-muted);
+  padding: 18px;
+}

@@ -109,6 +109,9 @@ public final class MappingControl {
         if (normalized.startsWith(ControlProtocol.CURRENT_NODE_MAP_REFERENCE_PREFIX)) {
             return attempt(() -> currentNodeMapByIndex(normalized));
         }
+        if (StepMapSeeds.isSeedReference(normalized)) {
+            return attempt(() -> StepMapSeeds.mapForReference(normalized));
+        }
         return attempt(() -> NodeMap.getNodeMap(normalized));
     }
 

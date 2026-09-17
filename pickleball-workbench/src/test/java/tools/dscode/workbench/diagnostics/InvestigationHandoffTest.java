@@ -72,6 +72,57 @@ class InvestigationHandoffTest {
         assertTrue(html.contains("Screenshot missing: reports/diagnostic-runs/run-1/scenarios/s1/screenshots/missing.png"));
         assertFalse(html.contains("extra.png"));
         assertFalse(html.contains("<button>"));
+        assertTrue(html.contains("Bottom line:"));
+        assertFalse(html.toLowerCase().contains("mermaid"));
+    }
+
+    @Test
+    void v2FieldsAreOptionalAndRenderWithoutNarrative() throws Exception {
+        Map<String, Object> raw = new LinkedHashMap<>();
+        raw.put("pkb_investigation_id", "v2-optional");
+        raw.put("cause", "The nested login left the catalog empty.");
+        raw.put("bottomLine", "The login COMPONENT did not return the catalog map.");
+        raw.put("failedStep", "Then the catalog is displayed");
+        raw.put("originatingCause", "When RUN COMPONENT SCENARIO: login");
+        raw.put("executionMap", List.of(
+                Map.of("kind", "step", "text", "When RUN COMPONENT SCENARIO: login", "indent", 0),
+                Map.of("kind", "component", "text", "login", "indent", 1)
+        ));
+
+        InvestigationHandoff.EmitResult emitted = InvestigationHandoff.emit(project, raw);
+        assertTrue(Files.isRegularFile(emitted.jsonFile()));
+        String json = Files.readString(emitted.jsonFile());
+        assertTrue(json.contains("\"schemaVersion\": 2"));
+        assertFalse(json.contains("\"narrative\""));
+        String html = Files.readString(emitted.htmlFile());
+        assertTrue(html.contains("The login COMPONENT did not return the catalog map."));
+        assertTrue(html.contains("When RUN COMPONENT SCENARIO: login"));
+        assertTrue(html.contains("class=\"tree\""));
+        assertFalse(html.toLowerCase().contains("mermaid"));
+    }
+
+    @Test
+    void emitDerivesExecutionMapFromEventsWhenOmitted() throws Exception {
+        Path scenario = project.resolve("reports/diagnostic-runs/run-derive/scenarios/parent");
+        Files.createDirectories(scenario);
+        Files.writeString(scenario.resolve("events.jsonl"), """
+                {"type":"nested_scenario_start","eventSeq":10,"callee":{"scenarioName":"login"}}
+                {"type":"step","eventSeq":11,"text":"Given nested login","nestingLevel":1,"source":{"path":"features/login.feature","line":5}}
+                {"type":"nested_scenario_end","eventSeq":12,"invocationId":"inv-login"}
+                {"type":"step","eventSeq":13,"text":"When RUN COMPONENT SCENARIO: login","nestingLevel":0,"source":{"path":"features/parent.feature","line":10}}
+                """);
+        Map<String, Object> raw = new LinkedHashMap<>();
+        raw.put("pkb_investigation_id", "derived-map");
+        raw.put("cause", "The nested login left the catalog empty.");
+        raw.put("runId", "run-derive");
+
+        InvestigationHandoff.Document document = InvestigationHandoff.normalize(raw, project);
+        assertTrue(document.executionMap() instanceof java.util.List<?>);
+        String html = InvestigationHandoff.renderHtml(document, project);
+        assertTrue(html.contains("Given nested login"));
+        assertTrue(html.contains("When RUN COMPONENT SCENARIO: login"));
+        assertTrue(html.contains("wb://explorer?run=run-derive&amp;seq=13"));
+        assertFalse(html.toLowerCase().contains("mermaid"));
     }
 
     @Test

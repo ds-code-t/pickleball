@@ -1,5 +1,7 @@
 package tools.dscode.launcher;
 
+import tools.dscode.common.reporting.diagnostic.ReportRetentionPolicy;
+
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -13,7 +15,7 @@ final class WorkbenchCommandLine {
             "sync", "worker-check", "live-check", "ui", "mcp", "isolate", "session-start", "session"
     );
     static final Set<String> AGENT_CORE_COMMANDS = Set.of(
-            "export-guidance", "hint", "discover-hint", "discover", "confirm"
+            "export-guidance", "hint", "discover-hint", "discover", "confirm", "resolve-runvars"
     );
     static final Set<String> SESSION_CLIENT_COMMANDS = Set.of(
             "isolate", "session-start", "execute-step", "status", "events", "stop", "kill"
@@ -28,6 +30,7 @@ final class WorkbenchCommandLine {
             Path outputDirectory,
             String tags,
             String name,
+            String retention,
             String[] forwarded
     ) {
     }
@@ -47,18 +50,19 @@ final class WorkbenchCommandLine {
     static Parsed parse(String[] args) {
         Path cwd = Path.of("").toAbsolutePath().normalize();
         if (args == null || args.length == 0) {
-            return new Parsed("ui", cwd, null, null, null, new String[]{"ui", cwd.toString()});
+            return new Parsed("ui", cwd, null, null, null, null, new String[]{"ui", cwd.toString()});
         }
         String command = args[0];
         if ("export-guidance".equals(command)) {
             Path output = args.length >= 2 && !isFlag(args[1])
                     ? Path.of(args[1])
                     : Path.of(".pickleball");
-            return new Parsed(command, cwd, output, null, null, args.clone());
+            return new Parsed(command, cwd, output, null, null, null, args.clone());
         }
 
         String tags = null;
         String name = null;
+        String retention = null;
         Path project = null;
         List<String> rest = new ArrayList<>();
         for (int index = 1; index < args.length; index++) {
@@ -78,6 +82,15 @@ final class WorkbenchCommandLine {
             }
             if ("--name".equals(token) && index + 1 < args.length) {
                 name = args[++index];
+                continue;
+            }
+            if (token.startsWith("--retention=")) {
+                retention = parseRetention(token.substring("--retention=".length()));
+                continue;
+            }
+            if ("--retention".equals(token)) {
+                String value = index + 1 < args.length ? args[++index] : null;
+                retention = parseRetention(value);
                 continue;
             }
             if (isFlag(token)) {
@@ -110,9 +123,13 @@ final class WorkbenchCommandLine {
                 forwarded.add(name);
             }
             forwarded.addAll(rest);
-            return new Parsed(command, project, null, tags, name, forwarded.toArray(String[]::new));
+            return new Parsed(command, project, null, tags, name, retention, forwarded.toArray(String[]::new));
         }
-        return new Parsed(command, project, null, tags, name, args.clone());
+        return new Parsed(command, project, null, tags, name, retention, args.clone());
+    }
+
+    private static String parseRetention(String value) {
+        return ReportRetentionPolicy.parseExact(value).name().toLowerCase(Locale.ROOT);
     }
 
     private static boolean isFlag(String token) {

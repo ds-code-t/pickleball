@@ -26,7 +26,7 @@ import java.util.regex.Pattern;
  */
 public final class InvestigationHandoff {
     public static final int MAX_SCREENSHOTS = 2;
-    public static final int SCHEMA_VERSION = 1;
+    public static final int SCHEMA_VERSION = 2;
     public static final String INVESTIGATIONS_DIRECTORY = "investigations";
     public static final String RELATIVE_ROOT = ".pickleball/" + INVESTIGATIONS_DIRECTORY;
     public static final String NOT_FIXED = "not fixed";
@@ -55,10 +55,22 @@ public final class InvestigationHandoff {
             String runId,
             String runIndexPath,
             List<String> screenshots,
-            String pickleballVersion
+            String pickleballVersion,
+            String bottomLine,
+            String failedStep,
+            String originatingCause,
+            Object executionMap,
+            Object gitSuspects,
+            Object serviceCalls,
+            Object environmentDelta,
+            Object narrative,
+            Object links
     ) {
         public Document {
             screenshots = List.copyOf(screenshots == null ? List.of() : screenshots);
+            bottomLine = bottomLine == null ? "" : bottomLine;
+            failedStep = failedStep == null ? "" : failedStep;
+            originatingCause = originatingCause == null ? "" : originatingCause;
         }
 
         public Map<String, Object> toMap() {
@@ -81,6 +93,15 @@ public final class InvestigationHandoff {
             putIfPresent(map, "runIndexPath", runIndexPath);
             map.put("screenshots", screenshots);
             putIfPresent(map, "pickleballVersion", pickleballVersion);
+            putIfPresent(map, "bottomLine", bottomLine);
+            putIfPresent(map, "failedStep", failedStep);
+            putIfPresent(map, "originatingCause", originatingCause);
+            if (executionMap != null) map.put("executionMap", executionMap);
+            if (gitSuspects != null) map.put("gitSuspects", gitSuspects);
+            if (serviceCalls != null) map.put("serviceCalls", serviceCalls);
+            if (environmentDelta != null) map.put("environmentDelta", environmentDelta);
+            if (narrative != null) map.put("narrative", narrative);
+            if (links != null) map.put("links", links);
             return map;
         }
     }
@@ -99,8 +120,7 @@ public final class InvestigationHandoff {
             throw new IllegalArgumentException("Consumer project root not found: " + root);
         }
         Document document = normalize(raw, root);
-        Path directory = root.resolve(".pickleball")
-                .resolve(INVESTIGATIONS_DIRECTORY)
+        Path directory = PickleballLocalLayout.investigationsDirectory(root)
                 .resolve(document.investigationId());
         Files.createDirectories(directory);
 
@@ -150,14 +170,22 @@ public final class InvestigationHandoff {
                 runId,
                 runIndexPath == null ? "" : runIndexPath,
                 screenshotPaths(root, raw.get("screenshots")),
-                firstText(raw, "pickleballVersion")
+                firstText(raw, "pickleballVersion"),
+                firstText(raw, "bottomLine"),
+                firstText(raw, "failedStep"),
+                firstText(raw, "originatingCause"),
+                executionMapOrDerived(root, runId, raw.get("executionMap")),
+                jsonValue(raw.get("gitSuspects")),
+                jsonValue(raw.get("serviceCalls")),
+                jsonValue(raw.get("environmentDelta")),
+                jsonValue(raw.get("narrative")),
+                jsonValue(raw.get("links"))
         );
     }
 
     public static String renderHtml(Document document, Path projectRoot) {
         Path root = requireProjectRoot(projectRoot);
-        Path reportDir = root.resolve(".pickleball")
-                .resolve(INVESTIGATIONS_DIRECTORY)
+        Path reportDir = PickleballLocalLayout.investigationsDirectory(root)
                 .resolve(document.investigationId());
         return renderHtml(document, root, reportDir);
     }
@@ -177,8 +205,14 @@ public final class InvestigationHandoff {
         html.append("section{margin:1.25rem 0}\n");
         html.append("img{max-width:100%;height:auto;border:1px solid #ccc}\n");
         html.append("pre{white-space:pre-wrap;overflow-wrap:anywhere}\n");
+        html.append("ul.tree{list-style:none;padding-left:1.2rem}\n");
+        html.append("ul.tree ul{padding-left:1.2rem}\n");
         html.append("</style>\n</head><body>\n");
         html.append("<h1>").append(escape(title)).append("</h1>\n");
+        String bottom = document.bottomLine().isBlank() ? document.cause() : document.bottomLine();
+        if (!bottom.isBlank()) {
+            html.append("<p><strong>Bottom line:</strong> ").append(escape(bottom)).append("</p>\n");
+        }
         html.append("<p class=\"meta\">Investigation ").append(escape(document.investigationId()));
         html.append(" · ").append(escape(document.outcome()));
         if (!document.createdAt().isBlank()) {
@@ -186,8 +220,27 @@ public final class InvestigationHandoff {
         }
         html.append("</p>\n");
 
-        section(html, "Cause", document.cause());
-        section(html, "Fix", document.fix());
+        html.append("<section><h2>Where</h2>\n");
+        if (!document.feature().isBlank() || !document.scenarioName().isBlank()) {
+            html.append("<p>").append(escape(document.feature()));
+            if (!document.scenarioName().isBlank()) {
+                html.append(" Scenario \"").append(escape(document.scenarioName())).append('"');
+            }
+            html.append("</p>\n");
+        }
+        appendExecutionMap(html, document);
+        html.append("</section>\n");
+
+        String cause = document.originatingCause().isBlank() ? document.cause() : document.originatingCause();
+        section(html, "Cause", cause);
+        if (!document.failedStep().isBlank()) {
+            section(html, "Failed assertion", document.failedStep());
+        }
+        section(html, "Next", document.fix());
+        appendObjectSection(html, "Git suspects", document.gitSuspects());
+        appendObjectSection(html, "Service calls", document.serviceCalls());
+        appendObjectSection(html, "Environment", document.environmentDelta());
+        appendNarrative(html, document.narrative());
 
         html.append("<section><h2>Scenario</h2>\n<dl>\n");
         definition(html, "Name", document.scenarioName());
@@ -243,7 +296,13 @@ public final class InvestigationHandoff {
         if (pickleballDirectory == null || path == null) return false;
         Path investigations = investigationsRoot(pickleballDirectory).toAbsolutePath().normalize();
         Path resolved = path.toAbsolutePath().normalize();
-        return resolved.equals(investigations) || resolved.startsWith(investigations);
+        if (resolved.equals(investigations) || resolved.startsWith(investigations)) return true;
+        Path pickleball = pickleballDirectory.toAbsolutePath().normalize();
+        Path versions = pickleball.resolve(PickleballLocalLayout.VERSIONS_DIRECTORY);
+        if (!resolved.startsWith(versions)) return false;
+        return resolved.getFileName() != null
+                && (INVESTIGATIONS_DIRECTORY.equals(resolved.getFileName().toString())
+                || resolved.toString().replace('\\', '/').contains("/" + INVESTIGATIONS_DIRECTORY + "/"));
     }
 
     private static Path requireProjectRoot(Path projectRoot) {
@@ -398,6 +457,226 @@ public final class InvestigationHandoff {
             return text.toString();
         }
         return String.valueOf(failureSite);
+    }
+
+    private static Object jsonValue(Object value) {
+        if (value == null) return null;
+        if (!isJsonValue(value)) return String.valueOf(value);
+        return value;
+    }
+
+    private static Object executionMapOrDerived(Path root, String runId, Object provided) {
+        if (provided instanceof List<?> list && !list.isEmpty()) return jsonValue(provided);
+        if (provided != null && !(provided instanceof List<?>)) return jsonValue(provided);
+        List<Map<String, Object>> derived = deriveExecutionMap(root, runId);
+        return derived == null || derived.isEmpty() ? null : derived;
+    }
+
+    static List<Map<String, Object>> deriveExecutionMap(Path projectRoot, String runId) {
+        if (projectRoot == null || runId == null || runId.isBlank() || runId.contains("..")
+                || runId.contains("/") || runId.contains("\\")) {
+            return List.of();
+        }
+        Path scenarios = projectRoot.resolve("reports").resolve("diagnostic-runs").resolve(runId).resolve("scenarios");
+        if (!Files.isDirectory(scenarios)) return List.of();
+        List<Map<String, Object>> rows = new ArrayList<>();
+        try (var directories = Files.list(scenarios)) {
+            for (Path scenarioDir : directories.filter(Files::isDirectory).sorted().toList()) {
+                Path events = scenarioDir.resolve("events.jsonl");
+                if (!Files.isRegularFile(events)) continue;
+                for (String line : Files.readAllLines(events, StandardCharsets.UTF_8)) {
+                    if (line.isBlank()) continue;
+                    Map<String, Object> row = executionRowFromEvent(line);
+                    if (row != null) rows.add(row);
+                }
+            }
+        } catch (IOException ignored) {
+            return rows;
+        }
+        return rows;
+    }
+
+    private static Map<String, Object> executionRowFromEvent(String line) {
+        String type = jsonString(line, "type");
+        if ("nested_scenario_end".equals(type) || "log".equals(type) || "screenshot".equals(type)
+                || "failure".equals(type) || "scenario_end".equals(type)) {
+            return null;
+        }
+        Map<String, Object> row = new LinkedHashMap<>();
+        long seq = jsonLong(line, "eventSeq");
+        if (seq > 0) row.put("eventSeq", seq);
+        String path = jsonString(line, "path");
+        if (path.isBlank()) path = nestedJsonString(line, "source", "path");
+        if (!path.isBlank()) row.put("path", path);
+        long sourceLine = jsonLong(line, "line");
+        if (sourceLine <= 0) sourceLine = nestedJsonLong(line, "source", "line");
+        if (sourceLine > 0) row.put("line", sourceLine);
+        if ("nested_scenario_start".equals(type)) {
+            String name = nestedJsonString(line, "callee", "scenarioName");
+            if (name.isBlank()) name = jsonString(line, "scenarioName");
+            row.put("kind", "component");
+            row.put("text", name.isBlank() ? "nested" : name);
+            row.put("indent", 1);
+            return row;
+        }
+        String text = jsonString(line, "text");
+        if (text.isBlank()) text = jsonString(line, "stepText");
+        if (text.isBlank() && !"step".equals(type) && !type.isBlank()) return null;
+        if (text.isBlank()) return null;
+        row.put("kind", "step");
+        row.put("text", text);
+        long nesting = jsonLong(line, "nestingLevel");
+        row.put("indent", Math.max(0, nesting));
+        return row;
+    }
+
+    private static void appendExecutionMap(StringBuilder html, Document document) {
+        Object executionMap = document.executionMap();
+        if (!(executionMap instanceof List<?> items) || items.isEmpty()) return;
+        html.append("<ul class=\"tree\">\n");
+        for (Object item : items) {
+            html.append("<li>");
+            if (item instanceof Map<?, ?> map) {
+                String indent = firstText(map, "indent", "depth");
+                int depth = 0;
+                try {
+                    if (!indent.isBlank()) depth = Integer.parseInt(indent);
+                } catch (NumberFormatException ignored) {
+                }
+                html.append("&nbsp;".repeat(Math.max(0, depth) * 2));
+                String kind = firstText(map, "kind", "type");
+                String text = firstText(map, "text", "stepText", "label", "name");
+                if (!kind.isBlank()) html.append(escape(kind)).append(": ");
+                String label = text.isBlank() ? String.valueOf(item) : text;
+                String href = explorerHref(document.runId(), map);
+                if (href.isBlank()) {
+                    html.append(escape(label));
+                } else {
+                    html.append("<a href=\"").append(escape(href)).append("\">").append(escape(label)).append("</a>");
+                }
+            } else {
+                html.append(escape(String.valueOf(item)));
+            }
+            html.append("</li>\n");
+        }
+        html.append("</ul>\n");
+    }
+
+    private static String explorerHref(String runId, Map<?, ?> map) {
+        if (runId == null || runId.isBlank()) return "";
+        StringBuilder href = new StringBuilder("wb://explorer?run=").append(urlQuery(runId));
+        String seq = firstText(map, "eventSeq", "seq");
+        if (!seq.isBlank()) href.append("&seq=").append(urlQuery(seq));
+        String path = firstText(map, "path");
+        if (!path.isBlank()) href.append("&path=").append(urlQuery(path));
+        String line = firstText(map, "line");
+        if (!line.isBlank()) href.append("&line=").append(urlQuery(line));
+        String kind = firstText(map, "kind", "type");
+        if (!kind.isBlank()) href.append("&kind=").append(urlQuery(kind));
+        return href.toString();
+    }
+
+    private static String urlQuery(String value) {
+        if (value == null || value.isEmpty()) return "";
+        StringBuilder out = new StringBuilder();
+        for (int i = 0; i < value.length(); i++) {
+            char ch = value.charAt(i);
+            if ((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9')
+                    || ch == '-' || ch == '_' || ch == '.' || ch == '~' || ch == '/') {
+                out.append(ch);
+            } else if (ch == ' ') {
+                out.append("%20");
+            } else {
+                out.append('%');
+                out.append("0123456789ABCDEF".charAt((ch >> 4) & 0xF));
+                out.append("0123456789ABCDEF".charAt(ch & 0xF));
+            }
+        }
+        return out.toString();
+    }
+
+    private static String jsonString(String json, String field) {
+        if (json == null || field == null) return "";
+        String key = "\"" + field + "\"";
+        int at = indexOfField(json, key);
+        if (at < 0) return "";
+        int colon = json.indexOf(':', at + key.length());
+        if (colon < 0) return "";
+        int i = colon + 1;
+        while (i < json.length() && Character.isWhitespace(json.charAt(i))) i++;
+        if (i >= json.length() || json.charAt(i) != '"') return "";
+        i++;
+        StringBuilder text = new StringBuilder();
+        while (i < json.length()) {
+            char ch = json.charAt(i++);
+            if (ch == '\\' && i < json.length()) {
+                text.append(json.charAt(i++));
+            } else if (ch == '"') {
+                break;
+            } else {
+                text.append(ch);
+            }
+        }
+        return text.toString();
+    }
+
+    private static long jsonLong(String json, String field) {
+        if (json == null || field == null) return 0;
+        String key = "\"" + field + "\"";
+        int at = indexOfField(json, key);
+        if (at < 0) return 0;
+        int colon = json.indexOf(':', at + key.length());
+        if (colon < 0) return 0;
+        int i = colon + 1;
+        while (i < json.length() && Character.isWhitespace(json.charAt(i))) i++;
+        int start = i;
+        if (i < json.length() && json.charAt(i) == '-') i++;
+        while (i < json.length() && Character.isDigit(json.charAt(i))) i++;
+        if (start == i) return 0;
+        try {
+            return Long.parseLong(json.substring(start, i));
+        } catch (NumberFormatException ignored) {
+            return 0;
+        }
+    }
+
+    private static int indexOfField(String json, String key) {
+        int from = 0;
+        while (from < json.length()) {
+            int at = json.indexOf(key, from);
+            if (at < 0) return -1;
+            if (at == 0 || json.charAt(at - 1) != '\\') return at;
+            from = at + key.length();
+        }
+        return -1;
+    }
+
+    private static String nestedJsonString(String json, String object, String field) {
+        String value = jsonString(json, field);
+        return value;
+    }
+
+    private static long nestedJsonLong(String json, String object, String field) {
+        return jsonLong(json, field);
+    }
+
+    private static void appendObjectSection(StringBuilder html, String heading, Object value) {
+        if (value == null) return;
+        if (value instanceof String text && text.isBlank()) return;
+        if (value instanceof List<?> list && list.isEmpty()) return;
+        if (value instanceof Map<?, ?> map && map.isEmpty()) return;
+        html.append("<section><h2>").append(escape(heading)).append("</h2>\n<pre>");
+        html.append(escape(value instanceof String text ? text : encodePretty(value)));
+        html.append("</pre>\n</section>\n");
+    }
+
+    private static void appendNarrative(StringBuilder html, Object narrative) {
+        if (!(narrative instanceof List<?> items) || items.isEmpty()) return;
+        html.append("<section><h2>Narrative</h2>\n");
+        for (Object item : items) {
+            html.append("<p>").append(escape(String.valueOf(item))).append("</p>\n");
+        }
+        html.append("</section>\n");
     }
 
     private static String firstText(Map<?, ?> map, String... keys) {

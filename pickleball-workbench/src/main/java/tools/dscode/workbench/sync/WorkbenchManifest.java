@@ -2,6 +2,7 @@ package tools.dscode.workbench.sync;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.dscode.control.protocol.PickleballLocalLayout;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -124,7 +125,7 @@ public record WorkbenchManifest(
     }
 
     public static Path workbenchRoot(Path projectRoot) {
-        return projectRoot.toAbsolutePath().normalize().resolve(".pickleball").resolve("workbench");
+        return PickleballLocalLayout.workbenchStateRoot(projectRoot);
     }
 
     public record OutputRoot(String kind, String path) { }

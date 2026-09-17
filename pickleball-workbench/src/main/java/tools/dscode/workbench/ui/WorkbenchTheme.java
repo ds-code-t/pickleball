@@ -5,12 +5,14 @@ import javax.swing.JButton;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
+import javax.swing.JScrollPane;
 import javax.swing.JSplitPane;
 import javax.swing.UIManager;
 import javax.swing.border.Border;
 import javax.swing.border.EmptyBorder;
 import javax.swing.plaf.ColorUIResource;
 import javax.swing.plaf.FontUIResource;
+import javax.swing.text.JTextComponent;
 import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Font;
@@ -28,33 +30,56 @@ final class WorkbenchTheme {
     static final Color ACCENT_SOFT = new Color(0xDB, 0xEA, 0xFE);
     static final Color PLAYHEAD = new Color(0xFE, 0xF3, 0xC7);
     static final Color DANGER = new Color(0xB9, 0x1C, 0x1C);
+    static final Color SUCCESS = new Color(0x04, 0x78, 0x57);
+    static final Color WARNING = new Color(0xB4, 0x53, 0x09);
 
     private WorkbenchTheme() {
     }
 
     static void install() {
+        Font base = new Font("SansSerif", Font.PLAIN, 13);
+        Font bold = base.deriveFont(Font.BOLD, 12f);
         UIManager.put("Panel.background", new ColorUIResource(BACKGROUND));
         UIManager.put("OptionPane.background", new ColorUIResource(BACKGROUND));
+        UIManager.put("OptionPane.messageForeground", new ColorUIResource(TEXT));
         UIManager.put("Label.foreground", new ColorUIResource(TEXT));
+        UIManager.put("Label.font", new FontUIResource(base));
         UIManager.put("Button.background", new ColorUIResource(SURFACE));
         UIManager.put("Button.foreground", new ColorUIResource(TEXT));
         UIManager.put("Button.focus", new ColorUIResource(ACCENT_SOFT));
+        UIManager.put("Button.font", new FontUIResource(base));
         UIManager.put("ToggleButton.background", new ColorUIResource(SURFACE));
+        UIManager.put("ToggleButton.foreground", new ColorUIResource(TEXT));
+        UIManager.put("ToggleButton.font", new FontUIResource(base));
+        UIManager.put("ToggleButton.select", new ColorUIResource(ACCENT_SOFT));
         UIManager.put("TextField.background", new ColorUIResource(SURFACE));
+        UIManager.put("TextField.foreground", new ColorUIResource(TEXT));
+        UIManager.put("TextField.caretForeground", new ColorUIResource(ACCENT));
+        UIManager.put("TextField.selectionBackground", new ColorUIResource(ACCENT_SOFT));
+        UIManager.put("TextField.font", new FontUIResource(base));
         UIManager.put("TextArea.background", new ColorUIResource(SURFACE));
+        UIManager.put("TextArea.foreground", new ColorUIResource(TEXT));
+        UIManager.put("TextArea.caretForeground", new ColorUIResource(ACCENT));
+        UIManager.put("TextArea.selectionBackground", new ColorUIResource(ACCENT_SOFT));
         UIManager.put("ComboBox.background", new ColorUIResource(SURFACE));
+        UIManager.put("ComboBox.foreground", new ColorUIResource(TEXT));
+        UIManager.put("ComboBox.font", new FontUIResource(base));
         UIManager.put("List.background", new ColorUIResource(SURFACE));
+        UIManager.put("List.foreground", new ColorUIResource(TEXT));
+        UIManager.put("List.selectionBackground", new ColorUIResource(ACCENT_SOFT));
+        UIManager.put("List.selectionForeground", new ColorUIResource(TEXT));
         UIManager.put("TabbedPane.background", new ColorUIResource(BACKGROUND));
         UIManager.put("TabbedPane.contentAreaColor", new ColorUIResource(SURFACE));
+        UIManager.put("TabbedPane.selected", new ColorUIResource(SURFACE));
+        UIManager.put("TabbedPane.font", new FontUIResource(bold));
         UIManager.put("SplitPane.background", new ColorUIResource(BACKGROUND));
         UIManager.put("MenuBar.background", new ColorUIResource(SURFACE));
-        Font base = new Font("SansSerif", Font.PLAIN, 13);
-        UIManager.put("Label.font", new FontUIResource(base));
-        UIManager.put("Button.font", new FontUIResource(base));
-        UIManager.put("ToggleButton.font", new FontUIResource(base));
-        UIManager.put("TextField.font", new FontUIResource(base));
-        UIManager.put("ComboBox.font", new FontUIResource(base));
-        UIManager.put("TabbedPane.font", new FontUIResource(base.deriveFont(Font.BOLD, 12f)));
+        UIManager.put("Menu.font", new FontUIResource(base));
+        UIManager.put("MenuItem.font", new FontUIResource(base));
+        UIManager.put("ToolTip.background", new ColorUIResource(SURFACE));
+        UIManager.put("ToolTip.foreground", new ColorUIResource(TEXT));
+        UIManager.put("ScrollPane.background", new ColorUIResource(SURFACE));
+        UIManager.put("Viewport.background", new ColorUIResource(SURFACE));
     }
 
     static Border cardBorder() {
@@ -62,6 +87,10 @@ final class WorkbenchTheme {
                 BorderFactory.createLineBorder(BORDER),
                 new EmptyBorder(10, 12, 10, 12)
         );
+    }
+
+    static Border hairline() {
+        return BorderFactory.createLineBorder(BORDER);
     }
 
     static JPanel card(String title) {
@@ -126,6 +155,20 @@ final class WorkbenchTheme {
         component.setBackground(SURFACE);
         component.setForeground(TEXT);
         component.setOpaque(true);
+    }
+
+    static void styleEditor(JTextComponent editor) {
+        editor.setBackground(SURFACE);
+        editor.setForeground(TEXT);
+        editor.setCaretColor(ACCENT);
+        editor.setSelectionColor(ACCENT_SOFT);
+        editor.setSelectedTextColor(TEXT);
+        editor.setBorder(new EmptyBorder(8, 10, 8, 10));
+    }
+
+    static void styleScroll(JScrollPane scroll) {
+        scroll.setBorder(hairline());
+        scroll.getViewport().setBackground(SURFACE);
     }
 
     static Dimension compact(int width, int height) {

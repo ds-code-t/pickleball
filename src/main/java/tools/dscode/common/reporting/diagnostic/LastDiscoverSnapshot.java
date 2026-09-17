@@ -2,7 +2,7 @@ package tools.dscode.common.reporting.diagnostic;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
-import tools.dscode.control.protocol.ControlProtocol;
+import tools.dscode.control.protocol.PickleballLocalLayout;
 import tools.dscode.testengine.PKB_props;
 
 import java.io.IOException;
@@ -13,7 +13,10 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-/** Reads and writes the last Workbench Discover snapshot for isolate/confirm replay. */
+/** Reads and writes the last Workbench Discover snapshot for isolate/confirm replay.
+ * Ordinary Discover snapshots replay as {@code pkb_runvars}. A snapshot marked sealed
+ * is for the next worker launch as {@code pkb_overriderunvars}, never {@code pkb_run_profile}.
+ */
 public final class LastDiscoverSnapshot {
     private static final ObjectMapper JSON = new ObjectMapper().enable(SerializationFeature.INDENT_OUTPUT);
     public static final String SOURCE = "workbench-discover";
@@ -28,7 +31,8 @@ public final class LastDiscoverSnapshot {
             String catalogPath,
             String runProfile,
             Map<String, String> runVars,
-            String createdAt
+            String createdAt,
+            boolean sealed
     ) {
         public Snapshot {
             runVars = runVars == null ? Map.of() : Map.copyOf(runVars);
@@ -40,7 +44,7 @@ public final class LastDiscoverSnapshot {
     }
 
     public static Path file(Path projectRoot) {
-        return projectRoot.toAbsolutePath().normalize().resolve(ControlProtocol.LAST_DISCOVER_SNAPSHOT_RELATIVE);
+        return PickleballLocalLayout.lastDiscoverSnapshot(projectRoot);
     }
 
     public static Snapshot read(Path projectRoot) {
@@ -90,7 +94,34 @@ public final class LastDiscoverSnapshot {
                 catalogPath == null ? "" : catalogPath.toString(),
                 runProfile == null ? "" : runProfile,
                 runVars,
-                Instant.now().toString()
+                Instant.now().toString(),
+                false
+        );
+        Path file = file(projectRoot);
+        if (file.getParent() != null) Files.createDirectories(file.getParent());
+        JSON.writeValue(file.toFile(), snapshotToMap(snapshot));
+        return snapshot;
+    }
+
+    public static Snapshot writeSealed(Path projectRoot, Map<String, String> runVars) throws IOException {
+        LinkedHashMap<String, String> copy = new LinkedHashMap<>();
+        if (runVars != null) {
+            runVars.forEach((key, value) -> {
+                if (key == null || key.isBlank()) return;
+                if (PKB_props.PKB_RUN_PROFILE.equals(key) || PKB_props.isRunProfileMemberKey(key)) return;
+                copy.put(key, value == null ? "" : value);
+            });
+        }
+        String runProfile = PKB_props.serializeRunVars(copy);
+        Snapshot snapshot = new Snapshot(
+                1,
+                SOURCE,
+                "",
+                "",
+                runProfile,
+                copy,
+                Instant.now().toString(),
+                true
         );
         Path file = file(projectRoot);
         if (file.getParent() != null) Files.createDirectories(file.getParent());
@@ -165,7 +196,8 @@ public final class LastDiscoverSnapshot {
                 text(raw.get("catalogPath")),
                 text(raw.get("runProfile")),
                 runVars,
-                text(raw.get("createdAt"))
+                text(raw.get("createdAt")),
+                booleanValue(raw.get("sealed"))
         );
     }
 
@@ -178,11 +210,18 @@ public final class LastDiscoverSnapshot {
         body.put("runProfile", snapshot.runProfile());
         body.put("runVars", snapshot.runVars());
         body.put("createdAt", snapshot.createdAt());
+        body.put("sealed", snapshot.sealed());
         return body;
     }
 
     private static String text(Object value) {
         return value == null ? "" : String.valueOf(value);
+    }
+
+    private static boolean booleanValue(Object value) {
+        if (value instanceof Boolean flag) return flag;
+        if (value == null) return false;
+        return "true".equalsIgnoreCase(String.valueOf(value).trim());
     }
 
     private static boolean isBlank(String value) {

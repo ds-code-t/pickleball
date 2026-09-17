@@ -2,7 +2,7 @@ package tools.dscode.workbench.discover;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import tools.dscode.control.protocol.ControlProtocol;
+import tools.dscode.control.protocol.PickleballLocalLayout;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -12,8 +12,9 @@ import java.util.Map;
 import java.util.TreeMap;
 
 /**
- * Reads the last Workbench Discover snapshot and replays it as compact
- * {@code pkb_runvars} for isolate/worker start.
+ * Reads the last Workbench Discover snapshot and replays it for isolate/worker start.
+ * Ordinary snapshots become compact {@code pkb_runvars}. Snapshots marked sealed become
+ * compact {@code pkb_overriderunvars}. Never {@code pkb_run_profile}.
  */
 public final class LastDiscoverSnapshot {
     private static final ObjectMapper JSON = new ObjectMapper();
@@ -24,7 +25,7 @@ public final class LastDiscoverSnapshot {
     private LastDiscoverSnapshot() {
     }
 
-    public record Snapshot(String runId, String runProfile, Map<String, String> runVars) {
+    public record Snapshot(String runId, String runProfile, Map<String, String> runVars, boolean sealed) {
         public Snapshot {
             runVars = runVars == null ? Map.of() : Map.copyOf(runVars);
         }
@@ -36,7 +37,7 @@ public final class LastDiscoverSnapshot {
     }
 
     public static Path file(Path projectRoot) {
-        return projectRoot.toAbsolutePath().normalize().resolve(ControlProtocol.LAST_DISCOVER_SNAPSHOT_RELATIVE);
+        return PickleballLocalLayout.lastDiscoverSnapshot(projectRoot);
     }
 
     public static Snapshot read(Path projectRoot) {
@@ -54,7 +55,8 @@ public final class LastDiscoverSnapshot {
             return new Snapshot(
                     text(root, "runId"),
                     text(root, "runProfile"),
-                    runVars
+                    runVars,
+                    root.path("sealed").asBoolean(false)
             );
         } catch (IOException failure) {
             throw new IllegalStateException("Could not read Discover snapshot: " + file, failure);
@@ -70,12 +72,19 @@ public final class LastDiscoverSnapshot {
     }
 
     public static Map<String, String> workerSystemProperties(Path projectRoot, String tags, String name) {
-        return Map.of("pkb_runvars", replay(require(projectRoot), true, tags, name));
+        Snapshot snapshot = require(projectRoot);
+        if (snapshot.sealed()) {
+            return Map.of("pkb_overriderunvars", replay(snapshot, true, tags, name));
+        }
+        return Map.of("pkb_runvars", replay(snapshot, true, tags, name));
     }
 
     public static Map<String, String> workerSystemPropertiesIfPresent(Path projectRoot) {
         Snapshot snapshot = read(projectRoot);
         if (snapshot == null || !snapshot.present()) return Map.of();
+        if (snapshot.sealed()) {
+            return Map.of("pkb_overriderunvars", replay(snapshot, true, null, null));
+        }
         return Map.of("pkb_runvars", replay(snapshot, true, null, null));
     }
 
@@ -92,7 +101,37 @@ public final class LastDiscoverSnapshot {
         return serializeCompact(values);
     }
 
-    static Map<String, String> parseCompact(String compact) {
+    public static Snapshot writeSealed(Path projectRoot, Map<String, String> runVars) {
+        LinkedHashMap<String, String> copy = new LinkedHashMap<>();
+        if (runVars != null) {
+            runVars.forEach((key, value) -> {
+                if (key == null || key.isBlank()) return;
+                if ("pkb_run_profile".equals(key)) return;
+                copy.put(key, value == null ? "" : value);
+            });
+        }
+        String runProfile = serializeCompact(copy);
+        Snapshot snapshot = new Snapshot("", runProfile, copy, true);
+        Path file = file(projectRoot);
+        try {
+            if (file.getParent() != null) Files.createDirectories(file.getParent());
+            Map<String, Object> body = new LinkedHashMap<>();
+            body.put("schemaVersion", 1);
+            body.put("source", "workbench-sealed");
+            body.put("runId", "");
+            body.put("catalogPath", "");
+            body.put("runProfile", runProfile);
+            body.put("runVars", copy);
+            body.put("createdAt", java.time.Instant.now().toString());
+            body.put("sealed", true);
+            JSON.writerWithDefaultPrettyPrinter().writeValue(file.toFile(), body);
+        } catch (IOException failure) {
+            throw new IllegalStateException("Could not write sealed Discover snapshot: " + file, failure);
+        }
+        return snapshot;
+    }
+
+    public static Map<String, String> parseCompact(String compact) {
         LinkedHashMap<String, String> values = new LinkedHashMap<>();
         if (compact == null || compact.isBlank()) return values;
         for (String assignment : compact.split(",(?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)", -1)) {

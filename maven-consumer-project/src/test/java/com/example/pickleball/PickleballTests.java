@@ -45,9 +45,6 @@ public final class PickleballTests extends PickleballRunner {
     private static void registerProjectElementVocabulary() {
         ExecutionDictionary dictionary = getExecutionDictionary();
 
-        dictionary.category("Radio Button")
-                .addBase("//input[@type='radio']");
-
         dictionary.category("Close Button")
                 .addBase("//*[self::button and @aria-label='Close']");
 

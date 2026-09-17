@@ -72,4 +72,6 @@ mvn test "-Dpkb_tags=@browser and not @dialogs"
 
 The consumer project's [feature files](../maven-consumer-project/src/test/resources/features) demonstrate normal tags, backgrounds, scenarios, outlines, examples, tables, and Pickleball steps in one suite.
 
+Cucumber CLI `--tags` / `--name` / `--glue` projection can overlay ordinary and named-profile runs. Direct `pkb_runvars` and sealed `pkb_overriderunvars` skip that projection so the controlled or sealed RunVar set is not mutated. Supply tag/name/glue inside the compact or expanded control instead.
+
 [Documentation home](README.md) · [Next: Dynamic Steps](dynamic-steps.md)

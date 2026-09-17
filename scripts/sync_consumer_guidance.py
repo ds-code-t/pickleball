@@ -37,7 +37,13 @@ MAX_REFERENCE_TOTAL_BYTES = 10 * 1024 * 1024
 
 
 def is_maintainer_local(path: Path) -> bool:
-    return "_local2" in path.stem
+    if "_local2" in path.stem:
+        return True
+    try:
+        relative = path.relative_to(CONSUMER_ROOT)
+    except ValueError:
+        return False
+    return any(part.startswith("_local") for part in relative.parts)
 
 
 def consumer_reference_sources() -> list[Path]:
@@ -117,10 +123,16 @@ def current_files() -> dict[str, bytes]:
     }
 
 
+def normalize_newlines(data: bytes) -> bytes:
+    return data.replace(b"\r\n", b"\n").replace(b"\r", b"\n")
+
+
 def check() -> int:
     expected = expected_files()
     current = current_files()
-    if current == expected:
+    if {path: normalize_newlines(body) for path, body in current.items()} == {
+        path: normalize_newlines(body) for path, body in expected.items()
+    }:
         print("Packaged consumer guidance is current.")
         return 0
 
@@ -128,7 +140,7 @@ def check() -> int:
     extra = sorted(set(current) - set(expected))
     changed = sorted(
         path for path in set(expected) & set(current)
-        if expected[path] != current[path]
+        if normalize_newlines(expected[path]) != normalize_newlines(current[path])
     )
 
     if missing:

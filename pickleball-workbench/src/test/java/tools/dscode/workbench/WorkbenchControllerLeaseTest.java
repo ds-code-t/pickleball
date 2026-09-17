@@ -9,6 +9,8 @@ import tools.dscode.workbench.player.WorkbenchSaveResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -41,6 +43,22 @@ class WorkbenchControllerLeaseTest {
             });
             assertTrue(controller.playerState().documentText().contains("Given stay"));
             assertEquals("Copilot", controller.controlLeaseSnapshot().agentDisplayName());
+        }
+    }
+
+    @Test
+    void goWithoutLeaseDoesNotMoveUi() {
+        AtomicBoolean moved = new AtomicBoolean(false);
+        try (WorkbenchController controller = new WorkbenchController(project)) {
+            controller.setUiGoHandler(link -> moved.set(true));
+            @SuppressWarnings("unchecked")
+            Map<String, Object> echoed = (Map<String, Object>) controller.go(Map.of(
+                    "to", "editor",
+                    "path", "features/missing.feature",
+                    "label", "Open missing"
+            ));
+            assertEquals(Boolean.FALSE, echoed.get("movedUi"));
+            assertFalse(moved.get());
         }
     }
 

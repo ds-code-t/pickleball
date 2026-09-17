@@ -6,6 +6,7 @@ import java.util.function.Consumer;
 public final class DiagnosticExplorerHost {
     private Consumer<String> onSelectRun;
     private Consumer<String> onFocusLayer;
+    private Consumer<String> onGo;
     private Runnable onReady;
 
     public void onSelectRun(Consumer<String> onSelectRun) {
@@ -18,6 +19,16 @@ public final class DiagnosticExplorerHost {
 
     public void onReady(Runnable onReady) {
         this.onReady = onReady;
+    }
+
+    public void onGo(Consumer<String> onGo) {
+        this.onGo = onGo;
+    }
+
+    public void go(String link) {
+        WebViewPanel.onSwing(() -> {
+            if (onGo != null) onGo.accept(link);
+        });
     }
 
     public void selectRun(String runId) {

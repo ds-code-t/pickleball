@@ -4,7 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.Headers;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
-import tools.dscode.control.protocol.ControlProtocol;
+import tools.dscode.control.protocol.PickleballLocalLayout;
 import tools.dscode.workbench.WorkbenchServices;
 
 import java.io.IOException;
@@ -145,11 +145,11 @@ public final class WorkbenchAttachServer implements AutoCloseable {
     }
 
     public static Path attachStateFile(Path projectRoot) {
-        return projectRoot.resolve(".pickleball").resolve("workbench").resolve("attach.json");
+        return PickleballLocalLayout.attachFile(projectRoot);
     }
 
     public static Path cliSessionStateFile(Path projectRoot) {
-        return projectRoot.toAbsolutePath().normalize().resolve(ControlProtocol.CLI_SESSION_STATE_RELATIVE);
+        return PickleballLocalLayout.cliSessionState(projectRoot);
     }
 
     public String url() {

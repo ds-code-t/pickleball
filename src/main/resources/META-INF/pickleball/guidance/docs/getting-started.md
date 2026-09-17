@@ -85,7 +85,7 @@ mvn test
 
 ## Launch the matching Workbench
 
-The Pickleball dependency carries its version-matched, controller-only Workbench as an opaque nested executable. Launch it from the consumer test classpath; do not add or version a second Workbench dependency:
+The Pickleball dependency carries its version-matched, controller-only Workbench as an opaque nested thin JAR. Launch it from the consumer test classpath, or `java -jar` the published Pickleball artifact; do not add or version a second Workbench dependency:
 
 ```bash
 mvn -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java \
@@ -94,7 +94,11 @@ mvn -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java \
   "-Dexec.args=ui ."
 ```
 
-The launcher extracts verified bytes beneath `.pickleball/workbench/controller/<sha256>/` and starts a separate controller JVM. Workbench then synchronizes the project and starts a second, consumer-owned worker JVM from the resolved test runtime. Core, Cucumber, Selenium, service behavior, mappings, and steps execute only in that worker. See [Pickleball Workbench](pickleball-workbench.md).
+```bash
+java -jar ~/.m2/repository/tools/dscode/pickleball/<version>/pickleball-<version>.jar ui .
+```
+
+After `export-guidance`, `.pickleball/open/pickleball-workbench.sh` (`.cmd` / `.ps1` on Windows) is a relocatable opener: copy it anywhere, it walks up for the project and resolves a pickleball jar. The launcher extracts verified bytes beneath `.pickleball/v/<version>/workbench/controller/<sha256>/` when `current.json` is complete (legacy `.pickleball/workbench/` otherwise), resolves controller libraries into the matching `lib/<version>/`, and starts a separate controller JVM with `java -cp`. Workbench then synchronizes the project and starts a second, consumer-owned worker JVM from the resolved test runtime. Core, Cucumber, Selenium, service behavior, mappings, and steps execute only in that worker. See [Pickleball Workbench](pickleball-workbench.md).
 
 Filter normally with RunVars such as:
 
@@ -160,6 +164,8 @@ PKB_props.runVars(Map.of(
 ```
 
 `PKB_props.runProfile()` is the read-only getter for the final canonical serialized RunVars. There are no direct `runProfile(String/Map)` input setters; external `pkb_run_profile` input is rejected. Use `pkb_runvars`.
+
+To freeze a complete already-resolved map for one run, use optional sealed `pkb_overriderunvars`. When it is absent or blank, resolution is unchanged. When it is present, that run ignores files, defaults, JVM `-D pkb_*` RunVars, profiles, `pkb_runvars`, inheritance, and templates for the Pickleball RunVar set (Maven/JVM/env still exist as the process). The six context keys must be present (blank tombstones allowed). Do not mix sealed input with `pkb_runvars` or a composing `pkb_profile`. Preview with `PKB_props.resolveRunVars` / `DiagnosticCli resolve-runvars` without starting tests, then launch `-Dpkb_overriderunvars=<compact complete map>` and compare `runProfileFingerprint`.
 
 See [Execution Configuration](configuration.md) and [AI Run Configuration](ai-run-configuration.md).
 

@@ -303,6 +303,22 @@ public final class LiveScenarioPlayer {
     }
 
     /**
+     * Advances a play-plan step without walking into later scenarios in the
+     * same feature file. {@code moreRemain} false stays in play at end.
+     */
+    public void finishPlanStep(long sourceLineId, boolean moreRemain, Long nextSourceId) {
+        lastExecutedId = sourceLineId;
+        if (moreRemain && nextSourceId != null && present(nextSourceId)) {
+            executionIndex = requireLineIndex(nextSourceId);
+            playheadId = nextSourceId;
+        } else if (!moreRemain && state == State.RUNNING) {
+            state = State.WAITING_FOR_STEP;
+            executionIndex = lines.size();
+            playheadId = sourceLineId;
+        }
+    }
+
+    /**
      * Leaves a failed run paused on its failed line. Already-consumed or stale
      * ids are ignored.
      */
@@ -447,9 +463,13 @@ public final class LiveScenarioPlayer {
         if (trimmed.isBlank()) return LineType.BLANK;
         if (trimmed.startsWith("#")) return LineType.COMMENT;
         if (startsWithAny(trimmed,
-                "Feature:", "Rule:", "Background:", "Scenario:", "Scenario Outline:", "Examples:")) {
+                "Feature:", "Rule:", "Background:", "Scenario:", "Scenario Outline:",
+                "Scenario Template:", "Examples:", "Example:")) {
             return LineType.STRUCTURE;
         }
+        if (trimmed.startsWith("@")) return LineType.STRUCTURE;
+        if (trimmed.startsWith("|")) return LineType.TEXT;
+        if (trimmed.startsWith("\"\"\"") || trimmed.startsWith("```")) return LineType.TEXT;
         if (startsWithAny(trimmed, "Given ", "When ", "Then ", "And ", "But ", "* ")) {
             return LineType.STEP;
         }

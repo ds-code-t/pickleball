@@ -216,7 +216,7 @@ public final class WorkbenchApplication {
                 requireInteractiveWorker(started, "isolate");
                 out.println("Workbench isolate worker: pid=" + started.pid()
                         + " scenario=" + started.scenarioId());
-                out.println("Replayed pkb_runvars=" + workerProperties.get("pkb_runvars"));
+                printReplayedRunVars(out, workerProperties);
                 out.println("Isolate stays one paused scenario. Do not start the GUI.");
                 if (once) {
                     requireCleanStop(live.stop());
@@ -276,7 +276,7 @@ public final class WorkbenchApplication {
             out.println("Workbench CLI session: pid=" + ProcessHandle.current().pid()
                     + " url=" + server.url());
             out.println("State: " + server.stateFile());
-            out.println("Replayed pkb_runvars=" + workerProperties.get("pkb_runvars"));
+            printReplayedRunVars(out, workerProperties);
             try {
                 done.await();
             } catch (InterruptedException interrupted) {
@@ -292,6 +292,14 @@ public final class WorkbenchApplication {
             if (server != null) server.close();
             if (controller != null) controller.close();
         }
+    }
+
+    private static void printReplayedRunVars(PrintStream out, Map<String, String> workerProperties) {
+        if (workerProperties != null && workerProperties.containsKey("pkb_overriderunvars")) {
+            out.println("Replayed pkb_overriderunvars=" + workerProperties.get("pkb_overriderunvars"));
+            return;
+        }
+        out.println("Replayed pkb_runvars=" + (workerProperties == null ? null : workerProperties.get("pkb_runvars")));
     }
 
     static boolean stdinIsInteractiveTty() {
@@ -590,24 +598,24 @@ public final class WorkbenchApplication {
         out.println("Pickleball Workbench");
         out.println();
         out.println("Usage:");
-        out.println("  java -jar pickleball-workbench-<version>.jar sync <project>");
-        out.println("  java -jar pickleball-workbench-<version>.jar status <project>");
-        out.println("  java -jar pickleball-workbench-<version>.jar worker-check <project>");
-        out.println("  java -jar pickleball-workbench-<version>.jar live-check <project>");
-        out.println("  java -jar pickleball-workbench-<version>.jar isolate <project> [--tags <expr>] [--name <expr>]");
-        out.println("  java -jar pickleball-workbench-<version>.jar session <project> [--tags <expr>] [--name <expr>]");
-        out.println("  java -jar pickleball-workbench-<version>.jar mcp <project>");
-        out.println("  java -jar pickleball-workbench-<version>.jar ui <project>");
-        out.println("  java -jar pickleball-workbench-<version>.jar --version");
+        out.println("  java -cp <thin-jar>:<resolved-libs> tools.dscode.workbench.WorkbenchApplication sync <project>");
+        out.println("  java -cp <thin-jar>:<resolved-libs> tools.dscode.workbench.WorkbenchApplication status <project>");
+        out.println("  java -cp <thin-jar>:<resolved-libs> tools.dscode.workbench.WorkbenchApplication worker-check <project>");
+        out.println("  java -cp <thin-jar>:<resolved-libs> tools.dscode.workbench.WorkbenchApplication live-check <project>");
+        out.println("  java -cp <thin-jar>:<resolved-libs> tools.dscode.workbench.WorkbenchApplication isolate <project> [--tags <expr>] [--name <expr>]");
+        out.println("  java -cp <thin-jar>:<resolved-libs> tools.dscode.workbench.WorkbenchApplication session <project> [--tags <expr>] [--name <expr>]");
+        out.println("  java -cp <thin-jar>:<resolved-libs> tools.dscode.workbench.WorkbenchApplication mcp <project>");
+        out.println("  java -cp <thin-jar>:<resolved-libs> tools.dscode.workbench.WorkbenchApplication ui <project>");
+        out.println("  java -cp <thin-jar>:<resolved-libs> tools.dscode.workbench.WorkbenchApplication --version");
         out.println();
         out.println("Agent-facing Discover/hint/export-guidance/confirm run through PickleballWorkbenchLauncher.");
-        out.println("sync uses the selected project wrapper and materializes .pickleball/workbench.");
+        out.println("sync uses the selected project wrapper and materializes versioned .pickleball/v/<version>/workbench state (legacy .pickleball/workbench when current.json is absent).");
         out.println("worker-check starts, restarts, and gracefully stops direct consumer workers without rebuilding.");
         out.println("live-check exercises raw Gherkin, Step Override, and live runtime operations on one persistent worker.");
         out.println("isolate holds a paused worker from the last Discover snapshot when stdin is an interactive TTY, or when pickleball.workbench.isolate.once is set.");
-        out.println("session is the headless long-lived CLI controller: sync, start the Discover-snapshot worker, and serve 127.0.0.1 HTTP plus a serial execute-step queue. State is .pickleball/workbench/cli-session.json.");
+        out.println("session is the headless long-lived CLI controller: sync, start the Discover-snapshot worker, and serve 127.0.0.1 HTTP plus a serial execute-step queue. State is .pickleball/v/<version>/workbench/cli-session.json when current.json is complete.");
         out.println("Consumer agents start session through PickleballWorkbenchLauncher isolate/session-start (detached). Do not start ui for agents.");
         out.println("mcp serves the same Workbench services over protocol-only stdio; optional host wiring, not an agent setup step.");
-        out.println("ui opens the thin Swing Workbench over the same controller services and writes a localhost agent-attach endpoint to .pickleball/workbench/attach.json.");
+        out.println("ui opens the thin Swing Workbench over the same controller services and writes a localhost agent-attach endpoint to .pickleball/workbench/attach.json (versioned under v/<version>/ when current.json is complete).");
     }
 }

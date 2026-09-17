@@ -55,6 +55,7 @@ class ControlBridgeClientTest {
         assertTrue(client.breakpoints().isEmpty());
         assertTrue(descriptor.capabilities().contains("step_overrides"));
         assertTrue(descriptor.capabilities().contains("step_override_compile"));
+        assertTrue(descriptor.capabilities().contains("resolve_step"));
 
         String missingScenario = UUID.randomUUID().toString();
         assertEquals("UNAVAILABLE", client.pause(missingScenario, 1, 30).status());
@@ -62,6 +63,10 @@ class ControlBridgeClientTest {
         assertEquals(
                 "UNAVAILABLE",
                 client.executeStep(missingScenario, "CONTROL API TEST STEP", "", 1).status()
+        );
+        assertEquals(
+                "UNMATCHED",
+                client.resolveStep(missingScenario, "CONTROL API TEST STEP", "", 1).kind()
         );
         assertEquals(
                 "UNAVAILABLE",
@@ -234,6 +239,9 @@ class ControlBridgeClientTest {
                 int removed = breakpoints.size();
                 breakpoints.clear();
                 response = new ControlBridgeResponses.ClearResult(removed);
+            } else if ("/v1/steps/resolve".equals(path)) {
+                read(exchange, ControlBridgeRequests.ResolveStepRequest.class);
+                response = ControlBridgeStepResolution.unmatched("No active scenario.");
             } else if ("/v1/step-overrides".equals(path)) {
                 response = List.of();
             } else if ("/v1/step-overrides/compile".equals(path)) {

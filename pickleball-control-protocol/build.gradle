@@ -5,12 +5,26 @@ plugins {
 group = rootProject.group
 version = rootProject.version
 
+repositories {
+    mavenCentral()
+}
+
 java {
     toolchain { languageVersion = JavaLanguageVersion.of(21) }
 }
 
+dependencies {
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.13.4'
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.13.4'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher:1.13.4'
+}
+
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
 }
 
 // The protocol is deliberately JDK-only. It is bundled into both the normal

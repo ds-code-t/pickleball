@@ -43,7 +43,7 @@ class LiveFeatureSaveTest {
     }
 
     @Test
-    void writeSplicesOnlyTheOriginatingScenario() throws Exception {
+    void writeReplacesTheWholeFeatureFileFromTheEditorBuffer() throws Exception {
         Path feature = project.resolve("login.feature");
         Files.writeString(feature, """
                 Feature: Sign in
@@ -52,26 +52,17 @@ class LiveFeatureSaveTest {
                   Scenario: Locked account
                     Given a lock
                 """);
-        LivePlaybackCoordinator playback = new LivePlaybackCoordinator(new LiveScenarioPlayer(List.of(
+        List<String> buffer = List.of(
                 "Feature: Sign in",
                 "",
-                "Scenario: Locked account",
-                "  Given a lock",
-                "  And stay locked"
-        )));
-        playback.loadScenario(
-                List.of(
-                        "Feature: Sign in",
-                        "",
-                        "Scenario: Locked account",
-                        "  Given a lock",
-                        "  And stay locked"
-                ),
-                feature,
-                "Locked account",
-                4,
-                5
+                "  Scenario: Valid password",
+                "    Given a user",
+                "  Scenario: Locked account",
+                "    Given a lock",
+                "    And stay locked"
         );
+        LivePlaybackCoordinator playback = new LivePlaybackCoordinator(new LiveScenarioPlayer(buffer));
+        playback.loadScenario(buffer, feature, "Locked account", 5, 7);
 
         WorkbenchSaveResult result = LiveFeatureSave.write(playback);
         assertTrue(result.written());

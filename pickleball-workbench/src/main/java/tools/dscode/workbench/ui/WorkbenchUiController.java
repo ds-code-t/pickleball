@@ -20,7 +20,9 @@ import tools.dscode.control.protocol.ControlBridgeStepOverrideResult;
 import tools.dscode.control.protocol.ControlBridgeValue;
 import tools.dscode.control.protocol.ControlBridgeValueResult;
 import tools.dscode.control.protocol.ControlProtocol;
+import tools.dscode.workbench.WorkbenchController;
 import tools.dscode.workbench.WorkbenchServices;
+import tools.dscode.workbench.nav.WorkbenchGoLink;
 import tools.dscode.workbench.lease.WorkbenchControlLeaseSnapshot;
 import tools.dscode.workbench.mapping.MappingValueCodec;
 import tools.dscode.workbench.player.LivePlaybackCoordinator;
@@ -38,6 +40,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Consumer;
 
 /** Thin presentation adapter over the shared Workbench service surface. */
 final class WorkbenchUiController implements AutoCloseable {
@@ -283,6 +286,14 @@ final class WorkbenchUiController implements AutoCloseable {
         return services.commitSave();
     }
 
+    void loadDefaultDemo() {
+        services.loadDefaultDemo();
+    }
+
+    tools.dscode.control.protocol.ControlBridgeStepResolution resolveStep(String text, String argument) {
+        return services.resolveStep(text, argument == null ? "" : argument);
+    }
+
     void loadPickerScenario(
             java.util.List<String> lines,
             Path originFile,
@@ -291,6 +302,20 @@ final class WorkbenchUiController implements AutoCloseable {
             int endLine
     ) {
         services.loadPickerScenario(lines, originFile, scenarioName, startLine, endLine);
+    }
+
+    void loadPickerScenario(
+            java.util.List<String> lines,
+            Path originFile,
+            String scenarioName,
+            int startLine,
+            int endLine,
+            int exampleRow,
+            String exampleLabel
+    ) {
+        services.loadPickerScenario(
+                lines, originFile, scenarioName, startLine, endLine, exampleRow, exampleLabel
+        );
     }
 
     void addLeaseListener(java.util.function.Consumer<WorkbenchControlLeaseSnapshot> listener) {
@@ -303,6 +328,16 @@ final class WorkbenchUiController implements AutoCloseable {
 
     Optional<WorkerLogFiles> workerLogFiles() {
         return services.workerLogFiles();
+    }
+
+    void setUiGoHandler(Consumer<WorkbenchGoLink> handler) {
+        if (services instanceof WorkbenchController controller) {
+            controller.setUiGoHandler(handler);
+        }
+    }
+
+    Object go(Map<String, ?> link) {
+        return services.go(link);
     }
 
     LiveActionResult mappingResolve(String input) {
@@ -391,6 +426,15 @@ final class WorkbenchUiController implements AutoCloseable {
         ControlBridgeEventPage page = services.events(eventSequence, EVENT_PAGE_SIZE);
         eventSequence = page.nextSequence();
         return renderEvents(page);
+    }
+
+    boolean workerRunning() {
+        WorkbenchWorkerStatus status = services.workerStatus();
+        return status != null && status.running();
+    }
+
+    ControlBridgeEventPage liveEvents(long afterSequence) {
+        return services.events(afterSequence, EVENT_PAGE_SIZE);
     }
 
     @Override
@@ -613,7 +657,11 @@ final class WorkbenchUiController implements AutoCloseable {
     record PlayerStepResult(boolean successful, String output, String events) {
     }
 
-    record MappingCatalogEntry(String reference, String label, boolean restorable) {
+    record MappingCatalogEntry(String reference, String label, boolean restorable, boolean pending) {
+        MappingCatalogEntry(String reference, String label, boolean restorable) {
+            this(reference, label, restorable, false);
+        }
+
         @Override
         public String toString() {
             return label;

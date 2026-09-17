@@ -1,6 +1,7 @@
 package tools.dscode.parallelutilities;
 
 import tools.dscode.common.reporting.diagnostic.AgentBrowserLadder;
+import tools.dscode.common.reporting.diagnostic.AgentDiscoverPlanner;
 
 import java.nio.file.Path;
 
@@ -73,8 +74,6 @@ public final class ParallelCountEstimator {
     }
 
     public static String recommendedDiscoverRunVars(String browser) {
-        String selected = browser == null || browser.isBlank() ? AgentBrowserLadder.CHROME_HEADLESS : browser.trim();
-        return "pkb_browser=" + selected + ", pkb_parallel=" + estimate()
-                + ", pkb_reportingmode=diagnostic, pkb_loglevel=warn, pkb_reportretention=failed";
+        return AgentDiscoverPlanner.recommendedDiscoverRunVars(browser);
     }
 }

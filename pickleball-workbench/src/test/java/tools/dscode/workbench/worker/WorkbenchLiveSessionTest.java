@@ -24,9 +24,14 @@ class WorkbenchLiveSessionTest {
                     IllegalStateException.class,
                     live::stepOverrides
             );
+            IllegalStateException resolveFailure = assertThrows(
+                    IllegalStateException.class,
+                    () -> live.resolveStep("Given stay", "")
+            );
 
             assertTrue(stepFailure.getMessage().contains("paused interactive worker"));
             assertTrue(overrideFailure.getMessage().contains("paused interactive worker"));
+            assertTrue(resolveFailure.getMessage().contains("paused interactive worker"));
         }
     }
 }

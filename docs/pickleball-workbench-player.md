@@ -9,7 +9,7 @@ The Workbench distribution and process model is unchanged:
 ```text
 published pickleball JAR
   -> embeds one opaque pickleball-workbench.jar
-  -> launcher extracts it and starts `java -jar` in a separate controller JVM
+  -> launcher extracts it and starts `java -cp` in a separate controller JVM
 
 Workbench controller JVM
   -> controller/UI/MCP only
@@ -29,13 +29,13 @@ The left rail lists scenarios from `.feature` files in the synchronized consumer
 
 Name and tag filtering is the primary UI. Type a scenario name and choose a match mode: starts with, contains (default), ends with, or full match. All four modes are case-insensitive and match only the Gherkin `Scenario` / `Scenario Outline` title. Include tags must all be present (AND). Exclude tags drop a scenario if it has any of them (NOT). Tag fields accept values with or without a leading `@` and split on commas and/or whitespace. Empty include/exclude means no tag constraint. Feature, Rule, scenario/outline, and Examples tags are inherited as Cucumber does; Workbench parses them from the same catalog files and does not call Cucumber from the controller JVM.
 
-Feature-file selection is secondary and collapsed behind **Filter by feature**. With no feature selected, name/tag filters apply to every catalog scenario. Opening that panel still toggles browse mode between Gherkin Feature name and file name + directory path, and click still selects or deselects features. Clicking a scenario loads it into the live editor. The default demo remains loaded until a scenario is chosen. **Save** is the only write-back path.
+Feature-file selection is secondary and collapsed behind **Filter by feature**. With no feature selected, name/tag filters apply to every catalog scenario. Opening that panel still toggles browse mode between Gherkin Feature name and file name + directory path, and click still selects or deselects features. Scenario Outlines expand to selectable Examples rows. Clicking a result opens the whole originating `.feature` file and sets that scenario (and optional Examples row) as the play target. The default demo remains loaded until a scenario is chosen. **Save** writes the editor buffer to the original file after confirmation. Ctrl+click or **Open target** on a `RUN` / `CALL` / `data:/` step opens the callee in a new tab; the caller tab stays pinned. The left **Step definition** panel shows consumer Java glue when it can be resolved, or that the line is a Pickleball dynamic step.
 
 ## Live Scenario Editor
 
-The center editor is an embedded HTML/JS block editor in JavaFX `WebView`, or ordinary Gherkin text on the same `LiveScenarioPlayer` buffer. A prominent **Text | Blocks** toggle next to the editor heading switches those views without losing playhead, selection, or document text. Play, Step, and From Here keep using the same `LiveScenarioPlayer`. Blocks are Gherkin text, including `Given` / `When` / `Then`. Nested steps and `IF` / `ELSE` snap as parent/child using leading colons. Clicking a block or line instantly seeks the playhead, like clicking a waveform. The execution cursor is internal to an active run.
+The center editor is one ordinary Gherkin text document over `LiveScenarioPlayer`. Tab at the start of a line, or while only leading colons/spaces sit before the caret, inserts one extra Pickleball leading `:`; Shift-Tab removes one leading `:` if present. Mid-line Tab inserts a space and does not jump to another Swing control. Typing the first letters of a Gherkin keyword after optional leading colons/whitespace offers completion (Feature, Rule, Background, Scenario, Scenario Outline, Examples, Given, When, Then, And, But, `*`, IF, ELSE, ELSE-IF). Tab or Enter accepts the selected keyword and inserts a trailing space. When the completion popup is open, Tab accepts it; otherwise Tab at the indent prefix inserts `:`. Play, Step, and From Here keep using `LiveScenarioPlayer`. **Play** executes a derived plan: Background steps plus the selected scenario, with one Examples row substituted when selected. Clicking a line instantly seeks the playhead. The top player bar shows the Pickleball version.
 
-Workbench chose OpenJFX `WebView` + `JFXPanel` over JCEF so the browser panel stays a Workbench-only Maven dependency that shades into the controller JAR. JDK 21 does not ship a modern browser component. If JavaFX cannot start, the same `LiveScenarioPlayer` buffer remains editable as plain Gherkin text and Blocks is shown as unavailable.
+Workbench chose OpenJFX `WebView` + `JFXPanel` over JCEF so Mapping and Diagnostic explorer stay Workbench-only Maven dependencies resolved onto the forked controller classpath. JDK 21 does not ship a modern browser component. If JavaFX cannot start, those panels use their text fallbacks. The live editor is always the Gherkin text buffer. The JavaFX unnamed-module warning on Windows is expected and is not a hang; the player window is shown before WebView starts.
 
 The initial buffer is Workbench-owned sample content. It is not written back to consumer `.feature` files unless you use **Save** on a picker-loaded scenario and confirm the copy. The default demo is a small browser scenario against the Maven consumer local test site:
 
@@ -106,9 +106,13 @@ Invalid typed text is not sent to the worker. NodeMap implementations that are n
 
 The Terminal tails the worker stdout/stderr files Workbench already creates under `.pickleball/workbench/logs/`. Filter by `TRACE`, `DEBUG`, `INFO`, `WARNING`, or `ERROR`. Logs continue as the playhead moves. This is not MCP stdout and is not a fabricated Workbench-only activity dump. Unmarked worker output is shown at `INFO`.
 
-## Diagnostic Log Explorer
+## Explorer and Report
 
-The explorer is a rewind/play/focus timeline of retained Pickleball diagnostic runs. Screenshot frames are shown with the Gherkin step that was running when they were taken. Denser layers follow the repository evidence order and only open when the retained files exist. If `reports/diagnostic-runs/run-catalog.json` is missing, the panel stays empty and says so.
+The explorer is a two-panel rewind/play/focus of retained Pickleball diagnostic runs. The run dropdown uses catalog ids plus retained outcome/purpose when those fields exist. The left panel is an indented execution tree (indent = call depth; nested COMPONENT children, then the next sibling after return). There are no return arrows and no Mermaid. Color is status at the playhead. Click seeks to that node's `eventSeq`. Ctrl+click / Open / double-click peeks the pack-local `source/files/` copy through `workbench_go` and does not replace the live buffer. The stage shows Gherkin, `source.path:line`, definition, INFO+ log, and the screenshot taken while that beat ran — or an explicit gap when no PNG was retained. Play stops at the last step. Speed changes the beat interval. Denser layers follow the repository evidence order and only open when the retained files exist. If `reports/diagnostic-runs/run-catalog.json` is missing, the panel stays empty and says so.
+
+Picker “Play this scenario” still replaces the live Gherkin buffer. Explorer and Report from a retained run are peek-only.
+
+The Report tab is the fourth right tab. It renders the same `investigation.json` as portable `report.html`: Gherkin/business bottom line first, then where, cause vs failed assertion, then lower-level Java/JSON/HTTP/git/environment. Clicks call `workbench_go`. Schema version 2 is additive; v1 still renders. Do not use Mermaid.
 
 ## Watched-agent control lease
 
@@ -129,7 +133,7 @@ The included consumer `@control-bridge` scenario verifies:
 - the current ParsingMap catalog contains at least one NodeMap;
 - a catalog reference resolves back to a live NodeMap.
 
-Workbench player/editor unit tests cover picker name/tag/feature filtering (including Feature-level tag inheritance), block buffer ↔ player model, Text | Blocks view toggling without changing document text or playhead id, click-to-seek, global Play from start, the two Step Editor play actions, wait-at-end / Enter-to-append-and-run, in-place edit of previously executed text, leftover Play-loop playhead marks after `executeStep`, typed Mapping edits through `WorkbenchServices`, the non-empty browser demo seed, control-lease lock/Take control, permission grant/deny, and Save not writing without approval.
+Workbench player/editor unit tests cover picker name/tag/feature filtering (including Feature-level tag inheritance), leading-colon buffer helpers, TEXT-only live editor (no Blocks toggle), colon-Tab indent and keyword completion, click-to-seek, global Play from start, the two Step Editor play actions, wait-at-end / Enter-to-append-and-run, in-place edit of previously executed text, leftover Play-loop playhead marks after `executeStep`, typed Mapping edits through `WorkbenchServices`, the non-empty browser demo seed, control-lease lock/Take control, permission grant/deny, and Save not writing without approval.
 
 Workbench changes should continue to use the repository's focused validation policy:
 

@@ -12,7 +12,11 @@ import java.util.List;
 import java.util.Map;
 
 public final class WorkbenchWebJson {
-    public record MapChoice(String reference, String label, boolean restorable) { }
+    public record MapChoice(String reference, String label, boolean restorable, boolean pending) {
+        public MapChoice(String reference, String label, boolean restorable) {
+            this(reference, label, restorable, false);
+        }
+    }
     private static final ObjectMapper JSON = new ObjectMapper();
 
     private WorkbenchWebJson() {
@@ -54,11 +58,13 @@ public final class WorkbenchWebJson {
             maps.add(Map.of(
                     "reference", entry.reference(),
                     "label", entry.label(),
-                    "restorable", entry.restorable()
+                    "restorable", entry.restorable(),
+                    "pending", entry.pending()
             ));
         }
         payload.put("entries", maps);
         payload.put("mapReference", selected == null ? "" : selected.reference());
+        payload.put("rootLabel", model == null || model.mapType().isBlank() ? "NodeMap" : model.mapType());
         payload.put("restorable", model != null && model.restorable());
         payload.put("status", status == null ? "" : status);
         List<Map<String, Object>> properties = new ArrayList<>();

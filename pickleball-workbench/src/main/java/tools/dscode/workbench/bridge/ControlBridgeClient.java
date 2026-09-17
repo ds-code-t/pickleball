@@ -128,6 +128,17 @@ public final class ControlBridgeClient {
         );
     }
 
+    public ControlBridgeStepResolution resolveStep(
+            String scenarioId, String text, String argument, Integer timeoutSeconds
+    ) {
+        int timeout = commandTimeout(timeoutSeconds);
+        return request(
+                "POST", "/v1/steps/resolve",
+                new ResolveStepRequest(scenarioId, text, argument, timeoutSeconds),
+                ControlBridgeStepResolution.class, commandDuration(timeout)
+        );
+    }
+
     public ControlBridgeValueResult mappingGet(
             String scenarioId, String mapReference, String key, Integer timeoutSeconds
     ) {

@@ -30,6 +30,14 @@ Data Elements determine explicit conversion behavior:
 - `Doc String` returns a stored native `DocString` unchanged.
 - `Data Row`, `Data Cell`, `Data Header`, `Data Value`, and `Data Entry` operate on the active data context.
 
+## Blank table cells
+
+A blank Gherkin Data Table cell is the empty string `""`. Cucumber 7.27.2 rewrites those empty cells to `null` before step definitions see the `DataTable`; Pickleball restores them to `""` at the Gherkin-table boundary when cells become mapping, JSON, or Data Element values. `SET "name" DATA TABLE` stores the native `DataTable` unchanged; restoration happens on adapt/convert, not by mutating the stored table.
+
+This matches blank Examples cells, which already resolve to `""`. A blank cell is not JSON `null`, is not a missing key, and does not keep the unresolved `"<Col2>"` token that would invert emptiness guards such as `IF "<Col2>" != ""`.
+
+Genuine null remains [`<^~NULL~^>`](mapping-and-templating.md#special-literal-markers). JSON-source nulls stay JSON null.
+
 ### Quoted Data and Data Table elements
 
 Quoted text can resolve a mapping/native-object reference:

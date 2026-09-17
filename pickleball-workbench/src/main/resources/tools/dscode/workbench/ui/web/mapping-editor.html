@@ -3,17 +3,23 @@
 <head>
   <meta charset="utf-8">
   <title>Mapping</title>
+  <link rel="stylesheet" href="workbench-web.css">
   <link rel="stylesheet" href="mapping-editor.css">
 </head>
 <body>
-  <div class="toolbar">
-    <label>NodeMap
-      <select id="maps"></select>
-    </label>
-    <button type="button" id="add">Add property</button>
-    <span id="status" class="status">Start the live worker to inspect Mapping.</span>
+  <div class="layout">
+    <aside class="maps-pane">
+      <div class="pane-title">NodeMaps</div>
+      <div id="maps" class="map-list"></div>
+    </aside>
+    <section class="tree-pane">
+      <div class="toolbar">
+        <button type="button" class="wb-btn primary" id="add">Add property</button>
+        <span id="status" class="status">Start the live worker to inspect Mapping.</span>
+      </div>
+      <div id="tree" class="tree"></div>
+    </section>
   </div>
-  <div id="tree" class="tree"></div>
   <script src="mapping-editor.js"></script>
 </body>
 </html>

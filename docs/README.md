@@ -30,11 +30,12 @@ When these docs are materialized from the Maven dependency with Workbench `expor
 
 - [Nested steps](nested-steps.md) — arrange parent/child steps and pass conditions or page context downward.
 - [Block conditionals](block-conditionals.md) — choose one `IF:` / `ELSE-IF:` / `ELSE:` branch.
+- [Log and assert steps](log-and-assert-steps.md) — author-facing `TRACE:` / `INFO:` / `ERROR:` / `FAIL:` tokens and `ASSERT:` / `SOFT ASSERT:` clauses.
 
 ## Execution
 
-- [Execution configuration](configuration.md) — tags, feature/resource locations, browsers, named profiles, controlled `pkb_runvars`, canonical `pkb_run_profile`, ReportPortal aliases, parallelism, logging, reports, and local overrides.
-- [AI and automation run configuration](ai-run-configuration.md) — controlled `pkb_runvars`, inherited execution context, retained `pkb_run_profile`, `pkb_configpath`, protected values, and deterministic diagnostic reruns.
+- [Execution configuration](configuration.md) — tags, feature/resource locations, browsers, named profiles, controlled `pkb_runvars`, optional sealed `pkb_overriderunvars`, canonical `pkb_run_profile`, ReportPortal aliases, parallelism, logging, reports, and local overrides.
+- [AI and automation run configuration](ai-run-configuration.md) — controlled `pkb_runvars`, optional sealed `pkb_overriderunvars`, inherited execution context, retained `pkb_run_profile`, `pkb_configpath`, protected values, dry-run resolve, and deterministic diagnostic reruns.
 - [Dynamic control API](dynamic-control-api.md) — optional retry-friendly dynamic Gherkin execution, isolated/scoped ParsingMap control, snapshots, value interception, synchronous semantic hooks, and the consumer-side Control Bridge used by Workbench.
 - [Step Overrides](step-overrides.md) — live REGEX/REPLACE step implementation authoring in a persistent worker, including generated Java handlers and Workbench management.
 - [Pickleball Workbench](pickleball-workbench.md) — dependency-matched external controller embedded opaquely in Pickleball, with a neutral versioned protocol, strict core-free artifact/process boundary, consumer-classpath worker, MCP stdio, and Swing UI.

@@ -49,9 +49,13 @@ final class TerminalPanel extends JPanel {
 
         area.setEditable(false);
         area.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 12));
-        area.setBackground(WorkbenchTheme.SURFACE);
+        area.setBackground(WorkbenchTheme.SURFACE_ALT);
         area.setForeground(WorkbenchTheme.TEXT);
-        add(new JScrollPane(area), BorderLayout.CENTER);
+        area.setCaretColor(WorkbenchTheme.ACCENT);
+        area.setBorder(new EmptyBorder(8, 10, 8, 10));
+        JScrollPane scroll = new JScrollPane(area);
+        WorkbenchTheme.styleScroll(scroll);
+        add(scroll, BorderLayout.CENTER);
         poller.setRepeats(true);
     }
 

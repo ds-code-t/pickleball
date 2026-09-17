@@ -25,12 +25,14 @@ docs/dynamic-steps.md
 docs/feature-status-notes.md
 docs/getting-started.md
 docs/key-parser-dsl.md
+docs/log-and-assert-steps.md
 docs/mapping-and-templating.md
 docs/nested-steps.md
 docs/pickleball-workbench-player.md
 docs/pickleball-workbench.md
 docs/service-call-scenarios.md
 docs/step-overrides.md
+docs/workbench-thin-packaging-roadmap.md
 maven-consumer-project/pom.xml
 maven-consumer-project/src/test/java/com/example/pickleball/PickleballTests.java
 maven-consumer-project/src/test/java/com/example/pickleball/support/LocalTestSite.java
@@ -55,7 +57,6 @@ maven-consumer-project/src/test/resources/data/data-element-native-fixtures.feat
 maven-consumer-project/src/test/resources/data/data-reference-records.feature
 maven-consumer-project/src/test/resources/data/escaped-data-records.feature
 maven-consumer-project/src/test/resources/data/files/customerPayload.json
-maven-consumer-project/src/test/resources/features/_localtests/test1.feature
 maven-consumer-project/src/test/resources/features/agent-pointer-eval.feature
 maven-consumer-project/src/test/resources/features/browser-action-contracts.feature
 maven-consumer-project/src/test/resources/features/catalog-context.feature
@@ -75,6 +76,7 @@ maven-consumer-project/src/test/resources/features/forms-dynamic-steps.feature
 maven-consumer-project/src/test/resources/features/internal-framework-java-checks.feature
 maven-consumer-project/src/test/resources/features/it-placeholder.feature
 maven-consumer-project/src/test/resources/features/keyboard.feature
+maven-consumer-project/src/test/resources/features/log-and-assert-steps.feature
 maven-consumer-project/src/test/resources/features/mapping-and-resources.feature
 maven-consumer-project/src/test/resources/features/mapping-value-type-preservation.feature
 maven-consumer-project/src/test/resources/features/navigation.feature

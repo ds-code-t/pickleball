@@ -22,10 +22,13 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
 
 public final class ControlBridgeTestSteps {
+    private static final AtomicInteger IPC_COUNTED_STEPS = new AtomicInteger();
+
     private final ObjectMapper json = new ObjectMapper();
     private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
 
@@ -34,9 +37,14 @@ public final class ControlBridgeTestSteps {
     private ControlBridgeDescriptor descriptor;
     private CompletableFuture<ClientOutcome> client;
 
+    @Given("^CONTROL BRIDGE IPC COUNTED STEP$")
+    public void controlBridgeIpcCountedStep() {
+        IPC_COUNTED_STEPS.incrementAndGet();
+    }
+
     @Given("^BEGIN CONTROL BRIDGE IPC TEST$")
     public void beginControlBridgeIpcTest() throws Exception {
-        ControlApiTestSteps.reset();
+        IPC_COUNTED_STEPS.set(0);
         BrowserSteps.getCurrentDriver();
         sessionDirectory = Files.createTempDirectory("pkb-control-bridge-");
         token = "test-" + UUID.randomUUID();
@@ -163,7 +171,7 @@ public final class ControlBridgeTestSteps {
                         "/v1/steps/execute",
                         Map.of(
                                 "scenarioId", scenario.scenarioId(),
-                                "text", "CONTROL API TEST STEP", "argument", "", "timeoutSeconds", 10
+                                "text", "CONTROL BRIDGE IPC COUNTED STEP", "argument", "", "timeoutSeconds", 10
                         )
                 );
 
@@ -300,14 +308,17 @@ public final class ControlBridgeTestSteps {
         assertEquals("SUCCESS", outcome.succeeded().status(), "successful retry step");
         assertEquals("SUCCESS", outcome.firstResume().status(), "resume before breakpoint");
         assertEquals("SUCCESS", outcome.secondResume().status(), "resume after breakpoint");
-        assertEquals(1, ControlApiTestSteps.invocationCount(), "detached successful invocation count");
+        assertEquals(1, IPC_COUNTED_STEPS.get(), "detached successful invocation count");
         assertTrue(!getCurrentScenarioState().isScenarioFailed(), "detached failures must not fail scenario");
     }
 
     @After("@control-bridge")
     public void cleanupControlBridge() {
+        if (descriptor == null) {
+            return;
+        }
         try {
-            if (descriptor != null && token != null) post("/v1/resume", Map.of());
+            if (token != null) post("/v1/resume", Map.of());
         } catch (Exception ignored) {
         } finally {
             ControlBridgeBootstrap.stop();

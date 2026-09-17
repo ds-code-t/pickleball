@@ -4,6 +4,7 @@ import com.example.pickleball.support.InternalJavaTestRunner;
 import io.cucumber.core.runner.ScenarioStepChecks;
 import io.cucumber.core.runner.ScenarioStepDataChecks;
 import io.cucumber.java.en.Given;
+import tools.dscode.common.assertions.AssertionClauseSplitterChecks;
 import tools.dscode.common.dataelements.DataElementPhaseFiveChecks;
 import tools.dscode.common.dataelements.DataElementPhaseFourAndSixChecks;
 import tools.dscode.common.dataelements.DataElementPhaseOneChecks;
@@ -21,11 +22,13 @@ import tools.dscode.common.reporting.diagnostic.ReportRetentionPolicy;
 import tools.dscode.common.treeparsing.parsedComponents.phraseoperations.PlaceHolderMatchChecks;
 import tools.dscode.common.util.datetime.BusinessTemporalDeltaChecks;
 import tools.dscode.common.util.datetime.BusinessTimePostModifierChecks;
+import tools.dscode.coredefinitions.DataTableConversionChecks;
 import tools.dscode.coredefinitions.ModularScenariosChecks;
 import tools.dscode.launcher.WorkbenchAgentCommandChecks;
 import tools.dscode.parallelutilities.ParallelCountEstimatorChecks;
 import tools.dscode.testengine.PkbPropertyValueNormalizerChecks;
 import tools.dscode.testengine.ProfileConfigurationChecks;
+import tools.dscode.testengine.RunVarOverrideChecks;
 
 import java.util.List;
 
@@ -51,17 +54,29 @@ public final class InternalFrameworkTestSteps {
                 ScenarioStepChecks.class,
                 ScenarioStepDataChecks.class,
                 MappingDataRefactorChecks.class,
+                DataTableConversionChecks.class,
                 QuoteParserChecks.class,
                 ModularScenariosChecks.class,
                 BusinessTemporalDeltaChecks.class,
                 BusinessTimePostModifierChecks.class,
                 PkbPropertyValueNormalizerChecks.class,
                 ProfileConfigurationChecks.class,
+                RunVarOverrideChecks.class,
                 ParallelCountEstimatorChecks.class,
                 ChromeHeadlessConfigChecks.class,
                 DynamicControlApiChecks.class,
                 ControlRuntimeObserverChecks.class,
-                PlaceHolderMatchChecks.class
+                PlaceHolderMatchChecks.class,
+                AssertionClauseSplitterChecks.class,
+                LogAndAssertStepsChecks.class
+        );
+    }
+
+    @Given("^RUN LOG AND ASSERT JAVA TESTS$")
+    public static void runLogAndAssertJavaTests() {
+        runAndAssert(
+                AssertionClauseSplitterChecks.class,
+                LogAndAssertStepsChecks.class
         );
     }
 
@@ -84,6 +99,16 @@ public final class InternalFrameworkTestSteps {
         } finally {
             ReportRetentionPolicy.clearThreadOverride();
         }
+    }
+
+    @Given("^RUN RUNVAR OVERRIDE JAVA TESTS$")
+    public static void runRunVarOverrideJavaTests() {
+        runAndAssert(RunVarOverrideChecks.class);
+    }
+
+    @Given("^RUN DATA TABLE CONVERSION JAVA TESTS$")
+    public static void runDataTableConversionJavaTests() {
+        runAndAssert(DataTableConversionChecks.class);
     }
 
     @Given("^RUN DATA ELEMENT PHASE 1 JAVA TESTS$")

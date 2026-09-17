@@ -12,6 +12,10 @@ Feature: Internal Pickleball Java checks
   Scenario: Run it-placeholder parse checks
     * RUN IT PLACEHOLDER JAVA TESTS
 
+  @all @regression @internal-java-checks @log-assert-steps @assert-steps
+  Scenario: Run log and assert Java checks
+    * RUN LOG AND ASSERT JAVA TESTS
+
   @all @regression @internal-java-checks @step-override
   Scenario: Run Step Override checks
     * RUN STEP OVERRIDE JAVA TESTS
@@ -39,3 +43,7 @@ Feature: Internal Pickleball Java checks
   @all @regression @internal-java-checks @data-element-phase-5
   Scenario: Run Data Element phase five copy-on-write checks
     * RUN DATA ELEMENT PHASE 5 JAVA TESTS
+
+  @runvar-override @configuration @internal-java-checks
+  Scenario: Sealed override RunVars ignore other sources
+    * RUN RUNVAR OVERRIDE JAVA TESTS

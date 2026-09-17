@@ -427,6 +427,9 @@ public final class ProfileConfigurationChecks {
         assertFalse(PKB_props.isRunVariableKey(PKB_RUN_VARS));
         assertFalse(PKB_props.isRunVariableKey(PKB_RUN_VARS_PREFIX + PKB_BROWSER));
         assertTrue(PKB_props.isRunVarsMemberKey(PKB_RUN_VARS_PREFIX + PKB_BROWSER));
+        assertFalse(PKB_props.isRunVariableKey(PKB_OVERRIDE_RUN_VARS));
+        assertFalse(PKB_props.isRunVariableKey(PKB_OVERRIDE_RUN_VARS_PREFIX + PKB_BROWSER));
+        assertTrue(PKB_props.isOverrideRunVarsMemberKey(PKB_OVERRIDE_RUN_VARS_PREFIX + PKB_BROWSER));
         assertFalse(PKB_props.isRunVariableKey(PKB_RUN_PROFILE));
         assertFalse(PKB_props.isRunVariableKey(PKB_RUN_PROFILE_PREFIX + PKB_BROWSER));
         assertTrue(PKB_props.isRunProfileMemberKey(PKB_RUN_PROFILE_PREFIX + PKB_BROWSER));

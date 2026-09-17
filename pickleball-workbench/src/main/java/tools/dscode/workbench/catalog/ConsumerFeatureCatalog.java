@@ -70,7 +70,9 @@ public final class ConsumerFeatureCatalog {
             int endLine,
             List<String> lines,
             List<String> tags,
-            List<String> effectiveTags
+            List<String> effectiveTags,
+            int exampleRow,
+            String exampleLabel
     ) {
         public ScenarioEntry {
             name = name == null ? "" : name;
@@ -80,10 +82,30 @@ public final class ConsumerFeatureCatalog {
             lines = List.copyOf(lines == null ? List.of() : lines);
             tags = ScenarioFilter.copyTags(tags);
             effectiveTags = ScenarioFilter.copyTags(effectiveTags);
+            exampleLabel = exampleLabel == null ? "" : exampleLabel;
+        }
+
+        public ScenarioEntry(
+                String name,
+                String featureName,
+                Path file,
+                String relativePath,
+                int startLine,
+                int endLine,
+                List<String> lines,
+                List<String> tags,
+                List<String> effectiveTags
+        ) {
+            this(name, featureName, file, relativePath, startLine, endLine, lines, tags, effectiveTags, 0, "");
         }
 
         public String displayLabel() {
-            return name.isBlank() ? "(unnamed scenario)" : name;
+            String base = name.isBlank() ? "(unnamed scenario)" : name;
+            return exampleLabel.isBlank() ? base : base + " · " + exampleLabel;
+        }
+
+        public boolean hasExampleRow() {
+            return exampleRow > 0;
         }
     }
 
@@ -334,7 +356,7 @@ public final class ConsumerFeatureCatalog {
                     || startsWithKeyword(trimmed, "Scenario Template:")
                     || startsWithKeyword(trimmed, "Scenario:")) {
                 if (currentScenario != null) {
-                    scenarios.add(scenario(
+                    scenarios.addAll(scenarioAndExamples(
                             projectRoot, file, featureName, featureTags, ruleTags,
                             currentScenario, currentOwnTags, currentExampleTags,
                             scenarioStart, i - 1, lines, header
@@ -359,7 +381,7 @@ public final class ConsumerFeatureCatalog {
             }
         }
         if (currentScenario != null) {
-            scenarios.add(scenario(
+            scenarios.addAll(scenarioAndExamples(
                     projectRoot, file, featureName, featureTags, ruleTags,
                     currentScenario, currentOwnTags, currentExampleTags,
                     scenarioStart, lines.size() - 1, lines, header
@@ -409,7 +431,7 @@ public final class ConsumerFeatureCatalog {
         effective.addAll(ruleTags);
         effective.addAll(ownTags);
         if (exampleTags != null) effective.addAll(exampleTags);
-        return new ScenarioEntry(
+        ScenarioEntry base = new ScenarioEntry(
                 name,
                 featureName,
                 file.toAbsolutePath().normalize(),
@@ -418,8 +440,67 @@ public final class ConsumerFeatureCatalog {
                 end + 1,
                 body,
                 ownTags,
-                List.copyOf(effective)
+                List.copyOf(effective),
+                0,
+                ""
         );
+        return base;
+    }
+
+    private static List<ScenarioEntry> scenarioAndExamples(
+            Path projectRoot,
+            Path file,
+            String featureName,
+            List<String> featureTags,
+            List<String> ruleTags,
+            String name,
+            List<String> ownTags,
+            Set<String> exampleTags,
+            int start,
+            int end,
+            List<String> lines,
+            List<String> header
+    ) {
+        ScenarioEntry base = scenario(
+                projectRoot, file, featureName, featureTags, ruleTags,
+                name, ownTags, exampleTags, start, end, lines, header
+        );
+        List<ScenarioEntry> entries = new ArrayList<>();
+        entries.add(base);
+        List<String> tableHeader = null;
+        int dataRow = 0;
+        for (int i = start; i <= end && i < lines.size(); i++) {
+            String trimmed = lines.get(i).strip();
+            if (startsWithKeyword(trimmed, "Examples:") || startsWithKeyword(trimmed, "Example:")) {
+                tableHeader = null;
+                continue;
+            }
+            if (!trimmed.startsWith("|")) continue;
+            List<String> cells = new ArrayList<>();
+            String row = trimmed.startsWith("|") ? trimmed.substring(1) : trimmed;
+            if (row.endsWith("|")) row = row.substring(0, row.length() - 1);
+            for (String cell : row.split("\\|", -1)) cells.add(cell.strip());
+            if (tableHeader == null) {
+                tableHeader = cells;
+                continue;
+            }
+            dataRow++;
+            String label = String.join(" | ", cells);
+            entries.add(new ScenarioEntry(
+                    base.name(),
+                    base.featureName(),
+                    base.file(),
+                    base.relativePath(),
+                    base.startLine(),
+                    base.endLine(),
+                    base.lines(),
+                    base.tags(),
+                    base.effectiveTags(),
+                    dataRow,
+                    label
+            ));
+        }
+        return entries;
     }
 
     private static boolean startsWithKeyword(String trimmed, String keyword) {

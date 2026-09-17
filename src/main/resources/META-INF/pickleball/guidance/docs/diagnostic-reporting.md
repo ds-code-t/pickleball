@@ -26,6 +26,8 @@ The resolved state is exposed as `PickleballRunner.DIAGNOSTIC_MODE`.
 
 Explicit report steps are not suppressed by this setting.
 
+Workbench `discover` / `confirm` / `hint` default to `failed` even though ordinary diagnostic runs default to `all`. Override the Workbench overlay with `--retention=all|failed|none`. That flag does not change this table.
+
 ## Diagnostic layout
 
 Default root:
@@ -85,6 +87,8 @@ or expanded members:
 
 Do not mix compact and expanded `pkb_runvars`. Never supply `pkb_run_profile` as input; it is derived output.
 
+To freeze a complete already-resolved map for one run, use optional sealed `pkb_overriderunvars` instead of composing `pkb_runvars` / `pkb_profile`. Preview with `DiagnosticCli resolve-runvars` / Workbench `hint` without starting tests, then launch `-Dpkb_overriderunvars=<compact complete map>` and compare `runProfileFingerprint`. Missing any of the six context keys is an error; blank tombstones are allowed. Sealed input ignores files, defaults, JVM `-D pkb_*` RunVars, profiles, inheritance, and templates for the Pickleball RunVar set (ignore-sources, not erase-process). Cucumber CLI tag/name/glue projection does not mutate a sealed set.
+
 A partial controlled input automatically inherits only missing project execution-context RunVars:
 
 ```text
@@ -114,12 +118,13 @@ See `docs/ai-run-configuration.md` and `docs/diagnostic-lineage-metadata.md`.
 
 ## Diagnostic CLI
 
-The agent-facing entry is Pickleball Workbench. DiagnosticCli remains the implementation behind export-guidance/hint and the comparison utilities:
+The agent-facing entry is Pickleball Workbench. Workbench `export-guidance` (including `java -jar pickleball-<version>.jar export-guidance`) is JDK-only `PickleballLocalStore`. DiagnosticCli still implements hint and the comparison utilities, and its `export-guidance` command delegates to the same store:
 
 ```text
 DiagnosticCli guidance
 DiagnosticCli export-guidance [output-directory]
 DiagnosticCli discover-hint [project]
+DiagnosticCli resolve-runvars [project]
 DiagnosticCli emit-investigation <investigation-json-or--> <consumer-project-root>
 DiagnosticCli compare-runs <left-run-index> <right-run-index> [output-json]
 DiagnosticCli compare-fingerprints <left.pkbf> <right.pkbf> [output-json]
@@ -138,7 +143,9 @@ Prefer `DiagnosticCli` over custom Maven-classpath/JShell workflows for routine 
     report.html           # one-page local render
 ```
 
-Input is investigation JSON from a file or stdin (`-`) plus the consumer project root. The command prints the project-relative `report.html` path. JSON is the source of truth. HTML renders that JSON plus at most two screenshots *linked* from the existing diagnostic pack; extra screenshot paths are ignored, and a missing image becomes a short note rather than a failed emit. The writer does not copy `reports/diagnostic-runs/` and does not change `pkb_diagnostic_output`. Headless Workbench MCP exposes the same emit as `workbench_investigation_emit` and returns only that relative report path.
+When `.pickleball/current.json` is complete, new handoffs go under `.pickleball/v/<version>/investigations/` instead. Legacy `.pickleball/investigations/` remains when no current pointer exists.
+
+Input is investigation JSON from a file or stdin (`-`) plus the consumer project root. The command prints the project-relative `report.html` path. JSON is the source of truth. HTML renders that JSON plus at most two screenshots *linked* from the existing diagnostic pack; extra screenshot paths are ignored, and a missing image becomes a short note rather than a failed emit. The writer does not copy `reports/diagnostic-runs/` and does not change `pkb_diagnostic_output`. Do not embed PNG bytes in investigation JSON. Headless Workbench MCP exposes the same emit as `workbench_investigation_emit` and returns only that relative report path. After emit, chat prints the six-line bottom-line block from `docs/consumer-agent-guide.md`, then that path. Portable `report.html` is an indented list in Gherkin/business-first order. Do not use Mermaid.
 
 Suggested investigation JSON fields, using existing lineage/diagnostic names where they already exist:
 
@@ -160,7 +167,23 @@ pickleballVersion
 
 Canonical names are `pkb_investigation_id` and `runId`. `investigationId` and `diagnosticRunId` are accepted aliases and are written back under the canonical names.
 
-`export-guidance` does not manage or delete `.pickleball/investigations/`.
+Schema version 2 is additive. v1 fields stay. Emit succeeds if v2 fields are missing. Additive v2 fields:
+
+```text
+bottomLine
+executionMap[]       # portable HTML snapshot only; live explorer tree is events.jsonl
+failedStep
+originatingCause
+gitSuspects[]
+serviceCalls[]
+environmentDelta
+narrative[]          # optional; if absent, render bottomLine + indented executionMap
+links[]              # optional workbench_go / wb:// targets
+```
+
+Do not parse Gherkin in the Workbench controller to invent `executionMap`. If the agent omitted it, derive it from `events.jsonl` at emit. v1 JSON still renders. Workbench Report is the same JSON.
+
+`export-guidance` does not manage or delete `.pickleball/investigations/` or versioned `v/<version>/investigations/`.
 
 ## Outcomes and completion
 
@@ -236,8 +259,22 @@ DiagnosticCli rebuild <diagnostic-runs-root-or-run-root>
 
 ## Configuration/source provenance
 
-`configuration.json` records effective configuration/provenance and the sanitized final run profile. Secret-like values are redacted; one-way hashes may be retained for comparison. `environment.json` captures focused runtime metadata. `source-provenance.json` records best-effort consumer/Pickleball source identity.
+`configuration.json` records effective configuration/provenance and the sanitized final run profile. Secret-like values are redacted; one-way hashes may be retained for comparison. `environment.json` captures focused runtime metadata. `source-provenance.json` records best-effort consumer/Pickleball source identity (remote, branch, commit, dirty, `reproducibleFromGit`). Feature/definition pointers already carry `path` + `sha256`.
 
-`pkb_gitsnapshot` supports `metadata`, `diff`, or `none` for consumer Git/source capture. Keep credentials out of remotes/evidence and never expose protected RunVar values in prompts or lineage.
+`pkb_gitsnapshot` supports `metadata`, `diff`, or `none` (default `metadata`) for consumer Git/source capture. There is no fourth mode. Keep credentials out of remotes/evidence and never expose protected RunVar values in prompts or lineage.
+
+When dense evidence is retained, Pickleball **core** (not Workbench) also writes a filtered source pack of files the scenario actually used:
+
+```text
+reports/diagnostic-runs/<run>/source/
+    referenced.json          # path, role, sha256, vsHead: clean|dirty|untracked|no-git
+    referenced.patch.gz      # filtered `git diff HEAD -- <those paths>` when dirty
+    files/<project-relative> # full copies of the allowed set, even when they match HEAD
+    live-buffer.feature      # only if isolate ran unsaved Gherkin that differs from disk
+```
+
+Allowed files: used `.feature` files (parent plus nested components named by events); consumer Java **step definition** sources named by `definition.sourcePath` (not helpers, not framework); JSON/YAML the scenario actually accessed.
+
+Always copy those allowed files, including clean HEAD matches. `pkb_gitsnapshot=none` still copies files; it only skips Git metadata/diff capture. Do not use whole-tree `consumer-working-tree.patch.gz` as recovery. Do not create a Git repo under `.pickleball`. Workbench only **reads** the pack; it never checks out or resets the consumer HEAD. Peek prefers `source/files/`. The filtered patch is a sidecar for “what differed from HEAD.” Flush is `pkb_reportretention` / delete the run folder. Agent git suspects are a local `git log -n 5 -- <path>` procedure, not an MCP git tool.
 
 For the full controlled execution contract, use [AI Run Configuration](ai-run-configuration.md). For the consumer workflow, use [Consumer Project](consumer-project.md).

@@ -3,7 +3,6 @@ package tools.dscode.workbench.ui;
 import tools.dscode.workbench.catalog.ConsumerFeatureCatalog;
 import tools.dscode.workbench.catalog.ScenarioFilter;
 
-import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
 import javax.swing.DefaultListModel;
@@ -135,6 +134,10 @@ final class FeaturePickerPanel extends JPanel {
         featureFilterPanel.setVisible(false);
     }
 
+    ConsumerFeatureCatalog catalog() {
+        return catalog;
+    }
+
     void setCatalog(ConsumerFeatureCatalog catalog) {
         this.catalog = catalog;
         featureModel.clear();
@@ -233,7 +236,7 @@ final class FeaturePickerPanel extends JPanel {
         featureFilterPanel.setAlignmentX(LEFT_ALIGNMENT);
         featureFilterPanel.add(modes, BorderLayout.NORTH);
         JScrollPane featureScroll = new JScrollPane(featureList);
-        featureScroll.setBorder(BorderFactory.createLineBorder(WorkbenchTheme.BORDER));
+        WorkbenchTheme.styleScroll(featureScroll);
         featureScroll.setPreferredSize(new Dimension(240, 140));
         featureFilterPanel.add(featureScroll, BorderLayout.CENTER);
         south.add(featureFilterPanel);
@@ -265,7 +268,7 @@ final class FeaturePickerPanel extends JPanel {
         panel.setOpaque(false);
         panel.add(WorkbenchTheme.muted(title), BorderLayout.NORTH);
         JScrollPane scroll = new JScrollPane(list);
-        scroll.setBorder(BorderFactory.createLineBorder(WorkbenchTheme.BORDER));
+        WorkbenchTheme.styleScroll(scroll);
         panel.add(scroll, BorderLayout.CENTER);
         return panel;
     }

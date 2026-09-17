@@ -1,5 +1,6 @@
 package io.cucumber.core.runner;
 
+import io.cucumber.core.backend.StepDefinition;
 import io.cucumber.core.gherkin.Step;
 import io.cucumber.core.runner.CachingGlue;
 import io.cucumber.core.runner.PickleStepDefinitionMatch;
@@ -7,13 +8,15 @@ import io.cucumber.core.stepexpression.Argument;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
+import java.util.Optional;
 
+import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
 import static io.cucumber.core.runner.GlobalState.getGlobalCachingGlue;
 
 public final class CucumberStepInvoker {
@@ -29,6 +32,66 @@ public final class CucumberStepInvoker {
             return (Method) findField(javaStepDefinition.getClass(), "method").get(javaStepDefinition);
         } catch (Exception e) {
             throw new RuntimeException(e);
+        }
+    }
+
+    /**
+     * Resolves one Gherkin step text against current Cucumber glue without invoking it.
+     * Returns empty when nothing matches. Ambiguous matches still throw.
+     */
+    public static Optional<GlueDefinition> findGlueDefinition(String stepText) {
+        CachingGlue glue = currentGlue();
+        if (glue == null || stepText == null) return Optional.empty();
+        return findGlueDefinition(glue, stepText);
+    }
+
+    public static Optional<GlueDefinition> findGlueDefinition(CachingGlue glue, String stepText) {
+        if (glue == null || stepText == null) return Optional.empty();
+        try {
+            PickleStepDefinitionMatch match;
+            synchronized (glue) {
+                match = getMatch(glue, stepText);
+            }
+            if (match == null) return Optional.empty();
+
+            Method method = null;
+            String pattern = "";
+            try {
+                Object javaStepDefinition = getJavaStepDefinition(match);
+                if (javaStepDefinition != null) {
+                    try {
+                        method = (Method) findField(javaStepDefinition.getClass(), "method")
+                                .get(javaStepDefinition);
+                    } catch (Exception ignored) {
+                    }
+                    if (javaStepDefinition instanceof StepDefinition stepDefinition
+                            && stepDefinition.getPattern() != null) {
+                        pattern = stepDefinition.getPattern();
+                    }
+                }
+            } catch (Exception ignored) {
+            }
+            if (pattern.isBlank()) {
+                try {
+                    StepDefinition definition = match.getStepDefinition();
+                    if (definition != null && definition.getPattern() != null) {
+                        pattern = definition.getPattern();
+                    }
+                } catch (Exception ignored) {
+                }
+            }
+            if (method == null && pattern.isBlank()) return Optional.empty();
+            return Optional.of(new GlueDefinition(method, pattern));
+        } catch (RuntimeException failure) {
+            throw failure;
+        } catch (Exception failure) {
+            throw new RuntimeException(failure);
+        }
+    }
+
+    public record GlueDefinition(Method method, String pattern) {
+        public GlueDefinition {
+            pattern = pattern == null ? "" : pattern;
         }
     }
 
@@ -66,11 +129,30 @@ public final class CucumberStepInvoker {
         }
     }
 
+    private static CachingGlue currentGlue() {
+        CurrentScenarioState state = getCurrentScenarioState();
+        if (state != null && state.cachingGlue != null) return state.cachingGlue;
+        try {
+            return getGlobalCachingGlue();
+        } catch (RuntimeException ignored) {
+            return null;
+        }
+    }
+
     private static PickleStepDefinitionMatch getMatch(CachingGlue glue, String stepText) throws Exception {
 //        Method prepareGlue = findMethod(glue.getClass(), "prepareGlue", Locale.class);
 //        prepareGlue.invoke(glue, Locale.getDefault());
         Method stepDefinitionMatch = findMethod(glue.getClass(), "stepDefinitionMatch", URI.class, Step.class);
-        return (PickleStepDefinitionMatch) stepDefinitionMatch.invoke(glue, SYNTHETIC_URI, stepProxy(stepText));
+        try {
+            return (PickleStepDefinitionMatch) stepDefinitionMatch.invoke(
+                    glue, SYNTHETIC_URI, stepProxy(stepText)
+            );
+        } catch (InvocationTargetException failure) {
+            Throwable cause = failure.getCause() == null ? failure : failure.getCause();
+            if (cause instanceof Exception exception) throw exception;
+            if (cause instanceof Error error) throw error;
+            throw failure;
+        }
     }
 
     private static Object getJavaStepDefinition(CachingGlue glue, String stepText) throws Exception {

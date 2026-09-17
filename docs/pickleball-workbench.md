@@ -20,7 +20,7 @@ Pickleball owns scenario execution semantics, Cucumber integration, DynamicContr
 
 Workbench owns synchronization, `.pickleball/workbench/` disposable state, worker lifecycle, the protocol client, `WorkbenchLiveSession`, `WorkbenchServices` / `WorkbenchController`, MCP stdio, the headless live-scenario presentation model, and the Swing adapter. It does not import the worker entry point; it launches the protocol's class-name string on the captured consumer classpath.
 
-`pickleball-control-protocol` owns only immutable wire records, request/response envelopes, transport constants, capabilities, and version/minimum-version negotiation. Worker-side bridge server/coordinator/bootstrap and all translation to runtime operations remain in Pickleball core.
+`pickleball-control-protocol` owns immutable wire records, request/response envelopes, transport constants, capabilities, version/minimum-version negotiation, and JDK-only `.pickleball` layout/store helpers (`PickleballLocalLayout`, `PickleballVersion`, `PickleballArtifactLocator`, `PickleballLocalStore`). Worker-side bridge server/coordinator/bootstrap and all translation to runtime operations remain in Pickleball core.
 
 MCP and Swing are adapters over the same Workbench service seam. They must not introduce a second runtime implementation. A visible UI keeps one Workbench JVM and one consumer worker. An AI agent attaches to that live session through a localhost HTTP JSON facade; it must not start a second Workbench or a second worker.
 
@@ -57,12 +57,17 @@ mvn -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java \
 ```bash
 "-Dexec.args=hint"
 "-Dexec.args=discover --tags=@smoke"
+"-Dexec.args=discover --tags=@smoke --retention=all"
 "-Dexec.args=confirm --tags=@smoke --name='The failing scenario'"
 "-Dexec.args=isolate"
 "-Dexec.args=execute-step --text='Given stay'"
 ```
 
 Same launcher; only change `-Dexec.args`. `isolate` starts a detached headless session; later execs are one-shot HTTP clients.
+
+`hint`, `discover`, and `confirm` accept `--tags` / `--name` plus `--retention=all|failed|none` (or `--retention <value>`). Discover and hint default to `failed`. Confirm without `--retention` keeps the Discover snapshot value. This overlay is launcher/planner-only; do not pass `--retention` to the Workbench controller `isolate` / `session` parser. Ordinary diagnostic runs still default to `pkb_reportretention=all`.
+
+Default Discover/Confirm stay on `pkb_runvars`. `hint` and `resolve-runvars` print a dry-run resolve preview (`PKB_props.resolveRunVars`) that does not start tests. Optional sealed `pkb_overriderunvars` is opt-in: resolve → inspect → complete map including the six context keys → `-Dpkb_overriderunvars=<compact>` → compare `runProfileFingerprint`. When a LastDiscoverSnapshot is marked sealed, the next worker launch uses `-Dpkb_overriderunvars=<compact complete map>`, never `-Dpkb_run_profile=`. Unused, sealed input changes no behavior.
 
 `mcp` and `ui` remain host/human commands. Hosts that already run Workbench MCP can launch it from the consumer test classpath:
 
@@ -79,6 +84,8 @@ mvn -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java "-Dexec.mainClass=tools.ds
 
 Humans who want the Swing player can pass `ui .` instead. With no launcher arguments, `ui` and the current directory are selected automatically for that human default. Other Workbench commands are forwarded in the same form, for example `"-Dexec.args=sync ."`. Headless `mcp .` is optional host wiring, not an agent setup step. Agents for this release should not use the GUI, `ui .`, or `.pickleball/workbench/attach.json` as their path; see `.pickleball/AGENT-GUIDE.md`.
 
+The published Pickleball JAR is also executable. `java -jar pickleball-<version>.jar ui <project>` is the outer `Main-Class` (`PickleballWorkbenchLauncher`): it still extracts the nested controller and forks `java -cp`. It does not merge Workbench onto the Pickleball classpath. `java -jar pickleball-<version>.jar export-guidance .pickleball` is JDK-only: it copies bundled guidance through `PickleballLocalStore` and does not load DiagnosticCli or Jackson. Relocatable openers under `.pickleball/open/` walk up to the consumer project, find Java, and resolve a pickleball jar from `current.json`, a sibling `pickleball-*.jar`, or Maven local / the Gradle cache. They do not bake in a project, m2, or version path. Direct `java -jar pickleball-X.jar` uses X and pins `current.json` to X so versions can be tested side by side under `.pickleball/v/<version>/`.
+
 Gradle consumers can expose the same dependency-owned launcher without resolving a cache path or adding a Workbench dependency:
 
 ```groovy
@@ -89,15 +96,17 @@ tasks.register('pickleballWorkbench', JavaExec) {
 }
 ```
 
-Run it with `./gradlew pickleballWorkbench` (or `gradlew.bat pickleballWorkbench`). The task uses the consumer's resolved test runtime only to locate the tiny launcher and nested bytes; actual controller code still starts in a separate `java -jar` process.
+Run it with `./gradlew pickleballWorkbench` (or `gradlew.bat pickleballWorkbench`). The task uses the consumer's resolved test runtime only to locate the tiny launcher and nested bytes; actual controller code still starts in a separate `java -cp` process.
 
-The launcher streams the nested payload (it does not load the controller JAR into a byte array), hashes SHA-256 while copying, and rejects payloads larger than 512 MiB. OpenJFX WebView natives make the executable larger than a plain Java controller. It extracts atomically to:
+The launcher streams the nested payload (it does not load the controller JAR into a byte array), hashes SHA-256 while copying, and rejects payloads larger than 32 MiB. The nested JAR is thin: Workbench classes plus shaded `pickleball-control-protocol` only. OpenJFX, MCP, and Jackson are resolved at launch into `.pickleball/v/<version>/workbench/lib/<version>/` when `current.json` is complete (legacy `.pickleball/workbench/lib/<version>/` otherwise). It extracts atomically to:
 
 ```text
-.pickleball/workbench/controller/<sha256>/pickleball-workbench.jar
+.pickleball/v/<version>/workbench/controller/<sha256>/pickleball-workbench.jar
 ```
 
-It verifies existing/extracted bytes, starts `java -jar` in a new Workbench JVM, inherits stdio, and propagates non-zero exit status. The content-addressed path prevents a stale payload from silently replacing the version carried by the consumer dependency.
+Unversioned `.pickleball/workbench/controller/<sha256>/` remains the fallback when `current.json` is missing, so older trees keep working. `.pickleball/current.json` is a version pointer (`pickleballVersion`, `complete`, `updatedAt`), not a path to the dependency jar. Guidance, Workbench extract/live/base, Discover/session/attach state, and libs live under `v/<version>/`. Root `AGENT-GUIDE.md` and `GUIDANCE-MANIFEST.json` are aliases of the current version. Auto-materialize happens lazily from `PickleballRunner` and the launcher; it unpacks from the running jar and never copies a sibling version folder.
+
+It verifies existing/extracted bytes, starts `java -cp <thinJar:resolved-libs> tools.dscode.workbench.WorkbenchApplication` in a new Workbench JVM, inherits stdio, and propagates non-zero exit status. The content-addressed path prevents a stale payload from silently replacing the version carried by the consumer dependency.
 
 ## Maintainer build and direct run
 
@@ -107,23 +116,24 @@ Build the standalone controller and strict isolation checks:
 .\gradlew.bat :pickleball-workbench:build verifyStrictControllerIsolation
 ```
 
-The executable is:
+The thin controller JAR is:
 
 ```text
 pickleball-workbench/build/libs/pickleball-workbench-<version>.jar
 ```
 
-Synchronize a consumer project before starting a worker manually from repository output:
+Synchronize a consumer project before starting a worker manually from repository output. Maintainer in-repo runs may put Workbench `runtimeClasspath` files on `-cp` next to the thin JAR; the consumer launcher must not use that compile classpath and instead resolves the generated lockfile:
 
 ```powershell
 $workbenchJar = ".\pickleball-workbench\build\libs\pickleball-workbench-<version>.jar"
-java -jar $workbenchJar sync ".\maven-consumer-project"
+$workbenchCp = "$workbenchJar;<resolved OpenJFX/MCP/Jackson controller libs>"
+java -cp $workbenchCp tools.dscode.workbench.WorkbenchApplication sync ".\maven-consumer-project"
 ```
 
 Read the last synchronization manifest without invoking Maven/Gradle:
 
 ```powershell
-java -jar $workbenchJar status ".\maven-consumer-project"
+java -cp $workbenchCp tools.dscode.workbench.WorkbenchApplication status ".\maven-consumer-project"
 ```
 
 Synchronization uses the selected project wrapper to establish compiled output and the effective test runtime classpath. It keeps `-DskipTests` (Surefire never runs during sync). Input fingerprints of Java sources, resources, build files, and dependency artifacts decide how much of the wrapper to run:
@@ -143,7 +153,7 @@ At worker connection time, Workbench requires a different PID, compatible protoc
 Start Workbench for one consumer project:
 
 ```powershell
-java -jar $workbenchJar ui ".\maven-consumer-project"
+java -cp $workbenchCp tools.dscode.workbench.WorkbenchApplication ui ".\maven-consumer-project"
 ```
 
 The Swing UI is a presentation adapter over the same `WorkbenchServices` / `WorkbenchController` seam used by MCP. It does not own a second worker manager, bridge client, Mapping implementation, Gherkin execution engine, or Pickleball runtime model.
@@ -153,31 +163,39 @@ The Swing UI is a presentation adapter over the same `WorkbenchServices` / `Work
 The primary workspace is an interactive Gherkin player with a project feature picker:
 
 ```text
-+-------------------------------------------------------------------------+
-| Scenarios | Project / readiness      Play  Pause  Stop    Player status |
-+-----------+--------------------------+----------------------------------+
-| Name +    | LIVE GHERKIN EDITOR      | Mapping | Terminal | Diagnostic  |
-| match mode| [Text | Blocks]          | WebView tree / typed values      |
-| tags AND  | playhead on same buffer  | worker log / retained-run frames |
-| tags NOT  |                          |                                  |
-| scenario  |                          |                                  |
-| list      |                          |                                  |
-| (feature  |                          |                                  |
-|  filter   |                          |                                  |
-|  hidden)  |                          |                                  |
-+-----------+--------------------------+                                  |
-|           | Step Editor [Step] [From |                                  |
-|           | Here] [ live command ]   |                                  |
-+-----------+--------------------------+----------------------------------+
-| Footer activity                                                         |
-+-------------------------------------------------------------------------+
++-----------------------------------------------------------------------------------+
+| Scenarios | Project  Pickleball <version> / readiness   Play Pause Stop  Status   |
++-----------+--------------------------------------------+--------------------------+
+| Name +    | LIVE GHERKIN TEXT EDITOR                   | Mapping | Terminal |     |
+| match mode| Tab = leading :  keyword autocomplete      | Explorer | Report   |     |
+| tags AND  | playhead on the same buffer                |                          |
+| tags NOT  |                                            |                          |
+| scenario  |                                            |                          |
+| list      |                                            |                          |
+| (feature  |                                            |                          |
+|  filter   |                                            |                          |
+|  hidden)  |                                            |                          |
++-----------+--------------------------------------------+                          |
+|           | Step Editor [Step] [From Here]             |                          |
++-----------+--------------------------------------------+--------------------------+
+| Footer activity                                                                   |
++-----------------------------------------------------------------------------------+
 ```
 
-The left rail is a scenario filter, not a feature-file browser. Primary controls are scenario name (starts with / contains / ends with / full match; default contains; all four are case-insensitive against the Gherkin Scenario / Scenario Outline title), tags the scenario must have (AND), and tags it must not have (NOT). Include/exclude fields accept any number of tags, with or without a leading `@`, split on commas and/or whitespace. Empty include/exclude means no tag constraint. Feature-level tags, optional Rule tags, the scenario/outline's own tags, and Examples tags on an outline are inherited the same way Cucumber does; Workbench parses those tags from the catalog `.feature` files and does not call Cucumber. Feature-file selection is collapsed behind **Filter by feature** (Gherkin Feature name vs file path lives in that panel). Default: no feature filter, so name/tag apply to every catalog scenario in the synchronized project. Clicking a result still loads that scenario into the live session buffer. Workbench does not write `.feature` files unless you use the explicit **Save** control.
+The left rail is a scenario filter, not a feature-file browser. Primary controls are scenario name (starts with / contains / ends with / full match; default contains; all four are case-insensitive against the Gherkin Scenario / Scenario Outline title), tags the scenario must have (AND), and tags it must not have (NOT). Include/exclude fields accept any number of tags, with or without a leading `@`, split on commas and/or whitespace. Empty include/exclude means no tag constraint. Feature-level tags, optional Rule tags, the scenario/outline's own tags, and Examples tags on an outline are inherited the same way Cucumber does; Workbench parses those tags from the catalog `.feature` files and does not call Cucumber. Feature-file selection is collapsed behind **Filter by feature** (Gherkin Feature name vs file path lives in that panel). Default: no feature filter, so name/tag apply to every catalog scenario in the synchronized project. Scenario Outlines expand to selectable Examples rows. Clicking a result opens the **whole originating `.feature` file** in the editor and sets that scenario (and optional Examples row) as the play target. The caller tab stays pinned; Ctrl+click or **Open target** on a `RUN` / `CALL` / `data:/` step opens the callee in another tab. Below the picker, the **Step definition** panel shows consumer Java glue for the selected step when it can be resolved, or that the line is a Pickleball dynamic step / unmatched reference. A small collapsible **Sealed RunVars** panel loads LastDiscoverSnapshot retained keys (boolean-like as toggles, known enums as combos, else text). **Apply sealed** writes a sealed snapshot used on the next worker start as `-Dpkb_overriderunvars=`; it does not mutate an in-flight worker, and leaving the panel unused changes no behavior. Workbench does not import `PKB_props` / `PickleballProfiles`; resolve stays in core. Workbench does not write `.feature` files unless you use the explicit **Save** control, which writes the editor buffer to the original file.
 
-The center editor shows the same `LiveScenarioPlayer` buffer as ordinary Gherkin text or as the embedded HTML/JS block editor hosted in JavaFX `WebView` (`JFXPanel`). A prominent **Text | Blocks** toggle next to the editor heading switches views without losing playhead, selection, or document text. Blocks are Gherkin text — including `Given` / `When` / `Then` — not a second language compiled to Gherkin. Nested steps and `IF` / `ELSE` blocks snap as parent/child using Pickleball's leading-colon grammar. The play header is unchanged: click-to-seek, global **Play** from the first step in a fresh worker context, **Step** = isolated `executeStep`, **From Here** = selected/playhead through the rest, stay in play at end, Enter append-and-run. JavaScript never executes Gherkin. If JavaFX cannot start, Text is already the fallback and Blocks stays disabled/unavailable.
+The center editor is one ordinary Gherkin text document over `LiveScenarioPlayer`. Nested steps use Pickleball's leading-colon grammar: Tab at the start of a line, or while only leading colons/spaces sit before the caret, inserts one extra `:`; Shift-Tab removes one leading `:` if present. Mid-line Tab inserts a single space and does not move focus to another Swing control. Typing the first letters of a Gherkin keyword after optional leading colons/whitespace offers completion for Feature, Rule, Background, Scenario, Scenario Outline, Examples, Given, When, Then, And, But, `*`, and line-start control words IF / ELSE / ELSE-IF. Tab or Enter accepts the selected keyword and inserts a trailing space. When the completion popup is open, Tab accepts the completion; when it is not, Tab at the indent prefix inserts `:`. **Play** runs a derived plan: Feature/Rule Background steps, then the selected scenario's steps, with one selected Examples row substituted. **Step** remains isolated `executeStep`. **From Here** runs the plan from the selected template step. The default demo buffer still has no save path.
 
-The right side remains Mapping, Terminal, and Diagnostic Log Explorer. Low-level lifecycle controls stay under **Session**. Existing investigation tools stay under **Tools > Advanced Controls**.
+The player bar shows the running Pickleball version next to the project name. The right side is four tabs: Mapping, Terminal, Explorer, and Report. Low-level lifecycle controls stay under **Session**. Existing investigation tools stay under **Tools > Advanced Controls**.
+
+### Open vs Play
+
+| Action | Effect |
+|---|---|
+| Picker “Play this scenario” | Replace the live Gherkin buffer (existing 2.1.12 behavior). |
+| Explorer / Report / `workbench_go` from a **retained run** | Open a **peek** tab. Prefer the pack-local `source/files/` copy. Do **not** replace the live buffer. Do not write. |
+
+Ctrl+click, Open, or double-click a tree row calls the same `workbench_go` resolver as MCP. Java from a retained run: Step definition panel first; if `definition.sourcePath` is a real consumer file, a read-only Workbench text tab. Never open framework sources from the JAR. Paths stay inside the consumer project. A missing target is a visible miss and does not blank the live editor. Pause, Stop, and explorer rewind are view-only; they do not rewind browser, Mapping, or services.
 
 ### Live scenario buffer and player state
 
@@ -189,7 +207,7 @@ The right side remains Mapping, Terminal, and Diagnostic Log Explorer. Low-level
 - playhead (the user-visible needle);
 - player states `STOPPED`, `PAUSED`, `RUNNING`, and `WAITING_FOR_STEP`.
 
-The Live Scenario Editor is a session-scoped Gherkin document presented as snap-together blocks. Users can type Gherkin into a block, including text that already ran. Stable line ids are preserved across in-place edits so the player can keep selection, playhead, and execution cursor coherent. Loading a picker scenario replaces the live buffer only. The default remains session/live. **Save** is confirmation-gated: it copies the live scenario into the originating `.feature` file and scenario only after Allow. The Workbench-owned demo has no save path. Workbench never writes `.feature` files on picker load or on Deny.
+The Live Scenario Editor is a session-scoped Gherkin text document. Users can type Gherkin on any line, including text that already ran. Stable line ids are preserved across in-place edits so the player can keep selection, playhead, and execution cursor coherent. Loading a picker scenario replaces the live buffer only. The default remains session/live. **Save** is confirmation-gated: it copies the live scenario into the originating `.feature` file and scenario only after Allow. The Workbench-owned demo has no save path. Workbench never writes `.feature` files on picker load or on Deny.
 
 The playhead behaves like an audio-player needle:
 
@@ -236,29 +254,37 @@ Scenario: Open the local test site
 
 ### Mapping tab
 
-There is no GUI-defined `Current Scope` concept and no hard-coded NodeMap names. The Mapping tab is a structured property tree populated from the actual NodeMaps in the current worker-side `ParsingMap`. Each property is edited in place: key, value text, and a type dropdown (`string`, `numeric`, `boolean`, `object-as-JSON`, `object-as-XML`). Typed writes go through the existing `mappingPut` service; key renames and whole-object replacement use `mappingRestore`. The GUI must not recreate inheritance rules or keep a second Mapping store.
+There is no GUI-defined `Current Scope` concept and no hard-coded NodeMap names. The Mapping tab is a graphical tree: every NodeMap has a visible root, nested JSON/XML objects expand as children, and properties are edited in place (key, value, type: `string`, `numeric`, `boolean`, `object-as-JSON`, `object-as-XML`). Live maps come from the worker `ParsingMap`. Upcoming play-plan steps also appear as pending `STEP_MAP` entries before they run; values authored there are stored under the protocol `STEP_SEED` reference and copied onto that step's NodeMap the moment the step first executes. Typed writes go through the existing `mappingPut` service; key renames, deletes, and whole-object replacement use `mappingRestore`. The GUI must not recreate inheritance rules or keep a second Mapping store.
 
 NodeMap implementations that are not exact ordinary `NodeMap` instances remain inspection-only. MCP continues to support arbitrary JSON-compatible Mapping values through the shared service methods.
 
 ### WebView packaging
 
-JDK 21 does not ship a modern browser panel. Workbench embeds OpenJFX `WebView` through `JFXPanel` for the Gherkin editor, Mapping tree, and Diagnostic explorer. That choice stays Workbench-only: Maven-central JavaFX modules are shaded into the controller executable, including platform natives under `javafx-natives/<platform>/`. JCEF was not used because Chromium natives are harder to keep isolation-clean and do not package as ordinary Workbench dependencies. If JavaFX cannot start, the live editor stays on the existing in-place text buffer on the same `LiveScenarioPlayer` model; the **Text | Blocks** toggle remains visible and Blocks is disabled so the fallback is honest.
+JDK 21 does not ship a modern browser panel. Workbench embeds OpenJFX `WebView` through `JFXPanel` for the Mapping tree, Explorer, and Report. That choice stays Workbench-only: Maven-central JavaFX modules are resolved onto the forked controller classpath at launch from ordinary platform JARs. They are not shaded into the thin nested JAR. JCEF was not used because Chromium natives are harder to keep isolation-clean and do not package as ordinary Workbench dependencies. Do not add heavy JS graph libraries; Explorer stays vanilla JS. If JavaFX cannot start, Mapping, Explorer, and Report use their text fallbacks. The live editor is always the in-place Gherkin text buffer on the same `LiveScenarioPlayer` model.
 
-### Terminal and Diagnostic Log Explorer
+A one-line JavaFX warning `Unsupported JavaFX configuration: classes were loaded from 'unnamed module'` is expected with that classpath launch. It is not a failure and does not mean Workbench is stuck. The window is shown first; JavaFX WebView is attached on the next Swing pulse so that warning cannot deadlock startup.
+
+### Terminal, Explorer, and Report
 
 The Terminal tab presents the existing consumer-worker stdout/stderr capture files under `.pickleball/workbench/logs/` as a scenario-run log. A dropdown filters `TRACE`, `DEBUG`, `INFO`, `WARNING`, and `ERROR`. Lines continue as the playhead moves because the panel tails those files and also records `executeStep` / Mapping results. Workbench does not redirect MCP stdout. If a worker log line has no printed level, it is shown at `INFO` rather than invented. Structured Pickleball logger output is used when present; there is no second log fabricator.
 
-The Diagnostic Log Explorer is a WebView timeline over Pickleball's retained diagnostic artifacts (`reports/diagnostic-runs`). It follows the existing evidence escalation order and does not create a competing store or fake retained-run data:
+The Explorer is a two-panel WebView **replay** over Pickleball's retained diagnostic artifacts (`reports/diagnostic-runs`), and it **tails** an in-progress isolate: it re-reads `events.jsonl` while `completion` is `IN_PROGRESS`, and it can also follow live `workbench_events` as a `live-isolate` stream. Tailing does not rewind the browser, Mapping, or services. When isolate runs unsaved Gherkin that differs from the originating `.feature`, Workbench writes `.pickleball/.../workbench/live-buffer.feature`; Pickleball core copies that sidecar into the retained pack as `source/live-buffer.feature`. Workbench never writes the pack. Choose a catalog run, then walk it like a recording. The left panel is an expandable **indented** execution tree: indent is call depth. After a nested COMPONENT finishes, the next sibling under the caller is the return. There are no return arrows, no live graph, and no Mermaid. Color is status **at the playhead**. Default expand: failed scenario plus the current stack; completed callees collapse to a status chip. Click a row to seek the playhead to that node's `eventSeq`. Ctrl+click / Open / double-click is `workbench_go` to the file (peek, never replace the live buffer). Node kinds: `scenario` | `component` | `service-call` | `step` | `data` | `java` (`java` is a drill). A multi-row `RUN` becomes sibling rows under the parent step.
+
+The right stage shows the screenshot for the current beat or an honest “no screenshot retained” gap, plus that beat’s Gherkin, `source.path:line`, definition, and INFO+ log lines. Do not invent Mapping for old retained runs. Play/Pause advances in order and **stops on the last step** (it does not wrap). Previous/Next, the scrubber, Left/Right arrows, and **speed** (beat interval) seek. Rewind is view-only. Evidence-layer chips show which catalog/index/events/screenshot files exist on disk; they do not invent a competing store or fake retained-run data:
 
 1. `run-catalog.json`
 2. selected `run-index.json` / `clusters.json`
 3. scenario `summary.json`
-4. relevant `events.jsonl`
+4. relevant `events.jsonl` (the replay timeline)
 5. existing comparison/fingerprint metadata
 6. PNG frames only when a retained screenshot exists, shown with the Gherkin step text that was running when taken
 7. raw trace only when structured evidence is insufficient
 
 If the consumer project has no `run-catalog.json`, the explorer says so and stays empty.
+
+The live explorer tree is built from `events.jsonl` in Java; the WebView only renders it. Do not add JCEF or heavy JS graph libraries. Explorer stays vanilla JS in OpenJFX WebView.
+
+The **Report** tab is the fourth right tab and reads the same `investigation.json` as portable `report.html`. Reading order is Gherkin/business bottom line, where, cause vs failed assertion, then lower-level Java/JSON/HTTP/git/environment. Clicks call `workbench_go`. Portable `report.html` is an indented list; do not use Mermaid in live UI or `report.html`. `executionMap` in investigation JSON is a portable HTML snapshot only — never the live tree source. Schema version 2 is additive; v1 JSON still renders, and emit succeeds if v2 fields are missing.
 
 ### Existing advanced capabilities
 
@@ -325,10 +351,10 @@ A Copilot or other MCP-style client finds that file in the consumer project, the
 1. `GET {url}/health` — liveness, no token.
 2. `GET {url}/lease` and `GET {url}/player` — `Authorization: Bearer <token>` or `X-Workbench-Token`.
 3. `POST {url}/tools/workbench_request_control` with `{"agentName":"Copilot"}`.
-4. Use the existing live tools (`workbench_execute_step`, Mapping, evidence, worker) while holding the lease, and `workbench_set_current_action` so the human can watch.
+4. Use the existing live tools (`workbench_execute_step`, `workbench_step_resolve`, Mapping, evidence, worker) while holding the lease, and `workbench_set_current_action` so the human can watch.
 5. `POST {url}/tools/workbench_request_save` to ask to copy the live scenario into the original feature. The call blocks until the human clicks Allow or Deny, or Take control.
 
-Headless `java -jar pickleball-workbench-<version>.jar mcp <project>` stays stdio JSON-RPC only. That is optional host wiring, not an agent setup step. The consumer-agent live path is launcher `isolate` then `execute-step`. That client may hold the lease without a banner. Save is still a distinct explicit tool and never an implicit write.
+Headless `java -cp <thin-jar>:<resolved-libs> tools.dscode.workbench.WorkbenchApplication mcp <project>` stays stdio JSON-RPC only. That is optional host wiring, not an agent setup step. The consumer-agent live path is launcher `isolate` then `execute-step`. That client may hold the lease without a banner. Save is still a distinct explicit tool and never an implicit write.
 
 A human-watched UI session is optional and separate. From `maven-consumer-project`, a person may start `ui .` and then a watcher can join `.pickleball/workbench/attach.json`. Do not launch a second `mcp` process against the same live UI session, and do not treat that attach file as the default agent path.
 
@@ -337,12 +363,12 @@ A human-watched UI session is optional and separate. From `maven-consumer-projec
 Start the lightweight non-Spring MCP server for a consumer project. This is optional host wiring when `workbench_*` tools are already connected, not an agent setup step:
 
 ```powershell
-java -jar $workbenchJar mcp ".\maven-consumer-project"
+java -cp $workbenchCp tools.dscode.workbench.WorkbenchApplication mcp ".\maven-consumer-project"
 ```
 
 Or, from a Maven consumer test classpath, `"-Dexec.args=mcp ."`. That launcher is optional host wiring. Agents use Workbench `discover` / `confirm` to find failures and `isolate` / `execute-step` for live debug. Do not document or use the Swing GUI, `ui .`, or `.pickleball/workbench/attach.json` as the agent path.
 
-The server uses the official Java MCP SDK core and stdio transport with the Jackson 2 JSON adapter. MCP dependencies are Workbench-only and are shaded into the executable companion. Workbench deliberately does not use Spring Boot, Spring Framework, Spring AI, WebMVC, or Tomcat.
+The server uses the official Java MCP SDK core and stdio transport with the Jackson 2 JSON adapter. MCP dependencies are Workbench-only and are resolved onto the forked controller classpath at launch; they are not shaded into the thin nested JAR. Workbench deliberately does not use Spring Boot, Spring Framework, Spring AI, WebMVC, or Tomcat.
 
 ### Stdout contract
 
@@ -388,6 +414,7 @@ workbench_player_state
 workbench_player_replace_document
 workbench_request_save
 workbench_execute_step
+workbench_step_resolve
 workbench_mapping_get
 workbench_mapping_put
 workbench_mapping_resolve
@@ -397,6 +424,8 @@ workbench_events
 ```
 
 `workbench_execute_step` returns a structured `SUCCESS` / `FAILED` / `UNAVAILABLE` result. A FAILED Gherkin hypothesis leaves the same paused worker available so the agent can inspect, insert, nest, or retry. That result is not an MCP `isError` and does not stop the worker. MCP `isError=true` is for controller/runtime problems such as a missing paused worker.
+
+`workbench_step_resolve` is read-only: it maps one Gherkin step to consumer glue, a Pickleball dynamic/framework step, a matching Step Override, or `UNMATCHED` without executing it.
 
 `workbench_events` is a paged read: pass `afterSequence` and a small `limit` (default 100, maximum 500). Do not request the full retained event history when a page answers the question.
 
@@ -443,6 +472,16 @@ Human investigation handoff (writes `.pickleball/investigations/<id>/` and retur
 workbench_investigation_emit
 ```
 
+After emit, chat prints the six-line bottom-line block from `docs/consumer-agent-guide.md`, then the report path. If a UI session is attached, at most two `wb://` links may follow.
+
+One navigation tool (do not add generic IDE / git / process MCP tools):
+
+```text
+workbench_go
+```
+
+`workbench_go(link)` accepts `to` (`explorer` | `editor` | `mapping` | `report` | `terminal`), `runId`, `eventSeq`, `nodeId`, `path`, `line`, `column`, `kind` (`feature` | `component` | `step` | `call` | `data` | `java`), `mapReference`, `key`, `investigationId`, `section`, and `label`. The same fields parse from `wb://explorer?run=&seq=&node=`. UI attach plus a control lease are required to move the window. Headless: validate and echo the resolved target. `label` may feed `workbench_set_current_action`. The tool does not write files. Report clicks, explorer Open, and MCP share one Java resolver.
+
 `workbench_step_override_compile` sends the Java source template to the consumer worker. The source must contain `{{CLASS_NAME}}`; worker-side Pickleball remains responsible for compilation, generated classloaders, matching, replacement, captures, and execution.
 
 Mutating live tools require the agent control lease. `workbench_request_save` never writes the original feature until the human Allows it in the UI, or until the explicit stdio tool call itself is the headless approval. Deny, Take control, and an unsavable demo buffer leave the file unchanged.
@@ -451,7 +490,7 @@ Controller/runtime failures are returned as MCP tool results with `isError=true`
 
 ## Scope boundary
 
-Workbench MCP and Swing intentionally do not expose a generic IDE or build system. They do not add generic file editing/search, arbitrary process management, generic Maven/Gradle task execution, Gradle Tooling API project browsing, source navigation, or collaboration tools.
+Workbench MCP and Swing intentionally do not expose a generic IDE or build system. They do not add generic file editing/search, arbitrary process management, generic Maven/Gradle task execution, Gradle Tooling API project browsing, source navigation, collaboration tools, or git checkout/reset of the consumer HEAD. `workbench_go` is the one new navigation tool; it peeks pack copies and does not replace the live buffer.
 
 ## Dependency and artifact checks
 
@@ -485,18 +524,19 @@ io.modelcontextprotocol.sdk:mcp-json-jackson2:2.0.0
 
 ```powershell
 $workbenchJar = ".\pickleball-workbench\build\libs\pickleball-workbench-<version>.jar"
-java -jar $workbenchJar ui ".\maven-consumer-project"
+$workbenchCp = "$workbenchJar;<resolved OpenJFX/MCP/Jackson controller libs>"
+java -cp $workbenchCp tools.dscode.workbench.WorkbenchApplication ui ".\maven-consumer-project"
 ```
 
 Use the UI-owned worker for runtime checks; do not run `worker-check` or `live-check` concurrently with the UI.
 
-1. Verify the top-level layout has a scenario name/tag filter rail (feature-file filter collapsed), the Live Gherkin Editor with a **Text | Blocks** toggle and compact Step Editor in the center, and exactly Mapping / Terminal / Diagnostic Log Explorer on the right.
+1. Verify the top-level layout has a scenario name/tag filter rail (feature-file filter collapsed), the Live Gherkin text editor and compact Step Editor in the center, and exactly Mapping / Terminal / Explorer / Report on the right.
 2. Confirm the default buffer is the Workbench demo scenario and includes `navigate to: URL.home` plus a click on the local test site when no picker scenario is selected.
 3. Filter scenarios by name using contains (default) and the other match modes; confirm matching is case-insensitive and applies to the Scenario / Scenario Outline title.
 4. Filter with include tags (AND) and exclude tags (NOT), with and without `@`, and confirm Feature-level tags apply to scenarios in that feature.
 5. Confirm **Filter by feature** is collapsed by default and that name/tag filters then apply to every catalog scenario. Opening it still supports multi-select and Feature name vs file path.
-6. Click a filtered scenario and verify it loads into the live buffer. Switch **Text | Blocks** and verify playhead, selection, and document text are unchanged. If WebView is unavailable, Blocks is disabled and Text remains the editor.
-7. Click different scenario blocks/lines and verify the playhead highlight moves immediately to the clicked step.
+6. Click a filtered scenario and verify it loads into the live Gherkin text editor. Tab at the start of an empty or colon-only line inserts `:`; Shift-Tab removes one leading `:`; mid-line Tab does not prepend `:`. Typing `Gi` at line start offers Given completion.
+7. Click different scenario lines and verify the playhead highlight moves immediately to the clicked step.
 8. Edit previously typed or previously executed Gherkin directly in the Live Scenario Editor and verify the line text updates in place.
 9. Press global **Play** after seeking the playhead to a later step and verify execution still starts from the first executable step in a fresh worker context.
 10. Use **From Here** on a later executable step and verify playback starts there and continues through the rest of the buffer.
@@ -505,7 +545,7 @@ Use the UI-owned worker for runtime checks; do not run `worker-check` or `live-c
 13. Treat **Pause** / **Stop** as presentation/control of automatic advancement only; they do not rewind browser or service side effects.
 14. Verify Mapping has no `Current Scope` control and no hard-coded NodeMap choices. Top-level properties come from the worker ParsingMap and accept typed in-place edits.
 15. Verify Terminal filters worker log files by level and continues as steps run, without writing to MCP stdout.
-16. Verify Diagnostic Log Explorer lists retained runs from `reports/diagnostic-runs` only, or shows an honest empty state.
+16. Verify Explorer lists retained runs from `reports/diagnostic-runs` only, or shows an honest empty state. Nested COMPONENT rows indent as children; after the callee ends, the next step is a sibling of that RUN. Play/Step walk events with screenshots when present, and a step without a PNG says so instead of leaving a blank stage. Click seeks; Open / Ctrl+click / double-click peeks the pack copy without replacing the live buffer. Play stops on the last beat. Report is the same `investigation.json` as `report.html`, business-first, no Mermaid.
 17. Verify **Tools > Advanced Controls** still exposes Status, Recent Events, Step Overrides, Evidence, and Breakpoints.
 18. Verify blocking runtime actions leave the Swing UI responsive.
 19. Load a picker scenario, click **Save**, and cancel the confirmation; the original `.feature` file must be unchanged. Confirming copies only that scenario back into the originating file.
@@ -537,10 +577,11 @@ For persistent worker/live behavior:
 
 ```powershell
 $workbenchJar = ".\pickleball-workbench\build\libs\pickleball-workbench-<version>.jar"
+$workbenchCp = "$workbenchJar;<resolved OpenJFX/MCP/Jackson controller libs>"
 
-java -jar $workbenchJar sync ".\maven-consumer-project"
-java -jar $workbenchJar worker-check ".\maven-consumer-project"
-java -jar $workbenchJar live-check ".\maven-consumer-project"
+java -cp $workbenchCp tools.dscode.workbench.WorkbenchApplication sync ".\maven-consumer-project"
+java -cp $workbenchCp tools.dscode.workbench.WorkbenchApplication worker-check ".\maven-consumer-project"
+java -cp $workbenchCp tools.dscode.workbench.WorkbenchApplication live-check ".\maven-consumer-project"
 ```
 
 For changed consumer bridge behavior, use only the affected focused tags—never `@all`—and use parallelism 80 where practical:

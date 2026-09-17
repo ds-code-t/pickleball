@@ -7,6 +7,7 @@ import tools.dscode.workbench.lease.WorkbenchPermissionCancelledException;
 import tools.dscode.workbench.lease.WorkbenchPermissionDecision;
 import tools.dscode.workbench.lease.WorkbenchPermissionKind;
 import tools.dscode.workbench.lease.WorkbenchPermissionRequest;
+import tools.dscode.workbench.player.LiveBufferSidecar;
 import tools.dscode.workbench.player.LiveFeatureSave;
 import tools.dscode.workbench.player.LivePlaybackCoordinator;
 import tools.dscode.workbench.player.LiveScenarioPlayer;
@@ -17,6 +18,9 @@ import tools.dscode.workbench.player.WorkbenchSaveResult;
 import tools.dscode.workbench.sync.WorkbenchManifest;
 import tools.dscode.workbench.sync.WorkbenchSynchronizer;
 import tools.dscode.workbench.diagnostics.DiagnosticEvidenceNavigator;
+import tools.dscode.workbench.lease.WorkbenchLeaseHolder;
+import tools.dscode.workbench.nav.WorkbenchGoLink;
+import tools.dscode.workbench.nav.WorkbenchGoResolver;
 import tools.dscode.workbench.terminal.WorkerLogFiles;
 import tools.dscode.workbench.worker.WorkbenchLiveSession;
 import tools.dscode.workbench.worker.WorkbenchWorkerStatus;
@@ -40,6 +44,7 @@ public final class WorkbenchController implements WorkbenchServices {
     private final WorkbenchControlLease lease;
     private final DiagnosticEvidenceNavigator diagnostics;
     private final List<Runnable> playerListeners = new CopyOnWriteArrayList<>();
+    private volatile Consumer<WorkbenchGoLink> uiGo;
 
     public WorkbenchController(Path projectRoot) {
         this(projectRoot, Map.of());
@@ -161,9 +166,26 @@ public final class WorkbenchController implements WorkbenchServices {
     }
 
     @Override
+    public void loadPickerScenario(
+            List<String> lines,
+            Path originFile,
+            String scenarioName,
+            int startLine,
+            int endLine,
+            int exampleRow,
+            String exampleLabel
+    ) {
+        requireMutating();
+        playback.loadScenario(lines, originFile, scenarioName, startLine, endLine, exampleRow, exampleLabel);
+        publishLiveBufferSidecar();
+        notifyPlayer();
+    }
+
+    @Override
     public void loadDefaultDemo() {
         requireMutating();
         playback.loadDefaultDemo();
+        LiveBufferSidecar.publish(projectRoot, null, player.documentText());
         notifyPlayer();
     }
 
@@ -171,6 +193,7 @@ public final class WorkbenchController implements WorkbenchServices {
     public void replaceLiveDocument(List<String> lines) {
         requireMutating();
         playback.replaceFromLines(lines);
+        publishLiveBufferSidecar();
         notifyPlayer();
     }
 
@@ -198,7 +221,7 @@ public final class WorkbenchController implements WorkbenchServices {
             if (decision != WorkbenchPermissionDecision.ALLOW) {
                 return WorkbenchSaveResult.denied();
             }
-            return LiveFeatureSave.write(playback);
+            return writeLiveFeature();
         } catch (WorkbenchPermissionCancelledException cancelled) {
             return WorkbenchSaveResult.cancelled(cancelled.getMessage());
         }
@@ -211,7 +234,15 @@ public final class WorkbenchController implements WorkbenchServices {
         if (!preview.savable()) {
             return WorkbenchSaveResult.unsavable(preview.summary());
         }
-        return LiveFeatureSave.write(playback);
+        return writeLiveFeature();
+    }
+
+    private WorkbenchSaveResult writeLiveFeature() {
+        WorkbenchSaveResult result = LiveFeatureSave.write(playback);
+        if (result.written()) {
+            publishLiveBufferSidecar();
+        }
+        return result;
     }
 
     @Override
@@ -261,9 +292,20 @@ public final class WorkbenchController implements WorkbenchServices {
     @Override
     public ControlBridgeCallResult executeStep(String text, String argument) {
         requireMutating();
+        publishLiveBufferSidecar();
         ControlBridgeCallResult result = live.executeStep(text, argument == null ? "" : argument);
         maybeAdvancePlayhead(text, "SUCCESS".equals(result.status()));
         return result;
+    }
+
+    private void publishLiveBufferSidecar() {
+        ScenarioOrigin origin = playback.origin();
+        LiveBufferSidecar.publish(projectRoot, origin.file(), player.documentText());
+    }
+
+    @Override
+    public ControlBridgeStepResolution resolveStep(String text, String argument) {
+        return live.resolveStep(text, argument == null ? "" : argument);
     }
 
     @Override
@@ -389,6 +431,36 @@ public final class WorkbenchController implements WorkbenchServices {
         } catch (IOException failure) {
             throw new IllegalStateException("Could not emit investigation handoff.", failure);
         }
+    }
+
+    public void setUiGoHandler(Consumer<WorkbenchGoLink> uiGo) {
+        this.uiGo = uiGo;
+    }
+
+    @Override
+    public Object go(Map<String, ?> link) {
+        WorkbenchGoLink parsed = WorkbenchGoLink.fromMap(link);
+        WorkbenchGoResolver.WorkbenchGoResult resolved = new WorkbenchGoResolver(projectRoot).resolve(parsed);
+        Map<String, Object> echo = new java.util.LinkedHashMap<>(parsed.toMap());
+        echo.put("to", resolved.to());
+        echo.put("path", resolved.relativePath());
+        echo.put("message", resolved.message());
+        echo.put("missing", resolved.missing());
+        echo.put("outsideProject", resolved.outsideProject());
+        echo.put("peek", resolved.peek());
+        echo.put("file", resolved.file() == null ? "" : resolved.file().toString());
+        WorkbenchControlLeaseSnapshot snapshot = controlLeaseSnapshot();
+        boolean mayMove = snapshot.uiAttached() && snapshot.holder() == WorkbenchLeaseHolder.AGENT;
+        if (mayMove && resolved.movesUi() && uiGo != null) {
+            uiGo.accept(parsed);
+            echo.put("movedUi", true);
+        } else {
+            echo.put("movedUi", false);
+        }
+        if (!parsed.label().isBlank() && snapshot.agentHolds()) {
+            setCurrentAction(parsed.label());
+        }
+        return echo;
     }
 
     @Override

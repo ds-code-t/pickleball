@@ -1,5 +1,7 @@
 package tools.dscode.common.reporting.diagnostic;
 
+import tools.dscode.control.protocol.PickleballLocalLayout;
+import tools.dscode.control.protocol.PickleballVersion;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
@@ -84,6 +86,7 @@ public class PickleballGuidanceChecks {
             assertTrue(chooserList.contains("pkb_run_profile"));
             assertTrue(chooserList.contains("-Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher"));
             assertTrue(chooserList.contains("-Dexec.args=discover"));
+            assertTrue(chooserList.contains("--retention"));
             assertTrue(chooserList.contains("change") && chooserList.contains("exec.args"));
             assertTrue(chooserList.contains("-Dexec.args=isolate"));
             assertTrue(chooserList.contains("execute-step"));
@@ -131,6 +134,7 @@ public class PickleballGuidanceChecks {
         assertTrue(help.contains("DiagnosticCli guidance"));
         assertTrue(help.contains("DiagnosticCli export-guidance"));
         assertTrue(help.contains("DiagnosticCli discover-hint"));
+        assertTrue(help.contains("DiagnosticCli resolve-runvars"));
         assertTrue(help.contains("Pickleball Workbench") || help.contains("PickleballWorkbenchLauncher"));
         assertTrue(help.contains("DiagnosticCli emit-investigation"));
         assertTrue(help.contains("DiagnosticCli compare-runs"));
@@ -170,24 +174,56 @@ public class PickleballGuidanceChecks {
     void discoverHintPrintsDiagnosticMvnTestAndRunCatalogNext() {
         ByteArrayOutputStream output = new ByteArrayOutputStream();
         ByteArrayOutputStream errors = new ByteArrayOutputStream();
+        String previousParallel = System.getProperty("pkb_parallel");
+        String previousRunVarsParallel = System.getProperty("pkb_runvars.pkb_parallel");
+        System.setProperty("pkb_parallel", "80");
+        System.setProperty("pkb_runvars.pkb_parallel", "80");
+        try {
+            assertEquals(0, DiagnosticCli.run(
+                    new String[]{"discover-hint"},
+                    new PrintStream(output, true, StandardCharsets.UTF_8),
+                    new PrintStream(errors, true, StandardCharsets.UTF_8)
+            ));
+            assertEquals("", errors.toString(StandardCharsets.UTF_8));
+            String text = output.toString(StandardCharsets.UTF_8);
+            assertTrue(text.contains("pkb_runvars"));
+            assertTrue(text.contains("pkb_browser=CHROME_HEADLESS"));
+            assertTrue(text.contains("pkb_parallel=" + tools.dscode.parallelutilities.ParallelCountEstimator.estimate()));
+            assertTrue(text.contains("pkb_reportingmode=diagnostic"));
+            assertTrue(text.contains("pkb_loglevel=warn"));
+            assertTrue(text.contains("pkb_reportretention=failed"));
+            assertTrue(text.contains("pkb_run_profile"));
+            assertTrue(text.contains("Dry-run resolve"));
+            assertTrue(text.contains("pkb_overriderunvars") || text.contains("sealed"));
+            assertFalse(text.contains("pkb_parallel=80"));
+            assertFalse(text.contains("when the project supports it"));
+            assertTrue(text.contains("NEXT: run discover"));
+            assertTrue(text.contains("Pickleball Workbench") || text.contains("Workbench"));
+        } finally {
+            if (previousParallel == null) System.clearProperty("pkb_parallel");
+            else System.setProperty("pkb_parallel", previousParallel);
+            if (previousRunVarsParallel == null) System.clearProperty("pkb_runvars.pkb_parallel");
+            else System.setProperty("pkb_runvars.pkb_parallel", previousRunVarsParallel);
+        }
+    }
+
+    @Test
+    void resolveRunVarsPrintsDryRunJsonWithoutStartingTests() {
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        ByteArrayOutputStream errors = new ByteArrayOutputStream();
         assertEquals(0, DiagnosticCli.run(
-                new String[]{"discover-hint"},
+                new String[]{"resolve-runvars"},
                 new PrintStream(output, true, StandardCharsets.UTF_8),
                 new PrintStream(errors, true, StandardCharsets.UTF_8)
         ));
         assertEquals("", errors.toString(StandardCharsets.UTF_8));
         String text = output.toString(StandardCharsets.UTF_8);
-        assertTrue(text.contains("pkb_runvars"));
-        assertTrue(text.contains("pkb_browser=CHROME_HEADLESS"));
-        assertTrue(text.contains("pkb_parallel=" + tools.dscode.parallelutilities.ParallelCountEstimator.estimate()));
-        assertTrue(text.contains("pkb_reportingmode=diagnostic"));
-        assertTrue(text.contains("pkb_loglevel=warn"));
-        assertTrue(text.contains("pkb_reportretention=failed"));
-        assertTrue(text.contains("pkb_run_profile"));
-        assertFalse(text.contains("pkb_parallel=80"));
-        assertFalse(text.contains("when the project supports it"));
-        assertTrue(text.contains("NEXT: run discover"));
-        assertTrue(text.contains("Pickleball Workbench") || text.contains("Workbench"));
+        assertTrue(text.contains("Dry-run resolve"));
+        assertTrue(text.contains("\"sealed\""));
+        assertTrue(text.contains("runProfileFingerprint"));
+        assertTrue(text.contains("provenance"));
+        assertTrue(text.contains("pkb_overriderunvars"));
+        assertFalse(text.contains("NEXT: run discover"));
     }
 
     @Test
@@ -348,16 +384,16 @@ public class PickleballGuidanceChecks {
                     System.err
             ));
 
-            Path obsolete = root.resolve("docs/obsolete-from-older-version.md");
+            Path obsolete = versionGuidanceRoot(root).resolve("docs/obsolete-from-older-version.md");
             Path unmanaged = root.resolve("consumer-note.txt");
             Files.writeString(obsolete, "old generated content", StandardCharsets.UTF_8);
             Files.writeString(unmanaged, "keep me", StandardCharsets.UTF_8);
 
-            Map<String, Object> manifest = readManifest(root);
+            Map<String, Object> manifest = readManifest(versionGuidanceRoot(root));
             List<String> managedFiles = new ArrayList<>(asStringList(manifest.get("files")));
             managedFiles.add("docs/obsolete-from-older-version.md");
             manifest.put("files", managedFiles);
-            JSON.writeValue(root.resolve("GUIDANCE-MANIFEST.json").toFile(), manifest);
+            JSON.writeValue(versionGuidanceRoot(root).resolve("GUIDANCE-MANIFEST.json").toFile(), manifest);
 
             assertEquals(0, DiagnosticCli.run(
                     new String[]{"export-guidance", root.toString()},
@@ -409,7 +445,7 @@ public class PickleballGuidanceChecks {
             assertTrue(Files.isRegularFile(report));
             assertTrue(Files.isDirectory(empty));
             assertEquals("{\"pkb_investigation_id\":\"keep-me\"}", Files.readString(investigation, StandardCharsets.UTF_8));
-            Map<String, Object> next = readManifest(root);
+            Map<String, Object> next = readManifest(versionGuidanceRoot(root));
             assertFalse(asStringList(next.get("files")).stream().anyMatch(path -> path.contains("investigations/")));
         } finally {
             deleteTree(consumer);
@@ -492,6 +528,37 @@ public class PickleballGuidanceChecks {
         } finally {
             deleteTree(consumer);
         }
+    }
+
+    @Test
+    void pickleballDirectoryExportIsVersionedUnderVAndCurrentJson() throws Exception {
+        Path consumer = Files.createTempDirectory("pickleball-guidance-versioned");
+        Path root = consumer.resolve(".pickleball");
+        try {
+            assertEquals(0, DiagnosticCli.run(
+                    new String[]{"export-guidance", root.toString()},
+                    System.out,
+                    System.err
+            ));
+            Path versionRoot = versionGuidanceRoot(root);
+            assertTrue(Files.isDirectory(versionRoot));
+            assertTrue(Files.isRegularFile(versionRoot.resolve("docs/README.md")));
+            assertTrue(Files.isRegularFile(versionRoot.resolve("maven-consumer-project/pom.xml")));
+            var current = PickleballLocalLayout.readCurrent(root).orElseThrow();
+            assertEquals(PickleballVersion.running(DiagnosticCli.class), current.pickleballVersion());
+            assertTrue(current.complete());
+            String script = Files.readString(root.resolve("open/pickleball-workbench.sh"), StandardCharsets.UTF_8);
+            assertTrue(script.contains("PKB_OPEN_BOOTSTRAP"));
+            assertFalse(script.contains(consumer.toString()));
+        } finally {
+            deleteTree(consumer);
+        }
+    }
+
+    private static Path versionGuidanceRoot(Path pickleballRoot) throws Exception {
+        Map<String, Object> manifest = readManifest(pickleballRoot);
+        String version = String.valueOf(manifest.get("pickleballVersion"));
+        return pickleballRoot.resolve("v").resolve(version);
     }
 
     private static Map<String, Object> readManifest(Path root) throws Exception {

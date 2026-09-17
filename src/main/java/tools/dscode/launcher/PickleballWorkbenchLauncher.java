@@ -1,6 +1,10 @@
 package tools.dscode.launcher;
 
 import tools.dscode.control.protocol.ControlProtocol;
+import tools.dscode.control.protocol.PickleballArtifactLocator;
+import tools.dscode.control.protocol.PickleballLocalLayout;
+import tools.dscode.control.protocol.PickleballLocalStore;
+import tools.dscode.control.protocol.PickleballVersion;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -16,10 +20,15 @@ import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Extracts the version-matched, controller-only Workbench payload from the
  * consumer's Pickleball dependency and always launches it in a separate JVM.
+ *
+ * <p>The outer Pickleball JAR is executable ({@code java -jar pickleball-<ver>.jar})
+ * and this class is its {@code Main-Class}. It never merges the nested controller
+ * classpath into this JVM.</p>
  *
  * <p>Agent-facing Discover/hint/export-guidance/confirm run in this consumer JVM
  * so they can reuse DiagnosticCli and wrap Maven. Isolate/session-start,
@@ -29,17 +38,53 @@ import java.util.List;
  */
 public final class PickleballWorkbenchLauncher {
     /**
-     * Safety cap for the opaque controller JAR. OpenJFX WebView natives make
-     * the payload larger than a plain Java executable, so this is a stream
-     * limit rather than an in-memory buffer size.
+     * Safety cap for the opaque thin controller JAR. Fat-jar regression guard:
+     * the nested payload is Workbench plus protocol only, so 32 MiB is enough.
      */
-    static final long MAX_PAYLOAD_BYTES = 512L * 1024 * 1024;
+    static final long MAX_PAYLOAD_BYTES = 32L * 1024 * 1024;
+
+    static final String WORKBENCH_MAIN_CLASS = "tools.dscode.workbench.WorkbenchApplication";
+    static final String OPEN_BOOTSTRAP_ENV = "PKB_OPEN_BOOTSTRAP";
+    static final String REEXEC_ENV = "PKB_PICKLEBALL_REEXEC";
 
     private PickleballWorkbenchLauncher() {
     }
 
     public static void main(String[] args) {
-        WorkbenchCommandLine.Parsed parsed = WorkbenchCommandLine.parse(args);
+        WorkbenchCommandLine.Parsed parsed;
+        try {
+            parsed = WorkbenchCommandLine.parse(args);
+        } catch (IllegalArgumentException failure) {
+            System.err.println(failure.getMessage());
+            System.exit(2);
+            return;
+        }
+        Path project = parsed.project() != null
+                ? parsed.project()
+                : PickleballLocalLayout.findProjectRoot(Path.of(""));
+        try {
+            Optional<Path> hop = reexecJar(project);
+            if (hop.isPresent()) {
+                int exitCode = reexec(hop.get(), args);
+                if (exitCode != 0) System.exit(exitCode);
+                return;
+            }
+        } catch (InterruptedException failure) {
+            Thread.currentThread().interrupt();
+            System.err.println("Pickleball Workbench launcher was interrupted.");
+            System.exit(1);
+            return;
+        } catch (IOException failure) {
+            System.err.println("Could not hop to the pinned Pickleball jar: " + failure.getMessage());
+            System.exit(1);
+            return;
+        }
+
+        if (!WorkbenchCommandLine.isAgentCoreCommand(parsed.command())
+                || !"export-guidance".equals(parsed.command())) {
+            PickleballLocalStore.ensureQuietly(project);
+        }
+
         if (WorkbenchCommandLine.isAgentCoreCommand(parsed.command())) {
             int exitCode = WorkbenchAgentCommands.run(args, System.out, System.err);
             if (exitCode != 0) System.exit(exitCode);
@@ -52,7 +97,10 @@ public final class PickleballWorkbenchLauncher {
         }
 
         String[] forwarded = parsed.forwarded() != null ? parsed.forwarded() : normalizedArguments(args);
-        Path project = parsed.project() != null ? parsed.project() : projectRoot(forwarded);
+        if (parsed.project() == null) {
+            project = projectRoot(forwarded);
+            PickleballLocalStore.ensureQuietly(project);
+        }
         try {
             Path controllerJar = extractEmbeddedPayload(project);
             Process process = new ProcessBuilder(command(controllerJar, forwarded))
@@ -69,6 +117,55 @@ public final class PickleballWorkbenchLauncher {
             System.err.println("Could not launch Pickleball Workbench: " + failure.getMessage());
             System.exit(1);
         }
+    }
+
+    /**
+     * Open-script bootstrap: if {@code current.json} pins another complete
+     * version whose jar is in Maven local / Gradle cache, hop to that jar.
+     * Direct {@code java -jar pickleball-X.jar} (no bootstrap env) stays on X
+     * so version testing can switch the pin.
+     */
+    static Optional<Path> reexecJar(Path projectRoot) {
+        return reexecJar(
+                projectRoot,
+                PickleballVersion.running(PickleballWorkbenchLauncher.class),
+                "1".equals(System.getenv(OPEN_BOOTSTRAP_ENV)),
+                "1".equals(System.getenv(REEXEC_ENV)),
+                PickleballArtifactLocator.Repositories.discover()
+        );
+    }
+
+    static Optional<Path> reexecJar(
+            Path projectRoot,
+            String runningVersion,
+            boolean bootstrap,
+            boolean alreadyReexec,
+            PickleballArtifactLocator.Repositories repositories
+    ) {
+        if (alreadyReexec || !bootstrap || projectRoot == null) return Optional.empty();
+        Path pickleball = PickleballLocalLayout.root(projectRoot);
+        var current = PickleballLocalLayout.readCurrent(pickleball);
+        if (current.isPresent() && current.get().usable()) {
+            String pinned = current.get().pickleballVersion();
+            if (pinned.equals(runningVersion)) return Optional.empty();
+            return PickleballArtifactLocator.find(pinned, repositories);
+        }
+        Optional<PickleballArtifactLocator.Located> latest = PickleballArtifactLocator.findLatest(repositories);
+        if (latest.isEmpty()) return Optional.empty();
+        if (latest.get().version().equals(runningVersion)) return Optional.empty();
+        return Optional.of(latest.get().jar());
+    }
+
+    static int reexec(Path jar, String[] args) throws IOException, InterruptedException {
+        List<String> command = new ArrayList<>();
+        command.add(javaExecutable().toString());
+        command.add("-jar");
+        command.add(jar.toAbsolutePath().normalize().toString());
+        if (args != null) command.addAll(List.of(args));
+        ProcessBuilder builder = new ProcessBuilder(command);
+        builder.inheritIO();
+        builder.environment().put(REEXEC_ENV, "1");
+        return builder.start().waitFor();
     }
 
     static Path extractEmbeddedPayload(Path projectRoot) throws IOException {
@@ -103,9 +200,7 @@ public final class PickleballWorkbenchLauncher {
                     "Consumer project directory does not exist: " + project
             );
         }
-        Path staging = project.resolve(".pickleball")
-                .resolve("workbench")
-                .resolve("controller");
+        Path staging = PickleballLocalLayout.workbenchStateRoot(project).resolve("controller");
         Files.createDirectories(staging);
         Path temporary = Files.createTempFile(staging, "pickleball-workbench-", ".tmp");
         try {
@@ -141,11 +236,29 @@ public final class PickleballWorkbenchLauncher {
         }
     }
 
+    /**
+     * Single fork seam for ui/mcp/sync/isolate session-start. Builds
+     * {@code java -cp <thinJar:libs...> tools.dscode.workbench.WorkbenchApplication <args>}.
+     */
     static List<String> command(Path controllerJar, String[] args) {
+        Path jar = controllerJar.toAbsolutePath().normalize();
+        WorkbenchRuntimeLibs.Manifest manifest = WorkbenchRuntimeLibs.withLaunchClassifier(
+                WorkbenchRuntimeLibs.readManifest(jar),
+                WorkbenchRuntimeLibs.platformKey()
+        );
+        Path libCache = WorkbenchRuntimeLibs.libCacheForController(jar, manifest.version());
+        List<Path> libs = WorkbenchRuntimeLibs.resolve(manifest, libCache);
+
+        StringBuilder classpath = new StringBuilder(jar.toString());
+        for (Path lib : libs) {
+            classpath.append(java.io.File.pathSeparator).append(lib.toAbsolutePath().normalize());
+        }
+
         List<String> command = new ArrayList<>();
         command.add(javaExecutable().toString());
-        command.add("-jar");
-        command.add(controllerJar.toAbsolutePath().normalize().toString());
+        command.add("-cp");
+        command.add(classpath.toString());
+        command.add(WORKBENCH_MAIN_CLASS);
         command.addAll(List.of(args));
         return List.copyOf(command);
     }
@@ -161,10 +274,10 @@ public final class PickleballWorkbenchLauncher {
                 && !args[1].startsWith("-")) {
             return Path.of(args[1]).toAbsolutePath().normalize();
         }
-        return Path.of("").toAbsolutePath().normalize();
+        return PickleballLocalLayout.findProjectRoot(Path.of(""));
     }
 
-    private static Path javaExecutable() {
+    static Path javaExecutable() {
         String executable = System.getProperty("os.name", "")
                 .toLowerCase()
                 .contains("win") ? "java.exe" : "java";

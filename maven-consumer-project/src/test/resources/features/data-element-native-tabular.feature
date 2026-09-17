@@ -158,3 +158,25 @@ Feature: Native Data Element Cucumber projections
     : * , save "<value>" as "<captureKey>"
 
     Then , verify "<nearestUp>" equals "selected nearest above"
+
+  Scenario Outline: Blank Gherkin data-table cells resolve to empty strings
+    Given CLEAR SAVED VALUES
+    * RUN DATA TABLE CONVERSION JAVA TESTS
+    And SET "Repro" DATA TABLE
+      | Col1 | Col2 |
+      | A    |      |
+    And , save "untouched" as "blankGuard"
+    When , in the "<Repro>" Data Table, for every Data Row:
+    : * , ensure "<Col1>" equals "A"
+    : * , ensure "<Col2>" equals ""
+    : * , ensure "<Col2>" equals "<exampleBlank>"
+    : * IF: "<Col2>" != "" && "<Col2>" != "null" THEN: , save "ran" as "blankGuard"
+    Then , ensure "<blankGuard>" equals "untouched"
+    When , save "Repro" Data as "reproData"
+    And , save "<reproData>" JSON String as "reproJsonText"
+    Then , verify "<reproJsonText>" contains '"Col2":""'
+    And , ensure "<exampleBlank>" equals ""
+
+    Examples:
+      | exampleBlank |
+      |              |

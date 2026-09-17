@@ -5,6 +5,7 @@ import tools.dscode.testengine.PKB_props;
 
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
+import java.util.Locale;
 import java.util.Map;
 
 /** Builds the complete AI Discover/Confirm {@code pkb_runvars} set. */
@@ -22,29 +23,59 @@ public final class AgentDiscoverPlanner {
     }
 
     public static Plan discover(Path projectRoot, String tags, String name) {
+        return discover(projectRoot, tags, name, null);
+    }
+
+    public static Plan discover(Path projectRoot, String tags, String name, String retention) {
         AgentBrowserLadder.Decision browser = AgentBrowserLadder.select(projectRoot);
         LinkedHashMap<String, String> values = baseDiscoverVars(browser.browser());
-        overlaySelection(values, tags, name);
+        overlaySelection(values, tags, name, retention);
         return new Plan(projectRoot, browser, PKB_props.serializeRunVars(values), blankToNull(tags), blankToNull(name));
     }
 
     public static String isolateRunVars(Map<String, String> retainedProfile, String tags, String name) {
+        return isolateRunVars(retainedProfile, tags, name, null);
+    }
+
+    public static String isolateRunVars(
+            Map<String, String> retainedProfile,
+            String tags,
+            String name,
+            String retention
+    ) {
         if (retainedProfile == null || retainedProfile.isEmpty()) {
             throw new IllegalStateException(missingDiscoverSnapshotMessage());
         }
         LinkedHashMap<String, String> values = copyRunVars(retainedProfile);
         values.put(PKB_props.PKB_PARALLEL, "1");
-        overlaySelection(values, tags, name);
+        overlaySelection(values, tags, name, retention);
         return PKB_props.serializeRunVars(values);
     }
 
     public static String confirmRunVars(Map<String, String> retainedProfile, String tags, String name) {
+        return confirmRunVars(retainedProfile, tags, name, null);
+    }
+
+    public static String confirmRunVars(
+            Map<String, String> retainedProfile,
+            String tags,
+            String name,
+            String retention
+    ) {
         if (retainedProfile == null || retainedProfile.isEmpty()) {
             throw new IllegalStateException(missingDiscoverSnapshotMessage());
         }
         LinkedHashMap<String, String> values = copyRunVars(retainedProfile);
-        overlaySelection(values, tags, name);
+        overlaySelection(values, tags, name, retention);
         return PKB_props.serializeRunVars(values);
+    }
+
+    /** Default Discover run-var string so hint/estimator strings cannot drift. */
+    public static String recommendedDiscoverRunVars(String browser) {
+        String selected = browser == null || browser.isBlank()
+                ? AgentBrowserLadder.CHROME_HEADLESS
+                : browser.trim();
+        return PKB_props.serializeRunVars(baseDiscoverVars(selected));
     }
 
     public static String missingDiscoverSnapshotMessage() {
@@ -62,9 +93,20 @@ public final class AgentDiscoverPlanner {
         return values;
     }
 
-    private static void overlaySelection(LinkedHashMap<String, String> values, String tags, String name) {
+    private static void overlaySelection(
+            LinkedHashMap<String, String> values,
+            String tags,
+            String name,
+            String retention
+    ) {
         if (tags != null && !tags.isBlank()) values.put(PKB_props.PKB_TAGS, tags.trim());
         if (name != null && !name.isBlank()) values.put(PKB_props.PKB_NAME, name.trim());
+        if (retention != null && !retention.isBlank()) {
+            values.put(
+                    PKB_props.PKB_REPORT_RETENTION,
+                    ReportRetentionPolicy.parseExact(retention).name().toLowerCase(Locale.ROOT)
+            );
+        }
         values.remove(PKB_props.PKB_RUN_PROFILE);
     }
 

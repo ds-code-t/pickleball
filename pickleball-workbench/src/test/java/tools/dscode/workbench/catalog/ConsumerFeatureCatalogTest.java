@@ -100,8 +100,8 @@ class ConsumerFeatureCatalogTest {
                 """);
 
         ConsumerFeatureCatalog catalog = ConsumerFeatureCatalog.scan(project, null);
-        assertEquals(4, catalog.candidateScenarios().size());
-        assertEquals(4, catalog.visibleScenarios().size());
+        assertEquals(6, catalog.candidateScenarios().size());
+        assertEquals(6, catalog.visibleScenarios().size());
 
         ConsumerFeatureCatalog.ScenarioEntry valid = named(catalog, "Valid password");
         assertEquals(List.of("feature-auth", "shared", "smoke", "login"), valid.effectiveTags());
@@ -154,8 +154,8 @@ class ConsumerFeatureCatalogTest {
         assertEquals(1, catalog.candidateScenarios().size());
 
         catalog.clearFeatureSelection();
-        assertEquals(4, catalog.candidateScenarios().size());
-        assertEquals(4, catalog.visibleScenarios().size());
+        assertEquals(6, catalog.candidateScenarios().size());
+        assertEquals(6, catalog.visibleScenarios().size());
     }
 
     @Test
@@ -184,7 +184,7 @@ class ConsumerFeatureCatalogTest {
 
     private static ConsumerFeatureCatalog.ScenarioEntry named(ConsumerFeatureCatalog catalog, String name) {
         return catalog.visibleScenarios().stream()
-                .filter(scenario -> scenario.name().equals(name))
+                .filter(scenario -> scenario.name().equals(name) && !scenario.hasExampleRow())
                 .findFirst()
                 .orElseThrow();
     }
@@ -192,6 +192,7 @@ class ConsumerFeatureCatalogTest {
     private static List<String> names(ConsumerFeatureCatalog catalog) {
         return catalog.visibleScenarios().stream()
                 .map(ConsumerFeatureCatalog.ScenarioEntry::name)
+                .distinct()
                 .toList();
     }
 
@@ -239,5 +240,26 @@ class ConsumerFeatureCatalogTest {
         assertEquals(1, catalog.features().size());
         assertEquals("Configured", catalog.features().getFirst().featureName());
         assertEquals("Only this", catalog.visibleScenarios().getFirst().name());
+    }
+
+    @Test
+    void expandsScenarioOutlineExampleRows() throws Exception {
+        Path features = project.resolve("src/test/resources/features");
+        Files.createDirectories(features);
+        Files.writeString(features.resolve("buy.feature"), """
+                Feature: Shop
+                  Scenario Outline: Buy
+                    When buy <item>
+                    Examples:
+                      | item  |
+                      | apple |
+                      | pear  |
+                """);
+        ConsumerFeatureCatalog catalog = ConsumerFeatureCatalog.scan(project, null);
+        assertEquals(3, catalog.visibleScenarios().size());
+        assertEquals("Buy", catalog.visibleScenarios().getFirst().name());
+        assertEquals(1, catalog.visibleScenarios().get(1).exampleRow());
+        assertTrue(catalog.visibleScenarios().get(1).displayLabel().contains("apple"));
+        assertEquals(2, catalog.visibleScenarios().get(2).exampleRow());
     }
 }

@@ -15,22 +15,24 @@ mvn -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java "-Dexec.mainClass=tools.ds
 Then read or browse:
 
 ```text
+.pickleball/current.json
 .pickleball/GUIDANCE-MANIFEST.json
 .pickleball/AGENT-GUIDE.md
-.pickleball/docs/README.md
-.pickleball/docs/consumer-project.md
-.pickleball/maven-consumer-project/
+.pickleball/open/
+.pickleball/v/<version>/docs/README.md
+.pickleball/v/<version>/docs/consumer-project.md
+.pickleball/v/<version>/maven-consumer-project/
 ```
 
-Rerun export before Pickleball work even when `.pickleball` already exists. A successful export overwrites current managed files, removes obsolete previously managed files, writes the manifest last, and best-effort keeps `.pickleball` ignored by Git. If export fails, treat existing generated guidance as potentially stale.
+Root `AGENT-GUIDE.md` and `GUIDANCE-MANIFEST.json` are aliases of the current version so the well-known agent pointer stays stable. Canonical files live under `v/<version>/`. Rerun export before Pickleball work even when `.pickleball` already exists. A successful export overwrites current managed files, removes obsolete previously managed files from that version folder, writes `current.json` last with `complete: true`, and best-effort keeps `.pickleball` ignored by Git. If export fails, treat existing generated guidance as potentially stale.
 
-Compatibility note: an older Pickleball release whose exporter predates the manifest lifecycle may leave newer files or a newer manifest behind after a downgrade. Those leftovers are not authoritative for the downgraded dependency; prefer the dependency actually resolved on the test classpath and the files freshly exported by that dependency.
+Compatibility note: an older Pickleball release whose exporter predates the manifest lifecycle may leave newer files or a newer manifest behind after a downgrade. Version folders keep each export isolated, so a downgrade reuses `v/<older>/` and rewrites `current.json` rather than mixing docs. Prefer the dependency actually resolved on the test classpath and the files freshly exported by that dependency. `current.json` is a version pointer, not a path to the Maven jar.
 
-AI agents should read `.pickleball/AGENT-GUIDE.md` first after a successful export. Workbench is the one front door: `discover` then `confirm` to find failures, then `isolate` / `execute-step` for live debug. Do not start the GUI. Do not treat `.pickleball/maven-consumer-project/` as the project under test, and do not dump `docs/README.md` or the whole snapshot into first-read context. Human readers can start with `.pickleball/docs/README.md`; links from those guides to `maven-consumer-project` resolve to the exported version-matched reference files.
+AI agents should read `.pickleball/AGENT-GUIDE.md` first after a successful export. Workbench is the one front door: `discover` then `confirm` to find failures, then `isolate` / `execute-step` for live debug. Do not start the GUI. Do not treat `.pickleball/maven-consumer-project/` as the project under test, and do not dump `docs/README.md` or the whole snapshot into first-read context. Human readers can start with `.pickleball/docs/README.md` or the versioned copy; links from those guides to `maven-consumer-project` resolve to the exported version-matched reference files.
 
 ## Version-matched reference snapshot
 
-`export-guidance` also materializes a curated, read-only snapshot of the canonical Pickleball Maven consumer under `.pickleball/maven-consumer-project/`. It is a version-matched **reference** of Pickleball's own example consumer for on-demand lookup, not a sandbox and not the consumer project under test. `export-guidance` does not copy the current consumer's own features into `.pickleball` for testing.
+`export-guidance` also materializes a curated, read-only snapshot of the canonical Pickleball Maven consumer under `.pickleball/v/<version>/maven-consumer-project/` (root `.pickleball/maven-consumer-project/` on a flat, non-`.pickleball` export). It is a version-matched **reference** of Pickleball's own example consumer for on-demand lookup, not a sandbox and not the consumer project under test. `export-guidance` does not copy the current consumer's own features into `.pickleball` for testing.
 
 The snapshot includes:
 
@@ -90,7 +92,7 @@ The test-scoped Pickleball dependency already contains its controller-only Workb
 .\mvnw.cmd -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java "-Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher" "-Dexec.classpathScope=test" "-Dexec.args=discover"
 ```
 
-Optional host MCP uses `"-Dexec.args=mcp ."`. Humans who want the Swing player can pass `ui .` instead. Agents for this release should not use the GUI, `ui .`, or `attach.json` as their path. The launcher verifies and extracts the opaque payload beneath `.pickleball/workbench/controller/<sha256>/`, then creates a separate Workbench JVM. Workbench captures this project's compiled outputs and effective test runtime before creating a separate worker JVM. Only the worker loads the consumer-resolved Pickleball runtime; the Workbench artifact and process contain no core implementation. See `docs/pickleball-workbench.md` for commands, lifecycle, protocol compatibility, and isolation checks. The live-loop order lives in `.pickleball/AGENT-GUIDE.md`.
+Optional host MCP uses `"-Dexec.args=mcp ."`. Humans who want the Swing player can pass `ui .` instead. Agents for this release should not use the GUI, `ui .`, or `attach.json` as their path. The launcher verifies and extracts the opaque payload beneath `.pickleball/v/<version>/workbench/controller/<sha256>/` when `current.json` is complete (legacy `.pickleball/workbench/` otherwise), resolves controller libraries into the matching `lib/<version>/`, then starts a separate Workbench JVM with `java -cp`. After export, `.pickleball/open/pickleball-workbench` scripts are relocatable openers that resolve a pickleball jar without a baked-in m2/version/project path. `java -jar pickleball-<version>.jar ui .` is the same outer Main-Class. Workbench captures this project's compiled outputs and effective test runtime before creating a separate worker JVM. Only the worker loads the consumer-resolved Pickleball runtime; the Workbench artifact and process contain no core implementation. See `docs/pickleball-workbench.md` for commands, lifecycle, protocol compatibility, and isolation checks. The live-loop order lives in `.pickleball/AGENT-GUIDE.md`.
 
 Runner defaults include:
 
@@ -262,7 +264,7 @@ When evidence supports a bounded rerun:
 
 ## Consumer-specific element vocabulary
 
-`PickleballTests` demonstrates extending the execution dictionary without custom Cucumber steps. The example registers categories such as `Radio Button`, `Test Panel`, `Product Card`, and `Status Badge`; the feature suite can continue using Pickleball's reusable dynamic steps.
+`PickleballTests` demonstrates extending the execution dictionary without custom Cucumber steps. The example registers `Test Panel`, `Product Card`, and `Status Badge`, and overlays the built-in `Close Button` for the local test site. The feature suite continues to use Pickleball's reusable dynamic steps, including built-in names such as `Radio Button`.
 
 ## Notes
 

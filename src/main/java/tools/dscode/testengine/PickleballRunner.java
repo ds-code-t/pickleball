@@ -4,6 +4,8 @@ import com.epam.reportportal.utils.properties.PropertiesLoader;
 import io.cucumber.core.runner.CurrentScenarioState;
 import tools.dscode.common.mappings.ParsingMap;
 import tools.dscode.common.reporting.logging.Level;
+import tools.dscode.control.protocol.PickleballLocalLayout;
+import tools.dscode.control.protocol.PickleballLocalStore;
 import tools.dscode.parallelutilities.ParallelCountEstimator;
 
 import java.io.InputStream;
@@ -38,9 +40,12 @@ import static tools.dscode.testengine.PKB_props.PKB_GLUE;
 import static tools.dscode.testengine.PKB_props.PKB_LOGLEVEL;
 import static tools.dscode.testengine.PKB_props.PKB_NAME;
 import static tools.dscode.testengine.PKB_props.PKB_OPTIONS;
+import static tools.dscode.testengine.PKB_props.PKB_OVERRIDE_RUN_VARS;
 import static tools.dscode.testengine.PKB_props.PKB_PARALLEL;
 import static tools.dscode.testengine.PKB_props.PKB_PREFIX;
+import static tools.dscode.testengine.PKB_props.PKB_PROFILE;
 import static tools.dscode.testengine.PKB_props.PKB_RUN_PROFILE;
+import static tools.dscode.testengine.PKB_props.PKB_RUN_VARS;
 import static tools.dscode.testengine.PKB_props.PKB_TAGS;
 
 public abstract class PickleballRunner {
@@ -57,7 +62,10 @@ public abstract class PickleballRunner {
     protected final LinkedHashMap<String, String> values = new LinkedHashMap<>();
     private final Map<String, String> readOnlyValues = Collections.unmodifiableMap(values);
     private final LinkedHashMap<String, String> systemRunVarOverrides = new LinkedHashMap<>();
+    private final LinkedHashMap<String, String> propertyFileRunVars = new LinkedHashMap<>();
+    private LinkedHashMap<String, String> defaultRunVars = new LinkedHashMap<>();
     private boolean directRunVars;
+    private boolean sealedRunVars;
 
     protected PickleballRunner() {
         debug("Constructing suite subclass: " + getClass().getName());
@@ -66,6 +74,7 @@ public abstract class PickleballRunner {
 
         globalTestDefaults();
         normalizeReportPortalValues();
+        defaultRunVars = snapshotRunVars();
         debug("Values after globalTestDefaults(): " + values);
 
         mergeResourcePropertiesOverwriting("pickleball.properties");
@@ -91,9 +100,11 @@ public abstract class PickleballRunner {
         syncCanonicalAndAliasKeys();
         syncReportPortalAliases(false);
 
+        suppressNonInvocationControlsWhenSealed();
         PickleballProfiles.Resolution profileResolution =
-                PickleballProfiles.apply(values, systemRunVarOverrides);
+                PickleballProfiles.apply(values, systemRunVarOverrides, defaultRunVars, propertyFileRunVars);
         directRunVars = profileResolution.direct();
+        sealedRunVars = profileResolution.sealed();
 
         applyPkbAliases();
         applyLegacyFrameworkDefaults();
@@ -109,6 +120,7 @@ public abstract class PickleballRunner {
 
         INSTANCE = this;
         debug("Registered singleton instance: " + getClass().getName());
+        PickleballLocalStore.ensureQuietly(PickleballLocalLayout.findProjectRoot(java.nio.file.Path.of("")));
 
         String configuredLogLevel = get(PKB_LOGLEVEL);
         String effectiveLogLevel = configuredLogLevel == null || configuredLogLevel.isBlank()
@@ -125,6 +137,12 @@ public abstract class PickleballRunner {
     public static boolean isDirectRunVarsActive() {
         PickleballRunner current = INSTANCE;
         return current != null && current.directRunVars;
+    }
+
+    /** True when the current runner was resolved from sealed {@code pkb_overriderunvars}. */
+    public static boolean isSealedRunVarsActive() {
+        PickleballRunner current = INSTANCE;
+        return current != null && current.sealedRunVars;
     }
 
     /** @deprecated Use {@link #isDirectRunVarsActive()}. Retained for diagnostic compatibility. */
@@ -144,7 +162,7 @@ public abstract class PickleballRunner {
     }
 
     public synchronized void captureCucumberCliArgs(String[] argv) {
-        if (directRunVars) {
+        if (suppressCucumberCliProjection(directRunVars, sealedRunVars)) {
             return;
         }
 
@@ -159,6 +177,21 @@ public abstract class PickleballRunner {
 
         refreshRunProfile();
         refreshPkbOptions();
+    }
+
+    /** Direct {@code pkb_runvars} and sealed {@code pkb_overriderunvars} must not be mutated by Cucumber CLI. */
+    static boolean suppressCucumberCliProjection(boolean directRunVars, boolean sealedRunVars) {
+        return directRunVars || sealedRunVars;
+    }
+
+    private LinkedHashMap<String, String> snapshotRunVars() {
+        LinkedHashMap<String, String> out = new LinkedHashMap<>();
+        values.forEach((key, value) -> {
+            if (PKB_props.isRunVariableKey(key) && value != null) {
+                out.put(key, value);
+            }
+        });
+        return out;
     }
 
     private void applyLegacyFrameworkDefaults() {
@@ -265,7 +298,12 @@ public abstract class PickleballRunner {
                 Properties props = new Properties();
                 try (InputStream in = url.openStream()) { props.load(in); }
                 for (String key : props.stringPropertyNames()) {
-                    values.put(normalizeConfigurationKey(key), props.getProperty(key));
+                    String normalized = normalizeConfigurationKey(key);
+                    String value = props.getProperty(key);
+                    values.put(normalized, value);
+                    if (PKB_props.isRunVariableKey(normalized)) {
+                        propertyFileRunVars.put(normalized, value);
+                    }
                 }
             }
             debug("Loaded " + count + " resource(s) named " + resourceName);
@@ -294,6 +332,57 @@ public abstract class PickleballRunner {
         }
         debug("Applied " + count + " system property override(s), skipped "
                 + skipped + " derived internal key(s)");
+    }
+
+    /**
+     * File/default {@code pkb_profile} and {@code pkb_runvars} are ignored when sealed JVM input is
+     * present. Invocation-level {@code -Dpkb_profile} / {@code -Dpkb_runvars} stay so apply() can
+     * fail-closed on mixed controls.
+     */
+    private void suppressNonInvocationControlsWhenSealed() {
+        boolean profileFromJvm = notBlank(System.getProperty(PKB_PROFILE));
+        boolean runVarsFromJvm = notBlank(System.getProperty(PKB_RUN_VARS));
+        if (!runVarsFromJvm) {
+            for (String key : System.getProperties().stringPropertyNames()) {
+                if (PKB_props.isRunVarsMemberKey(key)) {
+                    runVarsFromJvm = true;
+                    break;
+                }
+            }
+        }
+        stripNonInvocationControlsWhenSealed(values, profileFromJvm, runVarsFromJvm);
+    }
+
+    static void stripNonInvocationControlsWhenSealed(
+            Map<String, String> values,
+            boolean profileFromJvm,
+            boolean runVarsFromJvm
+    ) {
+        if (!sealedControlPresent(values)) {
+            return;
+        }
+        if (!profileFromJvm) {
+            values.remove(PKB_PROFILE);
+        }
+        if (!runVarsFromJvm) {
+            values.remove(PKB_RUN_VARS);
+            values.keySet().removeIf(PKB_props::isRunVarsMemberKey);
+        }
+    }
+
+    static boolean sealedControlPresent(Map<String, String> values) {
+        if (values == null) {
+            return false;
+        }
+        String compact = values.get(PKB_OVERRIDE_RUN_VARS);
+        if (compact != null && !compact.isBlank()) {
+            return true;
+        }
+        return values.keySet().stream().anyMatch(PKB_props::isOverrideRunVarsMemberKey);
+    }
+
+    private static boolean notBlank(String value) {
+        return value != null && !value.isBlank();
     }
 
     private void mergeReportPortalSourceProperties() {

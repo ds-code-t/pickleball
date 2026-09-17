@@ -26,17 +26,46 @@ class WorkbenchAgentCommandsTest {
         Files.createDirectories(resources);
         Files.writeString(resources.resolve("pickleball.properties"), "pkb_browser=chrome\n");
 
-        Output output = run("hint", tempDir.toString());
+        String previousParallel = System.getProperty("pkb_parallel");
+        String previousRunVarsParallel = System.getProperty("pkb_runvars.pkb_parallel");
+        System.setProperty("pkb_parallel", "80");
+        System.setProperty("pkb_runvars.pkb_parallel", "80");
+        try {
+            Output output = run("hint", tempDir.toString());
 
-        assertEquals(0, output.exitCode());
-        assertTrue(output.stdout().contains("pkb_browser=CHROME_HEADLESS"));
-        assertTrue(output.stdout().contains("NEXT: run discover"));
-        assertFalse(output.stdout().contains("MUST"));
-        assertFalse(output.stdout().contains("pkb_parallel=80"));
+            assertEquals(0, output.exitCode());
+            assertTrue(output.stdout().contains("pkb_browser=CHROME_HEADLESS"));
+            assertTrue(output.stdout().contains("pkb_reportretention=failed"));
+            assertTrue(output.stdout().contains("NEXT: run discover"));
+            assertTrue(output.stdout().contains("Dry-run resolve"));
+            assertTrue(output.stdout().contains("pkb_overriderunvars") || output.stdout().contains("sealed="));
+            assertTrue(output.stdout().contains("provenance="));
+            assertFalse(output.stdout().contains("MUST"));
+            assertFalse(output.stdout().contains("pkb_parallel=80"));
+        } finally {
+            restoreProperty("pkb_parallel", previousParallel);
+            restoreProperty("pkb_runvars.pkb_parallel", previousRunVarsParallel);
+        }
     }
 
     @Test
-    void exportGuidanceUsesDiagnosticCli() throws Exception {
+    void resolveRunVarsPrintsDryRunWithoutStartingTests() throws Exception {
+        Path resources = tempDir.resolve("src/test/resources");
+        Files.createDirectories(resources);
+        Files.writeString(resources.resolve("pickleball.properties"), "pkb_browser=chrome\n");
+
+        Output output = run("resolve-runvars", tempDir.toString());
+
+        assertEquals(0, output.exitCode());
+        assertTrue(output.stdout().contains("Dry-run resolve"));
+        assertTrue(output.stdout().contains("sealed="));
+        assertTrue(output.stdout().contains("pkb_overriderunvars"));
+        assertTrue(output.stdout().contains("provenance="));
+        assertFalse(output.stdout().contains("NEXT: run discover"));
+    }
+
+    @Test
+    void exportGuidanceUsesJdkLocalStore() throws Exception {
         Path outputDir = tempDir.resolve("guidance");
         Output output = run("export-guidance", outputDir.toString());
         assertEquals(0, output.exitCode());
@@ -79,6 +108,8 @@ class WorkbenchAgentCommandsTest {
         assertEquals(1, exit);
         assertEquals(1, captured.size());
         assertTrue(captured.getFirst().stream().anyMatch(item -> item.startsWith("-Dpkb_runvars=")));
+        assertTrue(captured.getFirst().stream().anyMatch(item ->
+                item.startsWith("-Dpkb_runvars=") && item.contains("pkb_reportretention=failed")));
         assertTrue(captured.getFirst().contains("-Dpkb_run_purpose=workbench-discover"));
         LastDiscoverSnapshot.Snapshot snapshot = LastDiscoverSnapshot.read(tempDir);
         assertTrue(snapshot.hasRunVars());
@@ -123,6 +154,46 @@ class WorkbenchAgentCommandsTest {
     }
 
     @Test
+    void discoverRetentionAllWritesAll() throws Exception {
+        Path catalogDir = tempDir.resolve("reports/diagnostic-runs");
+        Files.createDirectories(catalogDir);
+        List<List<String>> captured = new ArrayList<>();
+        ByteArrayOutputStream stdout = new ByteArrayOutputStream();
+        int exit = WorkbenchAgentCommands.run(
+                new String[]{"discover", tempDir.toString(), "--tags=@smoke", "--retention=all"},
+                new PrintStream(stdout, true, StandardCharsets.UTF_8),
+                System.err,
+                (project, command, out, err) -> {
+                    captured.add(command);
+                    try {
+                        Files.writeString(catalogDir.resolve("run-catalog.json"), """
+                                {
+                                  "schemaVersion": 1,
+                                  "runs": [
+                                    {
+                                      "runId": "run-all",
+                                      "runProfile": "pkb_browser=CHROME_HEADLESS, pkb_parallel=4, pkb_reportingmode=diagnostic, pkb_reportretention=all, pkb_tags=@smoke",
+                                      "lineage": { "runPurpose": "workbench-discover" }
+                                    }
+                                  ]
+                                }
+                                """);
+                    } catch (Exception failure) {
+                        throw new RuntimeException(failure);
+                    }
+                    return 0;
+                }
+        );
+
+        assertEquals(0, exit);
+        String printed = stdout.toString(StandardCharsets.UTF_8);
+        assertTrue(printed.contains("pkb_reportretention=all"));
+        assertFalse(printed.contains("pkb_reportretention=failed"));
+        assertTrue(captured.getFirst().stream().anyMatch(item ->
+                item.startsWith("-Dpkb_runvars=") && item.contains("pkb_reportretention=all")));
+    }
+
+    @Test
     void confirmRequiresDiscoverSnapshot() {
         ByteArrayOutputStream stderr = new ByteArrayOutputStream();
         int exit = WorkbenchAgentCommands.run(
@@ -145,6 +216,14 @@ class WorkbenchAgentCommandsTest {
                 new PrintStream(stderr, true, StandardCharsets.UTF_8)
         );
         return new Output(exit, stdout.toString(StandardCharsets.UTF_8), stderr.toString(StandardCharsets.UTF_8));
+    }
+
+    private static void restoreProperty(String key, String previous) {
+        if (previous == null) {
+            System.clearProperty(key);
+        } else {
+            System.setProperty(key, previous);
+        }
     }
 
     private record Output(int exitCode, String stdout, String stderr) { }

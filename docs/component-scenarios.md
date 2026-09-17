@@ -302,10 +302,12 @@ Examples:
   | %save_customer | Default Customer | Standard |
 ```
 
+`?customerName` is the optional default slot for `customerName`, not a different Examples column that the body reads as `<?customerName>`. The scenario body still uses `<customerName>`; when the caller omits that value, resolution falls back to `?customerName`. `<?customerName>` reads only the optional slot and does not walk back to `customerName`. See [Optional keys with ?](mapping-and-templating.md#optional-keys-with).
+
 The `%` prefix identifies a reusable component. Values come from the caller's invocation row and matching Examples row.
 
 ## Nesting and reports
 
 The outer `RUN` step remains the parent. Each selected scenario/component/service-call and its executable steps appear beneath it. Final result assignment is infrastructure finalization after the selected scenario subtree completes; it is not authored as another Gherkin child step. Avoid component cycles.
 
-[Previous: Block Conditionals](block-conditionals.md) · [Documentation home](README.md) · [Next: Service-call Scenarios](service-call-scenarios.md)
+[Previous: Log and Assert Steps](log-and-assert-steps.md) · [Documentation home](README.md) · [Next: Service-call Scenarios](service-call-scenarios.md)

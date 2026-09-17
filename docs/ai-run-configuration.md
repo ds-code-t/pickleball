@@ -8,6 +8,7 @@ Do not use these names interchangeably:
 
 - `default_profile` is Pickleball's in-memory snapshot of the normal resolved project RunVars before a named profile or controlled RunVars are applied. It is reference data.
 - `pkb_runvars` is optional **input** for a controlled run. It describes the RunVars the caller wants to control directly.
+- `pkb_overriderunvars` is optional **sealed input** for one run. When it is present and non-blank, that run ignores the normal sources for Pickleball execution RunVars.
 - `pkb_run_profile` is deterministic **output** generated after resolution. It serializes the final Pickleball RunVars and is retained in diagnostics for comparison and replay.
 
 The execution flow is:
@@ -30,7 +31,68 @@ pkb_run_profile
 test execution / diagnostics
 ```
 
-`pkb_run_profile` is internal derived output only. Supplying `pkb_run_profile` or `pkb_run_profile.<pkb_var>` from a JVM property, Pickleball property file, runner configuration, inline profile, or YAML profile is an error. Controlled execution uses only `pkb_runvars` / `pkb_runvars.<pkb_var>`.
+When optional sealed `pkb_overriderunvars` is present and non-blank, that path is skipped for the Pickleball RunVar set:
+
+```text
+pkb_overriderunvars complete map
+        ↓
+pkb_parallel=auto integer stamp only
+        ↓
+pkb_run_profile
+```
+
+`pkb_run_profile` is internal derived output only. Supplying `pkb_run_profile` or `pkb_run_profile.<pkb_var>` from a JVM property, Pickleball property file, runner configuration, inline profile, or YAML profile is an error. Controlled execution uses `pkb_runvars` / `pkb_runvars.<pkb_var>`. Sealed execution uses `pkb_overriderunvars` / `pkb_overriderunvars.<pkb_var>`. Never mix compact and expanded forms of the same control. Never mix sealed input with `pkb_runvars` or a `pkb_profile` selection meant to compose the run.
+
+## Sealed RunVars with `pkb_overriderunvars`
+
+Sealed input is **opt-in**. Missing/null/blank compact `pkb_overriderunvars` and no expanded `pkb_overriderunvars.*` members leaves sealed OFF; current resolution is unchanged.
+
+When sealed is ON for that execution only, Pickleball **ignores sources** for the execution RunVar set; it does not erase the Maven/JVM/env process:
+
+```text
+JVM -D pkb_* → globalTestProperties() → pickleball_local.properties
+→ pickleball.properties → globalTestDefaults()
+→ default_profile → pkb_profile and/or pkb_runvars
+→ inherit missing execution-context keys
+→ templates
+```
+
+Those layers still exist as the process. They must not change the Pickleball RunVar set for a sealed run. Ambient `-Dpkb_*` values that are not inside the sealed map have no effect. Cucumber CLI tag/name/glue projection must not mutate the sealed set.
+
+The sealed payload is already-resolved literals, plus `${protected:<pkb-key>}` for secrets. Do not resolve `<default_profile.x>`, named-profile templates, or `<config:...>` / `<configs...>` inside sealed input. Only execution RunVars (`PKB_props.isRunVariableKey`) are allowed. Reject lineage keys, `pkb_profile`, `pkb_runvars`, `pkb_run_profile`, and `pkb_options`. `pkb_overriderunvars` / `pkb_overriderunvars.*` are CONTROLS, not execution RunVars, and must not appear inside `pkb_run_profile`.
+
+These six keys MUST be present (blank allowed as a tombstone; a missing key is an error; do not inherit):
+
+```text
+pkb_glue
+pkb_features
+pkb_datapath
+pkb_callpath
+pkb_componentpath
+pkb_configpath
+```
+
+Omitted optional RunVars stay absent. Do not fill them from files, defaults, JVM `-D`, env, or profiles.
+
+`pkb_parallel=auto` is the only allowed derived mutation: resolve to an integer at start and stamp it into `pkb_run_profile`. Numeric parallel is unchanged. Sealed runs still write `pkb_run_profile` and `runProfileFingerprint`.
+
+Compact form:
+
+```text
+-Dpkb_overriderunvars="pkb_glue=com.example.steps, pkb_features=classpath:features, pkb_datapath=, pkb_callpath=src/test/resources/calls, pkb_componentpath=src/test/resources/component, pkb_configpath=configs, pkb_browser=CHROME_HEADLESS, pkb_tags=@smoke"
+```
+
+Expanded form uses the same grammar as `pkb_runvars.<pkb_var>`. Never mix compact and expanded `pkb_overriderunvars` in one invocation.
+
+Agent flow:
+
+1. Dry-run resolve (`PKB_props.resolveRunVars` / `DiagnosticCli resolve-runvars` / Workbench `hint`) without starting tests.
+2. Inspect the fully resolved map, provenance, compact profile, and fingerprint.
+3. Edit a **complete** map that includes the six context keys.
+4. Launch with `pkb_overriderunvars`.
+5. Compare `runProfileFingerprint` after the sealed run.
+
+Default Discover/Confirm stay on `pkb_runvars`. When a Workbench snapshot is marked sealed, the next worker launch uses `-Dpkb_overriderunvars=<compact complete map>`, never `-Dpkb_run_profile=`. If no sealed snapshot, replay stays on today's `pkb_runvars`.
 
 ## Normal configuration
 
@@ -290,7 +352,50 @@ PKB_props.runVars(Map.of(
 ));
 ```
 
-Configuration-source API:
+Sealed input (clears the other override form first, the same way `runVars` clears compact vs expanded):
+
+```java
+PKB_props.overrideRunVars("pkb_glue=com.example.steps, pkb_features=classpath:features, pkb_datapath=, pkb_callpath=calls, pkb_componentpath=component, pkb_configpath=configs, pkb_browser=firefox");
+```
+
+```java
+PKB_props.overrideRunVars(Map.of(
+        "pkb_glue", "com.example.steps",
+        "pkb_features", "classpath:features",
+        "pkb_datapath", "",
+        "pkb_callpath", "calls",
+        "pkb_componentpath", "component",
+        "pkb_configpath", "configs",
+        "pkb_browser", "firefox"
+));
+```
+
+Dry-run resolve does **not** start tests or browsers:
+
+```java
+PKB_props.ResolvedRunVars preview = PKB_props.resolveRunVars(values);
+preview.runVars();
+preview.runProfile();
+preview.fingerprint();
+preview.sealed();
+preview.provenance(); // override | runvars | profile | jvm | inherited-context | default | properties
+```
+
+Per-key provenance tokens:
+
+| Token | Source |
+|---|---|
+| `override` | sealed `pkb_overriderunvars` |
+| `runvars` | compact or expanded `pkb_runvars` |
+| `profile` | selected named `pkb_profile` |
+| `jvm` | JVM `-Dpkb_*` overlays passed to resolve |
+| `inherited-context` | one of the six execution-context keys inherited because the controlled/profile map omitted it |
+| `default` | `globalTestDefaults()` snapshot captured before property files |
+| `properties` | `pickleball.properties` / `pickleball_local.properties` (and the values bag in a dry-run that loads those files) |
+
+A later `runvars` / `profile` / `inherited-context` / `jvm` stamp overwrites the same key. Unstamped keys fall back to `default`. Dry-run `PKB_props.resolveRunVars(values, jvm)` stamps `values` as `properties` and the second map as `jvm`.
+
+Canonical output getter:
 
 ```java
 PKB_props.configPath("configs");
@@ -309,6 +414,8 @@ There are no `PKB_props.runProfile(String)` / `runProfile(Map)` input setters. `
 When operating in a consumer project:
 
 - when you launch tests and know the intended execution settings, default to `pkb_runvars` as the authoritative test-run input;
+- to freeze a complete snapshot, dry-run resolve, inspect, then launch sealed `pkb_overriderunvars`; absent that input, resolution is unchanged;
+- do not mix sealed input with `pkb_runvars` or a composing `pkb_profile`;
 - use ordinary JVM `pkb_*` RunVars or `pkb_profile` instead only when intentionally testing normal configuration/profile precedence or when the user requests those semantics;
 - never supply `pkb_run_profile` as input;
 - treat `pkb_run_profile` as retained resolved output;
@@ -335,6 +442,6 @@ pkb_reportretention=failed
 
 plus the narrowest useful `pkb_tags` / `pkb_name`. Multi-scenario Discover/Confirm use that high parallelism. Live isolate stays one paused scenario on a headless CLI session started with Maven-exec `isolate`.
 
-After Discover, inspect `pkb_run_profile` from `run-catalog.json`, `run-index.json`, or `summary.json`. Confirm and live isolate replay that retained profile through `pkb_runvars` (LastDiscoverSnapshot). If there is no prior Discover snapshot, Workbench says so; it does not silently re-resolve from project defaults.
+After Discover, inspect `pkb_run_profile` from `run-catalog.json`, `run-index.json`, or `summary.json`. Confirm and live isolate replay that retained profile through `pkb_runvars` (LastDiscoverSnapshot) unless the snapshot is marked sealed, in which case the next worker launch uses `-Dpkb_overriderunvars=<compact complete map>`. If there is no prior Discover snapshot, Workbench says so; it does not silently re-resolve from project defaults. The Workbench sealed-RunVars panel, if unused, changes no behavior; Apply writes a sealed snapshot for the **next** launch and does not mutate an in-flight worker.
 
 Never supply `pkb_run_profile` as input. Workbench MCP `workbench_diagnostic_catalog`, `workbench_diagnostic_run`, and `workbench_diagnostic_summary` return the same retained `runProfile` when present. The consumer worker resolves the same snapshot internally through `PickleballRunner`; it does not accept `pkb_run_profile` as input.

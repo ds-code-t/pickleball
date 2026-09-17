@@ -11,6 +11,7 @@ import tools.dscode.control.protocol.ControlBridgeMappingSnapshotResult;
 import tools.dscode.control.protocol.ControlBridgeServiceCallResult;
 import tools.dscode.control.protocol.ControlBridgeStepOverride;
 import tools.dscode.control.protocol.ControlBridgeStepOverrideResult;
+import tools.dscode.control.protocol.ControlBridgeStepResolution;
 import tools.dscode.control.protocol.ControlBridgeValueResult;
 import tools.dscode.workbench.lease.WorkbenchControlLease;
 import tools.dscode.workbench.lease.WorkbenchControlLeaseSnapshot;
@@ -71,6 +72,18 @@ public interface WorkbenchServices extends AutoCloseable {
             int endLine
     );
 
+    default void loadPickerScenario(
+            List<String> lines,
+            Path originFile,
+            String scenarioName,
+            int startLine,
+            int endLine,
+            int exampleRow,
+            String exampleLabel
+    ) {
+        loadPickerScenario(lines, originFile, scenarioName, startLine, endLine);
+    }
+
     void loadDefaultDemo();
 
     void replaceLiveDocument(List<String> lines);
@@ -98,6 +111,8 @@ public interface WorkbenchServices extends AutoCloseable {
     Optional<WorkerLogFiles> workerLogFiles();
 
     ControlBridgeCallResult executeStep(String text, String argument);
+
+    ControlBridgeStepResolution resolveStep(String text, String argument);
 
     ControlBridgeValueResult mappingGet(String mapReference, String key);
 
@@ -151,6 +166,8 @@ public interface WorkbenchServices extends AutoCloseable {
     Object diagnosticScenarioSummary(String runId, String scenarioId);
 
     Object emitInvestigation(Map<String, ?> investigation);
+
+    Object go(Map<String, ?> link);
 
     @Override
     void close();
