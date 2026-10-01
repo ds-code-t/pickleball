@@ -59,13 +59,16 @@ mvn -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java \
 "-Dexec.args=discover --tags=@smoke"
 "-Dexec.args=discover --tags=@smoke --retention=all"
 "-Dexec.args=confirm --tags=@smoke --name='The failing scenario'"
-"-Dexec.args=isolate"
+"-Dexec.args=confirm --tags=@smoke --example='1 2 5 3.4 7-11'"
+"-Dexec.args=isolate --example=1.1"
 "-Dexec.args=execute-step --text='Given stay'"
 ```
 
-Same launcher; only change `-Dexec.args`. `isolate` starts a detached headless session; later execs are one-shot HTTP clients.
+Same launcher; only change `-Dexec.args`. `isolate` starts a detached headless session; later execs are one-shot HTTP clients. `isolate` still forces `pkb_parallel=1`.
 
-`hint`, `discover`, and `confirm` accept `--tags` / `--name` plus `--retention=all|failed|none` (or `--retention <value>`). Discover and hint default to `failed`. Confirm without `--retention` keeps the Discover snapshot value. This overlay is launcher/planner-only; do not pass `--retention` to the Workbench controller `isolate` / `session` parser. Ordinary diagnostic runs still default to `pkb_reportretention=all`.
+`hint`, `discover`, `confirm`, and `isolate` accept `--example` / `--example=` the same way they accept `--tags` and `--name`. The value becomes `pkb_example` inside `pkb_runvars` (or inside `pkb_overriderunvars` when the Discover snapshot is sealed). That is the headless way to keep specific Examples rows. A normal Scenario counts as row 1. `pkb_example` is not a tag. `--example='1 2 5 3.4 7-11'` keeps those rows, in source order, in each scenario that tags and name already selected. Play still picks one visible row in the Workbench player. Headless selection is `pkb_example`. Do not start the GUI.
+
+`hint`, `discover`, and `confirm` accept `--tags` / `--name` / `--example` plus `--retention=all|failed|none` (or `--retention <value>`). Discover and hint default to `failed`. Confirm without `--retention` keeps the Discover snapshot value. This retention overlay is launcher/planner-only; do not pass `--retention` to the Workbench controller `isolate` / `session` parser. Ordinary diagnostic runs still default to `pkb_reportretention=all`.
 
 Default Discover/Confirm stay on `pkb_runvars`. `hint` and `resolve-runvars` print a dry-run resolve preview (`PKB_props.resolveRunVars`) that does not start tests. Optional sealed `pkb_overriderunvars` is opt-in: resolve → inspect → complete map including the six context keys → `-Dpkb_overriderunvars=<compact>` → compare `runProfileFingerprint`. When a LastDiscoverSnapshot is marked sealed, the next worker launch uses `-Dpkb_overriderunvars=<compact complete map>`, never `-Dpkb_run_profile=`. Unused, sealed input changes no behavior.
 

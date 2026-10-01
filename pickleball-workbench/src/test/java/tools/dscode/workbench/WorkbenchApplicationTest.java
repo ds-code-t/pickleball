@@ -210,6 +210,16 @@ class WorkbenchApplicationTest {
                 .contains("Usage: pickleball-workbench mcp <project>"));
     }
 
+    @Test
+    void projectCommandArgsForwardsExampleWithoutAbsorbingItIntoName() {
+        WorkbenchApplication.IsolateArgs parsed = WorkbenchApplication.projectCommandArgs(
+                new String[]{"isolate", "C:/consumer", "--name=The", "failing", "scenario", "--example=1", "2", "5"},
+                "isolate"
+        );
+        assertEquals("The failing scenario", parsed.name());
+        assertEquals("1 2 5", parsed.example());
+    }
+
     private static Output run(String... args) {
         ByteArrayOutputStream stdout = new ByteArrayOutputStream();
         ByteArrayOutputStream stderr = new ByteArrayOutputStream();

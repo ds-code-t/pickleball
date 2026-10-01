@@ -23,18 +23,28 @@ public final class AgentDiscoverPlanner {
     }
 
     public static Plan discover(Path projectRoot, String tags, String name) {
-        return discover(projectRoot, tags, name, null);
+        return discover(projectRoot, tags, name, null, null);
     }
 
     public static Plan discover(Path projectRoot, String tags, String name, String retention) {
+        return discover(projectRoot, tags, name, retention, null);
+    }
+
+    public static Plan discover(
+            Path projectRoot,
+            String tags,
+            String name,
+            String retention,
+            String example
+    ) {
         AgentBrowserLadder.Decision browser = AgentBrowserLadder.select(projectRoot);
         LinkedHashMap<String, String> values = baseDiscoverVars(browser.browser());
-        overlaySelection(values, tags, name, retention);
+        overlaySelection(values, tags, name, retention, example);
         return new Plan(projectRoot, browser, PKB_props.serializeRunVars(values), blankToNull(tags), blankToNull(name));
     }
 
     public static String isolateRunVars(Map<String, String> retainedProfile, String tags, String name) {
-        return isolateRunVars(retainedProfile, tags, name, null);
+        return isolateRunVars(retainedProfile, tags, name, null, null);
     }
 
     public static String isolateRunVars(
@@ -43,17 +53,27 @@ public final class AgentDiscoverPlanner {
             String name,
             String retention
     ) {
+        return isolateRunVars(retainedProfile, tags, name, retention, null);
+    }
+
+    public static String isolateRunVars(
+            Map<String, String> retainedProfile,
+            String tags,
+            String name,
+            String retention,
+            String example
+    ) {
         if (retainedProfile == null || retainedProfile.isEmpty()) {
             throw new IllegalStateException(missingDiscoverSnapshotMessage());
         }
         LinkedHashMap<String, String> values = copyRunVars(retainedProfile);
         values.put(PKB_props.PKB_PARALLEL, "1");
-        overlaySelection(values, tags, name, retention);
+        overlaySelection(values, tags, name, retention, example);
         return PKB_props.serializeRunVars(values);
     }
 
     public static String confirmRunVars(Map<String, String> retainedProfile, String tags, String name) {
-        return confirmRunVars(retainedProfile, tags, name, null);
+        return confirmRunVars(retainedProfile, tags, name, null, null);
     }
 
     public static String confirmRunVars(
@@ -62,11 +82,21 @@ public final class AgentDiscoverPlanner {
             String name,
             String retention
     ) {
+        return confirmRunVars(retainedProfile, tags, name, retention, null);
+    }
+
+    public static String confirmRunVars(
+            Map<String, String> retainedProfile,
+            String tags,
+            String name,
+            String retention,
+            String example
+    ) {
         if (retainedProfile == null || retainedProfile.isEmpty()) {
             throw new IllegalStateException(missingDiscoverSnapshotMessage());
         }
         LinkedHashMap<String, String> values = copyRunVars(retainedProfile);
-        overlaySelection(values, tags, name, retention);
+        overlaySelection(values, tags, name, retention, example);
         return PKB_props.serializeRunVars(values);
     }
 
@@ -97,10 +127,12 @@ public final class AgentDiscoverPlanner {
             LinkedHashMap<String, String> values,
             String tags,
             String name,
-            String retention
+            String retention,
+            String example
     ) {
         if (tags != null && !tags.isBlank()) values.put(PKB_props.PKB_TAGS, tags.trim());
         if (name != null && !name.isBlank()) values.put(PKB_props.PKB_NAME, name.trim());
+        if (example != null && !example.isBlank()) values.put(PKB_props.PKB_EXAMPLE, example.trim());
         if (retention != null && !retention.isBlank()) {
             values.put(
                     PKB_props.PKB_REPORT_RETENTION,

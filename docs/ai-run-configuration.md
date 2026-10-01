@@ -440,7 +440,7 @@ pkb_loglevel=warn
 pkb_reportretention=failed
 ```
 
-plus the narrowest useful `pkb_tags` / `pkb_name`. Multi-scenario Discover/Confirm use that high parallelism. Live isolate stays one paused scenario on a headless CLI session started with Maven-exec `isolate`.
+plus the narrowest useful `pkb_tags` / `pkb_name`. An agent can also pass `pkb_example`, or `confirm` / `isolate --example=...`, to run one or more Examples rows without the GUI. A normal Scenario counts as row 1. `--example='1 2 5 3.4 7-11'` keeps those rows in each scenario that tags and name already selected. `pkb_example` is not a tag. Multi-scenario Discover/Confirm use that high parallelism. Live isolate stays one paused scenario (`pkb_parallel=1`) on a headless CLI session started with Maven-exec `isolate`.
 
 After Discover, inspect `pkb_run_profile` from `run-catalog.json`, `run-index.json`, or `summary.json`. Confirm and live isolate replay that retained profile through `pkb_runvars` (LastDiscoverSnapshot) unless the snapshot is marked sealed, in which case the next worker launch uses `-Dpkb_overriderunvars=<compact complete map>`. If there is no prior Discover snapshot, Workbench says so; it does not silently re-resolve from project defaults. The Workbench sealed-RunVars panel, if unused, changes no behavior; Apply writes a sealed snapshot for the **next** launch and does not mutate an in-flight worker.
 

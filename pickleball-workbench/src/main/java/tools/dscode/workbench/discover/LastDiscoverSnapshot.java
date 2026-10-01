@@ -72,11 +72,20 @@ public final class LastDiscoverSnapshot {
     }
 
     public static Map<String, String> workerSystemProperties(Path projectRoot, String tags, String name) {
+        return workerSystemProperties(projectRoot, tags, name, null);
+    }
+
+    public static Map<String, String> workerSystemProperties(
+            Path projectRoot,
+            String tags,
+            String name,
+            String example
+    ) {
         Snapshot snapshot = require(projectRoot);
         if (snapshot.sealed()) {
-            return Map.of("pkb_overriderunvars", replay(snapshot, true, tags, name));
+            return Map.of("pkb_overriderunvars", replay(snapshot, true, tags, name, example));
         }
-        return Map.of("pkb_runvars", replay(snapshot, true, tags, name));
+        return Map.of("pkb_runvars", replay(snapshot, true, tags, name, example));
     }
 
     public static Map<String, String> workerSystemPropertiesIfPresent(Path projectRoot) {
@@ -89,6 +98,10 @@ public final class LastDiscoverSnapshot {
     }
 
     public static String replay(Snapshot snapshot, boolean isolate, String tags, String name) {
+        return replay(snapshot, isolate, tags, name, null);
+    }
+
+    public static String replay(Snapshot snapshot, boolean isolate, String tags, String name, String example) {
         Map<String, String> values = new TreeMap<>();
         if (snapshot.runVars() != null) values.putAll(snapshot.runVars());
         if (values.isEmpty() && snapshot.runProfile() != null && !snapshot.runProfile().isBlank()) {
@@ -98,6 +111,7 @@ public final class LastDiscoverSnapshot {
         if (isolate) values.put("pkb_parallel", "1");
         if (tags != null && !tags.isBlank()) values.put("pkb_tags", tags.trim());
         if (name != null && !name.isBlank()) values.put("pkb_name", name.trim());
+        if (example != null && !example.isBlank()) values.put("pkb_example", example.trim());
         return serializeCompact(values);
     }
 

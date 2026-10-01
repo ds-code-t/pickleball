@@ -30,6 +30,7 @@ final class WorkbenchCommandLine {
             Path outputDirectory,
             String tags,
             String name,
+            String example,
             String retention,
             String[] forwarded
     ) {
@@ -50,19 +51,22 @@ final class WorkbenchCommandLine {
     static Parsed parse(String[] args) {
         Path cwd = Path.of("").toAbsolutePath().normalize();
         if (args == null || args.length == 0) {
-            return new Parsed("ui", cwd, null, null, null, null, new String[]{"ui", cwd.toString()});
+            return new Parsed("ui", cwd, null, null, null, null, null, new String[]{"ui", cwd.toString()});
         }
         String command = args[0];
         if ("export-guidance".equals(command)) {
             Path output = args.length >= 2 && !isFlag(args[1])
                     ? Path.of(args[1])
                     : Path.of(".pickleball");
-            return new Parsed(command, cwd, output, null, null, null, args.clone());
+            return new Parsed(command, cwd, output, null, null, null, null, args.clone());
         }
 
         String tags = null;
         String name = null;
+        String example = null;
         String retention = null;
+        boolean absorbName = false;
+        boolean absorbExample = false;
         Path project = null;
         List<String> rest = new ArrayList<>();
         for (int index = 1; index < args.length; index++) {
@@ -78,10 +82,26 @@ final class WorkbenchCommandLine {
             }
             if (token.startsWith("--name=")) {
                 name = token.substring("--name=".length());
+                absorbName = true;
+                absorbExample = false;
                 continue;
             }
             if ("--name".equals(token) && index + 1 < args.length) {
                 name = args[++index];
+                absorbName = true;
+                absorbExample = false;
+                continue;
+            }
+            if (token.startsWith("--example=")) {
+                example = blankToNull(token.substring("--example=".length()));
+                absorbExample = example != null;
+                absorbName = false;
+                continue;
+            }
+            if ("--example".equals(token) && index + 1 < args.length) {
+                example = blankToNull(args[++index]);
+                absorbExample = example != null;
+                absorbName = false;
                 continue;
             }
             if (token.startsWith("--retention=")) {
@@ -97,8 +117,13 @@ final class WorkbenchCommandLine {
                 rest.add(token);
                 continue;
             }
-            // Maven exec splits unquoted --name=The failing scenario into extra tokens.
-            if (name != null && !looksLikeProject(token)) {
+            // Maven exec splits unquoted --name=The failing scenario and --example=1 2 5
+            // into extra tokens. The selector set most recently absorbs them.
+            if (absorbExample && example != null && !looksLikeProject(token)) {
+                example = example + " " + token;
+                continue;
+            }
+            if (absorbName && name != null && !looksLikeProject(token)) {
                 name = name + " " + token;
                 continue;
             }
@@ -122,10 +147,20 @@ final class WorkbenchCommandLine {
                 forwarded.add("--name");
                 forwarded.add(name);
             }
+            if (example != null && !example.isBlank()) {
+                forwarded.add("--example");
+                forwarded.add(example);
+            }
             forwarded.addAll(rest);
-            return new Parsed(command, project, null, tags, name, retention, forwarded.toArray(String[]::new));
+            return new Parsed(
+                    command, project, null, tags, name, example, retention, forwarded.toArray(String[]::new)
+            );
         }
-        return new Parsed(command, project, null, tags, name, retention, args.clone());
+        return new Parsed(command, project, null, tags, name, example, retention, args.clone());
+    }
+
+    private static String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value;
     }
 
     private static String parseRetention(String value) {

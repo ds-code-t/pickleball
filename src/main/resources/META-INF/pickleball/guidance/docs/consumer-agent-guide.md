@@ -16,8 +16,8 @@ mvn -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java "-Dexec.mainClass=tools.ds
 
 Same launcher for `hint`, `discover`, `confirm`, `resolve-runvars`, `isolate`, `execute-step`, `status`, `events`, and `stop` — change `exec.args` only.
 
-1. **Discover** — `-Dexec.args=discover` (optional `--tags` / `--name` / `--retention`). Workbench applies complete AI `pkb_runvars`: browser ladder, high/auto parallel, diagnostic, warn, failed retention. Override retention with `--retention=all|failed|none` (`--retention <value>` also works). It wraps consumer `mvn test`. Do not start a live worker to run the whole suite. Then read `run-catalog.json` and the retained `pkb_run_profile`.
-2. **Confirm** — `-Dexec.args=confirm --tags=... --name=...` with the same Discover snapshot (ordinary LastDiscoverSnapshot replayed as `pkb_runvars`) and narrow tags/name. Never supply `pkb_run_profile` as input. A snapshot marked sealed is for the next worker/isolate launch as `-Dpkb_overriderunvars=<compact complete map>`, not Confirm.
+1. **Discover** — `-Dexec.args=discover` (optional `--tags` / `--name` / `--example` / `--retention`). Workbench applies complete AI `pkb_runvars`: browser ladder, high/auto parallel, diagnostic, warn, failed retention. Override retention with `--retention=all|failed|none` (`--retention <value>` also works). It wraps consumer `mvn test`. Do not start a live worker to run the whole suite. Then read `run-catalog.json` and the retained `pkb_run_profile`.
+2. **Confirm** — `-Dexec.args=confirm --tags=... --name=... --example=...` with the same Discover snapshot (ordinary LastDiscoverSnapshot replayed as `pkb_runvars`) and narrow tags/name/example rows. Never supply `pkb_run_profile` as input. A snapshot marked sealed is for the next worker/isolate launch as `-Dpkb_overriderunvars=<compact complete map>`, not Confirm. `pkb_example` is not a tag. A normal Scenario counts as row 1. `--example='1 2 5 3.4 7-11'` keeps those Examples rows in each selected scenario.
 3. **Live debug** — `-Dexec.args=isolate` (alias `session-start`) starts one long-lived headless Workbench session from the last Discover snapshot and prints `ACK SESSION`. Then `-Dexec.args=execute-step --text='...'`, `status`, `events`, and `stop`. Each Maven exec exits; the session stays up.
 4. **Emit the human handoff, then edit real consumer source** — write `.pickleball/investigations/<id>/` then in chat print the six-line bottom-line block (Gherkin/business first) plus `.pickleball/investigations/<id>/report.html`. Do not dump MCP transcripts, TRACE, or PNG analysis.
 
@@ -33,7 +33,7 @@ After Discover has found the failing scenario, `isolate` starts a headless Workb
 2. `-Dexec.args=execute-step --text='...'` — queues Gherkin on the paused worker. `--ack-only` returns immediately; default `--wait` polls `status`.
 3. `-Dexec.args=status` or `status <id>`; `-Dexec.args=events`.
 4. `-Dexec.args=stop` (or `kill`) when finished.
-5. Confirm with Workbench `confirm` (`-Dexec.args=confirm --tags=... --name=...`). Read the pack with `workbench_diagnostic_catalog`, `workbench_diagnostic_run`, and `workbench_diagnostic_summary` when those tools already exist.
+5. Confirm with Workbench `confirm` (`-Dexec.args=confirm --tags=... --name=... --example=...`). Read the pack with `workbench_diagnostic_catalog`, `workbench_diagnostic_run`, and `workbench_diagnostic_summary` when those tools already exist.
 6. Emit the human handoff with `workbench_investigation_emit` or `DiagnosticCli emit-investigation`. In chat print the six-line bottom-line block, then the `report.html` path. If a UI session is attached, at most two `wb://` links may follow. If no UI, omit `wb://`.
 
 `execute-step` / `workbench_execute_step` returns a structured `SUCCESS` / `FAILED` / `UNAVAILABLE` result. A FAILED Gherkin hypothesis does not end the worker and does not fail the paused scenario. `workbench_step_resolve` maps one Gherkin step to its Java definition (or `DYNAMIC` / `OVERRIDE` / `UNMATCHED`) without executing it. Page events with `afterSequence` and a small `limit` (default 100, max 500). Live buffer edits do not require `workbench_sync` and do not write the original `.feature` until explicit Save (`workbench_request_save`). Worker restart without rebuild already exists (`workbench_worker_restart`). Step Overrides compile worker-side (`workbench_step_override_compile`).
@@ -156,7 +156,7 @@ pkb_loglevel=warn
 pkb_reportretention=failed
 ```
 
-Use the narrowest `pkb_tags` / `pkb_name` that isolate the failure. Do not add the `pretty` plugin; it is console noise for agents. Discover defaults to `pkb_reportretention=failed`, which keeps dense evidence for failing scenarios and does not retain it for passing ones. Override with Workbench `--retention=all|failed|none`. Workbench `hint` prints the estimated integer `pkb_parallel` and the selected browser for the current project/JVM. `pkb_parallel=auto` also resolves to that estimate at run start and stamps the integer into `pkb_run_profile`.
+Use the narrowest `pkb_tags` / `pkb_name` / `pkb_example` that isolate the failure. `pkb_example` selects Examples rows after tags and name. It is not a tag. A normal Scenario counts as row 1, and `--example='1 2 5 3.4 7-11'` is the list form. Do not add the `pretty` plugin; it is console noise for agents. Discover defaults to `pkb_reportretention=failed`, which keeps dense evidence for failing scenarios and does not retain it for passing ones. Override with Workbench `--retention=all|failed|none`. Workbench `hint` prints the estimated integer `pkb_parallel` and the selected browser for the current project/JVM. `pkb_parallel=auto` also resolves to that estimate at run start and stamps the integer into `pkb_run_profile`.
 
 These are documented agent defaults, not `PickleballTests` human defaults (`pretty`, `@all`, often headed Chrome). Example confirmation after Discover:
 
@@ -293,9 +293,9 @@ The agent-facing name is Workbench. From a Maven consumer where Pickleball is on
 ```text
 mvn -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java "-Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher" "-Dexec.classpathScope=test" "-Dexec.args=export-guidance .pickleball"
 "-Dexec.args=hint"
-"-Dexec.args=discover [--tags <expr>] [--name <expr>]"
-"-Dexec.args=confirm [--tags <expr>] [--name <expr>]"
-"-Dexec.args=isolate"
+"-Dexec.args=discover [--tags <expr>] [--name <expr>] [--example <rows>]"
+"-Dexec.args=confirm [--tags <expr>] [--name <expr>] [--example <rows>]"
+"-Dexec.args=isolate [--example <rows>]"
 "-Dexec.args=execute-step --text='Given stay'"
 "-Dexec.args=status"
 "-Dexec.args=events"

@@ -46,10 +46,18 @@ public final class WorkbenchAgentCommandChecks {
         retained.put(PKB_props.PKB_GLUE, "com.example.pickleball");
         retained.put(PKB_props.PKB_REPORTING_MODE, "diagnostic");
 
-        String isolate = AgentDiscoverPlanner.isolateRunVars(retained, "@broken", null);
+        String isolate = AgentDiscoverPlanner.isolateRunVars(retained, "@broken", null, null, "1 2 5");
         assertTrue(isolate.contains("pkb_browser=CHROME_HEADLESS"));
         assertTrue(isolate.contains("pkb_parallel=1"));
+        assertTrue(isolate.contains("pkb_example=1 2 5"));
         assertTrue(isolate.contains("pkb_glue=com.example.pickleball"));
+        assertFalse(isolate.contains("pkb_parallel=10"));
+
+        String[] forwarded = PickleballWorkbenchLauncher.normalizedArguments(
+                new String[]{"isolate", "--example=1", "2", "5"}
+        );
+        assertEquals("--example", forwarded[2]);
+        assertEquals("1 2 5", forwarded[3]);
         assertFalse(isolate.contains("pkb_run_profile="));
         assertFalse(isolate.contains("@all"));
         assertFalse(isolate.contains("pretty"));
@@ -61,9 +69,10 @@ public final class WorkbenchAgentCommandChecks {
                 PKB_props.PKB_BROWSER, "GRID_CHROME",
                 PKB_props.PKB_PARALLEL, "6"
         );
-        String confirm = AgentDiscoverPlanner.confirmRunVars(retained, "@one", null);
+        String confirm = AgentDiscoverPlanner.confirmRunVars(retained, "@one", null, null, "1.1");
         assertTrue(confirm.contains("pkb_browser=GRID_CHROME"));
         assertTrue(confirm.contains("pkb_parallel=6"));
         assertTrue(confirm.contains("pkb_tags=@one"));
+        assertTrue(confirm.contains("pkb_example=1.1"));
     }
 }

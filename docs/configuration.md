@@ -358,6 +358,7 @@ The existing path semantics for `pkb_features`, `pkb_datapath`, `pkb_callpath`, 
 | `pkb_configpath` | `configs` | source behind the stable `configs` mapping |
 | `pkb_tags` | `@smoke and not @slow` | Cucumber tag expression |
 | `pkb_name` | `Checkout.*` | scenario-name expression |
+| `pkb_example` | `1 2 5 3.4 7-11` | Examples-row filter applied after tags and name. Not a tag |
 | `pkb_environment` | `QA` | project environment label |
 | `pkb_browser` | `chrome` | browser configuration name looked up under the `configs` mapping (`CHROME_HEADLESS` uses the consumer yaml when present, otherwise Pickleball's bundled headless Chrome) |
 | `pkb_profile` | `qa,browser_firefox` | selected named profile(s) |
@@ -373,6 +374,24 @@ The existing path semantics for `pkb_features`, `pkb_datapath`, `pkb_callpath`, 
 | `pkb_diagnostic_output` | `reports/diagnostic-runs` | optional diagnostic output root |
 | `pkb_platformlog` | `default`, `default+git`, `none`, etc. | platform/caller log stamps |
 | `pkb_gitsnapshot` | `metadata`, `diff`, `none` | diagnostic Git/source provenance |
+
+## Example row filter
+
+`pkb_example` keeps specific Examples rows from scenarios that `pkb_tags`, `pkb_name`, and, on a component or `listPickles` scan, `pkb_featurename` have already selected. Where those filters select scenarios, `pkb_example` runs after them. It is not a tag and it does not extend Cucumber tag expressions (`and` / `or` / `not`). It has no `cucumber.filter` alias. `pkb_name` still matches the Scenario or Scenario Outline title and still selects every row until `pkb_example` runs. A normal Maven run applies the same filter after Cucumber's tag and name filters. It does not start honoring `pkb_featurename` on that engine path.
+
+Absent or blank `pkb_example` adds no filter.
+
+Tokens are separated by whitespace:
+
+- An integer `N` is overall value row `N` of that scenario, counted straight through every Examples table. The header is not a value row. `5` with two tables of 3 value rows is table 2, row 2.
+- `A.B` is table `A`, value row `B` inside that table. `3.5` is the fifth value row of the third Examples table.
+- `Low-High` is an inclusive range of overall indexes only. `7-11` is overall rows 7 through 11. A range is never a table range.
+
+A list mixes these. `1 2 5 3.4 7-11` keeps overall rows 1, 2, and 5, plus table 3 row 4, plus overall rows 7 through 11. Matching rows are emitted in source order. A row named more than once runs once.
+
+Each selected scenario is filtered on its own. A normal Scenario is one implicit Examples row, so `1` and `1.1` keep it and any other integer drops it. An outline with no matching row contributes nothing. The run does not wrap, borrow a row from another table, or fail only because one outline was shorter than the index. If the filter leaves zero pickles, the run fails the same way an empty tag or name selection fails. Invalid syntax rejects the run. That includes `0`, negatives, leading zeros, `3.`, `.5`, `2.0`, `1.2.3`, `5-3`, `5-`, `-5`, and a range used as a table selector.
+
+`pkb_order` and `pkb_limit` still apply after this filter.
 
 Other existing `pkb_*` RunVars retain their previous behavior unless specifically documented otherwise.
 
@@ -417,6 +436,8 @@ Pickleball synchronizes its main selection aliases with Cucumber properties, inc
 - `pkb_features` ↔ Cucumber feature locations;
 - `pkb_tags` ↔ Cucumber tag filter;
 - `pkb_name` ↔ Cucumber name filter.
+
+`pkb_example` is not one of those aliases. Put it in `pkb_runvars` (or pass `--example` to Discover, Confirm, and isolate). It is not a Cucumber CLI selector.
 
 Normal command-line Cucumber projection remains supported. When controlled direct RunVars are active, projected Cucumber CLI selection values do not mutate the controlled RunVar set; put intended values in `pkb_runvars`.
 

@@ -63,7 +63,7 @@ public final class WorkbenchAgentCommands {
 
     private static int hint(WorkbenchCommandLine.Parsed parsed, PrintStream out) {
         AgentDiscoverPlanner.Plan plan = AgentDiscoverPlanner.discover(
-                parsed.project(), parsed.tags(), parsed.name(), parsed.retention()
+                parsed.project(), parsed.tags(), parsed.name(), parsed.retention(), parsed.example()
         );
         out.println("Recommended complete diagnostic Discover `pkb_runvars` (Workbench honors the project browser ladder; headed Chrome / pretty / @all project defaults do not sneak in):");
         out.println("pkb_runvars=" + plan.runVars());
@@ -129,7 +129,7 @@ public final class WorkbenchAgentCommands {
             MavenRunner maven
     ) {
         AgentDiscoverPlanner.Plan plan = AgentDiscoverPlanner.discover(
-                parsed.project(), parsed.tags(), parsed.name(), parsed.retention()
+                parsed.project(), parsed.tags(), parsed.name(), parsed.retention(), parsed.example()
         );
         out.println("Workbench discover " + plan.browser().reason() + ".");
         out.println("pkb_runvars=" + plan.runVars());
@@ -147,7 +147,7 @@ public final class WorkbenchAgentCommands {
         LastDiscoverSnapshot.Snapshot snapshot = LastDiscoverSnapshot.require(parsed.project());
         Map<String, String> retained = LastDiscoverSnapshot.retainedRunVars(snapshot);
         String runVars = AgentDiscoverPlanner.confirmRunVars(
-                retained, parsed.tags(), parsed.name(), parsed.retention()
+                retained, parsed.tags(), parsed.name(), parsed.retention(), parsed.example()
         );
         out.println("Workbench confirm replaying Discover snapshot as pkb_runvars.");
         out.println("pkb_runvars=" + runVars);
@@ -181,7 +181,7 @@ public final class WorkbenchAgentCommands {
             out.println("run-catalog.json: " + latest.catalog());
             out.println("retained pkb_run_profile: " + latest.runProfile());
             if (writeSnapshot) {
-                out.println("NEXT: confirm --tags/--name. For live debug: isolate (starts session), then execute-step / status / events / stop.");
+                out.println("NEXT: confirm --tags/--name/--example. For live debug: isolate (starts session), then execute-step / status / events / stop.");
             }
             return mavenExit;
         } catch (Exception failure) {

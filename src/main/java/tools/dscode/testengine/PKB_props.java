@@ -19,6 +19,7 @@ public final class PKB_props {
     public static final String PKB_CONFIG_PATH = PKB_PREFIX + "configpath";
     public static final String PKB_TAGS = PKB_PREFIX + "tags";
     public static final String PKB_NAME = PKB_PREFIX + "name";
+    public static final String PKB_EXAMPLE = PKB_PREFIX + "example";
     public static final String PKB_ORDER = PKB_PREFIX + "order";
     public static final String PKB_LIMIT = PKB_PREFIX + "limit";
     public static final String PKB_PROFILE = PKB_PREFIX + "profile";
@@ -145,6 +146,8 @@ public final class PKB_props {
     public static void tags(String tagExpression) { put(PKB_TAGS, tagExpression); }
     public static String name() { return get(PKB_NAME); }
     public static void name(String nameRegex) { put(PKB_NAME, nameRegex); }
+    public static String example() { return get(PKB_EXAMPLE); }
+    public static void example(String exampleSelector) { put(PKB_EXAMPLE, exampleSelector); }
     public static String plugins() { return get(PKB_PLUGINS); }
     public static void plugins(String pluginConfig) { put(PKB_PLUGINS, pluginConfig); }
     public static String profile() { return get(PKB_PROFILE); }

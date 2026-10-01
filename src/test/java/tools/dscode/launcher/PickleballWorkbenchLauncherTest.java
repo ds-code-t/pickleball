@@ -196,6 +196,12 @@ class PickleballWorkbenchLauncherTest {
         assertEquals("--name", isolateName[2]);
         assertEquals("The failing scenario", isolateName[3]);
 
+        String[] isolateExample = PickleballWorkbenchLauncher.normalizedArguments(
+                new String[]{"isolate", "--example=1", "2", "5", "3.4", "7-11"}
+        );
+        assertEquals("--example", isolateExample[2]);
+        assertEquals("1 2 5 3.4 7-11", isolateExample[3]);
+
         assertTrue(WorkbenchCommandLine.isSessionClientCommand("isolate"));
         assertTrue(WorkbenchCommandLine.isSessionClientCommand("session-start"));
         assertTrue(WorkbenchCommandLine.isSessionClientCommand("execute-step"));

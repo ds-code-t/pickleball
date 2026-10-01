@@ -152,12 +152,15 @@ Controller/protocol migration checks must remain focused: use `@control-bridge` 
 ```bash
 mvn test -Dpkb_tags="@forms and @state-assertions"
 mvn test -Dpkb_tags="@workflow and @nested-steps and not @block-conditionals"
+mvn test "-Dpkb_example=1 2 5 3.4 7-11"
 ```
+
+`pkb_example` runs after `pkb_tags` and `pkb_name`. It keeps Examples rows. It is not a tag. A normal Scenario counts as row 1. The same selector is `--example` on Workbench `discover`, `confirm`, and `isolate`.
 
 Human `PickleballTests` defaults remain `pretty` and `@all`. Agents launching a bounded confirmation should not reuse those defaults. Use Workbench `confirm`, or a separate `pkb_runvars` command that honors the browser ladder:
 
 ```bash
-PickleballWorkbenchLauncher confirm --tags=@the-failing-tag --name='The failing scenario'
+PickleballWorkbenchLauncher confirm --tags=@the-failing-tag --name='The failing scenario' --example='1 2 5 3.4 7-11'
 ```
 
 After the run, read `pkb_run_profile` from `run-catalog.json` / `run-index.json` / `summary.json`. That is the complete resolved RunVar list. Do not assume omitted `pkb_runvars` keys equal project `pickleball.properties`.
@@ -239,7 +242,7 @@ Do not recursively ingest an entire run.
 ```text
 mvn -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java "-Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher" "-Dexec.classpathScope=test" "-Dexec.args=hint"
 "-Dexec.args=discover"
-"-Dexec.args=confirm --tags=@the-failing-tag"
+"-Dexec.args=confirm --tags=@the-failing-tag --example=1.1"
 DiagnosticCli compare-runs <left-run-index> <right-run-index> [output-json]
 DiagnosticCli compare-fingerprints <left.pkbf> <right.pkbf> [output-json]
 DiagnosticCli emit-investigation <investigation-json-or--> <consumer-project-root>

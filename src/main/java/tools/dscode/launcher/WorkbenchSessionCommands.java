@@ -35,7 +35,7 @@ public final class WorkbenchSessionCommands {
 
     @FunctionalInterface
     interface DetachedStarter {
-        Process start(Path project, String tags, String name, Path logFile) throws IOException;
+        Process start(Path project, String tags, String name, String example, Path logFile) throws IOException;
     }
 
     public static int run(String[] args, PrintStream out, PrintStream err) {
@@ -84,7 +84,13 @@ public final class WorkbenchSessionCommands {
         }
     }
 
-    static Process startControllerSession(Path project, String tags, String name, Path logFile) throws IOException {
+    static Process startControllerSession(
+            Path project,
+            String tags,
+            String name,
+            String example,
+            Path logFile
+    ) throws IOException {
         Path controllerJar = PickleballWorkbenchLauncher.extractEmbeddedPayload(project);
         List<String> forwarded = new ArrayList<>();
         forwarded.add("session");
@@ -96,6 +102,10 @@ public final class WorkbenchSessionCommands {
         if (name != null && !name.isBlank()) {
             forwarded.add("--name");
             forwarded.add(name);
+        }
+        if (example != null && !example.isBlank()) {
+            forwarded.add("--example");
+            forwarded.add(example);
         }
         return startDetached(project, PickleballWorkbenchLauncher.command(
                 controllerJar, forwarded.toArray(String[]::new)
@@ -131,7 +141,7 @@ public final class WorkbenchSessionCommands {
         Path logFile = PickleballLocalLayout.workbenchStateRoot(project).resolve("session.log");
         Process process;
         try {
-            process = starter.start(project, parsed.tags(), parsed.name(), logFile);
+            process = starter.start(project, parsed.tags(), parsed.name(), parsed.example(), logFile);
         } catch (IOException failure) {
             throw new IllegalStateException("Could not start Workbench session: " + failure.getMessage(), failure);
         }
@@ -470,6 +480,19 @@ public final class WorkbenchSessionCommands {
                     index++;
                     continue;
                 }
+                if (token.startsWith("--example=")) {
+                    while (index + 1 < args.length && isSelectorTail(args[index + 1])) {
+                        index++;
+                    }
+                    continue;
+                }
+                if ("--example".equals(token) && index + 1 < args.length) {
+                    index++;
+                    while (index + 1 < args.length && isSelectorTail(args[index + 1])) {
+                        index++;
+                    }
+                    continue;
+                }
                 if (token.startsWith("-")) continue;
                 if (looksLikeProject(token)) continue;
                 words.add(token);
@@ -483,6 +506,10 @@ public final class WorkbenchSessionCommands {
                 }
             }
             return new SessionFlags(text, id, ackOnly, wait);
+        }
+
+        private static boolean isSelectorTail(String token) {
+            return token != null && !token.startsWith("-") && !looksLikeProject(token);
         }
 
         private static boolean looksLikeProject(String token) {

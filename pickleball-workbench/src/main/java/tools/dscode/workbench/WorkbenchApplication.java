@@ -193,7 +193,7 @@ public final class WorkbenchApplication {
         Map<String, String> workerProperties;
         try {
             workerProperties = tools.dscode.workbench.discover.LastDiscoverSnapshot.workerSystemProperties(
-                    parsed.project(), parsed.tags(), parsed.name()
+                    parsed.project(), parsed.tags(), parsed.name(), parsed.example()
             );
         } catch (RuntimeException failure) {
             err.println(failure.getMessage());
@@ -242,7 +242,7 @@ public final class WorkbenchApplication {
         Map<String, String> workerProperties;
         try {
             workerProperties = tools.dscode.workbench.discover.LastDiscoverSnapshot.workerSystemProperties(
-                    parsed.project(), parsed.tags(), parsed.name()
+                    parsed.project(), parsed.tags(), parsed.name(), parsed.example()
             );
         } catch (RuntimeException failure) {
             err.println(failure.getMessage());
@@ -323,17 +323,21 @@ public final class WorkbenchApplication {
         }
     }
 
-    private record IsolateArgs(Path project, String tags, String name) {
+    record IsolateArgs(Path project, String tags, String name, String example) {
     }
 
-    private static IsolateArgs projectCommandArgs(String[] args, String command) {
+    static IsolateArgs projectCommandArgs(String[] args, String command) {
         if (args.length < 2 || args[1].isBlank() || args[1].startsWith("-")) {
             throw new IllegalArgumentException(
-                    "Usage: pickleball-workbench " + command + " <project> [--tags <expr>] [--name <expr>]"
+                    "Usage: pickleball-workbench " + command
+                            + " <project> [--tags <expr>] [--name <expr>] [--example <rows>]"
             );
         }
         String tags = null;
         String name = null;
+        String example = null;
+        boolean absorbName = false;
+        boolean absorbExample = false;
         for (int index = 2; index < args.length; index++) {
             String token = args[index];
             if (token.startsWith("--tags=")) {
@@ -342,13 +346,29 @@ public final class WorkbenchApplication {
                 tags = args[++index];
             } else if (token.startsWith("--name=")) {
                 name = token.substring("--name=".length());
+                absorbName = true;
+                absorbExample = false;
             } else if ("--name".equals(token) && index + 1 < args.length) {
                 name = args[++index];
-            } else if (name != null && !token.startsWith("-")) {
+                absorbName = true;
+                absorbExample = false;
+            } else if (token.startsWith("--example=")) {
+                String value = token.substring("--example=".length());
+                example = value.isBlank() ? null : value;
+                absorbExample = example != null;
+                absorbName = false;
+            } else if ("--example".equals(token) && index + 1 < args.length) {
+                String value = args[++index];
+                example = value == null || value.isBlank() ? null : value;
+                absorbExample = example != null;
+                absorbName = false;
+            } else if (absorbExample && example != null && !token.startsWith("-")) {
+                example = example + " " + token;
+            } else if (absorbName && name != null && !token.startsWith("-")) {
                 name = name + " " + token;
             }
         }
-        return new IsolateArgs(Path.of(args[1]), tags, name);
+        return new IsolateArgs(Path.of(args[1]), tags, name, example);
     }
 
     private static int workerCheck(String[] args, PrintStream out) {
@@ -602,8 +622,8 @@ public final class WorkbenchApplication {
         out.println("  java -cp <thin-jar>:<resolved-libs> tools.dscode.workbench.WorkbenchApplication status <project>");
         out.println("  java -cp <thin-jar>:<resolved-libs> tools.dscode.workbench.WorkbenchApplication worker-check <project>");
         out.println("  java -cp <thin-jar>:<resolved-libs> tools.dscode.workbench.WorkbenchApplication live-check <project>");
-        out.println("  java -cp <thin-jar>:<resolved-libs> tools.dscode.workbench.WorkbenchApplication isolate <project> [--tags <expr>] [--name <expr>]");
-        out.println("  java -cp <thin-jar>:<resolved-libs> tools.dscode.workbench.WorkbenchApplication session <project> [--tags <expr>] [--name <expr>]");
+        out.println("  java -cp <thin-jar>:<resolved-libs> tools.dscode.workbench.WorkbenchApplication isolate <project> [--tags <expr>] [--name <expr>] [--example <rows>]");
+        out.println("  java -cp <thin-jar>:<resolved-libs> tools.dscode.workbench.WorkbenchApplication session <project> [--tags <expr>] [--name <expr>] [--example <rows>]");
         out.println("  java -cp <thin-jar>:<resolved-libs> tools.dscode.workbench.WorkbenchApplication mcp <project>");
         out.println("  java -cp <thin-jar>:<resolved-libs> tools.dscode.workbench.WorkbenchApplication ui <project>");
         out.println("  java -cp <thin-jar>:<resolved-libs> tools.dscode.workbench.WorkbenchApplication --version");

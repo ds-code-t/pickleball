@@ -11,6 +11,8 @@ import org.junit.platform.engine.UniqueId;
 import java.util.Map;
 import java.util.TreeMap;
 
+import static io.cucumber.core.options.Constants.FILTER_NAME_PROPERTY_NAME;
+import static io.cucumber.core.options.Constants.FILTER_TAGS_PROPERTY_NAME;
 import static tools.dscode.common.reporting.logging.LogForwarder.logError;
 import static tools.dscode.common.reporting.logging.LogForwarder.logTrace;
 
@@ -45,7 +47,23 @@ public final class DynamicSuiteEngine implements TestEngine {
             DynamicEngineDiscoveryRequest wrappedRequest =
                     new DynamicEngineDiscoveryRequest(discoveryRequest, mergedParameters);
 
-            return delegate.discover(wrappedRequest, uniqueId);
+            TestDescriptor discovered = delegate.discover(wrappedRequest, uniqueId);
+            Map<String, String> config = materialize(mergedParameters);
+            ExampleRowFilter.applyToDiscoveredSuite(
+                    discovered,
+                    firstNonBlank(config.get(PKB_props.PKB_EXAMPLE), PKB_props.example()),
+                    firstNonBlank(
+                            config.get(FILTER_TAGS_PROPERTY_NAME),
+                            config.get(PKB_props.PKB_TAGS),
+                            PKB_props.tags()
+                    ),
+                    firstNonBlank(
+                            config.get(FILTER_NAME_PROPERTY_NAME),
+                            config.get(PKB_props.PKB_NAME),
+                            PKB_props.name()
+                    )
+            );
+            return discovered;
         } catch (RuntimeException e) {
             logError("[DynamicSuiteEngine] discover() failed: " + e.getMessage());
             e.printStackTrace(System.err);
@@ -81,6 +99,18 @@ public final class DynamicSuiteEngine implements TestEngine {
             e.printStackTrace(System.err);
             throw e;
         }
+    }
+
+    private static String firstNonBlank(String... values) {
+        if (values == null) {
+            return null;
+        }
+        for (String value : values) {
+            if (value != null && !value.isBlank()) {
+                return value;
+            }
+        }
+        return null;
     }
 
     private static Map<String, String> materialize(ConfigurationParameters parameters) {

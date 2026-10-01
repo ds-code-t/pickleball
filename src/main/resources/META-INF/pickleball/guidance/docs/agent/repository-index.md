@@ -387,6 +387,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/testengine/DynamicSuiteConfigUtils.java`
 - `src/main/java/tools/dscode/testengine/DynamicSuiteEngine.java`
 - `src/main/java/tools/dscode/testengine/EngineFilterBootstrap.java`
+- `src/main/java/tools/dscode/testengine/ExampleRowFilter.java`
 - `src/main/java/tools/dscode/testengine/MergedConfigurationParameters.java`
 - `src/main/java/tools/dscode/testengine/PickleballLauncherSessionListener.java`
 - `src/main/java/tools/dscode/testengine/PickleballProfiles.java`
@@ -416,6 +417,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/WorkbenchSessionCommandsTest.java`
 - `src/test/java/tools/dscode/parallelutilities/ParallelCountEstimatorTest.java`
 - `src/test/java/tools/dscode/testengine/DynamicSuiteBootstrapWorkbenchRootTest.java`
+- `src/test/java/tools/dscode/testengine/ExampleRowFilterTest.java`
 
 ## Control API module
 
@@ -666,6 +668,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `maven-consumer-project/src/test/java/tools/dscode/coredefinitions/ModularScenariosChecks.java`
 - `maven-consumer-project/src/test/java/tools/dscode/launcher/WorkbenchAgentCommandChecks.java`
 - `maven-consumer-project/src/test/java/tools/dscode/parallelutilities/ParallelCountEstimatorChecks.java`
+- `maven-consumer-project/src/test/java/tools/dscode/testengine/ExampleRowFilterChecks.java`
 - `maven-consumer-project/src/test/java/tools/dscode/testengine/PkbPropertyValueNormalizerChecks.java`
 - `maven-consumer-project/src/test/java/tools/dscode/testengine/ProfileConfigurationChecks.java`
 - `maven-consumer-project/src/test/java/tools/dscode/testengine/RunVarOverrideChecks.java`

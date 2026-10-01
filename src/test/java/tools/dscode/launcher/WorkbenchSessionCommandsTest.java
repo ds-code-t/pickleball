@@ -35,7 +35,7 @@ class WorkbenchSessionCommandsTest {
             AtomicBoolean started = new AtomicBoolean();
             Output output = run(
                     new String[]{"isolate", project.toString()},
-                    (proj, tags, name, log) -> {
+                    (proj, tags, name, example, log) -> {
                         started.set(true);
                         throw new AssertionError("should not start a second session");
                     }
@@ -53,8 +53,9 @@ class WorkbenchSessionCommandsTest {
         AtomicReference<Process> child = new AtomicReference<>();
         try {
             Output output = run(
-                    new String[]{"session-start", project.toString()},
-                    (proj, tags, name, log) -> {
+                    new String[]{"session-start", project.toString(), "--example=1", "2", "5"},
+                    (proj, tags, name, example, log) -> {
+                        assertEquals("1 2 5", example);
                         FakeSession session = FakeSession.start(proj);
                         started.set(session);
                         Process process = startLongLivedChild();
@@ -79,7 +80,7 @@ class WorkbenchSessionCommandsTest {
         try (FakeSession ignored = FakeSession.start(project)) {
             Output output = run(
                     new String[]{"execute-step", project.toString(), "--text=Given stay", "--ack-only"},
-                    (proj, tags, name, log) -> {
+                    (proj, tags, name, example, log) -> {
                         throw new AssertionError("execute-step must not start a session process");
                     }
             );

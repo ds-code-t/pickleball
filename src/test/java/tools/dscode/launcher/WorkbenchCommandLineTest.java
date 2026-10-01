@@ -47,6 +47,46 @@ class WorkbenchCommandLineTest {
     }
 
     @Test
+    void exampleJoinsSplitTokensWithoutStealingTheName() {
+        WorkbenchCommandLine.Parsed parsed = WorkbenchCommandLine.parse(
+                new String[]{"discover", "--name=The", "failing", "scenario", "--example=1", "2", "5", "3.4", "7-11"}
+        );
+        assertEquals("The failing scenario", parsed.name());
+        assertEquals("1 2 5 3.4 7-11", parsed.example());
+    }
+
+    @Test
+    void nameDoesNotAbsorbTokensAfterExample() {
+        WorkbenchCommandLine.Parsed parsed = WorkbenchCommandLine.parse(
+                new String[]{"confirm", "--example=1", "2", "--name=The", "failing", "scenario"}
+        );
+        assertEquals("1 2", parsed.example());
+        assertEquals("The failing scenario", parsed.name());
+    }
+
+    @Test
+    void blankExampleIsNotForwarded() {
+        WorkbenchCommandLine.Parsed parsed = WorkbenchCommandLine.parse(
+                new String[]{"isolate", "--example="}
+        );
+        assertNull(parsed.example());
+        assertTrue(java.util.Arrays.stream(parsed.forwarded()).noneMatch("--example"::equals));
+    }
+
+    @Test
+    void isolateForwardsExampleAfterName() {
+        WorkbenchCommandLine.Parsed parsed = WorkbenchCommandLine.parse(
+                new String[]{"isolate", "--tags=@one", "--name=The", "failing", "scenario", "--example=1", "2"}
+        );
+        assertEquals("--tags", parsed.forwarded()[2]);
+        assertEquals("@one", parsed.forwarded()[3]);
+        assertEquals("--name", parsed.forwarded()[4]);
+        assertEquals("The failing scenario", parsed.forwarded()[5]);
+        assertEquals("--example", parsed.forwarded()[6]);
+        assertEquals("1 2", parsed.forwarded()[7]);
+    }
+
+    @Test
     void omittedRetentionStaysNull() {
         WorkbenchCommandLine.Parsed parsed = WorkbenchCommandLine.parse(
                 new String[]{"hint"}
