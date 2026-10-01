@@ -1,6 +1,7 @@
 // file: tools/dscode/common/reporting/logging/Log.java
 package tools.dscode.common.reporting.logging;
 
+import tools.dscode.common.coordination.AgentCoordination;
 import tools.dscode.common.reporting.WorkBook;
 import tools.dscode.common.reporting.logging.reportportal.ReportPortalBridge;
 import tools.dscode.common.reporting.logging.simplehtml.SimpleHtmlReportConverter;
@@ -89,13 +90,14 @@ public final class Log {
             throw t;
         }
 
-        CleanupTrace.print("[closeAll] START: SimpleHtmlReportConverter.writeFinalReport(reports/cucumber-report.html)");
+        Path reportHtml = AgentCoordination.reportHtmlOrDefault();
+        CleanupTrace.print("[closeAll] START: SimpleHtmlReportConverter.writeFinalReport(" + reportHtml + ")");
         try {
-            SimpleHtmlReportConverter.writeFinalReport(Path.of("reports/cucumber-report.html"));
-            CleanupTrace.print("[closeAll] END: SimpleHtmlReportConverter.writeFinalReport(reports/cucumber-report.html)");
+            SimpleHtmlReportConverter.writeFinalReport(reportHtml);
+            CleanupTrace.print("[closeAll] END: SimpleHtmlReportConverter.writeFinalReport(" + reportHtml + ")");
         } catch (Throwable t) {
             CleanupTrace.printThrowable(
-                    "[closeAll] THROWABLE: SimpleHtmlReportConverter.writeFinalReport(reports/cucumber-report.html)",
+                    "[closeAll] THROWABLE: SimpleHtmlReportConverter.writeFinalReport(" + reportHtml + ")",
                     t
             );
             throw t;

@@ -54,6 +54,12 @@ public final class PKB_props {
     public static final String PKB_PARENT_RUN_ID = PKB_PREFIX + "parent_run_id";
     public static final String PKB_BASELINE_RUN_ID = PKB_PREFIX + "baseline_run_id";
     public static final String PKB_CHANGED_VARIABLES = PKB_PREFIX + "changed_variables";
+    public static final String PKB_RUN_ID = PKB_PREFIX + "run_id";
+    public static final String PKB_AGENT_ID = PKB_PREFIX + "agent_id";
+    public static final String PKB_RUN_GROUP = PKB_PREFIX + "run_group";
+    public static final String PKB_RUN_SEQUENCE = PKB_PREFIX + "run_sequence";
+    public static final String PKB_RUN_WHO = PKB_PREFIX + "run_who";
+    public static final String PKB_RUN_WHY = PKB_PREFIX + "run_why";
 
     public static final String PKB_DEBUG_BROWSER = PKB_PREFIX + "debugBrowser";
     public static final String PKB_DEBUG_ARGS = PKB_PREFIX + "debugargs";
@@ -63,7 +69,13 @@ public final class PKB_props {
             PKB_RUN_PURPOSE,
             PKB_PARENT_RUN_ID,
             PKB_BASELINE_RUN_ID,
-            PKB_CHANGED_VARIABLES
+            PKB_CHANGED_VARIABLES,
+            PKB_RUN_ID,
+            PKB_AGENT_ID,
+            PKB_RUN_GROUP,
+            PKB_RUN_SEQUENCE,
+            PKB_RUN_WHO,
+            PKB_RUN_WHY
     );
 
     private PKB_props() {

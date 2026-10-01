@@ -7,6 +7,7 @@ import io.cucumber.java.AfterAll;
 import io.cucumber.java.BeforeAll;
 import io.cucumber.java.en.Given;
 //import io.cucumber.messages.types.DataTable;
+import tools.dscode.common.coordination.AgentCoordination;
 import tools.dscode.common.CoreSteps;
 import tools.dscode.common.annotations.DefinitionFlag;
 import tools.dscode.common.annotations.DefinitionFlags;
@@ -199,6 +200,18 @@ public class GeneralSteps extends CoreSteps {
 
         if (failure != null) {
             CleanupTrace.print("[AfterAll] THROWING accumulated failure");
+        }
+
+        CleanupTrace.print("[AfterAll] START: AgentCoordination.finishCurrent");
+        try {
+            AgentCoordination.finishCurrent(failure == null ? "PASSED" : "FAILED", null, System.out);
+            CleanupTrace.print("[AfterAll] END: AgentCoordination.finishCurrent");
+        } catch (Throwable t) {
+            CleanupTrace.printThrowable("[AfterAll] THROWABLE: AgentCoordination.finishCurrent", t);
+            failure = rememberFailure(failure, t);
+        }
+
+        if (failure != null) {
             throw new RuntimeException(failure);
         }
 

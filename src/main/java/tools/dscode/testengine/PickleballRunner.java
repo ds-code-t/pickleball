@@ -2,6 +2,7 @@ package tools.dscode.testengine;
 
 import com.epam.reportportal.utils.properties.PropertiesLoader;
 import io.cucumber.core.runner.CurrentScenarioState;
+import tools.dscode.common.coordination.AgentCoordination;
 import tools.dscode.common.mappings.ParsingMap;
 import tools.dscode.common.reporting.logging.Level;
 import tools.dscode.control.protocol.PickleballLocalLayout;
@@ -127,6 +128,18 @@ public abstract class PickleballRunner {
                 ? "INFO"
                 : configuredLogLevel.trim();
         LOG_LEVEL = Level.valueOf(effectiveLogLevel.toUpperCase(Locale.ROOT));
+        AgentCoordination.Run coordination = AgentCoordination.openConsumerRun(
+                PickleballLocalLayout.findProjectRoot(java.nio.file.Path.of("")),
+                System.out
+        );
+        values.put(PKB_props.PKB_RUN_ID, coordination.runId());
+        values.put(PKB_props.PKB_AGENT_ID, coordination.agentId());
+        if (coordination.group() != null) values.put(PKB_props.PKB_RUN_GROUP, coordination.group());
+        if (coordination.sequence() != null) {
+            values.put(PKB_props.PKB_RUN_SEQUENCE, coordination.sequence().toString());
+        }
+        if (coordination.who() != null) values.put(PKB_props.PKB_RUN_WHO, coordination.who());
+        if (coordination.why() != null) values.put(PKB_props.PKB_RUN_WHY, coordination.why());
     }
 
     public static String getOptionsString() {

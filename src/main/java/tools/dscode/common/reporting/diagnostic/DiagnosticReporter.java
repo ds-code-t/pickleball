@@ -10,11 +10,13 @@ import io.cucumber.plugin.event.Status;
 import org.openqa.selenium.OutputType;
 import org.openqa.selenium.TakesScreenshot;
 import org.openqa.selenium.WebDriver;
+import tools.dscode.common.coordination.AgentCoordination;
 import tools.dscode.common.reporting.logging.Entry;
 import tools.dscode.common.reporting.logging.Level;
 import tools.dscode.testengine.PKB_props;
 
 import static tools.dscode.testengine.PKB_props.PKB_DIAGNOSTIC_OUTPUT;
+import static tools.dscode.testengine.PKB_props.PKB_RUN_ID;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -56,7 +58,7 @@ final class DiagnosticReporter {
     private static final int MAX_TEXT_CHARS = 20_000;
     private static final int MAX_COLLECTION_ITEMS = 200;
 
-    private final String runId = RUN_STAMP.format(Instant.now()) + "-" + UUID.randomUUID().toString().substring(0, 8);
+    private final String runId;
     private final Instant startedAt = Instant.now();
     private final long monotonicOriginNanos = System.nanoTime();
     private final Path runsRoot;
@@ -91,7 +93,8 @@ final class DiagnosticReporter {
         this.effectiveConfig = values == null ? Map.of() : Map.copyOf(values);
         this.directRunProfile = directRunProfile;
         this.sourceProvenance = SourceProvenance.capture(values);
-        this.runsRoot = resolveRunsRoot(values);
+        this.runId = resolveRunId(this.effectiveConfig);
+        this.runsRoot = resolveRunsRoot(this.effectiveConfig);
         this.runRoot = runsRoot.resolve(runId);
         this.runEvents = runRoot.resolve("run-events.jsonl");
         try {
@@ -1074,11 +1077,25 @@ final class DiagnosticReporter {
         System.err.println("[Pickleball diagnostic] Could not " + action + ": " + error.getMessage());
     }
 
+    private static String resolveRunId(Map<String, String> values) {
+        String supplied = find(values, PKB_RUN_ID);
+        if (supplied != null && !supplied.isBlank()) {
+            return AgentCoordination.requireSafeId(supplied.trim(), "run id");
+        }
+        return RUN_STAMP.format(Instant.now()) + "-" + UUID.randomUUID().toString().substring(0, 8);
+    }
+
     private static Path resolveRunsRoot(Map<String, String> values) {
         String configured = find(values, PKB_DIAGNOSTIC_OUTPUT);
-        return configured == null || configured.isBlank()
-                ? Path.of("reports", "diagnostic-runs")
-                : Path.of(configured.trim());
+        if (configured != null && !configured.isBlank()) {
+            return Path.of(configured.trim());
+        }
+        String runId = find(values, PKB_RUN_ID);
+        AgentCoordination.Run current = AgentCoordination.current();
+        if (current != null && runId != null && runId.trim().equals(current.runId())) {
+            return current.diagnosticDirectory();
+        }
+        return Path.of("reports", "diagnostic-runs");
     }
 
     private static String find(Map<String, String> values, String key) {

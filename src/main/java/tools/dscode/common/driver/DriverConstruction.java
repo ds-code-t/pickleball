@@ -17,9 +17,14 @@ import org.openqa.selenium.remote.RemoteWebDriver;
 import org.openqa.selenium.remote.http.ClientConfig;
 import org.openqa.selenium.remote.service.DriverService;
 
+import tools.dscode.common.coordination.AgentCoordination;
+
+import java.io.IOException;
 import java.io.File;
 import java.io.OutputStream;
 import java.net.URL;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -192,8 +197,10 @@ public final class DriverConstruction {
 
         applyChromiumOptions(options, getObject(driverConfig, "options"), "driver.options for chrome");
         applyProviderCapabilities(options, getObject(driverConfig, "providerCapabilities"));
-        if (localDriver)
+        if (localDriver) {
+            applyRunBrowserProfile(options);
             applyDebugPort(options, "chrome", fullConfiguration);
+        }
         return options;
     }
 
@@ -211,8 +218,10 @@ public final class DriverConstruction {
 
         applyChromiumOptions(options, getObject(driverConfig, "options"), "driver.options for edge");
         applyProviderCapabilities(options, getObject(driverConfig, "providerCapabilities"));
-        if (localDriver)
+        if (localDriver) {
+            applyRunBrowserProfile(options);
             applyDebugPort(options, "edge", fullConfiguration);
+        }
         return options;
     }
 
@@ -485,6 +494,30 @@ public final class DriverConstruction {
 
     public static boolean hasRemoteUrl(ObjectNode driverConfig) {
         return trimToNull(driverConfig.path("connection").path("remoteUrl").asText(null)) != null;
+    }
+
+    public static void applyRunBrowserProfile(ChromiumOptions<?> options) {
+        Path profile = AgentCoordination.currentBrowserProfile();
+        if (profile == null || containsUserDataDir(options)) return;
+        try {
+            Files.createDirectories(profile);
+        } catch (IOException failure) {
+            return;
+        }
+        options.addArguments("--user-data-dir=" + profile.toAbsolutePath().normalize());
+    }
+
+    private static boolean containsUserDataDir(ChromiumOptions<?> options) {
+        for (String capability : List.of("goog:chromeOptions", "ms:edgeOptions")) {
+            Object raw = options.getCapability(capability);
+            if (!(raw instanceof Map<?, ?> map)) continue;
+            Object args = map.get("args");
+            if (!(args instanceof List<?> list)) continue;
+            for (Object arg : list) {
+                if (arg != null && arg.toString().contains("user-data-dir")) return true;
+            }
+        }
+        return false;
     }
 
     public static void applyDebugPort(ChromiumOptions<?> options, String browserName, ObjectNode fullConfiguration) {
