@@ -70,6 +70,13 @@ public final class WorkbenchSessionCommands {
             return switch (parsed.command()) {
                 case "isolate", "session-start" -> sessionStart(parsed, out, err, starter, http);
                 case "execute-step" -> executeStep(parsed, flags, out, err, http);
+                case "insert-step", "update-step" -> textCommand(parsed, flags, out, err, http);
+                case "open-scenario" -> openScenario(parsed, flags, out, err, http);
+                case "example" -> example(parsed, flags, out, err, http);
+                case "diagnostic-run" -> diagnosticRun(parsed, flags, out, err, http);
+                case "play", "from-here", "pause", "save", "refresh",
+                     "session-sync", "worker-start", "worker-restart", "worker-stop" ->
+                        postCommand(parsed, flags, out, err, http);
                 case "status" -> status(parsed, flags, out, err, http);
                 case "events" -> events(parsed, out, err, http);
                 case "stop", "kill" -> stop(parsed, out, err, http);
@@ -183,10 +190,109 @@ public final class WorkbenchSessionCommands {
             err.println("Usage: execute-step <gherkin> or execute-step --text=<gherkin> [--ack-only]");
             return 2;
         }
-        Map<String, Object> body = new LinkedHashMap<>();
-        body.put("op", "execute-step");
+        Map<String, Object> body = commandBody(parsed, flags);
         body.put("text", text);
+        return postAndMaybeWait(state, flags, body, out, err, http);
+    }
+
+    private static int textCommand(
+            WorkbenchCommandLine.Parsed parsed,
+            SessionFlags flags,
+            PrintStream out,
+            PrintStream err,
+            HttpClient http
+    ) {
+        if (flags.text == null || flags.text.isBlank()) {
+            err.println("Usage: " + parsed.command() + " --text=<gherkin>");
+            return 2;
+        }
+        SessionState state = requireSession(parsed.project(), http);
+        return postAndMaybeWait(state, flags, commandBody(parsed, flags), out, err, http);
+    }
+
+    private static int openScenario(
+            WorkbenchCommandLine.Parsed parsed,
+            SessionFlags flags,
+            PrintStream out,
+            PrintStream err,
+            HttpClient http
+    ) {
+        boolean featureBlank = flags.feature == null || flags.feature.isBlank();
+        boolean nameBlank = parsed.name() == null || parsed.name().isBlank();
+        if (featureBlank && nameBlank) {
+            err.println("Usage: open-scenario --feature=<path-or-name> --name=<scenario> [--example=<rows>]");
+            return 2;
+        }
+        SessionState state = requireSession(parsed.project(), http);
+        return postAndMaybeWait(state, flags, commandBody(parsed, flags), out, err, http);
+    }
+
+    private static int example(
+            WorkbenchCommandLine.Parsed parsed,
+            SessionFlags flags,
+            PrintStream out,
+            PrintStream err,
+            HttpClient http
+    ) {
+        String selector = parsed.example();
+        if (selector == null || selector.isBlank()) selector = flags.text;
+        if (selector == null || selector.isBlank()) {
+            err.println("Usage: example --example=<rows>");
+            return 2;
+        }
+        SessionState state = requireSession(parsed.project(), http);
+        Map<String, Object> body = commandBody(parsed, flags);
+        body.put("example", selector);
+        return postAndMaybeWait(state, flags, body, out, err, http);
+    }
+
+    private static int diagnosticRun(
+            WorkbenchCommandLine.Parsed parsed,
+            SessionFlags flags,
+            PrintStream out,
+            PrintStream err,
+            HttpClient http
+    ) {
+        if (flags.run == null || flags.run.isBlank()) {
+            err.println("Usage: diagnostic-run --run=<id>");
+            return 2;
+        }
+        SessionState state = requireSession(parsed.project(), http);
+        return postAndMaybeWait(state, flags, commandBody(parsed, flags), out, err, http);
+    }
+
+    private static int postCommand(
+            WorkbenchCommandLine.Parsed parsed,
+            SessionFlags flags,
+            PrintStream out,
+            PrintStream err,
+            HttpClient http
+    ) {
+        SessionState state = requireSession(parsed.project(), http);
+        return postAndMaybeWait(state, flags, commandBody(parsed, flags), out, err, http);
+    }
+
+    private static Map<String, Object> commandBody(WorkbenchCommandLine.Parsed parsed, SessionFlags flags) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("op", parsed.command());
+        if (flags.text != null && !flags.text.isBlank()) body.put("text", flags.text);
         if (flags.id != null && !flags.id.isBlank()) body.put("id", flags.id);
+        if (flags.feature != null && !flags.feature.isBlank()) body.put("feature", flags.feature);
+        if (parsed.name() != null && !parsed.name().isBlank()) body.put("name", parsed.name());
+        if (parsed.example() != null && !parsed.example().isBlank()) body.put("example", parsed.example());
+        if (flags.run != null && !flags.run.isBlank()) body.put("run", flags.run);
+        if (flags.fromHere != null && !flags.fromHere.isBlank()) body.put("fromHere", flags.fromHere);
+        return body;
+    }
+
+    private static int postAndMaybeWait(
+            SessionState state,
+            SessionFlags flags,
+            Map<String, Object> body,
+            PrintStream out,
+            PrintStream err,
+            HttpClient http
+    ) {
         JsonNode ack = postJson(http, state, "/commands", body);
         String id = textOr(ack, "id", "");
         String status = textOr(ack, "status", "QUEUED");
@@ -204,7 +310,7 @@ public final class WorkbenchSessionCommands {
     ) {
         Optional<SessionState> state = readHealthy(parsed.project(), http);
         if (state.isEmpty()) {
-            err.println("No healthy Workbench CLI session. Run isolate / session-start first.");
+            err.println("No healthy Workbench session. Run isolate / session-start, or use the window that is already open.");
             return 1;
         }
         String id = flags.id;
@@ -254,10 +360,18 @@ public final class WorkbenchSessionCommands {
             return 0;
         }
         SessionState session = state.get();
+        boolean watched = "ui-attach".equals(session.mode());
         try {
             postJson(http, session, "/commands", Map.of("op", "stop"));
-        } catch (RuntimeException ignored) {
-            // Fall through to pid destroy.
+        } catch (RuntimeException failure) {
+            if (watched) {
+                err.println("Workbench stop failed: " + failure.getMessage());
+                return 1;
+            }
+        }
+        if (watched) {
+            out.println("ACK SESSION playback-stopped pid=" + session.pid());
+            return 0;
         }
         long deadline = System.nanoTime() + Duration.ofSeconds(8).toNanos();
         while (System.nanoTime() < deadline) {
@@ -324,12 +438,19 @@ public final class WorkbenchSessionCommands {
 
     private static SessionState requireSession(Path project, HttpClient http) {
         return readHealthy(project, http).orElseThrow(() -> new IllegalStateException(
-                "No healthy Workbench CLI session. Run isolate / session-start first."
+                "No healthy Workbench session. Run isolate / session-start, or use the window that is already open."
         ));
     }
 
     static Optional<SessionState> readHealthy(Path project, HttpClient http) {
-        Path file = sessionFile(project);
+        Optional<SessionState> attached = readHealthyFile(PickleballLocalLayout.attachFile(project), project, http);
+        if (attached.isPresent() && "ui-attach".equals(attached.get().mode())) {
+            return attached;
+        }
+        return readHealthyFile(sessionFile(project), project, http);
+    }
+
+    private static Optional<SessionState> readHealthyFile(Path file, Path project, HttpClient http) {
         if (!Files.isRegularFile(file)) return Optional.empty();
         try {
             JsonNode root = JSON.readTree(file.toFile());
@@ -426,12 +547,26 @@ public final class WorkbenchSessionCommands {
     static final class SessionFlags {
         final String text;
         final String id;
+        final String feature;
+        final String run;
+        final String fromHere;
         final boolean ackOnly;
         final boolean wait;
 
-        private SessionFlags(String text, String id, boolean ackOnly, boolean wait) {
+        private SessionFlags(
+                String text,
+                String id,
+                String feature,
+                String run,
+                String fromHere,
+                boolean ackOnly,
+                boolean wait
+        ) {
             this.text = text;
             this.id = id;
+            this.feature = feature;
+            this.run = run;
+            this.fromHere = fromHere;
             this.ackOnly = ackOnly;
             this.wait = wait;
         }
@@ -439,10 +574,13 @@ public final class WorkbenchSessionCommands {
         static SessionFlags parse(String[] args) {
             String text = null;
             String id = null;
+            String feature = null;
+            String run = null;
+            String fromHere = null;
             boolean ackOnly = false;
             boolean wait = true;
             List<String> words = new ArrayList<>();
-            if (args == null) return new SessionFlags(null, null, false, true);
+            if (args == null) return new SessionFlags(null, null, null, null, null, false, true);
             for (int index = 1; index < args.length; index++) {
                 String token = args[index];
                 if (token == null) continue;
@@ -475,6 +613,30 @@ public final class WorkbenchSessionCommands {
                     wait = false;
                     continue;
                 }
+                if (token.startsWith("--feature=")) {
+                    feature = token.substring("--feature=".length());
+                    continue;
+                }
+                if ("--feature".equals(token) && index + 1 < args.length) {
+                    feature = args[++index];
+                    continue;
+                }
+                if (token.startsWith("--run=")) {
+                    run = token.substring("--run=".length());
+                    continue;
+                }
+                if ("--run".equals(token) && index + 1 < args.length) {
+                    run = args[++index];
+                    continue;
+                }
+                if (token.startsWith("--from-here=")) {
+                    fromHere = token.substring("--from-here=".length());
+                    continue;
+                }
+                if ("--from-here".equals(token) && index + 1 < args.length) {
+                    fromHere = args[++index];
+                    continue;
+                }
                 if (token.startsWith("--tags=") || token.startsWith("--name=")) continue;
                 if (("--tags".equals(token) || "--name".equals(token)) && index + 1 < args.length) {
                     index++;
@@ -505,7 +667,7 @@ public final class WorkbenchSessionCommands {
                     if ("status".equals(args[0]) && id == null && words.size() == 1) id = words.getFirst();
                 }
             }
-            return new SessionFlags(text, id, ackOnly, wait);
+            return new SessionFlags(text, id, feature, run, fromHere, ackOnly, wait);
         }
 
         private static boolean isSelectorTail(String token) {

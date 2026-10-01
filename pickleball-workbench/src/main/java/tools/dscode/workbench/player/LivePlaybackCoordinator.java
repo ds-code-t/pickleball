@@ -1,5 +1,8 @@
 package tools.dscode.workbench.player;
 
+import tools.dscode.control.protocol.ExampleRowSelector;
+
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -79,11 +82,73 @@ public final class LivePlaybackCoordinator {
             int exampleRow,
             String exampleLabel
     ) {
+        loadScenario(lines, originFile, scenarioName, startLine, endLine, exampleRow, exampleLabel, "");
+    }
+
+    public void loadScenario(
+            List<String> lines,
+            java.nio.file.Path originFile,
+            String scenarioName,
+            int startLine,
+            int endLine,
+            int exampleRow,
+            String exampleLabel,
+            String exampleSelector
+    ) {
+        String selector = exampleSelector == null ? "" : exampleSelector.strip();
+        if (ExampleRowSelector.isInactive(selector) && exampleRow > 0) {
+            selector = Integer.toString(exampleRow);
+        }
+        if (!ExampleRowSelector.isInactive(selector)) {
+            ExampleRowSelector.parse(selector);
+        }
         origin = originFile == null
                 ? ScenarioOrigin.none()
-                : new ScenarioOrigin(originFile, scenarioName, startLine, endLine, exampleRow, exampleLabel);
+                : new ScenarioOrigin(
+                        originFile, scenarioName, startLine, endLine, exampleRow, exampleLabel, selector
+                );
         player.loadDocument(lines);
+        if (originFile != null && !ExampleRowSelector.isInactive(selector)) {
+            int resolved = ExampleRowSelector.firstOverallIndex(
+                    lineTexts(),
+                    startLine > 0 ? startLine - 1 : 0,
+                    endLine > 0 ? endLine : -1,
+                    selector
+            );
+            if (resolved <= 0) {
+                throw new IllegalArgumentException("No Examples row matched '" + selector + "'.");
+            }
+            String label = exampleLabel == null || exampleLabel.isBlank() ? "row " + resolved : exampleLabel;
+            origin = new ScenarioOrigin(
+                    originFile, scenarioName, startLine, endLine, resolved, label, selector
+            );
+        }
         rebuildPlan();
+    }
+
+    public void selectExample(String expression) {
+        if (ExampleRowSelector.isInactive(expression)) {
+            throw new IllegalArgumentException("example selector must not be blank.");
+        }
+        ExampleRowSelector.parse(expression);
+        String selector = expression.strip();
+        int start = origin.startLine() > 0 ? origin.startLine() - 1 : 0;
+        int end = origin.endLine() > 0 ? origin.endLine() : -1;
+        int resolved = ExampleRowSelector.firstOverallIndex(lineTexts(), start, end, selector);
+        if (resolved <= 0) {
+            throw new IllegalArgumentException("No Examples row matched '" + selector + "'.");
+        }
+        String label = origin.exampleLabel();
+        if (label.isBlank() || label.startsWith("row ")) label = "row " + resolved;
+        origin = new ScenarioOrigin(
+                origin.file(), origin.scenarioName(), origin.startLine(), origin.endLine(),
+                resolved, label, selector
+        );
+        rebuildPlan();
+    }
+
+    public int planIndex() {
+        return planIndex;
     }
 
     public GherkinBlockDocument blocks() {
@@ -190,5 +255,13 @@ public final class LivePlaybackCoordinator {
 
     private void seekPlanPlayhead() {
         nextPlanStep().ifPresent(step -> player.clickLine(step.sourceLineId()));
+    }
+
+    private List<String> lineTexts() {
+        List<String> texts = new ArrayList<>();
+        for (LiveScenarioPlayer.Line line : player.lines()) {
+            texts.add(line.text());
+        }
+        return texts;
     }
 }

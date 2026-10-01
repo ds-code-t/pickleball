@@ -209,7 +209,17 @@ class PickleballWorkbenchLauncherTest {
         assertTrue(WorkbenchCommandLine.isSessionClientCommand("events"));
         assertTrue(WorkbenchCommandLine.isSessionClientCommand("stop"));
         assertTrue(WorkbenchCommandLine.isSessionClientCommand("kill"));
+        assertTrue(WorkbenchCommandLine.isSessionClientCommand("open-scenario"));
+        assertTrue(WorkbenchCommandLine.isSessionClientCommand("example"));
+        assertTrue(WorkbenchCommandLine.isSessionClientCommand("play"));
+        assertTrue(WorkbenchCommandLine.isSessionClientCommand("from-here"));
+        assertTrue(WorkbenchCommandLine.isSessionClientCommand("pause"));
+        assertTrue(WorkbenchCommandLine.isSessionClientCommand("diagnostic-run"));
+        assertTrue(WorkbenchCommandLine.isSessionClientCommand("save"));
+        assertTrue(WorkbenchCommandLine.isSessionClientCommand("session-sync"));
+        assertTrue(WorkbenchCommandLine.isSessionClientCommand("worker-start"));
         assertFalse(WorkbenchCommandLine.isSessionClientCommand("session"));
+        assertFalse(WorkbenchCommandLine.isForwardedCommand("play"));
         assertFalse(WorkbenchCommandLine.isSessionClientCommand("hint"));
         assertFalse(WorkbenchCommandLine.isAgentCoreCommand("isolate"));
 

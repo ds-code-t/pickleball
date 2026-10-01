@@ -8,7 +8,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
-/** Invokes the consumer Maven wrapper the same way {@code mvn test} would. */
+/** Invokes the consumer Maven wrapper. A machine-wide Maven install is not used. */
 public final class ConsumerMavenTestRunner {
     private ConsumerMavenTestRunner() {
     }
@@ -19,8 +19,7 @@ public final class ConsumerMavenTestRunner {
     }
 
     public static List<String> command(Path projectRoot, String compactRunVars) {
-        List<String> command = new ArrayList<>();
-        command.add(wrapper(projectRoot).toString());
+        List<String> command = new ArrayList<>(launchPrefix(wrapper(projectRoot)));
         command.add("test");
         command.add("-Dpkb_runvars=" + compactRunVars);
         command.add("-Dpkb_run_purpose=workbench-discover");
@@ -28,8 +27,7 @@ public final class ConsumerMavenTestRunner {
     }
 
     public static List<String> confirmCommand(Path projectRoot, String compactRunVars) {
-        List<String> command = new ArrayList<>();
-        command.add(wrapper(projectRoot).toString());
+        List<String> command = new ArrayList<>(launchPrefix(wrapper(projectRoot)));
         command.add("test");
         command.add("-Dpkb_runvars=" + compactRunVars);
         command.add("-Dpkb_run_purpose=workbench-confirm");
@@ -71,7 +69,27 @@ public final class ConsumerMavenTestRunner {
         if (Files.isRegularFile(script)) return script;
         Path alternate = project.resolve(windows ? "mvnw" : "mvnw.cmd");
         if (Files.isRegularFile(alternate)) return alternate;
-        return Path.of(windows ? "mvn.cmd" : "mvn");
+        Path jar = project.resolve(".mvn").resolve("wrapper").resolve("maven-wrapper.jar");
+        if (Files.isRegularFile(jar)) return jar;
+        throw new IllegalArgumentException(
+                "No Maven wrapper at " + project
+                        + ". Expected mvnw or mvnw.cmd, or .mvn/wrapper/maven-wrapper.jar."
+                        + " Pickleball does not use a machine-wide Maven install."
+        );
+    }
+
+    static List<String> launchPrefix(Path launcher) {
+        String name = launcher.getFileName() == null ? launcher.toString() : launcher.getFileName().toString();
+        if (name.endsWith(".jar")) {
+            return List.of(javaExecutable(), "-jar", launcher.toString());
+        }
+        return List.of(launcher.toString());
+    }
+
+    private static String javaExecutable() {
+        boolean windows = System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win");
+        Path bin = Path.of(System.getProperty("java.home"), "bin", windows ? "java.exe" : "java");
+        return Files.isRegularFile(bin) ? bin.toString() : (windows ? "java.exe" : "java");
     }
 
     private static ProcessLauncher inheritIoLauncher() {

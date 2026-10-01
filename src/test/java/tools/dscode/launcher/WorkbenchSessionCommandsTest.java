@@ -15,6 +15,8 @@ import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -76,6 +78,103 @@ class WorkbenchSessionCommandsTest {
 
     @Test
     @Timeout(value = 5, unit = TimeUnit.SECONDS)
+    void watchedWindowIsPreferredAndStopDoesNotKillIt() throws Exception {
+        try (FakeSession cli = FakeSession.start(project);
+             FakeSession ui = FakeSession.start(project, "ui-attach", PickleballLocalLayout.attachFile(project))) {
+            AtomicReference<String> hit = new AtomicReference<>();
+            ui.onCommand = body -> hit.set(body);
+            Output play = run(
+                    new String[]{"play", project.toString(), "--ack-only"},
+                    (proj, tags, name, example, log) -> {
+                        throw new AssertionError("play must not start a session");
+                    }
+            );
+            assertEquals(0, play.exitCode, play.stderr + play.stdout);
+            assertTrue(play.stdout.contains("ACK "));
+            assertTrue(hit.get() != null && hit.get().contains("\"op\":\"play\""));
+            assertTrue(hit.get().contains(ui.url));
+
+            Process child = startLongLivedChild();
+            ui.setPid(child.pid());
+            Output stop = run(
+                    new String[]{"stop", project.toString()},
+                    (proj, tags, name, example, log) -> {
+                        throw new AssertionError("stop must not start a session");
+                    }
+            );
+            assertEquals(0, stop.exitCode, stop.stderr + stop.stdout);
+            assertTrue(stop.stdout.contains("playback-stopped"));
+            assertTrue(child.isAlive());
+            child.destroyForcibly();
+            assertTrue(cli.pidAlive());
+        }
+    }
+
+    @Test
+    @Timeout(value = 5, unit = TimeUnit.SECONDS)
+    void openScenarioPostsTheSharedCommandAndDoesNotStartASession() throws Exception {
+        try (FakeSession ignored = FakeSession.start(project)) {
+            AtomicReference<String> hit = new AtomicReference<>();
+            ignored.onCommand = hit::set;
+            Output output = run(
+                    new String[]{
+                            "open-scenario", project.toString(),
+                            "--feature=shop.feature", "--name=Buy", "--example=2.2", "--ack-only"
+                    },
+                    (proj, tags, name, example, log) -> {
+                        throw new AssertionError("open-scenario must not start a session");
+                    }
+            );
+            assertEquals(0, output.exitCode, output.stderr + output.stdout);
+            assertTrue(output.stdout.contains("ACK "));
+            assertTrue(hit.get().contains("\"op\":\"open-scenario\""));
+            assertTrue(hit.get().contains("shop.feature"));
+            assertTrue(hit.get().contains("2.2"));
+        }
+    }
+
+    @Test
+    @Timeout(value = 10, unit = TimeUnit.SECONDS)
+    void eachSessionCommandPostsToTheOpenSessionAndDoesNotStartOne() throws Exception {
+        String[][] commands = {
+                {"example", "--example=2.2"},
+                {"play"},
+                {"from-here", "--from-here=4"},
+                {"pause"},
+                {"insert-step", "--text=When stay"},
+                {"update-step", "--text=When stay"},
+                {"diagnostic-run", "--run=run-42"},
+                {"save"},
+                {"refresh"},
+                {"session-sync"},
+                {"worker-start"},
+                {"worker-restart"},
+                {"worker-stop"}
+        };
+        try (FakeSession session = FakeSession.start(project)) {
+            for (String[] command : commands) {
+                AtomicReference<String> hit = new AtomicReference<>();
+                session.onCommand = hit::set;
+                List<String> args = new ArrayList<>();
+                args.add(command[0]);
+                args.add(project.toString());
+                for (int index = 1; index < command.length; index++) args.add(command[index]);
+                args.add("--ack-only");
+                Output output = run(
+                        args.toArray(String[]::new),
+                        (proj, tags, name, example, log) -> {
+                            throw new AssertionError(command[0] + " must not start a session");
+                        }
+                );
+                assertEquals(0, output.exitCode, command[0] + " " + output.stderr + output.stdout);
+                assertTrue(output.stdout.contains("ACK "), command[0]);
+                assertTrue(hit.get() != null && hit.get().contains("\"op\":\"" + command[0] + "\""), hit.get());
+            }
+        }
+    }
+
+    @Test
+    @Timeout(value = 5, unit = TimeUnit.SECONDS)
     void executeStepAckOnlyExitsWithoutWaitingForDone() throws Exception {
         try (FakeSession ignored = FakeSession.start(project)) {
             Output output = run(
@@ -119,38 +218,70 @@ class WorkbenchSessionCommandsTest {
     private static final class FakeSession implements AutoCloseable {
         private final HttpServer http;
         private final Path stateFile;
+        private final String url;
         private Process child;
+        private volatile java.util.function.Consumer<String> onCommand;
+        private volatile long pid = ProcessHandle.current().pid();
 
-        private FakeSession(HttpServer http, Path stateFile) {
+        private FakeSession(HttpServer http, Path stateFile, String url) {
             this.http = http;
             this.stateFile = stateFile;
+            this.url = url;
         }
 
         static FakeSession start(Path project) throws IOException {
+            return start(project, "cli-session", PickleballLocalLayout.cliSessionState(project));
+        }
+
+        static FakeSession start(Path project, String mode, Path stateFile) throws IOException {
             HttpServer http = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+            FakeSession[] box = new FakeSession[1];
             http.createContext("/health", exchange -> write(exchange, 200, "{\"status\":\"ok\"}"));
             http.createContext("/commands", exchange -> {
+                String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+                FakeSession session = box[0];
+                if (session != null && session.onCommand != null) {
+                    session.onCommand.accept(body + " " + session.url);
+                }
                 if ("POST".equals(exchange.getRequestMethod())) {
-                    exchange.getRequestBody().readAllBytes();
                     write(exchange, 200, "{\"ack\":true,\"id\":\"step-held\",\"status\":\"QUEUED\"}");
                     return;
                 }
                 write(exchange, 200, "{\"id\":\"step-held\",\"status\":\"STILL_WORKING\"}");
             });
             http.start();
-            Path stateFile = PickleballLocalLayout.cliSessionState(project);
             Files.createDirectories(stateFile.getParent());
             String url = "http://127.0.0.1:" + http.getAddress().getPort();
+            FakeSession session = new FakeSession(http, stateFile, url);
+            box[0] = session;
+            session.writeState(project, mode);
+            return session;
+        }
+
+        void setPid(long pid) {
+            this.pid = pid;
+            try {
+                String text = Files.readString(stateFile).replaceAll("\"pid\"\\s*:\\s*\\d+", "\"pid\": " + pid);
+                Files.writeString(stateFile, text);
+            } catch (IOException failure) {
+                throw new IllegalStateException(failure);
+            }
+        }
+
+        boolean pidAlive() {
+            return ProcessHandle.of(pid).map(ProcessHandle::isAlive).orElse(false);
+        }
+
+        private void writeState(Path project, String mode) throws IOException {
             Files.writeString(stateFile, """
                     {
                       "url": "%s",
                       "token": "test-token",
                       "pid": %d,
                       "project": "%s",
-                      "mode": "cli-session"
+                      "mode": "%s"
                     }
-                    """.formatted(url, ProcessHandle.current().pid(), jsonEscape(project.toString())));
-            return new FakeSession(http, stateFile);
+                    """.formatted(url, pid, jsonEscape(project.toString()), mode));
         }
 
         @Override

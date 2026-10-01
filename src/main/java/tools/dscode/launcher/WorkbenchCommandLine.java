@@ -18,7 +18,10 @@ final class WorkbenchCommandLine {
             "export-guidance", "hint", "discover-hint", "discover", "confirm", "resolve-runvars"
     );
     static final Set<String> SESSION_CLIENT_COMMANDS = Set.of(
-            "isolate", "session-start", "execute-step", "status", "events", "stop", "kill"
+            "isolate", "session-start", "execute-step", "status", "events", "stop", "kill",
+            "open-scenario", "example", "play", "from-here", "pause",
+            "insert-step", "update-step", "diagnostic-run", "save", "refresh",
+            "session-sync", "worker-start", "worker-restart", "worker-stop"
     );
 
     private WorkbenchCommandLine() {

@@ -39,6 +39,12 @@ final class WorkbenchCommandQueue implements AutoCloseable {
     private final AtomicBoolean closed = new AtomicBoolean();
     private final AtomicBoolean silenced = new AtomicBoolean();
     private volatile Runnable stopHandler;
+    private volatile OpHandler opHandler;
+
+    @FunctionalInterface
+    interface OpHandler {
+        Object handle(String op, Map<String, String> args);
+    }
 
     WorkbenchCommandQueue(Function<String, Object> executeStep) {
         this(executeStep, Duration.ofSeconds(2));
@@ -64,14 +70,34 @@ final class WorkbenchCommandQueue implements AutoCloseable {
         this.stopHandler = stopHandler;
     }
 
+    void setOpHandler(OpHandler opHandler) {
+        this.opHandler = opHandler;
+    }
+
     Map<String, Object> enqueueExecuteStep(String text, String requestedId) {
         if (text == null || text.isBlank()) {
             throw new IllegalArgumentException("execute-step text must not be blank.");
         }
+        LinkedHashMap<String, String> args = new LinkedHashMap<>();
+        args.put("text", text);
+        return enqueueOp("execute-step", args, requestedId);
+    }
+
+    Map<String, Object> enqueueOp(String op, Map<String, String> args, String requestedId) {
+        if (op == null || op.isBlank()) {
+            throw new IllegalArgumentException("Command op must not be blank.");
+        }
+        Map<String, String> values = args == null ? Map.of() : Map.copyOf(args);
+        if ("execute-step".equals(op)) {
+            String text = values.get("text");
+            if (text == null || text.isBlank()) {
+                throw new IllegalArgumentException("execute-step text must not be blank.");
+            }
+        }
         String id = requestedId == null || requestedId.isBlank()
                 ? UUID.randomUUID().toString()
                 : requestedId.strip();
-        Command command = new Command(id, text);
+        Command command = new Command(id, op, values);
         if (commands.putIfAbsent(id, command) != null) {
             throw new IllegalArgumentException("Command id already exists: " + id);
         }
@@ -113,7 +139,10 @@ final class WorkbenchCommandQueue implements AutoCloseable {
     private void run(Command command) {
         command.markRunning();
         try {
-            Object value = executeStep.apply(command.text);
+            OpHandler handler = opHandler;
+            Object value = handler != null
+                    ? handler.handle(command.op, command.args)
+                    : executeStep.apply(command.text());
             command.complete(resultStatus(value), value);
         } catch (RuntimeException failure) {
             LinkedHashMap<String, Object> error = new LinkedHashMap<>();
@@ -148,13 +177,20 @@ final class WorkbenchCommandQueue implements AutoCloseable {
 
     private static final class Command {
         private final String id;
-        private final String text;
+        private final String op;
+        private final Map<String, String> args;
         private volatile String stored = QUEUED;
         private volatile Object result;
 
-        private Command(String id, String text) {
+        private Command(String id, String op, Map<String, String> args) {
             this.id = id;
-            this.text = text;
+            this.op = op;
+            this.args = args;
+        }
+
+        private String text() {
+            String text = args.get("text");
+            return text == null ? "" : text;
         }
 
         private void markRunning() {

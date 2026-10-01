@@ -11,6 +11,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -76,6 +77,7 @@ class WorkbenchAgentCommandsTest {
 
     @Test
     void discoverWrapsMavenAndRecordsSnapshot() throws Exception {
+        writeProjectWrapper();
         Path catalogDir = tempDir.resolve("reports/diagnostic-runs");
         Files.createDirectories(catalogDir);
         List<List<String>> captured = new ArrayList<>();
@@ -118,6 +120,7 @@ class WorkbenchAgentCommandsTest {
 
     @Test
     void discoverNextIsConfirmNotIsolateMavenExec() throws Exception {
+        writeProjectWrapper();
         Path catalogDir = tempDir.resolve("reports/diagnostic-runs");
         Files.createDirectories(catalogDir);
         ByteArrayOutputStream stdout = new ByteArrayOutputStream();
@@ -151,10 +154,15 @@ class WorkbenchAgentCommandsTest {
         assertTrue(text.contains("NEXT: confirm"));
         assertTrue(text.contains("isolate"));
         assertTrue(text.contains("execute-step"));
+        assertTrue(text.contains("open-scenario"));
+        assertTrue(text.contains("--example"));
+        assertTrue(text.contains("Do not start the GUI"));
+        assertFalse(text.contains("only controls"));
     }
 
     @Test
     void discoverRetentionAllWritesAll() throws Exception {
+        writeProjectWrapper();
         Path catalogDir = tempDir.resolve("reports/diagnostic-runs");
         Files.createDirectories(catalogDir);
         List<List<String>> captured = new ArrayList<>();
@@ -216,6 +224,12 @@ class WorkbenchAgentCommandsTest {
                 new PrintStream(stderr, true, StandardCharsets.UTF_8)
         );
         return new Output(exit, stdout.toString(StandardCharsets.UTF_8), stderr.toString(StandardCharsets.UTF_8));
+    }
+
+    private void writeProjectWrapper() throws Exception {
+        boolean windows = System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win");
+        Path script = tempDir.resolve(windows ? "mvnw.cmd" : "mvnw");
+        Files.writeString(script, windows ? "@echo off\r\n" : "#!/bin/sh\n");
     }
 
     private static void restoreProperty(String key, String previous) {

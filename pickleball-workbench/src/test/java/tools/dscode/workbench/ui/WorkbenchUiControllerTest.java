@@ -591,7 +591,7 @@ class WorkbenchUiControllerTest {
                             yield null;
                         }
                         case "addPlayerListener", "removePlayerListener", "loadPickerScenario",
-                             "loadDefaultDemo", "replaceLiveDocument" -> null;
+                             "loadDefaultDemo", "replaceLiveDocument", "selectExample" -> null;
                         case "savePreview" -> WorkbenchSavePreview.unsavable("session-only");
                         case "requestSave", "commitSave" -> WorkbenchSaveResult.unsavable("session-only");
                         case "workerLogFiles" -> {

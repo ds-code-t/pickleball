@@ -26,56 +26,35 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import tools.dscode.control.protocol.ExampleRowSelector;
 
 /**
  * Selects Examples rows after tag, name, and feature-name filters.
  * A normal scenario is table 1, row 1.
  */
 public final class ExampleRowFilter {
-    private static final Pattern INTEGER = Pattern.compile("[1-9][0-9]*");
-    private static final Pattern TABLE_ROW = Pattern.compile("([1-9][0-9]*)\\.([1-9][0-9]*)");
-    private static final Pattern RANGE = Pattern.compile("([1-9][0-9]*)-([1-9][0-9]*)");
     private static final String FEATURE_SEGMENT = "feature";
     private static final String SCENARIO_SEGMENT = "scenario";
     private static final String EXAMPLE_SEGMENT = "example";
 
-    private final List<Clause> clauses;
+    private final ExampleRowSelector selector;
 
-    private ExampleRowFilter(List<Clause> clauses) {
-        this.clauses = List.copyOf(clauses);
+    private ExampleRowFilter(ExampleRowSelector selector) {
+        this.selector = selector;
     }
 
     public static boolean isInactive(String expression) {
-        return expression == null || expression.isBlank();
+        return ExampleRowSelector.isInactive(expression);
     }
 
     public static ExampleRowFilter parse(String expression) {
-        if (isInactive(expression)) {
-            throw invalid("");
-        }
-        String[] tokens = expression.trim().split("\\s+");
-        List<Clause> clauses = new ArrayList<>();
-        for (String token : tokens) {
-            if (token == null || token.isEmpty()) {
-                throw invalid("");
-            }
-            clauses.add(parseToken(token));
-        }
-        if (clauses.isEmpty()) {
-            throw invalid("");
-        }
-        return new ExampleRowFilter(clauses);
+        return new ExampleRowFilter(ExampleRowSelector.parse(expression));
     }
 
     public boolean matches(int overall, int table, int row) {
-        for (Clause clause : clauses) {
-            if (clause.matches(overall, table, row)) {
-                return true;
-            }
-        }
-        return false;
+        return selector.matches(overall, table, row);
     }
 
     public static List<Pickle> filterPickles(String expression, List<Pickle> pickles) {
@@ -302,74 +281,9 @@ public final class ExampleRowFilter {
         return value;
     }
 
-    private static Clause parseToken(String token) {
-        if (INTEGER.matcher(token).matches()) {
-            return new Overall(parsePositive(token));
-        }
-        Matcher table = TABLE_ROW.matcher(token);
-        if (table.matches()) {
-            return new TableRowClause(parsePositive(table.group(1)), parsePositive(table.group(2)));
-        }
-        Matcher range = RANGE.matcher(token);
-        if (range.matches()) {
-            int low = parsePositive(range.group(1));
-            int high = parsePositive(range.group(2));
-            if (low > high) {
-                throw invalid(token);
-            }
-            return new RangeClause(low, high);
-        }
-        throw invalid(token);
-    }
-
-    private static int parsePositive(String token) {
-        try {
-            int value = Integer.parseInt(token);
-            if (value <= 0) {
-                throw invalid(token);
-            }
-            return value;
-        } catch (NumberFormatException exception) {
-            throw invalid(token);
-        }
-    }
-
-    private static IllegalArgumentException invalid(String token) {
-        return new IllegalArgumentException(
-                "Invalid pkb_example token '" + token + "'. "
-                        + "Expected a positive integer, table.row, or low-high range of positive integers "
-                        + "with no leading zeros."
-        );
-    }
-
     private static void appendDetail(StringBuilder message, String label, String value) {
         if (value != null && !value.isBlank()) {
             message.append(' ').append(label).append("=[").append(value.trim()).append(']');
-        }
-    }
-
-    private interface Clause {
-        boolean matches(int overall, int table, int row);
-    }
-
-    private record Overall(int index) implements Clause {
-        @Override
-        public boolean matches(int overall, int table, int row) {
-            return overall == index;
-        }
-    }
-
-    private record TableRowClause(int tableNumber, int rowInTable) implements Clause {
-        @Override
-        public boolean matches(int overall, int table, int row) {
-            return table == tableNumber && row == rowInTable;
-        }
-    }
-
-    private record RangeClause(int low, int high) implements Clause {
-        @Override
-        public boolean matches(int overall, int table, int row) {
-            return overall >= low && overall <= high;
         }
     }
 
