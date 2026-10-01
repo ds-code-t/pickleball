@@ -18,8 +18,11 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.HexFormat;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
@@ -248,6 +251,243 @@ class WorkbenchSessionCommandsTest {
             assertFalse(started.get());
             assertTrue(output.stderr.contains("No healthy Workbench session"));
         }
+    }
+
+    @Test
+    @Timeout(value = 10, unit = TimeUnit.SECONDS)
+    void openingAWindowOnARunIdLoadsTheRecordAndDoesNotStartATest() throws Exception {
+        Path run = writeRun("alpha", "ALPHA-RECORD");
+        Map<String, String> before = snapshot(run);
+        AtomicBoolean sessionStarted = new AtomicBoolean();
+        AtomicReference<FakeSession> ui = new AtomicReference<>();
+        AtomicReference<Process> windowProcess = new AtomicReference<>();
+        AtomicReference<String> posted = new AtomicReference<>();
+        try {
+            Output output = run(
+                    new String[]{"open-window", project.toString(), "--run-id=alpha", "--agent=agent-1"},
+                    launch -> {
+                        sessionStarted.set(true);
+                        throw new AssertionError("open-window must not start a test");
+                    },
+                    (root, runId, agentId) -> {
+                        assertEquals("alpha", runId);
+                        assertEquals("agent-1", agentId);
+                        FakeSession session = FakeSession.start(
+                                root, "ui-attach", PickleballLocalLayout.attachFile(root));
+                        session.onCommand = posted::set;
+                        ui.set(session);
+                        Process process = startLongLivedChild();
+                        windowProcess.set(process);
+                        return process;
+                    }
+            );
+            assertEquals(0, output.exitCode, output.stderr + output.stdout);
+            assertTrue(output.stdout.contains("ALPHA-RECORD"), output.stdout);
+            assertTrue(output.stdout.contains("does not start a test"), output.stdout);
+            assertTrue(output.stdout.contains("ACK WINDOW opened"), output.stdout);
+            assertFalse(sessionStarted.get());
+            assertFalse(Files.exists(run.resolve("session").resolve("cli-session.json")));
+            assertEquals(before, snapshot(run));
+            assertTrue(posted.get() != null && posted.get().contains("\"op\":\"show-run\""), String.valueOf(posted.get()));
+            assertEquals("alpha", tools.dscode.control.protocol.WindowDriver.read(project).liveRunId());
+            assertEquals("agent-1", tools.dscode.control.protocol.WindowDriver.read(project).driverAgent());
+        } finally {
+            if (ui.get() != null) ui.get().close();
+            if (windowProcess.get() != null) windowProcess.get().destroyForcibly();
+        }
+    }
+
+    @Test
+    @Timeout(value = 10, unit = TimeUnit.SECONDS)
+    void switchingRunIdsShowsTheOtherRunAndDoesNotWriteTheFirst() throws Exception {
+        Path first = writeRun("alpha", "ALPHA-RECORD");
+        writeRun("beta", "BETA-RECORD");
+        Map<String, String> before = snapshot(first);
+        AtomicReference<FakeSession> ui = new AtomicReference<>();
+        AtomicReference<Process> windowProcess = new AtomicReference<>();
+        AtomicReference<String> posted = new AtomicReference<>();
+        try {
+            Output opened = run(
+                    new String[]{"open-window", project.toString(), "--run-id=alpha", "--agent=agent-1"},
+                    launch -> {
+                        throw new AssertionError("open-window must not start a test");
+                    },
+                    (root, runId, agentId) -> {
+                        FakeSession session = FakeSession.start(
+                                root, "ui-attach", PickleballLocalLayout.attachFile(root));
+                        session.onCommand = posted::set;
+                        ui.set(session);
+                        Process process = startLongLivedChild();
+                        windowProcess.set(process);
+                        return process;
+                    }
+            );
+            assertEquals(0, opened.exitCode, opened.stderr + opened.stdout);
+            before = snapshot(first);
+            posted.set(null);
+            Output shown = run(
+                    new String[]{"show-run", project.toString(), "--run-id=beta", "--agent=agent-1"},
+                    launch -> {
+                        throw new AssertionError("show-run must not start a test");
+                    }
+            );
+            assertEquals(0, shown.exitCode, shown.stderr + shown.stdout);
+            assertTrue(shown.stdout.contains("BETA-RECORD"), shown.stdout);
+            assertTrue(shown.stdout.contains("beta.log"), shown.stdout);
+            assertTrue(shown.stdout.contains("does not start a test"), shown.stdout);
+            assertEquals(before, snapshot(first));
+            assertEquals("alpha", tools.dscode.control.protocol.WindowDriver.read(project).liveRunId());
+            assertEquals("beta", tools.dscode.control.protocol.WindowDriver.read(project).viewedRunId());
+            assertEquals("agent-1", tools.dscode.control.protocol.WindowDriver.read(project).driverAgent());
+            assertTrue(posted.get() != null && posted.get().contains("beta"), String.valueOf(posted.get()));
+        } finally {
+            if (ui.get() != null) ui.get().close();
+            if (windowProcess.get() != null) windowProcess.get().destroyForcibly();
+        }
+    }
+
+    @Test
+    @Timeout(value = 10, unit = TimeUnit.SECONDS)
+    void closingTheWindowLeavesTheRunDirectoryAndTheShortLog() throws Exception {
+        Path run = writeRun("alpha", "ALPHA-RECORD");
+        Path shortLog = project.resolve(".pickleball").resolve("agent-log");
+        Files.createDirectories(shortLog.getParent());
+        Files.writeString(shortLog, "keep-this-short-log\n");
+        Process headless = startLongLivedChild();
+        AtomicReference<FakeSession> ui = new AtomicReference<>();
+        AtomicReference<Process> windowProcess = new AtomicReference<>();
+        try (FakeSession cli = FakeSession.start(project)) {
+            cli.setPid(headless.pid());
+            Output opened = run(
+                    new String[]{"open-window", project.toString(), "--run-id=alpha", "--agent=agent-1"},
+                    launch -> {
+                        throw new AssertionError("open-window must not start a test");
+                    },
+                    (root, runId, agentId) -> {
+                        FakeSession session = FakeSession.start(
+                                root, "ui-attach", PickleballLocalLayout.attachFile(root));
+                        ui.set(session);
+                        Process process = startLongLivedChild();
+                        windowProcess.set(process);
+                        return process;
+                    }
+            );
+            assertEquals(0, opened.exitCode, opened.stderr + opened.stdout);
+            Map<String, String> runBefore = snapshot(run);
+            byte[] logBefore = Files.readAllBytes(shortLog);
+            Output closed = run(
+                    new String[]{"close-window", project.toString()},
+                    launch -> {
+                        throw new AssertionError("close-window must not start a session");
+                    }
+            );
+            assertEquals(0, closed.exitCode, closed.stderr + closed.stdout);
+            assertTrue(closed.stdout.contains("ACK WINDOW closed"), closed.stdout);
+            assertTrue(closed.stdout.contains("short log"), closed.stdout);
+            assertEquals(runBefore, snapshot(run));
+            assertEquals(new String(logBefore, StandardCharsets.UTF_8), Files.readString(shortLog));
+            assertTrue(headless.isAlive());
+            assertTrue(Files.isRegularFile(PickleballLocalLayout.cliSessionState(project)));
+            assertFalse(tools.dscode.control.protocol.WindowDriver.read(project).open());
+        } finally {
+            headless.destroyForcibly();
+            if (ui.get() != null) ui.get().close();
+            if (windowProcess.get() != null) windowProcess.get().destroyForcibly();
+        }
+    }
+
+    @Test
+    @Timeout(value = 10, unit = TimeUnit.SECONDS)
+    void aSecondAgentDoesNotBecomeASecondDriverOfTheLiveSession() throws Exception {
+        writeRun("alpha", "ALPHA-RECORD");
+        writeRun("beta", "BETA-RECORD");
+        AtomicReference<FakeSession> ui = new AtomicReference<>();
+        AtomicReference<Process> windowProcess = new AtomicReference<>();
+        List<String> posted = new ArrayList<>();
+        try {
+            Output opened = run(
+                    new String[]{"open-window", project.toString(), "--run-id=alpha", "--agent=agent-1"},
+                    launch -> {
+                        throw new AssertionError("open-window must not start a test");
+                    },
+                    (root, runId, agentId) -> {
+                        FakeSession session = FakeSession.start(
+                                root, "ui-attach", PickleballLocalLayout.attachFile(root));
+                        session.onCommand = posted::add;
+                        ui.set(session);
+                        Process process = startLongLivedChild();
+                        windowProcess.set(process);
+                        return process;
+                    }
+            );
+            assertEquals(0, opened.exitCode, opened.stderr + opened.stdout);
+            posted.clear();
+            Output other = run(
+                    new String[]{"open-window", project.toString(), "--run-id=beta", "--agent=agent-2"},
+                    launch -> {
+                        throw new AssertionError("a second window must not be started");
+                    }
+            );
+            assertEquals(0, other.exitCode, other.stderr + other.stdout);
+            assertTrue(other.stdout.contains("BETA-RECORD"), other.stdout);
+            assertTrue(other.stdout.contains("does not become a second driver"), other.stdout);
+            assertEquals("alpha", tools.dscode.control.protocol.WindowDriver.read(project).liveRunId());
+            assertEquals("agent-1", tools.dscode.control.protocol.WindowDriver.read(project).driverAgent());
+            posted.clear();
+            Output play = run(
+                    new String[]{"play", project.toString(), "--agent=agent-2", "--ack-only"},
+                    launch -> {
+                        throw new AssertionError("a second agent must not start a session");
+                    }
+            );
+            assertEquals(1, play.exitCode, play.stderr + play.stdout);
+            assertTrue(play.stderr.contains("does not become a second driver"), play.stderr);
+            assertTrue(posted.isEmpty(), posted.toString());
+            assertEquals("agent-1", tools.dscode.control.protocol.WindowDriver.read(project).driverAgent());
+        } finally {
+            if (ui.get() != null) ui.get().close();
+            if (windowProcess.get() != null) windowProcess.get().destroyForcibly();
+        }
+    }
+
+    private Path writeRun(String id, String marker) throws IOException {
+        Path run = project.resolve(".pickleball").resolve("runs").resolve(id);
+        Files.createDirectories(run.resolve("reports"));
+        Files.createDirectories(run.resolve("config"));
+        Files.writeString(run.resolve("record.json"), "{\"runId\":\"" + id + "\",\"marker\":\"" + marker + "\"}\n");
+        Files.writeString(run.resolve(id + ".log"), marker + "\n");
+        Files.writeString(run.resolve("reports").resolve(id + "-report.txt"), marker + "\n");
+        Files.writeString(run.resolve("config").resolve(id + ".properties"), "name=" + marker + "\n");
+        return run;
+    }
+
+    private static Map<String, String> snapshot(Path root) throws IOException {
+        Map<String, String> files = new LinkedHashMap<>();
+        if (!Files.exists(root)) return files;
+        try (var walk = Files.walk(root)) {
+            List<Path> paths = walk.filter(Files::isRegularFile).sorted().toList();
+            for (Path path : paths) {
+                files.put(root.relativize(path).toString(), HexFormat.of().formatHex(Files.readAllBytes(path)));
+            }
+        }
+        return files;
+    }
+
+    private static Output run(
+            String[] args,
+            WorkbenchSessionCommands.DetachedStarter starter,
+            WorkbenchSessionCommands.UiStarter uiStarter
+    ) {
+        ByteArrayOutputStream stdout = new ByteArrayOutputStream();
+        ByteArrayOutputStream stderr = new ByteArrayOutputStream();
+        int exit = WorkbenchSessionCommands.run(
+                args,
+                new PrintStream(stdout, true, StandardCharsets.UTF_8),
+                new PrintStream(stderr, true, StandardCharsets.UTF_8),
+                starter,
+                uiStarter
+        );
+        return new Output(exit, stdout.toString(StandardCharsets.UTF_8), stderr.toString(StandardCharsets.UTF_8));
     }
 
     private static Output run(String[] args, WorkbenchSessionCommands.DetachedStarter starter) {

@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import tools.dscode.common.coordination.AgentCoordination;
 import tools.dscode.control.protocol.PickleballLocalLayout;
+import tools.dscode.control.protocol.RunView;
+import tools.dscode.control.protocol.WindowDriver;
 
 import java.io.IOException;
 import java.io.PrintStream;
@@ -52,6 +54,11 @@ public final class WorkbenchSessionCommands {
         Process start(SessionLaunch launch) throws IOException;
     }
 
+    @FunctionalInterface
+    interface UiStarter {
+        Process start(Path project, String runId, String agentId) throws IOException;
+    }
+
     public static int run(String[] args, PrintStream out, PrintStream err) {
         return run(args, out, err, WorkbenchSessionCommands::startControllerSession, defaultHttp());
     }
@@ -71,6 +78,27 @@ public final class WorkbenchSessionCommands {
             PrintStream err,
             DetachedStarter starter,
             HttpClient http
+    ) {
+        return run(args, out, err, starter, http, WorkbenchSessionCommands::startUi);
+    }
+
+    static int run(
+            String[] args,
+            PrintStream out,
+            PrintStream err,
+            DetachedStarter starter,
+            UiStarter uiStarter
+    ) {
+        return run(args, out, err, starter, defaultHttp(), uiStarter);
+    }
+
+    static int run(
+            String[] args,
+            PrintStream out,
+            PrintStream err,
+            DetachedStarter starter,
+            HttpClient http,
+            UiStarter uiStarter
     ) {
         WorkbenchCommandLine.Parsed parsed;
         try {
@@ -94,6 +122,9 @@ public final class WorkbenchSessionCommands {
                 case "status" -> status(parsed, flags, out, err, http);
                 case "events" -> events(parsed, out, err, http);
                 case "stop", "kill" -> stop(parsed, out, err, http);
+                case "open-window" -> openWindow(parsed, out, err, http, uiStarter);
+                case "close-window" -> closeWindow(parsed, out, err, http);
+                case "show-run" -> showRun(parsed, out, err, http);
                 default -> {
                     err.println("Unknown Workbench session command: " + parsed.command());
                     yield 2;
@@ -148,6 +179,179 @@ public final class WorkbenchSessionCommands {
         builder.redirectError(ProcessBuilder.Redirect.appendTo(logFile.toFile()));
         builder.redirectInput(ProcessBuilder.Redirect.DISCARD);
         return builder.start();
+    }
+
+    static Process startUi(Path project, String runId, String agentId) throws IOException {
+        Path controllerJar = PickleballWorkbenchLauncher.extractEmbeddedPayload(project);
+        List<String> forwarded = new ArrayList<>();
+        forwarded.add("ui");
+        forwarded.add(project.toString());
+        if (runId != null && !runId.isBlank()) {
+            forwarded.add("--run-id");
+            forwarded.add(runId);
+        }
+        if (agentId != null && !agentId.isBlank()) {
+            forwarded.add("--agent-id");
+            forwarded.add(agentId);
+        }
+        Path logFile = PickleballLocalLayout.workbenchStateRoot(project).resolve("window.log");
+        return startDetached(project, PickleballWorkbenchLauncher.command(
+                controllerJar, forwarded.toArray(String[]::new)
+        ), logFile);
+    }
+
+    private static int openWindow(
+            WorkbenchCommandLine.Parsed parsed,
+            PrintStream out,
+            PrintStream err,
+            HttpClient http,
+            UiStarter uiStarter
+    ) {
+        return presentRun(parsed, out, err, http, uiStarter, true);
+    }
+
+    private static int showRun(
+            WorkbenchCommandLine.Parsed parsed,
+            PrintStream out,
+            PrintStream err,
+            HttpClient http
+    ) {
+        return presentRun(parsed, out, err, http, null, false);
+    }
+
+    private static int presentRun(
+            WorkbenchCommandLine.Parsed parsed,
+            PrintStream out,
+            PrintStream err,
+            HttpClient http,
+            UiStarter uiStarter,
+            boolean openIfClosed
+    ) {
+        String runId = parsed.coordination().runId();
+        if (runId == null || runId.isBlank()) {
+            err.println("Usage: " + parsed.command() + " --run-id=<id>");
+            return 2;
+        }
+        RunView.Loaded loaded;
+        try {
+            loaded = RunView.load(parsed.project(), runId);
+        } catch (RuntimeException failure) {
+            err.println(failure.getMessage());
+            return 1;
+        }
+        out.println("run-id=" + loaded.runId());
+        out.println("run-record=" + loaded.recordFile());
+        out.println(loaded.recordText());
+        for (Path log : loaded.logs()) out.println("log=" + log);
+        for (Path report : loaded.reports()) out.println("report=" + report);
+        for (Path config : loaded.config()) out.println("config=" + config);
+        out.println("Opening the window loads the run you already have. It does not start a test.");
+
+        Optional<SessionState> window = openWindow(parsed.project(), http);
+        boolean pointTheWindow = openIfClosed || window.isPresent();
+        WindowDriver.Decision decision = null;
+        if (pointTheWindow) {
+            boolean claim = openIfClosed && parsed.coordination().agentId() != null;
+            decision = WindowDriver.show(parsed.project(), runId, parsed.coordination().agentId(), claim);
+            out.println("live-run=" + (decision.state().liveRunId() == null ? "" : decision.state().liveRunId()));
+            out.println("viewed-run=" + loaded.runId());
+            if (decision.readOnly()
+                    && parsed.coordination().agentId() != null
+                    && decision.state().driverAgent() != null
+                    && !decision.state().driverAgent().equals(parsed.coordination().agentId())) {
+                out.println("A second agent does not become a second driver of the live session "
+                        + decision.state().liveRunId() + ".");
+            }
+        }
+        if (window.isEmpty() && openIfClosed) {
+            if (uiStarter == null) {
+                err.println("No Workbench window is open. open-window starts it; show-run does not.");
+                return 1;
+            }
+            Path logFile = PickleballLocalLayout.workbenchStateRoot(parsed.project()).resolve("window.log");
+            Process process;
+            try {
+                process = uiStarter.start(parsed.project(), runId, parsed.coordination().agentId());
+            } catch (IOException failure) {
+                err.println("Could not open the Workbench window: " + failure.getMessage());
+                return 1;
+            }
+            long deadline = System.nanoTime() + HEALTH_TIMEOUT.toNanos();
+            while (System.nanoTime() < deadline && openWindow(parsed.project(), http).isEmpty()) {
+                if (process != null && !process.isAlive() && openWindow(parsed.project(), http).isEmpty()) {
+                    err.println("Workbench window exited before it could show the run. See " + logFile);
+                    return 1;
+                }
+                sleep(POLL);
+            }
+            window = openWindow(parsed.project(), http);
+            if (window.isEmpty()) {
+                err.println("Workbench window did not become healthy within "
+                        + HEALTH_TIMEOUT.toSeconds() + "s. See " + logFile);
+                return 1;
+            }
+        }
+        if (window.isPresent()) {
+            Map<String, Object> body = new LinkedHashMap<>();
+            body.put("op", "show-run");
+            body.put("runId", loaded.runId());
+            if (parsed.coordination().agentId() != null) body.put("agent", parsed.coordination().agentId());
+            boolean driving = decision != null && decision.driving();
+            body.put("claim", Boolean.toString(openIfClosed && driving));
+            try {
+                postJson(http, window.get(), "/commands", body);
+            } catch (RuntimeException failure) {
+                err.println("Workbench window did not show the run: " + failure.getMessage());
+                return 1;
+            }
+        }
+        String driver = decision != null && decision.state().driverAgent() != null
+                ? decision.state().driverAgent()
+                : "";
+        out.println("ACK WINDOW " + (openIfClosed ? "opened" : "shown")
+                + " run-id=" + loaded.runId()
+                + (decision != null && decision.driving() ? " driver=" + driver : " read-only"));
+        return 0;
+    }
+
+    private static int closeWindow(
+            WorkbenchCommandLine.Parsed parsed,
+            PrintStream out,
+            PrintStream err,
+            HttpClient http
+    ) {
+        WindowDriver.closeWindow(parsed.project());
+        Optional<SessionState> window = openWindow(parsed.project(), http);
+        if (window.isPresent()) {
+            try {
+                postJson(http, window.get(), "/commands", Map.of("op", "close-window"));
+            } catch (RuntimeException failure) {
+                err.println("Workbench window did not close: " + failure.getMessage());
+                return 1;
+            }
+        }
+        out.println("ACK WINDOW closed");
+        out.println("The run directory and the short log are unchanged. A headless run keeps going.");
+        return 0;
+    }
+
+    private static Optional<SessionState> openWindow(Path project, HttpClient http) {
+        Optional<SessionState> attached = readHealthyFile(PickleballLocalLayout.attachFile(project), project, http);
+        if (attached.isPresent() && "ui-attach".equals(attached.get().mode())) return attached;
+        return Optional.empty();
+    }
+
+    private static Integer refusedDriver(WorkbenchCommandLine.Parsed parsed, PrintStream err) {
+        if (parsed.coordination().runId() != null && !parsed.coordination().runId().isBlank()) return null;
+        Optional<String> refused = WindowDriver.refuseSecondDriver(
+                parsed.project(), parsed.coordination().agentId()
+        );
+        if (refused.isPresent()) {
+            err.println(refused.get());
+            return 1;
+        }
+        WindowDriver.claimVacant(parsed.project(), parsed.coordination().agentId());
+        return null;
     }
 
     private static int sessionStart(
@@ -228,6 +432,8 @@ public final class WorkbenchSessionCommands {
             PrintStream err,
             HttpClient http
     ) {
+        Integer refused = refusedDriver(parsed, err);
+        if (refused != null) return refused;
         SessionState state = requireSession(parsed, http);
         String text = flags.text;
         if (text == null || text.isBlank()) {
@@ -250,6 +456,8 @@ public final class WorkbenchSessionCommands {
             err.println("Usage: " + parsed.command() + " --text=<gherkin>");
             return 2;
         }
+        Integer refused = refusedDriver(parsed, err);
+        if (refused != null) return refused;
         SessionState state = requireSession(parsed, http);
         return postAndMaybeWait(state, flags, commandBody(parsed, flags), out, err, http);
     }
@@ -267,6 +475,8 @@ public final class WorkbenchSessionCommands {
             err.println("Usage: open-scenario --feature=<path-or-name> --name=<scenario> [--example=<rows>]");
             return 2;
         }
+        Integer refused = refusedDriver(parsed, err);
+        if (refused != null) return refused;
         SessionState state = requireSession(parsed, http);
         return postAndMaybeWait(state, flags, commandBody(parsed, flags), out, err, http);
     }
@@ -284,6 +494,8 @@ public final class WorkbenchSessionCommands {
             err.println("Usage: example --example=<rows>");
             return 2;
         }
+        Integer refused = refusedDriver(parsed, err);
+        if (refused != null) return refused;
         SessionState state = requireSession(parsed, http);
         Map<String, Object> body = commandBody(parsed, flags);
         body.put("example", selector);
@@ -312,6 +524,8 @@ public final class WorkbenchSessionCommands {
             PrintStream err,
             HttpClient http
     ) {
+        Integer refused = refusedDriver(parsed, err);
+        if (refused != null) return refused;
         SessionState state = requireSession(parsed, http);
         return postAndMaybeWait(state, flags, commandBody(parsed, flags), out, err, http);
     }
@@ -326,6 +540,8 @@ public final class WorkbenchSessionCommands {
         if (parsed.example() != null && !parsed.example().isBlank()) body.put("example", parsed.example());
         if (flags.run != null && !flags.run.isBlank()) body.put("run", flags.run);
         if (flags.fromHere != null && !flags.fromHere.isBlank()) body.put("fromHere", flags.fromHere);
+        if (parsed.coordination().agentId() != null) body.put("agent", parsed.coordination().agentId());
+        if (parsed.coordination().runId() != null) body.put("runId", parsed.coordination().runId());
         return body;
     }
 
@@ -398,6 +614,8 @@ public final class WorkbenchSessionCommands {
             PrintStream err,
             HttpClient http
     ) {
+        Integer refused = refusedDriver(parsed, err);
+        if (refused != null) return refused;
         Optional<SessionState> state = resolveSession(parsed, http);
         if (state.isEmpty()) {
             out.println("ACK SESSION already-stopped");

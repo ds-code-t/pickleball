@@ -22,7 +22,8 @@ final class WorkbenchCommandLine {
             "isolate", "session-start", "execute-step", "status", "events", "stop", "kill",
             "open-scenario", "example", "play", "from-here", "pause",
             "insert-step", "update-step", "diagnostic-run", "save", "refresh",
-            "session-sync", "worker-start", "worker-restart", "worker-stop"
+            "session-sync", "worker-start", "worker-restart", "worker-stop",
+            "open-window", "close-window", "show-run"
     );
 
     private WorkbenchCommandLine() {
