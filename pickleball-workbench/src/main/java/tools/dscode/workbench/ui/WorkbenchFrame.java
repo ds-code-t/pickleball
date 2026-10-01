@@ -7,6 +7,8 @@ import tools.dscode.control.protocol.ControlBridgeEventPage;
 import tools.dscode.control.protocol.ControlBridgeMappingSnapshot;
 import tools.dscode.control.protocol.PickleballLocalLayout;
 import tools.dscode.control.protocol.PickleballVersion;
+import tools.dscode.control.protocol.RunView;
+import tools.dscode.control.protocol.WindowDriver;
 import tools.dscode.control.protocol.ControlBridgeStepResolution;
 import tools.dscode.workbench.WorkbenchSessionActions;
 import tools.dscode.workbench.catalog.CatalogTargetResolver;
@@ -92,6 +94,10 @@ final class WorkbenchFrame extends JFrame {
     private boolean liveIsolateWorkerSeen;
     private final Timer diagnosticTailTimer = new Timer(1200, event -> tailDiagnostics());
     private final JComboBox<String> reportPicker = new JComboBox<>();
+    private final JComboBox<String> runPicker = new JComboBox<>();
+    private final JTextArea runViewText = outputArea();
+    private final JLabel runLiveLabel = new JLabel("Live run: none");
+    private boolean syncingRunPicker;
     private final JEditorPane reportView = new JEditorPane();
     private final Map<String, Path> reportFiles = new LinkedHashMap<>();
 
@@ -176,10 +182,19 @@ final class WorkbenchFrame extends JFrame {
     private int shownTabIndex;
 
     WorkbenchFrame(WorkbenchUiController controller) {
-        this(controller, null);
+        this(controller, null, null, null);
     }
 
     WorkbenchFrame(WorkbenchUiController controller, WorkbenchAttachServer attach) {
+        this(controller, attach, null, null);
+    }
+
+    WorkbenchFrame(
+            WorkbenchUiController controller,
+            WorkbenchAttachServer attach,
+            String initialRunId,
+            String initialAgentId
+    ) {
         super("Pickleball Workbench");
         this.controller = controller;
         this.attach = attach;
@@ -250,6 +265,7 @@ final class WorkbenchFrame extends JFrame {
         }));
         applyLease(controller.controlLease());
         actions.installWindow(new SessionWindow());
+        loadInitialRun(initialRunId, initialAgentId);
         controller.setUiGoHandler(link -> SwingUtilities.invokeLater(() ->
                 applyGoResult(new WorkbenchGoResolver(controller.projectRoot()).resolve(link), link)));
 
@@ -453,8 +469,91 @@ final class WorkbenchFrame extends JFrame {
         return panel;
     }
 
+    private JComponent runPanel() {
+        JPanel panel = new JPanel(new BorderLayout(8, 8));
+        panel.setOpaque(false);
+        JPanel bar = new JPanel(new BorderLayout(8, 0));
+        bar.setOpaque(false);
+        JLabel caption = new JLabel("Run");
+        bar.add(caption, BorderLayout.WEST);
+        bar.add(runPicker, BorderLayout.CENTER);
+        bar.add(runLiveLabel, BorderLayout.EAST);
+        panel.add(bar, BorderLayout.NORTH);
+        runViewText.setText("Choose a run. This loads that run's record, logs, reports, and config. It does not start a test.");
+        panel.add(new JScrollPane(runViewText), BorderLayout.CENTER);
+        runPicker.addActionListener(event -> {
+            if (syncingRunPicker) return;
+            Object selected = runPicker.getSelectedItem();
+            if (selected == null || selected.toString().isBlank()) return;
+            try {
+                actions.showRun(selected.toString(), null, false);
+            } catch (RuntimeException failure) {
+                runViewText.setText(failure.getMessage());
+            }
+        });
+        return panel;
+    }
+
+    private void loadInitialRun(String runId, String agentId) {
+        refreshRunChooser();
+        String id = runId;
+        if (id == null || id.isBlank()) {
+            id = WindowDriver.read(controller.projectRoot()).viewedRunId();
+        }
+        if (id == null || id.isBlank()) return;
+        try {
+            boolean claim = agentId != null && !agentId.isBlank();
+            actions.showRun(id, agentId, claim);
+        } catch (RuntimeException failure) {
+            runViewText.setText(failure.getMessage());
+        }
+    }
+
+    private void refreshRunChooser() {
+        java.util.List<String> ids = RunView.runIds(controller.projectRoot());
+        syncingRunPicker = true;
+        try {
+            Object selected = runPicker.getSelectedItem();
+            runPicker.removeAllItems();
+            for (String id : ids) runPicker.addItem(id);
+            if (selected != null) runPicker.setSelectedItem(selected.toString());
+        } finally {
+            syncingRunPicker = false;
+        }
+    }
+
+    private void presentRun(WindowDriver.Decision decision) {
+        refreshRunChooser();
+        syncingRunPicker = true;
+        try {
+            runPicker.setSelectedItem(decision.loaded().runId());
+        } finally {
+            syncingRunPicker = false;
+        }
+        String live = decision.state().liveRunId() == null ? "none" : decision.state().liveRunId();
+        String mode = decision.readOnly() ? "read-only" : "live";
+        runLiveLabel.setText("Live run: " + live + " (" + mode + ")");
+        StringBuilder text = new StringBuilder();
+        text.append(decision.loaded().recordText());
+        if (!text.toString().endsWith("\n")) text.append('\n');
+        text.append("\nlogs:\n");
+        for (Path log : decision.loaded().logs()) text.append(log).append('\n');
+        text.append("\nreports:\n");
+        for (Path report : decision.loaded().reports()) text.append(report).append('\n');
+        text.append("\nconfig:\n");
+        for (Path config : decision.loaded().config()) text.append(config).append('\n');
+        text.append("\nPlay, step, and stop apply only to the live run. Other runs are readable.\n");
+        runViewText.setText(text.toString());
+        runViewText.setCaretPosition(0);
+        if (rightTabs != null) {
+            int index = rightTabs.indexOfTab("Run");
+            if (index >= 0) rightTabs.setSelectedIndex(index);
+        }
+    }
+
     private JComponent rightWorkspace() {
         rightTabs = new JTabbedPane();
+        rightTabs.addTab("Run", runPanel());
         rightTabs.addTab("Mapping", mappingPanel());
         rightTabs.addTab("Terminal", terminal);
         rightTabs.addTab("Explorer", diagnosticsPanel());
@@ -2779,6 +2878,7 @@ final class WorkbenchFrame extends JFrame {
     }
 
     private void closeWorkbench() {
+        WindowDriver.closeWindow(controller.projectRoot());
         diagnosticTailTimer.stop();
         if (closing) return;
         closing = true;
@@ -2909,6 +3009,16 @@ final class WorkbenchFrame extends JFrame {
         @Override
         public void stopWorker() {
             runStateAction("Stopping worker", controller::stopWorker);
+        }
+
+        @Override
+        public void showRun(WindowDriver.Decision decision) {
+            presentRun(decision);
+        }
+
+        @Override
+        public void closeWindow() {
+            closeWorkbench();
         }
     }
 

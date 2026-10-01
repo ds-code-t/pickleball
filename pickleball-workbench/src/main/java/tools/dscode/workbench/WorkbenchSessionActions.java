@@ -2,6 +2,7 @@ package tools.dscode.workbench;
 
 import tools.dscode.control.protocol.ControlBridgeCallResult;
 import tools.dscode.control.protocol.ExampleRowSelector;
+import tools.dscode.control.protocol.WindowDriver;
 import tools.dscode.workbench.catalog.ConsumerFeatureCatalog;
 import tools.dscode.workbench.lease.WorkbenchCallContext;
 import tools.dscode.workbench.lease.WorkbenchLeaseHolder;
@@ -43,6 +44,24 @@ public final class WorkbenchSessionActions {
             "save",
             "refresh",
             "session-sync",
+            "worker-start",
+            "worker-restart",
+            "worker-stop",
+            "stop",
+            "show-run",
+            "close-window"
+    );
+
+    private static final Set<String> DRIVING = Set.of(
+            "open-scenario",
+            "example",
+            "play",
+            "from-here",
+            "pause",
+            "execute-step",
+            "insert-step",
+            "update-step",
+            "save",
             "worker-start",
             "worker-restart",
             "worker-stop",
@@ -301,6 +320,13 @@ public final class WorkbenchSessionActions {
         if (!known(op)) {
             throw new IllegalArgumentException("Unknown session command: " + op);
         }
+        if (DRIVING.contains(op)) {
+            String refused = WindowDriver.refuseSecondDriver(services.projectRoot(), args.get("agent")).orElse(null);
+            if (refused != null) {
+                throw new IllegalStateException(refused);
+            }
+            WindowDriver.claimVacant(services.projectRoot(), args.get("agent"));
+        }
         return switch (op) {
             case "open-scenario" -> openScenario(args.get("feature"), args.get("name"), args.get("example"));
             case "example" -> example(first(args, "example", "text"));
@@ -318,8 +344,39 @@ public final class WorkbenchSessionActions {
             case "worker-restart" -> workerRestart();
             case "worker-stop" -> workerStop();
             case "stop" -> stopPlayback();
+            case "show-run" -> showRun(first(args, "runId", "run"), args.get("agent"), Boolean.parseBoolean(args.get("claim")));
+            case "close-window" -> closeWindow();
             default -> throw new IllegalArgumentException("Unknown session command: " + op);
         };
+    }
+
+    public Map<String, Object> showRun(String runId, String agentId, boolean claim) {
+        WindowDriver.Decision decision = WindowDriver.show(services.projectRoot(), runId, agentId, claim);
+        if (window != null) {
+            show(client -> client.showRun(decision));
+        }
+        LinkedHashMap<String, Object> payload = accepted("show-run", decision.readOnly() ? "READ_ONLY" : "SHOWN");
+        payload.put("run", decision.loaded().runId());
+        payload.put("record", decision.loaded().recordText());
+        payload.put("logs", decision.loaded().logs().stream().map(Path::toString).toList());
+        payload.put("reports", decision.loaded().reports().stream().map(Path::toString).toList());
+        payload.put("config", decision.loaded().config().stream().map(Path::toString).toList());
+        payload.put("liveRun", decision.state().liveRunId() == null ? "" : decision.state().liveRunId());
+        payload.put("driver", decision.state().driverAgent() == null ? "" : decision.state().driverAgent());
+        payload.put("driving", decision.driving());
+        payload.put("readOnly", decision.readOnly());
+        payload.put("startedTest", false);
+        return payload;
+    }
+
+    public Map<String, Object> closeWindow() {
+        WindowDriver.closeWindow(services.projectRoot());
+        if (window != null) {
+            show(Window::closeWindow);
+        }
+        LinkedHashMap<String, Object> payload = accepted("close-window", "CLOSED");
+        payload.put("startedTest", false);
+        return payload;
     }
 
     private Map<String, Object> play(boolean fromHere, String stepId) {
@@ -515,5 +572,11 @@ public final class WorkbenchSessionActions {
         void restartWorker();
 
         void stopWorker();
+
+        default void showRun(WindowDriver.Decision decision) {
+        }
+
+        default void closeWindow() {
+        }
     }
 }

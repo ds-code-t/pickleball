@@ -2,13 +2,18 @@ package tools.dscode.workbench;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import tools.dscode.control.protocol.PickleballLocalLayout;
+import tools.dscode.control.protocol.WindowDriver;
 import tools.dscode.workbench.lease.WorkbenchCallContext;
 import tools.dscode.workbench.lease.WorkbenchLeaseHolder;
 import tools.dscode.workbench.player.WorkbenchSaveResult;
 
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.HexFormat;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -120,6 +125,73 @@ class WorkbenchSessionActionsTest {
         }
     }
 
+    @Test
+    void showRunLoadsTheRecordAndASecondAgentDoesNotDrive() throws Exception {
+        Path alpha = writeRun("alpha", "ALPHA-RECORD");
+        writeRun("beta", "BETA-RECORD");
+        Path shortLog = PickleballLocalLayout.root(project).resolve("agent-log");
+        Files.createDirectories(shortLog.getParent());
+        Files.writeString(shortLog, "keep-this-short-log\n");
+        try (WorkbenchController controller = new WorkbenchController(project)) {
+            WorkbenchSessionActions actions = new WorkbenchSessionActions(controller);
+            RecordingWindow window = new RecordingWindow(alpha);
+            actions.installWindow(window);
+            Map<String, String> before = snapshot(alpha);
+
+            Map<String, Object> shown = actions.showRun("alpha", "agent-1", true);
+            assertEquals(Boolean.FALSE, shown.get("startedTest"));
+            assertTrue(String.valueOf(shown.get("record")).contains("ALPHA-RECORD"));
+            assertEquals("alpha", shown.get("liveRun"));
+            assertEquals("agent-1", shown.get("driver"));
+            assertTrue(window.calls.contains("show-run:alpha"), window.calls.toString());
+
+            Map<String, Object> other = actions.showRun("beta", null, false);
+            assertEquals(Boolean.FALSE, other.get("startedTest"));
+            assertTrue(String.valueOf(other.get("record")).contains("BETA-RECORD"));
+            assertEquals("alpha", other.get("liveRun"));
+            assertEquals(Boolean.TRUE, other.get("readOnly"));
+            assertEquals(before, snapshot(alpha));
+            assertTrue(window.calls.contains("show-run:beta"), window.calls.toString());
+
+            IllegalStateException refused = assertThrows(
+                    IllegalStateException.class,
+                    () -> actions.dispatch("play", Map.of("agent", "agent-2"))
+            );
+            assertTrue(refused.getMessage().contains("does not become a second driver"));
+            assertFalse(window.calls.contains("play"));
+            assertEquals("agent-1", WindowDriver.read(project).driverAgent());
+
+            byte[] logBefore = Files.readAllBytes(shortLog);
+            Map<String, String> runBefore = snapshot(alpha);
+            actions.closeWindow();
+            assertTrue(window.calls.contains("close-window"));
+            assertEquals(runBefore, snapshot(alpha));
+            assertEquals(new String(logBefore), Files.readString(shortLog));
+            assertFalse(WindowDriver.read(project).open());
+        }
+    }
+
+    private Path writeRun(String id, String marker) throws IOException {
+        Path run = PickleballLocalLayout.root(project).resolve("runs").resolve(id);
+        Files.createDirectories(run.resolve("reports"));
+        Files.createDirectories(run.resolve("config"));
+        Files.writeString(run.resolve("record.json"), "{\"runId\":\"" + id + "\",\"marker\":\"" + marker + "\"}\n");
+        Files.writeString(run.resolve(id + ".log"), marker + "\n");
+        Files.writeString(run.resolve("reports").resolve(id + "-report.txt"), marker + "\n");
+        Files.writeString(run.resolve("config").resolve(id + ".properties"), "name=" + marker + "\n");
+        return run;
+    }
+
+    private static Map<String, String> snapshot(Path root) throws IOException {
+        Map<String, String> files = new LinkedHashMap<>();
+        try (var walk = Files.walk(root)) {
+            for (Path path : walk.filter(Files::isRegularFile).sorted().toList()) {
+                files.put(root.relativize(path).toString(), HexFormat.of().formatHex(Files.readAllBytes(path)));
+            }
+        }
+        return files;
+    }
+
     private static final class RecordingWindow implements WorkbenchSessionActions.Window {
         private final Path feature;
         private final List<String> calls = new ArrayList<>();
@@ -217,6 +289,16 @@ class WorkbenchSessionActionsTest {
         @Override
         public void stopWorker() {
             calls.add("worker-stop");
+        }
+
+        @Override
+        public void showRun(WindowDriver.Decision decision) {
+            calls.add("show-run:" + decision.loaded().runId());
+        }
+
+        @Override
+        public void closeWindow() {
+            calls.add("close-window");
         }
     }
 }
