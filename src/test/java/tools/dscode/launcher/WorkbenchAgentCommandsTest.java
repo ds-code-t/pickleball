@@ -1,7 +1,9 @@
 package tools.dscode.launcher;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import tools.dscode.common.coordination.AgentCoordination;
 import tools.dscode.common.reporting.diagnostic.LastDiscoverSnapshot;
 
 import java.io.ByteArrayOutputStream;
@@ -20,6 +22,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class WorkbenchAgentCommandsTest {
     @TempDir
     Path tempDir;
+
+    @AfterEach
+    void clearCoordination() {
+        AgentCoordination.clearCurrent();
+    }
 
     @Test
     void hintPrintsLadderRunVarsAndNextDiscover() throws Exception {
@@ -213,6 +220,53 @@ class WorkbenchAgentCommandsTest {
         String errors = stderr.toString(StandardCharsets.UTF_8);
         assertTrue(errors.contains("No prior Discover snapshot"));
         assertFalse(errors.toLowerCase().contains("register"));
+    }
+
+    @Test
+    void shortLogNoteInboxAndFinishUseTheProjectBoard() throws Exception {
+        Output note = run("note", tempDir.toString(), "--agent=agent-board", "--text=looking at row 2");
+        assertEquals(0, note.exitCode(), note.stderr());
+        Output log = run("short-log", tempDir.toString());
+        assertEquals(0, log.exitCode(), log.stderr());
+        assertTrue(log.stdout().contains("agent-board"));
+        assertTrue(log.stdout().contains("looking at row 2"));
+
+        Output write = run(
+                "inbox", tempDir.toString(), "--write", "--to=agent-other",
+                "--from=agent-board", "--text=window is taken"
+        );
+        assertEquals(0, write.exitCode(), write.stderr());
+        Output hidden = run("inbox", tempDir.toString(), "--list", "--agent=agent-board");
+        assertEquals(0, hidden.exitCode(), hidden.stderr());
+        assertTrue(hidden.stdout().contains("(no inbox notes)"));
+        Output listed = run("inbox", tempDir.toString(), "--list", "--agent=agent-other");
+        assertTrue(listed.stdout().contains("window is taken"));
+        Output taken = run("inbox", tempDir.toString(), "--take", "--agent=agent-other");
+        assertTrue(taken.stdout().contains("window is taken"));
+        Output empty = run("inbox", tempDir.toString(), "--list", "--agent=agent-other");
+        assertTrue(empty.stdout().contains("(no inbox notes)"));
+
+        Output discover = run(
+                "finish", tempDir.toString(), "--run-id=missing-run", "--learned=no such run"
+        );
+        assertEquals(1, discover.exitCode());
+
+        AgentCoordination.begin(tempDir, AgentCoordination.Request.of(
+                "run-finish", "agent-board", null, null, null, null, "discover"
+        ));
+        Output finished = run(
+                "finish", tempDir.toString(), "--run-id=run-finish", "--learned=the empty row fails"
+        );
+        assertEquals(0, finished.exitCode(), finished.stderr());
+        String record = Files.readString(
+                AgentCoordination.runDirectory(tempDir, "run-finish").resolve("record.json")
+        );
+        assertTrue(record.contains("the empty row fails"));
+        assertTrue(record.contains("STOPPED"));
+        String board = Files.readString(AgentCoordination.logFile(tempDir));
+        assertTrue(board.contains("\tstart\t"));
+        assertTrue(board.contains("\tstop\t"));
+        assertTrue(board.contains("record.json"));
     }
 
     private Output run(String... args) {

@@ -3,6 +3,7 @@ package tools.dscode.launcher;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -92,6 +93,41 @@ class WorkbenchCommandLineTest {
                 new String[]{"hint"}
         );
         assertNull(parsed.retention());
+    }
+
+    @Test
+    void coordinationFlagsAreNotForwardedAndDoNotJoinTheName() {
+        WorkbenchCommandLine.Parsed parsed = WorkbenchCommandLine.parse(new String[]{
+                "isolate",
+                "--name=The", "failing", "scenario",
+                "--run-id", "run-42",
+                "--agent", "agent-7",
+                "--group=wave",
+                "--sequence=4",
+                "--who=Dan", "the", "author",
+                "--why=check", "the", "row",
+                "--learned=not", "yet"
+        });
+        assertEquals("The failing scenario", parsed.name());
+        assertEquals("run-42", parsed.coordination().runId());
+        assertEquals("agent-7", parsed.coordination().agentId());
+        assertEquals("wave", parsed.coordination().group());
+        assertEquals(4, parsed.coordination().sequence());
+        assertEquals("Dan the author", parsed.coordination().who());
+        assertEquals("check the row", parsed.coordination().why());
+        assertEquals("not yet", parsed.coordination().learned());
+        String joined = String.join("\n", parsed.forwarded());
+        assertFalse(joined.contains("--run-id"));
+        assertFalse(joined.contains("run-42"));
+        assertFalse(joined.contains("--agent"));
+        assertFalse(joined.contains("--who"));
+        assertFalse(joined.contains("--why"));
+        assertFalse(joined.contains("--learned"));
+        assertFalse(joined.contains("--group"));
+        assertTrue(WorkbenchCommandLine.isAgentCoreCommand("short-log"));
+        assertTrue(WorkbenchCommandLine.isAgentCoreCommand("note"));
+        assertTrue(WorkbenchCommandLine.isAgentCoreCommand("inbox"));
+        assertTrue(WorkbenchCommandLine.isAgentCoreCommand("finish"));
     }
 
     @Test

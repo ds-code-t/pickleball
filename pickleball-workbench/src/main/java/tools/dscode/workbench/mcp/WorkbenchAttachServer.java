@@ -84,7 +84,23 @@ public final class WorkbenchAttachServer implements AutoCloseable {
             Path projectRoot,
             Runnable stopHandler
     ) {
-        return startCliSession(services, projectRoot, stopHandler, null);
+        return startCliSession(services, projectRoot, stopHandler, (Path) null);
+    }
+
+    public static WorkbenchAttachServer startCliSession(
+            WorkbenchServices services,
+            Path projectRoot,
+            Runnable stopHandler,
+            Path stateFile
+    ) {
+        return start(
+                services,
+                projectRoot,
+                CLI_SESSION_MODE,
+                stateFile == null ? cliSessionStateFile(projectRoot) : stateFile,
+                stopHandler,
+                null
+        );
     }
 
     static WorkbenchAttachServer startCliSession(

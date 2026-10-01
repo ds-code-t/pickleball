@@ -2,9 +2,11 @@ package tools.dscode.launcher;
 
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
+import tools.dscode.common.coordination.AgentCoordination;
 import tools.dscode.control.protocol.PickleballLocalLayout;
 
 import java.io.ByteArrayOutputStream;
@@ -30,6 +32,11 @@ class WorkbenchSessionCommandsTest {
     @TempDir
     Path project;
 
+    @AfterEach
+    void clearCoordination() {
+        AgentCoordination.clearCurrent();
+    }
+
     @Test
     @Timeout(value = 5, unit = TimeUnit.SECONDS)
     void isolateDoesNotBlockOnStdinWhenSessionAlreadyHealthy() throws Exception {
@@ -37,13 +44,15 @@ class WorkbenchSessionCommandsTest {
             AtomicBoolean started = new AtomicBoolean();
             Output output = run(
                     new String[]{"isolate", project.toString()},
-                    (proj, tags, name, example, log) -> {
+                    launch -> {
                         started.set(true);
                         throw new AssertionError("should not start a second session");
                     }
             );
             assertEquals(0, output.exitCode);
             assertTrue(output.stdout.contains("ACK SESSION already-running"));
+            assertTrue(output.stdout.contains("Only one agent drives an open Workbench window"));
+            assertTrue(output.stdout.contains("stays headless"));
             assertFalse(started.get());
         }
     }
@@ -56,9 +65,9 @@ class WorkbenchSessionCommandsTest {
         try {
             Output output = run(
                     new String[]{"session-start", project.toString(), "--example=1", "2", "5"},
-                    (proj, tags, name, example, log) -> {
-                        assertEquals("1 2 5", example);
-                        FakeSession session = FakeSession.start(proj);
+                    launch -> {
+                        assertEquals("1 2 5", launch.example());
+                        FakeSession session = FakeSession.start(launch.project(), "cli-session", launch.sessionFile());
                         started.set(session);
                         Process process = startLongLivedChild();
                         child.set(process);
@@ -85,7 +94,7 @@ class WorkbenchSessionCommandsTest {
             ui.onCommand = body -> hit.set(body);
             Output play = run(
                     new String[]{"play", project.toString(), "--ack-only"},
-                    (proj, tags, name, example, log) -> {
+                    launch -> {
                         throw new AssertionError("play must not start a session");
                     }
             );
@@ -98,7 +107,7 @@ class WorkbenchSessionCommandsTest {
             ui.setPid(child.pid());
             Output stop = run(
                     new String[]{"stop", project.toString()},
-                    (proj, tags, name, example, log) -> {
+                    launch -> {
                         throw new AssertionError("stop must not start a session");
                     }
             );
@@ -121,7 +130,7 @@ class WorkbenchSessionCommandsTest {
                             "open-scenario", project.toString(),
                             "--feature=shop.feature", "--name=Buy", "--example=2.2", "--ack-only"
                     },
-                    (proj, tags, name, example, log) -> {
+                    launch -> {
                         throw new AssertionError("open-scenario must not start a session");
                     }
             );
@@ -162,7 +171,7 @@ class WorkbenchSessionCommandsTest {
                 args.add("--ack-only");
                 Output output = run(
                         args.toArray(String[]::new),
-                        (proj, tags, name, example, log) -> {
+                        launch -> {
                             throw new AssertionError(command[0] + " must not start a session");
                         }
                 );
@@ -179,13 +188,65 @@ class WorkbenchSessionCommandsTest {
         try (FakeSession ignored = FakeSession.start(project)) {
             Output output = run(
                     new String[]{"execute-step", project.toString(), "--text=Given stay", "--ack-only"},
-                    (proj, tags, name, example, log) -> {
+                    launch -> {
                         throw new AssertionError("execute-step must not start a session process");
                     }
             );
             assertEquals(0, output.exitCode);
             assertTrue(output.stdout.contains("ACK "));
             assertFalse(output.stdout.contains("DONE "));
+        }
+    }
+
+    @Test
+    @Timeout(value = 10, unit = TimeUnit.SECONDS)
+    void twoHeadlessIsolatesDoNotShareASessionFile() throws Exception {
+        List<Path> files = new ArrayList<>();
+        List<FakeSession> sessions = new ArrayList<>();
+        List<Process> children = new ArrayList<>();
+        try {
+            for (int index = 0; index < 2; index++) {
+                Output output = run(
+                        new String[]{"isolate", project.toString(), "--run-id=run-" + index, "--agent=agent-" + index},
+                        launch -> {
+                            files.add(launch.sessionFile());
+                            assertTrue(launch.sessionFile().toString().contains("run-" + (files.size() - 1)));
+                            FakeSession session = FakeSession.start(
+                                    launch.project(), "cli-session", launch.sessionFile()
+                            );
+                            sessions.add(session);
+                            Process process = startLongLivedChild();
+                            children.add(process);
+                            return process;
+                        }
+                );
+                assertEquals(0, output.exitCode, output.stderr + output.stdout);
+                assertTrue(output.stdout.contains("ACK SESSION pid="));
+                assertFalse(output.stdout.contains("already-running"));
+            }
+            assertEquals(2, files.size());
+            assertFalse(files.get(0).equals(files.get(1)));
+        } finally {
+            for (Process process : children) process.destroyForcibly();
+            for (FakeSession session : sessions) session.close();
+        }
+    }
+
+    @Test
+    @Timeout(value = 5, unit = TimeUnit.SECONDS)
+    void runIdDoesNotFallThroughToAnOpenWindow() throws Exception {
+        try (FakeSession ignored = FakeSession.start(project)) {
+            AtomicBoolean started = new AtomicBoolean();
+            Output output = run(
+                    new String[]{"play", project.toString(), "--run-id=run-private", "--ack-only"},
+                    launch -> {
+                        started.set(true);
+                        throw new AssertionError("a named run must not start or drive the open window");
+                    }
+            );
+            assertEquals(1, output.exitCode, output.stderr + output.stdout);
+            assertFalse(started.get());
+            assertTrue(output.stderr.contains("No healthy Workbench session"));
         }
     }
 

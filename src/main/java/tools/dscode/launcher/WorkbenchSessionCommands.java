@@ -2,6 +2,7 @@ package tools.dscode.launcher;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.dscode.common.coordination.AgentCoordination;
 import tools.dscode.control.protocol.PickleballLocalLayout;
 
 import java.io.IOException;
@@ -13,6 +14,7 @@ import java.net.http.HttpResponse;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -33,9 +35,21 @@ public final class WorkbenchSessionCommands {
     private WorkbenchSessionCommands() {
     }
 
+    record SessionLaunch(
+            Path project,
+            String tags,
+            String name,
+            String example,
+            Path logFile,
+            Path sessionFile,
+            String runId,
+            String agentId
+    ) {
+    }
+
     @FunctionalInterface
     interface DetachedStarter {
-        Process start(Path project, String tags, String name, String example, Path logFile) throws IOException;
+        Process start(SessionLaunch launch) throws IOException;
     }
 
     public static int run(String[] args, PrintStream out, PrintStream err) {
@@ -91,32 +105,38 @@ public final class WorkbenchSessionCommands {
         }
     }
 
-    static Process startControllerSession(
-            Path project,
-            String tags,
-            String name,
-            String example,
-            Path logFile
-    ) throws IOException {
-        Path controllerJar = PickleballWorkbenchLauncher.extractEmbeddedPayload(project);
+    static Process startControllerSession(SessionLaunch launch) throws IOException {
+        Path controllerJar = PickleballWorkbenchLauncher.extractEmbeddedPayload(launch.project());
         List<String> forwarded = new ArrayList<>();
         forwarded.add("session");
-        forwarded.add(project.toString());
-        if (tags != null && !tags.isBlank()) {
+        forwarded.add(launch.project().toString());
+        if (launch.tags() != null && !launch.tags().isBlank()) {
             forwarded.add("--tags");
-            forwarded.add(tags);
+            forwarded.add(launch.tags());
         }
-        if (name != null && !name.isBlank()) {
+        if (launch.name() != null && !launch.name().isBlank()) {
             forwarded.add("--name");
-            forwarded.add(name);
+            forwarded.add(launch.name());
         }
-        if (example != null && !example.isBlank()) {
+        if (launch.example() != null && !launch.example().isBlank()) {
             forwarded.add("--example");
-            forwarded.add(example);
+            forwarded.add(launch.example());
         }
-        return startDetached(project, PickleballWorkbenchLauncher.command(
+        if (launch.sessionFile() != null) {
+            forwarded.add("--session-file");
+            forwarded.add(launch.sessionFile().toString());
+        }
+        if (launch.runId() != null && !launch.runId().isBlank()) {
+            forwarded.add("--run-id");
+            forwarded.add(launch.runId());
+        }
+        if (launch.agentId() != null && !launch.agentId().isBlank()) {
+            forwarded.add("--agent-id");
+            forwarded.add(launch.agentId());
+        }
+        return startDetached(launch.project(), PickleballWorkbenchLauncher.command(
                 controllerJar, forwarded.toArray(String[]::new)
-        ), logFile);
+        ), launch.logFile());
     }
 
     static Process startDetached(Path project, List<String> command, Path logFile) throws IOException {
@@ -138,31 +158,55 @@ public final class WorkbenchSessionCommands {
             HttpClient http
     ) {
         Path project = parsed.project();
+        AgentCoordination.Run run = AgentCoordination.begin(
+                project,
+                AgentCoordination.Request.of(
+                        parsed.coordination().runId(),
+                        parsed.coordination().agentId(),
+                        parsed.coordination().group(),
+                        parsed.coordination().sequence(),
+                        parsed.coordination().who(),
+                        parsed.coordination().why(),
+                        "isolate"
+                )
+        );
         Optional<SessionState> existing = readHealthy(project, http);
         if (existing.isPresent()) {
             SessionState state = existing.get();
             out.println("ACK SESSION already-running pid=" + state.pid() + " url=" + state.url());
+            out.println("Only one agent drives an open Workbench window. This run stays headless on run-id="
+                    + run.runId() + ".");
             return 0;
         }
 
-        Path logFile = PickleballLocalLayout.workbenchStateRoot(project).resolve("session.log");
+        Path logFile = run.sessionDirectory().resolve("session.log");
+        Path sessionFile = run.sessionStateFile();
         Process process;
         try {
-            process = starter.start(project, parsed.tags(), parsed.name(), parsed.example(), logFile);
+            process = starter.start(new SessionLaunch(
+                    project,
+                    parsed.tags(),
+                    parsed.name(),
+                    parsed.example(),
+                    logFile,
+                    sessionFile,
+                    run.runId(),
+                    run.agentId()
+            ));
         } catch (IOException failure) {
             throw new IllegalStateException("Could not start Workbench session: " + failure.getMessage(), failure);
         }
 
         long deadline = System.nanoTime() + HEALTH_TIMEOUT.toNanos();
         while (System.nanoTime() < deadline) {
-            Optional<SessionState> ready = readHealthy(project, http);
+            Optional<SessionState> ready = readHealthyFile(sessionFile, project, http);
             if (ready.isPresent()) {
                 SessionState state = ready.get();
                 out.println("ACK SESSION pid=" + state.pid() + " url=" + state.url());
                 return 0;
             }
             if (process != null && !process.isAlive()) {
-                Optional<SessionState> afterExit = readHealthy(project, http);
+                Optional<SessionState> afterExit = readHealthyFile(sessionFile, project, http);
                 if (afterExit.isPresent()) {
                     SessionState state = afterExit.get();
                     out.println("ACK SESSION pid=" + state.pid() + " url=" + state.url());
@@ -184,7 +228,7 @@ public final class WorkbenchSessionCommands {
             PrintStream err,
             HttpClient http
     ) {
-        SessionState state = requireSession(parsed.project(), http);
+        SessionState state = requireSession(parsed, http);
         String text = flags.text;
         if (text == null || text.isBlank()) {
             err.println("Usage: execute-step <gherkin> or execute-step --text=<gherkin> [--ack-only]");
@@ -206,7 +250,7 @@ public final class WorkbenchSessionCommands {
             err.println("Usage: " + parsed.command() + " --text=<gherkin>");
             return 2;
         }
-        SessionState state = requireSession(parsed.project(), http);
+        SessionState state = requireSession(parsed, http);
         return postAndMaybeWait(state, flags, commandBody(parsed, flags), out, err, http);
     }
 
@@ -223,7 +267,7 @@ public final class WorkbenchSessionCommands {
             err.println("Usage: open-scenario --feature=<path-or-name> --name=<scenario> [--example=<rows>]");
             return 2;
         }
-        SessionState state = requireSession(parsed.project(), http);
+        SessionState state = requireSession(parsed, http);
         return postAndMaybeWait(state, flags, commandBody(parsed, flags), out, err, http);
     }
 
@@ -240,7 +284,7 @@ public final class WorkbenchSessionCommands {
             err.println("Usage: example --example=<rows>");
             return 2;
         }
-        SessionState state = requireSession(parsed.project(), http);
+        SessionState state = requireSession(parsed, http);
         Map<String, Object> body = commandBody(parsed, flags);
         body.put("example", selector);
         return postAndMaybeWait(state, flags, body, out, err, http);
@@ -257,7 +301,7 @@ public final class WorkbenchSessionCommands {
             err.println("Usage: diagnostic-run --run=<id>");
             return 2;
         }
-        SessionState state = requireSession(parsed.project(), http);
+        SessionState state = requireSession(parsed, http);
         return postAndMaybeWait(state, flags, commandBody(parsed, flags), out, err, http);
     }
 
@@ -268,7 +312,7 @@ public final class WorkbenchSessionCommands {
             PrintStream err,
             HttpClient http
     ) {
-        SessionState state = requireSession(parsed.project(), http);
+        SessionState state = requireSession(parsed, http);
         return postAndMaybeWait(state, flags, commandBody(parsed, flags), out, err, http);
     }
 
@@ -308,7 +352,7 @@ public final class WorkbenchSessionCommands {
             PrintStream err,
             HttpClient http
     ) {
-        Optional<SessionState> state = readHealthy(parsed.project(), http);
+        Optional<SessionState> state = resolveSession(parsed, http);
         if (state.isEmpty()) {
             err.println("No healthy Workbench session. Run isolate / session-start, or use the window that is already open.");
             return 1;
@@ -337,7 +381,7 @@ public final class WorkbenchSessionCommands {
             PrintStream err,
             HttpClient http
     ) {
-        SessionState state = requireSession(parsed.project(), http);
+        SessionState state = requireSession(parsed, http);
         try {
             JsonNode events = postJson(http, state, "/tools/workbench_events", Map.of());
             out.println(events.toString());
@@ -354,9 +398,10 @@ public final class WorkbenchSessionCommands {
             PrintStream err,
             HttpClient http
     ) {
-        Optional<SessionState> state = readHealthy(parsed.project(), http);
+        Optional<SessionState> state = resolveSession(parsed, http);
         if (state.isEmpty()) {
             out.println("ACK SESSION already-stopped");
+            finishRequestedRun(parsed, out);
             return 0;
         }
         SessionState session = state.get();
@@ -371,12 +416,14 @@ public final class WorkbenchSessionCommands {
         }
         if (watched) {
             out.println("ACK SESSION playback-stopped pid=" + session.pid());
+            finishRequestedRun(parsed, out);
             return 0;
         }
         long deadline = System.nanoTime() + Duration.ofSeconds(8).toNanos();
         while (System.nanoTime() < deadline) {
-            if (readHealthy(parsed.project(), http).isEmpty() && !pidAlive(session.pid())) {
+            if (readHealthyFile(session.stateFile(), parsed.project(), http).isEmpty() && !pidAlive(session.pid())) {
                 out.println("ACK SESSION stopped pid=" + session.pid());
+                finishRequestedRun(parsed, out);
                 return 0;
             }
             sleep(POLL);
@@ -385,12 +432,26 @@ public final class WorkbenchSessionCommands {
         sleep(Duration.ofMillis(400));
         if (pidAlive(session.pid())) ProcessHandle.of(session.pid()).ifPresent(ProcessHandle::destroyForcibly);
         try {
-            Files.deleteIfExists(sessionFile(parsed.project()));
+            Files.deleteIfExists(session.stateFile());
         } catch (IOException ignored) {
             // Disposable session state.
         }
         out.println("ACK SESSION killed pid=" + session.pid());
+        finishRequestedRun(parsed, out);
         return 0;
+    }
+
+    private static void finishRequestedRun(WorkbenchCommandLine.Parsed parsed, PrintStream out) {
+        String runId = parsed.coordination().runId();
+        if (runId == null || runId.isBlank()) return;
+        AgentCoordination.finish(
+                parsed.project(),
+                runId,
+                parsed.coordination().learned(),
+                "STOPPED",
+                Instant.now(),
+                out
+        );
     }
 
     private static int waitForDone(
@@ -404,7 +465,7 @@ public final class WorkbenchSessionCommands {
         while (true) {
             JsonNode view;
             try {
-                if (!pidAlive(state.pid()) && readHealthy(state.project(), http).isEmpty()) {
+                if (!pidAlive(state.pid()) && readHealthyFile(state.stateFile(), state.project(), http).isEmpty()) {
                     err.println("DONE " + id + " TIMEOUT");
                     return 1;
                 }
@@ -436,10 +497,21 @@ public final class WorkbenchSessionCommands {
         return "SUCCESS".equals(status) ? 0 : 1;
     }
 
-    private static SessionState requireSession(Path project, HttpClient http) {
-        return readHealthy(project, http).orElseThrow(() -> new IllegalStateException(
+    private static SessionState requireSession(WorkbenchCommandLine.Parsed parsed, HttpClient http) {
+        return resolveSession(parsed, http).orElseThrow(() -> new IllegalStateException(
                 "No healthy Workbench session. Run isolate / session-start, or use the window that is already open."
         ));
+    }
+
+    private static Optional<SessionState> resolveSession(WorkbenchCommandLine.Parsed parsed, HttpClient http) {
+        String runId = parsed.coordination().runId();
+        if (runId != null && !runId.isBlank()) {
+            Path file = AgentCoordination.runDirectory(parsed.project(), runId)
+                    .resolve("session")
+                    .resolve("cli-session.json");
+            return readHealthyFile(file, parsed.project(), http);
+        }
+        return readHealthy(parsed.project(), http);
     }
 
     static Optional<SessionState> readHealthy(Path project, HttpClient http) {
@@ -454,7 +526,7 @@ public final class WorkbenchSessionCommands {
         if (!Files.isRegularFile(file)) return Optional.empty();
         try {
             JsonNode root = JSON.readTree(file.toFile());
-            SessionState state = SessionState.from(project, root);
+            SessionState state = SessionState.from(project, file, root);
             if (!pidAlive(state.pid())) return Optional.empty();
             JsonNode health = getJson(http, state, "/health");
             if (!"ok".equals(textOr(health, "status", ""))) return Optional.empty();
@@ -532,14 +604,15 @@ public final class WorkbenchSessionCommands {
         return HttpClient.newBuilder().connectTimeout(HTTP_TIMEOUT).build();
     }
 
-    record SessionState(Path project, String url, String token, long pid, String mode) {
-        static SessionState from(Path project, JsonNode root) {
+    record SessionState(Path project, String url, String token, long pid, String mode, Path stateFile) {
+        static SessionState from(Path project, Path stateFile, JsonNode root) {
             return new SessionState(
                     project.toAbsolutePath().normalize(),
                     root.path("url").asText(""),
                     root.path("token").asText(""),
                     root.path("pid").asLong(0L),
-                    root.path("mode").asText("")
+                    root.path("mode").asText(""),
+                    stateFile
             );
         }
     }
