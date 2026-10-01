@@ -45,13 +45,19 @@ META-INF/pickleball/workbench/pickleball-workbench.jar
 
 Run the small launcher from the consumer test classpath. For Maven consumers, this command requires no cache path, separate Workbench dependency, or separately selected version.
 
-Workbench is the consumer AI-agent front door. Agents use `export-guidance`, `hint`, `discover`, and `confirm` to find failures, then `isolate` / `execute-step` / `status` / `events` / `stop` for live debug. Do not start the GUI.
+Workbench is the consumer AI-agent front door. Agents use `export-guidance`, `hint`, `discover`, and `confirm` to find failures. When a Workbench window is already open, the same session commands (`open-scenario`, `example`, `play`, `execute-step`, `stop`, `diagnostic-run`, and the rest of the table below) drive that session so the person sees the result. When nobody is watching, `isolate` / `execute-step` / `status` / `events` / `stop` stay the headless path. Do not start the GUI. Do not click the JavaFX or WebView UI.
+
+Run the project's wrapper. Pick the script from the OS: `mvnw` or `mvnw.cmd`, `gradlew` or `gradlew.bat`, or `java -jar` on `.mvn/wrapper/maven-wrapper.jar` or `gradle/wrapper/gradle-wrapper.jar`. Do not require a machine-wide Maven or Gradle install. Discover, confirm, and sync invoke that wrapper themselves. MCP and the launcher stay Pickleball actions. There is no general `mvn` or `gradle` tool.
 
 ```bash
-mvn -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java \
+./mvnw -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java \
   -Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher \
   -Dexec.classpathScope=test \
   "-Dexec.args=export-guidance .pickleball"
+```
+
+```powershell
+.\mvnw.cmd -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java "-Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher" "-Dexec.classpathScope=test" "-Dexec.args=export-guidance .pickleball"
 ```
 
 ```bash
@@ -64,9 +70,36 @@ mvn -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java \
 "-Dexec.args=execute-step --text='Given stay'"
 ```
 
-Same launcher; only change `-Dexec.args`. `isolate` starts a detached headless session; later execs are one-shot HTTP clients. `isolate` still forces `pkb_parallel=1`.
+Same launcher; only change `-Dexec.args`. When nobody is watching, `isolate` starts a detached headless session and later execs are one-shot HTTP clients. `isolate` still forces `pkb_parallel=1`. When a window is already open, `isolate` does not start a second session.
 
-`hint`, `discover`, `confirm`, and `isolate` accept `--example` / `--example=` the same way they accept `--tags` and `--name`. The value becomes `pkb_example` inside `pkb_runvars` (or inside `pkb_overriderunvars` when the Discover snapshot is sealed). That is the headless way to keep specific Examples rows. A normal Scenario counts as row 1. `pkb_example` is not a tag. `--example='1 2 5 3.4 7-11'` keeps those rows, in source order, in each scenario that tags and name already selected. Play still picks one visible row in the Workbench player. Headless selection is `pkb_example`. Do not start the GUI.
+`hint`, `discover`, `confirm`, and `isolate` accept `--example` / `--example=` the same way they accept `--tags` and `--name`. The value becomes `pkb_example` inside `pkb_runvars` (or inside `pkb_overriderunvars` when the Discover snapshot is sealed). That is the headless way to keep specific Examples rows. A normal Scenario counts as row 1. `pkb_example` is not a tag. `--example='1 2 5 3.4 7-11'` keeps those rows, in source order, in each scenario that tags and name already selected. The Play row picker calls the same `example` filter. Play shows the first source-order match. Headless `pkb_example` still runs every match. Do not start the GUI.
+
+## The window is a client
+
+Every action that changes the open session already exists as a launcher command or a command-queue command. The Swing window calls that command. It does not keep a second implementation.
+
+| Window action | Command |
+| --- | --- |
+| Open a scenario | `open-scenario` (`--feature`, `--name`, optional `--example`) |
+| Choose Examples rows | `example` — the same filter as `pkb_example`. Play shows the first source-order match. Headless `pkb_example` still runs every matching row. |
+| Play | `play` |
+| From here | `from-here` |
+| Step | `execute-step` |
+| Pause | `pause` |
+| Stop playback | `stop` |
+| Insert a step | `insert-step` |
+| Update the selected step | `update-step` |
+| Save | `save` |
+| Switch the retained diagnostic run | `diagnostic-run` (`--run`) |
+| Refresh status | `refresh` |
+| Synchronize the project | `session-sync` (the one-shot forwarded command remains `sync`) |
+| Start, restart, or stop the worker | `worker-start`, `worker-restart`, `worker-stop` |
+
+Advanced inspector actions (breakpoints, Step Overrides, browser page and screenshot, service call, Mapping) already call `WorkbenchServices`, the same methods as the existing MCP tools. Take control, Allow, and Deny stay the existing lease tools. Do not add a pixel, WebView, or JavaFX click tool.
+
+When a Workbench window is already open, an agent uses these same commands against that session so the person sees the result. The agent does not start the GUI and does not click the JavaFX or WebView UI. When nobody is watching, headless `discover`, `confirm`, and `isolate` stay the path.
+
+Build tools stay the project wrapper. Discover, confirm, and `session-sync` invoke `mvnw` or `mvnw.cmd`, `gradlew` or `gradlew.bat`, or `java -jar` on the wrapper jar. Pick the script from the OS. Do not require a machine-wide Maven or Gradle install. MCP and the launcher do not embed Maven or Gradle and do not expose a general `mvn` or `gradle` tool.
 
 `hint`, `discover`, and `confirm` accept `--tags` / `--name` / `--example` plus `--retention=all|failed|none` (or `--retention <value>`). Discover and hint default to `failed`. Confirm without `--retention` keeps the Discover snapshot value. This retention overlay is launcher/planner-only; do not pass `--retention` to the Workbench controller `isolate` / `session` parser. Ordinary diagnostic runs still default to `pkb_reportretention=all`.
 
@@ -75,17 +108,17 @@ Default Discover/Confirm stay on `pkb_runvars`. `hint` and `resolve-runvars` pri
 `mcp` and `ui` remain host/human commands. Hosts that already run Workbench MCP can launch it from the consumer test classpath:
 
 ```bash
-mvn -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java \
+./mvnw -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java \
   -Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher \
   -Dexec.classpathScope=test \
   "-Dexec.args=mcp ."
 ```
 
 ```powershell
-mvn -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java "-Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher" "-Dexec.classpathScope=test" "-Dexec.args=mcp ."
+.\mvnw.cmd -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java "-Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher" "-Dexec.classpathScope=test" "-Dexec.args=mcp ."
 ```
 
-Humans who want the Swing player can pass `ui .` instead. With no launcher arguments, `ui` and the current directory are selected automatically for that human default. Other Workbench commands are forwarded in the same form, for example `"-Dexec.args=sync ."`. Headless `mcp .` is optional host wiring, not an agent setup step. Agents for this release should not use the GUI, `ui .`, or `.pickleball/workbench/attach.json` as their path; see `.pickleball/AGENT-GUIDE.md`.
+Humans who want the Swing player can pass `ui .` instead. With no launcher arguments, `ui` and the current directory are selected automatically for that human default. Other Workbench commands are forwarded in the same form, for example `"-Dexec.args=sync ."`. Headless `mcp .` is optional host wiring, not an agent setup step. Agents do not start the GUI and do not click it. When a person already has the window open, the session commands above drive that session so the person sees the result. When nobody is watching, stay on headless `discover`, `confirm`, and `isolate`. See `.pickleball/AGENT-GUIDE.md`.
 
 The published Pickleball JAR is also executable. `java -jar pickleball-<version>.jar ui <project>` is the outer `Main-Class` (`PickleballWorkbenchLauncher`): it still extracts the nested controller and forks `java -cp`. It does not merge Workbench onto the Pickleball classpath. `java -jar pickleball-<version>.jar export-guidance .pickleball` is JDK-only: it copies bundled guidance through `PickleballLocalStore` and does not load DiagnosticCli or Jackson. Relocatable openers under `.pickleball/open/` walk up to the consumer project, find Java, and resolve a pickleball jar from `current.json`, a sibling `pickleball-*.jar`, or Maven local / the Gradle cache. They do not bake in a project, m2, or version path. Direct `java -jar pickleball-X.jar` uses X and pins `current.json` to X so versions can be tested side by side under `.pickleball/v/<version>/`.
 
@@ -326,9 +359,9 @@ The agent should update `currentAction` as it works. Playhead, Mapping, Terminal
 
 Human **Save** uses the same service. After a picker scenario was loaded, Swing asks: copy these live steps into file X / scenario Y? Deny writes nothing. The demo buffer stays unsavable.
 
-### Attaching an agent to a visible UI
+### Driving a session a person is watching
 
-The Swing UI is a human player. Consumer AI agents for this release should not attach to a GUI. Headless `mcp .` is optional when the host already exposes `workbench_*` tools.
+The Swing window is a client of the session commands above. Consumer agents do not start that window and do not click the JavaFX or WebView UI. When a person already has it open, the agent runs those same launcher commands against that session so the person sees the result. When nobody is watching, stay on headless `discover`, `confirm`, and `isolate`. Headless `mcp .` is optional when the host already exposes `workbench_*` tools. Those tools are the same session, not a second implementation and not a setup step.
 
 UI mode cannot share process stdout with stdio MCP. Starting `mcp` while the UI is already running would be a second Workbench JVM. Instead, `ui` starts a 127.0.0.1-only JSON attach endpoint over the same `WorkbenchServices` / `WorkbenchMcpTools` methods and writes disposable discovery state:
 
@@ -359,7 +392,7 @@ A Copilot or other MCP-style client finds that file in the consumer project, the
 
 Headless `java -cp <thin-jar>:<resolved-libs> tools.dscode.workbench.WorkbenchApplication mcp <project>` stays stdio JSON-RPC only. That is optional host wiring, not an agent setup step. The consumer-agent live path is launcher `isolate` then `execute-step`. That client may hold the lease without a banner. Save is still a distinct explicit tool and never an implicit write.
 
-A human-watched UI session is optional and separate. From `maven-consumer-project`, a person may start `ui .` and then a watcher can join `.pickleball/workbench/attach.json`. Do not launch a second `mcp` process against the same live UI session, and do not treat that attach file as the default agent path.
+A person may start `ui .` and watch the window. The agent then uses the session commands against that open session. Do not launch a second `mcp` process against the same live UI session, and do not start the GUI in order to obtain `.pickleball/workbench/attach.json`.
 
 ## MCP stdio
 
@@ -369,7 +402,7 @@ Start the lightweight non-Spring MCP server for a consumer project. This is opti
 java -cp $workbenchCp tools.dscode.workbench.WorkbenchApplication mcp ".\maven-consumer-project"
 ```
 
-Or, from a Maven consumer test classpath, `"-Dexec.args=mcp ."`. That launcher is optional host wiring. Agents use Workbench `discover` / `confirm` to find failures and `isolate` / `execute-step` for live debug. Do not document or use the Swing GUI, `ui .`, or `.pickleball/workbench/attach.json` as the agent path.
+Or, from a Maven consumer test classpath, `"-Dexec.args=mcp ."` through `mvnw` or `mvnw.cmd`. That launcher is optional host wiring. Agents use Workbench `discover` / `confirm` to find failures. When a window is already open they drive it with the session commands. When nobody is watching they use `isolate` / `execute-step`. Do not start the GUI. Do not click the JavaFX or WebView UI. Do not require a machine-wide Maven or Gradle install.
 
 The server uses the official Java MCP SDK core and stdio transport with the Jackson 2 JSON adapter. MCP dependencies are Workbench-only and are resolved onto the forked controller classpath at launch; they are not shaded into the thin nested JAR. Workbench deliberately does not use Spring Boot, Spring Framework, Spring AI, WebMVC, or Tomcat.
 

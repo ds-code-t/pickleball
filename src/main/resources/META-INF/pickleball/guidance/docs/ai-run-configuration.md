@@ -305,7 +305,7 @@ Example compact rerun:
 -Dpkb_changed_variables=pkb_browser
 ```
 
-For an agent's bounded confirmation `mvn test` (not `PickleballTests` human defaults of `pretty` / `@all`), include diagnostic evidence controls, headless Chrome, and high parallelism when more than one scenario will run:
+For an agent's bounded confirmation, run the project wrapper (`mvnw` or `mvnw.cmd`, `gradlew` or `gradlew.bat`, or `java -jar` on the wrapper jar). Pick the script from the OS. Do not require a machine-wide Maven or Gradle install. This is not the `PickleballTests` human defaults of `pretty` / `@all`. Include diagnostic evidence controls, headless Chrome, and high parallelism when more than one scenario will run:
 
 ```text
 -Dpkb_runvars="pkb_tags=@the-failing-tag, pkb_name=The failing scenario, pkb_browser=CHROME_HEADLESS, pkb_parallel=auto, pkb_reportingmode=diagnostic, pkb_loglevel=warn, pkb_reportretention=failed"
@@ -430,7 +430,7 @@ When operating in a consumer project:
 
 ## AI agents
 
-The agent-facing entry is Pickleball Workbench (`hint`, `discover`, `confirm` to find failures; `isolate` / `execute-step` for live debug). Set a **complete** Discover `pkb_runvars` rather than a partial overlay. Workbench `hint` prints the browser-ladder result and estimated integer parallel count. The browser ladder keeps a remote project `pkb_browser` (`SAUCE_*` / `GRID_*` / `REMOTE_*`); otherwise it prefers `CHROME_HEADLESS`. Unused Sauce/Grid yaml files are not auto-selected.
+The agent-facing entry is Pickleball Workbench. Run the consumer project's wrapper (`mvnw` or `mvnw.cmd`, `gradlew` or `gradlew.bat`, or `java -jar` on the wrapper jar). Pick the script from the OS. Do not require a machine-wide Maven or Gradle install. `hint`, `discover`, and `confirm` find failures. `pkb_tags`, `pkb_name`, and `pkb_example` narrow a run. When a Workbench window is already open, drive that session with `open-scenario`, `example`, `play`, `execute-step`, `stop`, and `diagnostic-run` so the person sees the result. Do not start the GUI. Do not click the JavaFX or WebView UI. When nobody is watching, `isolate` / `execute-step` stay the headless live-debug path. Set a **complete** Discover `pkb_runvars` rather than a partial overlay. Workbench `hint` prints the browser-ladder result and estimated integer parallel count. The browser ladder keeps a remote project `pkb_browser` (`SAUCE_*` / `GRID_*` / `REMOTE_*`); otherwise it prefers `CHROME_HEADLESS`. Unused Sauce/Grid yaml files are not auto-selected.
 
 ```text
 pkb_browser=<browser ladder>
@@ -440,7 +440,7 @@ pkb_loglevel=warn
 pkb_reportretention=failed
 ```
 
-plus the narrowest useful `pkb_tags` / `pkb_name`. An agent can also pass `pkb_example`, or `confirm` / `isolate --example=...`, to run one or more Examples rows without the GUI. A normal Scenario counts as row 1. `--example='1 2 5 3.4 7-11'` keeps those rows in each scenario that tags and name already selected. `pkb_example` is not a tag. Multi-scenario Discover/Confirm use that high parallelism. Live isolate stays one paused scenario (`pkb_parallel=1`) on a headless CLI session started with Maven-exec `isolate`.
+plus the narrowest useful `pkb_tags` / `pkb_name` / `pkb_example`. Those three narrow which scenarios and Examples rows run. They are not a second player. `example` and `pkb_example` are the same Examples-row filter. A normal Scenario counts as row 1. `--example='1 2 5 3.4 7-11'` keeps those rows in each scenario that tags and name already selected. `pkb_example` is not a tag. Multi-scenario Discover/Confirm use that high parallelism. When nobody is watching, live isolate stays one paused scenario (`pkb_parallel=1`) on a headless session started with `isolate`. When a Workbench window is already open, the same session commands drive that window. Do not start the GUI.
 
 After Discover, inspect `pkb_run_profile` from `run-catalog.json`, `run-index.json`, or `summary.json`. Confirm and live isolate replay that retained profile through `pkb_runvars` (LastDiscoverSnapshot) unless the snapshot is marked sealed, in which case the next worker launch uses `-Dpkb_overriderunvars=<compact complete map>`. If there is no prior Discover snapshot, Workbench says so; it does not silently re-resolve from project defaults. The Workbench sealed-RunVars panel, if unused, changes no behavior; Apply writes a sealed snapshot for the **next** launch and does not mutate an in-flight worker.
 

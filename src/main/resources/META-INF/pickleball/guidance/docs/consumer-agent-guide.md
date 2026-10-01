@@ -6,28 +6,32 @@ A consumer project may contain only a short `AGENTS.md` bridge. That bridge uses
 
 ## Tool chooser
 
-Pickleball Workbench is the one front door. It is a Java/Maven program, not a GUI requirement. Do not start the GUI.
+Pickleball Workbench is the one front door. It is a Java program launched from the consumer project, not a GUI requirement. Do not start the GUI. Do not click the JavaFX or WebView UI.
 
-From the consumer project, with Pickleball on the test classpath (`classpathScope=test`), use the same Maven exec wrapper as the project pointer; only change `-Dexec.args`:
+Run the project's own wrapper. Pick the script from the OS. Do not require a machine-wide Maven or Gradle install. On Windows use `mvnw.cmd` or `gradlew.bat`. Otherwise use `mvnw` or `gradlew`. If that script is absent and the wrapper jar is present, run `java -jar` on `.mvn/wrapper/maven-wrapper.jar` or `gradle/wrapper/gradle-wrapper.jar`. Discover, confirm, and project sync already invoke that wrapper. MCP and launcher tools stay Pickleball actions (`discover`, `confirm`, `isolate`, `execute-step`, `status`, `events`, `stop`, `open-scenario`, `example`, `play`, `pkb_example`, and the other session commands). There is no general Maven or Gradle tool.
+
+From the consumer project, with Pickleball on the test classpath (`classpathScope=test`), use that wrapper and the same exec invocation as the project pointer; only change `-Dexec.args`:
 
 ```text
-mvn -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java "-Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher" "-Dexec.classpathScope=test" "-Dexec.args=discover"
+mvnw -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java "-Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher" "-Dexec.classpathScope=test" "-Dexec.args=discover"
 ```
 
-Same launcher for `hint`, `discover`, `confirm`, `resolve-runvars`, `isolate`, `execute-step`, `status`, `events`, and `stop` — change `exec.args` only.
+Windows is the same command with `mvnw.cmd`. A Gradle consumer that exposes the launcher task uses `gradlew` or `gradlew.bat`.
 
-1. **Discover** — `-Dexec.args=discover` (optional `--tags` / `--name` / `--example` / `--retention`). Workbench applies complete AI `pkb_runvars`: browser ladder, high/auto parallel, diagnostic, warn, failed retention. Override retention with `--retention=all|failed|none` (`--retention <value>` also works). It wraps consumer `mvn test`. Do not start a live worker to run the whole suite. Then read `run-catalog.json` and the retained `pkb_run_profile`.
-2. **Confirm** — `-Dexec.args=confirm --tags=... --name=... --example=...` with the same Discover snapshot (ordinary LastDiscoverSnapshot replayed as `pkb_runvars`) and narrow tags/name/example rows. Never supply `pkb_run_profile` as input. A snapshot marked sealed is for the next worker/isolate launch as `-Dpkb_overriderunvars=<compact complete map>`, not Confirm. `pkb_example` is not a tag. A normal Scenario counts as row 1. `--example='1 2 5 3.4 7-11'` keeps those Examples rows in each selected scenario.
-3. **Live debug** — `-Dexec.args=isolate` (alias `session-start`) starts one long-lived headless Workbench session from the last Discover snapshot and prints `ACK SESSION`. Then `-Dexec.args=execute-step --text='...'`, `status`, `events`, and `stop`. Each Maven exec exits; the session stays up.
+Same launcher for `hint`, `discover`, `confirm`, `resolve-runvars`, `isolate`, `execute-step`, `status`, `events`, `stop`, `open-scenario`, `example`, `play`, `from-here`, `pause`, `insert-step`, `update-step`, `diagnostic-run`, `save`, `refresh`, `session-sync`, `worker-start`, `worker-restart`, and `worker-stop` — change `exec.args` only.
+
+1. **Discover** — `-Dexec.args=discover` (optional `--tags` / `--name` / `--example` / `--retention`). Workbench applies complete AI `pkb_runvars`: browser ladder, high/auto parallel, diagnostic, warn, failed retention. Override retention with `--retention=all|failed|none` (`--retention <value>` also works). It runs the consumer test through the project wrapper. Do not start a live worker to run the whole suite. Then read `run-catalog.json` and the retained `pkb_run_profile`.
+2. **Confirm** — `-Dexec.args=confirm --tags=... --name=... --example=...` with the same Discover snapshot (ordinary LastDiscoverSnapshot replayed as `pkb_runvars`) and narrow tags, name, and example rows. Never supply `pkb_run_profile` as input. A snapshot marked sealed is for the next worker/isolate launch as `-Dpkb_overriderunvars=<compact complete map>`, not Confirm. `pkb_example` is not a tag. A normal Scenario counts as row 1. `--example='1 2 5 3.4 7-11'` keeps those Examples rows in each selected scenario.
+3. **Live debug** — When nobody is watching, `-Dexec.args=isolate` (alias `session-start`) starts one long-lived headless Workbench session from the last Discover snapshot and prints `ACK SESSION`. When a Workbench window is already open, do not start another session. Drive that session with the same commands so the person sees the result: `open-scenario`, `example`, `play`, `from-here`, `execute-step`, `pause`, `stop`, `diagnostic-run`, and the worker, save, and refresh commands. `example` is the same Examples-row filter as `pkb_example`. Play shows the first source-order match. Headless `pkb_example` still runs every match. Then `-Dexec.args=execute-step --text='...'`, `status`, `events`, and `stop`. Each launcher exec exits; the session stays up.
 4. **Emit the human handoff, then edit real consumer source** — write `.pickleball/investigations/<id>/` then in chat print the six-line bottom-line block (Gherkin/business first) plus `.pickleball/investigations/<id>/report.html`. Do not dump MCP transcripts, TRACE, or PNG analysis.
 
-`hint` (alias `discover-hint`) is `-Dexec.args=hint` and prints the recommended Discover `pkb_runvars`, a dry-run resolve preview that does not start tests, and `NEXT: run discover`. Default Discover/Confirm stay on `pkb_runvars`. Sealed `pkb_overriderunvars` is opt-in: resolve → inspect → complete map (six context keys required) → `-Dpkb_overriderunvars=<compact>` → compare `runProfileFingerprint`. Do not mix sealed input with `pkb_runvars` or `pkb_profile`. `ui` is a host/human command. Agents must not use `ui`. If `workbench_*` tools already exist they are the same session, not a setup step.
+`hint` (alias `discover-hint`) is `-Dexec.args=hint` and prints the recommended Discover `pkb_runvars`, a dry-run resolve preview that does not start tests, and `NEXT: run discover`. Default Discover/Confirm stay on `pkb_runvars`. Sealed `pkb_overriderunvars` is opt-in: resolve → inspect → complete map (six context keys required) → `-Dpkb_overriderunvars=<compact>` → compare `runProfileFingerprint`. Do not mix sealed input with `pkb_runvars` or `pkb_profile`. Agents must not start the GUI. If `workbench_*` tools already exist they are the same session, not a setup step.
 
 Do not copy consumer features into `.pickleball` as a sandbox.
 
 ### Live isolation loop
 
-After Discover has found the failing scenario, `isolate` starts a headless Workbench session if one is not already healthy. Later Maven exec commands are one-shot HTTP clients against that session (127.0.0.1). Default `--wait` on `execute-step` prints `STILL_WORKING` while a browser wait is in flight, then `DONE <id> SUCCESS|FAILED`. `--ack-only` prints ACK and exits.
+After Discover has found the failing scenario, use the session that is already open when a person is watching. The same commands update that window. When nobody is watching, `isolate` starts a headless Workbench session if one is not already healthy. Later launcher commands are one-shot HTTP clients against that session (127.0.0.1). Default `--wait` on `execute-step` prints `STILL_WORKING` while a browser wait is in flight, then `DONE <id> SUCCESS|FAILED`. `--ack-only` prints ACK and exits. Do not start the GUI. Do not click the JavaFX or WebView UI.
 
 1. `-Dexec.args=isolate` (or `session-start`) — starts the session from the last Discover snapshot and prints `ACK SESSION ...`.
 2. `-Dexec.args=execute-step --text='...'` — queues Gherkin on the paused worker. `--ack-only` returns immediately; default `--wait` polls `status`.
@@ -50,7 +54,7 @@ After Discover has found the failing scenario, `isolate` starts a headless Workb
 Keep first-read small. After a successful export:
 
 1. Follow the consumer project's own instructions first; they remain authoritative for project-specific behavior.
-2. Stay in this guide's tool chooser: Workbench `discover` when the failing scenario is unknown, then `confirm` with narrow tags/name. For live debug use `isolate` then `execute-step` / `status` / `events` / `stop`. Do not start the GUI.
+2. Stay in this guide's tool chooser: Workbench `discover` when the failing scenario is unknown, then `confirm` with narrow tags, name, and `pkb_example`. When a Workbench window is already open, drive it with `open-scenario`, `example`, `play`, `execute-step`, `stop`, and `diagnostic-run`. When nobody is watching, use `isolate` then `execute-step` / `status` / `events` / `stop`. Do not start the GUI. Run builds through the project wrapper (`mvnw` or `mvnw.cmd`, `gradlew` or `gradlew.bat`, or `java -jar` on the wrapper jar). Do not require a machine-wide Maven or Gradle install.
 3. Inspect the **real** consumer `pom.xml`, Pickleball runner subclass, features, configuration, data, mappings, and test support before changing them.
 4. Open a specific exported guide only when that topic is needed, for example `docs/dynamic-steps.md`, `docs/diagnostic-reporting.md`, `docs/configuration.md`, or `docs/ai-run-configuration.md`.
 5. Do not assume the Pickleball core source repository is present. A normal consumer may only have the Maven dependency.
@@ -144,7 +148,7 @@ Never supply `pkb_run_profile` or `pkb_run_profile.<pkb_var>` as input. They are
 
 ### Default AI test-launch rule
 
-When you launch Pickleball tests and the intended execution settings are known, use `pkb_runvars` as the authoritative input. Put intentional tag/name selection, browser, evidence/logging controls, and other non-secret RunVar changes inside `pkb_runvars`; do not default to ambient optional project settings or separate JVM `-Dpkb_*` RunVars. Use `pkb_profile` or ordinary JVM RunVar overrides only when the task specifically tests those configuration semantics or the user asks for them. Keep protected secrets and diagnostic lineage outside `pkb_runvars`.
+When you launch Pickleball tests and the intended execution settings are known, run the project's wrapper (`mvnw` or `mvnw.cmd`, `gradlew` or `gradlew.bat`, or `java -jar` on the wrapper jar) and use `pkb_runvars` as the authoritative input. Pick the script from the OS. Do not require a machine-wide Maven or Gradle install. Put intentional tag/name selection, browser, evidence/logging controls, and other non-secret RunVar changes inside `pkb_runvars`; do not default to ambient optional project settings or separate JVM `-Dpkb_*` RunVars. Use `pkb_profile` or ordinary JVM RunVar overrides only when the task specifically tests those configuration semantics or the user asks for them. Keep protected secrets and diagnostic lineage outside `pkb_runvars`.
 
 For an agent's bounded confirmation (not the human runner defaults), include diagnostic evidence controls, the browser ladder (keep a remote `pkb_browser`; otherwise prefer `CHROME_HEADLESS`), and high parallelism when more than one scenario will run. Documented AI Discover/Confirm `pkb_runvars` keys:
 
@@ -161,7 +165,7 @@ Use the narrowest `pkb_tags` / `pkb_name` / `pkb_example` that isolate the failu
 These are documented agent defaults, not `PickleballTests` human defaults (`pretty`, `@all`, often headed Chrome). Example confirmation after Discover:
 
 ```text
-mvn -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java "-Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher" "-Dexec.classpathScope=test" "-Dexec.args=confirm --tags=@the-failing-tag --name='The failing scenario'"
+mvnw -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java "-Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher" "-Dexec.classpathScope=test" "-Dexec.args=confirm --tags=@the-failing-tag --name='The failing scenario'"
 ```
 
 After any diagnostic run, read `pkb_run_profile` from the pack. That is the complete resolved RunVar list, including inherited execution-context paths and the integer parallel count. Do not treat omitted `pkb_runvars` keys as equal to project `pickleball.properties`. Confirm stays on `pkb_runvars`. Live isolate/worker launch replays a sealed snapshot as `-Dpkb_overriderunvars=` and an ordinary snapshot as `-Dpkb_runvars=`; neither silently re-resolves from project defaults, and neither supplies `pkb_run_profile` as input.
@@ -288,10 +292,10 @@ Agent git suspects are a local procedure against the consumer repo (`git log -n 
 
 ## Diagnostic utility commands
 
-The agent-facing name is Workbench. From a Maven consumer where Pickleball is on the test classpath, use the same launcher as the project pointer and only change `-Dexec.args`:
+The agent-facing name is Workbench. From a consumer project where Pickleball is on the test classpath, use the project wrapper (`mvnw` or `mvnw.cmd`) and the same launcher as the project pointer. Only change `-Dexec.args`. Do not require a machine-wide Maven or Gradle install.
 
 ```text
-mvn -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java "-Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher" "-Dexec.classpathScope=test" "-Dexec.args=export-guidance .pickleball"
+mvnw -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java "-Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher" "-Dexec.classpathScope=test" "-Dexec.args=export-guidance .pickleball"
 "-Dexec.args=hint"
 "-Dexec.args=discover [--tags <expr>] [--name <expr>] [--example <rows>]"
 "-Dexec.args=confirm [--tags <expr>] [--name <expr>] [--example <rows>]"
@@ -391,7 +395,7 @@ Pickleball's example Maven consumer includes an opt-in mixed pass/fail suite tag
 Run it explicitly:
 
 ```text
-mvn -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java "-Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher" "-Dexec.classpathScope=test" "-Dexec.args=discover --tags=@agent-pointer-eval"
+mvnw -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java "-Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher" "-Dexec.classpathScope=test" "-Dexec.args=discover --tags=@agent-pointer-eval"
 ```
 
 or `-Dpkb_runvars="pkb_tags=@agent-pointer-eval, pkb_browser=CHROME_HEADLESS"`. Do not add this tag to consumer `AGENTS.md` or Copilot pointer files.

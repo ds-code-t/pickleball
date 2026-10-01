@@ -60,6 +60,12 @@ public class PickleballGuidanceChecks {
             assertTrue(guide.contains("**Discover**"));
             assertTrue(guide.contains("**Confirm**"));
             assertTrue(guide.contains("Do not start the GUI"));
+            assertTrue(guide.contains("open-scenario"));
+            assertTrue(guide.contains("mvnw"));
+            assertTrue(guide.contains("mvnw.cmd"));
+            assertTrue(guide.contains("machine-wide"));
+            assertTrue(guide.contains("already open"));
+            assertFalse(guide.toLowerCase(java.util.Locale.ROOT).contains("only controls"));
             assertTrue(guide.contains("execute-step"));
             assertTrue(guide.contains("run-catalog.json"));
             assertTrue(guide.contains("PickleballWorkbenchLauncher"));
