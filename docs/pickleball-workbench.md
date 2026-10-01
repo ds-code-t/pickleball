@@ -68,9 +68,14 @@ Run the project's wrapper. Pick the script from the OS: `mvnw` or `mvnw.cmd`, `g
 "-Dexec.args=confirm --tags=@smoke --example='1 2 5 3.4 7-11'"
 "-Dexec.args=isolate --example=1.1"
 "-Dexec.args=execute-step --text='Given stay'"
+"-Dexec.args=short-log"
+"-Dexec.args=note --text='row 2 failed closed'"
+"-Dexec.args=inbox --write --to=any --text='window is taken'"
+"-Dexec.args=inbox --take --agent=agent-1"
+"-Dexec.args=finish --run-id=<id> --learned='the empty row fails'"
 ```
 
-Same launcher; only change `-Dexec.args`. When nobody is watching, `isolate` starts a detached headless session and later execs are one-shot HTTP clients. `isolate` still forces `pkb_parallel=1`. When a window is already open, `isolate` does not start a second session.
+Same launcher; only change `-Dexec.args`. When nobody is watching, `isolate` starts a detached headless session and later execs are one-shot HTTP clients. `isolate` still forces `pkb_parallel=1`. When a window is already open, `isolate` does not start a second session. Read the short log `.pickleball/agent-log` before a run, after a run, and during a long session, instead of the dense diagnostic log. Use your own run id. When a Workbench window is already open, only one agent drives it. Other agents stay headless on their own run ids. Write start and stop lines. Put purpose and findings on the run record. Use the inbox only for a short note to a named agent or to any, and delete an inbox note after reading it. Two headless isolates do not share a session file; each file lives under `.pickleball/runs/<run-id>/session/`.
 
 `hint`, `discover`, `confirm`, and `isolate` accept `--example` / `--example=` the same way they accept `--tags` and `--name`. The value becomes `pkb_example` inside `pkb_runvars` (or inside `pkb_overriderunvars` when the Discover snapshot is sealed). That is the headless way to keep specific Examples rows. A normal Scenario counts as row 1. `pkb_example` is not a tag. `--example='1 2 5 3.4 7-11'` keeps those rows, in source order, in each scenario that tags and name already selected. The Play row picker calls the same `example` filter. Play shows the first source-order match. Headless `pkb_example` still runs every match. Do not start the GUI.
 

@@ -69,6 +69,10 @@ class WorkbenchPointerContractTest {
             assertTrue(lowered.contains("mvnw"), guide.toString());
             assertTrue(lowered.contains("machine-wide"), guide.toString());
             assertTrue(lowered.contains("already open"), guide.toString());
+            assertTrue(lowered.contains("only one agent"), guide.toString());
+            assertTrue(lowered.contains("own run id"), guide.toString());
+            assertTrue(lowered.contains("agent-log"), guide.toString());
+            assertTrue(lowered.contains("short log"), guide.toString());
             assertFalse(lowered.contains("only controls"), guide.toString());
         }
         String chooserSource = Files.readString(Path.of("docs/consumer-agent-guide.md"));

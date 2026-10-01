@@ -18,7 +18,7 @@ mvnw -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java "-Dexec.mainClass=tools.d
 
 Windows is the same command with `mvnw.cmd`. A Gradle consumer that exposes the launcher task uses `gradlew` or `gradlew.bat`.
 
-Same launcher for `hint`, `discover`, `confirm`, `resolve-runvars`, `isolate`, `execute-step`, `status`, `events`, `stop`, `open-scenario`, `example`, `play`, `from-here`, `pause`, `insert-step`, `update-step`, `diagnostic-run`, `save`, `refresh`, `session-sync`, `worker-start`, `worker-restart`, and `worker-stop` — change `exec.args` only.
+Same launcher for `hint`, `discover`, `confirm`, `resolve-runvars`, `short-log`, `note`, `inbox`, `finish`, `isolate`, `execute-step`, `status`, `events`, `stop`, `open-scenario`, `example`, `play`, `from-here`, `pause`, `insert-step`, `update-step`, `diagnostic-run`, `save`, `refresh`, `session-sync`, `worker-start`, `worker-restart`, and `worker-stop` — change `exec.args` only.
 
 1. **Discover** — `-Dexec.args=discover` (optional `--tags` / `--name` / `--example` / `--retention`). Workbench applies complete AI `pkb_runvars`: browser ladder, high/auto parallel, diagnostic, warn, failed retention. Override retention with `--retention=all|failed|none` (`--retention <value>` also works). It runs the consumer test through the project wrapper. Do not start a live worker to run the whole suite. Then read `run-catalog.json` and the retained `pkb_run_profile`.
 2. **Confirm** — `-Dexec.args=confirm --tags=... --name=... --example=...` with the same Discover snapshot (ordinary LastDiscoverSnapshot replayed as `pkb_runvars`) and narrow tags, name, and example rows. Never supply `pkb_run_profile` as input. A snapshot marked sealed is for the next worker/isolate launch as `-Dpkb_overriderunvars=<compact complete map>`, not Confirm. `pkb_example` is not a tag. A normal Scenario counts as row 1. `--example='1 2 5 3.4 7-11'` keeps those Examples rows in each selected scenario.
@@ -28,6 +28,12 @@ Same launcher for `hint`, `discover`, `confirm`, `resolve-runvars`, `isolate`, `
 `hint` (alias `discover-hint`) is `-Dexec.args=hint` and prints the recommended Discover `pkb_runvars`, a dry-run resolve preview that does not start tests, and `NEXT: run discover`. Default Discover/Confirm stay on `pkb_runvars`. Sealed `pkb_overriderunvars` is opt-in: resolve → inspect → complete map (six context keys required) → `-Dpkb_overriderunvars=<compact>` → compare `runProfileFingerprint`. Do not mix sealed input with `pkb_runvars` or `pkb_profile`. Agents must not start the GUI. If `workbench_*` tools already exist they are the same session, not a setup step.
 
 Do not copy consumer features into `.pickleball` as a sandbox.
+
+### Run coordination
+
+Read the short log `.pickleball/agent-log` before a run, after a run, and during a long session, instead of the dense diagnostic log. Use your own run id. When a Workbench window is already open, only one agent drives it. Other agents stay headless on their own run ids. Write start and stop lines. Put purpose and findings on the run record. Use the inbox only for a short note to a named agent or to any, and delete an inbox note after reading it.
+
+`discover`, `confirm`, and `isolate` accept optional `--run-id`, `--agent` (or `--agent-id`), `--group`, `--sequence`, `--who`, and `--why`. They write the start line and `.pickleball/runs/<run-id>/record.json`. Reports, diagnostic packs, scratch, the browser profile, and a headless session file for that run stay under that directory. Two runs do not share an output folder, a browser profile, or a live session. `finish --run-id=<id> --learned=<one line>` and `stop --run-id=<id>` write the stop line. `short-log` prints recent lines. `note --text=<one line>` appends a note. `inbox --write --to=<agent-id|any> --text=<one line>` leaves a note; `inbox --list` or `inbox --take --agent=<id>` lists or takes that agent's notes plus `inbox/any`. Taking a note deletes it. Same launcher; only change `-Dexec.args`. Project wrapper only (`mvnw` or `mvnw.cmd`, `gradlew` or `gradlew.bat`, or `java -jar` on the wrapper jar). Do not require a machine-wide Maven or Gradle install.
 
 ### Live isolation loop
 

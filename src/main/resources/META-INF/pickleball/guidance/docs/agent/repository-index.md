@@ -151,6 +151,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/common/control/ControlRuntime.java`
 - `src/main/java/tools/dscode/common/control/ControlRuntimeAspect.java`
 - `src/main/java/tools/dscode/common/control/ControlValueEvent.java`
+- `src/main/java/tools/dscode/common/coordination/AgentCoordination.java`
 - `src/main/java/tools/dscode/common/CoreSteps.java`
 - `src/main/java/tools/dscode/common/dataelements/CollectionDataAdapter.java`
 - `src/main/java/tools/dscode/common/dataelements/CollectionQueryEngine.java`
@@ -403,6 +404,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 ## Framework tests
 
 - `src/test/java/tools/dscode/common/assertions/AssertionClauseSplitterTest.java`
+- `src/test/java/tools/dscode/common/coordination/AgentCoordinationTest.java`
 - `src/test/java/tools/dscode/common/reporting/diagnostic/AgentBrowserLadderTest.java`
 - `src/test/java/tools/dscode/common/reporting/diagnostic/AgentDiscoverPlannerTest.java`
 - `src/test/java/tools/dscode/common/reporting/diagnostic/ConsumerMavenTestRunnerTest.java`

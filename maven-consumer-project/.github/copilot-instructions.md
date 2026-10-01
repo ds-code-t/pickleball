@@ -4,4 +4,6 @@ Use Workbench `hint`, `discover`, and `confirm` (narrow `--tags` / `--name` / `-
 
 When a Workbench window is already open, drive that session with `open-scenario`, `example`, `play`, `execute-step`, `stop`, and `diagnostic-run` so the person sees it. When nobody is watching, `isolate` starts a headless session, then `execute-step`, `status`, `events`, and `stop`.
 
+Read the short log `.pickleball/agent-log` before a run, after a run, and during a long session. Use your own run id. When a Workbench window is already open, only one agent drives it; other agents stay headless on their own run ids. Write start and stop lines. Put purpose and findings on the run record. Use the inbox only for a short note to a named agent or to any, and delete an inbox note after reading it.
+
 Gradle projects use `gradlew.bat` or `gradlew` the same way. Pick the script from the OS.

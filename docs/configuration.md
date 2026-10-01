@@ -96,9 +96,33 @@ pkb_run_purpose
 pkb_parent_run_id
 pkb_baseline_run_id
 pkb_changed_variables
+pkb_run_id
+pkb_agent_id
+pkb_run_group
+pkb_run_sequence
+pkb_run_who
+pkb_run_why
 ```
 
-Lineage survives controlled execution but is excluded from `pkb_run_profile` and `runProfileFingerprint`.
+Lineage and coordination metadata survive controlled execution but are excluded from `pkb_run_profile` and `runProfileFingerprint`. Do not put `pkb_run_id`, the run directory, `pkb_diagnostic_output`, or a browser profile path inside `pkb_runvars`. A confirm replay must not reuse another run's directory or browser profile.
+
+## Agent coordination
+
+Different consumer agents can run different tests at the same time. The shared files under the consumer `.pickleball` directory are a bulletin board. Run data stays private to each run.
+
+Every discover, confirm, isolate, and normal consumer run gets a unique run id when the caller does not pass one (`--run-id` or `-Dpkb_run_id`). An agent may pass its own id. An omitted agent id is generated and printed (`--agent` / `--agent-id` or `-Dpkb_agent_id`). Optional group, sequence, who, and why are `-Dpkb_run_group`, `-Dpkb_run_sequence`, `-Dpkb_run_who`, and `-Dpkb_run_why`.
+
+Reports, diagnostic packs, scratch, the local browser profile, and a headless Workbench session file for that run live under `.pickleball/runs/<run-id>/`. Two runs never write the same output folder, the same browser profile, or the same live session file.
+
+The run record is `.pickleball/runs/<run-id>/record.json`: run id, agent id, optional group, sequence, who, why, what was learned, start time, stop time, status, and the path to the run data. The short log only points at that record.
+
+The short log is `.pickleball/agent-log`. Read it before a run, after a run, and during a long session, instead of the dense diagnostic log. Each line is a timestamp, agent id, run id, `start` or `stop` or `note`, a one-line purpose, and the path to the run record. Appending does not take a file lock. A dead agent must not block the others. On each write, lines older than 3 days are dropped. Newer lines stay.
+
+`inbox/<agent-id>/` is a note for that agent. `inbox/any/` is a note any active agent may take. A note is one short file: who wrote it, timestamp, one message, optional path to a run record. The reader deletes the note after taking it. The inbox is not a second log and not an assignment framework.
+
+When a Workbench window is already open, only one agent drives it. Other agents stay headless on their own run ids. Two headless isolates each get their own session file under the run directory. Commands without `--run-id` still target the open window, or the legacy shared CLI session when no window is open. Commands with `--run-id` look only at that run's session file.
+
+Same launcher as the other session commands, project wrapper only: `short-log`, `note --text=<one line>`, `inbox --write|--list|--take`, and `finish --run-id=<id> [--learned=<one line>]`. `discover`, `confirm`, and `isolate` write the start line themselves. `finish` and `stop --run-id=` write the stop line and the learned field when the caller supplies it.
 
 ## Named profiles
 
