@@ -34,7 +34,11 @@ class WorkbenchPointerContractTest {
         assertTrue(lowered.contains("confirm"));
         assertTrue(lowered.contains("isolate"));
         assertTrue(lowered.contains("execute-step"));
-        assertTrue(lowered.contains("do not start the gui"));
+        assertTrue(lowered.contains("do not open the gui for your own testing"));
+        assertTrue(lowered.contains("while testing for yourself, stay headless"));
+        assertFalse(lowered.contains("do not start the gui"));
+        assertFalse(lowered.contains("must never open the gui"));
+        assertFalse(lowered.contains("must not start the gui"));
         assertTrue(lowered.contains("exec.args"));
 
         assertFalse(lowered.contains("register mcp"));
@@ -65,7 +69,10 @@ class WorkbenchPointerContractTest {
             String text = Files.readString(guide);
             String lowered = text.toLowerCase(Locale.ROOT);
             assertTrue(lowered.contains("open-scenario"), guide.toString());
-            assertTrue(lowered.contains("do not start the gui"), guide.toString());
+            assertTrue(lowered.contains("do not open the gui for your own testing"), guide.toString());
+            assertTrue(lowered.contains("while testing for yourself, stay headless"), guide.toString());
+            assertFalse(lowered.contains("do not start the gui"), guide.toString());
+            assertFalse(lowered.contains("must never open the gui"), guide.toString());
             assertTrue(lowered.contains("mvnw"), guide.toString());
             assertTrue(lowered.contains("machine-wide"), guide.toString());
             assertTrue(lowered.contains("already open"), guide.toString());

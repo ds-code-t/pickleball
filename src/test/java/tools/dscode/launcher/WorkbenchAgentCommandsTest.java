@@ -163,7 +163,9 @@ class WorkbenchAgentCommandsTest {
         assertTrue(text.contains("execute-step"));
         assertTrue(text.contains("open-scenario"));
         assertTrue(text.contains("--example"));
-        assertTrue(text.contains("Do not start the GUI"));
+        assertTrue(text.contains("Do not open the GUI for your own testing"));
+        assertTrue(text.contains("While testing for yourself, stay headless"));
+        assertFalse(text.contains("Do not start the GUI"));
         assertFalse(text.contains("only controls"));
     }
 

@@ -76,7 +76,7 @@ public final class WorkbenchAgentCommands {
         out.println();
         printDryRunResolve(parsed.project(), plan.runVars(), false, out);
         out.println("Browser: " + plan.browser().browser() + " (" + plan.browser().reason() + ").");
-        out.println("Multi-scenario Discover/Confirm use this high pkb_parallel. When a Workbench window is already open, only one agent drives that session with open-scenario, example, play, execute-step, stop, and diagnostic-run so the person sees it. Other agents stay headless on their own run ids. Otherwise isolate starts a headless session; then use execute-step / status / events / stop. Do not start the GUI. Same launcher, only change exec.args.");
+        out.println("Multi-scenario Discover/Confirm use this high pkb_parallel. When a Workbench window is already open, only one agent drives that session with open-scenario, example, play, execute-step, stop, and diagnostic-run so the person sees it. Other agents stay headless on their own run ids. Otherwise isolate starts a headless session; then use execute-step / status / events / stop. Do not open the GUI for your own testing. Open it to show a person a specific run, or when they ask. Close it when you are done showing it. While testing for yourself, stay headless. Opening the window loads the run you already have. It does not start a second test. Same launcher, only change exec.args.");
         out.println("Read the short log (.pickleball/agent-log) before and after a run, and during a long session, instead of the dense diagnostic log.");
         out.println("After Discover, confirm (and isolate/execute-step for live debug) replay the retained pkb_run_profile through pkb_runvars. Never supply pkb_run_profile as input.");
         out.println("Sealed runs are opt-in: resolve → inspect → complete map including the six context keys → pkb_overriderunvars. Do not mix with pkb_runvars or pkb_profile. Compare runProfileFingerprint after the sealed run.");
@@ -364,7 +364,7 @@ public final class WorkbenchAgentCommands {
             out.println("run-catalog.json: " + latest.catalog());
             out.println("retained pkb_run_profile: " + latest.runProfile());
             if (writeSnapshot) {
-                out.println("NEXT: confirm --tags/--name/--example. When a Workbench window is already open, drive that session with open-scenario, example, play, execute-step, stop, and diagnostic-run. Otherwise isolate, then execute-step / status / events / stop. Do not start the GUI.");
+                out.println("NEXT: confirm --tags/--name/--example. When a Workbench window is already open, drive that session with open-scenario, example, play, execute-step, stop, and diagnostic-run. Otherwise isolate, then execute-step / status / events / stop. Do not open the GUI for your own testing. Open it to show a person a specific run, or when they ask. Close it when you are done showing it. While testing for yourself, stay headless. Opening the window loads the run you already have. It does not start a second test.");
             }
             return mavenExit;
         } catch (Exception failure) {

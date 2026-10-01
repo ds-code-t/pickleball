@@ -315,9 +315,22 @@ def validate_consumer_bridge(errors: list[str]) -> None:
                 )
 
         lowered = text.lower()
-        if "do not start the gui" not in lowered:
+        if "do not open the gui for your own testing" not in lowered:
             errors.append(
-                "Consumer guidance bridge must say not to start the GUI: " + relative
+                "Consumer guidance bridge must say not to open the GUI for the agent's own testing: "
+                + relative
+            )
+        if "while testing for yourself, stay headless" not in lowered:
+            errors.append(
+                "Consumer guidance bridge must say to stay headless while testing: " + relative
+            )
+        if (
+            "do not start the gui" in lowered
+            or "must never open the gui" in lowered
+            or "must not start the gui" in lowered
+        ):
+            errors.append(
+                "Consumer guidance bridge must not say the agent must never open the GUI: " + relative
             )
         for required in (
             "hint",

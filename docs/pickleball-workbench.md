@@ -45,7 +45,7 @@ META-INF/pickleball/workbench/pickleball-workbench.jar
 
 Run the small launcher from the consumer test classpath. For Maven consumers, this command requires no cache path, separate Workbench dependency, or separately selected version.
 
-Workbench is the consumer AI-agent front door. Agents use `export-guidance`, `hint`, `discover`, and `confirm` to find failures. When a Workbench window is already open, the same session commands (`open-scenario`, `example`, `play`, `execute-step`, `stop`, `diagnostic-run`, and the rest of the table below) drive that session so the person sees the result. When nobody is watching, `isolate` / `execute-step` / `status` / `events` / `stop` stay the headless path. Do not start the GUI. Do not click the JavaFX or WebView UI.
+Workbench is the consumer AI-agent front door. Agents use `export-guidance`, `hint`, `discover`, and `confirm` to find failures. When a Workbench window is already open, the same session commands (`open-scenario`, `example`, `play`, `execute-step`, `stop`, `diagnostic-run`, and the rest of the table below) drive that session so the person sees the result. When nobody is watching, `isolate` / `execute-step` / `status` / `events` / `stop` stay the headless path. Do not open the GUI for your own testing. Open it to show a person a specific run, or when they ask. Close it when you are done showing it. While testing for yourself, stay headless. Opening the window loads the run you already have. It does not start a second test. Do not click the JavaFX or WebView UI.
 
 Run the project's wrapper. Pick the script from the OS: `mvnw` or `mvnw.cmd`, `gradlew` or `gradlew.bat`, or `java -jar` on `.mvn/wrapper/maven-wrapper.jar` or `gradle/wrapper/gradle-wrapper.jar`. Do not require a machine-wide Maven or Gradle install. Discover, confirm, and sync invoke that wrapper themselves. MCP and the launcher stay Pickleball actions. There is no general `mvn` or `gradle` tool.
 
@@ -77,7 +77,7 @@ Run the project's wrapper. Pick the script from the OS: `mvnw` or `mvnw.cmd`, `g
 
 Same launcher; only change `-Dexec.args`. When nobody is watching, `isolate` starts a detached headless session and later execs are one-shot HTTP clients. `isolate` still forces `pkb_parallel=1`. When a window is already open, `isolate` does not start a second session. Read the short log `.pickleball/agent-log` before a run, after a run, and during a long session, instead of the dense diagnostic log. Use your own run id. When a Workbench window is already open, only one agent drives it. Other agents stay headless on their own run ids. Write start and stop lines. Put purpose and findings on the run record. Use the inbox only for a short note to a named agent or to any, and delete an inbox note after reading it. Two headless isolates do not share a session file; each file lives under `.pickleball/runs/<run-id>/session/`.
 
-`hint`, `discover`, `confirm`, and `isolate` accept `--example` / `--example=` the same way they accept `--tags` and `--name`. The value becomes `pkb_example` inside `pkb_runvars` (or inside `pkb_overriderunvars` when the Discover snapshot is sealed). That is the headless way to keep specific Examples rows. A normal Scenario counts as row 1. `pkb_example` is not a tag. `--example='1 2 5 3.4 7-11'` keeps those rows, in source order, in each scenario that tags and name already selected. The Play row picker calls the same `example` filter. Play shows the first source-order match. Headless `pkb_example` still runs every match. Do not start the GUI.
+`hint`, `discover`, `confirm`, and `isolate` accept `--example` / `--example=` the same way they accept `--tags` and `--name`. The value becomes `pkb_example` inside `pkb_runvars` (or inside `pkb_overriderunvars` when the Discover snapshot is sealed). That is the headless way to keep specific Examples rows. A normal Scenario counts as row 1. `pkb_example` is not a tag. `--example='1 2 5 3.4 7-11'` keeps those rows, in source order, in each scenario that tags and name already selected. The Play row picker calls the same `example` filter. Play shows the first source-order match. Headless `pkb_example` still runs every match. Do not open the GUI for your own testing. Open it to show a person a specific run, or when they ask. Close it when you are done showing it. While testing for yourself, stay headless. Opening the window loads the run you already have. It does not start a second test.
 
 ## The window is a client
 
@@ -99,10 +99,15 @@ Every action that changes the open session already exists as a launcher command 
 | Refresh status | `refresh` |
 | Synchronize the project | `session-sync` (the one-shot forwarded command remains `sync`) |
 | Start, restart, or stop the worker | `worker-start`, `worker-restart`, `worker-stop` |
+| Show a run | `show-run` (`--run-id`) loads that run's record, logs, reports, and config. The run dropdown reads the same directory. It does not start a test. |
+| Open the window on a run | `open-window` (`--run-id`) opens the one window on that run. It does not start a test. |
+| Close the window | `close-window` closes the window. It does not delete the run directory, stop a headless run, or erase the short log. |
+
+There is no Gherkin step that opens the window. An agent that can only run a scenario and cannot call the launcher cannot open it. The open command stays on the launcher.
 
 Advanced inspector actions (breakpoints, Step Overrides, browser page and screenshot, service call, Mapping) already call `WorkbenchServices`, the same methods as the existing MCP tools. Take control, Allow, and Deny stay the existing lease tools. Do not add a pixel, WebView, or JavaFX click tool.
 
-When a Workbench window is already open, an agent uses these same commands against that session so the person sees the result. The agent does not start the GUI and does not click the JavaFX or WebView UI. When nobody is watching, headless `discover`, `confirm`, and `isolate` stay the path.
+When a Workbench window is already open, an agent uses these same commands against that session so the person sees the result. Do not open the GUI for your own testing. Open it to show a person a specific run, or when they ask. Close it when you are done showing it. While testing for yourself, stay headless. Opening the window loads the run you already have. It does not start a second test. Do not click the JavaFX or WebView UI. When nobody is watching, headless `discover`, `confirm`, and `isolate` stay the path.
 
 Build tools stay the project wrapper. Discover, confirm, and `session-sync` invoke `mvnw` or `mvnw.cmd`, `gradlew` or `gradlew.bat`, or `java -jar` on the wrapper jar. Pick the script from the OS. Do not require a machine-wide Maven or Gradle install. MCP and the launcher do not embed Maven or Gradle and do not expose a general `mvn` or `gradle` tool.
 
@@ -123,7 +128,7 @@ Default Discover/Confirm stay on `pkb_runvars`. `hint` and `resolve-runvars` pri
 .\mvnw.cmd -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java "-Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher" "-Dexec.classpathScope=test" "-Dexec.args=mcp ."
 ```
 
-Humans who want the Swing player can pass `ui .` instead. With no launcher arguments, `ui` and the current directory are selected automatically for that human default. Other Workbench commands are forwarded in the same form, for example `"-Dexec.args=sync ."`. Headless `mcp .` is optional host wiring, not an agent setup step. Agents do not start the GUI and do not click it. When a person already has the window open, the session commands above drive that session so the person sees the result. When nobody is watching, stay on headless `discover`, `confirm`, and `isolate`. See `.pickleball/AGENT-GUIDE.md`.
+Humans who want the Swing player can pass `ui .` instead. With no launcher arguments, `ui` and the current directory are selected automatically for that human default. Other Workbench commands are forwarded in the same form, for example `"-Dexec.args=sync ."`. Headless `mcp .` is optional host wiring, not an agent setup step. Do not open the GUI for your own testing. Open it to show a person a specific run, or when they ask. Close it when you are done showing it. While testing for yourself, stay headless. Opening the window loads the run you already have. It does not start a second test. Do not click the JavaFX or WebView UI. When a person already has the window open, the session commands above drive that session so the person sees the result. When nobody is watching, stay on headless `discover`, `confirm`, and `isolate`. See `.pickleball/AGENT-GUIDE.md`.
 
 The published Pickleball JAR is also executable. `java -jar pickleball-<version>.jar ui <project>` is the outer `Main-Class` (`PickleballWorkbenchLauncher`): it still extracts the nested controller and forks `java -cp`. It does not merge Workbench onto the Pickleball classpath. `java -jar pickleball-<version>.jar export-guidance .pickleball` is JDK-only: it copies bundled guidance through `PickleballLocalStore` and does not load DiagnosticCli or Jackson. Relocatable openers under `.pickleball/open/` walk up to the consumer project, find Java, and resolve a pickleball jar from `current.json`, a sibling `pickleball-*.jar`, or Maven local / the Gradle cache. They do not bake in a project, m2, or version path. Direct `java -jar pickleball-X.jar` uses X and pins `current.json` to X so versions can be tested side by side under `.pickleball/v/<version>/`.
 
@@ -366,7 +371,7 @@ Human **Save** uses the same service. After a picker scenario was loaded, Swing 
 
 ### Driving a session a person is watching
 
-The Swing window is a client of the session commands above. Consumer agents do not start that window and do not click the JavaFX or WebView UI. When a person already has it open, the agent runs those same launcher commands against that session so the person sees the result. When nobody is watching, stay on headless `discover`, `confirm`, and `isolate`. Headless `mcp .` is optional when the host already exposes `workbench_*` tools. Those tools are the same session, not a second implementation and not a setup step.
+The Swing window is a client of the session commands above. Do not open the GUI for your own testing. Open it to show a person a specific run, or when they ask. Close it when you are done showing it. While testing for yourself, stay headless. Opening the window loads the run you already have. It does not start a second test. Do not click the JavaFX or WebView UI. When a person already has it open, the agent runs those same launcher commands against that session so the person sees the result. When nobody is watching, stay on headless `discover`, `confirm`, and `isolate`. Headless `mcp .` is optional when the host already exposes `workbench_*` tools. Those tools are the same session, not a second implementation and not a setup step.
 
 UI mode cannot share process stdout with stdio MCP. Starting `mcp` while the UI is already running would be a second Workbench JVM. Instead, `ui` starts a 127.0.0.1-only JSON attach endpoint over the same `WorkbenchServices` / `WorkbenchMcpTools` methods and writes disposable discovery state:
 
@@ -397,7 +402,7 @@ A Copilot or other MCP-style client finds that file in the consumer project, the
 
 Headless `java -cp <thin-jar>:<resolved-libs> tools.dscode.workbench.WorkbenchApplication mcp <project>` stays stdio JSON-RPC only. That is optional host wiring, not an agent setup step. The consumer-agent live path is launcher `isolate` then `execute-step`. That client may hold the lease without a banner. Save is still a distinct explicit tool and never an implicit write.
 
-A person may start `ui .` and watch the window. The agent then uses the session commands against that open session. Do not launch a second `mcp` process against the same live UI session, and do not start the GUI in order to obtain `.pickleball/workbench/attach.json`.
+A person may start `ui .` and watch the window. The agent then uses the session commands against that open session. Do not launch a second `mcp` process against the same live UI session, and do not open the GUI for your own testing in order to obtain `.pickleball/workbench/attach.json`. Open it to show a person a specific run, or when they ask. Close it when you are done showing it. While testing for yourself, stay headless. Opening the window loads the run you already have. It does not start a second test.
 
 ## MCP stdio
 
@@ -407,7 +412,7 @@ Start the lightweight non-Spring MCP server for a consumer project. This is opti
 java -cp $workbenchCp tools.dscode.workbench.WorkbenchApplication mcp ".\maven-consumer-project"
 ```
 
-Or, from a Maven consumer test classpath, `"-Dexec.args=mcp ."` through `mvnw` or `mvnw.cmd`. That launcher is optional host wiring. Agents use Workbench `discover` / `confirm` to find failures. When a window is already open they drive it with the session commands. When nobody is watching they use `isolate` / `execute-step`. Do not start the GUI. Do not click the JavaFX or WebView UI. Do not require a machine-wide Maven or Gradle install.
+Or, from a Maven consumer test classpath, `"-Dexec.args=mcp ."` through `mvnw` or `mvnw.cmd`. That launcher is optional host wiring. Agents use Workbench `discover` / `confirm` to find failures. When a window is already open they drive it with the session commands. When nobody is watching they use `isolate` / `execute-step`. Do not open the GUI for your own testing. Open it to show a person a specific run, or when they ask. Close it when you are done showing it. While testing for yourself, stay headless. Opening the window loads the run you already have. It does not start a second test. Do not click the JavaFX or WebView UI. Do not require a machine-wide Maven or Gradle install.
 
 The server uses the official Java MCP SDK core and stdio transport with the Jackson 2 JSON adapter. MCP dependencies are Workbench-only and are resolved onto the forked controller classpath at launch; they are not shaded into the thin nested JAR. Workbench deliberately does not use Spring Boot, Spring Framework, Spring AI, WebMVC, or Tomcat.
 
