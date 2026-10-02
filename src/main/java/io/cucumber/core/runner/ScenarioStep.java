@@ -225,6 +225,14 @@ public class ScenarioStep extends StepExtension {
             ParsingMap parsingMap,
             String startStepMarker
     ) {
+        return createScenarioStep(pickle, parsingMap, startStepMarker, true);
+    }
+    public static ScenarioStep createScenarioStep(
+            Pickle pickle,
+            ParsingMap parsingMap,
+            String startStepMarker,
+            boolean includeBackground
+    ) {
         io.cucumber.core.runner.TestCase topLevel = GlobalState.getTestCase();
         String pickleName = parsingMap == null
                 ? pickle.getName()
@@ -249,8 +257,13 @@ public class ScenarioStep extends StepExtension {
             scenarioStep.stepParsingMap.clear();
             scenarioStep.stepParsingMap.getMaps().putAll(parsingMap.getMaps());
         }
+        List<PickleStepTestStep> pickleSteps =
+                new ArrayList<>(createPickleStepTestStepsFromPickle(pickle));
+        if (!includeBackground) {
+            CalledFeatureBackground.omitBackgroundSteps(pickle, pickleSteps);
+        }
         scenarioStep.initializeScenarioSteps(
-                createPickleStepTestStepsFromPickle(pickle).stream()
+                pickleSteps.stream()
                         .map(step -> new StepExtension(getTestCase(), step))
                         .toList(),
                 parsingMap,

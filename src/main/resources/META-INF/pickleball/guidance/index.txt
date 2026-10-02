@@ -72,6 +72,7 @@ maven-consumer-project/src/test/resources/features/date-time-utilities.feature
 maven-consumer-project/src/test/resources/features/diagnostic-reporting-validation.feature
 maven-consumer-project/src/test/resources/features/dialogs.feature
 maven-consumer-project/src/test/resources/features/dynamic-steps.feature
+maven-consumer-project/src/test/resources/features/example-row-proof.feature
 maven-consumer-project/src/test/resources/features/forms-dynamic-steps.feature
 maven-consumer-project/src/test/resources/features/internal-framework-java-checks.feature
 maven-consumer-project/src/test/resources/features/it-placeholder.feature
@@ -83,12 +84,14 @@ maven-consumer-project/src/test/resources/features/navigation.feature
 maven-consumer-project/src/test/resources/features/nested-and-block-conditionals.feature
 maven-consumer-project/src/test/resources/features/pickleball-2.1.2-syntax-demo.feature
 maven-consumer-project/src/test/resources/features/reusable-scenario-selection.feature
+maven-consumer-project/src/test/resources/features/run-row-gates.feature
 maven-consumer-project/src/test/resources/features/run-step-parameter-variations.feature
 maven-consumer-project/src/test/resources/features/scenario-data-references.feature
 maven-consumer-project/src/test/resources/features/scenario-marker-data.feature
 maven-consumer-project/src/test/resources/features/scenario-step-markers.feature
 maven-consumer-project/src/test/resources/features/service-call-execution.feature
 maven-consumer-project/src/test/resources/features/step-override-bridge.feature
+maven-consumer-project/src/test/resources/features/syntax-since-2.1.14.feature
 maven-consumer-project/src/test/resources/files/customers.yaml
 maven-consumer-project/src/test/resources/pickleball.properties
 maven-consumer-project/src/test/resources/pickleball_local.properties

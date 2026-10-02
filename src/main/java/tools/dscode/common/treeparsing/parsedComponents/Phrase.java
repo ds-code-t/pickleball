@@ -77,7 +77,9 @@ public final class Phrase extends PhraseData {
                         lastPhrase = nextPhrase;
                     }
                     StepExtension runningStep = getRunningStep();
-                    runningStep.childSteps.add(runningStep.modifyStepExtension(emitText));
+                    runningStep.childSteps.add(runningStep.modifyStepExtension(
+                            emitText,
+                            runningStep.inheritedGherkinArgument()));
                     setNextPhrase(null);
                     return false;
                 }

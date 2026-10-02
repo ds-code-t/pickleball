@@ -110,6 +110,7 @@ public abstract class PickleballRunner {
         applyPkbAliases();
         applyLegacyFrameworkDefaults();
         syncCanonicalAndAliasKeys();
+        alignCucumberNameFilterWithFind();
         syncReportPortalAliases(true);
         ParsingMap.initializeConfigs(values.get(PKB_CONFIG_PATH));
         refreshRunProfile();
@@ -187,6 +188,7 @@ public abstract class PickleballRunner {
         putCliOverride(PKB_NAME, FILTER_NAME_PROPERTY_NAME, joinNameFilters(projection.names));
         putCliOverride(PKB_GLUE, GLUE_PROPERTY_NAME, joinCommaSeparated(projection.glue));
         putCliReference(PKB_CUCUMBER_CLI_FEATURE_SELECTORS, formatCliArgs(projection.features));
+        alignCucumberNameFilterWithFind();
 
         refreshRunProfile();
         refreshPkbOptions();
@@ -468,6 +470,27 @@ public abstract class PickleballRunner {
             if (aliasWins) values.put(canonical, value);
             else values.putIfAbsent(canonical, value);
         }
+    }
+
+    /**
+     * Cucumber discovery selects a scenario when {@code pkb_name} is found inside the
+     * title. The JUnit engine later skips unless the same pattern matches the entire
+     * title. Publish the search form on the Cucumber alias and leave {@code pkb_name} as entered.
+     */
+    private void alignCucumberNameFilterWithFind() {
+        String name = values.get(PKB_NAME);
+        if (name == null || name.isBlank()) {
+            return;
+        }
+        String published = values.get(FILTER_NAME_PROPERTY_NAME);
+        if (published != null && !published.equals(name)) {
+            return;
+        }
+        values.put(FILTER_NAME_PROPERTY_NAME, cucumberNameFilterMatchingFind(name));
+    }
+
+    static String cucumberNameFilterMatchingFind(String namePattern) {
+        return "(?s).*(?:" + namePattern + ").*";
     }
 
     private void syncPair(String aliasKey, String canonicalKey) {

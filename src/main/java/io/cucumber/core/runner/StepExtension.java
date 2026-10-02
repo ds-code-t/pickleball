@@ -345,13 +345,17 @@ public class StepExtension extends StepData {
     }
 
     public StepExtension modifyStepExtension(String newText) {
+        return modifyStepExtension(newText, getGherkinArgumentText(pickleStepTestStep.getStep()));
+    }
+
+    public StepExtension modifyStepExtension(String newText, String gherkinArgument) {
         StepExtension modifiedStep = new StepExtension(
                 testCase,
                 getPickleStepTestStepFromStrings(
                         pickleStepTestStep,
                         pickleStepTestStep.getStep().getKeyword(),
                         newText,
-                        getGherkinArgumentText(pickleStepTestStep.getStep())));
+                        gherkinArgument == null ? "" : gherkinArgument));
         modifiedStep.setStepParsingMap(getStepParsingMap());
         modifiedStep.parentStep = parentStep;
         modifiedStep.nestingLevel = nestingLevel;

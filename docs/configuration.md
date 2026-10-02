@@ -401,7 +401,7 @@ The existing path semantics for `pkb_features`, `pkb_datapath`, `pkb_callpath`, 
 
 ## Example row filter
 
-`pkb_example` keeps specific Examples rows from scenarios that `pkb_tags`, `pkb_name`, and, on a component or `listPickles` scan, `pkb_featurename` have already selected. Where those filters select scenarios, `pkb_example` runs after them. It is not a tag and it does not extend Cucumber tag expressions (`and` / `or` / `not`). It has no `cucumber.filter` alias. `pkb_name` still matches the Scenario or Scenario Outline title and still selects every row until `pkb_example` runs. A normal Maven run applies the same filter after Cucumber's tag and name filters. It does not start honoring `pkb_featurename` on that engine path.
+`pkb_example` keeps specific Examples rows from scenarios that `pkb_tags`, `pkb_name`, and, on a component or `listPickles` scan, `pkb_featurename` have already selected. Where those filters select scenarios, `pkb_example` runs after them. It is not a tag and it does not extend Cucumber tag expressions (`and` / `or` / `not`). It has no `cucumber.filter` alias. `pkb_name` is a search of the Scenario or Scenario Outline title, the same rule Cucumber uses when it discovers scenarios. `Partial name` selects `Partial name example rows`. It still selects every row of that scenario until `pkb_example` runs. The Maven run keeps a scenario that this search selected. A normal Maven run applies the same filter after Cucumber's tag and name filters. It does not start honoring `pkb_featurename` on that engine path.
 
 Absent or blank `pkb_example` adds no filter.
 

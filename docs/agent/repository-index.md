@@ -91,6 +91,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/io/cucumber/core/gherkin/messages/MessageUtilities.java`
 - `src/main/java/io/cucumber/core/gherkin/messages/NGherkinFactory.java`
 - `src/main/java/io/cucumber/core/runner/ArgStepFunctions.java`
+- `src/main/java/io/cucumber/core/runner/CalledFeatureBackground.java`
 - `src/main/java/io/cucumber/core/runner/CoreConstants.java`
 - `src/main/java/io/cucumber/core/runner/CucumberStepInvoker.java`
 - `src/main/java/io/cucumber/core/runner/CurrentScenarioState.java`
@@ -369,6 +370,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/coredefinitions/NavigationSteps.java`
 - `src/main/java/tools/dscode/coredefinitions/ObjectRegistrationSteps.java`
 - `src/main/java/tools/dscode/coredefinitions/ReportingSteps.java`
+- `src/main/java/tools/dscode/coredefinitions/RunRowCondition.java`
 - `src/main/java/tools/dscode/coredefinitions/ServiceCallSteps.java`
 - `src/main/java/tools/dscode/coredefinitions/TableSteps.java`
 - `src/main/java/tools/dscode/coredefinitions/UtilitySteps.java`
@@ -421,6 +423,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/WorkbenchPointerContractTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchSessionCommandsTest.java`
 - `src/test/java/tools/dscode/parallelutilities/ParallelCountEstimatorTest.java`
+- `src/test/java/tools/dscode/testengine/CucumberNameFilterTest.java`
 - `src/test/java/tools/dscode/testengine/DynamicSuiteBootstrapWorkbenchRootTest.java`
 - `src/test/java/tools/dscode/testengine/ExampleRowFilterTest.java`
 
@@ -656,6 +659,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `maven-consumer-project/src/test/java/com/example/pickleball/StepOverrideChecks.java`
 - `maven-consumer-project/src/test/java/com/example/pickleball/support/InternalJavaTestRunner.java`
 - `maven-consumer-project/src/test/java/com/example/pickleball/support/LocalTestSite.java`
+- `maven-consumer-project/src/test/java/com/example/pickleball/SyntaxProofSteps.java`
 - `maven-consumer-project/src/test/java/com/example/pickleball/tests/TokenizedQueryTest.java`
 - `maven-consumer-project/src/test/java/io/cucumber/core/runner/ScenarioStepChecks.java`
 - `maven-consumer-project/src/test/java/io/cucumber/core/runner/ScenarioStepDataChecks.java`
@@ -702,6 +706,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `maven-consumer-project/src/test/resources/features/diagnostic-reporting-validation.feature`
 - `maven-consumer-project/src/test/resources/features/dialogs.feature`
 - `maven-consumer-project/src/test/resources/features/dynamic-steps.feature`
+- `maven-consumer-project/src/test/resources/features/example-row-proof.feature`
 - `maven-consumer-project/src/test/resources/features/forms-dynamic-steps.feature`
 - `maven-consumer-project/src/test/resources/features/internal-framework-java-checks.feature`
 - `maven-consumer-project/src/test/resources/features/it-placeholder.feature`
@@ -713,12 +718,14 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `maven-consumer-project/src/test/resources/features/nested-and-block-conditionals.feature`
 - `maven-consumer-project/src/test/resources/features/pickleball-2.1.2-syntax-demo.feature`
 - `maven-consumer-project/src/test/resources/features/reusable-scenario-selection.feature`
+- `maven-consumer-project/src/test/resources/features/run-row-gates.feature`
 - `maven-consumer-project/src/test/resources/features/run-step-parameter-variations.feature`
 - `maven-consumer-project/src/test/resources/features/scenario-data-references.feature`
 - `maven-consumer-project/src/test/resources/features/scenario-marker-data.feature`
 - `maven-consumer-project/src/test/resources/features/scenario-step-markers.feature`
 - `maven-consumer-project/src/test/resources/features/service-call-execution.feature`
 - `maven-consumer-project/src/test/resources/features/step-override-bridge.feature`
+- `maven-consumer-project/src/test/resources/features/syntax-since-2.1.14.feature`
 
 ## Maven consumer service-call definitions
 

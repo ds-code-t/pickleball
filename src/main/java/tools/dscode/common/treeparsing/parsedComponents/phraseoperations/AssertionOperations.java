@@ -267,12 +267,17 @@ public enum AssertionOperations implements OperationsInterface {
             logInfo(phraseData + " : Executing Assertion " + this.name());
             int repetition = phraseData.getRepetition();
 
-            ElementMatch firstElement = phraseData.getElementMatchBeforeOperation(RETURNS_VALUE);
+            List<ElementMatch> preceding = phraseData.getElementMatchesPrecedingOperation(RETURNS_VALUE);
+            // A reference such as <A> is resolved to a bare word before parsing, so
+            // "has value" has no element. The word itself is the subject.
+            List<ValueWrapper> values = preceding.isEmpty()
+                    ? List.of(createValueWrapper(literalValueSubject(phraseData)))
+                    : preceding.getFirst().getValues();
 
             phraseData.result = Attempt.run(repetition, 500, () -> {
                 return ValueWrapperCompareReducer.evalValues(
                         ValueWrapper::hasResolvedValue,
-                        firstElement.getValues(),
+                        values,
                         getModeSet(phraseData)
                 );
             });
@@ -516,6 +521,18 @@ public enum AssertionOperations implements OperationsInterface {
         }
     };
 
+
+    private static String literalValueSubject(PhraseData phraseData) {
+        String body = phraseData.body == null ? "" : phraseData.body.trim();
+        if (body.isEmpty()) {
+            String resolved = phraseData.getResolvedText();
+            body = resolved == null ? "" : resolved.trim();
+        }
+        return body
+                .replaceFirst("(?i)\\b(?:has|is)\\s+(?:no\\s+)?values?\\s*$", "")
+                .replaceFirst("(?i)^(?:if|else\\s+if|else|until|ensure|verify|the)\\s+", "")
+                .trim();
+    }
 
     private static ValueWrapper createLiteralRegexWrapper(ValueWrapper val, String assertion, String prefix, String suffix) {
         if (val == null) {
