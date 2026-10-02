@@ -133,14 +133,16 @@ public abstract class PickleballRunner {
                 PickleballLocalLayout.findProjectRoot(java.nio.file.Path.of("")),
                 System.out
         );
-        values.put(PKB_props.PKB_RUN_ID, coordination.runId());
-        values.put(PKB_props.PKB_AGENT_ID, coordination.agentId());
-        if (coordination.group() != null) values.put(PKB_props.PKB_RUN_GROUP, coordination.group());
-        if (coordination.sequence() != null) {
-            values.put(PKB_props.PKB_RUN_SEQUENCE, coordination.sequence().toString());
+        if (coordination != null) {
+            values.put(PKB_props.PKB_RUN_ID, coordination.runId());
+            values.put(PKB_props.PKB_AGENT_ID, coordination.agentId());
+            if (coordination.group() != null) values.put(PKB_props.PKB_RUN_GROUP, coordination.group());
+            if (coordination.sequence() != null) {
+                values.put(PKB_props.PKB_RUN_SEQUENCE, coordination.sequence().toString());
+            }
+            if (coordination.who() != null) values.put(PKB_props.PKB_RUN_WHO, coordination.who());
+            if (coordination.why() != null) values.put(PKB_props.PKB_RUN_WHY, coordination.why());
         }
-        if (coordination.who() != null) values.put(PKB_props.PKB_RUN_WHO, coordination.who());
-        if (coordination.why() != null) values.put(PKB_props.PKB_RUN_WHY, coordination.why());
     }
 
     public static String getOptionsString() {
@@ -275,7 +277,8 @@ public abstract class PickleballRunner {
         return current != null ? current : DynamicSuiteBootstrap.initializeFromRuntimeClasspath();
     }
 
-    static PickleballRunner rawInstance() { return INSTANCE; }
+    /** The live runner, or null when no suite has started. Does not bootstrap one. */
+    public static PickleballRunner rawInstance() { return INSTANCE; }
 
     private void mergeResourcePropertiesIfMissing(String resourceName) {
         try {

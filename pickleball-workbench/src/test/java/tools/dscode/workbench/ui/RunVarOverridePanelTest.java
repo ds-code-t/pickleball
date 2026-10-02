@@ -17,6 +17,8 @@ class RunVarOverridePanelTest {
     void booleanLikeKeysUseToggles() {
         assertEquals(RunVarOverridePanel.Kind.BOOLEAN, RunVarOverridePanel.kindFor("pkb_debugBrowser", "false"));
         assertEquals(RunVarOverridePanel.Kind.BOOLEAN, RunVarOverridePanel.kindFor("pkb_rp_enable", "true"));
+        assertEquals(RunVarOverridePanel.Kind.BOOLEAN, RunVarOverridePanel.kindFor("pkb_compositereport", "false"));
+        assertEquals(RunVarOverridePanel.Kind.BOOLEAN, RunVarOverridePanel.kindFor("pkb_scenarioreport", "true"));
         assertEquals(RunVarOverridePanel.Kind.BOOLEAN, RunVarOverridePanel.kindFor("pkb_custom", "yes"));
     }
 

@@ -45,6 +45,8 @@ public final class PKB_props {
     public static final String PKB_CUCUMBER_CLI_FEATURE_SELECTORS = PKB_PREFIX + "cucumber_cli_feature_selectors";
     public static final String PKB_LOGLEVEL = PKB_PREFIX + "loglevel";
     public static final String PKB_REPORTING_MODE = PKB_PREFIX + "reportingmode";
+    public static final String PKB_COMPOSITE_REPORT = PKB_PREFIX + "compositereport";
+    public static final String PKB_SCENARIO_REPORT = PKB_PREFIX + "scenarioreport";
     public static final String PKB_REPORT_RETENTION = PKB_PREFIX + "reportretention";
     public static final String PKB_DIAGNOSTIC_OUTPUT = PKB_PREFIX + "diagnostic_output";
     public static final String PKB_PLATFORM_LOG = PKB_PREFIX + "platformlog";

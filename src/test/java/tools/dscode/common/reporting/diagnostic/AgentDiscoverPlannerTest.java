@@ -31,6 +31,8 @@ class AgentDiscoverPlannerTest {
         assertTrue(plan.runVars().contains("pkb_parallel=" + ParallelCountEstimator.estimate()));
         assertTrue(plan.runVars().contains("pkb_reportingmode=diagnostic"));
         assertTrue(plan.runVars().contains("pkb_reportretention=failed"));
+        assertTrue(plan.runVars().contains("pkb_compositereport=false"));
+        assertTrue(plan.runVars().contains("pkb_scenarioreport=false"));
         assertTrue(plan.runVars().contains("pkb_tags=@smoke"));
         assertFalse(plan.runVars().contains("pkb_parallel=80"));
         assertFalse(plan.runVars().contains("pkb_run_profile="));

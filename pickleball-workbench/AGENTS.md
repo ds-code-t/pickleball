@@ -73,7 +73,9 @@ center:    Live Gherkin text editor + compact Step Editor / Command
 right:     Mapping | Terminal | Explorer | Report
 ```
 
-The Sealed RunVars panel is JDK/Workbench-only: it displays a map and writes LastDiscoverSnapshot `sealed=true` for the next worker `-Dpkb_overriderunvars=`. It must not import `PKB_props`, `PickleballProfiles`, or Pickleball core. Panel edits do not mutate an in-flight worker. Unused, it changes no behavior.
+The Sealed RunVars panel is JDK/Workbench-only: it displays a map and writes LastDiscoverSnapshot `sealed=true` for the next worker `-Dpkb_overriderunvars=`. It must not import `PKB_props`, `PickleballProfiles`, or Pickleball core. Panel edits do not mutate an in-flight worker. Unused, it changes no behavior. The panel shows `pkb_compositereport` and `pkb_scenarioreport`. Agent and Workbench runs default both to false. A normal test still writes both HTML reports. An explicit true writes that report again.
+
+The Workbench GUI is only a lightweight head over state and controls that already exist under the hood. Agents have direct access to that state and those controls, and direct control of the GUI controls, so they can collaborate with a person or present data and reports in the window. The GUI must not own behavior the agents cannot reach. Do not click JavaFX or WebView from tests. Do not embed Maven or Gradle. Agents run the project wrapper.
 
 Low-level lifecycle controls live under the Session menu and existing investigation controls remain available under Advanced Controls rather than dominating the permanent workspace.
 

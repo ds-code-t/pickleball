@@ -92,6 +92,9 @@ class WorkbenchAgentCommandsTest {
         )) {
             String text = Files.readString(Path.of(path));
             assertTrue(text.contains(line), path);
+            assertTrue(text.contains(
+                    "The Workbench GUI is only a lightweight head over state and controls that already exist under the hood."
+            ), path);
             assertFalse(text.contains("pkb_runvarssealed"), path);
             assertTrue(text.contains("pkb_overriderunvars"), path);
             assertTrue(text.contains("Never supply `pkb_run_profile` as input")

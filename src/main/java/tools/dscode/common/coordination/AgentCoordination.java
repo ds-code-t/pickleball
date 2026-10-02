@@ -3,8 +3,10 @@ package tools.dscode.common.coordination;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
+import tools.dscode.control.protocol.ControlProtocol;
 import tools.dscode.control.protocol.PickleballLocalLayout;
 import tools.dscode.testengine.PKB_props;
+import tools.dscode.testengine.PickleballRunner;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -30,10 +32,13 @@ import java.util.regex.Pattern;
  * Shared bulletin board for consumer agents, with private data per run.
  *
  * <p>The short log and inbox live under the consumer {@code .pickleball} directory.
- * Reports, diagnostic packs, scratch, the browser profile, and a headless
- * Workbench session file for that run live under {@code .pickleball/runs/<run-id>}.
- * Appending the short log does not take a file lock. A dead agent must not block
- * the others. Lines older than three days are dropped on the next append.</p>
+ * A private {@code .pickleball/runs/<run-id>} directory is only for an agent run
+ * or a Workbench run. A normal test does not create that folder and does not
+ * force a browser profile. Reports, diagnostic packs, scratch, per-worker
+ * browser profiles, and a headless Workbench session file for a private run
+ * live under that directory. Appending the short log does not take a file lock.
+ * A dead agent must not block the others. Lines older than three days are
+ * dropped on the next append.</p>
  */
 public final class AgentCoordination {
     public static final String LOG_FILE = "agent-log";
@@ -150,12 +155,73 @@ public final class AgentCoordination {
     }
 
     public static void clearCurrent() {
+        Run run = current;
         current = null;
+        if (run == null) return;
+        String scratch = System.getProperty(ATTACHMENT_TEMP_PROPERTY);
+        if (scratch != null && scratch.equals(run.scratchDirectory().toString())) {
+            System.clearProperty(ATTACHMENT_TEMP_PROPERTY);
+        }
+    }
+
+    /**
+     * True when this JVM was launched as an agent run ({@code -Dpkb_run_id} or
+     * {@code -Dpkb_agent_id}) or a Workbench worker. A normal {@code mvn test}
+     * is neither.
+     */
+    public static boolean launchRequestsPrivateRun() {
+        return present(System.getProperty(PKB_props.PKB_RUN_ID))
+                || present(System.getProperty(PKB_props.PKB_AGENT_ID))
+                || present(System.getProperty(ControlProtocol.WORKBENCH_TEST_OUTPUT_ROOT_PROPERTY))
+                || present(System.getenv(ControlProtocol.SESSION_DIRECTORY_ENV));
+    }
+
+    /** Folder name for the local browser profile of the current parallel worker. */
+    public static String workerKey() {
+        String name = Thread.currentThread().getName();
+        String cleaned = name == null ? "" : name.replaceAll("[^A-Za-z0-9._-]", "-");
+        if (cleaned.isBlank()) cleaned = "worker";
+        if (cleaned.length() > 60) cleaned = cleaned.substring(0, 60);
+        return cleaned + "-" + Thread.currentThread().threadId();
     }
 
     public static Path currentBrowserProfile() {
         Run run = current;
-        return run == null ? null : run.browserProfileDirectory();
+        return run == null ? null : run.browserProfileDirectory().resolve(workerKey());
+    }
+
+    /**
+     * Explicit {@code pkb_compositereport} / {@code pkb_scenarioreport} value, or null when unset.
+     * A blank value is explicit. Does not start a {@link PickleballRunner}.
+     */
+    public static String explicitHtmlSetting(String shortName) {
+        if (shortName == null || shortName.isBlank()) return null;
+        String key = PKB_props.PKB_PREFIX + shortName.trim().toLowerCase(Locale.ROOT);
+        if (PickleballRunner.rawInstance() != null) {
+            String live = liveRunVar(shortName.trim());
+            if (live != null) return live;
+            String resolved = PickleballRunner.rawInstance().get(key);
+            if (resolved != null) return resolved;
+        }
+        return System.getProperty(key);
+    }
+
+    /**
+     * Whether to write one HTML report. {@code false} suppresses it.
+     * Unset writes on a normal test and does not write on an agent or Workbench run.
+     * Any other non-blank value, including {@code true} or a path, writes.
+     */
+    public static boolean htmlEnabled(String shortName) {
+        if (explicitHtmlSetting(shortName) == null) return current() == null;
+        return explicitHtmlOn(shortName);
+    }
+
+    /** True only when the HTML run var is set to something other than false or blank. */
+    public static boolean explicitHtmlOn(String shortName) {
+        String explicit = explicitHtmlSetting(shortName);
+        if (explicit == null) return false;
+        String normalized = stripHtmlQuotes(explicit.trim());
+        return !normalized.isBlank() && !"false".equalsIgnoreCase(normalized);
     }
 
     public static Path reportHtmlOrDefault() {
@@ -228,6 +294,10 @@ public final class AgentCoordination {
     }
 
     public static Run openConsumerRun(Path project, Appendable out) {
+        if (!launchRequestsPrivateRun()) {
+            clearCurrent();
+            return null;
+        }
         Request request = Request.of(
                 System.getProperty(PKB_props.PKB_RUN_ID),
                 System.getProperty(PKB_props.PKB_AGENT_ID),
@@ -628,6 +698,29 @@ public final class AgentCoordination {
             if (value != null && !value.isBlank() && !"-".equals(value.trim())) return value;
         }
         return null;
+    }
+
+    private static String liveRunVar(String shortName) {
+        try {
+            Object value = tools.dscode.common.variables.RunVars.resolveFromVars(shortName);
+            return value == null ? null : value.toString();
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
+    private static String stripHtmlQuotes(String raw) {
+        String value = raw;
+        while ((value.startsWith("\"") && value.endsWith("\""))
+                || (value.startsWith("'") && value.endsWith("'"))) {
+            if (value.length() < 2) break;
+            value = value.substring(1, value.length() - 1).trim();
+        }
+        return value;
+    }
+
+    private static boolean present(String value) {
+        return value != null && !value.isBlank();
     }
 
     private static String blankToNull(String value) {

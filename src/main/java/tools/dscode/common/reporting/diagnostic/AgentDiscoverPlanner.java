@@ -120,6 +120,8 @@ public final class AgentDiscoverPlanner {
         values.put(PKB_props.PKB_REPORTING_MODE, "diagnostic");
         values.put(PKB_props.PKB_LOGLEVEL, "warn");
         values.put(PKB_props.PKB_REPORT_RETENTION, "failed");
+        values.put(PKB_props.PKB_COMPOSITE_REPORT, "false");
+        values.put(PKB_props.PKB_SCENARIO_REPORT, "false");
         return values;
     }
 

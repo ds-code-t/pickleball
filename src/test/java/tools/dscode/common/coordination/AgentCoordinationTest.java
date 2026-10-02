@@ -1,10 +1,18 @@
 package tools.dscode.common.coordination;
 
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.openqa.selenium.chrome.ChromeOptions;
+import org.openqa.selenium.edge.EdgeOptions;
 import tools.dscode.common.driver.DriverConstruction;
+import tools.dscode.common.reporting.diagnostic.DiagnosticRuntime;
+import tools.dscode.common.reporting.diagnostic.ReportRetentionPolicy;
+import tools.dscode.common.reporting.logging.Entry;
+import tools.dscode.common.reporting.logging.simplehtml.SimpleHtmlReportConverter;
+import tools.dscode.control.protocol.ControlProtocol;
 import tools.dscode.testengine.PKB_props;
 
 import java.nio.charset.StandardCharsets;
@@ -18,10 +26,12 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -32,6 +42,9 @@ class AgentCoordinationTest {
     @AfterEach
     void clearCoordination() {
         AgentCoordination.clearCurrent();
+        clearLaunchSignals();
+        ReportRetentionPolicy.clearThreadOverride();
+        DiagnosticRuntime.DIAGNOSTIC_MODE = false;
     }
 
     @Test
@@ -208,7 +221,10 @@ class AgentCoordinationTest {
         AgentCoordination.Run run = AgentCoordination.begin(project, request("run-browser", "agent-browser"));
         ChromeOptions local = new ChromeOptions();
         DriverConstruction.applyRunBrowserProfile(local);
-        assertTrue(argumentText(local).contains("--user-data-dir=" + run.browserProfileDirectory().toAbsolutePath().normalize()));
+        Path workerProfile = AgentCoordination.currentBrowserProfile();
+        assertTrue(workerProfile.startsWith(run.browserProfileDirectory()));
+        assertNotEquals(run.browserProfileDirectory(), workerProfile);
+        assertTrue(argumentText(local).contains("--user-data-dir=" + workerProfile.toAbsolutePath().normalize()));
 
         ChromeOptions preset = new ChromeOptions();
         preset.addArguments("--user-data-dir=/tmp/already-mine");
@@ -217,6 +233,132 @@ class AgentCoordinationTest {
         assertTrue(text.contains("--user-data-dir=/tmp/already-mine"));
         assertFalse(text.contains(run.browserProfileDirectory().toString()));
         assertEquals(1, text.split("user-data-dir", -1).length - 1);
+    }
+
+    @Test
+    void normalTestCreatesNoRunDirectoryAndSetsNoBrowserProfile() {
+        clearLaunchSignals();
+        assertNull(AgentCoordination.openConsumerRun(project, new StringBuilder()));
+        assertFalse(Files.exists(project.resolve(".pickleball/runs")));
+        ChromeOptions chrome = new ChromeOptions();
+        EdgeOptions edge = new EdgeOptions();
+        DriverConstruction.applyRunBrowserProfile(chrome);
+        DriverConstruction.applyRunBrowserProfile(edge);
+        assertFalse(argumentText(chrome).contains("user-data-dir"));
+        assertFalse(argumentText(edge).contains("user-data-dir"));
+        assertEquals(Path.of("reports", "cucumber-report.html"), AgentCoordination.reportHtmlOrDefault());
+        assertTrue(AgentCoordination.htmlEnabled("compositeReport"));
+        assertTrue(AgentCoordination.htmlEnabled("scenarioReport"));
+    }
+
+    @Test
+    void parallelLocalChromeWorkersGetSeparateProfilesAndRemoteStaysUntouched() throws Exception {
+        AgentCoordination.Run run = AgentCoordination.begin(project, request("run-workers", "agent-workers"));
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch go = new CountDownLatch(1);
+        List<String> profiles = new ArrayList<>();
+        try {
+            Future<?> left = pool.submit(() -> captureProfile(profiles, ready, go));
+            Future<?> right = pool.submit(() -> captureProfile(profiles, ready, go));
+            ready.await();
+            go.countDown();
+            left.get();
+            right.get();
+        } finally {
+            pool.shutdownNow();
+        }
+        assertEquals(2, profiles.size());
+        assertNotEquals(profiles.get(0), profiles.get(1));
+        String root = run.browserProfileDirectory().toAbsolutePath().normalize().toString();
+        for (String profile : profiles) {
+            assertTrue(profile.contains("--user-data-dir=" + root));
+            assertTrue(profile.contains("browser-profile"));
+            assertFalse(profile.endsWith("browser-profile") || profile.endsWith("browser-profile\""));
+        }
+
+        ObjectNode empty = JsonNodeFactory.instance.objectNode();
+        ChromeOptions remote = DriverConstruction.buildChromeOptions(empty, empty, false);
+        assertFalse(argumentText(remote).contains("user-data-dir"));
+    }
+
+    @Test
+    void agentAndWorkbenchRunsSuppressHtmlUntilAnExplicitTrue() throws Exception {
+        ReportRetentionPolicy.configure("all");
+        clearLaunchSignals();
+        Path normalReport = project.resolve("reports").resolve("cucumber-report.html");
+        recordScenario(normalReport, "Normal checkout");
+        assertTrue(Files.isRegularFile(normalReport));
+        assertTrue(htmlCount(project.resolve("reports")) >= 2);
+
+        System.setProperty(PKB_props.PKB_RUN_ID, "run-html");
+        System.setProperty(PKB_props.PKB_AGENT_ID, "agent-html");
+        AgentCoordination.Run agent = AgentCoordination.openConsumerRun(project, new StringBuilder());
+        assertTrue(Files.isDirectory(project.resolve(".pickleball").resolve("runs").resolve("run-html")));
+        assertFalse(AgentCoordination.htmlEnabled("compositeReport"));
+        assertFalse(AgentCoordination.htmlEnabled("scenarioReport"));
+        DiagnosticRuntime.DIAGNOSTIC_MODE = true;
+        Path agentReport = agent.reportsDirectory().resolve("cucumber-report.html");
+        recordScenario(agentReport, "Agent checkout");
+        assertFalse(Files.exists(agentReport));
+        assertEquals(0, htmlCount(agent.reportsDirectory()));
+
+        System.setProperty(PKB_props.PKB_COMPOSITE_REPORT, "true");
+        System.setProperty(PKB_props.PKB_SCENARIO_REPORT, "true");
+        assertTrue(AgentCoordination.htmlEnabled("compositeReport"));
+        assertTrue(AgentCoordination.htmlEnabled("scenarioReport"));
+        recordScenario(agentReport, "Agent checkout again");
+        assertTrue(Files.isRegularFile(agentReport));
+        assertTrue(htmlCount(agent.reportsDirectory()) >= 2);
+
+        AgentCoordination.clearCurrent();
+        clearLaunchSignals();
+        System.setProperty(ControlProtocol.WORKBENCH_TEST_OUTPUT_ROOT_PROPERTY, project.resolve("live").toString());
+        AgentCoordination.Run workbench = AgentCoordination.openConsumerRun(project, new StringBuilder());
+        assertFalse(AgentCoordination.htmlEnabled("compositeReport"));
+        assertFalse(AgentCoordination.htmlEnabled("scenarioReport"));
+        Path workbenchReport = workbench.reportsDirectory().resolve("cucumber-report.html");
+        recordScenario(workbenchReport, "Workbench checkout");
+        assertFalse(Files.exists(workbenchReport));
+    }
+
+    private void captureProfile(List<String> profiles, CountDownLatch ready, CountDownLatch go) {
+        ready.countDown();
+        try {
+            go.await();
+            ChromeOptions options = new ChromeOptions();
+            DriverConstruction.applyRunBrowserProfile(options);
+            synchronized (profiles) {
+                profiles.add(argumentText(options));
+            }
+        } catch (Exception failure) {
+            throw new IllegalStateException(failure);
+        }
+    }
+
+    private static void recordScenario(Path compositeReport, String title) {
+        SimpleHtmlReportConverter.resetRun();
+        SimpleHtmlReportConverter converter = new SimpleHtmlReportConverter(compositeReport);
+        Entry scope = Entry.of(title);
+        converter.onStart(scope, scope);
+        converter.onStop(scope, scope);
+        converter.close();
+        SimpleHtmlReportConverter.writeFinalReport(compositeReport);
+    }
+
+    private static long htmlCount(Path directory) throws Exception {
+        if (!Files.isDirectory(directory)) return 0;
+        try (Stream<Path> files = Files.list(directory)) {
+            return files.filter(path -> path.getFileName().toString().endsWith(".html")).count();
+        }
+    }
+
+    private static void clearLaunchSignals() {
+        System.clearProperty(PKB_props.PKB_RUN_ID);
+        System.clearProperty(PKB_props.PKB_AGENT_ID);
+        System.clearProperty(PKB_props.PKB_COMPOSITE_REPORT);
+        System.clearProperty(PKB_props.PKB_SCENARIO_REPORT);
+        System.clearProperty(ControlProtocol.WORKBENCH_TEST_OUTPUT_ROOT_PROPERTY);
     }
 
     private void appendMany(String agent, int count, CountDownLatch ready, CountDownLatch go) {
@@ -243,8 +385,14 @@ class AgentCoordinationTest {
         return AgentCoordination.Request.of(runId, agentId, null, null, null, null, "test");
     }
 
-    private static String argumentText(ChromeOptions options) {
-        Object raw = options.getCapability("goog:chromeOptions");
+    private static String argumentText(org.openqa.selenium.chromium.ChromiumOptions<?> options) {
+        String chrome = argumentsFrom(options, "goog:chromeOptions");
+        String edge = argumentsFrom(options, "ms:edgeOptions");
+        return chrome.isEmpty() ? edge : chrome;
+    }
+
+    private static String argumentsFrom(org.openqa.selenium.chromium.ChromiumOptions<?> options, String capability) {
+        Object raw = options.getCapability(capability);
         if (!(raw instanceof java.util.Map<?, ?> map)) return "";
         Object args = map.get("args");
         if (!(args instanceof List<?> list)) return "";

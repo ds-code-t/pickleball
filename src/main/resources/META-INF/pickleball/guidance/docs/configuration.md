@@ -110,9 +110,13 @@ Lineage and coordination metadata survive controlled execution but are excluded 
 
 Different consumer agents can run different tests at the same time. The shared files under the consumer `.pickleball` directory are a bulletin board. Run data stays private to each run.
 
-Every discover, confirm, isolate, and normal consumer run gets a unique run id when the caller does not pass one (`--run-id` or `-Dpkb_run_id`). An agent may pass its own id. An omitted agent id is generated and printed (`--agent` / `--agent-id` or `-Dpkb_agent_id`). Optional group, sequence, who, and why are `-Dpkb_run_group`, `-Dpkb_run_sequence`, `-Dpkb_run_who`, and `-Dpkb_run_why`.
+A private `.pickleball/runs/<run-id>/` directory is only for an agent run or a Workbench run (`-Dpkb_run_id`, `-Dpkb_agent_id`, or a Workbench worker). A normal `mvn test` does not open that folder, does not set Chrome or Edge `user-data-dir`, and writes the composite HTML report to `reports/cucumber-report.html`. Diagnostic packs and scratch stay on their 2.1.13 paths for a normal test. The short log and inbox stay where they are.
 
-Reports, diagnostic packs, scratch, the local browser profile, and a headless Workbench session file for that run live under `.pickleball/runs/<run-id>/`. Two runs never write the same output folder, the same browser profile, or the same live session file.
+An agent or Workbench run that does not pass a run id gets one (`--run-id` or `-Dpkb_run_id`). An agent may pass its own id. An omitted agent id is generated and printed (`--agent` / `--agent-id` or `-Dpkb_agent_id`). Optional group, sequence, who, and why are `-Dpkb_run_group`, `-Dpkb_run_sequence`, `-Dpkb_run_who`, and `-Dpkb_run_why`.
+
+Reports, diagnostic packs, scratch, and a headless Workbench session file for that private run live under `.pickleball/runs/<run-id>/`. Local Chrome and Edge in one run do not share one profile. Each parallel worker gets `browser-profile/<worker>`. Remote drivers are unchanged. Options that already contain `user-data-dir` are left alone. Two runs never write the same output folder or the same live session file.
+
+`pkb_compositeReport=false` suppresses the composite `reports/cucumber-report.html`. `pkb_scenarioReport=false` suppresses the per-scenario workbook HTML that `Log.closeAll` writes. A normal test leaves both unset and still writes both reports. An agent run, and a Workbench run including a person collaborating with an agent, default both to false. Agents keep diagnostic logs. An explicit `true` writes that report again. `pkb_reportingmode=diagnostic` still bypasses automatic HTML, ReportPortal, and XLSX unless one of those HTML run vars is explicitly true.
 
 The run record is `.pickleball/runs/<run-id>/record.json`: run id, agent id, optional group, sequence, who, why, what was learned, start time, stop time, status, and the path to the run data. The short log only points at that record.
 
@@ -394,6 +398,8 @@ The existing path semantics for `pkb_features`, `pkb_datapath`, `pkb_callpath`, 
 | `pkb_parallel` | `4`, `auto` | parallel scenario count; `auto` resolves at run start to a conservative JVM estimate and stamps the integer into `pkb_run_profile` |
 | `pkb_loglevel` | `debug` | console log level |
 | `pkb_reportingmode` | `diagnostic` | diagnostic evidence pipeline |
+| `pkb_compositeReport` | `true`, `false` | composite `reports/cucumber-report.html`; unset writes it on a normal test and suppresses it on an agent or Workbench run |
+| `pkb_scenarioReport` | `true`, `false` | per-scenario workbook HTML; same default as `pkb_compositeReport` |
 | `pkb_reportretention` | `all`, `failed`, `none` | automatic evidence/report retention |
 | `pkb_diagnostic_output` | `reports/diagnostic-runs` | optional diagnostic output root |
 | `pkb_platformlog` | `default`, `default+git`, `none`, etc. | platform/caller log stamps |

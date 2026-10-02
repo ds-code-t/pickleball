@@ -117,10 +117,17 @@ final class RunVarOverridePanel extends JPanel {
     private void rebuildFields(Map<String, String> values) {
         fields.removeAll();
         rows.clear();
-        if (values.isEmpty()) {
+        Map<String, String> shown = new TreeMap<>();
+        if (values != null) shown.putAll(values);
+        if (values != null && !values.isEmpty()) {
+            for (String key : HTML_REPORT_KEYS) {
+                shown.putIfAbsent(key, "false");
+            }
+        }
+        if (shown.isEmpty()) {
             fields.add(WorkbenchTheme.muted("No retained RunVars."));
         } else {
-            values.forEach((key, value) -> {
+            shown.forEach((key, value) -> {
                 FieldRow row = FieldRow.create(key, value == null ? "" : value);
                 rows.add(row);
                 fields.add(row.component());
@@ -163,7 +170,13 @@ final class RunVarOverridePanel extends JPanel {
 
     private static final java.util.Set<String> BOOLEAN_KEYS = java.util.Set.of(
             "pkb_debugbrowser",
-            "pkb_rp_enable"
+            "pkb_rp_enable",
+            "pkb_compositereport",
+            "pkb_scenarioreport"
+    );
+    private static final List<String> HTML_REPORT_KEYS = List.of(
+            "pkb_compositereport",
+            "pkb_scenarioreport"
     );
 
     enum Kind { BOOLEAN, ENUM, TEXT }
