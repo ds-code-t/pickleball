@@ -14,10 +14,34 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static tools.dscode.common.mappings.MappingProcessor.getRunMap;
 
 public class SyntaxProofSteps {
+    private static final ConcurrentHashMap<String, AtomicInteger> BRANCH_HITS = new ConcurrentHashMap<>();
+
+    @Given("^reset branch counts$")
+    public void resetBranchCounts() {
+        BRANCH_HITS.clear();
+    }
+
+    @Given("^count branch ([A-Za-z0-9-]+)$")
+    public static String countBranch(String name) {
+        return Integer.toString(BRANCH_HITS
+                .computeIfAbsent(name, key -> new AtomicInteger())
+                .incrementAndGet());
+    }
+
+    @Given("^branch count \"([^\"]*)\" equals \"([^\"]*)\"$")
+    public void branchCountEquals(String name, String expected) {
+        String actual = Integer.toString(BRANCH_HITS.getOrDefault(name, new AtomicInteger()).get());
+        if (!actual.equals(expected)) {
+            throw new AssertionError("branch " + name + " count was " + actual + " not " + expected);
+        }
+    }
+
     @Given("^the recorded city is saved as \"([^\"]*)\"$")
     public void recordCity(String key, DataTable table) {
         getRunMap().put(key, cityCell(table));

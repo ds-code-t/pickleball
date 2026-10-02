@@ -437,6 +437,12 @@ public class CurrentScenarioState extends ScenarioMapping {
 
         if (endCurrentScenario)
             return;
+        if (isUnselectedBlockChild(stepExtension)) {
+            stepExtension.skipped = true;
+            logSkip("Skipping Step: " + stepExtension.pickleStepTestStep.getStepText());
+            runNextSibling(stepExtension);
+            return;
+        }
         currentStep = stepExtension;
         if (currentStep.startTime == null)
             currentStep.startTime = Instant.now();
@@ -603,6 +609,24 @@ public class CurrentScenarioState extends ScenarioMapping {
 
 
         runNextSibling(stepExtension);
+    }
+
+    /**
+     * A child of a block conditional whose branch was not taken must not be
+     * parsed. IGNORE_CHILDREN_IF_FALSE already skips running it; parsing would
+     * still resolve mappings, expressions, and $ functions.
+     */
+    private boolean isUnselectedBlockChild(StepExtension stepExtension) {
+        StepBase parent = stepExtension.parentStep;
+        while (parent != null) {
+            if (parent.definitionFlags.contains(IGNORE_CHILDREN_IF_FALSE)
+                    && parent.lineData != null
+                    && parent.lineData.lineConditionalMode < 1) {
+                return true;
+            }
+            parent = parent.parentStep;
+        }
+        return false;
     }
 
     /**

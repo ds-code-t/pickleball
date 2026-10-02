@@ -169,6 +169,9 @@ public final class ParsedLine extends LineData {
     @Override
     public PhraseData runPhraseFromLine(PhraseData phrase) {
 //        setDefaultEntry(getRunningStep().stepEntry);
+        if (phrase.deferEvaluations && !phrase.shouldResolveBranchReferences()) {
+            phrase.suppressResolve = true;
+        }
         phrase.setOperationInheritanceIfNeeded();
 
         if (!phrase.getAssertion().isBlank() && phrase.assertionChainMembership == null && phrase.assertionChain == null) {
