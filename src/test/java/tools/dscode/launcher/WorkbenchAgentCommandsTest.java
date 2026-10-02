@@ -46,6 +46,11 @@ class WorkbenchAgentCommandsTest {
             assertTrue(output.stdout().contains("pkb_reportretention=failed"));
             assertTrue(output.stdout().contains("NEXT: run discover"));
             assertTrue(output.stdout().contains("Dry-run resolve"));
+            assertTrue(output.stdout().contains("launcher JVM"));
+            assertTrue(output.stdout().contains("not the Discover worker"));
+            assertTrue(output.stdout().contains("Do not treat resolve-runvars as the environment Discover will use"));
+            assertTrue(output.stdout().contains("run record after Discover"));
+            assertFalse(output.stdout().contains("pkb_runvarssealed"));
             assertTrue(output.stdout().contains("pkb_overriderunvars") || output.stdout().contains("sealed="));
             assertTrue(output.stdout().contains("provenance="));
             assertFalse(output.stdout().contains("MUST"));
@@ -66,10 +71,32 @@ class WorkbenchAgentCommandsTest {
 
         assertEquals(0, output.exitCode());
         assertTrue(output.stdout().contains("Dry-run resolve"));
+        assertTrue(output.stdout().contains("launcher JVM"));
+        assertTrue(output.stdout().contains("not the Discover worker"));
+        assertTrue(output.stdout().contains("Do not treat resolve-runvars as the environment Discover will use"));
+        assertTrue(output.stdout().contains("run record after Discover"));
+        assertFalse(output.stdout().contains("pkb_runvarssealed"));
         assertTrue(output.stdout().contains("sealed="));
         assertTrue(output.stdout().contains("pkb_overriderunvars"));
         assertTrue(output.stdout().contains("provenance="));
         assertFalse(output.stdout().contains("NEXT: run discover"));
+    }
+
+    @Test
+    void agentGuideSaysResolveRunVarsIsNotTheDiscoverEnvironment() throws Exception {
+        String line = "Do not treat resolve-runvars as the environment Discover will use.";
+        for (String path : List.of(
+                "docs/consumer-agent-guide.md",
+                "src/main/resources/META-INF/pickleball/guidance/AGENT-GUIDE.md",
+                "src/main/resources/META-INF/pickleball/guidance/docs/consumer-agent-guide.md"
+        )) {
+            String text = Files.readString(Path.of(path));
+            assertTrue(text.contains(line), path);
+            assertFalse(text.contains("pkb_runvarssealed"), path);
+            assertTrue(text.contains("pkb_overriderunvars"), path);
+            assertTrue(text.contains("Never supply `pkb_run_profile` as input")
+                    || text.contains("Never supply pkb_run_profile as input"), path);
+        }
     }
 
     @Test

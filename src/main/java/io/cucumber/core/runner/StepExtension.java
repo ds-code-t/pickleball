@@ -28,6 +28,7 @@ import java.util.stream.Collectors;
 
 import static io.cucumber.core.gherkin.messages.NGherkinFactory.argumentToGherkinText;
 import static io.cucumber.core.gherkin.messages.NGherkinFactory.getGherkinArgumentText;
+import static io.cucumber.core.gherkin.messages.NGherkinFactory.realGherkinArgument;
 import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
 import static io.cucumber.core.runner.GlobalState.getGlobalEventBus;
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
@@ -358,9 +359,19 @@ public class StepExtension extends StepData {
         return modifiedStep;
     }
 
+    public String inheritedGherkinArgument() {
+        return realGherkinArgument(pickleStepTestStep.getStep());
+    }
+
     public StepExtension createNewStepExtension(String stepText) {
+        return createNewStepExtension(stepText, "");
+    }
+
+    public StepExtension createNewStepExtension(String stepText, String gherkinArgument) {
         PickleStepTestStep newPickleStepTestStep = getPickleStepTestStepFromStrings(
-                pickleStepTestStep.getStep().getKeyword(), stepText, "");
+                pickleStepTestStep.getStep().getKeyword(),
+                stepText,
+                gherkinArgument == null ? "" : gherkinArgument);
         StepExtension modifiedStep = new StepExtension(testCase, newPickleStepTestStep);
         modifiedStep.setStepParsingMap(getStepParsingMap());
         modifiedStep.parentStep = parentStep;

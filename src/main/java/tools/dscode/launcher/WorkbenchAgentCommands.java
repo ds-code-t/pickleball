@@ -107,7 +107,8 @@ public final class WorkbenchAgentCommands {
             values.put(PKB_props.PKB_RUN_VARS, recommendedRunVars);
         }
         PKB_props.ResolvedRunVars resolved = PKB_props.resolveRunVars(values, jvm);
-        out.println("Dry-run resolve (does not start tests or browsers):");
+        out.println("Dry-run resolve of the launcher JVM, not the Discover worker (does not start tests, browsers, or Discover):");
+        out.println("Do not treat resolve-runvars as the environment Discover will use. Trust the environment on the run record after Discover.");
         out.println("sealed=" + resolved.sealed());
         out.println("pkb_run_profile=" + resolved.runProfile());
         out.println("runProfileFingerprint=" + resolved.fingerprint());
