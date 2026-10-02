@@ -76,8 +76,10 @@ public record WorkbenchProject(
         return type == Type.MAVEN
                 ? Files.isRegularFile(directory.resolve("mvnw"))
                     || Files.isRegularFile(directory.resolve("mvnw.cmd"))
+                    || Files.isRegularFile(wrapperJar(directory, type))
                 : Files.isRegularFile(directory.resolve("gradlew"))
-                    || Files.isRegularFile(directory.resolve("gradlew.bat"));
+                    || Files.isRegularFile(directory.resolve("gradlew.bat"))
+                    || Files.isRegularFile(wrapperJar(directory, type));
     }
 
     static boolean isWindows() {

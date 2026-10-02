@@ -184,10 +184,26 @@ class WorkbenchSynchronizerTest {
         Path jar = maven.resolve(".mvn").resolve("wrapper").resolve("maven-wrapper.jar");
         Files.writeString(jar, "jar");
         assertEquals(jar, WorkbenchProject.locate(maven).launcher());
+        Path module = maven.resolve("module");
+        Files.createDirectories(module);
+        Files.writeString(module.resolve("pom.xml"), "<project/>");
+        assertEquals(jar, WorkbenchProject.locate(module).launcher());
         List<String> command = WorkbenchSynchronizer.executableCommand(jar, List.of("test"));
         assertEquals("-jar", command.get(1));
         assertEquals(jar.toString(), command.get(2));
         assertEquals("test", command.get(3));
+
+        Path gradle = tempDir.resolve("jar-gradle");
+        Path gradleModule = gradle.resolve("module");
+        Files.createDirectories(gradleModule);
+        Files.writeString(gradleModule.resolve("build.gradle"), "plugins { id 'java' }\n");
+        Path gradleJar = gradle.resolve("gradle").resolve("wrapper").resolve("gradle-wrapper.jar");
+        Files.createDirectories(gradleJar.getParent());
+        Files.writeString(gradleJar, "jar");
+        assertEquals(gradleJar, WorkbenchProject.locate(gradleModule).launcher());
+        List<String> gradleCommand = WorkbenchSynchronizer.executableCommand(gradleJar, List.of("test"));
+        assertEquals("-jar", gradleCommand.get(1));
+        assertEquals(gradleJar.toString(), gradleCommand.get(2));
     }
 
     @Test

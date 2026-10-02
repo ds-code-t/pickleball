@@ -71,6 +71,14 @@ Use `THEN:` when the result fits on one line:
 
 Branches are considered from left to right. Only the first matching branch runs.
 
+## Data tables and doc strings
+
+An `IF:` / `THEN:` / `ELSE-IF:` / `ELSE:` branch that runs as its own step inherits the step's data table or doc string. A `THEN:` or `ELSE:` action that does not already start with a comma is run that way. A comma action stays in the IF step and uses that same table or doc string.
+
+A branch's own `DT:::...|` inline table replaces the inherited argument for that branch only. Any other inline type keeps the inherited argument.
+
+A marker peeled off the end of the whole line is put back on the last branch only. Earlier branches keep the step's data table or doc string. That still happens when an earlier branch already contains the same marker text.
+
 ## Multi-step branches
 
 End the branch with a colon and place its work beneath it:

@@ -287,6 +287,31 @@ class ExampleRowFilterTest {
     }
 
     @Test
+    void partialNameRegexRunsBeforeTheExampleFilter() {
+        assertEquals(
+                List.of(
+                        "First outline:a",
+                        "Short outline:a",
+                        "Long outline:a",
+                        "Tagged outline:a"
+                ),
+                named(scan(featureFile.toString(), "1", null, "outline", null))
+        );
+    }
+
+    @Test
+    void discoveryAppliesExampleAfterAPartialNameRegex() throws IOException {
+        Feature feature = readFeature(featureFile);
+        TestDescriptor root = suite(feature);
+        ExampleRowFilter.applyToDiscoveredSuite(root, "1", null, "outline");
+        Map<String, Integer> counts = counts(root);
+        assertEquals(1, counts.getOrDefault("plain", 0));
+        assertEquals(4, counts.getOrDefault("a", 0));
+        assertEquals(0, counts.getOrDefault("b", 0));
+        assertEquals(0, counts.getOrDefault("e", 0));
+    }
+
+    @Test
     void discoveryDropsSelectedRowsThatMissTheExample() throws IOException {
         Feature feature = readFeature(featureFile);
         TestDescriptor root = suite(feature);

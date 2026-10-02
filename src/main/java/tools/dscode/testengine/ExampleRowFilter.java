@@ -184,7 +184,9 @@ public final class ExampleRowFilter {
             }
         }
         if (name != null && !name.isBlank()) {
-            if (!Pattern.compile(name.trim()).matcher(pickle.getName()).matches()) {
+            // Cucumber's name predicate uses find(), so a partial regex such as
+            // "outline" selects "Long outline". Example rows run after that selection.
+            if (!Pattern.compile(name.trim()).matcher(pickle.getName()).find()) {
                 return false;
             }
         }

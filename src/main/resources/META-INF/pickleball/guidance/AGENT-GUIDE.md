@@ -29,7 +29,7 @@ The Workbench window is a view of a run you already have. `open-window --run-id=
 
 `hint` (alias `discover-hint`) is `-Dexec.args=hint` and prints the recommended Discover `pkb_runvars`, a dry-run resolve preview that does not start tests, and `NEXT: run discover`. Default Discover/Confirm stay on `pkb_runvars`. Sealed `pkb_overriderunvars` is opt-in: resolve → inspect → complete map (six context keys required) → `-Dpkb_overriderunvars=<compact>` → compare `runProfileFingerprint`. Do not mix sealed input with `pkb_runvars` or `pkb_profile`. Do not open the GUI for your own testing. Open it to show a person a specific run, or when they ask. Close it when you are done showing it. While testing for yourself, stay headless. Opening the window loads the run you already have. It does not start a second test. If `workbench_*` tools already exist they are the same session, not a setup step.
 
-Do not treat resolve-runvars as the environment Discover will use.
+Do not treat resolve-runvars as the environment Discover will use. That preview is the launcher JVM, not the Discover worker. Trust the run record after Discover.
 
 Do not copy consumer features into `.pickleball` as a sandbox.
 

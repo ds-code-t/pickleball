@@ -8,7 +8,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
-/** Invokes the consumer Maven wrapper. A machine-wide Maven install is not used. */
+/** Invokes the consumer Maven or Gradle wrapper. A machine-wide install is not used. */
 public final class ConsumerMavenTestRunner {
     private ConsumerMavenTestRunner() {
     }
@@ -64,18 +64,45 @@ public final class ConsumerMavenTestRunner {
 
     static Path wrapper(Path projectRoot) {
         Path project = projectRoot.toAbsolutePath().normalize();
-        boolean windows = System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win");
-        Path script = project.resolve(windows ? "mvnw.cmd" : "mvnw");
-        if (Files.isRegularFile(script)) return script;
-        Path alternate = project.resolve(windows ? "mvnw" : "mvnw.cmd");
-        if (Files.isRegularFile(alternate)) return alternate;
-        Path jar = project.resolve(".mvn").resolve("wrapper").resolve("maven-wrapper.jar");
+        boolean mavenFile = Files.isRegularFile(project.resolve("pom.xml"));
+        boolean gradleFile = Files.isRegularFile(project.resolve("build.gradle"))
+                || Files.isRegularFile(project.resolve("build.gradle.kts"));
+        if (mavenFile && gradleFile) {
+            throw new IllegalArgumentException(
+                    "Discover requires one Maven or Gradle project: " + project
+                            + ". Pickleball does not use a machine-wide Maven or Gradle install."
+            );
+        }
+        if (!mavenFile && !gradleFile) {
+            return findLauncher(project, true);
+        }
+        return findLauncher(project, mavenFile);
+    }
+
+    private static Path findLauncher(Path buildRoot, boolean maven) {
+        boolean windows = isWindows();
+        String windowsName = maven ? "mvnw.cmd" : "gradlew.bat";
+        String unixName = maven ? "mvnw" : "gradlew";
+        Path windowsPath = buildRoot.resolve(windowsName);
+        Path unixPath = buildRoot.resolve(unixName);
+        if (windows && Files.isRegularFile(windowsPath)) return windowsPath;
+        if (Files.isRegularFile(unixPath)) return unixPath;
+        if (Files.isRegularFile(windowsPath)) return windowsPath;
+        Path jar = wrapperJar(buildRoot, maven);
         if (Files.isRegularFile(jar)) return jar;
+        String script = windows ? windowsName : unixName;
+        String kind = maven ? "Maven" : "Gradle";
         throw new IllegalArgumentException(
-                "No Maven wrapper at " + project
-                        + ". Expected mvnw or mvnw.cmd, or .mvn/wrapper/maven-wrapper.jar."
-                        + " Pickleball does not use a machine-wide Maven install."
+                "No " + kind + " wrapper at " + buildRoot
+                        + ". Expected " + script + " or " + jar
+                        + ". Pickleball does not use a machine-wide Maven or Gradle install."
         );
+    }
+
+    private static Path wrapperJar(Path buildRoot, boolean maven) {
+        return maven
+                ? buildRoot.resolve(".mvn").resolve("wrapper").resolve("maven-wrapper.jar")
+                : buildRoot.resolve("gradle").resolve("wrapper").resolve("gradle-wrapper.jar");
     }
 
     static List<String> launchPrefix(Path launcher) {
@@ -83,7 +110,14 @@ public final class ConsumerMavenTestRunner {
         if (name.endsWith(".jar")) {
             return List.of(javaExecutable(), "-jar", launcher.toString());
         }
+        if (isWindows() && (name.endsWith(".cmd") || name.endsWith(".bat"))) {
+            return List.of("cmd.exe", "/d", "/c", launcher.toString());
+        }
         return List.of(launcher.toString());
+    }
+
+    private static boolean isWindows() {
+        return System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win");
     }
 
     private static String javaExecutable() {

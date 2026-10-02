@@ -77,6 +77,18 @@ class ConditionalBranchArgumentTest {
     }
 
     @Test
+    void elseIfThenAndElseInheritOrOverrideOnTheirOwn() {
+        String rewritten = ParsedLine.rewriteConditionalBranches(
+                "IF: ready THEN: enter one ELSE-IF: later THEN: enter two DT:::city|Paris| ELSE: enter three");
+        List<String> branches = backtickValues(rewritten);
+        assertEquals(3, branches.size());
+        assertEquals(DEFAULT_TABLE, ParsedLine.gherkinArgumentForBranch(branches.get(0), DEFAULT_TABLE));
+        assertTrue(ParsedLine.gherkinArgumentForBranch(branches.get(1), DEFAULT_TABLE).contains("Paris"));
+        assertFalse(ParsedLine.gherkinArgumentForBranch(branches.get(1), DEFAULT_TABLE).contains("Tempe"));
+        assertEquals(DEFAULT_DOC, ParsedLine.gherkinArgumentForBranch(branches.get(2), DEFAULT_DOC));
+    }
+
+    @Test
     void peeledMarkerIsRestoredOntoTheLastBranchOnly() {
         String restored = ParsedLine.appendStoredInlineMarker(
                 "IF: ready THEN: enter one ELSE: enter two",
@@ -93,6 +105,17 @@ class ConditionalBranchArgumentTest {
         assertFalse(first.contains("Paris"));
         assertTrue(last.contains("Paris"));
         assertFalse(last.contains("Tempe"));
+
+        String duplicated = ParsedLine.appendStoredInlineMarker(
+                "IF: ready THEN: enter one DT:::city|Paris| ELSE: enter two",
+                "DT",
+                "city|Paris|");
+        assertTrue(duplicated.stripTrailing().endsWith("ELSE: enter two DT:::city|Paris|"));
+        List<String> both = backtickValues(ParsedLine.rewriteConditionalBranches(duplicated));
+        assertEquals(2, both.size());
+        assertTrue(both.get(0).contains("DT:::city|Paris|"));
+        assertTrue(both.get(1).contains("DT:::city|Paris|"));
+        assertEquals(1, both.get(1).split("DT:::", -1).length - 1);
     }
 
     private static void assertExtracts(String text) {

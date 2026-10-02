@@ -70,7 +70,9 @@ public final class ParsedLine extends LineData {
             return input;
         }
         String marker = type.trim() + ":::" + argumentText.strip();
-        if (input.contains(marker)) {
+        // The same marker may already sit on an earlier branch. Only an end
+        // marker is already in place; anything else was peeled from the last branch.
+        if (input.stripTrailing().endsWith(marker)) {
             return input;
         }
         return input + " " + marker;

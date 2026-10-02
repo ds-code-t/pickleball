@@ -370,7 +370,7 @@ PKB_props.overrideRunVars(Map.of(
 ));
 ```
 
-Dry-run resolve does **not** start tests or browsers:
+Dry-run resolve does **not** start tests or browsers. `DiagnosticCli resolve-runvars` and Workbench `hint` preview the launcher JVM, not the Discover worker. Do not treat that preview, including its `pkb_environment`, as the environment Discover will use. Trust the run record after Discover.
 
 ```java
 PKB_props.ResolvedRunVars preview = PKB_props.resolveRunVars(values);

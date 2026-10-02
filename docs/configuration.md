@@ -284,7 +284,7 @@ Dry-run without starting tests:
 PKB_props.ResolvedRunVars preview = PKB_props.resolveRunVars(values);
 ```
 
-`DiagnosticCli resolve-runvars` and Workbench `hint` print that preview, including per-key provenance (`override`, `runvars`, `profile`, `jvm`, `inherited-context`, `default`, `properties`). Agents resolve → inspect → complete map → `pkb_overriderunvars` → compare fingerprint.
+`DiagnosticCli resolve-runvars` and Workbench `hint` print that preview, including per-key provenance (`override`, `runvars`, `profile`, `jvm`, `inherited-context`, `default`, `properties`). The preview is the launcher JVM, not the Discover worker. Do not treat its `pkb_environment` as the environment Discover will use. Trust the run record after Discover. Agents resolve → inspect → complete map → `pkb_overriderunvars` → compare fingerprint. Sealed input is `pkb_overriderunvars` only.
 
 ### Templates and runtime configs
 
