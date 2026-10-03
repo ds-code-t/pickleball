@@ -59,6 +59,8 @@ Parentheses can group expression parts:
 
 Expression parts are evaluated independently. They do not inherit a subject or comparison from a neighboring expression.
 
+`&&` and `||` read each side only when that side runs. A skipped side is not pasted and is not parsed, so a missing reference, a `$` call, a `file:` reference, or bad syntax on that side does not run. A blank side is false. A single `|` is not a short-circuit and still reads both sides. A taken comparison still pastes saved text, so `<A> > 5` with A saved as `6` is the source `6 > 5`.
+
 ## Inline branch chains
 
 Use `THEN:` when the result fits on one line:

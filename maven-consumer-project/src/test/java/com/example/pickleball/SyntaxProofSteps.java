@@ -42,6 +42,18 @@ public class SyntaxProofSteps {
         }
     }
 
+    @Given("^resolving \"([^\"]*)\" is recorded as \"([^\"]*)\"$")
+    public void resolvingIsRecorded(String expression, String key) {
+        try {
+            String value = ParsingMap.getRunningParsingMap().resolveWholeText("<{ " + expression + " }>");
+            getRunMap().put(key, value == null ? "" : value);
+            getRunMap().put(key + "Status", "ok");
+        } catch (RuntimeException ex) {
+            getRunMap().put(key, "");
+            getRunMap().put(key + "Status", "threw");
+        }
+    }
+
     @Given("^the recorded city is saved as \"([^\"]*)\"$")
     public void recordCity(String key, DataTable table) {
         getRunMap().put(key, cityCell(table));

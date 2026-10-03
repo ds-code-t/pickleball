@@ -227,6 +227,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/common/mappings/GlobalMappings.java`
 - `src/main/java/tools/dscode/common/mappings/JsonataParentDemo.java`
 - `src/main/java/tools/dscode/common/mappings/JsonPathUtil.java`
+- `src/main/java/tools/dscode/common/mappings/LazyBooleanSides.java`
 - `src/main/java/tools/dscode/common/mappings/MapConfigurations.java`
 - `src/main/java/tools/dscode/common/mappings/MappingProcessor.java`
 - `src/main/java/tools/dscode/common/mappings/NodeMap.java`
@@ -412,6 +413,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/common/reporting/diagnostic/AgentDiscoverPlannerTest.java`
 - `src/test/java/tools/dscode/common/reporting/diagnostic/ConsumerMavenTestRunnerTest.java`
 - `src/test/java/tools/dscode/common/treeparsing/preparsing/ConditionalBranchArgumentTest.java`
+- `src/test/java/tools/dscode/common/treeparsing/preparsing/LazyBranchResolutionTest.java`
 - `src/test/java/tools/dscode/control/override/StepOverrideCompilerTest.java`
 - `src/test/java/tools/dscode/control/protocol/PickleballArtifactLocatorTest.java`
 - `src/test/java/tools/dscode/control/protocol/PickleballLocalLayoutTest.java`
@@ -670,6 +672,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `maven-consumer-project/src/test/java/tools/dscode/common/dataelements/DataElementPhaseThreeChecks.java`
 - `maven-consumer-project/src/test/java/tools/dscode/common/dataelements/DataElementPhaseTwoChecks.java`
 - `maven-consumer-project/src/test/java/tools/dscode/common/driver/ChromeHeadlessConfigChecks.java`
+- `maven-consumer-project/src/test/java/tools/dscode/common/mappings/LazyBooleanSideTest.java`
 - `maven-consumer-project/src/test/java/tools/dscode/common/mappings/MappingDataRefactorChecks.java`
 - `maven-consumer-project/src/test/java/tools/dscode/common/mappings/QuoteParserChecks.java`
 - `maven-consumer-project/src/test/java/tools/dscode/common/reporting/diagnostic/AgentBrowserLadderChecks.java`
@@ -711,6 +714,8 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `maven-consumer-project/src/test/resources/features/internal-framework-java-checks.feature`
 - `maven-consumer-project/src/test/resources/features/it-placeholder.feature`
 - `maven-consumer-project/src/test/resources/features/keyboard.feature`
+- `maven-consumer-project/src/test/resources/features/lazy-boolean-sides.feature`
+- `maven-consumer-project/src/test/resources/features/lazy-branch-resolution.feature`
 - `maven-consumer-project/src/test/resources/features/log-and-assert-steps.feature`
 - `maven-consumer-project/src/test/resources/features/mapping-and-resources.feature`
 - `maven-consumer-project/src/test/resources/features/mapping-value-type-preservation.feature`

@@ -907,6 +907,21 @@ public class ParsingMap extends MappingProcessor {
                 if (reference == null) {
                     break;
                 }
+                if (isLazyBooleanExpression(reference.body())) {
+                    Object legacy = preserveWholeObject
+                            ? owner.legacyResolveWholeValue(
+                                    reference.fullText(current),
+                                    resolveEvaluations)
+                            : owner.legacyResolveWholeText(
+                                    reference.fullText(current),
+                                    resolveEvaluations);
+                    current = replace(
+                            current,
+                            reference.start(),
+                            reference.end() + 1,
+                            legacy == null ? "" : String.valueOf(legacy));
+                    continue;
+                }
 
                 Resolution resolution = resolveReference(
                         owner,
@@ -1265,12 +1280,72 @@ public class ParsingMap extends MappingProcessor {
             return value == '\'' || value == '"' || value == '`';
         }
 
+        private static boolean isLazyBooleanExpression(String body) {
+            if (body == null) {
+                return false;
+            }
+            String trimmed = body.trim();
+            return trimmed.startsWith("{")
+                    && trimmed.endsWith("}")
+                    && LazyBooleanSides.containsOperator(trimmed);
+        }
+
+        private static Reference lazyBooleanReference(
+                String input,
+                int index,
+                String open,
+                String close
+        ) {
+            if (!input.startsWith(open, index)) {
+                return null;
+            }
+            int end = LazyBooleanSides.matchingClose(input, index, open, close);
+            if (end < 0) {
+                return null;
+            }
+            String body = input.substring(
+                    index + open.length() - 1,
+                    end - close.length() + 1);
+            if (!LazyBooleanSides.containsOperator(body)) {
+                return null;
+            }
+            return new Reference(index, end - 1, body);
+        }
+
         private static Reference findInnermostReference(String input) {
             if (!looksLikeXml(input)) {
                 List<Integer> opens = new ArrayList<>();
+                char quote = 0;
+                boolean escaped = false;
                 for (int index = 0; index < input.length(); index++) {
                     char current = input.charAt(index);
+                    if (quote != 0) {
+                        if (escaped) {
+                            escaped = false;
+                        } else if (current == '\\') {
+                            escaped = true;
+                        } else if (current == quote) {
+                            quote = 0;
+                        }
+                    } else if (current == '\'' || current == '"' || current == '`') {
+                        quote = current;
+                    }
+                    boolean quoted = quote != 0 && current != quote;
+                    if (!quoted && input.startsWith("~[~{", index)) {
+                        Reference lazyTilde = lazyBooleanReference(
+                                input, index, "~[~{", "}~]~");
+                        if (lazyTilde != null) {
+                            return lazyTilde;
+                        }
+                    }
                     if (current == '<' && isReferenceOpen(input, index)) {
+                        if (!quoted) {
+                            Reference lazyAngle = lazyBooleanReference(
+                                    input, index, "<{", "}>");
+                            if (lazyAngle != null) {
+                                return lazyAngle;
+                            }
+                        }
                         opens.add(index);
                         continue;
                     }
