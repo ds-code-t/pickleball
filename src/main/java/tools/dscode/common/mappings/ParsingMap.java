@@ -1285,9 +1285,7 @@ public class ParsingMap extends MappingProcessor {
                 return false;
             }
             String trimmed = body.trim();
-            return trimmed.startsWith("{")
-                    && trimmed.endsWith("}")
-                    && LazyBooleanSides.containsOperator(trimmed);
+            return trimmed.startsWith("{") && trimmed.endsWith("}");
         }
 
         private static Reference lazyBooleanReference(
@@ -1306,7 +1304,7 @@ public class ParsingMap extends MappingProcessor {
             String body = input.substring(
                     index + open.length() - 1,
                     end - close.length() + 1);
-            if (!LazyBooleanSides.containsOperator(body)) {
+            if (!body.startsWith("{") || !body.endsWith("}")) {
                 return null;
             }
             return new Reference(index, end - 1, body);

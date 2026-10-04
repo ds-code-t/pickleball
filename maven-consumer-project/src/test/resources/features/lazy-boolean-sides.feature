@@ -61,3 +61,53 @@ Feature: Boolean sides resolve only when that side runs
     * , save "true" as "A"
     * IF: "a || b" == "a || b" || <MISSING> THEN: , save "yes" as "quotedOr"
     * , ensure "<quotedOr>" equals "yes"
+
+  Scenario: A skipped ternary arm with a missing reference does not throw
+    * , save "true" as "Flag"
+    * , save "6" as "Taken"
+    * resolving "<Flag> ? <Taken> : <MISSING>" is recorded as "ternarySkip" and the info contains "-> true ? 6 : <MISSING> -> 6"
+    * , ensure "<ternarySkipStatus>" equals "ok"
+    * , ensure "<ternarySkip>" equals "6"
+    * , ensure "<ternarySkipLogOk>" equals "yes"
+
+  Scenario: A skipped ternary arm keeps nested operators and a dollar call unpasted
+    * reset branch counts
+    * resolving "false ? (<MISSING> && <NOPE>) : 1" is recorded as "ternaryNestedSkip" and the info contains "-> false ? (<MISSING> && <NOPE>) : 1 -> 1"
+    * , ensure "<ternaryNestedSkipStatus>" equals "ok"
+    * , ensure "<ternaryNestedSkip>" equals "1"
+    * , ensure "<ternaryNestedSkipLogOk>" equals "yes"
+    * IF: <{ false ? <$count branch ternary-skip> : true }> THEN: , save "yes" as "ternaryDollar"
+    * , ensure "<ternaryDollar>" equals "yes"
+    * branch count "ternary-skip" equals "0"
+
+  Scenario: A taken ternary arm pastes and still throws
+    * resolving "true ? ((( : <MISSING>" fails as "ternaryTaken" and the info contains "-> true ? ((( : <MISSING> ->"
+    * , ensure "<ternaryTakenStatus>" equals "threw"
+
+  Scenario: A trailing question mark still means boolean
+    * , save "true" as "A"
+    * resolving "<A>?" is recorded as "trailingTrue" and the info contains "-> true -> true"
+    * , ensure "<trailingTrueStatus>" equals "ok"
+    * , ensure "<trailingTrue>" equals "true"
+    * , ensure "<trailingTrueLogOk>" equals "yes"
+    * resolving "1 == 0?" is recorded as "trailingFalse" and the info contains "-> 1 == 0 -> false"
+    * , ensure "<trailingFalse>" equals "false"
+
+  Scenario: And and or still paste only the side that runs
+    * , save "true" as "A"
+    * resolving "<A> || <MISSING>" is recorded as "orStill" and the info contains "-> true || <MISSING> -> true"
+    * , ensure "<orStillStatus>" equals "ok"
+    * , ensure "<orStill>" equals "true"
+    * , ensure "<orStillLogOk>" equals "yes"
+    * , save "false" as "A"
+    * resolving "<A> && <MISSING>" is recorded as "andStill" and the info contains "-> false && <MISSING> -> false"
+    * , ensure "<andStill>" equals "false"
+    * , ensure "<andStillLogOk>" equals "yes"
+
+  Scenario: A plain expression logs the filled text and the result
+    * , save "6" as "A"
+    * resolving "<A> + 1" is recorded as "plainSum" and the info contains "-> 6 + 1 -> 7"
+    * , ensure "<plainSumStatus>" equals "ok"
+    * , ensure "<plainSum>" equals "7"
+    * , ensure "<plainSumLogOk>" equals "yes"
+

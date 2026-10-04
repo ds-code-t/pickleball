@@ -61,6 +61,10 @@ Expression parts are evaluated independently. They do not inherit a subject or c
 
 `&&` and `||` read each side only when that side runs. A skipped side is not pasted and is not parsed, so a missing reference, a `$` call, a `file:` reference, or bad syntax on that side does not run. A blank side is false. A single `|` is not a short-circuit and still reads both sides. A taken comparison still pastes saved text, so `<A> > 5` with A saved as `6` is the source `6 > 5`.
 
+`condition ? whenTrue : whenFalse` uses the same rule. The condition runs first. Only the arm that runs is pasted and evaluated. The other arm stays as written, so a missing reference, a `$` call, a `file:` reference, or bad syntax there does not throw. A taken arm still pastes and can throw. Nested `&&`, `||`, or `?:` inside a skipped arm or side is not pasted. A `?` at the very end of an expression is still the boolean marker (evaluate as boolean, then drop the `?`), not this operator. `!`, comparisons, math, a single `|`, and function arguments still run.
+
+Each expression reference logs one info line after it finishes. A part that ran is shown with its map references filled in. A part that never ran is shown as written. Then the line shows the result, for example `<{ <A> || <Missing> }> -> yes || <Missing> -> true`. A plain expression with nothing to skip logs the original text, the filled-in text, and the result. If evaluation throws, an info line starting with `evaluation failed` names the original expression, shows that same picture, and includes the error. The error still propagates, and it still names the text that failed.
+
 ## Inline branch chains
 
 Use `THEN:` when the result fits on one line:

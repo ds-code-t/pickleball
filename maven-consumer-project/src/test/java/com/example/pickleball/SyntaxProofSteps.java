@@ -6,6 +6,8 @@ import io.cucumber.datatable.DataTable;
 import io.cucumber.docstring.DocString;
 import io.cucumber.java.en.Given;
 import tools.dscode.common.mappings.ParsingMap;
+import tools.dscode.common.reporting.logging.Entry;
+import tools.dscode.common.reporting.logging.LogForwarder;
 import tools.dscode.launcher.WorkbenchAgentCommands;
 
 import java.io.ByteArrayOutputStream;
@@ -13,7 +15,9 @@ import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -44,6 +48,42 @@ public class SyntaxProofSteps {
 
     @Given("^resolving \"([^\"]*)\" is recorded as \"([^\"]*)\"$")
     public void resolvingIsRecorded(String expression, String key) {
+        recordResolution(expression, key, null);
+    }
+
+    @Given("^resolving \"([^\"]*)\" is recorded as \"([^\"]*)\" and the info contains \"([^\"]*)\"$")
+    public void resolvingIsRecordedWithInfo(String expression, String key, String expectedLog) {
+        recordResolution(expression, key, expectedLog);
+    }
+
+    @Given("^resolving \"([^\"]*)\" fails as \"([^\"]*)\" and the info contains \"([^\"]*)\"$")
+    public void resolvingFailsWithInfo(String expression, String key, String expectedLog) {
+        Set<String> before = infoIds();
+        RuntimeException thrown;
+        try {
+            ParsingMap.getRunningParsingMap().resolveWholeText("<{ " + expression + " }>");
+            thrown = null;
+        } catch (RuntimeException ex) {
+            thrown = ex;
+        }
+        String log = joinedNewInfo(before);
+        getRunMap().put(key + "Status", thrown == null ? "ok" : "threw");
+        if (thrown == null) {
+            throw new AssertionError("expected evaluation to fail for <{ " + expression + " }>");
+        }
+        String message = thrown.getMessage() == null ? "" : thrown.getMessage();
+        if (!log.contains("evaluation failed")
+                || !log.contains(expectedLog)
+                || log.contains("pkbLazy")
+                || message.contains("pkbLazy")
+                || !message.contains("(((")) {
+            throw new AssertionError("failure picture was [" + log + "] error [" + message + "]");
+        }
+        getRunMap().put(key, "threw");
+    }
+
+    private void recordResolution(String expression, String key, String expectedLog) {
+        Set<String> before = infoIds();
         try {
             String value = ParsingMap.getRunningParsingMap().resolveWholeText("<{ " + expression + " }>");
             getRunMap().put(key, value == null ? "" : value);
@@ -51,6 +91,61 @@ public class SyntaxProofSteps {
         } catch (RuntimeException ex) {
             getRunMap().put(key, "");
             getRunMap().put(key + "Status", "threw");
+        }
+        if (expectedLog == null) {
+            return;
+        }
+        String log = joinedNewInfo(before);
+        boolean matched = log.contains(expectedLog) && !log.contains("pkbLazy");
+        getRunMap().put(key + "LogOk", matched ? "yes" : "no");
+        if (!matched) {
+            throw new AssertionError("info log [" + log + "] did not contain [" + expectedLog + "]");
+        }
+    }
+
+    private static Set<String> infoIds() {
+        Set<String> ids = new HashSet<>();
+        collectIds(LogForwarder.getDefaultEntry(), ids);
+        try {
+            collectIds(LogForwarder.closestEntryToStep(), ids);
+        } catch (RuntimeException ignored) {
+            // A unit-style call has no running step.
+        }
+        return ids;
+    }
+
+    private static void collectIds(Entry entry, Set<String> ids) {
+        if (entry == null || !ids.add(entry.id)) {
+            return;
+        }
+        for (Entry child : entry.children) {
+            collectIds(child, ids);
+        }
+    }
+
+    private static String joinedNewInfo(Set<String> before) {
+        StringBuilder joined = new StringBuilder();
+        appendNew(LogForwarder.getDefaultEntry(), before, joined, new HashSet<>());
+        try {
+            appendNew(LogForwarder.closestEntryToStep(), before, joined, new HashSet<>());
+        } catch (RuntimeException ignored) {
+            // A unit-style call has no running step.
+        }
+        return joined.toString();
+    }
+
+    private static void appendNew(Entry entry, Set<String> before, StringBuilder joined, Set<String> seen) {
+        if (entry == null || !seen.add(entry.id)) {
+            return;
+        }
+        if (!before.contains(entry.id) && entry.text != null && entry.text.contains("->")) {
+            if (joined.length() > 0) {
+                joined.append('\n');
+            }
+            joined.append(entry.text);
+        }
+        for (Entry child : entry.children) {
+            appendNew(child, before, joined, seen);
         }
     }
 

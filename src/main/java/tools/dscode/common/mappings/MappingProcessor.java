@@ -680,13 +680,12 @@ public abstract class MappingProcessor implements Map<String, Object> {
                     open + INTERNAL_EXPRESSION_OPEN.length(),
                     endExclusive - INTERNAL_EXPRESSION_CLOSE.length());
             String restored = restoreExpressionBody(internalBody, parsedObj, bookends);
-            if (!LazyBooleanSides.containsOperator(restored)) {
-                output.append(input, cursor, endExclusive);
-                cursor = endExclusive;
-                continue;
-            }
             output.append(input, cursor, open);
-            output.append(LazyBooleanSides.evaluate(this, restored));
+            output.append(LazyBooleanSides.evaluateReference(
+                    this,
+                    restored,
+                    bookends.expressionOpen(),
+                    bookends.expressionClose()));
             cursor = endExclusive;
         }
         return output.toString();
@@ -717,13 +716,8 @@ public abstract class MappingProcessor implements Map<String, Object> {
             String body = restored.length() >= open.length() + close.length()
                     ? restored.substring(open.length(), restored.length() - close.length())
                     : restored;
-            if (!LazyBooleanSides.containsOperator(body)) {
-                output.append(input, cursor, end);
-                cursor = end;
-                continue;
-            }
             output.append(input, cursor, start);
-            output.append(LazyBooleanSides.evaluate(this, body));
+            output.append(LazyBooleanSides.evaluateReference(this, body, open, close));
             cursor = end;
         }
         return output.toString();
