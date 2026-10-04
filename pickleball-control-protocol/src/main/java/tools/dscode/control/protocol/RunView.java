@@ -86,7 +86,7 @@ public final class RunView {
                 recordText,
                 List.copyOf(logs),
                 reports(directory),
-                regularFiles(directory.resolve("config"))
+                regularFiles(directory.resolve(RunConfigs.DIRECTORY))
         );
     }
 

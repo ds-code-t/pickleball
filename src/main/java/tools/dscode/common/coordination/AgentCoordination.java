@@ -118,6 +118,10 @@ public final class AgentCoordination {
             return dataDirectory.resolve("browser-profile");
         }
 
+        public Path configDirectory() {
+            return dataDirectory.resolve(RunConfigCopy.DIRECTORY_NAME);
+        }
+
         public Path sessionDirectory() {
             return dataDirectory.resolve("session");
         }
@@ -239,10 +243,14 @@ public final class AgentCoordination {
     }
 
     public static Run begin(Path project, Request request) {
-        return begin(project, request, Instant.now(), null);
+        return begin(project, request, Instant.now(), null, null);
     }
 
     public static Run begin(Path project, Request request, Instant when, Appendable out) {
+        return begin(project, request, when, out, null);
+    }
+
+    public static Run begin(Path project, Request request, Instant when, Appendable out, String configSource) {
         Instant clock = when == null ? Instant.now() : when;
         Request safe = request == null ? Request.of(null, null, null, null, null, null, null) : request;
         String runId = safe.runId() == null ? newRunId(clock) : requireSafeId(safe.runId(), "run id");
@@ -252,6 +260,7 @@ public final class AgentCoordination {
             if (Files.isRegularFile(recordFile)) {
                 RunRecord existing = readRecord(recordFile);
                 ensureTree(data);
+                ensureConfigs(project, data, configSource);
                 Run adopted = toRun(project, data, recordFile, existing);
                 activate(adopted);
                 print(out, "run-id=" + adopted.runId());
@@ -265,6 +274,7 @@ public final class AgentCoordination {
                 throw new IllegalArgumentException("agent id 'any' is reserved for the shared inbox.");
             }
             ensureTree(data);
+            ensureConfigs(project, data, configSource);
             String purpose = oneLine(firstNonBlank(safe.why(), safe.purpose(), "run"));
             RunRecord record = new RunRecord(
                     runId,
@@ -294,6 +304,10 @@ public final class AgentCoordination {
     }
 
     public static Run openConsumerRun(Path project, Appendable out) {
+        return openConsumerRun(project, out, null);
+    }
+
+    public static Run openConsumerRun(Path project, Appendable out, String configSource) {
         if (!launchRequestsPrivateRun()) {
             clearCurrent();
             return null;
@@ -307,7 +321,7 @@ public final class AgentCoordination {
                 System.getProperty(PKB_props.PKB_RUN_WHY),
                 "consumer-run"
         );
-        Run run = begin(project, request, Instant.now(), out);
+        Run run = begin(project, request, Instant.now(), out, configSource);
         System.setProperty(PKB_props.PKB_RUN_ID, run.runId());
         System.setProperty(PKB_props.PKB_AGENT_ID, run.agentId());
         return run;
@@ -563,6 +577,10 @@ public final class AgentCoordination {
 
     private static Path inboxDirectory(Path project, String agentFolder) {
         return PickleballLocalLayout.root(project).resolve(INBOX_DIRECTORY).resolve(agentFolder);
+    }
+
+    private static void ensureConfigs(Path project, Path data, String configSource) throws IOException {
+        RunConfigCopy.copyIfAbsent(project, data.resolve(RunConfigCopy.DIRECTORY_NAME), configSource);
     }
 
     private static void ensureTree(Path data) throws IOException {

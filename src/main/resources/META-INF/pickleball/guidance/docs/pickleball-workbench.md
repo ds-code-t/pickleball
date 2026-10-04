@@ -81,7 +81,9 @@ Same launcher; only change `-Dexec.args`. When nobody is watching, `isolate` sta
 
 ## The window is a client
 
-Every action that changes the open session already exists as a launcher command or a command-queue command. The Swing window calls that command. It does not keep a second implementation.
+Every action that changes the open session already exists as a launcher command or a command-queue command. The Swing window calls that command. It does not keep a second implementation. Switching the Config tab is only a view change. It shows `.pickleball/runs/<run-id>/config`, the same copy the run reads. Save writes that copy and does not write the project configs. An agent changes those files through the same run directory.
+
+Project sync, starting a run, and any other long load run off the Swing event thread. While that work is in progress the window stays usable and a banner names it (`Syncing the project`, `Starting the run`, `Loading the project`, or the other long load). The banner clears when the work finishes. A failure stays on that banner and names the error. Every split pane can be dragged so one side takes almost the whole window.
 
 | Window action | Command |
 | --- | --- |

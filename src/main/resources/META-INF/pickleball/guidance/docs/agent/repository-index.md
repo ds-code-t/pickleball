@@ -153,6 +153,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/common/control/ControlRuntimeAspect.java`
 - `src/main/java/tools/dscode/common/control/ControlValueEvent.java`
 - `src/main/java/tools/dscode/common/coordination/AgentCoordination.java`
+- `src/main/java/tools/dscode/common/coordination/RunConfigCopy.java`
 - `src/main/java/tools/dscode/common/CoreSteps.java`
 - `src/main/java/tools/dscode/common/dataelements/CollectionDataAdapter.java`
 - `src/main/java/tools/dscode/common/dataelements/CollectionQueryEngine.java`
@@ -409,6 +410,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/io/cucumber/core/gherkin/messages/ConditionalArgumentPickleTest.java`
 - `src/test/java/tools/dscode/common/assertions/AssertionClauseSplitterTest.java`
 - `src/test/java/tools/dscode/common/coordination/AgentCoordinationTest.java`
+- `src/test/java/tools/dscode/common/coordination/RunConfigIsolationTest.java`
 - `src/test/java/tools/dscode/common/reporting/diagnostic/AgentBrowserLadderTest.java`
 - `src/test/java/tools/dscode/common/reporting/diagnostic/AgentDiscoverPlannerTest.java`
 - `src/test/java/tools/dscode/common/reporting/diagnostic/ConsumerMavenTestRunnerTest.java`
@@ -520,11 +522,13 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/PickleballLocalLayout.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/PickleballLocalStore.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/PickleballVersion.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/RunConfigs.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/RunView.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/WindowDriver.java`
 - `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/ControlBridgeStepResolutionTest.java`
 - `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/ControlProtocolStepSeedTest.java`
 - `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/ExampleRowSelectorTest.java`
+- `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/RunConfigsTest.java`
 - `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/RunWindowTest.java`
 
 ## Pickleball Workbench module
@@ -577,7 +581,9 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/sync/WorkbenchSyncPlanner.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/terminal/WorkerLogBuffer.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/terminal/WorkerLogFiles.java`
+- `pickleball-workbench/src/main/java/tools/dscode/workbench/ui/ConfigTabModel.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/ui/FeaturePickerPanel.java`
+- `pickleball-workbench/src/main/java/tools/dscode/workbench/ui/LongWork.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/ui/RunVarOverridePanel.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/ui/TerminalPanel.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/ui/web/DiagnosticExplorerHost.java`
@@ -632,6 +638,8 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/sync/WorkbenchSynchronizerTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/sync/WorkbenchSyncPlannerTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/terminal/WorkerLogBufferTest.java`
+- `pickleball-workbench/src/test/java/tools/dscode/workbench/ui/ConfigTabModelTest.java`
+- `pickleball-workbench/src/test/java/tools/dscode/workbench/ui/LongWorkTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/ui/RunVarOverridePanelTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/ui/web/WorkbenchWebResourceTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/ui/WorkbenchUiControllerTest.java`

@@ -112,7 +112,20 @@ public abstract class PickleballRunner {
         syncCanonicalAndAliasKeys();
         alignCucumberNameFilterWithFind();
         syncReportPortalAliases(true);
-        ParsingMap.initializeConfigs(values.get(PKB_CONFIG_PATH));
+        java.nio.file.Path projectRoot = PickleballLocalLayout.findProjectRoot(java.nio.file.Path.of(""));
+        AgentCoordination.Run coordination = null;
+        if (AgentCoordination.launchRequestsPrivateRun()) {
+            coordination = AgentCoordination.openConsumerRun(
+                    projectRoot,
+                    System.out,
+                    values.get(PKB_CONFIG_PATH)
+            );
+        }
+        if (coordination != null && java.nio.file.Files.isDirectory(coordination.configDirectory())) {
+            ParsingMap.initializeConfigs(coordination.configDirectory().toString());
+        } else {
+            ParsingMap.initializeConfigs(values.get(PKB_CONFIG_PATH));
+        }
         refreshRunProfile();
         refreshPkbOptions();
 
@@ -122,17 +135,13 @@ public abstract class PickleballRunner {
 
         INSTANCE = this;
         debug("Registered singleton instance: " + getClass().getName());
-        PickleballLocalStore.ensureQuietly(PickleballLocalLayout.findProjectRoot(java.nio.file.Path.of("")));
+        PickleballLocalStore.ensureQuietly(projectRoot);
 
         String configuredLogLevel = get(PKB_LOGLEVEL);
         String effectiveLogLevel = configuredLogLevel == null || configuredLogLevel.isBlank()
                 ? "INFO"
                 : configuredLogLevel.trim();
         LOG_LEVEL = Level.valueOf(effectiveLogLevel.toUpperCase(Locale.ROOT));
-        AgentCoordination.Run coordination = AgentCoordination.openConsumerRun(
-                PickleballLocalLayout.findProjectRoot(java.nio.file.Path.of("")),
-                System.out
-        );
         if (coordination != null) {
             values.put(PKB_props.PKB_RUN_ID, coordination.runId());
             values.put(PKB_props.PKB_AGENT_ID, coordination.agentId());

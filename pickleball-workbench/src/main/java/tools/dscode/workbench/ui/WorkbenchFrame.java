@@ -62,6 +62,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
@@ -124,6 +126,19 @@ final class WorkbenchFrame extends JFrame {
     private final JLabel readinessLabel = new JLabel("Loading status...");
     private final JLabel playerStatusLabel = new JLabel("Stopped");
     private final JLabel activityLabel = new JLabel("Ready");
+    private final LongWork longWork = new LongWork();
+    private final ExecutorService loadExecutor = Executors.newSingleThreadExecutor(LongWork::thread);
+    private final JPanel workBanner = new JPanel(new BorderLayout());
+    private final JLabel workBannerLabel = new JLabel();
+    private final ConfigTabModel configTab = new ConfigTabModel();
+    private final DefaultListModel<String> configFileModel = new DefaultListModel<>();
+    private final JList<String> configFiles = new JList<>(configFileModel);
+    private final JTextArea configEditor = new JTextArea();
+    private final JLabel configStatus = new JLabel("No run is open.");
+    private final JButton configSave = WorkbenchTheme.flatButton("Save", "Write this file in the run's config copy");
+    private String viewedRunId;
+    private boolean viewedRunEditable;
+    private boolean syncingConfig;
     private final JPanel agentBanner = new JPanel(new BorderLayout(12, 0));
     private final JLabel agentBannerLabel = new JLabel();
     private final JButton takeControlButton = WorkbenchTheme.accentButton(
@@ -276,7 +291,7 @@ final class WorkbenchFrame extends JFrame {
             }
         });
 
-        runStateAction("Loading project status", controller::refresh);
+        runLong(LongWork.LOADING_THE_PROJECT, controller::refresh);
     }
 
     private JMenuBar menuBar() {
@@ -310,6 +325,8 @@ final class WorkbenchFrame extends JFrame {
         JPanel north = new JPanel();
         north.setOpaque(false);
         north.setLayout(new BoxLayout(north, BoxLayout.Y_AXIS));
+        north.add(workBanner);
+        north.add(Box.createVerticalStrut(6));
         north.add(agentBanner);
         north.add(Box.createVerticalStrut(6));
         north.add(permissionBar);
@@ -319,6 +336,13 @@ final class WorkbenchFrame extends JFrame {
     }
 
     private void configureAgentChrome() {
+        workBanner.setBackground(WorkbenchTheme.ACCENT_SOFT);
+        workBanner.setBorder(new EmptyBorder(10, 14, 10, 14));
+        workBannerLabel.setFont(workBannerLabel.getFont().deriveFont(Font.BOLD, 16f));
+        workBannerLabel.setForeground(WorkbenchTheme.TEXT);
+        workBanner.add(workBannerLabel, BorderLayout.CENTER);
+        workBanner.setVisible(false);
+
         agentBanner.setBackground(new Color(0xFE, 0xF3, 0xC7));
         agentBanner.setBorder(WorkbenchTheme.cardBorder());
         agentBannerLabel.setForeground(WorkbenchTheme.TEXT);
@@ -545,6 +569,9 @@ final class WorkbenchFrame extends JFrame {
         text.append("\nPlay, step, and stop apply only to the live run. Other runs are readable.\n");
         runViewText.setText(text.toString());
         runViewText.setCaretPosition(0);
+        viewedRunId = decision.loaded().runId();
+        viewedRunEditable = !decision.readOnly();
+        refreshConfigView();
         if (rightTabs != null) {
             int index = rightTabs.indexOfTab("Run");
             if (index >= 0) rightTabs.setSelectedIndex(index);
@@ -555,13 +582,16 @@ final class WorkbenchFrame extends JFrame {
         rightTabs = new JTabbedPane();
         rightTabs.addTab("Run", runPanel());
         rightTabs.addTab("Mapping", mappingPanel());
+        rightTabs.addTab("Config", configPanel());
         rightTabs.addTab("Terminal", terminal);
         rightTabs.addTab("Explorer", diagnosticsPanel());
         rightTabs.addTab("Report", reportPanel());
         diagnosticTailTimer.setRepeats(true);
         rightTabs.addChangeListener(event -> {
             String title = rightTabs.getTitleAt(rightTabs.getSelectedIndex());
-            if ("Explorer".equals(title) || "Diagnostic Log Explorer".equals(title)) {
+            if ("Config".equals(title)) {
+                refreshConfigView();
+            } else if ("Explorer".equals(title) || "Diagnostic Log Explorer".equals(title)) {
                 refreshDiagnostics();
                 if (!diagnosticTailTimer.isRunning()) diagnosticTailTimer.start();
             } else {
@@ -608,6 +638,85 @@ final class WorkbenchFrame extends JFrame {
             return wrap;
         }
         return panel;
+    }
+
+    private JPanel configPanel() {
+        JPanel panel = new JPanel(new BorderLayout(6, 6));
+        panel.setBackground(WorkbenchTheme.SURFACE);
+        panel.setBorder(new EmptyBorder(8, 8, 8, 8));
+        panel.setMinimumSize(new Dimension(0, 0));
+
+        JLabel heading = WorkbenchTheme.heading("Run config");
+        heading.setToolTipText("Edits stay in this run's config copy. Project configs are not written.");
+        JPanel north = new JPanel(new BorderLayout(8, 0));
+        north.setOpaque(false);
+        north.add(heading, BorderLayout.WEST);
+        configSave.addActionListener(event -> saveConfigDraft());
+        north.add(configSave, BorderLayout.EAST);
+        panel.add(north, BorderLayout.NORTH);
+
+        configFiles.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        configFiles.addListSelectionListener(event -> {
+            if (event.getValueIsAdjusting() || syncingConfig) return;
+            String selected = configFiles.getSelectedValue();
+            if (selected == null || selected.equals(configTab.selected())) return;
+            configTab.select(selected);
+            showConfigDraft();
+        });
+        configEditor.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 13));
+        configEditor.setTabSize(2);
+        WorkbenchTheme.styleEditor(configEditor);
+        JScrollPane files = new JScrollPane(configFiles);
+        JScrollPane editor = new JScrollPane(configEditor);
+        WorkbenchTheme.styleScroll(files);
+        WorkbenchTheme.styleScroll(editor);
+        files.setMinimumSize(new Dimension(0, 0));
+        editor.setMinimumSize(new Dimension(0, 0));
+        JSplitPane split = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, files, editor);
+        WorkbenchTheme.styleSplit(split);
+        split.setResizeWeight(0.28);
+        split.setDividerLocation(220);
+        panel.add(split, BorderLayout.CENTER);
+
+        configStatus.setBorder(new EmptyBorder(2, 2, 2, 2));
+        configStatus.setForeground(WorkbenchTheme.MUTED);
+        panel.add(configStatus, BorderLayout.SOUTH);
+        refreshConfigView();
+        return panel;
+    }
+
+    private void refreshConfigView() {
+        configTab.show(controller.projectRoot(), viewedRunId, viewedRunEditable);
+        syncingConfig = true;
+        try {
+            configFileModel.clear();
+            for (String file : configTab.files()) configFileModel.addElement(file);
+            if (!configTab.selected().isEmpty()) {
+                configFiles.setSelectedValue(configTab.selected(), true);
+            }
+            showConfigDraft();
+        } finally {
+            syncingConfig = false;
+        }
+    }
+
+    private void showConfigDraft() {
+        configEditor.setText(configTab.text());
+        configEditor.setCaretPosition(0);
+        configEditor.setEditable(configTab.editable() && !configTab.selected().isEmpty());
+        configSave.setEnabled(configTab.editable() && !configTab.selected().isEmpty());
+        configStatus.setText(configTab.status());
+    }
+
+    private void saveConfigDraft() {
+        configTab.setDraft(configEditor.getText());
+        try {
+            configTab.save();
+        } catch (RuntimeException failure) {
+            configStatus.setText(failure.getMessage() == null ? "Save failed." : failure.getMessage());
+            return;
+        }
+        configStatus.setText(configTab.status());
     }
 
     private JPanel diagnosticsPanel() {
@@ -895,16 +1004,34 @@ final class WorkbenchFrame extends JFrame {
         });
     }
 
-    private void refreshFeatureCatalog() {
+    private CatalogSnapshot scanProject() {
         WorkbenchManifest manifest = null;
         try {
             manifest = WorkbenchManifest.read(controller.projectRoot());
         } catch (RuntimeException ignored) {
             // The picker can still scan conventional project feature folders.
         }
-        picker.setCatalog(ConsumerFeatureCatalog.scan(controller.projectRoot(), manifest));
-        diagnosticNavigator = new DiagnosticEvidenceNavigator(controller.projectRoot());
-        glueIndex = JavaGlueIndex.scan(controller.projectRoot());
+        return new CatalogSnapshot(
+                ConsumerFeatureCatalog.scan(controller.projectRoot(), manifest),
+                new DiagnosticEvidenceNavigator(controller.projectRoot()),
+                JavaGlueIndex.scan(controller.projectRoot())
+        );
+    }
+
+    private void applyCatalog(CatalogSnapshot snapshot) {
+        picker.setCatalog(snapshot.catalog());
+        diagnosticNavigator = snapshot.navigator();
+        glueIndex = snapshot.glue();
+    }
+
+    private record CatalogSnapshot(
+            ConsumerFeatureCatalog catalog,
+            DiagnosticEvidenceNavigator navigator,
+            JavaGlueIndex glue
+    ) {
+    }
+
+    private record LoadedProject(WorkbenchUiController.State state, CatalogSnapshot catalog) {
     }
 
     private void togglePicker() {
@@ -2188,20 +2315,55 @@ final class WorkbenchFrame extends JFrame {
             String label,
             Supplier<WorkbenchUiController.State> action
     ) {
-        activityLabel.setText(label + "...");
-        runTask(
+        runLong(label, () -> new LoadedProject(action.get(), scanProject()), loaded -> {
+            applyState(loaded.state());
+            applyCatalog(loaded.catalog());
+            if (loaded.state().liveReady()) {
+                refreshMappingCatalog();
+                controller.workerLogFiles().ifPresent(terminal::setFiles);
+            }
+        });
+    }
+
+    private void runLong(String label, Supplier<WorkbenchUiController.State> action) {
+        runStateAction(label, action);
+    }
+
+    private <T> void runLong(String label, Supplier<T> action, Consumer<T> success) {
+        longWork.start(
+                label,
                 action,
-                state -> {
-                    applyState(state);
-                    activityLabel.setText(label + " complete.");
-                    if (state.liveReady()) {
-                        refreshMappingCatalog();
-                        controller.workerLogFiles().ifPresent(terminal::setFiles);
-                    }
-                    refreshFeatureCatalog();
+                value -> {
+                    success.accept(value);
+                    longWork.finish();
+                    publishWorkStatus();
                 },
-                failure -> showFailure(label + " failed", failure)
+                failure -> publishWorkStatus(),
+                loadExecutor,
+                SwingUtilities::invokeLater
         );
+        publishWorkStatus();
+    }
+
+    private void publishWorkStatus() {
+        String text = longWork.status();
+        boolean show = text != null && !text.isBlank();
+        workBanner.setVisible(show);
+        if (!show) {
+            revalidate();
+            repaint();
+            return;
+        }
+        workBannerLabel.setText(text);
+        if (longWork.failed()) {
+            workBanner.setBackground(new Color(0xFE, 0xE2, 0xE2));
+            workBannerLabel.setForeground(WorkbenchTheme.DANGER);
+        } else {
+            workBanner.setBackground(WorkbenchTheme.ACCENT_SOFT);
+            workBannerLabel.setForeground(WorkbenchTheme.TEXT);
+        }
+        revalidate();
+        repaint();
     }
 
     private void applyState(WorkbenchUiController.State state) {
@@ -2760,6 +2922,7 @@ final class WorkbenchFrame extends JFrame {
                 new JScrollPane(source),
                 new JScrollPane(output)
         );
+        WorkbenchTheme.styleSplit(split);
         split.setResizeWeight(0.55);
         panel.add(split, BorderLayout.CENTER);
         return panel;
@@ -2988,27 +3151,27 @@ final class WorkbenchFrame extends JFrame {
 
         @Override
         public void syncProject() {
-            runStateAction("Synchronizing project", controller::synchronize);
+            runStateAction(LongWork.SYNCING_THE_PROJECT, controller::synchronize);
         }
 
         @Override
         public void refreshStatus() {
-            runStateAction("Refreshing status", controller::refresh);
+            runStateAction(LongWork.LOADING_THE_PROJECT, controller::refresh);
         }
 
         @Override
         public void startWorker() {
-            runStateAction("Starting worker", controller::startWorker);
+            runStateAction(LongWork.STARTING_THE_RUN, controller::startWorker);
         }
 
         @Override
         public void restartWorker() {
-            runStateAction("Restarting worker", controller::restartWorker);
+            runStateAction(LongWork.STARTING_THE_RUN, controller::restartWorker);
         }
 
         @Override
         public void stopWorker() {
-            runStateAction("Stopping worker", controller::stopWorker);
+            runStateAction(LongWork.STOPPING_THE_RUN, controller::stopWorker);
         }
 
         @Override
