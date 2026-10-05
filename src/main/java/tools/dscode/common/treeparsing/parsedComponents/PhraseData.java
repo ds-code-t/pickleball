@@ -147,6 +147,31 @@ public abstract class PhraseData extends PassedData {
         }
         return phraseParsingMap;
     }
+
+    /**
+     * Construction resolves text before phrases are linked, so a continuation
+     * caches the step map and never sees a Data Table the previous phrase installs.
+     * Drop only that premature step-map cache. A map installed for this phrase
+     * (a data-row clone) is left alone.
+     */
+    void inheritParsingMapFromPrevious() {
+        if (phraseParsingMap == null || isNewContext()) {
+            return;
+        }
+        PhraseData previous = getPreviousPhrase();
+        if (previous == null) {
+            return;
+        }
+        Character end = previous.termination;
+        if (end != null && (end == '.' || end == '?')) {
+            return;
+        }
+        var step = getRunningStep();
+        if (step != null && phraseParsingMap == step.getStepParsingMap()) {
+            phraseParsingMap = null;
+        }
+    }
+
     public String resolveText(String inputText) {
         return getPhraseParsingMap().resolveWholeText(inputText);
     }

@@ -107,6 +107,7 @@ public final class Phrase extends PhraseData {
 
     @Override
     public PhraseData runPhrase() {
+        inheritParsingMapFromPrevious();
         executePhrase();
         resolveResults();
         setDefaultEntry(getRunningStep().stepEntry);
