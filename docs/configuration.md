@@ -391,6 +391,9 @@ The existing path semantics for `pkb_features`, `pkb_datapath`, `pkb_callpath`, 
 | `pkb_example` | `1 2 5 3.4 7-11` | Examples-row filter applied after tags and name. Not a tag |
 | `pkb_environment` | `QA` | project environment label |
 | `pkb_browser` | `chrome` | browser configuration name looked up under the `configs` mapping (`CHROME_HEADLESS` uses the consumer yaml when present, otherwise Pickleball's bundled headless Chrome) |
+| `pkb_driver_download_native` | `true`, `false` | `true` or unset tries Selenium Manager first; `false` keeps that launch off the network |
+| `pkb_driver_download_proxy` | empty, `false`, or `http://user:pass@host:port` | empty discovers a driver-download proxy; `false` disables the fallback; a URL is tried first and is redacted |
+| `pkb_driver_download_ca` | PEM file path | optional corporate CA for the driver downloader only |
 | `pkb_profile` | `qa,browser_firefox` | selected named profile(s) |
 | `pkb_runvars` | `pkb_tags=@smoke, pkb_browser=chrome` | compact controlled RunVar input |
 | `pkb_runvars.<pkb_var>` | `pkb_runvars.pkb_browser=chrome` | expanded controlled RunVar member |
@@ -449,6 +452,33 @@ The resolved integer is stamped into the final RunVars and `pkb_run_profile`. Wo
 2. Otherwise Pickleball injects a framework-bundled `CHROME_HEADLESS` resource from `META-INF/pickleball/configs/CHROME_HEADLESS.yaml` inside the Pickleball JAR.
 
 The bundled headless config uses `--headless=new`, a fixed `--window-size=1920,1080`, no `MAXIMIZE`, and `QUIT_LOCAL_DRIVER`. Consumer `CHROME`, `EDGE`, `GRID`, and `SAUCE` yaml files are unchanged. Agents can set `pkb_browser=CHROME_HEADLESS` without copying yaml into the project.
+
+## Local driver download
+
+Local Chrome and Edge start through Selenium. Remote WebDriver is unchanged. Bundled and consumer `CHROME_HEADLESS` configs set `driver.service.port` and `driver.service.verbose` and do not set `driver.service.driverExecutable`. Selenium Manager then resolves the driver. Behind a corporate proxy that child often cannot log in, trust a re-signed certificate, or reach `storage.googleapis.com`.
+
+Pickleball keeps a separate best-effort download for that case. It does not add a proxy block under `configs`, and it does not copy the download proxy onto `http.proxyHost`, `https.proxyHost`, `HTTPS_PROXY`, or `SE_PROXY`. Browser `--proxy-server` and `pkb_rp_http_proxy_*` stay on their own channels.
+
+| Property | Values | Meaning |
+|---|---|---|
+| `pkb_driver_download_native` | `true` or unset | Try Selenium Manager first |
+| `pkb_driver_download_native` | `false` | Do not let Selenium Manager use the network for this launch. Use a cached or fallback executable. `SE_OFFLINE` is set only around that launch |
+| `pkb_driver_download_proxy` | empty or unset | Discover a proxy, then try a direct connection |
+| `pkb_driver_download_proxy` | `false` | Do not run the fallback. `false` is not a hostname |
+| `pkb_driver_download_proxy` | one `http://user:pass@host:port` line | Try this proxy first. Percent-encode a password that contains `@` or `:` |
+| `pkb_driver_download_ca` | optional PEM file | Corporate CA used only by the downloader. It is not installed into the JVM trust store |
+
+`pkb_driver_download_proxy` is redacted everywhere a run profile, diagnostic, or log can show it, the same way `pkb_rp_http_proxy_password` is redacted.
+
+Native then fallback is the default. Fallback only, native only, and neither are valid. Neither requires `driver.service.driverExecutable`. If both are disabled and no executable is set, startup fails and the message names those two properties. An executable that is already set skips the download.
+
+Discovery runs once per JVM. The order is the `pkb_driver_download_proxy` value, then `HTTPS_PROXY` and `SE_PROXY`, then the OS system proxy, then the lower-level OS setting, then a direct connection. A connection, login, or certificate failure tries the next proxy. HTTP 403 or a block page after a successful handshake keeps that proxy and tries the next hostname. Direct is the last proxy configuration, not another hostname. Windows may use WinHTTP or a short PowerShell `-UseDefaultCredentials` helper for current-user proxy login. macOS reads `scutil --proxy`. Linux uses the environment, and a GNOME `gsettings` read is optional. A missing tool is skipped.
+
+Chrome metadata comes from `googlechromelabs.github.io/chrome-for-testing` (`LATEST_RELEASE_STABLE`, `LATEST_RELEASE_<major>`, the known-good and milestone JSON files). Chrome zips are tried as `commondatastorage.googleapis.com`, then `storage.googleapis.com`, then `edgedl.me.gvt1.com`. Edge metadata is UTF-16 LE. The version URL is `https://msedgedriver.microsoft.com/LATEST_RELEASE_<major>_WINDOWS` (or `_LINUX` / `_MACOS`), and the zip is `edgedriver_win64.zip`, `edgedriver_mac64.zip`, `edgedriver_mac64_m1.zip`, or `edgedriver_linux64.zip`. Pickleball does not use `chromedriver.storage.googleapis.com`, `msedgedriver.azureedge.net`, or `msedgewebdriverstorage.blob.core.windows.net`.
+
+The installed browser major wins: Windows file version or registry, and `--version` elsewhere. A Selenium Manager failure that already names a versioned zip is retried on the other hosts. `SessionNotCreatedException` text `Current browser version is ...` is parsed and retried once for that major. If the session starts and the driver only logs that it has not been tested with this browser, the test keeps that driver and caches the matching major for the next launch. It does not replace the open executable. With no version at all, only the current Stable driver is used, and only when no driver is already running. The last 8 stable majors are a cache fill for that browser, counted separately for Chrome and Edge. A major already in the cache is skipped. The lock is per browser, platform, and version. The launch never points `driverExecutable` at one of the other seven.
+
+Files go in Selenium Manager's cache: the `SE_CACHE_PATH` system property, otherwise the `SE_CACHE_PATH` environment variable, otherwise `cache-path` in `~/.cache/selenium/se-config.toml`, otherwise `~/.cache/selenium`, under `chromedriver/<platform>/<version>/` or `msedgedriver/<platform>/<version>/`. The launch also sets `driverExecutable` to the unzipped binary. Each transfer is capped at 20 seconds. A blocked transfer, unzip error, quarantine flag, antivirus lock, or certificate failure is a log line. It does not fail the test.
 
 ## Agent Discover browser ladder
 

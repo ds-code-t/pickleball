@@ -176,6 +176,8 @@ pkb_scenarioReport=false
 
 Use the narrowest `pkb_tags` / `pkb_name` / `pkb_example` that isolate the failure. `pkb_example` selects Examples rows after tags and name. It is not a tag. A normal Scenario counts as row 1, and `--example='1 2 5 3.4 7-11'` is the list form. Do not add the `pretty` plugin; it is console noise for agents. Discover defaults to `pkb_reportretention=failed`, which keeps dense evidence for failing scenarios and does not retain it for passing ones. Override with Workbench `--retention=all|failed|none`. Workbench `hint` prints the estimated integer `pkb_parallel` and the selected browser for the current project/JVM. `pkb_parallel=auto` also resolves to that estimate at run start and stamps the integer into `pkb_run_profile`.
 
+Local Chrome and Edge do not need a `driverExecutable`. Selenium Manager runs first (`pkb_driver_download_native=false` stops that network use for the launch). If the manager cannot fetch a driver, a best-effort download may cache one. Discovery, a 403, a certificate failure, or an antivirus lock is a log line, not a test error. Do not treat that log as a product failure, and do not add a proxy example under `configs`. `pkb_driver_download_proxy=false` turns the fallback off. A URL in that property is redacted in `pkb_run_profile` and diagnostics. Remote browsers are unchanged.
+
 These are documented agent defaults, not `PickleballTests` human defaults (`pretty`, `@all`, often headed Chrome). Example confirmation after Discover:
 
 ```text

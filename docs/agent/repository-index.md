@@ -210,6 +210,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/common/domoperations/SeleniumUtils.java`
 - `src/main/java/tools/dscode/common/domoperations/TableColumnByHeaderXPath.java`
 - `src/main/java/tools/dscode/common/driver/DriverConstruction.java`
+- `src/main/java/tools/dscode/common/driver/DriverDownloadFallback.java`
 - `src/main/java/tools/dscode/common/evaluations/AviatorFunctions.java`
 - `src/main/java/tools/dscode/common/evaluations/AviatorUtil.java`
 - `src/main/java/tools/dscode/common/evaluations/BookendUtils.java`
@@ -411,6 +412,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/common/assertions/AssertionClauseSplitterTest.java`
 - `src/test/java/tools/dscode/common/coordination/AgentCoordinationTest.java`
 - `src/test/java/tools/dscode/common/coordination/RunConfigIsolationTest.java`
+- `src/test/java/tools/dscode/common/driver/DriverDownloadFallbackTest.java`
 - `src/test/java/tools/dscode/common/reporting/diagnostic/AgentBrowserLadderTest.java`
 - `src/test/java/tools/dscode/common/reporting/diagnostic/AgentDiscoverPlannerTest.java`
 - `src/test/java/tools/dscode/common/reporting/diagnostic/ConsumerMavenTestRunnerTest.java`
@@ -428,6 +430,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/WorkbenchSessionCommandsTest.java`
 - `src/test/java/tools/dscode/parallelutilities/ParallelCountEstimatorTest.java`
 - `src/test/java/tools/dscode/testengine/CucumberNameFilterTest.java`
+- `src/test/java/tools/dscode/testengine/DriverDownloadRedactionTest.java`
 - `src/test/java/tools/dscode/testengine/DynamicSuiteBootstrapWorkbenchRootTest.java`
 - `src/test/java/tools/dscode/testengine/ExampleRowFilterTest.java`
 

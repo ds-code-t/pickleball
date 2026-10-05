@@ -123,6 +123,8 @@ qa:
   pkb_browser: CHROME_HEADLESS
 ```
 
+`pkb_browser` selects a yaml config. Local Chrome and Edge still start through Selenium. When that config has no `driver.service.driverExecutable`, Selenium Manager runs first. If it cannot download a driver, Pickleball tries a best-effort Chrome for Testing or Edge driver and caches it. A blocked download is a log line, not a test failure. Set `pkb_driver_download_proxy=false` to skip that fallback, or `pkb_driver_download_native=false` to keep Selenium Manager off the network for the launch. Do not put the download proxy in the browser yaml. See [Execution Configuration](configuration.md).
+
 ```bash
 ./mvnw test -Dpkb_profile=qa
 ```

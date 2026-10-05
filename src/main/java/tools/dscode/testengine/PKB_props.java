@@ -65,6 +65,9 @@ public final class PKB_props {
 
     public static final String PKB_DEBUG_BROWSER = PKB_PREFIX + "debugBrowser";
     public static final String PKB_DEBUG_ARGS = PKB_PREFIX + "debugargs";
+    public static final String PKB_DRIVER_DOWNLOAD_PROXY = PKB_PREFIX + "driver_download_proxy";
+    public static final String PKB_DRIVER_DOWNLOAD_NATIVE = PKB_PREFIX + "driver_download_native";
+    public static final String PKB_DRIVER_DOWNLOAD_CA = PKB_PREFIX + "driver_download_ca";
 
     private static final Set<String> RUN_METADATA_KEYS = Set.of(
             PKB_INVESTIGATION_ID,

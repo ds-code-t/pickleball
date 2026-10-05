@@ -116,6 +116,7 @@ Treat these as consumer-visible contracts unless source evidence clearly shows o
 - Mapping, template, key-expression, and reference syntax
 - Configuration keys, defaults, and resource lookup rules
 - Selenium element lookup, interaction, retry, and stale-element behavior
+- Local Chrome and Edge driver startup. Selenium Manager runs first unless `pkb_driver_download_native=false`. A best-effort fallback may then cache a matching Chrome for Testing or Edge driver. Discovery, download, unzip, quarantine, and certificate failures are logged and do not fail the test. Remote WebDriver is unchanged. An explicit `driver.service.driverExecutable` skips the download. The only configuration that fails closed is native and fallback both disabled with no `driverExecutable`.
 - Service-call definitions, request/response mapping, and REST/SOAP behavior
 - Component-scenario, nested-step, and conditional-flow semantics
 - Cucumber compatibility and AspectJ weaving behavior
