@@ -17,7 +17,7 @@ final class WorkbenchCommandLine {
     static final Set<String> AGENT_CORE_COMMANDS = Set.of(
             "export-guidance", "hint", "discover-hint", "discover", "confirm", "resolve-runvars",
             "short-log", "note", "inbox", "finish",
-            "presence", "post", "history", "gc-runs"
+            "presence", "post", "history", "gc-runs", "gc-versions", "use-version"
     );
     static final Set<String> SESSION_CLIENT_COMMANDS = Set.of(
             "isolate", "session-start", "execute-step", "status", "events", "stop", "kill",
@@ -69,7 +69,8 @@ final class WorkbenchCommandLine {
             String example,
             String retention,
             String[] forwarded,
-            Coordination coordination
+            Coordination coordination,
+            String version
     ) {
     }
 
@@ -88,14 +89,14 @@ final class WorkbenchCommandLine {
     static Parsed parse(String[] args) {
         Path cwd = Path.of("").toAbsolutePath().normalize();
         if (args == null || args.length == 0) {
-            return new Parsed("ui", cwd, null, null, null, null, null, new String[]{"ui", cwd.toString()}, Coordination.empty());
+            return new Parsed("ui", cwd, null, null, null, null, null, new String[]{"ui", cwd.toString()}, Coordination.empty(), null);
         }
         String command = args[0];
         if ("export-guidance".equals(command)) {
             Path output = args.length >= 2 && !isFlag(args[1])
                     ? Path.of(args[1])
                     : Path.of(".pickleball");
-            return new Parsed(command, cwd, output, null, null, null, null, args.clone(), Coordination.empty());
+            return new Parsed(command, cwd, output, null, null, null, null, args.clone(), Coordination.empty(), null);
         }
 
         String tags = null;
@@ -122,6 +123,7 @@ final class WorkbenchCommandLine {
         Integer limit = null;
         String id = null;
         String ttl = null;
+        String version = null;
         String absorb = null;
         Path project = null;
         List<String> rest = new ArrayList<>();
@@ -320,6 +322,16 @@ final class WorkbenchCommandLine {
                 absorb = null;
                 continue;
             }
+            if (token.startsWith("--version=")) {
+                version = blankToNull(token.substring("--version=".length()));
+                absorb = null;
+                continue;
+            }
+            if ("--version".equals(token) && index + 1 < args.length) {
+                version = blankToNull(args[++index]);
+                absorb = null;
+                continue;
+            }
             if (token.startsWith("--ttl=")) {
                 ttl = blankToNull(token.substring("--ttl=".length()));
                 absorb = null;
@@ -380,10 +392,10 @@ final class WorkbenchCommandLine {
             forwarded.addAll(rest);
             return new Parsed(
                     command, project, null, tags, name, example, retention, forwarded.toArray(String[]::new),
-                    coordination
+                    coordination, version
             );
         }
-        return new Parsed(command, project, null, tags, name, example, retention, args.clone(), coordination);
+        return new Parsed(command, project, null, tags, name, example, retention, args.clone(), coordination, version);
     }
 
     private static Integer parseWholeNumber(String value, String label) {

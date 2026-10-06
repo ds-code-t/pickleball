@@ -1,10 +1,12 @@
 package tools.dscode.common.coordination;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import tools.dscode.control.protocol.ControlProtocol;
 import tools.dscode.control.protocol.PickleballLocalLayout;
+import tools.dscode.control.protocol.PickleballVersion;
 import tools.dscode.control.protocol.WindowDriver;
 import tools.dscode.testengine.PKB_props;
 import tools.dscode.testengine.PickleballRunner;
@@ -56,6 +58,7 @@ public final class AgentCoordination {
     public static final String RECORD_FILE = "record.json";
     public static final String RUN_PROFILE_FILE = "pkb_run_profile";
     public static final Duration RETENTION = Duration.ofDays(3);
+    public static final Duration VERSION_UNUSED = Duration.ofDays(3);
     public static final Duration PRESENCE_STALE = Duration.ofMinutes(15);
     public static final Duration POST_TTL = Duration.ofHours(24);
     public static final Duration RUN_PAYLOAD_STALE = Duration.ofHours(24);
@@ -156,7 +159,11 @@ public final class AgentCoordination {
             String startedAt,
             String stoppedAt,
             String status,
-            String dataPath
+            String dataPath,
+            String pickleballVersion,
+            Integer failureCount,
+            Boolean failedScenario,
+            String failureSummary
     ) {
     }
 
@@ -300,7 +307,11 @@ public final class AgentCoordination {
                     clock.toString(),
                     null,
                     "RUNNING",
-                    data.toString()
+                    data.toString(),
+                    startedVersion(project),
+                    null,
+                    null,
+                    null
             );
             writeRecord(recordFile, record);
             appendLog(project, clock, agentId, runId, "start", purpose, recordFile);
@@ -363,22 +374,9 @@ public final class AgentCoordination {
             boolean alreadyStopped = existing.stoppedAt() != null && !existing.stoppedAt().isBlank();
             String learnedValue = blankToNull(learned);
             String keptLearned = learnedValue != null ? learnedValue : existing.learned();
-            String statusValue = blankToNull(status);
             if (!alreadyStopped) {
-                if (statusValue == null) statusValue = "STOPPED";
-                RunRecord updated = new RunRecord(
-                        existing.runId(),
-                        existing.agentId(),
-                        existing.group(),
-                        existing.sequence(),
-                        existing.who(),
-                        existing.why(),
-                        keptLearned,
-                        existing.startedAt(),
-                        clock.toString(),
-                        statusValue,
-                        existing.dataPath()
-                );
+                String statusValue = resolveStopStatus(status, existing, recordFile.getParent());
+                RunRecord updated = withStop(existing, keptLearned, clock.toString(), statusValue);
                 writeRecord(recordFile, updated);
                 String purpose = oneLine(firstNonBlank(learnedValue, existing.why(), statusValue));
                 appendLog(project, clock, existing.agentId(), existing.runId(), "stop", purpose, recordFile);
@@ -387,19 +385,7 @@ public final class AgentCoordination {
                 return;
             }
             if (learnedValue != null && !learnedValue.equals(existing.learned())) {
-                RunRecord updated = new RunRecord(
-                        existing.runId(),
-                        existing.agentId(),
-                        existing.group(),
-                        existing.sequence(),
-                        existing.who(),
-                        existing.why(),
-                        learnedValue,
-                        existing.startedAt(),
-                        existing.stoppedAt(),
-                        existing.status(),
-                        existing.dataPath()
-                );
+                RunRecord updated = withStop(existing, learnedValue, existing.stoppedAt(), existing.status());
                 writeRecord(recordFile, updated);
                 appendLog(
                         project,
@@ -540,6 +526,9 @@ public final class AgentCoordination {
     }
 
     public record RunSweep(int profilesRemoved, int payloadsRemoved) {
+    }
+
+    public record VersionSweep(int versionsRemoved) {
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
@@ -767,10 +756,13 @@ public final class AgentCoordination {
     /**
      * Explicit payload sweep. Not called from finish. Deletes a browser profile
      * only when that run has a stop line, nothing has the profile open, and no
-     * agent holds the run. Other dense payload waits 24 hours after stoppedAt,
-     * and never removes the run open in Workbench or the last failed run.
-     * record.json, sparse indexes, and pkb_run_profile stay. The run directory
-     * stays. Two sweepers deleting the same file are safe.
+     * agent holds the run. Chrome {@code SingletonLock} and an Edge {@code lockfile}
+     * both mean the profile is open. Other dense payload waits 24 hours after
+     * stoppedAt, and never removes the run open in Workbench or the last failed
+     * run. The last failed run is the latest stopped run whose status is FAILED,
+     * or a STOPPED record with a failure count, a failed-scenario flag, or a
+     * non-empty failure summary. record.json, sparse indexes, and pkb_run_profile
+     * stay. The run directory stays. Two sweepers deleting the same file are safe.
      */
     public static RunSweep sweepRuns(Path project, Instant when) {
         Instant clock = when == null ? Instant.now() : when;
@@ -794,6 +786,38 @@ public final class AgentCoordination {
             if (deleteDensePayload(directory)) payloads++;
         }
         return new RunSweep(profiles, payloads);
+    }
+
+    /**
+     * Explicit version-tree sweep. Not called from export-guidance, use-version,
+     * or finish. A missing or unreadable {@code .last-used} counts as last used
+     * now. Deletes only an unused version's guidance, controller, libs, and
+     * workbench state. Project history and a legacy investigations tree stay.
+     * Two sweepers deleting the same expired tree are safe.
+     */
+    public static VersionSweep sweepVersions(Path project, Instant when) {
+        Instant clock = when == null ? Instant.now() : when;
+        Path pickleball = PickleballLocalLayout.root(project);
+        Path versions = pickleball.resolve(PickleballLocalLayout.VERSIONS_DIRECTORY);
+        if (!Files.isDirectory(versions)) return new VersionSweep(0);
+        String current = usableCurrentVersion(pickleball);
+        Set<String> running = runningVersions(project);
+        List<Path> children;
+        try (var listed = Files.list(versions)) {
+            children = listed.filter(Files::isDirectory).toList();
+        } catch (IOException ignored) {
+            return new VersionSweep(0);
+        }
+        int removed = 0;
+        for (Path child : children) {
+            String name = child.getFileName() == null ? "" : child.getFileName().toString();
+            if (!PickleballLocalLayout.isSafeVersion(name)) continue;
+            if (name.equals(current) || running.contains(name)) continue;
+            if (workbenchLive(child.resolve(PickleballLocalLayout.WORKBENCH_DIRECTORY))) continue;
+            if (!versionExpired(child, clock)) continue;
+            if (deleteVersionTree(pickleball, child)) removed++;
+        }
+        return new VersionSweep(removed);
     }
 
     public static List<String> mavenProperties(Run run) {
@@ -1245,10 +1269,7 @@ public final class AgentCoordination {
         Path profile = directory.resolve("browser-profile");
         if (!Files.isDirectory(profile)) return false;
         try (var paths = Files.walk(profile)) {
-            return paths.anyMatch(path -> {
-                Path name = path.getFileName();
-                return name != null && "SingletonLock".equals(name.toString());
-            });
+            return paths.anyMatch(AgentCoordination::isProfileLock);
         } catch (IOException ignored) {
             return true;
         }
@@ -1275,10 +1296,8 @@ public final class AgentCoordination {
         Instant latest = null;
         for (Path directory : directories) {
             RunRecord record = readRecordQuiet(directory.resolve(RECORD_FILE));
-            if (record == null || record.status() == null || !"FAILED".equalsIgnoreCase(record.status().trim())) {
-                continue;
-            }
-            if (record.stoppedAt() == null || record.stoppedAt().isBlank()) continue;
+            if (record == null || record.stoppedAt() == null || record.stoppedAt().isBlank()) continue;
+            if (!failedRecord(record)) continue;
             Instant stopped;
             try {
                 stopped = Instant.parse(record.stoppedAt().trim());
@@ -1300,6 +1319,238 @@ public final class AgentCoordination {
         } catch (RuntimeException ignored) {
             return false;
         }
+    }
+
+    private static RunRecord withStop(RunRecord existing, String learned, String stoppedAt, String status) {
+        return new RunRecord(
+                existing.runId(),
+                existing.agentId(),
+                existing.group(),
+                existing.sequence(),
+                existing.who(),
+                existing.why(),
+                learned,
+                existing.startedAt(),
+                stoppedAt,
+                status,
+                existing.dataPath(),
+                existing.pickleballVersion(),
+                existing.failureCount(),
+                existing.failedScenario(),
+                existing.failureSummary()
+        );
+    }
+
+    private static String startedVersion(Path project) {
+        var current = PickleballLocalLayout.readCurrent(PickleballLocalLayout.root(project));
+        if (current.isPresent() && current.get().usable()) {
+            return current.get().pickleballVersion();
+        }
+        String running = PickleballVersion.running(AgentCoordination.class);
+        return PickleballLocalLayout.isSafeVersion(running) ? running : null;
+    }
+
+    /**
+     * STOPPED and a null status become FAILED when the run already has a failure
+     * signal or the run directory shows failures. An explicit PASSED or FAILED
+     * from the caller is left alone.
+     */
+    private static String resolveStopStatus(String requested, RunRecord existing, Path runDirectory) {
+        String statusValue = blankToNull(requested);
+        if (statusValue != null && !"STOPPED".equalsIgnoreCase(statusValue)) return statusValue;
+        boolean failed = recordSignalsFailure(existing) || directorySignalsFailure(runDirectory);
+        return failed ? "FAILED" : "STOPPED";
+    }
+
+    private static boolean failedRecord(RunRecord record) {
+        if (record.status() != null && "FAILED".equalsIgnoreCase(record.status().trim())) return true;
+        return record.status() != null
+                && "STOPPED".equalsIgnoreCase(record.status().trim())
+                && recordSignalsFailure(record);
+    }
+
+    private static boolean recordSignalsFailure(RunRecord record) {
+        if (record == null) return false;
+        if (record.failureCount() != null && record.failureCount() > 0) return true;
+        if (Boolean.TRUE.equals(record.failedScenario())) return true;
+        return record.failureSummary() != null && !record.failureSummary().isBlank();
+    }
+
+    private static boolean directorySignalsFailure(Path runDirectory) {
+        if (runDirectory == null || !Files.isDirectory(runDirectory)) return false;
+        try (var walk = Files.walk(runDirectory, 6)) {
+            for (Path path : walk.filter(Files::isRegularFile).toList()) {
+                if (skipFailureScan(runDirectory, path)) continue;
+                Path fileName = path.getFileName();
+                if (fileName == null || !fileName.toString().endsWith(".json")) continue;
+                if (RECORD_FILE.equals(fileName.toString())) continue;
+                try {
+                    if (Files.size(path) > 2_000_000L) continue;
+                    if (jsonSignalsFailure(JSON.readTree(path.toFile()))) return true;
+                } catch (IOException ignored) {
+                    // An unreadable pack is not a failure signal.
+                }
+            }
+        } catch (IOException ignored) {
+            return false;
+        }
+        return false;
+    }
+
+    private static boolean skipFailureScan(Path runDirectory, Path path) {
+        Path relative;
+        try {
+            relative = runDirectory.relativize(path);
+        } catch (IllegalArgumentException ignored) {
+            return true;
+        }
+        if (relative.getNameCount() == 0) return true;
+        String first = relative.getName(0).toString();
+        return "browser-profile".equals(first) || "config".equals(first) || "scratch".equals(first);
+    }
+
+    private static boolean jsonSignalsFailure(JsonNode node) {
+        if (node == null || !node.isObject()) return false;
+        if ("FAILED".equalsIgnoreCase(text(node, "outcome"))) return true;
+        JsonNode failed = node.get("failed");
+        if (failed != null && failed.isNumber() && failed.asInt(0) > 0) return true;
+        if (node.path("failedScenario").asBoolean(false) && node.has("failedScenario")) return true;
+        if (node.path("scenarioFailed").asBoolean(false) && node.has("scenarioFailed")) return true;
+        String summary = text(node, "failureSummary");
+        if (summary != null && !summary.isBlank()) return true;
+        return jsonSignalsFailure(node.get("counts")) || jsonSignalsFailure(node.get("steps"));
+    }
+
+    private static String text(JsonNode node, String field) {
+        JsonNode value = node.get(field);
+        if (value == null || value.isNull()) return null;
+        return value.asText(null);
+    }
+
+    private static String usableCurrentVersion(Path pickleball) {
+        var current = PickleballLocalLayout.readCurrent(pickleball);
+        if (current.isEmpty() || !current.get().usable()) return null;
+        return current.get().pickleballVersion();
+    }
+
+    private static Set<String> runningVersions(Path project) {
+        Set<String> versions = new LinkedHashSet<>();
+        Path runs = PickleballLocalLayout.root(project).resolve(RUNS_DIRECTORY);
+        if (!Files.isDirectory(runs)) return versions;
+        List<Path> directories;
+        try (var children = Files.list(runs)) {
+            directories = children.filter(Files::isDirectory).toList();
+        } catch (IOException ignored) {
+            return versions;
+        }
+        for (Path directory : directories) {
+            RunRecord record = readRecordQuiet(directory.resolve(RECORD_FILE));
+            if (record == null || !runStillRunning(record)) continue;
+            String version = blankToNull(record.pickleballVersion());
+            if (version != null && PickleballLocalLayout.isSafeVersion(version)) versions.add(version);
+        }
+        return versions;
+    }
+
+    private static boolean runStillRunning(RunRecord record) {
+        if (record.stoppedAt() == null || record.stoppedAt().isBlank()) return true;
+        return record.status() != null && "RUNNING".equalsIgnoreCase(record.status().trim());
+    }
+
+    private static boolean versionExpired(Path versionRoot, Instant now) {
+        var lastUsed = PickleballLocalLayout.readLastUsed(versionRoot);
+        Instant used = lastUsed.orElse(now);
+        return !used.isAfter(now.minus(VERSION_UNUSED));
+    }
+
+    private static boolean workbenchLive(Path workbench) {
+        if (!Files.isDirectory(workbench)) return false;
+        if (sessionFileLive(workbench.resolve(PickleballLocalLayout.CLI_SESSION_FILE))) return true;
+        if (sessionFileLive(workbench.resolve(PickleballLocalLayout.ATTACH_FILE))) return true;
+        try (var walk = Files.walk(workbench)) {
+            for (Path path : walk.filter(Files::isRegularFile).toList()) {
+                Path name = path.getFileName();
+                if (name == null) continue;
+                if ("worker.json".equals(name.toString())) return true;
+                if ("worker.pid".equals(name.toString()) && pidFileLive(path)) return true;
+            }
+        } catch (IOException ignored) {
+            return true;
+        }
+        return false;
+    }
+
+    private static boolean sessionFileLive(Path file) {
+        if (!Files.isRegularFile(file)) return false;
+        try {
+            JsonNode node = JSON.readTree(file.toFile());
+            JsonNode pidNode = node.get("pid");
+            if (pidNode == null || pidNode.isNull() || !pidNode.isNumber()) return false;
+            long pid = pidNode.asLong(0L);
+            if (pid <= 0L) return false;
+            return ProcessHandle.of(pid).map(ProcessHandle::isAlive).orElse(true);
+        } catch (Exception ignored) {
+            return true;
+        }
+    }
+
+    private static boolean pidFileLive(Path file) {
+        try {
+            long pid = Long.parseLong(Files.readString(file, StandardCharsets.UTF_8).trim());
+            if (pid <= 0L) return false;
+            return ProcessHandle.of(pid).map(ProcessHandle::isAlive).orElse(true);
+        } catch (Exception ignored) {
+            return true;
+        }
+    }
+
+    private static boolean deleteVersionTree(Path pickleball, Path versionDir) {
+        Path versions = pickleball.toAbsolutePath().normalize().resolve(PickleballLocalLayout.VERSIONS_DIRECTORY);
+        Path target = versionDir.toAbsolutePath().normalize();
+        if (!target.startsWith(versions) || target.equals(versions)) return false;
+        Path realVersions;
+        Path realTarget;
+        try {
+            realVersions = versions.toRealPath();
+            realTarget = target.toRealPath();
+        } catch (IOException ignored) {
+            return false;
+        }
+        if (!realTarget.startsWith(realVersions) || realTarget.equals(realVersions)) return false;
+        Path investigations = target.resolve("investigations");
+        boolean keepInvestigations = Files.isDirectory(investigations);
+        boolean removed = false;
+        List<Path> paths;
+        try (var walk = Files.walk(target)) {
+            paths = walk.sorted(Comparator.reverseOrder()).toList();
+        } catch (IOException ignored) {
+            return false;
+        }
+        for (Path path : paths) {
+            if (path.equals(target)) continue;
+            if (keepInvestigations && (path.startsWith(investigations))) continue;
+            try {
+                if (Files.deleteIfExists(path)) removed = true;
+            } catch (IOException ignored) {
+                // Another sweeper removed it, or it is still open.
+            }
+        }
+        if (!keepInvestigations) {
+            try {
+                if (Files.deleteIfExists(target)) removed = true;
+            } catch (IOException ignored) {
+                // The directory can already be gone.
+            }
+        }
+        return removed || !Files.exists(target);
+    }
+
+    /** Chrome SingletonLock and the Edge Chromium lockfile both mean the profile is open. */
+    private static boolean isProfileLock(Path path) {
+        Path name = path.getFileName();
+        if (name == null) return false;
+        String file = name.toString();
+        return "SingletonLock".equals(file) || "lockfile".equals(file);
     }
 
     private static RunRecord readRecordQuiet(Path file) {

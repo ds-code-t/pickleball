@@ -183,7 +183,7 @@ links[]              # optional workbench_go / wb:// targets
 
 Do not parse Gherkin in the Workbench controller to invent `executionMap`. If the agent omitted it, derive it from `events.jsonl` at emit. v1 JSON still renders. Workbench Report is the same JSON.
 
-`export-guidance` does not manage or delete `.pickleball/investigations/` or any legacy `v/<version>/investigations/` tree.
+`export-guidance` does not manage or delete `.pickleball/investigations/` or any legacy `v/<version>/investigations/` tree. `gc-versions` removes an expired version's guidance and workbench state only, and leaves that investigations tree in place.
 
 ## Outcomes and completion
 

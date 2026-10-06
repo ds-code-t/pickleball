@@ -424,6 +424,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/control/protocol/PickleballLocalStoreTest.java`
 - `src/test/java/tools/dscode/control/protocol/PickleballVersionTest.java`
 - `src/test/java/tools/dscode/launcher/PickleballWorkbenchLauncherTest.java`
+- `src/test/java/tools/dscode/launcher/VersionSwitchTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchAgentCommandsTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchCommandLineTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchPointerContractTest.java`
@@ -822,10 +823,13 @@ This inventory helps coding agents discover relevant files. It does not replace 
 ## .pickleball owners
 
 Jar cache is regenerable under `v/<current>/`, `open/`, and `current.json`.
+Side-by-side `v/<version>/` trees stay until an explicit `gc-versions`.
+`use-version` points `current.json` at an already exported tree and does not delete the others.
 Project history stays at the `.pickleball` root and survives export-guidance.
 Legacy `.pickleball/workbench/` is only the fallback when `current.json` is missing or not usable.
 
 - `.pickleball/v/<current>/`
+- `.pickleball/v/<version>/.last-used`
 - `.pickleball/open/`
 - `.pickleball/current.json`
 - `.pickleball/runs/<run-id>/`
@@ -848,3 +852,5 @@ Launcher verbs, same exec.args style as inbox, note, and short-log:
 - `history --append`
 - `history --tail`
 - `gc-runs`
+- `gc-versions`
+- `use-version --version=<version>`

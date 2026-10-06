@@ -29,6 +29,7 @@ public final class PickleballLocalLayout {
     public static final String LAST_DISCOVER_FILE = "last-discover.json";
     public static final String CLI_SESSION_FILE = "cli-session.json";
     public static final String ATTACH_FILE = "attach.json";
+    public static final String LAST_USED_FILE = ".last-used";
     public static final String MATERIALIZE_LOCK = ".materialize.lock";
     public static final String OPEN_SCRIPT_UNIX = "pickleball-workbench.sh";
     public static final String OPEN_SCRIPT_CMD = "pickleball-workbench.cmd";
@@ -187,6 +188,39 @@ public final class PickleballLocalLayout {
             Files.move(temporary, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
         } catch (AtomicMoveNotSupportedException ignored) {
             Files.move(temporary, target, StandardCopyOption.REPLACE_EXISTING);
+        }
+    }
+
+    public static void writeLastUsed(Path versionRoot, Instant when) throws IOException {
+        if (versionRoot == null) {
+            throw new IllegalArgumentException("Version tree is required.");
+        }
+        Instant clock = when == null ? Instant.now() : when;
+        Path root = versionRoot.toAbsolutePath().normalize();
+        Files.createDirectories(root);
+        Path target = root.resolve(LAST_USED_FILE);
+        Path temporary = root.resolve(LAST_USED_FILE + ".tmp");
+        Files.writeString(temporary, clock.toString() + "\n", StandardCharsets.UTF_8);
+        try {
+            Files.move(temporary, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+        } catch (AtomicMoveNotSupportedException ignored) {
+            Files.move(temporary, target, StandardCopyOption.REPLACE_EXISTING);
+        }
+    }
+
+    /** Empty when the file is missing or not an instant. Callers treat that as last used now. */
+    public static Optional<Instant> readLastUsed(Path versionRoot) {
+        if (versionRoot == null) return Optional.empty();
+        Path file = versionRoot.toAbsolutePath().normalize().resolve(LAST_USED_FILE);
+        if (!Files.isRegularFile(file)) return Optional.empty();
+        try {
+            String text = Files.readString(file, StandardCharsets.UTF_8).trim();
+            if (text.isEmpty()) return Optional.empty();
+            String first = text.lines().findFirst().orElse("").trim();
+            if (first.isEmpty()) return Optional.empty();
+            return Optional.of(Instant.parse(first));
+        } catch (Exception ignored) {
+            return Optional.empty();
         }
     }
 

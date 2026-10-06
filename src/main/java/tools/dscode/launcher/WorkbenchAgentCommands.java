@@ -52,6 +52,8 @@ public final class WorkbenchAgentCommands {
                 case "post" -> post(parsed, out, err);
                 case "history" -> history(parsed, out, err);
                 case "gc-runs" -> gcRuns(parsed, out, err);
+                case "gc-versions" -> gcVersions(parsed, out, err);
+                case "use-version" -> useVersion(parsed, out, err);
                 default -> {
                     err.println("Unknown Workbench agent command: " + parsed.command());
                     yield 2;
@@ -404,6 +406,24 @@ public final class WorkbenchAgentCommands {
         out.println("profiles-removed=" + sweep.profilesRemoved());
         out.println("payloads-removed=" + sweep.payloadsRemoved());
         return 0;
+    }
+
+    private static int gcVersions(WorkbenchCommandLine.Parsed parsed, PrintStream out, PrintStream err) {
+        AgentCoordination.VersionSweep sweep = AgentCoordination.sweepVersions(parsed.project(), java.time.Instant.now());
+        out.println("versions-removed=" + sweep.versionsRemoved());
+        return 0;
+    }
+
+    private static int useVersion(WorkbenchCommandLine.Parsed parsed, PrintStream out, PrintStream err) {
+        if (parsed.version() == null || parsed.version().isBlank()) {
+            err.println("Usage: use-version --version=<safe-version>");
+            return 2;
+        }
+        try {
+            return PickleballLocalStore.useVersion(parsed.project(), parsed.version(), out, err);
+        } catch (java.io.IOException failure) {
+            throw new IllegalStateException(failure.getMessage(), failure);
+        }
     }
 
     private static java.time.Duration parseTtl(String raw) {

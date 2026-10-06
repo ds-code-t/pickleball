@@ -117,6 +117,7 @@ GROUPS: tuple[tuple[str, tuple[str, ...]], ...] = (
 
 BOARD_PATHS = (
     ".pickleball/v/<current>/",
+    ".pickleball/v/<version>/.last-used",
     ".pickleball/open/",
     ".pickleball/current.json",
     ".pickleball/runs/<run-id>/",
@@ -138,6 +139,8 @@ BOARD_VERBS = (
     "history --append",
     "history --tail",
     "gc-runs",
+    "gc-versions",
+    "use-version --version=<version>",
 )
 
 
@@ -206,6 +209,8 @@ def render() -> str:
         "## .pickleball owners",
         "",
         "Jar cache is regenerable under `v/<current>/`, `open/`, and `current.json`.",
+        "Side-by-side `v/<version>/` trees stay until an explicit `gc-versions`.",
+        "`use-version` points `current.json` at an already exported tree and does not delete the others.",
         "Project history stays at the `.pickleball` root and survives export-guidance.",
         "Legacy `.pickleball/workbench/` is only the fallback when `current.json` is missing or not usable.",
         "",

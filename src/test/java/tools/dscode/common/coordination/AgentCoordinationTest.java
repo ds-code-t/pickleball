@@ -509,6 +509,60 @@ class AgentCoordinationTest {
         assertTrue(Files.isDirectory(old.dataDirectory()));
     }
 
+    @Test
+    void stoppedRunWithAFailureCountIsTheLastFailedRun() throws Exception {
+        AgentCoordination.Run failed = AgentCoordination.begin(project, request("run-stopped-failed", "agent-gc"));
+        Files.writeString(failed.reportsDirectory().resolve("shot.png"), "png");
+        AgentCoordination.finish(project, failed.runId(), null, "STOPPED", Instant.parse("2020-01-03T00:00:00Z"), null);
+        String record = Files.readString(failed.recordFile())
+                .replace("\"failureCount\" : null", "\"failureCount\" : 2")
+                .replace("\"failureCount\": null", "\"failureCount\": 2");
+        assertTrue(record.contains("STOPPED"), record);
+        Files.writeString(failed.recordFile(), record);
+
+        AgentCoordination.Run clean = AgentCoordination.begin(project, request("run-clean-old", "agent-gc"));
+        Files.writeString(clean.reportsDirectory().resolve("shot.png"), "png");
+        AgentCoordination.finish(project, clean.runId(), null, "STOPPED", Instant.parse("2020-01-04T00:00:00Z"), null);
+
+        AgentCoordination.sweepRuns(project, Instant.parse("2026-10-06T00:00:00Z"));
+        assertTrue(Files.isRegularFile(failed.reportsDirectory().resolve("shot.png")));
+        assertFalse(Files.exists(clean.reportsDirectory().resolve("shot.png")));
+        assertTrue(Files.isRegularFile(clean.recordFile()));
+        assertTrue(Files.isRegularFile(clean.dataDirectory().resolve("pkb_run_profile"))
+                || Files.isRegularFile(clean.recordFile()));
+    }
+
+    @Test
+    void finishWritesFailedWhenTheRunDirectoryShowsFailures() throws Exception {
+        AgentCoordination.Run failed = AgentCoordination.begin(project, request("run-evidence", "agent-finish"));
+        Files.createDirectories(failed.diagnosticDirectory());
+        Files.writeString(failed.diagnosticDirectory().resolve("summary.json"), "{\"outcome\":\"FAILED\",\"counts\":{\"failed\":1}}");
+        AgentCoordination.finish(project, failed.runId(), null, "STOPPED");
+        String record = Files.readString(failed.recordFile());
+        assertTrue(record.contains("\"status\" : \"FAILED\""), record);
+
+        AgentCoordination.Run clean = AgentCoordination.begin(project, request("run-clean-finish", "agent-finish"));
+        AgentCoordination.finish(project, clean.runId(), null, "STOPPED");
+        assertTrue(Files.readString(clean.recordFile()).contains("\"status\" : \"STOPPED\""));
+    }
+
+    @Test
+    void edgeLockfileHoldsTheProfileTheSameWayAsChromeSingletonLock() throws Exception {
+        AgentCoordination.Run edge = AgentCoordination.begin(project, request("run-edge", "agent-edge"));
+        Path cookies = edge.browserProfileDirectory().resolve("Default").resolve("Cookies");
+        Files.createDirectories(cookies.getParent());
+        Files.writeString(cookies, "edge");
+        Files.writeString(edge.browserProfileDirectory().resolve("Default").resolve("lockfile"), "edge-lock");
+        AgentCoordination.finish(project, edge.runId(), null, "STOPPED", Instant.now().minus(Duration.ofHours(2)), null);
+        AgentCoordination.sweepRuns(project, Instant.now());
+        assertTrue(Files.isRegularFile(cookies));
+
+        Files.delete(edge.browserProfileDirectory().resolve("Default").resolve("lockfile"));
+        AgentCoordination.sweepRuns(project, Instant.now());
+        assertFalse(Files.exists(cookies));
+        assertTrue(Files.isRegularFile(edge.recordFile()));
+    }
+
     private void captureProfile(List<String> profiles, CountDownLatch ready, CountDownLatch go) {
         ready.countDown();
         try {

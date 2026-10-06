@@ -132,6 +132,13 @@ class WorkbenchCommandLineTest {
         assertTrue(WorkbenchCommandLine.isAgentCoreCommand("post"));
         assertTrue(WorkbenchCommandLine.isAgentCoreCommand("history"));
         assertTrue(WorkbenchCommandLine.isAgentCoreCommand("gc-runs"));
+        assertTrue(WorkbenchCommandLine.isAgentCoreCommand("gc-versions"));
+        assertTrue(WorkbenchCommandLine.isAgentCoreCommand("use-version"));
+        WorkbenchCommandLine.Parsed switched = WorkbenchCommandLine.parse(new String[]{
+                "use-version", "--version=2.1.14"
+        });
+        assertEquals("use-version", switched.command());
+        assertEquals("2.1.14", switched.version());
     }
 
     @Test
