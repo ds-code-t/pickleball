@@ -31,6 +31,8 @@ class AgentDiscoverPlannerTest {
         assertTrue(plan.runVars().contains("pkb_parallel=" + ParallelCountEstimator.estimate()));
         assertTrue(plan.runVars().contains("pkb_reportingmode=diagnostic"));
         assertTrue(plan.runVars().contains("pkb_reportretention=failed"));
+        assertTrue(plan.runVars().contains("pkb_compositereport=false"));
+        assertTrue(plan.runVars().contains("pkb_scenarioreport=false"));
         assertTrue(plan.runVars().contains("pkb_tags=@smoke"));
         assertFalse(plan.runVars().contains("pkb_parallel=80"));
         assertFalse(plan.runVars().contains("pkb_run_profile="));
@@ -70,6 +72,32 @@ class AgentDiscoverPlannerTest {
         assertFalse(isolate.contains("pkb_run_profile="));
         assertFalse(isolate.contains("pretty"));
         assertFalse(isolate.contains("@all"));
+    }
+
+    @Test
+    void discoverConfirmAndIsolateForwardExampleIntoRunVars() {
+        LinkedHashMap<String, String> retained = new LinkedHashMap<>();
+        retained.put(PKB_props.PKB_BROWSER, "CHROME_HEADLESS");
+        retained.put(PKB_props.PKB_PARALLEL, "12");
+        retained.put(PKB_props.PKB_GLUE, "com.example.pickleball");
+
+        String discover = AgentDiscoverPlanner.discover(
+                tempDir, "@smoke", null, null, "1 2 5 3.4 7-11"
+        ).runVars();
+        String confirm = AgentDiscoverPlanner.confirmRunVars(
+                retained, "@one", null, null, "1 2 5 3.4 7-11"
+        );
+        String isolate = AgentDiscoverPlanner.isolateRunVars(
+                retained, "@failing", "Broken scenario", null, "1 2 5 3.4 7-11"
+        );
+
+        assertTrue(discover.contains("pkb_example=1 2 5 3.4 7-11"));
+        assertTrue(discover.contains("pkb_tags=@smoke"));
+        assertTrue(confirm.contains("pkb_example=1 2 5 3.4 7-11"));
+        assertTrue(confirm.contains("pkb_parallel=12"));
+        assertTrue(isolate.contains("pkb_example=1 2 5 3.4 7-11"));
+        assertTrue(isolate.contains("pkb_parallel=1"));
+        assertFalse(isolate.contains("pkb_parallel=12"));
     }
 
     @Test

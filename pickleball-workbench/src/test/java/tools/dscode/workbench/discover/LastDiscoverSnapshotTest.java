@@ -63,6 +63,53 @@ class LastDiscoverSnapshotTest {
     }
 
     @Test
+    void isolateReplayPutsExampleInRunVarsAndKeepsParallelOne() throws Exception {
+        Path file = LastDiscoverSnapshot.file(tempDir);
+        Files.createDirectories(file.getParent());
+        Files.writeString(file, """
+                {
+                  "schemaVersion": 1,
+                  "source": "workbench-discover",
+                  "runId": "run-1",
+                  "runProfile": "pkb_browser=CHROME_HEADLESS, pkb_parallel=12",
+                  "runVars": {
+                    "pkb_browser": "CHROME_HEADLESS",
+                    "pkb_parallel": "12"
+                  }
+                }
+                """);
+
+        Map<String, String> properties = LastDiscoverSnapshot.workerSystemProperties(
+                tempDir, "@broken", "Failing scenario", "1 2 5 3.4 7-11"
+        );
+        String runVars = properties.get("pkb_runvars");
+        assertTrue(runVars.contains("pkb_example=1 2 5 3.4 7-11"));
+        assertTrue(runVars.contains("pkb_parallel=1"));
+        assertFalse(runVars.contains("pkb_parallel=12"));
+
+        Files.writeString(file, """
+                {
+                  "schemaVersion": 1,
+                  "source": "workbench-sealed",
+                  "runId": "run-1",
+                  "runProfile": "pkb_browser=CHROME_HEADLESS, pkb_parallel=12",
+                  "runVars": {
+                    "pkb_browser": "CHROME_HEADLESS",
+                    "pkb_parallel": "12"
+                  },
+                  "sealed": true
+                }
+                """);
+        Map<String, String> sealed = LastDiscoverSnapshot.workerSystemProperties(
+                tempDir, "@broken", null, "1.1"
+        );
+        assertTrue(sealed.containsKey("pkb_overriderunvars"));
+        assertFalse(sealed.containsKey("pkb_runvars"));
+        assertTrue(sealed.get("pkb_overriderunvars").contains("pkb_example=1.1"));
+        assertTrue(sealed.get("pkb_overriderunvars").contains("pkb_parallel=1"));
+    }
+
+    @Test
     void sealedSnapshotReplaysOverrideNotRunProfileOrRunvars() throws Exception {
         Path file = LastDiscoverSnapshot.file(tempDir);
         Files.createDirectories(file.getParent());

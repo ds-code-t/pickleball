@@ -46,6 +46,20 @@ class WorkbenchCommandQueueTest {
 
     @Test
     @Timeout(value = 5, unit = TimeUnit.SECONDS)
+    void enqueueOpUsesTheSharedHandler() throws Exception {
+        try (WorkbenchCommandQueue queue = new WorkbenchCommandQueue(text -> {
+            throw new AssertionError("execute-step function is not used once an op handler is installed");
+        })) {
+            queue.setOpHandler((op, args) -> Map.of("status", "SUCCESS", "op", op, "example", args.get("example")));
+            Map<String, Object> ack = queue.enqueueOp("example", Map.of("example", "2.2"), "row");
+            assertEquals("row", ack.get("id"));
+            assertEquals("SUCCESS", awaitStatus(queue, "row", "SUCCESS"));
+            assertEquals("2.2", ((Map<?, ?>) queue.status("row").get("result")).get("example"));
+        }
+    }
+
+    @Test
+    @Timeout(value = 5, unit = TimeUnit.SECONDS)
     void stillWorkingWhileSlowToolUntilHeartbeatIsSilenced() throws Exception {
         CountDownLatch hold = new CountDownLatch(1);
         CountDownLatch started = new CountDownLatch(1);

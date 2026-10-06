@@ -55,7 +55,7 @@ public abstract class PhraseData extends PassedData {
     public String originalText;
     public String metaTextPrefix;
     public final String text;
-    public final String resolvedText;
+    public String resolvedText;
     public Character termination; // nullable
     public final LineData parsedLine;
     private SearchContext searchContext;
@@ -128,6 +128,13 @@ public abstract class PhraseData extends PassedData {
 
     public boolean hasResolvedText = false;
     public boolean hasTextToResolve = false;
+    /**
+     * Structural conditional phrases are parsed without evaluations.
+     * References are resolved once, when the phrase is about to execute.
+     */
+    public boolean deferEvaluations;
+    public boolean evaluationsResolved;
+    public boolean suppressResolve;
 
     public ParsingMap getPhraseParsingMap() {
         if (phraseParsingMap == null) {
@@ -140,6 +147,31 @@ public abstract class PhraseData extends PassedData {
         }
         return phraseParsingMap;
     }
+
+    /**
+     * Construction resolves text before phrases are linked, so a continuation
+     * caches the step map and never sees a Data Table the previous phrase installs.
+     * Drop only that premature step-map cache. A map installed for this phrase
+     * (a data-row clone) is left alone.
+     */
+    void inheritParsingMapFromPrevious() {
+        if (phraseParsingMap == null || isNewContext()) {
+            return;
+        }
+        PhraseData previous = getPreviousPhrase();
+        if (previous == null) {
+            return;
+        }
+        Character end = previous.termination;
+        if (end != null && (end == '.' || end == '?')) {
+            return;
+        }
+        var step = getRunningStep();
+        if (step != null && phraseParsingMap == step.getStepParsingMap()) {
+            phraseParsingMap = null;
+        }
+    }
+
     public String resolveText(String inputText) {
         return getPhraseParsingMap().resolveWholeText(inputText);
     }
@@ -168,7 +200,7 @@ public abstract class PhraseData extends PassedData {
     }
 
     public PhraseData(String inputText, Character delimiter, LineData lineData) {
-        this(inputText, delimiter, lineData, null);
+        this(inputText, delimiter, lineData, null, true);
     }
 
     public final boolean defaultContextPhrase;
@@ -178,6 +210,16 @@ public abstract class PhraseData extends PassedData {
     }
 
     public PhraseData(String inputText, Character delimiter, LineData lineData, PhraseData previousPhrase) {
+        this(inputText, delimiter, lineData, previousPhrase, true);
+    }
+
+    public PhraseData(
+            String inputText,
+            Character delimiter,
+            LineData lineData,
+            PhraseData previousPhrase,
+            boolean resolveEvaluations
+    ) {
         originalText = inputText;
         var m = Pattern.compile(META_TEXT_SEPARATOR + "\\s*(.*?)\\s*" + META_TEXT_SEPARATOR).matcher(inputText);
         boolean found = m.find();
@@ -190,11 +232,97 @@ public abstract class PhraseData extends PassedData {
         setPreviousPhrase(previousPhrase);
         parsedLine = lineData;
         text = inputText;
-        resolvedText = resolveText(text);
+        deferEvaluations = !resolveEvaluations;
+        if (resolveEvaluations) {
+            resolvedText = resolveText(text);
+            evaluationsResolved = true;
+        } else {
+            // Structural pass only. Do not resolve mappings, expressions, or $ functions.
+            resolvedText = text;
+            evaluationsResolved = false;
+        }
         hasResolvedText = !text.trim().equalsIgnoreCase(resolvedText.trim());
         hasTextToResolve = hasResolvedText || text.matches(".*<.*>.*");
         termination = delimiter;
-        MatchNode returnMatchNode = getNodeDictionary().parse(resolvedText);
+        parseFromText(resolvedText);
+        position = lineData.phrases.size();
+    }
+
+    /**
+     * One-shot execution resolve. A skipped branch never calls this.
+     * A taken phrase calls it once, then executes the resolved structure.
+     */
+    public void resolveForExecution() {
+        if (evaluationsResolved || suppressResolve) {
+            return;
+        }
+        resolvedText = resolveText(text);
+        evaluationsResolved = true;
+        hasResolvedText = !text.trim().equalsIgnoreCase(resolvedText.trim());
+        hasTextToResolve = hasResolvedText || text.matches(".*<.*>.*");
+        resetParsedFields();
+        parseFromText(resolvedText);
+    }
+
+    /**
+     * False when this deferred phrase is a later branch or the body of a
+     * condition that was not taken. The condition itself is resolved only
+     * when no earlier branch was taken.
+     */
+    public boolean shouldResolveBranchReferences() {
+        if (!deferEvaluations || evaluationsResolved) {
+            return true;
+        }
+        if (suppressResolve) {
+            return false;
+        }
+        return !skipReferenceResolution();
+    }
+
+    public boolean skipReferenceResolution() {
+        String cond = getConditional() == null ? "" : getConditional().trim().toLowerCase();
+        if (cond.startsWith("else")) {
+            if (position == 0 || getPreviousPhrase() == null) {
+                return parsedLine.previousSiblingConditionalState > -1;
+            }
+            return getPreviousPhrase().phraseConditionalMode > -1;
+        }
+        PhraseData previous = getPreviousPhrase();
+        if (previous != null
+                && previous.phraseConditionalMode <= 0
+                && !cond.equals("if")
+                && !cond.equals("until")) {
+            return true;
+        }
+        return false;
+    }
+
+    private void resetParsedFields() {
+        untilPhrase = false;
+        booleanValues = List.of();
+        conditional = "";
+        assertion = "";
+        assertionType = "";
+        action = "";
+        actionOperation = null;
+        assertionOperation = null;
+        isOperationPhrase = false;
+        phraseType = null;
+        hasNo = false;
+        body = "";
+        separator = false;
+        conjunction = "";
+        context = "";
+        isFrom = false;
+        isTopContext = false;
+        isPageContext = false;
+        operationIndex = 0;
+        setNewContext(false);
+        setElementMatches(new ArrayList<>());
+    }
+
+    private void parseFromText(String source) {
+        MatchNode returnMatchNode = getNodeDictionary().parse(source);
         phraseNode = returnMatchNode.getChild("phrase");
         assert phraseNode != null;
         booleanValues = phraseNode.getOrderedChildren("booleanValue").stream().map(ValueWrapper::createValueWrapper).toList();
@@ -216,16 +344,11 @@ public abstract class PhraseData extends PassedData {
 
 
         conjunction = phraseNode.getStringFromLocalState("conjunction");
-        position = lineData.phrases.size();
         context = phraseNode.getStringFromLocalState("context");
         if (getConditional().contains("if")) {
             setAssertionType("conditional");
             setAssertion(phraseNode.getStringFromLocalState("assertion"));
         }
-//        else if (termination.equals('?')) {
-//            setAssertionType("conditionalTermination");
-//            setAssertion(phraseNode.getStringFromLocalState("assertion"));
-//        }
         else if (!context.isBlank()) {
             phraseType = PhraseType.CONTEXT;
             isFrom = context.equals("from");
@@ -249,6 +372,10 @@ public abstract class PhraseData extends PassedData {
         if (phraseType == null && !elementMatches.isEmpty()) {
             phraseType = ELEMENT_ONLY;
         }
+        afterParse();
+    }
+
+    protected void afterParse() {
     }
 
     public ElementMatch getElementMatch(MatchNode elementNode) {

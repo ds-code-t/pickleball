@@ -102,11 +102,36 @@ public class NGherkinFactory {
     }
 
     static String getInlineDataTableArgumentText(PickleStep pickleStep) {
-        if (pickleStep == null || !pickleStep.hasInlineArgument() || !"DT".equals(pickleStep.getInlineArgumentType())) {
+        if (pickleStep == null || !pickleStep.hasInlineArgument()) {
             return null;
         }
 
-        return inlineDataTableArgumentToGherkinText(pickleStep.getInlineArgumentText());
+        return gherkinDataTableForInlineType(
+                pickleStep.getInlineArgumentType(),
+                pickleStep.getInlineArgumentText());
+    }
+
+    /**
+     * {@code DT} is only the table type name. Any other uppercase type stays
+     * readable as inline argument text and does not become a data table.
+     */
+    public static String gherkinDataTableForInlineType(String type, String argumentText) {
+        if (!"DT".equals(type) || argumentText == null || argumentText.isBlank()) {
+            return null;
+        }
+        return inlineDataTableArgumentToGherkinText(argumentText);
+    }
+
+    /** The step's real data table or doc string. Ignores an inline marker. */
+    public static String realGherkinArgument(io.cucumber.core.gherkin.Step step) {
+        if (step == null) {
+            return "";
+        }
+        PickleStep pickleStep = (PickleStep) getProperty(step, "pickleStep");
+        if (pickleStep == null) {
+            return "";
+        }
+        return argumentToGherkinText(pickleStep.getArgument().orElse(null));
     }
 
     static String inlineDataTableArgumentToGherkinText(String inlineArgumentText) {

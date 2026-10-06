@@ -7,10 +7,12 @@ import io.cucumber.datatable.DataTable;
 import io.cucumber.plugin.event.Result;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.remote.RemoteWebDriver;
+import tools.dscode.common.coordination.AgentCoordination;
 import tools.dscode.common.reporting.logging.BaseConverter;
 import tools.dscode.common.reporting.logging.Entry;
 import tools.dscode.common.reporting.logging.Level;
 import tools.dscode.common.reporting.logging.Status;
+import tools.dscode.common.reporting.logging.simplehtml.SimpleHtmlReportConverter;
 import tools.dscode.coredefinitions.BrowserSteps;
 
 import java.util.concurrent.CompletableFuture;
@@ -238,15 +240,22 @@ public privileged aspect DiagnosticRuntimeAspect {
     }
 
     void around(): execution(void tools.dscode.common.reporting.logging.BaseConverter+.onStart(..)) {
-        if (!DiagnosticRuntime.isDiagnostic()) proceed();
+        if (collectHtmlInDiagnostic(thisJoinPoint.getTarget())) proceed();
     }
 
     void around(): execution(void tools.dscode.common.reporting.logging.BaseConverter+.onTimestamp(..)) {
-        if (!DiagnosticRuntime.isDiagnostic()) proceed();
+        if (collectHtmlInDiagnostic(thisJoinPoint.getTarget())) proceed();
     }
 
     void around(): execution(void tools.dscode.common.reporting.logging.BaseConverter+.onStop(..)) {
-        if (!DiagnosticRuntime.isDiagnostic()) proceed();
+        if (collectHtmlInDiagnostic(thisJoinPoint.getTarget())) proceed();
+    }
+
+    private static boolean collectHtmlInDiagnostic(Object target) {
+        if (!DiagnosticRuntime.isDiagnostic()) return true;
+        return target instanceof SimpleHtmlReportConverter
+                && (AgentCoordination.htmlEnabled("compositeReport")
+                || AgentCoordination.htmlEnabled("scenarioReport"));
     }
 
     Entry around(): execution(public tools.dscode.common.reporting.logging.Entry tools.dscode.common.reporting.logging.Entry.close()) {

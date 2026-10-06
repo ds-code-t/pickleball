@@ -11,6 +11,7 @@ import tools.dscode.workbench.mcp.WorkbenchAttachServer;
 import tools.dscode.workbench.mcp.WorkbenchMcpServer;
 import tools.dscode.workbench.sync.WorkbenchManifest;
 import tools.dscode.workbench.sync.WorkbenchSynchronizer;
+import tools.dscode.control.protocol.WindowDriver;
 import tools.dscode.workbench.ui.WorkbenchUi;
 import tools.dscode.workbench.worker.WorkbenchLiveSession;
 import tools.dscode.workbench.worker.WorkbenchWorkerManager;
@@ -21,6 +22,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintStream;
 import java.nio.file.Path;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CountDownLatch;
@@ -183,8 +185,18 @@ public final class WorkbenchApplication {
     }
 
     private static int ui(String[] args) {
-        Path project = requiredProject(args, "ui");
-        WorkbenchUi.launch(project);
+        IsolateArgs parsed = projectCommandArgs(args, "ui");
+        try {
+            if (parsed.runId() != null) {
+                WindowDriver.show(parsed.project(), parsed.runId(), parsed.agentId(), parsed.agentId() != null);
+            } else {
+                WindowDriver.markOpen(parsed.project());
+            }
+        } catch (RuntimeException failure) {
+            System.err.println(failure.getMessage());
+            return 1;
+        }
+        WorkbenchUi.launch(parsed.project(), parsed.runId(), parsed.agentId());
         return 0;
     }
 
@@ -193,7 +205,7 @@ public final class WorkbenchApplication {
         Map<String, String> workerProperties;
         try {
             workerProperties = tools.dscode.workbench.discover.LastDiscoverSnapshot.workerSystemProperties(
-                    parsed.project(), parsed.tags(), parsed.name()
+                    parsed.project(), parsed.tags(), parsed.name(), parsed.example()
             );
         } catch (RuntimeException failure) {
             err.println(failure.getMessage());
@@ -205,7 +217,7 @@ public final class WorkbenchApplication {
         if (!once && !interactiveStdin) {
             err.println("Controller isolate holds a paused worker on an interactive TTY.");
             err.println("Maven-exec isolate through PickleballWorkbenchLauncher starts a detached headless CLI session instead.");
-            err.println("Do not start the GUI.");
+            err.println("While testing for yourself, stay headless. Do not open the GUI for your own testing.");
             return 2;
         }
 
@@ -217,7 +229,7 @@ public final class WorkbenchApplication {
                 out.println("Workbench isolate worker: pid=" + started.pid()
                         + " scenario=" + started.scenarioId());
                 printReplayedRunVars(out, workerProperties);
-                out.println("Isolate stays one paused scenario. Do not start the GUI.");
+                out.println("Isolate stays one paused scenario. While testing for yourself, stay headless.");
                 if (once) {
                     requireCleanStop(live.stop());
                     return 0;
@@ -241,12 +253,18 @@ public final class WorkbenchApplication {
         IsolateArgs parsed = projectCommandArgs(args, "session");
         Map<String, String> workerProperties;
         try {
-            workerProperties = tools.dscode.workbench.discover.LastDiscoverSnapshot.workerSystemProperties(
-                    parsed.project(), parsed.tags(), parsed.name()
-            );
+            workerProperties = new LinkedHashMap<>(tools.dscode.workbench.discover.LastDiscoverSnapshot.workerSystemProperties(
+                    parsed.project(), parsed.tags(), parsed.name(), parsed.example()
+            ));
         } catch (RuntimeException failure) {
             err.println(failure.getMessage());
             return 1;
+        }
+        if (parsed.runId() != null && !parsed.runId().isBlank()) {
+            workerProperties.put("pkb_run_id", parsed.runId());
+        }
+        if (parsed.agentId() != null && !parsed.agentId().isBlank()) {
+            workerProperties.put("pkb_agent_id", parsed.agentId());
         }
 
         CountDownLatch done = new CountDownLatch(1);
@@ -271,7 +289,10 @@ public final class WorkbenchApplication {
                 }
                 done.countDown();
             };
-            server = WorkbenchAttachServer.startCliSession(controller, parsed.project(), stop);
+            Path stateFile = parsed.sessionFile() == null
+                    ? WorkbenchAttachServer.cliSessionStateFile(parsed.project())
+                    : parsed.sessionFile();
+            server = WorkbenchAttachServer.startCliSession(controller, parsed.project(), stop, stateFile);
             Runtime.getRuntime().addShutdownHook(new Thread(stop, "pickleball-workbench-session-shutdown"));
             out.println("Workbench CLI session: pid=" + ProcessHandle.current().pid()
                     + " url=" + server.url());
@@ -323,17 +344,33 @@ public final class WorkbenchApplication {
         }
     }
 
-    private record IsolateArgs(Path project, String tags, String name) {
+    record IsolateArgs(
+            Path project,
+            String tags,
+            String name,
+            String example,
+            Path sessionFile,
+            String runId,
+            String agentId
+    ) {
     }
 
-    private static IsolateArgs projectCommandArgs(String[] args, String command) {
+    static IsolateArgs projectCommandArgs(String[] args, String command) {
         if (args.length < 2 || args[1].isBlank() || args[1].startsWith("-")) {
             throw new IllegalArgumentException(
-                    "Usage: pickleball-workbench " + command + " <project> [--tags <expr>] [--name <expr>]"
+                    "Usage: pickleball-workbench " + command
+                            + " <project> [--tags <expr>] [--name <expr>] [--example <rows>]"
+                            + " [--session-file <path>] [--run-id <id>] [--agent-id <id>]"
             );
         }
         String tags = null;
         String name = null;
+        String example = null;
+        String sessionFile = null;
+        String runId = null;
+        String agentId = null;
+        boolean absorbName = false;
+        boolean absorbExample = false;
         for (int index = 2; index < args.length; index++) {
             String token = args[index];
             if (token.startsWith("--tags=")) {
@@ -342,13 +379,61 @@ public final class WorkbenchApplication {
                 tags = args[++index];
             } else if (token.startsWith("--name=")) {
                 name = token.substring("--name=".length());
+                absorbName = true;
+                absorbExample = false;
             } else if ("--name".equals(token) && index + 1 < args.length) {
                 name = args[++index];
-            } else if (name != null && !token.startsWith("-")) {
+                absorbName = true;
+                absorbExample = false;
+            } else if (token.startsWith("--example=")) {
+                String value = token.substring("--example=".length());
+                example = value.isBlank() ? null : value;
+                absorbExample = example != null;
+                absorbName = false;
+            } else if ("--example".equals(token) && index + 1 < args.length) {
+                String value = args[++index];
+                example = value == null || value.isBlank() ? null : value;
+                absorbExample = example != null;
+                absorbName = false;
+            } else if (token.startsWith("--session-file=")) {
+                sessionFile = token.substring("--session-file=".length());
+                absorbName = false;
+                absorbExample = false;
+            } else if ("--session-file".equals(token) && index + 1 < args.length) {
+                sessionFile = args[++index];
+                absorbName = false;
+                absorbExample = false;
+            } else if (token.startsWith("--run-id=")) {
+                runId = token.substring("--run-id=".length());
+                absorbName = false;
+                absorbExample = false;
+            } else if ("--run-id".equals(token) && index + 1 < args.length) {
+                runId = args[++index];
+                absorbName = false;
+                absorbExample = false;
+            } else if (token.startsWith("--agent-id=") || token.startsWith("--agent=")) {
+                agentId = token.substring(token.indexOf('=') + 1);
+                absorbName = false;
+                absorbExample = false;
+            } else if (("--agent-id".equals(token) || "--agent".equals(token)) && index + 1 < args.length) {
+                agentId = args[++index];
+                absorbName = false;
+                absorbExample = false;
+            } else if (absorbExample && example != null && !token.startsWith("-")) {
+                example = example + " " + token;
+            } else if (absorbName && name != null && !token.startsWith("-")) {
                 name = name + " " + token;
             }
         }
-        return new IsolateArgs(Path.of(args[1]), tags, name);
+        return new IsolateArgs(
+                Path.of(args[1]),
+                tags,
+                name,
+                example,
+                sessionFile == null || sessionFile.isBlank() ? null : Path.of(sessionFile),
+                runId == null || runId.isBlank() ? null : runId.trim(),
+                agentId == null || agentId.isBlank() ? null : agentId.trim()
+        );
     }
 
     private static int workerCheck(String[] args, PrintStream out) {
@@ -602,8 +687,8 @@ public final class WorkbenchApplication {
         out.println("  java -cp <thin-jar>:<resolved-libs> tools.dscode.workbench.WorkbenchApplication status <project>");
         out.println("  java -cp <thin-jar>:<resolved-libs> tools.dscode.workbench.WorkbenchApplication worker-check <project>");
         out.println("  java -cp <thin-jar>:<resolved-libs> tools.dscode.workbench.WorkbenchApplication live-check <project>");
-        out.println("  java -cp <thin-jar>:<resolved-libs> tools.dscode.workbench.WorkbenchApplication isolate <project> [--tags <expr>] [--name <expr>]");
-        out.println("  java -cp <thin-jar>:<resolved-libs> tools.dscode.workbench.WorkbenchApplication session <project> [--tags <expr>] [--name <expr>]");
+        out.println("  java -cp <thin-jar>:<resolved-libs> tools.dscode.workbench.WorkbenchApplication isolate <project> [--tags <expr>] [--name <expr>] [--example <rows>]");
+        out.println("  java -cp <thin-jar>:<resolved-libs> tools.dscode.workbench.WorkbenchApplication session <project> [--tags <expr>] [--name <expr>] [--example <rows>] [--session-file <path>] [--run-id <id>] [--agent-id <id>]");
         out.println("  java -cp <thin-jar>:<resolved-libs> tools.dscode.workbench.WorkbenchApplication mcp <project>");
         out.println("  java -cp <thin-jar>:<resolved-libs> tools.dscode.workbench.WorkbenchApplication ui <project>");
         out.println("  java -cp <thin-jar>:<resolved-libs> tools.dscode.workbench.WorkbenchApplication --version");
@@ -613,9 +698,9 @@ public final class WorkbenchApplication {
         out.println("worker-check starts, restarts, and gracefully stops direct consumer workers without rebuilding.");
         out.println("live-check exercises raw Gherkin, Step Override, and live runtime operations on one persistent worker.");
         out.println("isolate holds a paused worker from the last Discover snapshot when stdin is an interactive TTY, or when pickleball.workbench.isolate.once is set.");
-        out.println("session is the headless long-lived CLI controller: sync, start the Discover-snapshot worker, and serve 127.0.0.1 HTTP plus a serial execute-step queue. State is .pickleball/v/<version>/workbench/cli-session.json when current.json is complete.");
-        out.println("Consumer agents start session through PickleballWorkbenchLauncher isolate/session-start (detached). Do not start ui for agents.");
+        out.println("session is the headless long-lived CLI controller: sync, start the Discover-snapshot worker, and serve 127.0.0.1 HTTP plus the same session commands the window uses. State is .pickleball/v/<version>/workbench/cli-session.json when current.json is complete, unless --session-file names that run's own session file. --run-id and --agent-id are copied onto the worker as pkb_run_id and pkb_agent_id. Two headless sessions do not share one session file.");
+        out.println("Consumer agents start session through PickleballWorkbenchLauncher isolate/session-start (detached) when testing for themselves. Do not open the GUI for your own testing. Open it with open-window --run-id to show a person a run you already have. That does not start a second test. Close it with close-window when you are done showing it. While testing for yourself, stay headless. When a window is already open, only one agent drives the live run. Other agents stay headless or attach read-only.");
         out.println("mcp serves the same Workbench services over protocol-only stdio; optional host wiring, not an agent setup step.");
-        out.println("ui opens the thin Swing Workbench over the same controller services and writes a localhost agent-attach endpoint to .pickleball/workbench/attach.json (versioned under v/<version>/ when current.json is complete).");
+        out.println("ui opens the one Swing Workbench over the same controller services and writes a localhost agent-attach endpoint to .pickleball/workbench/attach.json (versioned under v/<version>/ when current.json is complete). Optional --run-id loads that run's record, logs, reports, and config. It does not start a test. The window calls the session commands; it does not keep a second copy of them or of the run data.");
     }
 }

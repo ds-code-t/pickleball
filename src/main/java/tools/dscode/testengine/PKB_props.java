@@ -19,6 +19,7 @@ public final class PKB_props {
     public static final String PKB_CONFIG_PATH = PKB_PREFIX + "configpath";
     public static final String PKB_TAGS = PKB_PREFIX + "tags";
     public static final String PKB_NAME = PKB_PREFIX + "name";
+    public static final String PKB_EXAMPLE = PKB_PREFIX + "example";
     public static final String PKB_ORDER = PKB_PREFIX + "order";
     public static final String PKB_LIMIT = PKB_PREFIX + "limit";
     public static final String PKB_PROFILE = PKB_PREFIX + "profile";
@@ -44,6 +45,8 @@ public final class PKB_props {
     public static final String PKB_CUCUMBER_CLI_FEATURE_SELECTORS = PKB_PREFIX + "cucumber_cli_feature_selectors";
     public static final String PKB_LOGLEVEL = PKB_PREFIX + "loglevel";
     public static final String PKB_REPORTING_MODE = PKB_PREFIX + "reportingmode";
+    public static final String PKB_COMPOSITE_REPORT = PKB_PREFIX + "compositereport";
+    public static final String PKB_SCENARIO_REPORT = PKB_PREFIX + "scenarioreport";
     public static final String PKB_REPORT_RETENTION = PKB_PREFIX + "reportretention";
     public static final String PKB_DIAGNOSTIC_OUTPUT = PKB_PREFIX + "diagnostic_output";
     public static final String PKB_PLATFORM_LOG = PKB_PREFIX + "platformlog";
@@ -53,16 +56,31 @@ public final class PKB_props {
     public static final String PKB_PARENT_RUN_ID = PKB_PREFIX + "parent_run_id";
     public static final String PKB_BASELINE_RUN_ID = PKB_PREFIX + "baseline_run_id";
     public static final String PKB_CHANGED_VARIABLES = PKB_PREFIX + "changed_variables";
+    public static final String PKB_RUN_ID = PKB_PREFIX + "run_id";
+    public static final String PKB_AGENT_ID = PKB_PREFIX + "agent_id";
+    public static final String PKB_RUN_GROUP = PKB_PREFIX + "run_group";
+    public static final String PKB_RUN_SEQUENCE = PKB_PREFIX + "run_sequence";
+    public static final String PKB_RUN_WHO = PKB_PREFIX + "run_who";
+    public static final String PKB_RUN_WHY = PKB_PREFIX + "run_why";
 
     public static final String PKB_DEBUG_BROWSER = PKB_PREFIX + "debugBrowser";
     public static final String PKB_DEBUG_ARGS = PKB_PREFIX + "debugargs";
+    public static final String PKB_DRIVER_DOWNLOAD_PROXY = PKB_PREFIX + "driver_download_proxy";
+    public static final String PKB_DRIVER_DOWNLOAD_NATIVE = PKB_PREFIX + "driver_download_native";
+    public static final String PKB_DRIVER_DOWNLOAD_CA = PKB_PREFIX + "driver_download_ca";
 
     private static final Set<String> RUN_METADATA_KEYS = Set.of(
             PKB_INVESTIGATION_ID,
             PKB_RUN_PURPOSE,
             PKB_PARENT_RUN_ID,
             PKB_BASELINE_RUN_ID,
-            PKB_CHANGED_VARIABLES
+            PKB_CHANGED_VARIABLES,
+            PKB_RUN_ID,
+            PKB_AGENT_ID,
+            PKB_RUN_GROUP,
+            PKB_RUN_SEQUENCE,
+            PKB_RUN_WHO,
+            PKB_RUN_WHY
     );
 
     private PKB_props() {
@@ -145,6 +163,8 @@ public final class PKB_props {
     public static void tags(String tagExpression) { put(PKB_TAGS, tagExpression); }
     public static String name() { return get(PKB_NAME); }
     public static void name(String nameRegex) { put(PKB_NAME, nameRegex); }
+    public static String example() { return get(PKB_EXAMPLE); }
+    public static void example(String exampleSelector) { put(PKB_EXAMPLE, exampleSelector); }
     public static String plugins() { return get(PKB_PLUGINS); }
     public static void plugins(String pluginConfig) { put(PKB_PLUGINS, pluginConfig); }
     public static String profile() { return get(PKB_PROFILE); }

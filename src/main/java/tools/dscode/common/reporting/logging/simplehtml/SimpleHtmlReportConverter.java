@@ -1,6 +1,7 @@
 // file: tools/dscode/common/reporting/logging/simplehtml/SimpleHtmlReportConverter.java
 package tools.dscode.common.reporting.logging.simplehtml;
 
+import tools.dscode.common.coordination.AgentCoordination;
 import tools.dscode.common.reporting.logging.Attachment;
 import tools.dscode.common.reporting.logging.BaseConverter;
 import tools.dscode.common.reporting.logging.Entry;
@@ -230,12 +231,11 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
      * Writes report output from the path variables only.
      *
      * Rules:
-     * - compositeReport undefined + scenarioReport disabled/undefined => write composite report to the current default path
-     * - compositeReport undefined + scenarioReport enabled => do not write composite report
-     * - compositeReport blank/false => do not write composite report
-     * - compositeReport true => write composite report to the current default path
-     * - compositeReport other non-blank value => write composite report to that path/template
-     * - scenarioReport undefined/blank/false => do not write scenario reports
+     * - unset writes both reports on a normal test, and writes neither on an agent or Workbench run
+     * - compositeReport blank/false => do not write the composite report
+     * - compositeReport true => write the composite report to the current default path
+     * - compositeReport other non-blank value => write the composite report to that path/template
+     * - scenarioReport blank/false => do not write scenario reports
      * - scenarioReport true => write scenario reports to reports/<SCENARIO_NAME>.html
      * - scenarioReport other non-blank value => write one report per scenario to that path/template
      *
@@ -318,13 +318,8 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
         ReportPathSetting compositeSetting = reportPathSetting("compositeReport", fallback.toString());
         ReportPathSetting scenarioSetting = reportPathSetting("scenarioReport", "reports/<SCENARIO_NAME>");
 
-        boolean scenarioReport = scenarioSetting.enabled();
-
-        boolean compositeReport = compositeSetting.enabled();
-        if (compositeSetting.undefined()) {
-            // Default composite output is only automatic when scenario output was not explicitly enabled.
-            compositeReport = !scenarioReport;
-        }
+        boolean scenarioReport = AgentCoordination.htmlEnabled("scenarioReport");
+        boolean compositeReport = AgentCoordination.htmlEnabled("compositeReport");
 
         Path compositeOutFile = null;
         if (compositeReport) {
@@ -335,7 +330,7 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
 
         String compositeSource;
         if (compositeSetting.undefined()) {
-            compositeSource = compositeReport ? "default" : "default suppressed by scenarioReport";
+            compositeSource = compositeReport ? "default" : "private-run default";
         } else if (compositeSetting.blank()) {
             compositeSource = "RunVars:compositeReport(blank/false)";
         } else if (compositeSetting.booleanTrue()) {
@@ -347,7 +342,7 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
         String scenarioTemplate = scenarioReport ? scenarioSetting.template() : null;
         String scenarioSource;
         if (scenarioSetting.undefined()) {
-            scenarioSource = "missing";
+            scenarioSource = scenarioReport ? "default" : "private-run default";
         } else if (scenarioSetting.blank()) {
             scenarioSource = "RunVars:scenarioReport(blank/false)";
         } else if (scenarioSetting.booleanTrue()) {
@@ -420,20 +415,16 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
      * blank and false disable the report; true enables it with the supplied default template/path.
      */
     private static ReportPathSetting reportPathSetting(String name, String defaultTemplate) {
-        String sentinel = "__SIMPLE_HTML_REPORT_CONVERTER_UNDEFINED__" + name + "__";
-        Object rawObject = resolveFromVarsOrDefault(name, sentinel);
-        String raw = Objects.toString(rawObject, sentinel);
-
-        if (sentinel.equals(raw)) {
+        String explicit = AgentCoordination.explicitHtmlSetting(name);
+        if (explicit == null) {
             return new ReportPathSetting(name, null, null, true, false, false, false, defaultTemplate);
         }
 
-        String normalized = stripWrappingQuotes(raw.trim());
+        String normalized = stripWrappingQuotes(explicit.trim());
         boolean blank = normalized.isBlank();
         boolean booleanTrue = "true".equalsIgnoreCase(normalized);
         boolean booleanFalse = blank || "false".equalsIgnoreCase(normalized);
-
-        return new ReportPathSetting(name, raw, normalized, false, blank, booleanTrue, booleanFalse, defaultTemplate);
+        return new ReportPathSetting(name, explicit, normalized, false, blank, booleanTrue, booleanFalse, defaultTemplate);
     }
 
     private static String stripWrappingQuotes(String raw) {

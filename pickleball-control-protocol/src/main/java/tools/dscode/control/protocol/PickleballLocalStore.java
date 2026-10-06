@@ -142,7 +142,99 @@ public final class PickleballLocalStore {
                 pickleball.resolve(PickleballLocalLayout.GUIDANCE_MANIFEST),
                 StandardCopyOption.REPLACE_EXISTING
         );
+        snapshotOpenScripts(pickleball, versionRoot);
+        PickleballLocalLayout.writeLastUsed(versionRoot, Instant.now());
         PickleballLocalLayout.writeCurrent(pickleball, PickleballLocalLayout.CurrentPointer.completeNow(version));
+    }
+
+    /**
+     * Point {@code current.json} at an already complete {@code v/<version>/} export.
+     * Does not copy a sibling version, does not delete the tree being left, and
+     * does not invent files when the export is missing.
+     */
+    public static int useVersion(Path projectRoot, String version, PrintStream out, PrintStream err) throws IOException {
+        if (!PickleballLocalLayout.isSafeVersion(version)) {
+            err.println("use-version requires --version=<safe-version>.");
+            return 2;
+        }
+        Path project = projectRoot == null
+                ? Path.of("").toAbsolutePath().normalize()
+                : projectRoot.toAbsolutePath().normalize();
+        Path pickleball = PickleballLocalLayout.isPickleballDirectory(project)
+                ? project
+                : PickleballLocalLayout.root(project);
+        if (!completeExport(pickleball, version)) {
+            err.println("export-guidance from Pickleball " + version + " is required. current.json was not changed.");
+            return 1;
+        }
+        Path versionRoot = PickleballLocalLayout.versionRoot(pickleball, version);
+        Files.copy(
+                versionRoot.resolve(PickleballLocalLayout.AGENT_GUIDE),
+                pickleball.resolve(PickleballLocalLayout.AGENT_GUIDE),
+                StandardCopyOption.REPLACE_EXISTING
+        );
+        Files.copy(
+                versionRoot.resolve(PickleballLocalLayout.GUIDANCE_MANIFEST),
+                pickleball.resolve(PickleballLocalLayout.GUIDANCE_MANIFEST),
+                StandardCopyOption.REPLACE_EXISTING
+        );
+        refreshOpenFromVersion(pickleball, versionRoot);
+        PickleballLocalLayout.writeLastUsed(versionRoot, Instant.now());
+        PickleballLocalLayout.writeCurrent(pickleball, PickleballLocalLayout.CurrentPointer.completeNow(version));
+        out.println("current=" + version);
+        out.println("last-used=" + versionRoot.resolve(PickleballLocalLayout.LAST_USED_FILE));
+        return 0;
+    }
+
+    static boolean completeExport(Path pickleball, String version) {
+        if (!PickleballLocalLayout.isSafeVersion(version)) return false;
+        Path root = PickleballLocalLayout.versionRoot(pickleball, version);
+        if (!Files.isRegularFile(root.resolve(PickleballLocalLayout.AGENT_GUIDE))) return false;
+        Path manifest = root.resolve(PickleballLocalLayout.GUIDANCE_MANIFEST);
+        if (!Files.isRegularFile(manifest)) return false;
+        try {
+            String json = Files.readString(manifest, StandardCharsets.UTF_8);
+            Matcher matcher = Pattern.compile("\"pickleballVersion\"\\s*:\\s*\"([^\"]*)\"").matcher(json);
+            return matcher.find() && version.equals(matcher.group(1));
+        } catch (IOException ignored) {
+            return false;
+        }
+    }
+
+    private static void snapshotOpenScripts(Path pickleball, Path versionRoot) throws IOException {
+        Path from = pickleball.resolve(PickleballLocalLayout.OPEN_DIRECTORY);
+        if (!Files.isDirectory(from)) return;
+        Path to = versionRoot.resolve(PickleballLocalLayout.OPEN_DIRECTORY);
+        Files.createDirectories(to);
+        try (var files = Files.list(from)) {
+            for (Path file : files.filter(Files::isRegularFile).toList()) {
+                Files.copy(file, to.resolve(file.getFileName()), StandardCopyOption.REPLACE_EXISTING);
+            }
+        }
+    }
+
+    private static void refreshOpenFromVersion(Path pickleball, Path versionRoot) throws IOException {
+        Path from = versionRoot.resolve(PickleballLocalLayout.OPEN_DIRECTORY);
+        Path script = from.resolve(PickleballLocalLayout.OPEN_SCRIPT_UNIX);
+        if (!Files.isRegularFile(script)) {
+            writeOpenScripts(pickleball);
+            return;
+        }
+        Path open = pickleball.resolve(PickleballLocalLayout.OPEN_DIRECTORY);
+        Files.createDirectories(open);
+        try (var files = Files.list(from)) {
+            for (Path file : files.filter(Files::isRegularFile).toList()) {
+                Path target = open.resolve(file.getFileName());
+                Files.copy(file, target, StandardCopyOption.REPLACE_EXISTING);
+                if (PickleballLocalLayout.OPEN_SCRIPT_UNIX.equals(file.getFileName().toString())) {
+                    try {
+                        Files.setPosixFilePermissions(target, PosixFilePermissions.fromString("rwxr-xr-x"));
+                    } catch (UnsupportedOperationException ignored) {
+                        // Windows.
+                    }
+                }
+            }
+        }
     }
 
     private static void exportFlat(Path root, PrintStream out, PrintStream err) throws IOException {

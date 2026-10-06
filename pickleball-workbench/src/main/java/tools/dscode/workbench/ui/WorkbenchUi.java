@@ -12,13 +12,17 @@ public final class WorkbenchUi {
     }
 
     public static void launch(Path projectRoot) {
+        launch(projectRoot, null, null);
+    }
+
+    public static void launch(Path projectRoot, String runId, String agentId) {
         Runnable show = () -> {
             WorkbenchTheme.install();
             WorkbenchController services = new WorkbenchController(projectRoot);
             services.attachUi();
             WorkbenchAttachServer attach = WorkbenchAttachServer.start(services, projectRoot);
             WorkbenchUiController controller = new WorkbenchUiController(projectRoot, services);
-            WorkbenchFrame frame = new WorkbenchFrame(controller, attach);
+            WorkbenchFrame frame = new WorkbenchFrame(controller, attach, runId, agentId);
             frame.setVisible(true);
             // JFXPanel starts JavaFX with a SecondaryLoop on this EDT. Defer it until
             // after the window is showing so the unnamed-module warning is not a hang.

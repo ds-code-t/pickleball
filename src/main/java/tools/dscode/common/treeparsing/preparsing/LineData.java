@@ -14,6 +14,7 @@ import java.util.regex.Pattern;
 
 import static io.cucumber.core.runner.StepBase.getInheritancePhrase;
 import static tools.dscode.common.GlobalConstants.BOOK_END;
+import static tools.dscode.common.GlobalConstants.META_TEXT_SEPARATOR;
 import static tools.dscode.common.treeparsing.RegexUtil.stripObscureNonText;
 
 public abstract class LineData implements Cloneable {
@@ -37,6 +38,7 @@ public abstract class LineData implements Cloneable {
     public int inheritedConditionalState;
     public int previousSiblingConditionalState = 1;
     public StepBase stepExtension;
+    private boolean deferConditionalChain;
 
 
     public void setInheritance(StepBase currentStep) {
@@ -163,7 +165,11 @@ public abstract class LineData implements Cloneable {
     public void addPhrase(String phraseText, char termination, int lineComponentIndex) {
         String phraseString = phraseText.replace(BOOK_END, "") + termination;
         if (lineComponentIndex == 0) {
-            phrases.add(new Phrase(phraseText, termination, this));
+            boolean defer = deferConditionalChain || opensConditionalChain(phraseText);
+            phrases.add(new Phrase(phraseText, termination, this, null, !defer));
+            if (defer) {
+                deferConditionalChain = true;
+            }
             runningText += phraseString;
         } else {
             if (lineComponents.size() < lineComponentIndex) {
@@ -175,6 +181,33 @@ public abstract class LineData implements Cloneable {
                 );
             }
         }
+    }
+
+    /**
+     * A conditional phrase, and every later comma phrase in that sentence,
+     * is constructed without evaluating mappings, expressions, or $ functions.
+     */
+    static boolean opensConditionalChain(String phraseText) {
+        String stripped = stripConditionalMeta(phraseText);
+        return stripped.matches("(?is)^(?:(?:and|or|the)\\b\\s*)*(?:then\\b\\s*)?(?:else\\s+if|else|if|until)\\b.*")
+                || stripped.matches("(?is)^then\\b.*");
+    }
+
+    private static String stripConditionalMeta(String phraseText) {
+        if (phraseText == null || phraseText.isBlank()) {
+            return "";
+        }
+        String stripped = phraseText;
+        int start = stripped.indexOf(META_TEXT_SEPARATOR);
+        while (start >= 0) {
+            int end = stripped.indexOf(META_TEXT_SEPARATOR, start + META_TEXT_SEPARATOR.length());
+            if (end < 0) {
+                break;
+            }
+            stripped = stripped.substring(0, start) + stripped.substring(end + META_TEXT_SEPARATOR.length());
+            start = stripped.indexOf(META_TEXT_SEPARATOR);
+        }
+        return stripped.trim();
     }
 
     /**

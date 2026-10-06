@@ -143,7 +143,7 @@ Prefer `DiagnosticCli` over custom Maven-classpath/JShell workflows for routine 
     report.html           # one-page local render
 ```
 
-When `.pickleball/current.json` is complete, new handoffs go under `.pickleball/v/<version>/investigations/` instead. Legacy `.pickleball/investigations/` remains when no current pointer exists.
+New handoffs always go to `.pickleball/investigations/<id>/`, even when `.pickleball/current.json` is complete. Do not delete an existing `v/<version>/investigations` tree. If the root path for an id is absent, read that legacy versioned path.
 
 Input is investigation JSON from a file or stdin (`-`) plus the consumer project root. The command prints the project-relative `report.html` path. JSON is the source of truth. HTML renders that JSON plus at most two screenshots *linked* from the existing diagnostic pack; extra screenshot paths are ignored, and a missing image becomes a short note rather than a failed emit. The writer does not copy `reports/diagnostic-runs/` and does not change `pkb_diagnostic_output`. Do not embed PNG bytes in investigation JSON. Headless Workbench MCP exposes the same emit as `workbench_investigation_emit` and returns only that relative report path. After emit, chat prints the six-line bottom-line block from `docs/consumer-agent-guide.md`, then that path. Portable `report.html` is an indented list in Gherkin/business-first order. Do not use Mermaid.
 
@@ -183,7 +183,7 @@ links[]              # optional workbench_go / wb:// targets
 
 Do not parse Gherkin in the Workbench controller to invent `executionMap`. If the agent omitted it, derive it from `events.jsonl` at emit. v1 JSON still renders. Workbench Report is the same JSON.
 
-`export-guidance` does not manage or delete `.pickleball/investigations/` or versioned `v/<version>/investigations/`.
+`export-guidance` does not manage or delete `.pickleball/investigations/` or any legacy `v/<version>/investigations/` tree. `gc-versions` removes an expired version's guidance and workbench state only, and leaves that investigations tree in place.
 
 ## Outcomes and completion
 

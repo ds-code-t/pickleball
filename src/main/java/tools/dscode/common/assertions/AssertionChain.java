@@ -134,7 +134,9 @@ public class AssertionChain {
                     emitText += nextPhrase.getText() + nextPhrase.termination + " ";
                     lastPhrase = nextPhrase;
                 }
-                runningStep.childSteps.add(runningStep.modifyStepExtension(emitText));
+                runningStep.childSteps.add(runningStep.modifyStepExtension(
+                        emitText,
+                        runningStep.inheritedGherkinArgument()));
             }
         }
     }

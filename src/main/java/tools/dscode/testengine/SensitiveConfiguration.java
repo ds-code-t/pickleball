@@ -20,7 +20,8 @@ public final class SensitiveConfiguration {
             "pkb_rp_oauth_client_secret",
             "pkb_rp_keystore_password",
             "pkb_rp_truststore_password",
-            "pkb_rp_http_proxy_password"
+            "pkb_rp_http_proxy_password",
+            PKB_props.PKB_DRIVER_DOWNLOAD_PROXY
     );
 
     /* Conservative fallback so new secret-like RunVars cannot bypass redaction before being audited above. */

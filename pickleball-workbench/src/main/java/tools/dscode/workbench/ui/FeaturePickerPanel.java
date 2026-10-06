@@ -57,7 +57,7 @@ final class FeaturePickerPanel extends JPanel {
         WorkbenchTheme.surface(this);
         setBorder(WorkbenchTheme.cardBorder());
         setPreferredSize(new Dimension(300, 640));
-        setMinimumSize(new Dimension(240, 320));
+        setMinimumSize(new Dimension(0, 0));
 
         add(northChrome(), BorderLayout.NORTH);
         add(labeled("Scenarios", scenarioList), BorderLayout.CENTER);

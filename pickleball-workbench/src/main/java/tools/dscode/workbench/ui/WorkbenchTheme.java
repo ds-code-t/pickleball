@@ -149,6 +149,15 @@ final class WorkbenchTheme {
         split.setContinuousLayout(true);
         split.setDividerSize(8);
         split.setBackground(BACKGROUND);
+        // Minimum sizes are what stop a drag. Zero them so either side can
+        // take almost the whole window.
+        relax(split.getLeftComponent());
+        relax(split.getRightComponent());
+        relax(split);
+    }
+
+    static void relax(java.awt.Component component) {
+        if (component != null) component.setMinimumSize(new Dimension(0, 0));
     }
 
     static void surface(JComponent component) {

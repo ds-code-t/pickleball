@@ -36,10 +36,23 @@ public final class Phrase extends PhraseData {
         isTopContext = true;
     }
     public Phrase(String inputText, Character delimiter, LineData parsedLine) {
-        super(inputText, delimiter, parsedLine, null);
+        this(inputText, delimiter, parsedLine, null, true);
     }
     public Phrase(String inputText, Character delimiter, LineData parsedLine, PhraseData previousPhrase) {
-        super(inputText, delimiter, parsedLine, previousPhrase);
+        this(inputText, delimiter, parsedLine, previousPhrase, true);
+    }
+    public Phrase(
+            String inputText,
+            Character delimiter,
+            LineData parsedLine,
+            PhraseData previousPhrase,
+            boolean resolveEvaluations
+    ) {
+        super(inputText, delimiter, parsedLine, previousPhrase, resolveEvaluations);
+    }
+
+    @Override
+    protected void afterParse() {
         if (!isOperationPhrase) {
             elementMatches = new ArrayList<>(elementMatches.stream().filter(e -> !e.isPlaceHolder()).toList());
         }
@@ -77,7 +90,9 @@ public final class Phrase extends PhraseData {
                         lastPhrase = nextPhrase;
                     }
                     StepExtension runningStep = getRunningStep();
-                    runningStep.childSteps.add(runningStep.modifyStepExtension(emitText));
+                    runningStep.childSteps.add(runningStep.modifyStepExtension(
+                            emitText,
+                            runningStep.inheritedGherkinArgument()));
                     setNextPhrase(null);
                     return false;
                 }
@@ -92,6 +107,7 @@ public final class Phrase extends PhraseData {
 
     @Override
     public PhraseData runPhrase() {
+        inheritParsingMapFromPrevious();
         executePhrase();
         resolveResults();
         setDefaultEntry(getRunningStep().stepEntry);
@@ -131,6 +147,9 @@ public final class Phrase extends PhraseData {
         }
         StepExtension currentStep = getRunningStep();
         if (shouldRun()) {
+            if (deferEvaluations && !evaluationsResolved && !suppressResolve && assertionChain == null) {
+                resolveForExecution();
+            }
             if (assertionChain == null) {
                 phraseEntry = currentStep.stepEntry.logWithType("PHRASE", toString(), currentStep.stepLogLevel).tags("phrase").start();
                 logToDefaultLevel("Running Phrase: " + this.resolvedText);
@@ -320,6 +339,14 @@ public final class Phrase extends PhraseData {
         return clone;
     }
     public PhraseData resolvePhrase() {
+        if (deferEvaluations || evaluationsResolved) {
+            // Construction already resolved an ordinary phrase, or a conditional
+            // phrase resolves once later in executePhrase. Do not evaluate again.
+            return this;
+        }
+        if (getResolvedPhrase() != null) {
+            return getResolvedPhrase();
+        }
         PhraseData resolvedPhrase = new Phrase(originalText, termination, parsedLine, getPreviousPhrase());
         setResolvedPhrase(resolvedPhrase);
         getResolvedPhrase().position = position;
@@ -331,7 +358,14 @@ public final class Phrase extends PhraseData {
     }
     public PhraseData getNextResolvedPhrase() {
         if (getNextPhrase() == null) return null;
-        PhraseData nextResolvedPhrase = getNextPhrase().resolvePhrase();
+        PhraseData next = getNextPhrase();
+        if (next.deferEvaluations) {
+            if (!next.shouldResolveBranchReferences()) {
+                next.suppressResolve = true;
+            }
+            return next;
+        }
+        PhraseData nextResolvedPhrase = next.resolvePhrase();
         nextResolvedPhrase.setPreviousPhrase(this);
         this.setNextPhrase(nextResolvedPhrase);
         return nextResolvedPhrase;
@@ -341,7 +375,15 @@ public final class Phrase extends PhraseData {
         return copyPhraseWithModifications(phrase, null, null, null);
     }
     public static Phrase copyPhraseWithModifications(Phrase phrase, Character newTermination, LineData parsedLine, PhraseData previous) {
-        Phrase clonePhrase = newTermination == null ? new Phrase(phrase.originalText, phrase.termination, phrase.parsedLine) : new Phrase(phrase.originalText, newTermination, parsedLine, previous);
+        Phrase clonePhrase;
+        if (phrase.deferEvaluations) {
+            // A clone of a conditional phrase stays structural until that clone executes.
+            clonePhrase = newTermination == null
+                    ? new Phrase(phrase.originalText, phrase.termination, phrase.parsedLine, null, false)
+                    : new Phrase(phrase.originalText, newTermination, parsedLine, previous, false);
+        } else {
+            clonePhrase = newTermination == null ? new Phrase(phrase.originalText, phrase.termination, phrase.parsedLine) : new Phrase(phrase.originalText, newTermination, parsedLine, previous);
+        }
         clonePhrase.operationInheritancePhrase = phrase.operationInheritancePhrase;
         clonePhrase.hasNo = phrase.hasNo;
         clonePhrase.assertionChainMembership = phrase.assertionChainMembership;

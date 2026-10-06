@@ -28,8 +28,12 @@ import tools.dscode.common.mappings.queries.Tokenized;
 import tools.dscode.common.treeparsing.parsedComponents.DataElementMatch;
 import tools.dscode.common.treeparsing.parsedComponents.ElementMatch;
 
+import tools.dscode.common.coordination.AgentCoordination;
+
 import java.io.InputStream;
 import java.lang.reflect.Array;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -77,9 +81,7 @@ public class ParsingMap extends MappingProcessor {
     public static final String CHROME_HEADLESS_CONFIG_KEY = "CHROME_HEADLESS";
 
     public static synchronized void initializeConfigs(String configuredPath) {
-        String path = configuredPath == null || configuredPath.isBlank()
-                ? DEFAULT_CONFIG_PATH
-                : configuredPath.trim();
+        String path = configPathForCurrentRun(configuredPath);
         JsonNode configsNode = loadConfigs(path);
         ObjectNode configs;
         if (configsNode instanceof ObjectNode objectNode) {
@@ -92,6 +94,23 @@ public class ParsingMap extends MappingProcessor {
         }
         applyBundledBrowserDefaults(configs);
         GLOBALS.root.set(CONFIGS_MAP_ROOT, configs);
+    }
+
+    /**
+     * A private run reads its own config copy. A normal test, with no current
+     * run, keeps the project path.
+     */
+    static String configPathForCurrentRun(String configuredPath) {
+        AgentCoordination.Run run = AgentCoordination.current();
+        if (run != null) {
+            Path copy = run.configDirectory();
+            if (Files.isDirectory(copy)) {
+                return copy.toString();
+            }
+        }
+        return configuredPath == null || configuredPath.isBlank()
+                ? DEFAULT_CONFIG_PATH
+                : configuredPath.trim();
     }
 
     static void applyBundledBrowserDefaults(ObjectNode configs) {
@@ -907,6 +926,21 @@ public class ParsingMap extends MappingProcessor {
                 if (reference == null) {
                     break;
                 }
+                if (isLazyBooleanExpression(reference.body())) {
+                    Object legacy = preserveWholeObject
+                            ? owner.legacyResolveWholeValue(
+                                    reference.fullText(current),
+                                    resolveEvaluations)
+                            : owner.legacyResolveWholeText(
+                                    reference.fullText(current),
+                                    resolveEvaluations);
+                    current = replace(
+                            current,
+                            reference.start(),
+                            reference.end() + 1,
+                            legacy == null ? "" : String.valueOf(legacy));
+                    continue;
+                }
 
                 Resolution resolution = resolveReference(
                         owner,
@@ -1265,12 +1299,70 @@ public class ParsingMap extends MappingProcessor {
             return value == '\'' || value == '"' || value == '`';
         }
 
+        private static boolean isLazyBooleanExpression(String body) {
+            if (body == null) {
+                return false;
+            }
+            String trimmed = body.trim();
+            return trimmed.startsWith("{") && trimmed.endsWith("}");
+        }
+
+        private static Reference lazyBooleanReference(
+                String input,
+                int index,
+                String open,
+                String close
+        ) {
+            if (!input.startsWith(open, index)) {
+                return null;
+            }
+            int end = LazyBooleanSides.matchingClose(input, index, open, close);
+            if (end < 0) {
+                return null;
+            }
+            String body = input.substring(
+                    index + open.length() - 1,
+                    end - close.length() + 1);
+            if (!body.startsWith("{") || !body.endsWith("}")) {
+                return null;
+            }
+            return new Reference(index, end - 1, body);
+        }
+
         private static Reference findInnermostReference(String input) {
             if (!looksLikeXml(input)) {
                 List<Integer> opens = new ArrayList<>();
+                char quote = 0;
+                boolean escaped = false;
                 for (int index = 0; index < input.length(); index++) {
                     char current = input.charAt(index);
+                    if (quote != 0) {
+                        if (escaped) {
+                            escaped = false;
+                        } else if (current == '\\') {
+                            escaped = true;
+                        } else if (current == quote) {
+                            quote = 0;
+                        }
+                    } else if (current == '\'' || current == '"' || current == '`') {
+                        quote = current;
+                    }
+                    boolean quoted = quote != 0 && current != quote;
+                    if (!quoted && input.startsWith("~[~{", index)) {
+                        Reference lazyTilde = lazyBooleanReference(
+                                input, index, "~[~{", "}~]~");
+                        if (lazyTilde != null) {
+                            return lazyTilde;
+                        }
+                    }
                     if (current == '<' && isReferenceOpen(input, index)) {
+                        if (!quoted) {
+                            Reference lazyAngle = lazyBooleanReference(
+                                    input, index, "<{", "}>");
+                            if (lazyAngle != null) {
+                                return lazyAngle;
+                            }
+                        }
                         opens.add(index);
                         continue;
                     }

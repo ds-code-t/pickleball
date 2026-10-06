@@ -7,7 +7,7 @@ plugins {
 }
 
 group = 'tools.dscode'
-version = '2.1.13'
+version = '2.1.14'
 
 repositories {
     mavenCentral()
@@ -90,6 +90,9 @@ dependencies {
     api("org.junit.platform:junit-platform-launcher:1.13.4")
     api("org.junit.jupiter:junit-jupiter-api:5.13.4")
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:5.13.4")
+    // cucumber-core is excluded from the test runtime so woven classes win.
+    // That exclude also drops transitives only cucumber-core requests.
+    testRuntimeOnly("io.cucumber:tag-expressions")
 
     api("com.google.guava:guava:33.5.0-jre")
     api("com.fasterxml.jackson.core:jackson-databind:2.20.0")

@@ -17,9 +17,16 @@ import org.openqa.selenium.remote.RemoteWebDriver;
 import org.openqa.selenium.remote.http.ClientConfig;
 import org.openqa.selenium.remote.service.DriverService;
 
+import tools.dscode.common.coordination.AgentCoordination;
+
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.io.File;
 import java.io.OutputStream;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -33,6 +40,8 @@ import static tools.dscode.common.mappings.ValueFormatting.MAPPER;
 import static tools.dscode.common.reporting.logging.LogForwarder.logInfo;
 
 public final class DriverConstruction {
+
+    private static final Object SELENIUM_MANAGER_LAUNCH = new Object();
 
     private DriverConstruction() {
     }
@@ -122,26 +131,153 @@ public final class DriverConstruction {
         ClientConfig clientConfig = buildClientConfig(getObject(driverConfig, "connection"));
 
         return switch (browserName) {
-            case "chrome" -> {
-                ChromeOptions options = buildChromeOptions(driverConfig, fullConfiguration, true);
-                ChromeDriverService service = buildChromeService(toObjectMap(getObject(driverConfig, "service")));
-
-                yield service != null && clientConfig != null ? new ChromeDriver(service, options, clientConfig)
-                        : service != null ? new ChromeDriver(service, options)
-                        : clientConfig != null ? new ChromeDriver(options, clientConfig)
-                        : new ChromeDriver(options);
-            }
-            case "edge" -> {
-                EdgeOptions options = buildEdgeOptions(driverConfig, fullConfiguration, true);
-                EdgeDriverService service = buildEdgeService(toObjectMap(getObject(driverConfig, "service")));
-
-                yield service != null && clientConfig != null ? new EdgeDriver(service, options, clientConfig)
-                        : service != null ? new EdgeDriver(service, options)
-                        : clientConfig != null ? new EdgeDriver(options, clientConfig)
-                        : new EdgeDriver(options);
-            }
+            case "chrome", "edge" -> launchLocalChromium(browserName, driverConfig, fullConfiguration, clientConfig);
             default -> throw new RuntimeException("Unsupported local browser: " + browserName);
         };
+    }
+
+    private static RemoteWebDriver launchLocalChromium(
+            String browserName,
+            ObjectNode driverConfig,
+            ObjectNode fullConfiguration,
+            ClientConfig clientConfig
+    ) throws Exception {
+        Map<String, Object> service = new LinkedHashMap<>(toObjectMap(getObject(driverConfig, "service")));
+        String preset = trimToNull(service.get("driverExecutable"));
+        String binary = trimToNull(getObject(driverConfig, "options").path("binary").asText(null));
+        if (preset == null) {
+            DriverDownloadFallback.prepareLaunch(browserName, service, binary);
+        }
+        ByteArrayOutputStream capture = new ByteArrayOutputStream();
+        try {
+            RemoteWebDriver driver = startChromium(browserName, driverConfig, fullConfiguration, clientConfig, service, capture);
+            if (preset == null) {
+                DriverDownloadFallback.keepOpenDriver(
+                        trimToNull(service.get("driverExecutable")), browserName, driverLog(service, capture));
+            }
+            return driver;
+        } catch (RuntimeException first) {
+            if (preset != null) {
+                throw first;
+            }
+            if (trimToNull(service.get("driverExecutable")) != null && executableSetupFailed(first)) {
+                logInfo("Could not set driverExecutable; continuing without it");
+                service.remove("driverExecutable");
+                try {
+                    RemoteWebDriver driver = startChromium(browserName, driverConfig, fullConfiguration, clientConfig, service, capture);
+                    DriverDownloadFallback.keepOpenDriver(
+                            trimToNull(service.get("driverExecutable")), browserName, driverLog(service, capture));
+                    return driver;
+                } catch (RuntimeException ignored) {
+                    first = ignored;
+                }
+            }
+            boolean sessionRetried = DriverDownloadFallback.isSessionVersionMismatch(first);
+            String recovered = DriverDownloadFallback.recoverExecutable(browserName, first, binary, false);
+            String current = trimToNull(service.get("driverExecutable"));
+            if (recovered == null || recovered.equals(current)) {
+                throw first;
+            }
+            service.put("driverExecutable", recovered);
+            capture.reset();
+            try {
+                RemoteWebDriver driver = startChromium(browserName, driverConfig, fullConfiguration, clientConfig, service, capture);
+                DriverDownloadFallback.keepOpenDriver(
+                        trimToNull(service.get("driverExecutable")), browserName, driverLog(service, capture));
+                return driver;
+            } catch (RuntimeException second) {
+                if (!DriverDownloadFallback.allowsAnotherSessionRetry(sessionRetried, second)) {
+                    throw second;
+                }
+                String again = DriverDownloadFallback.recoverExecutable(browserName, second, binary, false);
+                if (again == null || again.equals(recovered)) {
+                    throw second;
+                }
+                service.put("driverExecutable", again);
+                capture.reset();
+                RemoteWebDriver driver = startChromium(browserName, driverConfig, fullConfiguration, clientConfig, service, capture);
+                DriverDownloadFallback.keepOpenDriver(
+                        trimToNull(service.get("driverExecutable")), browserName, driverLog(service, capture));
+                return driver;
+            }
+        }
+    }
+
+    private static String driverLog(Map<String, Object> service, ByteArrayOutputStream capture) {
+        String captured = capture.toString(StandardCharsets.UTF_8);
+        if (!captured.isBlank()) {
+            return captured;
+        }
+        String logFile = trimToNull(service.get("logFile"));
+        if (logFile == null) {
+            return captured;
+        }
+        try {
+            return Files.readString(Path.of(logFile));
+        } catch (IOException failure) {
+            return captured;
+        }
+    }
+
+    private static boolean executableSetupFailed(RuntimeException failure) {
+        String message = failure.getMessage() == null ? "" : failure.getMessage().toLowerCase(Locale.ROOT);
+        return message.contains("executable") || message.contains("not a file") || message.contains("unable to find");
+    }
+
+    private static RemoteWebDriver startChromium(
+            String browserName,
+            ObjectNode driverConfig,
+            ObjectNode fullConfiguration,
+            ClientConfig clientConfig,
+            Map<String, Object> service,
+            ByteArrayOutputStream capture
+    ) {
+        boolean callsManager = trimToNull(service.get("driverExecutable")) == null;
+        if (!callsManager) {
+            return newChromiumDriver(browserName, driverConfig, fullConfiguration, clientConfig, service, capture);
+        }
+        synchronized (SELENIUM_MANAGER_LAUNCH) {
+            boolean offline = !DriverDownloadFallback.nativeDownloadsEnabled();
+            String previous = System.getProperty("SE_OFFLINE");
+            try {
+                if (offline) {
+                    System.setProperty("SE_OFFLINE", "true");
+                }
+                return newChromiumDriver(browserName, driverConfig, fullConfiguration, clientConfig, service, capture);
+            } finally {
+                if (offline) {
+                    if (previous == null) {
+                        System.clearProperty("SE_OFFLINE");
+                    } else {
+                        System.setProperty("SE_OFFLINE", previous);
+                    }
+                }
+            }
+        }
+    }
+
+    private static RemoteWebDriver newChromiumDriver(
+            String browserName,
+            ObjectNode driverConfig,
+            ObjectNode fullConfiguration,
+            ClientConfig clientConfig,
+            Map<String, Object> service,
+            ByteArrayOutputStream capture
+    ) {
+        if ("edge".equals(browserName)) {
+            EdgeOptions options = buildEdgeOptions(driverConfig, fullConfiguration, true);
+            EdgeDriverService built = buildEdgeService(service, capture);
+            return built != null && clientConfig != null ? new EdgeDriver(built, options, clientConfig)
+                    : built != null ? new EdgeDriver(built, options)
+                    : clientConfig != null ? new EdgeDriver(options, clientConfig)
+                    : new EdgeDriver(options);
+        }
+        ChromeOptions options = buildChromeOptions(driverConfig, fullConfiguration, true);
+        ChromeDriverService built = buildChromeService(service, capture);
+        return built != null && clientConfig != null ? new ChromeDriver(built, options, clientConfig)
+                : built != null ? new ChromeDriver(built, options)
+                : clientConfig != null ? new ChromeDriver(options, clientConfig)
+                : new ChromeDriver(options);
     }
 
     public static RemoteWebDriver createRemoteDriver(
@@ -192,8 +328,10 @@ public final class DriverConstruction {
 
         applyChromiumOptions(options, getObject(driverConfig, "options"), "driver.options for chrome");
         applyProviderCapabilities(options, getObject(driverConfig, "providerCapabilities"));
-        if (localDriver)
+        if (localDriver) {
+            applyRunBrowserProfile(options);
             applyDebugPort(options, "chrome", fullConfiguration);
+        }
         return options;
     }
 
@@ -211,8 +349,10 @@ public final class DriverConstruction {
 
         applyChromiumOptions(options, getObject(driverConfig, "options"), "driver.options for edge");
         applyProviderCapabilities(options, getObject(driverConfig, "providerCapabilities"));
-        if (localDriver)
+        if (localDriver) {
+            applyRunBrowserProfile(options);
             applyDebugPort(options, "edge", fullConfiguration);
+        }
         return options;
     }
 
@@ -303,6 +443,10 @@ public final class DriverConstruction {
     }
 
     public static ChromeDriverService buildChromeService(Map<String, Object> serviceMap) {
+        return buildChromeService(serviceMap, null);
+    }
+
+    static ChromeDriverService buildChromeService(Map<String, Object> serviceMap, OutputStream capture) {
         Map<String, Object> service = safeMap(serviceMap);
         if (service.isEmpty()) {
             return null;
@@ -312,7 +456,6 @@ public final class DriverConstruction {
 
         ChromeDriverService.Builder builder = new ChromeDriverService.Builder();
         applyCommonServiceSettings(builder, service);
-
         if (service.containsKey("appendLog")) {
             builder.withAppendLog(booleanOrDefault(service.get("appendLog"), false));
         }
@@ -340,11 +483,16 @@ public final class DriverConstruction {
                 builder.withLogLevel(logLevel);
             }
         }
+        attachLogCapture(builder, service, capture);
 
         return builder.build();
     }
 
     public static EdgeDriverService buildEdgeService(Map<String, Object> serviceMap) {
+        return buildEdgeService(serviceMap, null);
+    }
+
+    static EdgeDriverService buildEdgeService(Map<String, Object> serviceMap, OutputStream capture) {
         Map<String, Object> service = safeMap(serviceMap);
         if (service.isEmpty()) {
             return null;
@@ -354,7 +502,6 @@ public final class DriverConstruction {
 
         EdgeDriverService.Builder builder = new EdgeDriverService.Builder();
         applyCommonServiceSettings(builder, service);
-
         if (service.containsKey("appendLog")) {
             builder.withAppendLog(booleanOrDefault(service.get("appendLog"), false));
         }
@@ -382,8 +529,49 @@ public final class DriverConstruction {
                 builder.withLoglevel(logLevel);
             }
         }
+        attachLogCapture(builder, service, capture);
 
         return builder.build();
+    }
+
+    private static <DS extends DriverService, B extends DriverService.Builder<DS, B>> void attachLogCapture(
+            B builder,
+            Map<String, Object> service,
+            OutputStream capture
+    ) {
+        if (capture == null || trimToNull(service.get("logFile")) != null) {
+            return;
+        }
+        OutputStream configured = resolveLogOutput(service.get("logOutput"));
+        builder.withLogOutput(configured == null ? capture : new TeeOutput(configured, capture));
+    }
+
+    private static final class TeeOutput extends OutputStream {
+        private final OutputStream left;
+        private final OutputStream right;
+
+        private TeeOutput(OutputStream left, OutputStream right) {
+            this.left = left;
+            this.right = right;
+        }
+
+        @Override
+        public void write(int value) throws IOException {
+            left.write(value);
+            right.write(value);
+        }
+
+        @Override
+        public void write(byte[] buffer, int offset, int length) throws IOException {
+            left.write(buffer, offset, length);
+            right.write(buffer, offset, length);
+        }
+
+        @Override
+        public void flush() throws IOException {
+            left.flush();
+            right.flush();
+        }
     }
 
     public static <DS extends DriverService, B extends DriverService.Builder<DS, B>> void applyCommonServiceSettings(
@@ -485,6 +673,30 @@ public final class DriverConstruction {
 
     public static boolean hasRemoteUrl(ObjectNode driverConfig) {
         return trimToNull(driverConfig.path("connection").path("remoteUrl").asText(null)) != null;
+    }
+
+    public static void applyRunBrowserProfile(ChromiumOptions<?> options) {
+        Path profile = AgentCoordination.currentBrowserProfile();
+        if (profile == null || containsUserDataDir(options)) return;
+        try {
+            Files.createDirectories(profile);
+        } catch (IOException failure) {
+            return;
+        }
+        options.addArguments("--user-data-dir=" + profile.toAbsolutePath().normalize());
+    }
+
+    private static boolean containsUserDataDir(ChromiumOptions<?> options) {
+        for (String capability : List.of("goog:chromeOptions", "ms:edgeOptions")) {
+            Object raw = options.getCapability(capability);
+            if (!(raw instanceof Map<?, ?> map)) continue;
+            Object args = map.get("args");
+            if (!(args instanceof List<?> list)) continue;
+            for (Object arg : list) {
+                if (arg != null && arg.toString().contains("user-data-dir")) return true;
+            }
+        }
+        return false;
     }
 
     public static void applyDebugPort(ChromiumOptions<?> options, String browserName, ObjectNode fullConfiguration) {

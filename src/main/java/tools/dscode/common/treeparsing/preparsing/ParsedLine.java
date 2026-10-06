@@ -1,6 +1,8 @@
 package tools.dscode.common.treeparsing.preparsing;
 
+import io.cucumber.core.gherkin.messages.NGherkinFactory;
 import io.cucumber.core.runner.StepExtension;
+import io.cucumber.messages.types.InlinePickleArgument;
 import tools.dscode.common.assertions.AssertionChain;
 import tools.dscode.common.treeparsing.parsedComponents.PhraseData;
 
@@ -50,7 +52,33 @@ public final class ParsedLine extends LineData {
         }
 
         stepExtension.addDefinitionFlag(BLOCK_CONDITIONAL, DEBUG_LOGGING, _DEBUG_LOGGING, IGNORE_CHILDREN_IF_FALSE);
+        input = appendStoredInlineMarker(
+                input,
+                stepExtension.getInlineArgumentType(),
+                stepExtension.getInlineArgumentText());
+        return rewriteConditionalBranches(input);
+    }
 
+    /**
+     * A marker peeled from the end of the whole IF line belongs to the last
+     * branch. Putting it back keeps branches from sharing one inline table.
+     */
+    static String appendStoredInlineMarker(String input, String type, String argumentText) {
+        if (input == null || input.isBlank()
+                || type == null || type.isBlank()
+                || argumentText == null || argumentText.isBlank()) {
+            return input;
+        }
+        String marker = type.trim() + ":::" + argumentText.strip();
+        // The same marker may already sit on an earlier branch. Only an end
+        // marker is already in place; anything else was peeled from the last branch.
+        if (input.stripTrailing().endsWith(marker)) {
+            return input;
+        }
+        return input + " " + marker;
+    }
+
+    static String rewriteConditionalBranches(String input) {
         String returnText = "";
 
         String metaText = input.endsWith(":") ? "" : META_TEXT_SEPARATOR + " BLOCK_CONDITIONAL " + META_TEXT_SEPARATOR;
@@ -70,6 +98,22 @@ public final class ParsedLine extends LineData {
         if (input.endsWith(":") && !returnText.endsWith(":"))
             return returnText + " :";
         return returnText;
+    }
+
+    /**
+     * A branch {@code DT:::...|} overrides the IF line's data table or doc string
+     * for that branch only. Any other type, or no marker, keeps the inherited argument.
+     */
+    public static String gherkinArgumentForBranch(String branchStepText, String inheritedGherkinArgument) {
+        String inherited = inheritedGherkinArgument == null ? "" : inheritedGherkinArgument;
+        InlinePickleArgument.Extracted extracted = InlinePickleArgument.extract(branchStepText);
+        if (extracted == null) {
+            return inherited;
+        }
+        String inlineTable = NGherkinFactory.gherkinDataTableForInlineType(
+                extracted.argumentType(),
+                extracted.argumentText());
+        return inlineTable == null ? inherited : inlineTable;
     }
 
     private static final Pattern TOKEN_PATTERN =
@@ -125,6 +169,9 @@ public final class ParsedLine extends LineData {
     @Override
     public PhraseData runPhraseFromLine(PhraseData phrase) {
 //        setDefaultEntry(getRunningStep().stepEntry);
+        if (phrase.deferEvaluations && !phrase.shouldResolveBranchReferences()) {
+            phrase.suppressResolve = true;
+        }
         phrase.setOperationInheritanceIfNeeded();
 
         if (!phrase.getAssertion().isBlank() && phrase.assertionChainMembership == null && phrase.assertionChain == null) {

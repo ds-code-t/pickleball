@@ -305,10 +305,10 @@ Example compact rerun:
 -Dpkb_changed_variables=pkb_browser
 ```
 
-For an agent's bounded confirmation `mvn test` (not `PickleballTests` human defaults of `pretty` / `@all`), include diagnostic evidence controls, headless Chrome, and high parallelism when more than one scenario will run:
+For an agent's bounded confirmation, run the project wrapper (`mvnw` or `mvnw.cmd`, `gradlew` or `gradlew.bat`, or `java -jar` on the wrapper jar). Pick the script from the OS. Do not require a machine-wide Maven or Gradle install. This is not the `PickleballTests` human defaults of `pretty` / `@all`. Include diagnostic evidence controls, headless Chrome, and high parallelism when more than one scenario will run:
 
 ```text
--Dpkb_runvars="pkb_tags=@the-failing-tag, pkb_name=The failing scenario, pkb_browser=CHROME_HEADLESS, pkb_parallel=auto, pkb_reportingmode=diagnostic, pkb_loglevel=warn, pkb_reportretention=failed"
+-Dpkb_runvars="pkb_tags=@the-failing-tag, pkb_name=The failing scenario, pkb_browser=CHROME_HEADLESS, pkb_parallel=auto, pkb_reportingmode=diagnostic, pkb_loglevel=warn, pkb_reportretention=failed, pkb_compositeReport=false, pkb_scenarioReport=false"
 ```
 
 Lineage metadata is not execution configuration:
@@ -370,7 +370,7 @@ PKB_props.overrideRunVars(Map.of(
 ));
 ```
 
-Dry-run resolve does **not** start tests or browsers:
+Dry-run resolve does **not** start tests or browsers. `DiagnosticCli resolve-runvars` and Workbench `hint` preview the launcher JVM, not the Discover worker. Do not treat that preview, including its `pkb_environment`, as the environment Discover will use. Trust the run record after Discover.
 
 ```java
 PKB_props.ResolvedRunVars preview = PKB_props.resolveRunVars(values);
@@ -430,7 +430,9 @@ When operating in a consumer project:
 
 ## AI agents
 
-The agent-facing entry is Pickleball Workbench (`hint`, `discover`, `confirm` to find failures; `isolate` / `execute-step` for live debug). Set a **complete** Discover `pkb_runvars` rather than a partial overlay. Workbench `hint` prints the browser-ladder result and estimated integer parallel count. The browser ladder keeps a remote project `pkb_browser` (`SAUCE_*` / `GRID_*` / `REMOTE_*`); otherwise it prefers `CHROME_HEADLESS`. Unused Sauce/Grid yaml files are not auto-selected.
+The agent-facing entry is Pickleball Workbench. Run the consumer project's wrapper (`mvnw` or `mvnw.cmd`, `gradlew` or `gradlew.bat`, or `java -jar` on the wrapper jar). Pick the script from the OS. Do not require a machine-wide Maven or Gradle install. `hint`, `discover`, and `confirm` find failures. `pkb_tags`, `pkb_name`, and `pkb_example` narrow a run. When a Workbench window is already open, drive that session with `open-scenario`, `example`, `play`, `execute-step`, `stop`, and `diagnostic-run` so the person sees the result. Do not open the GUI for your own testing. Open it to show a person a specific run, or when they ask. Close it when you are done showing it. While testing for yourself, stay headless. Opening the window loads the run you already have. It does not start a second test. Do not click the JavaFX or WebView UI. When nobody is watching, `isolate` / `execute-step` stay the headless live-debug path. Set a **complete** Discover `pkb_runvars` rather than a partial overlay. Workbench `hint` prints the browser-ladder result and estimated integer parallel count. The browser ladder keeps a remote project `pkb_browser` (`SAUCE_*` / `GRID_*` / `REMOTE_*`); otherwise it prefers `CHROME_HEADLESS`. Unused Sauce/Grid yaml files are not auto-selected. A blocked local driver download does not fail the run: Selenium Manager is tried first unless `pkb_driver_download_native=false`, and the fallback is skipped only when `pkb_driver_download_proxy=false`. An explicit `driver.service.driverExecutable` skips both. The proxy value is redacted. Do not invent a `configs` proxy block and do not copy it onto `HTTPS_PROXY` or `SE_PROXY`. See [Execution Configuration](configuration.md).
+
+Read the short log `.pickleball/agent-log` before a run, after a run, and during a long session, instead of the dense diagnostic log. Use your own run id. When a Workbench window is already open, only one agent drives it. Other agents stay headless on their own run ids. Write start and stop lines. Put purpose and findings on the run record. Use the inbox only for a short note to one named agent. Taking that note deletes it. A note for every agent is a post, not an inbox file, and listing or taking does not delete it. `pkb_run_id`, `pkb_agent_id`, `pkb_run_group`, `pkb_run_sequence`, `pkb_run_who`, and `pkb_run_why` are coordination metadata, not RunVars, so a confirm replay does not reuse another run's directory or browser profile.
 
 ```text
 pkb_browser=<browser ladder>
@@ -438,9 +440,11 @@ pkb_parallel=<conservative JVM estimate or auto>
 pkb_reportingmode=diagnostic
 pkb_loglevel=warn
 pkb_reportretention=failed
+pkb_compositeReport=false
+pkb_scenarioReport=false
 ```
 
-plus the narrowest useful `pkb_tags` / `pkb_name`. Multi-scenario Discover/Confirm use that high parallelism. Live isolate stays one paused scenario on a headless CLI session started with Maven-exec `isolate`.
+plus the narrowest useful `pkb_tags` / `pkb_name` / `pkb_example`. Those three narrow which scenarios and Examples rows run. They are not a second player. `example` and `pkb_example` are the same Examples-row filter. A normal Scenario counts as row 1. `--example='1 2 5 3.4 7-11'` keeps those rows in each scenario that tags and name already selected. `pkb_example` is not a tag. Multi-scenario Discover/Confirm use that high parallelism. When nobody is watching, live isolate stays one paused scenario (`pkb_parallel=1`) on a headless session started with `isolate`. When a Workbench window is already open, the same session commands drive that window. Do not open the GUI for your own testing. Open it to show a person a specific run, or when they ask. Close it when you are done showing it. While testing for yourself, stay headless. Opening the window loads the run you already have. It does not start a second test.
 
 After Discover, inspect `pkb_run_profile` from `run-catalog.json`, `run-index.json`, or `summary.json`. Confirm and live isolate replay that retained profile through `pkb_runvars` (LastDiscoverSnapshot) unless the snapshot is marked sealed, in which case the next worker launch uses `-Dpkb_overriderunvars=<compact complete map>`. If there is no prior Discover snapshot, Workbench says so; it does not silently re-resolve from project defaults. The Workbench sealed-RunVars panel, if unused, changes no behavior; Apply writes a sealed snapshot for the **next** launch and does not mutate an in-flight worker.
 

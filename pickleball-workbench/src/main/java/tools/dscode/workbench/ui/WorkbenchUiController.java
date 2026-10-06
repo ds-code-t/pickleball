@@ -58,6 +58,10 @@ final class WorkbenchUiController implements AutoCloseable {
         this.services = services;
     }
 
+    WorkbenchServices services() {
+        return services;
+    }
+
     State refresh() {
         try {
             manifest = services.synchronizationStatus();
@@ -314,8 +318,27 @@ final class WorkbenchUiController implements AutoCloseable {
             String exampleLabel
     ) {
         services.loadPickerScenario(
-                lines, originFile, scenarioName, startLine, endLine, exampleRow, exampleLabel
+                lines, originFile, scenarioName, startLine, endLine, exampleRow, exampleLabel, ""
         );
+    }
+
+    void loadPickerScenario(
+            java.util.List<String> lines,
+            Path originFile,
+            String scenarioName,
+            int startLine,
+            int endLine,
+            int exampleRow,
+            String exampleLabel,
+            String exampleSelector
+    ) {
+        services.loadPickerScenario(
+                lines, originFile, scenarioName, startLine, endLine, exampleRow, exampleLabel, exampleSelector
+        );
+    }
+
+    void selectExample(String selector) {
+        services.selectExample(selector);
     }
 
     void addLeaseListener(java.util.function.Consumer<WorkbenchControlLeaseSnapshot> listener) {

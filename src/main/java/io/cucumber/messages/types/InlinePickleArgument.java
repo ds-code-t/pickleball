@@ -6,6 +6,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
+import static tools.dscode.common.GlobalConstants.BOOK_END;
+
 public final class InlinePickleArgument {
 
     private static final Pattern INLINE_ARGUMENT_MARKER = Pattern.compile("\\b([A-Z]+):::");
@@ -18,12 +20,12 @@ public final class InlinePickleArgument {
             return null;
         }
 
-        String strippedText = text.stripTrailing();
-        if (!strippedText.endsWith("|")) {
+        String closed = closedInlineArgumentText(text);
+        if (closed == null) {
             return null;
         }
 
-        var matcher = INLINE_ARGUMENT_MARKER.matcher(strippedText);
+        var matcher = INLINE_ARGUMENT_MARKER.matcher(closed);
         String type = null;
         int markerStart = -1;
         int markerEnd = -1;
@@ -37,13 +39,58 @@ public final class InlinePickleArgument {
             return null;
         }
 
-        String argumentText = strippedText.substring(markerEnd).strip();
-        if (argumentText.isEmpty()) {
+        String argumentText = closed.substring(markerEnd).strip();
+        if (argumentText.isEmpty() || !argumentText.endsWith("|")) {
             return null;
         }
 
-        String stepText = strippedText.substring(0, markerStart).stripTrailing();
+        String stepText = closed.substring(0, markerStart).stripTrailing();
         return new Extracted(stepText, type, argumentText);
+    }
+
+    /**
+     * The marker must still end with {@code |}. A backtick wrap, bookend, quote,
+     * or the sentence period LineData appends may follow that pipe; those closers
+     * are not part of the argument text.
+     */
+    private static String closedInlineArgumentText(String text) {
+        String value = text.stripTrailing();
+        boolean changed = true;
+        while (changed && !value.isEmpty()) {
+            changed = false;
+            if (value.endsWith(".") && !value.endsWith("..")) {
+                String withoutPeriod = value.substring(0, value.length() - 1).stripTrailing();
+                if (endsWithInlineCloser(withoutPeriod)) {
+                    value = withoutPeriod;
+                    changed = true;
+                    continue;
+                }
+            }
+            if (value.length() >= 2) {
+                char first = value.charAt(0);
+                char last = value.charAt(value.length() - 1);
+                if (first == last && isInlineWrapper(first)) {
+                    value = value.substring(1, value.length() - 1).strip();
+                    changed = true;
+                }
+            }
+        }
+        value = value.stripTrailing();
+        return value.endsWith("|") ? value : null;
+    }
+
+    private static boolean endsWithInlineCloser(String value) {
+        if (value.endsWith("|")) {
+            return true;
+        }
+        return !value.isEmpty() && isInlineWrapper(value.charAt(value.length() - 1));
+    }
+
+    private static boolean isInlineWrapper(char character) {
+        return character == '`'
+                || character == '\''
+                || character == '"'
+                || character == BOOK_END.charAt(0);
     }
 
     public record Extracted(String stepText, String argumentType, String argumentText) {

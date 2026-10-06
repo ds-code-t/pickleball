@@ -56,18 +56,30 @@ public record WorkbenchProject(
         if (isWindows() && Files.isRegularFile(windowsPath)) return windowsPath;
         if (Files.isRegularFile(unixPath)) return unixPath;
         if (Files.isRegularFile(windowsPath)) return windowsPath;
-        if (isWindows()) {
-            return Path.of(type == Type.MAVEN ? "mvn.cmd" : "gradle.bat");
-        }
-        return Path.of(type == Type.MAVEN ? "mvn" : "gradle");
+        Path jar = wrapperJar(buildRoot, type);
+        if (Files.isRegularFile(jar)) return jar;
+        String script = isWindows() ? windows : unix;
+        throw new IllegalArgumentException(
+                "No project wrapper for " + type + " at " + buildRoot
+                        + ". Expected " + script + " or " + jar
+                        + ". Pickleball runs the project wrapper and does not use a machine-wide Maven or Gradle install."
+        );
+    }
+
+    static Path wrapperJar(Path buildRoot, Type type) {
+        return type == Type.MAVEN
+                ? buildRoot.resolve(".mvn").resolve("wrapper").resolve("maven-wrapper.jar")
+                : buildRoot.resolve("gradle").resolve("wrapper").resolve("gradle-wrapper.jar");
     }
 
     private static boolean hasWrapper(Path directory, Type type) {
         return type == Type.MAVEN
                 ? Files.isRegularFile(directory.resolve("mvnw"))
                     || Files.isRegularFile(directory.resolve("mvnw.cmd"))
+                    || Files.isRegularFile(wrapperJar(directory, type))
                 : Files.isRegularFile(directory.resolve("gradlew"))
-                    || Files.isRegularFile(directory.resolve("gradlew.bat"));
+                    || Files.isRegularFile(directory.resolve("gradlew.bat"))
+                    || Files.isRegularFile(wrapperJar(directory, type));
     }
 
     static boolean isWindows() {

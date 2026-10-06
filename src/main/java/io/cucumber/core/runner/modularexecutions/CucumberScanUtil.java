@@ -12,6 +12,7 @@ import io.cucumber.core.runner.StepExtension;
 import io.cucumber.core.runtime.FeaturePathFeatureSupplier;
 import org.intellij.lang.annotations.Language;
 import tools.dscode.testengine.DynamicSuiteConfigUtils;
+import tools.dscode.testengine.ExampleRowFilter;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -38,6 +39,7 @@ import static io.cucumber.core.runner.ScenarioStep.createScenarioStep;
 import static tools.dscode.common.GlobalConstants.COMPONENT_TAG_META_CHAR;
 import static tools.dscode.common.util.Reflect.getProperty;
 import static tools.dscode.testengine.DynamicSuiteConfigUtils.getFeaturePaths;
+import static tools.dscode.testengine.PKB_props.PKB_EXAMPLE;
 import static tools.dscode.testengine.PKB_props.PKB_FEATURES;
 import static tools.dscode.testengine.PKB_props.PKB_FEATURE_NAME;
 import static tools.dscode.testengine.PKB_props.PKB_LIMIT;
@@ -75,6 +77,7 @@ public final class CucumberScanUtil {
      * - pkb_features — comma-separated feature paths/URIs → cucumber.features
      * - pkb_tags — tag expression → cucumber.filter.tags
      * - pkb_name — scenario name regex → cucumber.filter.name
+     * - pkb_example — Examples-row filter applied after tags, name, and feature name. Not a Cucumber alias.
      * - pkb_order — lexical | reverse | random | random:&lt;seed&gt; → cucumber.execution.order
      * - pkb_limit — max scenarios to return → cucumber.execution.limit
      * <p>
@@ -82,15 +85,21 @@ public final class CucumberScanUtil {
      * input map (even if the value is null or blank), that value is used. When neither key is
      * present, paths default to {@link DynamicSuiteConfigUtils#getFeaturePaths()}.
      * <p>
-     * At least one scenario-level filter (tags, scenario name, or feature name) must have a
-     * non-blank value; otherwise an empty list is returned. When filters are present but
-     * nothing matches, {@link IllegalArgumentException} is thrown with filter details.
+     * At least one scenario-level filter (tags, scenario name, feature name, or example rows)
+     * must have a non-blank value; otherwise an empty list is returned. When filters are
+     * present but nothing matches, {@link IllegalArgumentException} is thrown with filter
+     * details. Invalid {@code pkb_example} syntax is rejected before feature IO.
      */
     public static List<Pickle> listPickles(Map<String, String> cucumberProps) {
         Objects.requireNonNull(cucumberProps, "cucumberProps");
 
         if (!hasScenarioLevelFilters(cucumberProps)) {
             return List.of();
+        }
+
+        String example = trimToNull(cucumberProps.get(PKB_EXAMPLE));
+        if (example != null) {
+            ExampleRowFilter.parse(example);
         }
 
         Map<String, String> effectiveProps = normalizePkbProps(cucumberProps);
@@ -117,7 +126,14 @@ public final class CucumberScanUtil {
                 .collect(Collectors.toCollection(ArrayList::new));
 
         if (pickles.isEmpty()) {
-            throw noScenariosMatchedException(effectiveProps, featureName, featureUris);
+            throw noScenariosMatchedException(effectiveProps, featureName, featureUris, example);
+        }
+
+        if (example != null) {
+            pickles = new ArrayList<>(ExampleRowFilter.filterPickles(example, pickles));
+            if (pickles.isEmpty()) {
+                throw noScenariosMatchedException(effectiveProps, featureName, featureUris, example);
+            }
         }
 
         return applyOrderAndLimit(options, pickles);
@@ -223,7 +239,8 @@ public final class CucumberScanUtil {
                 || hasNonBlankFilterValue(inputProps, FILTER_TAGS_PROPERTY_NAME)
                 || hasNonBlankFilterValue(inputProps, PKB_NAME)
                 || hasNonBlankFilterValue(inputProps, FILTER_NAME_PROPERTY_NAME)
-                || hasNonBlankFilterValue(inputProps, PKB_FEATURE_NAME);
+                || hasNonBlankFilterValue(inputProps, PKB_FEATURE_NAME)
+                || hasNonBlankFilterValue(inputProps, PKB_EXAMPLE);
     }
 
     private static boolean hasNonBlankFilterValue(Map<String, String> props, String key) {
@@ -237,11 +254,13 @@ public final class CucumberScanUtil {
     private static IllegalArgumentException noScenariosMatchedException(
             Map<String, String> effectiveProps,
             String featureName,
-            List<String> featureUris
+            List<String> featureUris,
+            String example
     ) {
         StringBuilder message = new StringBuilder("No scenarios matched the provided filters:");
         appendFilterDetail(message, "tags", effectiveProps.get(FILTER_TAGS_PROPERTY_NAME));
         appendFilterDetail(message, "name", effectiveProps.get(FILTER_NAME_PROPERTY_NAME));
+        appendFilterDetail(message, "example", example);
         appendFilterDetail(message, "featureName", featureName);
         if (!featureUris.isEmpty()) {
             message.append(" features=[").append(String.join(",", featureUris)).append(']');
@@ -278,6 +297,7 @@ public final class CucumberScanUtil {
 
         props.remove(PKB_TAGS);
         props.remove(PKB_NAME);
+        props.remove(PKB_EXAMPLE);
         props.remove(PKB_ORDER);
         props.remove(PKB_LIMIT);
         props.remove(PKB_FEATURES);

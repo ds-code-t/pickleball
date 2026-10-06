@@ -137,7 +137,8 @@ public final class DiagnosticCli {
         body.put("runProfileFingerprint", resolved.fingerprint());
         body.put("runVars", resolved.runVars());
         body.put("provenance", resolved.provenance());
-        out.println("Dry-run resolve (does not start tests or browsers):");
+        out.println("Dry-run resolve of the launcher JVM, not the Discover worker (does not start tests, browsers, or Discover):");
+        out.println("Do not treat resolve-runvars as the environment Discover will use. Trust the environment on the run record after Discover.");
         out.println(json().writeValueAsString(body));
         out.println("Sealed launch uses -Dpkb_overriderunvars=<complete compact map>, never -Dpkb_run_profile=.");
         out.println();

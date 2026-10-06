@@ -7,7 +7,7 @@ A consumer normally needs the Pickleball test dependency and one runner extendin
 ## Requirements
 
 - Java 21
-- Maven 3.9 or newer, or an equivalent Gradle setup
+- the project's wrapper: `mvnw` or `mvnw.cmd`, `gradlew` or `gradlew.bat`, or `java -jar` on the wrapper jar. Pick the script from the OS. Do not require a machine-wide Maven or Gradle install
 - a Selenium-supported browser for browser scenarios
 
 ## Maven dependency
@@ -80,7 +80,11 @@ Named profile definitions use the same shared/local idea: define shared profiles
 ## Run
 
 ```bash
-mvn test
+./mvnw test
+```
+
+```powershell
+.\mvnw.cmd test
 ```
 
 ## Launch the matching Workbench
@@ -88,10 +92,14 @@ mvn test
 The Pickleball dependency carries its version-matched, controller-only Workbench as an opaque nested thin JAR. Launch it from the consumer test classpath, or `java -jar` the published Pickleball artifact; do not add or version a second Workbench dependency:
 
 ```bash
-mvn -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java \
+./mvnw -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java \
   -Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher \
   -Dexec.classpathScope=test \
   "-Dexec.args=ui ."
+```
+
+```powershell
+.\mvnw.cmd -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java "-Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher" "-Dexec.classpathScope=test" "-Dexec.args=ui ."
 ```
 
 ```bash
@@ -103,7 +111,7 @@ After `export-guidance`, `.pickleball/open/pickleball-workbench.sh` (`.cmd` / `.
 Filter normally with RunVars such as:
 
 ```bash
-mvn test "-Dpkb_tags=@forms and not @dialogs"
+./mvnw test "-Dpkb_tags=@forms and not @dialogs"
 ```
 
 ## Named profiles
@@ -115,14 +123,16 @@ qa:
   pkb_browser: CHROME_HEADLESS
 ```
 
+`pkb_browser` selects a yaml config. Local Chrome and Edge still start through Selenium. When that config has no `driver.service.driverExecutable`, Selenium Manager runs first. If it cannot download a driver, Pickleball tries a best-effort Chrome for Testing or Edge driver and caches it. A blocked download is a log line, not a test failure. Set `pkb_driver_download_proxy=false` to skip that fallback, or `pkb_driver_download_native=false` to keep Selenium Manager off the network for the launch. Do not put the download proxy in the browser yaml. See [Execution Configuration](configuration.md).
+
 ```bash
-mvn test -Dpkb_profile=qa
+./mvnw test -Dpkb_profile=qa
 ```
 
 Multiple profile names compose left-to-right:
 
 ```bash
-mvn test -Dpkb_profile=qa,browser_firefox
+./mvnw test -Dpkb_profile=qa,browser_firefox
 ```
 
 A named profile automatically receives missing project execution-context RunVars (`pkb_glue`, `pkb_features`, `pkb_datapath`, `pkb_callpath`, `pkb_componentpath`, and `pkb_configpath`) when those values exist in normal project configuration. Optional RunVars do not implicitly inherit.
@@ -132,7 +142,7 @@ A named profile automatically receives missing project execution-context RunVars
 For automation or an AI agent, use `pkb_runvars` as the direct input:
 
 ```bash
-mvn test "-Dpkb_runvars=pkb_tags=@smoke, pkb_browser=CHROME_HEADLESS"
+./mvnw test "-Dpkb_runvars=pkb_tags=@smoke, pkb_browser=CHROME_HEADLESS"
 ```
 
 Project wiring omitted from a controlled input inherits only the six execution-context RunVars listed above. This lets a controlled rerun specify what changes without copying repetitive glue/resource wiring.

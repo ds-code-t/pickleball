@@ -84,6 +84,22 @@ public interface WorkbenchServices extends AutoCloseable {
         loadPickerScenario(lines, originFile, scenarioName, startLine, endLine);
     }
 
+    default void loadPickerScenario(
+            List<String> lines,
+            Path originFile,
+            String scenarioName,
+            int startLine,
+            int endLine,
+            int exampleRow,
+            String exampleLabel,
+            String exampleSelector
+    ) {
+        loadPickerScenario(lines, originFile, scenarioName, startLine, endLine, exampleRow, exampleLabel);
+    }
+
+    default void selectExample(String selector) {
+    }
+
     void loadDefaultDemo();
 
     void replaceLiveDocument(List<String> lines);

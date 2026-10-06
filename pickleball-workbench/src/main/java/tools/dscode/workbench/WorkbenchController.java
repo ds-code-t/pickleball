@@ -175,8 +175,32 @@ public final class WorkbenchController implements WorkbenchServices {
             int exampleRow,
             String exampleLabel
     ) {
+        loadPickerScenario(lines, originFile, scenarioName, startLine, endLine, exampleRow, exampleLabel, "");
+    }
+
+    @Override
+    public void loadPickerScenario(
+            List<String> lines,
+            Path originFile,
+            String scenarioName,
+            int startLine,
+            int endLine,
+            int exampleRow,
+            String exampleLabel,
+            String exampleSelector
+    ) {
         requireMutating();
-        playback.loadScenario(lines, originFile, scenarioName, startLine, endLine, exampleRow, exampleLabel);
+        playback.loadScenario(
+                lines, originFile, scenarioName, startLine, endLine, exampleRow, exampleLabel, exampleSelector
+        );
+        publishLiveBufferSidecar();
+        notifyPlayer();
+    }
+
+    @Override
+    public void selectExample(String selector) {
+        requireMutating();
+        playback.selectExample(selector);
         publishLiveBufferSidecar();
         notifyPlayer();
     }

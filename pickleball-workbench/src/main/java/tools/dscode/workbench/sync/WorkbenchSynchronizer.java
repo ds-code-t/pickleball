@@ -387,10 +387,14 @@ public final class WorkbenchSynchronizer {
         }
     }
 
-    private static List<String> executableCommand(Path launcher, List<String> args) {
+    static List<String> executableCommand(Path launcher, List<String> args) {
         String name = launcher.getFileName() == null ? launcher.toString() : launcher.getFileName().toString();
         List<String> command = new ArrayList<>();
-        if (WorkbenchProject.isWindows() && (name.endsWith(".cmd") || name.endsWith(".bat"))) {
+        if (name.endsWith(".jar")) {
+            command.add(javaExecutable());
+            command.add("-jar");
+            command.add(launcher.toString());
+        } else if (WorkbenchProject.isWindows() && (name.endsWith(".cmd") || name.endsWith(".bat"))) {
             command.add("cmd.exe");
             command.add("/d");
             command.add("/c");
@@ -403,6 +407,12 @@ public final class WorkbenchSynchronizer {
         }
         command.addAll(args);
         return command;
+    }
+
+    private static String javaExecutable() {
+        String binary = WorkbenchProject.isWindows() ? "java.exe" : "java";
+        Path bin = Path.of(System.getProperty("java.home"), "bin", binary);
+        return Files.isRegularFile(bin) ? bin.toString() : binary;
     }
 
     private static String gradleInitScript() {

@@ -162,12 +162,61 @@ class WorkbenchSynchronizerTest {
         Path maven = tempDir.resolve("maven");
         Files.createDirectories(maven);
         Files.writeString(maven.resolve("pom.xml"), "<project/>");
+        Path mvnw = maven.resolve(WorkbenchProject.isWindows() ? "mvnw.cmd" : "mvnw");
+        Files.writeString(mvnw, WorkbenchProject.isWindows() ? "@echo off\r\n" : "#!/bin/sh\n");
         assertEquals(WorkbenchProject.Type.MAVEN, WorkbenchProject.locate(maven).type());
+        assertEquals(mvnw, WorkbenchProject.locate(maven).launcher());
 
         Path gradle = tempDir.resolve("gradle");
         Files.createDirectories(gradle);
         Files.writeString(gradle.resolve("build.gradle"), "plugins { id 'java' }");
+        Path gradlew = gradle.resolve(WorkbenchProject.isWindows() ? "gradlew.bat" : "gradlew");
+        Files.writeString(gradlew, WorkbenchProject.isWindows() ? "@echo off\r\n" : "#!/bin/sh\n");
         assertEquals(WorkbenchProject.Type.GRADLE, WorkbenchProject.locate(gradle).type());
+        assertEquals(gradlew, WorkbenchProject.locate(gradle).launcher());
+    }
+
+    @Test
+    void wrapperJarIsUsedWhenTheScriptIsAbsent() throws Exception {
+        Path maven = tempDir.resolve("jar-maven");
+        Files.createDirectories(maven.resolve(".mvn").resolve("wrapper"));
+        Files.writeString(maven.resolve("pom.xml"), "<project/>");
+        Path jar = maven.resolve(".mvn").resolve("wrapper").resolve("maven-wrapper.jar");
+        Files.writeString(jar, "jar");
+        assertEquals(jar, WorkbenchProject.locate(maven).launcher());
+        Path module = maven.resolve("module");
+        Files.createDirectories(module);
+        Files.writeString(module.resolve("pom.xml"), "<project/>");
+        assertEquals(jar, WorkbenchProject.locate(module).launcher());
+        List<String> command = WorkbenchSynchronizer.executableCommand(jar, List.of("test"));
+        assertEquals("-jar", command.get(1));
+        assertEquals(jar.toString(), command.get(2));
+        assertEquals("test", command.get(3));
+
+        Path gradle = tempDir.resolve("jar-gradle");
+        Path gradleModule = gradle.resolve("module");
+        Files.createDirectories(gradleModule);
+        Files.writeString(gradleModule.resolve("build.gradle"), "plugins { id 'java' }\n");
+        Path gradleJar = gradle.resolve("gradle").resolve("wrapper").resolve("gradle-wrapper.jar");
+        Files.createDirectories(gradleJar.getParent());
+        Files.writeString(gradleJar, "jar");
+        assertEquals(gradleJar, WorkbenchProject.locate(gradleModule).launcher());
+        List<String> gradleCommand = WorkbenchSynchronizer.executableCommand(gradleJar, List.of("test"));
+        assertEquals("-jar", gradleCommand.get(1));
+        assertEquals(gradleJar.toString(), gradleCommand.get(2));
+    }
+
+    @Test
+    void missingWrapperNamesTheProjectScript() throws Exception {
+        Path maven = tempDir.resolve("bare-maven");
+        Files.createDirectories(maven);
+        Files.writeString(maven.resolve("pom.xml"), "<project/>");
+        IllegalArgumentException failure = org.junit.jupiter.api.Assertions.assertThrows(
+                IllegalArgumentException.class,
+                () -> WorkbenchProject.locate(maven)
+        );
+        assertTrue(failure.getMessage().contains("mvnw"));
+        assertTrue(failure.getMessage().contains("machine-wide"));
     }
 
     @Test
@@ -379,6 +428,8 @@ class WorkbenchSynchronizerTest {
             Files.createDirectories(projectRoot.resolve("src/test/java"));
             Files.createDirectories(projectRoot.resolve("src/test/resources/features"));
             Files.writeString(projectRoot.resolve("pom.xml"), "<project/>", StandardCharsets.UTF_8);
+            Files.writeString(projectRoot.resolve("mvnw.cmd"), "@echo off\r\n", StandardCharsets.UTF_8);
+            Files.writeString(projectRoot.resolve("mvnw"), "#!/bin/sh\n", StandardCharsets.UTF_8);
             Files.writeString(
                     projectRoot.resolve("src/test/java/Runner.java"),
                     "class Runner {}\n",

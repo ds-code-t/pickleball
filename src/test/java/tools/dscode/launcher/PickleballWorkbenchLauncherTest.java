@@ -196,6 +196,12 @@ class PickleballWorkbenchLauncherTest {
         assertEquals("--name", isolateName[2]);
         assertEquals("The failing scenario", isolateName[3]);
 
+        String[] isolateExample = PickleballWorkbenchLauncher.normalizedArguments(
+                new String[]{"isolate", "--example=1", "2", "5", "3.4", "7-11"}
+        );
+        assertEquals("--example", isolateExample[2]);
+        assertEquals("1 2 5 3.4 7-11", isolateExample[3]);
+
         assertTrue(WorkbenchCommandLine.isSessionClientCommand("isolate"));
         assertTrue(WorkbenchCommandLine.isSessionClientCommand("session-start"));
         assertTrue(WorkbenchCommandLine.isSessionClientCommand("execute-step"));
@@ -203,7 +209,17 @@ class PickleballWorkbenchLauncherTest {
         assertTrue(WorkbenchCommandLine.isSessionClientCommand("events"));
         assertTrue(WorkbenchCommandLine.isSessionClientCommand("stop"));
         assertTrue(WorkbenchCommandLine.isSessionClientCommand("kill"));
+        assertTrue(WorkbenchCommandLine.isSessionClientCommand("open-scenario"));
+        assertTrue(WorkbenchCommandLine.isSessionClientCommand("example"));
+        assertTrue(WorkbenchCommandLine.isSessionClientCommand("play"));
+        assertTrue(WorkbenchCommandLine.isSessionClientCommand("from-here"));
+        assertTrue(WorkbenchCommandLine.isSessionClientCommand("pause"));
+        assertTrue(WorkbenchCommandLine.isSessionClientCommand("diagnostic-run"));
+        assertTrue(WorkbenchCommandLine.isSessionClientCommand("save"));
+        assertTrue(WorkbenchCommandLine.isSessionClientCommand("session-sync"));
+        assertTrue(WorkbenchCommandLine.isSessionClientCommand("worker-start"));
         assertFalse(WorkbenchCommandLine.isSessionClientCommand("session"));
+        assertFalse(WorkbenchCommandLine.isForwardedCommand("play"));
         assertFalse(WorkbenchCommandLine.isSessionClientCommand("hint"));
         assertFalse(WorkbenchCommandLine.isAgentCoreCommand("isolate"));
 

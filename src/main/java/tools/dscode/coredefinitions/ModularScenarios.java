@@ -38,6 +38,8 @@ public class ModularScenarios extends CoreSteps {
     static final String RUN_TAGS = "Run Tags";
     static final String RUN_KEY = "RunKey";
     static final String RUN_TYPE = "RunType";
+    static final String RUN_IF = "RunIf";
+    static final String RUN_BACKGROUND = "RunBackground";
     static final String TAGS = "Tags";
     static final String CUCUMBER_FEATURES = "cucumber.features";
     static final String STEP_MARKER = "Step_Marker";
@@ -61,8 +63,17 @@ public class ModularScenarios extends CoreSteps {
             return;
         }
 
+        boolean runIfColumn = maps.stream().anyMatch(row -> row.containsKey(RUN_IF));
+        boolean runBackgroundColumn = maps.stream().anyMatch(row -> row.containsKey(RUN_BACKGROUND));
         List<PickleMatch> matches = new ArrayList<>();
         for (Map<String, String> map : maps) {
+            if (runIfColumn && !RunRowCondition.truthy(map.get(RUN_IF))) {
+                continue;
+            }
+            boolean includeBackground = runBackgroundColumn
+                    && RunRowCondition.truthy(map.get(RUN_BACKGROUND));
+            map.remove(RUN_IF);
+            map.remove(RUN_BACKGROUND);
             RunSelection selection = resolveRunSelection(map, runTypeText);
             RunType runType = selection.runType();
             List<PickleMatch> rowMatches = collectMatches(
@@ -77,7 +88,13 @@ public class ModularScenarios extends CoreSteps {
                             .toList(),
                     selection
             );
-            matches.addAll(rowMatches);
+            for (PickleMatch rowMatch : rowMatches) {
+                matches.add(new PickleMatch(
+                        rowMatch.pickle(),
+                        rowMatch.passedValues(),
+                        includeBackground
+                ));
+            }
         }
 
         appendMatches(
@@ -646,6 +663,8 @@ public class ModularScenarios extends CoreSteps {
             scanOptions.remove(STEP_MARKER);
             scanOptions.remove(RUN_KEY);
             scanOptions.remove(RUN_TYPE);
+            scanOptions.remove(RUN_IF);
+            scanOptions.remove(RUN_BACKGROUND);
             removeBlankPathOption(scanOptions, PKB_FEATURES);
             removeBlankPathOption(scanOptions, CUCUMBER_FEATURES);
             if (runType == null) {
@@ -796,7 +815,8 @@ public class ModularScenarios extends CoreSteps {
         ScenarioStep scenarioStep = createScenarioStep(
                 match.pickle(),
                 scenarioStepParsingMap,
-                match.passedValues().get(STEP_MARKER)
+                match.passedValues().get(STEP_MARKER),
+                match.includeBackground()
         );
         scenarioStep.setStepParsingMap(ParsingMap.getRunningParsingMap());
         if (scenarioInitializer != null) {
@@ -1046,7 +1066,11 @@ public class ModularScenarios extends CoreSteps {
     }
     private record PickleMatch(
             Pickle pickle,
-            Map<String, String> passedValues
+            Map<String, String> passedValues,
+            boolean includeBackground
     ) {
+        private PickleMatch(Pickle pickle, Map<String, String> passedValues) {
+            this(pickle, passedValues, true);
+        }
     }
 }

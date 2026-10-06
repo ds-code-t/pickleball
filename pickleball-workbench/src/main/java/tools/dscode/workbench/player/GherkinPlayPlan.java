@@ -1,5 +1,7 @@
 package tools.dscode.workbench.player;
 
+import tools.dscode.control.protocol.ExampleRowSelector;
+
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -46,7 +48,7 @@ public final class GherkinPlayPlan {
         }
         List<LiveScenarioPlayer.Line> background = backgroundSteps(lines, feature, scenario);
         List<LiveScenarioPlayer.Line> body = scenarioSteps(lines, scenario);
-        Map<String, String> substitutions = exampleSubstitutions(lines, scenario, target.exampleRow());
+        Map<String, String> substitutions = exampleSubstitutions(lines, scenario, target);
         List<Step> planned = new ArrayList<>();
         for (LiveScenarioPlayer.Line line : background) {
             planned.add(new Step(line.id(), line.text(), substitute(line.text(), substitutions)));
@@ -118,21 +120,35 @@ public final class GherkinPlayPlan {
     private static Map<String, String> exampleSubstitutions(
             List<LiveScenarioPlayer.Line> lines,
             Region scenario,
-            int exampleRow
+            ScenarioOrigin origin
     ) {
-        if (exampleRow <= 0) return Map.of();
+        String expression = origin == null ? "" : origin.activeExampleSelector();
+        if (ExampleRowSelector.isInactive(expression)) return Map.of();
+        ExampleRowSelector selector = ExampleRowSelector.parse(expression);
+        int table = 0;
+        int overall = 0;
+        int rowInTable = 0;
+        boolean headerSeen = false;
         List<String> header = null;
-        int dataIndex = 0;
         for (int i = scenario.start; i < scenario.end && i < lines.size(); i++) {
             String trimmed = lines.get(i).text().strip();
+            if (startsWithKeyword(trimmed, "Examples:") || startsWithKeyword(trimmed, "Example:")) {
+                table++;
+                headerSeen = false;
+                header = null;
+                rowInTable = 0;
+                continue;
+            }
             if (!trimmed.startsWith("|")) continue;
             List<String> cells = tableCells(trimmed);
-            if (header == null) {
+            if (!headerSeen) {
+                headerSeen = true;
                 header = cells;
                 continue;
             }
-            dataIndex++;
-            if (dataIndex == exampleRow) {
+            rowInTable++;
+            overall++;
+            if (header != null && selector.matches(overall, table, rowInTable)) {
                 LinkedHashMap<String, String> map = new LinkedHashMap<>();
                 int n = Math.min(header.size(), cells.size());
                 for (int c = 0; c < n; c++) {

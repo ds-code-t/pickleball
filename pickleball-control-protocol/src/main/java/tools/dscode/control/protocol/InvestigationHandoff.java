@@ -292,6 +292,48 @@ public final class InvestigationHandoff {
         return pickleballDirectory.resolve(INVESTIGATIONS_DIRECTORY);
     }
 
+    /**
+     * Directory for an existing handoff. New writes use
+     * {@link PickleballLocalLayout#investigationsDirectory(Path)}. If that root
+     * path is absent, the legacy {@code v/<version>/investigations/<id>} tree
+     * is returned when it exists.
+     */
+    public static Path directoryFor(Path projectRoot, String investigationId) {
+        String id = requireInvestigationId(investigationId);
+        Path primary = PickleballLocalLayout.investigationsDirectory(projectRoot).resolve(id);
+        if (Files.exists(primary)) return primary;
+        Path legacy = legacyDirectory(projectRoot, id);
+        return legacy == null ? primary : legacy;
+    }
+
+    public static java.util.Optional<String> readJson(Path projectRoot, String investigationId) throws IOException {
+        Path json = directoryFor(projectRoot, investigationId).resolve("investigation.json");
+        if (!Files.isRegularFile(json)) return java.util.Optional.empty();
+        return java.util.Optional.of(Files.readString(json, StandardCharsets.UTF_8));
+    }
+
+    /**
+     * Root reports first. A legacy versioned id is included only when the root
+     * path for that id is absent.
+     */
+    public static List<Path> reportFiles(Path projectRoot) throws IOException {
+        Map<String, Path> byId = new LinkedHashMap<>();
+        collectReports(byId, PickleballLocalLayout.investigationsDirectory(projectRoot));
+        Path versions = PickleballLocalLayout.root(projectRoot).resolve(PickleballLocalLayout.VERSIONS_DIRECTORY);
+        if (Files.isDirectory(versions)) {
+            try (var children = Files.list(versions)) {
+                for (Path version : children.filter(Files::isDirectory).sorted().toList()) {
+                    collectReports(byId, version.resolve(INVESTIGATIONS_DIRECTORY), true);
+                }
+            }
+        }
+        return List.copyOf(byId.values());
+    }
+
+    /**
+     * True for the root investigations tree and for any legacy
+     * {@code v/<version>/investigations} tree. Export cleanup must leave both alone.
+     */
     public static boolean isInvestigationsPath(Path pickleballDirectory, Path path) {
         if (pickleballDirectory == null || path == null) return false;
         Path investigations = investigationsRoot(pickleballDirectory).toAbsolutePath().normalize();
@@ -303,6 +345,46 @@ public final class InvestigationHandoff {
         return resolved.getFileName() != null
                 && (INVESTIGATIONS_DIRECTORY.equals(resolved.getFileName().toString())
                 || resolved.toString().replace('\\', '/').contains("/" + INVESTIGATIONS_DIRECTORY + "/"));
+    }
+
+    private static Path legacyDirectory(Path projectRoot, String id) {
+        Path versions = PickleballLocalLayout.root(projectRoot).resolve(PickleballLocalLayout.VERSIONS_DIRECTORY);
+        if (!Files.isDirectory(versions)) return null;
+        Path preferred = null;
+        var current = PickleballLocalLayout.readCurrent(PickleballLocalLayout.root(projectRoot));
+        if (current.isPresent() && current.get().usable()) {
+            Path candidate = PickleballLocalLayout.versionRoot(
+                    PickleballLocalLayout.root(projectRoot),
+                    current.get().pickleballVersion()
+            ).resolve(INVESTIGATIONS_DIRECTORY).resolve(id);
+            if (Files.isDirectory(candidate)) preferred = candidate;
+        }
+        if (preferred != null) return preferred;
+        try (var children = Files.list(versions)) {
+            for (Path version : children.filter(Files::isDirectory).sorted().toList()) {
+                Path candidate = version.resolve(INVESTIGATIONS_DIRECTORY).resolve(id);
+                if (Files.isDirectory(candidate)) return candidate;
+            }
+        } catch (IOException ignored) {
+            return null;
+        }
+        return null;
+    }
+
+    private static void collectReports(Map<String, Path> byId, Path investigations) throws IOException {
+        collectReports(byId, investigations, false);
+    }
+
+    private static void collectReports(Map<String, Path> byId, Path investigations, boolean onlyIfAbsent) throws IOException {
+        if (!Files.isDirectory(investigations)) return;
+        try (var directories = Files.list(investigations)) {
+            for (Path directory : directories.filter(Files::isDirectory).sorted().toList()) {
+                String id = directory.getFileName().toString();
+                if (onlyIfAbsent && byId.containsKey(id)) continue;
+                Path html = directory.resolve("report.html");
+                if (Files.isRegularFile(html)) byId.putIfAbsent(id, html);
+            }
+        }
     }
 
     private static Path requireProjectRoot(Path projectRoot) {

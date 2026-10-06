@@ -315,9 +315,22 @@ def validate_consumer_bridge(errors: list[str]) -> None:
                 )
 
         lowered = text.lower()
-        if "do not start the gui" not in lowered:
+        if "do not open the gui for your own testing" not in lowered:
             errors.append(
-                "Consumer guidance bridge must say not to start the GUI: " + relative
+                "Consumer guidance bridge must say not to open the GUI for the agent's own testing: "
+                + relative
+            )
+        if "while testing for yourself, stay headless" not in lowered:
+            errors.append(
+                "Consumer guidance bridge must say to stay headless while testing: " + relative
+            )
+        if (
+            "do not start the gui" in lowered
+            or "must never open the gui" in lowered
+            or "must not start the gui" in lowered
+        ):
+            errors.append(
+                "Consumer guidance bridge must not say the agent must never open the GUI: " + relative
             )
         for required in (
             "hint",
@@ -484,6 +497,28 @@ def validate_dependency_owned_guidance(errors: list[str]) -> None:
     if "execute-step" not in live or "isolate" not in live:
         errors.append(
             "AGENT-GUIDE live isolation loop must use isolate then execute-step."
+        )
+    for required in (
+        "presence --touch",
+        "post --write",
+        "history --append",
+        "gc-runs",
+        ".pickleball/investigations/",
+        ".pickleball/presence/",
+        ".pickleball/posts/",
+        ".pickleball/history.log",
+        "does not mean an old run",
+        "Agents are not daemons",
+        "one driver",
+    ):
+        if required not in text:
+            errors.append(
+                f"Dependency-owned consumer guide must state the board contract ({required}): "
+                "docs/consumer-agent-guide.md"
+            )
+    if "new handoffs go under `.pickleball/v/" in text or "versioned under v/<version>/investigations when current.json is complete" in text:
+        errors.append(
+            "docs/consumer-agent-guide.md must not send new investigations under v/<version>/."
         )
     if maintainer < text.find("## When the core Pickleball repository is also present"):
         errors.append(

@@ -6,34 +6,91 @@ A consumer project may contain only a short `AGENTS.md` bridge. That bridge uses
 
 ## Tool chooser
 
-Pickleball Workbench is the one front door. It is a Java/Maven program, not a GUI requirement. Do not start the GUI.
+Pickleball Workbench is the one front door. It is a Java program launched from the consumer project, not a GUI requirement. Do not open the GUI for your own testing. Open it to show a person a specific run, or when they ask. Close it when you are done showing it. While testing for yourself, stay headless. Opening the window loads the run you already have. It does not start a second test. Do not click the JavaFX or WebView UI.
 
-From the consumer project, with Pickleball on the test classpath (`classpathScope=test`), use the same Maven exec wrapper as the project pointer; only change `-Dexec.args`:
+Run the project's own wrapper. Pick the script from the OS. Do not require a machine-wide Maven or Gradle install. On Windows use `mvnw.cmd` or `gradlew.bat`. Otherwise use `mvnw` or `gradlew`. If that script is absent and the wrapper jar is present, run `java -jar` on `.mvn/wrapper/maven-wrapper.jar` or `gradle/wrapper/gradle-wrapper.jar`. Discover, confirm, and project sync already invoke that wrapper. MCP and launcher tools stay Pickleball actions (`discover`, `confirm`, `isolate`, `execute-step`, `status`, `events`, `stop`, `open-scenario`, `example`, `play`, `pkb_example`, and the other session commands). There is no general Maven or Gradle tool.
+
+The Workbench GUI is only a lightweight head over state and controls that already exist under the hood. Agents have direct access to that state and those controls, and direct control of the GUI controls, so they can collaborate with a person or present data and reports in the window. The GUI must not own behavior the agents cannot reach. Do not click JavaFX or WebView from tests. Do not embed Maven or Gradle. Agents run the project wrapper.
+
+From the consumer project, with Pickleball on the test classpath (`classpathScope=test`), use that wrapper and the same exec invocation as the project pointer; only change `-Dexec.args`:
 
 ```text
-mvn -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java "-Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher" "-Dexec.classpathScope=test" "-Dexec.args=discover"
+mvnw -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java "-Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher" "-Dexec.classpathScope=test" "-Dexec.args=discover"
 ```
 
-Same launcher for `hint`, `discover`, `confirm`, `resolve-runvars`, `isolate`, `execute-step`, `status`, `events`, and `stop` — change `exec.args` only.
+Windows is the same command with `mvnw.cmd`. A Gradle consumer that exposes the launcher task uses `gradlew` or `gradlew.bat`.
 
-1. **Discover** — `-Dexec.args=discover` (optional `--tags` / `--name` / `--retention`). Workbench applies complete AI `pkb_runvars`: browser ladder, high/auto parallel, diagnostic, warn, failed retention. Override retention with `--retention=all|failed|none` (`--retention <value>` also works). It wraps consumer `mvn test`. Do not start a live worker to run the whole suite. Then read `run-catalog.json` and the retained `pkb_run_profile`.
-2. **Confirm** — `-Dexec.args=confirm --tags=... --name=...` with the same Discover snapshot (ordinary LastDiscoverSnapshot replayed as `pkb_runvars`) and narrow tags/name. Never supply `pkb_run_profile` as input. A snapshot marked sealed is for the next worker/isolate launch as `-Dpkb_overriderunvars=<compact complete map>`, not Confirm.
-3. **Live debug** — `-Dexec.args=isolate` (alias `session-start`) starts one long-lived headless Workbench session from the last Discover snapshot and prints `ACK SESSION`. Then `-Dexec.args=execute-step --text='...'`, `status`, `events`, and `stop`. Each Maven exec exits; the session stays up.
+Same launcher for `hint`, `discover`, `confirm`, `resolve-runvars`, `short-log`, `note`, `inbox`, `finish`, `presence`, `post`, `history`, `gc-runs`, `gc-versions`, `use-version`, `isolate`, `execute-step`, `status`, `events`, `stop`, `open-scenario`, `example`, `play`, `from-here`, `pause`, `insert-step`, `update-step`, `diagnostic-run`, `save`, `refresh`, `session-sync`, `worker-start`, `worker-restart`, `worker-stop`, `open-window`, `close-window`, and `show-run` — change `exec.args` only.
+
+The Workbench window is a view of a run you already have. `open-window --run-id=<id>` opens the one window on that run. `show-run --run-id=<id>` loads that run's record, logs, reports, and config. The window's run dropdown reads the same `.pickleball/runs/` directory. Neither command starts a test. `close-window` closes the window and leaves the run directory, a headless run, and the short log in place. Play, step, and stop apply only to the one live run. Another agent may view a different run read-only and does not become a second driver of the live session. There is no Gherkin step that opens the window. An agent that can only run a scenario and cannot call the launcher cannot open it.
+
+1. **Discover** — `-Dexec.args=discover` (optional `--tags` / `--name` / `--example` / `--retention`). Workbench applies complete AI `pkb_runvars`: browser ladder, high/auto parallel, diagnostic, warn, failed retention. Override retention with `--retention=all|failed|none` (`--retention <value>` also works). It runs the consumer test through the project wrapper. Do not start a live worker to run the whole suite. Then read `run-catalog.json` and the retained `pkb_run_profile`.
+2. **Confirm** — `-Dexec.args=confirm --tags=... --name=... --example=...` with the same Discover snapshot (ordinary LastDiscoverSnapshot replayed as `pkb_runvars`) and narrow tags, name, and example rows. Never supply `pkb_run_profile` as input. A snapshot marked sealed is for the next worker/isolate launch as `-Dpkb_overriderunvars=<compact complete map>`, not Confirm. `pkb_example` is not a tag. A normal Scenario counts as row 1. `--example='1 2 5 3.4 7-11'` keeps those Examples rows in each selected scenario.
+3. **Live debug** — When nobody is watching, `-Dexec.args=isolate` (alias `session-start`) starts one long-lived headless Workbench session from the last Discover snapshot and prints `ACK SESSION`. When a Workbench window is already open, do not start another session. Drive that session with the same commands so the person sees the result: `open-scenario`, `example`, `play`, `from-here`, `execute-step`, `pause`, `stop`, `diagnostic-run`, and the worker, save, and refresh commands. `example` is the same Examples-row filter as `pkb_example`. Play shows the first source-order match. Headless `pkb_example` still runs every match. Then `-Dexec.args=execute-step --text='...'`, `status`, `events`, and `stop`. Each launcher exec exits; the session stays up.
 4. **Emit the human handoff, then edit real consumer source** — write `.pickleball/investigations/<id>/` then in chat print the six-line bottom-line block (Gherkin/business first) plus `.pickleball/investigations/<id>/report.html`. Do not dump MCP transcripts, TRACE, or PNG analysis.
 
-`hint` (alias `discover-hint`) is `-Dexec.args=hint` and prints the recommended Discover `pkb_runvars`, a dry-run resolve preview that does not start tests, and `NEXT: run discover`. Default Discover/Confirm stay on `pkb_runvars`. Sealed `pkb_overriderunvars` is opt-in: resolve → inspect → complete map (six context keys required) → `-Dpkb_overriderunvars=<compact>` → compare `runProfileFingerprint`. Do not mix sealed input with `pkb_runvars` or `pkb_profile`. `ui` is a host/human command. Agents must not use `ui`. If `workbench_*` tools already exist they are the same session, not a setup step.
+`hint` (alias `discover-hint`) is `-Dexec.args=hint` and prints the recommended Discover `pkb_runvars`, a dry-run resolve preview that does not start tests, and `NEXT: run discover`. Default Discover/Confirm stay on `pkb_runvars`. Sealed `pkb_overriderunvars` is opt-in: resolve → inspect → complete map (six context keys required) → `-Dpkb_overriderunvars=<compact>` → compare `runProfileFingerprint`. Do not mix sealed input with `pkb_runvars` or `pkb_profile`. Do not open the GUI for your own testing. Open it to show a person a specific run, or when they ask. Close it when you are done showing it. While testing for yourself, stay headless. Opening the window loads the run you already have. It does not start a second test. If `workbench_*` tools already exist they are the same session, not a setup step.
+
+Do not treat resolve-runvars as the environment Discover will use. That preview is the launcher JVM, not the Discover worker. Trust the run record after Discover.
 
 Do not copy consumer features into `.pickleball` as a sandbox.
 
+### Run coordination
+
+Read the short log `.pickleball/agent-log` before a run, after a run, and during a long session, instead of the dense diagnostic log. Use your own run id. When a Workbench window is already open, only one agent drives it. Other agents stay headless on their own run ids. Agents are not daemons. Write start and stop lines. Put purpose and findings on the run record. Use the inbox only for a short note to one named agent. Taking that note deletes it. A note for every agent is a post (`post --write --to=all`), not an inbox file, and listing or taking does not delete it.
+
+`discover`, `confirm`, and `isolate` accept optional `--run-id`, `--agent` (or `--agent-id`), `--group`, `--sequence`, `--who`, and `--why`. They write the start line and `.pickleball/runs/<run-id>/record.json`. The isolation unit is the run id. One agent may own many run ids. Uncoordinated agents each get their own id. Two runs never share a folder, a config copy, a session file, or a browser profile. A private runs directory is only for an agent run or a Workbench run. A normal `mvn test` does not create `.pickleball/runs`, does not set `user-data-dir`, and keeps `reports/cucumber-report.html`. Reports, diagnostic packs, scratch, and a headless session file for an agent or Workbench run stay under that run directory. Each parallel local Chrome or Edge worker gets its own `browser-profile/<worker>` directory. Remote drivers and a consumer-supplied `user-data-dir` are not that directory and are left alone. `finish` and `stop` only write `stoppedAt` and a stop line. They do not delete the run directory, the profile, the session file, or the log. `close-window` keeps that behavior. `gc-runs` is the explicit payload sweep. It is not run from finish. Delete `browser-profile/<worker>` only when that run has a stop line, nothing has the profile open, and no agent holds the run. Chrome `SingletonLock` and an Edge `lockfile` both mean the profile is open. Not when Cucumber returns, and not on finish alone. Keep dense evidence for the run open in Workbench and for the last failed run. The last failed run is the latest stopped run whose status is FAILED, or a STOPPED record with a failure count, a failed-scenario flag, or a non-empty failure summary. `finish` writes FAILED when that run had failures and STOPPED only when it did not. Other stopped run payloads may be removed 24 hours after `stoppedAt`. Always leave `record.json`, the sparse index, and `pkb_run_profile` (the resolved RunVar snapshot, not the Chrome directory). Never delete a run with no stop line, a `RUNNING` run, another agent's held run, a live session, a live worker, or the run the open window is showing. Two sweepers removing the same expired payload must be safe. A private run copies the project configs into `.pickleball/runs/<run-id>/config` once and reads and writes only that copy. Change a run's configs there, or in the Workbench Config tab beside Mapping. Do not edit the project config files for one run. Saving in the tab writes the run copy. A normal `mvn test` does not copy configs and still reads the project files. Discover and Workbench, including a person collaborating with an agent, default `pkb_compositeReport=false` and `pkb_scenarioReport=false`. A normal test still writes both HTML reports. An explicit `true` writes that report again. Agents keep diagnostic logs. `finish --run-id=<id> --learned=<one line>` and `stop --run-id=<id>` write the stop line. `short-log` prints recent lines. `note --text=<one line>` appends a note. `inbox --write --to=<agent-id> --text=<one line>` leaves directed mail; `inbox --list` does not delete it; `inbox --take --agent=<id>` deletes that note. `inbox/any` is not a broadcast. Use `post` for that. Same launcher; only change `-Dexec.args`. Project wrapper only (`mvnw` or `mvnw.cmd`, `gradlew` or `gradlew.bat`, or `java -jar` on the wrapper jar). Do not require a machine-wide Maven or Gradle install.
+
+One window has one driver. Each agent uses its own run id. Launcher commands are one-shot and exit. A 10-minute presence sweep is optional and cannot be enforced.
+
+### Board
+
+Three files. Do not merge them into the inbox.
+
+1. Presence. `.pickleball/presence/<agent-id>.json` has the agent id, `lastSeen`, and current run ids. Update it when you want: `presence --touch --agent=<id> [--run-id=<id>]`, `presence --list`, `presence --sweep`. An active agent may drop a row whose `lastSeen` is older than 15 minutes. That drop removes the row only. It does not delete posts, runs, profiles, or `history.log`. A missing heartbeat means not on the board, not clear their work. Two sweepers are idempotent.
+2. Posts. `.pickleball/posts/<id>.json` has id, from, to (an agent id or `all`), optional run id, one line, `createdAt`, `updatedAt`, `expiresAt`, and optional `ackedBy`. `post --write --to= --text= [--run-id] [--ttl=]`, `post --list`, `post --renew --id=`, `post --sweep`. Every agent may list them. Do not delete on read. Ack is optional and is not required to clear. Default expiry is 24 hours from the last update, not from the first write. The author may set a shorter expiry. One hour is appropriate for "I have the window." Short expiry is not the default. Renew by updating `updatedAt` and `expiresAt`. A missing or unreadable timestamp counts as expired. After expiry, any active agent may delete that post file. Two deletes of the same file are fine. Deleting a post does not delete the run, the profile, the presence row, or `history.log`. A post is a hint, not a lock. Readers treat it as possibly stale even if it is new.
+3. Summation log. `.pickleball/history.log` is append-only. One short line: version, files, fix, branch, commit, merge, run id. `history --append --text=` and `history --tail`. A missing run directory is normal. Trim from the front when the file exceeds 10 MB. Not a mailbox. Do not put keep-alives here.
+
+The short log `.pickleball/agent-log` stays the 3-day coordination tape. Appending does not take a file lock. On prune, a dropped run whose directory remains keeps a one-line stub so the index does not vanish. Do not put fix history in the short log. Do not add a lock a crashed agent can hold.
+
+### .pickleball has two owners
+
+Do not collapse `.pickleball` under `v/`.
+
+Jar cache, regenerable from the resolved dependency:
+
+- `.pickleball/v/<current>/` guidance, docs, the maven-consumer-project snapshot, `workbench/controller/<sha256>`, and `workbench/lib/<version>`
+- `.pickleball/open/`
+- root aliases `AGENT-GUIDE.md` and `GUIDANCE-MANIFEST.json`
+- `current.json` written last: `pickleballVersion`, `complete`, `updatedAt`
+
+Project history. It must survive `export-guidance` and a version bump. It stays at the `.pickleball` root:
+
+- `runs/<run-id>/`
+- `agent-log`
+- `inbox/`
+- `investigations/`
+- `presence/`, `posts/`, `history.log`
+
+`.pickleball/workbench/` is the legacy fallback when `current.json` is missing or not usable. Session, attach, and last-discover stay under `v/<version>/workbench` for the version that owns them. When `current.json` is complete, the next launch uses `v/<current>/workbench`. Switching the pointer does not destroy the other version's workbench tree. Do not describe both layouts as current.
+
+Export cleanup is a manifest diff of generated files in that version folder. `export-guidance` and `use-version` do not delete any other `v/<other-version>/` tree. `gc-versions` is the explicit version sweep. It is not a daemon, and it is not run from `export-guidance`, `use-version`, or finish. It may delete `v/<version>/` only when that version is not named by a usable `current.json`, its last use is at least 3 days ago, no RUNNING run was started with it, and that version's workbench tree has no live session, attach, or worker. A missing or unreadable `v/<version>/.last-used` counts as last used now, so an old tree is not deleted on the first sweep. Deleting the tree removes that version's guidance, controller, libs, and workbench state only. It does not delete `runs/`, `investigations/` (including a legacy `v/<version>/investigations` tree), `presence/`, `posts/`, `inbox/`, `agent-log`, or `history.log`. Two sweepers deleting the same expired tree must be safe. Never delete `current.json`, `open/`, or the `v/<current>/` tree named by a usable pointer.
+
+A version tree is last used when `export-guidance` completes it or `use-version` points `current.json` at it. That time is `v/<version>/.last-used`. A switch in the same session updates `.last-used`, so the tree cannot expire while it is being tested. An unused version tree is expired, not stale.
+
+`use-version --version=<version>` switches the pointer to an already complete `v/<version>/` export. It rewrites `current.json`, refreshes root `AGENT-GUIDE.md` and `GUIDANCE-MANIFEST.json`, and refreshes `open/` from that tree. It does not re-copy a sibling version and does not delete the tree being left. If that version tree is missing or not a complete export, it prints that `export-guidance` from that dependency is required and leaves `current.json` unchanged. The last `use-version` or `export-guidance` wins the pointer. Switching the pointer does not stop a run, delete a run, delete a browser profile, or clear presence, posts, inbox, investigations, or `history.log`. A run records the version it started with and is not retargeted when the pointer moves. An agent switches versions in one session with `use-version`, or with `export-guidance` from the dependency it wants.
+
+New investigation handoffs always go to `.pickleball/investigations/<id>/`. Do not delete an existing `v/<version>/investigations` tree. If the root path for an id is absent, read the legacy versioned path. `export-guidance` leaves both trees alone.
+
 ### Live isolation loop
 
-After Discover has found the failing scenario, `isolate` starts a headless Workbench session if one is not already healthy. Later Maven exec commands are one-shot HTTP clients against that session (127.0.0.1). Default `--wait` on `execute-step` prints `STILL_WORKING` while a browser wait is in flight, then `DONE <id> SUCCESS|FAILED`. `--ack-only` prints ACK and exits.
+After Discover has found the failing scenario, use the session that is already open when a person is watching. The same commands update that window. When nobody is watching, `isolate` starts a headless Workbench session if one is not already healthy. Later launcher commands are one-shot HTTP clients against that session (127.0.0.1). Default `--wait` on `execute-step` prints `STILL_WORKING` while a browser wait is in flight, then `DONE <id> SUCCESS|FAILED`. `--ack-only` prints ACK and exits. Do not open the GUI for your own testing. Open it to show a person a specific run, or when they ask. Close it when you are done showing it. While testing for yourself, stay headless. Opening the window loads the run you already have. It does not start a second test. Do not click the JavaFX or WebView UI.
 
 1. `-Dexec.args=isolate` (or `session-start`) — starts the session from the last Discover snapshot and prints `ACK SESSION ...`.
 2. `-Dexec.args=execute-step --text='...'` — queues Gherkin on the paused worker. `--ack-only` returns immediately; default `--wait` polls `status`.
 3. `-Dexec.args=status` or `status <id>`; `-Dexec.args=events`.
 4. `-Dexec.args=stop` (or `kill`) when finished.
-5. Confirm with Workbench `confirm` (`-Dexec.args=confirm --tags=... --name=...`). Read the pack with `workbench_diagnostic_catalog`, `workbench_diagnostic_run`, and `workbench_diagnostic_summary` when those tools already exist.
+5. Confirm with Workbench `confirm` (`-Dexec.args=confirm --tags=... --name=... --example=...`). Read the pack with `workbench_diagnostic_catalog`, `workbench_diagnostic_run`, and `workbench_diagnostic_summary` when those tools already exist.
 6. Emit the human handoff with `workbench_investigation_emit` or `DiagnosticCli emit-investigation`. In chat print the six-line bottom-line block, then the `report.html` path. If a UI session is attached, at most two `wb://` links may follow. If no UI, omit `wb://`.
 
 `execute-step` / `workbench_execute_step` returns a structured `SUCCESS` / `FAILED` / `UNAVAILABLE` result. A FAILED Gherkin hypothesis does not end the worker and does not fail the paused scenario. `workbench_step_resolve` maps one Gherkin step to its Java definition (or `DYNAMIC` / `OVERRIDE` / `UNMATCHED`) without executing it. Page events with `afterSequence` and a small `limit` (default 100, max 500). Live buffer edits do not require `workbench_sync` and do not write the original `.feature` until explicit Save (`workbench_request_save`). Worker restart without rebuild already exists (`workbench_worker_restart`). Step Overrides compile worker-side (`workbench_step_override_compile`).
@@ -42,7 +99,7 @@ After Discover has found the failing scenario, `isolate` starts a headless Workb
 
 - `.pickleball/maven-consumer-project/` is a version-matched **read-only** reference snapshot of Pickleball's own example consumer. Do not copy, edit, or execute it as the project under test.
 - `.pickleball/workbench/live/classes` is the compiled overlay for the worker classpath. Do not use it as an editor.
-- `.pickleball/investigations/` is unmanaged consumer-agent output. `export-guidance` leaves it alone.
+- `.pickleball/investigations/` is project history, not generated guidance. New handoffs always go there. A legacy `v/<version>/investigations/<id>` tree is still readable when the root path for that id is absent. `export-guidance` leaves both trees alone.
 - `export-guidance` does **not** copy this consumer's own features into `.pickleball` for testing. It still materializes full `docs/` plus the example-consumer snapshot for on-demand/human use.
 
 ## First-read
@@ -50,7 +107,7 @@ After Discover has found the failing scenario, `isolate` starts a headless Workb
 Keep first-read small. After a successful export:
 
 1. Follow the consumer project's own instructions first; they remain authoritative for project-specific behavior.
-2. Stay in this guide's tool chooser: Workbench `discover` when the failing scenario is unknown, then `confirm` with narrow tags/name. For live debug use `isolate` then `execute-step` / `status` / `events` / `stop`. Do not start the GUI.
+2. Stay in this guide's tool chooser: Workbench `discover` when the failing scenario is unknown, then `confirm` with narrow tags, name, and `pkb_example`. When a Workbench window is already open, drive it with `open-scenario`, `example`, `play`, `execute-step`, `stop`, and `diagnostic-run`. When nobody is watching, use `isolate` then `execute-step` / `status` / `events` / `stop`. Do not open the GUI for your own testing. Open it to show a person a specific run, or when they ask. Close it when you are done showing it. While testing for yourself, stay headless. Opening the window loads the run you already have. It does not start a second test. Run builds through the project wrapper (`mvnw` or `mvnw.cmd`, `gradlew` or `gradlew.bat`, or `java -jar` on the wrapper jar). Do not require a machine-wide Maven or Gradle install.
 3. Inspect the **real** consumer `pom.xml`, Pickleball runner subclass, features, configuration, data, mappings, and test support before changing them.
 4. Open a specific exported guide only when that topic is needed, for example `docs/dynamic-steps.md`, `docs/diagnostic-reporting.md`, `docs/configuration.md`, or `docs/ai-run-configuration.md`.
 5. Do not assume the Pickleball core source repository is present. A normal consumer may only have the Maven dependency.
@@ -69,12 +126,13 @@ A successful `export-guidance .pickleball` run:
 - copies root `AGENT-GUIDE.md` and `GUIDANCE-MANIFEST.json` as aliases of that version so the well-known agent pointer stays stable;
 - writes relocatable Workbench openers under `.pickleball/open/`;
 - writes `.pickleball/current.json` last (`pickleballVersion`, `complete`, `updatedAt`) — a version pointer, not a path to the dependency jar;
+- records last use on `v/<version>/.last-used`;
 - removes files managed by the previous manifest that are no longer shipped in that version folder, while leaving unrelated files alone, including `.pickleball/investigations/` and any other `v/<other-version>/` trees; and
 - best-effort ensures `.pickleball` is ignored by Git, preferring an existing `.gitignore` and then repository-local `.git/info/exclude`.
 
 Any Pickleball execution (`PickleballRunner`, `java -jar pickleball.jar`, Workbench launcher) lazily materializes the running jar's version folder if it is missing. It unpacks from the running jar; it never copies a sibling version folder. Direct `java -jar pickleball-X.jar` pins `current.json` to X. Open scripts set `PKB_OPEN_BOOTSTRAP=1` so Java hops to the pinned jar when `current.json` is complete.
 
-The exporter does not create/commit a new `.gitignore`, alter the Git index, or untrack files that were already committed. If export fails, treat any existing `.pickleball` contents as potentially stale. `complete: false` or a missing `current.json` means do not trust the tree. The manifest records the last completed export; it is not a substitute for rerunning the exporter.
+The exporter does not create/commit a new `.gitignore`, alter the Git index, or untrack files that were already committed. If export fails, treat generated guidance as potentially stale. Stale means an untrusted export: `complete: false`, a missing `current.json`, or a failed export. It does not mean an old run. It does not mean an old version tree. An unused version tree is expired, not stale. An agent switches versions in one session with `use-version --version=<version>`, or with `export-guidance` from the dependency it wants. The manifest records the last completed export; it is not a substitute for rerunning the exporter.
 
 Compatibility note: an older Pickleball release whose exporter predates the manifest lifecycle may leave newer files behind after a downgrade. Version folders keep each export isolated. Prefer the dependency actually resolved on the test classpath and files freshly exported by that dependency.
 
@@ -144,7 +202,7 @@ Never supply `pkb_run_profile` or `pkb_run_profile.<pkb_var>` as input. They are
 
 ### Default AI test-launch rule
 
-When you launch Pickleball tests and the intended execution settings are known, use `pkb_runvars` as the authoritative input. Put intentional tag/name selection, browser, evidence/logging controls, and other non-secret RunVar changes inside `pkb_runvars`; do not default to ambient optional project settings or separate JVM `-Dpkb_*` RunVars. Use `pkb_profile` or ordinary JVM RunVar overrides only when the task specifically tests those configuration semantics or the user asks for them. Keep protected secrets and diagnostic lineage outside `pkb_runvars`.
+When you launch Pickleball tests and the intended execution settings are known, run the project's wrapper (`mvnw` or `mvnw.cmd`, `gradlew` or `gradlew.bat`, or `java -jar` on the wrapper jar) and use `pkb_runvars` as the authoritative input. Pick the script from the OS. Do not require a machine-wide Maven or Gradle install. Put intentional tag/name selection, browser, evidence/logging controls, and other non-secret RunVar changes inside `pkb_runvars`; do not default to ambient optional project settings or separate JVM `-Dpkb_*` RunVars. Use `pkb_profile` or ordinary JVM RunVar overrides only when the task specifically tests those configuration semantics or the user asks for them. Keep protected secrets and diagnostic lineage outside `pkb_runvars`.
 
 For an agent's bounded confirmation (not the human runner defaults), include diagnostic evidence controls, the browser ladder (keep a remote `pkb_browser`; otherwise prefer `CHROME_HEADLESS`), and high parallelism when more than one scenario will run. Documented AI Discover/Confirm `pkb_runvars` keys:
 
@@ -154,14 +212,18 @@ pkb_parallel=<conservative JVM estimate or auto>
 pkb_reportingmode=diagnostic
 pkb_loglevel=warn
 pkb_reportretention=failed
+pkb_compositeReport=false
+pkb_scenarioReport=false
 ```
 
-Use the narrowest `pkb_tags` / `pkb_name` that isolate the failure. Do not add the `pretty` plugin; it is console noise for agents. Discover defaults to `pkb_reportretention=failed`, which keeps dense evidence for failing scenarios and does not retain it for passing ones. Override with Workbench `--retention=all|failed|none`. Workbench `hint` prints the estimated integer `pkb_parallel` and the selected browser for the current project/JVM. `pkb_parallel=auto` also resolves to that estimate at run start and stamps the integer into `pkb_run_profile`.
+Use the narrowest `pkb_tags` / `pkb_name` / `pkb_example` that isolate the failure. `pkb_example` selects Examples rows after tags and name. It is not a tag. A normal Scenario counts as row 1, and `--example='1 2 5 3.4 7-11'` is the list form. Do not add the `pretty` plugin; it is console noise for agents. Discover defaults to `pkb_reportretention=failed`, which keeps dense evidence for failing scenarios and does not retain it for passing ones. Override with Workbench `--retention=all|failed|none`. Workbench `hint` prints the estimated integer `pkb_parallel` and the selected browser for the current project/JVM. `pkb_parallel=auto` also resolves to that estimate at run start and stamps the integer into `pkb_run_profile`.
+
+Local Chrome and Edge do not need a `driverExecutable`. Selenium Manager runs first (`pkb_driver_download_native=false` stops that network use for the launch). If the manager cannot fetch a driver, a best-effort download may cache one. Discovery, a 403, a certificate failure, or an antivirus lock is a log line, not a test error. Do not treat that log as a product failure, and do not add a proxy example under `configs`. `pkb_driver_download_proxy=false` turns the fallback off. A URL in that property is redacted in `pkb_run_profile` and diagnostics. Remote browsers are unchanged.
 
 These are documented agent defaults, not `PickleballTests` human defaults (`pretty`, `@all`, often headed Chrome). Example confirmation after Discover:
 
 ```text
-mvn -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java "-Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher" "-Dexec.classpathScope=test" "-Dexec.args=confirm --tags=@the-failing-tag --name='The failing scenario'"
+mvnw -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java "-Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher" "-Dexec.classpathScope=test" "-Dexec.args=confirm --tags=@the-failing-tag --name='The failing scenario'"
 ```
 
 After any diagnostic run, read `pkb_run_profile` from the pack. That is the complete resolved RunVar list, including inherited execution-context paths and the integer parallel count. Do not treat omitted `pkb_runvars` keys as equal to project `pickleball.properties`. Confirm stays on `pkb_runvars`. Live isolate/worker launch replays a sealed snapshot as `-Dpkb_overriderunvars=` and an ordinary snapshot as `-Dpkb_runvars=`; neither silently re-resolves from project defaults, and neither supplies `pkb_run_profile` as input.
@@ -288,14 +350,14 @@ Agent git suspects are a local procedure against the consumer repo (`git log -n 
 
 ## Diagnostic utility commands
 
-The agent-facing name is Workbench. From a Maven consumer where Pickleball is on the test classpath, use the same launcher as the project pointer and only change `-Dexec.args`:
+The agent-facing name is Workbench. From a consumer project where Pickleball is on the test classpath, use the project wrapper (`mvnw` or `mvnw.cmd`) and the same launcher as the project pointer. Only change `-Dexec.args`. Do not require a machine-wide Maven or Gradle install.
 
 ```text
-mvn -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java "-Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher" "-Dexec.classpathScope=test" "-Dexec.args=export-guidance .pickleball"
+mvnw -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java "-Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher" "-Dexec.classpathScope=test" "-Dexec.args=export-guidance .pickleball"
 "-Dexec.args=hint"
-"-Dexec.args=discover [--tags <expr>] [--name <expr>]"
-"-Dexec.args=confirm [--tags <expr>] [--name <expr>]"
-"-Dexec.args=isolate"
+"-Dexec.args=discover [--tags <expr>] [--name <expr>] [--example <rows>]"
+"-Dexec.args=confirm [--tags <expr>] [--name <expr>] [--example <rows>]"
+"-Dexec.args=isolate [--example <rows>]"
 "-Dexec.args=execute-step --text='Given stay'"
 "-Dexec.args=status"
 "-Dexec.args=events"
@@ -391,7 +453,7 @@ Pickleball's example Maven consumer includes an opt-in mixed pass/fail suite tag
 Run it explicitly:
 
 ```text
-mvn -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java "-Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher" "-Dexec.classpathScope=test" "-Dexec.args=discover --tags=@agent-pointer-eval"
+mvnw -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java "-Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher" "-Dexec.classpathScope=test" "-Dexec.args=discover --tags=@agent-pointer-eval"
 ```
 
 or `-Dpkb_runvars="pkb_tags=@agent-pointer-eval, pkb_browser=CHROME_HEADLESS"`. Do not add this tag to consumer `AGENTS.md` or Copilot pointer files.

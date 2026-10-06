@@ -26,6 +26,7 @@ import tools.dscode.coredefinitions.DataTableConversionChecks;
 import tools.dscode.coredefinitions.ModularScenariosChecks;
 import tools.dscode.launcher.WorkbenchAgentCommandChecks;
 import tools.dscode.parallelutilities.ParallelCountEstimatorChecks;
+import tools.dscode.testengine.ExampleRowFilterChecks;
 import tools.dscode.testengine.PkbPropertyValueNormalizerChecks;
 import tools.dscode.testengine.ProfileConfigurationChecks;
 import tools.dscode.testengine.RunVarOverrideChecks;
@@ -60,6 +61,7 @@ public final class InternalFrameworkTestSteps {
                 BusinessTemporalDeltaChecks.class,
                 BusinessTimePostModifierChecks.class,
                 PkbPropertyValueNormalizerChecks.class,
+                ExampleRowFilterChecks.class,
                 ProfileConfigurationChecks.class,
                 RunVarOverrideChecks.class,
                 ParallelCountEstimatorChecks.class,

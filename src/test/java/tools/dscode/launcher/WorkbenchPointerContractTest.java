@@ -34,7 +34,11 @@ class WorkbenchPointerContractTest {
         assertTrue(lowered.contains("confirm"));
         assertTrue(lowered.contains("isolate"));
         assertTrue(lowered.contains("execute-step"));
-        assertTrue(lowered.contains("do not start the gui"));
+        assertTrue(lowered.contains("do not open the gui for your own testing"));
+        assertTrue(lowered.contains("while testing for yourself, stay headless"));
+        assertFalse(lowered.contains("do not start the gui"));
+        assertFalse(lowered.contains("must never open the gui"));
+        assertFalse(lowered.contains("must not start the gui"));
         assertTrue(lowered.contains("exec.args"));
 
         assertFalse(lowered.contains("register mcp"));
@@ -45,5 +49,50 @@ class WorkbenchPointerContractTest {
         assertFalse(lowered.contains("do not isolate"));
         assertFalse(lowered.contains("do not maven-exec isolate"));
         assertFalse(lowered.contains("must") && lowered.contains("chrome_headless"));
+        assertFalse(lowered.contains("only controls"));
+        assertTrue(lowered.contains("open-scenario"));
+        assertTrue(lowered.contains("mvnw"));
+        assertTrue(lowered.contains("machine-wide"));
+    }
+
+    @Test
+    void agentGuidesDriveAnOpenWindowAndUseTheProjectWrapper() throws Exception {
+        List<Path> guides = List.of(
+                Path.of("docs/consumer-agent-guide.md"),
+                Path.of("docs/ai-run-configuration.md"),
+                Path.of("docs/pickleball-workbench.md"),
+                Path.of("docs/consumer-project.md"),
+                Path.of("AGENTS.md"),
+                Path.of("pickleball-workbench/AGENTS.md")
+        );
+        for (Path guide : guides) {
+            String text = Files.readString(guide);
+            String lowered = text.toLowerCase(Locale.ROOT);
+            assertTrue(lowered.contains("open-scenario"), guide.toString());
+            assertTrue(lowered.contains("do not open the gui for your own testing"), guide.toString());
+            assertTrue(lowered.contains("while testing for yourself, stay headless"), guide.toString());
+            assertFalse(lowered.contains("do not start the gui"), guide.toString());
+            assertFalse(lowered.contains("must never open the gui"), guide.toString());
+            assertTrue(lowered.contains("mvnw"), guide.toString());
+            assertTrue(lowered.contains("machine-wide"), guide.toString());
+            assertTrue(lowered.contains("already open"), guide.toString());
+            assertTrue(lowered.contains("only one agent"), guide.toString());
+            assertTrue(lowered.contains("own run id"), guide.toString());
+            assertTrue(lowered.contains("agent-log"), guide.toString());
+            assertTrue(lowered.contains("short log"), guide.toString());
+            assertFalse(lowered.contains("only controls"), guide.toString());
+        }
+        String chooserSource = Files.readString(Path.of("docs/consumer-agent-guide.md"));
+        int chooserStart = chooserSource.indexOf("## Tool chooser");
+        int liveStart = chooserSource.indexOf("### Live isolation loop");
+        String chooser = chooserSource.substring(chooserStart, liveStart);
+        assertTrue(chooser.contains("-Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher"));
+        assertTrue(chooser.contains("-Dexec.args=discover"));
+        assertTrue(chooser.contains("-Dexec.args=isolate"));
+        assertTrue(chooser.contains("execute-step"));
+        assertFalse(chooser.contains("PickleballWorkbenchLauncher discover"));
+        assertFalse(chooser.toLowerCase(Locale.ROOT).contains("do not isolate"));
+        assertFalse(chooser.contains("attach.json"));
+        assertFalse(chooser.contains("ui ."));
     }
 }

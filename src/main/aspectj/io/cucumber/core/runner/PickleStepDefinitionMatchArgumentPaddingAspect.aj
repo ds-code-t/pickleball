@@ -2,6 +2,8 @@ package io.cucumber.core.runner;
 
 import io.cucumber.core.backend.ParameterInfo;
 import io.cucumber.core.stepexpression.Argument;
+import io.cucumber.core.stepexpression.DataTableArgument;
+import io.cucumber.core.stepexpression.DocStringArgument;
 
 import java.lang.reflect.Array;
 import java.lang.reflect.Constructor;
@@ -37,6 +39,21 @@ public privileged aspect PickleStepDefinitionMatchArgumentPaddingAspect {
         int argSize = arguments.size();
         int paramSize = parameterInfos.size();
 
+        // Cucumber counts a data table or doc string as an argument. An IF line
+        // keeps that argument for the branch and does not declare it on the glue.
+        if (argSize > paramSize && blockConditionalGlue(match)) {
+            int captured = 0;
+            for (Argument argument : arguments) {
+                if (!isStepAttachment(argument)) {
+                    captured++;
+                }
+            }
+            if (captured == paramSize) {
+                arguments.removeIf(PickleStepDefinitionMatchArgumentPaddingAspect::isStepAttachment);
+                return;
+            }
+        }
+
         if (argSize >= paramSize) {
             return;
         }
@@ -44,6 +61,18 @@ public privileged aspect PickleStepDefinitionMatchArgumentPaddingAspect {
         for (int i = argSize; i < paramSize; i++) {
             arguments.add(new PlaceholderArgument(parameterInfos.get(i)));
         }
+    }
+
+    private static boolean blockConditionalGlue(PickleStepDefinitionMatch match) {
+        if (match.stepDefinition == null) {
+            return false;
+        }
+        String location = match.stepDefinition.getLocation();
+        return location != null && location.contains("DynamicSteps.executeDynamicStepBlockConditionals");
+    }
+
+    private static boolean isStepAttachment(Argument argument) {
+        return argument instanceof DataTableArgument || argument instanceof DocStringArgument;
     }
 
     private static final class PlaceholderArgument implements Argument {

@@ -43,6 +43,7 @@ import static tools.dscode.common.treeparsing.parsedComponents.ElementType.VALUE
 import static tools.dscode.common.treeparsing.parsedComponents.phraseoperations.ElementMatching.processElementMatches;
 import static tools.dscode.common.util.StringUtilities.limitText;
 import static tools.dscode.common.util.datetime.TemporalValue.delta;
+import static tools.dscode.common.treeparsing.preparsing.ParsedLine.gherkinArgumentForBranch;
 import static tools.dscode.coredefinitions.BrowserSteps.getCurrentDriver;
 
 public enum ActionOperations implements OperationsInterface {
@@ -477,7 +478,12 @@ public enum ActionOperations implements OperationsInterface {
             int repetition = phraseData.getRepetition();
             phraseData.result = Attempt.runVoid(repetition, 500, () -> {
                 ElementMatch firstElement = phraseData.getElementMatchAfterOperation(VALUE_TYPE);
-                StepExtension newStepExtension = getRunningStep().createNewStepExtension(firstElement.getValue().toString());
+                StepExtension runningStep = getRunningStep();
+                String stepText = firstElement.getValue().toString();
+                String inherited = runningStep.inheritedGherkinArgument();
+                StepExtension newStepExtension = runningStep.createNewStepExtension(
+                        stepText,
+                        gherkinArgumentForBranch(stepText, inherited));
                 newStepExtension.runAndGetReturnValue();
             });
         }

@@ -2,6 +2,7 @@ package tools.dscode.testengine;
 
 import com.epam.reportportal.utils.properties.PropertiesLoader;
 import io.cucumber.core.runner.CurrentScenarioState;
+import tools.dscode.common.coordination.AgentCoordination;
 import tools.dscode.common.mappings.ParsingMap;
 import tools.dscode.common.reporting.logging.Level;
 import tools.dscode.control.protocol.PickleballLocalLayout;
@@ -109,8 +110,22 @@ public abstract class PickleballRunner {
         applyPkbAliases();
         applyLegacyFrameworkDefaults();
         syncCanonicalAndAliasKeys();
+        alignCucumberNameFilterWithFind();
         syncReportPortalAliases(true);
-        ParsingMap.initializeConfigs(values.get(PKB_CONFIG_PATH));
+        java.nio.file.Path projectRoot = PickleballLocalLayout.findProjectRoot(java.nio.file.Path.of(""));
+        AgentCoordination.Run coordination = null;
+        if (AgentCoordination.launchRequestsPrivateRun()) {
+            coordination = AgentCoordination.openConsumerRun(
+                    projectRoot,
+                    System.out,
+                    values.get(PKB_CONFIG_PATH)
+            );
+        }
+        if (coordination != null && java.nio.file.Files.isDirectory(coordination.configDirectory())) {
+            ParsingMap.initializeConfigs(coordination.configDirectory().toString());
+        } else {
+            ParsingMap.initializeConfigs(values.get(PKB_CONFIG_PATH));
+        }
         refreshRunProfile();
         refreshPkbOptions();
 
@@ -120,13 +135,23 @@ public abstract class PickleballRunner {
 
         INSTANCE = this;
         debug("Registered singleton instance: " + getClass().getName());
-        PickleballLocalStore.ensureQuietly(PickleballLocalLayout.findProjectRoot(java.nio.file.Path.of("")));
+        PickleballLocalStore.ensureQuietly(projectRoot);
 
         String configuredLogLevel = get(PKB_LOGLEVEL);
         String effectiveLogLevel = configuredLogLevel == null || configuredLogLevel.isBlank()
                 ? "INFO"
                 : configuredLogLevel.trim();
         LOG_LEVEL = Level.valueOf(effectiveLogLevel.toUpperCase(Locale.ROOT));
+        if (coordination != null) {
+            values.put(PKB_props.PKB_RUN_ID, coordination.runId());
+            values.put(PKB_props.PKB_AGENT_ID, coordination.agentId());
+            if (coordination.group() != null) values.put(PKB_props.PKB_RUN_GROUP, coordination.group());
+            if (coordination.sequence() != null) {
+                values.put(PKB_props.PKB_RUN_SEQUENCE, coordination.sequence().toString());
+            }
+            if (coordination.who() != null) values.put(PKB_props.PKB_RUN_WHO, coordination.who());
+            if (coordination.why() != null) values.put(PKB_props.PKB_RUN_WHY, coordination.why());
+        }
     }
 
     public static String getOptionsString() {
@@ -174,6 +199,7 @@ public abstract class PickleballRunner {
         putCliOverride(PKB_NAME, FILTER_NAME_PROPERTY_NAME, joinNameFilters(projection.names));
         putCliOverride(PKB_GLUE, GLUE_PROPERTY_NAME, joinCommaSeparated(projection.glue));
         putCliReference(PKB_CUCUMBER_CLI_FEATURE_SELECTORS, formatCliArgs(projection.features));
+        alignCucumberNameFilterWithFind();
 
         refreshRunProfile();
         refreshPkbOptions();
@@ -260,7 +286,8 @@ public abstract class PickleballRunner {
         return current != null ? current : DynamicSuiteBootstrap.initializeFromRuntimeClasspath();
     }
 
-    static PickleballRunner rawInstance() { return INSTANCE; }
+    /** The live runner, or null when no suite has started. Does not bootstrap one. */
+    public static PickleballRunner rawInstance() { return INSTANCE; }
 
     private void mergeResourcePropertiesIfMissing(String resourceName) {
         try {
@@ -455,6 +482,27 @@ public abstract class PickleballRunner {
             if (aliasWins) values.put(canonical, value);
             else values.putIfAbsent(canonical, value);
         }
+    }
+
+    /**
+     * Cucumber discovery selects a scenario when {@code pkb_name} is found inside the
+     * title. The JUnit engine later skips unless the same pattern matches the entire
+     * title. Publish the search form on the Cucumber alias and leave {@code pkb_name} as entered.
+     */
+    private void alignCucumberNameFilterWithFind() {
+        String name = values.get(PKB_NAME);
+        if (name == null || name.isBlank()) {
+            return;
+        }
+        String published = values.get(FILTER_NAME_PROPERTY_NAME);
+        if (published != null && !published.equals(name)) {
+            return;
+        }
+        values.put(FILTER_NAME_PROPERTY_NAME, cucumberNameFilterMatchingFind(name));
+    }
+
+    static String cucumberNameFilterMatchingFind(String namePattern) {
+        return "(?s).*(?:" + namePattern + ").*";
     }
 
     private void syncPair(String aliasKey, String canonicalKey) {

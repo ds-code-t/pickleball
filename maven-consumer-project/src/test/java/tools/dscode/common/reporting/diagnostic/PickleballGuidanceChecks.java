@@ -59,7 +59,16 @@ public class PickleballGuidanceChecks {
             assertTrue(guide.contains("DiagnosticCli help"));
             assertTrue(guide.contains("**Discover**"));
             assertTrue(guide.contains("**Confirm**"));
-            assertTrue(guide.contains("Do not start the GUI"));
+            assertTrue(guide.contains("Do not open the GUI for your own testing"));
+            assertTrue(guide.contains("While testing for yourself, stay headless"));
+            assertFalse(guide.contains("Do not start the GUI"));
+            assertFalse(guide.toLowerCase(java.util.Locale.ROOT).contains("must never open the gui"));
+            assertTrue(guide.contains("open-scenario"));
+            assertTrue(guide.contains("mvnw"));
+            assertTrue(guide.contains("mvnw.cmd"));
+            assertTrue(guide.contains("machine-wide"));
+            assertTrue(guide.contains("already open"));
+            assertFalse(guide.toLowerCase(java.util.Locale.ROOT).contains("only controls"));
             assertTrue(guide.contains("execute-step"));
             assertTrue(guide.contains("run-catalog.json"));
             assertTrue(guide.contains("PickleballWorkbenchLauncher"));
@@ -336,8 +345,8 @@ public class PickleballGuidanceChecks {
             assertTrue(consumerProject.contains("Version-matched reference snapshot"));
             assertTrue(consumerProject.contains("discover which scenarios fail")
                     || consumerProject.contains("one front door"));
-            assertTrue(consumerProject.contains("Do not start the GUI")
-                    || consumerProject.contains("one front door"));
+            assertTrue(consumerProject.contains("While testing for yourself, stay headless"));
+            assertFalse(consumerProject.contains("Do not start the GUI"));
         } finally {
             deleteTree(root);
         }

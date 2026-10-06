@@ -135,6 +135,8 @@ Both store explicit `RETURN` when present and otherwise store the completed scen
 |---|---|---|
 | Run kind/cardinality | `RunType` | — |
 | Saved result key | `RunKey` | — |
+| Row gate | `RunIf` | — |
+| Called-feature background | `RunBackground` | — |
 | Call feature path | `pkb_callpath` | — |
 | Exact feature name | `pkb_featurename` | — |
 | Scenario-name regex | `pkb_name` | `cucumber.filter.name` |
@@ -142,6 +144,8 @@ Both store explicit `RETURN` when present and otherwise store the completed scen
 | Result order | `pkb_order` | `cucumber.execution.order` |
 | Result limit | `pkb_limit` | `cucumber.execution.limit` |
 | Start marker | `Step_Marker` | — |
+
+`RunIf` and `RunBackground` are reserved on this same `RUN` table. They are not search filters and they are not passed into the called scenario. `RunIf` is evaluated in the caller, before the row starts, with the same rules as the text after `IF:` in a block conditional. False skips the row without failing `RUN`. `RunBackground` true runs background steps in the called feature. Blank, null, and unresolved cells are false for both columns. When `RunIf` is absent, every row runs. When `RunBackground` is absent, `RUN` ignores called-feature backgrounds. That default applies to every `RUN` row, including `SERVICE CALL`. `CALL:` is unchanged.
 
 Inline feature/scenario/marker components overwrite their equivalent table selector fields. A nonblank table `RunType` overrides the inline run type, and `RunKey` keeps its precedence over a quoted key.
 

@@ -2,6 +2,7 @@ package tools.dscode.common.reporting.diagnostic;
 
 import io.cucumber.core.runner.CurrentScenarioState;
 import io.cucumber.datatable.DataTable;
+import tools.dscode.common.coordination.AgentCoordination;
 import tools.dscode.common.reporting.WorkBook;
 import tools.dscode.common.reporting.logging.Log;
 import tools.dscode.common.reporting.logging.simplehtml.SimpleHtmlReportConverter;
@@ -13,13 +14,15 @@ public privileged aspect ReportRetentionAspect {
     void around(SimpleHtmlReportConverter converter):
             execution(protected void tools.dscode.common.reporting.logging.simplehtml.SimpleHtmlReportConverter.onClose())
             && this(converter) {
-        if (DiagnosticRuntime.isDiagnostic()) {
+        if (automaticHtmlBlocked()) {
             converter.scopes.clear();
             return;
         }
         CurrentScenarioState state = io.cucumber.core.runner.GlobalState.getCurrentScenarioState();
         boolean failed = state != null && state.isScenarioFailed();
-        if (ReportRetentionPolicy.writeAutomaticScenarioFiles(failed, false)) {
+        if (AgentCoordination.explicitHtmlOn("scenarioReport")
+                || AgentCoordination.explicitHtmlOn("compositeReport")
+                || ReportRetentionPolicy.writeAutomaticScenarioFiles(failed, false)) {
             proceed(converter);
         } else {
             converter.scopes.clear();
@@ -27,13 +30,17 @@ public privileged aspect ReportRetentionAspect {
     }
 
     void around(): execution(public static void tools.dscode.common.reporting.logging.simplehtml.SimpleHtmlReportConverter.writeFinalReport()) {
-        if (!DiagnosticRuntime.isDiagnostic() && ReportRetentionPolicy.writeAutomaticRunFiles()) proceed();
+        if (automaticHtmlBlocked()) return;
+        if (!explicitHtmlRequested() && !ReportRetentionPolicy.writeAutomaticRunFiles()) return;
+        proceed();
     }
 
     void around(Path path):
             execution(public static void tools.dscode.common.reporting.logging.simplehtml.SimpleHtmlReportConverter.writeFinalReport(java.nio.file.Path))
             && args(path) {
-        if (!DiagnosticRuntime.isDiagnostic() && ReportRetentionPolicy.writeAutomaticRunFiles()) proceed(path);
+        if (automaticHtmlBlocked()) return;
+        if (!explicitHtmlRequested() && !ReportRetentionPolicy.writeAutomaticRunFiles()) return;
+        proceed(path);
     }
 
     void around() throws java.io.IOException:
@@ -49,6 +56,9 @@ public privileged aspect ReportRetentionAspect {
             return;
         }
         ExplicitReportRegistry.writeExplicit(io.cucumber.core.runner.GlobalState.workBookMap.values());
+        if ((explicitHtmlRequested() || ReportRetentionPolicy.writeAutomaticRunFiles()) && !automaticHtmlBlocked()) {
+            SimpleHtmlReportConverter.writeFinalReport(AgentCoordination.reportHtmlOrDefault());
+        }
     }
 
     void around(String status):
@@ -61,7 +71,7 @@ public privileged aspect ReportRetentionAspect {
     SimpleHtmlReportConverter around():
             call(tools.dscode.common.reporting.logging.simplehtml.SimpleHtmlReportConverter.new(..))
             && (within(io.cucumber.core.runner.GlobalState) || within(io.cucumber.core.runner.CurrentScenarioState)) {
-        return DiagnosticRuntime.isDiagnostic() ? null : proceed();
+        return automaticHtmlBlocked() ? null : proceed();
     }
 
     tools.dscode.common.reporting.logging.reportportal.ReportPortalBridgeConverter around():
@@ -93,5 +103,16 @@ public privileged aspect ReportRetentionAspect {
             execution(public static void tools.dscode.coredefinitions.ReportingSteps.setRow(String, String, io.cucumber.datatable.DataTable))
             && args(reportPath, sheetName, dataTable) {
         ExplicitReportRegistry.mark(reportPath);
+    }
+
+    private static boolean automaticHtmlBlocked() {
+        return DiagnosticRuntime.isDiagnostic()
+                && !AgentCoordination.htmlEnabled("compositeReport")
+                && !AgentCoordination.htmlEnabled("scenarioReport");
+    }
+
+    private static boolean explicitHtmlRequested() {
+        return AgentCoordination.explicitHtmlOn("compositeReport")
+                || AgentCoordination.explicitHtmlOn("scenarioReport");
     }
 }

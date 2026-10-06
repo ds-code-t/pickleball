@@ -210,6 +210,34 @@ class WorkbenchApplicationTest {
                 .contains("Usage: pickleball-workbench mcp <project>"));
     }
 
+    @Test
+    void projectCommandArgsForwardsExampleWithoutAbsorbingItIntoName() {
+        WorkbenchApplication.IsolateArgs parsed = WorkbenchApplication.projectCommandArgs(
+                new String[]{"isolate", "C:/consumer", "--name=The", "failing", "scenario", "--example=1", "2", "5"},
+                "isolate"
+        );
+        assertEquals("The failing scenario", parsed.name());
+        assertEquals("1 2 5", parsed.example());
+    }
+
+    @Test
+    void projectCommandArgsKeepsSessionIdentityOffTheName() {
+        WorkbenchApplication.IsolateArgs parsed = WorkbenchApplication.projectCommandArgs(
+                new String[]{
+                        "session", "C:/consumer",
+                        "--name=The", "failing", "scenario",
+                        "--session-file", "C:/consumer/.pickleball/runs/run-1/session/cli-session.json",
+                        "--run-id", "run-1",
+                        "--agent-id", "agent-1"
+                },
+                "session"
+        );
+        assertEquals("The failing scenario", parsed.name());
+        assertEquals("run-1", parsed.runId());
+        assertEquals("agent-1", parsed.agentId());
+        assertTrue(parsed.sessionFile().toString().replace('\\', '/').endsWith("runs/run-1/session/cli-session.json"));
+    }
+
     private static Output run(String... args) {
         ByteArrayOutputStream stdout = new ByteArrayOutputStream();
         ByteArrayOutputStream stderr = new ByteArrayOutputStream();

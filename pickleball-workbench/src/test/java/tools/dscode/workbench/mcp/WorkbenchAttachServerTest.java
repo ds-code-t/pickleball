@@ -145,4 +145,61 @@ class WorkbenchAttachServerTest {
         }
         assertTrue(Files.notExists(WorkbenchAttachServer.cliSessionStateFile(project)));
     }
+
+    @Test
+    void uiAttachAcceptsTheSameSessionCommandsAndStopLeavesTheEndpointUp() throws Exception {
+        try (WorkbenchController controller = new WorkbenchController(project);
+             WorkbenchAttachServer server = WorkbenchAttachServer.start(controller, project)) {
+            HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2)).build();
+            HttpResponse<String> unknown = post(client, server, "{\"op\":\"not-a-command\"}");
+            assertEquals(400, unknown.statusCode());
+
+            HttpResponse<String> pause = post(client, server, "{\"op\":\"pause\",\"id\":\"pause-1\"}");
+            assertEquals(200, pause.statusCode());
+            JsonNode ack = JSON.readTree(pause.body());
+            assertEquals("pause-1", ack.get("id").asText());
+
+            JsonNode done = await(client, server, "pause-1");
+            assertEquals("SUCCESS", done.get("status").asText());
+
+            HttpResponse<String> stop = post(client, server, "{\"op\":\"stop\"}");
+            assertEquals(200, stop.statusCode());
+            assertTrue(stop.body().contains("STOPPING"));
+            HttpResponse<String> health = client.send(
+                    HttpRequest.newBuilder(URI.create(server.url() + "/health")).GET().build(),
+                    HttpResponse.BodyHandlers.ofString()
+            );
+            assertEquals(200, health.statusCode());
+        }
+    }
+
+    private static HttpResponse<String> post(HttpClient client, WorkbenchAttachServer server, String body) throws Exception {
+        return client.send(
+                HttpRequest.newBuilder(URI.create(server.url() + "/commands"))
+                        .header("Authorization", "Bearer " + server.token())
+                        .header("Content-Type", "application/json")
+                        .POST(HttpRequest.BodyPublishers.ofString(body))
+                        .build(),
+                HttpResponse.BodyHandlers.ofString()
+        );
+    }
+
+    private static JsonNode await(HttpClient client, WorkbenchAttachServer server, String id) throws Exception {
+        JsonNode done = null;
+        for (int i = 0; i < 50; i++) {
+            HttpResponse<String> status = client.send(
+                    HttpRequest.newBuilder(URI.create(server.url() + "/commands/" + id))
+                            .header("X-Workbench-Token", server.token())
+                            .GET()
+                            .build(),
+                    HttpResponse.BodyHandlers.ofString()
+            );
+            assertEquals(200, status.statusCode());
+            done = JSON.readTree(status.body());
+            String value = done.get("status").asText();
+            if ("SUCCESS".equals(value) || "FAILED".equals(value) || "TIMEOUT".equals(value)) return done;
+            Thread.sleep(20);
+        }
+        return done;
+    }
 }

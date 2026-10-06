@@ -1,6 +1,6 @@
 # Component Scenarios
 
-> **Working feature examples:** [`component-scenarios.feature`](../maven-consumer-project/src/test/resources/features/component-scenarios.feature) contains a reusable component. [`reusable-scenario-selection.feature`](../maven-consumer-project/src/test/resources/features/reusable-scenario-selection.feature) demonstrates named selectors, escaped names, ordering, limits, and singular/plural behavior. [`run-step-parameter-variations.feature`](../maven-consumer-project/src/test/resources/features/run-step-parameter-variations.feature) demonstrates the canonical table-driven `RUN` form, mixed run types, and shorthand variations. [`scenario-data-references.feature`](../maven-consumer-project/src/test/resources/features/scenario-data-references.feature) demonstrates marker and data-file references.
+> **Working feature examples:** [`component-scenarios.feature`](../maven-consumer-project/src/test/resources/features/component-scenarios.feature) contains a reusable component. [`reusable-scenario-selection.feature`](../maven-consumer-project/src/test/resources/features/reusable-scenario-selection.feature) demonstrates named selectors, escaped names, ordering, limits, and singular/plural behavior. [`run-step-parameter-variations.feature`](../maven-consumer-project/src/test/resources/features/run-step-parameter-variations.feature) demonstrates the canonical table-driven `RUN` form, mixed run types, and shorthand variations. [`syntax-since-2.1.14.feature`](../maven-consumer-project/src/test/resources/features/syntax-since-2.1.14.feature) demonstrates `RunIf`, `RunBackground`, and inline `DT:::` inheritance. [`scenario-data-references.feature`](../maven-consumer-project/src/test/resources/features/scenario-data-references.feature) demonstrates marker and data-file references.
 
 Component scenarios are reusable, scenario-sized flows. `RUN` is the common dispatcher for regular scenarios, component scenarios, and service calls.
 
@@ -110,12 +110,14 @@ Blank components and more than three unescaped components are rejected.
 
 ## Invocation options
 
-Every invocation-table column is passed to the scenario scan. Common options include:
+Every invocation-table column except the reserved `RunIf` and `RunBackground` columns is passed to the scenario scan. Those two columns are not search filters and are not merged into the called scenario. Common options include:
 
 | Purpose | Pickleball option | Cucumber option |
 |---|---|---|
 | Run kind/cardinality | `RunType` | — |
 | Saved result key | `RunKey` | — |
+| Row gate | `RunIf` | — |
+| Called-feature background | `RunBackground` | — |
 | Component feature path | `pkb_componentpath` | — |
 | Exact feature name | `pkb_featurename` | — |
 | Scenario-name regex | `pkb_name` | `cucumber.filter.name` |
@@ -123,6 +125,20 @@ Every invocation-table column is passed to the scenario scan. Common options inc
 | Result order | `pkb_order` | `cucumber.execution.order` |
 | Result limit | `pkb_limit` | `cucumber.execution.limit` |
 | Start marker | `Step_Marker` | — |
+
+### RunIf and RunBackground
+
+`RunIf` is evaluated in the calling scenario before that row is searched or started. The cell uses the same evaluator as the text after `IF:` in a block conditional. True runs the row. False skips it. A skipped row does not fail `RUN`, does not start its called scenario, and later rows are still evaluated. When one row matches several scenarios, that whole match runs or skips together.
+
+A blank cell, the word `null`, or a reference that does not resolve is false. Explicit `true` and `false` values work. Dynamic assertions such as `<A> has value` and block comparisons such as `4 > 3` work. When the `RunIf` column is absent, every row runs.
+
+`RunBackground` uses that same evaluation. Background steps in the called feature run only when the cell is true. A blank, null, or unresolved cell does not run them. When the `RunBackground` column is absent, `RUN` ignores called-feature backgrounds. That is the default for every `RUN` data table, including scenario, component-scenario, and service-call rows. `SCENARIO:`, `COMPONENT:`, `CALL:`, and a root scenario keep their existing background behavior.
+
+```gherkin
+* RUN
+    | RunType  | RunKey | RunIf         | RunBackground |
+    | SCENARIO | setup  | <A> has value | true          |
+```
 
 ```gherkin
 * RUN

@@ -55,6 +55,10 @@ The controlled run uses the default `configs` resource root because the blank va
 
 Named browser yaml files under the configured config path remain the local override, including headed `CHROME.yaml`. When `CHROME_HEADLESS` is absent from that mapping, Pickleball fills it from the JAR resource `META-INF/pickleball/configs/CHROME_HEADLESS.yaml` so agents can set `pkb_browser=CHROME_HEADLESS` without copying yaml. See [Execution Configuration](configuration.md).
 
+## Per-run copy
+
+An agent run or a Workbench run copies that config tree into `.pickleball/runs/<run-id>/config` when the run starts and then reads only the copy. Edits, including from the Workbench Config tab, write the copy and do not write the project files. A second run has its own copy. A normal test does not copy and still loads `pkb_configpath` from the project. The stored run profile keeps the project `pkb_configpath`. It does not record the run directory.
+
 ## Initialization order
 
 Run configuration is resolved before the final config source is bound:

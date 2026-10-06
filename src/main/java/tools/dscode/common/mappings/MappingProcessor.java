@@ -531,6 +531,10 @@ public abstract class MappingProcessor implements Map<String, Object> {
             String originalInput;
             do {
                 input = normalizeBookends(input, bookends);
+                if (resolveEvaluations) {
+                    input = replaceLazyBooleanExpressions(input, parsedObj, bookends);
+                    input = replaceRawTildeLazyExpressions(input, parsedObj, bookends);
+                }
                 originalInput = input;
                 String previousInput;
                 do {
@@ -652,6 +656,105 @@ public abstract class MappingProcessor implements Map<String, Object> {
                     "Could not resolve by map '" + input + "' due to: " + t.getMessage(),
                     t);
         }
+    }
+
+    private String replaceLazyBooleanExpressions(
+            String input,
+            QuoteParser parsedObj,
+            Bookends bookends
+    ) {
+        StringBuilder output = new StringBuilder();
+        int cursor = 0;
+        while (cursor < input.length()) {
+            int open = input.indexOf(INTERNAL_EXPRESSION_OPEN, cursor);
+            if (open < 0) {
+                output.append(input.substring(cursor));
+                break;
+            }
+            int endExclusive = matchInternalExpression(input, open);
+            if (endExclusive < 0) {
+                output.append(input.substring(cursor));
+                break;
+            }
+            String internalBody = input.substring(
+                    open + INTERNAL_EXPRESSION_OPEN.length(),
+                    endExclusive - INTERNAL_EXPRESSION_CLOSE.length());
+            String restored = restoreExpressionBody(internalBody, parsedObj, bookends);
+            output.append(input, cursor, open);
+            output.append(LazyBooleanSides.evaluateReference(
+                    this,
+                    restored,
+                    bookends.expressionOpen(),
+                    bookends.expressionClose()));
+            cursor = endExclusive;
+        }
+        return output.toString();
+    }
+
+    private String replaceRawTildeLazyExpressions(
+            String input,
+            QuoteParser parsedObj,
+            Bookends bookends
+    ) {
+        String open = "~[~{";
+        String close = "}~]~";
+        StringBuilder output = new StringBuilder();
+        int cursor = 0;
+        while (cursor < input.length()) {
+            int start = input.indexOf(open, cursor);
+            if (start < 0) {
+                output.append(input.substring(cursor));
+                break;
+            }
+            int end = LazyBooleanSides.matchingClose(input, start, open, close);
+            if (end < 0) {
+                output.append(input.substring(cursor));
+                break;
+            }
+            String restored = restoreExpressionBody(
+                    input.substring(start, end), parsedObj, bookends);
+            String body = restored.length() >= open.length() + close.length()
+                    ? restored.substring(open.length(), restored.length() - close.length())
+                    : restored;
+            output.append(input, cursor, start);
+            output.append(LazyBooleanSides.evaluateReference(this, body, open, close));
+            cursor = end;
+        }
+        return output.toString();
+    }
+
+    private static int matchInternalExpression(String input, int openIndex) {
+        int depth = 0;
+        for (int index = openIndex; index < input.length(); ) {
+            if (input.startsWith(INTERNAL_EXPRESSION_OPEN, index)) {
+                depth++;
+                index += INTERNAL_EXPRESSION_OPEN.length();
+                continue;
+            }
+            if (input.startsWith(INTERNAL_EXPRESSION_CLOSE, index)) {
+                depth--;
+                index += INTERNAL_EXPRESSION_CLOSE.length();
+                if (depth == 0) {
+                    return index;
+                }
+                continue;
+            }
+            index++;
+        }
+        return -1;
+    }
+
+    private String restoreExpressionBody(
+            String body,
+            QuoteParser parsedObj,
+            Bookends bookends
+    ) {
+        String restored = body
+                .replace(INTERNAL_MAP_OPEN, bookends.open())
+                .replace(INTERNAL_MAP_CLOSE, bookends.close())
+                .replace(INTERNAL_EXPRESSION_OPEN, bookends.expressionOpen())
+                .replace(INTERNAL_EXPRESSION_CLOSE, bookends.expressionClose());
+        return parsedObj.restoreAndStripBookEnds(decodeBackToText(restored));
     }
 
     private String resolveExpression(String input, QuoteParser parsedObj, Bookends bookends) {

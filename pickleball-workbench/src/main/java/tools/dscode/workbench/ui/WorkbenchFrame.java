@@ -5,9 +5,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import tools.dscode.control.protocol.ControlBridgeEvent;
 import tools.dscode.control.protocol.ControlBridgeEventPage;
 import tools.dscode.control.protocol.ControlBridgeMappingSnapshot;
-import tools.dscode.control.protocol.PickleballLocalLayout;
 import tools.dscode.control.protocol.PickleballVersion;
+import tools.dscode.control.protocol.RunView;
+import tools.dscode.control.protocol.WindowDriver;
 import tools.dscode.control.protocol.ControlBridgeStepResolution;
+import tools.dscode.workbench.WorkbenchSessionActions;
 import tools.dscode.workbench.catalog.CatalogTargetResolver;
 import tools.dscode.workbench.catalog.ConsumerFeatureCatalog;
 import tools.dscode.workbench.catalog.JavaGlueIndex;
@@ -59,6 +61,9 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
@@ -90,6 +95,10 @@ final class WorkbenchFrame extends JFrame {
     private boolean liveIsolateWorkerSeen;
     private final Timer diagnosticTailTimer = new Timer(1200, event -> tailDiagnostics());
     private final JComboBox<String> reportPicker = new JComboBox<>();
+    private final JComboBox<String> runPicker = new JComboBox<>();
+    private final JTextArea runViewText = outputArea();
+    private final JLabel runLiveLabel = new JLabel("Live run: none");
+    private boolean syncingRunPicker;
     private final JEditorPane reportView = new JEditorPane();
     private final Map<String, Path> reportFiles = new LinkedHashMap<>();
 
@@ -116,6 +125,19 @@ final class WorkbenchFrame extends JFrame {
     private final JLabel readinessLabel = new JLabel("Loading status...");
     private final JLabel playerStatusLabel = new JLabel("Stopped");
     private final JLabel activityLabel = new JLabel("Ready");
+    private final LongWork longWork = new LongWork();
+    private final ExecutorService loadExecutor = Executors.newSingleThreadExecutor(LongWork::thread);
+    private final JPanel workBanner = new JPanel(new BorderLayout());
+    private final JLabel workBannerLabel = new JLabel();
+    private final ConfigTabModel configTab = new ConfigTabModel();
+    private final DefaultListModel<String> configFileModel = new DefaultListModel<>();
+    private final JList<String> configFiles = new JList<>(configFileModel);
+    private final JTextArea configEditor = new JTextArea();
+    private final JLabel configStatus = new JLabel("No run is open.");
+    private final JButton configSave = WorkbenchTheme.flatButton("Save", "Write this file in the run's config copy");
+    private String viewedRunId;
+    private boolean viewedRunEditable;
+    private boolean syncingConfig;
     private final JPanel agentBanner = new JPanel(new BorderLayout(12, 0));
     private final JLabel agentBannerLabel = new JLabel();
     private final JButton takeControlButton = WorkbenchTheme.accentButton(
@@ -157,6 +179,8 @@ final class WorkbenchFrame extends JFrame {
     private boolean playbackPreparing;
     private boolean playbackBusy;
     private Long executingStepId;
+    private final AtomicBoolean commandDriven = new AtomicBoolean();
+    private final WorkbenchSessionActions actions;
     private boolean pendingFreshRun;
     private Long pendingFreshRunStepId;
     private String pendingIsolatedStep;
@@ -172,13 +196,25 @@ final class WorkbenchFrame extends JFrame {
     private int shownTabIndex;
 
     WorkbenchFrame(WorkbenchUiController controller) {
-        this(controller, null);
+        this(controller, null, null, null);
     }
 
     WorkbenchFrame(WorkbenchUiController controller, WorkbenchAttachServer attach) {
+        this(controller, attach, null, null);
+    }
+
+    WorkbenchFrame(
+            WorkbenchUiController controller,
+            WorkbenchAttachServer attach,
+            String initialRunId,
+            String initialAgentId
+    ) {
         super("Pickleball Workbench");
         this.controller = controller;
         this.attach = attach;
+        this.actions = attach == null
+                ? new WorkbenchSessionActions(controller.services())
+                : attach.sessionActions();
         this.player = controller.player();
         this.playback = controller.playback();
         editorSessions.add(new EditorTabState("Demo", null, player.documentText(), true));
@@ -242,6 +278,8 @@ final class WorkbenchFrame extends JFrame {
             updatePlayerView(null);
         }));
         applyLease(controller.controlLease());
+        actions.installWindow(new SessionWindow());
+        loadInitialRun(initialRunId, initialAgentId);
         controller.setUiGoHandler(link -> SwingUtilities.invokeLater(() ->
                 applyGoResult(new WorkbenchGoResolver(controller.projectRoot()).resolve(link), link)));
 
@@ -252,7 +290,7 @@ final class WorkbenchFrame extends JFrame {
             }
         });
 
-        runStateAction("Loading project status", controller::refresh);
+        runLong(LongWork.LOADING_THE_PROJECT, controller::refresh);
     }
 
     private JMenuBar menuBar() {
@@ -286,6 +324,8 @@ final class WorkbenchFrame extends JFrame {
         JPanel north = new JPanel();
         north.setOpaque(false);
         north.setLayout(new BoxLayout(north, BoxLayout.Y_AXIS));
+        north.add(workBanner);
+        north.add(Box.createVerticalStrut(6));
         north.add(agentBanner);
         north.add(Box.createVerticalStrut(6));
         north.add(permissionBar);
@@ -295,6 +335,13 @@ final class WorkbenchFrame extends JFrame {
     }
 
     private void configureAgentChrome() {
+        workBanner.setBackground(WorkbenchTheme.ACCENT_SOFT);
+        workBanner.setBorder(new EmptyBorder(10, 14, 10, 14));
+        workBannerLabel.setFont(workBannerLabel.getFont().deriveFont(Font.BOLD, 16f));
+        workBannerLabel.setForeground(WorkbenchTheme.TEXT);
+        workBanner.add(workBannerLabel, BorderLayout.CENTER);
+        workBanner.setVisible(false);
+
         agentBanner.setBackground(new Color(0xFE, 0xF3, 0xC7));
         agentBanner.setBorder(WorkbenchTheme.cardBorder());
         agentBannerLabel.setForeground(WorkbenchTheme.TEXT);
@@ -445,16 +492,105 @@ final class WorkbenchFrame extends JFrame {
         return panel;
     }
 
+    private JComponent runPanel() {
+        JPanel panel = new JPanel(new BorderLayout(8, 8));
+        panel.setOpaque(false);
+        JPanel bar = new JPanel(new BorderLayout(8, 0));
+        bar.setOpaque(false);
+        JLabel caption = new JLabel("Run");
+        bar.add(caption, BorderLayout.WEST);
+        bar.add(runPicker, BorderLayout.CENTER);
+        bar.add(runLiveLabel, BorderLayout.EAST);
+        panel.add(bar, BorderLayout.NORTH);
+        runViewText.setText("Choose a run. This loads that run's record, logs, reports, and config. It does not start a test.");
+        panel.add(new JScrollPane(runViewText), BorderLayout.CENTER);
+        runPicker.addActionListener(event -> {
+            if (syncingRunPicker) return;
+            Object selected = runPicker.getSelectedItem();
+            if (selected == null || selected.toString().isBlank()) return;
+            try {
+                actions.showRun(selected.toString(), null, false);
+            } catch (RuntimeException failure) {
+                runViewText.setText(failure.getMessage());
+            }
+        });
+        return panel;
+    }
+
+    private void loadInitialRun(String runId, String agentId) {
+        refreshRunChooser();
+        String id = runId;
+        if (id == null || id.isBlank()) {
+            id = WindowDriver.read(controller.projectRoot()).viewedRunId();
+        }
+        if (id == null || id.isBlank()) return;
+        try {
+            boolean claim = agentId != null && !agentId.isBlank();
+            actions.showRun(id, agentId, claim);
+        } catch (RuntimeException failure) {
+            runViewText.setText(failure.getMessage());
+        }
+    }
+
+    private void refreshRunChooser() {
+        java.util.List<String> ids = RunView.runIds(controller.projectRoot());
+        syncingRunPicker = true;
+        try {
+            Object selected = runPicker.getSelectedItem();
+            runPicker.removeAllItems();
+            for (String id : ids) runPicker.addItem(id);
+            if (selected != null) runPicker.setSelectedItem(selected.toString());
+        } finally {
+            syncingRunPicker = false;
+        }
+    }
+
+    private void presentRun(WindowDriver.Decision decision) {
+        refreshRunChooser();
+        syncingRunPicker = true;
+        try {
+            runPicker.setSelectedItem(decision.loaded().runId());
+        } finally {
+            syncingRunPicker = false;
+        }
+        String live = decision.state().liveRunId() == null ? "none" : decision.state().liveRunId();
+        String mode = decision.readOnly() ? "read-only" : "live";
+        runLiveLabel.setText("Live run: " + live + " (" + mode + ")");
+        StringBuilder text = new StringBuilder();
+        text.append(decision.loaded().recordText());
+        if (!text.toString().endsWith("\n")) text.append('\n');
+        text.append("\nlogs:\n");
+        for (Path log : decision.loaded().logs()) text.append(log).append('\n');
+        text.append("\nreports:\n");
+        for (Path report : decision.loaded().reports()) text.append(report).append('\n');
+        text.append("\nconfig:\n");
+        for (Path config : decision.loaded().config()) text.append(config).append('\n');
+        text.append("\nPlay, step, and stop apply only to the live run. Other runs are readable.\n");
+        runViewText.setText(text.toString());
+        runViewText.setCaretPosition(0);
+        viewedRunId = decision.loaded().runId();
+        viewedRunEditable = !decision.readOnly();
+        refreshConfigView();
+        if (rightTabs != null) {
+            int index = rightTabs.indexOfTab("Run");
+            if (index >= 0) rightTabs.setSelectedIndex(index);
+        }
+    }
+
     private JComponent rightWorkspace() {
         rightTabs = new JTabbedPane();
+        rightTabs.addTab("Run", runPanel());
         rightTabs.addTab("Mapping", mappingPanel());
+        rightTabs.addTab("Config", configPanel());
         rightTabs.addTab("Terminal", terminal);
         rightTabs.addTab("Explorer", diagnosticsPanel());
         rightTabs.addTab("Report", reportPanel());
         diagnosticTailTimer.setRepeats(true);
         rightTabs.addChangeListener(event -> {
             String title = rightTabs.getTitleAt(rightTabs.getSelectedIndex());
-            if ("Explorer".equals(title) || "Diagnostic Log Explorer".equals(title)) {
+            if ("Config".equals(title)) {
+                refreshConfigView();
+            } else if ("Explorer".equals(title) || "Diagnostic Log Explorer".equals(title)) {
                 refreshDiagnostics();
                 if (!diagnosticTailTimer.isRunning()) diagnosticTailTimer.start();
             } else {
@@ -501,6 +637,85 @@ final class WorkbenchFrame extends JFrame {
             return wrap;
         }
         return panel;
+    }
+
+    private JPanel configPanel() {
+        JPanel panel = new JPanel(new BorderLayout(6, 6));
+        panel.setBackground(WorkbenchTheme.SURFACE);
+        panel.setBorder(new EmptyBorder(8, 8, 8, 8));
+        panel.setMinimumSize(new Dimension(0, 0));
+
+        JLabel heading = WorkbenchTheme.heading("Run config");
+        heading.setToolTipText("Edits stay in this run's config copy. Project configs are not written.");
+        JPanel north = new JPanel(new BorderLayout(8, 0));
+        north.setOpaque(false);
+        north.add(heading, BorderLayout.WEST);
+        configSave.addActionListener(event -> saveConfigDraft());
+        north.add(configSave, BorderLayout.EAST);
+        panel.add(north, BorderLayout.NORTH);
+
+        configFiles.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        configFiles.addListSelectionListener(event -> {
+            if (event.getValueIsAdjusting() || syncingConfig) return;
+            String selected = configFiles.getSelectedValue();
+            if (selected == null || selected.equals(configTab.selected())) return;
+            configTab.select(selected);
+            showConfigDraft();
+        });
+        configEditor.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 13));
+        configEditor.setTabSize(2);
+        WorkbenchTheme.styleEditor(configEditor);
+        JScrollPane files = new JScrollPane(configFiles);
+        JScrollPane editor = new JScrollPane(configEditor);
+        WorkbenchTheme.styleScroll(files);
+        WorkbenchTheme.styleScroll(editor);
+        files.setMinimumSize(new Dimension(0, 0));
+        editor.setMinimumSize(new Dimension(0, 0));
+        JSplitPane split = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, files, editor);
+        WorkbenchTheme.styleSplit(split);
+        split.setResizeWeight(0.28);
+        split.setDividerLocation(220);
+        panel.add(split, BorderLayout.CENTER);
+
+        configStatus.setBorder(new EmptyBorder(2, 2, 2, 2));
+        configStatus.setForeground(WorkbenchTheme.MUTED);
+        panel.add(configStatus, BorderLayout.SOUTH);
+        refreshConfigView();
+        return panel;
+    }
+
+    private void refreshConfigView() {
+        configTab.show(controller.projectRoot(), viewedRunId, viewedRunEditable);
+        syncingConfig = true;
+        try {
+            configFileModel.clear();
+            for (String file : configTab.files()) configFileModel.addElement(file);
+            if (!configTab.selected().isEmpty()) {
+                configFiles.setSelectedValue(configTab.selected(), true);
+            }
+            showConfigDraft();
+        } finally {
+            syncingConfig = false;
+        }
+    }
+
+    private void showConfigDraft() {
+        configEditor.setText(configTab.text());
+        configEditor.setCaretPosition(0);
+        configEditor.setEditable(configTab.editable() && !configTab.selected().isEmpty());
+        configSave.setEnabled(configTab.editable() && !configTab.selected().isEmpty());
+        configStatus.setText(configTab.status());
+    }
+
+    private void saveConfigDraft() {
+        configTab.setDraft(configEditor.getText());
+        try {
+            configTab.save();
+        } catch (RuntimeException failure) {
+            configStatus.setText(failure.getMessage() == null ? "Save failed." : failure.getMessage());
+            return;
+        }
+        configStatus.setText(configTab.status());
     }
 
     private JPanel diagnosticsPanel() {
@@ -551,19 +766,13 @@ final class WorkbenchFrame extends JFrame {
     private void refreshReport() {
         reportFiles.clear();
         reportPicker.removeAllItems();
-        Path investigations = PickleballLocalLayout.investigationsDirectory(controller.projectRoot());
-        if (Files.isDirectory(investigations)) {
-            try (var directories = Files.list(investigations)) {
-                directories.filter(Files::isDirectory).sorted().forEach(directory -> {
-                    Path html = directory.resolve("report.html");
-                    if (Files.isRegularFile(html)) {
-                        String id = directory.getFileName().toString();
-                        reportFiles.put(id, html);
-                        reportPicker.addItem(id);
-                    }
-                });
-            } catch (Exception ignored) {
+        try {
+            for (Path html : tools.dscode.control.protocol.InvestigationHandoff.reportFiles(controller.projectRoot())) {
+                String id = html.getParent() == null ? html.getFileName().toString() : html.getParent().getFileName().toString();
+                reportFiles.put(id, html);
+                reportPicker.addItem(id);
             }
+        } catch (Exception ignored) {
         }
         if (reportFiles.isEmpty()) {
             reportView.setText("<html><body><p>No investigation reports under .pickleball/investigations.</p></body></html>");
@@ -687,8 +896,14 @@ final class WorkbenchFrame extends JFrame {
     }
 
     private void configureStepEditor() {
-        openTargetButton.addActionListener(event -> openSelectedTarget());
-        stepText.addActionListener(event -> insertStep());
+        openTargetButton.addActionListener(event -> {
+            if (humanControlsLocked()) return;
+            openSelectedTarget();
+        });
+        stepText.addActionListener(event -> {
+            if (humanControlsLocked()) return;
+            actions.insertStep(stepText.getText());
+        });
         stepText.getInputMap(JComponent.WHEN_FOCUSED).put(
                 KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, KeyEvent.CTRL_DOWN_MASK),
                 "update-selected-step"
@@ -696,7 +911,8 @@ final class WorkbenchFrame extends JFrame {
         stepText.getActionMap().put("update-selected-step", new AbstractAction() {
             @Override
             public void actionPerformed(java.awt.event.ActionEvent event) {
-                updateSelectedStep();
+                if (humanControlsLocked()) return;
+                actions.updateStep(stepText.getText());
             }
         });
     }
@@ -751,8 +967,8 @@ final class WorkbenchFrame extends JFrame {
             );
 
             diagnosticHost.onSelectRun(runId -> {
-                if (LIVE_ISOLATE_RUN.equals(runId)) showLiveIsolate();
-                else showDiagnosticRun(runId);
+                if (humanControlsLocked()) return;
+                actions.diagnosticRun(runId);
             });
             diagnosticHost.onGo(this::goFromExplorer);
             diagnosticHost.onReady(this::refreshDiagnostics);
@@ -771,46 +987,44 @@ final class WorkbenchFrame extends JFrame {
 
     private void configurePicker() {
         picker.onScenarioSelected(scenario -> {
-            flushActiveEditorTab();
-            List<String> fileLines = readFeatureFile(scenario.file(), scenario.lines());
-            controller.loadPickerScenario(
-                    fileLines,
-                    scenario.file(),
-                    scenario.name(),
-                    scenario.startLine(),
-                    scenario.endLine(),
-                    scenario.exampleRow(),
-                    scenario.exampleLabel()
-            );
-            picker.setSaveEnabled(true);
-            openEditorTab(
-                    scenario.file(),
-                    scenario.displayLabel(),
-                    scenario.name(),
-                    scenario.startLine(),
-                    scenario.endLine(),
-                    scenario.exampleRow(),
-                    scenario.exampleLabel(),
-                    player.documentText(),
-                    true
-            );
-            syncScenarioView();
-            updatePlayerView("Loaded " + scenario.displayLabel() + ".");
-            resolveSelectedStep();
+            if (humanControlsLocked()) return;
+            String example = scenario.exampleRow() > 0 ? Integer.toString(scenario.exampleRow()) : "";
+            actions.openScenario(scenario.file().toString(), scenario.name(), example);
         });
-        picker.onSave(this::saveLoadedFeature);
+        picker.onSave(() -> {
+            if (humanControlsLocked()) return;
+            actions.save();
+        });
     }
 
-    private void refreshFeatureCatalog() {
+    private CatalogSnapshot scanProject() {
         WorkbenchManifest manifest = null;
         try {
             manifest = WorkbenchManifest.read(controller.projectRoot());
         } catch (RuntimeException ignored) {
             // The picker can still scan conventional project feature folders.
         }
-        picker.setCatalog(ConsumerFeatureCatalog.scan(controller.projectRoot(), manifest));
-        diagnosticNavigator = new DiagnosticEvidenceNavigator(controller.projectRoot());
-        glueIndex = JavaGlueIndex.scan(controller.projectRoot());
+        return new CatalogSnapshot(
+                ConsumerFeatureCatalog.scan(controller.projectRoot(), manifest),
+                new DiagnosticEvidenceNavigator(controller.projectRoot()),
+                JavaGlueIndex.scan(controller.projectRoot())
+        );
+    }
+
+    private void applyCatalog(CatalogSnapshot snapshot) {
+        picker.setCatalog(snapshot.catalog());
+        diagnosticNavigator = snapshot.navigator();
+        glueIndex = snapshot.glue();
+    }
+
+    private record CatalogSnapshot(
+            ConsumerFeatureCatalog catalog,
+            DiagnosticEvidenceNavigator navigator,
+            JavaGlueIndex glue
+    ) {
+    }
+
+    private record LoadedProject(WorkbenchUiController.State state, CatalogSnapshot catalog) {
     }
 
     private void togglePicker() {
@@ -1007,12 +1221,14 @@ final class WorkbenchFrame extends JFrame {
         }
     }
 
-    private void saveLoadedFeature() {
-        if (humanControlsLocked()) return;
+    private WorkbenchSaveResult saveLoadedFeature() {
+        if (blocked()) {
+            return WorkbenchSaveResult.cancelled("Save is locked while an agent holds control.");
+        }
         WorkbenchSavePreview preview = controller.savePreview();
         if (!preview.savable()) {
             showFailure("Could not save", new IllegalStateException(preview.summary()));
-            return;
+            return WorkbenchSaveResult.unsavable(preview.summary());
         }
         int choice = JOptionPane.showConfirmDialog(
                 this,
@@ -1023,7 +1239,7 @@ final class WorkbenchFrame extends JFrame {
         );
         if (choice != JOptionPane.OK_OPTION) {
             updatePlayerView("Save cancelled. The original feature file was not changed.");
-            return;
+            return WorkbenchSaveResult.cancelled("Save cancelled. The original feature file was not changed.");
         }
         try {
             WorkbenchSaveResult result = controller.commitSave();
@@ -1032,8 +1248,10 @@ final class WorkbenchFrame extends JFrame {
             } else {
                 showFailure("Could not save", new IllegalStateException(result.message()));
             }
+            return result;
         } catch (RuntimeException failure) {
             showFailure("Could not save feature file", failure);
+            return WorkbenchSaveResult.unsavable(failure.getMessage());
         }
     }
 
@@ -1400,41 +1618,120 @@ final class WorkbenchFrame extends JFrame {
     }
 
     private void wirePlayerActions() {
-        playButton.addActionListener(event -> runScenarioFromBeginning());
+        playButton.addActionListener(event -> {
+            if (humanControlsLocked()) return;
+            actions.play();
+        });
         pauseButton.addActionListener(event -> {
             if (humanControlsLocked()) return;
-            player.pause();
-            updatePlayerView(playbackBusy
-                    ? "Pause requested; the current step will finish first."
-                    : "Scenario playback paused.");
+            actions.pause();
         });
         playerStopButton.addActionListener(event -> {
             if (humanControlsLocked()) return;
-            player.stop();
-            pendingFreshRun = false;
-            pendingFreshRunStepId = null;
-            pendingIsolatedStep = null;
-            updatePlayerView(playbackBusy
-                    ? "Scenario playback stopped; the current step will finish but no next step will start."
-                    : "Scenario playback stopped.");
+            actions.stopPlayback();
         });
-        stepOnlyButton.addActionListener(event -> executeStepOnly());
-        fromHereButton.addActionListener(event -> runScenarioFromSelectedStep());
+        stepOnlyButton.addActionListener(event -> {
+            if (humanControlsLocked()) return;
+            actions.executeStep(stepText.getText());
+        });
+        fromHereButton.addActionListener(event -> {
+            if (humanControlsLocked()) return;
+            actions.fromHere(null);
+        });
     }
 
     private void wireSessionActions() {
-        syncItem.addActionListener(event ->
-                runStateAction("Synchronizing project", controller::synchronize));
-        refreshItem.addActionListener(event ->
-                runStateAction("Refreshing status", controller::refresh));
-        startItem.addActionListener(event ->
-                runStateAction("Starting worker", controller::startWorker));
-        restartItem.addActionListener(event ->
-                runStateAction("Restarting worker", controller::restartWorker));
-        stopItem.addActionListener(event -> {
-            player.stop();
-            runStateAction("Stopping worker", controller::stopWorker);
+        syncItem.addActionListener(event -> {
+            if (humanControlsLocked()) return;
+            actions.sessionSync();
         });
+        refreshItem.addActionListener(event -> {
+            if (humanControlsLocked()) return;
+            actions.refresh();
+        });
+        startItem.addActionListener(event -> {
+            if (humanControlsLocked()) return;
+            actions.workerStart();
+        });
+        restartItem.addActionListener(event -> {
+            if (humanControlsLocked()) return;
+            actions.workerRestart();
+        });
+        stopItem.addActionListener(event -> {
+            if (humanControlsLocked()) return;
+            actions.workerStop();
+        });
+    }
+
+    private boolean blocked() {
+        return !commandDriven.get() && humanControlsLocked();
+    }
+
+    private void commandPause() {
+        if (blocked()) return;
+        player.pause();
+        updatePlayerView(playbackBusy
+                ? "Pause requested; the current step will finish first."
+                : "Scenario playback paused.");
+    }
+
+    private void commandStopPlayback() {
+        if (blocked()) return;
+        player.stop();
+        pendingFreshRun = false;
+        pendingFreshRunStepId = null;
+        pendingIsolatedStep = null;
+        updatePlayerView(playbackBusy
+                ? "Scenario playback stopped; the current step will finish but no next step will start."
+                : "Scenario playback stopped.");
+    }
+
+    private void commandPlayFromHere(String stepId) {
+        if (stepId != null && !stepId.isBlank()) {
+            try {
+                player.clickLine(Long.parseLong(stepId.strip()));
+            } catch (RuntimeException failure) {
+                showFailure("Could not run from selected step", failure);
+                return;
+            }
+        }
+        runScenarioFromSelectedStep();
+    }
+
+    private void openResolved(WorkbenchSessionActions.Opened opened) {
+        flushActiveEditorTab();
+        controller.loadPickerScenario(
+                opened.lines(),
+                opened.file(),
+                opened.name(),
+                opened.startLine(),
+                opened.endLine(),
+                opened.exampleRow(),
+                opened.exampleLabel(),
+                opened.exampleSelector()
+        );
+        int row = playback.origin().exampleRow();
+        picker.setSaveEnabled(opened.file() != null);
+        openEditorTab(
+                opened.file(),
+                opened.name(),
+                opened.name(),
+                opened.startLine(),
+                opened.endLine(),
+                row,
+                playback.origin().exampleLabel(),
+                player.documentText(),
+                true
+        );
+        syncScenarioView();
+        updatePlayerView("Loaded " + opened.name() + ".");
+        resolveSelectedStep();
+    }
+
+    private void commandSelectExample(String selector) {
+        controller.selectExample(selector);
+        updatePlayerView("Examples selector " + selector + " shows row " + playback.origin().exampleRow() + ".");
+        syncScenarioView();
     }
 
     private void runScenarioFromBeginning() {
@@ -1454,7 +1751,7 @@ final class WorkbenchFrame extends JFrame {
     }
 
     private void requestFreshRun(Long startStepId) {
-        if (humanControlsLocked()) return;
+        if (blocked()) return;
         pendingIsolatedStep = null;
         if (playbackBusy || playbackPreparing) {
             pendingFreshRun = true;
@@ -1593,10 +1890,10 @@ final class WorkbenchFrame extends JFrame {
         );
     }
 
-    private void insertStep() {
-        if (humanControlsLocked()) return;
+    private void insertStep(String text) {
+        if (blocked()) return;
         try {
-            LiveScenarioPlayer.Line inserted = player.insertStep(stepText.getText());
+            LiveScenarioPlayer.Line inserted = player.insertStep(text);
             stepText.setText("");
             player.clickLine(inserted.id());
             syncScenarioView();
@@ -1618,10 +1915,10 @@ final class WorkbenchFrame extends JFrame {
         }
     }
 
-    private void updateSelectedStep() {
-        if (humanControlsLocked()) return;
+    private void updateSelectedStep(String text) {
+        if (blocked()) return;
         try {
-            LiveScenarioPlayer.Line updated = player.updateSelectedStep(stepText.getText());
+            LiveScenarioPlayer.Line updated = player.updateSelectedStep(text);
             syncScenarioView();
             showLine(updated.id());
             updatePlayerView("Updated selected line in place.");
@@ -1630,9 +1927,8 @@ final class WorkbenchFrame extends JFrame {
         }
     }
 
-    private void executeStepOnly() {
-        if (humanControlsLocked()) return;
-        String text = stepText.getText();
+    private void executeStepOnly(String text) {
+        if (blocked()) return;
         if (text == null || text.isBlank()) {
             showFailure("Could not execute step",
                     new IllegalArgumentException("Step Editor text must not be blank."));
@@ -2012,20 +2308,55 @@ final class WorkbenchFrame extends JFrame {
             String label,
             Supplier<WorkbenchUiController.State> action
     ) {
-        activityLabel.setText(label + "...");
-        runTask(
+        runLong(label, () -> new LoadedProject(action.get(), scanProject()), loaded -> {
+            applyState(loaded.state());
+            applyCatalog(loaded.catalog());
+            if (loaded.state().liveReady()) {
+                refreshMappingCatalog();
+                controller.workerLogFiles().ifPresent(terminal::setFiles);
+            }
+        });
+    }
+
+    private void runLong(String label, Supplier<WorkbenchUiController.State> action) {
+        runStateAction(label, action);
+    }
+
+    private <T> void runLong(String label, Supplier<T> action, Consumer<T> success) {
+        longWork.start(
+                label,
                 action,
-                state -> {
-                    applyState(state);
-                    activityLabel.setText(label + " complete.");
-                    if (state.liveReady()) {
-                        refreshMappingCatalog();
-                        controller.workerLogFiles().ifPresent(terminal::setFiles);
-                    }
-                    refreshFeatureCatalog();
+                value -> {
+                    success.accept(value);
+                    longWork.finish();
+                    publishWorkStatus();
                 },
-                failure -> showFailure(label + " failed", failure)
+                failure -> publishWorkStatus(),
+                loadExecutor,
+                SwingUtilities::invokeLater
         );
+        publishWorkStatus();
+    }
+
+    private void publishWorkStatus() {
+        String text = longWork.status();
+        boolean show = text != null && !text.isBlank();
+        workBanner.setVisible(show);
+        if (!show) {
+            revalidate();
+            repaint();
+            return;
+        }
+        workBannerLabel.setText(text);
+        if (longWork.failed()) {
+            workBanner.setBackground(new Color(0xFE, 0xE2, 0xE2));
+            workBannerLabel.setForeground(WorkbenchTheme.DANGER);
+        } else {
+            workBanner.setBackground(WorkbenchTheme.ACCENT_SOFT);
+            workBannerLabel.setForeground(WorkbenchTheme.TEXT);
+        }
+        revalidate();
+        repaint();
     }
 
     private void applyState(WorkbenchUiController.State state) {
@@ -2448,7 +2779,7 @@ final class WorkbenchFrame extends JFrame {
     }
 
     private void openSelectedTarget() {
-        if (humanControlsLocked()) return;
+        if (blocked()) return;
         LiveScenarioPlayer.Line selected = player.selectedLine().orElse(player.playheadLine().orElse(null));
         if (selected == null) return;
         List<GherkinReference> refs = GherkinReference.parse(selected.text(), linesAfter(selected));
@@ -2467,48 +2798,15 @@ final class WorkbenchFrame extends JFrame {
             return;
         }
         CatalogTargetResolver.Target found = target.get();
-        flushActiveEditorTab();
         if (found.scenario() != null) {
-            List<String> fileLines = readFeatureFile(found.file(), found.scenario().lines());
-            controller.loadPickerScenario(
-                    fileLines,
-                    found.file(),
-                    found.scenario().name(),
-                    found.scenario().startLine(),
-                    found.scenario().endLine(),
-                    found.scenario().exampleRow(),
-                    found.scenario().exampleLabel()
-            );
-            openEditorTab(
-                    found.file(),
-                    found.scenario().displayLabel(),
-                    found.scenario().name(),
-                    found.scenario().startLine(),
-                    found.scenario().endLine(),
-                    found.scenario().exampleRow(),
-                    found.scenario().exampleLabel(),
-                    player.documentText(),
-                    true
-            );
+            String example = found.scenario().exampleRow() > 0
+                    ? Integer.toString(found.scenario().exampleRow())
+                    : "";
+            actions.openScenario(found.file().toString(), found.scenario().name(), example);
         } else {
-            List<String> fileLines = readFeatureFile(found.file(), List.of());
-            controller.loadPickerScenario(fileLines, found.file(), found.file().getFileName().toString(), 1, fileLines.size());
-            openEditorTab(
-                    found.file(),
-                    found.file().getFileName().toString(),
-                    found.file().getFileName().toString(),
-                    1,
-                    fileLines.size(),
-                    0,
-                    "",
-                    player.documentText(),
-                    true
-            );
+            actions.openScenario(found.file().toString(), found.file().getFileName().toString(), "");
         }
-        picker.setSaveEnabled(true);
-        syncScenarioView();
         updatePlayerView("Opened " + found.detail() + ".");
-        resolveSelectedStep();
     }
 
     private void showFailure(String label, Throwable failure) {
@@ -2617,6 +2915,7 @@ final class WorkbenchFrame extends JFrame {
                 new JScrollPane(source),
                 new JScrollPane(output)
         );
+        WorkbenchTheme.styleSplit(split);
         split.setResizeWeight(0.55);
         panel.add(split, BorderLayout.CENTER);
         return panel;
@@ -2735,6 +3034,7 @@ final class WorkbenchFrame extends JFrame {
     }
 
     private void closeWorkbench() {
+        WindowDriver.closeWindow(controller.projectRoot());
         diagnosticTailTimer.stop();
         if (closing) return;
         closing = true;
@@ -2773,6 +3073,109 @@ final class WorkbenchFrame extends JFrame {
         JButton button = playerButton(text, tooltip);
         button.setMargin(new Insets(1, 7, 1, 7));
         return button;
+    }
+
+    private final class SessionWindow implements WorkbenchSessionActions.Window {
+        @Override
+        public void beginCommand() {
+            commandDriven.set(true);
+        }
+
+        @Override
+        public void endCommand() {
+            commandDriven.set(false);
+        }
+
+        @Override
+        public void openResolved(WorkbenchSessionActions.Opened opened) {
+            WorkbenchFrame.this.openResolved(opened);
+        }
+
+        @Override
+        public void selectExample(String selector) {
+            commandSelectExample(selector);
+        }
+
+        @Override
+        public void playFromStart() {
+            runScenarioFromBeginning();
+        }
+
+        @Override
+        public void playFromHere(String stepId) {
+            commandPlayFromHere(stepId);
+        }
+
+        @Override
+        public void pause() {
+            commandPause();
+        }
+
+        @Override
+        public void stopPlayback() {
+            commandStopPlayback();
+        }
+
+        @Override
+        public void executeStep(String text) {
+            executeStepOnly(text);
+        }
+
+        @Override
+        public void insertStep(String text) {
+            WorkbenchFrame.this.insertStep(text);
+        }
+
+        @Override
+        public void updateStep(String text) {
+            updateSelectedStep(text);
+        }
+
+        @Override
+        public void diagnosticRun(String runId) {
+            if (LIVE_ISOLATE_RUN.equals(runId)) showLiveIsolate();
+            else showDiagnosticRun(runId);
+        }
+
+        @Override
+        public WorkbenchSaveResult presentSave() {
+            return saveLoadedFeature();
+        }
+
+        @Override
+        public void syncProject() {
+            runStateAction(LongWork.SYNCING_THE_PROJECT, controller::synchronize);
+        }
+
+        @Override
+        public void refreshStatus() {
+            runStateAction(LongWork.LOADING_THE_PROJECT, controller::refresh);
+        }
+
+        @Override
+        public void startWorker() {
+            runStateAction(LongWork.STARTING_THE_RUN, controller::startWorker);
+        }
+
+        @Override
+        public void restartWorker() {
+            runStateAction(LongWork.STARTING_THE_RUN, controller::restartWorker);
+        }
+
+        @Override
+        public void stopWorker() {
+            runStateAction(LongWork.STOPPING_THE_RUN, controller::stopWorker);
+        }
+
+        @Override
+        public void showRun(WindowDriver.Decision decision) {
+            presentRun(decision);
+        }
+
+        @Override
+        public void closeWindow() {
+            closeWorkbench();
+        }
     }
 
     private static String defaultOverrideSource() {

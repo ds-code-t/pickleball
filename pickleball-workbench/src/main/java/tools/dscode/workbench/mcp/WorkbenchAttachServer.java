@@ -6,6 +6,7 @@ import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import tools.dscode.control.protocol.PickleballLocalLayout;
 import tools.dscode.workbench.WorkbenchServices;
+import tools.dscode.workbench.WorkbenchSessionActions;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -42,6 +43,7 @@ public final class WorkbenchAttachServer implements AutoCloseable {
     private final HttpServer http;
     private final WorkbenchMcpTools tools;
     private final WorkbenchCommandQueue commands;
+    private final WorkbenchSessionActions actions;
     private final ExecutorService executor;
     private final AtomicBoolean closed = new AtomicBoolean();
 
@@ -54,6 +56,7 @@ public final class WorkbenchAttachServer implements AutoCloseable {
             HttpServer http,
             WorkbenchMcpTools tools,
             WorkbenchCommandQueue commands,
+            WorkbenchSessionActions actions,
             ExecutorService executor
     ) {
         this.services = services;
@@ -64,6 +67,7 @@ public final class WorkbenchAttachServer implements AutoCloseable {
         this.http = http;
         this.tools = tools;
         this.commands = commands;
+        this.actions = actions;
         this.executor = executor;
     }
 
@@ -80,7 +84,23 @@ public final class WorkbenchAttachServer implements AutoCloseable {
             Path projectRoot,
             Runnable stopHandler
     ) {
-        return startCliSession(services, projectRoot, stopHandler, null);
+        return startCliSession(services, projectRoot, stopHandler, (Path) null);
+    }
+
+    public static WorkbenchAttachServer startCliSession(
+            WorkbenchServices services,
+            Path projectRoot,
+            Runnable stopHandler,
+            Path stateFile
+    ) {
+        return start(
+                services,
+                projectRoot,
+                CLI_SESSION_MODE,
+                stateFile == null ? cliSessionStateFile(projectRoot) : stateFile,
+                stopHandler,
+                null
+        );
     }
 
     static WorkbenchAttachServer startCliSession(
@@ -113,12 +133,18 @@ public final class WorkbenchAttachServer implements AutoCloseable {
             HttpServer http = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
             String token = newToken();
             WorkbenchMcpTools tools = new WorkbenchMcpTools(services, JSON);
-            WorkbenchCommandQueue commands = null;
-            if (CLI_SESSION_MODE.equals(mode)) {
-                commands = queue != null ? queue : new WorkbenchCommandQueue(
-                        text -> tools.call("workbench_execute_step", Map.of("text", text))
-                );
-                if (stopHandler != null) commands.setStopHandler(stopHandler);
+            WorkbenchSessionActions actions = new WorkbenchSessionActions(services);
+            WorkbenchCommandQueue commands = queue != null ? queue : new WorkbenchCommandQueue(
+                    text -> tools.call("workbench_execute_step", Map.of("text", text))
+            );
+            commands.setOpHandler((op, args) -> actions.dispatch(op, args));
+            if (stopHandler != null) {
+                commands.setStopHandler(() -> {
+                    actions.stopPlayback();
+                    stopHandler.run();
+                });
+            } else if (UI_ATTACH_MODE.equals(mode)) {
+                commands.setStopHandler(actions::stopPlayback);
             }
             ExecutorService executor = Executors.newCachedThreadPool(runnable -> {
                 Thread thread = new Thread(runnable, "pickleball-workbench-attach");
@@ -126,15 +152,13 @@ public final class WorkbenchAttachServer implements AutoCloseable {
                 return thread;
             });
             WorkbenchAttachServer server = new WorkbenchAttachServer(
-                    services, root, stateFile, token, mode, http, tools, commands, executor
+                    services, root, stateFile, token, mode, http, tools, commands, actions, executor
             );
             http.createContext("/health", server::health);
             http.createContext("/lease", server::lease);
             http.createContext("/player", server::player);
             http.createContext("/tools", server::tools);
-            if (CLI_SESSION_MODE.equals(mode)) {
-                http.createContext("/commands", server::commands);
-            }
+            http.createContext("/commands", server::commands);
             http.setExecutor(executor);
             http.start();
             server.writeStateFile();
@@ -170,6 +194,10 @@ public final class WorkbenchAttachServer implements AutoCloseable {
 
     WorkbenchCommandQueue commandQueue() {
         return commands;
+    }
+
+    public WorkbenchSessionActions sessionActions() {
+        return actions;
     }
 
     @Override
@@ -251,16 +279,16 @@ public final class WorkbenchAttachServer implements AutoCloseable {
             if ("/commands".equals(path) && "POST".equals(exchange.getRequestMethod())) {
                 Map<String, Object> body = readJsonObject(exchange.getRequestBody());
                 String op = string(body, "op");
-                if ("execute-step".equals(op)) {
-                    send(exchange, 200, commands.enqueueExecuteStep(string(body, "text"), string(body, "id")));
-                    return;
-                }
                 if ("stop".equals(op) || "kill".equals(op)) {
                     send(exchange, 200, Map.of("ack", true, "status", "STOPPING", "op", op));
                     commands.requestStop();
                     return;
                 }
-                send(exchange, 400, Map.of("error", "Unknown command op: " + op));
+                if (!WorkbenchSessionActions.known(op)) {
+                    send(exchange, 400, Map.of("error", "Unknown command op: " + op));
+                    return;
+                }
+                send(exchange, 200, commands.enqueueOp(op, stringArgs(body), string(body, "id")));
                 return;
             }
             if (path.startsWith("/commands/") && path.length() > "/commands/".length()
@@ -321,6 +349,14 @@ public final class WorkbenchAttachServer implements AutoCloseable {
     private static String string(Map<String, Object> body, String key) {
         Object value = body.get(key);
         return value == null ? null : value.toString();
+    }
+
+    private static Map<String, String> stringArgs(Map<String, Object> body) {
+        LinkedHashMap<String, String> args = new LinkedHashMap<>();
+        for (Map.Entry<String, Object> entry : body.entrySet()) {
+            if (entry.getValue() != null) args.put(entry.getKey(), entry.getValue().toString());
+        }
+        return args;
     }
 
     private static void send(HttpExchange exchange, int status, Object body) throws IOException {
