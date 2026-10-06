@@ -5,7 +5,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import tools.dscode.control.protocol.ControlBridgeEvent;
 import tools.dscode.control.protocol.ControlBridgeEventPage;
 import tools.dscode.control.protocol.ControlBridgeMappingSnapshot;
-import tools.dscode.control.protocol.PickleballLocalLayout;
 import tools.dscode.control.protocol.PickleballVersion;
 import tools.dscode.control.protocol.RunView;
 import tools.dscode.control.protocol.WindowDriver;
@@ -767,19 +766,13 @@ final class WorkbenchFrame extends JFrame {
     private void refreshReport() {
         reportFiles.clear();
         reportPicker.removeAllItems();
-        Path investigations = PickleballLocalLayout.investigationsDirectory(controller.projectRoot());
-        if (Files.isDirectory(investigations)) {
-            try (var directories = Files.list(investigations)) {
-                directories.filter(Files::isDirectory).sorted().forEach(directory -> {
-                    Path html = directory.resolve("report.html");
-                    if (Files.isRegularFile(html)) {
-                        String id = directory.getFileName().toString();
-                        reportFiles.put(id, html);
-                        reportPicker.addItem(id);
-                    }
-                });
-            } catch (Exception ignored) {
+        try {
+            for (Path html : tools.dscode.control.protocol.InvestigationHandoff.reportFiles(controller.projectRoot())) {
+                String id = html.getParent() == null ? html.getFileName().toString() : html.getParent().getFileName().toString();
+                reportFiles.put(id, html);
+                reportPicker.addItem(id);
             }
+        } catch (Exception ignored) {
         }
         if (reportFiles.isEmpty()) {
             reportView.setText("<html><body><p>No investigation reports under .pickleball/investigations.</p></body></html>");

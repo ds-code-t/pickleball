@@ -20,7 +20,7 @@ mvnw -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java "-Dexec.mainClass=tools.d
 
 Windows is the same command with `mvnw.cmd`. A Gradle consumer that exposes the launcher task uses `gradlew` or `gradlew.bat`.
 
-Same launcher for `hint`, `discover`, `confirm`, `resolve-runvars`, `short-log`, `note`, `inbox`, `finish`, `isolate`, `execute-step`, `status`, `events`, `stop`, `open-scenario`, `example`, `play`, `from-here`, `pause`, `insert-step`, `update-step`, `diagnostic-run`, `save`, `refresh`, `session-sync`, `worker-start`, `worker-restart`, `worker-stop`, `open-window`, `close-window`, and `show-run` — change `exec.args` only.
+Same launcher for `hint`, `discover`, `confirm`, `resolve-runvars`, `short-log`, `note`, `inbox`, `finish`, `presence`, `post`, `history`, `gc-runs`, `isolate`, `execute-step`, `status`, `events`, `stop`, `open-scenario`, `example`, `play`, `from-here`, `pause`, `insert-step`, `update-step`, `diagnostic-run`, `save`, `refresh`, `session-sync`, `worker-start`, `worker-restart`, `worker-stop`, `open-window`, `close-window`, and `show-run` — change `exec.args` only.
 
 The Workbench window is a view of a run you already have. `open-window --run-id=<id>` opens the one window on that run. `show-run --run-id=<id>` loads that run's record, logs, reports, and config. The window's run dropdown reads the same `.pickleball/runs/` directory. Neither command starts a test. `close-window` closes the window and leaves the run directory, a headless run, and the short log in place. Play, step, and stop apply only to the one live run. Another agent may view a different run read-only and does not become a second driver of the live session. There is no Gherkin step that opens the window. An agent that can only run a scenario and cannot call the launcher cannot open it.
 
@@ -37,9 +37,46 @@ Do not copy consumer features into `.pickleball` as a sandbox.
 
 ### Run coordination
 
-Read the short log `.pickleball/agent-log` before a run, after a run, and during a long session, instead of the dense diagnostic log. Use your own run id. When a Workbench window is already open, only one agent drives it. Other agents stay headless on their own run ids. Write start and stop lines. Put purpose and findings on the run record. Use the inbox only for a short note to a named agent or to any, and delete an inbox note after reading it.
+Read the short log `.pickleball/agent-log` before a run, after a run, and during a long session, instead of the dense diagnostic log. Use your own run id. When a Workbench window is already open, only one agent drives it. Other agents stay headless on their own run ids. Agents are not daemons. Write start and stop lines. Put purpose and findings on the run record. Use the inbox only for a short note to one named agent. Taking that note deletes it. A note for every agent is a post (`post --write --to=all`), not an inbox file, and listing or taking does not delete it.
 
-`discover`, `confirm`, and `isolate` accept optional `--run-id`, `--agent` (or `--agent-id`), `--group`, `--sequence`, `--who`, and `--why`. They write the start line and `.pickleball/runs/<run-id>/record.json`. A private runs directory is only for an agent run or a Workbench run. A normal `mvn test` does not create `.pickleball/runs`, does not set `user-data-dir`, and keeps `reports/cucumber-report.html`. Reports, diagnostic packs, scratch, and a headless session file for an agent or Workbench run stay under that run directory. Each parallel local Chrome or Edge worker gets its own `browser-profile/<worker>` directory. Remote drivers stay untouched. Options that already contain `user-data-dir` are left alone. Two runs do not share an output folder, a live session, or a config copy. Each private run copies the project configs into `.pickleball/runs/<run-id>/config` once and reads and writes only that copy. Change a run's configs there, or in the Workbench Config tab beside Mapping. Do not edit the project config files for one run. Saving in the tab writes the run copy. A normal `mvn test` does not copy configs and still reads the project files. Discover and Workbench, including a person collaborating with an agent, default `pkb_compositeReport=false` and `pkb_scenarioReport=false`. A normal test still writes both HTML reports. An explicit `true` writes that report again. Agents keep diagnostic logs. `finish --run-id=<id> --learned=<one line>` and `stop --run-id=<id>` write the stop line. `short-log` prints recent lines. `note --text=<one line>` appends a note. `inbox --write --to=<agent-id|any> --text=<one line>` leaves a note; `inbox --list` or `inbox --take --agent=<id>` lists or takes that agent's notes plus `inbox/any`. Taking a note deletes it. Same launcher; only change `-Dexec.args`. Project wrapper only (`mvnw` or `mvnw.cmd`, `gradlew` or `gradlew.bat`, or `java -jar` on the wrapper jar). Do not require a machine-wide Maven or Gradle install.
+`discover`, `confirm`, and `isolate` accept optional `--run-id`, `--agent` (or `--agent-id`), `--group`, `--sequence`, `--who`, and `--why`. They write the start line and `.pickleball/runs/<run-id>/record.json`. The isolation unit is the run id. One agent may own many run ids. Uncoordinated agents each get their own id. Two runs never share a folder, a config copy, a session file, or a browser profile. A private runs directory is only for an agent run or a Workbench run. A normal `mvn test` does not create `.pickleball/runs`, does not set `user-data-dir`, and keeps `reports/cucumber-report.html`. Reports, diagnostic packs, scratch, and a headless session file for an agent or Workbench run stay under that run directory. Each parallel local Chrome or Edge worker gets its own `browser-profile/<worker>` directory. Remote drivers and a consumer-supplied `user-data-dir` are not that directory and are left alone. `finish` and `stop` only write `stoppedAt` and a stop line. They do not delete the run directory, the profile, the session file, or the log. `close-window` keeps that behavior. `gc-runs` is the explicit payload sweep. It is not run from finish. Delete `browser-profile/<worker>` only when that run has a stop line, nothing has the profile open, and no agent holds the run. Not when Cucumber returns, and not on finish alone. Keep dense evidence for the run open in Workbench and for the last failed run. Other stopped run payloads may be removed 24 hours after `stoppedAt`. Always leave `record.json`, the sparse index, and `pkb_run_profile` (the resolved RunVar snapshot, not the Chrome directory). Never delete a run with no stop line, a `RUNNING` run, another agent's held run, a live session, a live worker, or the run the open window is showing. Two sweepers removing the same expired payload must be safe. A private run copies the project configs into `.pickleball/runs/<run-id>/config` once and reads and writes only that copy. Change a run's configs there, or in the Workbench Config tab beside Mapping. Do not edit the project config files for one run. Saving in the tab writes the run copy. A normal `mvn test` does not copy configs and still reads the project files. Discover and Workbench, including a person collaborating with an agent, default `pkb_compositeReport=false` and `pkb_scenarioReport=false`. A normal test still writes both HTML reports. An explicit `true` writes that report again. Agents keep diagnostic logs. `finish --run-id=<id> --learned=<one line>` and `stop --run-id=<id>` write the stop line. `short-log` prints recent lines. `note --text=<one line>` appends a note. `inbox --write --to=<agent-id> --text=<one line>` leaves directed mail; `inbox --list` does not delete it; `inbox --take --agent=<id>` deletes that note. `inbox/any` is not a broadcast. Use `post` for that. Same launcher; only change `-Dexec.args`. Project wrapper only (`mvnw` or `mvnw.cmd`, `gradlew` or `gradlew.bat`, or `java -jar` on the wrapper jar). Do not require a machine-wide Maven or Gradle install.
+
+One window has one driver. Each agent uses its own run id. Launcher commands are one-shot and exit. A 10-minute presence sweep is optional and cannot be enforced.
+
+### Board
+
+Three files. Do not merge them into the inbox.
+
+1. Presence. `.pickleball/presence/<agent-id>.json` has the agent id, `lastSeen`, and current run ids. Update it when you want: `presence --touch --agent=<id> [--run-id=<id>]`, `presence --list`, `presence --sweep`. An active agent may drop a row whose `lastSeen` is older than 15 minutes. That drop removes the row only. It does not delete posts, runs, profiles, or `history.log`. A missing heartbeat means not on the board, not clear their work. Two sweepers are idempotent.
+2. Posts. `.pickleball/posts/<id>.json` has id, from, to (an agent id or `all`), optional run id, one line, `createdAt`, `updatedAt`, `expiresAt`, and optional `ackedBy`. `post --write --to= --text= [--run-id] [--ttl=]`, `post --list`, `post --renew --id=`, `post --sweep`. Every agent may list them. Do not delete on read. Ack is optional and is not required to clear. Default expiry is 24 hours from the last update, not from the first write. The author may set a shorter expiry. One hour is appropriate for "I have the window." Short expiry is not the default. Renew by updating `updatedAt` and `expiresAt`. A missing or unreadable timestamp counts as expired. After expiry, any active agent may delete that post file. Two deletes of the same file are fine. Deleting a post does not delete the run, the profile, the presence row, or `history.log`. A post is a hint, not a lock. Readers treat it as possibly stale even if it is new.
+3. Summation log. `.pickleball/history.log` is append-only. One short line: version, files, fix, branch, commit, merge, run id. `history --append --text=` and `history --tail`. A missing run directory is normal. Trim from the front when the file exceeds 10 MB. Not a mailbox. Do not put keep-alives here.
+
+The short log `.pickleball/agent-log` stays the 3-day coordination tape. Appending does not take a file lock. On prune, a dropped run whose directory remains keeps a one-line stub so the index does not vanish. Do not put fix history in the short log. Do not add a lock a crashed agent can hold.
+
+### .pickleball has two owners
+
+Do not collapse `.pickleball` under `v/`.
+
+Jar cache, regenerable from the resolved dependency:
+
+- `.pickleball/v/<current>/` guidance, docs, the maven-consumer-project snapshot, `workbench/controller/<sha256>`, and `workbench/lib/<version>`
+- `.pickleball/open/`
+- root aliases `AGENT-GUIDE.md` and `GUIDANCE-MANIFEST.json`
+- `current.json` written last: `pickleballVersion`, `complete`, `updatedAt`
+
+Project history. It must survive `export-guidance` and a version bump. It stays at the `.pickleball` root:
+
+- `runs/<run-id>/`
+- `agent-log`
+- `inbox/`
+- `investigations/`
+- `presence/`, `posts/`, `history.log`
+
+`.pickleball/workbench/` is the legacy fallback when `current.json` is missing or not usable. New session, attach, last-discover, logs, and `live/classes` stay under `v/<current>/workbench` when `current.json` is complete. Do not describe both layouts as current.
+
+Export cleanup is a manifest diff of generated files in that version folder. There is no general `.pickleball` garbage collector. Do not delete other `v/<other-version>/` trees until the new `current.json` is complete and a launch has succeeded. Keeping the previous version tree is enough. Never automatically delete `current.json`, `open/`, or the `v/<current>/` tree named by a complete pointer, or an in-progress export (`complete: false`).
+
+New investigation handoffs always go to `.pickleball/investigations/<id>/`. Do not delete an existing `v/<version>/investigations` tree. If the root path for an id is absent, read the legacy versioned path. `export-guidance` leaves both trees alone.
 
 ### Live isolation loop
 
@@ -58,7 +95,7 @@ After Discover has found the failing scenario, use the session that is already o
 
 - `.pickleball/maven-consumer-project/` is a version-matched **read-only** reference snapshot of Pickleball's own example consumer. Do not copy, edit, or execute it as the project under test.
 - `.pickleball/workbench/live/classes` is the compiled overlay for the worker classpath. Do not use it as an editor.
-- `.pickleball/investigations/` is unmanaged consumer-agent output. `export-guidance` leaves it alone.
+- `.pickleball/investigations/` is project history, not generated guidance. New handoffs always go there. A legacy `v/<version>/investigations/<id>` tree is still readable when the root path for that id is absent. `export-guidance` leaves both trees alone.
 - `export-guidance` does **not** copy this consumer's own features into `.pickleball` for testing. It still materializes full `docs/` plus the example-consumer snapshot for on-demand/human use.
 
 ## First-read
@@ -90,7 +127,7 @@ A successful `export-guidance .pickleball` run:
 
 Any Pickleball execution (`PickleballRunner`, `java -jar pickleball.jar`, Workbench launcher) lazily materializes the running jar's version folder if it is missing. It unpacks from the running jar; it never copies a sibling version folder. Direct `java -jar pickleball-X.jar` pins `current.json` to X. Open scripts set `PKB_OPEN_BOOTSTRAP=1` so Java hops to the pinned jar when `current.json` is complete.
 
-The exporter does not create/commit a new `.gitignore`, alter the Git index, or untrack files that were already committed. If export fails, treat any existing `.pickleball` contents as potentially stale. `complete: false` or a missing `current.json` means do not trust the tree. The manifest records the last completed export; it is not a substitute for rerunning the exporter.
+The exporter does not create/commit a new `.gitignore`, alter the Git index, or untrack files that were already committed. If export fails, treat generated guidance as potentially stale. Stale means an untrusted export: `complete: false`, a missing `current.json`, or a failed export. It does not mean an old run. The manifest records the last completed export; it is not a substitute for rerunning the exporter.
 
 Compatibility note: an older Pickleball release whose exporter predates the manifest lifecycle may leave newer files behind after a downgrade. Version folders keep each export isolated. Prefer the dependency actually resolved on the test classpath and files freshly exported by that dependency.
 

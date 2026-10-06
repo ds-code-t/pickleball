@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import tools.dscode.control.protocol.ControlProtocol;
 import tools.dscode.control.protocol.PickleballLocalLayout;
+import tools.dscode.control.protocol.WindowDriver;
 import tools.dscode.testengine.PKB_props;
 import tools.dscode.testengine.PickleballRunner;
 
@@ -23,30 +24,42 @@ import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Pattern;
 
 /**
  * Shared bulletin board for consumer agents, with private data per run.
  *
- * <p>The short log and inbox live under the consumer {@code .pickleball} directory.
- * A private {@code .pickleball/runs/<run-id>} directory is only for an agent run
- * or a Workbench run. A normal test does not create that folder and does not
- * force a browser profile. Reports, diagnostic packs, scratch, per-worker
- * browser profiles, and a headless Workbench session file for a private run
- * live under that directory. Appending the short log does not take a file lock.
- * A dead agent must not block the others. Lines older than three days are
- * dropped on the next append.</p>
+ * <p>Project history stays at the {@code .pickleball} root: the short log,
+ * inbox, runs, investigations, presence, posts, and {@code history.log}.
+ * The jar cache under {@code v/<version>/} is separate. Appending the short
+ * log does not take a file lock. A dead agent must not block the others.
+ * Lines older than three days are dropped on the next append. A dropped run
+ * whose directory is still there keeps one index stub. Launcher commands are
+ * one-shot. They are not daemons, and they do not delete a run, a profile,
+ * or this log on finish.</p>
  */
 public final class AgentCoordination {
     public static final String LOG_FILE = "agent-log";
     public static final String INBOX_DIRECTORY = "inbox";
     public static final String RUNS_DIRECTORY = "runs";
+    public static final String PRESENCE_DIRECTORY = "presence";
+    public static final String POSTS_DIRECTORY = "posts";
+    public static final String HISTORY_FILE = "history.log";
     public static final String ANY_AGENT = "any";
+    public static final String ALL_AGENTS = "all";
     public static final String RECORD_FILE = "record.json";
+    public static final String RUN_PROFILE_FILE = "pkb_run_profile";
     public static final Duration RETENTION = Duration.ofDays(3);
+    public static final Duration PRESENCE_STALE = Duration.ofMinutes(15);
+    public static final Duration POST_TTL = Duration.ofHours(24);
+    public static final Duration RUN_PAYLOAD_STALE = Duration.ofHours(24);
+    public static final long HISTORY_MAX_BYTES = 10L * 1024L * 1024L;
     public static final int PURPOSE_LIMIT = 240;
 
     private static final ObjectMapper JSON = new ObjectMapper()
@@ -442,7 +455,7 @@ public final class AgentCoordination {
         )) {
             channel.write(ByteBuffer.wrap(bytes));
         }
-        pruneIfStale(file, clock);
+        pruneIfStale(project, file, clock);
     }
 
     public static List<String> readLog(Path project) throws IOException {
@@ -485,6 +498,9 @@ public final class AgentCoordination {
         if (text.contains("\n") || text.contains("\r")) {
             throw new IllegalArgumentException("An inbox note is one line.");
         }
+        if (ANY_AGENT.equals(target)) {
+            return writePost(project, from, ALL_AGENTS, null, text, null, Instant.now()).file();
+        }
         Path dir = inboxDirectory(project, target);
         String name = Instant.now().toEpochMilli() + "-" + UUID.randomUUID() + ".json";
         Path file = dir.resolve(name);
@@ -504,6 +520,280 @@ public final class AgentCoordination {
 
     public static List<InboxNote> takeInbox(Path project, String agentId) {
         return List.copyOf(readInbox(project, agentId, true));
+    }
+
+    public record Presence(String agentId, String lastSeen, List<String> runIds, Path file) {
+    }
+
+    public record BoardPost(
+            String id,
+            String from,
+            String to,
+            String runId,
+            String text,
+            String createdAt,
+            String updatedAt,
+            String expiresAt,
+            List<String> ackedBy,
+            Path file
+    ) {
+    }
+
+    public record RunSweep(int profilesRemoved, int payloadsRemoved) {
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    private record PresenceFile(String agentId, String lastSeen, List<String> runIds) {
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    private record PostFile(
+            String id,
+            String from,
+            String to,
+            String runId,
+            String text,
+            String createdAt,
+            String updatedAt,
+            String expiresAt,
+            List<String> ackedBy
+    ) {
+    }
+
+    public static Presence touchPresence(Path project, String agentId, String runId, Instant when) {
+        String agent = requireSafeId(agentId, "agent id");
+        if (ANY_AGENT.equals(agent) || ALL_AGENTS.equals(agent)) {
+            throw new IllegalArgumentException("presence is for one agent, not '" + agent + "'.");
+        }
+        Instant clock = when == null ? Instant.now() : when;
+        Path file = presenceFile(project, agent);
+        List<String> runs = new ArrayList<>();
+        if (Files.isRegularFile(file)) {
+            try {
+                PresenceFile existing = JSON.readValue(file.toFile(), PresenceFile.class);
+                if (existing.runIds() != null) {
+                    for (String id : existing.runIds()) {
+                        if (id != null && !id.isBlank() && !runs.contains(id)) runs.add(id);
+                    }
+                }
+            } catch (IOException ignored) {
+                // A broken row is replaced by this touch.
+            }
+        }
+        if (runId != null && !runId.isBlank()) {
+            String safeRun = requireSafeId(runId, "run id");
+            if (!runs.contains(safeRun)) runs.add(safeRun);
+        }
+        PresenceFile body = new PresenceFile(agent, clock.toString(), List.copyOf(runs));
+        try {
+            writeJson(file, body);
+        } catch (IOException failure) {
+            throw new IllegalStateException("Could not write presence for " + agent + ": " + failure.getMessage(), failure);
+        }
+        return new Presence(agent, body.lastSeen(), body.runIds(), file);
+    }
+
+    public static List<Presence> listPresence(Path project) {
+        Path dir = presenceDirectory(project);
+        if (!Files.isDirectory(dir)) return List.of();
+        List<Presence> rows = new ArrayList<>();
+        for (Path file : noteFiles(dir)) {
+            try {
+                PresenceFile body = JSON.readValue(file.toFile(), PresenceFile.class);
+                String agent = body.agentId() == null || body.agentId().isBlank()
+                        ? file.getFileName().toString().replaceFirst("\\.json$", "")
+                        : body.agentId();
+                List<String> runs = body.runIds() == null ? List.of() : List.copyOf(body.runIds());
+                rows.add(new Presence(agent, body.lastSeen() == null ? "" : body.lastSeen(), runs, file));
+            } catch (IOException ignored) {
+                // An unreadable row is not a heartbeat.
+            }
+        }
+        rows.sort(Comparator.comparing(Presence::agentId));
+        return List.copyOf(rows);
+    }
+
+    /** Deletes expired presence rows only. Posts, runs, profiles, and history.log stay. */
+    public static int sweepPresence(Path project, Instant when) {
+        Instant clock = when == null ? Instant.now() : when;
+        int removed = 0;
+        for (Presence row : listPresence(project)) {
+            if (!presenceExpired(row.lastSeen(), clock)) continue;
+            try {
+                if (row.file() != null && Files.deleteIfExists(row.file())) removed++;
+            } catch (IOException ignored) {
+                // Another sweeper already removed the row.
+            }
+        }
+        Path dir = presenceDirectory(project);
+        if (!Files.isDirectory(dir)) return removed;
+        for (Path file : noteFiles(dir)) {
+            if (readablePresence(file)) continue;
+            try {
+                if (Files.deleteIfExists(file)) removed++;
+            } catch (IOException ignored) {
+                // Idempotent: a second delete of the same file is fine.
+            }
+        }
+        return removed;
+    }
+
+    public static BoardPost writePost(
+            Path project,
+            String fromAgent,
+            String toAgent,
+            String runId,
+            String message,
+            Duration ttl,
+            Instant when
+    ) {
+        String from = fromAgent == null || fromAgent.isBlank() ? newAgentId() : requireSafeId(fromAgent, "agent id");
+        String to = normalizePostTarget(toAgent);
+        String text = onePostLine(message);
+        Instant clock = when == null ? Instant.now() : when;
+        Duration life = ttl == null ? POST_TTL : ttl;
+        if (life.isZero() || life.isNegative()) {
+            throw new IllegalArgumentException("A post ttl must be positive. The default is 24 hours.");
+        }
+        String id = clock.toEpochMilli() + "-" + UUID.randomUUID().toString().substring(0, 8);
+        String run = runId == null || runId.isBlank() ? null : requireSafeId(runId, "run id");
+        String created = clock.toString();
+        String expires = clock.plus(life).toString();
+        PostFile body = new PostFile(id, from, to, run, text, created, created, expires, List.of());
+        Path file = postsDirectory(project).resolve(id + ".json");
+        try {
+            writeJson(file, body);
+        } catch (IOException failure) {
+            throw new IllegalStateException("Could not write post: " + failure.getMessage(), failure);
+        }
+        return toBoardPost(body, file);
+    }
+
+    public static List<BoardPost> listPosts(Path project, Instant when) {
+        Instant clock = when == null ? Instant.now() : when;
+        List<BoardPost> posts = new ArrayList<>();
+        for (Path file : noteFiles(postsDirectory(project))) {
+            BoardPost post = readPost(file);
+            if (post == null || postExpired(post.expiresAt(), clock)) continue;
+            posts.add(post);
+        }
+        posts.sort(Comparator.comparing(BoardPost::updatedAt).thenComparing(BoardPost::id));
+        return List.copyOf(posts);
+    }
+
+    public static BoardPost renewPost(Path project, String id, Duration ttl, Instant when) {
+        String safe = requireSafeId(stripJsonSuffix(id), "post id");
+        Path file = postsDirectory(project).resolve(safe + ".json");
+        BoardPost existing = readPost(file);
+        if (existing == null) {
+            throw new IllegalArgumentException("No post " + safe + " at " + file);
+        }
+        Instant clock = when == null ? Instant.now() : when;
+        Duration life = ttl == null ? POST_TTL : ttl;
+        if (life.isZero() || life.isNegative()) {
+            throw new IllegalArgumentException("A post ttl must be positive. The default is 24 hours.");
+        }
+        PostFile body = new PostFile(
+                existing.id(),
+                existing.from(),
+                existing.to(),
+                existing.runId(),
+                existing.text(),
+                existing.createdAt(),
+                clock.toString(),
+                clock.plus(life).toString(),
+                existing.ackedBy()
+        );
+        try {
+            writeJson(file, body);
+        } catch (IOException failure) {
+            throw new IllegalStateException("Could not renew post " + safe + ": " + failure.getMessage(), failure);
+        }
+        return toBoardPost(body, file);
+    }
+
+    /** Deletes expired post files only. Runs, profiles, presence, and history.log stay. */
+    public static int sweepPosts(Path project, Instant when) {
+        Instant clock = when == null ? Instant.now() : when;
+        int removed = 0;
+        for (Path file : noteFiles(postsDirectory(project))) {
+            BoardPost post = readPost(file);
+            boolean expired = post == null || postExpired(post.expiresAt(), clock);
+            if (!expired) continue;
+            try {
+                if (Files.deleteIfExists(file)) removed++;
+            } catch (IOException ignored) {
+                // Two deletes of the same file are fine.
+            }
+        }
+        return removed;
+    }
+
+    public static Path historyFile(Path project) {
+        return PickleballLocalLayout.root(project).resolve(HISTORY_FILE);
+    }
+
+    public static void appendHistory(Path project, String text) {
+        String line = onePostLine(text);
+        Path file = historyFile(project);
+        try {
+            Files.createDirectories(file.getParent());
+            byte[] bytes = (line + "\n").getBytes(StandardCharsets.UTF_8);
+            try (FileChannel channel = FileChannel.open(
+                    file,
+                    StandardOpenOption.CREATE,
+                    StandardOpenOption.WRITE,
+                    StandardOpenOption.APPEND
+            )) {
+                channel.write(ByteBuffer.wrap(bytes));
+            }
+            trimHistory(file);
+        } catch (IOException failure) {
+            throw new IllegalStateException("Could not append history.log: " + failure.getMessage(), failure);
+        }
+    }
+
+    public static List<String> tailHistory(Path project, int limit) throws IOException {
+        Path file = historyFile(project);
+        if (!Files.isRegularFile(file)) return List.of();
+        List<String> lines = new ArrayList<>();
+        for (String line : Files.readAllLines(file, StandardCharsets.UTF_8)) {
+            if (!line.isBlank()) lines.add(line);
+        }
+        if (limit <= 0 || lines.size() <= limit) return List.copyOf(lines);
+        return List.copyOf(lines.subList(lines.size() - limit, lines.size()));
+    }
+
+    /**
+     * Explicit payload sweep. Not called from finish. Deletes a browser profile
+     * only when that run has a stop line, nothing has the profile open, and no
+     * agent holds the run. Other dense payload waits 24 hours after stoppedAt,
+     * and never removes the run open in Workbench or the last failed run.
+     * record.json, sparse indexes, and pkb_run_profile stay. The run directory
+     * stays. Two sweepers deleting the same file are safe.
+     */
+    public static RunSweep sweepRuns(Path project, Instant when) {
+        Instant clock = when == null ? Instant.now() : when;
+        Path runs = PickleballLocalLayout.root(project).resolve(RUNS_DIRECTORY);
+        if (!Files.isDirectory(runs)) return new RunSweep(0, 0);
+        List<Path> directories;
+        try (var children = Files.list(runs)) {
+            directories = children.filter(Files::isDirectory).toList();
+        } catch (IOException ignored) {
+            return new RunSweep(0, 0);
+        }
+        String lastFailed = lastFailedRun(directories);
+        int profiles = 0;
+        int payloads = 0;
+        for (Path directory : directories) {
+            RunRecord record = readRecordQuiet(directory.resolve(RECORD_FILE));
+            if (record == null || held(project, directory, record, clock)) continue;
+            if (deleteTreeContents(directory.resolve("browser-profile"))) profiles++;
+            if (record.runId() != null && record.runId().equals(lastFailed)) continue;
+            if (!payloadExpired(record, clock)) continue;
+            if (deleteDensePayload(directory)) payloads++;
+        }
+        return new RunSweep(profiles, payloads);
     }
 
     public static List<String> mavenProperties(Run run) {
@@ -540,10 +830,10 @@ public final class AgentCoordination {
 
     private static List<InboxNote> readInbox(Path project, String agentId, boolean take) {
         List<Path> files = new ArrayList<>();
-        if (agentId != null && !agentId.isBlank() && !ANY_AGENT.equalsIgnoreCase(agentId.trim())) {
+        if (agentId != null && !agentId.isBlank() && !ANY_AGENT.equalsIgnoreCase(agentId.trim())
+                && !ALL_AGENTS.equalsIgnoreCase(agentId.trim())) {
             files.addAll(noteFiles(inboxDirectory(project, requireSafeId(agentId, "agent id"))));
         }
-        files.addAll(noteFiles(inboxDirectory(project, ANY_AGENT)));
         files.sort(Comparator.comparing(path -> path.getFileName().toString()));
         List<InboxNote> notes = new ArrayList<>();
         for (Path file : files) {
@@ -611,16 +901,18 @@ public final class AgentCoordination {
         );
     }
 
-    private static void pruneIfStale(Path file, Instant now) throws IOException {
+    private static void pruneIfStale(Path project, Path file, Instant now) throws IOException {
         if (!Files.isRegularFile(file)) return;
         byte[] snapshot = Files.readAllBytes(file);
         if (!containsStale(snapshot, now)) return;
         byte[] latest = Files.readAllBytes(file);
         byte[] source = latest.length >= snapshot.length ? latest : snapshot;
-        String filtered = filterLines(source, now);
+        LinkedHashMap<String, String[]> dropped = new LinkedHashMap<>();
+        String filtered = filterLines(source, now, dropped);
         if (latest.length > source.length) {
-            filtered = filtered + filterLines(slice(latest, source.length), now);
+            filtered = filtered + filterLines(slice(latest, source.length), now, dropped);
         }
+        filtered = filtered + indexStubs(filtered, dropped, project, now);
         Path temp = file.resolveSibling(file.getFileName() + ".prune-" + UUID.randomUUID());
         Files.writeString(temp, filtered, StandardCharsets.UTF_8);
         try {
@@ -639,16 +931,63 @@ public final class AgentCoordination {
         return false;
     }
 
-    private static String filterLines(byte[] bytes, Instant now) {
+    private static String filterLines(byte[] bytes, Instant now, LinkedHashMap<String, String[]> dropped) {
         Instant cutoff = now.minus(RETENTION);
         StringBuilder kept = new StringBuilder();
         for (String line : new String(bytes, StandardCharsets.UTF_8).split("\n", -1)) {
             if (line.isBlank()) continue;
             Instant stamp = timestampOf(line);
-            if (stamp != null && stamp.isBefore(cutoff)) continue;
+            if (stamp != null && stamp.isBefore(cutoff)) {
+                rememberDropped(dropped, line);
+                continue;
+            }
             kept.append(line).append('\n');
         }
         return kept.toString();
+    }
+
+    private static void rememberDropped(LinkedHashMap<String, String[]> dropped, String line) {
+        String[] fields = line.split("\t", -1);
+        if (fields.length < 3) return;
+        String runId = fields[2].trim();
+        if (runId.isBlank() || "-".equals(runId) || runId.contains("..") || runId.contains("/") || runId.contains("\\")) {
+            return;
+        }
+        dropped.put(runId, fields);
+    }
+
+    private static String indexStubs(
+            String kept,
+            LinkedHashMap<String, String[]> dropped,
+            Path project,
+            Instant now
+    ) {
+        if (dropped.isEmpty() || project == null) return "";
+        Set<String> present = new LinkedHashSet<>();
+        for (String line : kept.split("\n", -1)) {
+            if (line.isBlank()) continue;
+            String[] fields = line.split("\t", -1);
+            if (fields.length > 2) present.add(fields[2].trim());
+        }
+        StringBuilder stubs = new StringBuilder();
+        Path runs = PickleballLocalLayout.root(project).resolve(RUNS_DIRECTORY);
+        for (var entry : dropped.entrySet()) {
+            String runId = entry.getKey();
+            if (present.contains(runId)) continue;
+            if (!Files.isDirectory(runs.resolve(runId))) continue;
+            String[] fields = entry.getValue();
+            String agent = fields.length > 1 && !fields[1].isBlank() ? fields[1] : "-";
+            String record = fields.length > 5 && !fields[5].isBlank() ? fields[5] : "-";
+            stubs.append(String.join("\t",
+                    now.toString(),
+                    oneField(agent),
+                    oneField(runId),
+                    "index",
+                    "pruned",
+                    oneField(record)
+            )).append('\n');
+        }
+        return stubs.toString();
     }
 
     private static byte[] slice(byte[] bytes, int from) {
@@ -754,6 +1093,281 @@ public final class AgentCoordination {
         } catch (IOException ignored) {
             // Printing the id must not hide the run itself.
         }
+    }
+
+    private static final Set<String> SPARSE_NAMES = Set.of(
+            "record.json",
+            "run-id.txt",
+            "run-index.json",
+            "summary.json",
+            "run-catalog.json",
+            RUN_PROFILE_FILE,
+            RUN_PROFILE_FILE + ".json",
+            RUN_PROFILE_FILE + ".txt"
+    );
+
+    private static Path presenceDirectory(Path project) {
+        return PickleballLocalLayout.root(project).resolve(PRESENCE_DIRECTORY);
+    }
+
+    private static Path presenceFile(Path project, String agentId) {
+        return presenceDirectory(project).resolve(agentId + ".json");
+    }
+
+    private static Path postsDirectory(Path project) {
+        return PickleballLocalLayout.root(project).resolve(POSTS_DIRECTORY);
+    }
+
+    private static boolean presenceExpired(String lastSeen, Instant now) {
+        if (lastSeen == null || lastSeen.isBlank()) return true;
+        try {
+            return lastSeenInstant(lastSeen).isBefore(now.minus(PRESENCE_STALE));
+        } catch (RuntimeException ignored) {
+            return true;
+        }
+    }
+
+    private static Instant lastSeenInstant(String lastSeen) {
+        return Instant.parse(lastSeen.trim());
+    }
+
+    private static boolean readablePresence(Path file) {
+        try {
+            PresenceFile body = JSON.readValue(file.toFile(), PresenceFile.class);
+            return body.lastSeen() != null && !body.lastSeen().isBlank() && lastSeenInstant(body.lastSeen()) != null;
+        } catch (Exception ignored) {
+            return false;
+        }
+    }
+
+    private static String normalizePostTarget(String toAgent) {
+        if (toAgent == null || toAgent.isBlank()
+                || ANY_AGENT.equalsIgnoreCase(toAgent.trim())
+                || ALL_AGENTS.equalsIgnoreCase(toAgent.trim())) {
+            return ALL_AGENTS;
+        }
+        return requireSafeId(toAgent, "agent id");
+    }
+
+    private static String onePostLine(String message) {
+        String text = message == null ? "" : message.strip();
+        if (text.isEmpty()) throw new IllegalArgumentException("The line must not be empty.");
+        if (text.contains("\n") || text.contains("\r")) {
+            throw new IllegalArgumentException("The line must be one line.");
+        }
+        return oneLine(text);
+    }
+
+    private static BoardPost readPost(Path file) {
+        if (file == null || !Files.isRegularFile(file)) return null;
+        try {
+            return toBoardPost(JSON.readValue(file.toFile(), PostFile.class), file);
+        } catch (IOException ignored) {
+            return null;
+        }
+    }
+
+    private static BoardPost toBoardPost(PostFile body, Path file) {
+        String id = body.id() == null || body.id().isBlank()
+                ? stripJsonSuffix(file.getFileName().toString())
+                : body.id();
+        List<String> acked = body.ackedBy() == null ? List.of() : List.copyOf(body.ackedBy());
+        return new BoardPost(
+                id,
+                body.from() == null ? "" : body.from(),
+                body.to() == null ? ALL_AGENTS : body.to(),
+                blankToNull(body.runId()),
+                body.text() == null ? "" : body.text(),
+                body.createdAt() == null ? "" : body.createdAt(),
+                body.updatedAt() == null ? "" : body.updatedAt(),
+                body.expiresAt() == null ? "" : body.expiresAt(),
+                acked,
+                file
+        );
+    }
+
+    private static boolean postExpired(String expiresAt, Instant now) {
+        if (expiresAt == null || expiresAt.isBlank()) return true;
+        try {
+            return !Instant.parse(expiresAt.trim()).isAfter(now);
+        } catch (RuntimeException ignored) {
+            return true;
+        }
+    }
+
+    private static String stripJsonSuffix(String name) {
+        if (name == null) return "";
+        return name.endsWith(".json") ? name.substring(0, name.length() - 5) : name;
+    }
+
+    private static void trimHistory(Path file) throws IOException {
+        if (!Files.isRegularFile(file) || Files.size(file) <= HISTORY_MAX_BYTES) return;
+        byte[] bytes = Files.readAllBytes(file);
+        if (bytes.length <= HISTORY_MAX_BYTES) return;
+        int cut = bytes.length - (int) HISTORY_MAX_BYTES;
+        while (cut < bytes.length && bytes[cut] != '\n') cut++;
+        if (cut < bytes.length) cut++;
+        if (cut >= bytes.length) cut = bytes.length - (int) HISTORY_MAX_BYTES;
+        byte[] tail = slice(bytes, cut);
+        Path temp = file.resolveSibling(file.getFileName() + ".trim-" + UUID.randomUUID());
+        Files.write(temp, tail);
+        try {
+            Files.move(temp, file, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+        } catch (AtomicMoveNotSupportedException ignored) {
+            Files.move(temp, file, StandardCopyOption.REPLACE_EXISTING);
+        }
+    }
+
+    private static boolean held(Path project, Path directory, RunRecord record, Instant now) {
+        if (record.stoppedAt() == null || record.stoppedAt().isBlank()) return true;
+        if (record.status() != null && "RUNNING".equalsIgnoreCase(record.status().trim())) return true;
+        if (Files.isRegularFile(directory.resolve("session").resolve("cli-session.json"))) return true;
+        if (liveWorker(directory)) return true;
+        if (profileOpen(directory)) return true;
+        if (windowHolds(project, record.runId())) return true;
+        return agentHolds(project, record.runId(), now);
+    }
+
+    private static boolean liveWorker(Path directory) {
+        Path session = directory.resolve("session");
+        if (Files.isRegularFile(session.resolve("worker.json"))) return true;
+        Path pidFile = session.resolve("worker.pid");
+        if (!Files.isRegularFile(pidFile)) return false;
+        try {
+            long pid = Long.parseLong(Files.readString(pidFile, StandardCharsets.UTF_8).trim());
+            return ProcessHandle.of(pid).map(ProcessHandle::isAlive).orElse(false);
+        } catch (Exception ignored) {
+            return true;
+        }
+    }
+
+    private static boolean profileOpen(Path directory) {
+        Path profile = directory.resolve("browser-profile");
+        if (!Files.isDirectory(profile)) return false;
+        try (var paths = Files.walk(profile)) {
+            return paths.anyMatch(path -> {
+                Path name = path.getFileName();
+                return name != null && "SingletonLock".equals(name.toString());
+            });
+        } catch (IOException ignored) {
+            return true;
+        }
+    }
+
+    private static boolean windowHolds(Path project, String runId) {
+        if (runId == null || runId.isBlank()) return false;
+        WindowDriver.State state = WindowDriver.read(project);
+        if (!state.open()) return false;
+        return runId.equals(state.liveRunId()) || runId.equals(state.viewedRunId());
+    }
+
+    private static boolean agentHolds(Path project, String runId, Instant now) {
+        if (runId == null || runId.isBlank()) return false;
+        for (Presence row : listPresence(project)) {
+            if (presenceExpired(row.lastSeen(), now)) continue;
+            if (row.runIds() != null && row.runIds().contains(runId)) return true;
+        }
+        return false;
+    }
+
+    private static String lastFailedRun(List<Path> directories) {
+        String winner = null;
+        Instant latest = null;
+        for (Path directory : directories) {
+            RunRecord record = readRecordQuiet(directory.resolve(RECORD_FILE));
+            if (record == null || record.status() == null || !"FAILED".equalsIgnoreCase(record.status().trim())) {
+                continue;
+            }
+            if (record.stoppedAt() == null || record.stoppedAt().isBlank()) continue;
+            Instant stopped;
+            try {
+                stopped = Instant.parse(record.stoppedAt().trim());
+            } catch (RuntimeException ignored) {
+                continue;
+            }
+            if (latest == null || stopped.isAfter(latest)) {
+                latest = stopped;
+                winner = record.runId();
+            }
+        }
+        return winner;
+    }
+
+    private static boolean payloadExpired(RunRecord record, Instant now) {
+        if (record.stoppedAt() == null || record.stoppedAt().isBlank()) return false;
+        try {
+            return !Instant.parse(record.stoppedAt().trim()).isAfter(now.minus(RUN_PAYLOAD_STALE));
+        } catch (RuntimeException ignored) {
+            return false;
+        }
+    }
+
+    private static RunRecord readRecordQuiet(Path file) {
+        if (!Files.isRegularFile(file)) return null;
+        try {
+            return readRecord(file);
+        } catch (IOException ignored) {
+            return null;
+        }
+    }
+
+    private static boolean deleteTreeContents(Path root) {
+        if (!Files.exists(root)) return false;
+        boolean removed = false;
+        List<Path> paths;
+        try (var walk = Files.walk(root)) {
+            paths = walk.sorted(Comparator.reverseOrder()).toList();
+        } catch (IOException ignored) {
+            return false;
+        }
+        for (Path path : paths) {
+            if (path.equals(root)) continue;
+            try {
+                if (Files.deleteIfExists(path)) removed = true;
+            } catch (IOException ignored) {
+                // Another sweeper removed it, or it is still open.
+            }
+        }
+        try {
+            Files.deleteIfExists(root);
+        } catch (IOException ignored) {
+            // The parent run directory is not this path.
+        }
+        return removed;
+    }
+
+    private static boolean deleteDensePayload(Path runDirectory) {
+        boolean removed = false;
+        List<Path> paths;
+        try (var walk = Files.walk(runDirectory)) {
+            paths = walk.sorted(Comparator.reverseOrder()).toList();
+        } catch (IOException ignored) {
+            return false;
+        }
+        for (Path path : paths) {
+            if (path.equals(runDirectory)) continue;
+            if (keepPayload(runDirectory, path)) continue;
+            try {
+                if (Files.deleteIfExists(path)) removed = true;
+            } catch (IOException ignored) {
+                // Two sweepers removing the same file are fine.
+            }
+        }
+        return removed;
+    }
+
+    private static boolean keepPayload(Path runDirectory, Path path) {
+        Path name = path.getFileName();
+        if (name != null && SPARSE_NAMES.contains(name.toString())) return true;
+        Path config = runDirectory.resolve("config");
+        Path relative;
+        try {
+            relative = runDirectory.relativize(path);
+        } catch (IllegalArgumentException ignored) {
+            return true;
+        }
+        return relative.getNameCount() > 0 && "config".equals(relative.getName(0).toString())
+                || path.startsWith(config);
     }
 
     static String normalizeEvent(String event) {

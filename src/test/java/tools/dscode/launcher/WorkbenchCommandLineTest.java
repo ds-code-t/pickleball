@@ -128,6 +128,10 @@ class WorkbenchCommandLineTest {
         assertTrue(WorkbenchCommandLine.isAgentCoreCommand("note"));
         assertTrue(WorkbenchCommandLine.isAgentCoreCommand("inbox"));
         assertTrue(WorkbenchCommandLine.isAgentCoreCommand("finish"));
+        assertTrue(WorkbenchCommandLine.isAgentCoreCommand("presence"));
+        assertTrue(WorkbenchCommandLine.isAgentCoreCommand("post"));
+        assertTrue(WorkbenchCommandLine.isAgentCoreCommand("history"));
+        assertTrue(WorkbenchCommandLine.isAgentCoreCommand("gc-runs"));
     }
 
     @Test

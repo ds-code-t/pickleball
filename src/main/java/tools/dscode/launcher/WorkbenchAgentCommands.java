@@ -48,6 +48,10 @@ public final class WorkbenchAgentCommands {
                 case "note" -> note(parsed, out, err);
                 case "inbox" -> inbox(parsed, out, err);
                 case "finish" -> finish(parsed, out, err);
+                case "presence" -> presence(parsed, out, err);
+                case "post" -> post(parsed, out, err);
+                case "history" -> history(parsed, out, err);
+                case "gc-runs" -> gcRuns(parsed, out, err);
                 default -> {
                     err.println("Unknown Workbench agent command: " + parsed.command());
                     yield 2;
@@ -276,6 +280,155 @@ public final class WorkbenchAgentCommands {
                     + (note.record() == null ? "" : "\t" + note.record()));
         }
         return list || take ? 0 : 2;
+    }
+
+    private static int presence(WorkbenchCommandLine.Parsed parsed, PrintStream out, PrintStream err) {
+        WorkbenchCommandLine.Coordination flags = parsed.coordination();
+        if (flags.sweep()) {
+            int removed = AgentCoordination.sweepPresence(parsed.project(), java.time.Instant.now());
+            out.println("presence-removed=" + removed);
+            return 0;
+        }
+        if (flags.inboxList() && !flags.touch()) {
+            java.util.List<AgentCoordination.Presence> rows = AgentCoordination.listPresence(parsed.project());
+            if (rows.isEmpty()) {
+                out.println("(no presence)");
+                return 0;
+            }
+            for (AgentCoordination.Presence row : rows) {
+                out.println(row.agentId() + "\t" + row.lastSeen() + "\t" + String.join(",", row.runIds()));
+            }
+            return 0;
+        }
+        String agent = flags.agentId();
+        if (agent == null || agent.isBlank()) {
+            err.println("Usage: presence --touch --agent=<id> [--run-id=<id>] | presence --list | presence --sweep");
+            return 2;
+        }
+        AgentCoordination.Presence row = AgentCoordination.touchPresence(
+                parsed.project(), agent, flags.runId(), java.time.Instant.now()
+        );
+        out.println("presence=" + row.file());
+        return 0;
+    }
+
+    private static int post(WorkbenchCommandLine.Parsed parsed, PrintStream out, PrintStream err) {
+        WorkbenchCommandLine.Coordination flags = parsed.coordination();
+        if (flags.sweep()) {
+            int removed = AgentCoordination.sweepPosts(parsed.project(), java.time.Instant.now());
+            out.println("posts-removed=" + removed);
+            return 0;
+        }
+        java.time.Duration ttl = null;
+        if (flags.ttl() != null) {
+            try {
+                ttl = parseTtl(flags.ttl());
+            } catch (IllegalArgumentException failure) {
+                err.println(failure.getMessage());
+                return 2;
+            }
+        }
+        if (flags.renew()) {
+            if (flags.id() == null) {
+                err.println("Usage: post --renew --id=<id> [--ttl=1h]");
+                return 2;
+            }
+            AgentCoordination.BoardPost renewed = AgentCoordination.renewPost(
+                    parsed.project(), flags.id(), ttl, java.time.Instant.now()
+            );
+            out.println("post=" + renewed.file());
+            return 0;
+        }
+        boolean write = flags.inboxWrite() || (flags.text() != null && !flags.inboxList());
+        if (write) {
+            String message = firstText(parsed);
+            if (message == null || flags.inboxTo() == null) {
+                err.println("Usage: post --write --to=<agent-id|all> --text=<one line> [--run-id=<id>] [--ttl=1h]");
+                return 2;
+            }
+            String from = flags.inboxFrom() != null ? flags.inboxFrom() : flags.agentId();
+            AgentCoordination.BoardPost written = AgentCoordination.writePost(
+                    parsed.project(),
+                    from,
+                    flags.inboxTo(),
+                    flags.runId(),
+                    message,
+                    ttl,
+                    java.time.Instant.now()
+            );
+            out.println("post=" + written.file());
+            return 0;
+        }
+        java.util.List<AgentCoordination.BoardPost> posts = AgentCoordination.listPosts(
+                parsed.project(), java.time.Instant.now()
+        );
+        if (posts.isEmpty()) {
+            out.println("(no posts)");
+            return 0;
+        }
+        for (AgentCoordination.BoardPost note : posts) {
+            out.println(note.id() + "\t" + note.from() + "\t" + note.to() + "\t" + note.expiresAt() + "\t" + note.text());
+        }
+        return 0;
+    }
+
+    private static int history(WorkbenchCommandLine.Parsed parsed, PrintStream out, PrintStream err) {
+        WorkbenchCommandLine.Coordination flags = parsed.coordination();
+        if (flags.append() || (flags.text() != null && !flags.inboxList())) {
+            String text = firstText(parsed);
+            if (text == null) {
+                err.println("Usage: history --append --text=<one line>");
+                return 2;
+            }
+            AgentCoordination.appendHistory(parsed.project(), text);
+            out.println("history=" + AgentCoordination.historyFile(parsed.project()));
+            return 0;
+        }
+        int limit = flags.limit() == null ? 40 : flags.limit();
+        try {
+            java.util.List<String> lines = AgentCoordination.tailHistory(parsed.project(), limit);
+            if (lines.isEmpty()) {
+                out.println("(no history)");
+                return 0;
+            }
+            for (String line : lines) out.println(line);
+            return 0;
+        } catch (java.io.IOException failure) {
+            err.println("Could not read history.log: " + failure.getMessage());
+            return 1;
+        }
+    }
+
+    private static int gcRuns(WorkbenchCommandLine.Parsed parsed, PrintStream out, PrintStream err) {
+        AgentCoordination.RunSweep sweep = AgentCoordination.sweepRuns(parsed.project(), java.time.Instant.now());
+        out.println("profiles-removed=" + sweep.profilesRemoved());
+        out.println("payloads-removed=" + sweep.payloadsRemoved());
+        return 0;
+    }
+
+    private static java.time.Duration parseTtl(String raw) {
+        String value = raw.trim();
+        if (value.startsWith("P") || value.startsWith("p")) {
+            try {
+                return java.time.Duration.parse(value.toUpperCase(java.util.Locale.ROOT));
+            } catch (RuntimeException failure) {
+                throw new IllegalArgumentException("ttl must be a duration such as 1h or PT1H: " + raw);
+            }
+        }
+        java.util.regex.Matcher matcher = java.util.regex.Pattern
+                .compile("^(\\d+)\\s*([smhd])$", java.util.regex.Pattern.CASE_INSENSITIVE)
+                .matcher(value);
+        if (!matcher.matches()) {
+            throw new IllegalArgumentException("ttl must be a duration such as 1h, 30m, or PT1H: " + raw);
+        }
+        long amount = Long.parseLong(matcher.group(1));
+        return switch (matcher.group(2).toLowerCase(java.util.Locale.ROOT)) {
+            case "s" -> java.time.Duration.ofSeconds(amount);
+            case "m" -> java.time.Duration.ofMinutes(amount);
+            case "h" -> java.time.Duration.ofHours(amount);
+            case "d" -> java.time.Duration.ofDays(amount);
+            default -> throw new IllegalArgumentException("ttl must be a duration such as 1h or PT1H: " + raw);
+        };
     }
 
     private static int finish(WorkbenchCommandLine.Parsed parsed, PrintStream out, PrintStream err) {

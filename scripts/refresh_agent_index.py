@@ -115,6 +115,31 @@ GROUPS: tuple[tuple[str, tuple[str, ...]], ...] = (
     )),
 )
 
+BOARD_PATHS = (
+    ".pickleball/v/<current>/",
+    ".pickleball/open/",
+    ".pickleball/current.json",
+    ".pickleball/runs/<run-id>/",
+    ".pickleball/agent-log",
+    ".pickleball/inbox/<agent-id>/",
+    ".pickleball/investigations/<id>/",
+    ".pickleball/presence/<agent-id>.json",
+    ".pickleball/posts/<id>.json",
+    ".pickleball/history.log",
+)
+BOARD_VERBS = (
+    "presence --touch",
+    "presence --list",
+    "presence --sweep",
+    "post --write",
+    "post --list",
+    "post --renew",
+    "post --sweep",
+    "history --append",
+    "history --tail",
+    "gc-runs",
+)
+
 
 def is_included(path: Path) -> bool:
     if not path.is_file():
@@ -176,6 +201,21 @@ def render() -> str:
         else:
             lines.append("- _No matching files found._")
         lines.append("")
+
+    lines.extend((
+        "## .pickleball owners",
+        "",
+        "Jar cache is regenerable under `v/<current>/`, `open/`, and `current.json`.",
+        "Project history stays at the `.pickleball` root and survives export-guidance.",
+        "Legacy `.pickleball/workbench/` is only the fallback when `current.json` is missing or not usable.",
+        "",
+    ))
+    lines.extend(f"- `{path}`" for path in BOARD_PATHS)
+    lines.append("")
+    lines.append("Launcher verbs, same exec.args style as inbox, note, and short-log:")
+    lines.append("")
+    lines.extend(f"- `{verb}`" for verb in BOARD_VERBS)
+    lines.append("")
 
     return "\n".join(lines).rstrip() + "\n"
 

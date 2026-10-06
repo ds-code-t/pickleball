@@ -142,14 +142,13 @@ public final class PickleballLocalLayout {
         return workbenchStateRoot(projectRoot).resolve(ATTACH_FILE);
     }
 
+    /**
+     * New investigation handoffs always go here: {@code .pickleball/investigations}.
+     * A complete {@code current.json} does not move them under {@code v/<version>/}.
+     * Existing versioned trees are legacy reads only.
+     */
     public static Path investigationsDirectory(Path projectRoot) {
-        Path pickleball = root(projectRoot);
-        Optional<CurrentPointer> current = readCurrent(pickleball);
-        if (current.isPresent() && current.get().usable()) {
-            return versionRoot(pickleball, current.get().pickleballVersion())
-                    .resolve(InvestigationHandoff.INVESTIGATIONS_DIRECTORY);
-        }
-        return pickleball.resolve(InvestigationHandoff.INVESTIGATIONS_DIRECTORY);
+        return root(projectRoot).resolve(InvestigationHandoff.INVESTIGATIONS_DIRECTORY);
     }
 
     public static Optional<CurrentPointer> readCurrent(Path pickleballRoot) {

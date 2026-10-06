@@ -16,7 +16,8 @@ final class WorkbenchCommandLine {
     );
     static final Set<String> AGENT_CORE_COMMANDS = Set.of(
             "export-guidance", "hint", "discover-hint", "discover", "confirm", "resolve-runvars",
-            "short-log", "note", "inbox", "finish"
+            "short-log", "note", "inbox", "finish",
+            "presence", "post", "history", "gc-runs"
     );
     static final Set<String> SESSION_CLIENT_COMMANDS = Set.of(
             "isolate", "session-start", "execute-step", "status", "events", "stop", "kill",
@@ -43,10 +44,19 @@ final class WorkbenchCommandLine {
             boolean inboxWrite,
             boolean inboxList,
             boolean inboxTake,
-            Integer limit
+            boolean touch,
+            boolean sweep,
+            boolean renew,
+            boolean append,
+            Integer limit,
+            String id,
+            String ttl
     ) {
         static Coordination empty() {
-            return new Coordination(null, null, null, null, null, null, null, null, null, null, false, false, false, null);
+            return new Coordination(
+                    null, null, null, null, null, null, null, null, null, null,
+                    false, false, false, false, false, false, false, null, null, null
+            );
         }
     }
 
@@ -105,7 +115,13 @@ final class WorkbenchCommandLine {
         boolean inboxWrite = false;
         boolean inboxList = false;
         boolean inboxTake = false;
+        boolean touch = false;
+        boolean sweep = false;
+        boolean renew = false;
+        boolean append = false;
         Integer limit = null;
+        String id = null;
+        String ttl = null;
         String absorb = null;
         Path project = null;
         List<String> rest = new ArrayList<>();
@@ -274,6 +290,46 @@ final class WorkbenchCommandLine {
                 absorb = null;
                 continue;
             }
+            if ("--touch".equals(token)) {
+                touch = true;
+                absorb = null;
+                continue;
+            }
+            if ("--sweep".equals(token)) {
+                sweep = true;
+                absorb = null;
+                continue;
+            }
+            if ("--renew".equals(token)) {
+                renew = true;
+                absorb = null;
+                continue;
+            }
+            if ("--append".equals(token)) {
+                append = true;
+                absorb = null;
+                continue;
+            }
+            if (token.startsWith("--id=")) {
+                id = blankToNull(token.substring("--id=".length()));
+                absorb = null;
+                continue;
+            }
+            if ("--id".equals(token) && index + 1 < args.length) {
+                id = blankToNull(args[++index]);
+                absorb = null;
+                continue;
+            }
+            if (token.startsWith("--ttl=")) {
+                ttl = blankToNull(token.substring("--ttl=".length()));
+                absorb = null;
+                continue;
+            }
+            if ("--ttl".equals(token) && index + 1 < args.length) {
+                ttl = blankToNull(args[++index]);
+                absorb = null;
+                continue;
+            }
             if (isFlag(token)) {
                 rest.add(token);
                 continue;
@@ -301,7 +357,8 @@ final class WorkbenchCommandLine {
         if (project == null) project = cwd;
         Coordination coordination = new Coordination(
                 runId, agentId, group, sequence, who, why, learned, text,
-                inboxTo, inboxFrom, inboxWrite, inboxList, inboxTake, limit
+                inboxTo, inboxFrom, inboxWrite, inboxList, inboxTake,
+                touch, sweep, renew, append, limit, id, ttl
         );
 
         if (isForwardedCommand(command)) {

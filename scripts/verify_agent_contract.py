@@ -498,6 +498,28 @@ def validate_dependency_owned_guidance(errors: list[str]) -> None:
         errors.append(
             "AGENT-GUIDE live isolation loop must use isolate then execute-step."
         )
+    for required in (
+        "presence --touch",
+        "post --write",
+        "history --append",
+        "gc-runs",
+        ".pickleball/investigations/",
+        ".pickleball/presence/",
+        ".pickleball/posts/",
+        ".pickleball/history.log",
+        "does not mean an old run",
+        "Agents are not daemons",
+        "one driver",
+    ):
+        if required not in text:
+            errors.append(
+                f"Dependency-owned consumer guide must state the board contract ({required}): "
+                "docs/consumer-agent-guide.md"
+            )
+    if "new handoffs go under `.pickleball/v/" in text or "versioned under v/<version>/investigations when current.json is complete" in text:
+        errors.append(
+            "docs/consumer-agent-guide.md must not send new investigations under v/<version>/."
+        )
     if maintainer < text.find("## When the core Pickleball repository is also present"):
         errors.append(
             "@agent-pointer-eval guidance must stay maintainer-only at the bottom of "

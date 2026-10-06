@@ -299,6 +299,34 @@ class WorkbenchAgentCommandsTest {
         assertTrue(board.contains("\tstart\t"));
         assertTrue(board.contains("\tstop\t"));
         assertTrue(board.contains("record.json"));
+        assertTrue(Files.isDirectory(AgentCoordination.runDirectory(tempDir, "run-finish")));
+    }
+
+    @Test
+    void boardCommandsDoNotConsumeAPostAndSweepOnlyExpiredRows() throws Exception {
+        Output presence = run("presence", tempDir.toString(), "--touch", "--agent=agent-board", "--run-id=run-board");
+        assertEquals(0, presence.exitCode(), presence.stderr());
+        assertTrue(Files.isRegularFile(tempDir.resolve(".pickleball/presence/agent-board.json")));
+
+        Output post = run(
+                "post", tempDir.toString(), "--write", "--to=all", "--from=agent-board",
+                "--text=I have the window", "--ttl=1h"
+        );
+        assertEquals(0, post.exitCode(), post.stderr());
+        Output listed = run("post", tempDir.toString(), "--list");
+        assertTrue(listed.stdout().contains("I have the window"));
+        Output taken = run("inbox", tempDir.toString(), "--take", "--agent=agent-board");
+        assertTrue(taken.stdout().contains("(no inbox notes)"));
+        assertTrue(run("post", tempDir.toString(), "--list").stdout().contains("I have the window"));
+
+        Output history = run("history", tempDir.toString(), "--append", "--text=2.1.14 files fix branch commit merge run-board");
+        assertEquals(0, history.exitCode(), history.stderr());
+        assertTrue(run("history", tempDir.toString(), "--tail").stdout().contains("run-board"));
+
+        Output sweep = run("gc-runs", tempDir.toString());
+        assertEquals(0, sweep.exitCode(), sweep.stderr());
+        assertTrue(Files.isRegularFile(tempDir.resolve(".pickleball/presence/agent-board.json")));
+        assertTrue(Files.isRegularFile(tempDir.resolve(".pickleball/history.log")));
     }
 
     private Output run(String... args) {

@@ -81,4 +81,39 @@ class PickleballLocalStoreTest {
         assertTrue(cmd.contains("PROJECT:~-1"));
         assertTrue(ps.contains("SNAPSHOT"));
     }
+
+    @Test
+    void exportGuidanceDoesNotDeleteEitherInvestigationsTree() throws Exception {
+        Path project = Files.createTempDirectory(tempDir, "consumer");
+        Path pickleball = project.resolve(".pickleball");
+        String version = PickleballVersion.running(PickleballLocalStore.class);
+        Path versionRoot = pickleball.resolve("v").resolve(version);
+        Path rootInvestigation = pickleball.resolve("investigations/keep-root");
+        Path versioned = versionRoot.resolve("investigations/keep-version");
+        Path other = pickleball.resolve("v/9.9.9/investigations/keep-other");
+        Files.createDirectories(rootInvestigation);
+        Files.createDirectories(versioned);
+        Files.createDirectories(other);
+        Files.writeString(rootInvestigation.resolve("investigation.json"), "{\"id\":\"root\"}\n");
+        Files.writeString(rootInvestigation.resolve("report.html"), "<p>root</p>\n");
+        Files.writeString(versioned.resolve("investigation.json"), "{\"id\":\"version\"}\n");
+        Files.writeString(versioned.resolve("report.html"), "<p>version</p>\n");
+        Files.writeString(other.resolve("investigation.json"), "{\"id\":\"other\"}\n");
+        Files.writeString(versionRoot.resolve("GUIDANCE-MANIFEST.json"), """
+                {
+                  "files": [
+                    "investigations/keep-version/investigation.json",
+                    "investigations/keep-version/report.html",
+                    "AGENT-GUIDE.md"
+                  ]
+                }
+                """);
+
+        assertEquals(0, PickleballLocalStore.exportGuidance(pickleball, System.out, System.err));
+        assertTrue(Files.isRegularFile(rootInvestigation.resolve("investigation.json")));
+        assertTrue(Files.isRegularFile(rootInvestigation.resolve("report.html")));
+        assertTrue(Files.isRegularFile(versioned.resolve("investigation.json")));
+        assertTrue(Files.isRegularFile(versioned.resolve("report.html")));
+        assertTrue(Files.isRegularFile(other.resolve("investigation.json")));
+    }
 }

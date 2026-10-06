@@ -818,3 +818,33 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `scripts/refresh_agent_index.py`
 - `scripts/sync_consumer_guidance.py`
 - `scripts/verify_agent_contract.py`
+
+## .pickleball owners
+
+Jar cache is regenerable under `v/<current>/`, `open/`, and `current.json`.
+Project history stays at the `.pickleball` root and survives export-guidance.
+Legacy `.pickleball/workbench/` is only the fallback when `current.json` is missing or not usable.
+
+- `.pickleball/v/<current>/`
+- `.pickleball/open/`
+- `.pickleball/current.json`
+- `.pickleball/runs/<run-id>/`
+- `.pickleball/agent-log`
+- `.pickleball/inbox/<agent-id>/`
+- `.pickleball/investigations/<id>/`
+- `.pickleball/presence/<agent-id>.json`
+- `.pickleball/posts/<id>.json`
+- `.pickleball/history.log`
+
+Launcher verbs, same exec.args style as inbox, note, and short-log:
+
+- `presence --touch`
+- `presence --list`
+- `presence --sweep`
+- `post --write`
+- `post --list`
+- `post --renew`
+- `post --sweep`
+- `history --append`
+- `history --tail`
+- `gc-runs`

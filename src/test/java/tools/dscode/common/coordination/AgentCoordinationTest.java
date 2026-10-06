@@ -178,24 +178,25 @@ class AgentCoordinationTest {
 
         List<AgentCoordination.InboxNote> forA = AgentCoordination.listInbox(project, "agent-a");
         List<AgentCoordination.InboxNote> forB = AgentCoordination.listInbox(project, "agent-b");
-        List<AgentCoordination.InboxNote> forC = AgentCoordination.listInbox(project, "agent-c");
-        assertTrue(forA.stream().anyMatch(note -> note.message().equals("for a only")));
-        assertFalse(forA.stream().anyMatch(note -> note.message().equals("for b only")));
-        assertTrue(forA.stream().anyMatch(note -> note.message().equals("for anyone")));
-        assertTrue(forB.stream().anyMatch(note -> note.message().equals("for b only")));
-        assertFalse(forB.stream().anyMatch(note -> note.message().equals("for a only")));
-        assertEquals(1, forC.size());
-        assertEquals("for anyone", forC.getFirst().message());
+        assertEquals(1, forA.size());
+        assertEquals("for a only", forA.getFirst().message());
+        assertEquals(1, forB.size());
+        assertEquals("for b only", forB.getFirst().message());
+        assertTrue(AgentCoordination.listInbox(project, "agent-c").isEmpty());
+        assertTrue(any.toString().contains("posts"));
+        assertTrue(Files.isRegularFile(any));
 
         List<AgentCoordination.InboxNote> taken = AgentCoordination.takeInbox(project, "agent-a");
-        assertEquals(2, taken.size());
-        assertFalse(Files.exists(any));
+        assertEquals(1, taken.size());
+        assertEquals("for a only", taken.getFirst().message());
+        assertFalse(Files.exists(taken.getFirst().file()));
+        assertTrue(Files.isRegularFile(any));
         assertTrue(AgentCoordination.listInbox(project, "agent-a").isEmpty());
         assertEquals(1, AgentCoordination.listInbox(project, "agent-b").size());
-        assertEquals("for b only", AgentCoordination.listInbox(project, "agent-b").getFirst().message());
         AgentCoordination.takeInbox(project, "agent-b");
         assertTrue(AgentCoordination.listInbox(project, "agent-b").isEmpty());
-        assertTrue(AgentCoordination.listInbox(project, "agent-c").isEmpty());
+        assertTrue(Files.isRegularFile(any));
+        assertEquals(1, AgentCoordination.listPosts(project, Instant.now()).size());
     }
 
     @Test
@@ -320,6 +321,192 @@ class AgentCoordinationTest {
         Path workbenchReport = workbench.reportsDirectory().resolve("cucumber-report.html");
         recordScenario(workbenchReport, "Workbench checkout");
         assertFalse(Files.exists(workbenchReport));
+    }
+
+    @Test
+    void prunedRunKeepsAnIndexStubWhileItsDirectoryRemains() throws Exception {
+        Path runDir = AgentCoordination.runDirectory(project, "old-kept");
+        Files.createDirectories(runDir);
+        Instant now = Instant.parse("2026-10-04T12:00:00Z");
+        AgentCoordination.appendLog(
+                project,
+                now.minus(Duration.ofDays(3)).minusMillis(1),
+                "agent-old",
+                "old-kept",
+                "note",
+                "aged-out",
+                runDir.resolve("record.json")
+        );
+        AgentCoordination.appendLog(project, now, "agent-new", "fresh-run", "note", "stay", null);
+        String log = Files.readString(AgentCoordination.logFile(project), StandardCharsets.UTF_8);
+        assertTrue(log.contains("old-kept"));
+        assertTrue(log.contains("\tindex\t"));
+        assertFalse(log.contains("aged-out"));
+        assertTrue(log.contains("fresh-run"));
+        assertTrue(Files.isDirectory(runDir));
+    }
+
+    @Test
+    void presenceSweepDeletesOnlyAnExpiredRow() throws Exception {
+        AgentCoordination.touchPresence(project, "agent-fresh", "run-fresh", Instant.now());
+        AgentCoordination.touchPresence(project, "agent-stale", "run-stale", Instant.now().minus(Duration.ofMinutes(16)));
+        AgentCoordination.BoardPost post = AgentCoordination.writePost(
+                project, "agent-fresh", "all", null, "still here", null, Instant.now()
+        );
+        AgentCoordination.appendHistory(project, "2.1.14 files fix branch commit merge run-fresh");
+        AgentCoordination.Run run = AgentCoordination.begin(project, request("run-stale", "agent-stale"));
+        Path cookies = run.browserProfileDirectory().resolve("worker").resolve("Cookies");
+        Files.createDirectories(cookies.getParent());
+        Files.writeString(cookies, "keep");
+
+        int removed = AgentCoordination.sweepPresence(project, Instant.now());
+        assertEquals(1, removed);
+        assertFalse(Files.exists(project.resolve(".pickleball/presence/agent-stale.json")));
+        assertTrue(Files.isRegularFile(project.resolve(".pickleball/presence/agent-fresh.json")));
+        assertTrue(Files.isRegularFile(post.file()));
+        assertTrue(Files.isRegularFile(AgentCoordination.historyFile(project)));
+        assertTrue(Files.isRegularFile(run.browserProfileDirectory().resolve("worker").resolve("Cookies")));
+        assertEquals(0, AgentCoordination.sweepPresence(project, Instant.now()));
+    }
+
+    @Test
+    void unexpiredPostSurvivesListAndTakeAndExpiredDeleteIsIdempotent() throws Exception {
+        AgentCoordination.BoardPost live = AgentCoordination.writePost(
+                project, "agent-writer", "all", "run-post", "I have the window", Duration.ofHours(1), Instant.now()
+        );
+        AgentCoordination.BoardPost expired = AgentCoordination.writePost(
+                project, "agent-writer", "agent-other", null, "old hint", Duration.ofHours(1),
+                Instant.parse("2020-01-01T00:00:00Z")
+        );
+        assertEquals(1, AgentCoordination.listPosts(project, Instant.now()).size());
+        assertEquals("I have the window", AgentCoordination.listPosts(project, Instant.now()).getFirst().text());
+        assertTrue(Files.isRegularFile(live.file()));
+        AgentCoordination.takeInbox(project, "agent-other");
+        AgentCoordination.listInbox(project, "agent-other");
+        assertTrue(Files.isRegularFile(live.file()));
+        assertTrue(Files.isRegularFile(expired.file()));
+
+        assertEquals(1, AgentCoordination.sweepPosts(project, Instant.now()));
+        assertFalse(Files.exists(expired.file()));
+        assertTrue(Files.isRegularFile(live.file()));
+        assertEquals(0, AgentCoordination.sweepPosts(project, Instant.now()));
+        assertEquals(0, AgentCoordination.sweepPosts(project, Instant.now()));
+    }
+
+    @Test
+    void historyTrimAtTenMegabytesKeepsTheTail() throws Exception {
+        Path file = AgentCoordination.historyFile(project);
+        Files.createDirectories(file.getParent());
+        StringBuilder body = new StringBuilder();
+        body.append("HEAD-MARKER 0 ").append("x".repeat(80)).append('\n');
+        String filler = "FILL " + "y".repeat(200) + "\n";
+        while (body.length() <= AgentCoordination.HISTORY_MAX_BYTES + filler.length()) {
+            body.append(filler);
+        }
+        Files.writeString(file, body.toString());
+        String tail = "TAIL-MARKER version files fix branch commit merge run-z";
+        AgentCoordination.appendHistory(project, tail);
+        assertTrue(Files.size(file) <= AgentCoordination.HISTORY_MAX_BYTES);
+        String text = Files.readString(file);
+        assertTrue(text.contains("TAIL-MARKER"));
+        assertFalse(text.contains("HEAD-MARKER 0 "));
+        assertTrue(text.stripTrailing().endsWith(tail));
+    }
+
+    @Test
+    void browserProfileStaysWhileRunningWhileSessionIsLiveOrWhileTheWindowHoldsTheRun() throws Exception {
+        AgentCoordination.Run running = AgentCoordination.begin(project, request("run-live", "agent-live"));
+        Files.createDirectories(running.browserProfileDirectory().resolve("worker"));
+        Files.writeString(running.browserProfileDirectory().resolve("worker").resolve("Cookies"), "live");
+        AgentCoordination.sweepRuns(project, Instant.now());
+        assertTrue(Files.isRegularFile(running.browserProfileDirectory().resolve("worker").resolve("Cookies")));
+
+        AgentCoordination.Run session = AgentCoordination.begin(project, request("run-session", "agent-session"));
+        Files.createDirectories(session.browserProfileDirectory().resolve("worker"));
+        Files.writeString(session.browserProfileDirectory().resolve("worker").resolve("Cookies"), "session");
+        AgentCoordination.finish(project, session.runId(), null, "STOPPED", Instant.now().minus(Duration.ofHours(2)), null);
+        Files.writeString(session.sessionStateFile(), "{\"pid\":1}\n");
+        AgentCoordination.sweepRuns(project, Instant.now());
+        assertTrue(Files.isRegularFile(session.browserProfileDirectory().resolve("worker").resolve("Cookies")));
+
+        AgentCoordination.Run shown = AgentCoordination.begin(project, request("run-window", "agent-window"));
+        Files.createDirectories(shown.browserProfileDirectory().resolve("worker"));
+        Files.writeString(shown.browserProfileDirectory().resolve("worker").resolve("Cookies"), "window");
+        AgentCoordination.finish(project, shown.runId(), null, "STOPPED", Instant.now().minus(Duration.ofHours(2)), null);
+        tools.dscode.control.protocol.WindowDriver.show(project, shown.runId(), "agent-window", true);
+        AgentCoordination.sweepRuns(project, Instant.now());
+        assertTrue(Files.isRegularFile(shown.browserProfileDirectory().resolve("worker").resolve("Cookies")));
+        assertTrue(Files.isDirectory(shown.dataDirectory()));
+    }
+
+    @Test
+    void browserProfileMayBeDeletedOnlyAfterStopWhenNothingHoldsTheRun() throws Exception {
+        AgentCoordination.Run run = AgentCoordination.begin(project, request("run-done", "agent-done"));
+        Path cookies = run.browserProfileDirectory().resolve("worker").resolve("Cookies");
+        Files.createDirectories(cookies.getParent());
+        Files.writeString(cookies, "done");
+        Files.writeString(run.dataDirectory().resolve("record-extra.txt"), "dense");
+        AgentCoordination.finish(project, run.runId(), null, "STOPPED", Instant.now().minus(Duration.ofHours(1)), null);
+        assertTrue(Files.isDirectory(run.dataDirectory()));
+        assertTrue(Files.isRegularFile(cookies));
+        assertTrue(Files.isRegularFile(AgentCoordination.logFile(project)));
+
+        AgentCoordination.RunSweep sweep = AgentCoordination.sweepRuns(project, Instant.now());
+        assertEquals(1, sweep.profilesRemoved());
+        assertFalse(Files.exists(cookies));
+        assertTrue(Files.isRegularFile(run.recordFile()));
+        assertTrue(Files.isDirectory(run.dataDirectory()));
+        assertEquals(0, AgentCoordination.sweepRuns(project, Instant.now()).profilesRemoved());
+    }
+
+    @Test
+    void finishDoesNotDeleteTheRunDirectory() throws Exception {
+        AgentCoordination.Run run = AgentCoordination.begin(project, request("run-finish-keeps", "agent-keep"));
+        Path cookies = run.browserProfileDirectory().resolve("worker").resolve("Cookies");
+        Files.createDirectories(cookies.getParent());
+        Files.writeString(cookies, "stay");
+        Files.writeString(run.sessionStateFile(), "{\"pid\":1}\n");
+        AgentCoordination.finish(project, run.runId(), "learned the row", "STOPPED");
+        assertTrue(Files.isDirectory(run.dataDirectory()));
+        assertTrue(Files.isRegularFile(cookies));
+        assertTrue(Files.isRegularFile(run.sessionStateFile()));
+        assertTrue(Files.isRegularFile(run.recordFile()));
+        String record = Files.readString(run.recordFile());
+        assertTrue(record.contains("stoppedAt"));
+        assertFalse(record.contains("\"stoppedAt\" : null"));
+        assertTrue(Files.readString(AgentCoordination.logFile(project)).contains("\tstop\t"));
+    }
+
+    @Test
+    void expiredPayloadLeavesTheRecordSparseIndexAndRunProfile() throws Exception {
+        AgentCoordination.Run failed = AgentCoordination.begin(project, request("run-failed", "agent-gc"));
+        Files.writeString(failed.reportsDirectory().resolve("shot.png"), "png");
+        Files.writeString(failed.diagnosticDirectory().resolve("run-index.json"), "{\"runId\":\"run-failed\"}");
+        Files.writeString(failed.diagnosticDirectory().resolve("events.jsonl"), "dense");
+        Files.writeString(failed.dataDirectory().resolve("pkb_run_profile"), "pkb_browser=CHROME_HEADLESS");
+        AgentCoordination.finish(project, failed.runId(), null, "FAILED", Instant.parse("2020-01-01T00:00:00Z"), null);
+
+        AgentCoordination.Run old = AgentCoordination.begin(project, request("run-old", "agent-gc"));
+        Files.writeString(old.reportsDirectory().resolve("shot.png"), "png");
+        Files.writeString(old.scratchDirectory().resolve("tmp.txt"), "tmp");
+        Files.writeString(old.diagnosticDirectory().resolve("run-index.json"), "{\"runId\":\"run-old\"}");
+        Files.writeString(old.diagnosticDirectory().resolve("summary.json"), "{}");
+        Files.writeString(old.diagnosticDirectory().resolve("events.jsonl"), "dense-events");
+        Files.writeString(old.dataDirectory().resolve("pkb_run_profile"), "pkb_browser=EDGE");
+        AgentCoordination.finish(project, old.runId(), null, "STOPPED", Instant.parse("2020-01-02T00:00:00Z"), null);
+
+        AgentCoordination.sweepRuns(project, Instant.parse("2026-10-05T00:00:00Z"));
+        AgentCoordination.sweepRuns(project, Instant.parse("2026-10-05T00:00:00Z"));
+        assertTrue(Files.isRegularFile(failed.reportsDirectory().resolve("shot.png")));
+        assertTrue(Files.isRegularFile(failed.recordFile()));
+        assertFalse(Files.exists(old.reportsDirectory().resolve("shot.png")));
+        assertFalse(Files.exists(old.scratchDirectory().resolve("tmp.txt")));
+        assertFalse(Files.exists(old.diagnosticDirectory().resolve("events.jsonl")));
+        assertTrue(Files.isRegularFile(old.recordFile()));
+        assertTrue(Files.isRegularFile(old.diagnosticDirectory().resolve("run-index.json")));
+        assertTrue(Files.isRegularFile(old.diagnosticDirectory().resolve("summary.json")));
+        assertTrue(Files.isRegularFile(old.dataDirectory().resolve("pkb_run_profile")));
+        assertTrue(Files.isDirectory(old.dataDirectory()));
     }
 
     private void captureProfile(List<String> profiles, CountDownLatch ready, CountDownLatch go) {
