@@ -5,9 +5,12 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import tools.dscode.common.coordination.AgentCoordination;
 import tools.dscode.common.reporting.diagnostic.LastDiscoverSnapshot;
+import tools.dscode.testengine.PKB_props;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
+import java.net.URL;
+import java.net.URLClassLoader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -26,6 +29,9 @@ class WorkbenchAgentCommandsTest {
     @AfterEach
     void clearCoordination() {
         AgentCoordination.clearCurrent();
+        System.clearProperty(PKB_props.PKB_RUN_ID);
+        System.clearProperty(PKB_props.PKB_AGENT_ID);
+        System.clearProperty("pkb_configpath");
     }
 
     @Test
@@ -327,6 +333,93 @@ class WorkbenchAgentCommandsTest {
         assertEquals(0, sweep.exitCode(), sweep.stderr());
         assertTrue(Files.isRegularFile(tempDir.resolve(".pickleball/presence/agent-board.json")));
         assertTrue(Files.isRegularFile(tempDir.resolve(".pickleball/history.log")));
+    }
+
+    @Test
+    void discoverCopiesClasspathConfigsOnlyWhenTheWorkerOpensTheRun() throws Exception {
+        writeProjectWrapper();
+        Path resources = tempDir.resolve("src/test/resources");
+        Path qa = resources.resolve("qa-configs");
+        Files.createDirectories(qa);
+        Path marker = qa.resolve("MARKER.yaml");
+        String markerText = "marker: qa-only\n";
+        Files.writeString(marker, markerText, StandardCharsets.UTF_8);
+        Files.writeString(
+                resources.resolve("pickleball.properties"),
+                "pkb_configpath=classpath:qa-configs\n",
+                StandardCharsets.UTF_8
+        );
+
+        ByteArrayOutputStream stdout = new ByteArrayOutputStream();
+        ByteArrayOutputStream stderr = new ByteArrayOutputStream();
+        String resolved = "classpath:qa-configs";
+        int exit = WorkbenchAgentCommands.run(
+                new String[]{"discover", tempDir.toString(), "--run-id=run-qa", "--agent=agent-qa"},
+                new PrintStream(stdout, true, StandardCharsets.UTF_8),
+                new PrintStream(stderr, true, StandardCharsets.UTF_8),
+                (project, command, out, err) -> {
+                    assertTrue(command.stream().anyMatch(item -> item.equals("-Dpkb_run_id=run-qa")));
+                    assertTrue(command.stream().anyMatch(item -> item.equals("-Dpkb_agent_id=agent-qa")));
+                    assertFalse(command.stream().anyMatch(item -> item.startsWith("-Dpkb_configpath=")));
+                    Path config = AgentCoordination.runDirectory(project, "run-qa").resolve("config");
+                    assertFalse(Files.isRegularFile(config.resolve("CHROME_HEADLESS.yaml")));
+                    assertFalse(Files.isRegularFile(config.resolve("MARKER.yaml")));
+                    try {
+                        Files.createDirectories(config);
+                        Files.writeString(
+                                config.resolve("CHROME_HEADLESS.yaml"),
+                                "bundled: only\n",
+                                StandardCharsets.UTF_8
+                        );
+                        ClassLoader previous = Thread.currentThread().getContextClassLoader();
+                        try (URLClassLoader loader = new URLClassLoader(
+                                new URL[]{resources.toUri().toURL()},
+                                previous
+                        )) {
+                            Thread.currentThread().setContextClassLoader(loader);
+                            System.setProperty(PKB_props.PKB_RUN_ID, "run-qa");
+                            System.setProperty(PKB_props.PKB_AGENT_ID, "agent-qa");
+                            System.clearProperty("pkb_configpath");
+                            AgentCoordination.Run adopted = AgentCoordination.openConsumerRun(
+                                    project,
+                                    new StringBuilder(),
+                                    resolved
+                            );
+                            assertEquals("run-qa", adopted.runId());
+                            String recorded = System.getProperty("pkb_configpath");
+                            assertTrue(recorded == null || recorded.equals(resolved), () -> String.valueOf(recorded));
+                            assertFalse(adopted.configDirectory().toString().equals(recorded));
+                        } finally {
+                            Thread.currentThread().setContextClassLoader(previous);
+                            System.clearProperty(PKB_props.PKB_RUN_ID);
+                            System.clearProperty(PKB_props.PKB_AGENT_ID);
+                            System.clearProperty("pkb_configpath");
+                        }
+                        Path catalog = project.resolve("reports/diagnostic-runs");
+                        Files.createDirectories(catalog);
+                        Files.writeString(catalog.resolve("run-catalog.json"), """
+                                {
+                                  "schemaVersion": 1,
+                                  "runs": [
+                                    {
+                                      "runId": "run-qa",
+                                      "runProfile": "pkb_configpath=classpath:qa-configs, pkb_browser=CHROME_HEADLESS",
+                                      "lineage": { "runPurpose": "workbench-discover" }
+                                    }
+                                  ]
+                                }
+                                """);
+                    } catch (Exception failure) {
+                        throw new IllegalStateException(failure.getMessage(), failure);
+                    }
+                    return 0;
+                }
+        );
+
+        assertEquals(0, exit, () -> stderr.toString(StandardCharsets.UTF_8) + stdout.toString(StandardCharsets.UTF_8));
+        Path copied = AgentCoordination.runDirectory(tempDir, "run-qa").resolve("config").resolve("MARKER.yaml");
+        assertEquals(markerText, Files.readString(copied));
+        assertEquals(markerText, Files.readString(marker));
     }
 
     private Output run(String... args) {

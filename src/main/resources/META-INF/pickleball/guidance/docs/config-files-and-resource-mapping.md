@@ -57,7 +57,7 @@ Named browser yaml files under the configured config path remain the local overr
 
 ## Per-run copy
 
-An agent run or a Workbench run copies that config tree into `.pickleball/runs/<run-id>/config` when the run starts and then reads only the copy. Edits, including from the Workbench Config tab, write the copy and do not write the project files. A second run has its own copy. A normal test does not copy and still loads `pkb_configpath` from the project. The stored run profile keeps the project `pkb_configpath`. It does not record the run directory.
+An agent run or a Workbench run copies that config tree into `.pickleball/runs/<run-id>/config` when the worker or test JVM opens the run, after `pkb_configpath` is resolved, and then reads only the copy. `session-start`, `discover`, and `confirm` do not copy before that JVM exists. A directory that contains only the bundled `CHROME_HEADLESS.yaml` is not a finished copy. Edits, including from the Workbench Config tab, write the copy and do not write the project files. A second run has its own copy. A normal test does not copy and still loads `pkb_configpath` from the project. The stored run profile keeps the project `pkb_configpath`. It does not record the run directory.
 
 ## Initialization order
 

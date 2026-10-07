@@ -46,7 +46,7 @@ class RunConfigIsolationTest {
         Files.writeString(configs.resolve("jsonfiles/accounts.json"), "{\"id\":1}\n", StandardCharsets.UTF_8);
         String projectChrome = Files.readString(configs.resolve("CHROME.yaml"));
 
-        AgentCoordination.Run first = AgentCoordination.begin(project, request("run-a", "agent-a"));
+        AgentCoordination.Run first = openResolved("run-a", "agent-a", configs.toString());
         assertTrue(Files.readString(first.configDirectory().resolve("CHROME.yaml")).contains("marker: project"));
         assertTrue(Files.readString(first.configDirectory().resolve("URL.yaml")).contains("project-home"));
         assertTrue(Files.readString(first.configDirectory().resolve("EDGE.yaml")).contains("project-edge"));
@@ -62,18 +62,18 @@ class RunConfigIsolationTest {
                 RunConfigs.write(project, "run-a", "../CHROME.yaml", "marker: escaped\n"));
         assertEquals(projectChrome, Files.readString(configs.resolve("CHROME.yaml")));
 
-        AgentCoordination.Run second = AgentCoordination.begin(project, request("run-b", "agent-b"));
+        AgentCoordination.Run second = openResolved("run-b", "agent-b", configs.toString());
         assertTrue(Files.readString(second.configDirectory().resolve("CHROME.yaml")).contains("marker: project"));
         assertFalse(Files.readString(second.configDirectory().resolve("CHROME.yaml")).contains("run-a"));
         assertTrue(Files.readString(first.configDirectory().resolve("CHROME.yaml")).contains("marker: run-a"));
 
-        AgentCoordination.begin(project, request("run-a", "agent-a"));
+        openResolved("run-a", "agent-a", configs.toString());
         assertTrue(Files.readString(first.configDirectory().resolve("CHROME.yaml")).contains("marker: run-a"));
         ParsingMap.initializeConfigs(configs.toString());
         assertEquals("run-a", String.valueOf(ParsingMap.getGlobalsParsingmap().get("configs.CHROME.marker")));
         assertEquals("project-home", String.valueOf(ParsingMap.getGlobalsParsingmap().get("configs.URL.home")));
 
-        AgentCoordination.begin(project, request("run-b", "agent-b"));
+        openResolved("run-b", "agent-b", configs.toString());
         ParsingMap.initializeConfigs(configs.toString());
         assertEquals("project", String.valueOf(ParsingMap.getGlobalsParsingmap().get("configs.CHROME.marker")));
         RunConfigs.write(project, "run-b", "URL.yaml", "home: run-b-only\n");
@@ -115,7 +115,9 @@ class RunConfigIsolationTest {
         assertEquals("custom", String.valueOf(ParsingMap.getGlobalsParsingmap().get("configs.EDGE.marker")));
     }
 
-    private static AgentCoordination.Request request(String runId, String agentId) {
-        return AgentCoordination.Request.of(runId, agentId, null, null, null, null, "config copy");
+    private AgentCoordination.Run openResolved(String runId, String agentId, String configSource) {
+        System.setProperty(PKB_props.PKB_RUN_ID, runId);
+        System.setProperty(PKB_props.PKB_AGENT_ID, agentId);
+        return AgentCoordination.openConsumerRun(project, new StringBuilder(), configSource);
     }
 }

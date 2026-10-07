@@ -263,14 +263,14 @@ public final class AgentCoordination {
     }
 
     public static Run begin(Path project, Request request) {
-        return begin(project, request, Instant.now(), null, null);
+        return begin(project, request, Instant.now(), null);
     }
 
+    /**
+     * Books a run record. Does not copy configs. {@code session-start}, {@code discover},
+     * and {@code confirm} call this before the worker JVM exists.
+     */
     public static Run begin(Path project, Request request, Instant when, Appendable out) {
-        return begin(project, request, when, out, null);
-    }
-
-    public static Run begin(Path project, Request request, Instant when, Appendable out, String configSource) {
         Instant clock = when == null ? Instant.now() : when;
         Request safe = request == null ? Request.of(null, null, null, null, null, null, null) : request;
         String runId = safe.runId() == null ? newRunId(clock) : requireSafeId(safe.runId(), "run id");
@@ -280,7 +280,6 @@ public final class AgentCoordination {
             if (Files.isRegularFile(recordFile)) {
                 RunRecord existing = readRecord(recordFile);
                 ensureTree(data);
-                ensureConfigs(project, data, configSource);
                 Run adopted = toRun(project, data, recordFile, existing);
                 activate(adopted);
                 print(out, "run-id=" + adopted.runId());
@@ -294,7 +293,6 @@ public final class AgentCoordination {
                 throw new IllegalArgumentException("agent id 'any' is reserved for the shared inbox.");
             }
             ensureTree(data);
-            ensureConfigs(project, data, configSource);
             String purpose = oneLine(firstNonBlank(safe.why(), safe.purpose(), "run"));
             RunRecord record = new RunRecord(
                     runId,
@@ -345,7 +343,15 @@ public final class AgentCoordination {
                 System.getProperty(PKB_props.PKB_RUN_WHY),
                 "consumer-run"
         );
-        Run run = begin(project, request, Instant.now(), out, configSource);
+        Run run = begin(project, request, Instant.now(), out);
+        try {
+            ensureConfigs(project, run.dataDirectory(), configSource);
+        } catch (IOException failure) {
+            throw new IllegalStateException(
+                    "Could not copy configs for run " + run.runId() + ": " + failure.getMessage(),
+                    failure
+            );
+        }
         System.setProperty(PKB_props.PKB_RUN_ID, run.runId());
         System.setProperty(PKB_props.PKB_AGENT_ID, run.agentId());
         return run;

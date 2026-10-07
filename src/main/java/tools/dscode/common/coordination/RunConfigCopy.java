@@ -17,8 +17,10 @@ import java.util.stream.Stream;
 
 /**
  * Copies a consumer project's configs into one run directory.
+ * The worker calls this after {@code pkb_configpath} is resolved.
  * The copy is created once. A later start of the same run keeps edits.
- * A normal test never calls this.
+ * A destination that contains only the bundled {@code CHROME_HEADLESS.yaml} is not finished.
+ * A normal test never calls this. The run directory is not written back to {@code pkb_configpath}.
  */
 public final class RunConfigCopy {
     public static final String DIRECTORY_NAME = RunConfigs.DIRECTORY;
@@ -174,8 +176,13 @@ public final class RunConfigCopy {
     private static boolean containsFile(Path root) throws IOException {
         if (!Files.isDirectory(root)) return false;
         try (Stream<Path> walk = Files.walk(root)) {
-            return walk.anyMatch(Files::isRegularFile);
+            return walk.filter(Files::isRegularFile).anyMatch(path -> !bundledHeadlessFile(path));
         }
+    }
+
+    private static boolean bundledHeadlessFile(Path path) {
+        Path name = path.getFileName();
+        return name != null && "CHROME_HEADLESS.yaml".equalsIgnoreCase(name.toString());
     }
 
     private static boolean hasBaseName(Path root, String base) throws IOException {
