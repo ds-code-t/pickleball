@@ -132,6 +132,8 @@ Every invocation-table column except the reserved `RunIf` and `RunBackground` co
 
 A blank cell, the word `null`, or a reference that does not resolve is false. Explicit `true` and `false` values work. Dynamic assertions such as `<A> has value` and block comparisons such as `4 > 3` work. When the `RunIf` column is absent, every row runs.
 
+A plain cell uses the same truthiness as the text after `IF:`. `"abc"` runs. `"0"`, `0`, and `<{ 0 }>` skip. `<{ 1 }>` runs. A whole-cell reference that resolves is the saved text, not an element name: `<A>` saved as `hello` is as truthy as `IF: "hello"`. A missing reference is false.
+
 `RunBackground` uses that same evaluation. Background steps in the called feature run only when the cell is true. A blank, null, or unresolved cell does not run them. When the `RunBackground` column is absent, `RUN` ignores called-feature backgrounds. That is the default for every `RUN` data table, including scenario, component-scenario, and service-call rows. `SCENARIO:`, `COMPONENT:`, `CALL:`, and a root scenario keep their existing background behavior.
 
 ```gherkin

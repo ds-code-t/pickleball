@@ -45,6 +45,12 @@ tasks.withType(JavaCompile).configureEach {
 
 tasks.named('test') {
     useJUnitPlatform()
+    // The plain classes directory does not contain woven Cucumber types.
+    // hasInlineArgument() and the other PickleStep metadata members exist only
+    // on the woven classes. Put those first so they beat the unwoven api jars.
+    dependsOn rootProject.tasks.named('expandWoven')
+    def wovenExpanded = rootProject.layout.buildDirectory.dir('woven-expanded')
+    classpath = rootProject.files(wovenExpanded) + classpath
 }
 
 // Keep the control API as a separate source module, but bundle its output into

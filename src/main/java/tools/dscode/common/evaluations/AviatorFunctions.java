@@ -14,6 +14,13 @@ import static tools.dscode.common.evaluations.AviatorUtil.isTruthy;
 
 public class AviatorFunctions {
 
+    /**
+     * Forces this class to initialize. {@code AviatorFunctions.class} alone
+     * does not run the static block that registers the functions.
+     */
+    public static void load() {
+    }
+
     static {
         AviatorEvaluator.addFunction(new FirstNotBlankFn());
         AviatorEvaluator.addFunction(new FirstNotEmptyFn());

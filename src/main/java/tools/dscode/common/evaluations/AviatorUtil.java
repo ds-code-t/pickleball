@@ -19,6 +19,11 @@ import static tools.dscode.common.util.Reflect.invokeAnyMethod;
 public final class AviatorUtil {
 
     static {
+        // AviatorFunctions' static block registers firstNotBlank, firstNotEmpty,
+        // firstNotNull, and getBool. Nothing else referenced that class, so it
+        // never ran. FirstNonNull ("first") stays unregistered.
+        AviatorFunctions.load();
+
         // bool(x) helper
         AviatorEvaluator.addFunction(new BoolFn());
 
@@ -120,11 +125,16 @@ public final class AviatorUtil {
     }
 
     /**
-     * Evaluates an object to boolean, using Aviator's final-result coercion.
+     * Evaluates an expression, then applies {@link #isTruthy}.
+     * The third {@code AviatorEvaluator.execute} argument is the expression
+     * cache flag, not a coercion flag.
      */
     public static boolean evalToBoolean(Object expr, Map<String, Object> map) {
         try {
-            boolean evalReturn = expr != null && (boolean) AviatorEvaluator.execute(preprocessExpression(expr.toString()), map, true);
+            Object evaluated = expr == null
+                    ? null
+                    : AviatorEvaluator.execute(preprocessExpression(expr.toString()), map, true);
+            boolean evalReturn = isTruthy(evaluated);
             logInfo("Evaluated To Bool: '" + expr + "' -> '" + evalReturn + "'");
             return evalReturn;
         } catch (Exception e) {
@@ -160,14 +170,14 @@ public final class AviatorUtil {
             "null", "false", "no"));
 
     public static boolean isStringTruthy(String v) {
-        v = v.replaceAll("\"'`\\s", "").strip().toLowerCase();
+        v = v.replaceAll("[\"'`\\s]", "").strip().toLowerCase();
         if (v.isEmpty())
             return false;
         if (v.replaceAll("[\\[\\],0.]", "").isEmpty())
             return false;
         if (v.startsWith("<") || v.endsWith(">"))
             return false;
-        return !FALSE_VALUES.contains(v.replaceAll("[^A-Za-z]", ""));
+        return !FALSE_VALUES.contains(v);
     }
 
     /**
@@ -185,6 +195,9 @@ public final class AviatorUtil {
         }
     }
 
+    /**
+     * Dead. Not registered. {@code firstNotNull} is the supported function.
+     */
     public static class FirstNonNull extends AbstractFunction {
         @Override
         public String getName() {

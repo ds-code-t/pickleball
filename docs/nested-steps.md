@@ -64,6 +64,22 @@ A question mark can imply the conditional check without writing `if`:
 
 Use separate levels when each condition has a distinct business meaning.
 
+Block `IF:` / `ELSE-IF:` / `ELSE:` uses the same colon levels. A falsy parent does not run the inner `IF`. A truthy parent does. `"abc"` is truthy. `""`, `0`, `false`, and a missing reference are not. Three levels is the same chain with one more colon. A plain step between a false `IF:` and its `ELSE:` does not hide that `IF` from the `ELSE:`.
+
+```gherkin
+* IF: "abc":
+  : * IF: "":
+    :: * , save "no" as "inner"
+    : * ELSE:
+    :: * , save "else" as "inner"
+* IF: "abc":
+  : * IF: "abc":
+    :: * IF: "abc":
+      ::: * , save "yes" as "depth3"
+```
+
+See [Block Conditionals](block-conditionals.md).
+
 ## `if`, `else if`, and `else`
 
 Related branches must be at the same nesting level:

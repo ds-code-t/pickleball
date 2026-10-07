@@ -428,8 +428,20 @@ tasks.named('check') {
     dependsOn tasks.named('verifyStrictControllerIsolation')
 }
 
-// Disable the plain jar so only the shaded jar is produced/published
+// Disable the plain jar so only the shaded jar is produced/published.
+// Inter-project consumers still need the ajc classes. The disabled jar task
+// would otherwise advertise a file that is never built.
 tasks.jar { enabled = false }
+
+def mainClasses = sourceSets.main.java.destinationDirectory
+['apiElements', 'runtimeElements'].each { configName ->
+    configurations.named(configName).configure {
+        outgoing.artifacts.clear()
+        outgoing.artifact(mainClasses) {
+            builtBy tasks.named('classes')
+        }
+    }
+}
 
 publishing {
     repositories {

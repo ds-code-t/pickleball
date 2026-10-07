@@ -233,3 +233,83 @@ Feature: Syntax added since 2.1.14
 
   Scenario: resolve-runvars is the launcher JVM
     * resolve-runvars reports the launcher JVM
+
+  @area-a @area-plain-branch-args
+  Scenario: A truthy plain IF inherits the line table and doc string and a DT marker overrides
+    * IF: "abc" THEN: the recorded city is saved as "plainIfCity" ELSE: the recorded city is saved as "plainIfElseMiss"
+      | city  |
+      | Tempe |
+    * , verify "<plainIfCity>" equals "Tempe"
+    * IF: "abc" THEN: the recorded note is saved as "plainIfNote" ELSE: the recorded note is saved as "plainIfNoteElse"
+      """
+      hello plain if
+      """
+    * , verify "<plainIfNote>" equals "hello plain if"
+    * IF: "abc" THEN: the recorded city is saved as "plainOverride" DT:::city|Paris| ELSE: the recorded city is saved as "plainOverrideElse"
+      | city  |
+      | Tempe |
+    * , verify "<plainOverride>" equals "Paris"
+
+  @area-a @area-plain-branch-args-falsy
+  Scenario: A falsy plain IF lets ELSE inherit the line table and doc string
+    * IF: "" THEN: the recorded city is saved as "plainElseMiss" ELSE: the recorded city is saved as "plainElseCity"
+      | city  |
+      | Tempe |
+    * , verify "<plainElseCity>" equals "Tempe"
+    * IF: "" THEN: the recorded note is saved as "plainElseNoteMiss" ELSE: the recorded note is saved as "plainElseNote"
+      """
+      hello plain else
+      """
+    * , verify "<plainElseNote>" equals "hello plain else"
+    * IF: "" THEN: the recorded city is saved as "plainFalsyOverride" DT:::city|Paris| ELSE: the recorded city is saved as "plainFalsyKept"
+      | city  |
+      | Tempe |
+    * , verify "<plainFalsyKept>" equals "Tempe"
+
+  @area-a @area-runif-plain
+  Scenario: A plain RunIf cell uses IF truthiness
+    * , save "hello" as "A"
+    * RUN
+      | RunType  | pkb_tags       | token      | RunIf              |
+      | SCENARIO | @run-row-visit | plainAbc   | "abc"              |
+      | SCENARIO | @run-row-bomb  | plainZeroQ | "0"                |
+      | SCENARIO | @run-row-bomb  | plainZero  | 0                  |
+      | SCENARIO | @run-row-visit | plainOne   | <{ 1 }>            |
+      | SCENARIO | @run-row-bomb  | plainZeroE | <{ 0 }>            |
+      | SCENARIO | @run-row-visit | plainHello | <A>                |
+      | SCENARIO | @run-row-bomb  | plainMiss  | <no-such-run-flag> |
+    * , verify "<plainAbcMark>" equals "without-background"
+    * , verify "<plainOneMark>" equals "without-background"
+    * , verify "<plainHelloMark>" equals "without-background"
+
+  @area-a @area-stress-block
+  Scenario: A depth-3 block mixes operators a skipped side a table comma else-if and RunIf
+    * reset branch counts
+    * , save "untouched" as "stressInner"
+    * , save "untouched" as "stressQ"
+    * IF: <{ (!false && (true ? 1 : <$count branch stress-untaken>)) || <MISSING> ? }>:
+      : * IF: "abc":
+        :: * IF: "":
+          ::: * , save "no" as "stressInner"
+        :: * ELSE-IF: 0:
+          ::: * , save "no" as "stressInner"
+        :: * ELSE:
+          ::: * the recorded city is saved as "stressCity" DT:::city|Paris|
+            | city  |
+            | Tempe |
+          ::: * , save "yes" as "stressInner"
+      : * ELSE:
+        :: * , save "no" as "stressInner"
+    * ELSE:
+      : * , save "no" as "stressInner"
+    * , if "", save "no" as "stressQ", else if "abc", save "yes" as "stressQ", else, save "else" as "stressQ"
+    * RUN
+      | RunType  | pkb_tags       | token      | RunIf              |
+      | SCENARIO | @run-row-visit | stressRun  | "abc"              |
+      | SCENARIO | @run-row-bomb  | stressSkip | <no-such-run-flag> |
+    * , ensure "<stressInner>" equals "yes"
+    * , verify "<stressCity>" equals "Paris"
+    * , ensure "<stressQ>" equals "yes"
+    * branch count "stress-untaken" equals "0"
+    * , verify "<stressRunMark>" equals "without-background"
+

@@ -44,7 +44,7 @@ public abstract class LineData implements Cloneable {
     public void setInheritance(StepBase currentStep) {
         stepExtension = currentStep;
 
-        PhraseData previousSiblingInheritancePhrase = getInheritancePhrase(currentStep.previousSibling);
+        PhraseData previousSiblingInheritancePhrase = nearestSiblingInheritance(currentStep.previousSibling);
         previousSiblingConditionalState = previousSiblingInheritancePhrase == null ? 1 : previousSiblingInheritancePhrase.phraseConditionalMode;
         StepBase parentStep = currentStep.parentStep;
         inheritedPhrase = getInheritancePhrase(parentStep);
@@ -56,6 +56,22 @@ public abstract class LineData implements Cloneable {
         if(inheritedPhrase != null) {
             inheritedPhrase.setPhraseParsingMap(currentStep.getStepParsingMap());
         }
+    }
+
+    /**
+     * A plain step has no inheritance phrase. ELSE still belongs to the nearest
+     * earlier sibling that does, so a step between a false IF and ELSE does not
+     * hide that IF.
+     */
+    private static PhraseData nearestSiblingInheritance(StepBase sibling) {
+        while (sibling != null) {
+            PhraseData phrase = getInheritancePhrase(sibling);
+            if (phrase != null) {
+                return phrase;
+            }
+            sibling = sibling.previousSibling;
+        }
+        return null;
     }
 
     public List<String> lineComponents = new ArrayList<>();

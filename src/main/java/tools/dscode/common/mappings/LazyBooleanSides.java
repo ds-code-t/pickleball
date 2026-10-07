@@ -270,16 +270,7 @@ final class LazyBooleanSides {
     }
 
     private static boolean asBooleanMarker(Object value, String source) {
-        if (value instanceof Boolean bool) {
-            return bool;
-        }
-        try {
-            return (boolean) value;
-        } catch (ClassCastException ex) {
-            throw new RuntimeException(
-                    "Failed to evaluate expression to boolean: '" + source + "'",
-                    ex);
-        }
+        return isTruthy(value);
     }
 
     private static String stringify(Object value) {

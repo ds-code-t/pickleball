@@ -14,6 +14,9 @@ import static io.cucumber.core.runner.GlobalState.getRunningStep;
  * Evaluates a reserved RUN-table cell with the block-conditional IF: phrase engine.
  * Blank, the word null, and a whole-cell reference that does not resolve are false
  * before that engine runs, because those inputs are not phrases.
+ * A whole-cell reference that does resolve is quoted text, so {@code hello} follows
+ * {@code IF: "hello"} and is not an element name. An expression cell such as
+ * {@code <{ 1 }>} is left for that same IF engine.
  */
 final class RunRowCondition {
     private static final Pattern SINGLE_REFERENCE = Pattern.compile("^<[^<>]+>$");
@@ -26,17 +29,37 @@ final class RunRowCondition {
         if (text.isEmpty() || "null".equalsIgnoreCase(text)) {
             return false;
         }
-        if (SINGLE_REFERENCE.matcher(text).matches()) {
+        boolean resolvedReference = false;
+        if (isWholeDataReference(text)) {
             String resolved = ParsingMap.getRunningParsingMap().resolveWholeText(text);
             if (unresolved(resolved)) {
                 return false;
             }
             text = resolved.trim();
+            resolvedReference = true;
         }
         if ("true".equalsIgnoreCase(text) || "false".equalsIgnoreCase(text)) {
             return Boolean.parseBoolean(text);
         }
+        if (resolvedReference) {
+            text = quoteLiteral(text);
+        }
         return evaluateBlockCondition(text);
+    }
+
+    /**
+     * {@code <{ 1 }>} is an expression, not a saved value. Other whole-cell
+     * {@code <name>} references are saved text.
+     */
+    private static boolean isWholeDataReference(String text) {
+        if (!SINGLE_REFERENCE.matcher(text).matches()) {
+            return false;
+        }
+        return !(text.startsWith("<{") && text.endsWith("}>"));
+    }
+
+    private static String quoteLiteral(String value) {
+        return "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\"";
     }
 
     private static boolean unresolved(String resolved) {
