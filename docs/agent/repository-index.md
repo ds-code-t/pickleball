@@ -738,6 +738,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `maven-consumer-project/src/test/resources/features/mapping-value-type-preservation.feature`
 - `maven-consumer-project/src/test/resources/features/navigation.feature`
 - `maven-consumer-project/src/test/resources/features/nested-and-block-conditionals.feature`
+- `maven-consumer-project/src/test/resources/features/phrase-plain-forms.feature`
 - `maven-consumer-project/src/test/resources/features/pickleball-2.1.2-syntax-demo.feature`
 - `maven-consumer-project/src/test/resources/features/reusable-scenario-selection.feature`
 - `maven-consumer-project/src/test/resources/features/run-row-gates.feature`

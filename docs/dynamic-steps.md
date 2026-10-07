@@ -205,6 +205,8 @@ is greater than
 is greater than or equal to
 ```
 
+`matches` compiles a Java regular expression and uses `Matcher.matches`, so the pattern must cover the whole value. A double-quoted pattern is case-sensitive. A single quote on either side is case-insensitive. `"Ava"` matches `"A.+"`.
+
 Common state checks include:
 
 ```text

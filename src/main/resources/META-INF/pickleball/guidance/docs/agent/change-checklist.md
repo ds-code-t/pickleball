@@ -44,6 +44,18 @@ Plain forms `@all` must run. Group them into the feature named in the last colum
 | `<&key>` | `<&key>` after save `"ava"` as `"key"` | resolves to `ava` | | may warn; deprecation is not a hard error | `map-ref-plain-forms.feature` / A deprecated ampersand reference still resolves |
 | `ASSERT:` single element | `ASSERT: "abc"` | `"abc"`, `7`, and `true` pass, then a later step runs | | a hard-failing `ASSERT:` stays out of `@all` | `assert-single-element.feature` / A single-element ASSERT passes and a later step runs |
 | `SOFT ASSERT:` single element | `SOFT ASSERT: false` | | `false` and `""` do not throw | a later step still runs; not a hard fail | `assert-single-element.feature` / A single-element SOFT ASSERT does not throw and a later step runs |
+| `ends with` | `IF: "Phoenix" ends with "nix" THEN:` | ends with `nix` runs | ends with `Ava` skips | does not throw | `phrase-plain-forms.feature` / Ends with and starts with select the branch |
+| `starts with` | `IF: "Phoenix" starts with "Pho" THEN:` | starts with `Pho` runs | starts with `Tem` skips | does not throw | `phrase-plain-forms.feature` / Ends with and starts with select the branch |
+| `matches` | `IF: "Ava" matches "A.+" THEN:` | whole-string Java regex `A.+` runs | `T.+` skips | `Pattern.compile` and `Matcher.matches`; double quotes are case-sensitive; a single quote on either side is case-insensitive | `phrase-plain-forms.feature` / A quoted value matches a whole-string Java regex |
+| `is blank` | `IF: "" is blank THEN:` | `""` runs | `"abc"` skips | does not throw | `phrase-plain-forms.feature` / Is blank selects an empty string |
+| `is selected` / `is unselected` | `IF: "Email" Radio Button is selected THEN:` | selected Email and unselected Phone run, then the reverse after Phone is chosen | the opposite radio state skips | forms playground radios; does not throw | `phrase-plain-forms.feature` / Forms playground element states select the branch |
+| `is present` | `IF: "Submit Form" Button is present THEN:` | the visible Submit Form button runs | | does not throw | `phrase-plain-forms.feature` / Forms playground element states select the branch |
+| `is required` / `is non-required` | `IF: "Required Marker" Textbox is required THEN:` | Required Marker runs; Last Name non-required runs | the inverses skip | Required Marker is the forms-playground fixture; does not throw | `phrase-plain-forms.feature` / Forms playground element states select the branch |
+| backtick single element | `IF: \`abc\` THEN:` | backtick text runs | | does not throw | `phrase-plain-forms.feature` / A backtick runs and zero no null and the null marker skip |
+| quoted zero | `IF: "0" THEN:` | | a zero-only string skips | falsy; does not throw | `phrase-plain-forms.feature` / A backtick runs and zero no null and the null marker skip |
+| `"no"` | `IF: "no" THEN:` | | skips | does not throw | `phrase-plain-forms.feature` / A backtick runs and zero no null and the null marker skip |
+| `"null"` | `IF: "null" THEN:` | | skips | does not throw | `phrase-plain-forms.feature` / A backtick runs and zero no null and the null marker skip |
+| null marker | `IF: <^~NULL~^> THEN:` | | skips | does not throw | `phrase-plain-forms.feature` / A backtick runs and zero no null and the null marker skip |
 
 ## Maintain knowledge
 

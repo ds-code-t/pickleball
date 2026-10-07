@@ -28,7 +28,9 @@ Phrase-style conditions use the same assertions, elements, contexts, chains, inh
   : * , click the "Submit Request" Button
 ```
 
-A direct value can be used as a truthy or false-like condition. A quoted string, a saved reference, a bare `true` or `false`, a number, or `<{ ... }>` is enough: non-blank text, non-zero numbers, and true run the branch; blank text, `0`, `false`, and a missing reference skip it. Neither throws.
+A direct value can be used as a truthy or false-like condition. A quoted string, a saved reference, a bare `true` or `false`, a number, or `<{ ... }>` is enough: non-blank text, non-zero numbers, and true run the branch; blank text, `0`, `false`, and a missing reference skip it. A zero-only string such as `"0"`, the words `"no"` and `"null"`, and `<^~NULL~^>` are false-like and skip. A backtick string such as `` `abc` `` runs. Neither throws.
+
+Phrase comparisons and element states use the same words as a dynamic step. `ends with`, `starts with`, and `is blank` compare the quoted value. `matches` compiles a Java regular expression and requires `Matcher.matches`, so the pattern must cover the whole value. Double quotes are case-sensitive. A single quote on either side is case-insensitive. On the forms playground, `is selected`, `is unselected`, `is present`, `is required`, and `is non-required` select the branch without failing when the state is false. See [`phrase-plain-forms.feature`](../maven-consumer-project/src/test/resources/features/phrase-plain-forms.feature).
 
 ```gherkin
 * IF: <configs.TEST_DATA.featureFlags.workflowEnabled>:
