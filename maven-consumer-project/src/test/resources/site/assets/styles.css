@@ -298,3 +298,18 @@ kbd {
     .form-grid { grid-template-columns: 1fr; }
     .field.full { grid-column: auto; }
 }
+
+.spatial-grid {
+    display: grid;
+    grid-template-columns: 140px 140px 140px;
+    grid-template-rows: 48px 48px 48px;
+    gap: 16px;
+    width: max-content;
+}
+
+.spatial-grid button {
+    width: 140px;
+    height: 48px;
+}
+
+#scroll-spacer { height: 1800px; }

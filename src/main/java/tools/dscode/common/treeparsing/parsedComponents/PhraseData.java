@@ -44,7 +44,6 @@ import static tools.dscode.common.treeparsing.parsedComponents.PhraseData.Phrase
 import static tools.dscode.common.treeparsing.preparsing.LineData.wrapLooseConditionalExpression;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.afterOf;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.beforeOf;
-import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.inBetweenOf;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.insideOf;
 
 public abstract class PhraseData extends PassedData {
@@ -424,7 +423,6 @@ public abstract class PhraseData extends PassedData {
 
     public static void getXPathyContext(PhraseData phraseData, List<ElementMatch> elements) {
         if (elements.isEmpty()) phraseData.contextXPathy = null;
-        XPathy secondXPathy = elements.size() == 1 ? null : elements.get(1).xPathy;
         String context = phraseData.context.toLowerCase();
         XPathy xPathy = elements.getFirst().xPathy;
         if (xPathy == null) {
@@ -432,14 +430,10 @@ public abstract class PhraseData extends PassedData {
             return;
         }
 
-        phraseData.contextXPathy = resolveContextXPathy(
-                context,
-                xPathy,
-                secondXPathy
-        );
+        phraseData.contextXPathy = resolveContextXPathy(context, xPathy);
 
     }
-    private static XPathy resolveContextXPathy(String context, XPathy first, XPathy second) {
+    private static XPathy resolveContextXPathy(String context, XPathy first) {
         if (context.startsWith("for") || context.startsWith("from") || context.startsWith("in")) {
             return insideOf(first);
         }
@@ -448,10 +442,6 @@ public abstract class PhraseData extends PassedData {
         }
         if (context.startsWith("before")) {
             return beforeOf(first);
-        }
-        if (context.startsWith("between")) {
-            if (second == null) second = first;
-            return inBetweenOf(first, second);
         }
         return null;
     }

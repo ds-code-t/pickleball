@@ -6,35 +6,17 @@ This maintainer-only file is intentionally not linked from the public documentat
 
 ### `between`
 
-Confirm the intended business-language meaning and add tested examples before listing it as a public context phrase.
+Not a public context word. `resolveContextXPathy` does not apply it, and the phrase regex does not capture it. Confirm the business-language meaning and the two-anchor form before adding it.
 
 ### `in between`
 
-Confirm whether this is a supported alias of `between` and how it behaves with one or two surrounding elements.
+Confirm whether this should become a supported alias of a future `between`, and how it behaves with one or two surrounding elements.
 
 ## Action wording awaiting verification
-
-### `create and attach`
-
-Confirm the supported sentence forms, required values, and file behavior before documenting it as a normal action.
 
 ### `run step`
 
 Confirm the public syntax, return behavior, error handling, and reporting before documenting it as a normal action.
-
-### `hover`
-
-`move` is the documented pointer-over wording. Confirm whether `hover` should become a supported alias.
-
-### `dragAndDrop`
-
-Confirm the intended public spelling, source and target phrasing, and browser behavior.
-
-## Operations needing focused tests
-
-### `tab`
-
-Confirm public phrase recognition and verify that the resulting key behavior is the Tab key.
 
 ### `start` and `end`
 
@@ -47,6 +29,8 @@ Document tested forms for windows, tabs, frames, alerts, and any other supported
 ### `close`
 
 Document which browser targets can be closed and what context remains active afterward.
+
+`hover` is an alias of `move`. `dragAndDrop` takes the source element and then the target element. `create and attach` creates a temporary file and uploads it. The old `TAB` action was removed; press `"TAB"` remains the keyboard token. A prompt send-and-accept phrase does not exist; use `BrowserAlerts.sendKeys` from Java and then accept.
 
 ## Maintenance checklist
 

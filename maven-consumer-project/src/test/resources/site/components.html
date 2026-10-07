@@ -26,6 +26,58 @@
         <div class="button-row"><button id="dismiss-notice" type="button" aria-label="Close">Close</button></div>
     </section>
     <p class="output" id="component-close-state">Close State: open</p>
+    <section class="test-panel" aria-label="Spatial Grid">
+        <h2>Spatial Grid</h2>
+        <div class="spatial-grid">
+            <span></span>
+            <button id="above-target" type="button">Above Target</button>
+            <span></span>
+            <button id="left-target" type="button">Left Target</button>
+            <button id="spatial-anchor" type="button">Spatial Anchor</button>
+            <button id="right-target" type="button">Right Target</button>
+            <span></span>
+            <button id="below-target" type="button">Below Target</button>
+            <span></span>
+        </div>
+        <p class="output" id="spatial-result">Spatial Result: none</p>
+    </section>
+    <section class="test-panel" aria-label="Order Markers">
+        <h2>Order Markers</h2>
+        <div class="button-row">
+            <button id="before-marker" type="button">Before Marker</button>
+            <button id="order-anchor" type="button">Order Anchor</button>
+            <button id="after-marker" type="button">After Marker</button>
+        </div>
+        <p class="output" id="order-result">Order Result: none</p>
+    </section>
+    <section class="test-panel" aria-label="Outer Panel">
+        <h2>Outer Panel</h2>
+        <div id="middle-section">
+            <p>Middle Section</p>
+            <div id="inner-section">
+                <p>Inner Section</p>
+                <button id="deep-action" type="button">Deep Action</button>
+            </div>
+            <button id="middle-only" type="button">Middle Only</button>
+        </div>
+        <p class="output" id="nest-result">Nest Result: none</p>
+    </section>
+    <section class="test-panel" aria-label="Upload Panel">
+        <h2>Upload Panel</h2>
+        <div class="field">
+            <label for="upload-file">Upload File</label>
+            <input id="upload-file" type="file">
+        </div>
+        <div class="button-row">
+            <button id="drag-source" type="button">Drag Source</button>
+            <button id="drop-target" type="button">Drop Target</button>
+        </div>
+        <p class="output" id="upload-result">Upload Result: none</p>
+        <p class="output" id="drag-result">Drag Result: none</p>
+    </section>
+    <p class="output" id="scroll-state">Scroll State: top</p>
+    <div id="scroll-spacer"></div>
+    <button id="scroll-target" type="button">Scroll Target</button>
 </main>
 <footer class="site-footer"><a href="index.html">Return to the test lab home page</a></footer>
 </body>

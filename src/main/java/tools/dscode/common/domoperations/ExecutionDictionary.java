@@ -718,6 +718,15 @@ public class ExecutionDictionary {
 
         // --- parent -> children convenience ---
         public CategorySpec children(String... childCategories) {
+            for (String child : childCategories) {
+                if (child == null || child.isBlank()) {
+                    continue;
+                }
+                // Last category to claim a child name wins. Headers is claimed
+                // by Header Row and then by Header; both parents AND together
+                // and match nothing.
+                dict.categoryParents.removeAll(child);
+            }
             dict.registerParentOfCategories(parent(), childCategories);
             return this;
         }

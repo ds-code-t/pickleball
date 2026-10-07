@@ -23,10 +23,12 @@ import tools.dscode.common.dataelements.DataElementGroup;
 import tools.dscode.common.dataelements.DataExecutionResult;
 import tools.dscode.common.dataelements.DataElementKind;
 import tools.dscode.common.dataelements.DataElementRuntime;
+import tools.dscode.common.dataelements.DataQueryException;
 import tools.dscode.common.dataelements.StructuredDataConverter;
 import tools.dscode.common.mappings.queries.Tokenized;
 import tools.dscode.common.treeparsing.parsedComponents.DataElementMatch;
 import tools.dscode.common.treeparsing.parsedComponents.ElementMatch;
+import tools.dscode.common.treeparsing.parsedComponents.PhraseData;
 
 import tools.dscode.common.coordination.AgentCoordination;
 
@@ -293,6 +295,15 @@ public class ParsingMap extends MappingProcessor {
         Optional<DataElementMatch> dataElement =
                 DataElementMatch.from(element);
         if (dataElement.isPresent()
+                && dataElement.get().registration().kind() == DataElementKind.DATA_DOC_STRING
+                && docStringUsesQueryRuntime(dataElement.get())) {
+            throw new DataQueryException(
+                    "Data Doc String has no query runtime. "
+                            + "Read or save the whole Doc String. "
+                            + "Context, every, any, predicates, and return attributes are not supported."
+            );
+        }
+        if (dataElement.isPresent()
                 && DataElementRuntime.supports(
                         dataElement.get().registration().kind()
                 )
@@ -329,6 +340,43 @@ public class ParsingMap extends MappingProcessor {
             return List.of(toJsonData(data));
         }
         return super.get(element);
+    }
+
+    private static boolean docStringUsesQueryRuntime(DataElementMatch element) {
+        if (element.parentPhrase != null
+                && element.parentPhrase.phraseType == PhraseData.PhraseType.CONTEXT) {
+            return true;
+        }
+        if (element.selectionType != null && !element.selectionType.isBlank()) {
+            return true;
+        }
+        if (element.elementPosition != null && !element.elementPosition.isBlank()) {
+            return true;
+        }
+        if (element.attributes != null && !element.attributes.isEmpty()) {
+            return true;
+        }
+        if (element.valueTypes != null
+                && element.valueTypes.stream().anyMatch(value -> value != null && !value.isBlank())) {
+            return true;
+        }
+        // A quote before Doc String is the legacy whole-value source, not a query.
+        if (docStringLeadingSource(element)) {
+            return element.textOps != null && element.textOps.size() > 1;
+        }
+        return element.textOps != null && !element.textOps.isEmpty();
+    }
+
+    private static boolean docStringLeadingSource(DataElementMatch element) {
+        if (element.defaultText == null
+                || element.defaultText.isNullOrBlank()
+                || element.fullText == null
+                || element.category == null) {
+            return false;
+        }
+        int sourceIndex = element.fullText.indexOf(element.defaultText.toString());
+        int categoryIndex = element.fullText.indexOf(element.category);
+        return sourceIndex >= 0 && categoryIndex >= 0 && sourceIndex < categoryIndex;
     }
 
     private Object resolveDataSource(

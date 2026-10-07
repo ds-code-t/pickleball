@@ -71,6 +71,8 @@ A single literal character can be used directly:
 A B 1 . / -
 ```
 
+Key names are case-sensitive and must match the Selenium `Keys` name. `control[a]` is an error and names the uppercase form `CONTROL`. `SPACE` is the space key. A space character separates sequential keys; it is not `+` and it is not the `SPACE` key. `+` presses keys together. `[ ]` holds the key or group before the brackets.
+
 A multi-character token is interpreted as one key name, not as text. Write:
 
 ```text

@@ -286,7 +286,16 @@ public final class KeyParser {
         try {
             return Keys.valueOf(token);
         } catch (IllegalArgumentException ignored) {
-            // Not a Selenium Keys enum.
+            // Not an exact Selenium Keys name.
+        }
+
+        for (Keys key : Keys.values()) {
+            if (key.name().equalsIgnoreCase(token)) {
+                throw new IllegalArgumentException(
+                        "Unknown key: " + token
+                                + ". Key names are case-sensitive; use " + key.name() + "."
+                );
+            }
         }
 
         if (token.length() == 1) {

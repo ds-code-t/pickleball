@@ -19,7 +19,6 @@ public class NavigationSteps {
         if(obj instanceof String address) {
             logInfo("Attempting to navigate to: " + address + "");
             WebDriver driver = BrowserSteps.getCurrentDriver();
-            driver.get(address);
             if (isTruthy(resolveFromVarsOrDefault("pkb_staggerParallelURLCalls", false))) {
                 Stagger.runUrlHost(
                         address,

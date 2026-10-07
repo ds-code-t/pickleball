@@ -27,8 +27,10 @@ Data Elements determine explicit conversion behavior:
 
 - `Data` keeps existing `ObjectNode` and `ArrayNode` values unchanged, converts a `DataTable` through the framework DataTable-to-JSON converter, and converts a `DocString` through the existing DocString converter.
 - `Data Table` returns a stored native `DataTable` unchanged. A requested `JsonNode` is converted to a DataTable.
-- `Doc String` returns a stored native `DocString` unchanged.
+- `Doc String` returns a stored native `DocString` unchanged. A context, `every`, `any`, predicate, or return attribute on a Doc String is rejected. Read or save the whole value. `Set` has no Gherkin producer; construct it from Java. `none` is rejected for every Data Element.
 - `Data Row`, `Data Cell`, `Data Header`, `Data Value`, and `Data Entry` operate on the active data context.
+
+`size` and `count` are the same member count of one selected candidate (map entries, list items, or multimap entries). They are not the number of sibling candidates. An unfiltered `size of Maps` returns one size for each Map.
 
 ## Blank table cells
 

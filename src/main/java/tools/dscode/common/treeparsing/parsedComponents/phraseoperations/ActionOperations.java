@@ -1,7 +1,6 @@
 package tools.dscode.common.treeparsing.parsedComponents.phraseoperations;
 import io.cucumber.core.runner.StepData;
 import io.cucumber.core.runner.StepExtension;
-import org.openqa.selenium.Keys;
 import org.openqa.selenium.NoAlertPresentException;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.remote.RemoteWebDriver;
@@ -25,10 +24,10 @@ import static tools.dscode.common.domoperations.HumanInteractions.clear;
 import static tools.dscode.common.domoperations.HumanInteractions.click;
 import static tools.dscode.common.domoperations.HumanInteractions.contextClick;
 import static tools.dscode.common.domoperations.HumanInteractions.doubleClick;
+import static tools.dscode.common.domoperations.HumanInteractions.dragAndDrop;
 import static tools.dscode.common.domoperations.HumanInteractions.hover;
 import static tools.dscode.common.domoperations.HumanInteractions.selectDropdownByIndex;
 import static tools.dscode.common.domoperations.HumanInteractions.selectDropdownByVisibleText;
-import static tools.dscode.common.domoperations.HumanInteractions.sendKeys;
 import static tools.dscode.common.domoperations.HumanInteractions.typeText;
 import static tools.dscode.common.domoperations.HumanInteractions.wheelScrollBy;
 import static tools.dscode.common.domoperations.KeyParser.sendComplexKeys;
@@ -161,13 +160,6 @@ public enum ActionOperations implements OperationsInterface {
             });
         }
     },
-    TAB {
-        @Override
-        public void execute(PhraseData phraseData) {
-            logInfo(phraseData + " : Executing Action " + this.name());
-            sendKeys(getCurrentDriver(), Keys.chord(Keys.CONTROL, Keys.SHIFT));
-        }
-    },
 
 
     WAIT {
@@ -268,6 +260,32 @@ public enum ActionOperations implements OperationsInterface {
                     hover(getCurrentDriver(), elementWrapper);
                     count++;
                 }
+                return true;
+            });
+        }
+    },
+
+    DRAG_AND_DROP {
+        @Override
+        public void execute(PhraseData phraseData) {
+            logInfo(phraseData + " : Executing Action " + this.name());
+            int repetition = phraseData.getRepetition();
+            phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesFollowingOperation(),
+                    new ElementMatcher()
+                            .mustMatchAll(ElementType.HTML_ELEMENT),
+                    new ElementMatcher()
+                            .mustMatchAll(ElementType.HTML_ELEMENT)
+            );
+            ElementMatch source = phraseData.resultElements.getFirst();
+            ElementMatch target = phraseData.resultElements.get(1);
+            boolean waitOnPageLoad = !phraseData.nextSemicolon();
+            phraseData.result = Attempt.run(repetition, 500, () -> {
+                ElementWrapper sourceElement = source.getElementThrowErrorIfEmptyWithNoModifier().getFirst();
+                ElementWrapper targetElement = target.getElementThrowErrorIfEmptyWithNoModifier().getFirst();
+                if (waitOnPageLoad) {
+                    safeWaitForPageReady(getCurrentDriver(), Duration.ofSeconds(60), 300);
+                }
+                dragAndDrop(getCurrentDriver(), sourceElement, targetElement);
                 return true;
             });
         }
@@ -496,6 +514,16 @@ public enum ActionOperations implements OperationsInterface {
     };
 
     public static ActionOperations fromString(String input) {
+        if (input != null) {
+            String trimmed = input.trim();
+            if (trimmed.equalsIgnoreCase("hover")) {
+                return MOVE;
+            }
+            if (trimmed.equalsIgnoreCase("dragAndDrop")
+                    || trimmed.equalsIgnoreCase("drag and drop")) {
+                return DRAG_AND_DROP;
+            }
+        }
         return OperationsInterface.requireOperationEnum(ActionOperations.class, input);
     }
 
@@ -620,7 +648,7 @@ public enum ActionOperations implements OperationsInterface {
             String text = value.toString();
 
             if (enterKeys || value.type == ValueWrapper.ValueTypes.BACK_TICKED) {
-                sendComplexKeys(getCurrentDriver(), webElement, text.toUpperCase());
+                sendComplexKeys(getCurrentDriver(), webElement, text);
             } else {
                 typeText(getCurrentDriver(), webElement, text);
             }

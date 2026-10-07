@@ -269,8 +269,12 @@ The runtime retains:
 - quoted DataTable lookup;
 - active/direct DataTable precedence;
 - unnamed-marker fallback;
-- legacy `Data` and `Doc String` conversion paths;
+- legacy `Data` and `Doc String` whole-value conversion paths;
 - existing `NodeMap` latest-value retrieval.
+
+`Doc String` has no query runtime. Saving or reading the whole Doc String still uses the legacy path. A context phrase, `every`, `any`, a position, a predicate, or a return attribute throws `DataQueryException`. `none` is rejected for every Data Element. `Set` and `Sets` have no Gherkin producer; a JSON array is not coerced to a Set, and Set behavior is covered by the Java checks.
+
+`size` and `count` are equal. Each is the member count of that one candidate, not the number of sibling candidates. Unfiltered `size of Maps` returns one size per Map.
 
 The collection comparison contract intentionally requires explicit
 `DataAttribute` syntax for predicates. Structural mutation and `Tokenized` Data

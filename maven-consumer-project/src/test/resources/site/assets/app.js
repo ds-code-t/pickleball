@@ -218,9 +218,81 @@ function initComponentsPage() {
             text("component-close-state", "Close State: closed");
         });
     }
+
+    const spatial = (id, label) => {
+        const button = byId(id);
+        if (button) button.addEventListener("click", () => text("spatial-result", `Spatial Result: ${label}`));
+    };
+    spatial("above-target", "above");
+    spatial("below-target", "below");
+    spatial("left-target", "left");
+    spatial("right-target", "right");
+    spatial("spatial-anchor", "anchor");
+
+    const order = (id, label) => {
+        const button = byId(id);
+        if (button) button.addEventListener("click", () => text("order-result", `Order Result: ${label}`));
+    };
+    order("before-marker", "before");
+    order("order-anchor", "anchor");
+    order("after-marker", "after");
+
+    const nest = (id, label) => {
+        const button = byId(id);
+        if (button) button.addEventListener("click", () => text("nest-result", `Nest Result: ${label}`));
+    };
+    nest("deep-action", "deep");
+    nest("middle-only", "middle");
+
+    const upload = byId("upload-file");
+    if (upload) {
+        upload.addEventListener("change", () => {
+            const file = upload.files && upload.files[0];
+            text("upload-result", `Upload Result: ${file ? file.name : "none"}`);
+        });
+    }
+
+    const dragSource = byId("drag-source");
+    const dropTarget = byId("drop-target");
+    if (dragSource && dropTarget) {
+        let dragging = false;
+        dragSource.draggable = true;
+        dragSource.addEventListener("mousedown", () => { dragging = true; });
+        dragSource.addEventListener("dragstart", (event) => {
+            dragging = true;
+            if (event.dataTransfer) event.dataTransfer.setData("text/plain", "Drag Source");
+        });
+        dropTarget.addEventListener("dragover", (event) => event.preventDefault());
+        dropTarget.addEventListener("drop", (event) => {
+            event.preventDefault();
+            dragging = false;
+            text("drag-result", "Drag Result: dropped");
+        });
+        dropTarget.addEventListener("mouseup", () => {
+            if (dragging) {
+                dragging = false;
+                text("drag-result", "Drag Result: dropped");
+            }
+        });
+    }
+
+    const scrollTarget = byId("scroll-target");
+    if (scrollTarget) {
+        window.addEventListener("scroll", () => {
+            if (window.scrollY > 40) text("scroll-state", "Scroll State: moved");
+        });
+    }
+}
+
+function initHomePage() {
+    if (document.body.dataset.page !== "home") return;
+    const loads = Number(sessionStorage.getItem("pkb-home-loads") || "0") + 1;
+    sessionStorage.setItem("pkb-home-loads", String(loads));
+    text("load-count", `Load Count: ${loads}`);
 }
 
 markCurrentNavigation();
+initHomePage();
 initFormsPage();
 initCatalogPage();
 initWorkflowPage();

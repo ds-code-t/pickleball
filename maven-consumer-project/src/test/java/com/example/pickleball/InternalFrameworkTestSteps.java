@@ -79,6 +79,11 @@ public final class InternalFrameworkTestSteps {
         runAndAssert(AreaBControlFlowChecks.class);
     }
 
+    @Given("^RUN AREA C JAVA TESTS$")
+    public static void runAreaCJavaTests() {
+        runAndAssert(AreaCElementChecks.class);
+    }
+
     @Given("^RUN LOG AND ASSERT JAVA TESTS$")
     public static void runLogAndAssertJavaTests() {
         runAndAssert(

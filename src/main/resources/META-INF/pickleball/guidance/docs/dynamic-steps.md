@@ -78,15 +78,25 @@ State words can be part of a selector or assertion:
 
 ## Context
 
-Context phrases restrict the next element lookup:
+Context phrases restrict the next element lookup. A context word is public only when it both parses and changes the lookup.
 
 ```gherkin
 * , in the "Secondary Queue" Test Panel, click the "Approve" Button
-* , below the "Customer Name" Label, enter "Ava" in the Textbox
+* , below the "Spatial Anchor" Button, click the "Below Target" Button
 * , from the "Results" Table, ensure the 2nd Row contains "Approved"
 ```
 
-Common context words include `in`, `inside`, `within`, `from`, `of`, `on`, `before`, `after`, `above`, `below`, `near`, `next to`, `following`, and `preceding`.
+Context words that parse and resolve:
+
+| Word | Lookup |
+|---|---|
+| `in`, `from`, `for` | inside the anchor |
+| `after` | following the anchor in document order |
+| `before` | preceding the anchor in document order |
+| `below`, `above` | visually below or above the anchor, with horizontal overlap |
+| `left of`, `right of` | visually left or right of the anchor, with vertical overlap |
+
+`below`, `above`, `left of`, and `right of` use the element's rectangle. `after` and `before` use document order, not the visual position. `between` is not a context word. Do not use `inside`, `within`, `of`, `on`, `near`, `next to`, `following`, or `preceding`; those words do not resolve.
 
 ## The `it` placeholder
 
@@ -114,16 +124,18 @@ Frequently used actions include:
 |---|---|
 | `navigate to` | open a URL |
 | `click`, `double click`, `right click` | pointer actions |
-| `move to` | move the pointer over an element |
+| `move`, `hover` | move the pointer over an element. `hover` is the same action as `move` |
+| `dragAndDrop` | drag one HTML element onto a second HTML element: `dragAndDrop the "Drag Source" Button the "Drop Target" Button` |
 | `enter`, `overwrite`, `clear` | edit field values |
 | `select` | choose a dropdown or selectable value |
 | `scroll` | bring an element into view |
 | `wait` | wait for a duration or condition |
 | `save` | store a value under a key for later template resolution |
-| `attach` | attach a file where supported |
+| `attach` | upload an existing file through an `InternalFileInput` |
+| `create and attach` | create a temporary file, then upload it through an `InternalFileInput` |
 | `switch` | switch to a matching browser window or tab |
 | `close` | close a matched HTML component through its configured `Close Button` |
-| `accept`, `dismiss` | handle browser dialogs |
+| `accept`, `dismiss` | handle an open browser alert or confirmation. There is no phrase that types into a prompt; `BrowserAlerts.sendKeys` is Java-only |
 | `press` | send a keyboard expression |
 
 Examples:
@@ -131,10 +143,14 @@ Examples:
 ```gherkin
 * navigate to: URL.forms
 * , overwrite "3" in the "Quantity" Textbox
-* , move to the "Interaction Target" Button
+* , hover the "Interaction Target" Button
 * , double click the "Interaction Target" Button
 * , accept the Alert
 ```
+
+`navigate to:` loads the resolved URL once. A second call is a second navigation.
+
+A phrase that is only `false` is a truthiness check: `IF: false` does not take the branch. `is false` is the falsy assertion, and `is true` is the truthy assertion. `is on` and `is off` check a control. Keep each comparison in its own phrase; do not combine it with another operator.
 
 Window selection is part of the `Window` element vocabulary. For example:
 
