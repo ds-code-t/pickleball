@@ -30,6 +30,21 @@ Use this checklist for changes to Pickleball behavior. Coding agents should comp
 - [ ] For Workbench/protocol/worker changes, preserve the JDK-only shared protocol, core-free controller artifact/process, separate consumer worker, consumer-authoritative classpath, and opaque nested payload.
 - [ ] Never restore a root/`tools.dscode:pickleball`/behavioral-control dependency to Workbench to fix compilation.
 
+Plain forms `@all` must run. Group them into the feature named in the last column. Do not add a feature file per form.
+
+| form | plain example | truthy | falsy | hard-error vs wrong-value | @all feature/scenario |
+|---|---|---|---|---|---|
+| single-element IF | `IF: "abc" THEN:` | non-blank text, non-zero number, `true` | blank, `0`, `false`, missing reference | falsy skips; does not throw | `single-element-condition.feature` / Inline IF/THEN runs a truthy single element and skips a falsy one |
+| comma single-element IF | `, if "abc", save "yes" as "q"` | quoted text runs the save | `false`, `0`, and a missing reference take else; `""` leaves the prior value | does not throw | `comma-single-element-condition.feature` / A comma if runs a truthy single element and skips a falsy one |
+| leading `!` | `IF: !false THEN:` | `!false` runs | `!true` and `!"abc"` skip | does not throw | `expression-plain-forms.feature` / A leading bang and comparisons select the branch |
+| comparison | `IF: 1 != 0 THEN:` | `!=`, equal `<=`, `>=` | smaller `<=` skips | does not throw | `expression-plain-forms.feature` / A leading bang and comparisons select the branch |
+| tilde expression | `IF: ~[~{ 1 == 1 }~]~ THEN:` | `1 == 1` runs | `true && <missingRef>` and `false && <missingRef>` skip | a missing reference does not throw | `expression-plain-forms.feature` / A tilde expression runs and a missing reference does not throw |
+| trailing `?` | `IF: <{ true? }> THEN:` | `true?` runs | `false?` skips | trailing `?` is the boolean marker, not a ternary | `expression-plain-forms.feature` / A trailing question mark is the boolean marker |
+| `file:` | `<file:files/customers #1.name>` | Ava, Phoenix, Premium, then Ben; `[0]` is also Ava | skipped `false && <file:files/no-such-file>` does not throw | a taken missing file is falsy and does not throw | `map-ref-plain-forms.feature` / A file reference reads customers.yaml ; A taken missing file does not throw |
+| `<&key>` | `<&key>` after save `"ava"` as `"key"` | resolves to `ava` | | may warn; deprecation is not a hard error | `map-ref-plain-forms.feature` / A deprecated ampersand reference still resolves |
+| `ASSERT:` single element | `ASSERT: "abc"` | `"abc"`, `7`, and `true` pass, then a later step runs | | a hard-failing `ASSERT:` stays out of `@all` | `assert-single-element.feature` / A single-element ASSERT passes and a later step runs |
+| `SOFT ASSERT:` single element | `SOFT ASSERT: false` | | `false` and `""` do not throw | a later step still runs; not a hard fail | `assert-single-element.feature` / A single-element SOFT ASSERT does not throw and a later step runs |
+
 ## Maintain knowledge
 
 - [ ] Update the canonical README or guide for changed behavior.

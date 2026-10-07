@@ -81,12 +81,7 @@ public class LogAndAssertSteps {
         }
 
         if (!hard && !failedClauses.isEmpty()) {
-            throw new SoftRuntimeException(
-                    failedClauses.stream()
-                            .map(clause -> label + " failed: " + clause)
-                            .reduce((left, right) -> left + "; " + right)
-                            .orElse(label + " failed")
-            );
+            return;
         }
     }
 

@@ -26,6 +26,8 @@ import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
 import static io.cucumber.core.runner.GlobalState.lifecycle;
 import static io.cucumber.core.runner.GlobalState.pickleballLog;
 import static io.cucumber.core.runner.modularexecutions.CucumberScanUtil.getStepReturn;
+import static tools.dscode.common.mappings.MappingProcessor.isStepReturnAddress;
+import static tools.dscode.common.mappings.ParsingMap.getRunningParsingMap;
 import static tools.dscode.common.GlobalConstants.HARD_ERROR_STEP;
 import static tools.dscode.common.GlobalConstants.INFO_STEP;
 import static tools.dscode.common.GlobalConstants.NEXT_SIBLING_STEP;
@@ -94,6 +96,9 @@ public class GeneralSteps extends CoreSteps {
 
     @Given("^RETURN:(.*)$")
     public static Object getReturnValue(String stepAddress) {
+        if (!isStepReturnAddress(stepAddress)) {
+            return getRunningParsingMap().get(stepAddress);
+        }
         return getStepReturn(stepAddress);
     }
 

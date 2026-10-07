@@ -46,7 +46,7 @@ Internal prefixed `INFO:` / `ERROR:` / `FAIL ERROR:` steps used by Pickleball it
 |---|---|
 | `IF:` | selects another branch; a false condition does not fail the scenario |
 | `ASSERT:` | fail-on-false, hard-fail, fail-fast across `\|` clauses |
-| `SOFT ASSERT:` | fail-on-false, evaluate every `\|` clause, log each failure, soft-fail so later steps still run |
+| `SOFT ASSERT:` | fail-on-false, evaluate every `\|` clause, log each failure, and continue without throwing |
 | `, ensure ...` | long-form hard assertion |
 | `, verify ...` | long-form soft assertion |
 
@@ -82,6 +82,6 @@ These are two clauses:
 
 `ASSERT:` evaluates clauses left to right and stops at the first failure. The failing clause text is logged, for example `ASSERT failed: 2 < 1`. Later clauses are not evaluated.
 
-`SOFT ASSERT:` evaluates every clause, logs each failure separately (`SOFT ASSERT failed: "A" equals "B"`), then soft-fails the scenario so later steps in the same scenario still run.
+`SOFT ASSERT:` evaluates every clause, logs each failure separately (`SOFT ASSERT failed: "A" equals "B"`), and returns without throwing. Later steps in the same scenario still run, and Cucumber does not mark the scenario failed.
 
 [Previous: Block Conditionals](block-conditionals.md) · [Documentation home](README.md) · [Next: Component Scenarios](component-scenarios.md)

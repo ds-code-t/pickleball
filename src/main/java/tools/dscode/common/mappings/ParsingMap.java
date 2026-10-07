@@ -1056,10 +1056,12 @@ public class ParsingMap extends MappingProcessor {
                         "Mapping return-value reference '<&...>' is deprecated; "
                                 + "prefer a named mapping or explicit dynamic-step result."
                 );
-                current = owner.legacyResolveWholeValue(
-                        "<" + source + ">",
-                        resolveEvaluations
-                );
+                String address = source.substring(1);
+                current = MappingProcessor.isStepReturnAddress(address)
+                        ? owner.legacyResolveWholeValue(
+                                "<" + source + ">",
+                                resolveEvaluations)
+                        : owner.get(address);
             } else if (source.startsWith("$")
                     || source.startsWith("{") && source.endsWith("}")) {
                 current = owner.legacyResolveWholeValue(

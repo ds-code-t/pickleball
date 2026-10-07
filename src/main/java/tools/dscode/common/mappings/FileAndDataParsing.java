@@ -39,6 +39,7 @@ import java.util.Set;
 import java.util.stream.Stream;
 
 import static tools.dscode.common.mappings.ParsingMap.getRunningParsingMap;
+import static tools.dscode.common.mappings.queries.Tokenized.readDocument;
 import static tools.dscode.common.mappings.ValueFormatting.MAPPER;
 
 public final class FileAndDataParsing {
@@ -120,7 +121,7 @@ public final class FileAndDataParsing {
         ObjectNode wrapper = JSON_MAPPER.createObjectNode();
         wrapper.set(split.boundarySegment(), resolved);
 
-        Object value = new NodeMap(wrapper).get(split.queryPath());
+        Object value = readDocument(wrapper, split.queryPath());
         return toJsonNodeResult(value);
     }
 
@@ -142,7 +143,7 @@ public final class FileAndDataParsing {
         ObjectNode wrapper = JSON_MAPPER.createObjectNode();
         wrapper.set(split.boundarySegment(), resolved);
 
-        Object value = new NodeMap(wrapper).get(split.queryPath());
+        Object value = readDocument(wrapper, split.queryPath());
         return toJsonNodeResult(value);
     }
 

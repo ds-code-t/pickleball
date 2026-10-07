@@ -47,6 +47,8 @@ public final class Tokenized {
     private static final Pattern IDENTIFIER = Pattern.compile("[\\p{L}_][\\p{L}\\p{N}_]*");
     private static final Set<String> ROOT_LITERALS = Set.of("true", "false", "null");
     private static final Set<String> WORD_OPERATORS = Set.of("and", "or", "in");
+    /** Bare {@code i} and {@code m} are JSONata lexer tokens, so a saved field of that name must be quoted. */
+    private static final Set<String> JSONATA_FIELD_TOKENS = Set.of("i", "m");
 
     private final String readExpression;
     private final String listExpression;
@@ -85,6 +87,16 @@ public final class Tokenized {
     /** Returns the JSONata expression used by a normal read. */
     public static String preprocessReadQuery(String query) {
         return normalizeRead(query, true);
+    }
+
+    /**
+     * Reads a file or data document. The document is the value, not a history of
+     * saved NodeMap entries, so an index selects that record instead of the last
+     * saved collection item.
+     */
+    public static Object readDocument(JsonNode root, String query) {
+        JsonNode result = evaluate(root, normalizeRead(query, false));
+        return result == null ? null : fromSafeJsonNode(result);
     }
 
     /** Returns the literal properties when the complete query is a direct property path. */
@@ -425,7 +437,10 @@ public final class Tokenized {
             if (root && ROOT_LITERALS.contains(property)) {
                 return null;
             }
-            return new Property(property, property, end);
+            String expression = JSONATA_FIELD_TOKENS.contains(property)
+                    ? quoteLiteralProperty(property)
+                    : property;
+            return new Property(expression, property, end);
         }
         if (!root && (property.equals("*") || property.equals("**") || property.equals("%"))) {
             return new Property(property, property, end);

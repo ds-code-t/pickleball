@@ -70,6 +70,26 @@ public abstract class MappingProcessor implements Map<String, Object> {
     protected final List<MapConfigurations.MapType> keyOrder = new ArrayList<>();
     protected final List<MapConfigurations.MapType> singletonOrder = new ArrayList<>();
 
+    /**
+     * A step-return address is {@code feature.scenario.step}. Fewer dots is a saved key.
+     * {@code getStepReturn} splits on {@code '.'} and reads {@code segments.get(1)}, so a
+     * bare key must not be sent there.
+     */
+    public static boolean isStepReturnAddress(String address) {
+        if (address == null || address.isBlank()) {
+            return false;
+        }
+        int dots = 0;
+        for (int index = 0; index < address.length(); index++) {
+            if (address.charAt(index) == '.') {
+                if (++dots >= 2) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
     public static ThreadLocal<NodeMap> runMap = new ThreadLocal<>();
     public static ThreadLocal<NodeMap> singletonMap = new ThreadLocal<>();
     public static ThreadLocal<NodeMap> overridesMap = new ThreadLocal<>();
@@ -594,7 +614,10 @@ public abstract class MappingProcessor implements Map<String, Object> {
                 }
                 if (key.startsWith("&")) {
                     key = parsedObj.restoreAndStripBookEnds(decodeBackToText(key));
-                    replacement = getReturnValue(key.substring(1));
+                    String address = key.substring(1);
+                    replacement = isStepReturnAddress(address)
+                            ? getReturnValue(address)
+                            : get(address);
                     break;
                 }
                 if (key.startsWith("$")) {

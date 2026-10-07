@@ -381,8 +381,12 @@ See [Configuration Files and Resource Mapping](config-files-and-resource-mapping
 
 ```text
 <file:files/customers>
+<file:files/customers #1.name>
+<file:files/customers[0].name>
 <file:files/customers.customer.name>
 ```
+
+An index on a `file:` document selects that record in the file. `#1` and `[0]` are the first record. This is not the saved-NodeMap rule that reads the last stored collection item.
 
 ### Scenario marker `data:`
 
@@ -467,7 +471,7 @@ A completed named service call is stored in the shared RunMap and is referenced 
 
 ## Deprecated return-value reference
 
-`<&key>` remains supported for compatibility but logs a deprecation warning. Prefer a named mapping or explicit dynamic-step result instead of introducing new `<&...>` references.
+`<&key>` remains supported for compatibility but logs a deprecation warning. A bare key reads the saved value: after `save "ava" as "key"`, `<&key>` is `ava`. An address with a feature, a scenario, and a step (`feature.scenario.step`) still reads that step's return value. A bare key is not sent to that step-return lookup. Prefer a named mapping or explicit dynamic-step result instead of introducing new `<&...>` references.
 
 ## Removed conversion syntax
 

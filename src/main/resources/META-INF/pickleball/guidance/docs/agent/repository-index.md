@@ -413,6 +413,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/common/coordination/AgentCoordinationTest.java`
 - `src/test/java/tools/dscode/common/coordination/RunConfigIsolationTest.java`
 - `src/test/java/tools/dscode/common/driver/DriverDownloadFallbackTest.java`
+- `src/test/java/tools/dscode/common/mappings/queries/DocumentAndReservedFieldReadTest.java`
 - `src/test/java/tools/dscode/common/reporting/diagnostic/AgentBrowserLadderTest.java`
 - `src/test/java/tools/dscode/common/reporting/diagnostic/AgentDiscoverPlannerTest.java`
 - `src/test/java/tools/dscode/common/reporting/diagnostic/ConsumerMavenTestRunnerTest.java`
@@ -707,8 +708,10 @@ This inventory helps coding agents discover relevant files. It does not replace 
 ## Maven consumer feature scenarios
 
 - `maven-consumer-project/src/test/resources/features/agent-pointer-eval.feature`
+- `maven-consumer-project/src/test/resources/features/assert-single-element.feature`
 - `maven-consumer-project/src/test/resources/features/browser-action-contracts.feature`
 - `maven-consumer-project/src/test/resources/features/catalog-context.feature`
+- `maven-consumer-project/src/test/resources/features/comma-single-element-condition.feature`
 - `maven-consumer-project/src/test/resources/features/component-scenarios.feature`
 - `maven-consumer-project/src/test/resources/features/configuration-system-properties.feature`
 - `maven-consumer-project/src/test/resources/features/control-bridge.feature`
@@ -722,6 +725,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `maven-consumer-project/src/test/resources/features/dialogs.feature`
 - `maven-consumer-project/src/test/resources/features/dynamic-steps.feature`
 - `maven-consumer-project/src/test/resources/features/example-row-proof.feature`
+- `maven-consumer-project/src/test/resources/features/expression-plain-forms.feature`
 - `maven-consumer-project/src/test/resources/features/forms-dynamic-steps.feature`
 - `maven-consumer-project/src/test/resources/features/internal-framework-java-checks.feature`
 - `maven-consumer-project/src/test/resources/features/it-placeholder.feature`
@@ -729,6 +733,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `maven-consumer-project/src/test/resources/features/lazy-boolean-sides.feature`
 - `maven-consumer-project/src/test/resources/features/lazy-branch-resolution.feature`
 - `maven-consumer-project/src/test/resources/features/log-and-assert-steps.feature`
+- `maven-consumer-project/src/test/resources/features/map-ref-plain-forms.feature`
 - `maven-consumer-project/src/test/resources/features/mapping-and-resources.feature`
 - `maven-consumer-project/src/test/resources/features/mapping-value-type-preservation.feature`
 - `maven-consumer-project/src/test/resources/features/navigation.feature`
