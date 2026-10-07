@@ -68,6 +68,21 @@ Plain forms `@all` must run. Group them into the feature named in the last colum
 | `"no"` | `IF: "no" THEN:` | | skips | does not throw | `phrase-plain-forms.feature` / A backtick runs and zero no null and the null marker skip |
 | `"null"` | `IF: "null" THEN:` | | skips | does not throw | `phrase-plain-forms.feature` / A backtick runs and zero no null and the null marker skip |
 | null marker | `IF: <^~NULL~^> THEN:` | | skips | does not throw | `phrase-plain-forms.feature` / A backtick runs and zero no null and the null marker skip |
+| comma chain | `, save "one" as "q", save "two" as "r"` | both saves run | | does not throw | `area-b-control-flow.feature` / A comma chains two saves |
+| semicolon chain | `, save "one" as "q"; save "two" as "r"` | both saves run in one sentence | | does not throw | `area-b-control-flow.feature` / A semicolon chains two saves |
+| period sentence | `, save "a" as "x". save "b" as "y":` | the colon child sees both saves | | does not throw | `area-b-control-flow.feature` / A period splits sentences and the colon child sees both saves |
+| nested `:` | `, if "abc":` then a nested save | the child save runs | `, if "":` saves nothing | the following sibling still runs | `area-b-control-flow.feature` / A nested colon runs a truthy parent and skips a falsy parent |
+| `?` parent | `, if "abc"?` | the child save runs | `, if ""?` saves nothing | condition only; no page context | `area-b-control-flow.feature` / A question-mark parent runs a truthy child and skips a falsy child |
+| `::` | a grandchild under a truthy parent | the grandchild save runs | a falsy middle level saves nothing | does not throw | `area-b-control-flow.feature` / Nesting colons run depth 3 and a falsy middle level saves nothing |
+| `:::` | one more colon under truthy parents | the depth-3 save runs | | does not throw | `area-b-control-flow.feature` / Nesting colons run depth 3 and a falsy middle level saves nothing |
+| block `until` | `, until "<flag>" equals "done":` | a failing pass runs the body; the true pass stops | | exhausted `stepRepeatMaxCount` or `stepRepeatMaxTime` hard-fails; observed by Java checks | `area-b-control-flow.feature` / A block until loops until the condition is true on the second pass |
+| inline `until` | `, until "abc", save "yes" as "q"` | one shot, the same as `if` | `""` skips | not a loop | `area-b-control-flow.feature` / An inline until is a one-shot if |
+| `times` | `, save "tick" as "q" 3 times` | the save log shows three writes | | the first throw stops the repeat | `area-b-control-flow.feature` / Times saves the same value three times |
+| element `wait` | `, wait the "Missing" Button` | | a missing element does not poll forever | exhausted `stepRepeatMaxCount` or `stepRepeatMaxTime` fails the step; observed by Java checks | `area-b-control-flow.feature` / Exhausted until, element wait, empty comma, SOFT FAIL, and dynamic step text are observed |
+| `RETRY:` | `RETRY: not implemented` | the step passes and the next step runs | | not implemented; a no-op | `area-b-control-flow.feature` / RETRY and unimplemented flag steps are passing no-ops |
+| unimplemented flags | `IGNORE FAILURES` | the step passes and the next step runs | | `LOG FAILURES BUT CONTINUE SCENARIO` and `RUN IF SCENARIO FINISHED` are also no-ops | `area-b-control-flow.feature` / RETRY and unimplemented flag steps are passing no-ops |
+| `SOFT FAIL SCENARIO` | `SOFT FAIL SCENARIO "warning"` | later steps still run | | the step throws, so Cucumber fails the scenario; the observer does not fail the parent | `area-b-control-flow.feature` / Exhausted until, element wait, empty comma, SOFT FAIL, and dynamic step text are observed |
+| child table / doc string | a colon child with a table, `DT:::`, or `DS:::` | the child table and doc string are kept; `DT:::` overrides that child | | only `DT:::` becomes a table | `area-b-control-flow.feature` / A colon child keeps its table and doc string and only DT becomes a table |
 
 ## Maintain knowledge
 

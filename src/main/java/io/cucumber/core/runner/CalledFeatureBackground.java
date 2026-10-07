@@ -17,6 +17,7 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * Background steps are identified by Gherkin AST ids. Cached pickles are not mutated.
  * An empty id set means the caller must leave the pickle steps unchanged.
+ * A lookup failure is raised instead of being reported as an empty id set.
  */
 final class CalledFeatureBackground {
     private static final ConcurrentHashMap<String, Set<String>> IDS_BY_URI = new ConcurrentHashMap<>();
@@ -72,7 +73,15 @@ final class CalledFeatureBackground {
             }
             return Set.copyOf(ids);
         } catch (RuntimeException exception) {
-            return Set.of();
+            throw new IllegalStateException(
+                    "Could not determine background steps for '"
+                            + (pickle.getUri() == null ? pickle : pickle.getUri())
+                            + "': "
+                            + (exception.getMessage() == null
+                            ? exception.getClass().getSimpleName()
+                            : exception.getMessage()),
+                    exception
+            );
         }
     }
 

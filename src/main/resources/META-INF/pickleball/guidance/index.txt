@@ -58,6 +58,7 @@ maven-consumer-project/src/test/resources/data/data-reference-records.feature
 maven-consumer-project/src/test/resources/data/escaped-data-records.feature
 maven-consumer-project/src/test/resources/data/files/customerPayload.json
 maven-consumer-project/src/test/resources/features/agent-pointer-eval.feature
+maven-consumer-project/src/test/resources/features/area-b-control-flow.feature
 maven-consumer-project/src/test/resources/features/assert-single-element.feature
 maven-consumer-project/src/test/resources/features/browser-action-contracts.feature
 maven-consumer-project/src/test/resources/features/catalog-context.feature

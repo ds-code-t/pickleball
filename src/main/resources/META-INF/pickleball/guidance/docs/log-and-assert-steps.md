@@ -1,6 +1,6 @@
 # Log and Assert Steps
 
-> **Working feature example:** [`log-and-assert-steps.feature`](../maven-consumer-project/src/test/resources/features/log-and-assert-steps.feature) covers author-facing `TRACE:` / `DEBUG:` / `INFO:` / `WARN:` tokens and passing `ASSERT:` / `SOFT ASSERT:` clauses. `ERROR:` / `FAIL:` hard-fail, hard-assert fail-fast, and multi-clause `SOFT ASSERT:` failures are observed by the feature's Java checks without failing the parent scenario.
+> **Working feature example:** [`log-and-assert-steps.feature`](../maven-consumer-project/src/test/resources/features/log-and-assert-steps.feature) covers author-facing `TRACE:` / `DEBUG:` / `INFO:` / `WARN:` tokens and passing `ASSERT:` / `SOFT ASSERT:` clauses. `ERROR:` / `FAIL:` hard-fail, hard-assert fail-fast, and multi-clause `SOFT ASSERT:` failures are observed by the feature's Java checks without failing the parent scenario. [`area-b-control-flow.feature`](../maven-consumer-project/src/test/resources/features/area-b-control-flow.feature) pins `END SCENARIO`, the unimplemented flag steps, and the `SOFT FAIL SCENARIO` observer.
 
 Uppercase control tokens write a log line or evaluate the same conditions used after `IF:`. Optional whitespace is allowed after the colon.
 
@@ -37,6 +37,23 @@ Existing fail steps are unchanged:
 * END TEST
 * Scenario Log: a free-form note
 ```
+
+`FAIL SCENARIO` hard-fails. Later steps do not run, and Cucumber fails the scenario.
+
+`SOFT FAIL SCENARIO` throws `SoftRuntimeException`. The step result is failed, so Cucumber fails the scenario. The scenario is marked soft-failed and is not marked complete, so later steps still run. That is not what `SOFT ASSERT:` does. `SOFT ASSERT:` logs every failing clause and does not throw, so Cucumber stays green and later steps run. A direct `SOFT FAIL SCENARIO` is not an `@all` step. The area B Java check observes the throw without failing the parent scenario.
+
+`END SCENARIO` stops the rest of the current scenario. Steps after it do not run. `END TEST` is the whole token only. A longer line is not this step.
+
+These steps are accepted and do nothing. They do not change which later steps run:
+
+```gherkin
+* RETRY: not implemented
+* IGNORE FAILURES
+* LOG FAILURES BUT CONTINUE SCENARIO
+* RUN IF SCENARIO FINISHED
+```
+
+`ALWAYS RUN`, `RUN IF SCENARIO FAILED`, `RUN IF SCENARIO SOFT FAILED`, `RUN IF SCENARIO HARD FAILED`, and `RUN IF SCENARIO PASSING` are the flags the runner actually reads.
 
 Internal prefixed `INFO:` / `ERROR:` / `FAIL ERROR:` steps used by Pickleball itself keep their invisible prefix and do not collide with these author-facing tokens.
 

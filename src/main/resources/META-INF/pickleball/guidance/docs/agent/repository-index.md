@@ -658,6 +658,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 
 ## Maven consumer Java support
 
+- `maven-consumer-project/src/test/java/com/example/pickleball/AreaBControlFlowChecks.java`
 - `maven-consumer-project/src/test/java/com/example/pickleball/ConfigurationValidationSteps.java`
 - `maven-consumer-project/src/test/java/com/example/pickleball/ControlApiTestSteps.java`
 - `maven-consumer-project/src/test/java/com/example/pickleball/ControlBridgeTestSteps.java`
@@ -708,6 +709,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 ## Maven consumer feature scenarios
 
 - `maven-consumer-project/src/test/resources/features/agent-pointer-eval.feature`
+- `maven-consumer-project/src/test/resources/features/area-b-control-flow.feature`
 - `maven-consumer-project/src/test/resources/features/assert-single-element.feature`
 - `maven-consumer-project/src/test/resources/features/browser-action-contracts.feature`
 - `maven-consumer-project/src/test/resources/features/catalog-context.feature`

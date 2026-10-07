@@ -1,6 +1,6 @@
 # Nested Steps
 
-> **Working feature example:** [`nested-and-block-conditionals.feature`](../maven-consumer-project/src/test/resources/features/nested-and-block-conditionals.feature) demonstrates nested child steps, inherited conditions, and scoped page context.
+> **Working feature example:** [`nested-and-block-conditionals.feature`](../maven-consumer-project/src/test/resources/features/nested-and-block-conditionals.feature) demonstrates nested child steps, inherited conditions, and scoped page context. [`area-b-control-flow.feature`](../maven-consumer-project/src/test/resources/features/area-b-control-flow.feature) pins colon and question-mark parents, `::` / `:::`, a falsy middle level, same-level `if` / `else if` / `else`, block and inline `until`, markers, and a table or doc string on a colon child.
 
 Nested steps make the parent-and-child structure of a scenario explicit. They are useful for conditions, scoped page sections, and multi-step branches.
 
@@ -79,6 +79,20 @@ Block `IF:` / `ELSE-IF:` / `ELSE:` uses the same colon levels. A falsy parent do
 ```
 
 See [Block Conditionals](block-conditionals.md).
+
+A falsy parent does not run its children. A following sibling of that parent still runs. `::` is the grandchild level and `:::` is one level deeper. A falsy level in the middle saves nothing beneath it. The next sibling of that falsy step still runs when its own parent was truthy.
+
+A colon child keeps the data table or doc string written on that child. `DT:::city|Paris|` on that child replaces the table for that child only. `DS:::`, like `NOTE:::`, stays an inline marker and does not become a table. The doc string on that child is unchanged.
+
+A default `---startstep` / `---endstep` pair, or a custom marker such as `---area b marker`, runs the body between the markers. Steps before the start marker and after the end marker are skipped. Depth 2 and depth 3 inside the body still run. `SCENARIO: Feature.Scenario.marker` starts the called scenario at that marker.
+
+## `until`
+
+Only a block `until` loops. The parent must end in `:` or `?`. A failing pass runs the body. The pass that finds the condition true stops and does not run the body again. Hitting `stepRepeatMaxCount` (default 100) or `stepRepeatMaxTime` (default 3600 seconds) hard-fails the Cucumber scenario. The message names the limit that was hit.
+
+An inline `until`, including a comma `until`, is a one-shot `if`. It does not loop. A falsy inline `until` skips its save. `runUntilOperation` is not the runtime path.
+
+`times` repeats the action and stops on the first throw. It does not continue after a failure. See [Dynamic Steps](dynamic-steps.md).
 
 ## `if`, `else if`, and `else`
 

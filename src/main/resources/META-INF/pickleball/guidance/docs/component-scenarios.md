@@ -134,7 +134,9 @@ A blank cell, the word `null`, or a reference that does not resolve is false. Ex
 
 A plain cell uses the same truthiness as the text after `IF:`. `"abc"` runs. `"0"`, `0`, and `<{ 0 }>` skip. `<{ 1 }>` runs. A whole-cell reference that resolves is the saved text, not an element name: `<A>` saved as `hello` is as truthy as `IF: "hello"`. A missing reference is false.
 
-`RunBackground` uses that same evaluation. Background steps in the called feature run only when the cell is true. A blank, null, or unresolved cell does not run them. When the `RunBackground` column is absent, `RUN` ignores called-feature backgrounds. That is the default for every `RUN` data table, including scenario, component-scenario, and service-call rows. `SCENARIO:`, `COMPONENT:`, `CALL:`, and a root scenario keep their existing background behavior.
+`RunBackground` uses that same evaluation. Background steps in the called feature run only when the cell is true. A blank, null, or unresolved cell does not run them. When the `RunBackground` column is absent, `RUN` ignores called-feature backgrounds. That is the default for every `RUN` data table, including scenario, component-scenario, and service-call rows.
+
+`SCENARIO:`, `COMPONENT:`, and `CALL:` always include the called background. They do not consult `RunBackground`. A root scenario also keeps its own background. A table `RUN` includes that background only when `RunBackground` is truthy. [`area-b-control-flow.feature`](../maven-consumer-project/src/test/resources/features/area-b-control-flow.feature) pins a false `RunBackground`, a true `RunBackground`, and `SCENARIO:`.
 
 ```gherkin
 * RUN

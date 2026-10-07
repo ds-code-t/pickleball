@@ -1,4 +1,5 @@
 package tools.dscode.common.treeparsing.parsedComponents.phraseoperations;
+import io.cucumber.core.runner.StepData;
 import io.cucumber.core.runner.StepExtension;
 import org.openqa.selenium.Keys;
 import org.openqa.selenium.NoAlertPresentException;
@@ -12,6 +13,7 @@ import tools.dscode.common.treeparsing.parsedComponents.ElementType;
 import tools.dscode.common.treeparsing.parsedComponents.PhraseData;
 import tools.dscode.common.util.FileUploadUtil;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.MatchResult;
@@ -184,6 +186,8 @@ public enum ActionOperations implements OperationsInterface {
                     if (waitOnPageLoad)
                         safeWaitForPageReady(getCurrentDriver(), Duration.ofSeconds(60), 300);
                     boolean waitingOnLoading = waitElementMatch.elementTypes.contains(ElementType.HTML_LOADING);
+                    int polls = 0;
+                    Instant waitStarted = Instant.now();
                     while (true) {
                         List<ElementWrapper> wrappers = getWrappedElements(waitElementMatch);
                         if (wrappers.isEmpty()) {
@@ -192,6 +196,8 @@ public enum ActionOperations implements OperationsInterface {
                         } else if (!waitingOnLoading) {
                             return true;
                         }
+                        polls++;
+                        failIfElementWaitExhausted(polls, waitStarted, waitElementMatch);
                         System.out.println("Waiting on " + (waitingOnLoading ? "LOADING" : waitElementMatch));
                         waitMilliseconds(3000);
                     }
@@ -491,6 +497,40 @@ public enum ActionOperations implements OperationsInterface {
 
     public static ActionOperations fromString(String input) {
         return OperationsInterface.requireOperationEnum(ActionOperations.class, input);
+    }
+
+    /**
+     * Element waits honor the same repeat ceiling as an until loop.
+     * {@code stepRepeatMaxCount} and {@code stepRepeatMaxTime} are the global
+     * limits; a step may set a tighter ceiling.
+     */
+    private static void failIfElementWaitExhausted(int polls, Instant started, ElementMatch waited) {
+        StepExtension step = getRunningStep();
+        int maxCount = step != null && step.stepMaxIterations != null
+                ? step.stepMaxIterations
+                : StepData.globalMaxIterations;
+        Duration maxTime = step != null && step.stepTimeoutSeconds != null
+                ? step.stepTimeoutSeconds
+                : StepData.globalTimeoutSeconds;
+        boolean countHit = maxCount >= 0 && polls > maxCount;
+        boolean timeHit = maxTime != null
+                && !maxTime.isNegative()
+                && Duration.between(started, Instant.now()).compareTo(maxTime) > 0;
+        if (!countHit && !timeHit) {
+            return;
+        }
+        StringBuilder message = new StringBuilder("Element wait exhausted");
+        if (timeHit) {
+            message.append(" stepRepeatMaxTime ").append(maxTime);
+        }
+        if (countHit) {
+            message.append(" stepRepeatMaxCount ").append(maxCount);
+        }
+        message.append(" after ").append(polls).append(" polls");
+        if (waited != null) {
+            message.append(" for ").append(waited);
+        }
+        throw new RuntimeException(message.toString());
     }
 
 

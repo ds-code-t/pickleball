@@ -43,7 +43,7 @@ public class DynamicExecution {
         try {
             return getCustomStep(stepText, argumentText).runAndGetReturnValue();
         } catch (Throwable t) {
-            throw new StepCreationException("Failed to create Step '" + stepText + "'" + (argumentText.isBlank() ? " with argument '" + argumentText + "'" : "") + t.getMessage(), t);
+            throw new StepCreationException("Failed to create Step '" + stepText + "'" + (argumentText.isBlank() ? "" : " with argument '" + argumentText + "'") + ": " + t.getMessage(), t);
         }
     }
 

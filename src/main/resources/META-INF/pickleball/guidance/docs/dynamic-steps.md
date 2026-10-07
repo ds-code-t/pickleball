@@ -1,6 +1,6 @@
 # Dynamic Steps
 
-> **Working feature examples:** [`dynamic-steps.feature`](../maven-consumer-project/src/test/resources/features/dynamic-steps.feature) covers core element selection, actions, assertions, ordinals, and chained steps; [`forms-dynamic-steps.feature`](../maven-consumer-project/src/test/resources/features/forms-dynamic-steps.feature) covers form controls and pointer actions; [`it-placeholder.feature`](../maven-consumer-project/src/test/resources/features/it-placeholder.feature) covers the `it` placeholder, including a trailing phrase after `click it`; [`browser-action-contracts.feature`](../maven-consumer-project/src/test/resources/features/browser-action-contracts.feature) covers window switching and component closing; [`mapping-and-resources.feature`](../maven-consumer-project/src/test/resources/features/mapping-and-resources.feature) covers comma-step `save` actions.
+> **Working feature examples:** [`dynamic-steps.feature`](../maven-consumer-project/src/test/resources/features/dynamic-steps.feature) covers core element selection, actions, assertions, ordinals, and chained steps; [`forms-dynamic-steps.feature`](../maven-consumer-project/src/test/resources/features/forms-dynamic-steps.feature) covers form controls and pointer actions; [`it-placeholder.feature`](../maven-consumer-project/src/test/resources/features/it-placeholder.feature) covers the `it` placeholder, including a trailing phrase after `click it`; [`browser-action-contracts.feature`](../maven-consumer-project/src/test/resources/features/browser-action-contracts.feature) covers window switching and component closing; [`mapping-and-resources.feature`](../maven-consumer-project/src/test/resources/features/mapping-and-resources.feature) covers comma-step `save` actions; [`area-b-control-flow.feature`](../maven-consumer-project/src/test/resources/features/area-b-control-flow.feature) covers a comma chain, a semicolon chain, a period sentence split, `times`, and `DT:::` versus `DS:::`.
 
 Dynamic steps let a feature describe browser behavior directly without adding one Java method for every Gherkin sentence.
 
@@ -237,6 +237,25 @@ A semicolon continues without that normal boundary:
 ```
 
 Use semicolons only when an interaction must remain uninterrupted, such as a menu that would close after a normal focus or wait boundary.
+
+A period, exclamation mark, or question mark ends a sentence when the next character is whitespace or the end of the step. Later sentences become child steps of that dynamic step. A gherkin colon child hangs off the last sentence, so this child runs after both saves:
+
+```gherkin
+* , save "a" as "x". save "b" as "y":
+  : * , save "<x>-<y>" as "seen"
+```
+
+A step that is only a comma, `* ,`, has no phrase. It fails the step with a clear message. It is not an index error.
+
+## `times` and element `wait`
+
+`3 times` repeats that action. `save "tick" as "key" 3 times` stores the same value three times. The repeat stops on the first throw. Later repetitions do not run.
+
+An element `wait` polls until the element is present, or until a loading element is gone. It uses `stepRepeatMaxCount` and `stepRepeatMaxTime`, the same ceilings as a block `until`. A step-level ceiling overrides the global one. When the ceiling is hit, the step fails with a message that names the limit and the number of polls. It does not poll forever.
+
+## Inline argument markers
+
+On a dynamic step, or on a colon child, `DT:::city|Paris|` replaces that step's data table. Another marker, such as `DS:::hello|` or `NOTE:::hello|`, is stored as the inline type and does not become a table. A doc string on that step stays the doc string.
 
 ## Natural-language inheritance
 

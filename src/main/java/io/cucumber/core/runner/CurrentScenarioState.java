@@ -584,9 +584,19 @@ public class CurrentScenarioState extends ScenarioMapping {
                                 .pickleStepTestStep;
                         waitMilliseconds(400);
                         if (clonedStep.checkGlobalMax()) {
+                            String limit = clonedStep.reachedMaxDuration()
+                                    ? "stepRepeatMaxTime " + StepData.globalTimeoutSeconds
+                                    : "stepRepeatMaxCount " + StepData.globalMaxIterations;
+                            RuntimeException exhausted = new RuntimeException(
+                                    "Until loop exhausted " + limit
+                                            + " for step '"
+                                            + clonedStep.pickleStepTestStep.getStepText()
+                                            + "'"
+                            );
                             isScenarioHardFail = true;
                             isScenarioComplete = true;
-                            return;
+                            stepFailures.add(exhausted);
+                            throw exhausted;
                         }
                         runStep(clonedStep);
                         cloneStartTime = clonedStep.startTime;

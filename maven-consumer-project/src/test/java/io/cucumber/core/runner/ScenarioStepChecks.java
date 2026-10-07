@@ -5,9 +5,16 @@ import tools.dscode.common.mappings.MapConfigurations;
 import tools.dscode.common.mappings.NodeMap;
 import tools.dscode.common.mappings.ParsingMap;
 
+import java.net.URI;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.lang.reflect.Proxy;
+
+import io.cucumber.core.gherkin.Pickle;
+
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -183,5 +190,47 @@ public class ScenarioStepChecks {
                         parsingMap
                 )
         );
+    }
+
+    @Test
+    void backgroundLookupFailureIsRaisedInsteadOfKeepingBackgrounds() {
+        URI uri = URI.create("file:///area-b-missing-background.feature");
+        Pickle pickle = (Pickle) Proxy.newProxyInstance(
+                Pickle.class.getClassLoader(),
+                new Class<?>[]{Pickle.class},
+                (proxy, method, args) -> switch (method.getName()) {
+                    case "getUri" -> uri;
+                    case "getName" -> "area-b-missing";
+                    case "toString" -> "area-b-missing-pickle";
+                    case "hashCode" -> System.identityHashCode(proxy);
+                    case "equals" -> proxy == args[0];
+                    default -> defaultProxyValue(method.getReturnType());
+                }
+        );
+        IllegalStateException thrown = assertThrows(
+                IllegalStateException.class,
+                () -> CalledFeatureBackground.omitBackgroundSteps(pickle, new ArrayList<>())
+        );
+        assertTrue(
+                thrown.getMessage().contains("Could not determine background steps"),
+                thrown.getMessage()
+        );
+        assertTrue(thrown.getMessage().contains(uri.toString()), thrown.getMessage());
+    }
+
+    private static Object defaultProxyValue(Class<?> type) {
+        if (!type.isPrimitive()) {
+            return null;
+        }
+        if (type == boolean.class) {
+            return false;
+        }
+        if (type == int.class) {
+            return 0;
+        }
+        if (type == long.class) {
+            return 0L;
+        }
+        return null;
     }
 }

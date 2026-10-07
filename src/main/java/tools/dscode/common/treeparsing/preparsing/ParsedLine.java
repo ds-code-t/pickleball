@@ -41,6 +41,9 @@ public final class ParsedLine extends LineData {
             stepExtension.overridePhrase.assertionChain.executeAssertionChain();
             return;
         }
+        if (phrases.isEmpty() || startPhraseIndex < 0 || startPhraseIndex >= phrases.size()) {
+            throw new RuntimeException("Step has no phrase to run: '" + original() + "'");
+        }
         PhraseData phrase = phrases.get(startPhraseIndex);
         runPhraseFromLine(phrase.resolvePhrase());
     }

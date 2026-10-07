@@ -1,5 +1,6 @@
 package com.example.pickleball;
 
+import io.cucumber.core.runner.CurrentScenarioState;
 import io.cucumber.core.runner.GlobalState;
 import io.cucumber.core.runner.StepExtension;
 import io.cucumber.datatable.DataTable;
@@ -21,6 +22,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
 import static tools.dscode.common.mappings.MappingProcessor.getRunMap;
 
 public class SyntaxProofSteps {
@@ -147,6 +149,31 @@ public class SyntaxProofSteps {
         for (Entry child : entry.children) {
             appendNew(child, before, joined, seen);
         }
+    }
+
+    @Given("^the number of saves to \"([^\"]*)\" is saved as \"([^\"]*)\"$")
+    public void numberOfSaves(String key, String dest) {
+        String needle = "to key: '" + key + "'";
+        getRunMap().put(dest, Integer.toString(countLog(needle)));
+    }
+
+    private static int countLog(String needle) {
+        CurrentScenarioState state = getCurrentScenarioState();
+        if (state == null || state.scenarioLog == null) {
+            return 0;
+        }
+        return countEntry(state.scenarioLog, needle);
+    }
+
+    private static int countEntry(Entry entry, String needle) {
+        if (entry == null) {
+            return 0;
+        }
+        int count = entry.text != null && entry.text.contains(needle) ? 1 : 0;
+        for (Entry child : entry.children) {
+            count += countEntry(child, needle);
+        }
+        return count;
     }
 
     @Given("^the recorded city is saved as \"([^\"]*)\"$")
