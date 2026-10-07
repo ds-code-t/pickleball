@@ -741,6 +741,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `maven-consumer-project/src/test/resources/features/scenario-marker-data.feature`
 - `maven-consumer-project/src/test/resources/features/scenario-step-markers.feature`
 - `maven-consumer-project/src/test/resources/features/service-call-execution.feature`
+- `maven-consumer-project/src/test/resources/features/single-element-condition.feature`
 - `maven-consumer-project/src/test/resources/features/step-override-bridge.feature`
 - `maven-consumer-project/src/test/resources/features/syntax-since-2.1.14.feature`
 

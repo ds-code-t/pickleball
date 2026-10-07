@@ -28,7 +28,7 @@ Phrase-style conditions use the same assertions, elements, contexts, chains, inh
   : * , click the "Submit Request" Button
 ```
 
-A direct value can be used as a truthy or false-like condition:
+A direct value can be used as a truthy or false-like condition. A quoted string, a saved reference, a bare `true` or `false`, a number, or `<{ ... }>` is enough: non-blank text, non-zero numbers, and true run the branch; blank text, `0`, `false`, and a missing reference skip it. Neither throws.
 
 ```gherkin
 * IF: <configs.TEST_DATA.featureFlags.workflowEnabled>:

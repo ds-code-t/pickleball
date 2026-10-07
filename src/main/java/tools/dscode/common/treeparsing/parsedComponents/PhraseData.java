@@ -494,8 +494,13 @@ public abstract class PhraseData extends PassedData {
         if (operation instanceof ActionOperations) {
             waitMilliseconds(300);
         }
-        if (operation == null && (resolvedText.toLowerCase().contains("false") || resolvedText.toLowerCase().contains("true"))) {
+        if (operation == null && phraseType == PhraseType.CONDITIONAL) {
+            // A single element has no assertion keyword after resolve. TRUE
+            // uses ValueWrapper.isTruthy once booleanValues or elements exist.
             setAssertion("true");
+            if (getElementMatches().isEmpty() && (booleanValues == null || booleanValues.isEmpty())) {
+                booleanValues = List.of(ValueWrapper.createValueWrapper(resolvedConditionalBody()));
+            }
             operation = assertionOperation;
         }
         if (operation instanceof AssertionOperations && assertionChain != null) {
@@ -517,6 +522,18 @@ public abstract class PhraseData extends PassedData {
         }
 
     }
+
+    /**
+     * Body of a resolved conditional, without a leading {@code if} or {@code else if}.
+     */
+    private String resolvedConditionalBody() {
+        String source = body == null ? "" : body.trim();
+        if (source.isEmpty()) {
+            source = resolvedText == null ? "" : resolvedText.trim();
+        }
+        return source.replaceFirst("(?i)^(?:else\\s+if|if)\\b\\s*", "").trim();
+    }
+
     public void runUntilOperation() {
         OperationsInterface operation = actionOperation != null ? actionOperation : assertionOperation;
         if (operation instanceof ActionOperations) {
