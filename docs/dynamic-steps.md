@@ -267,7 +267,7 @@ A step that is only a comma, `* ,`, has no phrase. It fails the step with a clea
 
 `3 times` repeats that action. `save "tick" as "key" 3 times` stores the same value three times. The repeat stops on the first throw. Later repetitions do not run.
 
-An element `wait` polls until the element is present, or until a loading element is gone. It uses `stepRepeatMaxCount` and `stepRepeatMaxTime`, the same ceilings as a block `until`. A step-level ceiling overrides the global one. When the ceiling is hit, the step fails with a message that names the limit and the number of polls. It does not poll forever.
+An element `wait` polls until the element is present, or until a loading element is gone. It uses the run-wide `stepRepeatMaxCount` and `stepRepeatMaxTime`, the same ceilings as a block `until`. A limit of N allows N polls. There is no per-step ceiling. When the ceiling is hit, the step fails with a message that names the limit and the number of polls. It does not poll forever. Step Repetition, Step Duration, and the other reserved names are listed in [Reserved element names](reserved-element-names.md).
 
 ## Inline argument markers
 

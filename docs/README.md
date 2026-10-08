@@ -15,6 +15,7 @@ When these docs are materialized from the Maven dependency with Workbench `expor
 
 - [Dynamic steps](dynamic-steps.md) — describe Selenium elements, actions, assertions, values, contexts, and phrase chains directly in Gherkin.
 - [Custom element definitions](custom-element-definitions.md) — optionally add project-specific element names without placing selectors in feature files.
+- [Reserved element names](reserved-element-names.md) — Step Repetition, Step Duration, Data Elements, time, Match, Loading, and browser or window names. Any other name is HTML.
 - [Keyboard expressions](key-parser-dsl.md) — express sequential, simultaneous, and held-key input.
 
 ## Data and reusable behavior
@@ -43,6 +44,7 @@ When these docs are materialized from the Maven dependency with Workbench `expor
 - [Diagnostic lineage and metadata](diagnostic-lineage-metadata.md) — distinguish lineage annotations, execution/evidence RunVars, controls, and derived evidence.
 - [Diagnostic reporting](diagnostic-reporting.md) — sparse-first AI evidence, source provenance, step/capability metadata, trace evidence, screenshots/fingerprints, comparison, and retention.
 - [AI diagnostic reporting plan](ai-diagnostic-reporting-plan.md) — current sparse-first investigation and controlled-rerun architecture.
+- [Tech debt](tech-debt.md) — maintainer notes for fields that are not features. Not syntax.
 
 ## Working consumer project
 

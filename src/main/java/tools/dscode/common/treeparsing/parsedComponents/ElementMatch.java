@@ -1,6 +1,8 @@
 package tools.dscode.common.treeparsing.parsedComponents;
 
 import com.xpathy.XPathy;
+import io.cucumber.core.runner.CurrentScenarioState;
+import io.cucumber.core.runner.StepBase;
 import org.openqa.selenium.WebDriver;
 import tools.dscode.common.assertions.ValueWrapper;
 import tools.dscode.common.browseroperations.WindowSwitch;
@@ -27,6 +29,8 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
+import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static tools.dscode.common.assertions.ValueWrapper.ValueTypes.DURATION;
 import static tools.dscode.common.assertions.ValueWrapper.createValueWrapper;
 import static tools.dscode.common.browseroperations.BrowserAlerts.getText;
@@ -102,11 +106,24 @@ public class ElementMatch {
         if (wrappedElements != null) return wrappedElements;
         driver = parentPhrase.getDriver();
 
-        wrappedElements = getWrappedElements(this);
+        wrappedElements = lookupWrappedElements();
 
 
         parentPhrase.getWrappedElements().addAll(wrappedElements);
         return wrappedElements;
+    }
+
+    private List<ElementWrapper> lookupWrappedElements() {
+        if (!evaluatingUntilCondition() || driver == null) {
+            return getWrappedElements(this);
+        }
+        Duration original = driver.manage().timeouts().getImplicitWaitTimeout();
+        try {
+            driver.manage().timeouts().implicitlyWait(Duration.ZERO);
+            return getWrappedElements(this);
+        } finally {
+            driver.manage().timeouts().implicitlyWait(original);
+        }
     }
 
     static final Pattern attributePattern = Pattern.compile("^(?<attrName>[a-z][a-z\\s]+)\\s+(?<predicate>.*)$");
@@ -519,12 +536,16 @@ public class ElementMatch {
     public List<ValueWrapper> getValues() {
         List<ValueWrapper> returnList = new ArrayList<>();
         if (elementTypes.contains(ElementType.STEP_TYPE)) {
+            StepBase step = runningStepState();
             if (elementTypes.contains(ElementType.STEP_DURATION)){
-                defaultText = createValueWrapper(Duration.between(parentPhrase.parsedLine.stepExtension.startTime, Instant.now()));
+                Instant started = step == null ? null : step.startTime;
+                Duration elapsed = started == null ? Duration.ZERO : Duration.between(started, Instant.now());
+                defaultText = createValueWrapper(elapsed);
                 category = "Duration";
                 returnList.add(defaultText);
             } else if (elementTypes.contains(ElementType.STEP_REPETITION)){
-                defaultText = createValueWrapper(parentPhrase.parsedLine.stepExtension.runCount);
+                int count = step == null ? 0 : step.runCount;
+                defaultText = createValueWrapper(count);
                 category = VALUE_TYPE_MATCH;
                 returnList.add(defaultText);
             }
@@ -593,13 +614,29 @@ public class ElementMatch {
         if (wrappedElements == null) {
             if (parentPhrase.contextElement != null)
                 wrappedElements = Collections.singletonList(parentPhrase.contextElement);
-            else if (parentPhrase.skipPageSync()) {
+            else if (parentPhrase.skipPageSync() || evaluatingUntilCondition()) {
                 findWrappedElements();
             } else {
                 parentPhrase.syncWithDOM();
             }
         }
         return wrappedElements;
+    }
+
+    private StepBase runningStepState() {
+        StepBase running = getRunningStep();
+        if (running != null) {
+            return running;
+        }
+        if (parentPhrase != null && parentPhrase.parsedLine != null) {
+            return parentPhrase.parsedLine.stepExtension;
+        }
+        return null;
+    }
+
+    private static boolean evaluatingUntilCondition() {
+        CurrentScenarioState state = getCurrentScenarioState();
+        return state != null && state.evaluatingUntilCondition;
     }
 
 

@@ -118,6 +118,11 @@ public final class InternalFrameworkTestSteps {
         runAndAssert(RunVarOverrideChecks.class);
     }
 
+    @Given("^RUN STEP STATE ELEMENT JAVA TESTS$")
+    public static void runStepStateElementJavaTests() {
+        runAndAssert(StepStateElementChecks.class);
+    }
+
     @Given("^RUN DATA TABLE CONVERSION JAVA TESTS$")
     public static void runDataTableConversionJavaTests() {
         runAndAssert(DataTableConversionChecks.class);

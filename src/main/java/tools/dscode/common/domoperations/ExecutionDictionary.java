@@ -9,6 +9,7 @@ import org.openqa.selenium.SearchContext;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 import tools.dscode.common.assertions.ValueWrapper;
+import tools.dscode.common.treeparsing.parsedComponents.ElementType;
 import tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly;
 import tools.dscode.common.treeparsing.xpathcomponents.XPathyBuilder;
 
@@ -27,6 +28,7 @@ import static com.xpathy.Attribute.title;
 import static com.xpathy.Tag.any;
 import static com.xpathy.Tag.div;
 import static tools.dscode.common.domoperations.TableColumnByHeaderXPath.matchCellsByHeader;
+import static tools.dscode.common.reporting.logging.LogForwarder.logWarn;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.combineAnd;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.combineOr;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.xpathSpecificityScore;
@@ -682,6 +684,7 @@ public class ExecutionDictionary {
      * Start a fluent definition for a single category on this dictionary instance.
      */
     public CategorySpec category(String name) {
+        warnIfReservedCategory(name);
         return new CategorySpec(this, List.of(name));
     }
 
@@ -689,7 +692,23 @@ public class ExecutionDictionary {
      * Start a fluent definition for multiple categories at once on this dictionary instance.
      */
     public CategorySpec categories(String... names) {
+        if (names != null) {
+            for (String name : names) {
+                warnIfReservedCategory(name);
+            }
+        }
         return new CategorySpec(this, Arrays.asList(names));
+    }
+
+    private static void warnIfReservedCategory(String name) {
+        if (name == null || name.isBlank()) {
+            return;
+        }
+        String reason = ElementType.reservationWarning(name);
+        if (reason == null) {
+            return;
+        }
+        logWarn("Custom element category '" + name.trim() + "' will not be used. " + reason);
     }
 
     public CategorySpec registerDefaultStartingContext(ContextBuilder builder) {
@@ -722,6 +741,7 @@ public class ExecutionDictionary {
                 if (child == null || child.isBlank()) {
                     continue;
                 }
+                warnIfReservedCategory(child);
                 // Last category to claim a child name wins. Headers is claimed
                 // by Header Row and then by Header; both parents AND together
                 // and match nothing.

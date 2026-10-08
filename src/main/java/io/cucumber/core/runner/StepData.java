@@ -31,10 +31,12 @@ public abstract class StepData extends StepMapping {
     public Level stepLogLevel = Level.INFO;
 
     public static Duration globalTimeoutSeconds =
-            Duration.ofSeconds(Long.parseLong(String.valueOf(resolveFromVarsOrDefault("stepRepeatMaxTime", 3600)))); // 0 = no time limit
+            Duration.ofSeconds(Long.parseLong(String.valueOf(resolveFromVarsOrDefault("stepRepeatMaxTime", 3600))));
+    // Negative is unlimited. Zero is not: the limit is exceeded once elapsed time is greater than zero.
 
     public static int globalMaxIterations =
             Integer.parseInt(String.valueOf(resolveFromVarsOrDefault("stepRepeatMaxCount", 100)));
+    // Negative is unlimited. Zero is already at the limit, so the loop makes no pass.
 
 
     public boolean reachedMaxDuration() {
@@ -72,8 +74,16 @@ public abstract class StepData extends StepMapping {
     }
 
     private boolean reachedRepetitionLimit(int maxIterations) {
+        return repetitionLimitReached(runCount, maxIterations);
+    }
+
+    /**
+     * A negative limit is unlimited. Zero is already exceeded. A positive N is
+     * reached when {@code runCount} completed passes is at least N.
+     */
+    static boolean repetitionLimitReached(int runCount, int maxIterations) {
         if (maxIterations < 0) return false;
-        return runCount > maxIterations;
+        return runCount >= maxIterations;
     }
 
     public boolean checkGlobalMax() {

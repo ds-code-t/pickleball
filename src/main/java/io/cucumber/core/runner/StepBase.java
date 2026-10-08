@@ -20,7 +20,7 @@ import static tools.dscode.common.mappings.MapConfigurations.MapType.STEP_MAP;
 
 public abstract class StepBase implements Cloneable {
 
-    public Duration stepTimeoutSeconds; // 0 = no time limit
+    public Duration stepTimeoutSeconds;
     public Integer stepMaxIterations;
     public Instant startTime;
     public int runCount = 0;

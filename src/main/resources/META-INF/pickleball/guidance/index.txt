@@ -30,8 +30,10 @@ docs/mapping-and-templating.md
 docs/nested-steps.md
 docs/pickleball-workbench-player.md
 docs/pickleball-workbench.md
+docs/reserved-element-names.md
 docs/service-call-scenarios.md
 docs/step-overrides.md
+docs/tech-debt.md
 docs/workbench-thin-packaging-roadmap.md
 maven-consumer-project/pom.xml
 maven-consumer-project/src/test/java/com/example/pickleball/PickleballTests.java
@@ -102,6 +104,7 @@ maven-consumer-project/src/test/resources/features/scenario-step-markers.feature
 maven-consumer-project/src/test/resources/features/service-call-execution.feature
 maven-consumer-project/src/test/resources/features/single-element-condition.feature
 maven-consumer-project/src/test/resources/features/step-override-bridge.feature
+maven-consumer-project/src/test/resources/features/step-state-elements.feature
 maven-consumer-project/src/test/resources/features/syntax-since-2.1.14.feature
 maven-consumer-project/src/test/resources/files/customers.yaml
 maven-consumer-project/src/test/resources/pickleball.properties

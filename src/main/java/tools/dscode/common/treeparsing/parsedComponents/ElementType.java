@@ -3,13 +3,8 @@ package tools.dscode.common.treeparsing.parsedComponents;
 import tools.dscode.common.browseroperations.WindowSwitch;
 import tools.dscode.common.dataelements.DataElementRegistry;
 
-import java.time.Duration;
-import java.util.Arrays;
 import java.util.Locale;
-import java.util.Map;
 import java.util.Set;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
 import static tools.dscode.common.domoperations.ExecutionDictionary.STARTING_CONTEXT;
 
@@ -51,16 +46,8 @@ public enum ElementType {
     public static final String VALUE_TYPE_MATCH = "InternalValueUnit";
     public static final String PLACE_HOLDER_MATCH = "InternalPLACEHOLDER";
 
-    private static final Map<String, ElementType> LOOKUP =
-            Arrays.stream(values())
-                    .collect(Collectors.toUnmodifiableMap(
-                            ElementType::key,
-                            Function.identity()
-                    ));
-
-    private String key() {
-        return name();
-    }
+    public static final String RESERVED_STEP_MESSAGE_TAIL =
+            "Names starting with 'Step' are reserved for step-state elements; supported: Step Repetition, Step Duration.";
 
     public static final Set<String> TIME_UNITS = Set.of(
             "MILLISECOND",
@@ -101,20 +88,25 @@ public enum ElementType {
             return returnSet;
         }
 
-        String singular = raw.replaceAll("s$", "");
+        String trimmed = raw.trim().replaceAll("\\s+", " ");
+        String singular = trimmed.replaceAll("s$", "");
 
-        if (singular.matches("^Step\\b.*")) {
-            returnSet.add(STEP_TYPE);
-            if (singular.contains("Repetition")) {
+        if (singular.matches("(?i)^Step\\b.*")) {
+            if (isStepRepetition(singular)) {
+                returnSet.add(STEP_TYPE);
                 returnSet.add(STEP_REPETITION);
                 returnSet.add(RETURNS_VALUE);
-            } else if (singular.contains("Duration")) {
+                return returnSet;
+            }
+            if (isStepDuration(singular)) {
+                returnSet.add(STEP_TYPE);
                 returnSet.add(STEP_DURATION);
                 returnSet.add(TIME_DURATION);
                 returnSet.add(TIME_VALUE);
                 returnSet.add(RETURNS_VALUE);
+                return returnSet;
             }
-            return returnSet;
+            throw new IllegalArgumentException(reservedStepNameMessage(trimmed));
         }
 
         if (singular.equals("Duration")) {
@@ -216,7 +208,52 @@ public enum ElementType {
             return returnSet;
         }
 
-        returnSet.add(LOOKUP.getOrDefault(normalized, HTML_TYPE));
+        returnSet.add(HTML_TYPE);
         return returnSet;
+    }
+
+    /**
+     * Reason a custom {@code ExecutionDictionary} category must not replace this
+     * name, or null when the name is an ordinary HTML category (including
+     * built-ins such as {@code Button} and {@code Loading}).
+     */
+    public static String reservationWarning(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+        String trimmed = raw.trim().replaceAll("\\s+", " ");
+        String singular = trimmed.replaceAll("s$", "");
+        if (singular.matches("(?i)^Step\\b.*")) {
+            if (isStepRepetition(singular) || isStepDuration(singular)) {
+                return "'" + trimmed + "' is reserved for step-state elements and cannot be replaced by a custom element category.";
+            }
+            return reservedStepNameMessage(trimmed);
+        }
+        Set<ElementType> types = fromString(trimmed);
+        if (types.contains(DATA_TYPE)) {
+            return "'" + trimmed + "' is reserved for Data Elements.";
+        }
+        if (types.contains(TIME_VALUE)) {
+            return "'" + trimmed + "' is reserved for time values (Time, Time Range, Duration).";
+        }
+        if (types.contains(REGEX_MATCH)) {
+            return "'" + trimmed + "' is reserved for Match.";
+        }
+        if (types.contains(BROWSER_TYPE)) {
+            return "'" + trimmed + "' is reserved for browser, alert, and window elements.";
+        }
+        return null;
+    }
+
+    public static String reservedStepNameMessage(String name) {
+        return "'" + name + "' is a reserved element name. " + RESERVED_STEP_MESSAGE_TAIL;
+    }
+
+    private static boolean isStepRepetition(String singular) {
+        return singular.equalsIgnoreCase("Step Repetition");
+    }
+
+    private static boolean isStepDuration(String singular) {
+        return singular.equalsIgnoreCase("Step Duration");
     }
 }

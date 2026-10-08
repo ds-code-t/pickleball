@@ -48,6 +48,19 @@ public class SyntaxProofSteps {
         }
     }
 
+    @Given("^branch count \"([^\"]*)\" is from \"([^\"]*)\" through \"([^\"]*)\"$")
+    public void branchCountInRange(String name, String low, String high) {
+        int actual = BRANCH_HITS.getOrDefault(name, new AtomicInteger()).get();
+        int minimum = Integer.parseInt(low);
+        int maximum = Integer.parseInt(high);
+        if (actual < minimum || actual > maximum) {
+            throw new AssertionError(
+                    "branch " + name + " count was " + actual
+                            + " not from " + minimum + " through " + maximum
+            );
+        }
+    }
+
     @Given("^resolving \"([^\"]*)\" is recorded as \"([^\"]*)\"$")
     public void resolvingIsRecorded(String expression, String key) {
         recordResolution(expression, key, null);

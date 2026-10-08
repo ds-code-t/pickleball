@@ -405,6 +405,8 @@ The existing path semantics for `pkb_features`, `pkb_datapath`, `pkb_callpath`, 
 | `pkb_overriderunvars.<pkb_var>` | `pkb_overriderunvars.pkb_browser=chrome` | expanded sealed RunVar member; do not mix with compact |
 | `pkb_run_profile` | generated assignment string | canonical resolved RunVar output; external input rejected |
 | `pkb_parallel` | `4`, `auto` | parallel scenario count; `auto` resolves at run start to a conservative JVM estimate and stamps the integer into `pkb_run_profile` |
+| `stepRepeatMaxCount` | `100` | run-wide block-until and element-wait pass limit; see [Repeat ceilings](#repeat-ceilings) |
+| `stepRepeatMaxTime` | `3600` | run-wide duration ceiling in seconds; see [Repeat ceilings](#repeat-ceilings) |
 | `pkb_loglevel` | `debug` | console log level |
 | `pkb_reportingmode` | `diagnostic` | diagnostic evidence pipeline |
 | `pkb_compositeReport` | `true`, `false` | composite `reports/cucumber-report.html`; unset writes it on a normal test and suppresses it on an agent or Workbench run |
@@ -493,6 +495,18 @@ Workbench Discover/Confirm do not blindly MUST-use `CHROME_HEADLESS` for every p
 3. If local headless cannot start and the project already defines and uses GRID/SAUCE/REMOTE as its `pkb_browser`, fall back to that project browser. Do not pick Sauce/Grid merely because unused yaml files exist in `configs/`.
 
 Isolate stays one scenario and does not raise `pkb_parallel`.
+
+## Repeat ceilings
+
+`stepRepeatMaxCount` (default 100) and `stepRepeatMaxTime` (default 3600 seconds) cap every block `until` and every element `wait`. They are run-wide run vars. Resolved names are `pkb_steprepeatmaxcount` and `pkb_steprepeatmaxtime`. They are read when the step runtime loads. There is no per-step ceiling.
+
+A positive count N allows exactly N passes. The check before the next pass sees how many passes have already finished. `until the Step Repetition is greater than 3` still stops at 4 because that condition is true, which is sooner than the ceiling.
+
+A negative count is unlimited. Zero is already at the limit, so the loop or wait makes no pass and fails with `stepRepeatMaxCount`.
+
+A negative duration is unlimited. Zero is not unlimited. After the step's start time is set, the limit is exceeded as soon as elapsed time is greater than zero. The failure names `stepRepeatMaxTime`.
+
+An element `wait` uses the same numbers. A count of N allows N polls. Zero exhausts on the first poll.
 
 ## Cucumber aliases
 

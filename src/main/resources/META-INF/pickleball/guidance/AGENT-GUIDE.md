@@ -425,6 +425,7 @@ The exported `docs/` tree is the version-matched reference for all supported Pic
 - reusable component scenarios and canonical `RUN` authoring — `docs/component-scenarios.md`;
 - service calls and `RUN`/`CALL:` result semantics — `docs/service-call-scenarios.md`;
 - nested flow and conditionals — `docs/nested-steps.md`, `docs/block-conditionals.md`;
+- reserved element names, Step Repetition, and Step Duration — `docs/reserved-element-names.md`;
 - keyboard expressions — `docs/key-parser-dsl.md`;
 - execution/configuration/profiles — `docs/configuration.md`, `docs/ai-run-configuration.md`;
 - resource/config mapping — `docs/config-files-and-resource-mapping.md`;

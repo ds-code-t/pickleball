@@ -6,6 +6,8 @@
 
 Pickleball's built-in element language handles common HTML controls. A project can optionally add business-specific categories so feature files use names such as `Test Panel`, `Product Card`, or `Status Badge` without exposing selectors.
 
+Registering a reserved name, or a name that starts with `Step `, logs a WARN. The message names the category, what it is reserved for, and that the custom definition will not be used. `Button`, `Loading`, and an overlay of `Close Button` do not warn. The full list is in [Reserved element names](reserved-element-names.md).
+
 ## Register categories before Cucumber runs
 
 The consumer runner registers project vocabulary in a lifecycle hook:

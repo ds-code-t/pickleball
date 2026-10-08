@@ -75,6 +75,13 @@ public class CurrentScenarioState extends ScenarioMapping {
     String featureName;
     public boolean endCurrentScenario;
 
+    /**
+     * True only while a block-until condition is being evaluated. Element
+     * lookups on that condition skip page-ready sync and implicit wait; the
+     * loop itself is the retry. The body does not see this flag.
+     */
+    public boolean evaluatingUntilCondition;
+
     public List<Throwable> stepFailures = new ArrayList<>();
 
     private final List<Object> cleanupRegistry = new ArrayList<>();

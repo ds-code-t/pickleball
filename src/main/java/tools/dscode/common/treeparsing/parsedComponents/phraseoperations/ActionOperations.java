@@ -123,6 +123,9 @@ public enum ActionOperations implements OperationsInterface {
             phraseData.result = Attempt.run(repetition, 500, () -> {
                 for (ValueWrapper valueWrapper : valueElement.getValues()) {
                     Object value = valueWrapper.getValue();
+                    if (value instanceof Duration duration) {
+                        value = duration.toString();
+                    }
                     if (pattern != null) {
                         List<String> matches = pattern.matcher(String.valueOf(value))
                                 .results()
@@ -528,19 +531,15 @@ public enum ActionOperations implements OperationsInterface {
     }
 
     /**
-     * Element waits honor the same repeat ceiling as an until loop.
-     * {@code stepRepeatMaxCount} and {@code stepRepeatMaxTime} are the global
-     * limits; a step may set a tighter ceiling.
+     * Element waits honor the same run-wide repeat ceiling as an until loop.
+     * {@code stepRepeatMaxCount} and {@code stepRepeatMaxTime} are the only
+     * limits. A count of N allows N polls. Zero exhausts on the first poll.
+     * A negative count is unlimited.
      */
     private static void failIfElementWaitExhausted(int polls, Instant started, ElementMatch waited) {
-        StepExtension step = getRunningStep();
-        int maxCount = step != null && step.stepMaxIterations != null
-                ? step.stepMaxIterations
-                : StepData.globalMaxIterations;
-        Duration maxTime = step != null && step.stepTimeoutSeconds != null
-                ? step.stepTimeoutSeconds
-                : StepData.globalTimeoutSeconds;
-        boolean countHit = maxCount >= 0 && polls > maxCount;
+        int maxCount = StepData.globalMaxIterations;
+        Duration maxTime = StepData.globalTimeoutSeconds;
+        boolean countHit = maxCount >= 0 && polls >= maxCount;
         boolean timeHit = maxTime != null
                 && !maxTime.isNegative()
                 && Duration.between(started, Instant.now()).compareTo(maxTime) > 0;

@@ -52,8 +52,10 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/pickleball-workbench-player.md`
 - `docs/pickleball-workbench.md`
 - `docs/README.md`
+- `docs/reserved-element-names.md`
 - `docs/service-call-scenarios.md`
 - `docs/step-overrides.md`
+- `docs/tech-debt.md`
 - `docs/workbench-thin-packaging-roadmap.md`
 
 ## Framework Java and AspectJ source
@@ -409,6 +411,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 ## Framework tests
 
 - `src/test/java/io/cucumber/core/gherkin/messages/ConditionalArgumentPickleTest.java`
+- `src/test/java/io/cucumber/core/runner/StepRepetitionLimitTest.java`
 - `src/test/java/tools/dscode/common/assertions/AssertionClauseSplitterTest.java`
 - `src/test/java/tools/dscode/common/coordination/AgentCoordinationTest.java`
 - `src/test/java/tools/dscode/common/coordination/RunConfigIsolationTest.java`
@@ -674,6 +677,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `maven-consumer-project/src/test/java/com/example/pickleball/ScenarioDataSteps.java`
 - `maven-consumer-project/src/test/java/com/example/pickleball/StepOverrideBridgeTestSteps.java`
 - `maven-consumer-project/src/test/java/com/example/pickleball/StepOverrideChecks.java`
+- `maven-consumer-project/src/test/java/com/example/pickleball/StepStateElementChecks.java`
 - `maven-consumer-project/src/test/java/com/example/pickleball/support/InternalJavaTestRunner.java`
 - `maven-consumer-project/src/test/java/com/example/pickleball/support/LocalTestSite.java`
 - `maven-consumer-project/src/test/java/com/example/pickleball/SyntaxProofSteps.java`
@@ -754,6 +758,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `maven-consumer-project/src/test/resources/features/service-call-execution.feature`
 - `maven-consumer-project/src/test/resources/features/single-element-condition.feature`
 - `maven-consumer-project/src/test/resources/features/step-override-bridge.feature`
+- `maven-consumer-project/src/test/resources/features/step-state-elements.feature`
 - `maven-consumer-project/src/test/resources/features/syntax-since-2.1.14.feature`
 
 ## Maven consumer service-call definitions

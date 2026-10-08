@@ -38,7 +38,18 @@ public final class ParsedLine extends LineData {
     public void runPhrases() {
         isBlockConditionalStep = getRunningStep().definitionFlags.contains(BLOCK_CONDITIONAL);
         if (stepExtension.overridePhrase != null) {
-            stepExtension.overridePhrase.assertionChain.executeAssertionChain();
+            var state = getCurrentScenarioState();
+            boolean previous = state != null && state.evaluatingUntilCondition;
+            if (state != null) {
+                state.evaluatingUntilCondition = true;
+            }
+            try {
+                stepExtension.overridePhrase.assertionChain.executeAssertionChain();
+            } finally {
+                if (state != null) {
+                    state.evaluatingUntilCondition = previous;
+                }
+            }
             return;
         }
         if (phrases.isEmpty() || startPhraseIndex < 0 || startPhraseIndex >= phrases.size()) {
