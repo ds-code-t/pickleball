@@ -1,6 +1,6 @@
 # Nested Steps
 
-> **Working feature example:** [`nested-and-block-conditionals.feature`](../maven-consumer-project/src/test/resources/features/nested-and-block-conditionals.feature) demonstrates nested child steps, inherited conditions, and scoped page context. [`area-b-control-flow.feature`](../maven-consumer-project/src/test/resources/features/area-b-control-flow.feature) pins colon and question-mark parents, `::` / `:::`, a falsy middle level, same-level `if` / `else if` / `else`, block and inline `until`, markers, and a table or doc string on a colon child. [`step-state-elements.feature`](../maven-consumer-project/src/test/resources/features/step-state-elements.feature) pins Step Repetition and Step Duration.
+> **Working feature example:** [`nested-and-block-conditionals.feature`](../maven-consumer-project/src/test/resources/features/nested-and-block-conditionals.feature) demonstrates nested child steps, inherited conditions, and scoped page context. [`area-b-control-flow.feature`](../maven-consumer-project/src/test/resources/features/area-b-control-flow.feature) pins colon and question-mark parents, `::` / `:::`, a falsy middle level, same-level `if` / `else if` / `else`, block `until`, markers, and a table or doc string on a colon child. [`step-state-elements.feature`](../maven-consumer-project/src/test/resources/features/step-state-elements.feature) pins Step Repetition and Step Duration.
 
 Nested steps make the parent-and-child structure of a scenario explicit. They are useful for conditions, scoped page sections, and multi-step branches.
 
@@ -89,8 +89,6 @@ A default `---startstep` / `---endstep` pair, or a custom marker such as `---are
 ## `until`
 
 Only a block `until` loops. The parent must end in `:` or `?`. A failing pass runs the body. The pass that finds the condition true stops and does not run the body again. `until the Step Repetition is greater than 3` reads 1, then 2, then 3, runs the body on those three passes, and stops when the check reads 4. Step Duration on that check is the time since the loop's first pass. A child step has its own Step Repetition. Hitting `stepRepeatMaxCount` (default 100) or `stepRepeatMaxTime` (default 3600 seconds) hard-fails the Cucumber scenario. Those ceilings are run-wide. The message names the limit that was hit. Zero and negative are defined in [Repeat ceilings](configuration.md#repeat-ceilings). Names the parser treats specially are listed in [Reserved element names](reserved-element-names.md).
-
-An inline `until`, including a comma `until`, is a one-shot `if`. It does not loop. A falsy inline `until` skips its save. `runUntilOperation` is not the runtime path.
 
 `times` repeats the action and stops on the first throw. It does not continue after a failure. See [Dynamic Steps](dynamic-steps.md).
 

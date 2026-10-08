@@ -10,7 +10,6 @@ driver:
   options:
     args:
       - "--headless=new"
-      - "--no-sandbox"
       - "--disable-dev-shm-usage"
       - "--window-size=1920,1080"
       - "--disable-notifications"

@@ -56,6 +56,35 @@ Feature: Area B control flow
     * , ensure "<areaBDeepNo>" equals "untouched"
     * , ensure "<areaBDeepYes>" equals "yes"
 
+  @all @area-b @area-b-depth5
+  Scenario: Block IF ELSE-IF and ELSE nest five levels
+    * , save "untouched" as "depth5Yes"
+    * , save "untouched" as "depth5No"
+    * , save "untouched" as "depth3Else"
+    * IF: "yes":
+      : * IF: "no":
+        :: * , save "no" as "depth5Yes"
+      : * ELSE-IF: "yes":
+        :: * IF: "yes":
+          ::: * IF: "yes":
+            :::: * IF: "yes":
+              ::::: * , save "yes" as "depth5Yes"
+            :::: * ELSE:
+              ::::: * , save "no" as "depth5Yes"
+    * IF: "yes":
+      : * IF: "yes":
+        :: * IF: "":
+          ::: * IF: "yes":
+            :::: * IF: "yes":
+              ::::: * , save "no" as "depth5No"
+        :: * ELSE-IF: "":
+          ::: * , save "no" as "depth3Else"
+        :: * ELSE:
+          ::: * , save "else" as "depth3Else"
+    * , ensure "<depth5Yes>" equals "yes"
+    * , ensure "<depth5No>" equals "untouched"
+    * , ensure "<depth3Else>" equals "else"
+
   @all @area-b @area-b-block-branch
   Scenario: Same-level block if else-if else takes the first match only
     * , save "untouched" as "areaBBranch"
@@ -245,17 +274,58 @@ Feature: Area B control flow
     * , ensure "<areaBBg>" equals "from-background"
     * , ensure "<aBStressMarker>" equals "inside"
 
+  @all @area-b @area-b-flag-skip
+  Scenario: Run-if-failed children are skipped when nothing has failed
+    * , save "untouched" as "flagFailNested"
+    * , save "untouched" as "flagFailInline"
+    * , save "untouched" as "flagFailNoColon"
+    * , save "untouched" as "flagSoftNested"
+    * , save "untouched" as "flagSoftInline"
+    * , save "untouched" as "flagHardNested"
+    * , save "untouched" as "flagPassNested"
+    * , save "untouched" as "flagSibling"
+    * RUN IF SCENARIO FAILED:
+      : * , save "ran" as "flagFailNested"
+    * RUN IF SCENARIO FAILED: , save "ran" as "flagFailInline"
+    * RUN IF SCENARIO FAILED
+      : * , save "ran" as "flagFailNoColon"
+    * RUN IF SCENARIO SOFT FAILED:
+      : * , save "ran" as "flagSoftNested"
+    * RUN IF SCENARIO SOFT FAILED: , save "ran" as "flagSoftInline"
+    * RUN IF SCENARIO HARD FAILED:
+      : * , save "ran" as "flagHardNested"
+    * RUN IF SCENARIO PASSING:
+      : * , save "ran" as "flagPassNested"
+    * , save "ran" as "flagSibling"
+    * , ensure "<flagFailNested>" equals "untouched"
+    * , ensure "<flagFailInline>" equals "untouched"
+    * , ensure "<flagFailNoColon>" equals "untouched"
+    * , ensure "<flagSoftNested>" equals "untouched"
+    * , ensure "<flagSoftInline>" equals "untouched"
+    * , ensure "<flagHardNested>" equals "untouched"
+    * , ensure "<flagPassNested>" equals "ran"
+    * , ensure "<flagSibling>" equals "ran"
+
   @all @area-b @area-b-stress-soft
   Scenario: ALWAYS RUN cleanup an ASSERT and a failing SOFT ASSERT still reach a hard ensure
     * , save "untouched" as "areaBAlways"
+    * , save "untouched" as "areaBAlwaysInline"
     * , save "untouched" as "areaBHardStill"
+    * , save "untouched" as "areaBSibling"
+    * END TEST
     * ALWAYS RUN
-    * , save "cleaned" as "areaBAlways"
-    * ASSERT: 1 < 2
-    * SOFT ASSERT: 1 == 2 | "A" equals "B"
-    * , save "still" as "areaBHardStill"
-    * , ensure "<areaBAlways>" equals "cleaned"
-    * , ensure "<areaBHardStill>" equals "still"
+      : * , save "cleaned" as "areaBAlways"
+    * ALWAYS RUN:
+      : * ASSERT: 1 < 2
+      : * SOFT ASSERT: 1 == 2 | "A" equals "B"
+      : * , save "still" as "areaBHardStill"
+    * ALWAYS RUN: , save "inline" as "areaBAlwaysInline"
+    * , save "skipped" as "areaBSibling"
+    * ALWAYS RUN:
+      : * , ensure "<areaBAlways>" equals "cleaned"
+      : * , ensure "<areaBAlwaysInline>" equals "inline"
+      : * , ensure "<areaBHardStill>" equals "still"
+      : * , ensure "<areaBSibling>" equals "untouched"
 
   Rule: Area B called targets
 

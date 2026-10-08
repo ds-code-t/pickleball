@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import static io.cucumber.core.gherkin.messages.NGherkinFactory.argumentToGherkinText;
@@ -40,7 +41,12 @@ import static io.cucumber.core.runner.NPickleStepTestStepFactory.resolvePickleSt
 import static io.cucumber.core.runner.util.TableUtils.DOCSTRING_KEY;
 import static io.cucumber.core.runner.util.TableUtils.TABLE_KEY;
 import static io.cucumber.core.runner.util.TableUtils.toRowsStringMultimap;
+import static tools.dscode.common.GlobalConstants.ALWAYS_RUN;
 import static tools.dscode.common.GlobalConstants.HARD_ERROR_STEP;
+import static tools.dscode.common.GlobalConstants.RUN_IF_SCENARIO_FAILED;
+import static tools.dscode.common.GlobalConstants.RUN_IF_SCENARIO_HARD_FAILED;
+import static tools.dscode.common.GlobalConstants.RUN_IF_SCENARIO_PASSING;
+import static tools.dscode.common.GlobalConstants.RUN_IF_SCENARIO_SOFT_FAILED;
 import static tools.dscode.common.browseroperations.BrowserAlerts.isPresent;
 import static tools.dscode.common.domoperations.LeanWaits.safeWaitForPageReady;
 import static tools.dscode.common.gherkinoperations.DynamicExecution.getCustomStep;
@@ -59,6 +65,17 @@ public class StepExtension extends StepData {
 
     public boolean waitForPageReady = true;
     private Consumer<StepExtension> finalizerAction;
+    private String pendingInlineChild;
+    private static final Pattern FLAG_STEP_WITH_INLINE = Pattern.compile(
+            "^(RUN IF SCENARIO HARD FAILED|RUN IF SCENARIO SOFT FAILED|RUN IF SCENARIO FAILED|RUN IF SCENARIO PASSING|ALWAYS RUN)\\s*:\\s*(.*)$"
+    );
+    private static final Set<String> BARE_FLAG_STEPS = Set.of(
+            ALWAYS_RUN,
+            RUN_IF_SCENARIO_PASSING,
+            RUN_IF_SCENARIO_FAILED,
+            RUN_IF_SCENARIO_HARD_FAILED,
+            RUN_IF_SCENARIO_SOFT_FAILED
+    );
 
     public StepExtension(
             io.cucumber.core.runner.TestCase testCase,
@@ -84,8 +101,7 @@ public class StepExtension extends StepData {
         }
         if (isCoreStep) {
             if (methodName.startsWith("flagStep_")) {
-                isFlagStep = true;
-                stepFlags.add(pickleStepTestStep.getStep().getText());
+                recordFlagStep();
             } else if (methodName.equals("NEXT_SIBLING_STEP")) {
                 nextSiblingDefinitionFlags = pickleStepTestStep.getDefinitionFlags().stream()
                         .filter(f -> !f.toString().startsWith("_"))
@@ -128,6 +144,39 @@ public class StepExtension extends StepData {
         }
     }
 
+    private void recordFlagStep() {
+        isFlagStep = true;
+        String text = getUnmodifiedText();
+        text = text == null ? "" : text.trim();
+        if (BARE_FLAG_STEPS.contains(text)) {
+            stepFlags.add(text);
+            return;
+        }
+        Matcher flagMatcher = FLAG_STEP_WITH_INLINE.matcher(text);
+        if (flagMatcher.matches()) {
+            stepFlags.add(flagMatcher.group(1));
+            String inline = flagMatcher.group(2).trim();
+            if (!inline.isEmpty()) {
+                if (getCurrentScenarioState() != null) {
+                    addChildStep(createNewStepExtension(inline));
+                } else {
+                    pendingInlineChild = inline;
+                }
+            }
+            return;
+        }
+        stepFlags.add(text);
+    }
+
+    private void attachPendingInlineChild() {
+        if (pendingInlineChild == null) {
+            return;
+        }
+        String inline = pendingInlineChild;
+        pendingInlineChild = null;
+        addChildStep(createNewStepExtension(inline));
+    }
+
     public Object runAndGetReturnValue() {
         Object instanceOrNull;
         try {
@@ -159,6 +208,7 @@ public class StepExtension extends StepData {
     }
 
     public Result run() {
+        attachPendingInlineChild();
         result = null;
         ExecutionMode executionMode = ExecutionMode.RUN;
 

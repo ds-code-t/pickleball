@@ -22,6 +22,7 @@ docs/diagnostic-lineage-metadata.md
 docs/diagnostic-reporting.md
 docs/dynamic-control-api.md
 docs/dynamic-steps.md
+docs/experimental-features.md
 docs/feature-status-notes.md
 docs/getting-started.md
 docs/key-parser-dsl.md

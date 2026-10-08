@@ -4,8 +4,6 @@ import io.cucumber.java.en.Given;
 import tools.dscode.common.CoreSteps;
 
 import static tools.dscode.common.GlobalConstants.ALWAYS_RUN;
-import static tools.dscode.common.GlobalConstants.AND_IGNORE_FAILURES;
-import static tools.dscode.common.GlobalConstants.AND_SCENARIO_COMPLETE;
 import static tools.dscode.common.GlobalConstants.IGNORE_FAILURES;
 import static tools.dscode.common.GlobalConstants.LOG_FAILURES_BUT_CONTINUE_SCENARIO;
 import static tools.dscode.common.GlobalConstants.RUN_IF_SCENARIO_FAILED;
@@ -18,27 +16,27 @@ public class FlagSteps  extends CoreSteps {
 
 
 
-    @Given("^" + ALWAYS_RUN + AND_IGNORE_FAILURES + "$")
+    @Given("^" + ALWAYS_RUN + "(?: AND IGNORE FAILURES|\\s*:.*)?$")
     public static void flagStep_AlwaysRun() {
 
     }
 
-    @Given("^" + RUN_IF_SCENARIO_PASSING + AND_SCENARIO_COMPLETE + AND_IGNORE_FAILURES + "$")
+    @Given("^" + RUN_IF_SCENARIO_PASSING + "(?:(?: AND SCENARIO FINISHED)?(?: AND IGNORE FAILURES)?|\\s*:.*)$")
     public static void flagStep_RunIfPassed() {
 
     }
 
-    @Given(RUN_IF_SCENARIO_FAILED)
+    @Given("^" + RUN_IF_SCENARIO_FAILED + "(?:\\s*:.*)?$")
     public static void flagStep_RunOnFail() {
 
     }
 
-    @Given(RUN_IF_SCENARIO_HARD_FAILED)
+    @Given("^" + RUN_IF_SCENARIO_HARD_FAILED + "(?:\\s*:.*)?$")
     public static void flagStep_RunOnHardFail() {
 
     }
 
-    @Given(RUN_IF_SCENARIO_SOFT_FAILED)
+    @Given("^" + RUN_IF_SCENARIO_SOFT_FAILED + "(?:\\s*:.*)?$")
     public static void flagStep_RunOnSoftFail() {
 
     }

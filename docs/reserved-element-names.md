@@ -58,8 +58,6 @@ Saving Step Duration stores `java.time.Duration.toString()`, an ISO-8601 duratio
 
 `stepRepeatMaxCount` and `stepRepeatMaxTime` still cap every loop and every element `wait`. They are run-wide. There is no per-step ceiling. See [Repeat ceilings](configuration.md#repeat-ceilings).
 
-An inline `until`, including a comma `until` that does not end the step with `:` or `?`, is still a one-shot `if`. It does not loop. See [Nested steps](nested-steps.md).
-
 ## Data Elements
 
 These names are Data Elements, not HTML. Plurals and aliases are included. See [Data values and Data Elements](data-values-and-elements.md).

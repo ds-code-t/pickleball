@@ -1,6 +1,6 @@
 # Log and Assert Steps
 
-> **Working feature example:** [`log-and-assert-steps.feature`](../maven-consumer-project/src/test/resources/features/log-and-assert-steps.feature) covers author-facing `TRACE:` / `DEBUG:` / `INFO:` / `WARN:` tokens and passing `ASSERT:` / `SOFT ASSERT:` clauses. `ERROR:` / `FAIL:` hard-fail, hard-assert fail-fast, and multi-clause `SOFT ASSERT:` failures are observed by the feature's Java checks without failing the parent scenario. [`area-b-control-flow.feature`](../maven-consumer-project/src/test/resources/features/area-b-control-flow.feature) pins `END SCENARIO`, the unimplemented flag steps, and the `SOFT FAIL SCENARIO` observer.
+> **Working feature example:** [`log-and-assert-steps.feature`](../maven-consumer-project/src/test/resources/features/log-and-assert-steps.feature) covers author-facing `TRACE:` / `DEBUG:` / `INFO:` / `WARN:` tokens and passing `ASSERT:` / `SOFT ASSERT:` clauses. `ERROR:` / `FAIL:` hard-fail, hard-assert fail-fast, and multi-clause `SOFT ASSERT:` failures are observed by the feature's Java checks without failing the parent scenario. [`area-b-control-flow.feature`](../maven-consumer-project/src/test/resources/features/area-b-control-flow.feature) pins `END SCENARIO`, `END TEST`, scenario flags, and the `SOFT FAIL SCENARIO` observer.
 
 Uppercase control tokens write a log line or evaluate the same conditions used after `IF:`. Optional whitespace is allowed after the colon.
 
@@ -42,18 +42,43 @@ Existing fail steps are unchanged:
 
 `SOFT FAIL SCENARIO` throws `SoftRuntimeException`. The step result is failed, so Cucumber fails the scenario. The scenario is marked soft-failed and is not marked complete, so later steps still run. That is not what `SOFT ASSERT:` does. `SOFT ASSERT:` logs every failing clause and does not throw, so Cucumber stays green and later steps run. A direct `SOFT FAIL SCENARIO` is not an `@all` step. The area B Java check observes the throw without failing the parent scenario.
 
-`END SCENARIO` stops the rest of the current scenario. Steps after it do not run. `END TEST` is the whole token only. A longer line is not this step.
+`END SCENARIO` stops the rest of the current scenario. Steps after it do not run, including flagged steps. `END TEST` is the whole token only. A longer line is not this step. `END TEST` marks the scenario complete without failing it, so a later step runs only when a scenario flag below says it should.
 
-These steps are accepted and do nothing. They do not change which later steps run:
+## Scenario flags
+
+These flags are the ones the runner reads. A child nested under the flag with a leading colon inherits the flag. A trailing colon on the flag step is optional, and the no-colon form is unchanged:
 
 ```gherkin
-* RETRY: not implemented
-* IGNORE FAILURES
-* LOG FAILURES BUT CONTINUE SCENARIO
-* RUN IF SCENARIO FINISHED
+* ALWAYS RUN
+  : * , save "cleaned" as "status"
+* ALWAYS RUN:
+  : * , save "cleaned" as "status"
+* RUN IF SCENARIO FAILED
+  : * , save "x" as "y"
 ```
 
-`ALWAYS RUN`, `RUN IF SCENARIO FAILED`, `RUN IF SCENARIO SOFT FAILED`, `RUN IF SCENARIO HARD FAILED`, and `RUN IF SCENARIO PASSING` are the flags the runner actually reads.
+An inline child requires the colon. The text after the colon runs as a child step under the flag, the same as a nested child:
+
+```gherkin
+* RUN IF SCENARIO FAILED: , save "x" as "y"
+```
+
+That line is the same as:
+
+```gherkin
+* RUN IF SCENARIO FAILED:
+  : * , save "x" as "y"
+```
+
+| Flag | A child runs when |
+|---|---|
+| `ALWAYS RUN` | always, including after the scenario is complete |
+| `RUN IF SCENARIO FAILED` | the scenario has a soft or hard failure |
+| `RUN IF SCENARIO SOFT FAILED` | the scenario has a soft failure |
+| `RUN IF SCENARIO HARD FAILED` | the scenario has a hard failure |
+| `RUN IF SCENARIO PASSING` | the scenario has not failed |
+
+A hard failure marks the scenario complete, so a later step without one of these flags is skipped. A soft failure does not mark the scenario complete, so a later step without a flag still runs. `RUN IF SCENARIO PASSING` uses the same colon and inline forms.
 
 Internal prefixed `INFO:` / `ERROR:` / `FAIL ERROR:` steps used by Pickleball itself keep their invisible prefix and do not collide with these author-facing tokens.
 

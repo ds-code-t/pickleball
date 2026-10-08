@@ -82,7 +82,6 @@ Context phrases restrict the next element lookup. A context word is public only 
 
 ```gherkin
 * , in the "Secondary Queue" Test Panel, click the "Approve" Button
-* , below the "Spatial Anchor" Button, click the "Below Target" Button
 * , from the "Results" Table, ensure the 2nd Row contains "Approved"
 ```
 
@@ -93,10 +92,8 @@ Context words that parse and resolve:
 | `in`, `from`, `for` | inside the anchor |
 | `after` | following the anchor in document order |
 | `before` | preceding the anchor in document order |
-| `below`, `above` | visually below or above the anchor, with horizontal overlap |
-| `left of`, `right of` | visually left or right of the anchor, with vertical overlap |
 
-`below`, `above`, `left of`, and `right of` use the element's rectangle. `after` and `before` use document order, not the visual position. `between` is not a context word. Do not use `inside`, `within`, `of`, `on`, `near`, `next to`, `following`, or `preceding`; those words do not resolve.
+`after` and `before` use document order, not the visual position.
 
 ## The `it` placeholder
 

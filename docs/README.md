@@ -44,7 +44,10 @@ When these docs are materialized from the Maven dependency with Workbench `expor
 - [Diagnostic lineage and metadata](diagnostic-lineage-metadata.md) — distinguish lineage annotations, execution/evidence RunVars, controls, and derived evidence.
 - [Diagnostic reporting](diagnostic-reporting.md) — sparse-first AI evidence, source provenance, step/capability metadata, trace evidence, screenshots/fingerprints, comparison, and retention.
 - [AI diagnostic reporting plan](ai-diagnostic-reporting-plan.md) — current sparse-first investigation and controlled-rerun architecture.
-- [Tech debt](tech-debt.md) — maintainer notes for fields that are not features. Not syntax.
+
+## Experimental features
+
+- [Experimental features](experimental-features.md) — behavior that works now but is not recommended and may change.
 
 ## Working consumer project
 

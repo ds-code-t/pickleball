@@ -55,7 +55,6 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/reserved-element-names.md`
 - `docs/service-call-scenarios.md`
 - `docs/step-overrides.md`
-- `docs/tech-debt.md`
 - `docs/workbench-thin-packaging-roadmap.md`
 
 ## Framework Java and AspectJ source

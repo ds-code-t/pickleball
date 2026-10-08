@@ -102,6 +102,170 @@ public class AreaBControlFlowChecks {
         assertTrue(present.getMessage().contains("with argument 'arg'"), present.getMessage());
     }
 
+    @Test
+    void flaggedChildrenRunAfterAHardFailAndASiblingIsSkipped() {
+        CurrentScenarioState state = requireScenario();
+        StepExtension previousStep = state.getCurrentStep();
+        save("untouched", "flagHardAlwaysNested");
+        save("untouched", "flagHardAlwaysInline");
+        save("untouched", "flagHardFailNested");
+        save("untouched", "flagHardFailInline");
+        save("untouched", "flagHardSoftNested");
+        save("untouched", "flagHardSoftInline");
+        save("untouched", "flagHardSibling");
+        try {
+            // No @all scenario can end failed: the suite has no expected-failure tag.
+            // DynamicControl contains the real failure, the same way the soft-fail observer does.
+            // runStep would publish that failure and fail the parent scenario, so the runner
+            // flags a hard failure sets are applied here and the flag steps go through runStep.
+            ControlCallResult<Object> failed = DynamicControl.executeStep("FAIL SCENARIO \"flag proof\"");
+            assertEquals(ControlCallStatus.FAILED, failed.status(), detail(failed));
+            assertFalse(state.isScenarioFailed());
+            setProperty(state, "isScenarioHardFail", true);
+            setProperty(state, "isScenarioSoftFail", false);
+            setProperty(state, "isScenarioComplete", true);
+            StepExtension alwaysNested = flagWithNestedChild(
+                    "ALWAYS RUN:",
+                    ", save \"ran\" as \"flagHardAlwaysNested\""
+            );
+            StepExtension alwaysInline = observedStep(
+                    "ALWAYS RUN: , save \"ran\" as \"flagHardAlwaysInline\""
+            );
+            assertEquals(1, alwaysInline.childSteps.size());
+            StepExtension failedNested = flagWithNestedChild(
+                    "RUN IF SCENARIO FAILED:",
+                    ", save \"ran\" as \"flagHardFailNested\""
+            );
+            StepExtension failedInline = observedStep(
+                    "RUN IF SCENARIO FAILED: , save \"ran\" as \"flagHardFailInline\""
+            );
+            assertEquals(1, failedInline.childSteps.size());
+            StepExtension softNested = flagWithNestedChild(
+                    "RUN IF SCENARIO SOFT FAILED:",
+                    ", save \"ran\" as \"flagHardSoftNested\""
+            );
+            StepExtension softInline = observedStep(
+                    "RUN IF SCENARIO SOFT FAILED: , save \"ran\" as \"flagHardSoftInline\""
+            );
+            StepExtension sibling = observedStep(", save \"ran\" as \"flagHardSibling\"");
+            chain(state, alwaysNested, alwaysInline, failedNested, failedInline, softNested, softInline, sibling);
+            state.runStep(alwaysNested);
+            assertSaved("flagHardAlwaysNested", "ran");
+            assertSaved("flagHardAlwaysInline", "ran");
+            assertSaved("flagHardFailNested", "ran");
+            assertSaved("flagHardFailInline", "ran");
+            assertSaved("flagHardSoftNested", "untouched");
+            assertSaved("flagHardSoftInline", "untouched");
+            assertSaved("flagHardSibling", "untouched");
+        } finally {
+            restoreScenario(state, previousStep);
+        }
+    }
+
+    @Test
+    void softFailedChildrenRunAfterASoftFailAndAHardFailedChildDoesNot() {
+        CurrentScenarioState state = requireScenario();
+        StepExtension previousStep = state.getCurrentStep();
+        save("untouched", "flagSoftNested");
+        save("untouched", "flagSoftInline");
+        save("untouched", "flagSoftFailNested");
+        save("untouched", "flagSoftHardNested");
+        save("untouched", "flagSoftSibling");
+        try {
+            ControlCallResult<Object> failed = DynamicControl.executeStep(
+                    "SOFT FAIL SCENARIO \"flag soft\""
+            );
+            assertEquals(ControlCallStatus.FAILED, failed.status(), detail(failed));
+            assertFalse(state.isScenarioFailed());
+            setProperty(state, "isScenarioHardFail", false);
+            setProperty(state, "isScenarioSoftFail", true);
+            setProperty(state, "isScenarioComplete", false);
+            StepExtension softNested = flagWithNestedChild(
+                    "RUN IF SCENARIO SOFT FAILED:",
+                    ", save \"ran\" as \"flagSoftNested\""
+            );
+            StepExtension softInline = observedStep(
+                    "RUN IF SCENARIO SOFT FAILED: , save \"ran\" as \"flagSoftInline\""
+            );
+            assertEquals(1, softInline.childSteps.size());
+            StepExtension failedNested = flagWithNestedChild(
+                    "RUN IF SCENARIO FAILED:",
+                    ", save \"ran\" as \"flagSoftFailNested\""
+            );
+            StepExtension hardNested = flagWithNestedChild(
+                    "RUN IF SCENARIO HARD FAILED:",
+                    ", save \"ran\" as \"flagSoftHardNested\""
+            );
+            StepExtension sibling = observedStep(", save \"ran\" as \"flagSoftSibling\"");
+            chain(state, softNested, softInline, failedNested, hardNested, sibling);
+            state.runStep(softNested);
+            assertSaved("flagSoftNested", "ran");
+            assertSaved("flagSoftInline", "ran");
+            assertSaved("flagSoftFailNested", "ran");
+            assertSaved("flagSoftHardNested", "untouched");
+            // A soft failure does not mark the scenario complete, so an unflagged sibling still runs.
+            assertSaved("flagSoftSibling", "ran");
+        } finally {
+            restoreScenario(state, previousStep);
+        }
+    }
+
+    private static void save(String value, String key) {
+        ControlCallResult<Object> result = DynamicControl.executeStep(
+                ", save \"" + value + "\" as \"" + key + "\""
+        );
+        assertTrue(result.successful(), () -> String.valueOf(result.error()));
+    }
+
+    private static void assertSaved(String key, String expected) {
+        ControlCallResult<Object> result = DynamicControl.executeStep(
+                ", ensure \"<" + key + ">\" equals \"" + expected + "\""
+        );
+        assertTrue(result.successful(), () -> key + " expected " + expected + " but " + result.error());
+    }
+
+    private static StepExtension observedStep(String stepText) {
+        ControlCallResult<StepExtension> created = DynamicControl.createStep(stepText);
+        assertTrue(created.successful(), () -> stepText + " " + created.error());
+        return created.value();
+    }
+
+    private static void runObserved(CurrentScenarioState state, String stepText) {
+        StepExtension step = observedStep(stepText);
+        step.parentStep = state.getCurrentStep();
+        state.runStep(step);
+    }
+
+    private static StepExtension flagWithNestedChild(String flagText, String childText) {
+        StepExtension flag = observedStep(flagText);
+        StepExtension child = flag.createNewStepExtension(childText);
+        flag.addChildStep(child);
+        return flag;
+    }
+
+    private static void chain(CurrentScenarioState state, StepExtension... steps) {
+        StepExtension parent = state.getCurrentStep();
+        assertNotNull(parent);
+        StepExtension previous = null;
+        for (StepExtension step : steps) {
+            step.parentStep = parent;
+            if (previous != null) {
+                previous.nextSibling = step;
+                step.previousSibling = previous;
+            }
+            previous = step;
+        }
+    }
+
+    private static void restoreScenario(CurrentScenarioState state, StepExtension previousStep) {
+        state.stepFailures.clear();
+        state.endCurrentScenario = false;
+        setProperty(state, "currentStep", previousStep);
+        setProperty(state, "isScenarioHardFail", false);
+        setProperty(state, "isScenarioSoftFail", false);
+        setProperty(state, "isScenarioComplete", false);
+    }
+
     private static Throwable runUntil(String stepText, int maxIterations, Duration maxTime) {
         CurrentScenarioState state = requireScenario();
         StepExtension previousStep = state.getCurrentStep();

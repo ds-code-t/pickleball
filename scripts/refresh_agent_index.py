@@ -11,6 +11,10 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 OUTPUT = ROOT / "docs" / "agent" / "repository-index.md"
 GENERATED_GUIDANCE_PREFIX = "src/main/resources/META-INF/pickleball/guidance/"
+MAINTAINER_ONLY_DOCS = {
+    "docs/tech-debt.md",
+    "docs/experimental-features.md",
+}
 
 EXCLUDED_PARTS = {
     ".agent-work",
@@ -150,6 +154,8 @@ def is_included(path: Path) -> bool:
     relative = path.relative_to(ROOT)
     relative_text = relative.as_posix()
     if relative_text.startswith(GENERATED_GUIDANCE_PREFIX):
+        return False
+    if relative_text in MAINTAINER_ONLY_DOCS:
         return False
     return not any(part in EXCLUDED_PARTS for part in relative.parts)
 
