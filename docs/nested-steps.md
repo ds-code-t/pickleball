@@ -88,7 +88,18 @@ A default `---startstep` / `---endstep` pair, or a custom marker such as `---are
 
 ## `until`
 
-Only a block `until` loops. The parent must end in `:` or `?`. A failing pass runs the body. The pass that finds the condition true stops and does not run the body again. `until the Step Repetition is greater than 3` reads 1, then 2, then 3, runs the body on those three passes, and stops when the check reads 4. Step Duration on that check is the time since the loop's first pass. A child step has its own Step Repetition. Hitting `stepRepeatMaxCount` (default 100) or `stepRepeatMaxTime` (default 3600 seconds) hard-fails the Cucumber scenario. A following `ALWAYS RUN` sibling still runs. Those ceilings are run-wide. The message names the limit that was hit. Zero and negative are defined in [Repeat ceilings](configuration.md#repeat-ceilings). Names the parser treats specially are listed in [Reserved element names](reserved-element-names.md).
+Only a block `until` loops. The parent must end in `:` or `?`. A failing pass runs the body. The pass that finds the condition true stops and does not run the body again.
+
+```gherkin
+* , until the Step Repetition is 3:
+  : * , save "tick" as "passes"
+* , until the Step Repetition is greater than 3:
+  : * , save "tick" as "passes"
+```
+
+`is 3` runs the child steps 2 times. It stops at the start of run 3. `is greater than 3` runs them 3 times. It stops when the check reads 4. Step Duration on that check is the time since the loop's first pass. A child step has its own Step Repetition.
+
+Hitting `pkb_stepRepeatMaxCount` (default 100) or `pkb_stepMaxTime` (default 60 minutes) hard-fails the Cucumber scenario. The message names the setting, for example `Step exceeded pkb_stepMaxTime (5m)` or `Until loop exhausted pkb_stepRepeatMaxCount`. A following `ALWAYS RUN` sibling still runs. The clock is checked before the loop sleeps, and the sleep is only the time left, capped at 400 milliseconds. Those ceilings are run-wide. The run-var limit always hard-fails; a longer Gherkin time can't extend it. Zero and negative are defined in [Repeat ceilings](configuration.md#repeat-ceilings). Names the parser treats specially are listed in [Reserved element names](reserved-element-names.md).
 
 `times` repeats the action and stops on the first throw. It does not continue after a failure. See [Dynamic Steps](dynamic-steps.md).
 

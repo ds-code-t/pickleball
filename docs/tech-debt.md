@@ -4,7 +4,11 @@ This page lists behavior that is not a feature. Do not document it as syntax.
 
 ## Unused step ceiling fields
 
-`StepBase.stepMaxIterations` and `StepBase.stepTimeoutSeconds` are never assigned. A block `until` and an element `wait` use only the run-wide `stepRepeatMaxCount` and `stepRepeatMaxTime` values. There is no per-step ceiling. Do not read those fields as one.
+`StepBase.stepMaxIterations` and `StepBase.stepTimeoutSeconds` are never assigned. A block `until` uses the run-wide `pkb_stepRepeatMaxCount` and `pkb_stepMaxTime` values. An element `wait` uses `pkb_stepMaxTime` only. There is no per-step ceiling. Do not read those fields as one.
+
+## Hung step watchdog
+
+A non-repeating step never samples `pkb_stepMaxTime`. Only a block `until` and an element `wait` do. There is no watchdog that fails one hung non-repeating step. One should check about once a minute and fail that step. A hung Selenium call on the step thread may keep running after the watchdog fires.
 
 ## Accepted steps that do nothing
 

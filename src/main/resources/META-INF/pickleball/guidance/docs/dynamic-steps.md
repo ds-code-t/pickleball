@@ -264,7 +264,18 @@ A step that is only a comma, `* ,`, has no phrase. It fails the step with a clea
 
 `3 times` repeats that action. `save "tick" as "key" 3 times` stores the same value three times. The repeat stops on the first throw. Later repetitions do not run.
 
-An element `wait` polls until the element is present, or until a loading element is gone. It uses the run-wide `stepRepeatMaxCount` and `stepRepeatMaxTime`, the same ceilings as a block `until`. A limit of N allows N polls. There is no per-step ceiling. When the ceiling is hit, the step hard-fails the scenario, the same way an exhausted `until` does, with a message that names the limit and the number of polls. It does not poll forever. Step Repetition, Step Duration, and the other reserved names are listed in [Reserved element names](reserved-element-names.md).
+An element `wait` polls until the element is present, or until a loading element is gone. It then continues. The hard-fail cap is the run-wide `pkb_stepMaxTime` (default 60 minutes), the same clock as a block `until`. An element `wait` does not use `pkb_stepRepeatMaxCount`. There is no per-step ceiling and no poll-count cap. When `pkb_stepMaxTime` is hit, the step hard-fails the scenario. The message names the setting, for example `Step exceeded pkb_stepMaxTime (5m)`. It does not poll forever.
+
+A Gherkin time on that wait is a soft limit. Either order is the same:
+
+```gherkin
+* , wait the "Submit" Button, or 2 minutes
+* , wait 2 minutes, or the "Submit" Button
+```
+
+The wait stops when the element appears, or when that time passes, and then continues. It does not fail and it does not log a warning. The time counts from the step's start, the same clock as Step Duration, so page-ready time is included. The clock is checked before each sleep, and the sleep is only the time left, capped at 3 seconds. `, or 0 seconds` does one check. A number word such as `two` is not a duration. The run-var limit always hard-fails; a longer Gherkin time can't extend it.
+
+Step Repetition, Step Duration, and the other reserved names are listed in [Reserved element names](reserved-element-names.md).
 
 ## Inline argument markers
 

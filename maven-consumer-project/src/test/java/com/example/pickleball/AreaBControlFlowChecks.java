@@ -10,7 +10,15 @@ import tools.dscode.control.api.ControlCallResult;
 import tools.dscode.control.api.ControlCallStatus;
 import tools.dscode.control.api.DynamicControl;
 
+import org.openqa.selenium.remote.RemoteWebDriver;
+import tools.dscode.common.reporting.logging.Entry;
+import tools.dscode.common.reporting.logging.Level;
+import tools.dscode.common.reporting.logging.LogForwarder;
+import tools.dscode.coredefinitions.BrowserSteps;
+
 import java.time.Duration;
+import java.util.HashSet;
+import java.util.Set;
 
 import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -36,19 +44,19 @@ public class AreaBControlFlowChecks {
     void untilExhaustedByTimeHardFails() {
         Throwable exhausted = runUntil(", until \"\" equals \"done\":", 100_000, Duration.ofMillis(1));
         String detail = detail(exhausted);
-        assertTrue(detail.contains("Until loop exhausted"), detail);
-        assertTrue(detail.contains("stepRepeatMaxTime"), detail);
+        assertTrue(detail.contains("Step exceeded pkb_stepMaxTime"), detail);
+        assertFalse(detail.contains("Until loop exhausted"), detail);
         assertFalse(requireScenario().isScenarioFailed());
     }
 
     @Test
-    void elementWaitHonorsRepeatCount() {
+    void elementWaitIgnoresRepeatCountAndFailsOnTime() {
         navigateHome();
-        ControlCallResult<Object> result = waitForMissingElement(0, Duration.ofHours(1));
+        ControlCallResult<Object> result = waitForMissingElement(0, Duration.ofMillis(1));
         String detail = detail(result);
         assertEquals(ControlCallStatus.FAILED, result.status(), detail);
-        assertTrue(detail.contains("Element wait exhausted"), detail);
-        assertTrue(detail.contains("stepRepeatMaxCount"), detail);
+        assertTrue(detail.contains("Step exceeded pkb_stepMaxTime"), detail);
+        assertFalse(detail.contains("stepRepeatMaxCount"), detail);
         assertFalse(requireScenario().isScenarioFailed());
     }
 
@@ -58,9 +66,59 @@ public class AreaBControlFlowChecks {
         ControlCallResult<Object> result = waitForMissingElement(100_000, Duration.ofMillis(1));
         String detail = detail(result);
         assertEquals(ControlCallStatus.FAILED, result.status(), detail);
-        assertTrue(detail.contains("Element wait exhausted"), detail);
-        assertTrue(detail.contains("stepRepeatMaxTime"), detail);
+        assertTrue(detail.contains("Step exceeded pkb_stepMaxTime"), detail);
+        assertFalse(detail.contains("stepRepeatMaxCount"), detail);
         assertFalse(requireScenario().isScenarioFailed());
+    }
+
+    @Test
+    void softWaitContinuesWhenTheGherkinTimePassesWithoutAWarning() {
+        navigateHome();
+        Duration previousTimeout = StepData.globalTimeoutSeconds;
+        StepData.globalTimeoutSeconds = Duration.ofSeconds(40);
+        try {
+            assertSoftWaitSucceeds(", wait the \"No Such Area B\" Button, or 0 seconds");
+            assertSoftWaitSucceeds(", wait 0 seconds, or the \"No Such Area B\" Button");
+        } finally {
+            StepData.globalTimeoutSeconds = previousTimeout;
+        }
+    }
+
+    @Test
+    void longerGherkinWaitCannotExtendTheRunVarCap() {
+        navigateHome();
+        ControlCallResult<Object> result = waitForStep(
+                ", wait the \"No Such Area B\" Button, or 1 hour",
+                100_000,
+                Duration.ofMillis(1)
+        );
+        String detail = detail(result);
+        assertEquals(ControlCallStatus.FAILED, result.status(), detail);
+        assertTrue(detail.contains("Step exceeded pkb_stepMaxTime"), detail);
+        assertFalse(requireScenario().isScenarioFailed());
+    }
+
+    @Test
+    void untilConditionSkipsPageSyncAndImplicitWait() {
+        navigateHome();
+        RemoteWebDriver driver = BrowserSteps.getCurrentDriver();
+        Duration previousImplicit = driver.manage().timeouts().getImplicitWaitTimeout();
+        try {
+            driver.manage().timeouts().implicitlyWait(Duration.ofSeconds(12));
+            long started = System.nanoTime();
+            Throwable exhausted = runUntil(
+                    ", until the \"No Such Area B\" Button is displayed:",
+                    1,
+                    Duration.ofMinutes(5)
+            );
+            long elapsedMs = (System.nanoTime() - started) / 1_000_000L;
+            String detail = detail(exhausted);
+            assertTrue(detail.contains("pkb_stepRepeatMaxCount"), detail);
+            assertTrue(elapsedMs < 6000, "until condition took " + elapsedMs + "ms");
+            assertEquals(Duration.ofSeconds(12), driver.manage().timeouts().getImplicitWaitTimeout());
+        } finally {
+            driver.manage().timeouts().implicitlyWait(previousImplicit);
+        }
     }
 
     @Test
@@ -344,15 +402,84 @@ public class AreaBControlFlowChecks {
     }
 
     private static ControlCallResult<Object> waitForMissingElement(int maxIterations, Duration maxTime) {
+        return waitForStep(", wait the \"No Such Area B\" Button", maxIterations, maxTime);
+    }
+
+    private static ControlCallResult<Object> waitForStep(String step, int maxIterations, Duration maxTime) {
         int previousIterations = StepData.globalMaxIterations;
         Duration previousTimeout = StepData.globalTimeoutSeconds;
         StepData.globalMaxIterations = maxIterations;
         StepData.globalTimeoutSeconds = maxTime;
         try {
-            return DynamicControl.executeStep(", wait the \"No Such Area B\" Button");
+            return DynamicControl.executeStep(step);
         } finally {
             StepData.globalMaxIterations = previousIterations;
             StepData.globalTimeoutSeconds = previousTimeout;
+        }
+    }
+
+    private static void assertSoftWaitSucceeds(String step) {
+        Set<String> before = entryIds();
+        ControlCallResult<Object> result = DynamicControl.executeStep(step);
+        String detail = detail(result);
+        assertTrue(result.successful(), detail);
+        assertFalse(requireScenario().isScenarioFailed(), detail);
+        String log = newTexts(before);
+        assertFalse(log.contains("Skipping Phrase"), log);
+        assertFalse(log.contains("pkb_stepMaxTime"), log);
+        assertFalse(newLevels(before).contains(Level.WARN), log);
+    }
+
+    private static Set<String> entryIds() {
+        Set<String> ids = new HashSet<>();
+        collectIds(LogForwarder.getDefaultEntry(), ids);
+        return ids;
+    }
+
+    private static void collectIds(Entry entry, Set<String> ids) {
+        if (entry == null || !ids.add(entry.id)) {
+            return;
+        }
+        for (Entry child : entry.children) {
+            collectIds(child, ids);
+        }
+    }
+
+    private static String newTexts(Set<String> before) {
+        StringBuilder joined = new StringBuilder();
+        appendNew(LogForwarder.getDefaultEntry(), before, joined, new HashSet<>(), null);
+        return joined.toString();
+    }
+
+    private static Set<Level> newLevels(Set<String> before) {
+        Set<Level> levels = new HashSet<>();
+        appendNew(LogForwarder.getDefaultEntry(), before, new StringBuilder(), new HashSet<>(), levels);
+        return levels;
+    }
+
+    private static void appendNew(
+            Entry entry,
+            Set<String> before,
+            StringBuilder joined,
+            Set<String> seen,
+            Set<Level> levels
+    ) {
+        if (entry == null || !seen.add(entry.id)) {
+            return;
+        }
+        if (!before.contains(entry.id)) {
+            if (entry.text != null) {
+                if (!joined.isEmpty()) {
+                    joined.append('\n');
+                }
+                joined.append(entry.text);
+            }
+            if (levels != null && entry.level != null) {
+                levels.add(entry.level);
+            }
+        }
+        for (Entry child : entry.children) {
+            appendNew(child, before, joined, seen, levels);
         }
     }
 

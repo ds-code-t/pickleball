@@ -23,20 +23,91 @@ import java.util.List;
 
 
 import static tools.dscode.common.reporting.logging.LogForwarder.logError;
+import static tools.dscode.common.reporting.logging.LogForwarder.logWarn;
 import static tools.dscode.common.util.Reflect.getProperty;
+import static tools.dscode.common.util.datetime.DurationFormattingUtils.parseDuration;
+import static tools.dscode.common.variables.RunVars.resolveFromVars;
 import static tools.dscode.common.variables.RunVars.resolveFromVarsOrDefault;
 
 
 public abstract class StepData extends StepMapping {
     public Level stepLogLevel = Level.INFO;
 
-    public static Duration globalTimeoutSeconds =
-            Duration.ofSeconds(Long.parseLong(String.valueOf(resolveFromVarsOrDefault("stepRepeatMaxTime", 3600))));
+    public static Duration globalTimeoutSeconds;
     // Negative is unlimited. Zero is not: the limit is exceeded once elapsed time is greater than zero.
 
-    public static int globalMaxIterations =
-            Integer.parseInt(String.valueOf(resolveFromVarsOrDefault("stepRepeatMaxCount", 100)));
+    public static int globalMaxIterations;
     // Negative is unlimited. Zero is already at the limit, so the loop makes no pass.
+
+    static {
+        Object stepMaxTime = resolveFromVars("stepMaxTime");
+        Object legacySeconds = resolveFromVars("stepRepeatMaxTime");
+        if (isSet(legacySeconds)) {
+            logWarn("pkb_stepRepeatMaxTime is deprecated. Use pkb_stepMaxTime (minutes, or a unit such as 90s).");
+        }
+        globalTimeoutSeconds = parseStepMaxTime(stepMaxTime, legacySeconds);
+        globalMaxIterations = Integer.parseInt(String.valueOf(resolveFromVarsOrDefault("stepRepeatMaxCount", 100)));
+    }
+
+    /**
+     * {@code pkb_stepMaxTime} wins. A bare integer is minutes. A unit such as
+     * {@code 90s} is a duration. The deprecated alias is seconds. When both
+     * keys are absent the cap is 60 minutes.
+     */
+    static Duration parseStepMaxTime(Object stepMaxTime, Object legacySeconds) {
+        if (isSet(stepMaxTime)) {
+            return parseMaxTime(stepMaxTime, true);
+        }
+        if (isSet(legacySeconds)) {
+            return parseMaxTime(legacySeconds, false);
+        }
+        return Duration.ofMinutes(60);
+    }
+
+    static String formatStepMaxTime(Duration duration) {
+        long millis = duration.toMillis();
+        if (duration.getNano() % 1_000_000 != 0 || millis % 1000 != 0) {
+            return millis + "ms";
+        }
+        long seconds = millis / 1000;
+        if (seconds % 60 != 0) {
+            return seconds + "s";
+        }
+        return (seconds / 60) + "m";
+    }
+
+    public static String stepMaxTimeExceededMessage() {
+        return "Step exceeded pkb_stepMaxTime (" + formatStepMaxTime(globalTimeoutSeconds) + ")";
+    }
+
+    /**
+     * Milliseconds to sleep before the next until pass. Null start, a negative
+     * cap, or no cap sleeps the full 400. Otherwise only the time left, and
+     * never more than 400.
+     */
+    static long untilPauseMillis(Instant startTime, Duration cap) {
+        if (cap == null || cap.isNegative() || startTime == null) {
+            return 400;
+        }
+        Duration left = cap.minus(Duration.between(startTime, Instant.now()));
+        if (left.isNegative() || left.isZero()) {
+            return 0;
+        }
+        return Math.min(400L, left.toMillis());
+    }
+
+    private static boolean isSet(Object value) {
+        return value != null && !String.valueOf(value).isBlank();
+    }
+
+    private static Duration parseMaxTime(Object raw, boolean minutesIfBare) {
+        String text = String.valueOf(raw).trim();
+        if (text.matches("-?\\d+")) {
+            long amount = Long.parseLong(text);
+            return minutesIfBare ? Duration.ofMinutes(amount) : Duration.ofSeconds(amount);
+        }
+        return parseDuration(text);
+    }
 
 
     public boolean reachedMaxDuration() {
@@ -88,9 +159,9 @@ public abstract class StepData extends StepMapping {
 
     public boolean checkGlobalMax() {
         if(reachedGlobalMaxDuration()){
-            logError("Global Max Duration Reached of " + globalTimeoutSeconds + " seconds for Step " + pickleStepTestStep.getStepText());
+            logError(stepMaxTimeExceededMessage());
         } else if(reachedGlobalMaxRepetition()){
-            logError("Global Max " + globalMaxIterations + " repetitions reached for Step " + pickleStepTestStep.getStepText());
+            logError("Until loop exhausted pkb_stepRepeatMaxCount " + globalMaxIterations);
         }
         else
         {

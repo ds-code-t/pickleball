@@ -172,34 +172,54 @@ public enum ActionOperations implements OperationsInterface {
         public void execute(PhraseData phraseData) {
             logInfo(phraseData + " : Executing Action " + this.name());
             int repetition = phraseData.getRepetition();
+            PhraseData softPartner = softOrPartner(phraseData);
+            if (softPartner != null) {
+                softPartner.noExecution = true;
+            }
             phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesFollowingOperation(),
                     new ElementMatcher().mustMatchAtLeastOne(ElementType.TIME_VALUE, ElementType.HTML_ELEMENT)
             );
-            ElementMatch waitElementMatch = phraseData.resultElements.getFirst();
+            ElementMatch primary = phraseData.resultElements.getFirst();
+            ElementMatch partnerElement = softPartner == null ? null : softPartner.getFirstElement();
+            ElementMatch html = htmlWait(primary, partnerElement);
+            ElementMatch time = timeWait(primary, partnerElement);
             RemoteWebDriver driver = tools.dscode.coredefinitions.BrowserSteps.getCurrentDriverForNonUse();
             boolean waitOnPageLoad = driver != null && !phraseData.skipPageSync();
             phraseData.result = Attempt.run(repetition, 500, () -> {
-                if (waitElementMatch.elementTypes.contains(ElementType.HTML_ELEMENT)) {
+                Instant started = stepStart();
+                if (html != null) {
                     if (waitOnPageLoad)
                         safeWaitForPageReady(getCurrentDriver(), Duration.ofSeconds(60), 300);
-                    boolean waitingOnLoading = waitElementMatch.elementTypes.contains(ElementType.HTML_LOADING);
-                    int polls = 0;
-                    Instant waitStarted = Instant.now();
+                    boolean waitingOnLoading = html.elementTypes.contains(ElementType.HTML_LOADING);
+                    Duration soft = time == null ? null : softDuration(time);
                     while (true) {
-                        List<ElementWrapper> wrappers = getWrappedElements(waitElementMatch);
+                        List<ElementWrapper> wrappers = getWrappedElements(html);
                         if (wrappers.isEmpty()) {
                             if (waitingOnLoading)
                                 return true;
                         } else if (!waitingOnLoading) {
                             return true;
                         }
-                        polls++;
-                        failIfElementWaitExhausted(polls, waitStarted, waitElementMatch);
-                        System.out.println("Waiting on " + (waitingOnLoading ? "LOADING" : waitElementMatch));
-                        waitMilliseconds(3000);
+                        if (pastStepMaxTime(started)) {
+                            failStepMaxTime(html);
+                        }
+                        if (soft != null && !Duration.between(started, Instant.now()).minus(soft).isNegative()) {
+                            return true;
+                        }
+                        long sleep = elementWaitSleepMillis(started, soft);
+                        System.out.println("Waiting on " + (waitingOnLoading ? "LOADING" : html));
+                        waitMilliseconds(sleep);
                     }
                 } else {
-                    waitForDuration(delta(waitElementMatch.getValue().asNormalizedText()).toDuration(), driver);
+                    Duration requested = softDuration(primary);
+                    Duration hardLeft = stepMaxTimeLeft(started);
+                    if (hardLeft != null && requested.compareTo(hardLeft) > 0) {
+                        if (hardLeft.toMillis() > 0) {
+                            waitMilliseconds(hardLeft.toMillis());
+                        }
+                        failStepMaxTime(primary);
+                    }
+                    waitForDuration(requested, driver);
                 }
                 return true;
             });
@@ -533,29 +553,11 @@ public enum ActionOperations implements OperationsInterface {
     }
 
     /**
-     * Element waits honor the same run-wide repeat ceiling as an until loop.
-     * {@code stepRepeatMaxCount} and {@code stepRepeatMaxTime} are the only
-     * limits. A count of N allows N polls. Zero exhausts on the first poll.
-     * A negative count is unlimited.
+     * An element wait uses {@code pkb_stepMaxTime} only. The repeat-count cap
+     * does not apply. A longer Gherkin {@code , or} time cannot extend it.
      */
-    private static void failIfElementWaitExhausted(int polls, Instant started, ElementMatch waited) {
-        int maxCount = StepData.globalMaxIterations;
-        Duration maxTime = StepData.globalTimeoutSeconds;
-        boolean countHit = maxCount >= 0 && polls >= maxCount;
-        boolean timeHit = maxTime != null
-                && !maxTime.isNegative()
-                && Duration.between(started, Instant.now()).compareTo(maxTime) > 0;
-        if (!countHit && !timeHit) {
-            return;
-        }
-        StringBuilder message = new StringBuilder("Element wait exhausted");
-        if (timeHit) {
-            message.append(" stepRepeatMaxTime ").append(maxTime);
-        }
-        if (countHit) {
-            message.append(" stepRepeatMaxCount ").append(maxCount);
-        }
-        message.append(" after ").append(polls).append(" polls");
+    private static void failStepMaxTime(ElementMatch waited) {
+        StringBuilder message = new StringBuilder(StepData.stepMaxTimeExceededMessage());
         if (waited != null) {
             message.append(" for ").append(waited);
         }
@@ -565,6 +567,89 @@ public enum ActionOperations implements OperationsInterface {
             state.recordHardFailure(exhausted);
         }
         throw exhausted;
+    }
+
+    private static PhraseData softOrPartner(PhraseData phrase) {
+        PhraseData next = phrase.getNextPhraseWithinBoundary();
+        if (next == null || next.conjunction == null || !next.conjunction.trim().equalsIgnoreCase("or")) {
+            return null;
+        }
+        return next;
+    }
+
+    private static ElementMatch htmlWait(ElementMatch primary, ElementMatch partner) {
+        if (isHtmlWait(primary)) {
+            return primary;
+        }
+        if (isHtmlWait(partner)) {
+            return partner;
+        }
+        return null;
+    }
+
+    private static ElementMatch timeWait(ElementMatch primary, ElementMatch partner) {
+        if (isTimeWait(primary)) {
+            return primary;
+        }
+        if (isTimeWait(partner)) {
+            return partner;
+        }
+        return null;
+    }
+
+    private static boolean isHtmlWait(ElementMatch match) {
+        return match != null && !match.isPlaceHolder() && match.elementTypes.contains(ElementType.HTML_ELEMENT);
+    }
+
+    private static boolean isTimeWait(ElementMatch match) {
+        return match != null && !match.isPlaceHolder() && match.elementTypes.contains(ElementType.TIME_VALUE);
+    }
+
+    private static Duration softDuration(ElementMatch time) {
+        return delta(time.getValue().asNormalizedText()).toDuration();
+    }
+
+    private static Instant stepStart() {
+        StepExtension step = getRunningStep();
+        if (step != null && step.startTime != null) {
+            return step.startTime;
+        }
+        return Instant.now();
+    }
+
+    private static boolean pastStepMaxTime(Instant started) {
+        Duration cap = StepData.globalTimeoutSeconds;
+        if (cap == null || cap.isNegative() || started == null) {
+            return false;
+        }
+        return Duration.between(started, Instant.now()).compareTo(cap) > 0;
+    }
+
+    /** Null when the hard cap is absent or negative (unlimited). Zero means it is already due. */
+    private static Duration stepMaxTimeLeft(Instant started) {
+        Duration cap = StepData.globalTimeoutSeconds;
+        if (cap == null || cap.isNegative() || started == null) {
+            return null;
+        }
+        Duration left = cap.minus(Duration.between(started, Instant.now()));
+        if (left.isNegative() || pastStepMaxTime(started)) {
+            return Duration.ZERO;
+        }
+        return left;
+    }
+
+    private static long elementWaitSleepMillis(Instant started, Duration soft) {
+        long sleep = 3000;
+        Duration hardLeft = stepMaxTimeLeft(started);
+        if (hardLeft != null) {
+            sleep = Math.min(sleep, Math.max(0, hardLeft.toMillis()));
+        }
+        if (soft != null) {
+            Duration softLeft = soft.minus(Duration.between(started, Instant.now()));
+            long softMs = softLeft.isNegative() ? 0 : softLeft.toMillis();
+            sleep = Math.min(sleep, softMs);
+        }
+        return sleep <= 0 ? 1 : sleep;
     }
 
 

@@ -405,8 +405,9 @@ The existing path semantics for `pkb_features`, `pkb_datapath`, `pkb_callpath`, 
 | `pkb_overriderunvars.<pkb_var>` | `pkb_overriderunvars.pkb_browser=chrome` | expanded sealed RunVar member; do not mix with compact |
 | `pkb_run_profile` | generated assignment string | canonical resolved RunVar output; external input rejected |
 | `pkb_parallel` | `4`, `auto` | parallel scenario count; `auto` resolves at run start to a conservative JVM estimate and stamps the integer into `pkb_run_profile` |
-| `stepRepeatMaxCount` | `100` | run-wide block-until and element-wait pass limit; see [Repeat ceilings](#repeat-ceilings) |
-| `stepRepeatMaxTime` | `3600` | run-wide duration ceiling in seconds; see [Repeat ceilings](#repeat-ceilings) |
+| `stepRepeatMaxCount` | `100` | run-wide block-until pass limit; element waits do not use it; see [Repeat ceilings](#repeat-ceilings) |
+| `stepMaxTime` | `60` | run-wide hard-fail cap for block `until` and element `wait`, in minutes, or a unit such as `90s`; see [Repeat ceilings](#repeat-ceilings) |
+| `stepRepeatMaxTime` | deprecated | seconds alias of `stepMaxTime`. A warning is logged. Ignored when `stepMaxTime` is set |
 | `pkb_loglevel` | `debug` | console log level |
 | `pkb_reportingmode` | `diagnostic` | diagnostic evidence pipeline |
 | `pkb_compositeReport` | `true`, `false` | composite `reports/cucumber-report.html`; unset writes it on a normal test and suppresses it on an agent or Workbench run |
@@ -498,15 +499,30 @@ Isolate stays one scenario and does not raise `pkb_parallel`.
 
 ## Repeat ceilings
 
-`stepRepeatMaxCount` (default 100) and `stepRepeatMaxTime` (default 3600 seconds) cap every block `until` and every element `wait`. They are run-wide run vars. Resolved names are `pkb_steprepeatmaxcount` and `pkb_steprepeatmaxtime`. They are read when the step runtime loads. There is no per-step ceiling.
+`pkb_stepMaxTime` (default 60 minutes) is the hard-fail time cap for every block `until` and every element `wait`. `pkb_stepRepeatMaxCount` (default 100) is the repeat-count cap for a block `until` only. An element `wait` does not use the count. They are run-wide run vars, read once when the step runtime loads. Resolved names are `pkb_stepmaxtime` and `pkb_steprepeatmaxcount`. There is no per-step ceiling.
 
-A positive count N allows exactly N passes. The check before the next pass sees how many passes have already finished. `until the Step Repetition is greater than 3` still stops at 4 because that condition is true, which is sooner than the ceiling.
+A bare `pkb_stepMaxTime` integer is minutes. A unit is accepted, such as `90s` or `2 minutes`. The failure names the setting, for example `Step exceeded pkb_stepMaxTime (5m)`.
 
-A negative count is unlimited. Zero is already at the limit, so the loop or wait makes no pass and fails with `stepRepeatMaxCount`.
+`pkb_stepRepeatMaxTime` still works as a deprecated alias. A bare integer is seconds. Using it logs a warning: `pkb_stepRepeatMaxTime is deprecated. Use pkb_stepMaxTime (minutes, or a unit such as 90s).` If both are set, `pkb_stepMaxTime` wins and the warning is still logged. When neither is set, the cap is 60 minutes.
 
-A negative duration is unlimited. Zero is not unlimited. After the step's start time is set, the limit is exceeded as soon as elapsed time is greater than zero. The failure names `stepRepeatMaxTime`.
+A positive count N allows exactly N passes of a block `until`. The check before the next pass sees how many passes have already finished.
 
-An element `wait` uses the same numbers. A count of N allows N polls. Zero exhausts on the first poll.
+```gherkin
+* , until the Step Repetition is 3:
+  : * , save "tick" as "passes"
+* , until the Step Repetition is greater than 3:
+  : * , save "tick" as "passes"
+```
+
+`is 3` runs the child steps 2 times. It stops at the start of run 3. `is greater than 3` runs them 3 times. It stops when the check reads 4.
+
+The run-var limit always hard-fails; a longer Gherkin time can't extend it.
+
+A negative count is unlimited. Zero is already at the limit, so the loop makes no pass and fails with `pkb_stepRepeatMaxCount`.
+
+A negative duration is unlimited. Zero is not unlimited. After the step's start time is set, the limit is exceeded as soon as elapsed time is greater than zero. The failure names `pkb_stepMaxTime`.
+
+An element `wait` can also stop early without failing. `, or 2 minutes` on that wait is a soft limit, in either order. See [Dynamic Steps](dynamic-steps.md). That soft limit does not raise `pkb_stepMaxTime`.
 
 ## Cucumber aliases
 

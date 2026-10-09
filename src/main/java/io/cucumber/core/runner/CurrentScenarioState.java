@@ -591,13 +591,27 @@ public class CurrentScenarioState extends ScenarioMapping {
                                         ", ---" + clonedStep.overridePhrase.assertionChain
                                 )
                                 .pickleStepTestStep;
-                        waitMilliseconds(400);
-                        if (clonedStep.checkGlobalMax()) {
-                            String limit = clonedStep.reachedMaxDuration()
-                                    ? "stepRepeatMaxTime " + StepData.globalTimeoutSeconds
-                                    : "stepRepeatMaxCount " + StepData.globalMaxIterations;
+                        boolean overTime = clonedStep.reachedGlobalMaxDuration();
+                        boolean overCount = !overTime && clonedStep.reachedGlobalMaxRepetition();
+                        if (!overTime && !overCount) {
+                            long pause = StepData.untilPauseMillis(
+                                    clonedStep.startTime,
+                                    StepData.globalTimeoutSeconds
+                            );
+                            if (pause > 0) {
+                                waitMilliseconds(pause);
+                            }
+                            overTime = clonedStep.reachedGlobalMaxDuration();
+                            overCount = !overTime && clonedStep.reachedGlobalMaxRepetition();
+                        }
+                        if (overTime || overCount) {
+                            clonedStep.checkGlobalMax();
+                            String limit = overTime
+                                    ? StepData.stepMaxTimeExceededMessage()
+                                    : "Until loop exhausted pkb_stepRepeatMaxCount "
+                                            + StepData.globalMaxIterations;
                             exhaustedUntil = new RuntimeException(
-                                    "Until loop exhausted " + limit
+                                    limit
                                             + " for step '"
                                             + clonedStep.pickleStepTestStep.getStepText()
                                             + "'"
