@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
+import re
 import shutil
 import sys
 
@@ -34,6 +35,11 @@ CONSUMER_REFERENCE_TREES = (
 )
 MAX_REFERENCE_FILE_BYTES = 2 * 1024 * 1024
 MAX_REFERENCE_TOTAL_BYTES = 10 * 1024 * 1024
+# Maintainer pages stay in docs/ and out of the consumer guidance mirror.
+MAINTAINER_ONLY_DOCS = (
+    "docs/tech-debt.md",
+    "docs/experimental-features.md",
+)
 
 
 def is_maintainer_local(path: Path) -> bool:
@@ -104,13 +110,69 @@ def expected_files() -> dict[str, bytes]:
 
     files["AGENT-GUIDE.md"] = AGENT_SOURCE.read_bytes()
 
+    excluded = set(MAINTAINER_ONLY_DOCS)
     for source in sorted(DOCS_ROOT.rglob("*.md")):
         relative = source.relative_to(DOCS_ROOT).as_posix()
-        files[f"docs/{relative}"] = source.read_bytes()
+        doc_path = f"docs/{relative}"
+        if doc_path in excluded:
+            continue
+        files[doc_path] = consumer_doc_bytes(doc_path, source)
 
     index_entries = sorted([*files, *consumer_reference_entries()])
     files["index.txt"] = ("\n".join(index_entries) + "\n").encode("utf-8")
     return files
+
+
+def consumer_doc_bytes(relative: str, source: Path) -> bytes:
+    data = source.read_bytes()
+    if Path(relative).name != "README.md":
+        return data
+    return strip_maintainer_only_sections(data.decode("utf-8")).encode("utf-8")
+
+
+def strip_maintainer_only_sections(text: str) -> str:
+    """Drop README sections that only link to maintainer-only docs."""
+    excluded_names = {Path(path).name for path in MAINTAINER_ONLY_DOCS}
+    lines = text.splitlines(keepends=True)
+    kept: list[str] = []
+    index = 0
+    while index < len(lines):
+        if lines[index].startswith("## ") and section_is_maintainer_only(lines, index, excluded_names):
+            index = next_heading(lines, index + 1)
+            while kept and kept[-1].strip() == "":
+                kept.pop()
+            if kept and not kept[-1].endswith("\n"):
+                kept[-1] += "\n"
+            kept.append("\n")
+            continue
+        if markdown_link_targets_excluded(lines[index], excluded_names):
+            index += 1
+            continue
+        kept.append(lines[index])
+        index += 1
+    return "".join(kept)
+
+
+def section_is_maintainer_only(lines: list[str], heading: int, excluded_names: set[str]) -> bool:
+    end = next_heading(lines, heading + 1)
+    body = [line.strip() for line in lines[heading + 1:end] if line.strip()]
+    if not body:
+        return False
+    return all(markdown_link_targets_excluded(line, excluded_names) for line in body)
+
+
+def markdown_link_targets_excluded(line: str, excluded_names: set[str]) -> bool:
+    targets = re.findall(r"\[[^\]]*\]\(([^)]+)\)", line)
+    if not targets:
+        return False
+    return all(any(target.endswith(name) for name in excluded_names) for target in targets)
+
+
+def next_heading(lines: list[str], start: int) -> int:
+    for index in range(start, len(lines)):
+        if lines[index].startswith("## "):
+            return index
+    return len(lines)
 
 
 def current_files() -> dict[str, bytes]:

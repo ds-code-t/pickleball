@@ -1,4 +1,5 @@
 package tools.dscode.common.treeparsing.parsedComponents.phraseoperations;
+import io.cucumber.core.runner.CurrentScenarioState;
 import io.cucumber.core.runner.StepData;
 import io.cucumber.core.runner.StepExtension;
 import org.openqa.selenium.NoAlertPresentException;
@@ -17,6 +18,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.MatchResult;
 import java.util.regex.Pattern;
+import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static tools.dscode.common.browseroperations.BrowserAlerts.accept;
 import static tools.dscode.common.browseroperations.BrowserAlerts.dismiss;
@@ -557,7 +559,12 @@ public enum ActionOperations implements OperationsInterface {
         if (waited != null) {
             message.append(" for ").append(waited);
         }
-        throw new RuntimeException(message.toString());
+        RuntimeException exhausted = new RuntimeException(message.toString());
+        CurrentScenarioState state = getCurrentScenarioState();
+        if (state != null) {
+            state.recordHardFailure(exhausted);
+        }
+        throw exhausted;
     }
 
 

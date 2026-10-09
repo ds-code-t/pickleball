@@ -21,6 +21,10 @@ The parser and glue accept these steps. Their methods are empty. They do not cha
 
 These words do not resolve and are not context words: `between`, `inside`, `within`, `of`, `on`, `near`, `next to`, `following`, and `preceding`. `between` is under investigation.
 
+## Unsupported condition word
+
+`exists` is not a condition. Use `is present` or `is displayed` for elements, or a bare reference for values. Do not document `exists` as syntax.
+
 ## Inline until
 
 A mid-line or comma `until`, and a period-ending `until`, do not loop. They act as a one-time `if` or do nothing. Only a block `until` ending in `:` or `?` with nested steps loops. `runUntilOperation` is not that runtime path.

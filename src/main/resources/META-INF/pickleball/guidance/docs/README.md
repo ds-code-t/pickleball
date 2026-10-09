@@ -45,10 +45,6 @@ When these docs are materialized from the Maven dependency with Workbench `expor
 - [Diagnostic reporting](diagnostic-reporting.md) — sparse-first AI evidence, source provenance, step/capability metadata, trace evidence, screenshots/fingerprints, comparison, and retention.
 - [AI diagnostic reporting plan](ai-diagnostic-reporting-plan.md) — current sparse-first investigation and controlled-rerun architecture.
 
-## Experimental features
-
-- [Experimental features](experimental-features.md) — behavior that works now but is not recommended and may change.
-
 ## Working consumer project
 
 The example project contains a Maven dependency, runner, loopback server, browser pages, REST/SOAP endpoints, feature files, configuration data, and reusable call definitions. In the Pickleball source repository these links open the canonical consumer; after dependency guidance export they open the version-matched reference snapshot.

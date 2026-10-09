@@ -22,7 +22,6 @@ docs/diagnostic-lineage-metadata.md
 docs/diagnostic-reporting.md
 docs/dynamic-control-api.md
 docs/dynamic-steps.md
-docs/experimental-features.md
 docs/feature-status-notes.md
 docs/getting-started.md
 docs/key-parser-dsl.md
@@ -34,7 +33,6 @@ docs/pickleball-workbench.md
 docs/reserved-element-names.md
 docs/service-call-scenarios.md
 docs/step-overrides.md
-docs/tech-debt.md
 docs/workbench-thin-packaging-roadmap.md
 maven-consumer-project/pom.xml
 maven-consumer-project/src/test/java/com/example/pickleball/PickleballTests.java

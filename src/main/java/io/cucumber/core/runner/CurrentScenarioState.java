@@ -511,14 +511,13 @@ public class CurrentScenarioState extends ScenarioMapping {
         }
 
         if (throwable != null) {
-            if (SoftExceptionInterface.class.isAssignableFrom(throwable.getClass()))
+            if (SoftExceptionInterface.class.isAssignableFrom(throwable.getClass())) {
                 isScenarioSoftFail = true;
-            else {
-                isScenarioHardFail = true;
+                stepFailures.add(throwable);
+            } else {
+                recordHardFailure(throwable);
                 isScenarioSoftFail = false;
-                isScenarioComplete = true;
             }
-            stepFailures.add(throwable);
             scenarioLog.fail("SCENARIO FAILED: " + throwable.getMessage());
         }
 
@@ -561,9 +560,12 @@ public class CurrentScenarioState extends ScenarioMapping {
             return;
         }
 
+        RuntimeException exhaustedUntil = null;
+
         if (!stepExtension.definitionFlags.contains(IGNORE_CHILDREN)) {
             if (stepExtension.lineData.inheritancePhrases.isEmpty())
                 stepExtension.lineData.inheritancePhrases.add(null);
+            untilLimit:
             for (PhraseData inheritancePhrase : new ArrayList<>(stepExtension.lineData.inheritancePhrases)) {
                 if (inheritancePhrase != null && inheritancePhrase.untilPhrase) {
                     int cloneRunCount = 0;
@@ -594,16 +596,14 @@ public class CurrentScenarioState extends ScenarioMapping {
                             String limit = clonedStep.reachedMaxDuration()
                                     ? "stepRepeatMaxTime " + StepData.globalTimeoutSeconds
                                     : "stepRepeatMaxCount " + StepData.globalMaxIterations;
-                            RuntimeException exhausted = new RuntimeException(
+                            exhaustedUntil = new RuntimeException(
                                     "Until loop exhausted " + limit
                                             + " for step '"
                                             + clonedStep.pickleStepTestStep.getStepText()
                                             + "'"
                             );
-                            isScenarioHardFail = true;
-                            isScenarioComplete = true;
-                            stepFailures.add(exhausted);
-                            throw exhausted;
+                            recordHardFailure(exhaustedUntil);
+                            break untilLimit;
                         }
                         runStep(clonedStep);
                         cloneStartTime = clonedStep.startTime;
@@ -626,6 +626,9 @@ public class CurrentScenarioState extends ScenarioMapping {
 
 
         runNextSibling(stepExtension);
+        if (exhaustedUntil != null) {
+            throw exhaustedUntil;
+        }
     }
 
     /**
@@ -700,6 +703,19 @@ public class CurrentScenarioState extends ScenarioMapping {
         if (failMessage == null || failMessage.isBlank())
             failMessage = "Manually Soft Failed Scenario";
         throw new SoftRuntimeException(failMessage.trim());
+    }
+
+    /**
+     * Marks the scenario hard-failed and keeps the failure for the final status.
+     * Callers that still need later {@code ALWAYS RUN} siblings must not throw
+     * until those siblings have been offered a turn.
+     */
+    public void recordHardFailure(Throwable failure) {
+        isScenarioHardFail = true;
+        isScenarioComplete = true;
+        if (failure != null) {
+            stepFailures.add(failure);
+        }
     }
 
     public boolean isScenarioFailed() {

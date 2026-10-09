@@ -8,13 +8,11 @@ from pathlib import Path
 import subprocess
 import sys
 
+from sync_consumer_guidance import MAINTAINER_ONLY_DOCS
+
 ROOT = Path(__file__).resolve().parents[1]
 OUTPUT = ROOT / "docs" / "agent" / "repository-index.md"
 GENERATED_GUIDANCE_PREFIX = "src/main/resources/META-INF/pickleball/guidance/"
-MAINTAINER_ONLY_DOCS = {
-    "docs/tech-debt.md",
-    "docs/experimental-features.md",
-}
 
 EXCLUDED_PARTS = {
     ".agent-work",

@@ -16,6 +16,7 @@ import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static tools.dscode.common.util.Reflect.getProperty;
 import static tools.dscode.common.util.Reflect.setProperty;
@@ -100,6 +101,43 @@ public class AreaBControlFlowChecks {
         assertFalse(blank.getMessage().contains("with argument"), blank.getMessage());
         StepCreationException present = assertStepCreation("this step does not exist", "arg");
         assertTrue(present.getMessage().contains("with argument 'arg'"), present.getMessage());
+    }
+
+    @Test
+    void alwaysRunSiblingRunsAfterUntilExhaustsAndAPlainSiblingDoesNot() {
+        CurrentScenarioState state = requireScenario();
+        StepExtension previousStep = state.getCurrentStep();
+        int previousIterations = StepData.globalMaxIterations;
+        Duration previousTimeout = StepData.globalTimeoutSeconds;
+        int previousFailures = state.stepFailures.size();
+        StepData.globalMaxIterations = 0;
+        StepData.globalTimeoutSeconds = Duration.ofHours(1);
+        save("untouched", "untilAlwaysSibling");
+        save("untouched", "untilPlainSibling");
+        try {
+            StepExtension untilStep = observedStep(", until \"\" equals \"done\":");
+            StepExtension always = observedStep(
+                    "ALWAYS RUN: , save \"ran\" as \"untilAlwaysSibling\""
+            );
+            StepExtension plain = observedStep(", save \"ran\" as \"untilPlainSibling\"");
+            chain(state, untilStep, always, plain);
+            RuntimeException exhausted = assertThrows(
+                    RuntimeException.class,
+                    () -> state.runStep(untilStep)
+            );
+            String detail = detail(exhausted);
+            assertTrue(detail.contains("Until loop exhausted"), detail);
+            assertTrue(state.isScenarioFailed(), detail);
+            assertSaved("untilAlwaysSibling", "ran");
+            assertSaved("untilPlainSibling", "untouched");
+        } finally {
+            StepData.globalMaxIterations = previousIterations;
+            StepData.globalTimeoutSeconds = previousTimeout;
+            while (state.stepFailures.size() > previousFailures) {
+                state.stepFailures.remove(state.stepFailures.size() - 1);
+            }
+            restoreScenario(state, previousStep);
+        }
     }
 
     @Test
