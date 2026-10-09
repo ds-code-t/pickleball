@@ -260,7 +260,7 @@ public class ScenarioStep extends StepExtension {
         List<PickleStepTestStep> pickleSteps =
                 new ArrayList<>(createPickleStepTestStepsFromPickle(pickle));
         if (!includeBackground) {
-            CalledFeatureBackground.omitBackgroundSteps(pickle, pickleSteps);
+            omitBackgroundSteps(pickleSteps);
         }
         scenarioStep.initializeScenarioSteps(
                 pickleSteps.stream()
@@ -271,6 +271,19 @@ public class ScenarioStep extends StepExtension {
         );
         scenarioStep.getDefaultStepNodeMap().put("SCENARIO NAME", pickleName);
         return scenarioStep;
+    }
+
+    /**
+     * Drops steps compiled from a Background. A feature with no Background
+     * has none marked, so this removes nothing and does not fail.
+     */
+    static void omitBackgroundSteps(List<PickleStepTestStep> steps) {
+        if (steps == null || steps.isEmpty()) {
+            return;
+        }
+        steps.removeIf(step -> step != null
+                && step.getPickleStep() != null
+                && step.getPickleStep().isFromBackground());
     }
     private ScenarioStep(
             TestCase testCase,

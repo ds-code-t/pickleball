@@ -2,6 +2,7 @@ package io.cucumber.gherkin;
 
 import io.cucumber.messages.types.Location;
 import io.cucumber.messages.types.Pickle;
+import io.cucumber.messages.types.PickleStep;
 import io.cucumber.messages.types.TableCell;
 import io.cucumber.messages.types.TableRow;
 import io.cucumber.messages.types.Tag;
@@ -30,6 +31,17 @@ public aspect PickleCompilerAugment {
     public void io.cucumber.messages.types.Pickle.setOutlineRows(List<String> hdr, List<String> vals) {
         this.headerRow = (hdr == null || hdr.isEmpty()) ? List.of() : List.copyOf(hdr);
         this.valueRow = (vals == null || vals.isEmpty()) ? List.of() : List.copyOf(vals);
+    }
+
+    /* Background steps are marked when compiled, for every scenario, rule, and outline. */
+    private boolean io.cucumber.messages.types.PickleStep.fromBackground = false;
+
+    public boolean io.cucumber.messages.types.PickleStep.isFromBackground() {
+        return this.fromBackground;
+    }
+
+    public void io.cucumber.messages.types.PickleStep.setFromBackground(boolean fromBackground) {
+        this.fromBackground = fromBackground;
     }
 
     /* (2) Per-thread context for Examples row: [hdr, vals, loc] */
@@ -71,8 +83,33 @@ public aspect PickleCompilerAugment {
 
                     CTX.get().push(new Object[]{hdr, vals, loc});
                 }
-                return proceed(bgSteps, scenarioSteps, variableCells, valuesRow);
+                Object compiled = proceed(bgSteps, scenarioSteps, variableCells, valuesRow);
+                markBackgroundSteps(bgSteps, compiled);
+                return compiled;
             }
+
+    after(List<?> backgroundSteps) returning(Object steps)
+            : call(* io.cucumber.gherkin.PickleCompiler.compilePickleSteps(..))
+            && args(backgroundSteps, ..)
+            && !withinCompileScenarioOutline()
+            {
+                markBackgroundSteps(backgroundSteps, steps);
+            }
+
+    private static void markBackgroundSteps(List<?> backgroundSteps, Object compiled) {
+        if (!(compiled instanceof List<?> steps)
+                || backgroundSteps == null
+                || backgroundSteps.isEmpty()
+                || steps.isEmpty()) {
+            return;
+        }
+        int count = Math.min(backgroundSteps.size(), steps.size());
+        for (int i = 0; i < count; i++) {
+            if (steps.get(i) instanceof PickleStep pickleStep) {
+                pickleStep.setFromBackground(true);
+            }
+        }
+    }
 
     /* (5) Augment tags using header/value rows */
     List<Tag> around(List<Tag> a, List<Tag> b)

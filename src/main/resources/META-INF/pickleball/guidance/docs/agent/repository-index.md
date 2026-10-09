@@ -92,7 +92,6 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/io/cucumber/core/gherkin/messages/MessageUtilities.java`
 - `src/main/java/io/cucumber/core/gherkin/messages/NGherkinFactory.java`
 - `src/main/java/io/cucumber/core/runner/ArgStepFunctions.java`
-- `src/main/java/io/cucumber/core/runner/CalledFeatureBackground.java`
 - `src/main/java/io/cucumber/core/runner/CoreConstants.java`
 - `src/main/java/io/cucumber/core/runner/CucumberStepInvoker.java`
 - `src/main/java/io/cucumber/core/runner/CurrentScenarioState.java`
@@ -410,6 +409,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 ## Framework tests
 
 - `src/test/java/io/cucumber/core/gherkin/messages/ConditionalArgumentPickleTest.java`
+- `src/test/java/io/cucumber/core/gherkin/messages/PickleStepBackgroundCloneTest.java`
 - `src/test/java/io/cucumber/core/runner/StepRepetitionLimitTest.java`
 - `src/test/java/tools/dscode/common/assertions/AssertionClauseSplitterTest.java`
 - `src/test/java/tools/dscode/common/coordination/AgentCoordinationTest.java`

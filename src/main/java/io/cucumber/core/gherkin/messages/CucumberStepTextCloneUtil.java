@@ -35,6 +35,7 @@ final class CucumberStepTextCloneUtil {
             clone.inlineArgumentType = source.inlineArgumentType;
             clone.inlineArgumentText = source.inlineArgumentText;
         }
+        clone.setFromBackground(source.isFromBackground());
         return clone;
     }
 

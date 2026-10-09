@@ -35,6 +35,7 @@ public final class CucumberDeepCloneUtil {
         clone.inlineArgumentType = source.inlineArgumentType;
         clone.inlineArgumentText = source.inlineArgumentText;
         clone.nestingLevel = source.nestingLevel;
+        clone.setFromBackground(source.isFromBackground());
 
         return clone;
     }

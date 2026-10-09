@@ -5,16 +5,13 @@ import tools.dscode.common.mappings.MapConfigurations;
 import tools.dscode.common.mappings.NodeMap;
 import tools.dscode.common.mappings.ParsingMap;
 
-import java.net.URI;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.lang.reflect.Proxy;
 
-import io.cucumber.core.gherkin.Pickle;
+import io.cucumber.messages.types.PickleStep;
 
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -193,44 +190,35 @@ public class ScenarioStepChecks {
     }
 
     @Test
-    void backgroundLookupFailureIsRaisedInsteadOfKeepingBackgrounds() {
-        URI uri = URI.create("file:///area-b-missing-background.feature");
-        Pickle pickle = (Pickle) Proxy.newProxyInstance(
-                Pickle.class.getClassLoader(),
-                new Class<?>[]{Pickle.class},
-                (proxy, method, args) -> switch (method.getName()) {
-                    case "getUri" -> uri;
-                    case "getName" -> "area-b-missing";
-                    case "toString" -> "area-b-missing-pickle";
-                    case "hashCode" -> System.identityHashCode(proxy);
-                    case "equals" -> proxy == args[0];
-                    default -> defaultProxyValue(method.getReturnType());
-                }
+    void missingBackgroundOmitsNothingAndDoesNotFail() {
+        PickleStepTestStep kept = NPickleStepTestStepFactory.getPickleStepTestStepFromStrings(
+                "* ",
+                ", save \"kept\" as \"bgKept\"",
+                null
         );
-        IllegalStateException thrown = assertThrows(
-                IllegalStateException.class,
-                () -> CalledFeatureBackground.omitBackgroundSteps(pickle, new ArrayList<>())
+        PickleStepTestStep background = NPickleStepTestStepFactory.getPickleStepTestStepFromStrings(
+                "* ",
+                ", save \"background\" as \"bgDropped\"",
+                null
         );
-        assertTrue(
-                thrown.getMessage().contains("Could not determine background steps"),
-                thrown.getMessage()
+        assertFalse(kept.getPickleStep().isFromBackground());
+        background.getPickleStep().setFromBackground(true);
+        List<PickleStepTestStep> steps = new ArrayList<>();
+        ScenarioStep.omitBackgroundSteps(steps);
+        assertTrue(steps.isEmpty());
+        steps.add(background);
+        steps.add(kept);
+        ScenarioStep.omitBackgroundSteps(steps);
+        assertEquals(1, steps.size());
+        assertFalse(steps.getFirst().getPickleStep().isFromBackground());
+        PickleStep copy = new PickleStep(
+                null,
+                List.of("bg"),
+                "bg-id",
+                null,
+                "background step"
         );
-        assertTrue(thrown.getMessage().contains(uri.toString()), thrown.getMessage());
-    }
-
-    private static Object defaultProxyValue(Class<?> type) {
-        if (!type.isPrimitive()) {
-            return null;
-        }
-        if (type == boolean.class) {
-            return false;
-        }
-        if (type == int.class) {
-            return 0;
-        }
-        if (type == long.class) {
-            return 0L;
-        }
-        return null;
+        copy.setFromBackground(true);
+        assertTrue(copy.isFromBackground());
     }
 }

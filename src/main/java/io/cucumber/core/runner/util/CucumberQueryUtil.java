@@ -107,10 +107,6 @@ public final class CucumberQueryUtil {
         return scenarioOf(query(gmPickle), messagePickle(gmPickle));
     }
 
-    public static Optional<Feature> featureOf(Object gmPickle) {
-        return featureOf(query(gmPickle), messagePickle(gmPickle));
-    }
-
     public static Optional<Rule> ruleOf(Object gmPickle) {
         return ruleOf(query(gmPickle), messagePickle(gmPickle));
     }
