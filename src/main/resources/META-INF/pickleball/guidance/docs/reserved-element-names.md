@@ -101,6 +101,18 @@ These names are Data Elements, not HTML. Plurals and aliases are included. See [
 
 `Loading` and `Loadings` are the built-in loading element. It is still an HTML element. A project may overlay that category the same way it overlays `Button`. That overlay does not warn.
 
+`Loading` searches every context. The scan looks at the current document, then the top document, then each `iframe` and `frame`, then each open shadow root. It ignores an `in`, `from`, or `for` context on the phrase. Implicit wait is off during the scan. Only a displayed node counts, so a hidden spinner does not. A stale, cross-origin, detached, or closed frame or root is skipped. The scan stops descending at depth 5 and at 20 frames, logs one warning, and continues. The driver is put back in the frame it started in.
+
+A match in the current document, including an open shadow root there, can be clicked. A match in another frame counts for `wait`, `is present`, and `is displayed`, and is then dropped. It cannot be clicked, entered, saved, read, or used as a context:
+
+```text
+Loading matched in another frame and cannot be clicked, entered, saved, read, or used as a context.
+```
+
+The default locator matches `@aria-busy='true'`, `@role='progressbar'`, `@data-loading='true'`, `@data-state='loading'`, a `progress` that is busy, has no value, or whose value is below its max, a `meter` or `role=status` only when it is also busy, and a `data-testid` whose whole token is `loading` or `spinner`. `not-loading` and `loading-spinner` do not match. It does not match on class.
+
+`category("Loading").or(xpath)` adds a clause and keeps that locator and the all-contexts scan. `reset()` clears both. `Loadings` keeps its parent link and inherits nothing until `restoreBuiltinLoading()` puts the locator and the scan back. An `or` added after `reset()` has to be added again after restore. A category that inherits `Loading` inherits the scan.
+
 ## Browser, alert, and window names
 
 These names are browser elements, not HTML:

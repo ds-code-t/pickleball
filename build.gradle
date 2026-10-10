@@ -187,6 +187,8 @@ tasks.register('weaveTargets', JavaExec) {
     description = 'Weaves ALL target jars with compiled aspects in one AJC run'
     dependsOn 'ajcMain'
 
+    def classesDir = sourceSets.main.java.destinationDirectory
+    inputs.dir(classesDir)
     outputs.file(wovenJar)
 
     doFirst {
@@ -208,11 +210,11 @@ tasks.register('weaveTargets', JavaExec) {
     mainClass.set('org.aspectj.tools.ajc.Main')
     classpath = configurations.ajcTools
 
-    def classesDir = sourceSets.main.java.destinationDirectory.get().asFile
+    def classesDirFile = classesDir.get().asFile
     def weaverClasspath = files(
             configurations.weaveLibs,
             configurations.ajcRuntime,
-            classesDir
+            classesDirFile
     ).asPath
 
     args = [
@@ -220,7 +222,7 @@ tasks.register('weaveTargets', JavaExec) {
             '-verbose',
             '-Xlint:warning',
             '-inpath', files(inpathFiles).asPath,
-            '-aspectpath', files(classesDir).asPath,
+            '-aspectpath', files(classesDirFile).asPath,
             '-classpath', weaverClasspath,
             '-outjar', wovenJar.get().asFile.absolutePath
     ]

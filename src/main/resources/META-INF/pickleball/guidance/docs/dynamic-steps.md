@@ -275,6 +275,8 @@ A Gherkin time on that wait is a soft limit. Either order is the same:
 
 The wait stops when the element appears, or when that time passes, and then continues. It does not fail and it does not log a warning. The time counts from the step's start, the same clock as Step Duration, so page-ready time is included. The clock is checked before each sleep, and the sleep is only the time left, capped at 3 seconds. `, or 0 seconds` does one check. A number word such as `two` is not a duration. The run-var limit always hard-fails; a longer Gherkin time can't extend it.
 
+`wait Loading` waits until that loading element is gone. `Loading` is looked up in the current document, the top document, frames, and open shadow roots, not only inside an `in` / `from` / `for` context. A displayed match in another frame keeps the wait going. Clicking, entering, saving, reading, or using that match as a context fails. A match in the current document, including its open shadow root, can be clicked. See [Reserved element names](reserved-element-names.md).
+
 Step Repetition, Step Duration, and the other reserved names are listed in [Reserved element names](reserved-element-names.md).
 
 ## Inline argument markers

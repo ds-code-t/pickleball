@@ -406,22 +406,7 @@ public final class DefinitionContext {
                     );
 
 
-            category("Loading").flags()
-                    .or(
-                            (category, v, op) ->
-                                    XPathy.from("//*[" +
-                                            "       self::progress" +
-                                            "    or self::meter" +
-                                            "    or @aria-busy = 'true'" +
-                                            "    or @role = 'progressbar'" +
-                                            "    or @role = 'status'" +
-                                            "    or (@role = 'progressbar' and (@aria-valuenow or @aria-valuemin or @aria-valuemax))" +
-                                            "    or @data-loading = 'true'" +
-                                            "    or @data-state = 'loading'" +
-                                            "    or contains(@data-testid, 'loading')" +
-                                            "    or contains(@data-testid, 'spinner')" +
-                                            "]")
-                    );
+            registerBuiltinLoading();
 
             category(FILE_INPUT).flags(CategoryFlags.NON_DISPLAY_ELEMENT)
                     .and(

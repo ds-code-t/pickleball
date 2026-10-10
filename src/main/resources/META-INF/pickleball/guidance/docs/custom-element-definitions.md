@@ -81,13 +81,15 @@ dictionary.category("Close Button")
         .addBase("//*[self::button and @aria-label='Close']");
 ```
 
-Call `reset()` first when the category should be redefined from scratch. `reset()` clears registrations defined directly on that name. Child aliases that inherit from it are left intact.
+Call `reset()` first when the category should be redefined from scratch. `reset()` clears registrations defined directly on that name, including locator builders and flags such as `ALL_CONTEXTS`. Child aliases that inherit from it are left intact, and they inherit nothing until the category is registered again.
 
 ```java
 dictionary.category("Close Button")
         .reset()
         .addBase("//*[self::button and @aria-label='Close']");
 ```
+
+`Loading` is registered with `CategoryFlags.ALL_CONTEXTS` and the built-in locator. `category("Loading").or(xpath)` adds a clause and keeps both. `reset()` clears them. `restoreBuiltinLoading()` puts the locator and the flag back. Add the `or` again after that restore. A category that `inheritsFrom("Loading")` inherits the scan. Only a flagged category searches every context. `Button` does not.
 
 Do not re-register a built-in with the same locator as a "new" category. `Radio Button` is already built in; the consumer does not register it.
 

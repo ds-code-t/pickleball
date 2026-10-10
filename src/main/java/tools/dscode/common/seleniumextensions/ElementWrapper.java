@@ -5,6 +5,7 @@ import org.openqa.selenium.*;
 import org.openqa.selenium.NoSuchElementException;
 import tools.dscode.common.domoperations.ExecutionDictionary;
 import tools.dscode.common.treeparsing.parsedComponents.ElementMatch;
+import tools.dscode.common.treeparsing.parsedComponents.ElementType;
 import tools.dscode.common.assertions.ValueWrapper;
 
 import java.time.Duration;
@@ -39,6 +40,7 @@ public class ElementWrapper implements WebElement, WrapsElement {
     private final String xpath2;
     public final ElementMatch elementMatch;
     public final Integer matchIndex;
+    public final boolean foreignContext;
 
     private static final Set<String> DOM_PROPERTY_FALLBACK_KEYS = Set.of(
             "innerHTML",
@@ -49,11 +51,17 @@ public class ElementWrapper implements WebElement, WrapsElement {
     );
 
     public static List<ElementWrapper> getWrappedElements(ElementMatch elementMatch) {
+        if (elementMatch.searchesAllContexts()) {
+            return AllContextsScan.find(elementMatch);
+        }
         if (elementMatch.parentPhrase.contextElement != null)
             return Collections.singletonList(elementMatch.parentPhrase.contextElement);
+        // A partner phrase has not executed yet, so it has no context wrapper.
+        if (elementMatch.contextWrapper == null
+                && elementMatch.elementTypes.contains(ElementType.HTML_TYPE)) {
+            elementMatch.contextWrapper = new ContextWrapper(elementMatch);
+        }
         SearchContext searchContext = elementMatch.contextWrapper.getFinalSearchContext();
-        if (elementMatch.parentPhrase.contextElement != null)
-            return Collections.singletonList(elementMatch.parentPhrase.contextElement);
         List<ElementWrapper> elementWrappers = new ArrayList<>();
         List<WebElement> elements = elementMatch.contextWrapper.getElements(searchContext);
         boolean singleElement = elementMatch.selectionType.isBlank();
@@ -72,6 +80,7 @@ public class ElementWrapper implements WebElement, WrapsElement {
         this.driver = elementMatch.parentPhrase.getDriver();
         this.matchIndex = matchIndex;
         this.elementMatch = elementMatch;
+        this.foreignContext = false;
         this.element = Objects.requireNonNull(element, "element must not be null");
 
         takeSnapshot(this.element);
@@ -83,6 +92,37 @@ public class ElementWrapper implements WebElement, WrapsElement {
                 List.of("role", "aria-label", "class"));
         this.xpath2 = buildXPathForElement(driver, element, 10, 15,
                 List.of("href", "target", "src", "index"));
+    }
+
+    /**
+     * A displayed match from another frame. It counts for a presence or wait check and
+     * is not a live element.
+     */
+    public static ElementWrapper foreignPresence(ElementMatch elementMatch) {
+        return new ElementWrapper(elementMatch);
+    }
+
+    private ElementWrapper(ElementMatch elementMatch) {
+        this.driver = elementMatch.parentPhrase.getDriver();
+        this.matchIndex = 0;
+        this.elementMatch = elementMatch;
+        this.foreignContext = true;
+        this.element = null;
+        this.attributeSnapshot = MAPPER.createObjectNode();
+        this.xpath1 = "";
+        this.xpath2 = "";
+    }
+
+    public static String foreignContextMessage(String category) {
+        String name = category == null || category.isBlank() ? "Element" : category;
+        return name + " matched in another frame and cannot be clicked, entered, saved, read, or used as a context.";
+    }
+
+    public void rejectIfForeignContext() {
+        if (foreignContext) {
+            String category = elementMatch == null ? null : elementMatch.category;
+            throw new IllegalStateException(foreignContextMessage(category));
+        }
     }
 
     public void takeSnapshot() {
@@ -179,6 +219,7 @@ public class ElementWrapper implements WebElement, WrapsElement {
     }
 
     public ValueWrapper getElementReturnValue() {
+        rejectIfForeignContext();
         if (attributeSnapshot.has(ELEMENT_RETURN_VALUE))
             return createValueWrapper(attributeSnapshot.get(ELEMENT_RETURN_VALUE).asText());
 
@@ -250,6 +291,7 @@ public class ElementWrapper implements WebElement, WrapsElement {
     }
 
     private <T> T executeWithStaleRetry(java.util.function.Function<WebElement, T> operation) {
+        rejectIfForeignContext();
         WebElement currentElement = this.element;
         try {
             return operation.apply(currentElement);
@@ -813,6 +855,9 @@ public class ElementWrapper implements WebElement, WrapsElement {
 
     @Override
     public boolean isDisplayed() {
+        if (foreignContext) {
+            return true;
+        }
         if (elementMatch.categoryFlags.contains(
                 ExecutionDictionary.CategoryFlags.NON_DISPLAY_ELEMENT))
             return true;

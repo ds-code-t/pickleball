@@ -251,14 +251,20 @@ public final class Phrase extends PhraseData {
                 }
             }
         } else if (!firstElement.selectionType.isEmpty() || !firstElement.elementPosition.isEmpty()) {
-            if (firstElement.getElementWrappers().isEmpty()) {
+            List<ElementWrapper> wrappers = firstElement.getElementWrappers();
+            if (wrappers.isEmpty()) {
                 phraseConditionalMode = 0;
                 if (!firstElement.selectionType.equals("any")) {
                     throw new RuntimeException("Failed to find WebElements for " + firstElement);
                 }
                 System.out.println("No elements match for " + firstElement + ", skipping subsequent phrases");
             }
-            for (ElementWrapper elementWrapper : getWrappedElements()) {
+            for (ElementWrapper elementWrapper : wrappers) {
+                if (elementWrapper.foreignContext) {
+                    elementWrapper.rejectIfForeignContext();
+                }
+            }
+            for (ElementWrapper elementWrapper : wrappers) {
                 branchedPhrases.add(cloneWithElementContext(elementWrapper));
             }
         }

@@ -29,6 +29,14 @@ These words do not resolve and are not context words: `between`, `inside`, `with
 
 `exists` is not a condition. Use `is present` or `is displayed` for elements, or a bare reference for values. Do not document `exists` as syntax.
 
+## Any parent context
+
+There is no syntax that means "any parent context". `PhraseData.context` and `PhraseData.getPhraseContextList` are the hook. `AllContextsScan` must not special-case that syntax.
+
+## Phrase-local context
+
+A phrase cannot opt out of `ALL_CONTEXTS` or pin `Loading` to the inherited `in` / `from` / `for` context. A future flag would be read only by `ElementMatch.searchesAllContexts()`.
+
 ## Inline until
 
 A mid-line or comma `until`, and a period-ending `until`, do not loop. They act as a one-time `if` or do nothing. Only a block `until` ending in `:` or `?` with nested steps loops. `runUntilOperation` is not that runtime path.

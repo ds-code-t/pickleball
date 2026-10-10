@@ -28,6 +28,12 @@ public final class HumanInteractions {
     private HumanInteractions() {
     }
 
+    private static void rejectForeignContext(WebElement el) {
+        if (el instanceof ElementWrapper wrapper) {
+            wrapper.rejectIfForeignContext();
+        }
+    }
+
     public static void blur(WebDriver driver) {
         ((JavascriptExecutor) driver).executeScript(
                 "if (document.activeElement) { document.activeElement.blur(); }"
@@ -41,6 +47,7 @@ public final class HumanInteractions {
     public static void selectDropdownByIndex(WebDriver driver,
                                              WebElement element,
                                              int index) {
+        rejectForeignContext(element);
         Objects.requireNonNull(element, "element must not be null");
         if (index < 0) {
             throw new IllegalArgumentException("index must be >= 0");
@@ -62,6 +69,7 @@ public final class HumanInteractions {
     public static void selectDropdownByVisibleText(WebDriver driver,
                                                    WebElement container,
                                                    ValueWrapper valueWrapper) {
+        rejectForeignContext(container);
         Objects.requireNonNull(container, "container must not be null");
         Objects.requireNonNull(valueWrapper, "valueWrapper must not be null");
 
@@ -109,6 +117,7 @@ public final class HumanInteractions {
      * use ElementWrapper.executeScript so stale-element relocation remains available.</p>
      */
     public static void click(WebDriver driver, WebElement el) {
+        rejectForeignContext(el);
         Objects.requireNonNull(el, "element must not be null");
         try {
             centerScroll(driver, el);
@@ -129,6 +138,7 @@ public final class HumanInteractions {
     }
 
     public static void doubleClick(WebDriver driver, WebElement el) {
+        rejectForeignContext(el);
         Objects.requireNonNull(el, "element must not be null");
         try {
             centerScroll(driver, el);
@@ -148,6 +158,7 @@ public final class HumanInteractions {
     }
 
     public static void contextClick(WebDriver driver, WebElement el) {
+        rejectForeignContext(el);
         Objects.requireNonNull(el, "element must not be null");
         try {
             centerScroll(driver, el);
@@ -167,6 +178,7 @@ public final class HumanInteractions {
     }
 
     public static void hover(WebDriver driver, WebElement el) {
+        rejectForeignContext(el);
         Objects.requireNonNull(el, "element must not be null");
         try {
             centerScroll(driver, el);
@@ -179,6 +191,8 @@ public final class HumanInteractions {
     }
 
     public static void dragAndDrop(WebDriver driver, WebElement source, WebElement target) {
+        rejectForeignContext(source);
+        rejectForeignContext(target);
         Objects.requireNonNull(source, "source must not be null");
         Objects.requireNonNull(target, "target must not be null");
         try {
@@ -198,6 +212,7 @@ public final class HumanInteractions {
     }
 
     public static void dragByOffset(WebDriver driver, WebElement source, int xOffset, int yOffset) {
+        rejectForeignContext(source);
         Objects.requireNonNull(source, "source must not be null");
         try {
             centerScroll(driver, source);
@@ -219,6 +234,7 @@ public final class HumanInteractions {
     }
 
     public static void wheelScrollBy(WebDriver driver, WebElement el, int deltaY) {
+        rejectForeignContext(el);
         Objects.requireNonNull(el, "element must not be null");
         try {
             centerScroll(driver, el);
@@ -235,6 +251,7 @@ public final class HumanInteractions {
     // =======================
 
     public static void clearAndType(WebDriver driver, WebElement el, CharSequence text) {
+        rejectForeignContext(el);
         Objects.requireNonNull(el, "element must not be null");
         final String s = text == null ? "" : text.toString();
         try {
@@ -248,6 +265,7 @@ public final class HumanInteractions {
     }
 
     public static void clear(WebDriver driver, WebElement el) {
+        rejectForeignContext(el);
         Objects.requireNonNull(el, "element must not be null");
         focus(driver, el);
         el.sendKeys(Keys.chord(osControlKey(), "a"));
@@ -255,6 +273,7 @@ public final class HumanInteractions {
     }
 
     public static void typeText(WebDriver driver, WebElement el, CharSequence text) {
+        rejectForeignContext(el);
         if (el == null) {
             typeText(driver, text);
             return;
@@ -302,6 +321,7 @@ public final class HumanInteractions {
     }
 
     public static void pressEnter(WebDriver driver, WebElement el) {
+        rejectForeignContext(el);
         Objects.requireNonNull(el, "element must not be null");
         try {
             focus(driver, el);
@@ -330,6 +350,7 @@ public final class HumanInteractions {
      * propagated, while other WebDriver scrolling failures remain best-effort.
      */
     public static void centerScroll(WebDriver driver, WebElement el) {
+        rejectForeignContext(el);
         Objects.requireNonNull(el, "element must not be null");
         try {
             executeElementScript(driver, CENTER_SCROLL_SCRIPT, el);

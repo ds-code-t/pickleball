@@ -132,7 +132,31 @@ public class ExecutionDictionary {
         }
     }
 
-    public enum CategoryFlags {PAGE_CONTEXT, PAGE_TOP_CONTEXT, ELEMENT_CONTEXT, DATA_CONTEXT, SHADOW_HOST, IFRAME, NON_DISPLAY_ELEMENT, NO_NESTING_FILTER, OUTER_NESTING_FILTER}
+    public enum CategoryFlags {PAGE_CONTEXT, PAGE_TOP_CONTEXT, ELEMENT_CONTEXT, DATA_CONTEXT, SHADOW_HOST, IFRAME, NON_DISPLAY_ELEMENT, NO_NESTING_FILTER, OUTER_NESTING_FILTER, ALL_CONTEXTS}
+
+    /**
+     * Default locator for {@code Loading}. Whole {@code data-testid} tokens only:
+     * {@code loading-spinner} and {@code not-loading} do not match. Hidden nodes are
+     * dropped by the scan, not by this XPath.
+     */
+    public static final String BUILTIN_LOADING_XPATH = """
+            //*[
+              @aria-busy='true'
+              or @role='progressbar'
+              or @data-loading='true'
+              or @data-state='loading'
+              or (self::progress and (
+                    @aria-busy='true'
+                    or not(@value)
+                    or (not(@max) and number(@value) < 1)
+                    or (@max and number(@value) < number(@max))
+                 ))
+              or (self::meter and @aria-busy='true')
+              or (@role='status' and @aria-busy='true')
+              or contains(concat(' ', normalize-space(@data-testid), ' '), ' loading ')
+              or contains(concat(' ', normalize-space(@data-testid), ' '), ' spinner ')
+            ]
+            """;
 
     //========================================================
     // Instance state
@@ -292,6 +316,23 @@ public class ExecutionDictionary {
         lineageCache.clear();
     }
 
+    /**
+     * Put the built-in {@code Loading} locator and {@link CategoryFlags#ALL_CONTEXTS} back.
+     * {@code reset()} clears both. Child names such as {@code Loadings} keep their parent
+     * link across {@code resetCategory("Loading")} and inherit nothing until this runs.
+     * An {@code or} added after a reset must be added again after restore.
+     */
+    public void restoreBuiltinLoading() {
+        resetCategory("Loading");
+        registerBuiltinLoading();
+    }
+
+    protected void registerBuiltinLoading() {
+        category("Loading")
+                .children("Loadings")
+                .flags(CategoryFlags.ALL_CONTEXTS)
+                .or((category, v, op) -> XPathy.from(BUILTIN_LOADING_XPATH));
+    }
 
     /**
      * Resolve full inheritance chain for a category.

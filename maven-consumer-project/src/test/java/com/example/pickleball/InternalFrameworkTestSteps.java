@@ -153,6 +153,11 @@ public final class InternalFrameworkTestSteps {
         runAndAssert(DataElementPhaseFiveChecks.class);
     }
 
+    @Given("^RUN LOADING CONTEXT JAVA TESTS$")
+    public static void runLoadingContextJavaTests() {
+        runAndAssert(LoadingContextChecks.class);
+    }
+
     private static void runAndAssert(Class<?>... testClasses) {
         List<InternalJavaTestRunner.Result> results =
                 InternalJavaTestRunner.run(testClasses);

@@ -283,6 +283,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/common/reporting/WorkBook.java`
 - `src/main/java/tools/dscode/common/reporting/WorkBookConsolePrinter.java`
 - `src/main/java/tools/dscode/common/reporting/WorkSheet.java`
+- `src/main/java/tools/dscode/common/seleniumextensions/AllContextsScan.java`
 - `src/main/java/tools/dscode/common/seleniumextensions/ContextWrapper.java`
 - `src/main/java/tools/dscode/common/seleniumextensions/ElementWrapper.java`
 - `src/main/java/tools/dscode/common/servicecalls/RestAssuredUtil.java`
@@ -409,11 +410,11 @@ This inventory helps coding agents discover relevant files. It does not replace 
 ## Framework tests
 
 - `src/test/java/io/cucumber/core/gherkin/messages/ConditionalArgumentPickleTest.java`
-- `src/test/java/io/cucumber/core/gherkin/messages/PickleStepBackgroundCloneTest.java`
 - `src/test/java/io/cucumber/core/runner/StepRepetitionLimitTest.java`
 - `src/test/java/tools/dscode/common/assertions/AssertionClauseSplitterTest.java`
 - `src/test/java/tools/dscode/common/coordination/AgentCoordinationTest.java`
 - `src/test/java/tools/dscode/common/coordination/RunConfigIsolationTest.java`
+- `src/test/java/tools/dscode/common/domoperations/LoadingCategoryDefinitionTest.java`
 - `src/test/java/tools/dscode/common/driver/DriverDownloadFallbackTest.java`
 - `src/test/java/tools/dscode/common/mappings/queries/DocumentAndReservedFieldReadTest.java`
 - `src/test/java/tools/dscode/common/reporting/diagnostic/AgentBrowserLadderTest.java`
@@ -670,6 +671,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `maven-consumer-project/src/test/java/com/example/pickleball/DiagnosticValidationSteps.java`
 - `maven-consumer-project/src/test/java/com/example/pickleball/DynamicControlApiChecks.java`
 - `maven-consumer-project/src/test/java/com/example/pickleball/InternalFrameworkTestSteps.java`
+- `maven-consumer-project/src/test/java/com/example/pickleball/LoadingContextChecks.java`
 - `maven-consumer-project/src/test/java/com/example/pickleball/LogAndAssertStepsChecks.java`
 - `maven-consumer-project/src/test/java/com/example/pickleball/MappingTypeSteps.java`
 - `maven-consumer-project/src/test/java/com/example/pickleball/PickleballTests.java`
@@ -803,6 +805,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `maven-consumer-project/src/test/resources/site/forms.html`
 - `maven-consumer-project/src/test/resources/site/index.html`
 - `maven-consumer-project/src/test/resources/site/keyboard.html`
+- `maven-consumer-project/src/test/resources/site/loading.html`
 - `maven-consumer-project/src/test/resources/site/window-actions.html`
 - `maven-consumer-project/src/test/resources/site/window-child.html`
 - `maven-consumer-project/src/test/resources/site/workflow.html`

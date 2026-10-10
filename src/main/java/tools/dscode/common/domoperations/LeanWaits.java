@@ -40,6 +40,9 @@ public final class LeanWaits {
             if (elementMatch.elementTypes.contains(ElementType.HTML_ELEMENT)) {
                 elementMatch.findWrappedElements();
                 for (ElementWrapper elementWrapper : elementMatch.getElementWrappers()) {
+                    if (elementWrapper.foreignContext || elementWrapper.element == null) {
+                        continue;
+                    }
                     safeWaitForElementReady(driver, elementWrapper.element, Duration.ofSeconds(60));
                 }
             }

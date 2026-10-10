@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Loading fixtures</title>
+  <style>
+    progress, meter, iframe, button, [data-case] { display: block; width: 160px; height: 24px; margin: 4px 0; }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+  function write(iframe, html) {
+    var doc = iframe.contentDocument;
+    doc.open();
+    doc.write("<!DOCTYPE html><html><body>" + html + "</body></html>");
+    doc.close();
+  }
+
+  function chain(host, levels, leaf) {
+    var doc = document;
+    var parent = host;
+    for (var i = 1; i <= levels; i++) {
+      var iframe = doc.createElement("iframe");
+      iframe.id = "level-" + i;
+      iframe.title = "level-" + i;
+      parent.appendChild(iframe);
+      write(iframe, "");
+      doc = iframe.contentDocument;
+      parent = doc.body;
+    }
+    parent.innerHTML = leaf;
+  }
+
+  function siblings(host, count, spinnerIndex) {
+    for (var i = 1; i <= count; i++) {
+      var iframe = document.createElement("iframe");
+      iframe.id = "cap-" + i;
+      iframe.title = "cap-" + i;
+      host.appendChild(iframe);
+      write(iframe, i === spinnerIndex ? "<div aria-busy='true' id='cap-spin'>cap spin</div>" : "<p>empty</p>");
+    }
+  }
+
+  var fixtures = {
+    quiet: function (root) {
+      root.innerHTML = ""
+        + "<div role='status'>status without busy</div>"
+        + "<div data-testid='not-loading'>not loading</div>"
+        + "<div data-testid='loading-spinner'>hyphenated</div>"
+        + "<progress value='1'></progress>"
+        + "<meter min='0' max='1' value='0.4'></meter>"
+        + "<div aria-busy='true' style='display:none'>hidden spinner</div>"
+        + "<iframe id='cross' title='cross' sandbox srcdoc=\"<div aria-busy='true'>cross</div>\"></iframe>";
+    },
+    positive: function (root) {
+      root.innerHTML = ""
+        + "<div data-case id='busy' aria-busy='true'>busy</div>"
+        + "<div data-case id='progressbar' role='progressbar'>bar</div>"
+        + "<div data-case id='data-loading' data-loading='true'>data loading</div>"
+        + "<div data-case id='data-state' data-state='loading'>data state</div>"
+        + "<progress data-case id='progress-empty'></progress>"
+        + "<progress data-case id='progress-zero' value='0'></progress>"
+        + "<progress data-case id='progress-partial' value='1' max='2'></progress>"
+        + "<meter data-case id='meter-busy' min='0' max='1' value='0.2' aria-busy='true'></meter>"
+        + "<div data-case id='status-busy' role='status' aria-busy='true'>status busy</div>"
+        + "<div data-case id='token-loading' data-testid='loading'>token loading</div>"
+        + "<div data-case id='token-spinner' data-testid='spinner'>token spinner</div>"
+        + "<div data-case id='token-both' data-testid='loading spinner'>both tokens</div>";
+    },
+    frames: function (root) {
+      root.innerHTML = ""
+        + "<button id='stay'>Stay</button>"
+        + "<iframe id='mid' name='mid' title='Mid Frame'></iframe>"
+        + "<iframe id='outer' name='outer' title='Outer Frame'></iframe>"
+        + "<iframe id='cross' title='cross' sandbox srcdoc=\"<div aria-busy='true'>cross</div>\"></iframe>";
+      write(root.querySelector("#mid"), "<button id='mid-only'>Mid Only</button>");
+      write(root.querySelector("#outer"), "<iframe id='inner' name='inner' title='Inner Frame'></iframe>");
+      var inner = root.querySelector("#outer").contentDocument.getElementById("inner");
+      write(inner, "<div aria-busy='true' id='nested-spin'>nested spin</div><button>Inside Only</button>");
+    },
+    foreign: function (root) {
+      root.innerHTML = "<button id='stay'>Stay</button><iframe id='only' name='only' title='Only Frame'></iframe>";
+      write(root.querySelector("#only"), "<div aria-busy='true' id='spin'>spin</div>");
+    },
+    shadow: function (root) {
+      var host = document.createElement("div");
+      host.id = "host";
+      root.appendChild(host);
+      var shadow = host.attachShadow({mode: "open"});
+      var button = document.createElement("button");
+      button.setAttribute("aria-busy", "true");
+      button.textContent = "Shadow Busy";
+      button.addEventListener("click", function () {
+        var mark = document.createElement("div");
+        mark.textContent = "shadow-clicked";
+        document.body.appendChild(mark);
+      });
+      shadow.appendChild(button);
+    },
+    current: function (root) {
+      var button = document.createElement("button");
+      button.setAttribute("aria-busy", "true");
+      button.textContent = "Busy Button";
+      button.addEventListener("click", function () {
+        var mark = document.createElement("div");
+        mark.textContent = "current-clicked";
+        document.body.appendChild(mark);
+      });
+      root.appendChild(button);
+    },
+    panel: function (root) {
+      root.innerHTML = ""
+        + "<iframe id='panel-frame' name='panel-frame' title='Panel Frame'></iframe>"
+        + "<div aria-busy='true' id='outside-spin'>outside spin</div>";
+      write(root.querySelector("#panel-frame"), "<p>Panel Frame</p>");
+    },
+    "depth-over": function (root) {
+      chain(root, 6, "<div aria-busy='true' id='deep-spin'>deep</div>");
+    },
+    "depth-ok": function (root) {
+      chain(root, 5, "<div aria-busy='true' id='deep-spin'>deep</div>");
+    },
+    "frame-cap": function (root) {
+      siblings(root, 21, 21);
+    },
+    "frame-within": function (root) {
+      siblings(root, 21, 1);
+    }
+  };
+
+  function render() {
+    var name = (location.hash || "#quiet").replace("#", "");
+    var root = document.getElementById("root");
+    root.innerHTML = "";
+    (fixtures[name] || fixtures.quiet)(root);
+  }
+
+  window.addEventListener("hashchange", render);
+  render();
+</script>
+</body>
+</html>

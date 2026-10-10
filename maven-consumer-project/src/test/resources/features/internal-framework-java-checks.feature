@@ -44,6 +44,10 @@ Feature: Internal Pickleball Java checks
   Scenario: Run Data Element phase five copy-on-write checks
     * RUN DATA ELEMENT PHASE 5 JAVA TESTS
 
+  @all @regression @internal-java-checks @loading-context
+  Scenario: Run loading context Java checks
+    * RUN LOADING CONTEXT JAVA TESTS
+
   @runvar-override @configuration @internal-java-checks
   Scenario: Sealed override RunVars ignore other sources
     * RUN RUNVAR OVERRIDE JAVA TESTS

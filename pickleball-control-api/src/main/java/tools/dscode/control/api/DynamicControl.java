@@ -18,6 +18,8 @@ import java.util.function.Supplier;
 
 import static tools.dscode.common.gherkinoperations.DynamicExecution.getCustomStep;
 import static tools.dscode.common.mappings.ParsingMap.getRunningParsingMap;
+import static tools.dscode.common.util.Reflect.getProperty;
+import static tools.dscode.common.util.Reflect.setProperty;
 
 /**
  * Retry-friendly dynamic Pickleball execution API intended for humans, tooling, and future MCP adapters.
@@ -137,8 +139,17 @@ public final class DynamicControl {
         }
 
         Phrase previousPhrase = state.currentPhrase;
+        boolean previousEnd = state.endCurrentScenario;
+        List<Throwable> previousFailures = state.stepFailures;
+        boolean previousHard = Boolean.TRUE.equals(getProperty(state, "isScenarioHardFail"));
+        boolean previousSoft = Boolean.TRUE.equals(getProperty(state, "isScenarioSoftFail"));
+        boolean previousComplete = Boolean.TRUE.equals(getProperty(state, "isScenarioComplete"));
+        StepExtension previousStep = state.getCurrentStep();
         MappingScope mappingScope = null;
         try {
+            // A detached step reports its own failure. It must not hard-fail or
+            // complete the scenario that asked for it, or skip the steps after it.
+            state.stepFailures = new ArrayList<>();
             if (mappingContext != null) {
                 mappingScope = new MappingScope(step.getStepParsingMap(), mappingContext);
             }
@@ -157,6 +168,12 @@ public final class DynamicControl {
                 mappingScope.close();
             }
             state.currentPhrase = previousPhrase;
+            state.endCurrentScenario = previousEnd;
+            state.stepFailures = previousFailures;
+            setProperty(state, "isScenarioHardFail", previousHard);
+            setProperty(state, "isScenarioSoftFail", previousSoft);
+            setProperty(state, "isScenarioComplete", previousComplete);
+            setProperty(state, "currentStep", previousStep);
         }
     }
 

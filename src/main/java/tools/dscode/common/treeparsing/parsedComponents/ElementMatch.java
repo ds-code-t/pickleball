@@ -109,7 +109,7 @@ public class ElementMatch {
         wrappedElements = lookupWrappedElements();
 
 
-        parentPhrase.getWrappedElements().addAll(wrappedElements);
+        parentPhrase.getWrappedElements().addAll(wrappedElements.stream().filter(wrapper -> !wrapper.foreignContext).toList());
         return wrappedElements;
     }
 
@@ -609,10 +609,20 @@ public class ElementMatch {
         return !getElementWrappers().isEmpty();
     }
 
+    public boolean searchesAllContexts() {
+        return categoryFlags.contains(ExecutionDictionary.CategoryFlags.ALL_CONTEXTS);
+    }
+
     public List<ElementWrapper> getElementWrappers() {
 
         if (wrappedElements == null) {
-            if (parentPhrase.contextElement != null)
+            if (searchesAllContexts()) {
+                if (parentPhrase.skipPageSync() || evaluatingUntilCondition()) {
+                    findWrappedElements();
+                } else {
+                    parentPhrase.syncWithDOM();
+                }
+            } else if (parentPhrase.contextElement != null)
                 wrappedElements = Collections.singletonList(parentPhrase.contextElement);
             else if (parentPhrase.skipPageSync() || evaluatingUntilCondition()) {
                 findWrappedElements();

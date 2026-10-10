@@ -119,6 +119,7 @@ maven-consumer-project/src/test/resources/site/dialogs.html
 maven-consumer-project/src/test/resources/site/forms.html
 maven-consumer-project/src/test/resources/site/index.html
 maven-consumer-project/src/test/resources/site/keyboard.html
+maven-consumer-project/src/test/resources/site/loading.html
 maven-consumer-project/src/test/resources/site/window-actions.html
 maven-consumer-project/src/test/resources/site/window-child.html
 maven-consumer-project/src/test/resources/site/workflow.html
