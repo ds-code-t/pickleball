@@ -105,6 +105,7 @@ maven-consumer-project/src/test/resources/features/single-element-condition.feat
 maven-consumer-project/src/test/resources/features/step-override-bridge.feature
 maven-consumer-project/src/test/resources/features/step-state-elements.feature
 maven-consumer-project/src/test/resources/features/syntax-since-2.1.14.feature
+maven-consumer-project/src/test/resources/features/top-level-collection-index.feature
 maven-consumer-project/src/test/resources/files/customers.yaml
 maven-consumer-project/src/test/resources/pickleball.properties
 maven-consumer-project/src/test/resources/pickleball_local.properties

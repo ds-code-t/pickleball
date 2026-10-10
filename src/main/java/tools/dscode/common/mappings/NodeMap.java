@@ -2,6 +2,7 @@ package tools.dscode.common.mappings;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.NullNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.collect.LinkedListMultimap;
 import io.cucumber.core.runner.StepBase;
@@ -188,6 +189,11 @@ public class NodeMap extends ValueFormatting {
             existingArray.addAll(incomingArray);
             return;
         }
+        if (!(existing instanceof ObjectNode)
+                && value instanceof ArrayNode incomingArray
+                && mergeIntoFlattenedCollection(query, incomingArray)) {
+            return;
+        }
 
         throw new IllegalArgumentException(
                 "Cannot apply " + MERGE_SUFFIX + " to '" + query + "'. "
@@ -197,6 +203,31 @@ public class NodeMap extends ValueFormatting {
                         + "ArrayNode + ArrayNode; a missing/null existing value is "
                         + "stored normally and a null incoming value is ignored."
         );
+    }
+
+    /**
+     * A default save concatenates a list into the top-level collection, so
+     * {@code get(name)} is the last element rather than that list. {@code ~merge;}
+     * of another list still appends to the collection. When {@code get} already
+     * returned an array or object, the caller keeps the in-place merge.
+     */
+    private boolean mergeIntoFlattenedCollection(String query, ArrayNode incoming) {
+        String name = query == null ? "" : query.strip();
+        if (name.isEmpty()
+                || name.charAt(0) == '_'
+                || name.indexOf('.') >= 0
+                || name.indexOf('[') >= 0
+                || name.indexOf('(') >= 0
+                || name.indexOf('{') >= 0
+                || name.indexOf(' ') >= 0) {
+            return false;
+        }
+        JsonNode stored = materializeRoot().get(name);
+        if (!(stored instanceof ArrayNode collection)) {
+            return false;
+        }
+        incoming.forEach(node -> collection.add(node == null ? NullNode.getInstance() : node.deepCopy()));
+        return true;
     }
 
     private static void mergeObject(ObjectNode target, ObjectNode incoming) {

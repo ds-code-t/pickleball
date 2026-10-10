@@ -13,7 +13,7 @@ Feature: Data Element runtime result modes
     And RUN MAP PATH "PHASE3_FIRST_ROW.id" HAS VALUE "r1"
     And RUN MAP PATH "PHASE3_FIRST_ROW.status" HAS VALUE "ready"
     When , in the "<PHASE3_RESULT_TABLE>" Data Table, save Data Rows as "PHASE3_ALL_ROWS"
-    Then RUN MAP QUERY "PHASE3_ALL_ROWS" RETURNS TYPE "ArrayNode"
+    Then RUN MAP QUERY "PHASE3_ALL_ROWS[]" RETURNS TYPE "ArrayNode"
     And RUN MAP PATH "PHASE3_ALL_ROWS[0].id" HAS VALUE "r1"
     And RUN MAP PATH "PHASE3_ALL_ROWS[1].id" HAS VALUE "r2"
     And RUN MAP PATH "PHASE3_ALL_ROWS[2].id" HAS VALUE "r3"

@@ -38,6 +38,26 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 public class DynamicControlApiChecks {
 
     @Test
+    void detachedTopLevelSavePersistsFlattenedOnTheRunMap() {
+        MappingProcessor.getRunMap().clearValues("detachedFlat", "detachedRows");
+
+        ControlCallResult<Object> first = DynamicControl.executeStep(", save \"v1\" as \"detachedFlat\"");
+        ControlCallResult<Object> second = DynamicControl.executeStep(", save \"v2\" as \"detachedFlat\"");
+        assertTrue(first.successful(), () -> String.valueOf(first.error()));
+        assertTrue(second.successful(), () -> String.valueOf(second.error()));
+        assertEquals("v2", MappingProcessor.getRunMap().get("detachedFlat"));
+        assertEquals("v1", MappingProcessor.getRunMap().get("detachedFlat #1"));
+
+        ControlCallResult<Object> rows = DynamicControl.executeStep(
+                ", save \"[{\\\"id\\\":\\\"r1\\\",\\\"status\\\":\\\"ready\\\"},{\\\"id\\\":\\\"r2\\\",\\\"status\\\":\\\"done\\\"}]\" JSON Data as \"detachedRows\""
+        );
+        assertTrue(rows.successful(), () -> String.valueOf(rows.error()));
+        assertEquals("done", MappingProcessor.getRunMap().get("detachedRows #2.status"));
+        assertEquals("r1", MappingProcessor.getRunMap().get("detachedRows #1.id"));
+        assertEquals("done", String.valueOf(MappingProcessor.getRunMap().get("detachedRows.status")));
+    }
+
+    @Test
     void executesDetachedStepAgainstCurrentGlueWithoutChangingScenarioTraversal() {
         ControlApiTestSteps.reset();
 

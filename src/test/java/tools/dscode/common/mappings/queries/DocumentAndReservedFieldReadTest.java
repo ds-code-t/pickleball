@@ -38,7 +38,7 @@ class DocumentAndReservedFieldReadTest {
         assertEquals("Ben", Tokenized.readDocument(wrapper, "customers #2.name"));
         assertEquals("Tempe", Tokenized.readDocument(wrapper, "customers[1].city"));
         assertEquals(
-                "customers[][-1][0].name",
+                "customers[0].name",
                 Tokenized.preprocessReadQuery("customers[0].name")
         );
     }

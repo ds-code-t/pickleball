@@ -16,14 +16,13 @@ of three result modes.
 
 Only `IterationResult` expands candidates automatically.
 
-A terminal plural save therefore performs one save operation:
+For example:
 
 ```gherkin
 * , save the Data Rows as "rows"
 ```
 
-The saved value is one collection containing every selected row. It is not a
-sequence of writes to the same key.
+A terminal plural save performs one save. When that value is a list and the destination is a default top-level name, each element is added to that name's collection. A bare `<rows>` reads the last element. `<rows[]>` reads the whole collection, and `<rows #1>` or `<rows[0]>` reads the first element. It is not a series of separate saves.
 
 ## Cardinality at runtime
 

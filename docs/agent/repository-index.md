@@ -417,6 +417,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/common/domoperations/LoadingCategoryDefinitionTest.java`
 - `src/test/java/tools/dscode/common/driver/DriverDownloadFallbackTest.java`
 - `src/test/java/tools/dscode/common/mappings/queries/DocumentAndReservedFieldReadTest.java`
+- `src/test/java/tools/dscode/common/mappings/queries/TopLevelCollectionTest.java`
 - `src/test/java/tools/dscode/common/reporting/diagnostic/AgentBrowserLadderTest.java`
 - `src/test/java/tools/dscode/common/reporting/diagnostic/AgentDiscoverPlannerTest.java`
 - `src/test/java/tools/dscode/common/reporting/diagnostic/ConsumerMavenTestRunnerTest.java`
@@ -761,6 +762,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `maven-consumer-project/src/test/resources/features/step-override-bridge.feature`
 - `maven-consumer-project/src/test/resources/features/step-state-elements.feature`
 - `maven-consumer-project/src/test/resources/features/syntax-since-2.1.14.feature`
+- `maven-consumer-project/src/test/resources/features/top-level-collection-index.feature`
 
 ## Maven consumer service-call definitions
 

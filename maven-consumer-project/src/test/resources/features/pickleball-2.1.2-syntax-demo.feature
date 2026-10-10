@@ -167,21 +167,21 @@ Feature: Pickleball 2.1.2 syntax demo
     # Java collection candidates use explicit comparison attributes.
     And , save "<data:Data element native fixtures.Structured sources.mapCollection>" JSON Data as "maps"
 
-    And , save "<maps>" Map with key equaling "id" as "mapByKey"
+    And , save "<maps[]>" Map with key equaling "id" as "mapByKey"
 
     # Comparison and return projections are independent.
-    And , save key of "<maps>" Map with value equaling "pending" as "pendingKeys"
+    And , save key of "<maps[]>" Map with value equaling "pending" as "pendingKeys"
 
     # Cardinality and positional modifiers apply after filtering.
     And , save "<data:Data element native fixtures.Structured sources.listCollection>" JSON Data as "lists"
 
-    And , for every 2nd "<lists>" List:
-  : * , save "<value[0]>" as "lastEverySecondList"
+    And , for every 2nd "<lists[]>" List:
+  : * , save "<value[0][0]>" as "lastEverySecondList"
 
     # "any" permits zero matches.
     And , save "unchanged" as "optionalSentinel"
 
-    And , for any "<maps>" Map with key equaling "missing":
+    And , for any "<maps[]>" Map with key equaling "missing":
   : * , save "changed" as "optionalSentinel"
 
     # Multimap is another supported native collection category.

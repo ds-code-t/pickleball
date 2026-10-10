@@ -143,6 +143,8 @@ Normal nested references include:
 <orders #2.items #1.sku>
 ```
 
+A bracket or `#` selector written immediately after a top-level name addresses that name's collection. A default save of a list adds each element as its own item, so after the rows are saved, `<orders #2>` is the second row and `<orders #2.items #1.sku>` reads inside that row. A bare `<orders>` reads the last item. `<orders[]>` reads the whole collection. A scalar or object still appends as one item.
+
 XML-safe bookends are available where angle brackets conflict with XML markup:
 
 ```text
@@ -216,6 +218,8 @@ The `get` is the ordinary NodeMap get. That means all existing query behavior re
 3. `ObjectNode + ObjectNode` recursively merges into the existing object in place.
 4. `ArrayNode + ArrayNode` appends the incoming array items to the existing array in place.
 5. Any other existing/incoming top-level type combination fails with a descriptive merge error.
+
+A default top-level save concatenates a list into the collection, so `get(name)` is the last element rather than that list. `name~merge;` of another list still appends to the collection. When `get` returns an array or object, including a value stored with explicit `name[]`, that container is merged in place.
 
 During recursive object merge, object/object fields recurse, array/array fields append, and other field collisions are replaced by the incoming field. An incoming JSON null field therefore replaces that field with JSON null; the whole-value null no-op rule applies only to the value passed to the `~merge;` put itself.
 

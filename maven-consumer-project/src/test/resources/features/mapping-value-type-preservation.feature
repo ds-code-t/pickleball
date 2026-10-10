@@ -103,7 +103,7 @@ Feature: MappingSteps value type preservation
     Then RUN MAP PATH "nativeFirst" HAS VALUE "alpha"
     And RUN MAP PATH "nativeLast" HAS VALUE "beta"
     When , save "NATIVE_TABLE" Data as "NATIVE_TABLE_DATA"
-    Then RUN MAP QUERY "NATIVE_TABLE_DATA" RETURNS TYPE "ArrayNode"
+    Then RUN MAP QUERY "NATIVE_TABLE_DATA[]" RETURNS TYPE "ArrayNode"
     And RUN MAP PATH "NATIVE_TABLE_DATA[0].rowName" HAS VALUE "first"
     And RUN MAP PATH "NATIVE_TABLE_DATA[0].actual" HAS VALUE "alpha"
     And RUN MAP PATH "NATIVE_TABLE_DATA[1].rowName" HAS VALUE "last"
@@ -144,10 +144,10 @@ Feature: MappingSteps value type preservation
         }
       ]
       """
-    Then RUN MAP QUERY "JSON_ROWS" RETURNS TYPE "ArrayNode"
-    When , save "JSON_ROWS" Data as "JSON_ROWS_DATA"
-    Then RUN MAP QUERY "JSON_ROWS_DATA" RETURNS TYPE "ArrayNode"
-    When , save "JSON_ROWS_DATA" Data Table as "JSON_ROWS_TABLE"
+    Then RUN MAP QUERY "JSON_ROWS[]" RETURNS TYPE "ArrayNode"
+    When , save "JSON_ROWS[]" Data as "JSON_ROWS_DATA"
+    Then RUN MAP QUERY "JSON_ROWS_DATA[]" RETURNS TYPE "ArrayNode"
+    When , save "JSON_ROWS_DATA[]" Data Table as "JSON_ROWS_TABLE"
     Then RUN MAP QUERY "JSON_ROWS_TABLE" RETURNS TYPE "DataTable"
     When , in the "<JSON_ROWS_TABLE>" Data Table, for every Data Row:
     : * , ensure "<actual>" equals "<expected>"
@@ -214,19 +214,19 @@ Feature: MappingSteps value type preservation
       """
     When , save "PROFILE" Data as "SAVED_PROFILE"
     And , save "ADDRESS" Data as "SAVED_ADDRESS"
-    And , save "TAGS" Data as "SAVED_TAGS"
-    And , save "ORDERS" Data as "SAVED_ORDERS"
-    And , save "MATRIX" Data as "SAVED_MATRIX"
+    And , save "TAGS[]" Data as "SAVED_TAGS"
+    And , save "ORDERS[]" Data as "SAVED_ORDERS"
+    And , save "MATRIX[]" Data as "SAVED_MATRIX"
     Then RUN MAP QUERY "SAVED_PROFILE" RETURNS TYPE "ObjectNode"
     And RUN MAP QUERY "SAVED_ADDRESS" RETURNS TYPE "ObjectNode"
-    And RUN MAP QUERY "SAVED_TAGS" RETURNS TYPE "ArrayNode"
-    And RUN MAP QUERY "SAVED_ORDERS" RETURNS TYPE "ArrayNode"
-    And RUN MAP QUERY "SAVED_MATRIX" RETURNS TYPE "ArrayNode"
+    And RUN MAP QUERY "SAVED_TAGS[]" RETURNS TYPE "ArrayNode"
+    And RUN MAP QUERY "SAVED_ORDERS[]" RETURNS TYPE "ArrayNode"
+    And RUN MAP QUERY "SAVED_MATRIX[]" RETURNS TYPE "ArrayNode"
     When MAP "PROFILE_JSON_TEXT" TEXT VALUE
       """text
       <SAVED_PROFILE>
       """
-    And , save "<SAVED_TAGS>" as "TAGS_JSON_TEXT"
+    And , save "<SAVED_TAGS[]>" as "TAGS_JSON_TEXT"
     Then RUN MAP PATH "PROFILE_JSON_TEXT" HAS PRESERVED TYPE "String"
     And RUN MAP PATH "TAGS_JSON_TEXT" HAS PRESERVED TYPE "String"
     And RUN MAP PATH "PROFILE_JSON_TEXT" HAS TEXT VALUE
@@ -245,21 +245,21 @@ Feature: MappingSteps value type preservation
           "address": "<SAVED_ADDRESS~unquoted;>"
         },
         "collections": {
-          "tags": "<SAVED_TAGS~unquoted;>",
-          "orders": "<SAVED_ORDERS~unquoted;>",
-          "matrix": "<SAVED_MATRIX~unquoted;>"
+          "tags": "<SAVED_TAGS[]~unquoted;>",
+          "orders": "<SAVED_ORDERS[]~unquoted;>",
+          "matrix": "<SAVED_MATRIX[]~unquoted;>"
         },
         "serialized": {
           "profile": "<SAVED_PROFILE>",
-          "tags": "<SAVED_TAGS>",
-          "orders": "<SAVED_ORDERS>",
-          "matrix": "<SAVED_MATRIX>",
+          "tags": "<SAVED_TAGS[]>",
+          "orders": "<SAVED_ORDERS[]>",
+          "matrix": "<SAVED_MATRIX[]>",
           "profileViaSavedText": "<PROFILE_JSON_TEXT>",
           "tagsViaSavedText": "<TAGS_JSON_TEXT>"
         },
         "messages": {
           "profile": "profile=<SAVED_PROFILE>",
-          "orders": "orders=<SAVED_ORDERS>"
+          "orders": "orders=<SAVED_ORDERS[]>"
         }
       }
       """

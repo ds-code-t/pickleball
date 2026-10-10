@@ -83,15 +83,15 @@ public class AreaCElementChecks {
         );
         succeed(", save \"<data:Data element native fixtures.Structured sources.listCollection>\" JSON Data as \"areaLists\"");
         expectFailure(
-                ", save every \"<areaLists>\" List with first equaling \"missing\" as \"everyMiss\"",
+                ", save every \"<areaLists[]>\" List with first equaling \"missing\" as \"everyMiss\"",
                 "No Lists matched"
         );
         expectFailure(
-                ", save every 3rd \"<areaLists>\" List with first equaling \"alpha\" as \"everyThirdMiss\"",
+                ", save every 3rd \"<areaLists[]>\" List with first equaling \"alpha\" as \"everyThirdMiss\"",
                 "every 3rd"
         );
         expectFailure(
-                ", save none \"<areaLists>\" List as \"noneLists\"",
+                ", save none \"<areaLists[]>\" List as \"noneLists\"",
                 "none"
         );
     }

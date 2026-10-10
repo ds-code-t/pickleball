@@ -27,7 +27,9 @@ import static tools.dscode.common.mappings.ValueFormatting.fromSafeJsonNode;
  *   <li>{@code #N} uses one-based indexes and is converted to JSONata indexes.</li>
  *   <li>Unambiguous path properties containing spaces, compact internal dashes,
  *       or a leading {@code ?} are backticked.</li>
- *   <li>A plain non-underscore root property selects its last collection item.</li>
+ *   <li>A plain non-underscore root property selects its last collection item.
+ *       A bracket or {@code #} selector immediately after that name addresses
+ *       the collection itself.</li>
  * </ul>
  *
  * <p>Write queries are either a direct writable path or a JSONata selector
@@ -347,7 +349,6 @@ public final class Tokenized {
                 rootEnd = output.length();
             }
             int next = skipWhitespace(input, cursor);
-            int rootBracketIndex = 0;
             while (next < input.length() && input.charAt(next) == '[') {
                 directPropertyPath = false;
                 int bracketEnd = balancedBracketEnd(input, next);
@@ -364,10 +365,7 @@ public final class Tokenized {
                     );
                 }
                 if (root) {
-                    if (rootBracketIndex++ == 0
-                            && input.substring(next + 1, bracketEnd - 1).isBlank()) {
-                        rootCollectionExplicit = true;
-                    }
+                    rootCollectionExplicit = true;
                 }
                 output.append(input, next, bracketEnd);
                 cursor = bracketEnd;
@@ -737,8 +735,7 @@ public final class Tokenized {
 
         JsonNode current = root.get(name);
         if (remaining.isEmpty()) {
-            ArrayNode collection = asCollection(root, name, current);
-            collection.add(copy(value));
+            appendTopLevel(root, name, current, value);
             return;
         }
         WriteStep first = remaining.getFirst();
@@ -773,6 +770,30 @@ public final class Tokenized {
             collection.set(lastIndex, selected);
         }
         applySteps(selected, remaining, 0, value);
+    }
+
+    /**
+     * A default bare top-level save appends one item. A list or array concatenates
+     * one level: each element is its own item, an empty list adds nothing, and an
+     * inner list stays one item. Explicit {@code []}, indexes, and nested paths
+     * do not use this method.
+     */
+    private static void appendTopLevel(
+            ObjectNode root,
+            String name,
+            JsonNode current,
+            JsonNode value) {
+        if (value instanceof ArrayNode array) {
+            if (array.isEmpty()) {
+                return;
+            }
+            ArrayNode collection = asCollection(root, name, current);
+            for (JsonNode element : array) {
+                collection.add(copy(element));
+            }
+            return;
+        }
+        asCollection(root, name, current).add(copy(value));
     }
 
     private static ArrayNode asCollection(ObjectNode root, String name, JsonNode current) {

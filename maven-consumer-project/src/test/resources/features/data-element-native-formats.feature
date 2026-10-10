@@ -81,17 +81,17 @@ Feature: Native Data Element structured format conversion
     Given CLEAR SAVED VALUES
 
     When , save "<data:Data element native fixtures.Structured sources.mapCollection>" JSON Data as "objectArray"
-    And , save "<objectArray>" Data Objects as "dataObjects"
+    And , save "<objectArray[]>" Data Objects as "dataObjects"
     Then , verify "<dataObjects[0].id>" equals "one"
     And , verify "<dataObjects[1].code>" equals "two"
     And , verify "<dataObjects[2].status>" equals "complete"
 
-    When , save "<objectArray>" JSON Strings as "jsonStrings"
+    When , save "<objectArray[]>" JSON Strings as "jsonStrings"
     Then , verify "<jsonStrings[0]>" contains '"id":"one"'
     And , verify "<jsonStrings[1]>" contains '"code":"two"'
     And , verify "<jsonStrings[2]>" contains '"status":"complete"'
 
-    When , save "<objectArray>" Data Strings as "dataStrings"
+    When , save "<objectArray[]>" Data Strings as "dataStrings"
     Then , verify "<dataStrings[0]>" contains '"id":"one"'
     And , verify "<dataStrings[1]>" contains '"status":"pending"'
 
@@ -105,7 +105,7 @@ Feature: Native Data Element structured format conversion
     Then , verify "<tableJsonFromString[0].id>" equals "a1"
     And , verify "<tableJsonFromString[2].score>" equals "33"
 
-    When , in the "<tableJsonFromString>" Data Table, save Data Rows as "tableRowsFromString"
+    When , in the "<tableJsonFromString[]>" Data Table, save Data Rows as "tableRowsFromString"
     Then , verify "<tableRowsFromString[0].owner>" equals "Ada"
     And , verify "<tableRowsFromString[2].active>" equals "true"
 

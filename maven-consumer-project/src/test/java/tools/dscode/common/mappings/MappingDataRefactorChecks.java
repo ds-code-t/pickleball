@@ -44,7 +44,8 @@ public class MappingDataRefactorChecks {
         map.put("nullValue", NullNode.instance);
 
         assertEquals(object, assertInstanceOf(ObjectNode.class, map.get("object")));
-        assertEquals(array, assertInstanceOf(ArrayNode.class, map.get("array")));
+        assertEquals("b", map.get("array"));
+        assertEquals(array, assertInstanceOf(ArrayNode.class, map.get("array[]")));
         assertEquals("value", map.get("text"));
         assertEquals(7, map.get("number"));
         assertEquals(true, map.get("boolean"));
@@ -62,9 +63,10 @@ public class MappingDataRefactorChecks {
         map.putReference("inlineScenario", scenarioMap.getRoot());
 
         assertEquals("Selection fixture A", map.get("inlineScenario.SCENARIO NAME"));
+        assertEquals("b", map.get("inlineScenario.array"));
         assertEquals(array, assertInstanceOf(
                 ArrayNode.class,
-                map.get("inlineScenario.array")
+                map.get("inlineScenario.array[]")
         ));
     }
 
@@ -77,11 +79,11 @@ public class MappingDataRefactorChecks {
 
         map.put("rows", rows);
 
-        assertEquals(rows, assertInstanceOf(ArrayNode.class, map.get("rows")));
+        assertEquals("last", ((ObjectNode) map.get("rows")).get("rowName").textValue());
         assertEquals("first", map.get("rows[0].rowName"));
         assertEquals("last", map.get("rows[1].rowName"));
         assertEquals(
-                "rows[][-1][0].rowName",
+                "rows[0].rowName",
                 Tokenized.preprocessReadQuery("rows[0].rowName")
         );
         assertEquals("rows[]", Tokenized.preprocessReadQuery("rows[]"));
@@ -262,9 +264,11 @@ public class MappingDataRefactorChecks {
         processor.put("array", array);
 
         assertEquals("value={\"name\":\"Alice\"}", processor.resolveWholeText("value=<object>"));
-        assertEquals("value=[\"a\",\"b\"]", processor.resolveWholeText("value=<array>"));
+        assertEquals("value=b", processor.resolveWholeText("value=<array>"));
+        assertEquals("value=[\"a\",\"b\"]", processor.resolveWholeText("value=<array[]>"));
         assertEquals(object, processor.resolveWholeValue("<object>"));
-        assertEquals(array, processor.resolveWholeValue("<array>"));
+        assertEquals("b", processor.resolveWholeValue("<array>"));
+        assertEquals(array, processor.resolveWholeValue("<array[]>"));
     }
 
     @Test
@@ -632,17 +636,33 @@ public class MappingDataRefactorChecks {
     void mergePutAppendsArraysFallsBackForMissingAndIgnoresNullInput() {
         NodeMap map = runMap();
         map.put("items", MAPPER.createArrayNode().add(1).add(2));
-        ArrayNode selected = assertInstanceOf(ArrayNode.class, map.get("items"));
+        assertEquals(2, map.get("items"));
 
         map.put("items~merge;", MAPPER.createArrayNode().add(3).add(4));
 
-        ArrayNode merged = assertInstanceOf(ArrayNode.class, map.get("items"));
-        assertSame(selected, merged);
+        assertEquals(4, map.get("items"));
+        assertEquals(1, map.get("items[0]"));
+        assertEquals(2, map.get("items[1]"));
+        assertEquals(3, map.get("items[2]"));
+        assertEquals(4, map.get("items[3]"));
+        ArrayNode merged = assertInstanceOf(ArrayNode.class, map.get("items[]"));
         assertEquals(List.of(1, 2, 3, 4), List.of(
                 merged.get(0).intValue(),
                 merged.get(1).intValue(),
                 merged.get(2).intValue(),
                 merged.get(3).intValue()
+        ));
+
+        map.put("boxed[]", MAPPER.createArrayNode().add(1).add(2));
+        ArrayNode selected = assertInstanceOf(ArrayNode.class, map.get("boxed"));
+        map.put("boxed~merge;", MAPPER.createArrayNode().add(3).add(4));
+        ArrayNode boxed = assertInstanceOf(ArrayNode.class, map.get("boxed"));
+        assertSame(selected, boxed);
+        assertEquals(List.of(1, 2, 3, 4), List.of(
+                boxed.get(0).intValue(),
+                boxed.get(1).intValue(),
+                boxed.get(2).intValue(),
+                boxed.get(3).intValue()
         ));
 
         ObjectNode fallback = MAPPER.createObjectNode().put("created", true);

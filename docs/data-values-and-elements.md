@@ -4,9 +4,9 @@
 
 ## Normal storage and retrieval
 
-`NodeMap` stores supported values through a JSON-backed path. Jackson containers remain Jackson containers when read normally:
+`NodeMap` stores supported values through a JSON-backed path. A selected item keeps its Jackson type:
 
-| Stored value | Normal read result |
+| Stored item | Normal read result |
 |---|---|
 | `ObjectNode` | `ObjectNode` |
 | `ArrayNode` | `ArrayNode` |
@@ -16,6 +16,10 @@
 | null or missing node | `null` |
 | Cucumber `DataTable` | stored `DataTable` reference |
 | Cucumber `DocString` | stored `DocString` reference |
+
+A default save to a top-level name appends to that name's collection. A list is concatenated one level: each element becomes its own item, and an empty list adds nothing. An inner list stays one item. A scalar or object, including a native Data Table or Doc String, appends as one item. An explicit `name[]` write appends the value whole. `~merge;`, a dotted path such as `top.names`, and any non-top-level path do not concatenate.
+
+A bare `<name>` reads the last item. `<name[]>` reads the whole collection as an `ArrayNode`. A bracket or `#` selector written immediately after the name selects a collection item, so `#1` and `[0]` are the first saved item rather than an index into the last item. An underscore-prefixed name remains one value, not a collection. `file:` and `data:/` document indexes are unchanged.
 
 Explicit Java `Map` and `List` conversion belongs to the Data Element or converter that requests it. Normal retrieval does not convert Jackson objects and arrays into Java maps and lists.
 

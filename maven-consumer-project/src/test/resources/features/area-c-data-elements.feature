@@ -82,8 +82,8 @@ Feature: Area C data element kinds
   Scenario: Map singular and Maps plural
     Given CLEAR SAVED VALUES
     When , save "<data:Data element native fixtures.Structured sources.mapCollection>" JSON Data as "mapsJson"
-    And , save "<mapsJson>" Map as "oneMap"
-    And , save "<mapsJson>" Maps as "manyMaps"
+    And , save "<mapsJson[]>" Map as "oneMap"
+    And , save "<mapsJson[]>" Maps as "manyMaps"
     Then , verify "<oneMap.id>" equals "one"
     And , verify "<manyMaps[2].status>" equals "complete"
 
@@ -91,8 +91,8 @@ Feature: Area C data element kinds
   Scenario: List singular and Lists plural
     Given CLEAR SAVED VALUES
     When , save "<data:Data element native fixtures.Structured sources.listCollection>" JSON Data as "listsJson"
-    And , save "<listsJson>" List as "oneJavaList"
-    And , save "<listsJson>" Lists as "manyJavaLists"
+    And , save "<listsJson[]>" List as "oneJavaList"
+    And , save "<listsJson[]>" Lists as "manyJavaLists"
     Then , verify "<oneJavaList[0]>" equals "alpha"
     And , verify "<manyJavaLists[3][0]>" equals "delta"
 
@@ -111,7 +111,7 @@ Feature: Area C data element kinds
     Given CLEAR SAVED VALUES
     When , save "<data:Data element native fixtures.Structured sources.jsonDocument>" Data Object as "oneObject"
     And , save "<data:Data element native fixtures.Structured sources.mapCollection>" JSON Data as "objectArray"
-    And , save "<objectArray>" Data Objects as "manyObjects"
+    And , save "<objectArray[]>" Data Objects as "manyObjects"
     Then , verify "<oneObject.name>" equals "Ada"
     And , verify "<manyObjects[1].code>" equals "two"
 
@@ -141,7 +141,7 @@ Feature: Area C data element kinds
     Given CLEAR SAVED VALUES
     When , save "<data:Data element native fixtures.Structured sources.jsonDocument>" Data String as "oneDataString"
     And , save "<data:Data element native fixtures.Structured sources.mapCollection>" JSON Data as "objectArray"
-    And , save "<objectArray>" Data Strings as "manyDataStrings"
+    And , save "<objectArray[]>" Data Strings as "manyDataStrings"
     Then , verify "<oneDataString>" contains '"name": "Ada"'
     And , verify "<manyDataStrings[1]>" contains '"code":"two"'
 
@@ -151,7 +151,7 @@ Feature: Area C data element kinds
     When , save "<data:Data element native fixtures.Structured sources.jsonDocument>" JSON Data as "sourceJson"
     And , save "<sourceJson>" JSON String as "oneJsonString"
     And , save "<data:Data element native fixtures.Structured sources.mapCollection>" JSON Data as "objectArray"
-    And , save "<objectArray>" JSON Strings as "manyJsonStrings"
+    And , save "<objectArray[]>" JSON Strings as "manyJsonStrings"
     Then , verify "<oneJsonString>" contains '"name":"Ada"'
     And , verify "<manyJsonStrings[0]>" contains '"id":"one"'
 
@@ -161,7 +161,7 @@ Feature: Area C data element kinds
     When , save "<data:Data element native fixtures.Structured sources.jsonDocument>" JSON Data as "sourceJson"
     And , save "<sourceJson>" YAML String as "oneYamlString"
     And , save "<data:Data element native fixtures.Structured sources.mapCollection>" JSON Data as "objectArray"
-    And , save "<objectArray>" YAML Strings as "manyYamlStrings"
+    And , save "<objectArray[]>" YAML Strings as "manyYamlStrings"
     Then , verify "<oneYamlString>" contains "Ada"
     And , verify "<manyYamlStrings[0]>" contains "one"
 
@@ -171,7 +171,7 @@ Feature: Area C data element kinds
     When , save "<data:Data element native fixtures.Structured sources.jsonDocument>" JSON Data as "sourceJson"
     And , save "<sourceJson>" XML String as "oneXmlString"
     And , save "<data:Data element native fixtures.Structured sources.mapCollection>" JSON Data as "objectArray"
-    And , save "<objectArray>" XML Strings as "manyXmlStrings"
+    And , save "<objectArray[]>" XML Strings as "manyXmlStrings"
     Then , verify "~[~oneXmlString~]~" contains "<name>Ada</name>"
     And , verify "~[~manyXmlStrings[0]~]~" contains "<id>one</id>"
 
@@ -187,8 +187,8 @@ Feature: Area C data element kinds
   Scenario: first and last select one candidate
     Given CLEAR SAVED VALUES
     When , save "<data:Data element native fixtures.Structured sources.listCollection>" JSON Data as "listsJson"
-    And , save first "<listsJson>" List as "firstList"
-    And , save last "<listsJson>" List as "lastList"
+    And , save first "<listsJson[]>" List as "firstList"
+    And , save last "<listsJson[]>" List as "lastList"
     Then , verify "<firstList[0]>" equals "alpha"
     And , verify "<lastList[0]>" equals "delta"
 
@@ -196,14 +196,14 @@ Feature: Area C data element kinds
   Scenario: every and any hit and any misses without failing
     Given CLEAR SAVED VALUES
     When , save "<data:Data element native fixtures.Structured sources.listCollection>" JSON Data as "listsJson"
-    And , for every "<listsJson>" List:
-    : * , save "<value[0]>" as "everyLast"
+    And , for every "<listsJson[]>" List:
+    : * , save "<value[0][0]>" as "everyLast"
     Then , verify "<everyLast>" equals "delta"
-    When , for any "<listsJson>" List with first equaling "alpha":
-    : * , save "<value[0]>" as "anyHit"
+    When , for any "<listsJson[]>" List with first equaling "alpha":
+    : * , save "<value[0][0]>" as "anyHit"
     Then , verify "<anyHit>" equals "alpha"
     When , save "unchanged" as "anyMiss"
-    And , for any "<listsJson>" List with first equaling "missing":
+    And , for any "<listsJson[]>" List with first equaling "missing":
     : * , save "changed" as "anyMiss"
     Then , verify "<anyMiss>" equals "unchanged"
 
@@ -211,8 +211,8 @@ Feature: Area C data element kinds
   Scenario: every 3rd selects the third list
     Given CLEAR SAVED VALUES
     When , save "<data:Data element native fixtures.Structured sources.listCollection>" JSON Data as "listsJson"
-    And , for every 3rd "<listsJson>" List:
-    : * , save "<value[0]>" as "everyThird"
+    And , for every 3rd "<listsJson[]>" List:
+    : * , save "<value[0][0]>" as "everyThird"
     Then , verify "<everyThird>" equals "gamma"
 
   @area-data-inline-terminal
@@ -242,8 +242,8 @@ Feature: Area C data element kinds
   Scenario: size and count are the same member count
     Given CLEAR SAVED VALUES
     When , save "<data:Data element native fixtures.Structured sources.mapCollection>" JSON Data as "mapsJson"
-    And , save size of "<mapsJson>" Maps as "mapSizes"
-    And , save count of "<mapsJson>" Maps as "mapCounts"
+    And , save size of "<mapsJson[]>" Maps as "mapSizes"
+    And , save count of "<mapsJson[]>" Maps as "mapCounts"
     Then , verify "<mapSizes[0]>" equals 2
     And , verify "<mapCounts[0]>" equals 2
     And , verify "<mapSizes[2]>" equals 2

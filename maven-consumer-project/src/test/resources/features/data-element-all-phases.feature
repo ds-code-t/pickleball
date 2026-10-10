@@ -37,7 +37,7 @@ Feature: Data Element complete six-phase regression
     And RUN MAP PATH "ALL_PHASES_FIRST_ROW.status" HAS VALUE "ready"
 
     When , in the "<ALL_PHASES_TABLE>" Data Table, save Data Rows as "ALL_PHASES_ROWS"
-    Then RUN MAP QUERY "ALL_PHASES_ROWS" RETURNS TYPE "ArrayNode"
+    Then RUN MAP QUERY "ALL_PHASES_ROWS[]" RETURNS TYPE "ArrayNode"
     And RUN MAP PATH "ALL_PHASES_ROWS[0].id" HAS VALUE "r1"
     And RUN MAP PATH "ALL_PHASES_ROWS[1].id" HAS VALUE "r2"
     And RUN MAP PATH "ALL_PHASES_ROWS[2].id" HAS VALUE "r3"

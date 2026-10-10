@@ -114,12 +114,12 @@ Feature: Native Data Element Cucumber projections
     And , verify "<tableAsData[2].score>" equals "33"
 
     # The resulting JsonNode can become a native Data Table context again.
-    When , in the "<tableAsData>" Data Table, save Data Rows as "rowsAfterRoundTrip"
+    When , in the "<tableAsData[]>" Data Table, save Data Rows as "rowsAfterRoundTrip"
     Then , verify "<rowsAfterRoundTrip[0].id>" equals "a1"
     And , verify "<rowsAfterRoundTrip[1].active>" equals "false"
     And , verify "<rowsAfterRoundTrip[2].owner>" equals "Cara"
 
-    When , in the "<tableAsData>" Data Table, for every Data Row:
+    When , in the "<tableAsData[]>" Data Table, for every Data Row:
     : * , save "<owner>" as "lastRoundTripOwner"
     Then , verify "<lastRoundTripOwner>" equals "Cara"
 
