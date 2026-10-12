@@ -125,3 +125,28 @@ Feature: A top-level index reads that name's collection
       | id    | status |
       | c1    | ready  |
     * , in the Data Table, save the Data Rows as "componentRows"
+
+  Scenario: A named native Data Table stays one item per save
+    Given CLEAR SAVED VALUES
+    # Each save appends the table. Rows stay inside that table.
+    * SET "namedTables" DATA TABLE
+      | id | label |
+      | a1 | alpha |
+      | a2 | beta  |
+    * SET "namedTables" DATA TABLE
+      | id | label |
+      | b1 | gamma |
+      | b2 | delta |
+    * RUN MAP QUERY "namedTables" RETURNS TYPE "DataTable"
+    * RUN MAP QUERY "namedTables #1" RETURNS TYPE "DataTable"
+    * RUN MAP QUERY "namedTables[]" RETURNS TYPE "ArrayNode"
+    * , in the "<namedTables>" Data Table, save the Data Rows as "latestRows"
+    * , verify "<latestRows #1.id>" equals "b1"
+    * , verify "<latestRows.id>" equals "b2"
+    * , in the "<namedTables #1>" Data Table, save the Data Rows as "firstRows"
+    * , verify "<firstRows #1.id>" equals "a1"
+    * , verify "<firstRows.id>" equals "a2"
+    * , save "safe" as "namedTablesExtra"
+    * IF: <namedTables #3> THEN: , save "spread" as "namedTablesExtra"
+    * , verify "<namedTablesExtra>" equals "safe"
+    And CLEAR SAVED VALUES

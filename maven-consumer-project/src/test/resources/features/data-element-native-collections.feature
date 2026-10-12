@@ -102,6 +102,24 @@ Feature: Native Data Element Java collection projections
     : * , save "<value[0][0]>" as "lastEverySecondList"
     Then , verify "<lastEverySecondList>" equals "delta"
 
+  Scenario: A saved element list keeps the last item, the first item, and the whole list
+    Given CLEAR SAVED VALUES
+
+    # listCollection is the element-list fixture: one list save, four elements.
+    When , save "<data:Data element native fixtures.Structured sources.listCollection>" JSON Data as "listsJson"
+    And , save "<listsJson[]>" Lists as "elementLists"
+    And , save "<elementLists>" JSON String as "elementListsLast"
+    And , save "<elementLists #1>" JSON String as "elementListsFirst"
+    And , save "<elementLists[]>" JSON String as "elementListsWhole"
+    Then , verify "<elementLists[0][0]>" equals "alpha"
+    And , verify "<elementLists #1[0]>" equals "alpha"
+    And , verify "<elementLists #1[2]>" equals "omega"
+    And , verify "<elementLists #last[0]>" equals "delta"
+    And , verify "<elementLists #last[1]>" equals "end"
+    And , verify "<elementListsLast>" equals "[\"delta\",\"end\"]"
+    And , verify "<elementListsFirst>" equals "[\"alpha\",\"middle\",\"omega\"]"
+    And , verify "<elementListsWhole>" equals "[[\"alpha\",\"middle\",\"omega\"],[\"beta\",\"tail\"],[\"gamma\",\"center\",\"finish\"],[\"delta\",\"end\"]]"
+
   Scenario: Convert a JSON object with array values to an ordered Multimap
     Given CLEAR SAVED VALUES
 
