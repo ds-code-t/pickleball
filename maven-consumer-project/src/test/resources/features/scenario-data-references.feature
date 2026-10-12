@@ -40,8 +40,8 @@ Feature: Scenario data references
   @all @regression @scenario-data
   Scenario: Use RUN SCENARIO options for marker data lookup
     * VERIFY DATA ADDRESS "payload" HAS MARKER "payload"
-      | pkb_features            | pkb_name          |
-      | src/test/resources/data | ^Customer record$ |
+      | pkb_features | pkb_name          |
+      | data         | ^Customer record$ |
 
   @all @regression @scenario-data @data-table @data-row
   Scenario: Iterate a marker DataTable from another scenario

@@ -163,7 +163,7 @@ nonblank      -> use the supplied value
 blank / null  -> suppress inheritance and let the framework's normal Java fallback apply
 ```
 
-Blank is therefore meaningful during inheritance and remains a blank tombstone in the canonical `pkb_run_profile`. The blank blocks the project value and tells the downstream Pickleball subsystem to use its established fallback behavior. This distinction matters: for example, a blank `pkb_datapath` preserves marker-only `data:` behavior that can use the running scenario's own feature source, while an explicit `src/test/resources/data` path forces lookup under that directory. Replaying the retained blank through `pkb_runvars` reproduces the same semantics.
+Blank is therefore meaningful during inheritance and remains a blank tombstone in the canonical `pkb_run_profile`. The blank blocks the project value and tells the downstream Pickleball subsystem to use its established fallback behavior. This distinction matters: for example, a blank `pkb_datapath` preserves marker-only `data:` behavior that can use the running scenario's own feature source, while an explicit `data` value reads the classpath resource `data`. `wd-file:src/test/resources/data` reads that folder under the working directory. Replaying the retained blank through `pkb_runvars` reproduces the same semantics.
 
 The literal text `null` has no special meaning in compact assignment strings; it remains the literal string `null`.
 
@@ -243,10 +243,22 @@ Examples:
 
 ```text
 pkb_configpath=configs
+pkb_configpath=file:configs
 pkb_configpath=classpath:environment/qa/configs
-pkb_configpath=src/test/resources/environment/qa/configs
-pkb_configpath=file:/opt/project/configs
+pkb_configpath=qa/configs
+pkb_configpath=wd-file:configs
+pkb_configpath=wd-file:/opt/project/configs
 ```
+
+Changed in 2.1.15. A path with no prefix is a classpath resource, including a path that contains a slash. `qa/configs` is the resources folder. `wd-file:src/test/resources/qa/configs` is that folder under the working directory. `wd-file:/opt/...` is an absolute directory. `file:/opt/...` is the classpath resource `opt/...`. There is no project-root prefix.
+
+| Prefix | Meaning |
+|---|---|
+| (none) | resources folder (classpath) |
+| `file:` | resources folder (classpath), same as no prefix |
+| `classpath:` | resources folder (classpath) |
+| `wd-file:X` | `<working directory>/X` |
+| `wd-file:/X` | absolute path `/X` |
 
 The recommended mapping syntax does not change when the source path changes:
 
@@ -257,9 +269,9 @@ The recommended mapping syntax does not change when the source path changes:
 
 Legacy `<configs.application.baseUrl>` / `<configs.users.admin.name>` references remain supported for compatibility.
 
-If `pkb_configpath` is absent or explicitly blank, the Java fallback remains the historical classpath resource root `configs`.
+If `pkb_configpath` is absent or explicitly blank, the Java fallback remains the classpath resource root `configs`. A normal run and an agent or Workbench private-run copy resolve the same value to the same folder.
 
-Pickleball deliberately does **not** normalize the public path semantics of `pkb_features`, `pkb_datapath`, `pkb_callpath`, or `pkb_componentpath` as part of this change. Use the documented semantics for each existing key.
+`pkb_features`, `pkb_datapath`, and `<file:...>` use the same prefix table. `pkb_features=features`, `file:features`, and `classpath:features` are the resources folder. `wd-file:features` is passed to Cucumber as `file:features`. The default `pkb_datapath` is `data`. `pkb_callpath` and `pkb_componentpath` keep their previous path rules.
 
 ## Canonical `pkb_run_profile`
 

@@ -596,7 +596,7 @@ public class CurrentScenarioState extends ScenarioMapping {
                         if (!overTime && !overCount) {
                             long pause = StepData.untilPauseMillis(
                                     clonedStep.startTime,
-                                    StepData.globalTimeoutSeconds
+                                    StepData.effectiveTimeout()
                             );
                             if (pause > 0) {
                                 waitMilliseconds(pause);
@@ -609,7 +609,7 @@ public class CurrentScenarioState extends ScenarioMapping {
                             String limit = overTime
                                     ? StepData.stepMaxTimeExceededMessage()
                                     : "Until loop exhausted pkb_stepRepeatMaxCount "
-                                            + StepData.globalMaxIterations;
+                                            + StepData.effectiveMaxIterations();
                             exhaustedUntil = new RuntimeException(
                                     limit
                                             + " for step '"

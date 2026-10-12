@@ -98,7 +98,7 @@ Marker: payload.marker
 
 Named marker references resolve to the marker's native `DataTable` or `DocString`. Unnamed markers still cannot be addressed explicitly.
 
-Marker-data discovery continues to use the existing resolved `pkb_datapath` behavior.
+Marker-data discovery uses the resolved `pkb_datapath`. The default is the classpath resource `data`. Changed in 2.1.15: a path with no prefix is a classpath resource, including a path that contains a slash. `wd-file:src/test/resources/data` reads that folder under the working directory. A blank `pkb_datapath` still preserves marker-only lookup from the running scenario.
 
 ## Data files with `data:/`
 
@@ -112,13 +112,15 @@ A slash as the first character after `data:` selects file mode:
 
 The slash does **not** mean an OS absolute path. The file is resolved beneath the same Pickleball data root used by scenario-marker data.
 
-The existing data-path resolution/default fallback remains unchanged. File parsing and nested lookup reuse `file:` behavior, including suffix-agnostic discovery where supported.
+The default data root is the classpath resource `data`. `file:data` and `classpath:data` are the same folder. `wd-file:X` is under the working directory. File parsing and nested lookup use that prefix rule, including suffix-agnostic discovery where supported.
 
-For the consumer fixture:
+The consumer fixture on disk is:
 
 ```text
 src/test/resources/data/files/customerPayload.json
 ```
+
+With `pkb_datapath=data`, `<data:/files/customerPayload>` reads that classpath resource.
 
 these references are valid:
 

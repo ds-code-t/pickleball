@@ -10,6 +10,7 @@ import java.nio.file.Path;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ConsumerFeatureCatalogTest {
@@ -240,6 +241,57 @@ class ConsumerFeatureCatalogTest {
         assertEquals(1, catalog.features().size());
         assertEquals("Configured", catalog.features().getFirst().featureName());
         assertEquals("Only this", catalog.visibleScenarios().getFirst().name());
+    }
+
+    @Test
+    void filePrefixUsesTestResourcesAndWdFileUsesThatDirectory() throws Exception {
+        Files.createDirectories(project.resolve("features"));
+        Files.writeString(project.resolve("features/decoy.feature"), """
+                Feature: Decoy
+                  Scenario: Project root decoy
+                    Given ignored
+                """);
+        Path classpathFeatures = project.resolve("src/test/resources/features");
+        Files.createDirectories(classpathFeatures);
+        Files.writeString(classpathFeatures.resolve("configured.feature"), """
+                Feature: Configured
+                  Scenario: Classpath features
+                    Given stay
+                """);
+        Files.writeString(project.resolve("src/test/resources/pickleball.properties"),
+                "pkb_features=file:features\n");
+
+        ConsumerFeatureCatalog classpath = ConsumerFeatureCatalog.scan(project, null);
+        assertTrue(names(classpath).contains("Classpath features"));
+        assertFalse(names(classpath).contains("Project root decoy"));
+        assertEquals(
+                classpathFeatures.toAbsolutePath().normalize(),
+                ConsumerFeatureCatalog.resolveConfiguredFeatures(project, "file:features").toAbsolutePath().normalize()
+        );
+        assertEquals(
+                classpathFeatures.toAbsolutePath().normalize(),
+                ConsumerFeatureCatalog.resolveConfiguredFeatures(project, "features").toAbsolutePath().normalize()
+        );
+
+        Path wd = project.resolve("wd-features");
+        Files.createDirectories(wd);
+        Files.writeString(wd.resolve("disk.feature"), """
+                Feature: Disk
+                  Scenario: Working directory features
+                    Given disk
+                """);
+        String absolute = wd.toAbsolutePath().normalize().toString().replace('\\', '/');
+        Files.writeString(project.resolve("src/test/resources/pickleball.properties"),
+                "pkb_features=wd-file:" + absolute + "\n");
+        ConsumerFeatureCatalog disk = ConsumerFeatureCatalog.scan(project, null);
+        assertTrue(names(disk).contains("Working directory features"));
+        assertFalse(names(disk).contains("Project root decoy"));
+        assertEquals(
+                wd.toAbsolutePath().normalize(),
+                ConsumerFeatureCatalog.resolveConfiguredFeatures(project, "wd-file:" + absolute)
+                        .toAbsolutePath()
+                        .normalize()
+        );
     }
 
     @Test

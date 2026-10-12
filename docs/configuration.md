@@ -112,7 +112,7 @@ Different consumer agents can run different tests at the same time. The shared f
 
 A private `.pickleball/runs/<run-id>/` directory is only for an agent run or a Workbench run (`-Dpkb_run_id`, `-Dpkb_agent_id`, or a Workbench worker). A normal `mvn test` does not open that folder, does not set Chrome or Edge `user-data-dir`, and writes the composite HTML report to `reports/cucumber-report.html`. Diagnostic packs and scratch stay on their 2.1.13 paths for a normal test. The short log and inbox stay where they are.
 
-When the worker or test JVM opens that private run, after `pkb_configpath` is resolved, Pickleball copies the consumer project's configs into `.pickleball/runs/<run-id>/config` and reads only that copy. `session-start`, `discover`, and `confirm` book the run before that JVM exists and do not copy. A `classpath:` path does not resolve in the launcher JVM. Browser yaml and the other files under the resolved `pkb_configpath` are in the copy, including a bundled `CHROME_HEADLESS.yaml` when the project does not already have one. A destination that contains only that bundled file is not a finished copy, so the worker still copies the project configs. The copy is taken once a real project file is present. Starting the same run again does not overwrite it, so an edit made for that run stays. A second run gets its own copy from the project files and does not see the first run's edits. Neither run writes the project configs. `pkb_configpath` in the run profile stays the project path. The run directory is not stored there. A normal `mvn test` does not copy anything and keeps reading the project configs.
+When the worker or test JVM opens that private run, after `pkb_configpath` is resolved, Pickleball copies the consumer project's configs into `.pickleball/runs/<run-id>/config` and reads only that copy. The copy uses the same path rule as a normal run. A root `configs/` directory is chosen when `wd-file:` points at it. `session-start`, `discover`, and `confirm` book the run before that JVM exists and do not copy. A `classpath:` path does not resolve in the launcher JVM. Browser yaml and the other files under the resolved `pkb_configpath` are in the copy, including a bundled `CHROME_HEADLESS.yaml` when the project does not already have one. A destination that contains only that bundled file is not a finished copy, so the worker still copies the project configs. The copy is taken once a real project file is present. Starting the same run again does not overwrite it, so an edit made for that run stays. A second run gets its own copy from the project files and does not see the first run's edits. Neither run writes the project configs. `pkb_configpath` in the run profile stays the project path. The run directory is not stored there. A normal `mvn test` does not copy anything and keeps reading the project configs.
 
 An agent or Workbench run that does not pass a run id gets one (`--run-id` or `-Dpkb_run_id`). An agent may pass its own id. An omitted agent id is generated and printed (`--agent` / `--agent-id` or `-Dpkb_agent_id`). Optional group, sequence, who, and why are `-Dpkb_run_group`, `-Dpkb_run_sequence`, `-Dpkb_run_who`, and `-Dpkb_run_why`.
 
@@ -357,10 +357,22 @@ String finalProfile = PKB_props.runProfile();
 
 ```text
 pkb_configpath=configs
+pkb_configpath=file:configs
 pkb_configpath=classpath:environment/qa/configs
-pkb_configpath=src/test/resources/environment/qa/configs
-pkb_configpath=file:/opt/project/configs
+pkb_configpath=qa/configs
+pkb_configpath=wd-file:configs
+pkb_configpath=wd-file:/opt/project/configs
 ```
+
+Changed in 2.1.15. A path with no prefix is a classpath resource, including a path that contains a slash. `qa/configs` is the resources folder. `wd-file:src/test/resources/qa/configs` is that folder under the working directory. `wd-file:/opt/...` is an absolute directory. `file:/opt/...` is the classpath resource `opt/...`. There is no project-root prefix.
+
+| Prefix | Meaning |
+|---|---|
+| (none) | resources folder (classpath) |
+| `file:` | resources folder (classpath), same as no prefix |
+| `classpath:` | resources folder (classpath) |
+| `wd-file:X` | `<working directory>/X` |
+| `wd-file:/X` | absolute path `/X` |
 
 Regardless of source location, prefer the source-qualified syntax:
 
@@ -376,9 +388,9 @@ Legacy references remain valid:
 <configs.users.admin.name>
 ```
 
-Missing or blank `pkb_configpath` uses the historical Java fallback `configs`. Pickleball first completes RunVar/profile resolution and only then reloads the global `configs` mapping from the final path. This preserves a one-way initialization dependency and prevents runtime config data from selecting its own source.
+Missing or blank `pkb_configpath` uses the classpath resource root `configs`. Pickleball first completes RunVar/profile resolution and only then reloads the global `configs` mapping from the final path. This preserves a one-way initialization dependency and prevents runtime config data from selecting its own source.
 
-The existing path semantics for `pkb_features`, `pkb_datapath`, `pkb_callpath`, and `pkb_componentpath` are intentionally unchanged. See [Config Files and Resource Mapping](config-files-and-resource-mapping.md).
+`pkb_features` and `pkb_datapath` use the same prefix table. `pkb_features=features`, `file:features`, and `classpath:features` are the resources folder. `wd-file:features` is passed to Cucumber as `file:features`. The default `pkb_datapath` is `data`. `pkb_callpath` and `pkb_componentpath` keep their previous path rules. See [Config Files and Resource Mapping](config-files-and-resource-mapping.md).
 
 ## Common properties
 
@@ -388,7 +400,7 @@ The existing path semantics for `pkb_features`, `pkb_datapath`, `pkb_callpath`, 
 | `pkb_features` | `classpath:features` | top-level feature location(s) |
 | `pkb_componentpath` | `src/test/resources/component` | component-scenario location |
 | `pkb_callpath` | `src/test/resources/calls` | reusable service-call location |
-| `pkb_datapath` | `src/test/resources/data` | scenario-data / rooted `data:/` lookup |
+| `pkb_datapath` | `data` | scenario-data / rooted `data:/` lookup on the resources folder |
 | `pkb_configpath` | `configs` | source behind the stable `configs` mapping |
 | `pkb_tags` | `@smoke and not @slow` | Cucumber tag expression |
 | `pkb_name` | `Checkout.*` | scenario-name expression |

@@ -18,6 +18,9 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.dataformat.xml.XmlMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLMapper;
 
+import tools.dscode.common.resources.ResourceLocations;
+import tools.dscode.control.protocol.PickleballPaths;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.StringReader;
@@ -114,15 +117,17 @@ public final class FileAndDataParsing {
                 split.lookupPath(),
                 resolveTemplates
         );
-        if (resolved == null) {
+        return queryLoaded(resolved, split.queryPath(), split.boundarySegment());
+    }
+
+    public static JsonNode readDirectory(Path root, boolean resolveTemplates) {
+        try {
+            return buildFromRoot(root, resolveTemplates);
+        } catch (ParseFailureException failure) {
+            throw failure;
+        } catch (IOException ignored) {
             return null;
         }
-
-        ObjectNode wrapper = JSON_MAPPER.createObjectNode();
-        wrapper.set(split.boundarySegment(), resolved);
-
-        Object value = readDocument(wrapper, split.queryPath());
-        return toJsonNodeResult(value);
     }
 
     public static JsonNode attemptBuildJsonFromPath(String resourcePath) {
@@ -130,21 +135,93 @@ public final class FileAndDataParsing {
     }
 
     public static JsonNode attemptBuildJsonFromPath(String resourcePath, boolean resolveTemplates) {
+        if (resourcePath == null || resourcePath.isBlank()) {
+            return null;
+        }
+        String trimmed = resourcePath.trim();
+        if (startsWithPrefix(trimmed, "wd-file:")) {
+            return loadWdFileReference(trimmed.substring("wd-file:".length()), resolveTemplates);
+        }
+        return loadClasspathQuery(stripClasspathStylePrefixes(trimmed), resolveTemplates);
+    }
+
+    private static JsonNode loadClasspathQuery(String resourcePath, boolean resolveTemplates) {
         SplitResourcePath split = splitResourcePath(resourcePath);
         if (split == null) {
             return null;
         }
-
         JsonNode resolved = buildJsonFromSuffixAgnosticPath(split.lookupPath(), resolveTemplates);
+        return queryLoaded(resolved, split.queryPath(), split.boundarySegment());
+    }
+
+    private static JsonNode loadWdFileReference(String remainder, boolean resolveTemplates) {
+        SplitResourcePath split = splitFilesystemQuery(remainder);
+        if (split == null) {
+            return null;
+        }
+        PickleballPaths.Parsed parsed = PickleballPaths.parse("wd-file:" + split.lookupPath());
+        Path file = PickleballPaths.toFile(parsed, ResourceLocations.workingDirectory());
+        if (file == null) {
+            return null;
+        }
+        Path parent = file.getParent();
+        Path name = file.getFileName();
+        if (parent == null || name == null) {
+            return null;
+        }
+        JsonNode resolved = buildJsonFromSuffixAgnosticFilePath(parent, name.toString(), resolveTemplates);
+        return queryLoaded(resolved, split.queryPath(), split.boundarySegment());
+    }
+
+    private static JsonNode queryLoaded(JsonNode resolved, String queryPath, String boundary) {
         if (resolved == null) {
             return null;
         }
-
         ObjectNode wrapper = JSON_MAPPER.createObjectNode();
-        wrapper.set(split.boundarySegment(), resolved);
+        wrapper.set(boundary, resolved);
+        return toJsonNodeResult(readDocument(wrapper, queryPath));
+    }
 
-        Object value = readDocument(wrapper, split.queryPath());
-        return toJsonNodeResult(value);
+    private static String stripClasspathStylePrefixes(String value) {
+        String current = value == null ? "" : value.trim();
+        while (startsWithPrefix(current, "classpath:") || startsWithPrefix(current, "file:")) {
+            if (startsWithPrefix(current, "classpath:")) {
+                current = current.substring("classpath:".length()).trim();
+            } else {
+                current = current.substring("file:".length()).trim();
+            }
+        }
+        return current;
+    }
+
+    private static boolean startsWithPrefix(String text, String prefix) {
+        return text != null && text.regionMatches(true, 0, prefix, 0, prefix.length());
+    }
+
+    private static SplitResourcePath splitFilesystemQuery(String remainder) {
+        if (remainder == null) {
+            return null;
+        }
+        String text = remainder.trim();
+        while (text.endsWith("/") || text.endsWith("\\")) {
+            text = text.substring(0, text.length() - 1);
+        }
+        if (text.isEmpty()) {
+            return null;
+        }
+        int lastSlash = Math.max(text.lastIndexOf('/'), text.lastIndexOf('\\'));
+        int boundaryStart = lastSlash + 1;
+        if (boundaryStart >= text.length()) {
+            return null;
+        }
+        int boundaryEnd = findPlainBoundarySegmentEnd(text, boundaryStart);
+        if (boundaryEnd <= boundaryStart) {
+            return null;
+        }
+        String boundary = text.substring(boundaryStart, boundaryEnd);
+        String lookup = text.substring(0, boundaryEnd);
+        String query = boundary + text.substring(boundaryEnd);
+        return new SplitResourcePath(lookup, query, boundary);
     }
 
     private record SplitResourcePath(String lookupPath, String queryPath, String boundarySegment) {
@@ -233,7 +310,7 @@ public final class FileAndDataParsing {
 
         URL parentUrl = getResourceUrl(parentResourcePath);
         if (parentUrl == null) {
-            return null;
+            return jarRootResource(normalized, resolveTemplates);
         }
 
         try {
@@ -267,40 +344,33 @@ public final class FileAndDataParsing {
             return null;
         }
 
-        String normalizedRoot = normalizeRootPath(rootPath);
-        if (normalizedRoot.isBlank()) {
+        PickleballPaths.Parsed root = PickleballPaths.parse(rootPath);
+        if (root.kind() == PickleballPaths.Kind.CLASSPATH) {
             return buildJsonFromSuffixAgnosticPath(
-                    normalizedResource,
+                    joinResourcePaths(root.classpathResource(), normalizedResource),
                     resolveTemplates
             );
         }
-
-        if (normalizedRoot.startsWith("classpath:")) {
-            return buildJsonFromSuffixAgnosticPath(
-                    joinResourcePaths(
-                            normalizedRoot.substring("classpath:".length()),
-                            normalizedResource
-                    ),
-                    resolveTemplates
-            );
+        Path directory = PickleballPaths.toFile(root, ResourceLocations.workingDirectory());
+        if (directory == null || !Files.exists(directory)) {
+            return null;
         }
+        return buildJsonFromSuffixAgnosticFilePath(directory, normalizedResource, resolveTemplates);
+    }
 
-        Path physicalRoot = physicalRootPath(normalizedRoot);
-        if (physicalRoot != null && Files.exists(physicalRoot)) {
-            JsonNode fromFilesystem = buildJsonFromSuffixAgnosticFilePath(
-                    physicalRoot,
-                    normalizedResource,
-                    resolveTemplates
-            );
-            if (fromFilesystem != null) {
-                return fromFilesystem;
-            }
+    private static JsonNode jarRootResource(String resourcePath, boolean resolveTemplates) {
+        URL direct = getResourceUrl(resourcePath);
+        if (direct == null || !"jar".equalsIgnoreCase(direct.getProtocol())) {
+            return null;
         }
-
-        return buildJsonFromSuffixAgnosticPath(
-                joinResourcePaths(normalizedRoot, normalizedResource),
-                resolveTemplates
-        );
+        try (FileSystem fs = FileSystems.newFileSystem(toJarUri(direct), Map.of())) {
+            Path matched = fs.getPath(resourcePath);
+            return Files.exists(matched) ? buildFromRoot(matched, resolveTemplates) : null;
+        } catch (ParseFailureException failure) {
+            throw failure;
+        } catch (Exception ignored) {
+            return null;
+        }
     }
 
     private static JsonNode buildJsonFromSuffixAgnosticFilePath(
@@ -327,32 +397,6 @@ public final class FileAndDataParsing {
         } catch (ParseFailureException e) {
             throw e;
         } catch (Exception e) {
-            return null;
-        }
-    }
-
-    private static String normalizeRootPath(String rootPath) {
-        if (rootPath == null) {
-            return "";
-        }
-        String normalized = rootPath.trim().replace('\\', '/');
-        while (normalized.endsWith("/")) {
-            normalized = normalized.substring(0, normalized.length() - 1);
-        }
-        return normalized;
-    }
-
-    private static Path physicalRootPath(String rootPath) {
-        try {
-            if (rootPath.startsWith("file:")) {
-                try {
-                    return Paths.get(URI.create(rootPath));
-                } catch (Exception ignored) {
-                    return Paths.get(rootPath.substring("file:".length()));
-                }
-            }
-            return Paths.get(rootPath);
-        } catch (Exception ignored) {
             return null;
         }
     }
@@ -529,11 +573,11 @@ public final class FileAndDataParsing {
             .build();
 
     private static URL getResourceUrl(String path) {
-        return Thread.currentThread().getContextClassLoader().getResource(path);
+        return ResourceLocations.loader().getResource(path);
     }
 
     private static InputStream getResourceStream(String path) {
-        return Thread.currentThread().getContextClassLoader().getResourceAsStream(path);
+        return ResourceLocations.loader().getResourceAsStream(path);
     }
 
     private static URI toJarUri(URL url) throws Exception {

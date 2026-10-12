@@ -1,12 +1,15 @@
 package tools.dscode.testengine;
 
 import org.junit.platform.engine.ConfigurationParameters;
+import tools.dscode.control.protocol.PickleballPaths;
 
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+
+import static io.cucumber.core.options.Constants.FEATURES_PROPERTY_NAME;
 
 final class MergedConfigurationParameters implements ConfigurationParameters {
 
@@ -16,6 +19,10 @@ final class MergedConfigurationParameters implements ConfigurationParameters {
     MergedConfigurationParameters(ConfigurationParameters delegate, Map<String, String> overlay) {
         this.delegate = delegate;
         this.overlay = new LinkedHashMap<>(overlay);
+        String features = this.overlay.get(FEATURES_PROPERTY_NAME);
+        if (features != null) {
+            this.overlay.put(FEATURES_PROPERTY_NAME, PickleballPaths.toCucumberFeatures(features));
+        }
     }
 
     @Override

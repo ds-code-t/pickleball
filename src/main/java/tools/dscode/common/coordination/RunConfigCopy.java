@@ -1,5 +1,7 @@
 package tools.dscode.common.coordination;
 
+import tools.dscode.common.resources.ResourceLocations;
+import tools.dscode.control.protocol.PickleballPaths;
 import tools.dscode.control.protocol.RunConfigs;
 
 import java.io.IOException;
@@ -31,14 +33,24 @@ public final class RunConfigCopy {
     }
 
     public static void copyIfAbsent(Path project, Path destination, String configuredPath) throws IOException {
+        copyIfAbsent(project, destination, configuredPath, ResourceLocations.workingDirectory());
+    }
+
+    static void copyIfAbsent(
+            Path project,
+            Path destination,
+            String configuredPath,
+            Path workingDirectory
+    ) throws IOException {
         if (project == null || destination == null) return;
         if (containsFile(destination)) return;
         Files.createDirectories(destination);
-        Path source = resolveRoot(project, configuredPath);
+        String selected = selectSource(project, configuredPath);
+        Path source = resolveRoot(project, selected, workingDirectory);
         if (source != null && Files.isDirectory(source)) {
             copyTree(source, destination);
         } else {
-            copyClasspath(selectSource(project, configuredPath), destination);
+            copyClasspath(selected, destination);
         }
         ensureBundledHeadless(destination);
     }
@@ -52,27 +64,15 @@ public final class RunConfigCopy {
     }
 
     static Path resolveRoot(Path project, String configuredPath) {
-        String selected = selectSource(project, configuredPath);
-        if (selected.regionMatches(true, 0, "classpath:", 0, "classpath:".length())) {
-            return classpathDirectory(selected.substring("classpath:".length()));
-        }
-        if (selected.regionMatches(true, 0, "file:", 0, "file:".length())) {
-            Path file = fileUri(selected);
-            return file != null && Files.isDirectory(file) ? file.toAbsolutePath().normalize() : null;
-        }
-        Path direct = Path.of(selected);
-        if (direct.isAbsolute() && Files.isDirectory(direct)) {
-            return direct.toAbsolutePath().normalize();
-        }
-        if (project != null) {
-            Path relative = project.resolve(selected).normalize();
-            if (Files.isDirectory(relative)) return relative;
-            Path testResources = project.resolve("src/test/resources").resolve(stripSlashes(selected)).normalize();
-            if (Files.isDirectory(testResources)) return testResources;
-            Path mainResources = project.resolve("src/main/resources").resolve(stripSlashes(selected)).normalize();
-            if (Files.isDirectory(mainResources)) return mainResources;
-        }
-        return classpathDirectory(selected);
+        return resolveRoot(project, configuredPath, ResourceLocations.workingDirectory());
+    }
+
+    static Path resolveRoot(Path project, String configuredPath, Path workingDirectory) {
+        return ResourceLocations.existingDirectory(selectSource(project, configuredPath), workingDirectory);
+    }
+
+    static ResourceLocations.Location locate(Path project, String configuredPath, Path workingDirectory) {
+        return ResourceLocations.locate(selectSource(project, configuredPath), workingDirectory);
     }
 
     private static String discover(Path project) {
@@ -119,41 +119,22 @@ public final class RunConfigCopy {
     }
 
     private static void copyClasspath(String configuredPath, Path destination) throws IOException {
-        String resource = configuredPath;
-        if (resource.regionMatches(true, 0, "classpath:", 0, "classpath:".length())) {
-            resource = resource.substring("classpath:".length());
+        PickleballPaths.Parsed parsed = PickleballPaths.parse(configuredPath);
+        if (parsed.kind() != PickleballPaths.Kind.CLASSPATH) {
+            return;
         }
-        if (resource.regionMatches(true, 0, "file:", 0, "file:".length())) return;
-        Path fromClasspath = classpathDirectory(resource);
+        String resource = parsed.classpathResource() == null ? "" : parsed.classpathResource();
+        Path fromClasspath = ResourceLocations.classpathDirectory(resource);
         if (fromClasspath != null) {
             copyTree(fromClasspath, destination);
             return;
         }
-        copyJarResource(stripSlashes(resource), destination);
-    }
-
-    private static Path classpathDirectory(String resource) {
-        String name = stripSlashes(resource);
-        if (name.isBlank()) return null;
-        ClassLoader loader = loader();
-        URL url;
-        try {
-            url = loader.getResource(name);
-        } catch (RuntimeException ignored) {
-            return null;
-        }
-        if (url == null || !"file".equalsIgnoreCase(url.getProtocol())) return null;
-        try {
-            Path path = Path.of(url.toURI());
-            return Files.isDirectory(path) ? path.toAbsolutePath().normalize() : null;
-        } catch (Exception ignored) {
-            return null;
-        }
+        copyJarResource(resource, destination);
     }
 
     private static void copyJarResource(String resource, Path destination) throws IOException {
         if (resource.isBlank()) return;
-        URL url = loader().getResource(resource);
+        URL url = ResourceLocations.loader().getResource(resource);
         if (url == null || !"jar".equalsIgnoreCase(url.getProtocol())) return;
         try (FileSystem fs = FileSystems.newFileSystem(jarUri(url), Map.of())) {
             Path root = fs.getPath(resource);
@@ -167,7 +148,7 @@ public final class RunConfigCopy {
 
     private static void ensureBundledHeadless(Path destination) throws IOException {
         if (hasBaseName(destination, "CHROME_HEADLESS")) return;
-        try (InputStream in = loader().getResourceAsStream(BUNDLED_CHROME_HEADLESS)) {
+        try (InputStream in = ResourceLocations.loader().getResourceAsStream(BUNDLED_CHROME_HEADLESS)) {
             if (in == null) return;
             Files.write(destination.resolve("CHROME_HEADLESS.yaml"), in.readAllBytes());
         }
@@ -219,30 +200,10 @@ public final class RunConfigCopy {
         }
     }
 
-    private static Path fileUri(String value) {
-        try {
-            return Path.of(URI.create(value));
-        } catch (Exception ignored) {
-            return Path.of(value.substring("file:".length()));
-        }
-    }
-
     private static URI jarUri(URL url) {
         String text = url.toString();
         int bang = text.indexOf("!/");
         return URI.create(bang >= 0 ? text.substring(0, bang) : text);
-    }
-
-    private static String stripSlashes(String value) {
-        String text = value == null ? "" : value.trim().replace('\\', '/');
-        while (text.startsWith("/")) text = text.substring(1);
-        while (text.endsWith("/")) text = text.substring(0, text.length() - 1);
-        return text;
-    }
-
-    private static ClassLoader loader() {
-        ClassLoader loader = Thread.currentThread().getContextClassLoader();
-        return loader == null ? RunConfigCopy.class.getClassLoader() : loader;
     }
 
     /** Visible so tests can name the run folder the same way the GUI does. */

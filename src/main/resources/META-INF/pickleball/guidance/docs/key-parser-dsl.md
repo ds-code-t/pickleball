@@ -71,7 +71,7 @@ A single literal character can be used directly:
 A B 1 . / -
 ```
 
-Key names are case-sensitive and must match the Selenium `Keys` name. `control[a]` is an error and names the uppercase form `CONTROL`. `SPACE` is the space key. A space character separates sequential keys; it is not `+` and it is not the `SPACE` key. `+` presses keys together. `[ ]` holds the key or group before the brackets.
+Key names match the Selenium `Keys` name in any case. `Enter`, `enter`, and `ENTER` are the Enter key. `Tab` and `Down` are the Tab and Down keys. `control[a]` and `CONTROL[A]` both hold Control and press the A key. A single letter is that key. `SPACE` is the space key. A space character separates sequential keys; it is not `+` and it is not the `SPACE` key. `+` presses keys together. `[ ]` holds the key or group before the brackets. An unknown name such as `NOT_A_KEY` fails with `Unknown key: NOT_A_KEY`.
 
 A multi-character token is interpreted as one key name, not as text. Write:
 
@@ -89,6 +89,8 @@ hello
 
 ```text
 CONTROL[A]
+control[a]
+Enter
 CONTROL[A] BACK_SPACE
 CONTROL+SHIFT[A]
 SHIFT[A B C]

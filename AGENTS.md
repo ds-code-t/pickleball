@@ -186,7 +186,7 @@ The published Pickleball JAR embeds the completed controller-only Workbench JAR 
 
 The Swing window is a client of the launcher and command-queue session commands (`open-scenario`, `example`, `play`, `from-here`, `execute-step`, `stop`, `diagnostic-run`, and the other `WorkbenchSessionActions` operations). Do not add a second GUI-only implementation, and do not add a pixel, WebView, or JavaFX click tool. When a Workbench window is already open, an agent drives that session with those commands so the person sees the result. Do not open the GUI for your own testing. Open it to show a person a specific run, or when they ask. Close it when you are done showing it. While testing for yourself, stay headless. Opening the window loads the run you already have. It does not start a second test. When nobody is watching, headless `discover`, `confirm`, and `isolate` stay the path. Build invocation uses the consumer project wrapper (`mvnw` or `mvnw.cmd`, `gradlew` or `gradlew.bat`, or `java -jar` on the wrapper jar). Pick the script from the OS. Do not require a machine-wide Maven or Gradle install. Do not embed Maven or Gradle in MCP or the launcher, and do not add a general `mvn` or `gradle` tool. Read the short log `.pickleball/agent-log` before a run, after a run, and during a long session, instead of the dense diagnostic log. Use your own run id. When a Workbench window is already open, only one agent drives it. Other agents stay headless on their own run ids. Write start and stop lines. Put purpose and findings on the run record. Use the inbox only for a short note to one named agent. Taking that note deletes it. A note for every agent is a post, not an inbox file, and listing or taking does not delete it.
 
-The Workbench GUI is only a lightweight head over state and controls that already exist under the hood. Agents have direct access to that state and those controls, and direct control of the GUI controls, so they can collaborate with a person or present data and reports in the window. The GUI must not own behavior the agents cannot reach. Do not click JavaFX or WebView from tests. Do not embed Maven or Gradle. Agents run the project wrapper. A private `.pickleball/runs/<run-id>/` directory is only for an agent or Workbench run. A normal `mvn test` does not create it, does not copy configs, does not set `user-data-dir`, and still writes both HTML reports and still reads the project configs. A private run copies the project configs into `config/` once, when the test or Workbench worker JVM opens the run after `pkb_configpath` is resolved, and reads and writes only that copy. `session-start`, `discover`, and `confirm` do not copy before that JVM exists. A destination that contains only the bundled `CHROME_HEADLESS.yaml` is not a finished copy. `pkb_configpath` stays the project path. The Config tab beside Mapping is a view of that copy. Sync, run start, and other long loads stay off the event thread and show a banner that names the work or the error. Split panes drag so one panel can take almost the whole window. Parallel workers in one private run each get `browser-profile/<worker>`. `pkb_compositeReport=false` and `pkb_scenarioReport=false` are the agent and Workbench defaults. Do not change the `pkb_parallel` default. Isolate stays one scenario. Do not treat resolve-runvars as Discover's environment. Trust the post-Discover run record. Sealed input is `pkb_overriderunvars` only.
+The Workbench GUI is only a lightweight head over state and controls that already exist under the hood. Agents have direct access to that state and those controls, and direct control of the GUI controls, so they can collaborate with a person or present data and reports in the window. The GUI must not own behavior the agents cannot reach. Do not click JavaFX or WebView from tests. Do not embed Maven or Gradle. Agents run the project wrapper. A private `.pickleball/runs/<run-id>/` directory is only for an agent or Workbench run. A normal `mvn test` does not create it, does not copy configs, does not set `user-data-dir`, and still writes both HTML reports and still reads the project configs. A private run copies the project configs into `config/` once, when the test or Workbench worker JVM opens the run after `pkb_configpath` is resolved, and reads and writes only that copy. The copy uses the same path rule as a normal run. A root `configs/` directory is chosen when `wd-file:` points at it. `session-start`, `discover`, and `confirm` do not copy before that JVM exists. A destination that contains only the bundled `CHROME_HEADLESS.yaml` is not a finished copy. `pkb_configpath` stays the project path. The Config tab beside Mapping is a view of that copy. Sync, run start, and other long loads stay off the event thread and show a banner that names the work or the error. Split panes drag so one panel can take almost the whole window. Parallel workers in one private run each get `browser-profile/<worker>`. `pkb_compositeReport=false` and `pkb_scenarioReport=false` are the agent and Workbench defaults. Do not change the `pkb_parallel` default. Isolate stays one scenario. Do not treat resolve-runvars as Discover's environment. Trust the post-Discover run record. Sealed input is `pkb_overriderunvars` only.
 
 ## Build and validation
 
@@ -274,25 +274,25 @@ If a required validation cannot run, state exactly what was not run and why. Nev
 - Do not replace executable examples with prose.
 - Never store secrets, credentials, machine-specific paths, or private data in agent instruction files.
 
-### Core technical debt: resource-path RunVar consistency
+### Core technical debt: call and component path grammar
 
-**Status: intentionally deferred.**
+**Status: intentionally deferred for `pkb_callpath` and `pkb_componentpath`.**
 
-The following resource-path RunVars do not currently share one public path-resolution grammar:
+Changed in 2.1.15. `pkb_features`, `pkb_datapath`, `pkb_configpath`, and the Gherkin `<file:...>` reference share one prefix rule:
 
-- `pkb_features`
-- `pkb_datapath`
-- `pkb_callpath`
-- `pkb_componentpath`
-- `pkb_configpath`
+| Prefix | Meaning |
+|---|---|
+| (none) | resources folder (classpath) |
+| `file:` | resources folder (classpath), same as no prefix |
+| `classpath:` | resources folder (classpath) |
+| `wd-file:X` | working-directory/X |
+| `wd-file:/X` | absolute path /X |
 
-`pkb_glue` is part of inherited execution context but is Java/Cucumber glue syntax, not a resource path, and is outside this debt item.
+A path with no prefix is a classpath resource, including a path that contains a slash. `qa/configs` is the resources folder. `wd-file:src/test/resources/qa/configs` is that folder under the working directory. `wd-file:/opt/...` is an absolute directory. `file:/opt/...` is the classpath resource `opt/...`. There is no project-root prefix. The default `pkb_datapath` is `data`. `wd-file:features` is passed to Cucumber as `file:features`. A normal run and an agent or Workbench private-run copy resolve the same value to the same folder. A root `configs/` directory is chosen when `wd-file:` points at it.
 
-Current compatibility behavior is intentionally retained. In particular, feature paths use Cucumber URI/path semantics; data roots use Pickleball's hybrid filesystem/classpath lookup; call/component paths retain their historical project-relative defaults; and `pkb_configpath` preserves the historical `configs` classpath-resource fallback while allowing an explicit configured source.
+`pkb_callpath` and `pkb_componentpath` keep their historical project-relative defaults (`src/test/resources/calls`, `src/test/resources/component`). `pkb_glue` is Java/Cucumber glue syntax, not a resource path.
 
-A future dedicated change may investigate one common public grammar supporting `classpath:`, `file:`, absolute filesystem paths, relative filesystem paths, portable retained run profiles, Maven/Gradle resource output, IDE execution, JAR resources, Windows paths, multiple feature locations, and classpath/filesystem collisions. Do not assume all keys must share one internal loader: Cucumber feature locations and Pickleball structured-resource loading have different runtime requirements.
-
-**Maintainer rule:** do not normalize these path semantics opportunistically while changing profiles, `pkb_runvars`, `pkb_run_profile`, or execution-context inheritance. Bare values can already mean different things for different RunVars, and changing precedence can silently redirect existing consumer projects. Address this debt only in a task explicitly scoped to resource-path normalization with compatibility tests and migration documentation.
+**Maintainer rule:** do not change `pkb_callpath` or `pkb_componentpath` path semantics opportunistically while changing profiles, `pkb_runvars`, `pkb_run_profile`, or execution-context inheritance. Address that remaining debt only in a task explicitly scoped to those two keys, with compatibility tests and migration documentation.
 
 ### Temporary agent workspace
 

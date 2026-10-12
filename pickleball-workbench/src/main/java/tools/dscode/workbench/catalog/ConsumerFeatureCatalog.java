@@ -1,5 +1,6 @@
 package tools.dscode.workbench.catalog;
 
+import tools.dscode.control.protocol.PickleballPaths;
 import tools.dscode.workbench.sync.WorkbenchManifest;
 
 import java.io.IOException;
@@ -285,8 +286,10 @@ public final class ConsumerFeatureCatalog {
                     String trimmed = line.strip();
                     if (trimmed.startsWith("#") || !trimmed.contains("pkb_features")) continue;
                     String value = featurePathValue(trimmed);
-                    Path resolved = resolveConfiguredFeatures(projectRoot, value);
-                    if (resolved != null) roots.add(resolved);
+                    for (String part : value.split(",")) {
+                        Path resolved = resolveConfiguredFeatures(projectRoot, part);
+                        if (resolved != null) roots.add(resolved);
+                    }
                 }
             } catch (IOException ignored) {
                 // Configuration is optional discovery input.
@@ -306,19 +309,14 @@ public final class ConsumerFeatureCatalog {
     }
 
     static Path resolveConfiguredFeatures(Path projectRoot, String value) {
-        if (value == null || value.isBlank()) return null;
-        String path = value.strip();
-        if (path.startsWith("classpath:")) {
-            String remainder = path.substring("classpath:".length()).replace('\\', '/');
-            while (remainder.startsWith("/")) remainder = remainder.substring(1);
+        if (value == null || value.isBlank() || projectRoot == null) return null;
+        PickleballPaths.Parsed parsed = PickleballPaths.parse(value.strip());
+        if (parsed.kind() == PickleballPaths.Kind.CLASSPATH) {
+            String resource = parsed.classpathResource() == null ? "" : parsed.classpathResource();
             Path testResources = projectRoot.resolve("src").resolve("test").resolve("resources");
-            return remainder.isBlank() ? testResources : testResources.resolve(remainder);
+            return resource.isBlank() ? testResources : testResources.resolve(resource);
         }
-        if (path.startsWith("file:")) {
-            path = path.substring("file:".length());
-        }
-        Path configured = Path.of(path);
-        return configured.isAbsolute() ? configured.normalize() : projectRoot.resolve(configured).normalize();
+        return PickleballPaths.toFile(parsed, Path.of("").toAbsolutePath());
     }
 
     static FeatureEntry readFeature(Path projectRoot, Path file) throws IOException {

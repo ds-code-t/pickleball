@@ -245,9 +245,17 @@ Explicit JVM `-Dpkb_*` RunVars are different from ambient project defaults: they
 
 For those six inherited keys, missing means inherit, nonblank means override, and blank/null means suppress inheritance. A blank remains a blank tombstone in the retained final `runProfile`, because replaying that blank is what tells the underlying Pickleball subsystem to use its historical fallback behavior instead of re-inheriting a project value.
 
-`pkb_configpath` selects the source loaded beneath the configuration mapping. Prefer `<config:...>` references such as `<config:URL.forms>`; legacy `<configs...>` references remain supported. Missing/blank `pkb_configpath` uses the historical `configs` Java fallback. Runtime config data cannot resolve profiles, `pkb_runvars`, or the path that loads the configs themselves.
+`pkb_configpath` selects the source loaded beneath the configuration mapping. Prefer `<config:...>` references such as `<config:URL.forms>`; legacy `<configs...>` references remain supported. Missing/blank `pkb_configpath` uses the classpath resource `configs`. Runtime config data cannot resolve profiles, `pkb_runvars`, or the path that loads the configs themselves. A normal run and a private-run copy resolve the same value to the same folder. A root `configs/` directory is chosen when `wd-file:` points at it.
 
-Do not normalize other resource-path RunVar conventions. Follow the version-matched `docs/configuration.md` and `docs/config-files-and-resource-mapping.md` for each path.
+Changed in 2.1.15. `pkb_features`, `pkb_datapath`, `pkb_configpath`, and `<file:...>` use one prefix rule. A path with no prefix is a classpath resource, including a path that contains a slash. `qa/configs` is the resources folder. `wd-file:src/test/resources/qa/configs` is that folder under the working directory. `wd-file:/opt/...` is an absolute directory. `file:/opt/...` is the classpath resource `opt/...`. There is no project-root prefix. The default `pkb_datapath` is `data`. `wd-file:features` is passed to Cucumber as `file:features`. `pkb_callpath` and `pkb_componentpath` keep their previous path rules.
+
+| Prefix | Meaning |
+|---|---|
+| (none) | resources folder (classpath) |
+| `file:` | resources folder (classpath), same as no prefix |
+| `classpath:` | resources folder (classpath) |
+| `wd-file:X` | `<working directory>/X` |
+| `wd-file:/X` | absolute path `/X` |
 
 ## Diagnostic investigation protocol
 

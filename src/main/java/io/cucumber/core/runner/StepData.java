@@ -39,6 +39,10 @@ public abstract class StepData extends StepMapping {
     public static int globalMaxIterations;
     // Negative is unlimited. Zero is already at the limit, so the loop makes no pass.
 
+    // A scenario thread may tighten the cap for its own steps. Other parallel scenarios keep the run-wide values.
+    private static final ThreadLocal<Duration> timeoutOverride = new ThreadLocal<>();
+    private static final ThreadLocal<Integer> iterationOverride = new ThreadLocal<>();
+
     static {
         Object stepMaxTime = resolveFromVars("stepMaxTime");
         Object legacySeconds = resolveFromVars("stepRepeatMaxTime");
@@ -47,6 +51,46 @@ public abstract class StepData extends StepMapping {
         }
         globalTimeoutSeconds = parseStepMaxTime(stepMaxTime, legacySeconds);
         globalMaxIterations = Integer.parseInt(String.valueOf(resolveFromVarsOrDefault("stepRepeatMaxCount", 100)));
+    }
+
+    /** The cap this thread enforces. A null return from {@link #overrideTimeout} means the run-wide cap was in force. */
+    public static Duration effectiveTimeout() {
+        Duration override = timeoutOverride.get();
+        return override != null ? override : globalTimeoutSeconds;
+    }
+
+    /** The repeat cap this thread enforces. A null return from {@link #overrideMaxIterations} means the run-wide cap was in force. */
+    public static int effectiveMaxIterations() {
+        Integer override = iterationOverride.get();
+        return override != null ? override : globalMaxIterations;
+    }
+
+    public static Duration overrideTimeout(Duration timeout) {
+        Duration previous = timeoutOverride.get();
+        timeoutOverride.set(timeout);
+        return previous;
+    }
+
+    public static void restoreTimeout(Duration previous) {
+        if (previous == null) {
+            timeoutOverride.remove();
+        } else {
+            timeoutOverride.set(previous);
+        }
+    }
+
+    public static Integer overrideMaxIterations(int maxIterations) {
+        Integer previous = iterationOverride.get();
+        iterationOverride.set(maxIterations);
+        return previous;
+    }
+
+    public static void restoreMaxIterations(Integer previous) {
+        if (previous == null) {
+            iterationOverride.remove();
+        } else {
+            iterationOverride.set(previous);
+        }
     }
 
     /**
@@ -77,7 +121,7 @@ public abstract class StepData extends StepMapping {
     }
 
     public static String stepMaxTimeExceededMessage() {
-        return "Step exceeded pkb_stepMaxTime (" + formatStepMaxTime(globalTimeoutSeconds) + ")";
+        return "Step exceeded pkb_stepMaxTime (" + formatStepMaxTime(effectiveTimeout()) + ")";
     }
 
     /**
@@ -115,7 +159,7 @@ public abstract class StepData extends StepMapping {
     }
 
     public boolean reachedGlobalMaxDuration() {
-        return reachedDurationLimit(globalTimeoutSeconds);
+        return reachedDurationLimit(effectiveTimeout());
     }
 
     public boolean reachedStepMaxDuration() {
@@ -136,7 +180,7 @@ public abstract class StepData extends StepMapping {
     }
 
     public boolean reachedGlobalMaxRepetition() {
-        return reachedRepetitionLimit(globalMaxIterations);
+        return reachedRepetitionLimit(effectiveMaxIterations());
     }
 
     public boolean reachedStepMaxRepetition() {
@@ -161,7 +205,7 @@ public abstract class StepData extends StepMapping {
         if(reachedGlobalMaxDuration()){
             logError(stepMaxTimeExceededMessage());
         } else if(reachedGlobalMaxRepetition()){
-            logError("Until loop exhausted pkb_stepRepeatMaxCount " + globalMaxIterations);
+            logError("Until loop exhausted pkb_stepRepeatMaxCount " + effectiveMaxIterations());
         }
         else
         {

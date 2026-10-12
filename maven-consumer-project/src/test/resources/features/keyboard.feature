@@ -57,3 +57,25 @@ Feature: Use keyboard expressions in a text field
     * , press "TAB" in the "Keyboard Input" Textbox
     * , ensure "Key Down Codes: Tab" Text is displayed
     * , ensure "Focus Target: Keyboard Tab Target" Text is displayed
+
+  @all @regression @browser @local-site @keyboard @keyboard-expressions @named-keys
+  Scenario: Enter Tab and Down match in any case
+    * , click the "Keyboard Input" Textbox
+    * , press "Enter" in the "Keyboard Input" Textbox
+    * , ensure "Last Key: Enter" Text is displayed
+    * , press "enter" in the "Keyboard Input" Textbox
+    * , ensure "Last Key: Enter" Text is displayed
+    * , press "Tab" in the "Keyboard Input" Textbox
+    * , ensure "Last Key: Tab" Text is displayed
+    * , ensure "Focus Target: Keyboard Tab Target" Text is displayed
+    * , click the "Keyboard Input" Textbox
+    * , press "Down" in the "Keyboard Input" Textbox
+    * , ensure "Last Key: ArrowDown" Text is displayed
+
+  @all @regression @browser @local-site @keyboard @keyboard-expressions @modifier-keys
+  Scenario: Modifier names match in any case
+    * , click the "Keyboard Input" Textbox
+    * , press "control[a]" in the "Keyboard Input" Textbox
+    * , ensure "Last Key State: KeyA active=ControlLeft+KeyA ctrl=true shift=false alt=false" Text is displayed
+    * , press "CONTROL[A]" in the "Keyboard Input" Textbox
+    * , ensure "Last Key State: KeyA active=ControlLeft+KeyA ctrl=true shift=false alt=false" Text is displayed
