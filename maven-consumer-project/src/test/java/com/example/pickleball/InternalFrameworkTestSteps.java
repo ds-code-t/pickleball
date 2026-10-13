@@ -14,6 +14,7 @@ import tools.dscode.common.driver.ChromeHeadlessConfigChecks;
 import tools.dscode.common.mappings.MappingDataRefactorChecks;
 import tools.dscode.common.mappings.QuoteParserChecks;
 import tools.dscode.common.reporting.diagnostic.AgentBrowserLadderChecks;
+import tools.dscode.common.resources.PathPrefixChecks;
 import tools.dscode.common.reporting.diagnostic.Diagnostic213CompletionChecks;
 import tools.dscode.common.reporting.diagnostic.DiagnosticReportingChecks;
 import tools.dscode.common.reporting.diagnostic.InvestigationHandoffChecks;
@@ -47,6 +48,11 @@ public final class InternalFrameworkTestSteps {
     @Given("^RUN IT PLACEHOLDER JAVA TESTS$")
     public static void runItPlaceholderJavaTests() {
         runAndAssert(PlaceHolderMatchChecks.class);
+    }
+
+    @Given("^RUN PATH PREFIX JAVA TESTS$")
+    public static void runPathPrefixJavaTests() {
+        runAndAssert(PathPrefixChecks.class);
     }
 
     @Given("^RUN INTERNAL PICKLEBALL JAVA TESTS$")

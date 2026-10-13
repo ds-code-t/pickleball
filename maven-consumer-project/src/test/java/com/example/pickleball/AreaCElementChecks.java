@@ -63,16 +63,13 @@ public class AreaCElementChecks {
     }
 
     @Test
-    void unknownAndLowercaseKeysFail() {
+    void unknownKeyFailsAndLowercaseModifierSucceeds() {
         navigate("URL.keyboard");
         expectFailure(
                 ", press \"NOT_A_KEY\" in the \"Keyboard Input\" Textbox",
                 "Unknown key: NOT_A_KEY"
         );
-        expectFailure(
-                ", press \"control[a]\" in the \"Keyboard Input\" Textbox",
-                "case-sensitive"
-        );
+        succeed(", press \"control[a]\" in the \"Keyboard Input\" Textbox");
     }
 
     @Test

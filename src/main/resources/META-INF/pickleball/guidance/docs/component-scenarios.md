@@ -272,7 +272,7 @@ Mapping references use the lowercase `data:` prefix:
 
 A marker mapping reference resolves to the marker's attached native `DataTable` or `DocString`. Java marker lookup APIs continue to return `ScenarioStepData`.
 
-`pkb_datapath` controls named marker-data discovery and defaults to `src/test/resources/data` when no configured value is resolved.
+`pkb_datapath` controls named marker-data discovery and defaults to `data` when no configured value is resolved. That value is the classpath resource `data`.
 
 ## Data files under the data root
 
@@ -284,7 +284,7 @@ A slash immediately after `data:` switches to data-file mode:
 <data:/files/customerPayload.customer.orders[0].id>
 ```
 
-The slash is a syntax discriminator, not an operating-system absolute path. Lookup is rooted below the same resolved `pkb_datapath` used for scenario data. File parsing, suffix-agnostic discovery, and nested queries reuse the existing `file:` resource machinery.
+The slash is a syntax discriminator, not an operating-system absolute path. Lookup is rooted below the same resolved `pkb_datapath` used for scenario data. The data root uses the 2.1.15 path prefixes: no prefix, `file:`, and `classpath:` are the resources folder, and `wd-file:` is a working-directory or absolute directory. File parsing, suffix-agnostic discovery, and nested queries use that same rule.
 
 Structured whole-document and nested object/array results remain Jackson `JsonNode` values; scalar nested results retain their normal scalar type.
 

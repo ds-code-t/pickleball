@@ -618,7 +618,7 @@ public enum ActionOperations implements OperationsInterface {
     }
 
     private static boolean pastStepMaxTime(Instant started) {
-        Duration cap = StepData.globalTimeoutSeconds;
+        Duration cap = StepData.effectiveTimeout();
         if (cap == null || cap.isNegative() || started == null) {
             return false;
         }
@@ -627,7 +627,7 @@ public enum ActionOperations implements OperationsInterface {
 
     /** Null when the hard cap is absent or negative (unlimited). Zero means it is already due. */
     private static Duration stepMaxTimeLeft(Instant started) {
-        Duration cap = StepData.globalTimeoutSeconds;
+        Duration cap = StepData.effectiveTimeout();
         if (cap == null || cap.isNegative() || started == null) {
             return null;
         }

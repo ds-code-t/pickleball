@@ -381,16 +381,27 @@ See [Configuration Files and Resource Mapping](config-files-and-resource-mapping
 
 ### `file:`
 
-`file:` uses the existing resource lookup, parsing, suffix-agnostic discovery, and nested-query behavior:
+The Gherkin `<file:...>` reference uses the same path prefixes as `pkb_configpath`. The path after `file:` follows that table. `files/customers` has no path prefix, so it stays a classpath resource.
 
 ```text
 <file:files/customers>
 <file:files/customers #1.name>
 <file:files/customers[0].name>
 <file:files/customers.customer.name>
+<file:wd-file:/opt/pickleball/files/customers #1.name>
 ```
 
-An index on a `file:` document selects that record in the file. `#1` and `[0]` are the first record. This is not the saved-NodeMap rule that reads the last stored collection item.
+Changed in 2.1.15. A path with no prefix is a classpath resource, including a path that contains a slash. `file:` and `classpath:` are the resources folder. `wd-file:X` is under the working directory. `wd-file:/X` is an absolute directory. There is no project-root prefix.
+
+| Prefix | Meaning |
+|---|---|
+| (none) | resources folder (classpath) |
+| `file:` | resources folder (classpath), same as no prefix |
+| `classpath:` | resources folder (classpath) |
+| `wd-file:X` | `<working directory>/X` |
+| `wd-file:/X` | absolute path `/X` |
+
+An index on a `file:` document selects that record in the file. `#1` and `[0]` are the first record. This is not the saved-NodeMap rule that reads the last stored collection item. `<file:files/customers #1.name>` is unchanged and still reads the classpath file.
 
 ### Scenario marker `data:`
 
@@ -439,12 +450,12 @@ A slash immediately after `data:` switches to file lookup rooted below the resol
 
 The leading slash is only a syntax discriminator. It is **not** an operating-system absolute path.
 
-`data:/` uses the same already-resolved `pkb_datapath` and default fallback as marker-data lookup. It then reuses the existing `file:` machinery for filesystem/classpath resource resolution supported by the data root, suffix-agnostic discovery, supported structured formats, and nested object/array queries.
+`data:/` uses the same already-resolved `pkb_datapath` and default fallback as marker-data lookup. The root follows the prefix table above. Suffix-agnostic discovery, supported structured formats, and nested object/array queries stay in place.
 
 For example, with:
 
 ```text
-pkb_datapath=src/test/resources/data
+pkb_datapath=data
 ```
 
 this reference:
@@ -453,7 +464,7 @@ this reference:
 <data:/files/customerPayload>
 ```
 
-can resolve `src/test/resources/data/files/customerPayload.json` without requiring the `.json` suffix.
+resolves the classpath resource `data/files/customerPayload.json` without requiring the `.json` suffix. The consumer file on disk is `src/test/resources/data/files/customerPayload.json`. `wd-file:src/test/resources/data` reads that folder from the working directory.
 
 Whole documents and nested objects/arrays remain Jackson `JsonNode` values (`ObjectNode`/`ArrayNode`). Nested scalar queries return their natural scalar value.
 

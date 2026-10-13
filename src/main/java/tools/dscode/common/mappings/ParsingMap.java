@@ -31,6 +31,8 @@ import tools.dscode.common.treeparsing.parsedComponents.ElementMatch;
 import tools.dscode.common.treeparsing.parsedComponents.PhraseData;
 
 import tools.dscode.common.coordination.AgentCoordination;
+import tools.dscode.common.resources.ResourceLocations;
+import tools.dscode.control.protocol.PickleballPaths;
 
 import java.io.InputStream;
 import java.lang.reflect.Array;
@@ -84,7 +86,7 @@ public class ParsingMap extends MappingProcessor {
 
     public static synchronized void initializeConfigs(String configuredPath) {
         String path = configPathForCurrentRun(configuredPath);
-        JsonNode configsNode = loadConfigs(path);
+        JsonNode configsNode = loadConfigs(path, ResourceLocations.workingDirectory());
         ObjectNode configs;
         if (configsNode instanceof ObjectNode objectNode) {
             configs = objectNode;
@@ -153,28 +155,17 @@ public class ParsingMap extends MappingProcessor {
         }
     }
 
-    private static JsonNode loadConfigs(String path) {
-        String normalized = path.replace('\\', '/');
-        if (normalized.startsWith("classpath:")) {
-            return FileAndDataParsing.buildJsonFromPath(
-                    normalized.substring("classpath:".length()),
-                    false
-            );
+    public static JsonNode loadConfigs(String path, Path workingDirectory) {
+        ResourceLocations.Location location = ResourceLocations.locate(path, workingDirectory);
+        if (location.kind() == PickleballPaths.Kind.FILE_SYSTEM) {
+            Path file = location.file();
+            if (file == null || !Files.isDirectory(file)) {
+                return null;
+            }
+            return FileAndDataParsing.readDirectory(file, false);
         }
-
-        int slash = normalized.lastIndexOf('/');
-        if (slash < 0) {
-            return FileAndDataParsing.buildJsonFromPath(normalized, false);
-        }
-
-        String root = normalized.substring(0, slash);
-        String name = normalized.substring(slash + 1);
-        if (name.isBlank()) {
-            int previousSlash = root.lastIndexOf('/');
-            name = previousSlash < 0 ? root : root.substring(previousSlash + 1);
-            root = previousSlash < 0 ? "" : root.substring(0, previousSlash);
-        }
-        return FileAndDataParsing.buildJsonFromPathUnderRoot(root, name, false);
+        String resource = location.classpathResource() == null ? "" : location.classpathResource();
+        return FileAndDataParsing.buildJsonFromPath(resource, false);
     }
 
     public static ParsingMap getGlobalsParsingmap() {

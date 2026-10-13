@@ -50,12 +50,11 @@ class StepRepetitionLimitTest {
         assertEquals("90s", StepData.formatStepMaxTime(Duration.ofSeconds(90)));
         assertEquals("1ms", StepData.formatStepMaxTime(Duration.ofMillis(1)));
         assertEquals("60m", StepData.formatStepMaxTime(Duration.ofHours(1)));
-        Duration previous = StepData.globalTimeoutSeconds;
-        StepData.globalTimeoutSeconds = Duration.ofMinutes(5);
+        Duration previous = StepData.overrideTimeout(Duration.ofMinutes(5));
         try {
             assertEquals("Step exceeded pkb_stepMaxTime (5m)", StepData.stepMaxTimeExceededMessage());
         } finally {
-            StepData.globalTimeoutSeconds = previous;
+            StepData.restoreTimeout(previous);
         }
     }
 

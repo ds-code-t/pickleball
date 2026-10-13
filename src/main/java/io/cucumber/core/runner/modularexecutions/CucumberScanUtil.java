@@ -11,6 +11,7 @@ import io.cucumber.core.runner.ScenarioStep;
 import io.cucumber.core.runner.StepExtension;
 import io.cucumber.core.runtime.FeaturePathFeatureSupplier;
 import org.intellij.lang.annotations.Language;
+import tools.dscode.control.protocol.PickleballPaths;
 import tools.dscode.testengine.DynamicSuiteConfigUtils;
 import tools.dscode.testengine.ExampleRowFilter;
 
@@ -314,15 +315,15 @@ public final class CucumberScanUtil {
 
     private static List<String> resolveFeatureUrisForListPickles(Map<String, String> inputProps) {
         if (inputProps.containsKey(PKB_FEATURES)) {
-            return resolveExplicitFeaturePaths(inputProps.get(PKB_FEATURES));
+            return resolveExplicitFeaturePaths(inputProps.get(PKB_FEATURES), true);
         }
         if (inputProps.containsKey(FEATURES_PROPERTY_NAME)) {
-            return resolveExplicitFeaturePaths(inputProps.get(FEATURES_PROPERTY_NAME));
+            return resolveExplicitFeaturePaths(inputProps.get(FEATURES_PROPERTY_NAME), false);
         }
         return resolveGlobalFeaturePaths();
     }
 
-    private static List<String> resolveExplicitFeaturePaths(String featurePathsProp) {
+    private static List<String> resolveExplicitFeaturePaths(String featurePathsProp, boolean pickleballGrammar) {
         if (featurePathsProp == null || featurePathsProp.isBlank()) {
             return List.of();
         }
@@ -330,13 +331,13 @@ public final class CucumberScanUtil {
         return Arrays.stream(featurePathsProp.split(","))
                 .map(String::trim)
                 .filter(s -> !s.isEmpty())
-                .map(CucumberScanUtil::toUriString)
+                .map(path -> toUriString(path, pickleballGrammar))
                 .collect(Collectors.toList());
     }
 
     private static List<String> resolveGlobalFeaturePaths() {
         return getFeaturePaths().stream()
-                .map(FilePathResolver::toAbsoluteFileUri)
+                .map(PickleballPaths::toCucumberFeatureUri)
                 .filter(Objects::nonNull)
                 .map(String::trim)
                 .filter(s -> !s.isEmpty())
@@ -352,12 +353,15 @@ public final class CucumberScanUtil {
         return List.copyOf(ordered);
     }
 
-    private static String toUriString(String pathOrUri) {
+    private static String toUriString(String pathOrUri, boolean pickleballGrammar) {
         String s = pathOrUri.trim();
-        if (s.startsWith("classpath:") || s.startsWith("file:")) {
+        if (pickleballGrammar || s.regionMatches(true, 0, "wd-file:", 0, "wd-file:".length())) {
+            return PickleballPaths.toCucumberFeatureUri(s);
+        }
+        if (s.regionMatches(true, 0, "classpath:", 0, "classpath:".length())
+                || s.regionMatches(true, 0, "file:", 0, "file:".length())) {
             return s;
         }
-
         Path abs = Paths.get(s).toAbsolutePath();
         return "file:" + abs.toString().replace('\\', '/');
     }

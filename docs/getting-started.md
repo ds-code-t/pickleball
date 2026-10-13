@@ -185,11 +185,24 @@ Prefer `<config:...>` for configuration mappings, while legacy `<configs...>` re
 
 ```text
 pkb_configpath=configs
+pkb_configpath=file:configs
 pkb_configpath=classpath:environment/qa/configs
-pkb_configpath=src/test/resources/environment/qa/configs
+pkb_configpath=qa/configs
+pkb_configpath=wd-file:src/test/resources/qa/configs
+pkb_configpath=wd-file:/opt/pickleball/configs
 ```
 
-If missing or blank, the historical `configs` resource root remains the Java fallback.
+Changed in 2.1.15. A path with no prefix is a classpath resource, including a path that contains a slash. `qa/configs` is the resources folder. `wd-file:src/test/resources/qa/configs` is that folder under the working directory. `wd-file:/opt/...` is an absolute directory. `file:/opt/...` is the classpath resource `opt/...`. There is no project-root prefix.
+
+| Prefix | Meaning |
+|---|---|
+| (none) | resources folder (classpath) |
+| `file:` | resources folder (classpath), same as no prefix |
+| `classpath:` | resources folder (classpath) |
+| `wd-file:X` | `<working directory>/X` |
+| `wd-file:/X` | absolute path `/X` |
+
+If missing or blank, the classpath resource root `configs` remains the fallback. The same table applies to `pkb_features`, `pkb_datapath`, and `<file:...>`. The default `pkb_datapath` is `data`. `pkb_callpath` and `pkb_componentpath` keep their previous path rules.
 
 ## First feature
 

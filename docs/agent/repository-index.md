@@ -283,6 +283,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/common/reporting/WorkBook.java`
 - `src/main/java/tools/dscode/common/reporting/WorkBookConsolePrinter.java`
 - `src/main/java/tools/dscode/common/reporting/WorkSheet.java`
+- `src/main/java/tools/dscode/common/resources/ResourceLocations.java`
 - `src/main/java/tools/dscode/common/seleniumextensions/AllContextsScan.java`
 - `src/main/java/tools/dscode/common/seleniumextensions/ContextWrapper.java`
 - `src/main/java/tools/dscode/common/seleniumextensions/ElementWrapper.java`
@@ -413,6 +414,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/io/cucumber/core/runner/StepRepetitionLimitTest.java`
 - `src/test/java/tools/dscode/common/assertions/AssertionClauseSplitterTest.java`
 - `src/test/java/tools/dscode/common/coordination/AgentCoordinationTest.java`
+- `src/test/java/tools/dscode/common/coordination/PathPrefixResolutionTest.java`
 - `src/test/java/tools/dscode/common/coordination/RunConfigIsolationTest.java`
 - `src/test/java/tools/dscode/common/domoperations/LoadingCategoryDefinitionTest.java`
 - `src/test/java/tools/dscode/common/driver/DriverDownloadFallbackTest.java`
@@ -530,6 +532,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/PickleballArtifactLocator.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/PickleballLocalLayout.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/PickleballLocalStore.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/PickleballPaths.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/PickleballVersion.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/RunConfigs.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/RunView.java`
@@ -537,6 +540,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/ControlBridgeStepResolutionTest.java`
 - `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/ControlProtocolStepSeedTest.java`
 - `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/ExampleRowSelectorTest.java`
+- `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/PickleballPathsTest.java`
 - `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/RunConfigsTest.java`
 - `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/RunWindowTest.java`
 
@@ -701,6 +705,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `maven-consumer-project/src/test/java/tools/dscode/common/reporting/diagnostic/DiagnosticReportingChecks.java`
 - `maven-consumer-project/src/test/java/tools/dscode/common/reporting/diagnostic/InvestigationHandoffChecks.java`
 - `maven-consumer-project/src/test/java/tools/dscode/common/reporting/diagnostic/PickleballGuidanceChecks.java`
+- `maven-consumer-project/src/test/java/tools/dscode/common/resources/PathPrefixChecks.java`
 - `maven-consumer-project/src/test/java/tools/dscode/common/treeparsing/parsedComponents/phraseoperations/PlaceHolderMatchChecks.java`
 - `maven-consumer-project/src/test/java/tools/dscode/common/util/datetime/BusinessTemporalDeltaChecks.java`
 - `maven-consumer-project/src/test/java/tools/dscode/common/util/datetime/BusinessTimePostModifierChecks.java`

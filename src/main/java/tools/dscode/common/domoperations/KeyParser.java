@@ -1,6 +1,5 @@
 package tools.dscode.common.domoperations;
 
-import groovyjarjarantlr4.v4.codegen.model.dbg;
 import org.openqa.selenium.Keys;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
@@ -283,19 +282,17 @@ public final class KeyParser {
     }
 
     private static CharSequence resolveKey(String token) {
-        try {
-            return Keys.valueOf(token);
-        } catch (IllegalArgumentException ignored) {
-            // Not an exact Selenium Keys name.
-        }
-
+        Keys ignoreCase = null;
         for (Keys key : Keys.values()) {
-            if (key.name().equalsIgnoreCase(token)) {
-                throw new IllegalArgumentException(
-                        "Unknown key: " + token
-                                + ". Key names are case-sensitive; use " + key.name() + "."
-                );
+            if (key.name().equals(token)) {
+                return key;
             }
+            if (ignoreCase == null && key.name().equalsIgnoreCase(token)) {
+                ignoreCase = key;
+            }
+        }
+        if (ignoreCase != null) {
+            return ignoreCase;
         }
 
         if (token.length() == 1) {

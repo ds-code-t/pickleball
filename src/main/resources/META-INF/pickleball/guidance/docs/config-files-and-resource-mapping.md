@@ -32,13 +32,25 @@ Examples:
 
 ```text
 pkb_configpath=configs
+pkb_configpath=file:configs
 pkb_configpath=classpath:configs
+pkb_configpath=qa/configs
 pkb_configpath=classpath:environment/qa/configs
-pkb_configpath=src/test/resources/environment/qa/configs
-pkb_configpath=file:/opt/pickleball/configs
+pkb_configpath=wd-file:configs
+pkb_configpath=wd-file:/opt/pickleball/configs
 ```
 
-When the value is absent or blank, Pickleball keeps the historical Java fallback: the classpath resource root `configs`.
+Changed in 2.1.15. A path with no prefix is a classpath resource, including a path that contains a slash. `qa/configs` is the resources folder. `wd-file:src/test/resources/qa/configs` is that folder under the working directory. `wd-file:/opt/...` is an absolute directory. `file:/opt/...` is the classpath resource `opt/...`. There is no project-root prefix.
+
+| Prefix | Meaning |
+|---|---|
+| (none) | resources folder (classpath) |
+| `file:` | resources folder (classpath), same as no prefix |
+| `classpath:` | resources folder (classpath) |
+| `wd-file:X` | `<working directory>/X` |
+| `wd-file:/X` | absolute path `/X` |
+
+When the value is absent or blank, Pickleball keeps the classpath resource root `configs`. A missing folder loads an empty config and does not fail the run. Configs that exist only inside a jar dependency still load. A normal run and an agent or Workbench private-run copy resolve the same value to the same folder.
 
 A project-level `pkb_configpath` is part of required execution context. Named profiles and controlled `pkb_runvars` inherit it when they omit the key. An explicit blank suppresses that inheritance and returns to the Java fallback.
 
@@ -57,7 +69,7 @@ Named browser yaml files under the configured config path remain the local overr
 
 ## Per-run copy
 
-An agent run or a Workbench run copies that config tree into `.pickleball/runs/<run-id>/config` when the worker or test JVM opens the run, after `pkb_configpath` is resolved, and then reads only the copy. `session-start`, `discover`, and `confirm` do not copy before that JVM exists. A directory that contains only the bundled `CHROME_HEADLESS.yaml` is not a finished copy. Edits, including from the Workbench Config tab, write the copy and do not write the project files. A second run has its own copy. A normal test does not copy and still loads `pkb_configpath` from the project. The stored run profile keeps the project `pkb_configpath`. It does not record the run directory.
+An agent run or a Workbench run copies that config tree into `.pickleball/runs/<run-id>/config` when the worker or test JVM opens the run, after `pkb_configpath` is resolved, and then reads only the copy. The copy uses the same path rule as a normal run. A root `configs/` directory is chosen when `wd-file:` points at it. `session-start`, `discover`, and `confirm` do not copy before that JVM exists. A directory that contains only the bundled `CHROME_HEADLESS.yaml` is not a finished copy. Edits, including from the Workbench Config tab, write the copy and do not write the project files. A second run has its own copy. A normal test does not copy and still loads `pkb_configpath` from the project. The stored run profile keeps the project `pkb_configpath`. It does not record the run directory.
 
 ## Initialization order
 
@@ -87,15 +99,20 @@ pkb_runvars=pkb_configpath=<qa.pkb_configpath>,pkb_browser=firefox
 
 ## Other resource paths
 
-This feature intentionally preserves the existing path behavior of other RunVars.
+`pkb_features`, `pkb_datapath`, and the Gherkin `<file:...>` reference use the same prefix table as `pkb_configpath`.
 
-- `pkb_features` uses Cucumber feature-location semantics. Explicit `classpath:` and `file:` locations are supported; a bare path follows the existing Cucumber/Pickleball feature-path behavior.
-- `pkb_datapath` keeps its existing filesystem/classpath-root behavior and Java fallback.
-- `pkb_callpath` keeps its existing component/service-call path behavior and Java fallback.
-- `pkb_componentpath` keeps its existing component-scenario path behavior and Java fallback.
-- `pkb_glue` is Java/Cucumber glue package syntax, not a resource path.
+```text
+pkb_features=features
+pkb_features=file:features
+pkb_features=classpath:features
+pkb_features=wd-file:features
+pkb_datapath=data
+<file:files/customers #1.name>
+```
 
-Do not assume those keys share one public path grammar merely because they are all inherited execution-context values.
+`features`, `file:features`, and `classpath:features` are the resources folder. `wd-file:features` is passed to Cucumber as `file:features`. The default `pkb_datapath` is `data`. `<file:files/customers #1.name>` stays a classpath file reference. The path after `file:` follows the prefix table, so `files/customers` is a classpath resource.
+
+`pkb_callpath` and `pkb_componentpath` keep their previous project-relative path rules and Java fallbacks. `pkb_glue` is Java/Cucumber glue package syntax, not a resource path.
 
 ## Structured resource formats
 

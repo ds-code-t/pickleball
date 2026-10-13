@@ -74,13 +74,12 @@ public class AreaBControlFlowChecks {
     @Test
     void softWaitContinuesWhenTheGherkinTimePassesWithoutAWarning() {
         navigateHome();
-        Duration previousTimeout = StepData.globalTimeoutSeconds;
-        StepData.globalTimeoutSeconds = Duration.ofSeconds(40);
+        Duration previousTimeout = StepData.overrideTimeout(Duration.ofSeconds(40));
         try {
             assertSoftWaitSucceeds(", wait the \"No Such Area B\" Button, or 0 seconds");
             assertSoftWaitSucceeds(", wait 0 seconds, or the \"No Such Area B\" Button");
         } finally {
-            StepData.globalTimeoutSeconds = previousTimeout;
+            StepData.restoreTimeout(previousTimeout);
         }
     }
 
@@ -165,11 +164,9 @@ public class AreaBControlFlowChecks {
     void alwaysRunSiblingRunsAfterUntilExhaustsAndAPlainSiblingDoesNot() {
         CurrentScenarioState state = requireScenario();
         StepExtension previousStep = state.getCurrentStep();
-        int previousIterations = StepData.globalMaxIterations;
-        Duration previousTimeout = StepData.globalTimeoutSeconds;
+        Integer previousIterations = StepData.overrideMaxIterations(0);
+        Duration previousTimeout = StepData.overrideTimeout(Duration.ofHours(1));
         int previousFailures = state.stepFailures.size();
-        StepData.globalMaxIterations = 0;
-        StepData.globalTimeoutSeconds = Duration.ofHours(1);
         save("untouched", "untilAlwaysSibling");
         save("untouched", "untilPlainSibling");
         try {
@@ -189,8 +186,8 @@ public class AreaBControlFlowChecks {
             assertSaved("untilAlwaysSibling", "ran");
             assertSaved("untilPlainSibling", "untouched");
         } finally {
-            StepData.globalMaxIterations = previousIterations;
-            StepData.globalTimeoutSeconds = previousTimeout;
+            StepData.restoreMaxIterations(previousIterations);
+            StepData.restoreTimeout(previousTimeout);
             while (state.stepFailures.size() > previousFailures) {
                 state.stepFailures.remove(state.stepFailures.size() - 1);
             }
@@ -367,10 +364,8 @@ public class AreaBControlFlowChecks {
         StepExtension previousStep = state.getCurrentStep();
         boolean previousEnd = state.endCurrentScenario;
         int previousFailures = state.stepFailures.size();
-        int previousIterations = StepData.globalMaxIterations;
-        Duration previousTimeout = StepData.globalTimeoutSeconds;
-        StepData.globalMaxIterations = maxIterations;
-        StepData.globalTimeoutSeconds = maxTime;
+        Integer previousIterations = StepData.overrideMaxIterations(maxIterations);
+        Duration previousTimeout = StepData.overrideTimeout(maxTime);
         try {
             ControlCallResult<StepExtension> created = DynamicControl.createStep(stepText);
             assertTrue(created.successful(), () -> String.valueOf(created.error()));
@@ -383,8 +378,8 @@ public class AreaBControlFlowChecks {
             }
             return thrown;
         } finally {
-            StepData.globalMaxIterations = previousIterations;
-            StepData.globalTimeoutSeconds = previousTimeout;
+            StepData.restoreMaxIterations(previousIterations);
+            StepData.restoreTimeout(previousTimeout);
             while (state.stepFailures.size() > previousFailures) {
                 state.stepFailures.remove(state.stepFailures.size() - 1);
             }
@@ -406,15 +401,13 @@ public class AreaBControlFlowChecks {
     }
 
     private static ControlCallResult<Object> waitForStep(String step, int maxIterations, Duration maxTime) {
-        int previousIterations = StepData.globalMaxIterations;
-        Duration previousTimeout = StepData.globalTimeoutSeconds;
-        StepData.globalMaxIterations = maxIterations;
-        StepData.globalTimeoutSeconds = maxTime;
+        Integer previousIterations = StepData.overrideMaxIterations(maxIterations);
+        Duration previousTimeout = StepData.overrideTimeout(maxTime);
         try {
             return DynamicControl.executeStep(step);
         } finally {
-            StepData.globalMaxIterations = previousIterations;
-            StepData.globalTimeoutSeconds = previousTimeout;
+            StepData.restoreMaxIterations(previousIterations);
+            StepData.restoreTimeout(previousTimeout);
         }
     }
 

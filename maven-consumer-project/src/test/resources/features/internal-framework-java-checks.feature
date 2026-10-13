@@ -4,6 +4,10 @@ Feature: Internal Pickleball Java checks
   Scenario: Run framework checks through the published Pickleball dependency
     * RUN INTERNAL PICKLEBALL JAVA TESTS
 
+  @all @regression @internal-java-checks @path-prefix
+  Scenario: Run path prefix Java checks
+    * RUN PATH PREFIX JAVA TESTS
+
   @all @regression @internal-java-checks @mapping @quote-parser
   Scenario: Run quote-parser mapping checks
     * RUN QUOTE PARSER JAVA TESTS

@@ -44,7 +44,7 @@ public class ModularScenarios extends CoreSteps {
     static final String CUCUMBER_FEATURES = "cucumber.features";
     static final String STEP_MARKER = "Step_Marker";
     static final String RETURN = "RETURN";
-    static final String DEFAULT_DATA_PATH = "src/test/resources/data";
+    static final String DEFAULT_DATA_PATH = "data";
     static final String DEFAULT_CALLS_PATH = "src/test/resources/calls";
     static final String DEFAULT_COMPONENT_PATH = "src/test/resources/component";
     @Given("^RUN\\s*(?:\"([^\"]+)\"\\s+)?(?:(SCENARIOS?|COMPONENT SCENARIOS?|SERVICE CALLS?))?(?::(.*))?$")
@@ -333,6 +333,7 @@ public class ModularScenarios extends CoreSteps {
         String featureName = address.featureName();
         String scenarioName = address.scenarioName();
         String featuresPath = configuredDataPath();
+        boolean translateFeatures = !featuresPath.isBlank();
         if (featureName.isBlank()
                 && scenarioName.isBlank()
                 && featuresPath.isBlank()
@@ -378,6 +379,7 @@ public class ModularScenarios extends CoreSteps {
                     && featureName.isBlank()
                     && !tableHasFeatureName) {
                 featuresPath = normalize(currentScenario.getSourceFeaturePath());
+                translateFeatures = false;
                 featureName = normalize(
                         CucumberScanUtil.getFeatureName(
                                 currentScenario.getSourcePickle()
@@ -392,6 +394,10 @@ public class ModularScenarios extends CoreSteps {
         }
         if (featuresPath.isBlank() && !tableHasFeaturePath) {
             featuresPath = DEFAULT_DATA_PATH;
+            translateFeatures = true;
+        }
+        if (translateFeatures && featuresPath != null && !featuresPath.isBlank()) {
+            featuresPath = tools.dscode.control.protocol.PickleballPaths.toCucumberFeatureUri(featuresPath);
         }
         DataAddress resolvedAddress = new DataAddress(
                 featureName,
