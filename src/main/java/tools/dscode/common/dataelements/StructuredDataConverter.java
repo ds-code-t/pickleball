@@ -223,7 +223,7 @@ public final class StructuredDataConverter {
         return result;
     }
 
-    private static void rejectUnsafeXml(String value) {
+    public static void rejectUnsafeXml(String value) {
         String normalized = value == null
                 ? ""
                 : value.toUpperCase(Locale.ROOT);

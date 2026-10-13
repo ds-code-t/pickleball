@@ -45,13 +45,16 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/dynamic-steps.md`
 - `docs/feature-status-notes.md`
 - `docs/getting-started.md`
+- `docs/java-values.md`
 - `docs/key-parser-dsl.md`
 - `docs/log-and-assert-steps.md`
 - `docs/mapping-and-templating.md`
 - `docs/nested-steps.md`
+- `docs/object-registration.md`
 - `docs/pickleball-workbench-player.md`
 - `docs/pickleball-workbench.md`
 - `docs/README.md`
+- `docs/release-notes.md`
 - `docs/reserved-element-names.md`
 - `docs/service-call-scenarios.md`
 - `docs/step-overrides.md`
@@ -287,6 +290,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/common/seleniumextensions/AllContextsScan.java`
 - `src/main/java/tools/dscode/common/seleniumextensions/ContextWrapper.java`
 - `src/main/java/tools/dscode/common/seleniumextensions/ElementWrapper.java`
+- `src/main/java/tools/dscode/common/servicecalls/JdbcServiceCall.java`
 - `src/main/java/tools/dscode/common/servicecalls/RestAssuredUtil.java`
 - `src/main/java/tools/dscode/common/trace/InstanceRegistry.java`
 - `src/main/java/tools/dscode/common/trace/ObjDataRegistry.java`
@@ -389,6 +393,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/parallelutilities/ParallelCountEstimator.java`
 - `src/main/java/tools/dscode/parallelutilities/Stagger.java`
 - `src/main/java/tools/dscode/pickleruntime/CucumberOptionResolver.java`
+- `src/main/java/tools/dscode/PrefixValue.java`
 - `src/main/java/tools/dscode/registry/GlobalRegistry.java`
 - `src/main/java/tools/dscode/testengine/DynamicEngineDiscoveryRequest.java`
 - `src/main/java/tools/dscode/testengine/DynamicSuiteBootstrap.java`
@@ -404,6 +409,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/testengine/PkbPropertyValueNormalizer.java`
 - `src/main/java/tools/dscode/testengine/SensitiveConfiguration.java`
 - `src/main/java/tools/dscode/testengine/WorkbenchWorkerMain.java`
+- `src/main/java/tools/dscode/Values.java`
 - `src/main/resources/META-INF/pickleball/configs/CHROME_HEADLESS.yaml`
 - `src/main/resources/META-INF/services/org.junit.platform.engine.TestEngine`
 - `src/main/resources/META-INF/services/org.junit.platform.launcher.LauncherSessionListener`
@@ -437,6 +443,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/WorkbenchPointerContractTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchSessionCommandsTest.java`
 - `src/test/java/tools/dscode/parallelutilities/ParallelCountEstimatorTest.java`
+- `src/test/java/tools/dscode/Release216BehaviorTest.java`
 - `src/test/java/tools/dscode/testengine/CucumberNameFilterTest.java`
 - `src/test/java/tools/dscode/testengine/DriverDownloadRedactionTest.java`
 - `src/test/java/tools/dscode/testengine/DynamicSuiteBootstrapWorkbenchRootTest.java`
@@ -680,6 +687,8 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `maven-consumer-project/src/test/java/com/example/pickleball/LogAndAssertStepsChecks.java`
 - `maven-consumer-project/src/test/java/com/example/pickleball/MappingTypeSteps.java`
 - `maven-consumer-project/src/test/java/com/example/pickleball/PickleballTests.java`
+- `maven-consumer-project/src/test/java/com/example/pickleball/Release216Checks.java`
+- `maven-consumer-project/src/test/java/com/example/pickleball/Release216Steps.java`
 - `maven-consumer-project/src/test/java/com/example/pickleball/ScenarioDataSteps.java`
 - `maven-consumer-project/src/test/java/com/example/pickleball/StepOverrideBridgeTestSteps.java`
 - `maven-consumer-project/src/test/java/com/example/pickleball/StepOverrideChecks.java`
@@ -756,6 +765,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `maven-consumer-project/src/test/resources/features/nested-and-block-conditionals.feature`
 - `maven-consumer-project/src/test/resources/features/phrase-plain-forms.feature`
 - `maven-consumer-project/src/test/resources/features/pickleball-2.1.2-syntax-demo.feature`
+- `maven-consumer-project/src/test/resources/features/release-2-1-16.feature`
 - `maven-consumer-project/src/test/resources/features/reusable-scenario-selection.feature`
 - `maven-consumer-project/src/test/resources/features/run-row-gates.feature`
 - `maven-consumer-project/src/test/resources/features/run-step-parameter-variations.feature`
@@ -813,6 +823,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `maven-consumer-project/src/test/resources/site/index.html`
 - `maven-consumer-project/src/test/resources/site/keyboard.html`
 - `maven-consumer-project/src/test/resources/site/loading.html`
+- `maven-consumer-project/src/test/resources/site/text-match.html`
 - `maven-consumer-project/src/test/resources/site/window-actions.html`
 - `maven-consumer-project/src/test/resources/site/window-child.html`
 - `maven-consumer-project/src/test/resources/site/workflow.html`

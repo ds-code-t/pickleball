@@ -67,6 +67,11 @@ public final class PickleballTests extends PickleballRunner {
                 );
     }
 
+    @LifecycleHook(Phase.AFTER_SCENARIO_CLEANUP)
+    public static void afterScenarioCleanup() {
+        Release216Steps.afterScenarioCleanup();
+    }
+
     @LifecycleHook(Phase.AFTER_CUCUMBER_RUN)
     public static void stopLocalTestSite() {
         if (testSite != null) {

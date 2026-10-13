@@ -21,6 +21,8 @@ When these docs are materialized from the Maven dependency with Workbench `expor
 ## Data and reusable behavior
 
 - [Mapping and templating](mapping-and-templating.md) — supported mapping and saved-value behavior.
+- [Java values](java-values.md) — static `getValue` / `saveValue`, typed Jackson reads, `softFail`, `throttle`, custom prefixes, and masked values.
+- [Registered objects](object-registration.md) — constructor, post-actions, and scenario-end cleanup.
 - [Data values and Data Elements](data-values-and-elements.md) — native values, Jackson container preservation, Data Elements, and explicit conversions.
 - [Configuration files and resource mapping](config-files-and-resource-mapping.md) — load shared config/resources, use `pkb_configpath`, prefer `<config:...>`, and retain legacy `<configs...>` compatibility.
 - [Component scenarios](component-scenarios.md) — invoke reusable scenario-sized flows.
@@ -48,6 +50,7 @@ When these docs are materialized from the Maven dependency with Workbench `expor
 ## Experimental features
 
 - [Experimental features](experimental-features.md) — behavior that works now but is not recommended and may change.
+- [Release notes](release-notes.md) — version notes, including breaking changes.
 
 ## Working consumer project
 

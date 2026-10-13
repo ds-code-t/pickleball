@@ -175,8 +175,11 @@ Supported suffix directives and destination-key behaviors are:
 | `~unquoted;` | When the reference is directly surrounded by one matching quote pair, remove that pair and insert the resolved value raw. |
 | `~JSON;` | Convert to structured JSON data. |
 | `~JSON-STRING;` | Convert to a JSON string. |
-| `~XML;` | Convert XML input to structured data. |
+| `~XML;` | Convert XML input to structured data. See [XML to JSON](#xml-to-json). |
 | `~XML-STRING;` | Convert to an XML string. |
+| `~XML-ESCAPE;` | Escape `&`, `<`, `>`, `"`, and `'` as `&amp;`, `&lt;`, `&gt;`, `&quot;`, and `&apos;`. |
+| `~MASK;` | Store a masked value. Logs and reports show `******`. The real value is used. |
+| `~UNMASK;` | Read the plain value of a masked value. |
 | `~YAML;` | Convert YAML input to structured data. |
 | `~YAML-STRING;` | Convert to a YAML string. |
 | `~DATA;` | Best-effort structured-data conversion. |
@@ -190,6 +193,52 @@ Supported suffix directives and destination-key behaviors are:
 | `~merge;` | Destination-key put behavior: merge into the container returned by the normal unsuffixed `NodeMap.get` selection. |
 
 Conversion failures are errors. Pickleball does not silently substitute null for an invalid directive conversion.
+
+### XML to JSON
+
+`~XML;` uses Jackson's `XmlMapper`. The root element is dropped. Attributes become plain fields. An element that has both attributes and text stores the text under the empty-string key `""`. Repeated tags become a list. A single tag stays a value. Every value is a string.
+
+This input:
+
+```xml
+<order id="A7" status="open"><customer type="vip"><name>Dan</name></customer><item sku="X1" qty="2">Pen</item><item sku="Y9" qty="1">Pad</item></order>
+```
+
+becomes this JSON:
+
+```json
+{"id":"A7","status":"open","customer":{"type":"vip","name":"Dan"},"item":[{"sku":"X1","qty":"2","":"Pen"},{"sku":"Y9","qty":"1","":"Pad"}]}
+```
+
+Queries are ordinary JSONata against that object. The root name `order` is not part of the result.
+
+| Query | Result |
+|---|---|
+| `customer.type` | `vip` |
+| `item#2.sku` | `Y9` |
+| `item.sku` | `["X1","Y9"]` |
+
+A pipeline applies the directive, then the query:
+
+```text
+<raw~XML;::customer.type>
+<raw~XML;::item#2.sku>
+<raw~XML;::item.sku>
+```
+
+`~XML-ESCAPE;` is separate. It escapes text. It does not parse XML.
+
+```text
+<name~XML-ESCAPE;>
+~[~name~XML-ESCAPE;~]~
+<payload~JSON;::title~XML-ESCAPE;>
+```
+
+A `MAP TABLE VALUES` row key can carry it. `| body.title~XML-ESCAPE; | Tom & Jerry |` stores `Tom &amp; Jerry` at `body.title`. A structured object key such as `body.title~XML-ESCAPE;` does the same. A `MAP "key" TEXT/OBJECT VALUE` destination key rejects `~XML-ESCAPE;` with the existing destination-key error. Those destination keys support `~merge;` only. A plain value with no directive is unchanged.
+
+XML that contains a `DOCTYPE` or `ENTITY` declaration fails with `XML declarations containing DOCTYPE or ENTITY are not supported.` Normal XML is unchanged.
+
+Java reads and writes of the same values are in [Java values](java-values.md).
 
 ### Directive placement
 
@@ -249,6 +298,19 @@ Use `~unquoted;` when a quoted template position must insert a number, boolean, 
 Only one directly surrounding matching quote pair is removed. Without `~unquoted;`, the resolved value remains inside the surrounding quotes and is escaped as needed.
 
 Quoted `'`, `"`, and backtick spans are masked before `<...>` resolution so quote characters inside them are not treated as mapping syntax. Masking is a linear scan, so large quoted values resolve without depending on Java regex stack depth.
+
+### Literal keys
+
+A key is split on unescaped periods. Escape a literal period with `\.` and a literal backslash with `\\`. Quoted, single-quoted, and backtick spans in a key are masked before that split, so a period inside the quotes stays part of the name.
+
+```text
+<data:Data\.reference\.records.Customer\.record.payload\.marker>
+customer.address\.line
+customer."suite.4".city
+customer.`a.b`.name
+```
+
+The first form is the scenario-marker address documented in [Data values and Data Elements](data-values-and-elements.md). The same escapes apply to mapping keys. Quote types change how the span is masked. They do not add another key syntax.
 
 ### Deferred nested references with `~unresolved;`
 
@@ -391,7 +453,7 @@ The Gherkin `<file:...>` reference uses the same path prefixes as `pkb_configpat
 <file:wd-file:/opt/pickleball/files/customers #1.name>
 ```
 
-Changed in 2.1.15. A path with no prefix is a classpath resource, including a path that contains a slash. `file:` and `classpath:` are the resources folder. `wd-file:X` is under the working directory. `wd-file:/X` is an absolute directory. There is no project-root prefix.
+Changed in 2.1.15. A path with no prefix is a classpath resource, including a path that contains a slash. `file:` and `classpath:` are the resources folder. `wd-file:X` is under the working directory. `wd-file:/X` is an absolute directory. There is no project-root prefix. A `file:/...` or unprefixed `/...` path that is not on the classpath fails with a hint: use `wd-file:/...` for a filesystem path. A relative miss and a missing `wd-file:` path stay empty.
 
 | Prefix | Meaning |
 |---|---|

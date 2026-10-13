@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.openqa.selenium.*;
 import org.openqa.selenium.NoSuchElementException;
 import tools.dscode.common.domoperations.ExecutionDictionary;
+import tools.dscode.common.domoperations.NestedByLocator;
 import tools.dscode.common.treeparsing.parsedComponents.ElementMatch;
 import tools.dscode.common.treeparsing.parsedComponents.ElementType;
 import tools.dscode.common.assertions.ValueWrapper;
@@ -698,11 +699,14 @@ public class ElementWrapper implements WebElement, WrapsElement {
 
     private List<WebElement> getElementList(WebDriver driver, String xpathyWithId) {
         logTrace("getElementList.xpathyWithId: " + xpathyWithId);
-        return withoutImplicitWait(
-                driver,
-                () -> elementMatch.contextWrapper
-                        .getFinalSearchContext()
-                        .findElements(new By.ByXPath(xpathyWithId))
+        return NestedByLocator.retainFullMatches(
+                withoutImplicitWait(
+                        driver,
+                        () -> elementMatch.contextWrapper
+                                .getFinalSearchContext()
+                                .findElements(new By.ByXPath(xpathyWithId))
+                ),
+                elementMatch
         );
     }
 

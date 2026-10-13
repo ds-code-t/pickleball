@@ -17,6 +17,8 @@ import io.cucumber.core.runner.StepExtension;
 import io.cucumber.core.stepexpression.DocStringArgument;
 import io.cucumber.datatable.DataTable;
 import io.cucumber.docstring.DocString;
+import tools.dscode.PrefixValue;
+import tools.dscode.Values;
 import tools.dscode.common.assertions.ValueWrapper;
 import tools.dscode.common.dataelements.DataContextNodeMap;
 import tools.dscode.common.dataelements.DataElementGroup;
@@ -159,13 +161,23 @@ public class ParsingMap extends MappingProcessor {
         ResourceLocations.Location location = ResourceLocations.locate(path, workingDirectory);
         if (location.kind() == PickleballPaths.Kind.FILE_SYSTEM) {
             Path file = location.file();
-            if (file == null || !Files.isDirectory(file)) {
-                return null;
+            if (file != null && Files.isDirectory(file)) {
+                return FileAndDataParsing.readDirectory(file, false);
             }
-            return FileAndDataParsing.readDirectory(file, false);
+            if (FileAndDataParsing.absoluteClasspathRequest(path)
+                    && FileAndDataParsing.classpathResourceMissing(
+                            PickleballPaths.stripToResource(path)
+                    )) {
+                throw FileAndDataParsing.filesystemHint(path);
+            }
+            return null;
         }
         String resource = location.classpathResource() == null ? "" : location.classpathResource();
-        return FileAndDataParsing.buildJsonFromPath(resource, false);
+        JsonNode loaded = FileAndDataParsing.buildJsonFromPath(resource, false);
+        if (loaded == null && FileAndDataParsing.absoluteClasspathRequest(path)) {
+            throw FileAndDataParsing.filesystemHint(path);
+        }
+        return loaded;
     }
 
     public static ParsingMap getGlobalsParsingmap() {
@@ -672,6 +684,7 @@ public class ParsingMap extends MappingProcessor {
                 "JSON-STRING",
                 "XML",
                 "XML-STRING",
+                "XML-ESCAPE",
                 "YAML",
                 "YAML-STRING",
                 "MAP",
@@ -682,6 +695,8 @@ public class ParsingMap extends MappingProcessor {
                 "DOCSTRING",
                 "DATA",
                 "STRING",
+                "MASK",
+                "UNMASK",
                 "MERGE"
         );
         private static final Object MISSING = new Object();
@@ -884,6 +899,9 @@ public class ParsingMap extends MappingProcessor {
                             current,
                             DataElementKind.XML_STRING
                     );
+                    case "XML-ESCAPE" -> Values.xmlEscape(current);
+                    case "MASK" -> Values.mask(current);
+                    case "UNMASK" -> Values.unmask(current);
                     case "YAML" -> StructuredDataConverter.convert(
                             current,
                             DataElementKind.YAML_DATA
@@ -1088,7 +1106,9 @@ public class ParsingMap extends MappingProcessor {
             }
 
             Object current;
-            if (source.startsWith("value:")) {
+            if (Values.hasRegisteredPrefix(source)) {
+                current = Values.callPrefix(source);
+            } else if (source.startsWith("value:")) {
                 current = source.substring("value:".length());
             } else if (source.startsWith("&")) {
                 logWarn(
@@ -1545,6 +1565,9 @@ public class ParsingMap extends MappingProcessor {
             if (DIRECTIVE_TOKEN.matcher(input).find()) {
                 return true;
             }
+            if (Values.containsRegisteredPrefixReference(input)) {
+                return true;
+            }
             return containsNestedReference(input);
         }
 
@@ -1591,6 +1614,9 @@ public class ParsingMap extends MappingProcessor {
         }
 
         private static String stringify(Object value) {
+            if (value instanceof PrefixValue prefix) {
+                return stringify(prefix.value());
+            }
             if (value == null || value instanceof NullNode) {
                 return "";
             }

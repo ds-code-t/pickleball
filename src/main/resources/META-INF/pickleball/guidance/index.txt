@@ -24,12 +24,15 @@ docs/dynamic-control-api.md
 docs/dynamic-steps.md
 docs/feature-status-notes.md
 docs/getting-started.md
+docs/java-values.md
 docs/key-parser-dsl.md
 docs/log-and-assert-steps.md
 docs/mapping-and-templating.md
 docs/nested-steps.md
+docs/object-registration.md
 docs/pickleball-workbench-player.md
 docs/pickleball-workbench.md
+docs/release-notes.md
 docs/reserved-element-names.md
 docs/service-call-scenarios.md
 docs/step-overrides.md
@@ -94,6 +97,7 @@ maven-consumer-project/src/test/resources/features/navigation.feature
 maven-consumer-project/src/test/resources/features/nested-and-block-conditionals.feature
 maven-consumer-project/src/test/resources/features/phrase-plain-forms.feature
 maven-consumer-project/src/test/resources/features/pickleball-2.1.2-syntax-demo.feature
+maven-consumer-project/src/test/resources/features/release-2-1-16.feature
 maven-consumer-project/src/test/resources/features/reusable-scenario-selection.feature
 maven-consumer-project/src/test/resources/features/run-row-gates.feature
 maven-consumer-project/src/test/resources/features/run-step-parameter-variations.feature
@@ -121,6 +125,7 @@ maven-consumer-project/src/test/resources/site/forms.html
 maven-consumer-project/src/test/resources/site/index.html
 maven-consumer-project/src/test/resources/site/keyboard.html
 maven-consumer-project/src/test/resources/site/loading.html
+maven-consumer-project/src/test/resources/site/text-match.html
 maven-consumer-project/src/test/resources/site/window-actions.html
 maven-consumer-project/src/test/resources/site/window-child.html
 maven-consumer-project/src/test/resources/site/workflow.html

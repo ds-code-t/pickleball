@@ -5,6 +5,7 @@ import io.cucumber.core.runner.StepExtension;
 import org.openqa.selenium.NoAlertPresentException;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.remote.RemoteWebDriver;
+import tools.dscode.Values;
 import tools.dscode.common.assertions.ValueWrapper;
 import tools.dscode.common.browseroperations.WindowSwitch;
 import tools.dscode.common.seleniumextensions.ElementWrapper;
@@ -158,8 +159,14 @@ public enum ActionOperations implements OperationsInterface {
                         }
                     }
                     value = convertSpecialValues(value);
-                    logInfo("Saving '" + limitText(value, 10000) + "' to key: '" + keyName + "'");
-                    getRunningParsingMap().put(keyName, value);
+                    String destinationKey = keyName;
+                    if (Values.isMaskKey(keyName)) {
+                        Object[] holder = {value};
+                        destinationKey = Values.storageKey(keyName, holder);
+                        value = holder[0];
+                    }
+                    logInfo("Saving '" + limitText(value, 10000) + "' to key: '" + destinationKey + "'");
+                    getRunningParsingMap().put(destinationKey, value);
                 }
                 return true;
             });

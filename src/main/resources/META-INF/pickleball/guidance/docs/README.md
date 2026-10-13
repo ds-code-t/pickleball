@@ -21,6 +21,8 @@ When these docs are materialized from the Maven dependency with Workbench `expor
 ## Data and reusable behavior
 
 - [Mapping and templating](mapping-and-templating.md) — supported mapping and saved-value behavior.
+- [Java values](java-values.md) — static `getValue` / `saveValue`, typed Jackson reads, `softFail`, `throttle`, custom prefixes, and masked values.
+- [Registered objects](object-registration.md) — constructor, post-actions, and scenario-end cleanup.
 - [Data values and Data Elements](data-values-and-elements.md) — native values, Jackson container preservation, Data Elements, and explicit conversions.
 - [Configuration files and resource mapping](config-files-and-resource-mapping.md) — load shared config/resources, use `pkb_configpath`, prefer `<config:...>`, and retain legacy `<configs...>` compatibility.
 - [Component scenarios](component-scenarios.md) — invoke reusable scenario-sized flows.
@@ -44,6 +46,10 @@ When these docs are materialized from the Maven dependency with Workbench `expor
 - [Diagnostic lineage and metadata](diagnostic-lineage-metadata.md) — distinguish lineage annotations, execution/evidence RunVars, controls, and derived evidence.
 - [Diagnostic reporting](diagnostic-reporting.md) — sparse-first AI evidence, source provenance, step/capability metadata, trace evidence, screenshots/fingerprints, comparison, and retention.
 - [AI diagnostic reporting plan](ai-diagnostic-reporting-plan.md) — current sparse-first investigation and controlled-rerun architecture.
+
+## Experimental features
+
+- [Release notes](release-notes.md) — version notes, including breaking changes.
 
 ## Working consumer project
 

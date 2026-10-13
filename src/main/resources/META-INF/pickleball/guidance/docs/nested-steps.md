@@ -99,6 +99,8 @@ Only a block `until` loops. The parent must end in `:` or `?`. A failing pass ru
 
 `is 3` runs the child steps 2 times. It stops at the start of run 3. `is greater than 3` runs them 3 times. It stops when the check reads 4. Step Duration on that check is the time since the loop's first pass. A child step has its own Step Repetition.
 
+Scenario-end teardown that is not a loop ceiling uses `ALWAYS RUN` or a Cucumber `@After` hook. A registered object's `cleanup` property also runs at scenario end, including after a failure. See [Registered objects](object-registration.md) and [Log and assert steps](log-and-assert-steps.md).
+
 Hitting `pkb_stepRepeatMaxCount` (default 100) or `pkb_stepMaxTime` (default 60 minutes) hard-fails the Cucumber scenario. The message names the setting, for example `Step exceeded pkb_stepMaxTime (5m)` or `Until loop exhausted pkb_stepRepeatMaxCount`. A following `ALWAYS RUN` sibling still runs. The clock is checked before the loop sleeps, and the sleep is only the time left, capped at 400 milliseconds. Those ceilings are run-wide. The run-var limit always hard-fails; a longer Gherkin time can't extend it. Zero and negative are defined in [Repeat ceilings](configuration.md#repeat-ceilings). Names the parser treats specially are listed in [Reserved element names](reserved-element-names.md).
 
 `times` repeats the action and stops on the first throw. It does not continue after a failure. See [Dynamic Steps](dynamic-steps.md).

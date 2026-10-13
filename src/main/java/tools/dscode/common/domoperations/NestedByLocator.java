@@ -6,6 +6,9 @@ import org.openqa.selenium.SearchContext;
 import org.openqa.selenium.StaleElementReferenceException;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.WrapsDriver;
+import tools.dscode.common.dataoperations.TextOp;
+import tools.dscode.common.dataoperations.TextPredicateMatcher;
+import tools.dscode.common.domoperations.ExecutionDictionary;
 import tools.dscode.common.treeparsing.parsedComponents.ElementMatch;
 
 import java.time.Duration;
@@ -97,6 +100,10 @@ public final class NestedByLocator {
         }
 
         List<WebElement>  returnList = findWithRetry(context, locator, Duration.ofSeconds(10), displayedElementsOnly, mode);
+        returnList = retainFullMatches(returnList, elementMatch);
+        if (returnList.isEmpty()) {
+            return new ArrayList<>();
+        }
 
         if(elementMatch.elementPosition.equalsIgnoreCase("last"))
             return new ArrayList<>(List.of(returnList.getLast()));
@@ -110,6 +117,63 @@ public final class NestedByLocator {
             return returnList;
 
         return sampleEvery(returnList, elementMatch.elementIndex-1, elementMatch.elementIndex);
+    }
+
+    public static List<WebElement> retainFullMatches(List<WebElement> found, ElementMatch elementMatch) {
+        if (found == null || found.isEmpty() || elementMatch == null || elementMatch.textOps == null) {
+            return found == null ? new ArrayList<>() : found;
+        }
+        List<ElementMatch.TextOp> regexOps = new ArrayList<>();
+        for (ElementMatch.TextOp textOp : elementMatch.textOps) {
+            if (textOp.op() == ExecutionDictionary.Op.MATCHES) {
+                regexOps.add(textOp);
+            }
+        }
+        if (regexOps.isEmpty()) {
+            return found;
+        }
+        JavascriptExecutor javascript = getJavascriptExecutor(null, found);
+        List<WebElement> matched = new ArrayList<>();
+        for (WebElement element : found) {
+            String text;
+            try {
+                text = matchText(javascript, element);
+            } catch (StaleElementReferenceException ignored) {
+                continue;
+            }
+            boolean kept = true;
+            for (ElementMatch.TextOp textOp : regexOps) {
+                if (!TextPredicateMatcher.matches(
+                        text == null ? "" : text,
+                        new TextOp(textOp.text(), textOp.op())
+                )) {
+                    kept = false;
+                    break;
+                }
+            }
+            if (kept) {
+                matched.add(element);
+            }
+        }
+        return matched;
+    }
+
+    /**
+     * The label a person reads. {@code textContent} keeps "Save All" intact.
+     * Selenium {@code getText()} can return an empty string for that button.
+     */
+    private static String matchText(JavascriptExecutor javascript, WebElement element) {
+        if (javascript != null) {
+            Object content = javascript.executeScript(
+                    "var el = arguments[0]; return el.textContent == null ? '' : el.textContent;",
+                    element
+            );
+            if (content != null && !content.toString().isBlank()) {
+                return content.toString();
+            }
+        }
+        String visible = element.getText();
+        return visible == null ? "" : visible;
     }
 
     public static <T> ArrayList<T> sampleEvery(List<T> list, int startIndex, int step) {

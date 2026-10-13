@@ -83,6 +83,7 @@ public class CurrentScenarioState extends ScenarioMapping {
     public boolean evaluatingUntilCondition;
 
     public List<Throwable> stepFailures = new ArrayList<>();
+    private final List<Throwable> deferredSoftFailures = new ArrayList<>();
 
     private final List<Object> cleanupRegistry = new ArrayList<>();
     private final Set<Object> cleanupRegistrySeen =
@@ -331,6 +332,12 @@ public class CurrentScenarioState extends ScenarioMapping {
             throwable = rememberFailure(throwable, t);
         }
 
+        if (throwable == null) {
+            Throwable deferred = deferredScenarioFailure();
+            if (deferred != null) {
+                throwable = deferred;
+            }
+        }
         if (throwable != null)
             throw new RuntimeException(throwable);
     }
@@ -729,6 +736,62 @@ public class CurrentScenarioState extends ScenarioMapping {
         isScenarioComplete = true;
         if (failure != null) {
             stepFailures.add(failure);
+        }
+    }
+
+    /**
+     * Records a soft failure without failing the calling step.
+     * The scenario stays soft-failed so later conditional steps can see it,
+     * and Cucumber fails the scenario after the remaining steps finish.
+     */
+    public void recordDeferredSoftFailure(String message) {
+        String text = message == null || message.isBlank()
+                ? "Soft failure"
+                : message.trim();
+        SoftRuntimeException failure = new SoftRuntimeException(text);
+        isScenarioSoftFail = true;
+        deferredSoftFailures.add(failure);
+        stepFailures.add(failure);
+    }
+
+    public Throwable latestDeferredSoftFailure() {
+        if (deferredSoftFailures.isEmpty()) {
+            return null;
+        }
+        return deferredSoftFailures.get(deferredSoftFailures.size() - 1);
+    }
+
+    /**
+     * Failure to raise after the scenario body when a deferred soft failure
+     * was recorded and the scenario did not already fail hard. Empty when
+     * the caller discarded the deferred failure.
+     */
+    public Throwable deferredScenarioFailure() {
+        if (isScenarioHardFail || deferredSoftFailures.isEmpty()) {
+            return null;
+        }
+        String joined = deferredSoftFailures.stream()
+                .map(Throwable::getMessage)
+                .filter(Objects::nonNull)
+                .distinct()
+                .collect(Collectors.joining(", "));
+        return new SoftRuntimeException(joined.isBlank() ? "Soft failure" : joined);
+    }
+
+    /**
+     * Removes one deferred soft failure recorded by {@code Values.softFail}.
+     * Clears the soft-failed flag only when no soft failure remains.
+     */
+    public void discardDeferredSoftFailure(Throwable failure) {
+        if (failure == null) {
+            return;
+        }
+        deferredSoftFailures.remove(failure);
+        stepFailures.remove(failure);
+        boolean stillSoft = !deferredSoftFailures.isEmpty()
+                || stepFailures.stream().anyMatch(item -> item instanceof SoftExceptionInterface);
+        if (!stillSoft) {
+            isScenarioSoftFail = false;
         }
     }
 

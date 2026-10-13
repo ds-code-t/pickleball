@@ -18,6 +18,8 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.dataformat.xml.XmlMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLMapper;
 
+import tools.dscode.common.dataelements.DataQueryException;
+import tools.dscode.common.dataelements.StructuredDataConverter;
 import tools.dscode.common.resources.ResourceLocations;
 import tools.dscode.control.protocol.PickleballPaths;
 
@@ -142,15 +144,61 @@ public final class FileAndDataParsing {
         if (startsWithPrefix(trimmed, "wd-file:")) {
             return loadWdFileReference(trimmed.substring("wd-file:".length()), resolveTemplates);
         }
-        return loadClasspathQuery(stripClasspathStylePrefixes(trimmed), resolveTemplates);
+        return loadClasspathQuery(stripClasspathStylePrefixes(trimmed), resolveTemplates, trimmed);
     }
 
-    private static JsonNode loadClasspathQuery(String resourcePath, boolean resolveTemplates) {
+    /**
+     * True when {@code path} is a classpath-style request for an absolute
+     * location ({@code file:/...}, {@code classpath:/...}, or an unprefixed
+     * absolute path). {@code wd-file:} stays a filesystem path and is never
+     * hinted.
+     */
+    public static boolean absoluteClasspathRequest(String path) {
+        if (path == null || path.isBlank()) {
+            return false;
+        }
+        String text = path.trim();
+        if (startsWithPrefix(text, "wd-file:")) {
+            return false;
+        }
+        String remainder = text;
+        if (startsWithPrefix(text, "classpath:")) {
+            remainder = text.substring("classpath:".length()).trim();
+        } else if (startsWithPrefix(text, "file:")) {
+            remainder = text.substring("file:".length()).trim();
+        }
+        if (remainder.startsWith("/") || remainder.startsWith("\\")) {
+            return true;
+        }
+        return remainder.length() >= 3
+                && Character.isLetter(remainder.charAt(0))
+                && remainder.charAt(1) == ':'
+                && (remainder.charAt(2) == '/' || remainder.charAt(2) == '\\');
+    }
+
+    public static boolean classpathResourceMissing(String resource) {
+        if (resource == null || resource.isBlank()) {
+            return true;
+        }
+        return buildJsonFromSuffixAgnosticPath(resource, false) == null;
+    }
+
+    public static IllegalArgumentException filesystemHint(String path) {
+        return new IllegalArgumentException(
+                "Classpath resource '" + path
+                        + "' was not found. use wd-file:/... for a filesystem path"
+        );
+    }
+
+    private static JsonNode loadClasspathQuery(String resourcePath, boolean resolveTemplates, String original) {
         SplitResourcePath split = splitResourcePath(resourcePath);
         if (split == null) {
             return null;
         }
         JsonNode resolved = buildJsonFromSuffixAgnosticPath(split.lookupPath(), resolveTemplates);
+        if (resolved == null && absoluteClasspathRequest(original)) {
+            throw filesystemHint(original);
+        }
         return queryLoaded(resolved, split.queryPath(), split.boundarySegment());
     }
 
@@ -327,7 +375,7 @@ public final class FileAndDataParsing {
             Path parent = Paths.get(parentUrl.toURI());
             Path matched = findSuffixAgnosticChild(parent, requestedName);
             return matched == null ? null : buildFromRoot(matched, resolveTemplates);
-        } catch (ParseFailureException e) {
+        } catch (ParseFailureException | DataQueryException e) {
             throw e;
         } catch (Exception e) {
             return null;
@@ -366,7 +414,7 @@ public final class FileAndDataParsing {
         try (FileSystem fs = FileSystems.newFileSystem(toJarUri(direct), Map.of())) {
             Path matched = fs.getPath(resourcePath);
             return Files.exists(matched) ? buildFromRoot(matched, resolveTemplates) : null;
-        } catch (ParseFailureException failure) {
+        } catch (ParseFailureException | DataQueryException failure) {
             throw failure;
         } catch (Exception ignored) {
             return null;
@@ -394,7 +442,7 @@ public final class FileAndDataParsing {
                     : normalizedRoot.resolve(parentResourcePath).normalize();
             Path matched = findSuffixAgnosticChild(parent, requestedName);
             return matched == null ? null : buildFromRoot(matched, resolveTemplates);
-        } catch (ParseFailureException e) {
+        } catch (ParseFailureException | DataQueryException e) {
             throw e;
         } catch (Exception e) {
             return null;
@@ -661,6 +709,9 @@ public final class FileAndDataParsing {
     }
 
     private static JsonNode resolveAndParseSingleFile(String content, String fileName, boolean resolveTemplates) {
+        if ("xml".equals(getExtensionLower(fileName))) {
+            StructuredDataConverter.rejectUnsafeXml(content);
+        }
         String resolvedContent = resolveTemplates
                 ? getRunningParsingMap().resolveWholeText(content)
                 : content;
@@ -763,6 +814,7 @@ public final class FileAndDataParsing {
     }
 
     private static JsonNode parseXmlStrict(String content, String name) {
+        StructuredDataConverter.rejectUnsafeXml(content);
         try {
             Object value = XML_MAPPER.readValue(content.strip(), Object.class);
             return value == null ? null : JSON_MAPPER.valueToTree(value);

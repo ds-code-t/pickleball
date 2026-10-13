@@ -123,7 +123,7 @@ public class ExecutionDictionary {
                 case String s when s.startsWith("equal") -> Op.EQUALS;
                 case String s when s.startsWith("contain") -> Op.CONTAINS;
                 case String s when s.startsWith("start") -> Op.STARTS_WITH;
-                case String s when s.startsWith("matches") -> Op.MATCHES;
+                case String s when s.startsWith("match") -> Op.MATCHES;
                 case String s when s.startsWith("end") -> Op.ENDS_WITH;
                 case String s when s.startsWith("greater") -> s.contains("equal") ? Op.GTE : Op.GT;
                 case String s when s.startsWith("lesser") -> s.contains("equal") ? Op.LTE : Op.LT;

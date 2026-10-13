@@ -1,6 +1,7 @@
 package tools.dscode.common.reporting;
 
 import org.apache.logging.log4j.core.pattern.AnsiEscape;
+import tools.dscode.Values;
 import tools.dscode.common.reporting.logging.Entry;
 import tools.dscode.common.reporting.logging.Level;
 
@@ -248,7 +249,7 @@ public final class WorkBookConsolePrinter {
     }
 
     private static String safe(String text) {
-        return text == null ? "" : text;
+        return Values.maskLog(text);
     }
 
     // ---------------------------------------------------------

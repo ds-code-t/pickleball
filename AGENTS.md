@@ -109,7 +109,10 @@ When implementation, tests, examples, and documentation disagree:
 
 Treat these as consumer-visible contracts unless source evidence clearly shows otherwise:
 
-- Public Java APIs, including the optional dynamic-control API and semantic hook contract
+- Public Java APIs, including the optional dynamic-control API and semantic hook contract. `tools.dscode.Values` is the static value API (`getValue`, `saveValue`, the map-specific pairs, Jackson `Class` overloads, `softFail`, `throttle`, `registerPrefix`, `cacheGet` / `cachePut`, and `secret`). `PrefixValue` is the only prefix return type. `~MASK;` and `~UNMASK;` keep known secrets out of logs.
+- Element text `matching` is a full match and honors quote types the way phrase `matches` does. This changed in 2.1.16.
+- `~XML-ESCAPE;` is a conversion directive. XML readers reject `DOCTYPE` and `ENTITY` declarations.
+- Experimental JDBC service calls: a `REQUEST.endpoint` that starts with `jdbc:` runs JDBC. Other endpoints stay HTTP. Drivers are published dependencies, not shaded into the runtime JAR.
 - Dynamic-control mapping behavior: isolated caller-defined NodeMap contexts, scoped live-map replacement, snapshot materialization, and mapping resolve/lookup/write interception are opt-in and must not alter normal execution when unused
 - Maven artifact behavior and runtime dependencies
 - Cucumber step phrases and dynamic-step behavior
@@ -288,7 +291,7 @@ Changed in 2.1.15. `pkb_features`, `pkb_datapath`, `pkb_configpath`, and the Ghe
 | `wd-file:X` | working-directory/X |
 | `wd-file:/X` | absolute path /X |
 
-A path with no prefix is a classpath resource, including a path that contains a slash. `qa/configs` is the resources folder. `wd-file:src/test/resources/qa/configs` is that folder under the working directory. `wd-file:/opt/...` is an absolute directory. `file:/opt/...` is the classpath resource `opt/...`. There is no project-root prefix. The default `pkb_datapath` is `data`. `wd-file:features` is passed to Cucumber as `file:features`. A normal run and an agent or Workbench private-run copy resolve the same value to the same folder. A root `configs/` directory is chosen when `wd-file:` points at it.
+A path with no prefix is a classpath resource, including a path that contains a slash. `qa/configs` is the resources folder. `wd-file:src/test/resources/qa/configs` is that folder under the working directory. `wd-file:/opt/...` is an absolute directory. `file:/opt/...` is the classpath resource `opt/...`. There is no project-root prefix. A `file:/...` or unprefixed `/...` path that is not on the classpath fails with a hint: use `wd-file:/...` for a filesystem path. A relative miss and a missing `wd-file:` path stay empty. The default `pkb_datapath` is `data`. `wd-file:features` is passed to Cucumber as `file:features`. A normal run and an agent or Workbench private-run copy resolve the same value to the same folder. A root `configs/` directory is chosen when `wd-file:` points at it.
 
 `pkb_callpath` and `pkb_componentpath` keep their historical project-relative defaults (`src/test/resources/calls`, `src/test/resources/component`). `pkb_glue` is Java/Cucumber glue syntax, not a resource path.
 

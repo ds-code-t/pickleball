@@ -267,6 +267,8 @@ RESPONSE.body
 
 HTTP `4xx` and `5xx` responses are retained as normal service results. No-content responses retain status and headers.
 
+An endpoint that starts with `jdbc:` is an experimental JDBC call instead of HTTP. The HTTP keys above are unchanged. JDBC request and response keys, including `sql`, `params`, `rows`, `rowCount`, `updateCount`, and `error`, are in [Experimental features](experimental-features.md).
+
 ## Generic mappings
 
 Build service calls with the shared mapping syntax:

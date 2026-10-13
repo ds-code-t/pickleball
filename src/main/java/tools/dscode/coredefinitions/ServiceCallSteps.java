@@ -9,6 +9,7 @@ import io.restassured.response.Response;
 import io.restassured.specification.RequestSpecification;
 import tools.dscode.common.CoreSteps;
 import tools.dscode.common.mappings.NodeMap;
+import tools.dscode.common.servicecalls.JdbcServiceCall;
 import tools.dscode.common.servicecalls.RestAssuredUtil;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -97,6 +98,21 @@ public class ServiceCallSteps extends CoreSteps {
             );
         }
         long started = System.nanoTime();
+        if (JdbcServiceCall.isJdbc(endpoint)) {
+            logInfo("JDBC service call endpoint: " + endpoint);
+            ObjectNode responseNode = JdbcServiceCall.execute(request);
+            serviceCallObject.set(RESPONSE, responseNode);
+            if (responseNode.hasNonNull("error")) {
+                logInfo("JDBC service call error: " + responseNode.get("error").asText());
+            } else {
+                logInfo(
+                        "JDBC service call completed in "
+                                + elapsedMillis(started)
+                                + " ms"
+                );
+            }
+            return;
+        }
         try (PrintStream restLog = new PrintStream(
                 new LogInfoOutputStream(),
                 true,

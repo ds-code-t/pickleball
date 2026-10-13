@@ -272,7 +272,12 @@ public class ElementMatch {
         }
 
         for (TextOp textOp : textOps) {
-            ExecutionDictionary.CategoryResolution categoryResolution = dict.getFinalCategoryResolution(category, textOp.text, textOp.op);
+            boolean regex = textOp.op() == ExecutionDictionary.Op.MATCHES;
+            ExecutionDictionary.CategoryResolution categoryResolution = dict.getFinalCategoryResolution(
+                    category,
+                    regex ? null : textOp.text,
+                    regex ? null : textOp.op()
+            );
             elPredictXPaths.add(categoryResolution.xpath());
         }
 
@@ -412,8 +417,13 @@ public class ElementMatch {
         }
 
         for (TextOp textOp : textOps) {
+            boolean regex = textOp.op() == ExecutionDictionary.Op.MATCHES;
             ExecutionDictionary.CategoryResolution categoryResolution =
-                    dict.getFinalCategoryResolution(category, textOp.text, textOp.op);
+                    dict.getFinalCategoryResolution(
+                            category,
+                            regex ? null : textOp.text,
+                            regex ? null : textOp.op()
+                    );
             elPredictXPaths.add(categoryResolution.xpath());
         }
 

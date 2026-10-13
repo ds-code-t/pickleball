@@ -98,7 +98,7 @@ Marker: payload.marker
 
 Named marker references resolve to the marker's native `DataTable` or `DocString`. Unnamed markers still cannot be addressed explicitly.
 
-Marker-data discovery uses the resolved `pkb_datapath`. The default is the classpath resource `data`. Changed in 2.1.15: a path with no prefix is a classpath resource, including a path that contains a slash. `wd-file:src/test/resources/data` reads that folder under the working directory. A blank `pkb_datapath` still preserves marker-only lookup from the running scenario.
+Marker-data discovery uses the resolved `pkb_datapath`. The default is the classpath resource `data`. Changed in 2.1.15: a path with no prefix is a classpath resource, including a path that contains a slash. `wd-file:src/test/resources/data` reads that folder under the working directory. A `file:/...` or unprefixed `/...` path that is not on the classpath fails with a hint: use `wd-file:/...` for a filesystem path. A blank `pkb_datapath` still preserves marker-only lookup from the running scenario.
 
 ## Data files with `data:/`
 

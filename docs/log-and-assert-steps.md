@@ -42,6 +42,8 @@ Existing fail steps are unchanged:
 
 `SOFT FAIL SCENARIO` throws `SoftRuntimeException`. The step result is failed, so Cucumber fails the scenario. The scenario is marked soft-failed and is not marked complete, so later steps still run. That is not what `SOFT ASSERT:` does. `SOFT ASSERT:` logs every failing clause and does not throw, so Cucumber stays green and later steps run. A direct `SOFT FAIL SCENARIO` is not an `@all` step. The area B Java check observes the throw without failing the parent scenario.
 
+`Values.softFail(message)` records a soft failure without failing the calling step. Later steps still run, `RUN IF SCENARIO SOFT FAILED` runs, and the scenario fails when it ends. See [Java values](java-values.md).
+
 `END SCENARIO` stops the rest of the current scenario. Steps after it do not run, including flagged steps. `END TEST` is the whole token only. A longer line is not this step. `END TEST` marks the scenario complete without failing it, so a later step runs only when a scenario flag below says it should.
 
 ## Scenario flags

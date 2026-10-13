@@ -29,9 +29,7 @@ public final class TextPredicateMatcher {
             case CONTAINS -> compareStrings(left, right, StringMode.CONTAINS);
             case STARTS_WITH -> compareStrings(left, right, StringMode.STARTS_WITH);
             case ENDS_WITH -> compareStrings(left, right, StringMode.ENDS_WITH);
-            case MATCHES -> Pattern.compile(right.toNonNullString())
-                    .matcher(left.getValue() == null ? "" : left.getValue().toString())
-                    .find();
+            case MATCHES -> fullMatch(left, right);
             case GT -> compareNumbers(left, right) > 0;
             case GTE -> compareNumbers(left, right) >= 0;
             case LT -> compareNumbers(left, right) < 0;
@@ -50,6 +48,28 @@ public final class TextPredicateMatcher {
             }
         }
         return true;
+    }
+
+    private static boolean fullMatch(ValueWrapper left, ValueWrapper right) {
+        if (left == null || right == null) {
+            return false;
+        }
+        boolean raw = left.type == ValueTypes.BACK_TICKED
+                || right.type == ValueTypes.BACK_TICKED;
+        String value = raw ? rawText(left) : left.asNormalizedText();
+        String pattern = raw ? rawText(right) : right.asNormalizedText();
+        if (value == null || pattern == null) {
+            return false;
+        }
+        int flags = left.type == ValueTypes.SINGLE_QUOTED
+                || right.type == ValueTypes.SINGLE_QUOTED
+                ? Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE
+                : 0;
+        return Pattern.compile(pattern, flags).matcher(value).matches();
+    }
+
+    private static String rawText(ValueWrapper value) {
+        return value.getValue() == null ? "" : value.getValue().toString();
     }
 
     private static int compareNumbers(ValueWrapper left, ValueWrapper right) {

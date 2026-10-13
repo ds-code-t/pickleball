@@ -9,6 +9,7 @@ import io.cucumber.docstring.DocString;
 import io.cucumber.java.en.Given;
 import tools.dscode.common.CoreSteps;
 import tools.dscode.common.annotations.DefinitionFlags;
+import tools.dscode.common.dataelements.StructuredDataConverter;
 import tools.dscode.common.mappings.MappingProcessor;
 import tools.dscode.common.mappings.NodeMap;
 import tools.dscode.common.mappings.ParsingMap.MappingDirectiveResolver;
@@ -108,6 +109,17 @@ public class MappingSteps extends CoreSteps {
             DocString docString
     ) {
         NodeMap nodeMap = getNodeMap(mapType);
+        MappingDirectiveResolver.DirectiveSpec keySpec =
+                MappingDirectiveResolver.parseDirectiveSuffix(key);
+        for (String directive : keySpec.directives()) {
+            if (!"MERGE".equals(directive)) {
+                throw new IllegalArgumentException(
+                        "Mapping behavior '~" + directive.toLowerCase(Locale.ROOT)
+                                + ";' is not valid on a MAP TEXT/OBJECT VALUE destination key. "
+                                + "Those destination keys support '~merge;' only."
+                );
+            }
+        }
         String content =
                 resolveToStringWithRunningParsingMap(docString.getContent());
         Object value = switch (dataType == null ? "TEXT" : dataType) {
@@ -218,6 +230,11 @@ public class MappingSteps extends CoreSteps {
         String normalizedType = contentType
                 .toLowerCase(Locale.ROOT)
                 .trim();
+        if (normalizedType.equals("xml")
+                || normalizedType.equals("application/xml")
+                || normalizedType.equals("text/xml")) {
+            StructuredDataConverter.rejectUnsafeXml(content);
+        }
         ObjectMapper mapper = switch (normalizedType) {
             case "json",
                  "application/json",

@@ -7,6 +7,7 @@ import org.openqa.selenium.SearchContext;
 import org.openqa.selenium.StaleElementReferenceException;
 import org.openqa.selenium.WebElement;
 import tools.dscode.common.domoperations.ExecutionDictionary;
+import tools.dscode.common.domoperations.NestedByLocator;
 import tools.dscode.common.treeparsing.parsedComponents.ElementMatch;
 import tools.dscode.common.treeparsing.parsedComponents.PhraseData;
 
@@ -191,12 +192,15 @@ public class ContextWrapper {
         logDebug("XPATH: " + prettyPrintXPath(xpath));
         boolean displayedElementsOnly =
                 !elementMatch.categoryFlags.contains(ExecutionDictionary.CategoryFlags.NON_DISPLAY_ELEMENT);
-        return findWithRetry(
-                searchContext,
-                new By.ByXPath(xpath),
-                Duration.ofSeconds(10),
-                displayedElementsOnly,
-                nestingMode(elementMatch)
+        return NestedByLocator.retainFullMatches(
+                findWithRetry(
+                        searchContext,
+                        new By.ByXPath(xpath),
+                        Duration.ofSeconds(10),
+                        displayedElementsOnly,
+                        nestingMode(elementMatch)
+                ),
+                elementMatch
         );
     }
 

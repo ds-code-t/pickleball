@@ -40,7 +40,7 @@ Controlled/named-profile execution inherits only missing `pkb_glue`, `pkb_featur
 
 Runtime configuration mappings are loaded only after final run configuration; they must not participate in resolving profiles/RunVars or `pkb_configpath`. New syntax should prefer `<config:...>` while legacy `<configs...>` remains compatible.
 
-Changed in 2.1.15. `pkb_features`, `pkb_datapath`, `pkb_configpath`, and Gherkin `<file:...>` share the prefix rule in `docs/config-files-and-resource-mapping.md`. No prefix, `file:`, and `classpath:` are the resources folder. `wd-file:X` is under the working directory. `wd-file:/X` is an absolute directory. `pkb_callpath` and `pkb_componentpath` keep their historical project-relative paths. Leave those two keys unchanged during unrelated configuration work.
+Changed in 2.1.15. `pkb_features`, `pkb_datapath`, `pkb_configpath`, and Gherkin `<file:...>` share the prefix rule in `docs/config-files-and-resource-mapping.md`. No prefix, `file:`, and `classpath:` are the resources folder. `wd-file:X` is under the working directory. `wd-file:/X` is an absolute directory. A `file:/...` or unprefixed `/...` path that is not on the classpath fails with a hint: use `wd-file:/...` for a filesystem path. `pkb_callpath` and `pkb_componentpath` keep their historical project-relative paths. Leave those two keys unchanged during unrelated configuration work.
 
 ## Temporary agent work
 

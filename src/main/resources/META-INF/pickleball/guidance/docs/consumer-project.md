@@ -211,7 +211,7 @@ Legacy `<configs.URL.forms>` / `<configs.users.admin>` remains supported.
 
 `pkb_configpath` changes where that mapping is loaded from. Missing/blank uses the classpath resource `configs`. Runtime configs are loaded only after final RunVar/profile resolution, so `<configs...>` cannot be used to resolve `pkb_configpath` or another RunVar.
 
-Changed in 2.1.15. A path with no prefix is a classpath resource, including a path that contains a slash. `qa/configs` is the resources folder. `wd-file:src/test/resources/qa/configs` is that folder under the working directory. `wd-file:/opt/...` is an absolute directory. `file:/opt/...` is the classpath resource `opt/...`. There is no project-root prefix. The same table applies to `pkb_features`, `pkb_datapath`, and `<file:...>`. The default `pkb_datapath` is `data`. The on-disk data folder remains `src/test/resources/data/`. `pkb_callpath` and `pkb_componentpath` keep their previous path rules.
+Changed in 2.1.15. A path with no prefix is a classpath resource, including a path that contains a slash. `qa/configs` is the resources folder. `wd-file:src/test/resources/qa/configs` is that folder under the working directory. `wd-file:/opt/...` is an absolute directory. `file:/opt/...` is the classpath resource `opt/...`. There is no project-root prefix. A `file:/...` or unprefixed `/...` path that is not on the classpath fails with a hint: use `wd-file:/...` for a filesystem path. A relative miss and a missing `wd-file:` path stay empty. The same table applies to `pkb_features`, `pkb_datapath`, and `<file:...>`. The default `pkb_datapath` is `data`. The on-disk data folder remains `src/test/resources/data/`. `pkb_callpath` and `pkb_componentpath` keep their previous path rules.
 
 | Prefix | Meaning |
 |---|---|

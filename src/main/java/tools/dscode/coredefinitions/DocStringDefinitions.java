@@ -19,6 +19,7 @@ import java.util.Map;
 import java.util.Set;
 
 import static io.cucumber.core.runner.CurrentScenarioState.getScenarioObject;
+import static tools.dscode.common.dataelements.StructuredDataConverter.rejectUnsafeXml;
 
 @SuppressWarnings("unused")
 public class DocStringDefinitions {
@@ -59,6 +60,7 @@ public class DocStringDefinitions {
 
     @DocStringType(contentType = "xml")
     public ObjectNode xmlObjectNode(String docString) throws JsonProcessingException {
+        rejectUnsafeXml(docString);
         return toObjectNode(XML_MAPPER.readTree(docString), "xml");
     }
 
@@ -284,6 +286,7 @@ public class DocStringDefinitions {
     }
 
     private static JsonNode parseXml(String docString) throws JsonProcessingException {
+        rejectUnsafeXml(docString);
         return XML_MAPPER.readTree(docString);
     }
 

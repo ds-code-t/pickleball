@@ -47,8 +47,13 @@ The selector is assembled dynamically from the element category, text, state, or
 ```gherkin
 * , click the "Submit" Button
 * , click the Button containing "Submit"
+* , click the Button matching "Save"
 * , select the Dropdown starting with "Account"
 ```
+
+`matches` is a full-match Java regular expression everywhere, including element text and phrase text. `containing` is a literal partial match. For a partial regular expression, wrap the pattern in `.*`, for example `".*Sa.e.*"`. For exact text that contains `(` `)` `.` or `$`, use `equals` or escape the pattern. Quote types change case and whitespace only. There is no separate regex syntax and no regex warning.
+
+Changed in 2.1.16. Element `matching` used to succeed when the pattern occurred anywhere in the text. It is now a full match, the same rule phrase `matches` already used. On buttons Save, Save All, and Autosave, `matching "Save"` selects only Save, `matching "Save.*"` selects Save and Save All, and `matching 'save all'` selects Save All.
 
 Quote styles affect text handling:
 
