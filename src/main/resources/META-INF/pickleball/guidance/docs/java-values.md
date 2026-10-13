@@ -40,7 +40,7 @@ Every read has a `Class<T>` overload. It converts the stored value with Jackson.
 
 ## softFail
 
-`softFail(String message)` records a soft failure the way a soft assert is meant to finish the scenario. The calling step continues. The scenario fails when it ends. `RUN IF SCENARIO SOFT FAILED` sees the soft failure and runs. This does not change `SOFT ASSERT` or `SOFT FAIL SCENARIO`.
+`softFail(String message)` records a soft failure the way a soft assert is meant to finish the scenario. The calling step continues. The scenario fails when it ends. `RUN IF SCENARIO SOFT FAILED` sees the soft failure and runs. This does not change `SOFT ASSERT` or `SOFT FAIL SCENARIO`. There is no API to discard or absorb that failure. The Cucumber result stays failed, matching the workbook status.
 
 Outside a scenario, `softFail` throws `IllegalStateException`.
 

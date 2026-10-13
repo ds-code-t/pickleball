@@ -2,7 +2,6 @@ package com.example.pickleball;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.cucumber.core.runner.CurrentScenarioState;
-import io.cucumber.core.runner.GlobalState;
 import io.cucumber.java.en.Given;
 import org.openqa.selenium.By;
 import tools.dscode.common.reporting.logging.Entry;
@@ -20,7 +19,6 @@ import static tools.dscode.Values.saveScenarioValue;
 import static tools.dscode.Values.saveStepValue;
 import static tools.dscode.Values.saveValue;
 import static tools.dscode.Values.secret;
-import static tools.dscode.Values.softFail;
 import static tools.dscode.common.mappings.ValueFormatting.MAPPER;
 
 /**
@@ -33,7 +31,6 @@ public final class Release216Steps {
 
     private static final ThreadLocal<String> EXPECTED_CLEANUP = new ThreadLocal<>();
     private static final ThreadLocal<String> CLEANED = new ThreadLocal<>();
-    private static final ThreadLocal<Boolean> DISCARD_SOFT = new ThreadLocal<>();
 
     static {
         registerPrefix("password", (ctx, arg) -> switch (arg) {
@@ -105,19 +102,6 @@ public final class Release216Steps {
         assertLogHidesSecrets();
     }
 
-    @Given("^RUN RELEASE 216 SOFT FAIL$")
-    public static void softFailStep() {
-        softFail("release 216 observer");
-        CurrentScenarioState state = GlobalState.getCurrentScenarioState();
-        if (state == null
-                || state.latestDeferredSoftFailure() == null
-                || state.deferredScenarioFailure() == null
-                || !state.isScenarioFailed()) {
-            throw new AssertionError("softFail did not record a deferred failure.");
-        }
-        DISCARD_SOFT.set(true);
-    }
-
     @Given("^RUN RELEASE 216 PREPARE JDBC$")
     public static void prepareJdbc() {
         saveValue(
@@ -150,7 +134,6 @@ public final class Release216Steps {
 
     public static void afterScenarioCleanup() {
         String expected = EXPECTED_CLEANUP.get();
-        Boolean discard = DISCARD_SOFT.get();
         try {
             if (expected != null) {
                 String actual = CLEANED.get();
@@ -159,30 +142,10 @@ public final class Release216Steps {
                             "Registered-object cleanup did not run for the scenario."
                     );
                 }
-                if ("hard".equals(expected)) {
-                    CurrentScenarioState state = GlobalState.getCurrentScenarioState();
-                    if (state == null
-                            || !state.isScenarioFailed()
-                            || !state.isScenarioComplete()) {
-                        throw new AssertionError(
-                                "Registered-object cleanup did not observe a hard-failed scenario."
-                        );
-                    }
-                    state.absorbRecordedScenarioFailure();
-                }
-            }
-            if (Boolean.TRUE.equals(discard)) {
-                CurrentScenarioState state = GlobalState.getCurrentScenarioState();
-                Throwable failure = state == null ? null : state.latestDeferredSoftFailure();
-                if (failure == null) {
-                    throw new AssertionError("Expected a deferred soft failure to discard.");
-                }
-                state.discardDeferredSoftFailure(failure);
             }
         } finally {
             EXPECTED_CLEANUP.remove();
             CLEANED.remove();
-            DISCARD_SOFT.remove();
         }
     }
 

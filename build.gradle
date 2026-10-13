@@ -97,6 +97,14 @@ dependencies {
     testRuntimeOnly("io.cucumber:tag-expressions")
     testRuntimeOnly("io.cucumber:datatable:${cucumberVersion}")
     testRuntimeOnly("io.cucumber:docstring:${cucumberVersion}")
+    // cucumber-core's other runtime modules. The core jar itself stays excluded
+    // so woven classes win. ExpectedFailureRunnerTest launches the real engine.
+    testRuntimeOnly("io.cucumber:ci-environment")
+    testRuntimeOnly("io.cucumber:cucumber-expressions")
+    testRuntimeOnly("io.cucumber:pretty-formatter")
+    testRuntimeOnly("io.cucumber:html-formatter")
+    testRuntimeOnly("io.cucumber:junit-xml-formatter")
+    testRuntimeOnly("io.cucumber:testng-xml-formatter")
 
     api("com.google.guava:guava:33.5.0-jre")
     api("com.fasterxml.jackson.core:jackson-databind:2.20.0")

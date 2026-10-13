@@ -43,7 +43,6 @@ import java.util.stream.Stream;
 
 import static io.cucumber.core.gherkin.messages.MessageUtilities.getFeatureName;
 import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
-import static io.cucumber.core.runner.GlobalState.getTestCaseState;
 import static io.cucumber.core.runner.GlobalState.lifecycle;
 import static io.cucumber.core.runner.GlobalState.pickleballLog;
 import static io.cucumber.core.runner.StepLogic.stepCloner;
@@ -124,7 +123,6 @@ public class CurrentScenarioState extends ScenarioMapping {
 
     List<StepExtension> stepExtensions;
     StepExtension startStep;
-    private TestCaseState testCaseState;
 
     public StepExtension getCurrentStep() {
         return currentStep;
@@ -260,8 +258,6 @@ public class CurrentScenarioState extends ScenarioMapping {
         }
 
 //        rootScenarioStep.addDefinitionFlag(DefinitionFlag.NO_LOGGING);
-        testCaseState = getTestCaseState();
-//        rootScenarioStep.runMethodDirectly = true;
 
         Throwable throwable = null;
 
@@ -333,13 +329,20 @@ public class CurrentScenarioState extends ScenarioMapping {
         }
 
         if (throwable == null) {
+            Throwable hard = recordedHardFailure();
+            if (hard != null) {
+                throwable = hard;
+            }
+        }
+        if (throwable == null) {
             Throwable deferred = deferredScenarioFailure();
             if (deferred != null) {
                 throwable = deferred;
             }
         }
-        if (throwable != null && !recordedFailureAbsorbed)
+        if (throwable != null) {
             throw new RuntimeException(throwable);
+        }
     }
 
     /**
@@ -707,7 +710,6 @@ public class CurrentScenarioState extends ScenarioMapping {
     private boolean isScenarioHardFail = false;
     private boolean isScenarioSoftFail = false;
     private boolean isScenarioComplete = false;
-    private boolean recordedFailureAbsorbed = false;
 
     public static void endTest() {
         getCurrentScenarioState().isScenarioComplete = true;
@@ -763,23 +765,27 @@ public class CurrentScenarioState extends ScenarioMapping {
     }
 
     /**
-     * Leaves the recorded failure flags in place and does not fail Cucumber
-     * for this scenario. A check can observe a hard failure after cleanup.
-     * Cucumber also stores the failed step on the active {@link TestCaseState};
-     * that result is removed here so the JUnit engine does not fail the scenario.
+     * Hard failure to raise after cleanup when the failing step was caught so
+     * later {@code ALWAYS RUN} siblings could run. Empty when the scenario
+     * did not hard-fail. The workbook status and the Cucumber result both
+     * stay failed. There is no API to absorb that failure.
      */
-    public void absorbRecordedScenarioFailure() {
-        TestCaseState cucumberState = testCaseState != null ? testCaseState : getTestCaseState();
-        if (cucumberState != null) {
-            cucumberState.dropNonPassingStepResults();
+    private Throwable recordedHardFailure() {
+        if (!isScenarioHardFail) {
+            return null;
         }
-        recordedFailureAbsorbed = true;
+        for (int index = stepFailures.size() - 1; index >= 0; index--) {
+            Throwable failure = stepFailures.get(index);
+            if (failure != null && !(failure instanceof SoftExceptionInterface)) {
+                return failure;
+            }
+        }
+        return new RuntimeException("Scenario hard-failed");
     }
 
     /**
      * Failure to raise after the scenario body when a deferred soft failure
-     * was recorded and the scenario did not already fail hard. Empty when
-     * the caller discarded the deferred failure.
+     * was recorded and the scenario did not already fail hard.
      */
     public Throwable deferredScenarioFailure() {
         if (isScenarioHardFail || deferredSoftFailures.isEmpty()) {
@@ -791,23 +797,6 @@ public class CurrentScenarioState extends ScenarioMapping {
                 .distinct()
                 .collect(Collectors.joining(", "));
         return new SoftRuntimeException(joined.isBlank() ? "Soft failure" : joined);
-    }
-
-    /**
-     * Removes one deferred soft failure recorded by {@code Values.softFail}.
-     * Clears the soft-failed flag only when no soft failure remains.
-     */
-    public void discardDeferredSoftFailure(Throwable failure) {
-        if (failure == null) {
-            return;
-        }
-        deferredSoftFailures.remove(failure);
-        stepFailures.remove(failure);
-        boolean stillSoft = !deferredSoftFailures.isEmpty()
-                || stepFailures.stream().anyMatch(item -> item instanceof SoftExceptionInterface);
-        if (!stillSoft) {
-            isScenarioSoftFail = false;
-        }
     }
 
     public boolean isScenarioFailed() {

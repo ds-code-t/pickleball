@@ -22,4 +22,4 @@ There is no separate cleanup step to add for ordinary scenario teardown. Use one
 - `ALWAYS RUN` for a Gherkin child that must run after the scenario is complete. See [Nested steps](nested-steps.md) and [Log and assert steps](log-and-assert-steps.md).
 - A Cucumber `@After` hook on the consumer runner or glue for Java teardown.
 
-The executable check is [`release-2-1-16.feature`](../maven-consumer-project/src/test/resources/features/release-2-1-16.feature). It registers an object whose `cleanup` action records a token after a pass, after a soft failure, and after a hard-failed step.
+The passing check is [`release-2-1-16.feature`](../maven-consumer-project/src/test/resources/features/release-2-1-16.feature). It registers an object whose `cleanup` action records a token after a pass. Hard-failed and soft-failed cleanup, including `isScenarioFailed` and `isScenarioComplete` while hard-fail cleanup runs, are executed by [`ExpectedFailureRunnerTest`](../src/test/java/tools/dscode/expectedfailure/ExpectedFailureRunnerTest.java) through the real runner. That feature is tagged `@expected-failure` and is not part of `@all`, because those scenarios stay failed.

@@ -5,6 +5,7 @@ import io.cucumber.core.runner.GlobalState;
 import io.cucumber.core.runner.StepExtension;
 import io.cucumber.datatable.DataTable;
 import io.cucumber.docstring.DocString;
+import io.cucumber.java.After;
 import io.cucumber.java.en.Given;
 import tools.dscode.common.mappings.ParsingMap;
 import tools.dscode.common.reporting.logging.Entry;
@@ -26,23 +27,45 @@ import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
 import static tools.dscode.common.mappings.MappingProcessor.getRunMap;
 
 public class SyntaxProofSteps {
-    private static final ConcurrentHashMap<String, AtomicInteger> BRANCH_HITS = new ConcurrentHashMap<>();
+    private static final ConcurrentHashMap<String, ConcurrentHashMap<String, AtomicInteger>> BRANCH_HITS =
+            new ConcurrentHashMap<>();
+
+    private static ConcurrentHashMap<String, AtomicInteger> branchCounts() {
+        CurrentScenarioState state = GlobalState.getCurrentScenarioState();
+        if (state == null) {
+            throw new IllegalStateException("branch counts require a running scenario");
+        }
+        return BRANCH_HITS.computeIfAbsent(state.id.toString(), key -> new ConcurrentHashMap<>());
+    }
 
     @Given("^reset branch counts$")
     public void resetBranchCounts() {
-        BRANCH_HITS.clear();
+        branchCounts().clear();
+    }
+
+    @After
+    public void dropBranchCounts() {
+        CurrentScenarioState state = GlobalState.getCurrentScenarioState();
+        if (state != null) {
+            BRANCH_HITS.remove(state.id.toString());
+        }
     }
 
     @Given("^count branch ([A-Za-z0-9-]+)$")
     public static String countBranch(String name) {
+        CurrentScenarioState state = GlobalState.getCurrentScenarioState();
+        if (state == null) {
+            throw new IllegalStateException("branch counts require a running scenario");
+        }
         return Integer.toString(BRANCH_HITS
+                .computeIfAbsent(state.id.toString(), key -> new ConcurrentHashMap<>())
                 .computeIfAbsent(name, key -> new AtomicInteger())
                 .incrementAndGet());
     }
 
     @Given("^branch count \"([^\"]*)\" equals \"([^\"]*)\"$")
     public void branchCountEquals(String name, String expected) {
-        String actual = Integer.toString(BRANCH_HITS.getOrDefault(name, new AtomicInteger()).get());
+        String actual = Integer.toString(branchCounts().getOrDefault(name, new AtomicInteger()).get());
         if (!actual.equals(expected)) {
             throw new AssertionError("branch " + name + " count was " + actual + " not " + expected);
         }
@@ -50,7 +73,7 @@ public class SyntaxProofSteps {
 
     @Given("^branch count \"([^\"]*)\" is from \"([^\"]*)\" through \"([^\"]*)\"$")
     public void branchCountInRange(String name, String low, String high) {
-        int actual = BRANCH_HITS.getOrDefault(name, new AtomicInteger()).get();
+        int actual = branchCounts().getOrDefault(name, new AtomicInteger()).get();
         int minimum = Integer.parseInt(low);
         int maximum = Integer.parseInt(high);
         if (actual < minimum || actual > maximum) {

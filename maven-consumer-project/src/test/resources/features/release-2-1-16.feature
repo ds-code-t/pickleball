@@ -90,12 +90,6 @@ Feature: Pickleball 2.1.16 value API, matching, masking, JDBC, and cleanup
     * , ensure "<pw>" equals "******"
     * RUN RELEASE 216 UNMASK
 
-  Scenario: softFail continues the step and runs the soft-failed flag
-    * , save "no" as "flagSoft"
-    * RUN RELEASE 216 SOFT FAIL
-    * RUN IF SCENARIO SOFT FAILED: , save "yes" as "flagSoft"
-    * , ensure "<flagSoft>" equals "yes"
-
   Scenario: A JDBC service call runs beside an HTTP service call
     * RUN RELEASE 216 PREPARE JDBC
     * MAP "REQUEST" TABLE VALUES TO SCENARIO MAP
@@ -113,11 +107,3 @@ Feature: Pickleball 2.1.16 value API, matching, masking, JDBC, and cleanup
 
   Scenario: Registered-object cleanup runs when the scenario passes
     * RUN RELEASE 216 REGISTER CLEANUP success
-
-  Scenario: Registered-object cleanup runs when the scenario soft-fails
-    * RUN RELEASE 216 REGISTER CLEANUP failure
-    * RUN RELEASE 216 SOFT FAIL
-
-  Scenario: Registered-object cleanup runs when the scenario hard-fails
-    * RUN RELEASE 216 REGISTER CLEANUP hard
-    * FAIL: release 216 hard failure
