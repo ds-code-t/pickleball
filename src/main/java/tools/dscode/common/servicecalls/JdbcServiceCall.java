@@ -4,7 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import tools.dscode.Values;
+import tools.dscode.internal.ValuesSupport;
 import tools.dscode.common.mappings.ValueFormatting;
 
 import java.sql.Connection;
@@ -164,7 +164,7 @@ public final class JdbcServiceCall {
             return "";
         }
         Object restored = ValueFormatting.fromSafeJsonNode(node);
-        Object plain = Values.unmask(restored);
+        Object plain = ValuesSupport.unmask(restored);
         if (plain == null) {
             return "";
         }

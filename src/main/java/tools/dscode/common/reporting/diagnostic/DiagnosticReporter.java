@@ -10,7 +10,7 @@ import io.cucumber.plugin.event.Status;
 import org.openqa.selenium.OutputType;
 import org.openqa.selenium.TakesScreenshot;
 import org.openqa.selenium.WebDriver;
-import tools.dscode.Values;
+import tools.dscode.internal.ValuesSupport;
 import tools.dscode.common.coordination.AgentCoordination;
 import tools.dscode.common.reporting.logging.Entry;
 import tools.dscode.common.reporting.logging.Level;
@@ -1178,7 +1178,7 @@ final class DiagnosticReporter {
 
     private static String sanitizeText(String value) {
         if (value == null) return "";
-        String sanitized = SECRET.matcher(Values.maskLog(value)).replaceAll("$1$2<redacted>");
+        String sanitized = SECRET.matcher(ValuesSupport.maskLog(value)).replaceAll("$1$2<redacted>");
         if (sanitized.length() <= MAX_TEXT_CHARS) return sanitized;
         return sanitized.substring(0, MAX_TEXT_CHARS)
                 + "<diagnostic-truncated originalChars=" + sanitized.length() + ">";

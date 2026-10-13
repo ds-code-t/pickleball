@@ -22,4 +22,20 @@ public privileged aspect StepResultCapture {
     after(TestStep step) returning (Result r) : mapToResult(step) {
         step._lastResult = r;
     }
+
+    /**
+     * Removes failed, pending, and undefined results so a check can observe a
+     * hard failure after cleanup without Cucumber failing the scenario.
+     * Passing and skipped results stay.
+     */
+    public void io.cucumber.core.runner.TestCaseState.dropNonPassingStepResults() {
+        java.util.Iterator<io.cucumber.plugin.event.Result> results = stepResults.iterator();
+        while (results.hasNext()) {
+            io.cucumber.plugin.event.Status status = results.next().getStatus();
+            if (status != io.cucumber.plugin.event.Status.PASSED
+                    && status != io.cucumber.plugin.event.Status.SKIPPED) {
+                results.remove();
+            }
+        }
+    }
 }

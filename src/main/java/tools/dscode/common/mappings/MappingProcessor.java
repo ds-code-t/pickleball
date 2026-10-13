@@ -12,7 +12,7 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.google.common.collect.LinkedListMultimap;
 import io.cucumber.datatable.DataTable;
 import io.cucumber.docstring.DocString;
-import tools.dscode.Values;
+import tools.dscode.internal.ValuesSupport;
 import tools.dscode.common.mappings.queries.Tokenized;
 import tools.dscode.common.treeparsing.parsedComponents.ElementMatch;
 
@@ -1104,9 +1104,9 @@ public abstract class MappingProcessor implements Map<String, Object> {
         if (key == null || key.isBlank()) {
             throw new RuntimeException("key cannot be null or blank");
         }
-        if (Values.isMaskKey(key)) {
+        if (ValuesSupport.isMaskKey(key)) {
             Object[] holder = {value};
-            key = Values.storageKey(key, holder);
+            key = ValuesSupport.storageKey(key, holder);
             value = holder[0];
         }
         if (key.contains("_") && key.toLowerCase().startsWith(PKB_PREFIX)) {

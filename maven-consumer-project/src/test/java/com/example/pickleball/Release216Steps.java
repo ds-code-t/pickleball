@@ -159,6 +159,17 @@ public final class Release216Steps {
                             "Registered-object cleanup did not run for the scenario."
                     );
                 }
+                if ("hard".equals(expected)) {
+                    CurrentScenarioState state = GlobalState.getCurrentScenarioState();
+                    if (state == null
+                            || !state.isScenarioFailed()
+                            || !state.isScenarioComplete()) {
+                        throw new AssertionError(
+                                "Registered-object cleanup did not observe a hard-failed scenario."
+                        );
+                    }
+                    state.absorbRecordedScenarioFailure();
+                }
             }
             if (Boolean.TRUE.equals(discard)) {
                 CurrentScenarioState state = GlobalState.getCurrentScenarioState();

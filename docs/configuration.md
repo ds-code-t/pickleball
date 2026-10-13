@@ -390,7 +390,7 @@ Legacy references remain valid:
 
 Missing or blank `pkb_configpath` uses the classpath resource root `configs`. Pickleball first completes RunVar/profile resolution and only then reloads the global `configs` mapping from the final path. This preserves a one-way initialization dependency and prevents runtime config data from selecting its own source.
 
-`pkb_features` and `pkb_datapath` use the same prefix table. `pkb_features=features`, `file:features`, and `classpath:features` are the resources folder. `wd-file:features` is passed to Cucumber as `file:features`. The default `pkb_datapath` is `data`. `pkb_callpath` and `pkb_componentpath` keep their previous path rules. See [Config Files and Resource Mapping](config-files-and-resource-mapping.md).
+`pkb_features` and `pkb_datapath` use the same prefix table. `pkb_features=features`, `file:features`, and `classpath:features` are the resources folder. `wd-file:features` is passed to Cucumber as `file:features`. The default `pkb_datapath` is `data`. `pkb_callpath` and `pkb_componentpath` keep their previous path rules. The examples below use the resources-folder names `component` and `calls`. When those properties are unset, the defaults remain `src/test/resources/component` and `src/test/resources/calls`. See [Config Files and Resource Mapping](config-files-and-resource-mapping.md).
 
 ## Common properties
 
@@ -398,8 +398,8 @@ Missing or blank `pkb_configpath` uses the classpath resource root `configs`. Pi
 |---|---|---|
 | `pkb_glue` | `com.example.tests` | Cucumber glue packages |
 | `pkb_features` | `classpath:features` | top-level feature location(s) |
-| `pkb_componentpath` | `src/test/resources/component` | component-scenario location |
-| `pkb_callpath` | `src/test/resources/calls` | reusable service-call location |
+| `pkb_componentpath` | `component` | component-scenario location |
+| `pkb_callpath` | `calls` | reusable service-call location |
 | `pkb_datapath` | `data` | scenario-data / rooted `data:/` lookup on the resources folder |
 | `pkb_configpath` | `configs` | source behind the stable `configs` mapping |
 | `pkb_tags` | `@smoke and not @slow` | Cucumber tag expression |

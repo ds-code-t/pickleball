@@ -6,6 +6,7 @@ import io.cucumber.datatable.DataTable;
 import io.cucumber.docstring.DocString;
 import org.junit.jupiter.api.Test;
 import tools.dscode.PrefixValue;
+import tools.dscode.Values;
 import tools.dscode.common.dataelements.DataElementKind;
 import tools.dscode.common.dataelements.DataQueryException;
 import tools.dscode.common.dataelements.StructuredDataConverter;
@@ -15,9 +16,16 @@ import tools.dscode.common.mappings.custommappings.ValConverter;
 import tools.dscode.common.servicecalls.JdbcServiceCall;
 import tools.dscode.coredefinitions.MappingSteps;
 
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.concurrent.CountDownLatch;
+import java.util.stream.Collectors;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -55,10 +63,76 @@ import static tools.dscode.common.mappings.ValueFormatting.toSafeJsonNode;
  * Consumer checks for 2.1.16. They run inside a scenario, so they do not reset maps.
  */
 public final class Release216Checks {
+    private static final Set<String> PUBLIC_STATIC_VALUES_METHODS = Set.of(
+            "cacheGet(String)",
+            "cachePut(String,Object)",
+            "getDefaultValue(String)",
+            "getDefaultValue(String,Class)",
+            "getOverrideValue(String)",
+            "getOverrideValue(String,Class)",
+            "getRootScenarioValue(String)",
+            "getRootScenarioValue(String,Class)",
+            "getRunValue(String)",
+            "getRunValue(String,Class)",
+            "getScenarioValue(String)",
+            "getScenarioValue(String,Class)",
+            "getSingletonValue(String)",
+            "getSingletonValue(String,Class)",
+            "getStepValue(String)",
+            "getStepValue(String,Class)",
+            "getValue(String)",
+            "getValue(String,Class)",
+            "registerPrefix(String,BiFunction)",
+            "saveDefaultValue(String,Object)",
+            "saveOverrideValue(String,Object)",
+            "saveRootScenarioValue(String,Object)",
+            "saveRunValue(String,Object)",
+            "saveScenarioValue(String,Object)",
+            "saveSingletonValue(String,Object)",
+            "saveStepValue(String,Object)",
+            "saveValue(String,Object)",
+            "secret(Object)",
+            "softFail(String)",
+            "throttle(String,int)"
+    );
+
     private static final String ORDER_XML = """
             <order id="A7" status="open"><customer type="vip"><name>Dan</name></customer><item sku="X1" qty="2">Pen</item><item sku="Y9" qty="1">Pad</item></order>
             """.trim();
     private static final String ORDER_JSON = "{\"id\":\"A7\",\"status\":\"open\",\"customer\":{\"type\":\"vip\",\"name\":\"Dan\"},\"item\":[{\"sku\":\"X1\",\"qty\":\"2\",\"\":\"Pen\"},{\"sku\":\"Y9\",\"qty\":\"1\",\"\":\"Pad\"}]}";
+
+    @Test
+    void valuesPublicStaticMembersAreTheConsumerApi() {
+        Set<String> actual = new TreeSet<>();
+        for (Method method : Values.class.getDeclaredMethods()) {
+            int modifiers = method.getModifiers();
+            if (!Modifier.isPublic(modifiers)) {
+                continue;
+            }
+            assertTrue(Modifier.isStatic(modifiers), method.toString());
+            assertFalse(method.isSynthetic(), method.toString());
+            assertFalse(method.isBridge(), method.toString());
+            actual.add(method.getName() + "(" + Arrays.stream(method.getParameterTypes())
+                    .map(Class::getSimpleName)
+                    .collect(Collectors.joining(",")) + ")");
+        }
+        assertEquals(PUBLIC_STATIC_VALUES_METHODS, actual);
+
+        for (Field field : Values.class.getDeclaredFields()) {
+            assertFalse(Modifier.isPublic(field.getModifiers()), field.getName());
+        }
+        for (java.lang.reflect.Constructor<?> constructor : Values.class.getDeclaredConstructors()) {
+            assertFalse(Modifier.isPublic(constructor.getModifiers()), constructor.toString());
+        }
+        Set<String> nested = new TreeSet<>();
+        for (Class<?> type : Values.class.getDeclaredClasses()) {
+            if (Modifier.isPublic(type.getModifiers())) {
+                assertTrue(Modifier.isStatic(type.getModifiers()), type.getName());
+                nested.add(type.getSimpleName());
+            }
+        }
+        assertEquals(Set.of("Context"), nested);
+    }
 
     @Test
     void valueApiRoundTripTypesAndMapPairs() {

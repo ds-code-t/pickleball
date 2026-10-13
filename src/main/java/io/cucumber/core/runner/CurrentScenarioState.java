@@ -338,7 +338,7 @@ public class CurrentScenarioState extends ScenarioMapping {
                 throwable = deferred;
             }
         }
-        if (throwable != null)
+        if (throwable != null && !recordedFailureAbsorbed)
             throw new RuntimeException(throwable);
     }
 
@@ -707,6 +707,7 @@ public class CurrentScenarioState extends ScenarioMapping {
     private boolean isScenarioHardFail = false;
     private boolean isScenarioSoftFail = false;
     private boolean isScenarioComplete = false;
+    private boolean recordedFailureAbsorbed = false;
 
     public static void endTest() {
         getCurrentScenarioState().isScenarioComplete = true;
@@ -759,6 +760,20 @@ public class CurrentScenarioState extends ScenarioMapping {
             return null;
         }
         return deferredSoftFailures.get(deferredSoftFailures.size() - 1);
+    }
+
+    /**
+     * Leaves the recorded failure flags in place and does not fail Cucumber
+     * for this scenario. A check can observe a hard failure after cleanup.
+     * Cucumber also stores the failed step on the active {@link TestCaseState};
+     * that result is removed here so the JUnit engine does not fail the scenario.
+     */
+    public void absorbRecordedScenarioFailure() {
+        TestCaseState cucumberState = testCaseState != null ? testCaseState : getTestCaseState();
+        if (cucumberState != null) {
+            cucumberState.dropNonPassingStepResults();
+        }
+        recordedFailureAbsorbed = true;
     }
 
     /**

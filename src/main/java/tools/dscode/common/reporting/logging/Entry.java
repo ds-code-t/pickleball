@@ -14,7 +14,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Supplier;
 
-import tools.dscode.Values;
+import tools.dscode.internal.ValuesSupport;
 
 import static tools.dscode.common.GlobalConstants.BOOK_END;
 import static tools.dscode.common.reporting.WorkBookConsolePrinter.PrintStyle.DIM;
@@ -63,7 +63,7 @@ public class Entry {
 
     private Entry(String text, Entry parent, AtomicLong seqGen, boolean threadSafe) {
         String stripped = text == null ? "" : text.replaceAll(BOOK_END, "");
-        this.text = Values.maskLog(stripped);
+        this.text = ValuesSupport.maskLog(stripped);
         this.parent = parent;
         this.seqGen = seqGen;
         this.threadSafe = threadSafe;
@@ -649,8 +649,8 @@ public class Entry {
         if (!entry.fields.isEmpty()) {
             sb.append(indent).append("fields:").append('\n');
             entry.fields.forEach((k, v) ->
-                    sb.append(indent).append("- ").append(Values.maskLog(k)).append(": ")
-                            .append(Values.maskLog(v == null ? "" : String.valueOf(v))).append('\n'));
+                    sb.append(indent).append("- ").append(ValuesSupport.maskLog(k)).append(": ")
+                            .append(ValuesSupport.maskLog(v == null ? "" : String.valueOf(v))).append('\n'));
         }
 
         if (!entry.tags.isEmpty()) {
@@ -666,7 +666,7 @@ public class Entry {
     }
 
     private static String safe(String text) {
-        return Values.maskLog(text);
+        return ValuesSupport.maskLog(text);
     }
 
     private <T> T guarded(Supplier<T> supplier) {

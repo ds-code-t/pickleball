@@ -117,3 +117,7 @@ Feature: Pickleball 2.1.16 value API, matching, masking, JDBC, and cleanup
   Scenario: Registered-object cleanup runs when the scenario soft-fails
     * RUN RELEASE 216 REGISTER CLEANUP failure
     * RUN RELEASE 216 SOFT FAIL
+
+  Scenario: Registered-object cleanup runs when the scenario hard-fails
+    * RUN RELEASE 216 REGISTER CLEANUP hard
+    * FAIL: release 216 hard failure

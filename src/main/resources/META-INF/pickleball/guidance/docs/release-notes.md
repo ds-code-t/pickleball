@@ -27,4 +27,6 @@ On a page with buttons Save, Save All, and Autosave:
 
 - XML readers reject `DOCTYPE` and `ENTITY` declarations. Normal XML is unchanged. `~XML;` uses Jackson's `XmlMapper` conversion, documented with captured output in [Mapping and templating](mapping-and-templating.md).
 - A `file:/...` or unprefixed `/...` path that is not on the classpath fails with a hint to use `wd-file:/...` for a filesystem path.
-- Literal key escapes and registered-object cleanup are documented. Cleanup behavior is unchanged: the existing `cleanup` property runs at scenario end, including on failure.
+- Literal key escapes and registered-object cleanup are documented. The existing `cleanup` property runs at scenario end after a pass, a soft failure, or a hard-failed step.
+- A static import of `Values` includes the documented methods and `Values.Context`. Framework helpers are not part of that import.
+- Sample `pkb_callpath` and `pkb_componentpath` values use the resources-folder names `calls` and `component`. When those properties are unset, the defaults remain `src/test/resources/calls` and `src/test/resources/component`.

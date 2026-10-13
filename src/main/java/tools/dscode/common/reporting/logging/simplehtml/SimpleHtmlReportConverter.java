@@ -1,7 +1,7 @@
 // file: tools/dscode/common/reporting/logging/simplehtml/SimpleHtmlReportConverter.java
 package tools.dscode.common.reporting.logging.simplehtml;
 
-import tools.dscode.Values;
+import tools.dscode.internal.ValuesSupport;
 import tools.dscode.common.coordination.AgentCoordination;
 import tools.dscode.common.reporting.logging.Attachment;
 import tools.dscode.common.reporting.logging.BaseConverter;
@@ -896,7 +896,7 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
                     node.addLogLine(LogLine.of(
                             (entry.timestampedAt != null) ? entry.timestampedAt : Instant.now(),
                             mapStatusCss(st),
-                            Values.maskLog(entry.text),
+                            ValuesSupport.maskLog(entry.text),
                             node.nextEventOrder++
                     ));
                 }
@@ -2066,7 +2066,7 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
     private static String sanitizeCommon(String s) {
         if (s == null) return "";
 
-        String x = Values.maskLog(s);
+        String x = ValuesSupport.maskLog(s);
 
         x = x.replace('\u2028', '\n')
                 .replace('\u2029', '\n')

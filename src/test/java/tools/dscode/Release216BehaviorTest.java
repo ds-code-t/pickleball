@@ -29,12 +29,19 @@ import tools.dscode.coredefinitions.MappingSteps;
 import io.cucumber.datatable.DataTable;
 import io.cucumber.docstring.DocString;
 
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -44,13 +51,11 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static tools.dscode.Values.cacheGet;
 import static tools.dscode.Values.cachePut;
-import static tools.dscode.Values.convert;
 import static tools.dscode.Values.getDefaultValue;
 import static tools.dscode.Values.getOverrideValue;
 import static tools.dscode.Values.getRunValue;
 import static tools.dscode.Values.getSingletonValue;
 import static tools.dscode.Values.getValue;
-import static tools.dscode.Values.maskLog;
 import static tools.dscode.Values.registerPrefix;
 import static tools.dscode.Values.saveDefaultValue;
 import static tools.dscode.Values.saveOverrideValue;
@@ -59,12 +64,47 @@ import static tools.dscode.Values.saveSingletonValue;
 import static tools.dscode.Values.saveValue;
 import static tools.dscode.Values.secret;
 import static tools.dscode.Values.throttle;
-import static tools.dscode.Values.unmask;
-import static tools.dscode.Values.xmlEscape;
+import static tools.dscode.internal.ValuesSupport.convert;
+import static tools.dscode.internal.ValuesSupport.maskLog;
+import static tools.dscode.internal.ValuesSupport.unmask;
+import static tools.dscode.internal.ValuesSupport.xmlEscape;
 import static tools.dscode.common.assertions.ValueWrapper.createValueWrapper;
 import static tools.dscode.common.mappings.ValueFormatting.MAPPER;
 
 class Release216BehaviorTest {
+    private static final Set<String> PUBLIC_STATIC_VALUES_METHODS = Set.of(
+            "cacheGet(String)",
+            "cachePut(String,Object)",
+            "getDefaultValue(String)",
+            "getDefaultValue(String,Class)",
+            "getOverrideValue(String)",
+            "getOverrideValue(String,Class)",
+            "getRootScenarioValue(String)",
+            "getRootScenarioValue(String,Class)",
+            "getRunValue(String)",
+            "getRunValue(String,Class)",
+            "getScenarioValue(String)",
+            "getScenarioValue(String,Class)",
+            "getSingletonValue(String)",
+            "getSingletonValue(String,Class)",
+            "getStepValue(String)",
+            "getStepValue(String,Class)",
+            "getValue(String)",
+            "getValue(String,Class)",
+            "registerPrefix(String,BiFunction)",
+            "saveDefaultValue(String,Object)",
+            "saveOverrideValue(String,Object)",
+            "saveRootScenarioValue(String,Object)",
+            "saveRunValue(String,Object)",
+            "saveScenarioValue(String,Object)",
+            "saveSingletonValue(String,Object)",
+            "saveStepValue(String,Object)",
+            "saveValue(String,Object)",
+            "secret(Object)",
+            "softFail(String)",
+            "throttle(String,int)"
+    );
+
     private static final String ORDER_XML = """
             <order id="A7" status="open"><customer type="vip"><name>Dan</name></customer><item sku="X1" qty="2">Pen</item><item sku="Y9" qty="1">Pad</item></order>
             """.trim();
@@ -72,6 +112,39 @@ class Release216BehaviorTest {
     @AfterEach
     void resetMaps() {
         MappingProcessor.resetCommonMaps();
+    }
+
+    @Test
+    void valuesPublicStaticMembersAreTheConsumerApi() {
+        Set<String> actual = new TreeSet<>();
+        for (Method method : Values.class.getDeclaredMethods()) {
+            int modifiers = method.getModifiers();
+            if (!Modifier.isPublic(modifiers)) {
+                continue;
+            }
+            assertTrue(Modifier.isStatic(modifiers), method.toString());
+            assertFalse(method.isSynthetic(), method.toString());
+            assertFalse(method.isBridge(), method.toString());
+            actual.add(method.getName() + "(" + Arrays.stream(method.getParameterTypes())
+                    .map(Class::getSimpleName)
+                    .collect(Collectors.joining(",")) + ")");
+        }
+        assertEquals(PUBLIC_STATIC_VALUES_METHODS, actual);
+
+        for (Field field : Values.class.getDeclaredFields()) {
+            assertFalse(Modifier.isPublic(field.getModifiers()), field.getName());
+        }
+        for (java.lang.reflect.Constructor<?> constructor : Values.class.getDeclaredConstructors()) {
+            assertFalse(Modifier.isPublic(constructor.getModifiers()), constructor.toString());
+        }
+        Set<String> nested = new TreeSet<>();
+        for (Class<?> type : Values.class.getDeclaredClasses()) {
+            if (Modifier.isPublic(type.getModifiers())) {
+                assertTrue(Modifier.isStatic(type.getModifiers()), type.getName());
+                nested.add(type.getSimpleName());
+            }
+        }
+        assertEquals(Set.of("Context"), nested);
     }
 
     @Test
@@ -459,7 +532,7 @@ class Release216BehaviorTest {
     }
 
     private static void rememberAndExecute(ObjectNode request) {
-        Values.rememberSecret("pkb-secret-216-db");
+        tools.dscode.internal.ValuesSupport.rememberSecret("pkb-secret-216-db");
         ObjectNode response = JdbcServiceCall.execute(request);
         assertFalse(response.has("error"), response.toString());
     }

@@ -79,7 +79,7 @@ Omitted optional RunVars stay absent. Do not fill them from files, defaults, JVM
 Compact form:
 
 ```text
--Dpkb_overriderunvars="pkb_glue=com.example.steps, pkb_features=classpath:features, pkb_datapath=, pkb_callpath=src/test/resources/calls, pkb_componentpath=src/test/resources/component, pkb_configpath=configs, pkb_browser=CHROME_HEADLESS, pkb_tags=@smoke"
+-Dpkb_overriderunvars="pkb_glue=com.example.steps, pkb_features=classpath:features, pkb_datapath=, pkb_callpath=calls, pkb_componentpath=component, pkb_configpath=configs, pkb_browser=CHROME_HEADLESS, pkb_tags=@smoke"
 ```
 
 Expanded form uses the same grammar as `pkb_runvars.<pkb_var>`. Never mix compact and expanded `pkb_overriderunvars` in one invocation.

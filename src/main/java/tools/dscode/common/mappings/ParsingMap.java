@@ -18,7 +18,7 @@ import io.cucumber.core.stepexpression.DocStringArgument;
 import io.cucumber.datatable.DataTable;
 import io.cucumber.docstring.DocString;
 import tools.dscode.PrefixValue;
-import tools.dscode.Values;
+import tools.dscode.internal.ValuesSupport;
 import tools.dscode.common.assertions.ValueWrapper;
 import tools.dscode.common.dataelements.DataContextNodeMap;
 import tools.dscode.common.dataelements.DataElementGroup;
@@ -899,9 +899,9 @@ public class ParsingMap extends MappingProcessor {
                             current,
                             DataElementKind.XML_STRING
                     );
-                    case "XML-ESCAPE" -> Values.xmlEscape(current);
-                    case "MASK" -> Values.mask(current);
-                    case "UNMASK" -> Values.unmask(current);
+                    case "XML-ESCAPE" -> ValuesSupport.xmlEscape(current);
+                    case "MASK" -> ValuesSupport.mask(current);
+                    case "UNMASK" -> ValuesSupport.unmask(current);
                     case "YAML" -> StructuredDataConverter.convert(
                             current,
                             DataElementKind.YAML_DATA
@@ -1106,8 +1106,8 @@ public class ParsingMap extends MappingProcessor {
             }
 
             Object current;
-            if (Values.hasRegisteredPrefix(source)) {
-                current = Values.callPrefix(source);
+            if (ValuesSupport.hasRegisteredPrefix(source)) {
+                current = ValuesSupport.callPrefix(source);
             } else if (source.startsWith("value:")) {
                 current = source.substring("value:".length());
             } else if (source.startsWith("&")) {
@@ -1565,7 +1565,7 @@ public class ParsingMap extends MappingProcessor {
             if (DIRECTIVE_TOKEN.matcher(input).find()) {
                 return true;
             }
-            if (Values.containsRegisteredPrefixReference(input)) {
+            if (ValuesSupport.containsRegisteredPrefixReference(input)) {
                 return true;
             }
             return containsNestedReference(input);

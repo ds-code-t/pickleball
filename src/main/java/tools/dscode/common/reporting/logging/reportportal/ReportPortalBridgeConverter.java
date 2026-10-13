@@ -1,6 +1,6 @@
 package tools.dscode.common.reporting.logging.reportportal;
 
-import tools.dscode.Values;
+import tools.dscode.internal.ValuesSupport;
 import tools.dscode.common.reporting.logging.Attachment;
 import tools.dscode.common.reporting.logging.BaseConverter;
 import tools.dscode.common.reporting.logging.Entry;
@@ -355,7 +355,7 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
     }
 
     private static String safe(String s) {
-        return Values.maskLog(s);
+        return ValuesSupport.maskLog(s);
     }
 
     private static String level(Level lvl) {

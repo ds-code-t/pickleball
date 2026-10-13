@@ -8,7 +8,7 @@
 import static tools.dscode.Values.*;
 ```
 
-The methods are plain static methods. Thread safety is inside the class. The API does not expose maps, NodeMap, ParsingMap, or enums.
+The methods are plain static methods. Thread safety is inside the class. The API does not expose maps, NodeMap, ParsingMap, or enums. That import includes the methods in this guide and `Values.Context`, the context a prefix function receives. `PrefixValue` is a separate type. Framework helpers are not members of `Values`.
 
 ## Read and write
 
