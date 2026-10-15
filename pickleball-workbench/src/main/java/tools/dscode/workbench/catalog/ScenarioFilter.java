@@ -1,5 +1,7 @@
 package tools.dscode.workbench.catalog;
 
+import tools.dscode.control.protocol.WorkbenchFeatureIndex;
+
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashSet;
@@ -50,6 +52,7 @@ public final class ScenarioFilter {
     private String nameQuery = "";
     private String includeTagsQuery = "";
     private String excludeTagsQuery = "";
+    private List<WorkbenchFeatureIndex.FeatureLine> pathLines = List.of();
 
     public NameMatchMode nameMatchMode() {
         return nameMatchMode;
@@ -83,12 +86,26 @@ public final class ScenarioFilter {
         this.excludeTagsQuery = excludeTagsQuery == null ? "" : excludeTagsQuery;
     }
 
+    public List<String> pathLines() {
+        return pathLines.stream().map(line -> line.path() + ":" + line.line()).toList();
+    }
+
+    /**
+     * Cucumber-native {@code path:line} selectors. Empty means no line constraint.
+     * A line on an Examples row selects that row. A line elsewhere in the scenario
+     * selects the scenario entry.
+     */
+    public void setPathLines(List<String> selectors) {
+        this.pathLines = WorkbenchFeatureIndex.parseSelectors(selectors == null ? List.of() : selectors);
+    }
+
     public void copyFrom(ScenarioFilter other) {
         if (other == null) return;
         this.nameMatchMode = other.nameMatchMode;
         this.nameQuery = other.nameQuery;
         this.includeTagsQuery = other.includeTagsQuery;
         this.excludeTagsQuery = other.excludeTagsQuery;
+        this.pathLines = other.pathLines;
     }
 
     public List<String> includeTags() {
@@ -108,7 +125,7 @@ public final class ScenarioFilter {
         List<String> exclude = excludeTags();
         List<ConsumerFeatureCatalog.ScenarioEntry> matched = new ArrayList<>();
         for (ConsumerFeatureCatalog.ScenarioEntry scenario : source) {
-            if (matches(scenario, include, exclude)) {
+            if (matches(scenario, include, exclude, source)) {
                 matched.add(scenario);
             }
         }
@@ -116,16 +133,18 @@ public final class ScenarioFilter {
     }
 
     boolean matches(ConsumerFeatureCatalog.ScenarioEntry scenario) {
-        return matches(scenario, includeTags(), excludeTags());
+        return matches(scenario, includeTags(), excludeTags(), List.of(scenario));
     }
 
     private boolean matches(
             ConsumerFeatureCatalog.ScenarioEntry scenario,
             List<String> include,
-            List<String> exclude
+            List<String> exclude,
+            List<ConsumerFeatureCatalog.ScenarioEntry> pool
     ) {
         if (scenario == null) return false;
         if (!nameMatches(scenario.name())) return false;
+        if (!pathLineMatches(scenario, pool)) return false;
         Set<String> effective = canonicalTagSet(scenario.effectiveTags());
         if (!include.isEmpty() && !effective.containsAll(include)) return false;
         if (!exclude.isEmpty()) {
@@ -134,6 +153,42 @@ public final class ScenarioFilter {
             }
         }
         return true;
+    }
+
+    private boolean pathLineMatches(
+            ConsumerFeatureCatalog.ScenarioEntry scenario,
+            List<ConsumerFeatureCatalog.ScenarioEntry> pool
+    ) {
+        if (pathLines.isEmpty()) return true;
+        for (WorkbenchFeatureIndex.FeatureLine line : pathLines) {
+            if (!WorkbenchFeatureIndex.sameFeature(scenario.relativePath(), scenario.file(), line.path())) continue;
+            boolean exampleLine = exampleRowAt(pool, scenario, line.line());
+            if (scenario.hasExampleRow()) {
+                if (scenario.focusLine() == line.line()) return true;
+                if (!exampleLine && line.line() >= scenario.startLine() && line.line() <= scenario.endLine()) {
+                    return true;
+                }
+            } else if (!exampleLine && line.line() >= scenario.startLine() && line.line() <= scenario.endLine()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean exampleRowAt(
+            List<ConsumerFeatureCatalog.ScenarioEntry> pool,
+            ConsumerFeatureCatalog.ScenarioEntry scenario,
+            int line
+    ) {
+        if (pool == null) return false;
+        for (ConsumerFeatureCatalog.ScenarioEntry other : pool) {
+            if (other == null || !other.hasExampleRow()) continue;
+            if (other.focusLine() != line) continue;
+            if (!other.file().equals(scenario.file())) continue;
+            if (!other.name().equals(scenario.name())) continue;
+            return true;
+        }
+        return false;
     }
 
     private boolean nameMatches(String name) {
@@ -212,7 +267,8 @@ public final class ScenarioFilter {
         return "ScenarioFilter{mode=" + nameMatchMode
                 + ", name='" + nameQuery
                 + "', include='" + includeTagsQuery
-                + "', exclude='" + excludeTagsQuery + "'}";
+                + "', exclude='" + excludeTagsQuery
+                + "', lines=" + pathLines() + '}';
     }
 
     @Override
@@ -222,11 +278,12 @@ public final class ScenarioFilter {
         return nameMatchMode == that.nameMatchMode
                 && Objects.equals(nameQuery, that.nameQuery)
                 && Objects.equals(includeTagsQuery, that.includeTagsQuery)
-                && Objects.equals(excludeTagsQuery, that.excludeTagsQuery);
+                && Objects.equals(excludeTagsQuery, that.excludeTagsQuery)
+                && Objects.equals(pathLines, that.pathLines);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(nameMatchMode, nameQuery, includeTagsQuery, excludeTagsQuery);
+        return Objects.hash(nameMatchMode, nameQuery, includeTagsQuery, excludeTagsQuery, pathLines);
     }
 }

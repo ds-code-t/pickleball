@@ -1,10 +1,13 @@
 package tools.dscode.common.reporting.diagnostic;
 
+import tools.dscode.testengine.PKB_props;
+
 import java.io.IOException;
 import java.io.PrintStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 
@@ -18,19 +21,52 @@ public final class ConsumerMavenTestRunner {
                 throws IOException, InterruptedException;
     }
 
+    public static final String SUREFIRE_CUCUMBER_ENGINE = "-Dsurefire.includeJUnit5Engines=pickleball-test-engine";
+    public static final String PLATFORM_CUCUMBER_ENGINE = "-Djunit.platform.discovery.includeEngines=pickleball-test-engine";
+
     public static List<String> command(Path projectRoot, String compactRunVars) {
-        List<String> command = new ArrayList<>(launchPrefix(wrapper(projectRoot)));
-        command.add("test");
-        command.add("-Dpkb_runvars=" + compactRunVars);
-        command.add("-Dpkb_run_purpose=workbench-discover");
-        return List.copyOf(command);
+        return command(projectRoot, compactRunVars, null);
+    }
+
+    public static List<String> command(Path projectRoot, String compactRunVars, String featurePaths) {
+        return build(projectRoot, compactRunVars, featurePaths, "workbench-discover");
     }
 
     public static List<String> confirmCommand(Path projectRoot, String compactRunVars) {
+        return confirmCommand(projectRoot, compactRunVars, null);
+    }
+
+    public static List<String> confirmCommand(Path projectRoot, String compactRunVars, String featurePaths) {
+        return build(projectRoot, compactRunVars, featurePaths, "workbench-confirm");
+    }
+
+    /**
+     * Puts selected feature paths into the Workbench runvars. A blank value leaves
+     * the original string unchanged so a normal full scan is not rewritten.
+     */
+    public static String embedFeaturePaths(String compactRunVars, String featurePaths) {
+        if (featurePaths == null || featurePaths.isBlank()) {
+            return compactRunVars == null ? "" : compactRunVars;
+        }
+        LinkedHashMap<String, String> values = PKB_props.parseAssignments(compactRunVars == null ? "" : compactRunVars);
+        values.put(PKB_props.PKB_FEATURES, featurePaths);
+        return PKB_props.serializeRunVars(values);
+    }
+
+    private static List<String> build(
+            Path projectRoot,
+            String compactRunVars,
+            String featurePaths,
+            String purpose
+    ) {
         List<String> command = new ArrayList<>(launchPrefix(wrapper(projectRoot)));
         command.add("test");
-        command.add("-Dpkb_runvars=" + compactRunVars);
-        command.add("-Dpkb_run_purpose=workbench-confirm");
+        command.add("-Dpkb_runvars=" + embedFeaturePaths(compactRunVars, featurePaths));
+        command.add("-Dpkb_run_purpose=" + purpose);
+        if (Files.isRegularFile(projectRoot.resolve("pom.xml"))) {
+            command.add(SUREFIRE_CUCUMBER_ENGINE);
+            command.add(PLATFORM_CUCUMBER_ENGINE);
+        }
         return List.copyOf(command);
     }
 

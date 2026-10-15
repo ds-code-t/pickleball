@@ -73,7 +73,8 @@ public final class ConsumerFeatureCatalog {
             List<String> tags,
             List<String> effectiveTags,
             int exampleRow,
-            String exampleLabel
+            String exampleLabel,
+            int focusLine
     ) {
         public ScenarioEntry {
             name = name == null ? "" : name;
@@ -84,6 +85,23 @@ public final class ConsumerFeatureCatalog {
             tags = ScenarioFilter.copyTags(tags);
             effectiveTags = ScenarioFilter.copyTags(effectiveTags);
             exampleLabel = exampleLabel == null ? "" : exampleLabel;
+            if (focusLine <= 0) focusLine = startLine;
+        }
+
+        public ScenarioEntry(
+                String name,
+                String featureName,
+                Path file,
+                String relativePath,
+                int startLine,
+                int endLine,
+                List<String> lines,
+                List<String> tags,
+                List<String> effectiveTags,
+                int exampleRow,
+                String exampleLabel
+        ) {
+            this(name, featureName, file, relativePath, startLine, endLine, lines, tags, effectiveTags, exampleRow, exampleLabel, startLine);
         }
 
         public ScenarioEntry(
@@ -495,7 +513,8 @@ public final class ConsumerFeatureCatalog {
                     base.tags(),
                     base.effectiveTags(),
                     dataRow,
-                    label
+                    label,
+                    i + 1
             ));
         }
         return entries;

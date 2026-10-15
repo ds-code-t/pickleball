@@ -1,5 +1,6 @@
 package tools.dscode.workbench.catalog;
 
+import tools.dscode.control.protocol.WorkbenchFeatureIndex;
 import tools.dscode.workbench.player.GherkinReference;
 
 import java.io.IOException;
@@ -57,6 +58,13 @@ public final class CatalogTargetResolver {
                 ? selector.substring(1)
                 : selector;
         String lower = value.toLowerCase(Locale.ROOT);
+        List<WorkbenchFeatureIndex.FeatureLine> lines = featureLines(selector);
+        if (!lines.isEmpty()) {
+            WorkbenchFeatureIndex.FeatureLine line = lines.getFirst();
+            if (!WorkbenchFeatureIndex.sameFeature(entry.relativePath(), entry.file(), line.path())) return false;
+            if (entry.hasExampleRow()) return entry.focusLine() == line.line();
+            return line.line() >= entry.startLine() && line.line() <= entry.endLine();
+        }
         if (selector.startsWith("%") || selector.startsWith("@")) {
             return entry.effectiveTags().stream().anyMatch(tag -> tag.equalsIgnoreCase(value) || tag.equalsIgnoreCase(selector));
         }
@@ -64,6 +72,15 @@ public final class CatalogTargetResolver {
         if (entry.name().toLowerCase(Locale.ROOT).contains(lower)) return true;
         String qualified = entry.featureName() + "." + entry.name();
         return qualified.equalsIgnoreCase(value);
+    }
+
+    private static List<WorkbenchFeatureIndex.FeatureLine> featureLines(String selector) {
+        if (selector == null || !selector.toLowerCase(Locale.ROOT).contains(".feature:")) return List.of();
+        try {
+            return WorkbenchFeatureIndex.parseSelectors(List.of(selector));
+        } catch (IllegalArgumentException ignored) {
+            return List.of();
+        }
     }
 
     static Optional<Path> findDataFile(Path projectRoot, String selector) {

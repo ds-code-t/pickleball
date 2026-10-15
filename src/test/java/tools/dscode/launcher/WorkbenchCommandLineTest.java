@@ -2,6 +2,8 @@ package tools.dscode.launcher;
 
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -63,6 +65,38 @@ class WorkbenchCommandLineTest {
         );
         assertEquals("1 2", parsed.example());
         assertEquals("The failing scenario", parsed.name());
+    }
+
+    @Test
+    void planRefreshAndSelectStayOutOfTheName() {
+        WorkbenchCommandLine.Parsed parsed = WorkbenchCommandLine.parse(new String[]{
+                "discover",
+                "--plan",
+                "--refresh",
+                "--tags=@smoke",
+                "--name=Find",
+                "term",
+                "--select",
+                "src/test/resources/features/search.feature:9",
+                "--select=src/test/resources/features/search.feature:13"
+        });
+        assertTrue(parsed.planOnly());
+        assertTrue(parsed.refreshIndex());
+        assertEquals("Find term", parsed.name());
+        assertEquals("@smoke", parsed.tags());
+        assertEquals(List.of(
+                "src/test/resources/features/search.feature:9",
+                "src/test/resources/features/search.feature:13"
+        ), parsed.selects());
+    }
+
+    @Test
+    void bareFeatureLineIsASelectionNotAProject() {
+        WorkbenchCommandLine.Parsed parsed = WorkbenchCommandLine.parse(new String[]{
+                "plan", "features/login.feature:4"
+        });
+        assertEquals("plan", parsed.command());
+        assertEquals(List.of("features/login.feature:4"), parsed.selects());
     }
 
     @Test

@@ -109,6 +109,38 @@ class ScenarioFilterTest {
         assertEquals(List.of("smoke", "login"), ScenarioFilter.parseGherkinTagLine("@smoke @login"));
     }
 
+    @Test
+    void pathLineSelectsAnExampleRowOrTheWholeScenario() {
+        Path file = Path.of("/tmp/search.feature");
+        String relative = "workflow/search.feature";
+        ConsumerFeatureCatalog.ScenarioEntry outline = entry(file, relative, "Find", 0, "", 4);
+        ConsumerFeatureCatalog.ScenarioEntry ada = entry(file, relative, "Find", 1, "ada", 9);
+        ConsumerFeatureCatalog.ScenarioEntry bob = entry(file, relative, "Find", 1, "bob", 13);
+        List<ConsumerFeatureCatalog.ScenarioEntry> pool = List.of(outline, ada, bob);
+
+        ScenarioFilter row = new ScenarioFilter();
+        row.setPathLines(List.of(relative + ":9"));
+        assertEquals(List.of(ada), row.apply(pool));
+
+        ScenarioFilter scenario = new ScenarioFilter();
+        scenario.setPathLines(List.of("search.feature:4:13"));
+        assertEquals(pool, scenario.apply(pool));
+    }
+
+    private static ConsumerFeatureCatalog.ScenarioEntry entry(
+            Path file,
+            String relative,
+            String name,
+            int exampleRow,
+            String label,
+            int focusLine
+    ) {
+        return new ConsumerFeatureCatalog.ScenarioEntry(
+                name, "Search", file, relative, 4, 13, List.of("Scenario: " + name),
+                List.of(), List.of(), exampleRow, label, focusLine
+        );
+    }
+
     private static ConsumerFeatureCatalog.ScenarioEntry scenario(String name, String... effectiveTags) {
         return new ConsumerFeatureCatalog.ScenarioEntry(
                 name,

@@ -5,6 +5,7 @@ import tools.dscode.common.reporting.diagnostic.AgentDiscoverPlanner;
 import tools.dscode.common.reporting.diagnostic.ConsumerMavenTestRunner;
 import tools.dscode.common.reporting.diagnostic.LastDiscoverSnapshot;
 import tools.dscode.control.protocol.PickleballLocalStore;
+import tools.dscode.control.protocol.WorkbenchFeatureIndex;
 import tools.dscode.testengine.PKB_props;
 
 import java.io.IOException;
@@ -42,8 +43,9 @@ public final class WorkbenchAgentCommands {
                 case "export-guidance" -> exportGuidance(parsed, out, err);
                 case "hint", "discover-hint" -> hint(parsed, out);
                 case "resolve-runvars" -> resolveRunVars(parsed, out);
-                case "discover" -> discover(parsed, out, err, maven);
-                case "confirm" -> confirm(parsed, out, err, maven);
+                case "discover" -> parsed.planOnly() ? plan(parsed, out, err) : discover(parsed, out, err, maven);
+                case "confirm" -> parsed.planOnly() ? plan(parsed, out, err) : confirm(parsed, out, err, maven);
+                case "plan" -> plan(parsed, out, err);
                 case "short-log" -> shortLog(parsed, out, err);
                 case "note" -> note(parsed, out, err);
                 case "inbox" -> inbox(parsed, out, err);
@@ -152,8 +154,15 @@ public final class WorkbenchAgentCommands {
             );
             out.println("Workbench discover " + plan.browser().reason() + ".");
             out.println("pkb_runvars=" + plan.runVars());
+            WorkbenchFeatureIndex.Selection selection = select(
+                    parsed.project(), parsed.tags(), parsed.name(), parsed.example(), parsed
+            );
             List<String> command = withCoordination(
-                    ConsumerMavenTestRunner.command(parsed.project(), plan.runVars()),
+                    ConsumerMavenTestRunner.command(
+                            parsed.project(),
+                            plan.runVars(),
+                            featurePaths(parsed.project(), selection)
+                    ),
                     run
             );
             int exit = maven.run(parsed.project(), command, out, err);
@@ -188,10 +197,21 @@ public final class WorkbenchAgentCommands {
             String runVars = AgentDiscoverPlanner.confirmRunVars(
                     retained, parsed.tags(), parsed.name(), parsed.retention(), parsed.example()
             );
+            WorkbenchFeatureIndex.Selection selection = select(
+                    parsed.project(),
+                    firstNonBlank(parsed.tags(), retained.get(PKB_props.PKB_TAGS)),
+                    firstNonBlank(parsed.name(), retained.get(PKB_props.PKB_NAME)),
+                    firstNonBlank(parsed.example(), retained.get(PKB_props.PKB_EXAMPLE)),
+                    parsed
+            );
             out.println("Workbench confirm replaying Discover snapshot as pkb_runvars.");
             out.println("pkb_runvars=" + runVars);
             List<String> command = withCoordination(
-                    ConsumerMavenTestRunner.confirmCommand(parsed.project(), runVars),
+                    ConsumerMavenTestRunner.confirmCommand(
+                            parsed.project(),
+                            runVars,
+                            featurePaths(parsed.project(), selection)
+                    ),
                     run
             );
             int exit = maven.run(parsed.project(), command, out, err);
@@ -208,6 +228,98 @@ public final class WorkbenchAgentCommands {
             finishQuietly(parsed.project(), run.runId(), "FAILED", out);
             throw failure;
         }
+    }
+
+    private static int plan(WorkbenchCommandLine.Parsed parsed, PrintStream out, PrintStream err) {
+        try {
+            return printPlan(parsed, select(parsed.project(), parsed.tags(), parsed.name(), parsed.example(), parsed), out, err);
+        } catch (IllegalArgumentException failure) {
+            err.println(failure.getMessage());
+            return 2;
+        }
+    }
+
+    private static WorkbenchFeatureIndex.Selection select(
+            Path project,
+            String tags,
+            String name,
+            String example,
+            WorkbenchCommandLine.Parsed parsed
+    ) {
+        return WorkbenchFeatureIndex.select(new WorkbenchFeatureIndex.Request(
+                project,
+                java.util.List.of(),
+                tags,
+                name,
+                example,
+                parsed.selects(),
+                parsed.refreshIndex()
+        ));
+    }
+
+    private static String featurePaths(Path project, WorkbenchFeatureIndex.Selection selection) {
+        if (selection == null || selection.fullScanFallback() || !selection.narrowed()) return null;
+        if (selection.matchedNone()) {
+            try {
+                return WorkbenchFeatureIndex.noMatchFeatureProperty(project);
+            } catch (IOException failure) {
+                throw new IllegalStateException(
+                        "Could not record an empty Workbench selection: " + failure.getMessage(),
+                        failure
+                );
+            }
+        }
+        return selection.featureProperty();
+    }
+
+    private static int printPlan(
+            WorkbenchCommandLine.Parsed parsed,
+            WorkbenchFeatureIndex.Selection selection,
+            PrintStream out,
+            PrintStream err
+    ) {
+        out.println("tags=" + text(parsed.tags()));
+        out.println("name=" + text(parsed.name()));
+        out.println("example=" + text(parsed.example()));
+        out.println("select=" + parsed.selects());
+        if (selection.fullScanFallback()) {
+            err.println("WARNING: full-scan fallback: " + selection.fallbackReason());
+            out.println("PLAN full-scan");
+            out.println("features=full-scan");
+            return 0;
+        }
+        out.println("PLAN " + selection.hits().size() + " scenario(s)");
+        for (WorkbenchFeatureIndex.Hit hit : selection.hits()) {
+            StringBuilder line = new StringBuilder();
+            line.append(hit.relativePath()).append(':').append(hit.line()).append(' ').append(hit.scenarioName());
+            if (hit.exampleRow() > 0) {
+                line.append(" example ").append(hit.exampleRow());
+                String arguments = hit.argumentText();
+                if (!arguments.isEmpty()) line.append(' ').append(arguments);
+            }
+            out.println(line);
+        }
+        if (selection.hits().isEmpty()) {
+            err.println("WARNING: no scenarios matched tags=" + text(parsed.tags())
+                    + " name=" + text(parsed.name())
+                    + " example=" + text(parsed.example())
+                    + " select=" + parsed.selects());
+            out.println("features=none");
+            return 1;
+        }
+        out.println(selection.narrowed()
+                ? "features=" + selection.featureProperty()
+                : "features=full-scan");
+        return 0;
+    }
+
+    private static String text(String value) {
+        return value == null || value.isBlank() ? "" : value;
+    }
+
+    private static String firstNonBlank(String primary, String fallback) {
+        if (primary != null && !primary.isBlank()) return primary;
+        return fallback;
     }
 
     private static int shortLog(WorkbenchCommandLine.Parsed parsed, PrintStream out, PrintStream err) {

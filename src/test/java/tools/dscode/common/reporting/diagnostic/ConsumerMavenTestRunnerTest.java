@@ -3,12 +3,15 @@ package tools.dscode.common.reporting.diagnostic;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import tools.dscode.testengine.PKB_props;
+
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Locale;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -69,6 +72,33 @@ class ConsumerMavenTestRunnerTest {
             assertEquals(script.toString(), scriptCommand.getFirst());
         }
         assertTrue(scriptCommand.contains("-Dpkb_run_purpose=workbench-confirm"));
+        assertTrue(scriptCommand.stream().noneMatch(item -> item.startsWith("-Dsurefire.includeJUnit5Engines")));
+    }
+
+    @Test
+    void mavenCommandSkipsPlainJUnitWhileTheConsumerPomDoesNot() throws Exception {
+        Files.writeString(project.resolve("pom.xml"), "<project/>");
+        Path script = project.resolve("mvnw");
+        Files.writeString(script, "#!/bin/sh\n");
+        List<String> command = ConsumerMavenTestRunner.command(project, "pkb_tags=@smoke");
+        assertTrue(command.contains(ConsumerMavenTestRunner.SUREFIRE_CUCUMBER_ENGINE));
+        assertTrue(command.contains(ConsumerMavenTestRunner.PLATFORM_CUCUMBER_ENGINE));
+
+        String pom = Files.readString(Path.of("maven-consumer-project/pom.xml"));
+        assertFalse(pom.contains("includeJUnit5Engines"));
+        assertFalse(pom.contains("junit.platform.discovery.includeEngines"));
+    }
+
+    @Test
+    void featurePathsAreQuotedInsideRunVarsAndAbsentWhenBlank() {
+        String embedded = ConsumerMavenTestRunner.embedFeaturePaths(
+                "pkb_tags=@smoke",
+                "wd-file:/tmp/a.feature,wd-file:/tmp/b.feature"
+        );
+        var parsed = PKB_props.parseAssignments(embedded);
+        assertEquals("@smoke", parsed.get("pkb_tags"));
+        assertEquals("wd-file:/tmp/a.feature,wd-file:/tmp/b.feature", parsed.get(PKB_props.PKB_FEATURES));
+        assertEquals("pkb_tags=@smoke", ConsumerMavenTestRunner.embedFeaturePaths("pkb_tags=@smoke", " "));
     }
 
     @Test

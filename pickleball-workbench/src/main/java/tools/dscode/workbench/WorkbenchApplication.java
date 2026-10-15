@@ -75,7 +75,7 @@ public final class WorkbenchApplication {
                 case "mcp" -> throw new IllegalArgumentException(
                         "MCP mode must be launched through the Workbench executable."
                 );
-                case "export-guidance", "hint", "discover-hint", "discover", "confirm" -> {
+                case "export-guidance", "hint", "discover-hint", "discover", "confirm", "plan" -> {
                     err.println("Workbench " + args[0]
                             + " runs through PickleballWorkbenchLauncher in the consumer JVM, not this controller JAR.");
                     yield 2;

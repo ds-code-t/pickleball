@@ -422,6 +422,130 @@ class WorkbenchAgentCommandsTest {
         assertEquals(markerText, Files.readString(marker));
     }
 
+    @Test
+    void discoverHandsMavenOnlyTheMatchingFeatureAndLeavesListPicklesAlone() throws Exception {
+        writeProjectWrapper();
+        Path features = tempDir.resolve("src/test/resources/features");
+        Files.createDirectories(features);
+        Files.writeString(features.resolve("needle.feature"), """
+                @needle
+                Feature: Needle
+                  Scenario: The one
+                    Given one
+                """);
+        for (int i = 0; i < 40; i++) {
+            Files.writeString(features.resolve("skip-" + i + ".feature"), """
+                    Feature: Skip %d
+                      Scenario: Untagged %d
+                        Given skip
+                    """.formatted(i, i));
+        }
+        Path catalogDir = tempDir.resolve("reports/diagnostic-runs");
+        Files.createDirectories(catalogDir);
+        List<List<String>> captured = new ArrayList<>();
+        int exit = WorkbenchAgentCommands.run(
+                new String[]{"discover", tempDir.toString(), "--tags=@needle"},
+                System.out,
+                System.err,
+                (project, command, out, err) -> {
+                    captured.add(command);
+                    try {
+                        Files.writeString(catalogDir.resolve("run-catalog.json"), """
+                                {
+                                  "schemaVersion": 1,
+                                  "runs": [
+                                    {
+                                      "runId": "run-needle",
+                                      "runProfile": "pkb_tags=@needle",
+                                      "lineage": { "runPurpose": "workbench-discover" }
+                                    }
+                                  ]
+                                }
+                                """);
+                    } catch (Exception failure) {
+                        throw new RuntimeException(failure);
+                    }
+                    return 0;
+                }
+        );
+        assertEquals(0, exit);
+        String runVars = captured.getFirst().stream().filter(item -> item.startsWith("-Dpkb_runvars=")).findFirst().orElseThrow();
+        var parsed = PKB_props.parseAssignments(runVars.substring("-Dpkb_runvars=".length()));
+        String paths = parsed.get(PKB_props.PKB_FEATURES);
+        assertTrue(paths.contains("needle.feature"));
+        assertFalse(paths.contains("skip-0.feature"));
+        assertFalse(paths.contains("skip-39.feature"));
+
+        String modular = Files.readString(Path.of("src/main/java/tools/dscode/coredefinitions/ModularScenarios.java"));
+        assertTrue(modular.contains("CucumberScanUtil.listPickles(scanOptions)"));
+        String scan = Files.readString(Path.of("src/main/java/io/cucumber/core/runner/modularexecutions/CucumberScanUtil.java"));
+        assertTrue(scan.contains("public static List<Pickle> listPickles"));
+    }
+
+    @Test
+    void planResolvesExampleRowsAndWarnsWhenEmptyWithoutMaven() throws Exception {
+        Path features = tempDir.resolve("src/test/resources/features");
+        Files.createDirectories(features);
+        Files.writeString(features.resolve("search.feature"), """
+                Feature: Search
+                  Scenario Outline: Find term
+                    When search <term>
+                    Examples:
+                      | term |
+                      | ada  |
+                      | bob  |
+                """);
+        boolean[] mavenCalled = {false};
+        ByteArrayOutputStream stdout = new ByteArrayOutputStream();
+        ByteArrayOutputStream stderr = new ByteArrayOutputStream();
+        int exit = WorkbenchAgentCommands.run(
+                new String[]{"discover", tempDir.toString(), "--plan", "--name=Find term", "--example=2"},
+                new PrintStream(stdout, true, StandardCharsets.UTF_8),
+                new PrintStream(stderr, true, StandardCharsets.UTF_8),
+                (project, command, out, err) -> {
+                    mavenCalled[0] = true;
+                    return 0;
+                }
+        );
+        assertEquals(0, exit);
+        assertFalse(mavenCalled[0]);
+        String text = stdout.toString(StandardCharsets.UTF_8);
+        assertTrue(text.contains("PLAN 1 scenario(s)"));
+        assertTrue(text.contains("term=bob"));
+        assertTrue(text.contains("search.feature:"));
+
+        ByteArrayOutputStream emptyErr = new ByteArrayOutputStream();
+        int empty = WorkbenchAgentCommands.run(
+                new String[]{"plan", tempDir.toString(), "--tags=@missing"},
+                new PrintStream(new ByteArrayOutputStream(), true, StandardCharsets.UTF_8),
+                new PrintStream(emptyErr, true, StandardCharsets.UTF_8)
+        );
+        assertEquals(1, empty);
+        assertTrue(emptyErr.toString(StandardCharsets.UTF_8).contains("WARNING: no scenarios matched"));
+    }
+
+    @Test
+    void pathLinePlanDoesNotBuildOrOpenABrowser() throws Exception {
+        Path features = tempDir.resolve("src/test/resources/features");
+        Files.createDirectories(features);
+        Files.writeString(features.resolve("login.feature"), """
+                Feature: Sign in
+                  Scenario: Valid password
+                    Given a user
+                  Scenario: Locked account
+                    Given a lock
+                """);
+        Output output = run(
+                "plan",
+                tempDir.toString(),
+                "--select=src/test/resources/features/login.feature:4"
+        );
+        assertEquals(0, output.exitCode(), output.stderr());
+        assertTrue(output.stdout().contains("Locked account"));
+        assertFalse(output.stdout().contains("Valid password"));
+        assertFalse(output.stdout().contains("mvnw"));
+    }
+
     private Output run(String... args) {
         ByteArrayOutputStream stdout = new ByteArrayOutputStream();
         ByteArrayOutputStream stderr = new ByteArrayOutputStream();

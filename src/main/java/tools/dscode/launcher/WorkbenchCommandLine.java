@@ -15,7 +15,7 @@ final class WorkbenchCommandLine {
             "sync", "worker-check", "live-check", "ui", "mcp", "isolate", "session-start", "session"
     );
     static final Set<String> AGENT_CORE_COMMANDS = Set.of(
-            "export-guidance", "hint", "discover-hint", "discover", "confirm", "resolve-runvars",
+            "export-guidance", "hint", "discover-hint", "discover", "confirm", "plan", "resolve-runvars",
             "short-log", "note", "inbox", "finish",
             "presence", "post", "history", "gc-runs", "gc-versions", "use-version"
     );
@@ -70,8 +70,14 @@ final class WorkbenchCommandLine {
             String retention,
             String[] forwarded,
             Coordination coordination,
-            String version
+            String version,
+            boolean planOnly,
+            boolean refreshIndex,
+            List<String> selects
     ) {
+        public Parsed {
+            selects = selects == null ? List.of() : List.copyOf(selects);
+        }
     }
 
     static boolean isAgentCoreCommand(String command) {
@@ -89,14 +95,14 @@ final class WorkbenchCommandLine {
     static Parsed parse(String[] args) {
         Path cwd = Path.of("").toAbsolutePath().normalize();
         if (args == null || args.length == 0) {
-            return new Parsed("ui", cwd, null, null, null, null, null, new String[]{"ui", cwd.toString()}, Coordination.empty(), null);
+            return new Parsed("ui", cwd, null, null, null, null, null, new String[]{"ui", cwd.toString()}, Coordination.empty(), null, false, false, List.of());
         }
         String command = args[0];
         if ("export-guidance".equals(command)) {
             Path output = args.length >= 2 && !isFlag(args[1])
                     ? Path.of(args[1])
                     : Path.of(".pickleball");
-            return new Parsed(command, cwd, output, null, null, null, null, args.clone(), Coordination.empty(), null);
+            return new Parsed(command, cwd, output, null, null, null, null, args.clone(), Coordination.empty(), null, false, false, List.of());
         }
 
         String tags = null;
@@ -124,6 +130,9 @@ final class WorkbenchCommandLine {
         String id = null;
         String ttl = null;
         String version = null;
+        boolean planOnly = false;
+        boolean refreshIndex = false;
+        List<String> selects = new ArrayList<>();
         String absorb = null;
         Path project = null;
         List<String> rest = new ArrayList<>();
@@ -156,6 +165,31 @@ final class WorkbenchCommandLine {
             if ("--example".equals(token) && index + 1 < args.length) {
                 example = blankToNull(args[++index]);
                 absorb = example == null ? null : "example";
+                continue;
+            }
+            if ("--plan".equals(token)) {
+                planOnly = true;
+                absorb = null;
+                continue;
+            }
+            if ("--refresh".equals(token)) {
+                refreshIndex = true;
+                absorb = null;
+                continue;
+            }
+            if (token.startsWith("--select=")) {
+                selects.add(token.substring("--select=".length()));
+                absorb = null;
+                continue;
+            }
+            if ("--select".equals(token) && index + 1 < args.length) {
+                selects.add(args[++index]);
+                absorb = null;
+                continue;
+            }
+            if (isFeatureLineToken(token)) {
+                selects.add(token);
+                absorb = null;
                 continue;
             }
             if (token.startsWith("--retention=")) {
@@ -392,10 +426,13 @@ final class WorkbenchCommandLine {
             forwarded.addAll(rest);
             return new Parsed(
                     command, project, null, tags, name, example, retention, forwarded.toArray(String[]::new),
-                    coordination, version
+                    coordination, version, planOnly, refreshIndex, selects
             );
         }
-        return new Parsed(command, project, null, tags, name, example, retention, args.clone(), coordination, version);
+        return new Parsed(
+                command, project, null, tags, name, example, retention, args.clone(),
+                coordination, version, planOnly, refreshIndex, selects
+        );
     }
 
     private static Integer parseWholeNumber(String value, String label) {
@@ -415,6 +452,22 @@ final class WorkbenchCommandLine {
 
     private static String parseRetention(String value) {
         return ReportRetentionPolicy.parseExact(value).name().toLowerCase(Locale.ROOT);
+    }
+
+    private static boolean isFeatureLineToken(String token) {
+        if (token == null) return false;
+        String lower = token.toLowerCase(Locale.ROOT).replace('\\', '/');
+        int feature = lower.lastIndexOf(".feature:");
+        if (feature < 0) return false;
+        String rest = lower.substring(feature + ".feature:".length());
+        if (rest.isEmpty()) return false;
+        for (String part : rest.split(":")) {
+            if (part.isEmpty()) return false;
+            for (int i = 0; i < part.length(); i++) {
+                if (!Character.isDigit(part.charAt(i))) return false;
+            }
+        }
+        return true;
     }
 
     private static boolean isFlag(String token) {
