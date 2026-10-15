@@ -62,6 +62,8 @@ final class BusinessTimePostModifier {
             case "is closed" -> bt.isClosed();
             case "is business day" -> cal.isBusinessDate(bt.value().toLocalDate());
             case "is non-business day", "is non business day" -> !cal.isBusinessDate(bt.value().toLocalDate());
+            case "next business day" -> bt.withValue(cal.nextBusinessDay(bt.value()));
+            case "business day on or after" -> bt.withValue(cal.businessDayOnOrAfter(bt.value()));
             default -> throw new IllegalArgumentException("Unknown date/time pipe modifier: \"" + rawModifier + "\"");
         };
     }

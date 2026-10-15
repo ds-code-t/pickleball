@@ -1,6 +1,8 @@
 package tools.dscode.common.assertions;
 
 import org.apache.commons.lang3.StringUtils;
+import tools.dscode.common.util.datetime.BusinessCalendar;
+import tools.dscode.common.util.datetime.CalendarRegistry;
 import tools.dscode.common.util.datetime.TemporalValue;
 
 import java.math.BigDecimal;
@@ -148,9 +150,21 @@ public final class ValueWrapperComparisons {
     }
 
     private static boolean equalsInternal(ValueWrapper a, ValueWrapper b, ValueWrapper margin) {
+        return equalsInternal(a, b, margin, stringDateTimes(a, b, margin));
+    }
+
+    private static boolean equalsInternal(
+            ValueWrapper a,
+            ValueWrapper b,
+            ValueWrapper margin,
+            ParsedDatePair parsedDates
+    ) {
         if (a == null || b == null) return a == b;
         if (eitherTemporal(a, b)) return temporalEqualsInternal(a, b, margin);
         if (eitherNumeric(a, b)) return numericEqualsInternal(a, b, margin);
+        if (parsedDates != null) {
+            return temporalEqualsInternal(parsedDates.left(), parsedDates.right(), margin);
+        }
 
         String left = stringValue(a, b);
         String right = stringValueOther(a, b);
@@ -200,15 +214,18 @@ public final class ValueWrapperComparisons {
     }
 
     public static boolean notEquals(ValueWrapper a, ValueWrapper b, ValueWrapper margin) {
+        ParsedDatePair parsedDates = stringDateTimes(a, b, margin);
         if (a != null && b != null && eitherTemporal(a, b)) {
             logTemporalComparison("temporal non-equality", a, b);
+        } else if (parsedDates != null) {
+            logTemporalComparison("temporal non-equality", parsedDates.left(), parsedDates.right());
         } else if (a != null && b != null && eitherNumeric(a, b)) {
             logNumericComparison("numeric non-equality", a, b);
         } else {
             logStringComparison("non-equality", a, b);
         }
 
-        return !equalsInternal(a, b, margin);
+        return !equalsInternal(a, b, margin, parsedDates);
     }
 
     public static boolean equals(ValueWrapper a, ValueWrapper b) {
@@ -216,15 +233,18 @@ public final class ValueWrapperComparisons {
     }
 
     public static boolean equals(ValueWrapper a, ValueWrapper b, ValueWrapper margin) {
+        ParsedDatePair parsedDates = stringDateTimes(a, b, margin);
         if (a != null && b != null && eitherTemporal(a, b)) {
             logTemporalComparison("temporal equality", a, b);
+        } else if (parsedDates != null) {
+            logTemporalComparison("temporal equality", parsedDates.left(), parsedDates.right());
         } else if (a != null && b != null && eitherNumeric(a, b)) {
             logNumericComparison("numeric equality", a, b);
         } else {
             logStringComparison("equality", a, b);
         }
 
-        return equalsInternal(a, b, margin);
+        return equalsInternal(a, b, margin, parsedDates);
     }
 
     public static boolean contains(ValueWrapper a, ValueWrapper b) {
@@ -410,6 +430,91 @@ public final class ValueWrapperComparisons {
         if (a == null || b == null) return a == b;
         return temporalCompare(a, b) <= 0
                 || temporalWithinMargin(a, b, margin, true);
+    }
+
+    private static ParsedDatePair stringDateTimes(ValueWrapper a, ValueWrapper b, ValueWrapper margin) {
+        if (a == null || b == null || eitherTemporal(a, b) || eitherNumeric(a, b)) {
+            return null;
+        }
+        return durationMarginDateTimes(a, b, margin);
+    }
+
+    /**
+     * String operands stay strings unless the margin is a duration and both
+     * sides parse as date-times. A numeric margin is not a duration.
+     */
+    private static ParsedDatePair durationMarginDateTimes(
+            ValueWrapper a,
+            ValueWrapper b,
+            ValueWrapper margin
+    ) {
+        if (!isDurationMargin(margin)) {
+            return null;
+        }
+        String left = stringValue(a, b);
+        String right = stringValueOther(a, b);
+        if (!looksLikeDateTime(left) || !looksLikeDateTime(right)) {
+            return null;
+        }
+        try {
+            BusinessCalendar calendar = CalendarRegistry.calendar.get();
+            if (calendar == null) {
+                calendar = CalendarRegistry.getCalendar();
+            }
+            TemporalValue leftValue = TemporalValue.dateTime(calendar, left);
+            TemporalValue rightValue = TemporalValue.dateTime(calendar, right);
+            if (leftValue == null || rightValue == null
+                    || !leftValue.isDateTime() || !rightValue.isDateTime()) {
+                return null;
+            }
+            return new ParsedDatePair(
+                    ValueWrapper.createValueWrapper(leftValue),
+                    ValueWrapper.createValueWrapper(rightValue));
+        } catch (RuntimeException ignored) {
+            return null;
+        }
+    }
+
+    private static boolean isDurationMargin(ValueWrapper margin) {
+        if (!hasMargin(margin) || margin.isNumeric()) {
+            return false;
+        }
+        if (isTemporal(margin)) {
+            return switch (margin.type.name()) {
+                case "TIME_DURATION", "DURATION", "DELTA" -> true;
+                default -> false;
+            };
+        }
+        String text = margin.asNormalizedText();
+        if (text == null || text.isBlank()) {
+            return false;
+        }
+        try {
+            TemporalValue.duration(text);
+            return true;
+        } catch (RuntimeException ignored) {
+            return false;
+        }
+    }
+
+    private static boolean looksLikeDateTime(String text) {
+        if (text == null || text.length() < 6) {
+            return false;
+        }
+        boolean digit = false;
+        boolean separator = false;
+        for (int index = 0; index < text.length(); index++) {
+            char current = text.charAt(index);
+            if (current >= '0' && current <= '9') {
+                digit = true;
+            } else if (current == '-' || current == ':' || current == 'T' || current == '/') {
+                separator = true;
+            }
+        }
+        return digit && separator;
+    }
+
+    private record ParsedDatePair(ValueWrapper left, ValueWrapper right) {
     }
 
 }

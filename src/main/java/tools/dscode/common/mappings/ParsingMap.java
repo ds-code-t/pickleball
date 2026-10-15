@@ -208,12 +208,20 @@ public class ParsingMap extends MappingProcessor {
             boolean resolveEvaluations,
             String... delimiterReplacements
     ) {
-        return MappingDirectiveResolver.resolveText(
-                this,
-                input,
-                resolveEvaluations,
-                delimiterReplacements
-        );
+        boolean logText = LogExpressionGuard.enter(input);
+        try {
+            return LogExpressionGuard.finish(
+                    MappingDirectiveResolver.resolveText(
+                            this,
+                            input,
+                            resolveEvaluations,
+                            delimiterReplacements
+                    ),
+                    logText);
+        } catch (RuntimeException exception) {
+            LogExpressionGuard.exit(logText);
+            throw exception;
+        }
     }
 
     @Override
@@ -227,12 +235,20 @@ public class ParsingMap extends MappingProcessor {
             boolean resolveEvaluations,
             String... delimiterReplacements
     ) {
-        return MappingDirectiveResolver.resolveValue(
-                this,
-                input,
-                resolveEvaluations,
-                delimiterReplacements
-        );
+        boolean logText = LogExpressionGuard.enter(input);
+        try {
+            return LogExpressionGuard.finish(
+                    MappingDirectiveResolver.resolveValue(
+                            this,
+                            input,
+                            resolveEvaluations,
+                            delimiterReplacements
+                    ),
+                    logText);
+        } catch (RuntimeException exception) {
+            LogExpressionGuard.exit(logText);
+            throw exception;
+        }
     }
 
     private String legacyResolveWholeText(
@@ -1039,6 +1055,8 @@ public class ParsingMap extends MappingProcessor {
                 if (resolution.unresolved()
                         && containsReferenceSyntax(replacement)) {
                     replacement = opaque.protect(replacement);
+                } else if (containsDataCloser(replacement)) {
+                    replacement = opaque.protect(replacement);
                 }
                 current = replaceReference(
                         current,
@@ -1575,6 +1593,18 @@ public class ParsingMap extends MappingProcessor {
         private static boolean containsReferenceSyntax(String input) {
             return input != null
                     && (input.contains("<") || input.contains("~[~"));
+        }
+
+        /**
+         * A resolved value that contains {@code >} but no new reference would
+         * otherwise be read as the close of a still-open outer reference.
+         * Mask it until the surrounding template has finished.
+         */
+        private static boolean containsDataCloser(String replacement) {
+            return replacement != null
+                    && replacement.indexOf('>') >= 0
+                    && !replacement.contains("<")
+                    && !replacement.contains("~[~");
         }
 
         private static boolean containsNestedReference(String input) {

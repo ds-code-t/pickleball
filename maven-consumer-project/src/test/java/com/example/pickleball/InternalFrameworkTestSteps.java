@@ -4,6 +4,7 @@ import com.example.pickleball.support.InternalJavaTestRunner;
 import io.cucumber.core.runner.ScenarioStepChecks;
 import io.cucumber.core.runner.ScenarioStepDataChecks;
 import io.cucumber.java.en.Given;
+import tools.dscode.Release217Phase1Checks;
 import tools.dscode.common.assertions.AssertionClauseSplitterChecks;
 import tools.dscode.common.dataelements.DataElementPhaseFiveChecks;
 import tools.dscode.common.dataelements.DataElementPhaseFourAndSixChecks;
@@ -76,7 +77,8 @@ public final class InternalFrameworkTestSteps {
                 ControlRuntimeObserverChecks.class,
                 PlaceHolderMatchChecks.class,
                 AssertionClauseSplitterChecks.class,
-                LogAndAssertStepsChecks.class
+                LogAndAssertStepsChecks.class,
+                Release217Phase1Checks.class
         );
     }
 

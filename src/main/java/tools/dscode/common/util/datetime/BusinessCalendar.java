@@ -60,6 +60,8 @@ public final class BusinessCalendar {
 
     private final String defaultOutputPattern;  // nullable
     private final ZoneId defaultOutputZone;     // nullable
+    private final boolean unzonedInputInCalendarZone;
+    private final List<DateTimeFormatter> queryFormatters;
 
     public Optional<String> defaultOutputPattern() {
         return Optional.ofNullable(defaultOutputPattern);
@@ -68,13 +70,20 @@ public final class BusinessCalendar {
     public Optional<ZoneId> defaultOutputZone() {
         return Optional.ofNullable(defaultOutputZone);
     }
+
+    /** True when unzoned input is read in {@link #zone()} instead of UTC. */
+    public boolean unzonedInputInCalendarZone() {
+        return unzonedInputInCalendarZone;
+    }
+
     private BusinessCalendar(
             ZoneId zone,
             List<WeeklyOpenRule> openRules,
             List<ClosedRule> closedRules,
             List<DateTimeFormatter> dateTimeFormatters,
             String defaultOutputPattern,
-            ZoneId defaultOutputZone
+            ZoneId defaultOutputZone,
+            boolean unzonedInputInCalendarZone
     ) {
         this.zone = zone;
         this.openRules = List.copyOf(openRules);
@@ -86,6 +95,8 @@ public final class BusinessCalendar {
                 : defaultOutputPattern.trim();
 
         this.defaultOutputZone = defaultOutputZone;
+        this.unzonedInputInCalendarZone = unzonedInputInCalendarZone;
+        this.queryFormatters = queryFormatters(this.dateTimeFormatters, this.defaultOutputPattern);
     }
 
 
@@ -149,7 +160,14 @@ public final class BusinessCalendar {
             }
         }
 
-        return new BusinessCalendar(zone, openRules, closedRules, formats, defaultPattern, defaultOutZone);
+        return new BusinessCalendar(
+                zone,
+                openRules,
+                closedRules,
+                formats,
+                defaultPattern,
+                defaultOutZone,
+                unzonedInputUsesCalendarZone(n));
     }
 
 
@@ -540,7 +558,7 @@ public final class BusinessCalendar {
      * If the input has no zone/offset, assume it was GMT/UTC.
      */
     public ZonedDateTime toCalendarZoneAssumeGmtIfMissing(Object t) {
-        return toCalendarZoneAssumeGmtIfMissing(t, dateTimeFormatters);
+        return toCalendarZoneAssumeGmtIfMissing(t, queryFormatters);
     }
 
     ZonedDateTime toCalendarZoneAssumeGmtIfMissing(Object t, List<DateTimeFormatter> formatters) {
@@ -557,11 +575,11 @@ public final class BusinessCalendar {
         if (t instanceof OffsetDateTime odt) return odt.toInstant().atZone(zone);
         if (t instanceof Instant ins) return ins.atZone(zone);
 
-        if (t instanceof LocalDateTime ldt) return ldt.atZone(ZoneOffset.UTC).withZoneSameInstant(zone);
-        if (t instanceof LocalDate ld) return ld.atStartOfDay(ZoneOffset.UTC).withZoneSameInstant(zone);
+        if (t instanceof LocalDateTime ldt) return ldt.atZone(assumedUnzonedZone()).withZoneSameInstant(zone);
+        if (t instanceof LocalDate ld) return ld.atStartOfDay(assumedUnzonedZone()).withZoneSameInstant(zone);
         if (t instanceof LocalTime lt) {
-            LocalDate todayUtc = LocalDate.now(ZoneOffset.UTC);
-            return ZonedDateTime.of(todayUtc, lt, ZoneOffset.UTC).withZoneSameInstant(zone);
+            LocalDate today = LocalDate.now(assumedUnzonedZone());
+            return ZonedDateTime.of(today, lt, assumedUnzonedZone()).withZoneSameInstant(zone);
         }
         if (t instanceof TemporalAccessor ta) {
             Instant ins = Instant.from(ta);
@@ -676,6 +694,63 @@ public final class BusinessCalendar {
         };
     }
 
+    ZonedDateTime nextBusinessDay(ZonedDateTime input) {
+        ZonedDateTime local = input.withZoneSameInstant(zone).plusDays(1);
+        return businessDayOnOrAfter(local);
+    }
+
+    ZonedDateTime businessDayOnOrAfter(ZonedDateTime input) {
+        ZonedDateTime local = input.withZoneSameInstant(zone);
+        LocalDate date = nextBusinessDateOnOrAfter(local.toLocalDate());
+        if (date == null) {
+            return null;
+        }
+        return ZonedDateTime.of(date, local.toLocalTime(), zone);
+    }
+
+    private ZoneId assumedUnzonedZone() {
+        return unzonedInputInCalendarZone ? zone : ZoneOffset.UTC;
+    }
+
+    private static List<DateTimeFormatter> queryFormatters(
+            List<DateTimeFormatter> formatters,
+            String defaultOutputPattern
+    ) {
+        if (defaultOutputPattern == null) {
+            return formatters;
+        }
+        DateTimeFormatter ownOutput = DateTimeFormatter.ofPattern(defaultOutputPattern);
+        List<DateTimeFormatter> withOwnOutput = new ArrayList<>(formatters.size() + 1);
+        withOwnOutput.addAll(formatters);
+        withOwnOutput.add(ownOutput);
+        return List.copyOf(withOwnOutput);
+    }
+
+    /**
+     * Absent, blank, UTC, and GMT keep the historical UTC assumption.
+     * {@code calendar} reads unzoned local values in the calendar time zone.
+     */
+    private static boolean unzonedInputUsesCalendarZone(JsonNode n) {
+        JsonNode value = n.get("UnzonedInputZone");
+        if (value == null || value.isNull()) {
+            return false;
+        }
+        String text = value.asText("").trim();
+        if (text.isEmpty()
+                || text.equalsIgnoreCase("UTC")
+                || text.equalsIgnoreCase("GMT")
+                || text.equalsIgnoreCase("Z")) {
+            return false;
+        }
+        if (text.equalsIgnoreCase("calendar")
+                || text.equalsIgnoreCase("timezone")
+                || text.equalsIgnoreCase("time zone")) {
+            return true;
+        }
+        throw new IllegalArgumentException(
+                "UnzonedInputZone must be UTC or calendar, not \"" + text + "\"");
+    }
+
     private LocalDate nextBusinessDateOnOrAfter(LocalDate date) {
         for (int offset = 0; offset <= BUSINESS_DATE_SEARCH_LIMIT_DAYS; offset++) {
             LocalDate candidate = date.plusDays(offset);
@@ -698,7 +773,7 @@ public final class BusinessCalendar {
         ZonedDateTime now = ZonedDateTime.now(zone);
 
         if (t instanceof String s) {
-            Object parsed = DateTimeParsingUtils.tryParse(dateTimeFormatters, s);
+            Object parsed = DateTimeParsingUtils.tryParse(queryFormatters, s);
             if (parsed != null) return normalizeForQuery(parsed);
             throw new IllegalArgumentException("Unparseable date/time: \"" + s + "\"");
         }
@@ -707,8 +782,8 @@ public final class BusinessCalendar {
         if (t instanceof OffsetDateTime odt) return odt.toInstant().atZone(zone);
         if (t instanceof Instant ins) return ins.atZone(zone);
 
-        if (t instanceof LocalDateTime ldt) return ldt.atZone(ZoneOffset.UTC).withZoneSameInstant(zone);
-        if (t instanceof LocalDate ld) return ld.atStartOfDay(ZoneOffset.UTC).withZoneSameInstant(zone);
+        if (t instanceof LocalDateTime ldt) return ldt.atZone(assumedUnzonedZone()).withZoneSameInstant(zone);
+        if (t instanceof LocalDate ld) return ld.atStartOfDay(assumedUnzonedZone()).withZoneSameInstant(zone);
 
 
         if (t instanceof LocalTime lt) {

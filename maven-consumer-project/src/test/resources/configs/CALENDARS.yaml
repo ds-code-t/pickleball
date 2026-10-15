@@ -45,4 +45,18 @@ DefaultCalendar:
     - "11 NOV 2026"     # Veterans Day
     - "26 NOV 2026"     # Thanksgiving Day
     - "25 DEC 2026"     # Christmas Day
+
+OwnOutput:
+  TimeZone: America/New_York
+  DefaultOutputPattern: "MMMM d, yyyy h:mm a VV"
+  DefaultOutputZone: America/New_York
+  Open:
+    - MON-FRI 09:00-17:00
+
+UnzonedLocal:
+  TimeZone: America/New_York
+  UnzonedInputZone: calendar
+  Open:
+    - MON-FRI 09:00-17:00
+
   

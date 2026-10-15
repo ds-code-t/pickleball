@@ -9,6 +9,15 @@ Feature: Author-facing log and assert steps
     * , save "logged" as "afterInfoLogs"
     * , ensure "<afterInfoLogs>" equals "logged"
 
+  Scenario: Invalid expressions in log text stay literal
+    * , save "Ada" as "logName217"
+    * INFO: hello <logName217> <{ 1 + 1 }>
+    * TRACE: kept <{ 1 + }>
+    * DEBUG: kept <{ 1 + }>
+    * WARN: kept <{ 1 + }>
+    * , save "after-invalid-log" as "afterInvalidLog217"
+    * , ensure "<afterInvalidLog217>" equals "after-invalid-log"
+
   Scenario: ASSERT expression and phrase clauses pass
     * ASSERT: 1 < 2
     * ASSERT: "A" equals "A"

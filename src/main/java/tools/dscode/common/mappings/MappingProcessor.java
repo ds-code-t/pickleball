@@ -626,9 +626,14 @@ public abstract class MappingProcessor implements Map<String, Object> {
                         continue;
                     }
                     key = parsedObj.restoreAndStripBookEnds(decodeBackToText(key));
-                    replacement = getRunningStep()
-                            .createNewStepExtension(key.substring(1))
-                            .runAndGetReturnValue();
+                    LogExpressionGuard.suspend();
+                    try {
+                        replacement = getRunningStep()
+                                .createNewStepExtension(key.substring(1))
+                                .runAndGetReturnValue();
+                    } finally {
+                        LogExpressionGuard.resume();
+                    }
                     break;
                 }
                 if (key.contains(MATCH_BREAK)) {
@@ -705,11 +710,12 @@ public abstract class MappingProcessor implements Map<String, Object> {
                     endExclusive - INTERNAL_EXPRESSION_CLOSE.length());
             String restored = restoreExpressionBody(internalBody, parsedObj, bookends);
             output.append(input, cursor, open);
-            output.append(LazyBooleanSides.evaluateReference(
-                    this,
+            output.append(evaluateOrKeepLiteral(
+                    input.substring(open, endExclusive),
                     restored,
                     bookends.expressionOpen(),
-                    bookends.expressionClose()));
+                    bookends.expressionClose(),
+                    bookends));
             cursor = endExclusive;
         }
         return output.toString();
@@ -741,7 +747,12 @@ public abstract class MappingProcessor implements Map<String, Object> {
                     ? restored.substring(open.length(), restored.length() - close.length())
                     : restored;
             output.append(input, cursor, start);
-            output.append(LazyBooleanSides.evaluateReference(this, body, open, close));
+            output.append(evaluateOrKeepLiteral(
+                    input.substring(start, end),
+                    body,
+                    open,
+                    close,
+                    bookends));
             cursor = end;
         }
         return output.toString();
@@ -789,11 +800,20 @@ public abstract class MappingProcessor implements Map<String, Object> {
                     .replace(INTERNAL_MAP_OPEN, bookends.open())
                     .replace(INTERNAL_MAP_CLOSE, bookends.close());
             key = parsedObj.restoreAndStripBookEnds(decodeBackToText(key));
-            String replacement = key.endsWith("?")
-                    ? String.valueOf(evalToBoolean(key.substring(0, key.length() - 1), this))
-                    : String.valueOf(eval(key, this));
-            logTrace("'" + bookends.expressionOpen() + key
-                    + bookends.expressionClose() + "' -> '" + replacement + "'");
+            String replacement;
+            try {
+                replacement = key.endsWith("?")
+                        ? String.valueOf(evalToBoolean(key.substring(0, key.length() - 1), this))
+                        : String.valueOf(eval(key, this));
+                logTrace("'" + bookends.expressionOpen() + key
+                        + bookends.expressionClose() + "' -> '" + replacement + "'");
+            } catch (RuntimeException exception) {
+                if (!LogExpressionGuard.active()) {
+                    throw exception;
+                }
+                replacement = LogExpressionGuard.protect(
+                        restoreBookends(matcher.group(0), bookends));
+            }
             matcher.appendReplacement(
                     output,
                     replacement == null
@@ -802,6 +822,23 @@ public abstract class MappingProcessor implements Map<String, Object> {
         }
         matcher.appendTail(output);
         return output.toString();
+    }
+
+    private String evaluateOrKeepLiteral(
+            String originalInternal,
+            String expression,
+            String open,
+            String close,
+            Bookends bookends
+    ) {
+        try {
+            return LazyBooleanSides.evaluateReference(this, expression, open, close);
+        } catch (RuntimeException exception) {
+            if (!LogExpressionGuard.active()) {
+                throw exception;
+            }
+            return LogExpressionGuard.protect(restoreBookends(originalInternal, bookends));
+        }
     }
 
     private static String normalizeBookends(String input, Bookends bookends) {

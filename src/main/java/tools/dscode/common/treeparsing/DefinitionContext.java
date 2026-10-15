@@ -60,6 +60,10 @@ public final class DefinitionContext {
         BracketMasker bm = getBracketMasker(input);
         String parsedText = normalizeWhitespace(bm.masked())
                 .replaceAll("\\bmargin\\s+of\\b", "margin-of")
+                .replaceAll("\\bwithin\\s+(?:(?:a|the)\\s+)?margin-of\\b", "margin-of")
+                .replaceAll(
+                        "\\bwithin\\s+(\\d+(?:\\.\\d+)?)\\s+((?:second|minute|hour|day|week|month|year)s?)\\b",
+                        "margin-of $1 $2")
                 .replaceAll("\\bno\\s+attribute\\b", "noattribute")
                 .replaceAll("\\b(?:the|a)\\b", "")
                 .replaceAll("\\bare\\b", "is")

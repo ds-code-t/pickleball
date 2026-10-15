@@ -4,7 +4,7 @@ Feature: Implemented date and time utility expressions
   DateTimeUtilitySteps and tools.dscode.common.util.datetime.
 
   # The feature intentionally does not use unsupported clauses such as:
-  # input format:, zone:, to zone:, plus:, minus:, next business day,
+  # input format:, zone:, to zone:, plus:, minus:,
   # opening time, closing time, next opening time, or next closing time.
 
   @browser @local-page
@@ -263,3 +263,32 @@ Feature: Implemented date and time utility expressions
     Then , user saves "<$DateTime:Calendar:OpsUS 2026-12-15T14:00:00Z format: uuuu-MM-dd h:mm a VV>" as "ops calendar date"
     And , verify "<ops calendar date>" equals "2026-12-15 9:00 AM America/New_York"
     And , user enters "<ops calendar date>" for the "Reformatted Date Time" Textbox
+
+  Scenario: Nested date-time references stay exact at one and two levels and at three or more
+    Then , verify "<$DateTime:2026-07-20T23:45:00Z to UTC TimeZone format: iso>" equals "2026-07-20T23:45:00Z"
+    And , verify "<$DateTime:<$DateTime:2026-07-20T23:45:00Z to UTC TimeZone format: iso> to UTC TimeZone format: iso>" equals "2026-07-20T23:45:00Z"
+    And , verify "<$DateTime:<$DateTime:<$DateTime:2026-07-20T23:45:00Z to UTC TimeZone format: iso> to UTC TimeZone format: iso> to UTC TimeZone format: iso>" equals "2026-07-20T23:45:00Z"
+    And , verify "<$DateTime:<$DateTime:<$DateTime:<$DateTime:2026-07-20T23:45:00Z to UTC TimeZone format: iso> to UTC TimeZone format: iso> to UTC TimeZone format: iso> to UTC TimeZone format: iso>" equals "2026-07-20T23:45:00Z"
+
+  Scenario: A calendar can parse its own default output and unzoned input follows its zone setting
+    Then , verify "<$DateTime:Calendar:OwnOutput 2026-07-20T23:45:00Z to UTC TimeZone format: iso>" equals "2026-07-20T23:45:00Z"
+    And , verify "<$DateTime:Calendar:OwnOutput July 20, 2026 7:45 PM America/New_York to UTC TimeZone format: iso>" equals "2026-07-20T23:45:00Z"
+    And , verify "<$DateTime:Calendar:DefaultCalendar 2026-07-20T00:00:00 format: uuuu-MM-dd HH:mm VV>" equals "2026-07-19 20:00 America/New_York"
+    And , verify "<$DateTime:Calendar:UnzonedLocal 2026-07-20T00:00:00 format: uuuu-MM-dd HH:mm VV>" equals "2026-07-20 00:00 America/New_York"
+
+  Scenario: Business-day pipe modifiers roll weekends forward and business-day math stays the same
+    Then , verify "<$DateTime:2026-07-17T15:00:00Z format: uuuu-MM-dd | business day on or after>" equals "2026-07-17"
+    And , verify "<$DateTime:2026-07-18T15:00:00Z format: uuuu-MM-dd | business day on or after>" equals "2026-07-20"
+    And , verify "<$DateTime:2026-07-17T15:00:00Z format: uuuu-MM-dd | next business day>" equals "2026-07-20"
+    And , verify "<$DateTime:2026-07-18T15:00:00Z format: uuuu-MM-dd | next business day>" equals "2026-07-20"
+    And , verify "<$DateTime:2026-07-17T15:00:00Z + 1 business day format: uuuu-MM-dd>" equals "2026-07-20"
+
+  Scenario: Date-time text equality honors a duration margin and plain text does not
+    Then , verify "2026-07-20T23:45:00Z" equals "2026-07-20T23:45:00Z"
+    And , verify "2026-07-20T23:45:00Z" equals "2026-07-20T23:45:00Z" within a margin of 5 minutes
+    And , verify "2026-07-20T23:45:00Z" equals "2026-07-20T23:49:00Z" within a margin of 5 minutes
+    And , verify "2026-07-20T23:45:00Z" equals "2026-07-20T23:40:00Z" within 5 minutes
+    And , verify "alpha" equals "alpha" within a margin of 5 minutes
+    And , verify "alpha" equals "alpha" within 5 minutes
+    And , verify "alpha" equals "alpha" within a margin of 5
+
