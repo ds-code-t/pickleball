@@ -8,7 +8,10 @@ import tools.dscode.workbench.sync.WorkbenchManifest;
 import tools.dscode.workbench.sync.WorkbenchSyncMode;
 
 import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 
@@ -219,6 +222,79 @@ class WorkbenchWorkerManagerTest {
         assertTrue(controllerLeakFailure.getMessage().contains("must not contain"));
         assertTrue(duplicateOriginFailure.getMessage().contains("exactly once"));
         assertTrue(missingVersionFailure.getMessage().contains("did not report"));
+    }
+
+    @Test
+    void workerStartTimeoutDefaultsToThreeMinutesAndHonorsOverrides() {
+        assertEquals(Duration.ofSeconds(180), WorkbenchWorkerManager.START_TIMEOUT);
+        assertEquals(Duration.ofSeconds(180), WorkbenchWorkerManager.startTimeout(Map.of()));
+        String property = WorkbenchWorkerManager.START_TIMEOUT_PROPERTY;
+        String previous = System.getProperty(property);
+        String previousRunVars = System.getProperty("pkb_runvars");
+        String previousDotted = System.getProperty(WorkbenchWorkerManager.START_TIMEOUT_RUNVAR);
+        try {
+            System.setProperty(property, "12");
+            assertEquals(Duration.ofSeconds(12), WorkbenchWorkerManager.startTimeout(Map.of()));
+            System.clearProperty(property);
+            System.setProperty("pkb_runvars", "pkb_browser=CHROME_HEADLESS, pkb_workbench_worker_start_timeout=45");
+            assertEquals(Duration.ofSeconds(45), WorkbenchWorkerManager.startTimeout(Map.of()));
+            System.clearProperty("pkb_runvars");
+            System.setProperty(WorkbenchWorkerManager.START_TIMEOUT_RUNVAR, "30");
+            assertEquals(Duration.ofSeconds(30), WorkbenchWorkerManager.startTimeout(Map.of()));
+            System.clearProperty(WorkbenchWorkerManager.START_TIMEOUT_RUNVAR);
+            assertEquals(
+                    Duration.ofSeconds(90),
+                    WorkbenchWorkerManager.startTimeout(Map.of(
+                            "pkb_runvars", "pkb_workbench_worker_start_timeout=90"
+                    ))
+            );
+            assertEquals(Duration.ofSeconds(180), WorkbenchWorkerManager.startTimeout(Map.of(property, "nope")));
+        } finally {
+            restore(property, previous);
+            restore("pkb_runvars", previousRunVars);
+            restore(WorkbenchWorkerManager.START_TIMEOUT_RUNVAR, previousDotted);
+        }
+    }
+
+    @Test
+    void progressLinesNameTheStageAndTimeoutIncludesTheTail() throws Exception {
+        Path log = tempDir.resolve("worker.err.log");
+        for (String stage : WorkbenchWorkerManager.STARTUP_STAGES) {
+            WorkbenchWorkerManager.writeProgress(log, stage);
+        }
+        String text = Files.readString(log);
+        assertTrue(text.contains("progress stage=compile"));
+        assertTrue(text.contains("progress stage=classpath"));
+        assertTrue(text.contains("progress stage=worker-launch"));
+        assertTrue(text.contains("progress stage=anchor-parse"));
+        assertTrue(text.contains("progress stage=paused"));
+        String detail = WorkbenchWorkerManager.startupContext(Duration.ofMillis(1500), "anchor-parse", log);
+        assertTrue(detail.contains("elapsed=1500ms"));
+        assertTrue(detail.contains("stage=anchor-parse"));
+        assertTrue(detail.contains("last-worker-output="));
+        assertTrue(detail.contains("progress stage=paused"));
+    }
+
+    @Test
+    void sessionStartWritesCompileProgressBeforeTheWorkerExists() throws IOException {
+        Path project = tempDir.resolve("consumer");
+        Files.createDirectories(project);
+        WorkbenchWorkerManager manager = new WorkbenchWorkerManager(project);
+        assertThrows(IllegalStateException.class, manager::startInteractive);
+        Path logs = WorkbenchManifest.workbenchRoot(project).resolve("logs");
+        assertTrue(Files.isDirectory(logs));
+        boolean found = false;
+        try (var listed = Files.list(logs)) {
+            for (Path log : listed.toList()) {
+                if (Files.readString(log).contains("progress stage=compile")) found = true;
+            }
+        }
+        assertTrue(found);
+    }
+
+    private static void restore(String key, String previous) {
+        if (previous == null) System.clearProperty(key);
+        else System.setProperty(key, previous);
     }
 
     private ControlBridgeDescriptor descriptor(long pid, Path runtimeSource, String version) {

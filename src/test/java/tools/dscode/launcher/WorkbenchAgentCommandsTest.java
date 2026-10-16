@@ -2,6 +2,7 @@ package tools.dscode.launcher;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import tools.dscode.common.coordination.AgentCoordination;
 import tools.dscode.common.reporting.diagnostic.LastDiscoverSnapshot;
@@ -17,6 +18,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -544,6 +546,34 @@ class WorkbenchAgentCommandsTest {
         assertTrue(output.stdout().contains("Locked account"));
         assertFalse(output.stdout().contains("Valid password"));
         assertFalse(output.stdout().contains("mvnw"));
+    }
+
+    @Test
+    @Timeout(value = 20, unit = TimeUnit.SECONDS)
+    void discoverRunTimeoutRecordsTimeoutAndDoesNotReportPassed() throws Exception {
+        writeProjectWrapper();
+        ByteArrayOutputStream stdout = new ByteArrayOutputStream();
+        ByteArrayOutputStream stderr = new ByteArrayOutputStream();
+        int exit = WorkbenchAgentCommands.run(
+                new String[]{"discover", tempDir.toString(), "--run-timeout=1", "--run-id=slow-run"},
+                new PrintStream(stdout, true, StandardCharsets.UTF_8),
+                new PrintStream(stderr, true, StandardCharsets.UTF_8),
+                (project, command, out, err) -> {
+                    try {
+                        Thread.sleep(30_000);
+                    } catch (InterruptedException interrupted) {
+                        Thread.currentThread().interrupt();
+                    }
+                    return 0;
+                }
+        );
+        assertEquals(1, exit);
+        assertTrue(stderr.toString(StandardCharsets.UTF_8).contains("TIMEOUT"));
+        String record = Files.readString(
+                AgentCoordination.runDirectory(tempDir, "slow-run").resolve(AgentCoordination.RECORD_FILE)
+        );
+        assertTrue(record.contains("TIMEOUT"));
+        assertFalse(record.contains("PASSED"));
     }
 
     private Output run(String... args) {

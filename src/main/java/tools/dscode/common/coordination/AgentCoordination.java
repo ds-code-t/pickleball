@@ -263,7 +263,7 @@ public final class AgentCoordination {
     }
 
     public static Run begin(Path project, Request request) {
-        return begin(project, request, Instant.now(), null);
+        return begin(project, request, Instant.now(), null, true);
     }
 
     /**
@@ -271,6 +271,15 @@ public final class AgentCoordination {
      * and {@code confirm} call this before the worker JVM exists.
      */
     public static Run begin(Path project, Request request, Instant when, Appendable out) {
+        return begin(project, request, when, out, true);
+    }
+
+    /**
+     * @param logStart false defers the short-log {@code start} line. Session-start uses that
+     *                 so a session that never becomes healthy does not look like it started.
+     *                 Discover and confirm keep the default, which logs immediately.
+     */
+    public static Run begin(Path project, Request request, Instant when, Appendable out, boolean logStart) {
         Instant clock = when == null ? Instant.now() : when;
         Request safe = request == null ? Request.of(null, null, null, null, null, null, null) : request;
         String runId = safe.runId() == null ? newRunId(clock) : requireSafeId(safe.runId(), "run id");
@@ -312,7 +321,9 @@ public final class AgentCoordination {
                     null
             );
             writeRecord(recordFile, record);
-            appendLog(project, clock, agentId, runId, "start", purpose, recordFile);
+            if (logStart) {
+                appendLog(project, clock, agentId, runId, "start", purpose, recordFile);
+            }
             Run opened = toRun(project, data, recordFile, record);
             activate(opened);
             if (generatedAgent) print(out, "agent-id=" + agentId);
@@ -322,6 +333,29 @@ public final class AgentCoordination {
             return opened;
         } catch (IOException failure) {
             throw new IllegalStateException("Could not open run " + runId + ": " + failure.getMessage(), failure);
+        }
+    }
+
+    /** Appends the short-log {@code start} line once a deferred session is actually up. */
+    public static void logStart(Path project, Run run, String purpose) {
+        if (run == null) {
+            throw new IllegalArgumentException("A run is required to log session start.");
+        }
+        try {
+            appendLog(
+                    project,
+                    Instant.now(),
+                    run.agentId(),
+                    run.runId(),
+                    "start",
+                    oneLine(firstNonBlank(purpose, "isolate")),
+                    run.recordFile()
+            );
+        } catch (IOException failure) {
+            throw new IllegalStateException(
+                    "Could not log session start for " + run.runId() + ": " + failure.getMessage(),
+                    failure
+            );
         }
     }
 

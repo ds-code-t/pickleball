@@ -327,6 +327,7 @@ public final class WorkbenchSessionActions {
             }
             WindowDriver.claimVacant(services.projectRoot(), args.get("agent"));
         }
+        applyStopAfter(args);
         return switch (op) {
             case "open-scenario" -> openScenario(args.get("feature"), args.get("name"), args.get("example"));
             case "example" -> example(first(args, "example", "text"));
@@ -348,6 +349,12 @@ public final class WorkbenchSessionActions {
             case "close-window" -> closeWindow();
             default -> throw new IllegalArgumentException("Unknown session command: " + op);
         };
+    }
+
+    private void applyStopAfter(Map<String, String> args) {
+        String phrase = args.get("stopAfter");
+        if (phrase == null || phrase.isBlank()) return;
+        services.player().stopAfter(phrase);
     }
 
     public Map<String, Object> showRun(String runId, String agentId, boolean claim) {

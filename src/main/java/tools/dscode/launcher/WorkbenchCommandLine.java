@@ -73,7 +73,9 @@ final class WorkbenchCommandLine {
             String version,
             boolean planOnly,
             boolean refreshIndex,
-            List<String> selects
+            List<String> selects,
+            Long stepTimeoutSeconds,
+            Long runTimeoutSeconds
     ) {
         public Parsed {
             selects = selects == null ? List.of() : List.copyOf(selects);
@@ -95,14 +97,14 @@ final class WorkbenchCommandLine {
     static Parsed parse(String[] args) {
         Path cwd = Path.of("").toAbsolutePath().normalize();
         if (args == null || args.length == 0) {
-            return new Parsed("ui", cwd, null, null, null, null, null, new String[]{"ui", cwd.toString()}, Coordination.empty(), null, false, false, List.of());
+            return new Parsed("ui", cwd, null, null, null, null, null, new String[]{"ui", cwd.toString()}, Coordination.empty(), null, false, false, List.of(), null, null);
         }
         String command = args[0];
         if ("export-guidance".equals(command)) {
             Path output = args.length >= 2 && !isFlag(args[1])
                     ? Path.of(args[1])
                     : Path.of(".pickleball");
-            return new Parsed(command, cwd, output, null, null, null, null, args.clone(), Coordination.empty(), null, false, false, List.of());
+            return new Parsed(command, cwd, output, null, null, null, null, args.clone(), Coordination.empty(), null, false, false, List.of(), null, null);
         }
 
         String tags = null;
@@ -133,6 +135,8 @@ final class WorkbenchCommandLine {
         boolean planOnly = false;
         boolean refreshIndex = false;
         List<String> selects = new ArrayList<>();
+        Long stepTimeoutSeconds = null;
+        Long runTimeoutSeconds = null;
         String absorb = null;
         Path project = null;
         List<String> rest = new ArrayList<>();
@@ -376,6 +380,22 @@ final class WorkbenchCommandLine {
                 absorb = null;
                 continue;
             }
+            if (token.startsWith("--step-timeout=") || "--step-timeout".equals(token)) {
+                String value = token.startsWith("--step-timeout=")
+                        ? token.substring("--step-timeout=".length())
+                        : (index + 1 < args.length ? args[++index] : null);
+                stepTimeoutSeconds = parsePositiveSeconds(value, "--step-timeout");
+                absorb = null;
+                continue;
+            }
+            if (token.startsWith("--run-timeout=") || "--run-timeout".equals(token)) {
+                String value = token.startsWith("--run-timeout=")
+                        ? token.substring("--run-timeout=".length())
+                        : (index + 1 < args.length ? args[++index] : null);
+                runTimeoutSeconds = parsePositiveSeconds(value, "--run-timeout");
+                absorb = null;
+                continue;
+            }
             if (isFlag(token)) {
                 rest.add(token);
                 continue;
@@ -426,13 +446,28 @@ final class WorkbenchCommandLine {
             forwarded.addAll(rest);
             return new Parsed(
                     command, project, null, tags, name, example, retention, forwarded.toArray(String[]::new),
-                    coordination, version, planOnly, refreshIndex, selects
+                    coordination, version, planOnly, refreshIndex, selects, stepTimeoutSeconds, runTimeoutSeconds
             );
         }
         return new Parsed(
                 command, project, null, tags, name, example, retention, args.clone(),
-                coordination, version, planOnly, refreshIndex, selects
+                coordination, version, planOnly, refreshIndex, selects, stepTimeoutSeconds, runTimeoutSeconds
         );
+    }
+
+    private static Long parsePositiveSeconds(String value, String label) {
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException(label + " requires a positive number of seconds.");
+        }
+        try {
+            long seconds = Long.parseLong(value.trim());
+            if (seconds <= 0) {
+                throw new IllegalArgumentException(label + " requires a positive number of seconds.");
+            }
+            return seconds;
+        } catch (NumberFormatException failure) {
+            throw new IllegalArgumentException(label + " must be a whole number of seconds: " + value);
+        }
     }
 
     private static Integer parseWholeNumber(String value, String label) {

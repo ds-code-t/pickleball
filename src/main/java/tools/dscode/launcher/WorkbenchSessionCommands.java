@@ -107,7 +107,13 @@ public final class WorkbenchSessionCommands {
             err.println(failure.getMessage());
             return 2;
         }
-        SessionFlags flags = SessionFlags.parse(args);
+        SessionFlags flags;
+        try {
+            flags = SessionFlags.parse(args);
+        } catch (IllegalArgumentException failure) {
+            err.println(failure.getMessage());
+            return 2;
+        }
         try {
             return switch (parsed.command()) {
                 case "isolate", "session-start" -> sessionStart(parsed, out, err, starter, http);
@@ -121,7 +127,7 @@ public final class WorkbenchSessionCommands {
                         postCommand(parsed, flags, out, err, http);
                 case "status" -> status(parsed, flags, out, err, http);
                 case "events" -> events(parsed, out, err, http);
-                case "stop", "kill" -> stop(parsed, out, err, http);
+                case "stop", "kill" -> stop(parsed, flags, out, err, http);
                 case "open-window" -> openWindow(parsed, out, err, http, uiStarter);
                 case "close-window" -> closeWindow(parsed, out, err, http);
                 case "show-run" -> showRun(parsed, out, err, http);
@@ -177,8 +183,10 @@ public final class WorkbenchSessionCommands {
         builder.directory(project.toFile());
         builder.redirectOutput(ProcessBuilder.Redirect.appendTo(logFile.toFile()));
         builder.redirectError(ProcessBuilder.Redirect.appendTo(logFile.toFile()));
-        builder.redirectInput(ProcessBuilder.Redirect.DISCARD);
-        return builder.start();
+        builder.redirectInput(ProcessBuilder.Redirect.PIPE);
+        Process process = builder.start();
+        process.getOutputStream().close();
+        return process;
     }
 
     static Process startUi(Path project, String runId, String agentId) throws IOException {
@@ -372,11 +380,15 @@ public final class WorkbenchSessionCommands {
                         parsed.coordination().who(),
                         parsed.coordination().why(),
                         "isolate"
-                )
+                ),
+                Instant.now(),
+                null,
+                false
         );
         Optional<SessionState> existing = readHealthy(project, http);
         if (existing.isPresent()) {
             SessionState state = existing.get();
+            AgentCoordination.logStart(project, run, "isolate");
             out.println("ACK SESSION already-running pid=" + state.pid() + " url=" + state.url());
             out.println("Only one agent drives an open Workbench window. This run stays headless on run-id="
                     + run.runId() + ".");
@@ -406,6 +418,7 @@ public final class WorkbenchSessionCommands {
             Optional<SessionState> ready = readHealthyFile(sessionFile, project, http);
             if (ready.isPresent()) {
                 SessionState state = ready.get();
+                AgentCoordination.logStart(project, run, "isolate");
                 out.println("ACK SESSION pid=" + state.pid() + " url=" + state.url());
                 return 0;
             }
@@ -413,6 +426,7 @@ public final class WorkbenchSessionCommands {
                 Optional<SessionState> afterExit = readHealthyFile(sessionFile, project, http);
                 if (afterExit.isPresent()) {
                     SessionState state = afterExit.get();
+                    AgentCoordination.logStart(project, run, "isolate");
                     out.println("ACK SESSION pid=" + state.pid() + " url=" + state.url());
                     return 0;
                 }
@@ -442,7 +456,7 @@ public final class WorkbenchSessionCommands {
         }
         Map<String, Object> body = commandBody(parsed, flags);
         body.put("text", text);
-        return postAndMaybeWait(state, flags, body, out, err, http);
+        return postAndMaybeWait(parsed, state, flags, body, out, err, http);
     }
 
     private static int textCommand(
@@ -459,7 +473,7 @@ public final class WorkbenchSessionCommands {
         Integer refused = refusedDriver(parsed, err);
         if (refused != null) return refused;
         SessionState state = requireSession(parsed, http);
-        return postAndMaybeWait(state, flags, commandBody(parsed, flags), out, err, http);
+        return postAndMaybeWait(parsed, state, flags, commandBody(parsed, flags), out, err, http);
     }
 
     private static int openScenario(
@@ -478,7 +492,7 @@ public final class WorkbenchSessionCommands {
         Integer refused = refusedDriver(parsed, err);
         if (refused != null) return refused;
         SessionState state = requireSession(parsed, http);
-        return postAndMaybeWait(state, flags, commandBody(parsed, flags), out, err, http);
+        return postAndMaybeWait(parsed, state, flags, commandBody(parsed, flags), out, err, http);
     }
 
     private static int example(
@@ -499,7 +513,7 @@ public final class WorkbenchSessionCommands {
         SessionState state = requireSession(parsed, http);
         Map<String, Object> body = commandBody(parsed, flags);
         body.put("example", selector);
-        return postAndMaybeWait(state, flags, body, out, err, http);
+        return postAndMaybeWait(parsed, state, flags, body, out, err, http);
     }
 
     private static int diagnosticRun(
@@ -514,7 +528,7 @@ public final class WorkbenchSessionCommands {
             return 2;
         }
         SessionState state = requireSession(parsed, http);
-        return postAndMaybeWait(state, flags, commandBody(parsed, flags), out, err, http);
+        return postAndMaybeWait(parsed, state, flags, commandBody(parsed, flags), out, err, http);
     }
 
     private static int postCommand(
@@ -527,7 +541,7 @@ public final class WorkbenchSessionCommands {
         Integer refused = refusedDriver(parsed, err);
         if (refused != null) return refused;
         SessionState state = requireSession(parsed, http);
-        return postAndMaybeWait(state, flags, commandBody(parsed, flags), out, err, http);
+        return postAndMaybeWait(parsed, state, flags, commandBody(parsed, flags), out, err, http);
     }
 
     private static Map<String, Object> commandBody(WorkbenchCommandLine.Parsed parsed, SessionFlags flags) {
@@ -540,12 +554,14 @@ public final class WorkbenchSessionCommands {
         if (parsed.example() != null && !parsed.example().isBlank()) body.put("example", parsed.example());
         if (flags.run != null && !flags.run.isBlank()) body.put("run", flags.run);
         if (flags.fromHere != null && !flags.fromHere.isBlank()) body.put("fromHere", flags.fromHere);
+        if (flags.stopAfter != null && !flags.stopAfter.isBlank()) body.put("stopAfter", flags.stopAfter);
         if (parsed.coordination().agentId() != null) body.put("agent", parsed.coordination().agentId());
         if (parsed.coordination().runId() != null) body.put("runId", parsed.coordination().runId());
         return body;
     }
 
     private static int postAndMaybeWait(
+            WorkbenchCommandLine.Parsed parsed,
             SessionState state,
             SessionFlags flags,
             Map<String, Object> body,
@@ -558,7 +574,7 @@ public final class WorkbenchSessionCommands {
         String status = textOr(ack, "status", "QUEUED");
         out.println("ACK " + id + " " + status);
         if (flags.ackOnly || !flags.wait) return 0;
-        return waitForDone(http, state, id, out, err);
+        return waitForDone(parsed, http, state, flags, id, out, err);
     }
 
     private static int status(
@@ -570,13 +586,14 @@ public final class WorkbenchSessionCommands {
     ) {
         Optional<SessionState> state = resolveSession(parsed, http);
         if (state.isEmpty()) {
-            err.println("No healthy Workbench session. Run isolate / session-start, or use the window that is already open.");
+            err.println(unhealthyMessage(parsed.project(), parsed.coordination().runId()));
             return 1;
         }
         String id = flags.id;
         if (id == null || id.isBlank()) {
             SessionState session = state.get();
             out.println("SESSION pid=" + session.pid() + " url=" + session.url() + " mode=" + session.mode());
+            printTiming(out, parsed, http, session);
             return 0;
         }
         try {
@@ -584,9 +601,11 @@ public final class WorkbenchSessionCommands {
             String status = textOr(view, "status", "");
             out.println(id + " " + status);
             if (view.has("result")) out.println(view.get("result").toString());
+            printTiming(out, parsed, http, state.get());
             return terminalExit(status);
         } catch (RuntimeException failure) {
             err.println("DONE " + id + " TIMEOUT");
+            recordRunStatus(parsed, out, "TIMEOUT");
             return 1;
         }
     }
@@ -601,6 +620,7 @@ public final class WorkbenchSessionCommands {
         try {
             JsonNode events = postJson(http, state, "/tools/workbench_events", Map.of());
             out.println(events.toString());
+            out.println(timingOf(events, runStarted(parsed), Instant.now()).format());
             return 0;
         } catch (RuntimeException failure) {
             err.println("Workbench events failed: " + failure.getMessage());
@@ -610,6 +630,7 @@ public final class WorkbenchSessionCommands {
 
     private static int stop(
             WorkbenchCommandLine.Parsed parsed,
+            SessionFlags flags,
             PrintStream out,
             PrintStream err,
             HttpClient http
@@ -619,11 +640,18 @@ public final class WorkbenchSessionCommands {
         Optional<SessionState> state = resolveSession(parsed, http);
         if (state.isEmpty()) {
             out.println("ACK SESSION already-stopped");
-            finishRequestedRun(parsed, out);
+            finishRequestedRun(parsed, out, "STOPPED");
             return 0;
         }
         SessionState session = state.get();
         boolean watched = "ui-attach".equals(session.mode());
+        if (flags.force) {
+            killTree(session.pid());
+            deleteSessionFile(session.stateFile());
+            out.println("ACK SESSION killed pid=" + session.pid());
+            finishRequestedRun(parsed, out, "STOPPED");
+            return 0;
+        }
         try {
             postJson(http, session, "/commands", Map.of("op", "stop"));
         } catch (RuntimeException failure) {
@@ -634,14 +662,14 @@ public final class WorkbenchSessionCommands {
         }
         if (watched) {
             out.println("ACK SESSION playback-stopped pid=" + session.pid());
-            finishRequestedRun(parsed, out);
+            finishRequestedRun(parsed, out, "STOPPED");
             return 0;
         }
         long deadline = System.nanoTime() + Duration.ofSeconds(8).toNanos();
         while (System.nanoTime() < deadline) {
             if (readHealthyFile(session.stateFile(), parsed.project(), http).isEmpty() && !pidAlive(session.pid())) {
                 out.println("ACK SESSION stopped pid=" + session.pid());
-                finishRequestedRun(parsed, out);
+                finishRequestedRun(parsed, out, "STOPPED");
                 return 0;
             }
             sleep(POLL);
@@ -649,47 +677,72 @@ public final class WorkbenchSessionCommands {
         ProcessHandle.of(session.pid()).ifPresent(ProcessHandle::destroy);
         sleep(Duration.ofMillis(400));
         if (pidAlive(session.pid())) ProcessHandle.of(session.pid()).ifPresent(ProcessHandle::destroyForcibly);
-        try {
-            Files.deleteIfExists(session.stateFile());
-        } catch (IOException ignored) {
-            // Disposable session state.
-        }
+        deleteSessionFile(session.stateFile());
         out.println("ACK SESSION killed pid=" + session.pid());
-        finishRequestedRun(parsed, out);
+        finishRequestedRun(parsed, out, "STOPPED");
         return 0;
     }
 
-    private static void finishRequestedRun(WorkbenchCommandLine.Parsed parsed, PrintStream out) {
+    private static void killTree(long pid) {
+        ProcessHandle.of(pid).ifPresent(handle -> {
+            List<ProcessHandle> descendants = handle.descendants().toList();
+            for (int index = descendants.size() - 1; index >= 0; index--) {
+                descendants.get(index).destroyForcibly();
+            }
+            if (handle.isAlive()) handle.destroyForcibly();
+        });
+    }
+
+    private static void deleteSessionFile(Path stateFile) {
+        try {
+            Files.deleteIfExists(stateFile);
+        } catch (IOException ignored) {
+            // Disposable session state.
+        }
+    }
+
+    private static void finishRequestedRun(WorkbenchCommandLine.Parsed parsed, PrintStream out, String status) {
         String runId = parsed.coordination().runId();
         if (runId == null || runId.isBlank()) return;
         AgentCoordination.finish(
                 parsed.project(),
                 runId,
                 parsed.coordination().learned(),
-                "STOPPED",
+                status,
                 Instant.now(),
                 out
         );
     }
 
     private static int waitForDone(
+            WorkbenchCommandLine.Parsed parsed,
             HttpClient http,
             SessionState state,
+            SessionFlags flags,
             String id,
             PrintStream out,
             PrintStream err
     ) {
         String last = "";
+        Long budget = stepBudgetSeconds(flags);
+        long deadline = budget == null ? Long.MAX_VALUE : System.nanoTime() + Duration.ofSeconds(budget).toNanos();
         while (true) {
+            if (System.nanoTime() > deadline) {
+                err.println("DONE " + id + " TIMEOUT");
+                recordRunStatus(parsed, out, "TIMEOUT");
+                return 1;
+            }
             JsonNode view;
             try {
                 if (!pidAlive(state.pid()) && readHealthyFile(state.stateFile(), state.project(), http).isEmpty()) {
                     err.println("DONE " + id + " TIMEOUT");
+                    recordRunStatus(parsed, out, "TIMEOUT");
                     return 1;
                 }
                 view = getJson(http, state, "/commands/" + id);
             } catch (RuntimeException failure) {
                 err.println("DONE " + id + " TIMEOUT");
+                recordRunStatus(parsed, out, "TIMEOUT");
                 return 1;
             }
             String status = textOr(view, "status", "");
@@ -703,11 +756,37 @@ public final class WorkbenchSessionCommands {
             }
             if ("TIMEOUT".equals(status)) {
                 err.println("DONE " + id + " TIMEOUT");
+                recordRunStatus(parsed, out, "TIMEOUT");
                 return 1;
             }
             out.println("DONE " + id + " " + status);
             if (view.has("result")) out.println(view.get("result").toString());
             return terminalExit(status);
+        }
+    }
+
+    private static Long stepBudgetSeconds(SessionFlags flags) {
+        Long step = flags.stepTimeoutSeconds;
+        Long run = flags.runTimeoutSeconds;
+        if (step == null) return run;
+        if (run == null) return step;
+        return Math.min(step, run);
+    }
+
+    private static void recordRunStatus(WorkbenchCommandLine.Parsed parsed, PrintStream out, String status) {
+        String runId = parsed.coordination().runId();
+        if (runId == null || runId.isBlank()) return;
+        try {
+            AgentCoordination.finish(
+                    parsed.project(),
+                    runId,
+                    parsed.coordination().learned(),
+                    status,
+                    Instant.now(),
+                    out
+            );
+        } catch (RuntimeException ignored) {
+            // A missing run record must not hide the TIMEOUT line.
         }
     }
 
@@ -717,7 +796,7 @@ public final class WorkbenchSessionCommands {
 
     private static SessionState requireSession(WorkbenchCommandLine.Parsed parsed, HttpClient http) {
         return resolveSession(parsed, http).orElseThrow(() -> new IllegalStateException(
-                "No healthy Workbench session. Run isolate / session-start, or use the window that is already open."
+                unhealthyMessage(parsed.project(), parsed.coordination().runId())
         ));
     }
 
@@ -751,6 +830,177 @@ public final class WorkbenchSessionCommands {
             return Optional.of(state);
         } catch (Exception ignored) {
             return Optional.empty();
+        }
+    }
+
+    private static void printTiming(
+            PrintStream out,
+            WorkbenchCommandLine.Parsed parsed,
+            HttpClient http,
+            SessionState state
+    ) {
+        JsonNode events = null;
+        try {
+            events = postJson(http, state, "/tools/workbench_events", Map.of());
+        } catch (RuntimeException ignored) {
+            // Elapsed time still prints from the run record when the event feed is down.
+        }
+        out.println(timingOf(events, runStarted(parsed), Instant.now()).format());
+    }
+
+    static String unhealthyMessage(Path project, String runId) {
+        return "No healthy Workbench session. Run isolate / session-start, or use the window that is already open. ("
+                + unhealthyReason(project, runId) + ")";
+    }
+
+    static String unhealthyReason(Path project, String runId) {
+        Path file = sessionFileFor(project, runId);
+        if (Files.isRegularFile(file)) {
+            Long pid = readPid(file);
+            if (pid == null) return "missing-session-file";
+            if (!pidAlive(pid)) return "crashed";
+            return "still-starting";
+        }
+        if (runId == null || runId.isBlank()) return "never-started";
+        Path record = AgentCoordination.runDirectory(project, runId).resolve(AgentCoordination.RECORD_FILE);
+        if (!Files.isRegularFile(record)) return "never-started";
+        try {
+            JsonNode node = JSON.readTree(record.toFile());
+            String status = node.path("status").asText("");
+            String stopped = node.path("stoppedAt").asText("");
+            boolean running = "RUNNING".equalsIgnoreCase(status) && (stopped.isBlank() || "null".equals(stopped));
+            return running ? "still-starting" : "missing-session-file";
+        } catch (IOException failure) {
+            return "missing-session-file";
+        }
+    }
+
+    private static Path sessionFileFor(Path project, String runId) {
+        if (runId != null && !runId.isBlank()) {
+            return AgentCoordination.runDirectory(project, runId).resolve("session").resolve("cli-session.json");
+        }
+        Path attach = PickleballLocalLayout.attachFile(project);
+        if (Files.isRegularFile(attach)) return attach;
+        return sessionFile(project);
+    }
+
+    private static Long readPid(Path file) {
+        try {
+            JsonNode root = JSON.readTree(file.toFile());
+            if (!root.has("pid")) return null;
+            long pid = root.path("pid").asLong(0L);
+            return pid <= 0 ? null : pid;
+        } catch (IOException failure) {
+            return null;
+        }
+    }
+
+    private static Instant runStarted(WorkbenchCommandLine.Parsed parsed) {
+        String runId = parsed.coordination().runId();
+        if (runId == null || runId.isBlank()) return null;
+        Path record = AgentCoordination.runDirectory(parsed.project(), runId).resolve(AgentCoordination.RECORD_FILE);
+        if (!Files.isRegularFile(record)) return null;
+        try {
+            String started = JSON.readTree(record.toFile()).path("startedAt").asText("");
+            if (started.isBlank()) return null;
+            return Instant.parse(started);
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    static final Duration SLEEP_GAP = Duration.ofSeconds(2);
+
+    static final class Timing {
+        final long elapsedRunMs;
+        final long elapsedStepMs;
+        final boolean sleepGap;
+
+        Timing(long elapsedRunMs, long elapsedStepMs, boolean sleepGap) {
+            this.elapsedRunMs = elapsedRunMs;
+            this.elapsedStepMs = elapsedStepMs;
+            this.sleepGap = sleepGap;
+        }
+
+        String format() {
+            return "elapsed-run-ms=" + elapsedRunMs
+                    + System.lineSeparator() + "elapsed-step-ms=" + elapsedStepMs
+                    + System.lineSeparator() + "sleep-gap=" + sleepGap;
+        }
+    }
+
+    static Timing timingOf(JsonNode events, Instant runStarted, Instant now) {
+        Instant clock = now == null ? Instant.now() : now;
+        List<Mark> marks = eventMarks(events);
+        Instant origin = runStarted;
+        if (origin == null) {
+            for (Mark mark : marks) {
+                if (mark.at != null) {
+                    origin = mark.at;
+                    break;
+                }
+            }
+        }
+        long runMs = origin == null ? 0 : Math.max(0, Duration.between(origin, clock).toMillis());
+        Instant stepAt = null;
+        boolean sleep = false;
+        Instant previous = null;
+        for (Mark mark : marks) {
+            if (mark.at != null && previous != null && !Duration.between(previous, mark.at).minus(SLEEP_GAP).isNegative()) {
+                sleep = true;
+            }
+            if (mark.at != null) previous = mark.at;
+            if (mark.step && mark.at != null) stepAt = mark.at;
+            if (mark.text != null && mark.text.toLowerCase(Locale.ROOT).contains("sleep")) sleep = true;
+        }
+        long stepMs = stepAt == null ? 0 : Math.max(0, Duration.between(stepAt, clock).toMillis());
+        return new Timing(runMs, stepMs, sleep);
+    }
+
+    private record Mark(Instant at, boolean step, String text) {
+    }
+
+    private static List<Mark> eventMarks(JsonNode events) {
+        JsonNode array = events;
+        if (events != null && events.isObject()) {
+            if (events.has("events") && events.get("events").isArray()) array = events.get("events");
+            else if (events.has("result") && events.get("result").isArray()) array = events.get("result");
+            else array = null;
+        }
+        if (array == null || !array.isArray()) return List.of();
+        List<Mark> marks = new ArrayList<>();
+        for (JsonNode event : array) {
+            Instant at = parseInstant(firstText(event, "timestamp", "time", "at"));
+            String stepText = firstText(event, "stepText", "step", "text");
+            String phrase = firstText(event, "phraseText", "phrase");
+            String hook = firstText(event, "hook", "type", "kind");
+            boolean step = (stepText != null && !stepText.isBlank())
+                    || (hook != null && hook.toUpperCase(Locale.ROOT).contains("STEP"));
+            String text = ((stepText == null ? "" : stepText) + " " + (phrase == null ? "" : phrase)).trim();
+            marks.add(new Mark(at, step, text));
+        }
+        return marks;
+    }
+
+    private static String firstText(JsonNode node, String... fields) {
+        if (node == null) return null;
+        for (String field : fields) {
+            JsonNode value = node.get(field);
+            if (value != null && !value.isNull() && !value.asText("").isBlank()) return value.asText();
+        }
+        return null;
+    }
+
+    private static Instant parseInstant(String text) {
+        if (text == null || text.isBlank()) return null;
+        try {
+            return Instant.parse(text.trim());
+        } catch (RuntimeException ignored) {
+            try {
+                return Instant.ofEpochMilli(Long.parseLong(text.trim()));
+            } catch (RuntimeException again) {
+                return null;
+            }
         }
     }
 
@@ -841,8 +1091,12 @@ public final class WorkbenchSessionCommands {
         final String feature;
         final String run;
         final String fromHere;
+        final String stopAfter;
         final boolean ackOnly;
         final boolean wait;
+        final boolean force;
+        final Long stepTimeoutSeconds;
+        final Long runTimeoutSeconds;
 
         private SessionFlags(
                 String text,
@@ -850,16 +1104,24 @@ public final class WorkbenchSessionCommands {
                 String feature,
                 String run,
                 String fromHere,
+                String stopAfter,
                 boolean ackOnly,
-                boolean wait
+                boolean wait,
+                boolean force,
+                Long stepTimeoutSeconds,
+                Long runTimeoutSeconds
         ) {
             this.text = text;
             this.id = id;
             this.feature = feature;
             this.run = run;
             this.fromHere = fromHere;
+            this.stopAfter = stopAfter;
             this.ackOnly = ackOnly;
             this.wait = wait;
+            this.force = force;
+            this.stepTimeoutSeconds = stepTimeoutSeconds;
+            this.runTimeoutSeconds = runTimeoutSeconds;
         }
 
         static SessionFlags parse(String[] args) {
@@ -868,72 +1130,128 @@ public final class WorkbenchSessionCommands {
             String feature = null;
             String run = null;
             String fromHere = null;
+            String stopAfter = null;
             boolean ackOnly = false;
             boolean wait = true;
+            boolean force = false;
+            Long stepTimeoutSeconds = null;
+            Long runTimeoutSeconds = null;
+            String absorb = null;
             List<String> words = new ArrayList<>();
-            if (args == null) return new SessionFlags(null, null, null, null, null, false, true);
+            if (args == null) {
+                return new SessionFlags(null, null, null, null, null, null, false, true, false, null, null);
+            }
             for (int index = 1; index < args.length; index++) {
                 String token = args[index];
                 if (token == null) continue;
                 if (token.startsWith("--text=")) {
                     text = token.substring("--text=".length());
+                    absorb = null;
                     continue;
                 }
                 if ("--text".equals(token) && index + 1 < args.length) {
                     text = args[++index];
+                    absorb = null;
                     continue;
                 }
                 if (token.startsWith("--id=")) {
                     id = token.substring("--id=".length());
+                    absorb = null;
                     continue;
                 }
                 if ("--id".equals(token) && index + 1 < args.length) {
                     id = args[++index];
+                    absorb = null;
                     continue;
                 }
                 if ("--ack-only".equals(token)) {
                     ackOnly = true;
                     wait = false;
+                    absorb = null;
                     continue;
                 }
                 if ("--wait".equals(token)) {
                     wait = true;
+                    absorb = null;
                     continue;
                 }
                 if ("--no-wait".equals(token)) {
                     wait = false;
+                    absorb = null;
+                    continue;
+                }
+                if ("--force".equals(token)) {
+                    force = true;
+                    absorb = null;
+                    continue;
+                }
+                if (token.startsWith("--step-timeout=") || "--step-timeout".equals(token)) {
+                    String value = token.startsWith("--step-timeout=")
+                            ? token.substring("--step-timeout=".length())
+                            : (index + 1 < args.length ? args[++index] : null);
+                    stepTimeoutSeconds = positiveSeconds(value, "--step-timeout");
+                    absorb = null;
+                    continue;
+                }
+                if (token.startsWith("--run-timeout=") || "--run-timeout".equals(token)) {
+                    String value = token.startsWith("--run-timeout=")
+                            ? token.substring("--run-timeout=".length())
+                            : (index + 1 < args.length ? args[++index] : null);
+                    runTimeoutSeconds = positiveSeconds(value, "--run-timeout");
+                    absorb = null;
+                    continue;
+                }
+                if (token.startsWith("--stop-after=")) {
+                    stopAfter = token.substring("--stop-after=".length());
+                    absorb = "stopAfter";
+                    continue;
+                }
+                if ("--stop-after".equals(token) && index + 1 < args.length) {
+                    stopAfter = args[++index];
+                    absorb = "stopAfter";
                     continue;
                 }
                 if (token.startsWith("--feature=")) {
                     feature = token.substring("--feature=".length());
+                    absorb = null;
                     continue;
                 }
                 if ("--feature".equals(token) && index + 1 < args.length) {
                     feature = args[++index];
+                    absorb = null;
                     continue;
                 }
                 if (token.startsWith("--run=")) {
                     run = token.substring("--run=".length());
+                    absorb = null;
                     continue;
                 }
                 if ("--run".equals(token) && index + 1 < args.length) {
                     run = args[++index];
+                    absorb = null;
                     continue;
                 }
                 if (token.startsWith("--from-here=")) {
                     fromHere = token.substring("--from-here=".length());
+                    absorb = null;
                     continue;
                 }
                 if ("--from-here".equals(token) && index + 1 < args.length) {
                     fromHere = args[++index];
+                    absorb = null;
                     continue;
                 }
-                if (token.startsWith("--tags=") || token.startsWith("--name=")) continue;
+                if (token.startsWith("--tags=") || token.startsWith("--name=")) {
+                    absorb = null;
+                    continue;
+                }
                 if (("--tags".equals(token) || "--name".equals(token)) && index + 1 < args.length) {
                     index++;
+                    absorb = null;
                     continue;
                 }
                 if (token.startsWith("--example=")) {
+                    absorb = null;
                     while (index + 1 < args.length && isSelectorTail(args[index + 1])) {
                         index++;
                     }
@@ -941,9 +1259,14 @@ public final class WorkbenchSessionCommands {
                 }
                 if ("--example".equals(token) && index + 1 < args.length) {
                     index++;
+                    absorb = null;
                     while (index + 1 < args.length && isSelectorTail(args[index + 1])) {
                         index++;
                     }
+                    continue;
+                }
+                if (absorb != null && !token.startsWith("-") && !looksLikeProject(token)) {
+                    if ("stopAfter".equals(absorb)) stopAfter = stopAfter + " " + token;
                     continue;
                 }
                 if (token.startsWith("-")) continue;
@@ -958,7 +1281,25 @@ public final class WorkbenchSessionCommands {
                     if ("status".equals(args[0]) && id == null && words.size() == 1) id = words.getFirst();
                 }
             }
-            return new SessionFlags(text, id, feature, run, fromHere, ackOnly, wait);
+            return new SessionFlags(
+                    text, id, feature, run, fromHere, stopAfter, ackOnly, wait, force,
+                    stepTimeoutSeconds, runTimeoutSeconds
+            );
+        }
+
+        private static Long positiveSeconds(String value, String label) {
+            if (value == null || value.isBlank()) {
+                throw new IllegalArgumentException(label + " requires a positive number of seconds.");
+            }
+            try {
+                long seconds = Long.parseLong(value.trim());
+                if (seconds <= 0) {
+                    throw new IllegalArgumentException(label + " requires a positive number of seconds.");
+                }
+                return seconds;
+            } catch (NumberFormatException failure) {
+                throw new IllegalArgumentException(label + " must be a whole number of seconds: " + value);
+            }
         }
 
         private static boolean isSelectorTail(String token) {

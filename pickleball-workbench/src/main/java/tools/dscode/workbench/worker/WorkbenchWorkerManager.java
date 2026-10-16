@@ -34,7 +34,13 @@ public final class WorkbenchWorkerManager implements AutoCloseable {
     static final int LEASE_RENEW_SECONDS = 30;
     static final String INTERACTIVE_PAUSE_HOOK = "BEFORE_STEP";
     static final String INTERACTIVE_PAUSE_STEP = "---pickleball-workbench-anchor";
-    static final Duration START_TIMEOUT = Duration.ofSeconds(30);
+    static final Duration START_TIMEOUT = Duration.ofSeconds(180);
+    static final String START_TIMEOUT_PROPERTY = "pkb_workbench_worker_start_timeout";
+    static final String START_TIMEOUT_ENV = "PKB_WORKBENCH_WORKER_START_TIMEOUT";
+    static final String START_TIMEOUT_RUNVAR = "pkb_runvars.pkb_workbench_worker_start_timeout";
+    static final List<String> STARTUP_STAGES = List.of(
+            "compile", "classpath", "worker-launch", "anchor-parse", "paused"
+    );
     static final Duration GRACEFUL_STOP_TIMEOUT = Duration.ofSeconds(10);
     static final Duration TERMINATE_TIMEOUT = Duration.ofSeconds(5);
 
@@ -58,8 +64,6 @@ public final class WorkbenchWorkerManager implements AutoCloseable {
         }
         active = null;
 
-        WorkbenchManifest manifest = WorkbenchManifest.read(projectRoot);
-        List<String> classpath = WorkbenchSynchronizer.readWorkerClasspath(projectRoot);
         Path stateRoot = WorkbenchManifest.workbenchRoot(projectRoot);
         String sessionId = UUID.randomUUID().toString();
         String token = token();
@@ -68,6 +72,10 @@ public final class WorkbenchWorkerManager implements AutoCloseable {
         Path stdout = stateRoot.resolve("logs").resolve("worker-" + sessionId + ".out.log");
         Path stderr = stateRoot.resolve("logs").resolve("worker-" + sessionId + ".err.log");
         createDirectories(sessionDirectory, stdout.getParent());
+        writeProgress(stderr, "compile");
+        WorkbenchManifest manifest = WorkbenchManifest.read(projectRoot);
+        List<String> classpath = WorkbenchSynchronizer.readWorkerClasspath(projectRoot);
+        writeProgress(stderr, "classpath");
         writeAnchor(anchor);
 
         Map<String, String> properties = workerSystemProperties.isEmpty()
@@ -78,17 +86,21 @@ public final class WorkbenchWorkerManager implements AutoCloseable {
         ))
                 .directory(projectRoot.toFile())
                 .redirectOutput(stdout.toFile())
-                .redirectError(stderr.toFile());
+                .redirectError(ProcessBuilder.Redirect.appendTo(stderr.toFile()));
         builder.environment().put(ControlProtocol.SESSION_DIRECTORY_ENV, sessionDirectory.toString());
         builder.environment().put(ControlProtocol.SESSION_ID_ENV, sessionId);
         builder.environment().put(ControlProtocol.SESSION_TOKEN_ENV, token);
         builder.environment().put(ControlProtocol.PAUSE_FIRST_SCENARIO_ENV, "true");
 
         Process process = null;
+        long started = System.nanoTime();
+        String stage = "worker-launch";
         try {
+            writeProgress(stderr, stage);
             process = builder.start();
             WorkerSession session = awaitBridge(
-                    process, sessionId, token, sessionDirectory, stdout, stderr, manifest, classpath
+                    process, sessionId, token, sessionDirectory, stdout, stderr, manifest, classpath,
+                    started
             );
             active = session;
             scheduleLeaseRenewal(session);
@@ -252,19 +264,26 @@ public final class WorkbenchWorkerManager implements AutoCloseable {
             Path stdout,
             Path stderr,
             WorkbenchManifest manifest,
-            List<String> classpath
+            List<String> classpath,
+            long startedNanos
     ) {
-        long deadline = System.nanoTime() + START_TIMEOUT.toNanos();
+        String stage = "worker-launch";
+        long deadline = startedNanos + startTimeout(workerSystemProperties).toNanos();
         while (System.nanoTime() < deadline) {
             if (!process.isAlive()) {
-                throw new IllegalStateException(
+                throw startupFailure(
                         "Workbench worker exited before publishing its control bridge. exit="
-                                + process.exitValue() + ", stdout=" + stdout + ", stderr=" + stderr
+                                + process.exitValue(),
+                        startedNanos, stage, stdout, stderr
                 );
             }
 
             Path descriptor = firstDescriptor(sessionDirectory);
             if (descriptor != null) {
+                if (!"anchor-parse".equals(stage)) {
+                    stage = "anchor-parse";
+                    writeProgress(stderr, stage);
+                }
                 ControlBridgeClient client;
                 try {
                     client = ControlBridgeClient.fromDescriptor(descriptor, token);
@@ -295,8 +314,10 @@ public final class WorkbenchWorkerManager implements AutoCloseable {
                     if (!scenario.paused()) continue;
 
                     ControlBridgeScenarioStatus interactive = awaitInteractivePause(
-                            process, client, scenario, deadline, stdout, stderr
+                            process, client, scenario, deadline, stdout, stderr, startedNanos, stage
                     );
+                    stage = "paused";
+                    writeProgress(stderr, stage);
                     ScheduledExecutorService renewal = Executors.newSingleThreadScheduledExecutor(runnable -> {
                         Thread thread = new Thread(runnable, "pickleball-workbench-lease-" + sessionId);
                         thread.setDaemon(true);
@@ -310,9 +331,97 @@ public final class WorkbenchWorkerManager implements AutoCloseable {
             sleep(50);
         }
         process.destroy();
-        throw new IllegalStateException(
-                "Timed out waiting for Workbench worker anchor to pause. stdout=" + stdout + ", stderr=" + stderr
+        throw startupFailure(
+                "Timed out waiting for Workbench worker anchor to pause.",
+                startedNanos, stage, stdout, stderr
         );
+    }
+
+    static Duration startTimeout(Map<String, String> workerProperties) {
+        Map<String, String> properties = workerProperties == null ? Map.of() : workerProperties;
+        String raw = firstNonBlank(
+                System.getProperty(START_TIMEOUT_PROPERTY),
+                System.getenv(START_TIMEOUT_ENV),
+                System.getProperty(START_TIMEOUT_RUNVAR),
+                compactValue(System.getProperty("pkb_runvars"), START_TIMEOUT_PROPERTY),
+                properties.get(START_TIMEOUT_PROPERTY),
+                compactValue(properties.get("pkb_runvars"), START_TIMEOUT_PROPERTY)
+        );
+        if (raw == null || raw.isBlank()) return START_TIMEOUT;
+        try {
+            long seconds = Long.parseLong(raw.trim());
+            if (seconds <= 0) return START_TIMEOUT;
+            return Duration.ofSeconds(seconds);
+        } catch (NumberFormatException failure) {
+            return START_TIMEOUT;
+        }
+    }
+
+    static void writeProgress(Path log, String stage) {
+        if (log == null || stage == null || stage.isBlank()) return;
+        try {
+            if (log.getParent() != null) Files.createDirectories(log.getParent());
+            Files.writeString(
+                    log,
+                    "progress stage=" + stage + System.lineSeparator(),
+                    StandardCharsets.UTF_8,
+                    java.nio.file.StandardOpenOption.CREATE,
+                    java.nio.file.StandardOpenOption.APPEND
+            );
+        } catch (IOException ignored) {
+            // Progress must not hide the startup error that follows.
+        }
+    }
+
+    static String startupContext(Duration elapsed, String stage, Path stderr) {
+        Duration shown = elapsed == null ? Duration.ZERO : elapsed;
+        String where = stage == null || stage.isBlank() ? "worker-launch" : stage;
+        return "elapsed=" + shown.toMillis() + "ms stage=" + where
+                + " last-worker-output=" + tail(stderr);
+    }
+
+    private static IllegalStateException startupFailure(
+            String message,
+            long startedNanos,
+            String stage,
+            Path stdout,
+            Path stderr
+    ) {
+        String context = startupContext(Duration.ofNanos(Math.max(0, System.nanoTime() - startedNanos)), stage, stderr);
+        return new IllegalStateException(message + " " + context + " stdout=" + stdout + " stderr=" + stderr);
+    }
+
+    private static String tail(Path file) {
+        if (file == null || !Files.isRegularFile(file)) return "";
+        try {
+            String text = Files.readString(file);
+            int max = 800;
+            String trimmed = text.length() <= max ? text : text.substring(text.length() - max);
+            return trimmed.replace('\n', ' ').replace('\r', ' ').trim();
+        } catch (IOException failure) {
+            return "";
+        }
+    }
+
+    private static String firstNonBlank(String... values) {
+        if (values == null) return null;
+        for (String value : values) {
+            if (value != null && !value.isBlank()) return value.trim();
+        }
+        return null;
+    }
+
+    private static String compactValue(String compact, String key) {
+        if (compact == null || compact.isBlank() || key == null) return null;
+        for (String part : compact.split(",")) {
+            String token = part.trim();
+            int equals = token.indexOf('=');
+            if (equals <= 0) continue;
+            if (key.equals(token.substring(0, equals).trim())) {
+                return token.substring(equals + 1).trim();
+            }
+        }
+        return null;
     }
 
     static void verifyConsumerRuntime(
@@ -424,7 +533,9 @@ public final class WorkbenchWorkerManager implements AutoCloseable {
             ControlBridgeScenarioStatus initialPause,
             long deadline,
             Path stdout,
-            Path stderr
+            Path stderr,
+            long startedNanos,
+            String stage
     ) {
         if (isInteractivePause(initialPause)) {
             return initialPause;
@@ -450,9 +561,10 @@ public final class WorkbenchWorkerManager implements AutoCloseable {
 
         while (System.nanoTime() < deadline) {
             if (!process.isAlive()) {
-                throw new IllegalStateException(
+                throw startupFailure(
                         "Workbench worker exited before reaching the interactive pause boundary. exit="
-                                + process.exitValue() + ", stdout=" + stdout + ", stderr=" + stderr
+                                + process.exitValue(),
+                        startedNanos, stage, stdout, stderr
                 );
             }
             ControlBridgeScenarioStatus scenario = client.scenarios().stream()
@@ -466,9 +578,9 @@ public final class WorkbenchWorkerManager implements AutoCloseable {
         }
 
         client.removeBreakpoint(breakpoint.breakpointId());
-        throw new IllegalStateException(
-                "Timed out waiting for Workbench worker interactive boundary "
-                        + INTERACTIVE_PAUSE_HOOK + ". stdout=" + stdout + ", stderr=" + stderr
+        throw startupFailure(
+                "Timed out waiting for Workbench worker interactive boundary " + INTERACTIVE_PAUSE_HOOK + ".",
+                startedNanos, stage, stdout, stderr
         );
     }
 

@@ -58,6 +58,12 @@ public final class LiveScenarioPlayer {
             "# Click a step to move the playhead. Global Play always starts from the first step."
     );
 
+    public record StopAfter(String stepContains, boolean oneShot) {
+        public StopAfter {
+            Objects.requireNonNull(stepContains, "stepContains");
+        }
+    }
+
     private final List<Line> lines = new ArrayList<>();
     private long nextId = 1;
     private Long selectedId;
@@ -65,6 +71,7 @@ public final class LiveScenarioPlayer {
     private Long lastExecutedId;
     private int executionIndex;
     private State state = State.STOPPED;
+    private StopAfter stopAfter;
 
     public LiveScenarioPlayer(List<String> initialLines) {
         if (initialLines != null) {
@@ -94,6 +101,7 @@ public final class LiveScenarioPlayer {
         lastExecutedId = null;
         executionIndex = 0;
         state = State.STOPPED;
+        stopAfter = null;
         List<String> incoming = texts == null || texts.isEmpty() ? List.of("") : texts;
         for (String text : incoming) {
             addInitialLine(text == null ? "" : text);
@@ -276,6 +284,22 @@ public final class LiveScenarioPlayer {
 
     public void stop() {
         state = State.STOPPED;
+    }
+
+    /**
+     * Live-session alias for a one-shot breakpoint. {@code --stop-after "Pend case NEW UI"}
+     * pauses when a step contains that text, then the breakpoint removes itself.
+     */
+    public StopAfter stopAfter(String phrase) {
+        if (phrase == null || phrase.isBlank()) {
+            throw new IllegalArgumentException("--stop-after requires the step text to match.");
+        }
+        stopAfter = new StopAfter(phrase.strip(), true);
+        return stopAfter;
+    }
+
+    public Optional<StopAfter> activeStopAfter() {
+        return Optional.ofNullable(stopAfter);
     }
 
     /** Step-only execution always leaves automatic scenario playback paused. */

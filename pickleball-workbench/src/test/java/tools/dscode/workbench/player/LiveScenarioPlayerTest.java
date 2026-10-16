@@ -38,6 +38,19 @@ class LiveScenarioPlayerTest {
     }
 
     @Test
+    void stopAfterSetsAOneShotBreakpointOnTheStepText() {
+        LiveScenarioPlayer player = LiveScenarioPlayer.interactiveBuffer();
+        LiveScenarioPlayer.StopAfter stop = player.stopAfter("Pend case NEW UI");
+        assertEquals("Pend case NEW UI", stop.stepContains());
+        assertTrue(stop.oneShot());
+        assertEquals("Pend case NEW UI", player.activeStopAfter().orElseThrow().stepContains());
+        assertTrue(player.activeStopAfter().orElseThrow().oneShot());
+        player.loadDocument(List.of("Given stay"));
+        assertTrue(player.activeStopAfter().isEmpty());
+        assertThrows(IllegalArgumentException.class, () -> player.stopAfter("  "));
+    }
+
+    @Test
     void clickingAStepInstantlyMovesThePlayhead() {
         LiveScenarioPlayer player = new LiveScenarioPlayer(List.of(
                 "Given first",

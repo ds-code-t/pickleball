@@ -1,5 +1,6 @@
 package tools.dscode.launcher;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.AfterEach;
@@ -17,6 +18,7 @@ import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
@@ -29,6 +31,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class WorkbenchSessionCommandsTest {
@@ -119,6 +122,266 @@ class WorkbenchSessionCommandsTest {
             assertTrue(child.isAlive());
             child.destroyForcibly();
             assertTrue(cli.pidAlive());
+        }
+    }
+
+    @Test
+    @Timeout(value = 10, unit = TimeUnit.SECONDS)
+    void startDetachedClosesStdinAndTheChildStarts() throws Exception {
+        Path log = project.resolve("session-smoke.log");
+        Process process = WorkbenchSessionCommands.startDetached(project, List.of("sleep", "30"), log);
+        try {
+            assertTrue(process.isAlive());
+            assertThrows(IOException.class, () -> {
+                process.getOutputStream().write(new byte[]{'x'});
+                process.getOutputStream().flush();
+            });
+        } finally {
+            process.destroyForcibly();
+            process.waitFor(3, TimeUnit.SECONDS);
+        }
+    }
+
+    @Test
+    @Timeout(value = 10, unit = TimeUnit.SECONDS)
+    void sessionStartLogsStartOnlyAfterTheSessionIsUp() throws Exception {
+        AtomicReference<FakeSession> started = new AtomicReference<>();
+        AtomicReference<Process> child = new AtomicReference<>();
+        try {
+            Output output = run(
+                    new String[]{"session-start", project.toString(), "--run-id=up-run", "--agent=agent-up"},
+                    launch -> {
+                        FakeSession session = FakeSession.start(launch.project(), "cli-session", launch.sessionFile());
+                        started.set(session);
+                        Process process = startLongLivedChild();
+                        child.set(process);
+                        return process;
+                    }
+            );
+            assertEquals(0, output.exitCode, output.stderr + output.stdout);
+            String log = Files.readString(AgentCoordination.logFile(project));
+            assertEquals(1, log.lines().filter(line -> line.contains("\tstart\t")).count());
+            assertTrue(log.contains("up-run"));
+        } finally {
+            Process process = child.get();
+            if (process != null) process.destroyForcibly();
+            FakeSession session = started.get();
+            if (session != null) session.close();
+        }
+    }
+
+    @Test
+    @Timeout(value = 10, unit = TimeUnit.SECONDS)
+    void sessionStartDoesNotLogStartWhenTheProcessDies() throws Exception {
+        Process dead = exitedProcess();
+        Output output = run(
+                new String[]{"session-start", project.toString(), "--run-id=dead-run", "--agent=agent-dead"},
+                launch -> dead
+        );
+        assertEquals(1, output.exitCode, output.stderr + output.stdout);
+        Path log = AgentCoordination.logFile(project);
+        String text = Files.isRegularFile(log) ? Files.readString(log) : "";
+        assertFalse(text.contains("\tstart\t"));
+    }
+
+    @Test
+    @Timeout(value = 10, unit = TimeUnit.SECONDS)
+    void statusNamesNeverStartedStillStartingCrashedAndMissingFile() throws Exception {
+        Output never = run(
+                new String[]{"status", project.toString()},
+                launch -> {
+                    throw new AssertionError("status must not start a session");
+                }
+        );
+        assertEquals(1, never.exitCode);
+        assertTrue(never.stderr.contains("No healthy Workbench session"));
+        assertTrue(never.stderr.contains("(never-started)"));
+
+        AgentCoordination.begin(
+                project,
+                AgentCoordination.Request.of("boot", "agent", null, null, null, null, "isolate"),
+                Instant.now(),
+                null,
+                false
+        );
+        Output starting = run(
+                new String[]{"status", project.toString(), "--run-id=boot"},
+                launch -> {
+                    throw new AssertionError("status must not start a session");
+                }
+        );
+        assertTrue(starting.stderr.contains("(still-starting)"), starting.stderr);
+
+        AgentCoordination.finish(project, "boot", null, "STOPPED");
+        Output missing = run(
+                new String[]{"status", project.toString(), "--run-id=boot"},
+                launch -> {
+                    throw new AssertionError("status must not start a session");
+                }
+        );
+        assertTrue(missing.stderr.contains("(missing-session-file)"), missing.stderr);
+
+        Process done = exitedProcess();
+        Path file = PickleballLocalLayout.cliSessionState(project);
+        Files.createDirectories(file.getParent());
+        Files.writeString(file, """
+                {"url":"http://127.0.0.1:9","token":"t","pid":%d,"mode":"cli-session"}
+                """.formatted(done.pid()));
+        Output crashed = run(
+                new String[]{"status", project.toString()},
+                launch -> {
+                    throw new AssertionError("status must not start a session");
+                }
+        );
+        assertTrue(crashed.stderr.contains("(crashed)"), crashed.stderr);
+    }
+
+    @Test
+    void elapsedTimeFlagsASleepGapBetweenSteps() throws Exception {
+        Instant now = Instant.parse("2026-07-20T12:00:10Z");
+        var timing = WorkbenchSessionCommands.timingOf(
+                new ObjectMapper().readTree("""
+                        {"events":[
+                          {"timestamp":"2026-07-20T12:00:00Z","stepText":"Given stay"},
+                          {"timestamp":"2026-07-20T12:00:07Z","stepText":"And sleep 5"}
+                        ]}
+                        """),
+                Instant.parse("2026-07-20T12:00:00Z"),
+                now
+        );
+        assertEquals(10_000, timing.elapsedRunMs);
+        assertEquals(3_000, timing.elapsedStepMs);
+        assertTrue(timing.sleepGap);
+        assertTrue(timing.format().contains("elapsed-run-ms=10000"));
+        assertTrue(timing.format().contains("sleep-gap=true"));
+
+        var close = WorkbenchSessionCommands.timingOf(
+                new ObjectMapper().readTree("""
+                        {"events":[
+                          {"timestamp":"2026-07-20T12:00:00Z","stepText":"Given stay"},
+                          {"timestamp":"2026-07-20T12:00:01Z","stepText":"Then done"}
+                        ]}
+                        """),
+                Instant.parse("2026-07-20T12:00:00Z"),
+                Instant.parse("2026-07-20T12:00:01Z")
+        );
+        assertFalse(close.sleepGap);
+    }
+
+    @Test
+    @Timeout(value = 10, unit = TimeUnit.SECONDS)
+    void eventsPrintElapsedAndSleepGap() throws Exception {
+        try (FakeSession session = FakeSession.start(project)) {
+            session.eventsJson = """
+                    {"events":[
+                      {"timestamp":"2026-07-20T12:00:00Z","stepText":"Given stay"},
+                      {"timestamp":"2026-07-20T12:00:05Z","stepText":"And sleep 5"}
+                    ]}
+                    """;
+            Output output = run(
+                    new String[]{"events", project.toString()},
+                    launch -> {
+                        throw new AssertionError("events must not start a session");
+                    }
+            );
+            assertEquals(0, output.exitCode, output.stderr + output.stdout);
+            assertTrue(output.stdout.contains("elapsed-run-ms="));
+            assertTrue(output.stdout.contains("elapsed-step-ms="));
+            assertTrue(output.stdout.contains("sleep-gap=true"));
+        }
+    }
+
+    @Test
+    @Timeout(value = 10, unit = TimeUnit.SECONDS)
+    void executeStepTimeoutRecordsTimeout() throws Exception {
+        AgentCoordination.begin(
+                project,
+                AgentCoordination.Request.of("step-timeout", "agent", null, null, null, null, "execute-step")
+        );
+        Path sessionFile = AgentCoordination.runDirectory(project, "step-timeout")
+                .resolve("session").resolve("cli-session.json");
+        try (FakeSession ignored = FakeSession.start(project, "cli-session", sessionFile)) {
+            Output output = run(
+                    new String[]{
+                            "execute-step", project.toString(), "--run-id=step-timeout",
+                            "--text=Given stay", "--step-timeout=1"
+                    },
+                    launch -> {
+                        throw new AssertionError("execute-step must not start a session");
+                    }
+            );
+            assertEquals(1, output.exitCode, output.stderr + output.stdout);
+            assertTrue(output.stderr.contains("TIMEOUT"));
+            String record = Files.readString(
+                    AgentCoordination.runDirectory(project, "step-timeout").resolve(AgentCoordination.RECORD_FILE)
+            );
+            assertTrue(record.contains("TIMEOUT"));
+            assertFalse(record.contains("PASSED"));
+        }
+    }
+
+    @Test
+    @Timeout(value = 15, unit = TimeUnit.SECONDS)
+    void stopForceKillsTheProcessTreeAndRecordsStopped() throws Exception {
+        Path childFile = project.resolve("child.pid");
+        Process parent = new ProcessBuilder(
+                "bash", "-c", "sleep 120 & echo $! > '" + childFile.toAbsolutePath() + "'; wait"
+        ).start();
+        try {
+            for (int attempt = 0; attempt < 50 && !Files.isRegularFile(childFile); attempt++) {
+                Thread.sleep(20);
+            }
+            assertTrue(Files.isRegularFile(childFile), "child pid was not published");
+            long child = Long.parseLong(Files.readString(childFile).trim());
+            AgentCoordination.begin(
+                    project,
+                    AgentCoordination.Request.of("force-run", "agent", null, null, null, null, "stop"),
+                    Instant.now(),
+                    null,
+                    false
+            );
+            Path sessionFile = AgentCoordination.runDirectory(project, "force-run")
+                    .resolve("session").resolve("cli-session.json");
+            try (FakeSession session = FakeSession.start(project, "cli-session", sessionFile)) {
+                session.setPid(parent.pid());
+                Output stop = run(
+                        new String[]{"stop", project.toString(), "--run-id=force-run", "--force"},
+                        launch -> {
+                            throw new AssertionError("stop must not start a session");
+                        }
+                );
+                assertEquals(0, stop.exitCode, stop.stderr + stop.stdout);
+                assertTrue(stop.stdout.contains("killed"), stop.stdout);
+                parent.waitFor(3, TimeUnit.SECONDS);
+                assertFalse(parent.isAlive());
+                assertFalse(ProcessHandle.of(child).map(ProcessHandle::isAlive).orElse(false));
+                String record = Files.readString(
+                        AgentCoordination.runDirectory(project, "force-run").resolve(AgentCoordination.RECORD_FILE)
+                );
+                assertTrue(record.contains("STOPPED"), record);
+            }
+        } finally {
+            if (parent.isAlive()) parent.destroyForcibly();
+        }
+    }
+
+    @Test
+    @Timeout(value = 5, unit = TimeUnit.SECONDS)
+    void stopAfterIsPostedOnTheLiveCommand() throws Exception {
+        try (FakeSession session = FakeSession.start(project)) {
+            AtomicReference<String> hit = new AtomicReference<>();
+            session.onCommand = hit::set;
+            Output output = run(
+                    new String[]{
+                            "execute-step", project.toString(), "--text=Given stay",
+                            "--stop-after=Pend case NEW UI", "--ack-only"
+                    },
+                    launch -> {
+                        throw new AssertionError("execute-step must not start a session");
+                    }
+            );
+            assertEquals(0, output.exitCode, output.stderr + output.stdout);
+            assertTrue(hit.get().contains("\"stopAfter\":\"Pend case NEW UI\""));
         }
     }
 
@@ -516,6 +779,12 @@ class WorkbenchSessionCommandsTest {
         return new ProcessBuilder("sleep", "30").start();
     }
 
+    private static Process exitedProcess() throws IOException, InterruptedException {
+        Process process = new ProcessBuilder("true").start();
+        process.waitFor(2, TimeUnit.SECONDS);
+        return process;
+    }
+
     private static final class FakeSession implements AutoCloseable {
         private final HttpServer http;
         private final Path stateFile;
@@ -523,6 +792,7 @@ class WorkbenchSessionCommandsTest {
         private Process child;
         private volatile java.util.function.Consumer<String> onCommand;
         private volatile long pid = ProcessHandle.current().pid();
+        private volatile String eventsJson = "{\"events\":[]}";
 
         private FakeSession(HttpServer http, Path stateFile, String url) {
             this.http = http;
@@ -538,6 +808,11 @@ class WorkbenchSessionCommandsTest {
             HttpServer http = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
             FakeSession[] box = new FakeSession[1];
             http.createContext("/health", exchange -> write(exchange, 200, "{\"status\":\"ok\"}"));
+            http.createContext("/tools/workbench_events", exchange -> {
+                FakeSession current = box[0];
+                String body = current == null || current.eventsJson == null ? "{\"events\":[]}" : current.eventsJson;
+                write(exchange, 200, body);
+            });
             http.createContext("/commands", exchange -> {
                 String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
                 FakeSession session = box[0];

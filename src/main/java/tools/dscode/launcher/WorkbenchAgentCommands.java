@@ -15,6 +15,12 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 /** Agent-facing Workbench verbs that run in the consumer JVM (not the controller JAR). */
 public final class WorkbenchAgentCommands {
@@ -165,7 +171,11 @@ public final class WorkbenchAgentCommands {
                     ),
                     run
             );
-            int exit = maven.run(parsed.project(), command, out, err);
+            Bounded mavenResult = runBounded(parsed, command, out, err, maven);
+            if (mavenResult.timedOut()) {
+                return timeoutExit(parsed, run, out, err);
+            }
+            int exit = mavenResult.exit();
             AgentCoordination.finish(
                     parsed.project(),
                     run.runId(),
@@ -214,7 +224,11 @@ public final class WorkbenchAgentCommands {
                     ),
                     run
             );
-            int exit = maven.run(parsed.project(), command, out, err);
+            Bounded mavenResult = runBounded(parsed, command, out, err, maven);
+            if (mavenResult.timedOut()) {
+                return timeoutExit(parsed, run, out, err);
+            }
+            int exit = mavenResult.exit();
             AgentCoordination.finish(
                     parsed.project(),
                     run.runId(),
@@ -228,6 +242,79 @@ public final class WorkbenchAgentCommands {
             finishQuietly(parsed.project(), run.runId(), "FAILED", out);
             throw failure;
         }
+    }
+
+    private record Bounded(int exit, boolean timedOut) {
+    }
+
+    /**
+     * Workbench-only watchdog. A null timeout keeps the existing blocking Maven call.
+     * Timeout records TIMEOUT on the run and does not go through StepData.
+     */
+    private static Bounded runBounded(
+            WorkbenchCommandLine.Parsed parsed,
+            List<String> command,
+            PrintStream out,
+            PrintStream err,
+            MavenRunner maven
+    ) {
+        Long seconds = runBudgetSeconds(parsed);
+        if (seconds == null) {
+            return new Bounded(maven.run(parsed.project(), command, out, err), false);
+        }
+        ExecutorService pool = Executors.newSingleThreadExecutor(runnable -> {
+            Thread thread = new Thread(runnable, "pickleball-workbench-run-watch");
+            thread.setDaemon(true);
+            return thread;
+        });
+        Future<Integer> future = pool.submit(() -> maven.run(parsed.project(), command, out, err));
+        try {
+            return new Bounded(future.get(seconds, TimeUnit.SECONDS), false);
+        } catch (TimeoutException timeout) {
+            future.cancel(true);
+            return new Bounded(1, true);
+        } catch (ExecutionException failure) {
+            Throwable cause = failure.getCause() == null ? failure : failure.getCause();
+            if (cause instanceof RuntimeException runtime) throw runtime;
+            if (cause instanceof Error error) throw error;
+            throw new IllegalStateException(cause);
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            future.cancel(true);
+            throw new IllegalStateException(
+                    "Interrupted while waiting for Workbench " + parsed.command() + ".",
+                    interrupted
+            );
+        } finally {
+            pool.shutdownNow();
+        }
+    }
+
+    private static Long runBudgetSeconds(WorkbenchCommandLine.Parsed parsed) {
+        Long step = parsed.stepTimeoutSeconds();
+        Long run = parsed.runTimeoutSeconds();
+        if (step == null) return run;
+        if (run == null) return step;
+        return Math.min(step, run);
+    }
+
+    private static int timeoutExit(
+            WorkbenchCommandLine.Parsed parsed,
+            AgentCoordination.Run run,
+            PrintStream out,
+            PrintStream err
+    ) {
+        long seconds = runBudgetSeconds(parsed);
+        err.println("Workbench " + parsed.command() + " TIMEOUT after " + seconds + "s");
+        AgentCoordination.finish(
+                parsed.project(),
+                run.runId(),
+                parsed.coordination().learned(),
+                "TIMEOUT",
+                java.time.Instant.now(),
+                out
+        );
+        return 1;
     }
 
     private static int plan(WorkbenchCommandLine.Parsed parsed, PrintStream out, PrintStream err) {
