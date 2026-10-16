@@ -50,7 +50,32 @@ The built-in evaluator accepts Java ISO forms such as:
 
 A calendar can add strict custom input patterns in `CALENDARS.yaml`.
 
-An unzoned date/time is initially interpreted as UTC/GMT and then converted to the selected calendar's zone. It is not initially interpreted in the calendar's local zone.
+An unzoned date/time is initially interpreted as UTC/GMT and then converted to the selected calendar's zone. It is not initially interpreted in the calendar's local zone. That default is unchanged.
+
+Set `UnzonedInputZone: calendar` on that calendar to read an unzoned local value in the calendar zone instead. `UTC`, `GMT`, `Z`, blank, and an omitted key stay UTC. A value that already carries an offset or a zone is unchanged either way. Any other text is an error: `UnzonedInputZone must be UTC or calendar`.
+
+## Nested references
+
+A reference may contain another reference, including a saved value that itself contains `>`. Resolution walks those levels and does not leave a stray `>`. One-level and two-level references produce the same text they did before. An invalid `<{...}>` still fails outside a log step. See [Log and assert steps](log-and-assert-steps.md).
+
+## Own output as input
+
+When a calendar sets `DefaultOutputPattern`, that pattern is also tried after the existing `DateTimeFormats`. The calendar can parse the text it just rendered. A string that already matched an earlier format still matches that earlier format.
+
+## Business-day pipe modifiers
+
+After a date/time, a pipe modifier is an exact name:
+
+```gherkin
+<$DateTime:2026-07-17T15:00:00-07:00 | business day on or after>
+<$DateTime:2026-07-17T15:00:00-07:00 | next business day>
+```
+
+`business day on or after` keeps a date that is already a business date and otherwise moves forward. `next business day` always moves to a later business date. Both use the calendar’s existing rule: a business date is a local date that still has an open interval. They do not add a holiday list. `next open`, `is business day`, and `+ N business days` are different operations and are unchanged. An unknown name still fails with `Unknown date/time pipe modifier`.
+
+## Comparisons with a duration margin
+
+`equal to … within a margin of N minutes`, `within a margin of N minutes`, and `within N minutes` compare two values as date-times only when the margin is a duration and both sides parse as date-times. Two ordinary strings stay a string compare, and the margin is ignored. Text that already compared equal as date-times still compares equal. A numeric margin is not a duration margin.
 
 ## Arithmetic
 

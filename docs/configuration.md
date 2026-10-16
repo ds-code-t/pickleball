@@ -472,6 +472,8 @@ The resolved integer is stamped into the final RunVars and `pkb_run_profile`. Wo
 
 The bundled headless config uses `--headless=new`, a fixed `--window-size=1920,1080`, no `MAXIMIZE`, and `QUIT_LOCAL_DRIVER`. Consumer `CHROME`, `EDGE`, `GRID`, and `SAUCE` yaml files are unchanged. Agents can set `pkb_browser=CHROME_HEADLESS` without copying yaml into the project.
 
+`pkb_browser` is that configuration name, not a path to a browser binary. A normal `mvn test` uses the project value. When `pkb_runvars` already sets `pkb_browser`, that member wins over a bare `-Dpkb_browser`. Workbench discover prints the name the browser ladder selected. See the ladder below.
+
 ## Local driver download
 
 Local Chrome and Edge start through Selenium. Remote WebDriver is unchanged. Bundled and consumer `CHROME_HEADLESS` configs set `driver.service.port` and `driver.service.verbose` and do not set `driver.service.driverExecutable`. Selenium Manager then resolves the driver. Behind a corporate proxy that child often cannot log in, trust a re-signed certificate, or reach `storage.googleapis.com`.
@@ -511,7 +513,7 @@ Isolate stays one scenario and does not raise `pkb_parallel`.
 
 ## Repeat ceilings
 
-`pkb_stepMaxTime` (default 60 minutes) is the hard-fail time cap for every block `until` and every element `wait`. `pkb_stepRepeatMaxCount` (default 100) is the repeat-count cap for a block `until` only. An element `wait` does not use the count. They are run-wide run vars, read once when the step runtime loads. Resolved names are `pkb_stepmaxtime` and `pkb_steprepeatmaxcount`. There is no per-step ceiling.
+`pkb_stepMaxTime` (default 60 minutes) is the hard-fail time cap for every block `until` and every element `wait`. `pkb_stepRepeatMaxCount` (default 100) is the repeat-count cap for a block `until` only. An element `wait` does not use the count. They are run-wide run vars, read once when the step runtime loads. Resolved names are `pkb_stepmaxtime` and `pkb_steprepeatmaxcount`. There is no per-step ceiling. Workbench `--step-timeout` and `--run-timeout` are not these settings. They apply only to a live Workbench command and record `TIMEOUT`. See [Pickleball Workbench](pickleball-workbench.md).
 
 A bare `pkb_stepMaxTime` integer is minutes. A unit is accepted, such as `90s` or `2 minutes`. The failure names the setting, for example `Step exceeded pkb_stepMaxTime (5m)`.
 

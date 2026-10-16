@@ -79,6 +79,35 @@ Same launcher; only change `-Dexec.args`. When nobody is watching, `isolate` sta
 
 `hint`, `discover`, `confirm`, and `isolate` accept `--example` / `--example=` the same way they accept `--tags` and `--name`. The value becomes `pkb_example` inside `pkb_runvars` (or inside `pkb_overriderunvars` when the Discover snapshot is sealed). That is the headless way to keep specific Examples rows. A normal Scenario counts as row 1. `pkb_example` is not a tag. `--example='1 2 5 3.4 7-11'` keeps those rows, in source order, in each scenario that tags and name already selected. The Play row picker calls the same `example` filter. Play shows the first source-order match. Headless `pkb_example` still runs every match. Do not open the GUI for your own testing. Open it to show a person a specific run, or when they ask. Close it when you are done showing it. While testing for yourself, stay headless. Opening the window loads the run you already have. It does not start a second test.
 
+## Selection, timeouts, and side reports
+
+These commands stay on the Workbench launcher. They do not change a normal `mvn test`, `pkb_stepMaxTime`, `CucumberScanUtil.listPickles`, or `DiagnosticReporter`.
+
+```text
+"-Dexec.args=plan --tags=@smoke --name='Checkout.*'"
+"-Dexec.args=discover --plan --select=src/test/resources/features/checkout.feature:42"
+"-Dexec.args=discover --tags=@smoke --tags-file=tags.txt --agent=agent-1"
+"-Dexec.args=discover --tags-b64=<base64>"
+"-Dexec.args=confirm --tags=@smoke and not @wip"
+"-Dexec.args=execute-step --text='Given stay' --step-timeout=30 --run-timeout=120"
+"-Dexec.args=execute-step --stop-after='the anchor'"
+"-Dexec.args=stop --force"
+"-Dexec.args=inspect-page --html=page.html"
+"-Dexec.args=find-element --category=Button --text=Save --html=page.html"
+```
+
+`plan` and `--plan` resolve tags, name, example rows, and `file.feature:line` and print each hit. They do not compile and do not open a browser. An empty selection warns. `discover` and `confirm` that select nothing print `status=EMPTY` and exit non-zero. They do not report `PASSED`. `--step-timeout` and `--run-timeout` record `TIMEOUT`. `stop --force` kills the worker and browser process tree and records `STOPPED`. Cooperative `stop` still waits.
+
+The shared `last-discover.json` is whichever discover finished last. `--agent=<id>` also writes `last-discover-agent-<id>.json`, and the run writes `last-discover-run-<id>.json`. Confirm without `--agent` still reads the shared file. Discover reports that run’s profile.
+
+Maven `target/` and Gradle `build/` are generated sync input, as is `live/classes`. Do not hand-edit them.
+
+A startup timeout names elapsed time, stage (`compile`, `classpath`, `worker-launch`, `anchor-parse`, `paused`), and the last worker output. `pkb_workbench_worker_start_timeout` (property, `PKB_WORKBENCH_WORKER_START_TIMEOUT`, or `pkb_runvars`) defaults to 180 seconds and is read only here. `No healthy Workbench session` names `never-started`, `still-starting`, `crashed`, or `missing-session-file`. Start is logged only once the session is up.
+
+Workbench writes `runs/<id>/workbench/summary.json`, `workbench/trace-index.json`, and `runs/<id>/console/<scenario>.txt` beside the core reports. It does not rewrite `events.jsonl`, `trace.jsonl`, or a core `summary.json` that is already there. `inspect-page` and `find-element` only read HTML and print the phrase or the XPath, raw count, and visible count. The run-folder config copy redacts secret-looking keys. The project config is unchanged. A directory install retries a locked move three times, then copies. A CLI error that wraps an `IOException` shows that cause.
+
+`--retention=all|failed|none` is this discover or confirm only. The default for discover is `failed`. `gc-runs` is the separate payload sweep and is not run from `finish`.
+
 ## The window is a client
 
 Every action that changes the open session already exists as a launcher command or a command-queue command. The Swing window calls that command. It does not keep a second implementation. Switching the Config tab is only a view change. It shows `.pickleball/runs/<run-id>/config`, the same copy the run reads. Save writes that copy and does not write the project configs. An agent changes those files through the same run directory.

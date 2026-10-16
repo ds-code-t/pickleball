@@ -18,6 +18,8 @@ Uppercase control tokens write a log line or evaluate the same conditions used a
 
 Templates in the rest of the line resolve the same way other ordinary step text does before the glue method runs. For example, `INFO: hello <name>` uses the current step ParsingMap if `<name>` is already saved.
 
+An invalid `<{...}>` in `TRACE:`, `DEBUG:`, `INFO:`, `WARN:`, `ERROR:`, or `FAIL:` text is left as that literal text and does not fail the expression. A valid `<{...}>` and a valid `<name>` still resolve. The same invalid expression in any other step, including a bare `<{...}>` and a nested step started from a log line, still fails. `ERROR:` and `FAIL:` still hard-fail because of the log token.
+
 ## Logging tokens
 
 `TRACE`, `DEBUG`, `INFO`, `WARN`, and `ERROR` are log levels. `FAIL` is not a log level; it is a control token that records a fail entry and then hard-fails the scenario.
