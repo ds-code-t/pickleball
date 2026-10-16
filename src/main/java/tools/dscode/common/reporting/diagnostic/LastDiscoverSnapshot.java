@@ -48,19 +48,34 @@ public final class LastDiscoverSnapshot {
     }
 
     public static Snapshot read(Path projectRoot) {
-        Path file = file(projectRoot);
-        if (!Files.isRegularFile(file)) return null;
-        try {
-            @SuppressWarnings("unchecked")
-            Map<String, Object> raw = JSON.readValue(file.toFile(), LinkedHashMap.class);
-            return fromMap(raw);
-        } catch (IOException failure) {
-            throw new IllegalStateException("Could not read Discover snapshot: " + file, failure);
+        return readFile(file(projectRoot));
+    }
+
+    /**
+     * Prefers the agent snapshot, then that run's snapshot, then the shared file.
+     * A later agent's discover must not replace an earlier agent's filters.
+     */
+    public static Snapshot readScoped(Path projectRoot, String agentId, String runId) {
+        if (!isBlank(agentId)) {
+            Snapshot agent = readFile(PickleballLocalLayout.lastDiscoverSnapshot(projectRoot, "agent-" + agentId));
+            if (present(agent)) return agent;
         }
+        if (!isBlank(runId)) {
+            Snapshot run = readFile(PickleballLocalLayout.lastDiscoverSnapshot(projectRoot, "run-" + runId));
+            if (present(run)) return run;
+        }
+        return read(projectRoot);
     }
 
     public static Snapshot require(Path projectRoot) {
-        Snapshot snapshot = read(projectRoot);
+        return requirePresent(read(projectRoot));
+    }
+
+    public static Snapshot requireScoped(Path projectRoot, String agentId, String runId) {
+        return requirePresent(readScoped(projectRoot, agentId, runId));
+    }
+
+    private static Snapshot requirePresent(Snapshot snapshot) {
         if (snapshot == null || !snapshot.hasRunVars() && isBlank(snapshot.runProfile())) {
             throw new IllegalStateException(AgentDiscoverPlanner.missingDiscoverSnapshotMessage());
         }
@@ -100,6 +115,23 @@ public final class LastDiscoverSnapshot {
         Path file = file(projectRoot);
         if (file.getParent() != null) Files.createDirectories(file.getParent());
         JSON.writeValue(file.toFile(), snapshotToMap(snapshot));
+        if (!isBlank(runId)) {
+            writeCopy(PickleballLocalLayout.lastDiscoverSnapshot(projectRoot, "run-" + runId), snapshot);
+        }
+        return snapshot;
+    }
+
+    public static Snapshot write(
+            Path projectRoot,
+            String runId,
+            Path catalogPath,
+            String runProfile,
+            String agentId
+    ) throws IOException {
+        Snapshot snapshot = write(projectRoot, runId, catalogPath, runProfile);
+        if (!isBlank(agentId)) {
+            writeCopy(PickleballLocalLayout.lastDiscoverSnapshot(projectRoot, "agent-" + agentId), snapshot);
+        }
         return snapshot;
     }
 
@@ -134,39 +166,73 @@ public final class LastDiscoverSnapshot {
     }
 
     public static CatalogRun latestCatalogRun(Path projectRoot, String purpose) throws IOException {
+        return catalogRun(projectRoot, purpose, null);
+    }
+
+    /** The current run's catalog row wins over a newer row from another agent. */
+    public static CatalogRun catalogRun(Path projectRoot, String purpose, String runId) throws IOException {
+        List<CatalogRun> runs = catalogRuns(projectRoot);
+        CatalogRun byId = null;
+        CatalogRun byPurpose = null;
+        CatalogRun first = null;
+        for (CatalogRun candidate : runs) {
+            if (first == null) first = candidate;
+            if (!isBlank(runId) && runId.equals(candidate.runId())) byId = candidate;
+            if (purpose != null && purpose.equals(candidate.purpose()) && byPurpose == null) byPurpose = candidate;
+        }
+        if (byId != null) return byId;
+        if (byPurpose != null) return byPurpose;
+        return purpose == null ? first : null;
+    }
+
+    private static List<CatalogRun> catalogRuns(Path projectRoot) throws IOException {
         Path catalog = projectRoot.toAbsolutePath().normalize()
                 .resolve("reports")
                 .resolve("diagnostic-runs")
                 .resolve("run-catalog.json");
-        if (!Files.isRegularFile(catalog)) return null;
+        if (!Files.isRegularFile(catalog)) return List.of();
         @SuppressWarnings("unchecked")
         Map<String, Object> raw = JSON.readValue(catalog.toFile(), LinkedHashMap.class);
         Object runsValue = raw.get("runs");
-        if (!(runsValue instanceof List<?> runs) || runs.isEmpty()) return null;
-        CatalogRun matchedPurpose = null;
-        CatalogRun first = null;
+        if (!(runsValue instanceof List<?> runs) || runs.isEmpty()) return List.of();
+        List<CatalogRun> parsed = new java.util.ArrayList<>();
         for (Object item : runs) {
             if (!(item instanceof Map<?, ?> run)) continue;
-            CatalogRun candidate = new CatalogRun(
+            parsed.add(new CatalogRun(
                     catalog,
                     text(run.get("runId")),
                     text(run.get("runProfile")),
                     text(run.get("outcome")),
                     lineagePurpose(run.get("lineage"))
-            );
-            if (first == null) first = candidate;
-            if (purpose != null && purpose.equals(candidate.purpose()) && matchedPurpose == null) {
-                matchedPurpose = candidate;
-            }
+            ));
         }
-        if (matchedPurpose != null) return matchedPurpose;
-        return purpose == null ? first : null;
+        return parsed;
     }
 
     public record CatalogRun(Path catalog, String runId, String runProfile, String outcome, String purpose) {
         public CatalogRun(Path catalog, String runId, String runProfile, String outcome) {
             this(catalog, runId, runProfile, outcome, "");
         }
+    }
+
+    private static boolean present(Snapshot snapshot) {
+        return snapshot != null && (snapshot.hasRunVars() || !isBlank(snapshot.runProfile()));
+    }
+
+    private static Snapshot readFile(Path file) {
+        if (file == null || !Files.isRegularFile(file)) return null;
+        try {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> raw = JSON.readValue(file.toFile(), LinkedHashMap.class);
+            return fromMap(raw);
+        } catch (IOException failure) {
+            throw new IllegalStateException("Could not read Discover snapshot: " + file, failure);
+        }
+    }
+
+    private static void writeCopy(Path file, Snapshot snapshot) throws IOException {
+        if (file.getParent() != null) Files.createDirectories(file.getParent());
+        JSON.writeValue(file.toFile(), snapshotToMap(snapshot));
     }
 
     private static String lineagePurpose(Object lineage) {

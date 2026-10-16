@@ -194,8 +194,10 @@ class WorkbenchAgentCommandsTest {
                 }
         );
 
-        assertEquals(0, exit);
+        assertEquals(1, exit);
         String text = stdout.toString(StandardCharsets.UTF_8);
+        assertTrue(text.contains("status=EMPTY"));
+        assertFalse(text.contains("status=PASSED"));
         assertTrue(text.contains("NEXT: confirm"));
         assertTrue(text.contains("isolate"));
         assertTrue(text.contains("execute-step"));
@@ -240,8 +242,10 @@ class WorkbenchAgentCommandsTest {
                 }
         );
 
-        assertEquals(0, exit);
+        assertEquals(1, exit);
         String printed = stdout.toString(StandardCharsets.UTF_8);
+        assertTrue(printed.contains("status=EMPTY"));
+        assertFalse(printed.contains("status=PASSED"));
         assertTrue(printed.contains("pkb_reportretention=all"));
         assertFalse(printed.contains("pkb_reportretention=failed"));
         assertTrue(captured.getFirst().stream().anyMatch(item ->
@@ -574,6 +578,264 @@ class WorkbenchAgentCommandsTest {
         );
         assertTrue(record.contains("TIMEOUT"));
         assertFalse(record.contains("PASSED"));
+    }
+
+    @Test
+    void zeroSelectedDiscoverAndConfirmAreEmptyAndDoNotReportPassed() throws Exception {
+        writeProjectWrapper();
+        Path features = tempDir.resolve("src/test/resources/features");
+        Files.createDirectories(features);
+        Files.writeString(features.resolve("other.feature"), """
+                @other
+                Feature: Other
+                  Scenario: Somewhere else
+                    Given elsewhere
+                """);
+        ByteArrayOutputStream stdout = new ByteArrayOutputStream();
+        ByteArrayOutputStream stderr = new ByteArrayOutputStream();
+        int exit = WorkbenchAgentCommands.run(
+                new String[]{
+                        "discover", tempDir.toString(),
+                        "--run-id=run-empty",
+                        "--tags=@missing",
+                        "--name=Nowhere",
+                        "--example=4"
+                },
+                new PrintStream(stdout, true, StandardCharsets.UTF_8),
+                new PrintStream(stderr, true, StandardCharsets.UTF_8),
+                (project, command, out, err) -> {
+                    try {
+                        Files.createDirectories(project.resolve("reports/diagnostic-runs"));
+                        Files.writeString(project.resolve("reports/diagnostic-runs/run-catalog.json"), """
+                                {
+                                  "runs": [
+                                    {
+                                      "runId": "run-empty",
+                                      "runProfile": "pkb_browser=CHROME_HEADLESS, pkb_tags=@missing",
+                                      "lineage": { "runPurpose": "workbench-discover" }
+                                    }
+                                  ]
+                                }
+                                """);
+                    } catch (Exception failure) {
+                        throw new RuntimeException(failure);
+                    }
+                    return 0;
+                }
+        );
+        assertEquals(1, exit);
+        String text = stdout.toString(StandardCharsets.UTF_8);
+        String errors = stderr.toString(StandardCharsets.UTF_8);
+        assertTrue(text.contains("status=EMPTY"), text);
+        assertTrue(text.contains("tags=@missing"), text);
+        assertTrue(text.contains("name=Nowhere"), text);
+        assertTrue(text.contains("example=4"), text);
+        assertTrue(text.contains("browser=CHROME_HEADLESS") || errors.contains("browser=CHROME_HEADLESS"), text + errors);
+        assertTrue(text.contains("tags=@missing"));
+        assertTrue(text.contains("name=Nowhere"));
+        assertFalse(text.contains("status=PASSED"));
+        String record = Files.readString(
+                AgentCoordination.runDirectory(tempDir, "run-empty").resolve(AgentCoordination.RECORD_FILE)
+        );
+        assertTrue(record.contains("EMPTY"), record);
+        assertFalse(record.contains("PASSED"), record);
+
+        LastDiscoverSnapshot.write(tempDir, "run-empty", tempDir.resolve("reports/diagnostic-runs/run-catalog.json"),
+                "pkb_browser=FIREFOX, pkb_tags=@missing");
+        ByteArrayOutputStream confirmOut = new ByteArrayOutputStream();
+        int confirm = WorkbenchAgentCommands.run(
+                new String[]{"confirm", tempDir.toString(), "--run-id=run-empty-confirm", "--example=9"},
+                new PrintStream(confirmOut, true, StandardCharsets.UTF_8),
+                new PrintStream(new ByteArrayOutputStream(), true, StandardCharsets.UTF_8),
+                (project, command, out, err) -> 0
+        );
+        assertEquals(1, confirm);
+        String confirmed = confirmOut.toString(StandardCharsets.UTF_8);
+        assertTrue(confirmed.contains("status=EMPTY"), confirmed);
+        assertTrue(confirmed.contains("browser=FIREFOX"), confirmed);
+        assertTrue(confirmed.contains("example=9"), confirmed);
+        assertFalse(confirmed.contains("status=PASSED"));
+        String confirmRecord = Files.readString(
+                AgentCoordination.runDirectory(tempDir, "run-empty-confirm").resolve(AgentCoordination.RECORD_FILE)
+        );
+        assertTrue(confirmRecord.contains("EMPTY"), confirmRecord);
+        assertFalse(confirmRecord.contains("PASSED"), confirmRecord);
+    }
+
+    @Test
+    void discoverSnapshotStaysWithItsAgentAndRun() throws Exception {
+        writeProjectWrapper();
+        int first = WorkbenchAgentCommands.run(
+                new String[]{"discover", tempDir.toString(), "--agent=agent-a", "--run-id=run-a", "--tags=@alpha"},
+                new PrintStream(new ByteArrayOutputStream(), true, StandardCharsets.UTF_8),
+                new PrintStream(new ByteArrayOutputStream(), true, StandardCharsets.UTF_8),
+                (project, command, out, err) -> {
+                    try {
+                        Path catalog = project.resolve("reports/diagnostic-runs");
+                        Files.createDirectories(catalog);
+                        Files.writeString(catalog.resolve("run-catalog.json"), """
+                                {
+                                  "runs": [
+                                    {
+                                      "runId": "run-b",
+                                      "runProfile": "pkb_browser=FIREFOX, pkb_tags=@beta",
+                                      "lineage": { "runPurpose": "workbench-discover" }
+                                    },
+                                    {
+                                      "runId": "run-a",
+                                      "runProfile": "pkb_browser=CHROME_HEADLESS, pkb_tags=@alpha",
+                                      "lineage": { "runPurpose": "workbench-discover" }
+                                    }
+                                  ]
+                                }
+                                """);
+                    } catch (Exception failure) {
+                        throw new RuntimeException(failure);
+                    }
+                    return 0;
+                }
+        );
+        assertEquals(1, first);
+        LastDiscoverSnapshot.Snapshot agentA = LastDiscoverSnapshot.readScoped(tempDir, "agent-a", "run-a");
+        assertTrue(agentA.runProfile().contains("pkb_tags=@alpha"), agentA.runProfile());
+        assertFalse(agentA.runProfile().contains("@beta"), agentA.runProfile());
+
+        ByteArrayOutputStream secondOut = new ByteArrayOutputStream();
+        WorkbenchAgentCommands.run(
+                new String[]{"discover", tempDir.toString(), "--agent=agent-b", "--run-id=run-b", "--tags=@beta"},
+                new PrintStream(secondOut, true, StandardCharsets.UTF_8),
+                new PrintStream(new ByteArrayOutputStream(), true, StandardCharsets.UTF_8),
+                (project, command, out, err) -> {
+                    try {
+                        Files.writeString(project.resolve("reports/diagnostic-runs/run-catalog.json"), """
+                                {
+                                  "runs": [
+                                    {
+                                      "runId": "run-newer",
+                                      "runProfile": "pkb_browser=FIREFOX, pkb_tags=@newer",
+                                      "lineage": { "runPurpose": "workbench-discover" }
+                                    },
+                                    {
+                                      "runId": "run-b",
+                                      "runProfile": "pkb_browser=FIREFOX, pkb_tags=@beta",
+                                      "lineage": { "runPurpose": "workbench-discover" }
+                                    }
+                                  ]
+                                }
+                                """);
+                    } catch (Exception failure) {
+                        throw new RuntimeException(failure);
+                    }
+                    return 0;
+                }
+        );
+        String secondText = secondOut.toString(StandardCharsets.UTF_8);
+        int retained = secondText.indexOf("retained pkb_run_profile:");
+        assertTrue(retained >= 0, secondText);
+        String retainedLine = secondText.substring(retained);
+        assertTrue(retainedLine.contains("pkb_tags=@beta"), retainedLine);
+        assertFalse(retainedLine.contains("@newer"), retainedLine);
+        assertTrue(LastDiscoverSnapshot.readScoped(tempDir, "agent-a", null).runProfile().contains("@alpha"));
+        assertTrue(LastDiscoverSnapshot.read(tempDir).runProfile().contains("@beta"));
+
+        List<List<String>> captured = new ArrayList<>();
+        WorkbenchAgentCommands.run(
+                new String[]{"confirm", tempDir.toString(), "--agent=agent-a", "--run-id=run-a-confirm"},
+                new PrintStream(new ByteArrayOutputStream(), true, StandardCharsets.UTF_8),
+                new PrintStream(new ByteArrayOutputStream(), true, StandardCharsets.UTF_8),
+                (project, command, out, err) -> {
+                    captured.add(command);
+                    return 0;
+                }
+        );
+        String runVars = captured.getFirst().stream().filter(item -> item.startsWith("-Dpkb_runvars=")).findFirst().orElse("");
+        assertTrue(runVars.contains("pkb_tags=@alpha"), runVars);
+        assertFalse(runVars.contains("@beta"), runVars);
+        assertFalse(runVars.contains("@newer"), runVars);
+    }
+
+    @Test
+    void quotingErrorFailsBeforeMavenAndEchoesTheParsedExpression() throws Exception {
+        boolean[] maven = {false};
+        ByteArrayOutputStream stderr = new ByteArrayOutputStream();
+        int exit = WorkbenchAgentCommands.run(
+                new String[]{"discover", tempDir.toString(), "--tags=@a and \"oops"},
+                new PrintStream(new ByteArrayOutputStream(), true, StandardCharsets.UTF_8),
+                new PrintStream(stderr, true, StandardCharsets.UTF_8),
+                (project, command, out, err) -> {
+                    maven[0] = true;
+                    return 0;
+                }
+        );
+        assertEquals(2, exit);
+        assertFalse(maven[0]);
+        assertTrue(stderr.toString(StandardCharsets.UTF_8).contains("quoting"));
+
+        writeProjectWrapper();
+        ByteArrayOutputStream stdout = new ByteArrayOutputStream();
+        WorkbenchAgentCommands.run(
+                new String[]{"discover", tempDir.toString(), "--tags=@smoke", "--name=Find term"},
+                new PrintStream(stdout, true, StandardCharsets.UTF_8),
+                new PrintStream(new ByteArrayOutputStream(), true, StandardCharsets.UTF_8),
+                (project, command, out, err) -> 1
+        );
+        String text = stdout.toString(StandardCharsets.UTF_8);
+        assertTrue(text.contains("tags=@smoke"), text);
+        assertTrue(text.contains("name=Find term"), text);
+    }
+
+    @Test
+    void emptySelectionDoesNotChangeDiagnosticReporter() throws Exception {
+        String source = Files.readString(Path.of(
+                "src/main/java/tools/dscode/common/reporting/diagnostic/DiagnosticReporter.java"
+        ));
+        assertTrue(source.contains("return \"NO_TESTS\""));
+        assertFalse(source.contains("\"EMPTY\""));
+        assertFalse(source.contains("\"TIMEOUT\""));
+        assertFalse(source.contains("\"STOPPED\""));
+    }
+
+    @Test
+    void discoverSavesScenarioConsoleUnderTheRunFolder() throws Exception {
+        writeProjectWrapper();
+        Path features = tempDir.resolve("src/test/resources/features");
+        Files.createDirectories(features);
+        Files.writeString(features.resolve("one.feature"), """
+                Feature: One
+                  Scenario: The one
+                    Given one
+                """);
+        WorkbenchAgentCommands.run(
+                new String[]{"discover", tempDir.toString(), "--run-id=run-console", "--name=The one"},
+                new PrintStream(new ByteArrayOutputStream(), true, StandardCharsets.UTF_8),
+                new PrintStream(new ByteArrayOutputStream(), true, StandardCharsets.UTF_8),
+                (project, command, out, err) -> {
+                    out.println("Scenario: The one");
+                    out.println("console-from-the-worker");
+                    try {
+                        Files.createDirectories(project.resolve("reports/diagnostic-runs"));
+                        Files.writeString(project.resolve("reports/diagnostic-runs/run-catalog.json"), """
+                                {
+                                  "runs": [
+                                    {
+                                      "runId": "run-console",
+                                      "runProfile": "pkb_browser=CHROME_HEADLESS, pkb_name=The one",
+                                      "lineage": { "runPurpose": "workbench-discover" }
+                                    }
+                                  ]
+                                }
+                                """);
+                    } catch (Exception failure) {
+                        throw new RuntimeException(failure);
+                    }
+                    return 0;
+                }
+        );
+        String console = Files.readString(
+                AgentCoordination.runDirectory(tempDir, "run-console").resolve("console").resolve("The_one.txt")
+        );
+        assertTrue(console.contains("console-from-the-worker"), console);
+        assertTrue(console.contains("Scenario: The one"), console);
     }
 
     private Output run(String... args) {

@@ -2,12 +2,16 @@ package tools.dscode.launcher;
 
 import tools.dscode.common.reporting.diagnostic.ReportRetentionPolicy;
 
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.regex.Pattern;
+import java.util.regex.PatternSyntaxException;
 
 /** Parses Maven-exec-friendly Workbench launcher arguments. */
 final class WorkbenchCommandLine {
@@ -108,6 +112,7 @@ final class WorkbenchCommandLine {
         }
 
         String tags = null;
+        String tagsFile = null;
         String name = null;
         String example = null;
         String retention = null;
@@ -145,10 +150,30 @@ final class WorkbenchCommandLine {
             if (token == null) continue;
             if (token.startsWith("--tags=")) {
                 tags = token.substring("--tags=".length());
+                tagsFile = null;
                 continue;
             }
             if ("--tags".equals(token) && index + 1 < args.length) {
                 tags = args[++index];
+                tagsFile = null;
+                continue;
+            }
+            if (token.startsWith("--tags-file=") || "--tags-file".equals(token)) {
+                String value = token.startsWith("--tags-file=")
+                        ? token.substring("--tags-file=".length())
+                        : (index + 1 < args.length ? args[++index] : null);
+                tagsFile = blankToNull(value);
+                if (tagsFile == null) {
+                    throw new IllegalArgumentException("Tag quoting error: --tags-file needs a path.");
+                }
+                continue;
+            }
+            if (token.startsWith("--tags-b64=") || "--tags-b64".equals(token)) {
+                String value = token.startsWith("--tags-b64=")
+                        ? token.substring("--tags-b64=".length())
+                        : (index + 1 < args.length ? args[++index] : null);
+                tags = decodeTags(value);
+                tagsFile = null;
                 continue;
             }
             if (token.startsWith("--name=")) {
@@ -421,6 +446,10 @@ final class WorkbenchCommandLine {
             rest.add(token);
         }
         if (project == null) project = cwd;
+        if (tagsFile != null) {
+            tags = readTagsFile(project, tagsFile);
+        }
+        validateFilters(tags, name);
         Coordination coordination = new Coordination(
                 runId, agentId, group, sequence, who, why, learned, text,
                 inboxTo, inboxFrom, inboxWrite, inboxList, inboxTake,
@@ -487,6 +516,76 @@ final class WorkbenchCommandLine {
 
     private static String parseRetention(String value) {
         return ReportRetentionPolicy.parseExact(value).name().toLowerCase(Locale.ROOT);
+    }
+
+    static void validateFilters(String tags, String name) {
+        String tagError = tagQuotingError(tags);
+        if (tagError != null) {
+            throw new IllegalArgumentException(tagError);
+        }
+        if (name == null || name.isBlank()) return;
+        try {
+            Pattern.compile(name);
+        } catch (PatternSyntaxException failure) {
+            throw new IllegalArgumentException(
+                    "Name quoting error: unparseable expression '" + name + "' (" + failure.getDescription() + ")"
+            );
+        }
+    }
+
+    static String tagQuotingError(String tags) {
+        if (tags == null || tags.isBlank()) return null;
+        boolean inQuote = false;
+        int depth = 0;
+        for (int index = 0; index < tags.length(); index++) {
+            char ch = tags.charAt(index);
+            if (ch == '"' && (index == 0 || tags.charAt(index - 1) != '\\')) {
+                inQuote = !inQuote;
+                continue;
+            }
+            if (inQuote) continue;
+            if (ch == '(') depth++;
+            else if (ch == ')') {
+                depth--;
+                if (depth < 0) {
+                    return "Tag quoting error: unmatched parenthesis in " + tags;
+                }
+            }
+        }
+        if (inQuote) return "Tag quoting error: unmatched quote in " + tags;
+        if (depth != 0) return "Tag quoting error: unmatched parenthesis in " + tags;
+        return null;
+    }
+
+    private static String readTagsFile(Path project, String raw) {
+        Path file = Path.of(raw);
+        if (!file.isAbsolute()) {
+            Path inProject = project.resolve(raw);
+            file = Files.isRegularFile(inProject) ? inProject : file.toAbsolutePath().normalize();
+        }
+        if (!Files.isRegularFile(file)) {
+            throw new IllegalArgumentException("Tag quoting error: tags file not found: " + raw);
+        }
+        try {
+            return Files.readString(file, StandardCharsets.UTF_8).trim();
+        } catch (java.io.IOException failure) {
+            throw new IllegalArgumentException(
+                    "Tag quoting error: could not read tags file " + raw + ": " + failure.getMessage(),
+                    failure
+            );
+        }
+    }
+
+    private static String decodeTags(String value) {
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException("Tag quoting error: --tags-b64 needs an encoded expression.");
+        }
+        try {
+            byte[] decoded = Base64.getDecoder().decode(value.trim());
+            return new String(decoded, StandardCharsets.UTF_8).trim();
+        } catch (IllegalArgumentException failure) {
+            throw new IllegalArgumentException("Tag quoting error: --tags-b64 is not valid base64.");
+        }
     }
 
     private static boolean isFeatureLineToken(String token) {

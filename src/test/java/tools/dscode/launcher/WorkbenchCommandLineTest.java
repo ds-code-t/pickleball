@@ -2,6 +2,10 @@ package tools.dscode.launcher;
 
 import org.junit.jupiter.api.Test;
 
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Base64;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -119,6 +123,57 @@ class WorkbenchCommandLineTest {
         assertEquals("The failing scenario", parsed.forwarded()[5]);
         assertEquals("--example", parsed.forwarded()[6]);
         assertEquals("1 2", parsed.forwarded()[7]);
+    }
+
+    @Test
+    void unparseableTagOrNameIsAQuotingError() {
+        IllegalArgumentException quotes = assertThrows(
+                IllegalArgumentException.class,
+                () -> WorkbenchCommandLine.parse(new String[]{"discover", "--tags=@a and \"oops"})
+        );
+        assertTrue(quotes.getMessage().contains("quoting"));
+        assertTrue(quotes.getMessage().toLowerCase().contains("quote"));
+
+        IllegalArgumentException parens = assertThrows(
+                IllegalArgumentException.class,
+                () -> WorkbenchCommandLine.parse(new String[]{"confirm", "--tags=(@a and @b"})
+        );
+        assertTrue(parens.getMessage().contains("quoting"));
+        assertTrue(parens.getMessage().toLowerCase().contains("parenthesis"));
+
+        IllegalArgumentException name = assertThrows(
+                IllegalArgumentException.class,
+                () -> WorkbenchCommandLine.parse(new String[]{"plan", "--name=[unclosed"})
+        );
+        assertTrue(name.getMessage().contains("quoting"));
+    }
+
+    @Test
+    void tagsFileAndEncodedFormBecomeTheParsedExpression() throws Exception {
+        Path file = Files.createTempFile("pickleball-tags", ".txt");
+        try {
+            Files.writeString(file, "@smoke and (@wip or @slow)\n", StandardCharsets.UTF_8);
+            WorkbenchCommandLine.Parsed fromFile = WorkbenchCommandLine.parse(new String[]{
+                    "discover", "--tags-file=" + file.toAbsolutePath()
+            });
+            assertEquals("@smoke and (@wip or @slow)", fromFile.tags());
+        } finally {
+            Files.deleteIfExists(file);
+        }
+        String encoded = Base64.getEncoder().encodeToString("@nightly and not @wip".getBytes(StandardCharsets.UTF_8));
+        WorkbenchCommandLine.Parsed fromEncoded = WorkbenchCommandLine.parse(new String[]{
+                "discover", "--tags-b64=" + encoded
+        });
+        assertEquals("@nightly and not @wip", fromEncoded.tags());
+    }
+
+    @Test
+    void balancedExpressionsStillParse() {
+        WorkbenchCommandLine.Parsed parsed = WorkbenchCommandLine.parse(new String[]{
+                "discover", "--tags=@smoke and not @wip", "--name=Find term"
+        });
+        assertEquals("@smoke and not @wip", parsed.tags());
+        assertEquals("Find term", parsed.name());
     }
 
     @Test

@@ -8,8 +8,10 @@ import tools.dscode.control.protocol.PickleballLocalStore;
 import tools.dscode.control.protocol.WorkbenchFeatureIndex;
 import tools.dscode.testengine.PKB_props;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.PrintStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -155,6 +157,7 @@ public final class WorkbenchAgentCommands {
                 request(parsed, "discover")
         );
         try {
+            echoFilters(parsed, out);
             AgentDiscoverPlanner.Plan plan = AgentDiscoverPlanner.discover(
                     parsed.project(), parsed.tags(), parsed.name(), parsed.retention(), parsed.example()
             );
@@ -171,20 +174,34 @@ public final class WorkbenchAgentCommands {
                     ),
                     run
             );
-            Bounded mavenResult = runBounded(parsed, command, out, err, maven);
+            ByteArrayOutputStream capturedOut = new ByteArrayOutputStream();
+            ByteArrayOutputStream capturedErr = new ByteArrayOutputStream();
+            Bounded mavenResult = runBounded(
+                    parsed,
+                    command,
+                    new WorkbenchRunReports.Tee(out, capturedOut),
+                    new WorkbenchRunReports.Tee(err, capturedErr),
+                    maven
+            );
             if (mavenResult.timedOut()) {
+                publishQuietly(parsed, run, selection, capturedOut, capturedErr, "TIMEOUT", out, err);
                 return timeoutExit(parsed, run, out, err);
             }
             int exit = mavenResult.exit();
+            boolean empty = selection.matchedNone();
+            String status = empty ? "EMPTY" : exit == 0 ? "PASSED" : "FAILED";
+            int reported = empty && exit == 0 ? 1 : exit;
+            if (empty) printEmpty(parsed, plan.browser().browser(), out, err);
             AgentCoordination.finish(
                     parsed.project(),
                     run.runId(),
                     parsed.coordination().learned(),
-                    exit == 0 ? "PASSED" : "FAILED",
+                    status,
                     java.time.Instant.now(),
                     out
             );
-            return recordDiscover(parsed.project(), out, err, exit);
+            publishQuietly(parsed, run, selection, capturedOut, capturedErr, status, out, err);
+            return recordDiscover(parsed, out, err, reported, run.runId());
         } catch (RuntimeException failure) {
             finishQuietly(parsed.project(), run.runId(), "FAILED", out);
             throw failure;
@@ -202,7 +219,12 @@ public final class WorkbenchAgentCommands {
                 request(parsed, "confirm")
         );
         try {
-            LastDiscoverSnapshot.Snapshot snapshot = LastDiscoverSnapshot.require(parsed.project());
+            echoFilters(parsed, out);
+            LastDiscoverSnapshot.Snapshot snapshot = LastDiscoverSnapshot.requireScoped(
+                    parsed.project(),
+                    parsed.coordination().agentId(),
+                    parsed.coordination().runId()
+            );
             Map<String, String> retained = LastDiscoverSnapshot.retainedRunVars(snapshot);
             String runVars = AgentDiscoverPlanner.confirmRunVars(
                     retained, parsed.tags(), parsed.name(), parsed.retention(), parsed.example()
@@ -224,20 +246,34 @@ public final class WorkbenchAgentCommands {
                     ),
                     run
             );
-            Bounded mavenResult = runBounded(parsed, command, out, err, maven);
+            ByteArrayOutputStream capturedOut = new ByteArrayOutputStream();
+            ByteArrayOutputStream capturedErr = new ByteArrayOutputStream();
+            Bounded mavenResult = runBounded(
+                    parsed,
+                    command,
+                    new WorkbenchRunReports.Tee(out, capturedOut),
+                    new WorkbenchRunReports.Tee(err, capturedErr),
+                    maven
+            );
             if (mavenResult.timedOut()) {
+                publishQuietly(parsed, run, selection, capturedOut, capturedErr, "TIMEOUT", out, err);
                 return timeoutExit(parsed, run, out, err);
             }
             int exit = mavenResult.exit();
+            boolean empty = selection.matchedNone();
+            String status = empty ? "EMPTY" : exit == 0 ? "PASSED" : "FAILED";
+            int reported = empty && exit == 0 ? 1 : exit;
+            if (empty) printEmpty(parsed, retained.get(PKB_props.PKB_BROWSER), out, err);
             AgentCoordination.finish(
                     parsed.project(),
                     run.runId(),
                     parsed.coordination().learned(),
-                    exit == 0 ? "PASSED" : "FAILED",
+                    status,
                     java.time.Instant.now(),
                     out
             );
-            return printCatalog(parsed.project(), out, err, exit, "workbench-confirm", false);
+            publishQuietly(parsed, run, selection, capturedOut, capturedErr, status, out, err);
+            return printCatalog(parsed.project(), out, err, reported, "workbench-confirm", false, run.runId(), agentId(parsed));
         } catch (RuntimeException failure) {
             finishQuietly(parsed.project(), run.runId(), "FAILED", out);
             throw failure;
@@ -712,8 +748,66 @@ public final class WorkbenchAgentCommands {
         return AgentCoordination.runDirectory(parsed.project(), runId).resolve(AgentCoordination.RECORD_FILE);
     }
 
-    private static int recordDiscover(Path project, PrintStream out, PrintStream err, int mavenExit) {
-        return printCatalog(project, out, err, mavenExit, "workbench-discover", true);
+    private static void echoFilters(WorkbenchCommandLine.Parsed parsed, PrintStream out) {
+        out.println("tags=" + text(parsed.tags()));
+        out.println("name=" + text(parsed.name()));
+    }
+
+    private static void printEmpty(
+            WorkbenchCommandLine.Parsed parsed,
+            String browser,
+            PrintStream out,
+            PrintStream err
+    ) {
+        String block = "status=EMPTY\n"
+                + "tags=" + text(parsed.tags()) + "\n"
+                + "name=" + text(parsed.name()) + "\n"
+                + "example=" + text(parsed.example()) + "\n"
+                + "browser=" + text(browser) + "\n"
+                + "select=" + parsed.selects();
+        out.println(block);
+        err.println(block);
+    }
+
+    private static void publishQuietly(
+            WorkbenchCommandLine.Parsed parsed,
+            AgentCoordination.Run run,
+            WorkbenchFeatureIndex.Selection selection,
+            ByteArrayOutputStream capturedOut,
+            ByteArrayOutputStream capturedErr,
+            String status,
+            PrintStream out,
+            PrintStream err
+    ) {
+        try {
+            String console = capturedOut.toString(StandardCharsets.UTF_8) + capturedErr.toString(StandardCharsets.UTF_8);
+            WorkbenchRunReports.publish(
+                    parsed.project(),
+                    run.runId(),
+                    selection == null ? List.of() : selection.hits(),
+                    console,
+                    status,
+                    out
+            );
+        } catch (Exception failure) {
+            err.println("Workbench summary was not written: " + failure.getMessage());
+        }
+    }
+
+    private static String agentId(WorkbenchCommandLine.Parsed parsed) {
+        return parsed.coordination().agentId();
+    }
+
+    private static int recordDiscover(
+            WorkbenchCommandLine.Parsed parsed,
+            PrintStream out,
+            PrintStream err,
+            int mavenExit,
+            String runId
+    ) {
+        return printCatalog(
+                parsed.project(), out, err, mavenExit, "workbench-discover", true, runId, agentId(parsed)
+        );
     }
 
     private static int printCatalog(
@@ -722,17 +816,19 @@ public final class WorkbenchAgentCommands {
             PrintStream err,
             int mavenExit,
             String purpose,
-            boolean writeSnapshot
+            boolean writeSnapshot,
+            String runId,
+            String agentId
     ) {
         try {
-            LastDiscoverSnapshot.CatalogRun latest = LastDiscoverSnapshot.latestCatalogRun(project, purpose);
+            LastDiscoverSnapshot.CatalogRun latest = LastDiscoverSnapshot.catalogRun(project, purpose, runId);
             if (latest == null) latest = LastDiscoverSnapshot.latestCatalogRun(project);
             if (latest == null || latest.runProfile() == null || latest.runProfile().isBlank()) {
                 err.println("Workbench finished but run-catalog.json has no retained pkb_run_profile.");
                 return mavenExit == 0 ? 1 : mavenExit;
             }
             if (writeSnapshot) {
-                LastDiscoverSnapshot.write(project, latest.runId(), latest.catalog(), latest.runProfile());
+                LastDiscoverSnapshot.write(project, latest.runId(), latest.catalog(), latest.runProfile(), agentId);
             }
             out.println("run-catalog.json: " + latest.catalog());
             out.println("retained pkb_run_profile: " + latest.runProfile());

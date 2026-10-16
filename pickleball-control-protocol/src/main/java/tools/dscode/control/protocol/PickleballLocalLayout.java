@@ -135,6 +135,17 @@ public final class PickleballLocalLayout {
         return workbenchStateRoot(projectRoot).resolve(LAST_DISCOVER_FILE);
     }
 
+    /** Agent or run copy of the shared snapshot. A blank scope is the shared file. */
+    public static Path lastDiscoverSnapshot(Path projectRoot, String scope) {
+        if (scope == null || scope.isBlank()) return lastDiscoverSnapshot(projectRoot);
+        String safe = scope.replaceAll("[^A-Za-z0-9._-]", "_");
+        Path shared = lastDiscoverSnapshot(projectRoot);
+        String name = shared.getFileName().toString();
+        int dot = name.lastIndexOf('.');
+        String scoped = (dot > 0 ? name.substring(0, dot) : name) + "-" + safe + ".json";
+        return shared.resolveSibling(scoped);
+    }
+
     public static Path cliSessionState(Path projectRoot) {
         return workbenchStateRoot(projectRoot).resolve(CLI_SESSION_FILE);
     }
