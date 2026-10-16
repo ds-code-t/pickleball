@@ -638,12 +638,62 @@ public final class WorkbenchSynchronizer {
     }
 
     private static void replaceDirectory(Path staged, Path target) {
+        replaceDirectory(staged, target, WorkbenchSynchronizer::moveReplacing);
+    }
+
+    /**
+     * Installs a staged directory. A Windows lock on {@code Files.move} is retried,
+     * then the tree is copied and the staged directory is deleted.
+     */
+    static void replaceDirectory(Path staged, Path target, DirectoryMove move) {
         deleteTree(target);
-        try {
-            Files.move(staged, target, StandardCopyOption.REPLACE_EXISTING);
-        } catch (IOException failure) {
-            throw new IllegalStateException("Could not install Workbench directory " + target, failure);
+        IOException last = null;
+        for (int attempt = 0; attempt < 3; attempt++) {
+            try {
+                move.move(staged, target);
+                return;
+            } catch (IOException failure) {
+                last = failure;
+            }
         }
+        try {
+            copyDirectory(staged, target);
+            deleteTree(staged);
+        } catch (IOException failure) {
+            IllegalStateException wrapped = new IllegalStateException(
+                    "Could not install Workbench directory " + target,
+                    failure
+            );
+            if (last != null) wrapped.addSuppressed(last);
+            throw wrapped;
+        }
+    }
+
+    @FunctionalInterface
+    interface DirectoryMove {
+        void move(Path source, Path target) throws IOException;
+    }
+
+    private static void moveReplacing(Path source, Path target) throws IOException {
+        Files.move(source, target, StandardCopyOption.REPLACE_EXISTING);
+    }
+
+    private static void copyDirectory(Path source, Path target) throws IOException {
+        Files.walkFileTree(source, new SimpleFileVisitor<>() {
+            @Override
+            public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
+                Files.createDirectories(target.resolve(source.relativize(dir).toString()));
+                return FileVisitResult.CONTINUE;
+            }
+
+            @Override
+            public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+                Path destination = target.resolve(source.relativize(file).toString());
+                if (destination.getParent() != null) Files.createDirectories(destination.getParent());
+                Files.copy(file, destination, StandardCopyOption.REPLACE_EXISTING);
+                return FileVisitResult.CONTINUE;
+            }
+        });
     }
 
     private static void replaceFile(Path staged, Path target) {

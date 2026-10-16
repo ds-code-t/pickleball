@@ -838,6 +838,43 @@ class WorkbenchAgentCommandsTest {
         assertTrue(console.contains("Scenario: The one"), console);
     }
 
+    @Test
+    void wrappedIoExceptionIsVisibleAndEmptyRunsRecordWhy() throws Exception {
+        writeProjectWrapper();
+        ByteArrayOutputStream stderr = new ByteArrayOutputStream();
+        int exit = WorkbenchAgentCommands.run(
+                new String[]{"discover", tempDir.toString(), "--run-id=run-io", "--tags=@missing"},
+                new PrintStream(new ByteArrayOutputStream(), true, StandardCharsets.UTF_8),
+                new PrintStream(stderr, true, StandardCharsets.UTF_8),
+                (project, command, out, err) -> {
+                    throw new IllegalStateException("wrapped", new java.io.IOException("disk full"));
+                }
+        );
+        assertEquals(1, exit);
+        String errors = stderr.toString(StandardCharsets.UTF_8);
+        assertTrue(errors.contains("IOException"), errors);
+        assertTrue(errors.contains("disk full"), errors);
+
+        Path features = tempDir.resolve("src/test/resources/features");
+        Files.createDirectories(features);
+        Files.writeString(features.resolve("other.feature"), """
+                Feature: Other
+                  Scenario: Elsewhere
+                    Given elsewhere
+                """);
+        WorkbenchAgentCommands.run(
+                new String[]{"discover", tempDir.toString(), "--run-id=run-why", "--tags=@missing"},
+                new PrintStream(new ByteArrayOutputStream(), true, StandardCharsets.UTF_8),
+                new PrintStream(new ByteArrayOutputStream(), true, StandardCharsets.UTF_8),
+                (project, command, out, err) -> 0
+        );
+        String record = Files.readString(
+                AgentCoordination.runDirectory(tempDir, "run-why").resolve(AgentCoordination.RECORD_FILE)
+        );
+        assertTrue(record.contains("No scenarios matched"), record);
+        assertTrue(record.contains("@missing"), record);
+    }
+
     private Output run(String... args) {
         ByteArrayOutputStream stdout = new ByteArrayOutputStream();
         ByteArrayOutputStream stderr = new ByteArrayOutputStream();

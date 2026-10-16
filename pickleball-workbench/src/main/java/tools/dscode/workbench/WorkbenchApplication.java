@@ -165,11 +165,65 @@ public final class WorkbenchApplication {
 
     private static int sync(String[] args, PrintStream out) {
         Path project = requiredProject(args, "sync");
-        WorkbenchManifest manifest = new WorkbenchSynchronizer().sync(project);
-        out.println("Synchronized " + manifest.projectType() + " project: " + manifest.projectRoot());
-        out.println("Live output: " + manifest.liveOutput());
-        out.println("Fingerprint: " + manifest.fingerprint());
-        return 0;
+        try {
+            WorkbenchManifest manifest = new WorkbenchSynchronizer().sync(project);
+            out.println("Synchronized " + manifest.projectType() + " project: " + manifest.projectRoot());
+            out.println("Live output: " + manifest.liveOutput());
+            out.println("Fingerprint: " + manifest.fingerprint());
+            return 0;
+        } catch (RuntimeException failure) {
+            String reason = "Sync failed: " + explain(failure);
+            System.err.println(reason);
+            noteRun(project, flag(args, "--run-id"), reason);
+            return 1;
+        }
+    }
+
+    static String explain(Throwable failure) {
+        if (failure == null) return "Sync failed.";
+        StringBuilder text = new StringBuilder();
+        String message = failure.getMessage();
+        text.append(message == null || message.isBlank() ? failure.getClass().getSimpleName() : message);
+        Throwable cause = failure.getCause();
+        int depth = 0;
+        while (cause != null && cause != failure && depth++ < 6) {
+            text.append(" caused by ").append(cause.getClass().getSimpleName());
+            if (cause.getMessage() != null && !cause.getMessage().isBlank()) {
+                text.append(": ").append(cause.getMessage());
+            }
+            cause = cause.getCause();
+        }
+        return text.toString();
+    }
+
+    static void noteRun(Path project, String runId, String reason) {
+        if (project == null || runId == null || runId.isBlank() || reason == null) return;
+        Path record = tools.dscode.control.protocol.PickleballLocalLayout.root(project)
+                .resolve("runs")
+                .resolve(runId.replaceAll("[^A-Za-z0-9._-]", "_"))
+                .resolve("record.json");
+        if (!java.nio.file.Files.isRegularFile(record)) return;
+        try {
+            com.fasterxml.jackson.databind.ObjectMapper json = new com.fasterxml.jackson.databind.ObjectMapper();
+            @SuppressWarnings("unchecked")
+            java.util.Map<String, Object> body = json.readValue(record.toFile(), java.util.LinkedHashMap.class);
+            body.put("learned", reason);
+            body.put("failureSummary", reason);
+            json.writerWithDefaultPrettyPrinter().writeValue(record.toFile(), body);
+        } catch (java.io.IOException ignored) {
+            // The stderr line is still the cause the operator sees.
+        }
+    }
+
+    private static String flag(String[] args, String name) {
+        if (args == null) return null;
+        for (int index = 0; index < args.length; index++) {
+            String token = args[index];
+            if (token == null) continue;
+            if (token.startsWith(name + "=")) return token.substring(name.length() + 1);
+            if (name.equals(token) && index + 1 < args.length) return args[index + 1];
+        }
+        return null;
     }
 
     private static int status(String[] args, PrintStream out) {

@@ -137,7 +137,7 @@ public final class WorkbenchSessionCommands {
                 }
             };
         } catch (RuntimeException failure) {
-            err.println("Workbench " + parsed.command() + " failed: " + failure.getMessage());
+            err.println("Workbench " + parsed.command() + " failed: " + WorkbenchCliErrors.explain(failure));
             return 1;
         }
     }
@@ -410,7 +410,9 @@ public final class WorkbenchSessionCommands {
                     run.agentId()
             ));
         } catch (IOException failure) {
-            throw new IllegalStateException("Could not start Workbench session: " + failure.getMessage(), failure);
+            String reason = "Session start failed: " + WorkbenchCliErrors.explain(failure);
+            finishReason(project, run.runId(), reason, out);
+            throw new IllegalStateException(reason, failure);
         }
 
         long deadline = System.nanoTime() + HEALTH_TIMEOUT.toNanos();
@@ -431,11 +433,13 @@ public final class WorkbenchSessionCommands {
                     return 0;
                 }
                 err.println("Workbench session process exited before becoming healthy. See " + logFile);
+                finishReason(project, run.runId(), "Session start failed: the process exited before it was healthy.", out);
                 return 1;
             }
             sleep(POLL);
         }
         err.println("Workbench session did not become healthy within " + HEALTH_TIMEOUT.toSeconds() + "s. See " + logFile);
+        finishReason(project, run.runId(), "Session start failed: the session did not become healthy.", out);
         return 1;
     }
 
@@ -1057,6 +1061,14 @@ public final class WorkbenchSessionCommands {
     private static String textOr(JsonNode node, String field, String fallback) {
         JsonNode value = node == null ? null : node.get(field);
         return value == null || value.isNull() ? fallback : value.asText(fallback);
+    }
+
+    private static void finishReason(Path project, String runId, String reason, PrintStream out) {
+        try {
+            AgentCoordination.finish(project, runId, reason, "FAILED", java.time.Instant.now(), out);
+        } catch (RuntimeException ignored) {
+            // The session error is already printed.
+        }
     }
 
     private static void sleep(Duration duration) {

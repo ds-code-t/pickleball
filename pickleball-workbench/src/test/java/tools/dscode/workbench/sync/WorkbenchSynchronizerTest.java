@@ -381,6 +381,22 @@ class WorkbenchSynchronizerTest {
         assertTrue(Files.exists(Path.of(second.liveOutput()).resolve("Runner.class")));
     }
 
+    @Test
+    void replaceDirectoryRetriesALockThenCopies() throws Exception {
+        Path staged = tempDir.resolve("staged");
+        Files.createDirectories(staged.resolve("nested"));
+        Files.writeString(staged.resolve("nested").resolve("a.txt"), "kept");
+        Path target = tempDir.resolve("installed");
+        int[] attempts = {0};
+        WorkbenchSynchronizer.replaceDirectory(staged, target, (source, dest) -> {
+            attempts[0]++;
+            throw new java.io.IOException("locked by Windows");
+        });
+        assertEquals(3, attempts[0]);
+        assertEquals("kept", Files.readString(target.resolve("nested").resolve("a.txt")));
+        assertFalse(Files.exists(staged));
+    }
+
     private static void deleteTree(Path root) throws Exception {
         if (root == null || !Files.exists(root)) return;
         try (var paths = Files.walk(root)) {

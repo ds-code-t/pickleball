@@ -21,7 +21,8 @@ final class WorkbenchCommandLine {
     static final Set<String> AGENT_CORE_COMMANDS = Set.of(
             "export-guidance", "hint", "discover-hint", "discover", "confirm", "plan", "resolve-runvars",
             "short-log", "note", "inbox", "finish",
-            "presence", "post", "history", "gc-runs", "gc-versions", "use-version"
+            "presence", "post", "history", "gc-runs", "gc-versions", "use-version",
+            "inspect-page", "find-element"
     );
     static final Set<String> SESSION_CLIENT_COMMANDS = Set.of(
             "isolate", "session-start", "execute-step", "status", "events", "stop", "kill",

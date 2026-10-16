@@ -64,13 +64,15 @@ public final class WorkbenchAgentCommands {
                 case "gc-runs" -> gcRuns(parsed, out, err);
                 case "gc-versions" -> gcVersions(parsed, out, err);
                 case "use-version" -> useVersion(parsed, out, err);
+                case "inspect-page" -> inspectPage(parsed, out, err);
+                case "find-element" -> findElement(parsed, out, err);
                 default -> {
                     err.println("Unknown Workbench agent command: " + parsed.command());
                     yield 2;
                 }
             };
         } catch (RuntimeException failure) {
-            err.println("Workbench " + parsed.command() + " failed: " + failure.getMessage());
+            err.println("Workbench " + parsed.command() + " failed: " + WorkbenchCliErrors.explain(failure));
             return 1;
         }
     }
@@ -195,7 +197,7 @@ public final class WorkbenchAgentCommands {
             AgentCoordination.finish(
                     parsed.project(),
                     run.runId(),
-                    parsed.coordination().learned(),
+                    outcomeLearned(parsed, empty, plan.browser().browser()),
                     status,
                     java.time.Instant.now(),
                     out
@@ -267,7 +269,7 @@ public final class WorkbenchAgentCommands {
             AgentCoordination.finish(
                     parsed.project(),
                     run.runId(),
-                    parsed.coordination().learned(),
+                    outcomeLearned(parsed, empty, retained.get(PKB_props.PKB_BROWSER)),
                     status,
                     java.time.Instant.now(),
                     out
@@ -751,6 +753,73 @@ public final class WorkbenchAgentCommands {
     private static void echoFilters(WorkbenchCommandLine.Parsed parsed, PrintStream out) {
         out.println("tags=" + text(parsed.tags()));
         out.println("name=" + text(parsed.name()));
+    }
+
+    private static String outcomeLearned(WorkbenchCommandLine.Parsed parsed, boolean empty, String browser) {
+        String supplied = parsed.coordination().learned();
+        if (!empty) return supplied;
+        if (supplied != null && !supplied.isBlank()) return supplied;
+        return "No scenarios matched tags=" + text(parsed.tags())
+                + " name=" + text(parsed.name())
+                + " example=" + text(parsed.example())
+                + " browser=" + text(browser);
+    }
+
+    private static int inspectPage(WorkbenchCommandLine.Parsed parsed, PrintStream out, PrintStream err) {
+        String html = readHtml(parsed, err);
+        if (html == null) return 2;
+        for (WorkbenchElementInspect.Hit hit : WorkbenchElementInspect.dump(html)) {
+            out.println(hit.phrase());
+            out.println("xpath=" + hit.xpath());
+            out.println("rawMatchCount=" + hit.rawMatchCount());
+            out.println("visibleCount=" + hit.visibleCount());
+        }
+        return 0;
+    }
+
+    private static int findElement(WorkbenchCommandLine.Parsed parsed, PrintStream out, PrintStream err) {
+        String category = flag(parsed, "--category");
+        if (category == null || category.isBlank()) {
+            err.println("Usage: find-element --category=<Button> [--text=<label>] --html=<file>");
+            return 2;
+        }
+        String html = readHtml(parsed, err);
+        if (html == null) return 2;
+        String label = parsed.coordination().text();
+        WorkbenchElementInspect.Hit hit = WorkbenchElementInspect.find(category, label, html);
+        out.println("phrase=" + hit.phrase());
+        out.println("xpath=" + hit.xpath());
+        out.println("rawMatchCount=" + hit.rawMatchCount());
+        out.println("visibleCount=" + hit.visibleCount());
+        return hit.xpath().isBlank() ? 1 : 0;
+    }
+
+    private static String readHtml(WorkbenchCommandLine.Parsed parsed, PrintStream err) {
+        String raw = flag(parsed, "--html");
+        if (raw == null || raw.isBlank()) {
+            err.println("Usage requires --html=<file>. Inspection does not open a browser.");
+            return null;
+        }
+        Path file = Path.of(raw);
+        if (!file.isAbsolute()) file = parsed.project().resolve(raw);
+        try {
+            return java.nio.file.Files.readString(file);
+        } catch (java.io.IOException failure) {
+            err.println("Workbench inspect failed: " + WorkbenchCliErrors.explain(failure));
+            return null;
+        }
+    }
+
+    private static String flag(WorkbenchCommandLine.Parsed parsed, String name) {
+        String[] args = parsed.forwarded();
+        if (args == null) return null;
+        for (int index = 0; index < args.length; index++) {
+            String token = args[index];
+            if (token == null) continue;
+            if (token.startsWith(name + "=")) return token.substring(name.length() + 1);
+            if (name.equals(token) && index + 1 < args.length) return args[index + 1];
+        }
+        return null;
     }
 
     private static void printEmpty(

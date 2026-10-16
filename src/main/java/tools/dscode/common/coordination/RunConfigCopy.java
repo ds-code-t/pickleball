@@ -8,6 +8,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.FileSystem;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
@@ -15,6 +16,8 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 /**
@@ -194,10 +197,38 @@ public final class RunConfigCopy {
                     Files.createDirectories(target);
                 } else if (Files.isRegularFile(path)) {
                     if (target.getParent() != null) Files.createDirectories(target.getParent());
-                    Files.copy(path, target, StandardCopyOption.REPLACE_EXISTING);
+                    if (isTextConfig(path)) {
+                        String original = Files.readString(path, StandardCharsets.UTF_8);
+                        Files.writeString(target, redactSecrets(original), StandardCharsets.UTF_8);
+                    } else {
+                        Files.copy(path, target, StandardCopyOption.REPLACE_EXISTING);
+                    }
                 }
             }
         }
+    }
+
+    private static final Pattern SECRET_ASSIGNMENT = Pattern.compile(
+            "(?i)(^|[\\s{\\[,\"'])((?:password|passwd|secret|token|credential|api[_-]?key|access[_-]?key))(\\s*[\"']?\\s*[:=]\\s*[\"']?)([^\\s\"',#}]+)"
+    );
+
+    /** Workbench run copies only. The file that a normal run reads is not opened for write. */
+    static String redactSecrets(String text) {
+        if (text == null || text.isEmpty()) return text == null ? "" : text;
+        Matcher matcher = SECRET_ASSIGNMENT.matcher(text);
+        StringBuffer redacted = new StringBuffer();
+        while (matcher.find()) {
+            matcher.appendReplacement(redacted, Matcher.quoteReplacement(matcher.group(1) + matcher.group(2) + matcher.group(3) + "***"));
+        }
+        matcher.appendTail(redacted);
+        return redacted.toString();
+    }
+
+    private static boolean isTextConfig(Path path) {
+        String name = path.getFileName() == null ? "" : path.getFileName().toString().toLowerCase(java.util.Locale.ROOT);
+        return name.endsWith(".yaml") || name.endsWith(".yml") || name.endsWith(".properties")
+                || name.endsWith(".json") || name.endsWith(".xml") || name.endsWith(".conf")
+                || name.endsWith(".txt") || name.endsWith(".env");
     }
 
     private static URI jarUri(URL url) {
