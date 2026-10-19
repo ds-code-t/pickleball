@@ -11,7 +11,9 @@ import tools.dscode.testengine.PKB_props;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -40,24 +42,30 @@ class RunConfigIsolationTest {
     void aPrivateRunReadsAndWritesOnlyItsOwnConfigCopy() throws Exception {
         Path configs = project.resolve("src/test/resources/configs");
         Files.createDirectories(configs.resolve("jsonfiles"));
-        Files.writeString(configs.resolve("CHROME.yaml"), "browser: chrome\nmarker: project\n", StandardCharsets.UTF_8);
+        Files.writeString(configs.resolve("CHROME.yaml"), "browser: chrome\nmarker: project\npassword: secret123\n", StandardCharsets.UTF_8);
         Files.writeString(configs.resolve("URL.yaml"), "home: project-home\n", StandardCharsets.UTF_8);
         Files.writeString(configs.resolve("EDGE.yaml"), "browser: edge\nmarker: project-edge\n", StandardCharsets.UTF_8);
         Files.writeString(configs.resolve("jsonfiles/accounts.json"), "{\"id\":1}\n", StandardCharsets.UTF_8);
         String projectChrome = Files.readString(configs.resolve("CHROME.yaml"));
+        byte[] projectChromeBytes = Files.readAllBytes(configs.resolve("CHROME.yaml"));
+        byte[] projectUrlBytes = Files.readAllBytes(configs.resolve("URL.yaml"));
+        byte[] projectEdgeBytes = Files.readAllBytes(configs.resolve("EDGE.yaml"));
+        byte[] projectAccountsBytes = Files.readAllBytes(configs.resolve("jsonfiles/accounts.json"));
 
         AgentCoordination.Run first = openResolved("run-a", "agent-a", configs.toString());
-        assertTrue(Files.readString(first.configDirectory().resolve("CHROME.yaml")).contains("marker: project"));
-        assertTrue(Files.readString(first.configDirectory().resolve("URL.yaml")).contains("project-home"));
-        assertTrue(Files.readString(first.configDirectory().resolve("EDGE.yaml")).contains("project-edge"));
-        assertEquals("{\"id\":1}\n", Files.readString(first.configDirectory().resolve("jsonfiles/accounts.json")));
+        assertArrayEquals(projectChromeBytes, Files.readAllBytes(first.configDirectory().resolve("CHROME.yaml")));
+        assertArrayEquals(projectUrlBytes, Files.readAllBytes(first.configDirectory().resolve("URL.yaml")));
+        assertArrayEquals(projectEdgeBytes, Files.readAllBytes(first.configDirectory().resolve("EDGE.yaml")));
+        assertArrayEquals(projectAccountsBytes, Files.readAllBytes(first.configDirectory().resolve("jsonfiles/accounts.json")));
+        assertTrue(new String(projectChromeBytes, StandardCharsets.UTF_8).contains("password: secret123"));
         assertTrue(Files.isRegularFile(first.configDirectory().resolve("CHROME_HEADLESS.yaml")));
         assertFalse(Files.exists(configs.resolve("CHROME_HEADLESS.yaml")));
         assertEquals(projectChrome, Files.readString(configs.resolve("CHROME.yaml")));
 
-        RunConfigs.write(project, "run-a", "CHROME.yaml", "browser: chrome\nmarker: run-a\n");
+        RunConfigs.write(project, "run-a", "CHROME.yaml", "browser: chrome\nmarker: run-a\npassword: mutated\n");
         assertTrue(Files.readString(first.configDirectory().resolve("CHROME.yaml")).contains("marker: run-a"));
-        assertEquals(projectChrome, Files.readString(configs.resolve("CHROME.yaml")));
+        assertTrue(Files.readString(first.configDirectory().resolve("CHROME.yaml")).contains("password: mutated"));
+        assertArrayEquals(projectChromeBytes, Files.readAllBytes(configs.resolve("CHROME.yaml")));
         assertThrows(IllegalArgumentException.class, () ->
                 RunConfigs.write(project, "run-a", "../CHROME.yaml", "marker: escaped\n"));
         assertEquals(projectChrome, Files.readString(configs.resolve("CHROME.yaml")));
@@ -94,13 +102,16 @@ class RunConfigIsolationTest {
                 StandardCharsets.UTF_8
         );
 
+        Path staleFile = project.resolve(".pickleball/runs/stale/config/URL.yaml");
+        byte[] staleBefore = Files.readAllBytes(staleFile);
+
         assertNull(AgentCoordination.openConsumerRun(project, new StringBuilder()));
         assertFalse(Files.isDirectory(project.resolve(".pickleball/runs/stale/reports")));
-        assertFalse(Files.isDirectory(project.resolve(".pickleball/runs/normal/config")));
-        assertEquals(
-                "home: from-stale-run\n",
-                Files.readString(project.resolve(".pickleball/runs/stale/config/URL.yaml"))
-        );
+        assertArrayEquals(staleBefore, Files.readAllBytes(staleFile));
+        try (var walk = Files.walk(project.resolve(".pickleball/runs"))) {
+            List<Path> files = walk.filter(Files::isRegularFile).sorted().toList();
+            assertEquals(List.of(staleFile), files);
+        }
         ParsingMap.initializeConfigs(configs.toString());
         assertEquals("from-project", String.valueOf(ParsingMap.getGlobalsParsingmap().get("configs.URL.home")));
     }
