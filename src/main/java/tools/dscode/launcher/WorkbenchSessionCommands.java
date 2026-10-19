@@ -3,6 +3,7 @@ package tools.dscode.launcher;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import tools.dscode.common.coordination.AgentCoordination;
+import tools.dscode.common.runtime.ProcessTrees;
 import tools.dscode.control.protocol.PickleballLocalLayout;
 import tools.dscode.control.protocol.RunView;
 import tools.dscode.control.protocol.WindowDriver;
@@ -688,13 +689,7 @@ public final class WorkbenchSessionCommands {
     }
 
     private static void killTree(long pid) {
-        ProcessHandle.of(pid).ifPresent(handle -> {
-            List<ProcessHandle> descendants = handle.descendants().toList();
-            for (int index = descendants.size() - 1; index >= 0; index--) {
-                descendants.get(index).destroyForcibly();
-            }
-            if (handle.isAlive()) handle.destroyForcibly();
-        });
+        ProcessHandle.of(pid).ifPresent(ProcessTrees::killTree);
     }
 
     private static void deleteSessionFile(Path stateFile) {

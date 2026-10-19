@@ -96,7 +96,7 @@ Maven `target/` and Gradle `build/` are generated. Workbench sync reads that out
 
 A Workbench discover or confirm that selects nothing prints `status=EMPTY`, the effective tags, name, example, and browser, and exits non-zero. It does not print `status=PASSED`. The run record status is `EMPTY`. If you did not pass `--learned`, the record says which filters matched nothing. Diagnostic mode still reports `NO_TESTS`. A normal Cucumber run is unchanged.
 
-`--step-timeout=<seconds>` and `--run-timeout=<seconds>` on a live command record `TIMEOUT` when that budget is exceeded. They are not `pkb_stepMaxTime`. `stop --force` kills the worker and browser process tree and records `STOPPED`. `stop` without `--force` still waits. `--stop-after=<step>` is the live alias of the one-shot breakpoint.
+`--step-timeout=<seconds>` and `--run-timeout=<seconds>` on a live command record `TIMEOUT` when that budget is exceeded. They are not `pkb_stepMaxTime`. A timed-out `discover` or `confirm` kills the wrapper and its child processes. `stop --force` kills the worker and browser process tree the same way and records `STOPPED`. `stop` without `--force` still waits. `--stop-after=<step>` is the live alias of the one-shot breakpoint.
 
 `No healthy Workbench session` names why: `never-started`, `still-starting`, `crashed`, or `missing-session-file`. Session start logs `start` only after the session is healthy. Worker start waits `pkb_workbench_worker_start_timeout` seconds (system property, `PKB_WORKBENCH_WORKER_START_TIMEOUT`, or a `pkb_runvars` member; default 180). A timeout names the elapsed time, the stage (`compile`, `classpath`, `worker-launch`, `anchor-parse`, or `paused`), and the last worker output. That setting is Workbench only.
 

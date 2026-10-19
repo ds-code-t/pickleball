@@ -288,6 +288,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/common/reporting/WorkBookConsolePrinter.java`
 - `src/main/java/tools/dscode/common/reporting/WorkSheet.java`
 - `src/main/java/tools/dscode/common/resources/ResourceLocations.java`
+- `src/main/java/tools/dscode/common/runtime/ProcessTrees.java`
 - `src/main/java/tools/dscode/common/seleniumextensions/AllContextsScan.java`
 - `src/main/java/tools/dscode/common/seleniumextensions/ContextWrapper.java`
 - `src/main/java/tools/dscode/common/seleniumextensions/ElementWrapper.java`

@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import tools.dscode.common.coordination.AgentCoordination;
+import tools.dscode.common.reporting.diagnostic.ConsumerMavenTestRunner;
 import tools.dscode.common.reporting.diagnostic.LastDiscoverSnapshot;
 import tools.dscode.testengine.PKB_props;
 
@@ -578,6 +579,73 @@ class WorkbenchAgentCommandsTest {
         );
         assertTrue(record.contains("TIMEOUT"));
         assertFalse(record.contains("PASSED"));
+    }
+
+    @Test
+    @Timeout(value = 40, unit = TimeUnit.SECONDS)
+    void discoverRunTimeoutKillsTheLauncherProcessTree() throws Exception {
+        Path classes = tempDir.resolve("sleeper");
+        Files.createDirectories(classes);
+        Path source = classes.resolve("TreeSleeper.java");
+        Files.writeString(source, """
+                import java.nio.file.Files;
+                import java.nio.file.Path;
+                public class TreeSleeper {
+                    public static void main(String[] args) throws Exception {
+                        if (args.length > 0 && "leaf".equals(args[0])) {
+                            Thread.sleep(Long.parseLong(args[1]));
+                            return;
+                        }
+                        String javaBin = Path.of(System.getProperty("java.home"), "bin", "java").toString();
+                        Process leaf = new ProcessBuilder(
+                                javaBin, "-cp", args[0], "TreeSleeper", "leaf", args[2]
+                        ).start();
+                        Files.writeString(Path.of(args[1]), ProcessHandle.current().pid() + "\\n" + leaf.pid() + "\\n");
+                        Thread.sleep(Long.parseLong(args[2]));
+                    }
+                }
+                """);
+        String javaBin = Path.of(System.getProperty("java.home"), "bin", "java").toString();
+        Process compile = new ProcessBuilder(
+                Path.of(System.getProperty("java.home"), "bin", "javac").toString(),
+                source.toString()
+        ).inheritIO().start();
+        assertEquals(0, compile.waitFor(), "sleeper did not compile");
+        new ProcessBuilder(javaBin, "-cp", classes.toString(), "TreeSleeper", classes.toString(),
+                tempDir.resolve("warmup.txt").toString(), "50").inheritIO().start().waitFor();
+
+        Path pids = tempDir.resolve("pids.txt");
+        boolean windows = System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win");
+        Path script = tempDir.resolve(windows ? "mvnw.cmd" : "mvnw");
+        String body = windows
+                ? "@echo off\r\n\"" + javaBin + "\" -cp \"" + classes + "\" TreeSleeper \"" + classes + "\" \"" + pids + "\" 120000\r\n"
+                : "#!/bin/sh\nexec \"" + javaBin + "\" -cp \"" + classes + "\" TreeSleeper \"" + classes + "\" \"" + pids + "\" 120000\n";
+        Files.writeString(script, body);
+        script.toFile().setExecutable(true);
+
+        ByteArrayOutputStream stdout = new ByteArrayOutputStream();
+        ByteArrayOutputStream stderr = new ByteArrayOutputStream();
+        int exit = WorkbenchAgentCommands.run(
+                new String[]{"discover", tempDir.toString(), "--run-timeout=1", "--run-id=tree-timeout"},
+                new PrintStream(stdout, true, StandardCharsets.UTF_8),
+                new PrintStream(stderr, true, StandardCharsets.UTF_8),
+                ConsumerMavenTestRunner::run
+        );
+        assertEquals(1, exit);
+        assertTrue(stderr.toString(StandardCharsets.UTF_8).contains("TIMEOUT"), stderr.toString(StandardCharsets.UTF_8));
+        assertTrue(Files.isRegularFile(pids), "launcher did not publish the process tree");
+        List<Long> tree = Files.readString(pids).lines().map(String::trim).filter(line -> !line.isEmpty()).map(Long::parseLong).toList();
+        assertEquals(2, tree.size(), tree.toString());
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+        while (System.nanoTime() < deadline && tree.stream().anyMatch(pid -> ProcessHandle.of(pid).map(ProcessHandle::isAlive).orElse(false))) {
+            Thread.sleep(50);
+        }
+        assertTrue(tree.stream().noneMatch(pid -> ProcessHandle.of(pid).map(ProcessHandle::isAlive).orElse(false)), tree.toString());
+        String record = Files.readString(
+                AgentCoordination.runDirectory(tempDir, "tree-timeout").resolve(AgentCoordination.RECORD_FILE)
+        );
+        assertTrue(record.contains("TIMEOUT"), record);
+        assertFalse(record.contains("PASSED"), record);
     }
 
     @Test

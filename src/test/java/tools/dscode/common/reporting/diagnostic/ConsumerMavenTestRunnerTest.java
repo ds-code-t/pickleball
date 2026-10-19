@@ -1,6 +1,7 @@
 package tools.dscode.common.reporting.diagnostic;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 
 import tools.dscode.testengine.PKB_props;
@@ -9,6 +10,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Locale;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -111,5 +114,116 @@ class ConsumerMavenTestRunnerTest {
         );
         assertTrue(failure.getMessage().contains("one Maven or Gradle"));
         assertTrue(failure.getMessage().contains("machine-wide"));
+    }
+
+    @Test
+    @Timeout(value = 30, unit = TimeUnit.SECONDS)
+    void noTimeoutLetsTheProcessTreeExitOnItsOwn() throws Exception {
+        Path classes = compileSleeper(project);
+        Path pids = project.resolve("pids.txt");
+        int exit = ConsumerMavenTestRunner.inheritIoLauncher().run(
+                sleeperCommand(classes, pids, 400),
+                project,
+                System.out,
+                System.err
+        );
+        assertEquals(0, exit);
+        assertFalse(anyAlive(readPids(pids)));
+    }
+
+    @Test
+    @Timeout(value = 30, unit = TimeUnit.SECONDS)
+    void interruptWhileWaitingKillsTheProcessTree() throws Exception {
+        Path classes = compileSleeper(project);
+        Path pids = project.resolve("pids.txt");
+        AtomicReference<Throwable> thrown = new AtomicReference<>();
+        Thread waiter = new Thread(() -> {
+            try {
+                ConsumerMavenTestRunner.inheritIoLauncher().run(
+                        sleeperCommand(classes, pids, 120_000),
+                        project,
+                        System.out,
+                        System.err
+                );
+            } catch (Throwable failure) {
+                thrown.set(failure);
+            }
+        }, "pickleball-tree-wait");
+        waiter.start();
+        List<Long> tree = awaitPids(pids);
+        waiter.interrupt();
+        waiter.join(15_000);
+        assertFalse(waiter.isAlive(), "waiter did not leave waitFor");
+        assertTrue(thrown.get() instanceof InterruptedException, String.valueOf(thrown.get()));
+        assertFalse(anyAlive(tree), "pids still alive: " + tree);
+    }
+
+    private static List<String> sleeperCommand(Path classes, Path pids, long sleepMs) {
+        String java = Path.of(System.getProperty("java.home"), "bin", "java").toString();
+        return List.of(
+                java,
+                "-cp",
+                classes.toString(),
+                "TreeSleeper",
+                classes.toString(),
+                pids.toString(),
+                Long.toString(sleepMs)
+        );
+    }
+
+    private static Path compileSleeper(Path directory) throws Exception {
+        Path source = directory.resolve("TreeSleeper.java");
+        Files.writeString(source, """
+                import java.nio.file.Files;
+                import java.nio.file.Path;
+                public class TreeSleeper {
+                    public static void main(String[] args) throws Exception {
+                        if (args.length > 0 && "leaf".equals(args[0])) {
+                            Thread.sleep(Long.parseLong(args[1]));
+                            return;
+                        }
+                        String javaBin = Path.of(System.getProperty("java.home"), "bin", "java").toString();
+                        Process leaf = new ProcessBuilder(
+                                javaBin, "-cp", args[0], "TreeSleeper", "leaf", args[2]
+                        ).start();
+                        Files.writeString(Path.of(args[1]), ProcessHandle.current().pid() + "\\n" + leaf.pid() + "\\n");
+                        Thread.sleep(Long.parseLong(args[2]));
+                        leaf.destroyForcibly();
+                        leaf.waitFor();
+                    }
+                }
+                """);
+        Process compile = new ProcessBuilder(
+                Path.of(System.getProperty("java.home"), "bin", "javac").toString(),
+                source.toString()
+        ).directory(directory.toFile()).inheritIO().start();
+        assertEquals(0, compile.waitFor());
+        return directory;
+    }
+
+    private static List<Long> awaitPids(Path file) throws Exception {
+        for (int attempt = 0; attempt < 100; attempt++) {
+            if (Files.isRegularFile(file)) {
+                List<Long> pids = readPids(file);
+                if (pids.size() >= 2) return pids;
+            }
+            Thread.sleep(50);
+        }
+        throw new AssertionError("process tree did not publish pids");
+    }
+
+    private static List<Long> readPids(Path file) throws Exception {
+        return Files.readString(file).lines()
+                .map(String::trim)
+                .filter(line -> !line.isEmpty())
+                .map(Long::parseLong)
+                .toList();
+    }
+
+    private static boolean anyAlive(List<Long> pids) {
+        for (Long pid : pids) {
+            if (ProcessHandle.of(pid).map(ProcessHandle::isAlive).orElse(false)) return true;
+        }
+        return false;
     }
 }

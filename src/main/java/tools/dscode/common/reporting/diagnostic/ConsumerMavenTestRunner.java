@@ -1,5 +1,6 @@
 package tools.dscode.common.reporting.diagnostic;
 
+import tools.dscode.common.runtime.ProcessTrees;
 import tools.dscode.testengine.PKB_props;
 
 import java.io.IOException;
@@ -162,13 +163,19 @@ public final class ConsumerMavenTestRunner {
         return Files.isRegularFile(bin) ? bin.toString() : (windows ? "java.exe" : "java");
     }
 
-    private static ProcessLauncher inheritIoLauncher() {
+    static ProcessLauncher inheritIoLauncher() {
         return (command, directory, out, err) -> {
             ProcessBuilder builder = new ProcessBuilder(command)
                     .directory(directory.toFile())
                     .inheritIO();
             Process process = builder.start();
-            return process.waitFor();
+            try {
+                return process.waitFor();
+            } catch (InterruptedException interrupted) {
+                ProcessTrees.killTree(process.toHandle());
+                Thread.currentThread().interrupt();
+                throw interrupted;
+            }
         };
     }
 }
