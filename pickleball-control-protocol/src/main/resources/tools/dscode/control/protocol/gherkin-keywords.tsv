@@ -1,0 +1,1363 @@
+# Keywords from io.cucumber:gherkin:35.1.0. One language code, a tab, and the keyword. Asterisk step keywords are omitted.
+af	Funksie
+af	Besigheid Behoefte
+af	Vermoë
+af	Reël
+af	Reel
+af	Voorbeeld
+af	Situasie
+af	Situasie Uiteensetting
+af	Agtergrond
+af	Voorbeelde
+af	Gegewe
+af	Wanneer
+af	Dan
+af	En
+af	Maar
+am	Ֆունկցիոնալություն
+am	Հատկություն
+am	Rule
+am	Օրինակ
+am	Սցենար
+am	Սցենարի կառուցվացքը
+am	Կոնտեքստ
+am	Օրինակներ
+am	Դիցուք
+am	Եթե
+am	Երբ
+am	Ապա
+am	Եվ
+am	Բայց
+amh	ስራ
+amh	የተፈለገው ስራ
+amh	የሚፈለገው ድርጊት
+amh	ህግ
+amh	ምሳሌ
+amh	ሁናቴ
+amh	ሁናቴ ዝርዝር
+amh	ሁናቴ አብነት
+amh	ቅድመ ሁኔታ
+amh	መነሻ
+amh	መነሻ ሀሳብ
+amh	ምሳሌዎች
+amh	ሁናቴዎች
+amh	የተሰጠ
+amh	መቼ
+amh	ከዚያ
+amh	እና
+amh	ግን
+an	Caracteristica
+an	Rule
+an	Eixemplo
+an	Caso
+an	Esquema del caso
+an	Antecedents
+an	Eixemplos
+an	Dau
+an	Dada
+an	Daus
+an	Dadas
+an	Cuan
+an	Alavez
+an	Allora
+an	Antonces
+an	Y
+an	E
+an	Pero
+ar	خاصية
+ar	Rule
+ar	مثال
+ar	سيناريو
+ar	سيناريو مخطط
+ar	الخلفية
+ar	امثلة
+ar	بفرض
+ar	متى
+ar	عندما
+ar	اذاً
+ar	ثم
+ar	و
+ar	لكن
+ast	Carauterística
+ast	Rule
+ast	Exemplo
+ast	Casu
+ast	Esbozu del casu
+ast	Antecedentes
+ast	Exemplos
+ast	Dáu
+ast	Dada
+ast	Daos
+ast	Daes
+ast	Cuando
+ast	Entós
+ast	Y
+ast	Ya
+ast	Peru
+az	Özəllik
+az	Rule
+az	Nümunə
+az	Ssenari
+az	Ssenarinin strukturu
+az	Keçmiş
+az	Kontekst
+az	Nümunələr
+az	Tutaq ki
+az	Verilir
+az	Əgər
+az	Nə vaxt ki
+az	O halda
+az	Və
+az	Həm
+az	Amma
+az	Ancaq
+be	Функцыянальнасць
+be	Фіча
+be	Правілы
+be	Сцэнарый
+be	Cцэнар
+be	Шаблон сцэнарыя
+be	Узор сцэнара
+be	Кантэкст
+be	Прыклады
+be	Няхай
+be	Дадзена
+be	Калі
+be	Тады
+be	I
+be	Ды
+be	Таксама
+be	Але
+be	Інакш
+bg	Функционалност
+bg	Правило
+bg	Пример
+bg	Сценарий
+bg	Рамка на сценарий
+bg	Предистория
+bg	Примери
+bg	Дадено
+bg	Когато
+bg	То
+bg	И
+bg	Но
+bm	Fungsi
+bm	Rule
+bm	Senario
+bm	Situasi
+bm	Keadaan
+bm	Kerangka Senario
+bm	Kerangka Situasi
+bm	Kerangka Keadaan
+bm	Garis Panduan Senario
+bm	Latar Belakang
+bm	Contoh
+bm	Diberi
+bm	Bagi
+bm	Apabila
+bm	Maka
+bm	Kemudian
+bm	Dan
+bm	Tetapi
+bm	Tapi
+bs	Karakteristika
+bs	Rule
+bs	Primjer
+bs	Scenariju
+bs	Scenario
+bs	Scenariju-obris
+bs	Scenario-outline
+bs	Pozadina
+bs	Primjeri
+bs	Dato
+bs	Kada
+bs	Zatim
+bs	I
+bs	A
+bs	Ali
+ca	Característica
+ca	Funcionalitat
+ca	Rule
+ca	Exemple
+ca	Escenari
+ca	Esquema de l'escenari
+ca	Rerefons
+ca	Antecedents
+ca	Exemples
+ca	Donat
+ca	Donada
+ca	Atès
+ca	Atesa
+ca	Quan
+ca	Aleshores
+ca	Cal
+ca	I
+ca	Però
+cs	Požadavek
+cs	Pravidlo
+cs	Příklad
+cs	Scénář
+cs	Náčrt Scénáře
+cs	Osnova scénáře
+cs	Pozadí
+cs	Kontext
+cs	Příklady
+cs	Pokud
+cs	Za předpokladu
+cs	Když
+cs	Pak
+cs	A také
+cs	A
+cs	Ale
+cy-GB	Arwedd
+cy-GB	Rule
+cy-GB	Enghraifft
+cy-GB	Scenario
+cy-GB	Scenario Amlinellol
+cy-GB	Cefndir
+cy-GB	Enghreifftiau
+cy-GB	Anrhegedig a
+cy-GB	Pryd
+cy-GB	Yna
+cy-GB	A
+cy-GB	Ond
+da	Egenskab
+da	Regel
+da	Eksempel
+da	Scenarie
+da	Abstrakt Scenario
+da	Baggrund
+da	Eksempler
+da	Givet
+da	Når
+da	Så
+da	Og
+da	Men
+de	Funktionalität
+de	Funktion
+de	Rule
+de	Regel
+de	Beispiel
+de	Szenario
+de	Szenariogrundriss
+de	Szenarien
+de	Grundlage
+de	Hintergrund
+de	Voraussetzungen
+de	Vorbedingungen
+de	Beispiele
+de	Angenommen
+de	Gegeben sei
+de	Gegeben seien
+de	Wenn
+de	Dann
+de	Und
+de	Aber
+el	Δυνατότητα
+el	Λειτουργία
+el	Rule
+el	Παράδειγμα
+el	Σενάριο
+el	Περιγραφή Σεναρίου
+el	Περίγραμμα Σεναρίου
+el	Υπόβαθρο
+el	Παραδείγματα
+el	Σενάρια
+el	Δεδομένου
+el	Όταν
+el	Τότε
+el	Και
+el	Αλλά
+em	📚
+em	Rule
+em	🥒
+em	📕
+em	📖
+em	💤
+em	📓
+em	😐
+em	🎬
+em	🙏
+em	😂
+em	😔
+en	Feature
+en	Business Need
+en	Ability
+en	Rule
+en	Example
+en	Scenario
+en	Scenario Outline
+en	Scenario Template
+en	Background
+en	Examples
+en	Scenarios
+en	Given
+en	When
+en	Then
+en	And
+en	But
+en-Scouse	Feature
+en-Scouse	Rule
+en-Scouse	The thing of it is
+en-Scouse	Wharrimean is
+en-Scouse	Dis is what went down
+en-Scouse	Examples
+en-Scouse	Givun
+en-Scouse	Youse know when youse got
+en-Scouse	Wun
+en-Scouse	Youse know like when
+en-Scouse	Dun
+en-Scouse	Den youse gotta
+en-Scouse	An
+en-Scouse	Buh
+en-au	Pretty much
+en-au	Rule
+en-au	Awww, look mate
+en-au	Reckon it's like
+en-au	First off
+en-au	You'll wanna
+en-au	Y'know
+en-au	It's just unbelievable
+en-au	But at the end of the day I reckon
+en-au	Too right
+en-au	Yeah nah
+en-lol	OH HAI
+en-lol	Rule
+en-lol	MISHUN
+en-lol	MISHUN SRSLY
+en-lol	B4
+en-lol	EXAMPLZ
+en-lol	I CAN HAZ
+en-lol	WEN
+en-lol	DEN
+en-lol	AN
+en-lol	BUT
+en-old	Hwaet
+en-old	Hwæt
+en-old	Rule
+en-old	Swa
+en-old	Swa hwaer swa
+en-old	Swa hwær swa
+en-old	Aer
+en-old	Ær
+en-old	Se the
+en-old	Se þe
+en-old	Se ðe
+en-old	Thurh
+en-old	Þurh
+en-old	Ðurh
+en-old	Bæþsealf
+en-old	Bæþsealfa
+en-old	Bæþsealfe
+en-old	Ciricæw
+en-old	Ciricæwe
+en-old	Ciricæwa
+en-old	Tha
+en-old	Þa
+en-old	Ða
+en-old	Tha the
+en-old	Þa þe
+en-old	Ða ðe
+en-old	Ond
+en-old	7
+en-old	Ac
+en-pirate	Ahoy matey!
+en-pirate	Rule
+en-pirate	Heave to
+en-pirate	Shiver me timbers
+en-pirate	Yo-ho-ho
+en-pirate	Dead men tell no tales
+en-pirate	Gangway!
+en-pirate	Blimey!
+en-pirate	Let go and haul
+en-pirate	Aye
+en-pirate	Avast!
+en-tx	This ain’t my first rodeo
+en-tx	All gussied up
+en-tx	Rule
+en-tx	All hat and no cattle
+en-tx	Serious as a snake bite
+en-tx	Busy as a hound in flea season
+en-tx	Lemme tell y'all a story
+en-tx	Now that's a story longer than a cattle drive in July
+en-tx	Fixin' to
+en-tx	All git out
+en-tx	Quick out of the chute
+en-tx	There’s no tree but bears some fruit
+en-tx	Come hell or high water
+en-tx	Well now hold on, I'll you what
+eo	Trajto
+eo	Regulo
+eo	Ekzemplo
+eo	Scenaro
+eo	Kazo
+eo	Konturo de la scenaro
+eo	Skizo
+eo	Kazo-skizo
+eo	Fono
+eo	Ekzemploj
+eo	Donitaĵo
+eo	Komence
+eo	Se
+eo	Do
+eo	Kaj
+eo	Sed
+es	Característica
+es	Necesidad del negocio
+es	Requisito
+es	Regla
+es	Regla de negocio
+es	Ejemplo
+es	Escenario
+es	Esquema del escenario
+es	Antecedentes
+es	Ejemplos
+es	Dado
+es	Dada
+es	Dados
+es	Dadas
+es	Cuando
+es	Entonces
+es	Y
+es	E
+es	Pero
+et	Omadus
+et	Reegel
+et	Juhtum
+et	Stsenaarium
+et	Raamjuhtum
+et	Raamstsenaarium
+et	Taust
+et	Juhtumid
+et	Eeldades
+et	Kui
+et	Siis
+et	Ja
+et	Kuid
+fa	وِیژگی
+fa	Rule
+fa	مثال
+fa	سناریو
+fa	الگوی سناریو
+fa	زمینه
+fa	نمونه ها
+fa	با فرض
+fa	هنگامی
+fa	آنگاه
+fa	و
+fa	اما
+fi	Ominaisuus
+fi	Rule
+fi	Tapaus
+fi	Tapausaihio
+fi	Tausta
+fi	Tapaukset
+fi	Oletetaan
+fi	Kun
+fi	Niin
+fi	Ja
+fi	Mutta
+fr	Fonctionnalité
+fr	Règle
+fr	Exemple
+fr	Scénario
+fr	Plan du scénario
+fr	Plan du Scénario
+fr	Contexte
+fr	Exemples
+fr	Soit
+fr	Sachant que
+fr	Sachant qu'
+fr	Sachant
+fr	Etant donné que
+fr	Etant donné qu'
+fr	Etant donné
+fr	Etant donnée
+fr	Etant donnés
+fr	Etant données
+fr	Étant donné que
+fr	Étant donné qu'
+fr	Étant donné
+fr	Étant donnée
+fr	Étant donnés
+fr	Étant données
+fr	Quand
+fr	Lorsque
+fr	Lorsqu'
+fr	Alors
+fr	Donc
+fr	Et que
+fr	Et qu'
+fr	Et
+fr	Mais que
+fr	Mais qu'
+fr	Mais
+ga	Gné
+ga	Riail
+ga	Sampla
+ga	Cás
+ga	Cás Achomair
+ga	Cúlra
+ga	Samplaí
+ga	Cuir i gcás go
+ga	Cuir i gcás nach
+ga	Cuir i gcás gur
+ga	Cuir i gcás nár
+ga	Nuair a
+ga	Nuair nach
+ga	Nuair ba
+ga	Nuair nár
+ga	Ansin
+ga	Agus
+ga	Ach
+gj	લક્ષણ
+gj	વ્યાપાર જરૂર
+gj	ક્ષમતા
+gj	નિયમ
+gj	ઉદાહરણ
+gj	સ્થિતિ
+gj	પરિદ્દશ્ય રૂપરેખા
+gj	પરિદ્દશ્ય ઢાંચો
+gj	બેકગ્રાઉન્ડ
+gj	ઉદાહરણો
+gj	આપેલ છે
+gj	ક્યારે
+gj	પછી
+gj	અને
+gj	પણ
+gl	Característica
+gl	Rule
+gl	Exemplo
+gl	Escenario
+gl	Esbozo do escenario
+gl	Contexto
+gl	Exemplos
+gl	Dado
+gl	Dada
+gl	Dados
+gl	Dadas
+gl	Cando
+gl	Entón
+gl	Logo
+gl	E
+gl	Mais
+gl	Pero
+he	תכונה
+he	כלל
+he	דוגמא
+he	תרחיש
+he	תבנית תרחיש
+he	רקע
+he	דוגמאות
+he	בהינתן
+he	כאשר
+he	אז
+he	אזי
+he	וגם
+he	אבל
+hi	रूप लेख
+hi	नियम
+hi	परिदृश्य
+hi	परिदृश्य रूपरेखा
+hi	पृष्ठभूमि
+hi	उदाहरण
+hi	अगर
+hi	यदि
+hi	चूंकि
+hi	जब
+hi	कदा
+hi	तब
+hi	तदा
+hi	और
+hi	तथा
+hi	पर
+hi	परन्तु
+hi	किन्तु
+hr	Osobina
+hr	Mogućnost
+hr	Mogucnost
+hr	Rule
+hr	Primjer
+hr	Scenarij
+hr	Skica
+hr	Koncept
+hr	Pozadina
+hr	Primjeri
+hr	Scenariji
+hr	Zadan
+hr	Zadani
+hr	Zadano
+hr	Ukoliko
+hr	Kada
+hr	Kad
+hr	Onda
+hr	I
+hr	Ali
+ht	Karakteristik
+ht	Mak
+ht	Fonksyonalite
+ht	Rule
+ht	Senaryo
+ht	Plan senaryo
+ht	Plan Senaryo
+ht	Senaryo deskripsyon
+ht	Senaryo Deskripsyon
+ht	Dyagram senaryo
+ht	Dyagram Senaryo
+ht	Kontèks
+ht	Istorik
+ht	Egzanp
+ht	Sipoze
+ht	Sipoze ke
+ht	Sipoze Ke
+ht	Lè
+ht	Le
+ht	Lè sa a
+ht	Le sa a
+ht	Ak
+ht	Epi
+ht	E
+ht	Men
+hu	Jellemző
+hu	Szabály
+hu	Példa
+hu	Forgatókönyv
+hu	Forgatókönyv vázlat
+hu	Háttér
+hu	Példák
+hu	Amennyiben
+hu	Adott
+hu	Majd
+hu	Ha
+hu	Amikor
+hu	Akkor
+hu	És
+hu	De
+id	Fitur
+id	Rule
+id	Aturan
+id	Skenario
+id	Skenario konsep
+id	Garis-Besar Skenario
+id	Dasar
+id	Latar Belakang
+id	Contoh
+id	Misal
+id	Dengan
+id	Diketahui
+id	Diasumsikan
+id	Bila
+id	Jika
+id	Ketika
+id	Maka
+id	Kemudian
+id	Dan
+id	Tapi
+id	Tetapi
+is	Eiginleiki
+is	Rule
+is	Atburðarás
+is	Lýsing Atburðarásar
+is	Lýsing Dæma
+is	Bakgrunnur
+is	Dæmi
+is	Atburðarásir
+is	Ef
+is	Þegar
+is	Þá
+is	Og
+is	En
+it	Funzionalità
+it	Esigenza di Business
+it	Abilità
+it	Regola
+it	Esempio
+it	Scenario
+it	Schema dello scenario
+it	Contesto
+it	Esempi
+it	Dato
+it	Data
+it	Dati
+it	Date
+it	Quando
+it	Allora
+it	E
+it	Ed
+it	Ma
+ja	フィーチャ
+ja	機能
+ja	ルール
+ja	シナリオ
+ja	シナリオアウトライン
+ja	シナリオテンプレート
+ja	テンプレ
+ja	シナリオテンプレ
+ja	背景
+ja	例
+ja	サンプル
+ja	前提
+ja	もし
+ja	ならば
+ja	且つ
+ja	かつ
+ja	然し
+ja	しかし
+ja	但し
+ja	ただし
+jv	Fitur
+jv	Rule
+jv	Skenario
+jv	Konsep skenario
+jv	Dasar
+jv	Conto
+jv	Contone
+jv	Nalika
+jv	Nalikaning
+jv	Manawa
+jv	Menawa
+jv	Njuk
+jv	Banjur
+jv	Lan
+jv	Tapi
+jv	Nanging
+jv	Ananging
+ka	თვისება
+ka	მოთხოვნა
+ka	წესი
+ka	მაგალითად
+ka	მაგალითი
+ka	მაგ
+ka	სცენარი
+ka	სცენარის ნიმუში
+ka	სცენარის შაბლონი
+ka	ნიმუში
+ka	შაბლონი
+ka	კონტექსტი
+ka	მაგალითები
+ka	მოცემული
+ka	მოცემულია
+ka	ვთქვათ
+ka	როდესაც
+ka	როცა
+ka	როგორც კი
+ka	თუ
+ka	მაშინ
+ka	და
+ka	ასევე
+ka	მაგრამ
+ka	თუმცა
+kn	ಹೆಚ್ಚಳ
+kn	Rule
+kn	ಉದಾಹರಣೆ
+kn	ಕಥಾಸಾರಾಂಶ
+kn	ವಿವರಣೆ
+kn	ಹಿನ್ನೆಲೆ
+kn	ಉದಾಹರಣೆಗಳು
+kn	ನೀಡಿದ
+kn	ಸ್ಥಿತಿಯನ್ನು
+kn	ನಂತರ
+kn	ಮತ್ತು
+kn	ಆದರೆ
+ko	기능
+ko	Rule
+ko	시나리오
+ko	시나리오 개요
+ko	배경
+ko	예
+ko	조건
+ko	먼저
+ko	만일
+ko	만약
+ko	그러면
+ko	그리고
+ko	하지만
+ko	단
+lt	Savybė
+lt	Rule
+lt	Pavyzdys
+lt	Scenarijus
+lt	Scenarijaus šablonas
+lt	Kontekstas
+lt	Pavyzdžiai
+lt	Scenarijai
+lt	Variantai
+lt	Duota
+lt	Kai
+lt	Tada
+lt	Ir
+lt	Bet
+lu	Funktionalitéit
+lu	Rule
+lu	Beispill
+lu	Szenario
+lu	Plang vum Szenario
+lu	Hannergrond
+lu	Beispiller
+lu	ugeholl
+lu	wann
+lu	dann
+lu	an
+lu	a
+lu	awer
+lu	mä
+lv	Funkcionalitāte
+lv	Fīča
+lv	Rule
+lv	Piemērs
+lv	Scenārijs
+lv	Scenārijs pēc parauga
+lv	Konteksts
+lv	Situācija
+lv	Piemēri
+lv	Paraugs
+lv	Kad
+lv	Ja
+lv	Tad
+lv	Un
+lv	Bet
+mk-Cyrl	Функционалност
+mk-Cyrl	Бизнис потреба
+mk-Cyrl	Можност
+mk-Cyrl	Rule
+mk-Cyrl	Пример
+mk-Cyrl	Сценарио
+mk-Cyrl	На пример
+mk-Cyrl	Преглед на сценарија
+mk-Cyrl	Скица
+mk-Cyrl	Концепт
+mk-Cyrl	Контекст
+mk-Cyrl	Содржина
+mk-Cyrl	Примери
+mk-Cyrl	Сценарија
+mk-Cyrl	Дадено
+mk-Cyrl	Дадена
+mk-Cyrl	Кога
+mk-Cyrl	Тогаш
+mk-Cyrl	И
+mk-Cyrl	Но
+mk-Latn	Funkcionalnost
+mk-Latn	Biznis potreba
+mk-Latn	Mozhnost
+mk-Latn	Rule
+mk-Latn	Scenario
+mk-Latn	Na primer
+mk-Latn	Pregled na scenarija
+mk-Latn	Skica
+mk-Latn	Koncept
+mk-Latn	Kontekst
+mk-Latn	Sodrzhina
+mk-Latn	Primeri
+mk-Latn	Scenaria
+mk-Latn	Dadeno
+mk-Latn	Dadena
+mk-Latn	Koga
+mk-Latn	Togash
+mk-Latn	I
+mk-Latn	No
+ml	സവിശേഷത
+ml	നിയമം
+ml	രംഗം
+ml	സാഹചര്യത്തിന്റെ രൂപരേഖ
+ml	പശ്ചാത്തലം
+ml	ഉദാഹരണങ്ങൾ
+ml	നൽകിയത്
+ml	എപ്പോൾ
+ml	പിന്നെ
+ml	ഒപ്പം
+ml	പക്ഷേ
+mn	Функц
+mn	Функционал
+mn	Rule
+mn	Сценар
+mn	Сценарын төлөвлөгөө
+mn	Агуулга
+mn	Тухайлбал
+mn	Өгөгдсөн нь
+mn	Анх
+mn	Хэрэв
+mn	Тэгэхэд
+mn	Үүний дараа
+mn	Мөн
+mn	Тэгээд
+mn	Гэхдээ
+mn	Харин
+mr	वैशिष्ट्य
+mr	सुविधा
+mr	नियम
+mr	परिदृश्य
+mr	परिदृश्य रूपरेखा
+mr	पार्श्वभूमी
+mr	उदाहरण
+mr	जर
+mr	दिलेल्या प्रमाणे
+mr	जेव्हा
+mr	मग
+mr	तेव्हा
+mr	आणि
+mr	तसेच
+mr	पण
+mr	परंतु
+ne	सुविधा
+ne	विशेषता
+ne	नियम
+ne	परिदृश्य
+ne	परिदृश्य रूपरेखा
+ne	पृष्ठभूमी
+ne	उदाहरण
+ne	उदाहरणहरु
+ne	दिइएको
+ne	दिएको
+ne	यदि
+ne	जब
+ne	त्यसपछि
+ne	अनी
+ne	र
+ne	अनि
+ne	तर
+nl	Functionaliteit
+nl	Regel
+nl	Voorbeeld
+nl	Scenario
+nl	Abstract Scenario
+nl	Achtergrond
+nl	Voorbeelden
+nl	Gegeven
+nl	Stel
+nl	Als
+nl	Wanneer
+nl	Dan
+nl	En
+nl	Maar
+no	Egenskap
+no	Regel
+no	Eksempel
+no	Scenario
+no	Scenariomal
+no	Abstrakt Scenario
+no	Bakgrunn
+no	Eksempler
+no	Gitt
+no	Når
+no	Så
+no	Og
+no	Men
+pa	ਖਾਸੀਅਤ
+pa	ਮੁਹਾਂਦਰਾ
+pa	ਨਕਸ਼ ਨੁਹਾਰ
+pa	Rule
+pa	ਉਦਾਹਰਨ
+pa	ਪਟਕਥਾ
+pa	ਪਟਕਥਾ ਢਾਂਚਾ
+pa	ਪਟਕਥਾ ਰੂਪ ਰੇਖਾ
+pa	ਪਿਛੋਕੜ
+pa	ਉਦਾਹਰਨਾਂ
+pa	ਜੇਕਰ
+pa	ਜਿਵੇਂ ਕਿ
+pa	ਜਦੋਂ
+pa	ਤਦ
+pa	ਅਤੇ
+pa	ਪਰ
+pl	Właściwość
+pl	Funkcja
+pl	Aspekt
+pl	Potrzeba biznesowa
+pl	Zasada
+pl	Reguła
+pl	Przykład
+pl	Scenariusz
+pl	Szablon scenariusza
+pl	Założenia
+pl	Przykłady
+pl	Zakładając
+pl	Mając
+pl	Zakładając, że
+pl	Jeżeli
+pl	Jeśli
+pl	Gdy
+pl	Kiedy
+pl	Wtedy
+pl	Oraz
+pl	I
+pl	Ale
+pt	Funcionalidade
+pt	Característica
+pt	Caracteristica
+pt	Regra
+pt	Exemplo
+pt	Cenário
+pt	Cenario
+pt	Esquema do Cenário
+pt	Esquema do Cenario
+pt	Delineação do Cenário
+pt	Delineacao do Cenario
+pt	Contexto
+pt	Cenário de Fundo
+pt	Cenario de Fundo
+pt	Fundo
+pt	Exemplos
+pt	Cenários
+pt	Cenarios
+pt	Dado
+pt	Dada
+pt	Dados
+pt	Dadas
+pt	Quando
+pt	Então
+pt	Entao
+pt	E
+pt	Mas
+ro	Functionalitate
+ro	Funcționalitate
+ro	Funcţionalitate
+ro	Rule
+ro	Exemplu
+ro	Scenariu
+ro	Structura scenariu
+ro	Structură scenariu
+ro	Context
+ro	Exemple
+ro	Date fiind
+ro	Dat fiind
+ro	Dată fiind
+ro	Dati fiind
+ro	Dați fiind
+ro	Daţi fiind
+ro	Cand
+ro	Când
+ro	Atunci
+ro	Si
+ro	Și
+ro	Şi
+ro	Dar
+ru	Функция
+ru	Функциональность
+ru	Функционал
+ru	Свойство
+ru	Фича
+ru	Правило
+ru	Пример
+ru	Сценарий
+ru	Структура сценария
+ru	Шаблон сценария
+ru	Предыстория
+ru	Контекст
+ru	Примеры
+ru	Значения
+ru	Допустим
+ru	Дано
+ru	Пусть
+ru	Когда
+ru	Если
+ru	То
+ru	Затем
+ru	Тогда
+ru	И
+ru	К тому же
+ru	Также
+ru	Но
+ru	А
+ru	Иначе
+sk	Požiadavka
+sk	Funkcia
+sk	Vlastnosť
+sk	Rule
+sk	Príklad
+sk	Scenár
+sk	Náčrt Scenáru
+sk	Náčrt Scenára
+sk	Osnova Scenára
+sk	Pozadie
+sk	Príklady
+sk	Pokiaľ
+sk	Za predpokladu
+sk	Keď
+sk	Ak
+sk	Tak
+sk	Potom
+sk	A
+sk	A tiež
+sk	A taktiež
+sk	A zároveň
+sk	Ale
+sl	Funkcionalnost
+sl	Funkcija
+sl	Možnosti
+sl	Moznosti
+sl	Lastnost
+sl	Značilnost
+sl	Rule
+sl	Primer
+sl	Scenarij
+sl	Struktura scenarija
+sl	Skica
+sl	Koncept
+sl	Oris scenarija
+sl	Osnutek
+sl	Kontekst
+sl	Osnova
+sl	Ozadje
+sl	Primeri
+sl	Scenariji
+sl	Dano
+sl	Podano
+sl	Zaradi
+sl	Privzeto
+sl	Ko
+sl	Ce
+sl	Če
+sl	Kadar
+sl	Nato
+sl	Potem
+sl	Takrat
+sl	In
+sl	Ter
+sl	Toda
+sl	Ampak
+sl	Vendar
+sr-Cyrl	Функционалност
+sr-Cyrl	Могућност
+sr-Cyrl	Особина
+sr-Cyrl	Правило
+sr-Cyrl	Сценарио
+sr-Cyrl	Пример
+sr-Cyrl	Структура сценарија
+sr-Cyrl	Скица
+sr-Cyrl	Концепт
+sr-Cyrl	Контекст
+sr-Cyrl	Основа
+sr-Cyrl	Позадина
+sr-Cyrl	Примери
+sr-Cyrl	Сценарији
+sr-Cyrl	За дато
+sr-Cyrl	За дате
+sr-Cyrl	За дати
+sr-Cyrl	Када
+sr-Cyrl	Кад
+sr-Cyrl	Онда
+sr-Cyrl	И
+sr-Cyrl	Али
+sr-Latn	Funkcionalnost
+sr-Latn	Mogućnost
+sr-Latn	Mogucnost
+sr-Latn	Osobina
+sr-Latn	Pravilo
+sr-Latn	Scenario
+sr-Latn	Primer
+sr-Latn	Struktura scenarija
+sr-Latn	Skica
+sr-Latn	Koncept
+sr-Latn	Kontekst
+sr-Latn	Osnova
+sr-Latn	Pozadina
+sr-Latn	Primeri
+sr-Latn	Scenariji
+sr-Latn	Za dato
+sr-Latn	Za date
+sr-Latn	Za dati
+sr-Latn	Kada
+sr-Latn	Kad
+sr-Latn	Onda
+sr-Latn	I
+sr-Latn	Ali
+sv	Egenskap
+sv	Regel
+sv	Scenario
+sv	Abstrakt Scenario
+sv	Scenariomall
+sv	Bakgrund
+sv	Exempel
+sv	Givet
+sv	När
+sv	Så
+sv	Och
+sv	Men
+ta	அம்சம்
+ta	வணிக தேவை
+ta	திறன்
+ta	Rule
+ta	உதாரணமாக
+ta	காட்சி
+ta	காட்சி சுருக்கம்
+ta	காட்சி வார்ப்புரு
+ta	பின்னணி
+ta	எடுத்துக்காட்டுகள்
+ta	காட்சிகள்
+ta	நிலைமைகளில்
+ta	கொடுக்கப்பட்ட
+ta	எப்போது
+ta	அப்பொழுது
+ta	மேலும்
+ta	மற்றும்
+ta	ஆனால்
+te	గుణము
+te	Rule
+te	ఉదాహరణ
+te	సన్నివేశం
+te	కథనం
+te	నేపథ్యం
+te	ఉదాహరణలు
+te	చెప్పబడినది
+te	ఈ పరిస్థితిలో
+te	అప్పుడు
+te	మరియు
+te	కాని
+th	โครงหลัก
+th	ความต้องการทางธุรกิจ
+th	ความสามารถ
+th	Rule
+th	เหตุการณ์
+th	สรุปเหตุการณ์
+th	โครงสร้างของเหตุการณ์
+th	แนวคิด
+th	ชุดของตัวอย่าง
+th	ชุดของเหตุการณ์
+th	กำหนดให้
+th	เมื่อ
+th	ดังนั้น
+th	และ
+th	แต่
+tlh	Qap
+tlh	Qu'meH 'ut
+tlh	perbogh
+tlh	poQbogh malja'
+tlh	laH
+tlh	Rule
+tlh	lut
+tlh	lut chovnatlh
+tlh	mo'
+tlh	ghantoH
+tlh	lutmey
+tlh	ghu' noblu'
+tlh	DaH ghu' bejlu'
+tlh	qaSDI'
+tlh	vaj
+tlh	'ej
+tlh	latlh
+tlh	'ach
+tlh	'a
+tr	Özellik
+tr	Kural
+tr	Örnek
+tr	Senaryo
+tr	Senaryo taslağı
+tr	Geçmiş
+tr	Örnekler
+tr	Diyelim ki
+tr	Eğer ki
+tr	O zaman
+tr	Ve
+tr	Fakat
+tr	Ama
+tt	Мөмкинлек
+tt	Үзенчәлеклелек
+tt	Rule
+tt	Сценарий
+tt	Сценарийның төзелеше
+tt	Кереш
+tt	Үрнәкләр
+tt	Мисаллар
+tt	Әйтик
+tt	Әгәр
+tt	Нәтиҗәдә
+tt	Һәм
+tt	Вә
+tt	Ләкин
+tt	Әмма
+uk	Функціонал
+uk	Rule
+uk	Приклад
+uk	Сценарій
+uk	Структура сценарію
+uk	Передумова
+uk	Приклади
+uk	Припустимо
+uk	Припустимо, що
+uk	Нехай
+uk	Дано
+uk	Якщо
+uk	Коли
+uk	То
+uk	Тоді
+uk	І
+uk	А також
+uk	Та
+uk	Але
+ur	صلاحیت
+ur	کاروبار کی ضرورت
+ur	خصوصیت
+ur	Rule
+ur	منظرنامہ
+ur	منظر نامے کا خاکہ
+ur	پس منظر
+ur	مثالیں
+ur	اگر
+ur	بالفرض
+ur	فرض کیا
+ur	جب
+ur	پھر
+ur	تب
+ur	اور
+ur	لیکن
+uz	Функционал
+uz	Rule
+uz	Сценарий
+uz	Сценарий структураси
+uz	Тарих
+uz	Мисоллар
+uz	Belgilangan
+uz	Агар
+uz	Унда
+uz	Ва
+uz	Лекин
+uz	Бирок
+uz	Аммо
+vi	Tính năng
+vi	Quy tắc
+vi	Tình huống
+vi	Kịch bản
+vi	Khung tình huống
+vi	Khung kịch bản
+vi	Bối cảnh
+vi	Dữ liệu
+vi	Biết
+vi	Cho
+vi	Khi
+vi	Thì
+vi	Và
+vi	Nhưng
+zh-CN	功能
+zh-CN	Rule
+zh-CN	规则
+zh-CN	场景
+zh-CN	剧本
+zh-CN	场景大纲
+zh-CN	剧本大纲
+zh-CN	背景
+zh-CN	例子
+zh-CN	假如
+zh-CN	假设
+zh-CN	假定
+zh-CN	当
+zh-CN	那么
+zh-CN	而且
+zh-CN	并且
+zh-CN	同时
+zh-CN	但是
+zh-TW	功能
+zh-TW	Rule
+zh-TW	場景
+zh-TW	劇本
+zh-TW	場景大綱
+zh-TW	劇本大綱
+zh-TW	背景
+zh-TW	例子
+zh-TW	假如
+zh-TW	假設
+zh-TW	假定
+zh-TW	當
+zh-TW	那麼
+zh-TW	而且
+zh-TW	並且
+zh-TW	同時
+zh-TW	但是

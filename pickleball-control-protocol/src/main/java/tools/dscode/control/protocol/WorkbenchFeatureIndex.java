@@ -30,13 +30,14 @@ import java.util.stream.Stream;
  * When a file cannot be read, or a tag expression cannot be evaluated, the
  * launch must not trust a narrowed path list: that is the full-scan fallback.
  * A file the text parser cannot fully model (a {@code # language:} header other
- * than {@code en}, or a keyword it does not recognise) is not a full-scan
- * fallback. That file is always added to a narrowed selection, and it contributes
- * no scenario hits.</p>
+ * than {@code en}, an unsupported language, or a real Gherkin keyword from
+ * another dialect) is not a full-scan fallback. That file is always added to a
+ * narrowed selection, and it contributes no scenario hits. A free-text
+ * description such as {@code Note:} is not a keyword and does not force inclusion.</p>
  */
 public final class WorkbenchFeatureIndex {
-    static final int VERSION = 2;
-    public static final String CACHE_FILE = "feature-index.v2";
+    static final int VERSION = 3;
+    public static final String CACHE_FILE = "feature-index.v3";
     public static final String NO_MATCH_FEATURE = "no-match.feature";
 
     private WorkbenchFeatureIndex() {
@@ -496,6 +497,8 @@ public final class WorkbenchFeatureIndex {
         boolean inExamples = false;
         boolean inDocString = false;
         boolean unindexable = false;
+        String language = "en";
+        boolean languageSeen = false;
         List<StoredScenario> scenarios = new ArrayList<>();
         for (int i = 0; i < rawLines.length; i++) {
             String trimmed = rawLines[i].strip();
@@ -511,7 +514,16 @@ public final class WorkbenchFeatureIndex {
                 continue;
             }
             if (trimmed.isEmpty() || trimmed.startsWith("#")) {
-                if (trimmed.startsWith("#")) unindexable |= foreignLanguage(trimmed);
+                if (trimmed.startsWith("#")) {
+                    unindexable |= foreignLanguage(trimmed);
+                    if (!languageSeen) {
+                        java.util.regex.Matcher matcher = LANGUAGE_HEADER.matcher(trimmed);
+                        if (matcher.find()) {
+                            language = matcher.group(1);
+                            languageSeen = true;
+                        }
+                    }
+                }
                 continue;
             }
             if (starts(trimmed, "Feature:") || starts(trimmed, "Business Need:") || starts(trimmed, "Ability:")) {
@@ -590,7 +602,7 @@ public final class WorkbenchFeatureIndex {
                 inExamples = false;
                 continue;
             }
-            if (looksLikeUnknownKeyword(trimmed)) {
+            if (looksLikeUnknownKeyword(trimmed, language)) {
                 unindexable = true;
             }
             pending.clear();
@@ -651,22 +663,15 @@ public final class WorkbenchFeatureIndex {
         return trimmed.equals(keyword) || trimmed.startsWith(keyword + " ") || trimmed.startsWith(keyword + "\t");
     }
 
-    /** A structural keyword this parser does not model, such as a foreign {@code Mot:}. */
-    private static boolean looksLikeUnknownKeyword(String trimmed) {
+    /**
+     * A real Gherkin keyword from a dialect other than the file's {@code # language:}.
+     * Free-text descriptions ({@code Note:}, {@code As a shopper:}) are not keywords.
+     */
+    private static boolean looksLikeUnknownKeyword(String trimmed, String language) {
         int colon = trimmed.indexOf(':');
         if (colon <= 0) return false;
         String head = trimmed.substring(0, colon).strip();
-        if (head.isEmpty() || head.length() > 80) return false;
-        String[] words = head.split("\\s+");
-        if (words.length == 0 || words.length > 6) return false;
-        for (String word : words) {
-            if (word.isEmpty() || !Character.isLetter(word.charAt(0))) return false;
-            for (int i = 1; i < word.length(); i++) {
-                char ch = word.charAt(i);
-                if (!Character.isLetter(ch) && ch != '-' && ch != '\'') return false;
-            }
-        }
-        return true;
+        return GherkinKeywords.isForeignKeyword(language, head);
     }
 
     private static StoredScenario scenario(

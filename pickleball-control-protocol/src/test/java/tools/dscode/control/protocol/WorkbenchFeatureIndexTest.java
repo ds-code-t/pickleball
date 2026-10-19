@@ -304,10 +304,12 @@ class WorkbenchFeatureIndexTest {
                 Feature: Odd
                   Scenario: Real but unmodelled
                     Given a
-                  Mot: foreign
+                  Scénario: foreign
                 """);
         Files.writeString(features.resolve("other.feature"), """
                 Feature: Other
+                  Note: ordinary description
+                  As a shopper: I want speed
                   Scenario: Stay
                     Given stay
                 """);
@@ -340,9 +342,51 @@ class WorkbenchFeatureIndexTest {
     }
 
     @Test
+    void freeTextDescriptionsDoNotForceInclusion() throws Exception {
+        assertTrue(GherkinKeywords.supported("en"));
+        assertTrue(GherkinKeywords.supported("fr"));
+        assertFalse(GherkinKeywords.supported("not-a-language"));
+        assertFalse(GherkinKeywords.isForeignKeyword("en", "Note"));
+        assertFalse(GherkinKeywords.isForeignKeyword("en", "As a shopper"));
+        assertFalse(GherkinKeywords.isForeignKeyword("en", "Ability"));
+        assertTrue(GherkinKeywords.isForeignKeyword("en", "Scénario"));
+        assertTrue(GherkinKeywords.isForeignKeyword("en", "I"));
+
+        Path features = project.resolve("src/test/resources/features");
+        Files.createDirectories(features);
+        Files.writeString(features.resolve("notes.feature"), """
+                @kept
+                Feature: Notes
+                  Note: this is a description
+                  As a shopper: I want a fast page
+                  Business context: not a keyword
+                  Scenario: Stay
+                    Given stay
+                """);
+        Files.writeString(features.resolve("foreign.feature"), """
+                Feature: Foreign word
+                  Scenario: Hidden
+                    Given a
+                  I: this is a real keyword in another dialect
+                """);
+        Files.writeString(features.resolve("plain.feature"), """
+                Feature: Plain
+                  Scenario: Other
+                    Given other
+                """);
+
+        WorkbenchFeatureIndex.Selection selection = select("@kept", null, null, List.of(), false);
+        assertEquals(List.of("Stay"), selection.hits().stream().map(WorkbenchFeatureIndex.Hit::scenarioName).toList());
+        assertTrue(selection.featureProperty().contains("notes.feature"));
+        assertFalse(selection.featureProperty().contains("plain.feature"));
+        assertTrue(selection.featureProperty().contains("foreign.feature"));
+        assertFalse(selection.hits().stream().anyMatch(hit -> hit.relativePath().contains("foreign.feature")));
+    }
+
+    @Test
     void cacheSchemaVersionBumpForcesReparse() throws Exception {
-        assertEquals(2, WorkbenchFeatureIndex.VERSION);
-        assertEquals("feature-index.v2", WorkbenchFeatureIndex.CACHE_FILE);
+        assertEquals(3, WorkbenchFeatureIndex.VERSION);
+        assertEquals("feature-index.v3", WorkbenchFeatureIndex.CACHE_FILE);
         Path features = project.resolve("src/test/resources/features");
         Files.createDirectories(features);
         Files.writeString(features.resolve("one.feature"), """
