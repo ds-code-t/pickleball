@@ -431,6 +431,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/common/coordination/RunConfigIsolationTest.java`
 - `src/test/java/tools/dscode/common/domoperations/LoadingCategoryDefinitionTest.java`
 - `src/test/java/tools/dscode/common/driver/DriverDownloadFallbackTest.java`
+- `src/test/java/tools/dscode/common/mappings/ParsingMapGreaterThanMaskTest.java`
 - `src/test/java/tools/dscode/common/mappings/queries/DocumentAndReservedFieldReadTest.java`
 - `src/test/java/tools/dscode/common/mappings/queries/TopLevelCollectionTest.java`
 - `src/test/java/tools/dscode/common/reporting/diagnostic/AgentBrowserLadderTest.java`
@@ -438,6 +439,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/common/reporting/diagnostic/ConsumerMavenTestRunnerTest.java`
 - `src/test/java/tools/dscode/common/treeparsing/preparsing/ConditionalBranchArgumentTest.java`
 - `src/test/java/tools/dscode/common/treeparsing/preparsing/LazyBranchResolutionTest.java`
+- `src/test/java/tools/dscode/common/treeparsing/WithinRewriteScopeTest.java`
 - `src/test/java/tools/dscode/control/override/StepOverrideCompilerTest.java`
 - `src/test/java/tools/dscode/control/protocol/PickleballArtifactLocatorTest.java`
 - `src/test/java/tools/dscode/control/protocol/PickleballLocalLayoutTest.java`

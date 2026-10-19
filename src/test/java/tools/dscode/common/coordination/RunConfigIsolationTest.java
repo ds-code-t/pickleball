@@ -96,6 +96,11 @@ class RunConfigIsolationTest {
 
         assertNull(AgentCoordination.openConsumerRun(project, new StringBuilder()));
         assertFalse(Files.isDirectory(project.resolve(".pickleball/runs/stale/reports")));
+        assertFalse(Files.isDirectory(project.resolve(".pickleball/runs/normal/config")));
+        assertEquals(
+                "home: from-stale-run\n",
+                Files.readString(project.resolve(".pickleball/runs/stale/config/URL.yaml"))
+        );
         ParsingMap.initializeConfigs(configs.toString());
         assertEquals("from-project", String.valueOf(ParsingMap.getGlobalsParsingmap().get("configs.URL.home")));
     }

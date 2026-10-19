@@ -104,7 +104,7 @@ After a Workbench run, read `runs/<id>/workbench/summary.json` for step, status,
 
 `inspect-page` lists interactive elements and the Pickleball phrase that would target each one. `find-element --category=Button --text=Save` prints the XPath the execution dictionary would build, the raw match count, and the visible count. `--html=<file>` is an offline fallback labelled `source=offline-html` (well-formed XML, HTML5 doctype allowed). Without `--html`, both commands use the live session (`source=live-session`) and do not click. No session prints `start a session first`. A wrapped I/O failure on any of these commands includes the `IOException` cause.
 
-The copy of configs under the run folder redacts `password`, `passwd`, `secret`, `token`, `credential`, `api_key`, `api-key`, and `access_key`. The project file a normal run reads is not redacted.
+The config copy under the run folder is a faithful copy of the project configs (real values, valid YAML) so the worker can load them. The project config is unchanged. Redaction for logs and reports stays a separate path and does not rewrite that copy.
 
 `pkb_browser` is a name in the `configs` mapping, not a browser binary. Workbench discover keeps a remote farm name when the project already uses one, and otherwise prefers `CHROME_HEADLESS` (the consumer yaml if present, otherwise the bundled config). It prints that name. A normal `mvn test` uses the project value. When `pkb_runvars` sets `pkb_browser`, that member wins over `-Dpkb_browser`.
 

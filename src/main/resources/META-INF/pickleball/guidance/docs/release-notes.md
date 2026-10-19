@@ -38,7 +38,7 @@ Normal scenario execution is unchanged. The feature index, plan, timeouts, and t
 - `inspect-page` and `find-element` with `--html=<file>` are an offline fallback. The output is labelled `source=offline-html`. The file is read as XML, so `<!DOCTYPE html>` is accepted and external entities are not loaded. Unclosed HTML tags are still rejected; write the snapshot as XHTML. Without `--html`, both commands use the live session and a read-only worker query. That query builds the XPath with the execution dictionary, then counts `findElements` and `isDisplayed`. It does not click and does not wait. If no session is running, the command prints `start a session first` and exits 2. The live `ElementControl.inspect` signature is unchanged.
 - A locked Workbench directory install retries `deleteTree` and the move, waiting 100 ms, then 300 ms, then 1000 ms. If the move still fails, the staged tree is copied to a sibling `target.tmp-<n>` and renamed into place. A failed copy deletes that temp directory and leaves the original target absent or unchanged, not a partial tree.
 - A CLI error that wraps an `IOException` includes that cause. Session-start and sync failures record a plain-language reason on the run.
-- The config copy under the Workbench run folder redacts `password`, `passwd`, `secret`, `token`, `credential`, `api_key` / `api-key`, and `access_key`. The project file a normal run reads is not modified.
+- The config copy under `.pickleball/runs/<run-id>/config` is a faithful copy of the project configs: real values and valid YAML, JSON, XML, and properties, so the worker can load them. The project config is unchanged. Redaction for logs and reports stays a separate path and does not rewrite that copy.
 
 ### Clarifications
 
