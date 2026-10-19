@@ -822,6 +822,20 @@ public final class WorkbenchAgentCommands {
         out.println("visibleCount=" + visible);
     }
 
+    /** Live inspect and find-element poll. Still in flight after this is {@code TIMEOUT}, exit {@link #LIVE_QUERY_TIMEOUT_EXIT}. */
+    static final long LIVE_QUERY_TIMEOUT_SECONDS = 30L;
+    /** Distinct from exit 1 (query failed) and exit 2 (no session or bad usage). */
+    static final int LIVE_QUERY_TIMEOUT_EXIT = 3;
+    private static volatile long liveQueryTimeoutMillis = LIVE_QUERY_TIMEOUT_SECONDS * 1000L;
+
+    static void setLiveQueryTimeoutMillisForTest(long millis) {
+        liveQueryTimeoutMillis = millis;
+    }
+
+    static void resetLiveQueryTimeoutForTest() {
+        liveQueryTimeoutMillis = LIVE_QUERY_TIMEOUT_SECONDS * 1000L;
+    }
+
     private static int liveQuery(
             WorkbenchCommandLine.Parsed parsed,
             String category,
@@ -836,25 +850,40 @@ public final class WorkbenchAgentCommands {
             err.println("start a session first");
             return 2;
         }
+        String op = category == null || category.isBlank() ? "inspect-page" : "find-element";
         try {
             WorkbenchSessionCommands.SessionState state = session.get();
             Map<String, Object> body = new LinkedHashMap<>();
-            body.put("op", category == null || category.isBlank() ? "inspect-page" : "find-element");
+            body.put("op", op);
             if (category != null && !category.isBlank()) body.put("category", category);
             if (text != null && !text.isBlank()) body.put("text", text);
             JsonNode ack = postSession(http, state, "/commands", body);
             String id = ack.path("id").asText("");
             JsonNode view = ack;
-            long deadline = System.nanoTime() + java.time.Duration.ofSeconds(30).toNanos();
+            long deadline = System.nanoTime() + java.time.Duration.ofMillis(liveQueryTimeoutMillis).toNanos();
             while (id != null && !id.isBlank() && System.nanoTime() < deadline) {
                 String status = view.path("status").asText("");
-                if (!"QUEUED".equals(status) && !"RUNNING".equals(status) && !"STILL_WORKING".equals(status) && !"STOPPING".equals(status)) {
+                if (!inFlight(status)) {
                     break;
                 }
-                Thread.sleep(100);
+                long remainingMillis = java.time.Duration.ofNanos(deadline - System.nanoTime()).toMillis();
+                if (remainingMillis <= 0) {
+                    break;
+                }
+                Thread.sleep(Math.min(100L, remainingMillis));
+                if (System.nanoTime() >= deadline) {
+                    break;
+                }
                 view = getSession(http, state, "/commands/" + id);
             }
+            String status = view.path("status").asText("");
+            if (inFlight(status) || "TIMEOUT".equals(status)) {
+                return liveQueryTimeout(op, out, err);
+            }
             JsonNode result = view.has("result") ? view.get("result") : view;
+            if ("TIMEOUT".equals(result.path("status").asText(""))) {
+                return liveQueryTimeout(op, out, err);
+            }
             if (result.has("message") && !"SUCCESS".equals(result.path("status").asText(""))) {
                 err.println(result.path("message").asText("Page query failed."));
                 return 1;
@@ -881,6 +910,22 @@ public final class WorkbenchAgentCommands {
             err.println("Workbench inspect failed: " + failure.getMessage());
             return 1;
         }
+    }
+
+    private static int liveQueryTimeout(String op, PrintStream out, PrintStream err) {
+        String budget = liveQueryTimeoutMillis % 1000L == 0
+                ? (liveQueryTimeoutMillis / 1000L) + "s"
+                : liveQueryTimeoutMillis + "ms";
+        err.println("Workbench " + op + " TIMEOUT after " + budget);
+        out.println("status=TIMEOUT");
+        return LIVE_QUERY_TIMEOUT_EXIT;
+    }
+
+    private static boolean inFlight(String status) {
+        return "QUEUED".equals(status)
+                || "RUNNING".equals(status)
+                || "STILL_WORKING".equals(status)
+                || "STOPPING".equals(status);
     }
 
     private static JsonNode postSession(
