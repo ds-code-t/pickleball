@@ -354,6 +354,73 @@ class WorkbenchSessionCommandsTest {
     }
 
     @Test
+    @Timeout(value = 10, unit = TimeUnit.SECONDS)
+    void oneTransientHttpFailureDoesNotRecordTimeout() throws Exception {
+        AgentCoordination.begin(
+                project,
+                AgentCoordination.Request.of("transient-step", "agent", null, null, null, null, "execute-step")
+        );
+        Path sessionFile = AgentCoordination.runDirectory(project, "transient-step")
+                .resolve("session").resolve("cli-session.json");
+        try (FakeSession session = FakeSession.start(project, "cli-session", sessionFile)) {
+            session.failGets = 1;
+            session.succeedAfter = true;
+            Output output = run(
+                    new String[]{
+                            "execute-step", project.toString(), "--run-id=transient-step",
+                            "--text=Given stay"
+                    },
+                    launch -> {
+                        throw new AssertionError("execute-step must not start a session");
+                    }
+            );
+            assertEquals(0, output.exitCode, output.stderr + output.stdout);
+            assertTrue(output.stdout.contains("SUCCESS"), output.stdout);
+            assertFalse(output.stderr.contains("TIMEOUT"), output.stderr);
+            String record = Files.readString(
+                    AgentCoordination.runDirectory(project, "transient-step").resolve(AgentCoordination.RECORD_FILE)
+            );
+            assertFalse(record.contains("TIMEOUT"), record);
+        }
+    }
+
+    @Test
+    @Timeout(value = 10, unit = TimeUnit.SECONDS)
+    void runTimeoutIsMeasuredFromRunStart() throws Exception {
+        AgentCoordination.begin(
+                project,
+                AgentCoordination.Request.of("run-budget", "agent", null, null, null, null, "execute-step"),
+                Instant.now().minusSeconds(30),
+                null,
+                false
+        );
+        Path sessionFile = AgentCoordination.runDirectory(project, "run-budget")
+                .resolve("session").resolve("cli-session.json");
+        try (FakeSession ignored = FakeSession.start(project, "cli-session", sessionFile)) {
+            long started = System.nanoTime();
+            Output output = run(
+                    new String[]{
+                            "execute-step", project.toString(), "--run-id=run-budget",
+                            "--text=Given stay", "--run-timeout=5"
+                    },
+                    launch -> {
+                        throw new AssertionError("execute-step must not start a session");
+                    }
+            );
+            long elapsedMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started);
+            assertEquals(1, output.exitCode, output.stderr + output.stdout);
+            assertTrue(output.stderr.contains("TIMEOUT"), output.stderr);
+            assertTrue(output.stderr.contains("still running"), output.stderr);
+            assertTrue(output.stderr.contains("stop --force"), output.stderr);
+            assertTrue(elapsedMs < 3_000, "run budget was not already spent: " + elapsedMs + "ms");
+            String record = Files.readString(
+                    AgentCoordination.runDirectory(project, "run-budget").resolve(AgentCoordination.RECORD_FILE)
+            );
+            assertTrue(record.contains("TIMEOUT"), record);
+        }
+    }
+
+    @Test
     @Timeout(value = 15, unit = TimeUnit.SECONDS)
     void stopForceKillsTheProcessTreeAndRecordsStopped() throws Exception {
         Path childFile = project.resolve("child.pid");
@@ -827,6 +894,8 @@ class WorkbenchSessionCommandsTest {
         private volatile long pid = ProcessHandle.current().pid();
         private volatile String eventsJson = "{\"events\":[]}";
         private volatile String healthJson = "{\"status\":\"ok\"}";
+        private volatile int failGets;
+        private volatile boolean succeedAfter;
 
         private FakeSession(HttpServer http, Path stateFile, String url) {
             this.http = http;
@@ -859,6 +928,16 @@ class WorkbenchSessionCommandsTest {
                 }
                 if ("POST".equals(exchange.getRequestMethod())) {
                     write(exchange, 200, "{\"ack\":true,\"id\":\"step-held\",\"status\":\"QUEUED\"}");
+                    return;
+                }
+                FakeSession current = box[0];
+                if (current != null && current.failGets > 0) {
+                    current.failGets--;
+                    write(exchange, 503, "{\"error\":\"unavailable\"}");
+                    return;
+                }
+                if (current != null && current.succeedAfter) {
+                    write(exchange, 200, "{\"id\":\"step-held\",\"status\":\"SUCCESS\"}");
                     return;
                 }
                 write(exchange, 200, "{\"id\":\"step-held\",\"status\":\"STILL_WORKING\"}");

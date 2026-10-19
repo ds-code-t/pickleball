@@ -57,8 +57,16 @@ public final class WorkbenchAgentCommands {
                 case "export-guidance" -> exportGuidance(parsed, out, err);
                 case "hint", "discover-hint" -> hint(parsed, out);
                 case "resolve-runvars" -> resolveRunVars(parsed, out);
-                case "discover" -> parsed.planOnly() ? plan(parsed, out, err) : discover(parsed, out, err, maven);
-                case "confirm" -> parsed.planOnly() ? plan(parsed, out, err) : confirm(parsed, out, err, maven);
+                case "discover" -> {
+                    Integer rejected = rejectStepTimeout(parsed, err);
+                    if (rejected != null) yield rejected;
+                    yield parsed.planOnly() ? plan(parsed, out, err) : discover(parsed, out, err, maven);
+                }
+                case "confirm" -> {
+                    Integer rejected = rejectStepTimeout(parsed, err);
+                    if (rejected != null) yield rejected;
+                    yield parsed.planOnly() ? plan(parsed, out, err) : confirm(parsed, out, err, maven);
+                }
                 case "plan" -> plan(parsed, out, err);
                 case "short-log" -> shortLog(parsed, out, err);
                 case "note" -> note(parsed, out, err);
@@ -334,12 +342,14 @@ public final class WorkbenchAgentCommands {
         }
     }
 
+    private static Integer rejectStepTimeout(WorkbenchCommandLine.Parsed parsed, PrintStream err) {
+        if (parsed.stepTimeoutSeconds() == null) return null;
+        err.println(parsed.command() + " does not accept --step-timeout; use --run-timeout; per-step limits apply to execute-step");
+        return 2;
+    }
+
     private static Long runBudgetSeconds(WorkbenchCommandLine.Parsed parsed) {
-        Long step = parsed.stepTimeoutSeconds();
-        Long run = parsed.runTimeoutSeconds();
-        if (step == null) return run;
-        if (run == null) return step;
-        return Math.min(step, run);
+        return parsed.runTimeoutSeconds();
     }
 
     private static int timeoutExit(

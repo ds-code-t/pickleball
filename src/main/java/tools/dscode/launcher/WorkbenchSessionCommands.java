@@ -724,26 +724,26 @@ public final class WorkbenchSessionCommands {
             PrintStream err
     ) {
         String last = "";
-        Long budget = stepBudgetSeconds(flags);
-        long deadline = budget == null ? Long.MAX_VALUE : System.nanoTime() + Duration.ofSeconds(budget).toNanos();
+        int transientFailures = 0;
+        long deadline = waitDeadline(parsed, flags);
         while (true) {
             if (System.nanoTime() > deadline) {
-                err.println("DONE " + id + " TIMEOUT");
-                recordRunStatus(parsed, out, "TIMEOUT");
-                return 1;
+                return timedOut(parsed, id, out, err, true);
             }
             JsonNode view;
             try {
                 if (!pidAlive(state.pid()) && readHealthyFile(state.stateFile(), state.project(), http).isEmpty()) {
-                    err.println("DONE " + id + " TIMEOUT");
-                    recordRunStatus(parsed, out, "TIMEOUT");
-                    return 1;
+                    return timedOut(parsed, id, out, err, false);
                 }
                 view = getJson(http, state, "/commands/" + id);
+                transientFailures = 0;
             } catch (RuntimeException failure) {
-                err.println("DONE " + id + " TIMEOUT");
-                recordRunStatus(parsed, out, "TIMEOUT");
-                return 1;
+                if (transientHttp(failure) && transientFailures < TRANSIENT_HTTP_RETRIES) {
+                    transientFailures++;
+                    sleep(POLL);
+                    continue;
+                }
+                return timedOut(parsed, id, out, err, false);
             }
             String status = textOr(view, "status", "");
             if ("STILL_WORKING".equals(status) || "RUNNING".equals(status) || "QUEUED".equals(status)) {
@@ -755,9 +755,7 @@ public final class WorkbenchSessionCommands {
                 continue;
             }
             if ("TIMEOUT".equals(status)) {
-                err.println("DONE " + id + " TIMEOUT");
-                recordRunStatus(parsed, out, "TIMEOUT");
-                return 1;
+                return timedOut(parsed, id, out, err, true);
             }
             out.println("DONE " + id + " " + status);
             if (view.has("result")) out.println(view.get("result").toString());
@@ -765,12 +763,48 @@ public final class WorkbenchSessionCommands {
         }
     }
 
-    private static Long stepBudgetSeconds(SessionFlags flags) {
-        Long step = flags.stepTimeoutSeconds;
-        Long run = flags.runTimeoutSeconds;
-        if (step == null) return run;
-        if (run == null) return step;
-        return Math.min(step, run);
+    private static final int TRANSIENT_HTTP_RETRIES = 2;
+
+    private static long waitDeadline(WorkbenchCommandLine.Parsed parsed, SessionFlags flags) {
+        long now = System.nanoTime();
+        long deadline = Long.MAX_VALUE;
+        if (flags.stepTimeoutSeconds != null) {
+            deadline = now + Duration.ofSeconds(flags.stepTimeoutSeconds).toNanos();
+        }
+        if (flags.runTimeoutSeconds != null) {
+            long runDeadline = now + Duration.ofSeconds(flags.runTimeoutSeconds).toNanos();
+            Instant started = runStarted(parsed);
+            if (started != null) {
+                long remainingMillis = Duration.between(Instant.now(), started.plusSeconds(flags.runTimeoutSeconds)).toMillis();
+                runDeadline = remainingMillis <= 0 ? now - 1 : now + Duration.ofMillis(remainingMillis).toNanos();
+            }
+            deadline = Math.min(deadline, runDeadline);
+        }
+        return deadline;
+    }
+
+    private static boolean transientHttp(RuntimeException failure) {
+        String message = failure.getMessage() == null ? "" : failure.getMessage();
+        if (message.startsWith("HTTP 502") || message.startsWith("HTTP 503") || message.startsWith("HTTP 504")) {
+            return true;
+        }
+        if (failure.getCause() instanceof IOException) return true;
+        return message.contains("Connection") || message.contains("timed out") || message.contains("reset");
+    }
+
+    private static int timedOut(
+            WorkbenchCommandLine.Parsed parsed,
+            String id,
+            PrintStream out,
+            PrintStream err,
+            boolean stepStillRunning
+    ) {
+        err.println("DONE " + id + " TIMEOUT");
+        if (stepStillRunning) {
+            err.println("The step is still running. Use stop --force.");
+        }
+        recordRunStatus(parsed, out, "TIMEOUT");
+        return 1;
     }
 
     private static void recordRunStatus(WorkbenchCommandLine.Parsed parsed, PrintStream out, String status) {

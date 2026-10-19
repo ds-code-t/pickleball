@@ -38,6 +38,14 @@ class WorkbenchAgentCommandsTest {
     }
 
     @Test
+    void confirmRejectsStepTimeout() {
+        Output output = run("confirm", tempDir.toString(), "--step-timeout=5");
+        assertEquals(2, output.exitCode());
+        assertTrue(output.stderr().contains("use --run-timeout"), output.stderr());
+        assertTrue(output.stderr().contains("per-step limits apply to execute-step"), output.stderr());
+    }
+
+    @Test
     void hintPrintsLadderRunVarsAndNextDiscover() throws Exception {
         Path resources = tempDir.resolve("src/test/resources");
         Files.createDirectories(resources);
