@@ -183,6 +183,189 @@ class WorkbenchFeatureIndexTest {
     }
 
     @Test
+    void exampleKeywordIsAScenarioAndScenariosIsAnExamplesTable() throws Exception {
+        Path features = project.resolve("src/test/resources/features");
+        Files.createDirectories(features);
+        Files.writeString(features.resolve("keywords.feature"), """
+                @root
+                Feature: Pair
+                  @one
+                  Scenario: First
+                    Given a
+                  @two
+                  Example: Second
+                    Given b
+                  @rows
+                  Scenario Outline: Find term
+                    When search <term>
+                    @alpha
+                    Scenarios:
+                      | term |
+                      | ada  |
+                      | bob  |
+                """);
+
+        WorkbenchFeatureIndex.Selection byTag = select("@two", null, null, List.of(), false);
+        assertEquals(1, byTag.hits().size());
+        WorkbenchFeatureIndex.Hit second = byTag.hits().getFirst();
+        assertEquals("Second", second.scenarioName());
+        assertEquals(7, second.line());
+        assertEquals(7, second.startLine());
+        assertTrue(second.tags().contains("two"));
+        assertTrue(second.tags().contains("root"));
+        assertFalse(second.tags().contains("one"));
+
+        WorkbenchFeatureIndex.Selection both = select("@one or @two", null, null, List.of(), false);
+        assertEquals(List.of("First", "Second"), both.hits().stream().map(WorkbenchFeatureIndex.Hit::scenarioName).toList());
+        assertEquals(List.of(4, 7), both.hits().stream().map(WorkbenchFeatureIndex.Hit::line).toList());
+
+        WorkbenchFeatureIndex.Selection row = select("@rows", null, "2", List.of(), false);
+        assertEquals(1, row.hits().size());
+        assertEquals("bob", row.hits().getFirst().values().getFirst());
+        assertEquals(16, row.hits().getFirst().line());
+        assertTrue(row.hits().getFirst().tags().contains("alpha"));
+    }
+
+    @Test
+    void scenarioTagsColumnIsIndexedOnTheRow() throws Exception {
+        Path features = project.resolve("src/test/resources/features");
+        Files.createDirectories(features);
+        Files.writeString(features.resolve("components.feature"), """
+                Feature: Components
+                  Scenario Outline: Save customer
+                    When save <name>
+                    Examples:
+                      | Scenario Tags           | name |
+                      | %save_customer @extra   | ada  |
+                      | plain                   | bob  |
+                """);
+        WorkbenchFeatureIndex.Selection tagged = select("@extra", null, null, List.of(), false);
+        assertEquals(1, tagged.hits().size());
+        assertEquals("ada", tagged.hits().getFirst().values().get(1));
+        assertTrue(tagged.hits().getFirst().tags().contains("%save_customer"));
+        assertTrue(tagged.hits().getFirst().tags().contains("extra"));
+        WorkbenchFeatureIndex.Selection component = select("@%save_customer", null, null, List.of(), false);
+        assertEquals(1, component.hits().size());
+        WorkbenchFeatureIndex.Selection plain = select(null, null, "2", List.of(), false);
+        assertEquals("bob", plain.hits().getFirst().values().get(1));
+        assertFalse(plain.hits().getFirst().tags().contains("plain"));
+    }
+
+    @Test
+    void docstringContentsDoNotCreatePhantomScenarios() throws Exception {
+        Path features = project.resolve("src/test/resources/features");
+        Files.createDirectories(features);
+        Files.writeString(features.resolve("doc.feature"), """
+                Feature: Doc
+                  @real
+                  Scenario: Real
+                    Given a
+                      \"\"\"
+                      Scenario: Phantom
+                      @ghost
+                      Example: Also phantom
+                      \"\"\"
+                    Then done
+                  Scenario: Ticks
+                    Given b
+                      ```
+                      Scenario: Tick phantom
+                      @tickghost
+                      ```
+                    Then done
+                """);
+
+        WorkbenchFeatureIndex.Selection all = select(null, null, null, List.of(), false);
+        assertEquals(List.of("Real", "Ticks"), all.hits().stream().map(WorkbenchFeatureIndex.Hit::scenarioName).toList());
+        WorkbenchFeatureIndex.Selection ghost = select("@ghost or @tickghost", null, null, List.of(), false);
+        assertTrue(ghost.hits().isEmpty());
+        assertTrue(ghost.matchedNone());
+    }
+
+    @Test
+    void nonEnglishLanguageAndUnknownKeywordsAreAlwaysIncluded() throws Exception {
+        Path features = project.resolve("src/test/resources/features");
+        Files.createDirectories(features);
+        String english = """
+                # language: en
+                @smoke
+                Feature: English
+                  Scenario: Kept
+                    Given a
+                """;
+        Files.writeString(features.resolve("en.feature"), english);
+        Files.writeString(features.resolve("fr.feature"), """
+                # language: fr
+                Fonctionnalité: Bonjour
+                  Scénario: Un
+                    Soit ceci
+                """);
+        Files.writeString(features.resolve("odd.feature"), """
+                Feature: Odd
+                  Scenario: Real but unmodelled
+                    Given a
+                  Mot: foreign
+                """);
+        Files.writeString(features.resolve("other.feature"), """
+                Feature: Other
+                  Scenario: Stay
+                    Given stay
+                """);
+
+        WorkbenchFeatureIndex.Selection selection = select("@smoke", null, null, List.of(), false);
+        assertEquals(List.of("Kept"), selection.hits().stream().map(WorkbenchFeatureIndex.Hit::scenarioName).toList());
+        assertFalse(selection.matchedNone());
+        assertFalse(selection.fullScanFallback());
+        assertTrue(selection.featureProperty().contains("en.feature"));
+        assertTrue(selection.featureProperty().contains("fr.feature"));
+        assertTrue(selection.featureProperty().contains("odd.feature"));
+        assertFalse(selection.featureProperty().contains("other.feature"));
+        assertFalse(selection.featureProperty().contains("fr.feature:"));
+        assertFalse(selection.hits().stream().anyMatch(hit -> hit.relativePath().contains("fr.feature")));
+        assertFalse(selection.hits().stream().anyMatch(hit -> hit.relativePath().contains("odd.feature")));
+
+        String relative = "src/test/resources/features/en.feature";
+        WorkbenchFeatureIndex.Selection byLine = select(null, null, null, List.of(relative + ":4"), false);
+        assertEquals(1, byLine.hits().size());
+        assertTrue(byLine.featureProperty().contains(":4"));
+        assertTrue(byLine.featureProperty().contains("fr.feature"));
+        assertTrue(byLine.featureProperty().contains("odd.feature"));
+        assertFalse(byLine.featureProperty().contains("fr.feature:"));
+
+        WorkbenchFeatureIndex.Selection cached = select("@smoke", null, null, List.of(), false);
+        assertEquals(0, cached.filesReparsed());
+        assertEquals(selection.hits(), cached.hits());
+        assertTrue(cached.featureProperty().contains("fr.feature"));
+        assertTrue(cached.featureProperty().contains("odd.feature"));
+    }
+
+    @Test
+    void cacheSchemaVersionBumpForcesReparse() throws Exception {
+        assertEquals(2, WorkbenchFeatureIndex.VERSION);
+        assertEquals("feature-index.v2", WorkbenchFeatureIndex.CACHE_FILE);
+        Path features = project.resolve("src/test/resources/features");
+        Files.createDirectories(features);
+        Files.writeString(features.resolve("one.feature"), """
+                Feature: One
+                  Scenario: Alpha
+                    Given a
+                """);
+        WorkbenchFeatureIndex.Selection first = select(null, null, null, List.of(), false);
+        assertEquals(1, first.filesReparsed());
+        Path cache = WorkbenchFeatureIndex.cacheFile(project);
+        byte[] bytes = Files.readAllBytes(cache);
+        bytes[0] = 0;
+        bytes[1] = 0;
+        bytes[2] = 0;
+        bytes[3] = 1;
+        Files.write(cache, bytes);
+        WorkbenchFeatureIndex.Selection again = select("@missing", null, null, List.of(), false);
+        assertEquals(1, again.filesReparsed());
+        assertEquals(0, again.cacheHits());
+        assertTrue(again.matchedNone());
+    }
+
+    @Test
     void noMatchFeatureIsOutsideTheIndexedRoots() throws Exception {
         String property = WorkbenchFeatureIndex.noMatchFeatureProperty(project);
         assertTrue(property.startsWith("wd-file:"));

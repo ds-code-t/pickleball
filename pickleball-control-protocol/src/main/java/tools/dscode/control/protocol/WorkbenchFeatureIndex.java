@@ -28,11 +28,15 @@ import java.util.stream.Stream;
  * scenarios when the file bytes still hash to the stored digest. A changed or
  * new file is parsed again. A corrupt cache is ignored and the tree is scanned.
  * When a file cannot be read, or a tag expression cannot be evaluated, the
- * launch must not trust a narrowed path list: that is the full-scan fallback.</p>
+ * launch must not trust a narrowed path list: that is the full-scan fallback.
+ * A file the text parser cannot fully model (a {@code # language:} header other
+ * than {@code en}, or a keyword it does not recognise) is not a full-scan
+ * fallback. That file is always added to a narrowed selection, and it contributes
+ * no scenario hits.</p>
  */
 public final class WorkbenchFeatureIndex {
-    static final int VERSION = 1;
-    public static final String CACHE_FILE = "feature-index.v1";
+    static final int VERSION = 2;
+    public static final String CACHE_FILE = "feature-index.v2";
     public static final String NO_MATCH_FEATURE = "no-match.feature";
 
     private WorkbenchFeatureIndex() {
@@ -158,7 +162,12 @@ public final class WorkbenchFeatureIndex {
         ExampleRowSelector example = compileExample(request.example());
         List<FeatureLine> lines = parseSelectors(request.selects());
         List<Hit> hits = new ArrayList<>();
+        List<String> forced = new ArrayList<>();
         for (StoredFile file : stored) {
+            if (file.unindexable) {
+                forced.add(file.relativePath);
+                continue;
+            }
             for (StoredScenario scenario : file.scenarios) {
                 hits.addAll(matchScenario(file, scenario, tags, name, example, lines));
             }
@@ -171,16 +180,19 @@ public final class WorkbenchFeatureIndex {
         boolean lineSpecific = !lines.isEmpty();
         Set<String> matchedFiles = new LinkedHashSet<>();
         for (Hit hit : hits) matchedFiles.add(hit.relativePath());
-        boolean subset = matchedFiles.size() < stored.size() || lineSpecific || (filtered && hits.isEmpty());
+        Set<String> included = new LinkedHashSet<>(matchedFiles);
+        included.addAll(forced);
+        boolean coversAllFiles = !stored.isEmpty() && included.size() == stored.size();
+        boolean subset = !coversAllFiles || lineSpecific || (filtered && hits.isEmpty() && forced.isEmpty());
         boolean narrowed = filtered && subset;
         String property = null;
-        if (narrowed && !hits.isEmpty()) {
-            property = featureProperty(root, hits, lineSpecific);
+        if (narrowed && (!hits.isEmpty() || !forced.isEmpty())) {
+            property = featureProperty(root, hits, lineSpecific, forced);
         }
         return new Selection(
                 narrowed,
                 false,
-                narrowed && hits.isEmpty(),
+                narrowed && hits.isEmpty() && forced.isEmpty(),
                 "",
                 property,
                 hits,
@@ -236,13 +248,17 @@ public final class WorkbenchFeatureIndex {
                 || !lines.isEmpty();
     }
 
-    private static String featureProperty(Path root, List<Hit> hits, boolean lineSpecific) {
+    private static String featureProperty(Path root, List<Hit> hits, boolean lineSpecific, List<String> forcedPaths) {
         LinkedHashSet<String> paths = new LinkedHashSet<>();
         for (Hit hit : hits) {
             Path file = root.resolve(hit.relativePath()).toAbsolutePath().normalize();
             String value = "wd-file:" + file.toString().replace('\\', '/');
             if (lineSpecific) value = value + ":" + hit.line();
             paths.add(value);
+        }
+        for (String relative : forcedPaths) {
+            Path file = root.resolve(relative).toAbsolutePath().normalize();
+            paths.add("wd-file:" + file.toString().replace('\\', '/'));
         }
         return String.join(",", paths);
     }
@@ -456,8 +472,11 @@ public final class WorkbenchFeatureIndex {
         }
     }
 
+    private static final Pattern LANGUAGE_HEADER = Pattern.compile("(?i)^#\\s*language\\s*:\\s*(\\S+)");
+
     private static StoredFile parse(Path root, Path file, String relative, String hash, byte[] bytes) {
         String text = new String(bytes, StandardCharsets.UTF_8);
+        if (text.startsWith("\uFEFF")) text = text.substring(1);
         String[] rawLines = text.split("\\R", -1);
         String featureName = "";
         List<String> featureTags = List.of();
@@ -475,28 +494,40 @@ public final class WorkbenchFeatureIndex {
         int overall = 0;
         int rowInTable = 0;
         boolean inExamples = false;
+        boolean inDocString = false;
+        boolean unindexable = false;
         List<StoredScenario> scenarios = new ArrayList<>();
         for (int i = 0; i < rawLines.length; i++) {
             String trimmed = rawLines[i].strip();
             int lineNo = i + 1;
+            if (isDocStringDelimiter(trimmed)) {
+                inDocString = !inDocString;
+                continue;
+            }
+            if (inDocString) continue;
             if (isTagLine(trimmed)) {
                 if (pending.isEmpty()) pendingStart = lineNo;
                 pending.addAll(tagTokens(trimmed));
                 continue;
             }
-            if (trimmed.isEmpty() || trimmed.startsWith("#")) continue;
-            if (starts(trimmed, "Feature:")) {
-                featureName = trimmed.substring("Feature:".length()).strip();
+            if (trimmed.isEmpty() || trimmed.startsWith("#")) {
+                if (trimmed.startsWith("#")) unindexable |= foreignLanguage(trimmed);
+                continue;
+            }
+            if (starts(trimmed, "Feature:") || starts(trimmed, "Business Need:") || starts(trimmed, "Ability:")) {
+                featureName = trimmed.substring(trimmed.indexOf(':') + 1).strip();
                 featureTags = List.copyOf(pending);
                 ruleTags = List.of();
                 pending.clear();
                 pendingStart = -1;
+                inExamples = false;
                 continue;
             }
             if (starts(trimmed, "Rule:")) {
                 ruleTags = List.copyOf(pending);
                 pending.clear();
                 pendingStart = -1;
+                inExamples = false;
                 continue;
             }
             if (starts(trimmed, "Background:")) {
@@ -505,7 +536,8 @@ public final class WorkbenchFeatureIndex {
                 inExamples = false;
                 continue;
             }
-            if (starts(trimmed, "Scenario Outline:") || starts(trimmed, "Scenario Template:") || starts(trimmed, "Scenario:")) {
+            if (starts(trimmed, "Scenario Outline:") || starts(trimmed, "Scenario Template:")
+                    || starts(trimmed, "Scenario:") || starts(trimmed, "Example:")) {
                 if (currentName != null) {
                     scenarios.add(scenario(currentName, keywordLine, rangeStart, lineNo - 1, ownTags, examples));
                 }
@@ -524,7 +556,7 @@ public final class WorkbenchFeatureIndex {
                 inExamples = false;
                 continue;
             }
-            if (starts(trimmed, "Examples:") || starts(trimmed, "Example:")) {
+            if (starts(trimmed, "Examples:") || starts(trimmed, "Scenarios:")) {
                 inExamples = currentName != null;
                 exampleHeader = null;
                 exampleTags = List.copyOf(pending);
@@ -541,11 +573,25 @@ public final class WorkbenchFeatureIndex {
                 } else {
                     rowInTable++;
                     overall++;
-                    examples.add(new StoredExample(lineNo, overall, table, rowInTable, exampleTags, exampleHeader, cells));
+                    examples.add(new StoredExample(
+                            lineNo, overall, table, rowInTable,
+                            withScenarioTags(exampleTags, exampleHeader, cells),
+                            exampleHeader,
+                            cells
+                    ));
                 }
                 pending.clear();
                 pendingStart = -1;
                 continue;
+            }
+            if (isStep(trimmed) || trimmed.startsWith("|")) {
+                pending.clear();
+                pendingStart = -1;
+                inExamples = false;
+                continue;
+            }
+            if (looksLikeUnknownKeyword(trimmed)) {
+                unindexable = true;
             }
             pending.clear();
             pendingStart = -1;
@@ -553,7 +599,74 @@ public final class WorkbenchFeatureIndex {
         if (currentName != null) {
             scenarios.add(scenario(currentName, keywordLine, rangeStart, rawLines.length, ownTags, examples));
         }
-        return new StoredFile(relative, hash, featureName, scenarios);
+        if (unindexable) scenarios = List.of();
+        return new StoredFile(relative, hash, featureName, scenarios, unindexable);
+    }
+
+    /**
+     * A {@code Scenario Tags} examples column is a Pickleball outline tag, not a Gherkin tag line.
+     * {@code @} is a normal tag. {@code %} is a component tag. Other cell text is not a tag.
+     */
+    private static List<String> withScenarioTags(List<String> exampleTags, List<String> headers, List<String> cells) {
+        int index = headers.indexOf("Scenario Tags");
+        if (index < 0 || index >= cells.size()) return exampleTags;
+        String raw = cells.get(index);
+        if (raw == null || raw.isBlank()) return exampleTags;
+        List<String> tags = new ArrayList<>(exampleTags);
+        for (String token : raw.trim().split("\\s+")) {
+            if (token.isBlank()) continue;
+            if (token.startsWith("@")) {
+                String value = token;
+                while (value.startsWith("@")) value = value.substring(1);
+                if (!value.isEmpty()) tags.add(value);
+            } else if (token.startsWith("%")) {
+                tags.add(token);
+            }
+        }
+        return List.copyOf(tags);
+    }
+
+    private static boolean foreignLanguage(String comment) {
+        java.util.regex.Matcher matcher = LANGUAGE_HEADER.matcher(comment);
+        if (!matcher.find()) return false;
+        return !"en".equalsIgnoreCase(matcher.group(1));
+    }
+
+    private static boolean isDocStringDelimiter(String trimmed) {
+        return trimmed.startsWith("\"\"\"") || trimmed.startsWith("```");
+    }
+
+    private static boolean isStep(String trimmed) {
+        return stepKeyword(trimmed, "Given")
+                || stepKeyword(trimmed, "When")
+                || stepKeyword(trimmed, "Then")
+                || stepKeyword(trimmed, "And")
+                || stepKeyword(trimmed, "But")
+                || trimmed.equals("*")
+                || trimmed.startsWith("* ")
+                || trimmed.startsWith("*\t");
+    }
+
+    private static boolean stepKeyword(String trimmed, String keyword) {
+        return trimmed.equals(keyword) || trimmed.startsWith(keyword + " ") || trimmed.startsWith(keyword + "\t");
+    }
+
+    /** A structural keyword this parser does not model, such as a foreign {@code Mot:}. */
+    private static boolean looksLikeUnknownKeyword(String trimmed) {
+        int colon = trimmed.indexOf(':');
+        if (colon <= 0) return false;
+        String head = trimmed.substring(0, colon).strip();
+        if (head.isEmpty() || head.length() > 80) return false;
+        String[] words = head.split("\\s+");
+        if (words.length == 0 || words.length > 6) return false;
+        for (String word : words) {
+            if (word.isEmpty() || !Character.isLetter(word.charAt(0))) return false;
+            for (int i = 1; i < word.length(); i++) {
+                char ch = word.charAt(i);
+                if (!Character.isLetter(ch) && ch != '-' && ch != '\'') return false;
+            }
+        }
+        return true;
     }
 
     private static StoredScenario scenario(
@@ -568,7 +681,7 @@ public final class WorkbenchFeatureIndex {
     }
 
     private static List<String> merge(List<String> feature, List<String> rule, List<String> own) {
-        LinkedHashSet<String> tags = new LinkedHashSet<>();
+        List<String> tags = new ArrayList<>();
         tags.addAll(feature);
         tags.addAll(rule);
         tags.addAll(own);
@@ -647,7 +760,13 @@ public final class WorkbenchFeatureIndex {
     ) {
     }
 
-    private record StoredFile(String relativePath, String sha256, String featureName, List<StoredScenario> scenarios) {
+    private record StoredFile(
+            String relativePath,
+            String sha256,
+            String featureName,
+            List<StoredScenario> scenarios,
+            boolean unindexable
+    ) {
     }
 
     private static final class Cache {
@@ -696,6 +815,7 @@ public final class WorkbenchFeatureIndex {
             out.writeUTF(file.relativePath);
             out.writeUTF(file.sha256);
             out.writeUTF(file.featureName == null ? "" : file.featureName);
+            out.writeBoolean(file.unindexable);
             out.writeInt(file.scenarios.size());
             for (StoredScenario scenario : file.scenarios) {
                 out.writeUTF(scenario.name == null ? "" : scenario.name);
@@ -720,6 +840,7 @@ public final class WorkbenchFeatureIndex {
             String path = in.readUTF();
             String hash = in.readUTF();
             String feature = in.readUTF();
+            boolean unindexable = in.readBoolean();
             int scenarios = in.readInt();
             List<StoredScenario> parsed = new ArrayList<>();
             for (int i = 0; i < scenarios; i++) {
@@ -738,7 +859,7 @@ public final class WorkbenchFeatureIndex {
                 }
                 parsed.add(new StoredScenario(name, keyword, range, end, tags, rows));
             }
-            return new StoredFile(path, hash, feature, parsed);
+            return new StoredFile(path, hash, feature, parsed, unindexable);
         }
 
         private static void writeList(DataOutputStream out, List<String> values) throws IOException {

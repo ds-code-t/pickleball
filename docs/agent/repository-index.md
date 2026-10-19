@@ -443,6 +443,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/control/protocol/PickleballLocalLayoutTest.java`
 - `src/test/java/tools/dscode/control/protocol/PickleballLocalStoreTest.java`
 - `src/test/java/tools/dscode/control/protocol/PickleballVersionTest.java`
+- `src/test/java/tools/dscode/control/protocol/WorkbenchFeatureIndexParityTest.java`
 - `src/test/java/tools/dscode/expectedfailure/ExpectedFailureRunnerTest.java`
 - `src/test/java/tools/dscode/expectedfailure/ExpectedFailureSteps.java`
 - `src/test/java/tools/dscode/launcher/PickleballWorkbenchLauncherTest.java`
