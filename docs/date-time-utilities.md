@@ -77,6 +77,8 @@ After a date/time, a pipe modifier is an exact name:
 
 `equal to … within a margin of N minutes`, `within a margin of N minutes`, and `within N minutes` compare two values as date-times only when the margin is a duration and both sides parse as date-times. Two ordinary strings stay a string compare, and the margin is ignored. Text that already compared equal as date-times still compares equal. A numeric margin is not a duration margin.
 
+`within N second|minute|hour|day|week|month|year(s)` is rewritten to `margin-of N unit` only when that same phrase (the text between commas or semicolons, outside quotes) already contains a comparison word (`equal`, `equals`, `greater`, `less`, `before`, `after`, `at least`, or `at most`) and the duration follows that word. `wait … within 30 seconds`, `click … within 2 minutes`, and a quoted `"within 5 minutes"` stay unchanged. `margin of` is still normalised to `margin-of`.
+
 ## Arithmetic
 
 ```gherkin

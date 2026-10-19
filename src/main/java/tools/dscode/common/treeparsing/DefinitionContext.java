@@ -10,6 +10,10 @@ import tools.dscode.common.mappings.QuoteParser;
 import tools.dscode.common.treeparsing.preparsing.BracketMasker;
 import tools.dscode.common.treeparsing.xpathcomponents.XPathyBuilder;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import static com.xpathy.Attribute.aria_label;
 import static com.xpathy.Attribute.checked;
 import static com.xpathy.Attribute.class_;
@@ -51,6 +55,13 @@ public final class DefinitionContext {
             "(?<!\\S)-?(?:\\d+(?:\\.\\d*)?|\\.\\d+)(?!\\S)";
 
 
+    private static final Pattern WITHIN_DURATION = Pattern.compile(
+            "\\bwithin\\s+(\\d+(?:\\.\\d+)?)\\s+((?:second|minute|hour|day|week|month|year)s?)\\b");
+    private static final Pattern COMPARISON_KEYWORD = Pattern.compile(
+            "\\b(?:at\\s+least|at\\s+most|equals|equal|greater|less|before|after)\\b",
+            Pattern.CASE_INSENSITIVE);
+
+
     private DefinitionContext() {
         // utility class
     }
@@ -60,10 +71,8 @@ public final class DefinitionContext {
         BracketMasker bm = getBracketMasker(input);
         String parsedText = normalizeWhitespace(bm.masked())
                 .replaceAll("\\bmargin\\s+of\\b", "margin-of")
-                .replaceAll("\\bwithin\\s+(?:(?:a|the)\\s+)?margin-of\\b", "margin-of")
-                .replaceAll(
-                        "\\bwithin\\s+(\\d+(?:\\.\\d+)?)\\s+((?:second|minute|hour|day|week|month|year)s?)\\b",
-                        "margin-of $1 $2")
+                .replaceAll("\\bwithin\\s+(?:(?:a|the)\\s+)?margin-of\\b", "margin-of");
+        parsedText = rewriteWithinDurationInComparisonPhrases(parsedText)
                 .replaceAll("\\bno\\s+attribute\\b", "noattribute")
                 .replaceAll("\\b(?:the|a)\\b", "")
                 .replaceAll("\\bare\\b", "is")
@@ -74,6 +83,135 @@ public final class DefinitionContext {
                 .replaceAll("\\bnot\\b|n't\\b", " no ")
                 .replaceAll("\\s+", " ");
         return bm.restoreFrom(parsedText);
+    }
+
+    /**
+     * {@code within N <unit>} becomes {@code margin-of N <unit>} only when that
+     * site follows a comparison word in the same comma/semicolon phrase, outside
+     * quotes. A wait, a click, and a quoted duration stay as written.
+     */
+    private static String rewriteWithinDurationInComparisonPhrases(String input) {
+        StringBuilder rewritten = new StringBuilder(input.length());
+        int phraseStart = 0;
+        int index = 0;
+        while (index <= input.length()) {
+            if (index == input.length() || isPhraseSeparator(input.charAt(index))) {
+                rewritten.append(rewriteComparisonPhrase(input.substring(phraseStart, index)));
+                if (index < input.length()) {
+                    rewritten.append(input.charAt(index));
+                }
+                phraseStart = index + 1;
+                index = phraseStart;
+                continue;
+            }
+            index = skipAtom(input, index);
+        }
+        return rewritten.toString();
+    }
+
+    private static String rewriteComparisonPhrase(String phrase) {
+        List<int[]> quotes = quoteSpans(phrase);
+        List<Integer> keywordEnds = new ArrayList<>();
+        Matcher keywords = COMPARISON_KEYWORD.matcher(phrase);
+        while (keywords.find()) {
+            if (!insideSpan(quotes, keywords.start())) {
+                keywordEnds.add(keywords.end());
+            }
+        }
+        Matcher durations = WITHIN_DURATION.matcher(phrase);
+        StringBuilder rewritten = new StringBuilder();
+        int cursor = 0;
+        while (durations.find()) {
+            rewritten.append(phrase, cursor, durations.start());
+            boolean followsComparison = false;
+            if (!insideSpan(quotes, durations.start())) {
+                for (int end : keywordEnds) {
+                    if (end <= durations.start()) {
+                        followsComparison = true;
+                        break;
+                    }
+                }
+            }
+            if (followsComparison) {
+                rewritten.append("margin-of ")
+                        .append(durations.group(1))
+                        .append(' ')
+                        .append(durations.group(2));
+            } else {
+                rewritten.append(durations.group());
+            }
+            cursor = durations.end();
+        }
+        rewritten.append(phrase.substring(cursor));
+        return rewritten.toString();
+    }
+
+    private static boolean isPhraseSeparator(char current) {
+        return current == ',' || current == ';';
+    }
+
+    private static int skipAtom(String input, int index) {
+        if (startsTripleQuote(input, index)) {
+            int close = input.indexOf("'''", index + 3);
+            return close < 0 ? input.length() : close + 3;
+        }
+        char current = input.charAt(index);
+        if (isQuote(current) && !isEscaped(input, index)) {
+            int close = index + 1;
+            while (close < input.length()
+                    && !(input.charAt(close) == current && !isEscaped(input, close))) {
+                close++;
+            }
+            return close >= input.length() ? input.length() : close + 1;
+        }
+        return index + 1;
+    }
+
+    private static List<int[]> quoteSpans(String input) {
+        List<int[]> spans = new ArrayList<>();
+        int index = 0;
+        while (index < input.length()) {
+            int next = skipAtom(input, index);
+            if (next > index + 1 || (next == index + 1 && isQuote(input.charAt(index)) && !isEscaped(input, index))) {
+                if (startsTripleQuote(input, index) || (isQuote(input.charAt(index)) && !isEscaped(input, index))) {
+                    spans.add(new int[] {index, Math.min(next, input.length())});
+                }
+            }
+            if (next <= index) {
+                break;
+            }
+            index = next;
+        }
+        return spans;
+    }
+
+    private static boolean insideSpan(List<int[]> spans, int index) {
+        for (int[] span : spans) {
+            if (index >= span[0] && index < span[1]) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean startsTripleQuote(String input, int index) {
+        return index + 2 < input.length()
+                && input.charAt(index) == '\''
+                && input.charAt(index + 1) == '\''
+                && input.charAt(index + 2) == '\''
+                && !isEscaped(input, index);
+    }
+
+    private static boolean isQuote(char current) {
+        return current == '"' || current == '\'' || current == '`';
+    }
+
+    private static boolean isEscaped(String input, int index) {
+        int slashes = 0;
+        for (int cursor = index - 1; cursor >= 0 && input.charAt(cursor) == '\\'; cursor--) {
+            slashes++;
+        }
+        return slashes % 2 == 1;
     }
 
 
