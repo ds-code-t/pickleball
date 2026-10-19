@@ -560,6 +560,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/PickleballVersion.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/RunConfigs.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/RunView.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/SleepGapMonitor.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/WindowDriver.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/WorkbenchFeatureIndex.java`
 - `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/ControlBridgeStepResolutionTest.java`
@@ -568,6 +569,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/PickleballPathsTest.java`
 - `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/RunConfigsTest.java`
 - `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/RunWindowTest.java`
+- `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/SleepGapMonitorTest.java`
 - `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/WorkbenchFeatureIndexTest.java`
 
 ## Pickleball Workbench module

@@ -237,7 +237,7 @@ class WorkbenchSessionCommandsTest {
     }
 
     @Test
-    void elapsedTimeFlagsASleepGapBetweenSteps() throws Exception {
+    void eventSpacingAndSleepTextDoNotRecordASleepGap() throws Exception {
         Instant now = Instant.parse("2026-07-20T12:00:10Z");
         var timing = WorkbenchSessionCommands.timingOf(
                 new ObjectMapper().readTree("""
@@ -251,31 +251,40 @@ class WorkbenchSessionCommandsTest {
         );
         assertEquals(10_000, timing.elapsedRunMs);
         assertEquals(3_000, timing.elapsedStepMs);
-        assertTrue(timing.sleepGap);
-        assertTrue(timing.format().contains("elapsed-run-ms=10000"));
-        assertTrue(timing.format().contains("sleep-gap=true"));
+        String report = WorkbenchSessionCommands.formatReport(timing, List.of());
+        assertTrue(report.contains("elapsed-run-ms=10000"));
+        assertTrue(report.contains("sleep-gap=none"));
+        assertFalse(report.contains("sleep-gap=true"));
 
         var close = WorkbenchSessionCommands.timingOf(
                 new ObjectMapper().readTree("""
                         {"events":[
                           {"timestamp":"2026-07-20T12:00:00Z","stepText":"Given stay"},
-                          {"timestamp":"2026-07-20T12:00:01Z","stepText":"Then done"}
+                          {"timestamp":"2026-07-20T12:00:03Z","stepText":"And sleep 5"}
                         ]}
                         """),
                 Instant.parse("2026-07-20T12:00:00Z"),
-                Instant.parse("2026-07-20T12:00:01Z")
+                Instant.parse("2026-07-20T12:00:03Z")
         );
-        assertFalse(close.sleepGap);
+        assertEquals(3_000, close.elapsedRunMs);
+        assertTrue(WorkbenchSessionCommands.formatReport(close, List.of()).contains("sleep-gap=none"));
+
+        String recorded = WorkbenchSessionCommands.formatSleepGaps(List.of(
+                new tools.dscode.control.protocol.SleepGapMonitor.Gap(
+                        Instant.parse("2026-07-20T12:00:45Z"), 45_000
+                )
+        ));
+        assertEquals("sleep-gap=45000ms at 2026-07-20T12:00:45Z", recorded);
     }
 
     @Test
     @Timeout(value = 10, unit = TimeUnit.SECONDS)
-    void eventsPrintElapsedAndSleepGap() throws Exception {
+    void eventsPrintElapsedAndNoSleepGapFromStepText() throws Exception {
         try (FakeSession session = FakeSession.start(project)) {
             session.eventsJson = """
                     {"events":[
                       {"timestamp":"2026-07-20T12:00:00Z","stepText":"Given stay"},
-                      {"timestamp":"2026-07-20T12:00:05Z","stepText":"And sleep 5"}
+                      {"timestamp":"2026-07-20T12:00:03Z","stepText":"And sleep 5"}
                     ]}
                     """;
             Output output = run(
@@ -287,7 +296,31 @@ class WorkbenchSessionCommandsTest {
             assertEquals(0, output.exitCode, output.stderr + output.stdout);
             assertTrue(output.stdout.contains("elapsed-run-ms="));
             assertTrue(output.stdout.contains("elapsed-step-ms="));
-            assertTrue(output.stdout.contains("sleep-gap=true"));
+            assertTrue(output.stdout.contains("sleep-gap=none"), output.stdout);
+            assertFalse(output.stdout.contains("sleep-gap=true"), output.stdout);
+
+            session.healthJson = """
+                    {"status":"ok","sleepGaps":[{"detectedAt":"2026-07-20T12:00:45Z","gapMs":45000}]}
+                    """;
+            Output stalled = run(
+                    new String[]{"events", project.toString()},
+                    launch -> {
+                        throw new AssertionError("events must not start a session");
+                    }
+            );
+            assertEquals(0, stalled.exitCode, stalled.stderr + stalled.stdout);
+            assertTrue(stalled.stdout.contains("sleep-gap=45000ms at 2026-07-20T12:00:45Z"), stalled.stdout);
+        }
+    }
+
+    @Test
+    void sleepGapDocsMeanAMachineSleepNotAGherkinStep() throws Exception {
+        String workbench = Files.readString(Path.of("docs/pickleball-workbench.md"));
+        String guide = Files.readString(Path.of("docs/consumer-agent-guide.md"));
+        for (String doc : List.of(workbench, guide)) {
+            assertTrue(doc.contains("sleep-gap"), doc);
+            assertTrue(doc.contains("machine sleep") || doc.contains("machine-sleep"), doc);
+            assertTrue(doc.contains("not a Gherkin sleep step"), doc);
         }
     }
 
@@ -793,6 +826,7 @@ class WorkbenchSessionCommandsTest {
         private volatile java.util.function.Consumer<String> onCommand;
         private volatile long pid = ProcessHandle.current().pid();
         private volatile String eventsJson = "{\"events\":[]}";
+        private volatile String healthJson = "{\"status\":\"ok\"}";
 
         private FakeSession(HttpServer http, Path stateFile, String url) {
             this.http = http;
@@ -807,7 +841,11 @@ class WorkbenchSessionCommandsTest {
         static FakeSession start(Path project, String mode, Path stateFile) throws IOException {
             HttpServer http = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
             FakeSession[] box = new FakeSession[1];
-            http.createContext("/health", exchange -> write(exchange, 200, "{\"status\":\"ok\"}"));
+            http.createContext("/health", exchange -> {
+                FakeSession current = box[0];
+                String body = current == null || current.healthJson == null ? "{\"status\":\"ok\"}" : current.healthJson;
+                write(exchange, 200, body);
+            });
             http.createContext("/tools/workbench_events", exchange -> {
                 FakeSession current = box[0];
                 String body = current == null || current.eventsJson == null ? "{\"events\":[]}" : current.eventsJson;

@@ -5,6 +5,7 @@ import com.sun.net.httpserver.Headers;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import tools.dscode.control.protocol.PickleballLocalLayout;
+import tools.dscode.control.protocol.SleepGapMonitor;
 import tools.dscode.workbench.WorkbenchServices;
 import tools.dscode.workbench.WorkbenchSessionActions;
 
@@ -46,6 +47,7 @@ public final class WorkbenchAttachServer implements AutoCloseable {
     private final WorkbenchSessionActions actions;
     private final ExecutorService executor;
     private final AtomicBoolean closed = new AtomicBoolean();
+    private final SleepGapMonitor sleepGaps = new SleepGapMonitor();
 
     private WorkbenchAttachServer(
             WorkbenchServices services,
@@ -162,6 +164,7 @@ public final class WorkbenchAttachServer implements AutoCloseable {
             http.setExecutor(executor);
             http.start();
             server.writeStateFile();
+            server.sleepGaps.start();
             return server;
         } catch (IOException failure) {
             throw new IllegalStateException("Could not start the Workbench agent-attach endpoint.", failure);
@@ -203,6 +206,7 @@ public final class WorkbenchAttachServer implements AutoCloseable {
     @Override
     public void close() {
         if (!closed.compareAndSet(false, true)) return;
+        sleepGaps.close();
         http.stop(0);
         executor.shutdownNow();
         if (commands != null) commands.close();
@@ -218,12 +222,20 @@ public final class WorkbenchAttachServer implements AutoCloseable {
             send(exchange, 405, Map.of("error", "Method not allowed"));
             return;
         }
-        send(exchange, 200, Map.of(
-                "status", "ok",
-                "url", url(),
-                "pid", ProcessHandle.current().pid(),
-                "mode", mode
-        ));
+        java.util.List<Map<String, Object>> recorded = new java.util.ArrayList<>();
+        for (SleepGapMonitor.Gap gap : sleepGaps.gaps()) {
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("detectedAt", gap.detectedAt().toString());
+            row.put("gapMs", gap.gapMs());
+            recorded.add(row);
+        }
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("status", "ok");
+        body.put("url", url());
+        body.put("pid", ProcessHandle.current().pid());
+        body.put("mode", mode);
+        body.put("sleepGaps", recorded);
+        send(exchange, 200, body);
     }
 
     private void lease(HttpExchange exchange) throws IOException {

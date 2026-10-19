@@ -6,6 +6,7 @@ import tools.dscode.common.coordination.AgentCoordination;
 import tools.dscode.common.runtime.ProcessTrees;
 import tools.dscode.control.protocol.PickleballLocalLayout;
 import tools.dscode.control.protocol.RunView;
+import tools.dscode.control.protocol.SleepGapMonitor;
 import tools.dscode.control.protocol.WindowDriver;
 
 import java.io.IOException;
@@ -625,7 +626,7 @@ public final class WorkbenchSessionCommands {
         try {
             JsonNode events = postJson(http, state, "/tools/workbench_events", Map.of());
             out.println(events.toString());
-            out.println(timingOf(events, runStarted(parsed), Instant.now()).format());
+            out.println(formatReport(timingOf(events, runStarted(parsed), Instant.now()), sleepGaps(http, state)));
             return 0;
         } catch (RuntimeException failure) {
             err.println("Workbench events failed: " + failure.getMessage());
@@ -844,7 +845,7 @@ public final class WorkbenchSessionCommands {
         } catch (RuntimeException ignored) {
             // Elapsed time still prints from the run record when the event feed is down.
         }
-        out.println(timingOf(events, runStarted(parsed), Instant.now()).format());
+        out.println(formatReport(timingOf(events, runStarted(parsed), Instant.now()), sleepGaps(http, state)));
     }
 
     static String unhealthyMessage(Path project, String runId) {
@@ -908,23 +909,51 @@ public final class WorkbenchSessionCommands {
         }
     }
 
-    static final Duration SLEEP_GAP = Duration.ofSeconds(2);
+    static String formatReport(Timing timing, List<SleepGapMonitor.Gap> gaps) {
+        return "elapsed-run-ms=" + timing.elapsedRunMs
+                + System.lineSeparator() + "elapsed-step-ms=" + timing.elapsedStepMs
+                + System.lineSeparator() + formatSleepGaps(gaps);
+    }
+
+    static String formatSleepGaps(List<SleepGapMonitor.Gap> gaps) {
+        if (gaps == null || gaps.isEmpty()) return "sleep-gap=none";
+        StringBuilder text = new StringBuilder();
+        for (SleepGapMonitor.Gap gap : gaps) {
+            if (!text.isEmpty()) text.append(System.lineSeparator());
+            text.append("sleep-gap=").append(gap.gapMs()).append("ms at ").append(gap.detectedAt());
+        }
+        return text.toString();
+    }
+
+    private static List<SleepGapMonitor.Gap> sleepGaps(HttpClient http, SessionState state) {
+        try {
+            JsonNode health = getJson(http, state, "/health");
+            JsonNode array = health == null ? null : health.get("sleepGaps");
+            if (array == null || !array.isArray()) return List.of();
+            List<SleepGapMonitor.Gap> gaps = new ArrayList<>();
+            for (JsonNode node : array) {
+                String detected = node.path("detectedAt").asText("");
+                long gapMs = node.path("gapMs").asLong(-1);
+                if (detected.isBlank() || gapMs < 0) continue;
+                try {
+                    gaps.add(new SleepGapMonitor.Gap(Instant.parse(detected), gapMs));
+                } catch (RuntimeException ignored) {
+                    // A bad record does not hide the rest.
+                }
+            }
+            return gaps;
+        } catch (RuntimeException ignored) {
+            return List.of();
+        }
+    }
 
     static final class Timing {
         final long elapsedRunMs;
         final long elapsedStepMs;
-        final boolean sleepGap;
 
-        Timing(long elapsedRunMs, long elapsedStepMs, boolean sleepGap) {
+        Timing(long elapsedRunMs, long elapsedStepMs) {
             this.elapsedRunMs = elapsedRunMs;
             this.elapsedStepMs = elapsedStepMs;
-            this.sleepGap = sleepGap;
-        }
-
-        String format() {
-            return "elapsed-run-ms=" + elapsedRunMs
-                    + System.lineSeparator() + "elapsed-step-ms=" + elapsedStepMs
-                    + System.lineSeparator() + "sleep-gap=" + sleepGap;
         }
     }
 
@@ -942,18 +971,11 @@ public final class WorkbenchSessionCommands {
         }
         long runMs = origin == null ? 0 : Math.max(0, Duration.between(origin, clock).toMillis());
         Instant stepAt = null;
-        boolean sleep = false;
-        Instant previous = null;
         for (Mark mark : marks) {
-            if (mark.at != null && previous != null && !Duration.between(previous, mark.at).minus(SLEEP_GAP).isNegative()) {
-                sleep = true;
-            }
-            if (mark.at != null) previous = mark.at;
             if (mark.step && mark.at != null) stepAt = mark.at;
-            if (mark.text != null && mark.text.toLowerCase(Locale.ROOT).contains("sleep")) sleep = true;
         }
         long stepMs = stepAt == null ? 0 : Math.max(0, Duration.between(stepAt, clock).toMillis());
-        return new Timing(runMs, stepMs, sleep);
+        return new Timing(runMs, stepMs);
     }
 
     private record Mark(Instant at, boolean step, String text) {
