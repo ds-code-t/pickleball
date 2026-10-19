@@ -134,6 +134,8 @@ CLEAR SAVED VALUES:temporaryToken,customerDraft
 
 ## Template paths
 
+A reference may contain another reference. A saved value that itself contains `>` does not close the outer reference. `->`, `a > b`, and `>=` outside a reference stay literal. The same characters stay intact inside a nested reference, inside `<{...}>`, and inside `~[~...~]~`. A reference whose whole value is a non-string object stays structured data, not a string cut at `>`.
+
 Normal nested references include:
 
 ```text
