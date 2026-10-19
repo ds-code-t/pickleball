@@ -57,6 +57,8 @@ public final class DefinitionContext {
 
     private static final Pattern WITHIN_DURATION = Pattern.compile(
             "\\bwithin\\s+(\\d+(?:\\.\\d+)?)\\s+((?:second|minute|hour|day|week|month|year)s?)\\b");
+    private static final Pattern WITHIN_MARGIN = Pattern.compile(
+            "\\bwithin\\s+(?:(?:a|the)\\s+)?margin-of\\b");
     private static final Pattern COMPARISON_KEYWORD = Pattern.compile(
             "\\b(?:at\\s+least|at\\s+most|equals|equal|greater|less|before|after)\\b",
             Pattern.CASE_INSENSITIVE);
@@ -70,8 +72,7 @@ public final class DefinitionContext {
     public static String preParseDynamicStepString(String input) {
         BracketMasker bm = getBracketMasker(input);
         String parsedText = normalizeWhitespace(bm.masked())
-                .replaceAll("\\bmargin\\s+of\\b", "margin-of")
-                .replaceAll("\\bwithin\\s+(?:(?:a|the)\\s+)?margin-of\\b", "margin-of");
+                .replaceAll("\\bmargin\\s+of\\b", "margin-of");
         parsedText = rewriteWithinDurationInComparisonPhrases(parsedText)
                 .replaceAll("\\bno\\s+attribute\\b", "noattribute")
                 .replaceAll("\\b(?:the|a)\\b", "")
@@ -86,9 +87,11 @@ public final class DefinitionContext {
     }
 
     /**
-     * {@code within N <unit>} becomes {@code margin-of N <unit>} only when that
-     * site follows a comparison word in the same comma/semicolon phrase, outside
-     * quotes. A wait, a click, and a quoted duration stay as written.
+     * {@code within N <unit>} becomes {@code margin-of N <unit>}, and
+     * {@code within a margin of} / {@code within the margin of} becomes
+     * {@code margin-of}, only when that site follows a comparison word in the
+     * same comma/semicolon phrase, outside quotes. A wait, a click, and a quoted
+     * duration stay as written.
      */
     private static String rewriteWithinDurationInComparisonPhrases(String input) {
         StringBuilder rewritten = new StringBuilder(input.length());
@@ -111,6 +114,17 @@ public final class DefinitionContext {
 
     private static String rewriteComparisonPhrase(String phrase) {
         List<int[]> quotes = quoteSpans(phrase);
+        List<Integer> keywordEnds = comparisonEnds(phrase, quotes);
+        String rewritten = replaceFollowing(phrase, quotes, keywordEnds, WITHIN_MARGIN, match -> "margin-of");
+        if (!rewritten.equals(phrase)) {
+            quotes = quoteSpans(rewritten);
+            keywordEnds = comparisonEnds(rewritten, quotes);
+        }
+        return replaceFollowing(rewritten, quotes, keywordEnds, WITHIN_DURATION, match ->
+                "margin-of " + match.group(1) + " " + match.group(2));
+    }
+
+    private static List<Integer> comparisonEnds(String phrase, List<int[]> quotes) {
         List<Integer> keywordEnds = new ArrayList<>();
         Matcher keywords = COMPARISON_KEYWORD.matcher(phrase);
         while (keywords.find()) {
@@ -118,29 +132,32 @@ public final class DefinitionContext {
                 keywordEnds.add(keywords.end());
             }
         }
-        Matcher durations = WITHIN_DURATION.matcher(phrase);
+        return keywordEnds;
+    }
+
+    private static String replaceFollowing(
+            String phrase,
+            List<int[]> quotes,
+            List<Integer> keywordEnds,
+            Pattern pattern,
+            java.util.function.Function<Matcher, String> replacement
+    ) {
+        Matcher matcher = pattern.matcher(phrase);
         StringBuilder rewritten = new StringBuilder();
         int cursor = 0;
-        while (durations.find()) {
-            rewritten.append(phrase, cursor, durations.start());
+        while (matcher.find()) {
+            rewritten.append(phrase, cursor, matcher.start());
             boolean followsComparison = false;
-            if (!insideSpan(quotes, durations.start())) {
+            if (!insideSpan(quotes, matcher.start())) {
                 for (int end : keywordEnds) {
-                    if (end <= durations.start()) {
+                    if (end <= matcher.start()) {
                         followsComparison = true;
                         break;
                     }
                 }
             }
-            if (followsComparison) {
-                rewritten.append("margin-of ")
-                        .append(durations.group(1))
-                        .append(' ')
-                        .append(durations.group(2));
-            } else {
-                rewritten.append(durations.group());
-            }
-            cursor = durations.end();
+            rewritten.append(followsComparison ? replacement.apply(matcher) : matcher.group());
+            cursor = matcher.end();
         }
         rewritten.append(phrase.substring(cursor));
         return rewritten.toString();

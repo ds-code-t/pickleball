@@ -29,6 +29,9 @@ class WithinRewriteScopeTest {
             Pattern.CASE_INSENSITIVE);
     private static final Pattern WITHIN_MARGIN = Pattern.compile(
             "\\bwithin\\s+(?:(?:a|the)\\s+)?margin-of\\b");
+    private static final Pattern WITHIN_MARGIN_PHRASE = Pattern.compile(
+            "\\bwithin\\s+(?:(?:a|the)\\s+)?margin(?:-of|\\s+of)\\b",
+            Pattern.CASE_INSENSITIVE);
 
     @Test
     void comparisonWithinBecomesMarginOfAndWaitsStay() {
@@ -72,11 +75,54 @@ class WithinRewriteScopeTest {
                 "equal to 1 margin-of 2 seconds; wait within 3 seconds",
                 DefinitionContext.preParseDynamicStepString(
                         "equal to 1 within 2 seconds; wait within 3 seconds"));
+    }
 
-        String quotedOnly = DefinitionContext.preParseDynamicStepString(
-                "wait \"within 5 minutes\"");
-        assertTrue(quotedOnly.contains("within 5 minutes"), quotedOnly);
-        assertFalse(quotedOnly.contains("margin-of"), quotedOnly);
+    @Test
+    void waitAndClickWithinDurationsStayLiteral() {
+        assertEquals(
+                "wait for dialog within 30 seconds",
+                DefinitionContext.preParseDynamicStepString(
+                        "wait for the dialog within 30 seconds"));
+        assertEquals(
+                "click button within 2 minutes",
+                DefinitionContext.preParseDynamicStepString(
+                        "click the button within 2 minutes"));
+        assertEquals(
+                "click link within 1 day",
+                DefinitionContext.preParseDynamicStepString(
+                        "click the link within 1 day"));
+        assertEquals(
+                "wait for page within 2 hours",
+                DefinitionContext.preParseDynamicStepString(
+                        "wait for the page within 2 hours"));
+        assertEquals(
+                "click button \"within 5 minutes\"",
+                DefinitionContext.preParseDynamicStepString(
+                        "click the button \"within 5 minutes\""));
+        assertEquals(
+                "click button 'within 10 seconds'",
+                DefinitionContext.preParseDynamicStepString(
+                        "click the button 'within 10 seconds'"));
+        assertEquals(
+                "click button `within 1 hour`",
+                DefinitionContext.preParseDynamicStepString(
+                        "click the button `within 1 hour`"));
+        assertEquals(
+                "wait \"within 5 minutes\"",
+                DefinitionContext.preParseDynamicStepString(
+                        "wait \"within 5 minutes\""));
+        assertEquals(
+                "wait for dialog within margin-of 5 minutes",
+                DefinitionContext.preParseDynamicStepString(
+                        "wait for the dialog within a margin of 5 minutes"));
+        assertEquals(
+                "click button within margin-of 2 seconds",
+                DefinitionContext.preParseDynamicStepString(
+                        "click the button within the margin of 2 seconds"));
+        String quotedMargin = DefinitionContext.preParseDynamicStepString(
+                "wait \"within a margin of 5 minutes\"");
+        assertTrue(quotedMargin.contains("within"), quotedMargin);
+        assertFalse(quotedMargin.startsWith("margin-of"), quotedMargin);
     }
 
     @Test
@@ -97,12 +143,22 @@ class WithinRewriteScopeTest {
                     steps++;
                     String current = DefinitionContext.preParseDynamicStepString(line);
                     String historical = preParseAt42404209(line);
+                    if (current.equals(historical)) {
+                        continue;
+                    }
+                    if (!comparisonScopedWithin(line)) {
+                        unexpected.add(root.relativize(file) + ":" + lineNumber
+                                + "\n  line=" + line
+                                + "\n  42404209=" + historical
+                                + "\n  current=" + current);
+                        continue;
+                    }
+                    allowed++;
                     String keptMargin = WITHIN_MARGIN.matcher(historical).replaceAll("margin-of");
                     if (current.equals(keptMargin)) {
                         continue;
                     }
                     if (withinFollowsComparison(line)) {
-                        allowed++;
                         assertFalse(current.contains("within " + withinAmount(line)), current);
                         continue;
                     }
@@ -139,12 +195,20 @@ class WithinRewriteScopeTest {
         return bm.restoreFrom(parsedText);
     }
 
+    private static boolean comparisonScopedWithin(String line) {
+        return phraseMatches(line, WITHIN_DURATION) || phraseMatches(line, WITHIN_MARGIN_PHRASE);
+    }
+
     private static boolean withinFollowsComparison(String line) {
+        return phraseMatches(line, WITHIN_DURATION);
+    }
+
+    private static boolean phraseMatches(String line, Pattern pattern) {
         int phraseStart = 0;
         int index = 0;
         while (index <= line.length()) {
             if (index == line.length() || line.charAt(index) == ',' || line.charAt(index) == ';') {
-                if (phraseFollows(line.substring(phraseStart, index))) {
+                if (phraseMatchesPattern(line.substring(phraseStart, index), pattern)) {
                     return true;
                 }
                 phraseStart = index + 1;
@@ -156,7 +220,7 @@ class WithinRewriteScopeTest {
         return false;
     }
 
-    private static boolean phraseFollows(String phrase) {
+    private static boolean phraseMatchesPattern(String phrase, Pattern pattern) {
         List<int[]> quotes = quoteSpans(phrase);
         List<Integer> keywordEnds = new ArrayList<>();
         Matcher keywords = COMPARISON_KEYWORD.matcher(phrase);
@@ -165,7 +229,7 @@ class WithinRewriteScopeTest {
                 keywordEnds.add(keywords.end());
             }
         }
-        Matcher durations = WITHIN_DURATION.matcher(phrase);
+        Matcher durations = pattern.matcher(phrase);
         while (durations.find()) {
             if (inside(quotes, durations.start())) {
                 continue;
