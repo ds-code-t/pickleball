@@ -380,6 +380,11 @@ public final class WorkbenchController implements WorkbenchServices {
     }
 
     @Override
+    public ControlBridgePageQueryResult pageQuery(String category, String text) {
+        return live.pageQuery(category, text);
+    }
+
+    @Override
     public ControlBridgeServiceCallResult serviceCall(String selector) {
         return mutating(() -> live.serviceCall(selector));
     }

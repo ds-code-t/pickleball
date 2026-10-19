@@ -8,6 +8,7 @@ import tools.dscode.control.protocol.ControlBridgeElementInspectionResult;
 import tools.dscode.control.protocol.ControlBridgeEventPage;
 import tools.dscode.control.protocol.ControlBridgeMappingSnapshot;
 import tools.dscode.control.protocol.ControlBridgeMappingSnapshotResult;
+import tools.dscode.control.protocol.ControlBridgePageQueryResult;
 import tools.dscode.control.protocol.ControlBridgeServiceCallResult;
 import tools.dscode.control.protocol.ControlBridgeStepOverride;
 import tools.dscode.control.protocol.ControlBridgeStepOverrideResult;
@@ -149,6 +150,8 @@ public interface WorkbenchServices extends AutoCloseable {
     ControlBridgeElementInspectionResult elementInspect(
             String category, String text, String operation, Integer maxElements
     );
+
+    ControlBridgePageQueryResult pageQuery(String category, String text);
 
     ControlBridgeServiceCallResult serviceCall(String selector);
 

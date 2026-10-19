@@ -19,8 +19,9 @@ import java.util.Locale;
 import java.util.Set;
 
 /**
- * Read-only page inspection. XPath comes from the existing execution dictionary.
- * Nothing is clicked, typed, or saved.
+ * Read-only offline fallback. The file is parsed as XML, so a HTML5 {@code <!DOCTYPE html>}
+ * is accepted and external entities are not loaded. Unclosed HTML tags are still rejected:
+ * write the snapshot as XHTML. Nothing is clicked, typed, or saved.
  */
 public final class WorkbenchElementInspect {
     private static final Set<String> INTERACTIVE = Set.of(
@@ -142,7 +143,11 @@ public final class WorkbenchElementInspect {
             DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
             factory.setNamespaceAware(false);
             factory.setExpandEntityReferences(false);
-            factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+            factory.setXIncludeAware(false);
+            factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", false);
+            factory.setFeature("http://xml.org/sax/features/external-general-entities", false);
+            factory.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+            factory.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
             Document document = factory.newDocumentBuilder().parse(
                     new ByteArrayInputStream(html.getBytes(StandardCharsets.UTF_8))
             );

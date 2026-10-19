@@ -1,5 +1,7 @@
 package tools.dscode.launcher;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import tools.dscode.common.coordination.AgentCoordination;
 import tools.dscode.common.reporting.diagnostic.AgentDiscoverPlanner;
 import tools.dscode.common.reporting.diagnostic.ConsumerMavenTestRunner;
@@ -11,6 +13,10 @@ import tools.dscode.testengine.PKB_props;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.PrintStream;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -765,39 +771,147 @@ public final class WorkbenchAgentCommands {
                 + " browser=" + text(browser);
     }
 
+    private static final ObjectMapper JSON = new ObjectMapper();
+
     private static int inspectPage(WorkbenchCommandLine.Parsed parsed, PrintStream out, PrintStream err) {
         String html = readHtml(parsed, err);
-        if (html == null) return 2;
-        for (WorkbenchElementInspect.Hit hit : WorkbenchElementInspect.dump(html)) {
-            out.println(hit.phrase());
-            out.println("xpath=" + hit.xpath());
-            out.println("rawMatchCount=" + hit.rawMatchCount());
-            out.println("visibleCount=" + hit.visibleCount());
+        if (html == null && flag(parsed, "--html") != null) return 2;
+        if (html != null) {
+            out.println("source=offline-html");
+            for (WorkbenchElementInspect.Hit hit : WorkbenchElementInspect.dump(html)) {
+                printHit(out, hit.phrase(), hit.xpath(), hit.rawMatchCount(), hit.visibleCount());
+            }
+            return 0;
         }
-        return 0;
+        return liveQuery(parsed, null, null, out, err);
     }
 
     private static int findElement(WorkbenchCommandLine.Parsed parsed, PrintStream out, PrintStream err) {
         String category = flag(parsed, "--category");
         if (category == null || category.isBlank()) {
-            err.println("Usage: find-element --category=<Button> [--text=<label>] --html=<file>");
+            err.println("Usage: find-element --category=<Button> [--text=<label>] [--html=<file>]");
             return 2;
         }
-        String html = readHtml(parsed, err);
-        if (html == null) return 2;
+        String htmlFlag = flag(parsed, "--html");
         String label = parsed.coordination().text();
-        WorkbenchElementInspect.Hit hit = WorkbenchElementInspect.find(category, label, html);
-        out.println("phrase=" + hit.phrase());
-        out.println("xpath=" + hit.xpath());
-        out.println("rawMatchCount=" + hit.rawMatchCount());
-        out.println("visibleCount=" + hit.visibleCount());
-        return hit.xpath().isBlank() ? 1 : 0;
+        if (htmlFlag != null) {
+            String html = readHtml(parsed, err);
+            if (html == null) return 2;
+            out.println("source=offline-html");
+            WorkbenchElementInspect.Hit hit = WorkbenchElementInspect.find(category, label, html);
+            printHit(out, hit.phrase(), hit.xpath(), hit.rawMatchCount(), hit.visibleCount());
+            return hit.xpath().isBlank() ? 1 : 0;
+        }
+        return liveQuery(parsed, category, label, out, err);
+    }
+
+    private static void printHit(PrintStream out, String phrase, String xpath, int raw, int visible) {
+        out.println("phrase=" + phrase);
+        out.println("xpath=" + xpath);
+        out.println("rawMatchCount=" + raw);
+        out.println("visibleCount=" + visible);
+    }
+
+    private static int liveQuery(
+            WorkbenchCommandLine.Parsed parsed,
+            String category,
+            String text,
+            PrintStream out,
+            PrintStream err
+    ) {
+        HttpClient http = HttpClient.newBuilder().connectTimeout(java.time.Duration.ofSeconds(5)).build();
+        java.util.Optional<WorkbenchSessionCommands.SessionState> session =
+                WorkbenchSessionCommands.readHealthy(parsed.project(), http);
+        if (session.isEmpty()) {
+            err.println("start a session first");
+            return 2;
+        }
+        try {
+            WorkbenchSessionCommands.SessionState state = session.get();
+            Map<String, Object> body = new LinkedHashMap<>();
+            body.put("op", category == null || category.isBlank() ? "inspect-page" : "find-element");
+            if (category != null && !category.isBlank()) body.put("category", category);
+            if (text != null && !text.isBlank()) body.put("text", text);
+            JsonNode ack = postSession(http, state, "/commands", body);
+            String id = ack.path("id").asText("");
+            JsonNode view = ack;
+            long deadline = System.nanoTime() + java.time.Duration.ofSeconds(30).toNanos();
+            while (id != null && !id.isBlank() && System.nanoTime() < deadline) {
+                String status = view.path("status").asText("");
+                if (!"QUEUED".equals(status) && !"RUNNING".equals(status) && !"STILL_WORKING".equals(status) && !"STOPPING".equals(status)) {
+                    break;
+                }
+                Thread.sleep(100);
+                view = getSession(http, state, "/commands/" + id);
+            }
+            JsonNode result = view.has("result") ? view.get("result") : view;
+            if (result.has("message") && !"SUCCESS".equals(result.path("status").asText(""))) {
+                err.println(result.path("message").asText("Page query failed."));
+                return 1;
+            }
+            out.println("source=" + result.path("source").asText("live-session"));
+            JsonNode hits = result.get("hits");
+            if (hits != null && hits.isArray()) {
+                for (JsonNode hit : hits) {
+                    printHit(
+                            out,
+                            hit.path("phrase").asText(""),
+                            hit.path("xpath").asText(""),
+                            hit.path("rawMatchCount").asInt(0),
+                            hit.path("visibleCount").asInt(0)
+                    );
+                }
+            }
+            return 0;
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            err.println("Workbench inspect was interrupted.");
+            return 1;
+        } catch (RuntimeException | IOException failure) {
+            err.println("Workbench inspect failed: " + failure.getMessage());
+            return 1;
+        }
+    }
+
+    private static JsonNode postSession(
+            HttpClient http,
+            WorkbenchSessionCommands.SessionState state,
+            String path,
+            Object body
+    ) throws IOException, InterruptedException {
+        HttpRequest request = HttpRequest.newBuilder(URI.create(state.url() + path))
+                .timeout(java.time.Duration.ofSeconds(5))
+                .header("Authorization", "Bearer " + state.token())
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(JSON.writeValueAsString(body)))
+                .build();
+        HttpResponse<String> response = http.send(request, HttpResponse.BodyHandlers.ofString());
+        if (response.statusCode() >= 400) {
+            throw new IllegalStateException("HTTP " + response.statusCode() + " " + response.body());
+        }
+        return JSON.readTree(response.body().isBlank() ? "{}" : response.body());
+    }
+
+    private static JsonNode getSession(
+            HttpClient http,
+            WorkbenchSessionCommands.SessionState state,
+            String path
+    ) throws IOException, InterruptedException {
+        HttpRequest request = HttpRequest.newBuilder(URI.create(state.url() + path))
+                .timeout(java.time.Duration.ofSeconds(5))
+                .header("Authorization", "Bearer " + state.token())
+                .GET()
+                .build();
+        HttpResponse<String> response = http.send(request, HttpResponse.BodyHandlers.ofString());
+        if (response.statusCode() >= 400) {
+            throw new IllegalStateException("HTTP " + response.statusCode() + " " + response.body());
+        }
+        return JSON.readTree(response.body().isBlank() ? "{}" : response.body());
     }
 
     private static String readHtml(WorkbenchCommandLine.Parsed parsed, PrintStream err) {
         String raw = flag(parsed, "--html");
         if (raw == null || raw.isBlank()) {
-            err.println("Usage requires --html=<file>. Inspection does not open a browser.");
             return null;
         }
         Path file = Path.of(raw);

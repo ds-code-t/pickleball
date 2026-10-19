@@ -205,6 +205,12 @@ final class ControlBridgeRuntime implements AutoCloseable {
                     request.maxElements(), request.timeoutSeconds()
             );
         }));
+        server.createContext("/v1/browser/query", exchange -> handle(exchange, "POST", () -> {
+            PageQueryRequest request = readRequired(exchange, PageQueryRequest.class);
+            return coordinator.queryPage(
+                    request.scenarioId(), request.category(), request.text(), request.timeoutSeconds()
+            );
+        }));
         server.createContext("/v1/services/call", exchange -> handle(exchange, "POST", () -> {
             ServiceCallRequest request = readRequired(exchange, ServiceCallRequest.class);
             return coordinator.executeServiceCall(request.scenarioId(), request.selector(), request.timeoutSeconds());

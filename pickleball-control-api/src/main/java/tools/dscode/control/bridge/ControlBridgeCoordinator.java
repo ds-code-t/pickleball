@@ -20,6 +20,8 @@ import tools.dscode.control.api.DynamicControl;
 import tools.dscode.control.api.ElementControl;
 import tools.dscode.control.api.ElementEvidence;
 import tools.dscode.control.api.ElementInspection;
+import tools.dscode.control.api.PageElementQuery;
+import tools.dscode.control.protocol.ControlBridgePageQueryResult;
 import tools.dscode.control.api.MappingControl;
 import tools.dscode.control.api.ServiceCallControl;
 import tools.dscode.control.api.ServiceCallEvidence;
@@ -401,6 +403,58 @@ final class ControlBridgeCoordinator implements ControlHookHandler, AutoCloseabl
                 (type, message) -> elementFailed(type, message, lane.status(lanes.size())),
                 message -> elementUnavailable(message, lane.status(lanes.size()))
         );
+    }
+
+    ControlBridgePageQueryResult queryPage(
+            String scenarioId,
+            String category,
+            String text,
+            Integer timeoutSeconds
+    ) {
+        ScenarioLane lane = selectedLane(normalizeScenarioId(scenarioId));
+        if (lane == null) {
+            return pageQueryUnavailable(scenarioCommandUnavailableMessage(scenarioId, "Page query"));
+        }
+        return submit(
+                lane,
+                commandTimeout(timeoutSeconds),
+                () -> pageQueryOnScenarioThread(category, text, lane),
+                (type, message) -> pageQueryFailed(type, message, lane.status(lanes.size())),
+                message -> pageQueryUnavailable(message, lane.status(lanes.size()))
+        );
+    }
+
+    private ControlBridgePageQueryResult pageQueryOnScenarioThread(
+            String category,
+            String text,
+            ScenarioLane lane
+    ) {
+        try {
+            org.openqa.selenium.WebDriver driver = BrowserSteps.getCurrentDriverIfPresent();
+            if (driver == null) {
+                return pageQueryUnavailable(
+                        "The active scenario has not created a browser.",
+                        lane.status(lanes.size())
+                );
+            }
+            List<PageElementQuery.Hit> hits = category == null || category.isBlank()
+                    ? PageElementQuery.inspect(driver)
+                    : List.of(PageElementQuery.find(driver, category, text));
+            return new ControlBridgePageQueryResult(
+                    "SUCCESS",
+                    hits.stream().map(hit -> new ControlBridgePageQueryResult.ControlBridgePageQueryHit(
+                            hit.phrase(), hit.xpath(), hit.rawMatchCount(), hit.visibleCount()
+                    )).toList(),
+                    null,
+                    lane.status(lanes.size())
+            );
+        } catch (RuntimeException failure) {
+            return pageQueryFailed(
+                    failure.getClass().getSimpleName(),
+                    failure.getMessage() == null ? failure.toString() : failure.getMessage(),
+                    lane.status(lanes.size())
+            );
+        }
     }
 
     ControlBridgeServiceCallResult executeServiceCall(String scenarioId, String selector, Integer timeoutSeconds) {
@@ -886,6 +940,22 @@ final class ControlBridgeCoordinator implements ControlHookHandler, AutoCloseabl
     }
     private ControlBridgeElementInspectionResult elementFailed(String type, String message, ControlBridgeStatus runtime) {
         return new ControlBridgeElementInspectionResult("FAILED", null, new ControlBridgeError(type, clipped(message), ""), runtime);
+    }
+
+    private ControlBridgePageQueryResult pageQueryUnavailable(String message) {
+        return pageQueryUnavailable(message, status());
+    }
+
+    private ControlBridgePageQueryResult pageQueryUnavailable(String message, ControlBridgeStatus runtime) {
+        return new ControlBridgePageQueryResult(
+                "UNAVAILABLE", List.of(), new ControlBridgeError("UNAVAILABLE", clipped(message), ""), runtime
+        );
+    }
+
+    private ControlBridgePageQueryResult pageQueryFailed(String type, String message, ControlBridgeStatus runtime) {
+        return new ControlBridgePageQueryResult(
+                "FAILED", List.of(), new ControlBridgeError(type, clipped(message), ""), runtime
+        );
     }
 
     private ControlBridgeServiceCallResult serviceUnavailable(String message) { return serviceUnavailable(message, status()); }

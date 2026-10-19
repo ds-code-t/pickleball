@@ -232,6 +232,20 @@ public final class ControlBridgeClient {
         );
     }
 
+    public ControlBridgePageQueryResult pageQuery(
+            String scenarioId,
+            String category,
+            String text,
+            Integer timeoutSeconds
+    ) {
+        int timeout = commandTimeout(timeoutSeconds);
+        return request(
+                "POST", "/v1/browser/query",
+                new PageQueryRequest(scenarioId, category, text, timeoutSeconds),
+                ControlBridgePageQueryResult.class, commandDuration(timeout)
+        );
+    }
+
     public ControlBridgeServiceCallResult serviceCall(
             String scenarioId, String selector, Integer timeoutSeconds
     ) {

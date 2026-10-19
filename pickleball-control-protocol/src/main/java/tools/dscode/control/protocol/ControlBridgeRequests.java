@@ -37,6 +37,12 @@ public final class ControlBridgeRequests {
             Integer maxElements,
             Integer timeoutSeconds
     ) { }
+    public record PageQueryRequest(
+            String scenarioId,
+            String category,
+            String text,
+            Integer timeoutSeconds
+    ) { }
     public record ServiceCallRequest(String scenarioId, String selector, Integer timeoutSeconds) { }
     public record BreakpointAddRequest(
             String scenarioId,

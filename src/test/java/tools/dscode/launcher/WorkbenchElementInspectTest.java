@@ -8,6 +8,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -49,6 +50,45 @@ class WorkbenchElementInspectTest {
         assertTrue(text.contains("xpath="), text);
         assertTrue(text.contains("rawMatchCount="), text);
         assertTrue(text.contains("visibleCount="), text);
+        assertTrue(text.contains("source=offline-html"), text);
+
+        String html5 = """
+                <!DOCTYPE html>
+                <html><body>
+                  <button id="save">Save</button>
+                </body></html>
+                """;
+        Path html5File = tempDir.resolve("html5.html");
+        Files.writeString(html5File, html5, StandardCharsets.UTF_8);
+        java.io.ByteArrayOutputStream html5Out = new java.io.ByteArrayOutputStream();
+        java.io.ByteArrayOutputStream html5Err = new java.io.ByteArrayOutputStream();
+        int html5Exit = WorkbenchAgentCommands.run(
+                new String[]{"find-element", tempDir.toString(), "--category=Button", "--text=Save", "--html=" + html5File},
+                new java.io.PrintStream(html5Out, true, StandardCharsets.UTF_8),
+                new java.io.PrintStream(html5Err, true, StandardCharsets.UTF_8)
+        );
+        assertTrue(html5Exit == 0 || html5Exit == 1, html5Err.toString(StandardCharsets.UTF_8));
+        String html5Text = html5Out.toString(StandardCharsets.UTF_8);
+        assertTrue(html5Text.contains("source=offline-html"), html5Text);
+        assertTrue(html5Text.contains("phrase=the \"Save\" Button"), html5Text);
+
+        java.io.ByteArrayOutputStream missingErr = new java.io.ByteArrayOutputStream();
+        int missing = WorkbenchAgentCommands.run(
+                new String[]{"find-element", tempDir.toString(), "--category=Button", "--text=Save"},
+                new java.io.PrintStream(new java.io.ByteArrayOutputStream(), true, StandardCharsets.UTF_8),
+                new java.io.PrintStream(missingErr, true, StandardCharsets.UTF_8)
+        );
+        assertEquals(2, missing);
+        assertTrue(missingErr.toString(StandardCharsets.UTF_8).contains("start a session first"));
+
+        java.io.ByteArrayOutputStream pageErr = new java.io.ByteArrayOutputStream();
+        int page = WorkbenchAgentCommands.run(
+                new String[]{"inspect-page", tempDir.toString()},
+                new java.io.PrintStream(new java.io.ByteArrayOutputStream(), true, StandardCharsets.UTF_8),
+                new java.io.PrintStream(pageErr, true, StandardCharsets.UTF_8)
+        );
+        assertEquals(2, page);
+        assertTrue(pageErr.toString(StandardCharsets.UTF_8).contains("start a session first"));
     }
 
     private static void assertEqualsPhrase(WorkbenchElementInspect.Hit found) {

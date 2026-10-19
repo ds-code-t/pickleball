@@ -83,7 +83,7 @@ public final class ControlProtocol {
     public static final List<String> WORKER_CAPABILITIES = List.of(
             "status", "scenarios", "events", "pause", "resume", "execute_step", "resolve_step",
             "mapping_get", "mapping_put", "mapping_resolve", "mapping_snapshot", "mapping_restore",
-            "browser_page", "browser_screenshot", "element_inspect", "service_call", "breakpoints",
+            "browser_page", "browser_screenshot", "element_inspect", "page_query", "service_call", "breakpoints",
             "step_overrides", "step_override_compile"
     );
 

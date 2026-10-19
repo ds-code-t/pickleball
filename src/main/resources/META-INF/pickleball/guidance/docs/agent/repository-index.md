@@ -481,6 +481,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-control-api/src/main/java/tools/dscode/control/api/MappingSnapshot.java`
 - `pickleball-control-api/src/main/java/tools/dscode/control/api/NodeMapSnapshot.java`
 - `pickleball-control-api/src/main/java/tools/dscode/control/api/OverrideScope.java`
+- `pickleball-control-api/src/main/java/tools/dscode/control/api/PageElementQuery.java`
 - `pickleball-control-api/src/main/java/tools/dscode/control/api/ResolutionCandidate.java`
 - `pickleball-control-api/src/main/java/tools/dscode/control/api/ResolutionExplanation.java`
 - `pickleball-control-api/src/main/java/tools/dscode/control/api/ServiceCallControl.java`
@@ -512,6 +513,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-control-api/src/main/java/tools/dscode/control/bridge/ControlBridgeValue.java`
 - `pickleball-control-api/src/main/java/tools/dscode/control/bridge/ControlBridgeValueResult.java`
 - `pickleball-control-api/src/test/java/com/example/glue/SampleGlue.java`
+- `pickleball-control-api/src/test/java/tools/dscode/control/api/PageElementQueryTest.java`
 - `pickleball-control-api/src/test/java/tools/dscode/control/api/StepMapSeedsTest.java`
 - `pickleball-control-api/src/test/java/tools/dscode/control/bridge/ControlBridgeStepResolverTest.java`
 
@@ -535,6 +537,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/ControlBridgeJson.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/ControlBridgeMappingSnapshot.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/ControlBridgeMappingSnapshotResult.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/ControlBridgePageQueryResult.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/ControlBridgeRequests.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/ControlBridgeResponses.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/ControlBridgeScenarioStatus.java`

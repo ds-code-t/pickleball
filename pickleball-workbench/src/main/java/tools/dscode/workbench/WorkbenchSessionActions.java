@@ -1,6 +1,7 @@
 package tools.dscode.workbench;
 
 import tools.dscode.control.protocol.ControlBridgeCallResult;
+import tools.dscode.control.protocol.ControlBridgePageQueryResult;
 import tools.dscode.control.protocol.ExampleRowSelector;
 import tools.dscode.control.protocol.WindowDriver;
 import tools.dscode.workbench.catalog.ConsumerFeatureCatalog;
@@ -49,7 +50,9 @@ public final class WorkbenchSessionActions {
             "worker-stop",
             "stop",
             "show-run",
-            "close-window"
+            "close-window",
+            "inspect-page",
+            "find-element"
     );
 
     private static final Set<String> DRIVING = Set.of(
@@ -347,6 +350,8 @@ public final class WorkbenchSessionActions {
             case "stop" -> stopPlayback();
             case "show-run" -> showRun(first(args, "runId", "run"), args.get("agent"), Boolean.parseBoolean(args.get("claim")));
             case "close-window" -> closeWindow();
+            case "inspect-page" -> pageQuery(null, null);
+            case "find-element" -> pageQuery(args.get("category"), args.get("text"));
             default -> throw new IllegalArgumentException("Unknown session command: " + op);
         };
     }
@@ -384,6 +389,35 @@ public final class WorkbenchSessionActions {
         LinkedHashMap<String, Object> payload = accepted("close-window", "CLOSED");
         payload.put("startedTest", false);
         return payload;
+    }
+
+    private Map<String, Object> pageQuery(String category, String text) {
+        String op = category == null || category.isBlank() ? "inspect-page" : "find-element";
+        try {
+            ControlBridgePageQueryResult result = services.pageQuery(category, text);
+            if (result == null || !"SUCCESS".equals(result.status())) {
+                String message = result == null || result.error() == null
+                        ? "Page query failed."
+                        : result.error().message();
+                return failed(op, message);
+            }
+            List<Map<String, Object>> hits = new ArrayList<>();
+            for (ControlBridgePageQueryResult.ControlBridgePageQueryHit hit : result.hits()) {
+                LinkedHashMap<String, Object> row = new LinkedHashMap<>();
+                row.put("phrase", hit.phrase());
+                row.put("xpath", hit.xpath());
+                row.put("rawMatchCount", hit.rawMatchCount());
+                row.put("visibleCount", hit.visibleCount());
+                hits.add(row);
+            }
+            LinkedHashMap<String, Object> payload = accepted(op, "READ");
+            payload.put("source", "live-session");
+            payload.put("hits", hits);
+            payload.put("clicked", false);
+            return payload;
+        } catch (RuntimeException failure) {
+            return failed(op, failure.getMessage() == null ? failure.toString() : failure.getMessage());
+        }
     }
 
     private Map<String, Object> play(boolean fromHere, String stepId) {

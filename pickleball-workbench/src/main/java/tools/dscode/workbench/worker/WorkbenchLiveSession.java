@@ -115,6 +115,12 @@ public final class WorkbenchLiveSession implements AutoCloseable {
         ));
     }
 
+    public ControlBridgePageQueryResult pageQuery(String category, String text) {
+        return call(binding -> binding.client().pageQuery(
+                binding.scenarioId(), category, text, COMMAND_TIMEOUT_SECONDS
+        ));
+    }
+
     public ControlBridgeServiceCallResult serviceCall(String selector) {
         return call(binding -> binding.client().serviceCall(
                 binding.scenarioId(), selector, COMMAND_TIMEOUT_SECONDS

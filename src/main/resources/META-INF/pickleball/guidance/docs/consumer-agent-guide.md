@@ -102,7 +102,7 @@ A Workbench discover or confirm that selects nothing prints `status=EMPTY`, the 
 
 After a Workbench run, read `runs/<id>/workbench/summary.json` for step, status, assertion result, and duration. `workbench/trace-index.json` maps a step to its byte range in the trace. A core `summary.json` that already exists is left alone. Console text for that run is `runs/<id>/console/<scenario>.txt`. Failure text can include `final XPath`, `raw match count`, `visible count`, `rejection`, and expected versus actual. The core event and trace files are not rewritten.
 
-`inspect-page --html=<file>` prints each interactive element and the phrase that would target it, such as `the "Save" Button`. `find-element --category=Button --text=Save --html=<file>` prints the XPath the execution dictionary would build, the raw match count, and the visible count. Neither command clicks. A wrapped I/O failure on any of these commands includes the `IOException` cause.
+`inspect-page` lists interactive elements and the Pickleball phrase that would target each one. `find-element --category=Button --text=Save` prints the XPath the execution dictionary would build, the raw match count, and the visible count. `--html=<file>` is an offline fallback labelled `source=offline-html` (well-formed XML, HTML5 doctype allowed). Without `--html`, both commands use the live session (`source=live-session`) and do not click. No session prints `start a session first`. A wrapped I/O failure on any of these commands includes the `IOException` cause.
 
 The copy of configs under the run folder redacts `password`, `passwd`, `secret`, `token`, `credential`, `api_key`, `api-key`, and `access_key`. The project file a normal run reads is not redacted.
 
