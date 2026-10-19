@@ -391,11 +391,13 @@ class WorkbenchSynchronizerTest {
         Files.writeString(staged.resolve("nested").resolve("a.txt"), "kept");
         Path target = tempDir.resolve("installed");
         int[] attempts = {0};
+        List<Long> delays = new ArrayList<>();
         WorkbenchSynchronizer.replaceDirectory(staged, target, (source, dest) -> {
             attempts[0]++;
             throw new java.io.IOException("locked by Windows");
-        });
-        assertEquals(3, attempts[0]);
+        }, delays::add);
+        assertEquals(4, attempts[0]);
+        assertEquals(List.of(100L, 300L, 1000L), delays);
         assertEquals("kept", Files.readString(target.resolve("nested").resolve("a.txt")));
         assertFalse(Files.exists(staged));
         assertNoTempSiblings(target);
@@ -409,13 +411,13 @@ class WorkbenchSynchronizerTest {
         List<Long> delays = new ArrayList<>();
         WorkbenchSynchronizer.replaceDirectory(staged, target, (source, dest) -> {
             attempts[0]++;
-            if (attempts[0] < 3) {
+            if (attempts[0] < 4) {
                 throw new IOException("locked by Windows");
             }
             Files.move(source, dest, StandardCopyOption.REPLACE_EXISTING);
         }, delays::add);
-        assertEquals(3, attempts[0]);
-        assertEquals(List.of(100L, 300L), delays);
+        assertEquals(4, attempts[0]);
+        assertEquals(List.of(100L, 300L, 1000L), delays);
         assertEquals("kept", Files.readString(target.resolve("nested").resolve("a.txt")));
         assertFalse(Files.exists(staged));
     }
@@ -481,15 +483,15 @@ class WorkbenchSynchronizerTest {
                 (source, dest) -> Files.move(source, dest, StandardCopyOption.REPLACE_EXISTING),
                 root -> {
                     deletes[0]++;
-                    if (deletes[0] < 3) {
+                    if (deletes[0] < 4) {
                         throw new IOException("locked by Windows");
                     }
                     deleteTree(root);
                 },
                 delays::add
         );
-        assertEquals(3, deletes[0]);
-        assertEquals(List.of(100L, 300L), delays);
+        assertEquals(4, deletes[0]);
+        assertEquals(List.of(100L, 300L, 1000L), delays);
         assertEquals("kept", Files.readString(target.resolve("nested").resolve("a.txt")));
         assertFalse(Files.exists(target.resolve("locked.txt")));
         assertFalse(Files.exists(staged));

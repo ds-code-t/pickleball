@@ -644,8 +644,8 @@ public final class WorkbenchSynchronizer {
     }
 
     /**
-     * Installs a staged directory. A lock on delete or move is retried with
-     * backoff of 100 ms, 300 ms, and 1000 ms. If the move still fails, the tree
+     * Installs a staged directory. A locked delete or move is tried once, then
+     * retried after 100 ms, 300 ms, and 1000 ms. If the move still fails, the tree
      * is copied to a sibling {@code target.tmp-<n>} and renamed into place.
      * A failed copy deletes that temp directory and leaves the original target
      * absent or unchanged.
@@ -684,7 +684,6 @@ public final class WorkbenchSynchronizer {
         if (moveFailure == null) {
             return;
         }
-        pause(sleeper, REPLACE_BACKOFF_MS[REPLACE_BACKOFF_MS.length - 1]);
         Path temp = tempSibling(target);
         try {
             copy.copy(staged, temp);
@@ -706,7 +705,7 @@ public final class WorkbenchSynchronizer {
 
     private static IOException retry(IoAttempt attempt, Sleeper sleeper) {
         IOException last = null;
-        for (int attemptNumber = 0; attemptNumber < REPLACE_BACKOFF_MS.length; attemptNumber++) {
+        for (int attemptNumber = 0; attemptNumber <= REPLACE_BACKOFF_MS.length; attemptNumber++) {
             if (attemptNumber > 0) {
                 pause(sleeper, REPLACE_BACKOFF_MS[attemptNumber - 1]);
             }
