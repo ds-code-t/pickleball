@@ -3,15 +3,18 @@ package tools.dscode.workbench.sync;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class WorkbenchSynchronizerTest {
@@ -395,9 +398,119 @@ class WorkbenchSynchronizerTest {
         assertEquals(3, attempts[0]);
         assertEquals("kept", Files.readString(target.resolve("nested").resolve("a.txt")));
         assertFalse(Files.exists(staged));
+        assertNoTempSiblings(target);
     }
 
-    private static void deleteTree(Path root) throws Exception {
+    @Test
+    void replaceDirectoryRetriesMoveWithBackoffThenSucceeds() throws Exception {
+        Path staged = stagedTree("kept");
+        Path target = tempDir.resolve("installed");
+        int[] attempts = {0};
+        List<Long> delays = new ArrayList<>();
+        WorkbenchSynchronizer.replaceDirectory(staged, target, (source, dest) -> {
+            attempts[0]++;
+            if (attempts[0] < 3) {
+                throw new IOException("locked by Windows");
+            }
+            Files.move(source, dest, StandardCopyOption.REPLACE_EXISTING);
+        }, delays::add);
+        assertEquals(3, attempts[0]);
+        assertEquals(List.of(100L, 300L), delays);
+        assertEquals("kept", Files.readString(target.resolve("nested").resolve("a.txt")));
+        assertFalse(Files.exists(staged));
+    }
+
+    @Test
+    void replaceDirectoryFallsBackToACompleteCopy() throws Exception {
+        Path staged = stagedTree("kept");
+        Files.writeString(staged.resolve("nested").resolve("b.txt"), "also");
+        Path target = tempDir.resolve("installed");
+        WorkbenchSynchronizer.replaceDirectory(staged, target, (source, dest) -> {
+            throw new IOException("locked by Windows");
+        }, millis -> {
+        });
+        assertEquals("kept", Files.readString(target.resolve("nested").resolve("a.txt")));
+        assertEquals("also", Files.readString(target.resolve("nested").resolve("b.txt")));
+        assertFalse(Files.exists(staged));
+        assertNoTempSiblings(target);
+    }
+
+    @Test
+    void copyFailureLeavesNoPartialTree() throws Exception {
+        Path staged = stagedTree("kept");
+        Path target = tempDir.resolve("installed");
+        Files.createDirectories(target.resolve("nested"));
+        Files.writeString(target.resolve("nested").resolve("old.txt"), "old");
+        Files.writeString(target.resolve("keep.txt"), "keep");
+        assertThrows(IllegalStateException.class, () -> WorkbenchSynchronizer.replaceDirectory(
+                staged,
+                target,
+                (source, dest) -> {
+                    throw new IOException("locked by Windows");
+                },
+                root -> deleteTree(root),
+                (source, dest) -> {
+                    Files.createDirectories(dest.resolve("nested"));
+                    Files.writeString(dest.resolve("nested").resolve("partial.txt"), "partial");
+                    throw new IOException("copy failed");
+                },
+                millis -> {
+                }
+        ));
+        assertFalse(Files.exists(target.resolve("nested").resolve("partial.txt")));
+        if (Files.exists(target)) {
+            assertEquals("old", Files.readString(target.resolve("nested").resolve("old.txt")));
+            assertEquals("keep", Files.readString(target.resolve("keep.txt")));
+            assertFalse(Files.exists(target.resolve("nested").resolve("a.txt")));
+        }
+        assertNoTempSiblings(target);
+        assertTrue(Files.exists(staged), "a failed copy must not consume the staged tree");
+    }
+
+    @Test
+    void lockedDeleteTreeIsRetried() throws Exception {
+        Path staged = stagedTree("kept");
+        Path target = tempDir.resolve("installed");
+        Files.createDirectories(target);
+        Files.writeString(target.resolve("locked.txt"), "locked");
+        int[] deletes = {0};
+        List<Long> delays = new ArrayList<>();
+        WorkbenchSynchronizer.replaceDirectory(
+                staged,
+                target,
+                (source, dest) -> Files.move(source, dest, StandardCopyOption.REPLACE_EXISTING),
+                root -> {
+                    deletes[0]++;
+                    if (deletes[0] < 3) {
+                        throw new IOException("locked by Windows");
+                    }
+                    deleteTree(root);
+                },
+                delays::add
+        );
+        assertEquals(3, deletes[0]);
+        assertEquals(List.of(100L, 300L), delays);
+        assertEquals("kept", Files.readString(target.resolve("nested").resolve("a.txt")));
+        assertFalse(Files.exists(target.resolve("locked.txt")));
+        assertFalse(Files.exists(staged));
+    }
+
+    private Path stagedTree(String contents) throws IOException {
+        Path staged = tempDir.resolve("staged-" + contents);
+        Files.createDirectories(staged.resolve("nested"));
+        Files.writeString(staged.resolve("nested").resolve("a.txt"), contents);
+        return staged;
+    }
+
+    private static void assertNoTempSiblings(Path target) throws IOException {
+        Path parent = target.getParent();
+        String prefix = target.getFileName() + ".tmp-";
+        try (var children = Files.list(parent)) {
+            assertTrue(children.noneMatch(path -> path.getFileName().toString().startsWith(prefix)));
+        }
+    }
+
+    private static void deleteTree(Path root) throws IOException {
         if (root == null || !Files.exists(root)) return;
         try (var paths = Files.walk(root)) {
             for (Path path : paths.sorted(Comparator.reverseOrder()).toList()) {

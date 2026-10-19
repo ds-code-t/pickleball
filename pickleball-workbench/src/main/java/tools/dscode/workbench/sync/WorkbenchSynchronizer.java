@@ -637,41 +637,140 @@ public final class WorkbenchSynchronizer {
         }
     }
 
+    private static final long[] REPLACE_BACKOFF_MS = {100L, 300L, 1000L};
+
     private static void replaceDirectory(Path staged, Path target) {
         replaceDirectory(staged, target, WorkbenchSynchronizer::moveReplacing);
     }
 
     /**
-     * Installs a staged directory. A Windows lock on {@code Files.move} is retried,
-     * then the tree is copied and the staged directory is deleted.
+     * Installs a staged directory. A lock on delete or move is retried with
+     * backoff of 100 ms, 300 ms, and 1000 ms. If the move still fails, the tree
+     * is copied to a sibling {@code target.tmp-<n>} and renamed into place.
+     * A failed copy deletes that temp directory and leaves the original target
+     * absent or unchanged.
      */
     static void replaceDirectory(Path staged, Path target, DirectoryMove move) {
-        deleteTree(target);
-        IOException last = null;
-        for (int attempt = 0; attempt < 3; attempt++) {
-            try {
-                move.move(staged, target);
-                return;
-            } catch (IOException failure) {
-                last = failure;
-            }
+        replaceDirectory(staged, target, move, WorkbenchSynchronizer::deleteTreeOnce, WorkbenchSynchronizer::copyDirectory, Thread::sleep);
+    }
+
+    static void replaceDirectory(Path staged, Path target, DirectoryMove move, Sleeper sleeper) {
+        replaceDirectory(staged, target, move, WorkbenchSynchronizer::deleteTreeOnce, WorkbenchSynchronizer::copyDirectory, sleeper);
+    }
+
+    static void replaceDirectory(
+            Path staged,
+            Path target,
+            DirectoryMove move,
+            DirectoryDelete delete,
+            Sleeper sleeper
+    ) {
+        replaceDirectory(staged, target, move, delete, WorkbenchSynchronizer::copyDirectory, sleeper);
+    }
+
+    static void replaceDirectory(
+            Path staged,
+            Path target,
+            DirectoryMove move,
+            DirectoryDelete delete,
+            DirectoryCopy copy,
+            Sleeper sleeper
+    ) {
+        IOException deleteFailure = retry(attempt -> delete.delete(target), sleeper);
+        if (deleteFailure != null) {
+            throw new IllegalStateException("Could not clean Workbench path " + target, deleteFailure);
         }
+        IOException moveFailure = retry(attempt -> move.move(staged, target), sleeper);
+        if (moveFailure == null) {
+            return;
+        }
+        pause(sleeper, REPLACE_BACKOFF_MS[REPLACE_BACKOFF_MS.length - 1]);
+        Path temp = tempSibling(target);
         try {
-            copyDirectory(staged, target);
-            deleteTree(staged);
+            copy.copy(staged, temp);
+            Files.move(temp, target, StandardCopyOption.REPLACE_EXISTING);
         } catch (IOException failure) {
+            deleteQuietly(temp);
             IllegalStateException wrapped = new IllegalStateException(
                     "Could not install Workbench directory " + target,
                     failure
             );
-            if (last != null) wrapped.addSuppressed(last);
+            wrapped.addSuppressed(moveFailure);
             throw wrapped;
+        }
+        IOException stagedDelete = retry(attempt -> delete.delete(staged), sleeper);
+        if (stagedDelete != null) {
+            throw new IllegalStateException("Could not clean Workbench path " + staged, stagedDelete);
+        }
+    }
+
+    private static IOException retry(IoAttempt attempt, Sleeper sleeper) {
+        IOException last = null;
+        for (int attemptNumber = 0; attemptNumber < REPLACE_BACKOFF_MS.length; attemptNumber++) {
+            if (attemptNumber > 0) {
+                pause(sleeper, REPLACE_BACKOFF_MS[attemptNumber - 1]);
+            }
+            try {
+                attempt.run(attemptNumber);
+                return null;
+            } catch (IOException failure) {
+                last = failure;
+            }
+        }
+        return last;
+    }
+
+    private static void pause(Sleeper sleeper, long millis) {
+        try {
+            sleeper.sleep(millis);
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Workbench directory install was interrupted.", interrupted);
+        }
+    }
+
+    private static Path tempSibling(Path target) {
+        Path parent = target.getParent() == null ? Path.of(".") : target.getParent();
+        String name = target.getFileName() == null ? "directory" : target.getFileName().toString();
+        for (int n = 1; ; n++) {
+            Path candidate = parent.resolve(name + ".tmp-" + n);
+            if (!Files.exists(candidate)) {
+                return candidate;
+            }
+        }
+    }
+
+    private static void deleteQuietly(Path root) {
+        try {
+            deleteTreeOnce(root);
+        } catch (IOException ignored) {
+            // The install error is the one the caller sees. The temp must not remain.
         }
     }
 
     @FunctionalInterface
     interface DirectoryMove {
         void move(Path source, Path target) throws IOException;
+    }
+
+    @FunctionalInterface
+    interface DirectoryDelete {
+        void delete(Path root) throws IOException;
+    }
+
+    @FunctionalInterface
+    interface DirectoryCopy {
+        void copy(Path source, Path target) throws IOException;
+    }
+
+    @FunctionalInterface
+    interface Sleeper {
+        void sleep(long millis) throws InterruptedException;
+    }
+
+    @FunctionalInterface
+    private interface IoAttempt {
+        void run(int attemptNumber) throws IOException;
     }
 
     private static void moveReplacing(Path source, Path target) throws IOException {
@@ -705,24 +804,31 @@ public final class WorkbenchSynchronizer {
     }
 
     private static void deleteTree(Path root) {
-        if (root == null || !Files.exists(root)) return;
         try {
-            Files.walkFileTree(root, new SimpleFileVisitor<>() {
-                @Override
-                public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
-                    Files.deleteIfExists(file);
-                    return FileVisitResult.CONTINUE;
-                }
-
-                @Override
-                public FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
-                    Files.deleteIfExists(dir);
-                    return FileVisitResult.CONTINUE;
-                }
-            });
+            deleteTreeOnce(root);
         } catch (IOException failure) {
             throw new IllegalStateException("Could not clean Workbench path " + root, failure);
         }
+    }
+
+    private static void deleteTreeOnce(Path root) throws IOException {
+        if (root == null || !Files.exists(root)) return;
+        Files.walkFileTree(root, new SimpleFileVisitor<>() {
+            @Override
+            public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+                Files.deleteIfExists(file);
+                return FileVisitResult.CONTINUE;
+            }
+
+            @Override
+            public FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
+                if (exc != null) {
+                    throw exc;
+                }
+                Files.deleteIfExists(dir);
+                return FileVisitResult.CONTINUE;
+            }
+        });
     }
 
     private static void createDirectories(Path... directories) {
