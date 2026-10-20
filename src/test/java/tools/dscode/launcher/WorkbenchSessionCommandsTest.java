@@ -18,6 +18,8 @@ import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.FileTime;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HexFormat;
@@ -82,6 +84,7 @@ class WorkbenchSessionCommandsTest {
             );
             assertEquals(0, output.exitCode, () -> output.stderr + output.stdout);
             assertTrue(output.stdout.contains("ACK SESSION pid="));
+            assertFalse(output.stdout.contains("session-start progress"), output.stdout);
             assertFalse(output.stdout.contains("Workbench isolate worker:"));
         } finally {
             Process process = child.get();
@@ -182,6 +185,126 @@ class WorkbenchSessionCommandsTest {
         Path log = AgentCoordination.logFile(project);
         String text = Files.isRegularFile(log) ? Files.readString(log) : "";
         assertFalse(text.contains("\tstart\t"));
+    }
+
+    @Test
+    @Timeout(value = 8, unit = TimeUnit.SECONDS)
+    void sessionStartHonorsTheWorkerStartTimeoutAndNamesTheStage() throws Exception {
+        String property = SessionHealthWait.START_TIMEOUT_PROPERTY;
+        String previous = System.getProperty(property);
+        AtomicReference<Process> child = new AtomicReference<>();
+        try {
+            System.setProperty(property, "1");
+            Output output = run(
+                    new String[]{"session-start", project.toString(), "--run-id=slow-run", "--agent=agent-slow"},
+                    launch -> {
+                        Files.createDirectories(launch.logFile().getParent());
+                        StringBuilder body = new StringBuilder();
+                        body.append("early-marker\n");
+                        for (int i = 1; i <= 24; i++) body.append("boot-line-").append(i).append('\n');
+                        body.append("progress stage=classpath\n");
+                        Files.writeString(launch.logFile(), body.toString());
+                        Process process = startLongLivedChild();
+                        child.set(process);
+                        return process;
+                    }
+            );
+            assertEquals(1, output.exitCode, output.stderr + output.stdout);
+            assertTrue(output.stderr.contains("within 1s"), output.stderr);
+            assertTrue(output.stderr.contains("elapsed="), output.stderr);
+            assertTrue(output.stderr.contains("stage=classpath"), output.stderr);
+            assertTrue(output.stderr.contains("stages:"), output.stderr);
+            assertTrue(output.stderr.contains("classpath="), output.stderr);
+            assertTrue(output.stderr.contains("boot-line-24"), output.stderr);
+            assertTrue(output.stderr.contains("progress stage=classpath"), output.stderr);
+            assertFalse(output.stderr.contains("early-marker"), output.stderr);
+            assertTrue(output.stderr.contains("-Dpkb_workbench_worker_start_timeout=N"), output.stderr);
+            assertTrue(output.stderr.contains(SessionHealthWait.START_TIMEOUT_ENV), output.stderr);
+            assertTrue(output.stderr.contains("pkb_runvars member pkb_workbench_worker_start_timeout"), output.stderr);
+            assertFalse(output.stdout.contains("ACK SESSION"), output.stdout);
+            Path progress = AgentCoordination.runDirectory(project, "slow-run")
+                    .resolve("session")
+                    .resolve(SessionHealthWait.PROGRESS_FILE);
+            assertTrue(Files.isRegularFile(progress), progress.toString());
+            assertTrue(Files.readString(progress).contains("classpath"));
+            String record = Files.readString(
+                    AgentCoordination.runDirectory(project, "slow-run").resolve(AgentCoordination.RECORD_FILE)
+            );
+            assertTrue(record.contains("stage=classpath"), record);
+            assertFalse(Files.readString(AgentCoordination.logFile(project)).contains("\tstart\t"));
+        } finally {
+            restoreProperty(property, previous);
+            Process process = child.get();
+            if (process != null) process.destroyForcibly();
+        }
+    }
+
+    @Test
+    @Timeout(value = 8, unit = TimeUnit.SECONDS)
+    void sessionStartPrintsElapsedStageWhileTheHealthWaitRuns() throws Exception {
+        String property = SessionHealthWait.START_TIMEOUT_PROPERTY;
+        String previous = System.getProperty(property);
+        Duration previousEvery = SessionHealthWait.progressEveryOverride;
+        AtomicReference<Process> child = new AtomicReference<>();
+        try {
+            System.setProperty(property, "1");
+            SessionHealthWait.progressEveryOverride = Duration.ofMillis(20);
+            Output output = run(
+                    new String[]{"session-start", project.toString(), "--run-id=progress-run"},
+                    launch -> {
+                        Files.createDirectories(launch.logFile().getParent());
+                        Files.writeString(launch.logFile(), "progress stage=compile\n");
+                        Files.setLastModifiedTime(launch.logFile(), FileTime.fromMillis(1_000_000L));
+                        Path worker = PickleballLocalLayout.workbenchStateRoot(launch.project())
+                                .resolve("logs")
+                                .resolve("worker-progress.err.log");
+                        Files.createDirectories(worker.getParent());
+                        Files.writeString(worker, "noise\nprogress stage=anchor-parse\n");
+                        Files.setLastModifiedTime(worker, FileTime.fromMillis(2_000_000L));
+                        Process process = startLongLivedChild();
+                        child.set(process);
+                        return process;
+                    }
+            );
+            assertEquals(1, output.exitCode, output.stderr + output.stdout);
+            assertTrue(output.stdout.contains("session-start progress"), output.stdout);
+            assertTrue(output.stdout.contains("elapsed="), output.stdout);
+            assertTrue(output.stdout.contains("stage=anchor-parse"), output.stdout);
+            assertTrue(output.stderr.contains("stage=anchor-parse"), output.stderr);
+            assertTrue(output.stderr.contains("anchor-parse="), output.stderr);
+        } finally {
+            SessionHealthWait.progressEveryOverride = previousEvery;
+            restoreProperty(property, previous);
+            Process process = child.get();
+            if (process != null) process.destroyForcibly();
+        }
+    }
+
+    @Test
+    void resolvedStartTimeoutIsPassedToTheForkedController() {
+        String property = SessionHealthWait.START_TIMEOUT_PROPERTY;
+        String previous = System.getProperty(property);
+        try {
+            System.setProperty(property, "15");
+            List<String> command = WorkbenchSessionCommands.withResolvedStartTimeout(
+                    List.of("java", "-cp", "app.jar", "tools.dscode.workbench.WorkbenchApplication", "session")
+            );
+            assertEquals("-Dpkb_workbench_worker_start_timeout=15", command.get(1));
+            assertEquals("java", command.get(0));
+            assertEquals("-cp", command.get(2));
+            List<String> replaced = WorkbenchSessionCommands.withResolvedStartTimeout(List.of(
+                    "java", "-Dpkb_workbench_worker_start_timeout=9", "-cp", "app.jar"
+            ));
+            assertEquals("-Dpkb_workbench_worker_start_timeout=15", replaced.get(1));
+            assertEquals(4, replaced.size());
+        } finally {
+            restoreProperty(property, previous);
+        }
+    }
+
+    private static void restoreProperty(String key, String previous) {
+        if (previous == null) System.clearProperty(key);
+        else System.setProperty(key, previous);
     }
 
     @Test

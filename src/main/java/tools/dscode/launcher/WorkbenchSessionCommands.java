@@ -32,7 +32,8 @@ import java.util.Optional;
  */
 public final class WorkbenchSessionCommands {
     private static final ObjectMapper JSON = new ObjectMapper();
-    private static final Duration HEALTH_TIMEOUT = Duration.ofSeconds(60);
+    /** Window open stays on a short fixed wait. Isolate uses {@link SessionHealthWait}. */
+    static final Duration OPEN_WINDOW_HEALTH_TIMEOUT = Duration.ofSeconds(60);
     private static final Duration HTTP_TIMEOUT = Duration.ofSeconds(5);
     private static final Duration POLL = Duration.ofMillis(200);
 
@@ -173,9 +174,9 @@ public final class WorkbenchSessionCommands {
             forwarded.add("--agent-id");
             forwarded.add(launch.agentId());
         }
-        return startDetached(launch.project(), PickleballWorkbenchLauncher.command(
+        return startDetached(launch.project(), withResolvedStartTimeout(PickleballWorkbenchLauncher.command(
                 controllerJar, forwarded.toArray(String[]::new)
-        ), launch.logFile());
+        )), launch.logFile());
     }
 
     static Process startDetached(Path project, List<String> command, Path logFile) throws IOException {
@@ -286,7 +287,7 @@ public final class WorkbenchSessionCommands {
                 err.println("Could not open the Workbench window: " + failure.getMessage());
                 return 1;
             }
-            long deadline = System.nanoTime() + HEALTH_TIMEOUT.toNanos();
+            long deadline = System.nanoTime() + OPEN_WINDOW_HEALTH_TIMEOUT.toNanos();
             while (System.nanoTime() < deadline && openWindow(parsed.project(), http).isEmpty()) {
                 if (process != null && !process.isAlive() && openWindow(parsed.project(), http).isEmpty()) {
                     err.println("Workbench window exited before it could show the run. See " + logFile);
@@ -297,7 +298,7 @@ public final class WorkbenchSessionCommands {
             window = openWindow(parsed.project(), http);
             if (window.isEmpty()) {
                 err.println("Workbench window did not become healthy within "
-                        + HEALTH_TIMEOUT.toSeconds() + "s. See " + logFile);
+                        + OPEN_WINDOW_HEALTH_TIMEOUT.toSeconds() + "s. See " + logFile);
                 return 1;
             }
         }
@@ -364,6 +365,26 @@ public final class WorkbenchSessionCommands {
         return null;
     }
 
+    /**
+     * The forked controller does not inherit launcher {@code -D} properties.
+     * Pass the timeout the health wait already resolved so the worker wait matches.
+     */
+    static List<String> withResolvedStartTimeout(List<String> command) {
+        if (command == null || command.isEmpty()) return List.of();
+        String flag = "-D" + SessionHealthWait.START_TIMEOUT_PROPERTY + "="
+                + SessionHealthWait.timeout(Map.of()).toSeconds();
+        ArrayList<String> copy = new ArrayList<>(command);
+        for (int i = 1; i < copy.size(); i++) {
+            String token = copy.get(i);
+            if (token != null && token.startsWith("-D" + SessionHealthWait.START_TIMEOUT_PROPERTY + "=")) {
+                copy.set(i, flag);
+                return List.copyOf(copy);
+            }
+        }
+        copy.add(1, flag);
+        return List.copyOf(copy);
+    }
+
     private static int sessionStart(
             WorkbenchCommandLine.Parsed parsed,
             PrintStream out,
@@ -417,31 +438,40 @@ public final class WorkbenchSessionCommands {
             throw new IllegalStateException(reason, failure);
         }
 
-        long deadline = System.nanoTime() + HEALTH_TIMEOUT.toNanos();
-        while (System.nanoTime() < deadline) {
-            Optional<SessionState> ready = readHealthyFile(sessionFile, project, http);
-            if (ready.isPresent()) {
-                SessionState state = ready.get();
-                AgentCoordination.logStart(project, run, "isolate");
-                out.println("ACK SESSION pid=" + state.pid() + " url=" + state.url());
-                return 0;
-            }
-            if (process != null && !process.isAlive()) {
-                Optional<SessionState> afterExit = readHealthyFile(sessionFile, project, http);
-                if (afterExit.isPresent()) {
-                    SessionState state = afterExit.get();
-                    AgentCoordination.logStart(project, run, "isolate");
-                    out.println("ACK SESSION pid=" + state.pid() + " url=" + state.url());
-                    return 0;
-                }
-                err.println("Workbench session process exited before becoming healthy. See " + logFile);
-                finishReason(project, run.runId(), "Session start failed: the process exited before it was healthy.", out);
-                return 1;
-            }
-            sleep(POLL);
+        SessionState[] found = new SessionState[1];
+        SessionHealthWait.Outcome outcome = SessionHealthWait.waitFor(
+                () -> {
+                    Optional<SessionState> ready = readHealthyFile(sessionFile, project, http);
+                    if (ready.isPresent()) found[0] = ready.get();
+                    return ready.isPresent();
+                },
+                () -> process == null || process.isAlive(),
+                project,
+                logFile,
+                out,
+                err,
+                SessionHealthWait.timeout(Map.of()),
+                SessionHealthWait.progressEvery(),
+                POLL
+        );
+        if (outcome.kind() == SessionHealthWait.Kind.HEALTHY && found[0] != null) {
+            SessionState state = found[0];
+            AgentCoordination.logStart(project, run, "isolate");
+            out.println("ACK SESSION pid=" + state.pid() + " url=" + state.url());
+            return 0;
         }
-        err.println("Workbench session did not become healthy within " + HEALTH_TIMEOUT.toSeconds() + "s. See " + logFile);
-        finishReason(project, run.runId(), "Session start failed: the session did not become healthy.", out);
+        if (outcome.kind() != SessionHealthWait.Kind.TIMED_OUT) {
+            err.println("Workbench session process exited before becoming healthy. See " + logFile);
+            finishReason(project, run.runId(), "Session start failed: the process exited before it was healthy.", out);
+            return 1;
+        }
+        finishReason(
+                project,
+                run.runId(),
+                "Session start failed: the session did not become healthy (elapsed="
+                        + outcome.elapsedMs() + "ms stage=" + outcome.stage() + ").",
+                out
+        );
         return 1;
     }
 
