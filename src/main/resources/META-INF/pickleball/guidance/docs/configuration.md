@@ -511,6 +511,29 @@ Workbench Discover/Confirm do not blindly MUST-use `CHROME_HEADLESS` for every p
 
 Isolate stays one scenario and does not raise `pkb_parallel`.
 
+## Workbench start timeout
+
+`pkb_workbench_worker_start_timeout` is Workbench only. A normal `mvn test` does not read it. The same value limits the consumer worker start and the `isolate` / `session-start` health wait. The default is 180 seconds. A blank, non-numeric, or non-positive value stays 180 seconds.
+
+Resolution order, first match wins:
+
+1. System property `-Dpkb_workbench_worker_start_timeout=N`
+2. Environment variable `PKB_WORKBENCH_WORKER_START_TIMEOUT`
+3. System property `-Dpkb_runvars.pkb_workbench_worker_start_timeout=N`
+4. Member `pkb_workbench_worker_start_timeout` inside compact `pkb_runvars` (system property or the worker property map)
+
+`isolate` / `session-start` passes the resolved number to the forked controller as `-Dpkb_workbench_worker_start_timeout`, because that process does not inherit launcher `-D` properties. `open-window` still waits 60 seconds. It does not use this setting.
+
+While `isolate` / `session-start` waits, stdout prints a progress line about every 12 seconds:
+
+```text
+session-start progress elapsed=12000ms stage=compile
+```
+
+The stage is the latest `progress stage=` line in the session log or in a worker `*.err.log` under the Workbench `logs` directory (`compile`, `classpath`, `worker-launch`, `anchor-parse`, `paused`). Before any marker the stage is `starting / Maven resolve or feature index`. A start that is healthy before the first interval prints no progress line.
+
+A session-start timeout names the current stage, the elapsed time, per-stage durations, the last 20 lines of the relevant log, and this hint: raise the limit with `-Dpkb_workbench_worker_start_timeout=N`, `PKB_WORKBENCH_WORKER_START_TIMEOUT`, or a `pkb_runvars` member `pkb_workbench_worker_start_timeout`. Stage enter times are written to `.pickleball/runs/<run-id>/session/startup-progress.json`. A worker startup timeout still names the elapsed time, the stage, and the last worker output.
+
 ## Repeat ceilings
 
 `pkb_stepMaxTime` (default 60 minutes) is the hard-fail time cap for every block `until` and every element `wait`. `pkb_stepRepeatMaxCount` (default 100) is the repeat-count cap for a block `until` only. An element `wait` does not use the count. They are run-wide run vars, read once when the step runtime loads. Resolved names are `pkb_stepmaxtime` and `pkb_steprepeatmaxcount`. There is no per-step ceiling. Workbench `--step-timeout` and `--run-timeout` are not these settings. They apply only to a live Workbench command and record `TIMEOUT`. See [Pickleball Workbench](pickleball-workbench.md).
