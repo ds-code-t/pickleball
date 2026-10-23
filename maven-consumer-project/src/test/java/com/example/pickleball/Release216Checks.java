@@ -82,6 +82,7 @@ public final class Release216Checks {
             "getStepValue(String,Class)",
             "getValue(String)",
             "getValue(String,Class)",
+            "isBlank(Object)",
             "registerPrefix(String,BiFunction)",
             "saveDefaultValue(String,Object)",
             "saveOverrideValue(String,Object)",

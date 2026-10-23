@@ -46,10 +46,41 @@ Response keys:
 
 | Key | Meaning |
 |---|---|
-| `rows` | List of column-to-value objects. Numbers stay numbers. Nulls stay null. Other values are strings. |
-| `rowCount` | Number of rows for a query. `0` for an update. |
-| `updateCount` | Number of updated rows. `0` for a query. |
-| `error` | Database error text. The step continues, the same way a failed HTTP call records its result. |
+| `rows` | List of column-to-value objects. See the type table below. |
+| `rowCount` | Number of rows for a query. `0` for an update, and `0` when the statement fails. |
+| `updateCount` | Number of updated rows. `0` for a query, and `0` when the statement fails. |
+| `error` | Database error text. Present only when the driver throws `SQLException`. |
+
+A SQL error does not fail the step. `JdbcServiceCall.execute` catches `SQLException`, puts the message in `error`, and returns. `rows` is an empty list, and both counts are `0`. The step continues. A blank `sql` is not a database error: that still throws `IllegalArgumentException` before a connection is opened. Assert on `RESPONSE.error` when the test should fail:
+
+```gherkin
+* MAP "REQUEST" TABLE VALUES TO SCENARIO MAP
+  | endpoint | jdbc:h2:mem:demo;DB_CLOSE_DELAY=-1 |
+  | sql | select * from missing_table |
+* EXECUTE SERVICE CALL
+* ASSERT: <RESPONSE.error> contains "missing_table"
+```
+
+```java
+ObjectNode response = JdbcServiceCall.execute(request);
+if (response.hasNonNull("error")) {
+    throw new AssertionError(response.get("error").asText());
+}
+```
+
+Values come back from `ResultSet.getObject` as follows:
+
+| JDBC value | JSON |
+|---|---|
+| SQL `NULL` | JSON `null` |
+| `BOOLEAN` / `BIT` | JSON boolean |
+| integer, bigint, and any other `Number`, including `DECIMAL` / `NUMERIC` | JSON number |
+| `DATE` | string from `java.sql.Date.toString`, `yyyy-MM-dd` |
+| `TIMESTAMP` | string from `java.sql.Timestamp.toString`, such as `2020-01-02 03:04:05.0` |
+| `CHAR` / `VARCHAR` | the text, including a Windows path or a path with spaces |
+| `BLOB` / `BINARY` (`byte[]`) | `String.valueOf` of the array, which looks like `[B@` plus an identity hash, not the bytes |
+| `CLOB` | `String.valueOf` of the driver object. H2 looks like `clob0: 'the text'` |
+| anything else | `String.valueOf` |
 
 Each call opens a new connection and closes it. There is no pool.
 

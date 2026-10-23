@@ -131,10 +131,28 @@ public final class Values {
     }
 
     /**
+     * True for null, a blank character sequence, or a {@link PrefixValue}
+     * whose stored value is blank. A masked value is judged by the stored
+     * value, not by {@code ******}. Any other object is not blank.
+     */
+    public static boolean isBlank(Object value) {
+        Object plain = value instanceof PrefixValue prefix ? prefix.value() : value;
+        if (plain == null) {
+            return true;
+        }
+        if (plain instanceof CharSequence text) {
+            return text.toString().isBlank();
+        }
+        return false;
+    }
+
+    /**
      * Records a soft failure the way a failing soft assert is logged.
      * The calling step continues. The scenario is soft-failed, so
      * {@code RUN IF SCENARIO SOFT FAILED} runs, and Cucumber fails the scenario
-     * after the remaining steps.
+     * after the remaining steps. The JUnit failure is a {@code RuntimeException}
+     * whose cause is a {@code SoftRuntimeException}. That cause's message is
+     * the text passed here. It is not null.
      */
     public static void softFail(String message) {
         String text = message == null || message.isBlank()
@@ -153,9 +171,17 @@ public final class Values {
     /**
      * Blocks until at least {@code seconds} have passed since the previous
      * {@code throttle} call with the same key in this JVM. The first call
-     * does not wait.
+     * does not wait. Returns how long this call waited, in milliseconds.
+     * Callers that ignore the result are unchanged.
+     *
+     * <p>One key has one gate. The thread that holds it parks with
+     * {@link LockSupport#parkNanos} until the gap has elapsed. Another thread
+     * with the same key waits for that lock, then for whatever gap is still
+     * left. An interrupt sets the interrupt status again and throws
+     * {@code IllegalStateException}. The gate is not moved forward when the
+     * wait is interrupted.
      */
-    public static void throttle(String key, int seconds) {
+    public static long throttle(String key, int seconds) {
         if (key == null || key.isBlank()) {
             throw new IllegalArgumentException("throttle key must not be blank.");
         }
@@ -167,8 +193,10 @@ public final class Values {
         ThrottleGate gate = THROTTLES.computeIfAbsent(key, ignored -> new ThrottleGate());
         synchronized (gate.lock) {
             long now = System.nanoTime();
+            long waitedNanos = 0L;
             if (gate.lastReleasedNanos != Long.MIN_VALUE && seconds > 0) {
                 long deadline = gate.lastReleasedNanos + java.util.concurrent.TimeUnit.SECONDS.toNanos(seconds);
+                long started = now;
                 while (now < deadline) {
                     LockSupport.parkNanos(deadline - now);
                     if (Thread.currentThread().isInterrupted()) {
@@ -177,8 +205,10 @@ public final class Values {
                     }
                     now = System.nanoTime();
                 }
+                waitedNanos = Math.max(0L, now - started);
             }
             gate.lastReleasedNanos = System.nanoTime();
+            return java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(waitedNanos);
         }
     }
 

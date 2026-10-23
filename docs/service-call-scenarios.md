@@ -269,7 +269,14 @@ RESPONSE.body
 
 HTTP `4xx` and `5xx` responses are retained as normal service results. No-content responses retain status and headers.
 
-An endpoint that starts with `jdbc:` is an experimental JDBC call instead of HTTP. The HTTP keys above are unchanged. JDBC request and response keys, including `sql`, `params`, `rows`, `rowCount`, `updateCount`, and `error`, are in [Experimental features](experimental-features.md).
+An endpoint that starts with `jdbc:` is a JDBC call instead of HTTP. The HTTP keys above are unchanged. A SQL error does not fail the step. The driver message is `RESPONSE.error`, `RESPONSE.rows` is empty, and `rowCount` and `updateCount` are `0`. A blank `sql` still fails the step before a connection is opened. To make the scenario fail, assert on the error:
+
+```gherkin
+* EXECUTE SERVICE CALL
+* ASSERT: <RESPONSE.error> contains "missing_table"
+```
+
+`NULL` stays JSON null. Booleans stay booleans. Integers, bigints, and decimals stay numbers. Dates, timestamps, and ordinary strings come back as text, so a Windows path and a path with spaces stay text. A `BLOB` or `BINARY` value comes back as `String.valueOf` of the byte array (`[B@…`), not the bytes. A `CLOB` comes back as `String.valueOf` of the driver object (H2 includes the text after `clob`). The request keys and a full example are in [Experimental features](experimental-features.md).
 
 ## Generic mappings
 

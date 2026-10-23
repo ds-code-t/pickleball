@@ -56,6 +56,7 @@ import static tools.dscode.Values.getOverrideValue;
 import static tools.dscode.Values.getRunValue;
 import static tools.dscode.Values.getSingletonValue;
 import static tools.dscode.Values.getValue;
+import static tools.dscode.Values.isBlank;
 import static tools.dscode.Values.registerPrefix;
 import static tools.dscode.Values.saveDefaultValue;
 import static tools.dscode.Values.saveOverrideValue;
@@ -91,6 +92,7 @@ class Release216BehaviorTest {
             "getStepValue(String,Class)",
             "getValue(String)",
             "getValue(String,Class)",
+            "isBlank(Object)",
             "registerPrefix(String,BiFunction)",
             "saveDefaultValue(String,Object)",
             "saveOverrideValue(String,Object)",
@@ -253,6 +255,23 @@ class Release216BehaviorTest {
         waiter.start();
         waiter.join();
         assertTrue(System.nanoTime() - started >= 900_000_000L);
+        long waited = throttle(key, 1);
+        assertTrue(waited >= 900L && waited < 5_000L, "waited=" + waited);
+    }
+
+    @Test
+    void throttleReportsZeroWhenItDoesNotWaitAndIsBlankChecksStoredText() {
+        String key = "release-217-zero-" + System.nanoTime();
+        assertEquals(0L, throttle(key, 3));
+        assertTrue(isBlank(null));
+        assertTrue(isBlank(""));
+        assertTrue(isBlank(" \t"));
+        assertFalse(isBlank("C:\\Users\\Dan She'll\\page"));
+        assertFalse(isBlank("C:/Program Files/Pickleball/body.xml"));
+        assertFalse(isBlank(0));
+        assertFalse(isBlank(Boolean.FALSE));
+        assertTrue(isBlank(PrefixValue.secret("  ")));
+        assertFalse(isBlank(PrefixValue.secret("C:\\Users\\Dan She'll\\page")));
     }
 
     @Test

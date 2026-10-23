@@ -49,6 +49,7 @@ When these docs are materialized from the Maven dependency with Workbench `expor
 
 ## Experimental features
 
+- [Experimental features](experimental-features.md) — behavior that works now but is not recommended and may change.
 - [Release notes](release-notes.md) — version notes, including breaking changes.
 
 ## Working consumer project

@@ -38,7 +38,6 @@ MAX_REFERENCE_TOTAL_BYTES = 10 * 1024 * 1024
 # Maintainer pages stay in docs/ and out of the consumer guidance mirror.
 MAINTAINER_ONLY_DOCS = (
     "docs/tech-debt.md",
-    "docs/experimental-features.md",
 )
 
 

@@ -40,13 +40,23 @@ Every read has a `Class<T>` overload. It converts the stored value with Jackson.
 
 ## softFail
 
-`softFail(String message)` records a soft failure the way a soft assert is meant to finish the scenario. The calling step continues. The scenario fails when it ends. `RUN IF SCENARIO SOFT FAILED` sees the soft failure and runs. This does not change `SOFT ASSERT` or `SOFT FAIL SCENARIO`. There is no API to discard or absorb that failure. The Cucumber result stays failed, matching the workbook status.
+`softFail(String message)` records a soft failure the way a soft assert is meant to finish the scenario. The calling step continues. The scenario fails when it ends. `RUN IF SCENARIO SOFT FAILED` sees the soft failure and runs. This does not change `SOFT ASSERT` or `SOFT FAIL SCENARIO`. There is no API to discard or absorb that failure. The Cucumber result stays failed, matching the workbook status. The JUnit failure is a `RuntimeException` whose cause is a `SoftRuntimeException`. That cause's message is the text you passed. It is not null.
 
-Outside a scenario, `softFail` throws `IllegalStateException`.
+Outside a scenario, `softFail` throws `IllegalStateException`. A Cucumber `@Before` or `@After` is not a running scenario step, so `softFail` throws there too.
+
+## isBlank
+
+`isBlank(Object value)` is true for null, `""`, and a character sequence that is only whitespace. A `PrefixValue` is judged by the stored value, not by the printed `******`, so a masked blank is blank and a masked word is not. A number, a boolean, or any other object is not blank. `isBlank(0)` and `isBlank(false)` are false.
 
 ## throttle
 
-`throttle(String key, int seconds)` blocks until at least `seconds` have passed since the previous `throttle` call with the same key in this JVM. Parallel scenarios share the gate. The first call does not wait. `0` records the call and does not wait. A blank key or a negative second count throws. There is no Gherkin syntax.
+`throttle(String key, int seconds)` blocks until at least `seconds` have passed since the previous `throttle` call with the same key in this JVM. It returns how many milliseconds this call waited. The first call returns `0` and does not wait. `0` records the call and returns `0`. A blank key or a negative second count throws. Callers that ignore the result are unchanged. There is no Gherkin syntax.
+
+One key has one lock. The thread that holds it parks until the gap has elapsed. Another thread with the same key waits for the lock, then for whatever part of the gap is still left. Parallel scenarios share that gate. An interrupt sets the interrupt flag again and throws `IllegalStateException` with the message `throttle was interrupted.` The gate is not moved forward when the wait is interrupted.
+
+## Hooks
+
+A Cucumber `@Before` or `@After` is not a running step. `getScenarioValue`, `saveScenarioValue`, `getRootScenarioValue`, `saveRootScenarioValue`, `getStepValue`, `saveStepValue`, and `softFail` throw there. `getRunValue`, `saveRunValue`, `getValue`, `saveValue`, `throttle`, and `isBlank` do not need a running step. `getValue` and `saveValue` use the run values when no scenario step is current.
 
 ## Custom reference prefixes
 
