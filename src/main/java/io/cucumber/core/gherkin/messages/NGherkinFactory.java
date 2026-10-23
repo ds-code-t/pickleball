@@ -58,13 +58,11 @@ public class NGherkinFactory {
                 for (String l : lines) {
                     featureSrc.append("      ").append(l.strip()).append("\n");
                 }
+            } else if (alreadyFencedDocString(lines) || !containsLineBreak(argument)) {
+                featureSrc.append(argument.replace("\r\n", "\n").replace("\r", "\n"));
+                if (!argument.endsWith("\n") && !argument.endsWith("\r")) featureSrc.append('\n');
             } else {
-                featureSrc.append(argument.replace("\r\n", "\n").replace("\r", "\n")).append("\n");
-
-                // Emit as DocString
-//                featureSrc.append("      \"\"\"\n")
-//                        .append(argument.replace("\r\n", "\n").replace("\r", "\n")).append("\n")
-//                        .append("      \"\"\"\n");
+                featureSrc.append(fenceDocString(argument));
             }
         }
 
@@ -84,6 +82,37 @@ public class NGherkinFactory {
         } catch (Exception e) {
             throw new IllegalStateException("Error creating pickle", e);
         }
+    }
+
+    private static boolean containsLineBreak(String argument) {
+        return argument.indexOf('\n') >= 0 || argument.indexOf('\r') >= 0;
+    }
+
+    /** A value that is already a Gherkin docstring must not be fenced again. */
+    private static boolean alreadyFencedDocString(List<String> lines) {
+        if (lines.size() < 2) return false;
+        String open = lines.getFirst().strip();
+        String close = lines.getLast().strip();
+        return (open.startsWith("\"\"\"") && "\"\"\"".equals(close))
+                || (open.startsWith("```") && "```".equals(close));
+    }
+
+    private static String fenceDocString(String argument) {
+        String content = argument.replace("\r\n", "\n").replace('\r', '\n');
+        if (content.endsWith("\n")) content = content.substring(0, content.length() - 1);
+        boolean hasTriple = content.lines().anyMatch(line -> "\"\"\"".equals(line.strip()));
+        boolean hasTicks = content.lines().anyMatch(line -> "```".equals(line.strip()));
+        String fence = !hasTriple ? "\"\"\"" : (!hasTicks ? "```" : null);
+        if (fence == null) {
+            throw new IllegalArgumentException("DocString contains both \"\"\" and ``` lines; cannot render safely.");
+        }
+        StringBuilder body = new StringBuilder();
+        body.append("      ").append(fence).append('\n');
+        for (String line : content.split("\n", -1)) {
+            body.append("      ").append(line).append('\n');
+        }
+        body.append("      ").append(fence).append('\n');
+        return body.toString();
     }
 
 

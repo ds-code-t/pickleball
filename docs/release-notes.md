@@ -42,6 +42,7 @@ Normal scenario execution is unchanged. The feature index, plan, timeouts, and t
 - A CLI error that wraps an `IOException` includes that cause. Session-start and sync failures record a plain-language reason on the run.
 - The config copy under `.pickleball/runs/<run-id>/config` is a faithful copy of the project configs: real values and valid YAML, JSON, XML, and properties, so the worker can load them. The project config is unchanged. Redaction for logs and reports stays a separate path and does not rewrite that copy.
 - Diagnostic events mask secrets before they are written. JSON `"password":"..."` and `"authorization":"..."` values, and a REST Assured `Authorization=Basic` or `Bearer` dump, are `<redacted>` in `events.jsonl`. The token after `Basic` is masked, not only the word `Basic`. Configuration-file redaction is unchanged and still does not rewrite project config files.
+- A multi-line value on a resolved step is fenced as a DocString when Pickleball builds the temporary `memory:/single.feature`. A one-line value, a data table, and a value that is already a docstring stay as they were. Public Gherkin syntax is unchanged.
 
 ### Clarifications
 
