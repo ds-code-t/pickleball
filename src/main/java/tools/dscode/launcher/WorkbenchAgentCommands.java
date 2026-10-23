@@ -18,11 +18,15 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -205,8 +209,9 @@ public final class WorkbenchAgentCommands {
             }
             int exit = mavenResult.exit();
             boolean empty = selection.matchedNone();
-            String status = empty ? "EMPTY" : exit == 0 ? "PASSED" : "FAILED";
-            int reported = empty && exit == 0 ? 1 : exit;
+            Observed observed = observe(parsed.project(), run.runId(), exit, empty);
+            String status = observed.status();
+            int reported = observed.exitCode();
             if (empty) printEmpty(parsed, plan.browser().browser(), out, err);
             AgentCoordination.finish(
                     parsed.project(),
@@ -277,8 +282,9 @@ public final class WorkbenchAgentCommands {
             }
             int exit = mavenResult.exit();
             boolean empty = selection.matchedNone();
-            String status = empty ? "EMPTY" : exit == 0 ? "PASSED" : "FAILED";
-            int reported = empty && exit == 0 ? 1 : exit;
+            Observed observed = observe(parsed.project(), run.runId(), exit, empty);
+            String status = observed.status();
+            int reported = observed.exitCode();
             if (empty) printEmpty(parsed, retained.get(PKB_props.PKB_BROWSER), out, err);
             AgentCoordination.finish(
                     parsed.project(),
@@ -1034,6 +1040,134 @@ public final class WorkbenchAgentCommands {
 
     private static String agentId(WorkbenchCommandLine.Parsed parsed) {
         return parsed.coordination().agentId();
+    }
+
+    private record Observed(String status, int exitCode) {
+    }
+
+    /**
+     * Maven {@code testFailureIgnore} can exit 0 when scenarios failed.
+     * The current run's {@code run-index.json} is authoritative. Surefire XML is
+     * used only when that index was not written. Otherwise the Maven exit stands.
+     */
+    private static Observed observe(Path project, String runId, int mavenExit, boolean empty) {
+        if (empty) {
+            return new Observed("EMPTY", mavenExit == 0 ? 1 : mavenExit);
+        }
+        DiagnosticVerdict verdict = readDiagnosticVerdict(project, runId);
+        if (verdict == null) {
+            return new Observed(mavenExit == 0 ? "PASSED" : "FAILED", mavenExit);
+        }
+        if (verdict.failed()) {
+            int exit = mavenExit == 0 ? Math.max(verdict.failures(), 1) : mavenExit;
+            return new Observed("FAILED", exit);
+        }
+        if (verdict.passed()) {
+            return new Observed("PASSED", 0);
+        }
+        return new Observed(mavenExit == 0 ? "PASSED" : "FAILED", mavenExit);
+    }
+
+    private record DiagnosticVerdict(String outcome, int failures) {
+        boolean failed() {
+            return failures > 0
+                    || "FAILED".equalsIgnoreCase(outcome)
+                    || "AMBIGUOUS".equalsIgnoreCase(outcome);
+        }
+
+        boolean passed() {
+            return failures == 0 && "PASSED".equalsIgnoreCase(outcome);
+        }
+    }
+
+    private static DiagnosticVerdict readDiagnosticVerdict(Path project, String runId) {
+        if (project == null || runId == null || runId.isBlank()) return null;
+        Path runDir = AgentCoordination.runDirectory(project, runId);
+        DiagnosticVerdict indexed = verdictFromIndex(runDir.resolve("diagnostic").resolve(runId).resolve("run-index.json"));
+        if (indexed != null) return indexed;
+        DiagnosticVerdict shared = verdictFromIndex(
+                project.resolve("reports").resolve("diagnostic-runs").resolve(runId).resolve("run-index.json")
+        );
+        if (shared != null) return shared;
+        return surefireVerdict(project, runDir.resolve(AgentCoordination.RECORD_FILE));
+    }
+
+    private static DiagnosticVerdict verdictFromIndex(Path index) {
+        if (index == null || !Files.isRegularFile(index)) return null;
+        try {
+            JsonNode root = JSON.readTree(index.toFile());
+            if (root == null || !root.isObject() || !root.has("outcome")) return null;
+            String outcome = root.path("outcome").asText("");
+            int failed = root.path("counts").path("failed").asInt(0);
+            return new DiagnosticVerdict(outcome, failed);
+        } catch (IOException failure) {
+            return null;
+        }
+    }
+
+    private static final Pattern SUREFIRE_FAILURES = Pattern.compile("\\bfailures=\"(\\d+)\"");
+    private static final Pattern SUREFIRE_ERRORS = Pattern.compile("\\berrors=\"(\\d+)\"");
+
+    private static DiagnosticVerdict surefireVerdict(Path project, Path recordFile) {
+        Instant started = recordStarted(recordFile);
+        int failures = 0;
+        boolean sawReport = false;
+        for (Path dir : List.of(
+                project.resolve("target").resolve("surefire-reports"),
+                project.resolve("build").resolve("test-results").resolve("test")
+        )) {
+            if (!Files.isDirectory(dir)) continue;
+            try (var children = Files.list(dir)) {
+                for (Path file : children.filter(Files::isRegularFile).toList()) {
+                    String name = file.getFileName() == null ? "" : file.getFileName().toString();
+                    if (!name.endsWith(".xml")) continue;
+                    if (started != null && !surefireBelongsToRun(file, started)) continue;
+                    String text;
+                    try {
+                        text = Files.readString(file);
+                    } catch (IOException ignored) {
+                        continue;
+                    }
+                    if (!text.contains("<testsuite") && !text.contains("<testsuites")) continue;
+                    sawReport = true;
+                    failures += attributeSum(SUREFIRE_FAILURES, text) + attributeSum(SUREFIRE_ERRORS, text);
+                }
+            } catch (IOException ignored) {
+                // A missing report directory is not a result.
+            }
+        }
+        if (!sawReport) return null;
+        return new DiagnosticVerdict(failures > 0 ? "FAILED" : "PASSED", failures);
+    }
+
+    private static boolean surefireBelongsToRun(Path file, Instant started) {
+        try {
+            Instant modified = Files.getLastModifiedTime(file).toInstant();
+            return !modified.isBefore(started.minusSeconds(2));
+        } catch (IOException ignored) {
+            return true;
+        }
+    }
+
+    private static Instant recordStarted(Path recordFile) {
+        if (recordFile == null || !Files.isRegularFile(recordFile)) return null;
+        try {
+            JsonNode root = JSON.readTree(recordFile.toFile());
+            String text = root.path("startedAt").asText("");
+            if (text.isBlank()) return null;
+            return Instant.parse(text);
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    private static int attributeSum(Pattern pattern, String text) {
+        int sum = 0;
+        Matcher matcher = pattern.matcher(text);
+        while (matcher.find()) {
+            sum += Integer.parseInt(matcher.group(1));
+        }
+        return sum;
     }
 
     private static int recordDiscover(

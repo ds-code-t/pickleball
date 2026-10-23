@@ -559,6 +559,123 @@ class WorkbenchAgentCommandsTest {
     }
 
     @Test
+    void discoverFailureIgnoreStillReportsFailedFromTheRunIndex() throws Exception {
+        writeProjectWrapper();
+        Path features = tempDir.resolve("src/test/resources/features");
+        Files.createDirectories(features);
+        Files.writeString(features.resolve("boom.feature"), """
+                @boom
+                Feature: Boom
+                  Scenario: It fails
+                    Given no
+                """);
+        Path catalogDir = tempDir.resolve("reports/diagnostic-runs");
+        Files.createDirectories(catalogDir);
+        ByteArrayOutputStream stdout = new ByteArrayOutputStream();
+        int exit = WorkbenchAgentCommands.run(
+                new String[]{"discover", tempDir.toString(), "--tags=@boom", "--run-id=run-fail"},
+                new PrintStream(stdout, true, StandardCharsets.UTF_8),
+                new PrintStream(new ByteArrayOutputStream(), true, StandardCharsets.UTF_8),
+                (project, command, out, err) -> {
+                    try {
+                        Path index = AgentCoordination.runDirectory(project, "run-fail")
+                                .resolve("diagnostic").resolve("run-fail").resolve("run-index.json");
+                        Files.createDirectories(index.getParent());
+                        Files.writeString(index, """
+                                {
+                                  "schemaVersion": 1,
+                                  "runId": "run-fail",
+                                  "outcome": "FAILED",
+                                  "counts": { "total": 1, "passed": 0, "failed": 1, "unknown": 0 }
+                                }
+                                """);
+                        Files.writeString(catalogDir.resolve("run-catalog.json"), """
+                                {
+                                  "schemaVersion": 1,
+                                  "runs": [
+                                    {
+                                      "runId": "run-old",
+                                      "outcome": "PASSED",
+                                      "runProfile": "pkb_tags=@old",
+                                      "lineage": { "runPurpose": "workbench-discover" }
+                                    }
+                                  ]
+                                }
+                                """);
+                    } catch (Exception failure) {
+                        throw new RuntimeException(failure);
+                    }
+                    return 0;
+                }
+        );
+        assertEquals(1, exit);
+        String text = stdout.toString(StandardCharsets.UTF_8);
+        assertTrue(text.contains("summary status=FAILED"), text);
+        assertFalse(text.contains("summary status=PASSED"), text);
+        String record = Files.readString(
+                AgentCoordination.runDirectory(tempDir, "run-fail").resolve(AgentCoordination.RECORD_FILE)
+        );
+        assertTrue(record.contains("\"status\" : \"FAILED\""), record);
+        assertFalse(record.contains("\"status\" : \"PASSED\""), record);
+    }
+
+    @Test
+    void discoverFailureIgnoreUsesSurefireWhenTheRunIndexIsMissing() throws Exception {
+        writeProjectWrapper();
+        Path features = tempDir.resolve("src/test/resources/features");
+        Files.createDirectories(features);
+        Files.writeString(features.resolve("boom.feature"), """
+                @boom
+                Feature: Boom
+                  Scenario: It fails
+                    Given no
+                """);
+        Path catalogDir = tempDir.resolve("reports/diagnostic-runs");
+        Files.createDirectories(catalogDir);
+        Path stale = tempDir.resolve("target/surefire-reports/TEST-old.xml");
+        Files.createDirectories(stale.getParent());
+        Files.writeString(stale, "<testsuite name=\"old\" tests=\"1\" failures=\"3\" errors=\"0\"></testsuite>\n");
+        Files.setLastModifiedTime(stale, java.nio.file.attribute.FileTime.from(java.time.Instant.now().minusSeconds(120)));
+        ByteArrayOutputStream stdout = new ByteArrayOutputStream();
+        int exit = WorkbenchAgentCommands.run(
+                new String[]{"discover", tempDir.toString(), "--tags=@boom", "--run-id=run-surefire"},
+                new PrintStream(stdout, true, StandardCharsets.UTF_8),
+                new PrintStream(new ByteArrayOutputStream(), true, StandardCharsets.UTF_8),
+                (project, command, out, err) -> {
+                    try {
+                        Path report = project.resolve("target/surefire-reports/TEST-boom.xml");
+                        Files.createDirectories(report.getParent());
+                        Files.writeString(report, """
+                                <testsuite name="boom" tests="1" failures="1" errors="0"></testsuite>
+                                """);
+                        Files.writeString(catalogDir.resolve("run-catalog.json"), """
+                                {
+                                  "schemaVersion": 1,
+                                  "runs": [
+                                    {
+                                      "runId": "run-surefire",
+                                      "outcome": "PASSED",
+                                      "runProfile": "pkb_tags=@boom",
+                                      "lineage": { "runPurpose": "workbench-discover" }
+                                    }
+                                  ]
+                                }
+                                """);
+                    } catch (Exception failure) {
+                        throw new RuntimeException(failure);
+                    }
+                    return 0;
+                }
+        );
+        assertEquals(1, exit);
+        assertTrue(stdout.toString(StandardCharsets.UTF_8).contains("summary status=FAILED"));
+        String record = Files.readString(
+                AgentCoordination.runDirectory(tempDir, "run-surefire").resolve(AgentCoordination.RECORD_FILE)
+        );
+        assertTrue(record.contains("\"status\" : \"FAILED\""), record);
+    }
+
+    @Test
     void planResolvesExampleRowsAndWarnsWhenEmptyWithoutMaven() throws Exception {
         Path features = tempDir.resolve("src/test/resources/features");
         Files.createDirectories(features);
