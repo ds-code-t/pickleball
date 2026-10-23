@@ -41,6 +41,7 @@ Normal scenario execution is unchanged. The feature index, plan, timeouts, and t
 - A locked Workbench directory install tries `deleteTree` and the move, then retries each after 100 ms, 300 ms, and 1000 ms. The temp-sibling copy runs only after those retries fail, with no further wait. The staged tree is copied to a sibling `target.tmp-<n>` and renamed into place. A failed copy deletes that temp directory and leaves the original target absent or unchanged, not a partial tree.
 - A CLI error that wraps an `IOException` includes that cause. Session-start and sync failures record a plain-language reason on the run.
 - The config copy under `.pickleball/runs/<run-id>/config` is a faithful copy of the project configs: real values and valid YAML, JSON, XML, and properties, so the worker can load them. The project config is unchanged. Redaction for logs and reports stays a separate path and does not rewrite that copy.
+- Diagnostic events mask secrets before they are written. JSON `"password":"..."` and `"authorization":"..."` values, and a REST Assured `Authorization=Basic` or `Bearer` dump, are `<redacted>` in `events.jsonl`. The token after `Basic` is masked, not only the word `Basic`. Configuration-file redaction is unchanged and still does not rewrite project config files.
 
 ### Clarifications
 

@@ -263,6 +263,8 @@ DiagnosticCli rebuild <diagnostic-runs-root-or-run-root>
 
 `configuration.json` records effective configuration/provenance and the sanitized final run profile. Secret-like values are redacted; one-way hashes may be retained for comparison. `environment.json` captures focused runtime metadata. `source-provenance.json` records best-effort consumer/Pickleball source identity (remote, branch, commit, dirty, `reproducibleFromGit`). Feature/definition pointers already carry `path` + `sha256`.
 
+Diagnostic events mask a secret before it is written. `events.jsonl`, `run-events.jsonl`, and failure text replace the value of `password`, `secret`, `token`, `authorization`, and the other secret-like keys. That covers `key=value`, JSON `"password":"..."` and `"authorization":"..."`, and a REST Assured dump such as `Authorization=Basic <token>` or `Authorization: Bearer <token>`. The token after `Basic` or `Bearer` is `<redacted>`, not only the word `Basic`. Configuration-file redaction is a separate path and still redacts secret-like keys in `configuration.json`. Event masking does not rewrite project config files.
+
 `pkb_gitsnapshot` supports `metadata`, `diff`, or `none` (default `metadata`) for consumer Git/source capture. There is no fourth mode. Keep credentials out of remotes/evidence and never expose protected RunVar values in prompts or lineage.
 
 When dense evidence is retained, Pickleball **core** (not Workbench) also writes a filtered source pack of files the scenario actually used:

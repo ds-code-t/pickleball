@@ -56,6 +56,17 @@ final class DiagnosticReporter {
     private static final Pattern SECRET = Pattern.compile(
             "(?i)(password|passwd|secret|token|api[_-]?key|authorization|credential|cookie|access[_-]?key|private[_-]?key)(\\s*[:=]\\s*)([^,\\s}\\]]+)"
     );
+    /** Quoted JSON values. The key is still in quotes, so {@link #SECRET} does not see the colon. */
+    private static final Pattern JSON_SECRET = Pattern.compile(
+            "(?i)(\"(?:password|passwd|secret|token|api[_-]?key|authorization|credential|cookie|access[_-]?key|private[_-]?key)\"\\s*:\\s*\")((?:\\\\.|[^\"\\\\])*)(\")"
+    );
+    private static final Pattern JSON_SECRET_SINGLE = Pattern.compile(
+            "(?i)('(?:password|passwd|secret|token|api[_-]?key|authorization|credential|cookie|access[_-]?key|private[_-]?key)'\\s*:\\s*')((?:\\\\.|[^'\\\\])*)(')"
+    );
+    /** REST Assured prints {@code Authorization=Basic <token>} and SECRET stops at the first space. */
+    private static final Pattern AUTH_TAIL = Pattern.compile(
+            "(?i)((?:proxy-)?authorization\\s*[:=]\\s*<redacted>\\s+)([A-Za-z0-9+/=_.~-]{8,})"
+    );
     private static final int MAX_TEXT_CHARS = 20_000;
     private static final int MAX_COLLECTION_ITEMS = 200;
 
@@ -1178,7 +1189,11 @@ final class DiagnosticReporter {
 
     private static String sanitizeText(String value) {
         if (value == null) return "";
-        String sanitized = SECRET.matcher(ValuesSupport.maskLog(value)).replaceAll("$1$2<redacted>");
+        String sanitized = ValuesSupport.maskLog(value);
+        sanitized = JSON_SECRET.matcher(sanitized).replaceAll("$1<redacted>$3");
+        sanitized = JSON_SECRET_SINGLE.matcher(sanitized).replaceAll("$1<redacted>$3");
+        sanitized = SECRET.matcher(sanitized).replaceAll("$1$2<redacted>");
+        sanitized = AUTH_TAIL.matcher(sanitized).replaceAll("$1<redacted>");
         if (sanitized.length() <= MAX_TEXT_CHARS) return sanitized;
         return sanitized.substring(0, MAX_TEXT_CHARS)
                 + "<diagnostic-truncated originalChars=" + sanitized.length() + ">";
