@@ -1540,6 +1540,65 @@ class WorkbenchAgentCommandsTest {
         assertTrue(text.contains("summary status="), text);
     }
 
+    @Test
+    void discoverRewritesXorForMavenAndWarnsWithTheEscapedForm() throws Exception {
+        writeProjectWrapper();
+        Path features = tempDir.resolve("src/test/resources/features");
+        Files.createDirectories(features);
+        Files.writeString(features.resolve("tags.feature"), """
+                @smoke
+                Feature: Tags
+                  Scenario: Smoke
+                    Given a
+                """);
+        Path catalogDir = tempDir.resolve("reports/diagnostic-runs");
+        Files.createDirectories(catalogDir);
+        ByteArrayOutputStream stderr = new ByteArrayOutputStream();
+        List<List<String>> captured = new ArrayList<>();
+        int exit = WorkbenchAgentCommands.run(
+                new String[]{"discover", tempDir.toString(), "--tags=@smoke xor @wip", "--run-id=run-xor"},
+                new PrintStream(new ByteArrayOutputStream(), true, StandardCharsets.UTF_8),
+                new PrintStream(stderr, true, StandardCharsets.UTF_8),
+                (project, command, out, err) -> {
+                    captured.add(command);
+                    try {
+                        Files.writeString(catalogDir.resolve("run-catalog.json"), """
+                                {"schemaVersion":1,"runs":[{"runId":"run-xor","outcome":"PASSED","runProfile":"pkb_tags=@smoke","lineage":{"runPurpose":"workbench-discover"}}]}
+                                """);
+                    } catch (Exception failure) {
+                        throw new RuntimeException(failure);
+                    }
+                    return 0;
+                }
+        );
+        assertEquals(0, exit);
+        String runVars = captured.getFirst().stream().filter(item -> item.startsWith("-Dpkb_runvars=")).findFirst().orElse("");
+        String tags = String.valueOf(PKB_props.parseAssignments(runVars.substring("-Dpkb_runvars=".length())).get(PKB_props.PKB_TAGS));
+        io.cucumber.tagexpressions.TagExpressionParser.parse(tags);
+        assertFalse(tags.toLowerCase().contains("xor"), tags);
+        assertTrue(tags.contains("or"), tags);
+        String errors = stderr.toString(StandardCharsets.UTF_8);
+        assertTrue(errors.contains("@smoke\\ xor\\ @wip"), errors);
+        assertTrue(errors.contains("not xor"), errors);
+        assertFalse(captured.getFirst().stream().anyMatch(item -> item.startsWith("-D" + DynamicSuiteEngine.TOP_LEVEL_FEATURES_PROPERTY + "=")));
+
+        List<List<String>> escaped = new ArrayList<>();
+        ByteArrayOutputStream escapedErr = new ByteArrayOutputStream();
+        WorkbenchAgentCommands.run(
+                new String[]{"discover", tempDir.toString(), "--tags=@smoke\\ xor\\ @wip", "--run-id=run-escaped"},
+                new PrintStream(new ByteArrayOutputStream(), true, StandardCharsets.UTF_8),
+                new PrintStream(escapedErr, true, StandardCharsets.UTF_8),
+                (project, command, out, err) -> {
+                    escaped.add(command);
+                    return 0;
+                }
+        );
+        String escapedVars = escaped.getFirst().stream().filter(item -> item.startsWith("-Dpkb_runvars=")).findFirst().orElse("");
+        String escapedTags = String.valueOf(PKB_props.parseAssignments(escapedVars.substring("-Dpkb_runvars=".length())).get(PKB_props.PKB_TAGS));
+        assertEquals("@smoke\\ xor\\ @wip", escapedTags);
+        io.cucumber.tagexpressions.TagExpressionParser.parse(escapedTags);
+    }
+
     private Output run(String... args) {
         ByteArrayOutputStream stdout = new ByteArrayOutputStream();
         ByteArrayOutputStream stderr = new ByteArrayOutputStream();

@@ -194,10 +194,11 @@ public final class WorkbenchAgentCommands {
             WorkbenchFeatureIndex.Selection selection = select(
                     parsed.project(), parsed.tags(), parsed.name(), parsed.example(), parsed
             );
+            String mavenVars = mavenRunVars(selection, plan.runVars(), parsed.tags(), err);
             List<String> command = withCoordination(
                     ConsumerMavenTestRunner.command(
                             parsed.project(),
-                            plan.runVars(),
+                            mavenVars,
                             featurePaths(parsed, selection)
                     ),
                     run
@@ -278,10 +279,16 @@ public final class WorkbenchAgentCommands {
             );
             out.println("Workbench confirm replaying Discover snapshot as pkb_runvars.");
             out.println("pkb_runvars=" + runVars);
+            String mavenVars = mavenRunVars(
+                    selection,
+                    runVars,
+                    firstNonBlank(parsed.tags(), retained.get(PKB_props.PKB_TAGS)),
+                    err
+            );
             List<String> command = withCoordination(
                     ConsumerMavenTestRunner.confirmCommand(
                             parsed.project(),
-                            runVars,
+                            mavenVars,
                             featurePaths(parsed, selection)
                     ),
                     run
@@ -457,11 +464,17 @@ public final class WorkbenchAgentCommands {
         out.println("example=" + text(parsed.example()));
         out.println("select=" + parsed.selects());
         if (selection.fullScanFallback() || parsed.fullScan()) {
-            err.println("WARNING: full-scan fallback: " + (
-                    parsed.fullScan() && !selection.fullScanFallback()
-                            ? "top-level narrowing skipped (--no-narrow / --full-scan); nested lookups keep the configured pkb_features"
-                            : selection.fallbackReason()
-            ));
+            if (selection.fullScanFallback()
+                    && selection.fallbackReason() != null
+                    && selection.fallbackReason().contains("unsupported tag expression")) {
+                err.println(WorkbenchTagFallback.warning(selection.fallbackReason(), parsed.tags()));
+            } else {
+                err.println("WARNING: full-scan fallback: " + (
+                        parsed.fullScan() && !selection.fullScanFallback()
+                                ? "top-level narrowing skipped (--no-narrow / --full-scan); nested lookups keep the configured pkb_features"
+                                : selection.fallbackReason()
+                ));
+            }
             out.println("PLAN full-scan");
             out.println("features=full-scan");
             return 0;
@@ -1074,6 +1087,24 @@ public final class WorkbenchAgentCommands {
         } catch (Exception failure) {
             err.println("Workbench summary was not written: " + failure.getMessage());
         }
+    }
+
+    private static String mavenRunVars(
+            WorkbenchFeatureIndex.Selection selection,
+            String runVars,
+            String tags,
+            PrintStream err
+    ) {
+        if (selection == null || !selection.fullScanFallback()) return runVars;
+        String reason = selection.fallbackReason() == null ? "" : selection.fallbackReason();
+        if (!reason.contains("unsupported tag expression")) return runVars;
+        String original = tags == null || tags.isBlank() ? runVar(runVars, PKB_props.PKB_TAGS) : tags;
+        err.println(WorkbenchTagFallback.warning(reason, original));
+        String rewritten = WorkbenchTagFallback.cucumberTags(original);
+        if (rewritten == null || rewritten.equals(original) || runVars == null) return runVars;
+        java.util.LinkedHashMap<String, String> values = new java.util.LinkedHashMap<>(PKB_props.parseAssignments(runVars));
+        values.put(PKB_props.PKB_TAGS, rewritten);
+        return PKB_props.serializeRunVars(values);
     }
 
     private static String runVar(String compact, String key) {

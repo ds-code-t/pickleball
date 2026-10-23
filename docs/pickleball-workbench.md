@@ -85,7 +85,9 @@ Same launcher; only change `-Dexec.args`. When nobody is watching, `isolate` sta
 
 These commands stay on the Workbench launcher. They do not change a normal `mvn test`, `pkb_stepMaxTime`, `CucumberScanUtil.listPickles`, or `DiagnosticReporter`.
 
-When the feature index can narrow a `discover` or `confirm` selection, only the top-level Cucumber discovery is narrowed. The matching paths go to `-Dpickleball.workbench.topFeatures`. They are not written over `pkb_features`. Nested `SCENARIO` / `COMPONENT` / `CALL` / `RUN` still call `CucumberScanUtil.listPickles` with the configured feature set, so a scenario in another file is found, including a path with spaces. `--no-narrow` and `--full-scan` skip that top-level list. A normal `mvn test` does not set the property.
+When the feature index can narrow a `discover` or `confirm` selection, only the top-level Cucumber discovery is narrowed. The matching paths go to `-Dpickleball.workbench.topFeatures`. They are not written over `pkb_features`. Nested `SCENARIO` / `COMPONENT` / `CALL` / `RUN` still call `CucumberScanUtil.listPickles` with the configured feature set, so a scenario in another file is found, including a path with spaces. `--no-narrow` and `--full-scan` skip that top-level list. A normal `mvn test` does not set the property. A full scan is the fallback for an unreadable feature or an unsupported tag such as `xor`, and that fallback still enumerates every scenario. Nested lookup no longer needs it.
+
+`xor` is not a Cucumber tag operator. The warning prints the escaped form that parses, `--tags=@smoke\ xor\ @wip`. Maven receives `(A or B) and not (A and B)` in `pkb_tags` only. The index parser is unchanged.
 
 `pkb_example` decodes a classpath feature URI before it opens the file. `%20` is a space, and a Windows `\` is a `/`. One unreadable feature logs `WARNING: pkb_example skipped unreadable feature` and is left out of that filter. It does not abort the rest of the run.
 
