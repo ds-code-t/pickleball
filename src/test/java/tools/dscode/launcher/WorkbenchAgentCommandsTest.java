@@ -1478,6 +1478,68 @@ class WorkbenchAgentCommandsTest {
         assertTrue(record.contains("@missing"), record);
     }
 
+    @Test
+    void discoverRunVarSetsEnvironmentOnTheCommandRecordAndSummary() throws Exception {
+        writeProjectWrapper();
+        Path features = tempDir.resolve("src/test/resources/features");
+        Files.createDirectories(features);
+        Files.writeString(features.resolve("dev.feature"), """
+                @dev
+                Feature: Dev
+                  Scenario: In dev
+                    Given a
+                """);
+        Path catalogDir = tempDir.resolve("reports/diagnostic-runs");
+        Files.createDirectories(catalogDir);
+        ByteArrayOutputStream stdout = new ByteArrayOutputStream();
+        ByteArrayOutputStream stderr = new ByteArrayOutputStream();
+        List<List<String>> captured = new ArrayList<>();
+        int exit = WorkbenchAgentCommands.run(
+                new String[]{
+                        "discover", tempDir.toString(), "--tags=@dev", "--run-id=run-dev",
+                        "--runvar", "pkb_environment=DEV", "--runvar=pkb_parallel=3"
+                },
+                new PrintStream(stdout, true, StandardCharsets.UTF_8),
+                new PrintStream(stderr, true, StandardCharsets.UTF_8),
+                (project, command, out, err) -> {
+                    captured.add(command);
+                    try {
+                        Files.writeString(catalogDir.resolve("run-catalog.json"), """
+                                {
+                                  "schemaVersion": 1,
+                                  "runs": [
+                                    {
+                                      "runId": "run-dev",
+                                      "outcome": "PASSED",
+                                      "runProfile": "pkb_environment=DEV, pkb_tags=@dev",
+                                      "lineage": { "runPurpose": "workbench-discover" }
+                                    }
+                                  ]
+                                }
+                                """);
+                    } catch (Exception failure) {
+                        throw new RuntimeException(failure);
+                    }
+                    return 0;
+                }
+        );
+        assertEquals(0, exit);
+        String runVars = captured.getFirst().stream().filter(item -> item.startsWith("-Dpkb_runvars=")).findFirst().orElse("");
+        assertTrue(runVars.contains("pkb_environment=DEV"), runVars);
+        assertTrue(runVars.contains("pkb_parallel=3"), runVars);
+        String errors = stderr.toString(StandardCharsets.UTF_8);
+        assertTrue(errors.contains("WARNING: --runvar pkb_parallel replaces"), errors);
+        String record = Files.readString(
+                AgentCoordination.runDirectory(tempDir, "run-dev").resolve(AgentCoordination.RECORD_FILE)
+        );
+        assertTrue(record.contains("\"environment\" : \"DEV\""), record);
+        assertTrue(record.contains("\"browser\""), record);
+        String text = stdout.toString(StandardCharsets.UTF_8);
+        assertTrue(text.contains("environment=DEV"), text);
+        assertTrue(text.contains("browser="), text);
+        assertTrue(text.contains("summary status="), text);
+    }
+
     private Output run(String... args) {
         ByteArrayOutputStream stdout = new ByteArrayOutputStream();
         ByteArrayOutputStream stderr = new ByteArrayOutputStream();

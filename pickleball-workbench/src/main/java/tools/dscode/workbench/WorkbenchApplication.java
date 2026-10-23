@@ -259,7 +259,7 @@ public final class WorkbenchApplication {
         Map<String, String> workerProperties;
         try {
             workerProperties = tools.dscode.workbench.discover.LastDiscoverSnapshot.workerSystemProperties(
-                    parsed.project(), parsed.tags(), parsed.name(), parsed.example()
+                    parsed.project(), parsed.tags(), parsed.name(), parsed.example(), parsed.runVars(), err
             );
         } catch (RuntimeException failure) {
             err.println(failure.getMessage());
@@ -308,7 +308,7 @@ public final class WorkbenchApplication {
         Map<String, String> workerProperties;
         try {
             workerProperties = new LinkedHashMap<>(tools.dscode.workbench.discover.LastDiscoverSnapshot.workerSystemProperties(
-                    parsed.project(), parsed.tags(), parsed.name(), parsed.example()
+                    parsed.project(), parsed.tags(), parsed.name(), parsed.example(), parsed.runVars(), err
             ));
         } catch (RuntimeException failure) {
             err.println(failure.getMessage());
@@ -405,7 +405,8 @@ public final class WorkbenchApplication {
             String example,
             Path sessionFile,
             String runId,
-            String agentId
+            String agentId,
+            java.util.List<String> runVars
     ) {
     }
 
@@ -414,6 +415,7 @@ public final class WorkbenchApplication {
             throw new IllegalArgumentException(
                     "Usage: pickleball-workbench " + command
                             + " <project> [--tags <expr>] [--name <expr>] [--example <rows>]"
+                            + " [--runvar key=value]"
                             + " [--session-file <path>] [--run-id <id>] [--agent-id <id>]"
             );
         }
@@ -423,6 +425,7 @@ public final class WorkbenchApplication {
         String sessionFile = null;
         String runId = null;
         String agentId = null;
+        java.util.List<String> runVars = new java.util.ArrayList<>();
         boolean absorbName = false;
         boolean absorbExample = false;
         for (int index = 2; index < args.length; index++) {
@@ -449,6 +452,22 @@ public final class WorkbenchApplication {
                 example = value == null || value.isBlank() ? null : value;
                 absorbExample = example != null;
                 absorbName = false;
+            } else if (token.startsWith("--runvar=")) {
+                String value = token.substring("--runvar=".length()).trim();
+                if (value.isBlank() || !value.contains("=")) {
+                    throw new IllegalArgumentException("--runvar requires key=value.");
+                }
+                runVars.add(value);
+                absorbName = false;
+                absorbExample = false;
+            } else if ("--runvar".equals(token) && index + 1 < args.length) {
+                String value = args[++index];
+                if (value == null || value.isBlank() || !value.contains("=")) {
+                    throw new IllegalArgumentException("--runvar requires key=value.");
+                }
+                runVars.add(value.trim());
+                absorbName = false;
+                absorbExample = false;
             } else if (token.startsWith("--session-file=")) {
                 sessionFile = token.substring("--session-file=".length());
                 absorbName = false;
@@ -486,7 +505,8 @@ public final class WorkbenchApplication {
                 example,
                 sessionFile == null || sessionFile.isBlank() ? null : Path.of(sessionFile),
                 runId == null || runId.isBlank() ? null : runId.trim(),
-                agentId == null || agentId.isBlank() ? null : agentId.trim()
+                agentId == null || agentId.isBlank() ? null : agentId.trim(),
+                java.util.List.copyOf(runVars)
         );
     }
 

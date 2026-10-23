@@ -5,9 +5,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import tools.dscode.control.protocol.PickleballLocalLayout;
 
 import java.io.IOException;
+import java.io.PrintStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.TreeMap;
 
@@ -81,11 +84,23 @@ public final class LastDiscoverSnapshot {
             String name,
             String example
     ) {
+        return workerSystemProperties(projectRoot, tags, name, example, null, null);
+    }
+
+    public static Map<String, String> workerSystemProperties(
+            Path projectRoot,
+            String tags,
+            String name,
+            String example,
+            List<String> cliRunVars,
+            PrintStream err
+    ) {
         Snapshot snapshot = require(projectRoot);
+        String replayed = replay(snapshot, true, tags, name, example, cliRunVars, err);
         if (snapshot.sealed()) {
-            return Map.of("pkb_overriderunvars", replay(snapshot, true, tags, name, example));
+            return Map.of("pkb_overriderunvars", replayed);
         }
-        return Map.of("pkb_runvars", replay(snapshot, true, tags, name, example));
+        return Map.of("pkb_runvars", replayed);
     }
 
     public static Map<String, String> workerSystemPropertiesIfPresent(Path projectRoot) {
@@ -102,6 +117,18 @@ public final class LastDiscoverSnapshot {
     }
 
     public static String replay(Snapshot snapshot, boolean isolate, String tags, String name, String example) {
+        return replay(snapshot, isolate, tags, name, example, null, null);
+    }
+
+    public static String replay(
+            Snapshot snapshot,
+            boolean isolate,
+            String tags,
+            String name,
+            String example,
+            List<String> cliRunVars,
+            PrintStream err
+    ) {
         Map<String, String> values = new TreeMap<>();
         if (snapshot.runVars() != null) values.putAll(snapshot.runVars());
         if (values.isEmpty() && snapshot.runProfile() != null && !snapshot.runProfile().isBlank()) {
@@ -112,7 +139,28 @@ public final class LastDiscoverSnapshot {
         if (tags != null && !tags.isBlank()) values.put("pkb_tags", tags.trim());
         if (name != null && !name.isBlank()) values.put("pkb_name", name.trim());
         if (example != null && !example.isBlank()) values.put("pkb_example", example.trim());
+        applyCliRunVars(values, cliRunVars, err);
         return serializeCompact(values);
+    }
+
+    static void applyCliRunVars(Map<String, String> values, List<String> raw, PrintStream err) {
+        if (values == null || raw == null) return;
+        for (String item : raw) {
+            if (item == null || item.isBlank()) continue;
+            int equals = item.indexOf('=');
+            if (equals <= 0) {
+                if (err != null) err.println("WARNING: --runvar ignored, expected key=value: " + item);
+                continue;
+            }
+            String key = item.substring(0, equals).trim().toLowerCase(Locale.ROOT);
+            String value = item.substring(equals + 1).trim();
+            if (!key.startsWith("pkb_")) key = "pkb_" + key;
+            String existing = values.get(key);
+            if (existing != null && !existing.equals(value) && err != null) {
+                err.println("WARNING: --runvar " + key + " replaces " + existing + " with " + value);
+            }
+            values.put(key, value);
+        }
     }
 
     public static Snapshot writeSealed(Path projectRoot, Map<String, String> runVars) {

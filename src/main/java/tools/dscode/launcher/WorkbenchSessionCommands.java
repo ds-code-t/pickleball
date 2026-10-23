@@ -48,7 +48,8 @@ public final class WorkbenchSessionCommands {
             Path logFile,
             Path sessionFile,
             String runId,
-            String agentId
+            String agentId,
+            java.util.List<String> runVars
     ) {
     }
 
@@ -173,6 +174,13 @@ public final class WorkbenchSessionCommands {
         if (launch.agentId() != null && !launch.agentId().isBlank()) {
             forwarded.add("--agent-id");
             forwarded.add(launch.agentId());
+        }
+        if (launch.runVars() != null) {
+            for (String runVar : launch.runVars()) {
+                if (runVar == null || runVar.isBlank()) continue;
+                forwarded.add("--runvar");
+                forwarded.add(runVar);
+            }
         }
         return startDetached(launch.project(), withResolvedStartTimeout(PickleballWorkbenchLauncher.command(
                 controllerJar, forwarded.toArray(String[]::new)
@@ -430,7 +438,8 @@ public final class WorkbenchSessionCommands {
                     logFile,
                     sessionFile,
                     run.runId(),
-                    run.agentId()
+                    run.agentId(),
+                    parsed.runVars()
             ));
         } catch (IOException failure) {
             String reason = "Session start failed: " + WorkbenchCliErrors.explain(failure);

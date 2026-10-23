@@ -79,12 +79,14 @@ final class WorkbenchCommandLine {
             boolean planOnly,
             boolean refreshIndex,
             boolean fullScan,
+            List<String> runVars,
             List<String> selects,
             Long stepTimeoutSeconds,
             Long runTimeoutSeconds
     ) {
         public Parsed {
             selects = selects == null ? List.of() : List.copyOf(selects);
+            runVars = runVars == null ? List.of() : List.copyOf(runVars);
         }
     }
 
@@ -103,14 +105,14 @@ final class WorkbenchCommandLine {
     static Parsed parse(String[] args) {
         Path cwd = Path.of("").toAbsolutePath().normalize();
         if (args == null || args.length == 0) {
-            return new Parsed("ui", cwd, null, null, null, null, null, new String[]{"ui", cwd.toString()}, Coordination.empty(), null, false, false, false, List.of(), null, null);
+            return new Parsed("ui", cwd, null, null, null, null, null, new String[]{"ui", cwd.toString()}, Coordination.empty(), null, false, false, false, List.of(), List.of(), null, null);
         }
         String command = args[0];
         if ("export-guidance".equals(command)) {
             Path output = args.length >= 2 && !isFlag(args[1])
                     ? Path.of(args[1])
                     : Path.of(".pickleball");
-            return new Parsed(command, cwd, output, null, null, null, null, args.clone(), Coordination.empty(), null, false, false, false, List.of(), null, null);
+            return new Parsed(command, cwd, output, null, null, null, null, args.clone(), Coordination.empty(), null, false, false, false, List.of(), List.of(), null, null);
         }
 
         String tags = null;
@@ -142,6 +144,7 @@ final class WorkbenchCommandLine {
         boolean planOnly = false;
         boolean refreshIndex = false;
         boolean fullScan = false;
+        List<String> runVars = new ArrayList<>();
         List<String> selects = new ArrayList<>();
         Long stepTimeoutSeconds = null;
         Long runTimeoutSeconds = null;
@@ -224,6 +227,26 @@ final class WorkbenchCommandLine {
             if ("--no-narrow".equals(token) || "--full-scan".equals(token)) {
                 fullScan = true;
                 absorb = null;
+                continue;
+            }
+            if (token.startsWith("--runvar=")) {
+                String value = token.substring("--runvar=".length()).trim();
+                if (value.isBlank() || !value.contains("=")) {
+                    throw new IllegalArgumentException("--runvar requires key=value.");
+                }
+                runVars.add(value);
+                absorb = null;
+                tagsSplitOpen = false;
+                continue;
+            }
+            if ("--runvar".equals(token)) {
+                String value = index + 1 < args.length ? args[++index] : null;
+                if (value == null || value.isBlank() || !value.contains("=")) {
+                    throw new IllegalArgumentException("--runvar requires key=value.");
+                }
+                runVars.add(value.trim());
+                absorb = null;
+                tagsSplitOpen = false;
                 continue;
             }
             if (token.startsWith("--select=")) {
@@ -503,15 +526,19 @@ final class WorkbenchCommandLine {
                 forwarded.add("--example");
                 forwarded.add(example);
             }
+            for (String runVar : runVars) {
+                forwarded.add("--runvar");
+                forwarded.add(runVar);
+            }
             forwarded.addAll(rest);
             return new Parsed(
                     command, project, null, tags, name, example, retention, forwarded.toArray(String[]::new),
-                    coordination, version, planOnly, refreshIndex, fullScan, selects, stepTimeoutSeconds, runTimeoutSeconds
+                    coordination, version, planOnly, refreshIndex, fullScan, runVars, selects, stepTimeoutSeconds, runTimeoutSeconds
             );
         }
         return new Parsed(
                 command, project, null, tags, name, example, retention, args.clone(),
-                coordination, version, planOnly, refreshIndex, fullScan, selects, stepTimeoutSeconds, runTimeoutSeconds
+                coordination, version, planOnly, refreshIndex, fullScan, runVars, selects, stepTimeoutSeconds, runTimeoutSeconds
         );
     }
 

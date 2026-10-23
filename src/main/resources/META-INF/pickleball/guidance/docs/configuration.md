@@ -294,7 +294,7 @@ Dry-run without starting tests:
 PKB_props.ResolvedRunVars preview = PKB_props.resolveRunVars(values);
 ```
 
-`DiagnosticCli resolve-runvars` and Workbench `hint` print that preview, including per-key provenance (`override`, `runvars`, `profile`, `jvm`, `inherited-context`, `default`, `properties`). The preview is the launcher JVM, not the Discover worker. Do not treat its `pkb_environment` as the environment Discover will use. Trust the run record after Discover. Agents resolve → inspect → complete map → `pkb_overriderunvars` → compare fingerprint. Sealed input is `pkb_overriderunvars` only.
+`DiagnosticCli resolve-runvars` and Workbench `hint` print that preview, including per-key provenance (`override`, `runvars`, `profile`, `jvm`, `inherited-context`, `default`, `properties`). The preview is the launcher JVM, not the Discover worker. Do not treat its `pkb_environment` as the environment Discover will use. Trust the `environment` field on `record.json` after Discover, and the `environment=` token on the summary line. A launcher `-Dpkb_runvars` is not the controlled run. Pass `--runvar pkb_environment=DEV` on `discover`, `confirm`, or `isolate`. Agents resolve → inspect → complete map → `pkb_overriderunvars` → compare fingerprint. Sealed input is `pkb_overriderunvars` only.
 
 ### Templates and runtime configs
 
@@ -405,7 +405,7 @@ Missing or blank `pkb_configpath` uses the classpath resource root `configs`. Pi
 | `pkb_tags` | `@smoke and not @slow` | Cucumber tag expression |
 | `pkb_name` | `Checkout.*` | scenario-name expression |
 | `pkb_example` | `1 2 5 3.4 7-11` | Examples-row filter applied after tags and name. Not a tag |
-| `pkb_environment` | `QA` | project environment label |
+| `pkb_environment` | `QA` | project environment label. Workbench `discover`, `confirm`, and `isolate` accept repeatable `--runvar key=value` (a missing `pkb_` prefix is added). That value is merged into the planned run vars. A conflict warns and the command-line value wins. The run record `environment` and `browser` fields, and the summary line, come from the merged run vars |
 | `pkb_browser` | `chrome` | browser configuration name looked up under the `configs` mapping (`CHROME_HEADLESS` uses the consumer yaml when present, otherwise Pickleball's bundled headless Chrome) |
 | `pkb_driver_download_native` | `true`, `false` | `true` or unset tries Selenium Manager first; `false` keeps that launch off the network |
 | `pkb_driver_download_proxy` | empty, `false`, or `http://user:pass@host:port` | empty discovers a driver-download proxy; `false` disables the fallback; a URL is tried first and is redacted |

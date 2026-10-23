@@ -79,6 +79,8 @@ Same launcher; only change `-Dexec.args`. When nobody is watching, `isolate` sta
 
 `hint`, `discover`, `confirm`, and `isolate` accept `--example` / `--example=` the same way they accept `--tags` and `--name`. The value becomes `pkb_example` inside `pkb_runvars` (or inside `pkb_overriderunvars` when the Discover snapshot is sealed). That is the headless way to keep specific Examples rows. A normal Scenario counts as row 1. `pkb_example` is not a tag. `--example='1 2 5 3.4 7-11'` keeps those rows, in source order, in each scenario that tags and name already selected. The Play row picker calls the same `example` filter. Play shows the first source-order match. Headless `pkb_example` still runs every match. Do not open the GUI for your own testing. Open it to show a person a specific run, or when they ask. Close it when you are done showing it. While testing for yourself, stay headless. Opening the window loads the run you already have. It does not start a second test.
 
+`discover`, `confirm`, and `isolate` also accept repeatable `--runvar key=value` (or `--runvar=key=value`). A key written as `environment` is stored as `pkb_environment`. The value is merged into the planned run vars. If that key already has a different value, Workbench warns and the command-line value wins. `record.json` then has `environment` and `browser`, and the summary line ends with `environment=` and `browser=` when those values are set. Trust those fields, not a launcher JVM preview.
+
 ## Selection, timeouts, and side reports
 
 These commands stay on the Workbench launcher. They do not change a normal `mvn test`, `pkb_stepMaxTime`, `CucumberScanUtil.listPickles`, or `DiagnosticReporter`.

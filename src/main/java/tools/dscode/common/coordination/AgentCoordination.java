@@ -163,7 +163,9 @@ public final class AgentCoordination {
             String pickleballVersion,
             Integer failureCount,
             Boolean failedScenario,
-            String failureSummary
+            String failureSummary,
+            String environment,
+            String browser
     ) {
     }
 
@@ -333,6 +335,8 @@ public final class AgentCoordination {
                     startedVersion(project),
                     null,
                     null,
+                    null,
+                    null,
                     null
             );
             writeRecord(recordFile, record);
@@ -421,12 +425,6 @@ public final class AgentCoordination {
         finish(project, runId, learned, status, when, out, null);
     }
 
-    /**
-     * Stops the run. When {@code run-index.json} is present it supplies the status
-     * and the failure fields, including after a worker already wrote PASSED.
-     * {@code TIMEOUT} and {@code EMPTY} are left alone. {@code observedFailures}
-     * is the Surefire or Gradle failure+error count used only when no index exists.
-     */
     public static void finish(
             Path project,
             String runId,
@@ -435,6 +433,27 @@ public final class AgentCoordination {
             Instant when,
             Appendable out,
             Integer observedFailures
+    ) {
+        finish(project, runId, learned, status, when, out, observedFailures, null, null);
+    }
+
+    /**
+     * Stops the run. When {@code run-index.json} is present it supplies the status
+     * and the failure fields, including after a worker already wrote PASSED.
+     * {@code TIMEOUT} and {@code EMPTY} are left alone. {@code observedFailures}
+     * is the Surefire or Gradle failure+error count used only when no index exists.
+     * {@code environment} and {@code browser} come from the resolved run vars.
+     */
+    public static void finish(
+            Path project,
+            String runId,
+            String learned,
+            String status,
+            Instant when,
+            Appendable out,
+            Integer observedFailures,
+            String environment,
+            String browser
     ) {
         String safeRun = requireSafeId(runId, "run id");
         Instant clock = when == null ? Instant.now() : when;
@@ -466,15 +485,27 @@ public final class AgentCoordination {
                     failureSummary = "surefire errors+failures=" + observedFailures;
                 }
             }
+            String environmentValue = firstNonBlank(environment, existing.environment());
+            String browserValue = firstNonBlank(browser, existing.browser());
             boolean statusChanged = existing.status() == null || !existing.status().equals(statusValue);
             boolean learnedChanged = learnedValue != null && !learnedValue.equals(existing.learned());
             boolean failureChanged = !sameInteger(existing.failureCount(), failureCount)
                     || !java.util.Objects.equals(existing.failedScenario(), failedScenario)
                     || !java.util.Objects.equals(existing.failureSummary(), failureSummary);
-            if (!alreadyStopped || statusChanged || learnedChanged || failureChanged) {
+            boolean contextChanged = !java.util.Objects.equals(blankToNull(existing.environment()), environmentValue)
+                    || !java.util.Objects.equals(blankToNull(existing.browser()), browserValue);
+            if (!alreadyStopped || statusChanged || learnedChanged || failureChanged || contextChanged) {
                 String stoppedAt = alreadyStopped ? existing.stoppedAt() : clock.toString();
                 RunRecord updated = withStop(
-                        existing, keptLearned, stoppedAt, statusValue, failureCount, failedScenario, failureSummary
+                        existing,
+                        keptLearned,
+                        stoppedAt,
+                        statusValue,
+                        failureCount,
+                        failedScenario,
+                        failureSummary,
+                        environmentValue,
+                        browserValue
                 );
                 writeRecord(recordFile, updated);
                 if (!alreadyStopped) {
@@ -1415,7 +1446,9 @@ public final class AgentCoordination {
             String status,
             Integer failureCount,
             Boolean failedScenario,
-            String failureSummary
+            String failureSummary,
+            String environment,
+            String browser
     ) {
         return new RunRecord(
                 existing.runId(),
@@ -1432,7 +1465,9 @@ public final class AgentCoordination {
                 existing.pickleballVersion(),
                 failureCount,
                 failedScenario,
-                failureSummary
+                failureSummary,
+                environment,
+                browser
         );
     }
 

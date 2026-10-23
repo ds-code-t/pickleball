@@ -145,6 +145,27 @@ class WorkbenchCommandLineTest {
     }
 
     @Test
+    void runVarIsRepeatableAndForwardedForIsolate() {
+        WorkbenchCommandLine.Parsed parsed = WorkbenchCommandLine.parse(new String[]{
+                "discover", "--name=The", "scenario", "--runvar", "pkb_environment=DEV", "--runvar=browser=EDGE"
+        });
+        assertEquals("The scenario", parsed.name());
+        assertEquals(List.of("pkb_environment=DEV", "browser=EDGE"), parsed.runVars());
+
+        WorkbenchCommandLine.Parsed isolate = WorkbenchCommandLine.parse(new String[]{
+                "isolate", "--runvar=pkb_environment=DEV"
+        });
+        assertEquals(List.of("pkb_environment=DEV"), isolate.runVars());
+        assertTrue(java.util.Arrays.asList(isolate.forwarded()).contains("pkb_environment=DEV"));
+
+        IllegalArgumentException missing = assertThrows(
+                IllegalArgumentException.class,
+                () -> WorkbenchCommandLine.parse(new String[]{"confirm", "--runvar"})
+        );
+        assertTrue(missing.getMessage().contains("key=value"));
+    }
+
+    @Test
     void unparseableTagOrNameIsAQuotingError() {
         IllegalArgumentException quotes = assertThrows(
                 IllegalArgumentException.class,

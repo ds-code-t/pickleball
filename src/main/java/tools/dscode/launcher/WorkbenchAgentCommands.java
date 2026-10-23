@@ -179,10 +179,18 @@ public final class WorkbenchAgentCommands {
         try {
             echoFilters(parsed, out);
             AgentDiscoverPlanner.Plan plan = AgentDiscoverPlanner.discover(
-                    parsed.project(), parsed.tags(), parsed.name(), parsed.retention(), parsed.example()
+                    parsed.project(),
+                    parsed.tags(),
+                    parsed.name(),
+                    parsed.retention(),
+                    parsed.example(),
+                    parsed.runVars(),
+                    err
             );
             out.println("Workbench discover " + plan.browser().reason() + ".");
             out.println("pkb_runvars=" + plan.runVars());
+            String environment = runVar(plan.runVars(), PKB_props.PKB_ENVIRONMENT);
+            String browser = runVar(plan.runVars(), PKB_props.PKB_BROWSER);
             WorkbenchFeatureIndex.Selection selection = select(
                     parsed.project(), parsed.tags(), parsed.name(), parsed.example(), parsed
             );
@@ -204,7 +212,7 @@ public final class WorkbenchAgentCommands {
                     maven
             );
             if (mavenResult.timedOut()) {
-                publishQuietly(parsed, run, selection, capturedOut, capturedErr, "TIMEOUT", out, err);
+                publishQuietly(parsed, run, selection, capturedOut, capturedErr, "TIMEOUT", environment, browser, out, err);
                 return timeoutExit(parsed, run, out, err);
             }
             int exit = mavenResult.exit();
@@ -212,17 +220,19 @@ public final class WorkbenchAgentCommands {
             Observed observed = observe(parsed.project(), run.runId(), exit, empty);
             String status = observed.status();
             int reported = observed.exitCode();
-            if (empty) printEmpty(parsed, plan.browser().browser(), out, err);
+            if (empty) printEmpty(parsed, browser, out, err);
             AgentCoordination.finish(
                     parsed.project(),
                     run.runId(),
-                    outcomeLearned(parsed, empty, plan.browser().browser()),
+                    outcomeLearned(parsed, empty, browser),
                     status,
                     java.time.Instant.now(),
                     out,
-                    observed.failureCount() > 0 ? observed.failureCount() : null
+                    observed.failureCount() > 0 ? observed.failureCount() : null,
+                    environment,
+                    browser
             );
-            publishQuietly(parsed, run, selection, capturedOut, capturedErr, status, out, err);
+            publishQuietly(parsed, run, selection, capturedOut, capturedErr, status, environment, browser, out, err);
             return recordDiscover(parsed, out, err, reported, run.runId());
         } catch (RuntimeException failure) {
             finishQuietly(parsed.project(), run.runId(), "FAILED", out);
@@ -249,8 +259,16 @@ public final class WorkbenchAgentCommands {
             );
             Map<String, String> retained = LastDiscoverSnapshot.retainedRunVars(snapshot);
             String runVars = AgentDiscoverPlanner.confirmRunVars(
-                    retained, parsed.tags(), parsed.name(), parsed.retention(), parsed.example()
+                    retained,
+                    parsed.tags(),
+                    parsed.name(),
+                    parsed.retention(),
+                    parsed.example(),
+                    parsed.runVars(),
+                    err
             );
+            String environment = runVar(runVars, PKB_props.PKB_ENVIRONMENT);
+            String browser = firstNonBlank(runVar(runVars, PKB_props.PKB_BROWSER), retained.get(PKB_props.PKB_BROWSER));
             WorkbenchFeatureIndex.Selection selection = select(
                     parsed.project(),
                     firstNonBlank(parsed.tags(), retained.get(PKB_props.PKB_TAGS)),
@@ -278,7 +296,7 @@ public final class WorkbenchAgentCommands {
                     maven
             );
             if (mavenResult.timedOut()) {
-                publishQuietly(parsed, run, selection, capturedOut, capturedErr, "TIMEOUT", out, err);
+                publishQuietly(parsed, run, selection, capturedOut, capturedErr, "TIMEOUT", environment, browser, out, err);
                 return timeoutExit(parsed, run, out, err);
             }
             int exit = mavenResult.exit();
@@ -286,17 +304,19 @@ public final class WorkbenchAgentCommands {
             Observed observed = observe(parsed.project(), run.runId(), exit, empty);
             String status = observed.status();
             int reported = observed.exitCode();
-            if (empty) printEmpty(parsed, retained.get(PKB_props.PKB_BROWSER), out, err);
+            if (empty) printEmpty(parsed, browser, out, err);
             AgentCoordination.finish(
                     parsed.project(),
                     run.runId(),
-                    outcomeLearned(parsed, empty, retained.get(PKB_props.PKB_BROWSER)),
+                    outcomeLearned(parsed, empty, browser),
                     status,
                     java.time.Instant.now(),
                     out,
-                    observed.failureCount() > 0 ? observed.failureCount() : null
+                    observed.failureCount() > 0 ? observed.failureCount() : null,
+                    environment,
+                    browser
             );
-            publishQuietly(parsed, run, selection, capturedOut, capturedErr, status, out, err);
+            publishQuietly(parsed, run, selection, capturedOut, capturedErr, status, environment, browser, out, err);
             return printCatalog(parsed.project(), out, err, reported, "workbench-confirm", false, run.runId(), agentId(parsed));
         } catch (RuntimeException failure) {
             finishQuietly(parsed.project(), run.runId(), "FAILED", out);
@@ -1034,6 +1054,8 @@ public final class WorkbenchAgentCommands {
             ByteArrayOutputStream capturedOut,
             ByteArrayOutputStream capturedErr,
             String status,
+            String environment,
+            String browser,
             PrintStream out,
             PrintStream err
     ) {
@@ -1045,11 +1067,19 @@ public final class WorkbenchAgentCommands {
                     selection == null ? List.of() : selection.hits(),
                     console,
                     status,
+                    environment,
+                    browser,
                     out
             );
         } catch (Exception failure) {
             err.println("Workbench summary was not written: " + failure.getMessage());
         }
+    }
+
+    private static String runVar(String compact, String key) {
+        if (compact == null || compact.isBlank() || key == null) return null;
+        String value = PKB_props.parseAssignments(compact).get(key);
+        return value == null || value.isBlank() ? null : value;
     }
 
     private static String agentId(WorkbenchCommandLine.Parsed parsed) {

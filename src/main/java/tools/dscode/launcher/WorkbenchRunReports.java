@@ -69,9 +69,21 @@ public final class WorkbenchRunReports {
     }
 
     public static String compact(String status, int scenarios, int steps) {
-        return "summary status=" + (status == null ? "" : status)
-                + " scenarios=" + scenarios
-                + " steps=" + steps;
+        return compact(status, scenarios, steps, null, null);
+    }
+
+    public static String compact(String status, int scenarios, int steps, String environment, String browser) {
+        StringBuilder line = new StringBuilder();
+        line.append("summary status=").append(status == null ? "" : status)
+                .append(" scenarios=").append(scenarios)
+                .append(" steps=").append(steps);
+        if (environment != null && !environment.isBlank()) {
+            line.append(" environment=").append(environment.trim());
+        }
+        if (browser != null && !browser.isBlank()) {
+            line.append(" browser=").append(browser.trim());
+        }
+        return line.toString();
     }
 
     /**
@@ -84,6 +96,19 @@ public final class WorkbenchRunReports {
             List<WorkbenchFeatureIndex.Hit> hits,
             String console,
             String status,
+            PrintStream out
+    ) throws IOException {
+        return publish(project, runId, hits, console, status, null, null, out);
+    }
+
+    public static int publish(
+            Path project,
+            String runId,
+            List<WorkbenchFeatureIndex.Hit> hits,
+            String console,
+            String status,
+            String environment,
+            String browser,
             PrintStream out
     ) throws IOException {
         List<String> names = new ArrayList<>();
@@ -119,7 +144,7 @@ public final class WorkbenchRunReports {
             }
         }
         if (scenarios == 0) scenarios = names.size();
-        if (out != null) out.println(compact(status, scenarios, steps));
+        if (out != null) out.println(compact(status, scenarios, steps, environment, browser));
         return steps;
     }
 

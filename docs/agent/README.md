@@ -38,6 +38,8 @@ pkb_run_profile  = canonical resolved RunVar output; never external input
 
 Controlled/named-profile execution inherits only missing `pkb_glue`, `pkb_features`, `pkb_datapath`, `pkb_callpath`, `pkb_componentpath`, and `pkb_configpath`. Explicit blanks suppress inheritance and remain replayable blank tombstones in the final canonical run profile so established subsystem fallback behavior is preserved.
 
+Workbench `discover`, `confirm`, and `isolate` take repeatable `--runvar key=value`. That is the controlled way to set `pkb_environment` or `pkb_browser` for that command. A launcher `-Dpkb_runvars` is not applied to the controlled run. After the run, trust `environment` and `browser` on `record.json`.
+
 Runtime configuration mappings are loaded only after final run configuration; they must not participate in resolving profiles/RunVars or `pkb_configpath`. New syntax should prefer `<config:...>` while legacy `<configs...>` remains compatible.
 
 Changed in 2.1.15. `pkb_features`, `pkb_datapath`, `pkb_configpath`, and Gherkin `<file:...>` share the prefix rule in `docs/config-files-and-resource-mapping.md`. No prefix, `file:`, and `classpath:` are the resources folder. `wd-file:X` is under the working directory. `wd-file:/X` is an absolute directory. A `file:/...` or unprefixed `/...` path that is not on the classpath fails with a hint: use `wd-file:/...` for a filesystem path. `pkb_callpath` and `pkb_componentpath` keep their historical project-relative paths. Leave those two keys unchanged during unrelated configuration work.

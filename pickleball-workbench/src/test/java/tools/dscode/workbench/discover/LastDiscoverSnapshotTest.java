@@ -3,8 +3,12 @@ package tools.dscode.workbench.discover;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.io.ByteArrayOutputStream;
+import java.io.PrintStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -60,6 +64,37 @@ class LastDiscoverSnapshotTest {
         assertFalse(runVars.contains("pkb_run_profile="));
         assertFalse(runVars.contains("pretty"));
         assertFalse(runVars.contains("@all"));
+    }
+
+    @Test
+    void isolateRunVarOverridesEnvironmentAndWarnsOnConflict() throws Exception {
+        Path file = LastDiscoverSnapshot.file(tempDir);
+        Files.createDirectories(file.getParent());
+        Files.writeString(file, """
+                {
+                  "runId": "run-1",
+                  "runProfile": "pkb_browser=CHROME_HEADLESS, pkb_parallel=12",
+                  "runVars": {
+                    "pkb_browser": "CHROME_HEADLESS",
+                    "pkb_parallel": "12"
+                  }
+                }
+                """);
+        ByteArrayOutputStream err = new ByteArrayOutputStream();
+        Map<String, String> properties = LastDiscoverSnapshot.workerSystemProperties(
+                tempDir,
+                null,
+                null,
+                null,
+                List.of("pkb_environment=DEV", "browser=EDGE"),
+                new PrintStream(err, true, StandardCharsets.UTF_8)
+        );
+        String runVars = properties.get("pkb_runvars");
+        assertTrue(runVars.contains("pkb_environment=DEV"), runVars);
+        assertTrue(runVars.contains("pkb_browser=EDGE"), runVars);
+        assertTrue(runVars.contains("pkb_parallel=1"), runVars);
+        String warnings = err.toString(StandardCharsets.UTF_8);
+        assertTrue(warnings.contains("WARNING: --runvar pkb_browser replaces CHROME_HEADLESS with EDGE"), warnings);
     }
 
     @Test
