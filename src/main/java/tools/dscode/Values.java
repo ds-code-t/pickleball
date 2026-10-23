@@ -29,6 +29,8 @@ public final class Values {
     private static final Object NULL_CACHE = new Object();
     private static final ConcurrentHashMap<String, ThrottleGate> THROTTLES = new ConcurrentHashMap<>();
     private static final ThreadLocal<ParsingMap> STANDALONE = new ThreadLocal<>();
+    private static final ThreadLocal<java.util.LinkedHashMap<String, Object>> SCENARIO_OBJECTS = new ThreadLocal<>();
+    private static final Object NULL_OBJECT = new Object();
 
     private Values() {
     }
@@ -210,6 +212,45 @@ public final class Values {
             gate.lastReleasedNanos = System.nanoTime();
             return java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(waitedNanos);
         }
+    }
+
+    /**
+     * Stores an object for this thread's current Cucumber scenario.
+     * A {@code @Before} hook, a step, and an {@code @After} hook on that
+     * scenario see the same object. The next scenario on this thread does not.
+     * This does not use the mapping store, so it does not need a running step.
+     */
+    public static void saveScenarioObject(String name, Object value) {
+        requireName(name);
+        scenarioObjects(true).put(name, value == null ? NULL_OBJECT : value);
+    }
+
+    /**
+     * Returns the object stored for {@code name} on this thread, or null when
+     * the name was not stored. A stored null also returns null.
+     */
+    public static Object getScenarioObject(String name) {
+        requireName(name);
+        java.util.Map<String, Object> map = scenarioObjects(false);
+        if (map == null || !map.containsKey(name)) {
+            return null;
+        }
+        Object value = map.get(name);
+        return value == NULL_OBJECT ? null : value;
+    }
+
+    /** Drops this thread's scenario objects. Cucumber clears them around each scenario run. */
+    public static void clearScenarioObjects() {
+        SCENARIO_OBJECTS.remove();
+    }
+
+    private static java.util.Map<String, Object> scenarioObjects(boolean create) {
+        java.util.LinkedHashMap<String, Object> map = SCENARIO_OBJECTS.get();
+        if (map == null && create) {
+            map = new java.util.LinkedHashMap<>();
+            SCENARIO_OBJECTS.set(map);
+        }
+        return map;
     }
 
     public static void registerPrefix(

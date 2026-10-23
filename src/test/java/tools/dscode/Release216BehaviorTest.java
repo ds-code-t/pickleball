@@ -76,6 +76,7 @@ class Release216BehaviorTest {
     private static final Set<String> PUBLIC_STATIC_VALUES_METHODS = Set.of(
             "cacheGet(String)",
             "cachePut(String,Object)",
+            "clearScenarioObjects()",
             "getDefaultValue(String)",
             "getDefaultValue(String,Class)",
             "getOverrideValue(String)",
@@ -86,6 +87,7 @@ class Release216BehaviorTest {
             "getRunValue(String,Class)",
             "getScenarioValue(String)",
             "getScenarioValue(String,Class)",
+            "getScenarioObject(String)",
             "getSingletonValue(String)",
             "getSingletonValue(String,Class)",
             "getStepValue(String)",
@@ -99,6 +101,7 @@ class Release216BehaviorTest {
             "saveRootScenarioValue(String,Object)",
             "saveRunValue(String,Object)",
             "saveScenarioValue(String,Object)",
+            "saveScenarioObject(String,Object)",
             "saveSingletonValue(String,Object)",
             "saveStepValue(String,Object)",
             "saveValue(String,Object)",

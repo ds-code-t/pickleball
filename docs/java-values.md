@@ -58,6 +58,12 @@ One key has one lock. The thread that holds it parks until the gap has elapsed. 
 
 A Cucumber `@Before` or `@After` is not a running step. `getScenarioValue`, `saveScenarioValue`, `getRootScenarioValue`, `saveRootScenarioValue`, `getStepValue`, `saveStepValue`, and `softFail` throw there. `getRunValue`, `saveRunValue`, `getValue`, `saveValue`, `throttle`, and `isBlank` do not need a running step. `getValue` and `saveValue` use the run values when no scenario step is current.
 
+## Scenario objects
+
+`saveScenarioObject(String name, Object value)` stores the object itself for this thread. `getScenarioObject(String name)` returns that same instance. A missing name returns null. A stored null also returns null. A blank name throws. This is not the mapping store, and there is no Gherkin syntax for it.
+
+A Cucumber `@Before`, the steps, and `@After` of the same scenario see the same objects, including a name that is a Windows path or a path with spaces. The next scenario on that thread does not. Another thread does not. A nested `RUN SCENARIO` on the same thread shares the store with the scenario that called it. `clearScenarioObjects()` drops this thread's store. The framework also clears it at the start and end of each Cucumber scenario run.
+
 ## Custom reference prefixes
 
 `registerPrefix(String prefix, function)` adds a reference prefix. Gherkin `<password:testAccount>` calls the function. The argument is the text after the first colon.
