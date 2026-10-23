@@ -35,7 +35,7 @@ A child inside that body still sees its own count of 1:
   : * , save "ran" as "seen"
 ```
 
-Step Duration is the time since that same step started. In a block `until`, the condition reads the loop step, so the duration is the time since the loop's first pass. The loop waits 400 milliseconds between passes. The condition does not also wait out the browser's implicit timeout or the page-ready quiet period; the loop is the retry.
+Step Duration is the time since that same step started. In a block `until`, the condition reads the loop step, so the duration is the time since the loop's first pass. The loop waits at most 400 milliseconds between passes. That is only the inter-pass pause. The condition, the step, logging, and diagnostics are extra, so the time from one pass to the next can be longer than 400 milliseconds. The condition does not also wait out the browser's implicit timeout or the page-ready quiet period; the loop is the retry.
 
 ```gherkin
 * , until the Step Duration is greater than 1 second:

@@ -109,6 +109,14 @@ Do not re-register a built-in with the same locator as a "new" category. `Radio 
 | `flags(...)` | Attach lookup flags. |
 | `context(...)` / `startingContext(...)` | Supply a `SearchContext` builder and mark the category as page context. |
 
+`and(...)` does not keep source order. The fragments are sorted by specificity (a path that names an element, such as `//button`, is more specific than `//*...`) and then joined:
+
+- When every fragment starts with `//*`, the result is one `//*` plus each fragment's suffix. `//*[@id='a']` and `//*[@data-kind='card']` become `//*[@id='a'][@data-kind='card']` (or the other order when the scores differ).
+- When the most specific fragment starts with `//` but not `//*`, that fragment stays first and each later `//*` fragment loses its `//*` and is appended. `//button` plus `//*[@data-kind='card']` becomes `//button[@data-kind='card']`.
+- Otherwise the fragments are joined with the XPath `and` operator.
+
+A constant fragment should be a `//*[...]` predicate when it is meant to tighten the base element. A second full path is not appended as that element's predicate.
+
 Keep selectors centralized in startup configuration instead of repeating them across feature files.
 
 ## Text-matching parents

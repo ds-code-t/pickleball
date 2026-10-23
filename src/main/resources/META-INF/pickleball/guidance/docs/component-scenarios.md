@@ -51,6 +51,8 @@ Component lookup uses `pkb_componentpath`. When it is not configured, the path d
 src/test/resources/component
 ```
 
+`RUN SCENARIO` uses the normal feature path. It does not read `pkb_componentpath`. `RUN COMPONENT SCENARIO` does. When `pkb_componentpath` is unset, that step looks in `src/test/resources/component`. Component scenarios are `.feature` files in that directory. They are not loaded from the ordinary features directory. A component that lives only under the normal features path is invisible to `RUN COMPONENT SCENARIO`.
+
 A nonblank `pkb_componentpath` value in an invocation table overrides the global setting for that row. Regular `SCENARIO` rows use the normal feature path, while `SERVICE CALL` rows use the service-call path.
 
 ## Named selector syntax

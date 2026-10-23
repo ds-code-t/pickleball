@@ -49,6 +49,12 @@ Normal scenario execution is unchanged. The feature index, plan, timeouts, and t
 These were already true. 2.1.17 only writes them down.
 
 - The shared `last-discover.json` is the latest discover. Two agents that omit `--agent` can replay each other’s tags. Maven `target/` and Gradle `build/`, and the Workbench `live/classes` overlay, are generated sync input. Do not hand-edit them.
+- A block `until` pauses at most 400 milliseconds between passes. That pause is not the whole pass. The condition, the step, logging, and diagnostics are extra.
+- A Workbench `--tags` expression that contains spaces must be quoted. An unquoted `-Dexec.args` value is split by Maven `exec` and PowerShell, and the later tokens are dropped with no warning. `--tags-file` and `--tags-b64` avoid the split.
+- `does not contain` is a comparison word, the same kind of partial match as `contains`.
+- `CategorySpec.and(...)` joins XPath fragments by specificity, not source order. A `//*[...]` predicate is appended to a more specific base such as `//button`. A second full path is not.
+- `RUN SCENARIO` uses the normal feature path and does not read `pkb_componentpath`. `RUN COMPONENT SCENARIO` does. When that property is unset, the directory is `src/test/resources/component`. Component scenarios are `.feature` files in that directory, not in the ordinary features directory.
+- `navigate to:` still resolves a config key such as `URL.forms` first. When that lookup is not a URL string, a literal `http://` or `https://` value is used, including one a placeholder already resolved to. A missing key that is not a URL still fails.
 - `pkb_browser` names a configuration under the `configs` mapping. Workbench discover uses the browser ladder, often `CHROME_HEADLESS`, and prints that name. A normal `mvn test` uses the project value. A `pkb_runvars` member wins over `-Dpkb_browser`.
 - `gc-runs` is the explicit payload sweep. `finish` does not run it. `--retention=all|failed|none` is Workbench `discover` / `confirm` only. Discover’s default retention is `failed`. Neither flag changes a normal `mvn test`.
 - Suite tags such as `@all` and agent tags are different. `@agent-pointer-eval` must not also carry `@all`. Workbench tag expressions are Cucumber-style `@tag` with `and`, `or`, and `not`, case-sensitive after `@`.

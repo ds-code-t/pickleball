@@ -150,7 +150,7 @@ Examples:
 * , accept the Alert
 ```
 
-`navigate to:` loads the resolved URL once. A second call is a second navigation.
+`navigate to:` loads the resolved URL once. A second call is a second navigation. The text is a config key first, as in `URL.forms`. When that lookup is not a URL string, a literal `http://` or `https://` value is used, including a value a placeholder already resolved to. A missing key that is not a URL still fails. An existing `URL.xxx` key is unchanged.
 
 A phrase that is only `false` is a truthiness check: `IF: false` does not take the branch. `is false` is the falsy assertion, and `is true` is the truthy assertion. `is on` and `is off` check a control. Keep each comparison in its own phrase; do not combine it with another operator.
 
@@ -214,6 +214,7 @@ Comparisons include:
 ```text
 equals
 contains
+does not contain
 starts with
 ends with
 matches
