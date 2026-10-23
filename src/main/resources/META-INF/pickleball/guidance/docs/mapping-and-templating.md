@@ -4,6 +4,8 @@
 
 Pickleball maps values into `NodeMap` scopes and resolves them later through templates such as `<customer.name>`.
 
+A value substituted into step text may contain line breaks. `* INFO: body=<Page.RESPONSE.body>` still runs when that body is multi-line HTML or JSON. Pickleball escapes those breaks while it builds the temporary `memory:/single.feature`, then restores them on the step text, so they are not parsed as new Gherkin steps. A one-line value is unchanged. A Windows path and a path that contains spaces are preserved. A multi-line DocString or data table argument is a separate value and is unchanged. See [Log and assert steps](log-and-assert-steps.md).
+
 ## Supported mapping steps
 
 ```gherkin

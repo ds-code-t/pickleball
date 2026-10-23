@@ -2,6 +2,8 @@ package io.cucumber.messages.types;
 
 import java.util.List;
 
+import io.cucumber.core.gherkin.messages.NGherkinFactory;
+
 import static tools.dscode.common.GlobalConstants.PARSER_FLAG;
 
 /**
@@ -103,11 +105,19 @@ public privileged aspect PickleStepMetaTextAspect {
             officialText = inlineArgument.stepText();
         }
 
+        // Newlines inside resolved step text were escaped so this temporary
+        // feature stayed one Gherkin line. Put the original breaks back after
+        // inline-argument extraction, which treats breaks as whitespace.
+        officialText = NGherkinFactory.restoreStepLineBreaks(officialText);
+        if (metaText != null) {
+            metaText = NGherkinFactory.restoreStepLineBreaks(metaText);
+        }
+
         PickleStep ps = (PickleStep) proceed(argument, astNodeIds, id, type, officialText);
         ps.metaText = metaText;
         if (inlineArgument != null) {
             ps.inlineArgumentType = inlineArgument.argumentType();
-            ps.inlineArgumentText = inlineArgument.argumentText();
+            ps.inlineArgumentText = NGherkinFactory.restoreStepLineBreaks(inlineArgument.argumentText());
         }
         return ps;
     }

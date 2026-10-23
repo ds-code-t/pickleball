@@ -20,7 +20,7 @@ import static tools.dscode.common.reporting.logging.LogForwarder.logWarn;
 
 public class LogAndAssertSteps {
 
-    @Given("^(TRACE|DEBUG|INFO|WARN|ERROR|FAIL):\\s*(.*)$")
+    @Given("^(TRACE|DEBUG|INFO|WARN|ERROR|FAIL):\\s*([\\s\\S]*)$")
     public void authorLogOrFail(String token, String text) {
         String message = text == null ? "" : text;
         switch (token) {
@@ -40,12 +40,12 @@ public class LogAndAssertSteps {
         }
     }
 
-    @Given("^ASSERT:\\s*(.*)$")
+    @Given("^ASSERT:\\s*([\\s\\S]*)$")
     public void hardAssert(String payload) {
         evaluateClauses(payload, true);
     }
 
-    @Given("^SOFT ASSERT:\\s*(.*)$")
+    @Given("^SOFT ASSERT:\\s*([\\s\\S]*)$")
     public void softAssert(String payload) {
         evaluateClauses(payload, false);
     }

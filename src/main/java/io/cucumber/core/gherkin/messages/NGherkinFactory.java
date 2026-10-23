@@ -40,7 +40,7 @@ public class NGherkinFactory {
         StringBuilder featureSrc = new StringBuilder()
                 .append("Feature: Virtual Feature\n")
                 .append("  Scenario: Virtual Scenario\n")
-                .append("    ").append(keyword).append(stepText).append("\n");
+                .append("    ").append(escapeStepLineBreaks(keyword)).append(escapeStepLineBreaks(stepText)).append("\n");
 // --- decide how to render the argument ---
         if (argument != null && !argument.isBlank()) {
             // Heuristic: every non-blank line starts and ends with a pipe -> treat as DataTable
@@ -86,6 +86,75 @@ public class NGherkinFactory {
 
     private static boolean containsLineBreak(String argument) {
         return argument.indexOf('\n') >= 0 || argument.indexOf('\r') >= 0;
+    }
+
+    /**
+     * Private-use markers for a newline that must survive the temporary
+     * {@code memory:/single.feature} parse as one Gherkin step line.
+     * Restored in {@code PickleStepMetaTextAspect} before the step text is stored.
+     */
+    private static final char LINE_BREAK_SENTINEL = '\uE000';
+    private static final char LINE_BREAK_ESCAPED_SENTINEL = '\uE001';
+    private static final char LINE_BREAK_CRLF = '\uE002';
+    private static final char LINE_BREAK_LF = '\uE003';
+    private static final char LINE_BREAK_CR = '\uE004';
+
+    /**
+     * A newline inside resolved step text is not Gherkin. Escape it so the
+     * temporary feature stays one step line. A value with no line break and no
+     * sentinel is returned unchanged.
+     */
+    public static String escapeStepLineBreaks(String stepText) {
+        if (stepText == null || !needsStepLineBreakEscape(stepText)) {
+            return stepText;
+        }
+        StringBuilder escaped = new StringBuilder(stepText.length() + 8);
+        for (int i = 0; i < stepText.length(); i++) {
+            char current = stepText.charAt(i);
+            if (current == '\r' && i + 1 < stepText.length() && stepText.charAt(i + 1) == '\n') {
+                escaped.append(LINE_BREAK_SENTINEL).append(LINE_BREAK_CRLF);
+                i++;
+            } else if (current == '\n') {
+                escaped.append(LINE_BREAK_SENTINEL).append(LINE_BREAK_LF);
+            } else if (current == '\r') {
+                escaped.append(LINE_BREAK_SENTINEL).append(LINE_BREAK_CR);
+            } else if (current == LINE_BREAK_SENTINEL) {
+                escaped.append(LINE_BREAK_SENTINEL).append(LINE_BREAK_ESCAPED_SENTINEL);
+            } else {
+                escaped.append(current);
+            }
+        }
+        return escaped.toString();
+    }
+
+    /** Inverse of {@link #escapeStepLineBreaks(String)}. No sentinel means the same instance. */
+    public static String restoreStepLineBreaks(String stepText) {
+        if (stepText == null || stepText.indexOf(LINE_BREAK_SENTINEL) < 0) {
+            return stepText;
+        }
+        StringBuilder restored = new StringBuilder(stepText.length());
+        for (int i = 0; i < stepText.length(); i++) {
+            char current = stepText.charAt(i);
+            if (current == LINE_BREAK_SENTINEL && i + 1 < stepText.length()) {
+                char code = stepText.charAt(++i);
+                switch (code) {
+                    case LINE_BREAK_CRLF -> restored.append("\r\n");
+                    case LINE_BREAK_LF -> restored.append('\n');
+                    case LINE_BREAK_CR -> restored.append('\r');
+                    case LINE_BREAK_ESCAPED_SENTINEL -> restored.append(LINE_BREAK_SENTINEL);
+                    default -> restored.append(LINE_BREAK_SENTINEL).append(code);
+                }
+            } else {
+                restored.append(current);
+            }
+        }
+        return restored.toString();
+    }
+
+    private static boolean needsStepLineBreakEscape(String stepText) {
+        return stepText.indexOf('\n') >= 0
+                || stepText.indexOf('\r') >= 0
+                || stepText.indexOf(LINE_BREAK_SENTINEL) >= 0;
     }
 
     /** A value that is already a Gherkin docstring must not be fenced again. */

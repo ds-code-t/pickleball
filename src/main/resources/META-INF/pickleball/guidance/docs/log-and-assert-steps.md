@@ -18,6 +18,8 @@ Uppercase control tokens write a log line or evaluate the same conditions used a
 
 Templates in the rest of the line resolve the same way other ordinary step text does before the glue method runs. For example, `INFO: hello <name>` uses the current step ParsingMap if `<name>` is already saved.
 
+A substituted value may itself contain line breaks, such as `INFO: body=<Page.RESPONSE.body>` when the body is HTML or JSON. Those breaks stay in the step text the glue method receives. They are not parsed as extra Gherkin lines. A one-line value is unchanged, including a Windows path (`C:\Users\Dan She'll\page.html`) or a path with spaces (`C:/Program Files/Pickleball/body.json`). `ASSERT:` and `SOFT ASSERT:` accept the same restored line breaks. This is not new Gherkin syntax. A separate multi-line argument is still a DocString or a data table. See [Mapping and templating](mapping-and-templating.md).
+
 An invalid `<{...}>` in `TRACE:`, `DEBUG:`, `INFO:`, `WARN:`, `ERROR:`, or `FAIL:` text is left as that literal text and does not fail the expression. A valid `<{...}>` and a valid `<name>` still resolve. The same invalid expression in any other step, including a bare `<{...}>` and a nested step started from a log line, still fails. `ERROR:` and `FAIL:` still hard-fail because of the log token.
 
 ## Logging tokens
