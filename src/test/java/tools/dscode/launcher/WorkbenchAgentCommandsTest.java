@@ -676,6 +676,113 @@ class WorkbenchAgentCommandsTest {
     }
 
     @Test
+    void secondDiscoverUsesItsOwnRunIndexNotThePreviousCatalog() throws Exception {
+        writeProjectWrapper();
+        Path features = tempDir.resolve("src/test/resources/features");
+        Files.createDirectories(features);
+        Files.writeString(features.resolve("alpha.feature"), """
+                @alpha
+                Feature: Alpha
+                  Scenario: Alpha one
+                    Given a
+                """);
+        Files.writeString(features.resolve("beta.feature"), """
+                @beta
+                Feature: Beta
+                  Scenario: Beta one
+                    Given b
+                """);
+        Path catalogDir = tempDir.resolve("reports/diagnostic-runs");
+        for (String name : List.of("old-1", "old-2", "old-3", "old-4")) {
+            writeScenarioEvents(catalogDir.resolve("run-old").resolve("scenarios").resolve(name));
+        }
+        String alphaCatalog = """
+                {
+                  "schemaVersion": 1,
+                  "runs": [
+                    {
+                      "runId": "run-alpha",
+                      "outcome": "PASSED",
+                      "runProfile": "pkb_browser=CHROME_HEADLESS, pkb_tags=@alpha",
+                      "counts": { "total": 4, "passed": 4, "failed": 0 },
+                      "lineage": { "runPurpose": "workbench-discover" }
+                    }
+                  ]
+                }
+                """;
+        ByteArrayOutputStream firstOut = new ByteArrayOutputStream();
+        int first = WorkbenchAgentCommands.run(
+                new String[]{"discover", tempDir.toString(), "--tags=@alpha", "--run-id=run-alpha"},
+                new PrintStream(firstOut, true, StandardCharsets.UTF_8),
+                new PrintStream(new ByteArrayOutputStream(), true, StandardCharsets.UTF_8),
+                (project, command, out, err) -> {
+                    try {
+                        Files.createDirectories(catalogDir);
+                        Files.writeString(catalogDir.resolve("run-catalog.json"), alphaCatalog);
+                    } catch (Exception failure) {
+                        throw new RuntimeException(failure);
+                    }
+                    return 0;
+                }
+        );
+        assertEquals(0, first);
+        assertTrue(firstOut.toString(StandardCharsets.UTF_8).contains("pkb_tags=@alpha"));
+
+        for (String name : List.of("shared-1", "shared-2", "shared-3")) {
+            writeScenarioEvents(catalogDir.resolve("run-beta").resolve("scenarios").resolve(name));
+        }
+        ByteArrayOutputStream secondOut = new ByteArrayOutputStream();
+        int second = WorkbenchAgentCommands.run(
+                new String[]{"discover", tempDir.toString(), "--tags=@beta", "--run-id=run-beta"},
+                new PrintStream(secondOut, true, StandardCharsets.UTF_8),
+                new PrintStream(new ByteArrayOutputStream(), true, StandardCharsets.UTF_8),
+                (project, command, out, err) -> {
+                    try {
+                        Files.writeString(catalogDir.resolve("run-catalog.json"), alphaCatalog);
+                        Path index = AgentCoordination.runDirectory(project, "run-beta")
+                                .resolve("diagnostic").resolve("run-beta").resolve("run-index.json");
+                        Files.createDirectories(index.getParent());
+                        Files.writeString(index, """
+                                {
+                                  "schemaVersion": 1,
+                                  "runId": "run-beta",
+                                  "outcome": "PASSED",
+                                  "runProfile": "pkb_browser=CHROME_HEADLESS, pkb_tags=@beta",
+                                  "counts": { "total": 1, "passed": 1, "failed": 0 },
+                                  "lineage": { "runPurpose": "workbench-discover" }
+                                }
+                                """);
+                        writeScenarioEvents(index.getParent().resolve("scenarios").resolve("beta-only"));
+                    } catch (Exception failure) {
+                        throw new RuntimeException(failure);
+                    }
+                    return 0;
+                }
+        );
+        assertEquals(0, second);
+        String text = secondOut.toString(StandardCharsets.UTF_8);
+        assertTrue(text.contains("summary status=PASSED scenarios=1 steps=1"), text);
+        int retained = text.indexOf("retained pkb_run_profile:");
+        assertTrue(retained >= 0, text);
+        String retainedLine = text.substring(retained);
+        assertTrue(retainedLine.contains("pkb_tags=@beta"), retainedLine);
+        assertFalse(retainedLine.contains("@alpha"), retainedLine);
+        LastDiscoverSnapshot.Snapshot snapshot = LastDiscoverSnapshot.read(tempDir);
+        assertEquals("run-beta", snapshot.runId());
+        assertTrue(snapshot.runProfile().contains("pkb_tags=@beta"), snapshot.runProfile());
+        assertFalse(snapshot.runProfile().contains("@alpha"), snapshot.runProfile());
+    }
+
+    private static void writeScenarioEvents(Path scenarioDir) throws Exception {
+        Files.createDirectories(scenarioDir);
+        Files.writeString(scenarioDir.resolve("events.jsonl"), """
+                {"type":"scenario_start","identity":{"scenarioName":"Counted"}}
+                {"type":"step","keyword":"Given","text":"one","status":"PASSED"}
+                {"type":"scenario_end","outcome":"PASSED"}
+                """);
+    }
+
+    @Test
     void planResolvesExampleRowsAndWarnsWhenEmptyWithoutMaven() throws Exception {
         Path features = tempDir.resolve("src/test/resources/features");
         Files.createDirectories(features);

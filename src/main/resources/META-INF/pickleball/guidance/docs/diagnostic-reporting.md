@@ -56,6 +56,8 @@ An interrupted scenario may retain raw `trace.jsonl` instead of the gzip form. `
 
 `run-index.json` includes sparse scenario/outcome/comparison metadata plus the sanitized final `runProfile`, deterministic `runProfileFingerprint`, and compatibility field `directRunProfile`. The field name `directRunProfile` remains for diagnostic schema compatibility even though new direct controlled input is `pkb_runvars`. `run-catalog.json` copies each run's `runProfile` / `runProfileFingerprint` when present. Scenario `summary.json` also includes the same `runProfile` so agents can inspect the complete resolved RunVar snapshot without opening `configuration.json`.
 
+Workbench `discover` and `confirm` do not treat the project-wide `run-catalog.json` as the run that just finished. Summary counts, the retained `pkb_run_profile`, and `last-discover.json` come from the current run's private `.pickleball/runs/<run-id>/diagnostic/<run-id>/run-index.json` when that file has a `runProfile`. Scenario and step counts walk that private diagnostic folder, or only `reports/diagnostic-runs/<run-id>` when the private folder has no `events.jsonl`. Other runs under `reports/diagnostic-runs` are not included. The catalog remains the list of retained runs. It is not the source of the current summary.
+
 ## AI evidence access protocol
 
 Use the shallowest evidence layer that completely answers the question:

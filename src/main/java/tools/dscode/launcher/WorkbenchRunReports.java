@@ -96,20 +96,38 @@ public final class WorkbenchRunReports {
         }
         int steps = 0;
         int scenarios = 0;
-        Path diagnostic = project.resolve("reports").resolve("diagnostic-runs");
-        if (Files.isDirectory(diagnostic)) {
-            try (var walk = Files.walk(diagnostic, 4)) {
-                List<Path> dirs = walk.filter(path -> Files.isRegularFile(path.resolve("events.jsonl"))).toList();
-                for (Path dir : dirs) {
-                    writeScenario(dir);
-                    scenarios++;
-                    steps += stepCount(dir);
-                }
-            }
+        for (Path dir : currentRunScenarioDirs(project, runId)) {
+            writeScenario(dir);
+            scenarios++;
+            steps += stepCount(dir);
         }
         if (scenarios == 0) scenarios = names.size();
         if (out != null) out.println(compact(status, scenarios, steps));
         return steps;
+    }
+
+    /**
+     * Scenario counts belong to this run. A private diagnostic folder wins.
+     * The shared tree is only this run's directory, never every prior run.
+     */
+    private static List<Path> currentRunScenarioDirs(Path project, String runId) throws IOException {
+        if (project == null || runId == null || runId.isBlank()) return List.of();
+        Path privateRoot;
+        try {
+            privateRoot = AgentCoordination.runDirectory(project, runId).resolve("diagnostic");
+        } catch (IllegalArgumentException invalid) {
+            return List.of();
+        }
+        List<Path> privateDirs = scenarioDirs(privateRoot);
+        if (!privateDirs.isEmpty()) return privateDirs;
+        return scenarioDirs(project.resolve("reports").resolve("diagnostic-runs").resolve(runId));
+    }
+
+    private static List<Path> scenarioDirs(Path root) throws IOException {
+        if (root == null || !Files.isDirectory(root)) return List.of();
+        try (var walk = Files.walk(root, 4)) {
+            return walk.filter(path -> Files.isRegularFile(path.resolve("events.jsonl"))).toList();
+        }
     }
 
     public static List<Path> saveConsole(Path runFolder, List<String> scenarioNames, String console) throws IOException {

@@ -2,6 +2,7 @@ package tools.dscode.common.reporting.diagnostic;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
+import tools.dscode.common.coordination.AgentCoordination;
 import tools.dscode.control.protocol.PickleballLocalLayout;
 import tools.dscode.testengine.PKB_props;
 
@@ -169,8 +170,10 @@ public final class LastDiscoverSnapshot {
         return catalogRun(projectRoot, purpose, null);
     }
 
-    /** The current run's catalog row wins over a newer row from another agent. */
+    /** The current run's private run-index wins over a newer catalog row from another run. */
     public static CatalogRun catalogRun(Path projectRoot, String purpose, String runId) throws IOException {
+        CatalogRun scoped = scopedRunIndex(projectRoot, runId);
+        if (scoped != null) return scoped;
         List<CatalogRun> runs = catalogRuns(projectRoot);
         CatalogRun byId = null;
         CatalogRun byPurpose = null;
@@ -183,6 +186,45 @@ public final class LastDiscoverSnapshot {
         if (byId != null) return byId;
         if (byPurpose != null) return byPurpose;
         return purpose == null ? first : null;
+    }
+
+    /**
+     * Profile and outcome for this run live in its private diagnostic index,
+     * then in that same run's shared index. A blank profile does not count.
+     */
+    private static CatalogRun scopedRunIndex(Path projectRoot, String runId) throws IOException {
+        if (projectRoot == null || isBlank(runId)) return null;
+        String safeId;
+        try {
+            safeId = AgentCoordination.requireSafeId(runId, "run id");
+        } catch (IllegalArgumentException invalid) {
+            return null;
+        }
+        Path project = projectRoot.toAbsolutePath().normalize();
+        CatalogRun privateIndex = catalogRunFromIndex(
+                AgentCoordination.runDirectory(project, safeId)
+                        .resolve("diagnostic")
+                        .resolve(safeId)
+                        .resolve("run-index.json"),
+                safeId
+        );
+        if (privateIndex != null) return privateIndex;
+        return catalogRunFromIndex(
+                project.resolve("reports").resolve("diagnostic-runs").resolve(safeId).resolve("run-index.json"),
+                safeId
+        );
+    }
+
+    private static CatalogRun catalogRunFromIndex(Path index, String expectedRunId) throws IOException {
+        if (index == null || !Files.isRegularFile(index)) return null;
+        @SuppressWarnings("unchecked")
+        Map<String, Object> raw = JSON.readValue(index.toFile(), LinkedHashMap.class);
+        String profile = text(raw.get("runProfile"));
+        if (profile.isBlank()) return null;
+        String id = text(raw.get("runId"));
+        if (id.isBlank()) id = expectedRunId;
+        if (!expectedRunId.equals(id)) return null;
+        return new CatalogRun(index, id, profile, text(raw.get("outcome")), lineagePurpose(raw.get("lineage")));
     }
 
     private static List<CatalogRun> catalogRuns(Path projectRoot) throws IOException {
