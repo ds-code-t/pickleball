@@ -8,8 +8,10 @@ import tools.dscode.testengine.PKB_props;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -102,6 +104,35 @@ class ConsumerMavenTestRunnerTest {
         assertEquals("@smoke", parsed.get("pkb_tags"));
         assertEquals("wd-file:/tmp/a.feature,wd-file:/tmp/b.feature", parsed.get(PKB_props.PKB_FEATURES));
         assertEquals("pkb_tags=@smoke", ConsumerMavenTestRunner.embedFeaturePaths("pkb_tags=@smoke", " "));
+    }
+
+    @Test
+    void multiFileFeaturePathsStayOneAssignmentAfterQuoteStripping() {
+        String features = "wd-file:C:/proj/first.feature,wd-file:C:/proj/second.feature";
+        String bare = "pkb_tags=@smoke, pkb_features=" + features;
+        IllegalArgumentException bareFailure = assertThrows(
+                IllegalArgumentException.class,
+                () -> PKB_props.parseAssignments(bare)
+        );
+        assertTrue(bareFailure.getMessage().contains("Invalid profile assignment"), bareFailure.getMessage());
+        assertTrue(bareFailure.getMessage().contains("wd-file:C:/proj/second.feature"), bareFailure.getMessage());
+
+        String embedded = ConsumerMavenTestRunner.embedFeaturePaths("pkb_tags=@smoke", features);
+        String stripped = embedded.replace("\"", "").replace("'", "");
+        var parsed = PKB_props.parseAssignments(stripped);
+        assertEquals("@smoke", parsed.get("pkb_tags"));
+        assertEquals(features, parsed.get(PKB_props.PKB_FEATURES));
+        assertEquals(features, PKB_props.parseAssignments(embedded).get(PKB_props.PKB_FEATURES));
+
+        var preserved = PKB_props.parseAssignments("pkb_name=C:\\data\\, pkb_browser=chrome");
+        assertEquals("C:\\data\\", preserved.get("pkb_name"));
+        assertEquals("chrome", preserved.get("pkb_browser"));
+
+        Map<String, String> roundTrip = new LinkedHashMap<>();
+        roundTrip.put("pkb_browser", "chrome");
+        roundTrip.put("pkb_name", "  Bob's \"QA, phase 2; retry\" = green <orders #1,3> C:\\results  ");
+        String serialized = PKB_props.serializeRunVars(roundTrip);
+        assertEquals(roundTrip, PKB_props.parseAssignments(serialized));
     }
 
     @Test

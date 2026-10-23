@@ -63,6 +63,17 @@ class LastDiscoverSnapshotTest {
     }
 
     @Test
+    void multiFileFeatureListRoundTripsThroughTheWorkerRunVars() {
+        String features = "wd-file:C:/proj/first.feature,wd-file:C:/proj/second.feature";
+        String compact = LastDiscoverSnapshot.serializeCompact(Map.of(
+                "pkb_features", features,
+                "pkb_tags", "@smoke"
+        ));
+        assertEquals(features, LastDiscoverSnapshot.parseCompact(compact).get("pkb_features"));
+        assertEquals("@smoke", LastDiscoverSnapshot.parseCompact(compact).get("pkb_tags"));
+    }
+
+    @Test
     void isolateReplayPutsExampleInRunVarsAndKeepsParallelOne() throws Exception {
         Path file = LastDiscoverSnapshot.file(tempDir);
         Files.createDirectories(file.getParent());

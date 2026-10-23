@@ -886,6 +886,15 @@ final class PickleballProfiles {
                 else if (ch == quote) { quote = 0; quotedValueClosed = true; }
                 continue;
             }
+            if (!quotedValueClosed && ch == '\\' && index + 1 < input.length()) {
+                char next = input.charAt(index + 1);
+                if ((next == ',' || next == ';') && !separatorBeforeAssignment(input, index + 2)) {
+                    current.append(next);
+                    if (seenEquals && !valueStarted) valueStarted = true;
+                    index++;
+                    continue;
+                }
+            }
             if (quotedValueClosed) {
                 if (ch == ',' || ch == ';') {
                     addAssignment(out, current);
@@ -944,6 +953,22 @@ final class PickleballProfiles {
         return out;
     }
 
+    private static boolean separatorBeforeAssignment(String input, int afterSeparator) {
+        int index = afterSeparator;
+        while (index < input.length() && Character.isWhitespace(input.charAt(index))) index++;
+        if (index >= input.length() || !Character.isLetter(input.charAt(index))) return false;
+        index++;
+        while (index < input.length()) {
+            char ch = input.charAt(index);
+            if (Character.isLetterOrDigit(ch) || ch == '_' || ch == '.') {
+                index++;
+                continue;
+            }
+            break;
+        }
+        return index < input.length() && input.charAt(index) == '=';
+    }
+
     private static boolean hasClosingAngle(String input, int fromIndex) {
         return input.indexOf('>', fromIndex) >= 0;
     }
@@ -964,7 +989,7 @@ final class PickleballProfiles {
             char ch = inner.charAt(index);
             if (ch == '\\' && index + 1 < inner.length()) {
                 char next = inner.charAt(index + 1);
-                if (next == quote || next == '\\') {
+                if (next == quote || next == '\\' || next == ',' || next == ';') {
                     out.append(next); index++; continue;
                 }
             }
@@ -982,7 +1007,13 @@ final class PickleballProfiles {
                 || startsWithQuote
                 || !value.equals(value.trim());
         if (!quote) return value;
-        return '"' + value.replace("\\", "\\\\").replace("\"", "\\\"") + '"';
+        StringBuilder escaped = new StringBuilder(value.length() + 8);
+        for (int index = 0; index < value.length(); index++) {
+            char ch = value.charAt(index);
+            if (ch == '\\' || ch == '"' || ch == ',' || ch == ';') escaped.append('\\');
+            escaped.append(ch);
+        }
+        return '"' + escaped.toString() + '"';
     }
 
     private static void mergeDeep(ObjectNode target, ObjectNode source) {

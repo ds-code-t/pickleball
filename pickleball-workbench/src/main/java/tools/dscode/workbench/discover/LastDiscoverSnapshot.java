@@ -178,17 +178,37 @@ public final class LastDiscoverSnapshot {
     }
 
     private static String unquote(String value) {
-        if (value.length() < 2) return value == null ? "" : value;
+        if (value == null || value.length() < 2) return value == null ? "" : value;
         char quote = value.charAt(0);
         if ((quote != '"' && quote != '\'') || value.charAt(value.length() - 1) != quote) return value;
-        return value.substring(1, value.length() - 1).replace("\\\"", "\"").replace("\\\\", "\\");
+        String inner = value.substring(1, value.length() - 1);
+        StringBuilder out = new StringBuilder(inner.length());
+        for (int index = 0; index < inner.length(); index++) {
+            char ch = inner.charAt(index);
+            if (ch == '\\' && index + 1 < inner.length()) {
+                char next = inner.charAt(index + 1);
+                if (next == quote || next == '\\' || next == ',' || next == ';') {
+                    out.append(next);
+                    index++;
+                    continue;
+                }
+            }
+            out.append(ch);
+        }
+        return out.toString();
     }
 
     private static String quoteIfNeeded(String value) {
         if (value == null) return "";
         if (value.indexOf(',') >= 0 || value.indexOf(';') >= 0 || value.indexOf('"') >= 0
                 || !value.equals(value.trim())) {
-            return '"' + value.replace("\\", "\\\\").replace("\"", "\\\"") + '"';
+            StringBuilder escaped = new StringBuilder(value.length() + 8);
+            for (int index = 0; index < value.length(); index++) {
+                char ch = value.charAt(index);
+                if (ch == '\\' || ch == '"' || ch == ',' || ch == ';') escaped.append('\\');
+                escaped.append(ch);
+            }
+            return '"' + escaped.toString() + '"';
         }
         return value;
     }

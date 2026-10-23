@@ -498,6 +498,67 @@ class WorkbenchAgentCommandsTest {
     }
 
     @Test
+    void discoverLaunchesOnlyTheTwoMatchingFeatureFiles() throws Exception {
+        writeProjectWrapper();
+        Path features = tempDir.resolve("src/test/resources/features");
+        Files.createDirectories(features);
+        for (String name : List.of("keep-a.feature", "keep-b.feature")) {
+            Files.writeString(features.resolve(name), """
+                    @keep
+                    Feature: %s
+                      Scenario: The one
+                        Given one
+                    """.formatted(name));
+        }
+        Files.writeString(features.resolve("skip.feature"), """
+                Feature: Skip
+                  Scenario: Untagged
+                    Given skip
+                """);
+        Path catalogDir = tempDir.resolve("reports/diagnostic-runs");
+        Files.createDirectories(catalogDir);
+        List<List<String>> captured = new ArrayList<>();
+        int exit = WorkbenchAgentCommands.run(
+                new String[]{"discover", tempDir.toString(), "--tags=@keep"},
+                System.out,
+                System.err,
+                (project, command, out, err) -> {
+                    captured.add(command);
+                    try {
+                        Files.writeString(catalogDir.resolve("run-catalog.json"), """
+                                {
+                                  "schemaVersion": 1,
+                                  "runs": [
+                                    {
+                                      "runId": "run-keep",
+                                      "runProfile": "pkb_tags=@keep",
+                                      "lineage": { "runPurpose": "workbench-discover" }
+                                    }
+                                  ]
+                                }
+                                """);
+                    } catch (Exception failure) {
+                        throw new RuntimeException(failure);
+                    }
+                    return 0;
+                }
+        );
+        assertEquals(0, exit);
+        String runVars = captured.getFirst().stream()
+                .filter(item -> item.startsWith("-Dpkb_runvars="))
+                .findFirst()
+                .orElseThrow()
+                .substring("-Dpkb_runvars=".length());
+        String stripped = runVars.replace("\"", "").replace("'", "");
+        var parsed = PKB_props.parseAssignments(stripped);
+        String paths = parsed.get(PKB_props.PKB_FEATURES);
+        assertTrue(paths.contains("keep-a.feature"), paths);
+        assertTrue(paths.contains("keep-b.feature"), paths);
+        assertFalse(paths.contains("skip.feature"), paths);
+        assertEquals(2, paths.split(",").length, paths);
+    }
+
+    @Test
     void planResolvesExampleRowsAndWarnsWhenEmptyWithoutMaven() throws Exception {
         Path features = tempDir.resolve("src/test/resources/features");
         Files.createDirectories(features);
