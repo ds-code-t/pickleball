@@ -302,10 +302,11 @@ public abstract class MappingProcessor implements Map<String, Object> {
     private static final String DEFAULT_CLOSE_EXPRESSION_COMPONENT = "}";
     private static final String SECONDARY_DEFAULT_OPEN_BOOKEND = "~[~";
     private static final String SECONDARY_DEFAULT_CLOSE_BOOKEND = "~]~";
+    private static final String XML_NAME = "(?:[A-Za-z_][A-Za-z0-9_.-]*:)?[A-Za-z_][A-Za-z0-9_.-]*";
     private static final Pattern XML_CLOSING_ELEMENT = Pattern.compile(
-            "</\\s*[A-Za-z_][A-Za-z0-9_.-]*\\s*>");
+            "</\\s*" + XML_NAME + "\\s*>");
     private static final Pattern XML_SELF_CLOSING_ELEMENT = Pattern.compile(
-            "<\\s*[A-Za-z_][A-Za-z0-9_.-]*(?:\\s+[^<>]*?)?/\\s*>");
+            "<\\s*" + XML_NAME + "(?:\\s+[^<>]*?)?/\\s*>");
 
     private record Bookends(
             String open, String close, String expressionOpen, String expressionClose

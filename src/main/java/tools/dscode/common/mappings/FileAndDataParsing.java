@@ -816,7 +816,7 @@ public final class FileAndDataParsing {
     private static JsonNode parseXmlStrict(String content, String name) {
         StructuredDataConverter.rejectUnsafeXml(content);
         try {
-            Object value = XML_MAPPER.readValue(content.strip(), Object.class);
+            Object value = StructuredDataConverter.readXmlValue(XML_MAPPER, content.strip());
             return value == null ? null : JSON_MAPPER.valueToTree(value);
         } catch (IOException e) {
             throw parseFailure("XML", name, e);

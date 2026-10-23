@@ -254,6 +254,12 @@ public class MappingSteps extends CoreSteps {
             );
         };
         try {
+            if ("xml".equals(normalizedType)
+                    || "application/xml".equals(normalizedType)
+                    || "text/xml".equals(normalizedType)) {
+                return convertSpecialValuesToTree(
+                        StructuredDataConverter.readXmlTree(XML_MAPPER, content));
+            }
             return convertSpecialValuesToTree(mapper.readTree(content));
         } catch (JsonProcessingException e) {
             throw new RuntimeException(e);

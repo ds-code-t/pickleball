@@ -687,11 +687,12 @@ public class ParsingMap extends MappingProcessor {
         private static final Pattern DIRECTIVE_TOKEN = Pattern.compile(
                 "~[A-Za-z][A-Za-z-]*;"
         );
+        private static final String XML_NAME = "(?:[A-Za-z_][A-Za-z0-9_.-]*:)?[A-Za-z_][A-Za-z0-9_.-]*";
         private static final Pattern XML_CLOSING = Pattern.compile(
-                "</\\s*[A-Za-z_][A-Za-z0-9_.-]*\\s*>"
+                "</\\s*" + XML_NAME + "\\s*>"
         );
         private static final Pattern XML_SELF_CLOSING = Pattern.compile(
-                "<\\s*[A-Za-z_][A-Za-z0-9_.-]*(?:\\s+[^<>]*?)?/\\s*>"
+                "<\\s*" + XML_NAME + "(?:\\s+[^<>]*?)?/\\s*>"
         );
         private static final Set<String> DIRECTIVES = Set.of(
                 "UNRESOLVED",

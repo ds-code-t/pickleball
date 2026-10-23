@@ -22,6 +22,10 @@ Horizontal overlap means the candidate's left edge is left of the anchor's right
 * , right of the "Spatial Anchor" Button, click the "Right Target" Button
 ```
 
+## XML with a namespace prefix
+
+`<ns1:R ...>` and `<soapenv:Envelope ...>` parse in Java (`DocString` content type `xml`, `XML Data`, and an `.xml` file) and in Gherkin (`MAP ... OBJECT VALUE` with `"""xml`, and step text that contains the payload). A declared `xmlns` is unchanged. A missing declaration does not fail the parse; the tree uses the local name, so the body is `Body.R`, not `soapenv:Body`. This is not new Gherkin syntax. `DOCTYPE` and `ENTITY` are still rejected. See [Service calls](service-call-scenarios.md).
+
 ## JDBC service calls
 
 A service call whose `REQUEST.endpoint` starts with `jdbc:` runs a JDBC statement. Any other endpoint stays an HTTP call, using the same `EXECUTE SERVICE CALL` step and the same `RUN` / `CALL` / service-call scenario. This is experimental and may change.

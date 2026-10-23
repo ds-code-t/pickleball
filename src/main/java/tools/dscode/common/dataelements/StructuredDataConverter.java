@@ -10,8 +10,12 @@ import io.cucumber.datatable.DataTable;
 import io.cucumber.docstring.DocString;
 
 import java.util.Collection;
+import java.util.LinkedHashSet;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static tools.dscode.coredefinitions.DataTableDefinitions.dataTableToJsonNode;
 
@@ -215,12 +219,114 @@ public final class StructuredDataConverter {
 
     private static JsonNode parseXml(String value)
             throws JsonProcessingException {
-        rejectUnsafeXml(value);
-        JsonNode result = XML_MAPPER.readTree(value);
+        JsonNode result = readXmlTree(XML_MAPPER, value);
         if (result == null) {
             throw new DataQueryException("XML input produced no value.");
         }
         return result;
+    }
+
+    private static final Pattern XML_TAG = Pattern.compile("<[^>]*>");
+    private static final Pattern NAMESPACED_NAME = Pattern.compile(
+            "(?:</|<|\\s)([A-Za-z_][A-Za-z0-9_.-]*):([A-Za-z_][A-Za-z0-9_.-]*)"
+    );
+    private static final Pattern DECLARED_PREFIX = Pattern.compile(
+            "xmlns:([A-Za-z_][A-Za-z0-9_.-]*)\\s*="
+    );
+    private static final Pattern ROOT_START_TAG = Pattern.compile("<(?![?!/])([^>]*?)(/?)>");
+
+    /**
+     * Reads XML, including a namespace-prefixed root such as {@code ns1:R} or
+     * {@code soapenv:Envelope}. A prefix that already has an {@code xmlns}
+     * declaration is unchanged. A prefix with no declaration is declared on the
+     * root and parsed again, so the tree uses the local name. XML that already
+     * parses is not rewritten.
+     */
+    public static JsonNode readXmlTree(ObjectMapper mapper, String xml)
+            throws JsonProcessingException {
+        rejectUnsafeXml(xml);
+        try {
+            return mapper.readTree(xml);
+        } catch (JsonProcessingException exception) {
+            String declared = declareMissingNamespacePrefixes(xml);
+            if (declared == xml || !isUndeclaredNamespacePrefix(exception)) {
+                throw exception;
+            }
+            return mapper.readTree(declared);
+        }
+    }
+
+    /**
+     * Same namespace fallback as {@link #readXmlTree(ObjectMapper, String)} for
+     * callers that bind XML to a map before converting it to a tree.
+     */
+    public static Object readXmlValue(ObjectMapper mapper, String xml)
+            throws JsonProcessingException {
+        rejectUnsafeXml(xml);
+        String stripped = xml == null ? "" : xml.strip();
+        try {
+            return mapper.readValue(stripped, Object.class);
+        } catch (JsonProcessingException exception) {
+            String declared = declareMissingNamespacePrefixes(stripped);
+            if (declared.equals(stripped) || !isUndeclaredNamespacePrefix(exception)) {
+                throw exception;
+            }
+            return mapper.readValue(declared, Object.class);
+        }
+    }
+
+    static String declareMissingNamespacePrefixes(String xml) {
+        if (xml == null || xml.indexOf(':') < 0) {
+            return xml;
+        }
+        Set<String> used = new LinkedHashSet<>();
+        Set<String> declared = new LinkedHashSet<>();
+        Matcher tags = XML_TAG.matcher(xml);
+        while (tags.find()) {
+            String tag = tags.group();
+            if (tag.startsWith("<?") || tag.startsWith("<!") || tag.startsWith("<!--")) {
+                continue;
+            }
+            Matcher names = NAMESPACED_NAME.matcher(tag);
+            while (names.find()) {
+                String prefix = names.group(1);
+                if (!"xmlns".equals(prefix)) {
+                    used.add(prefix);
+                }
+            }
+            Matcher declarations = DECLARED_PREFIX.matcher(tag);
+            while (declarations.find()) {
+                declared.add(declarations.group(1));
+            }
+        }
+        used.removeAll(declared);
+        if (used.isEmpty()) {
+            return xml;
+        }
+        StringBuilder attributes = new StringBuilder();
+        for (String prefix : used) {
+            attributes.append(" xmlns:").append(prefix)
+                    .append("=\"urn:pickleball:prefix:").append(prefix).append('"');
+        }
+        Matcher root = ROOT_START_TAG.matcher(xml);
+        if (!root.find()) {
+            return xml;
+        }
+        int slash = root.group(2).isEmpty() ? 1 : 2;
+        int insertAt = root.end() - slash;
+        return xml.substring(0, insertAt) + attributes + xml.substring(insertAt);
+    }
+
+    private static boolean isUndeclaredNamespacePrefix(Throwable exception) {
+        Throwable current = exception;
+        while (current != null) {
+            String message = current.getMessage();
+            if (message != null && message.contains("Undeclared namespace prefix")) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
     }
 
     public static void rejectUnsafeXml(String value) {

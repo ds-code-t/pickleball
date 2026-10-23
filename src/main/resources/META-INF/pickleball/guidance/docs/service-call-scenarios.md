@@ -222,6 +222,8 @@ For XML content, use XML-safe reference bookends:
 ~[~seedCall.RESPONSE.body.body.quantity~]~
 ```
 
+A namespace-prefixed root is XML, not a mapping reference. `<ns1:R ...>` and `<soapenv:Envelope ...>` stay intact in step text, including a Windows path or a path with spaces inside an attribute. `"""xml` and a Java `xml` DocString parse the same payload. A prefix that already has `xmlns` is unchanged. A prefix with no declaration is still accepted, and the parsed fields use the local name (`Body`, `R`), not `soapenv:Body`. `DOCTYPE` and `ENTITY` are still rejected.
+
 ## JSON body types
 
 A quoted `~unquoted;` reference preserves resolved numbers, booleans, objects, and arrays as raw JSON values:
