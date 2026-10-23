@@ -1,5 +1,7 @@
 package tools.dscode.launcher;
 
+import io.cucumber.core.gherkin.Pickle;
+import io.cucumber.core.runner.modularexecutions.CucumberScanUtil;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -7,6 +9,7 @@ import org.junit.jupiter.api.io.TempDir;
 import tools.dscode.common.coordination.AgentCoordination;
 import tools.dscode.common.reporting.diagnostic.ConsumerMavenTestRunner;
 import tools.dscode.common.reporting.diagnostic.LastDiscoverSnapshot;
+import tools.dscode.testengine.DynamicSuiteEngine;
 import tools.dscode.testengine.PKB_props;
 
 import java.io.ByteArrayOutputStream;
@@ -19,10 +22,12 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class WorkbenchAgentCommandsTest {
@@ -487,9 +492,11 @@ class WorkbenchAgentCommandsTest {
         String runVars = captured.getFirst().stream().filter(item -> item.startsWith("-Dpkb_runvars=")).findFirst().orElseThrow();
         var parsed = PKB_props.parseAssignments(runVars.substring("-Dpkb_runvars=".length()));
         String paths = parsed.get(PKB_props.PKB_FEATURES);
-        assertTrue(paths.contains("needle.feature"));
-        assertFalse(paths.contains("skip-0.feature"));
-        assertFalse(paths.contains("skip-39.feature"));
+        assertTrue(paths == null || !paths.contains("needle.feature"), String.valueOf(paths));
+        String top = topLevelArgument(captured.getFirst());
+        assertTrue(top.contains("needle.feature"), top);
+        assertFalse(top.contains("skip-0.feature"), top);
+        assertFalse(top.contains("skip-39.feature"), top);
 
         String modular = Files.readString(Path.of("src/main/java/tools/dscode/coredefinitions/ModularScenarios.java"));
         assertTrue(modular.contains("CucumberScanUtil.listPickles(scanOptions)"));
@@ -552,10 +559,131 @@ class WorkbenchAgentCommandsTest {
         String stripped = runVars.replace("\"", "").replace("'", "");
         var parsed = PKB_props.parseAssignments(stripped);
         String paths = parsed.get(PKB_props.PKB_FEATURES);
-        assertTrue(paths.contains("keep-a.feature"), paths);
-        assertTrue(paths.contains("keep-b.feature"), paths);
-        assertFalse(paths.contains("skip.feature"), paths);
-        assertEquals(2, paths.split(",").length, paths);
+        assertTrue(paths == null || (!paths.contains("keep-a.feature") && !paths.contains("keep-b.feature")), String.valueOf(paths));
+        String top = topLevelArgument(captured.getFirst());
+        assertTrue(top.contains("keep-a.feature"), top);
+        assertTrue(top.contains("keep-b.feature"), top);
+        assertFalse(top.contains("skip.feature"), top);
+        assertEquals(2, top.substring(top.indexOf('=') + 1).split(",").length, top);
+    }
+
+    @Test
+    void narrowedTopLevelLeavesConfiguredFeaturesForANestedLookup() throws Exception {
+        writeProjectWrapper();
+        Path features = tempDir.resolve("src/test/resources/features");
+        Path spaced = features.resolve("Business Exception");
+        Files.createDirectories(spaced);
+        Path caller = features.resolve("caller.feature");
+        Path callee = spaced.resolve("callee.feature");
+        Files.writeString(caller, """
+                @caller
+                Feature: Caller
+                  Scenario: The caller
+                    Given one
+                """);
+        Files.writeString(callee, """
+                @callee
+                Feature: Callee
+                  Scenario: The callee
+                    Given two
+                """);
+        Path windowsNamed = features.resolve("windows callee.feature");
+        Files.writeString(windowsNamed, """
+                @windows-callee
+                Feature: Windows callee
+                  Scenario: The windows callee
+                    Given three
+                """);
+        CucumberScanUtil.clearCache();
+        String configured = features.toAbsolutePath().normalize().toString().replace('\\', '/');
+        List<Pickle> nested = CucumberScanUtil.listPickles(Map.of(
+                PKB_props.PKB_FEATURES, configured,
+                PKB_props.PKB_TAGS, "@callee"
+        ));
+        assertEquals(1, nested.size());
+        assertEquals("The callee", nested.getFirst().getName());
+        List<Pickle> windowsNested = CucumberScanUtil.listPickles(Map.of(
+                PKB_props.PKB_FEATURES, configured,
+                PKB_props.PKB_TAGS, "@windows-callee"
+        ));
+        assertEquals("The windows callee", windowsNested.getFirst().getName());
+        IllegalArgumentException narrowedAway = assertThrows(
+                IllegalArgumentException.class,
+                () -> CucumberScanUtil.listPickles(Map.of(
+                        PKB_props.PKB_FEATURES, caller.toAbsolutePath().normalize().toString(),
+                        PKB_props.PKB_TAGS, "@callee"
+                ))
+        );
+        assertTrue(narrowedAway.getMessage().toLowerCase(Locale.ROOT).contains("no scenarios"), narrowedAway.getMessage());
+
+        Path catalogDir = tempDir.resolve("reports/diagnostic-runs");
+        Files.createDirectories(catalogDir);
+        List<List<String>> captured = new ArrayList<>();
+        int exit = WorkbenchAgentCommands.run(
+                new String[]{"discover", tempDir.toString(), "--tags=@caller"},
+                System.out,
+                System.err,
+                (project, command, out, err) -> {
+                    captured.add(command);
+                    try {
+                        Files.writeString(catalogDir.resolve("run-catalog.json"), """
+                                {
+                                  "schemaVersion": 1,
+                                  "runs": [
+                                    {
+                                      "runId": "run-nested",
+                                      "runProfile": "pkb_tags=@caller",
+                                      "lineage": { "runPurpose": "workbench-discover" }
+                                    }
+                                  ]
+                                }
+                                """);
+                    } catch (Exception failure) {
+                        throw new RuntimeException(failure);
+                    }
+                    return 0;
+                }
+        );
+        assertEquals(0, exit);
+        String runVars = captured.getFirst().stream()
+                .filter(item -> item.startsWith("-Dpkb_runvars="))
+                .findFirst()
+                .orElseThrow();
+        var parsed = PKB_props.parseAssignments(runVars.substring("-Dpkb_runvars=".length()));
+        assertFalse(String.valueOf(parsed.get(PKB_props.PKB_FEATURES)).contains("caller.feature"));
+        String top = topLevelArgument(captured.getFirst());
+        assertTrue(top.contains("caller.feature"), top);
+        assertFalse(top.contains("callee.feature"), top);
+        assertTrue(top.contains("wd-file:"), top);
+        assertFalse(top.contains("\\"), top);
+
+        String windowsTop = "wd-file:C:/proj/Business Exception/callee.feature";
+        Map<String, String> suite = Map.of(
+                PKB_props.PKB_FEATURES, configured,
+                "cucumber.features", configured
+        );
+        Map<String, String> overlay = DynamicSuiteEngine.overlayTopLevelFeatures(suite, windowsTop);
+        assertEquals(configured, overlay.get(PKB_props.PKB_FEATURES));
+        assertEquals(windowsTop, overlay.get("cucumber.features"));
+        assertEquals(configured, suite.get(PKB_props.PKB_FEATURES));
+
+        List<List<String>> fullScan = new ArrayList<>();
+        int skipped = WorkbenchAgentCommands.run(
+                new String[]{"discover", tempDir.toString(), "--tags=@caller", "--full-scan"},
+                System.out,
+                System.err,
+                (project, command, out, err) -> {
+                    fullScan.add(command);
+                    return 0;
+                }
+        );
+        assertEquals(0, skipped);
+        assertTrue(fullScan.getFirst().stream().noneMatch(item -> item.startsWith("-D" + DynamicSuiteEngine.TOP_LEVEL_FEATURES_PROPERTY + "=")));
+    }
+
+    private static String topLevelArgument(List<String> command) {
+        String prefix = "-D" + DynamicSuiteEngine.TOP_LEVEL_FEATURES_PROPERTY + "=";
+        return command.stream().filter(item -> item.startsWith(prefix)).findFirst().orElseThrow();
     }
 
     @Test

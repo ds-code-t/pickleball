@@ -83,6 +83,8 @@ Same launcher; only change `-Dexec.args`. When nobody is watching, `isolate` sta
 
 These commands stay on the Workbench launcher. They do not change a normal `mvn test`, `pkb_stepMaxTime`, `CucumberScanUtil.listPickles`, or `DiagnosticReporter`.
 
+When the feature index can narrow a `discover` or `confirm` selection, only the top-level Cucumber discovery is narrowed. The matching paths go to `-Dpickleball.workbench.topFeatures`. They are not written over `pkb_features`. Nested `SCENARIO` / `COMPONENT` / `CALL` / `RUN` still call `CucumberScanUtil.listPickles` with the configured feature set, so a scenario in another file is found, including a path with spaces. `--no-narrow` and `--full-scan` skip that top-level list. A normal `mvn test` does not set the property.
+
 ```text
 "-Dexec.args=plan --tags=@smoke --name='Checkout.*'"
 "-Dexec.args=discover --plan --select=src/test/resources/features/checkout.feature:42"

@@ -190,7 +190,7 @@ public final class WorkbenchAgentCommands {
                     ConsumerMavenTestRunner.command(
                             parsed.project(),
                             plan.runVars(),
-                            featurePaths(parsed.project(), selection)
+                            featurePaths(parsed, selection)
                     ),
                     run
             );
@@ -263,7 +263,7 @@ public final class WorkbenchAgentCommands {
                     ConsumerMavenTestRunner.confirmCommand(
                             parsed.project(),
                             runVars,
-                            featurePaths(parsed.project(), selection)
+                            featurePaths(parsed, selection)
                     ),
                     run
             );
@@ -404,6 +404,11 @@ public final class WorkbenchAgentCommands {
         ));
     }
 
+    private static String featurePaths(WorkbenchCommandLine.Parsed parsed, WorkbenchFeatureIndex.Selection selection) {
+        if (parsed.fullScan()) return null;
+        return featurePaths(parsed.project(), selection);
+    }
+
     private static String featurePaths(Path project, WorkbenchFeatureIndex.Selection selection) {
         if (selection == null || selection.fullScanFallback() || !selection.narrowed()) return null;
         if (selection.matchedNone()) {
@@ -429,8 +434,12 @@ public final class WorkbenchAgentCommands {
         out.println("name=" + text(parsed.name()));
         out.println("example=" + text(parsed.example()));
         out.println("select=" + parsed.selects());
-        if (selection.fullScanFallback()) {
-            err.println("WARNING: full-scan fallback: " + selection.fallbackReason());
+        if (selection.fullScanFallback() || parsed.fullScan()) {
+            err.println("WARNING: full-scan fallback: " + (
+                    parsed.fullScan() && !selection.fullScanFallback()
+                            ? "top-level narrowing skipped (--no-narrow / --full-scan); nested lookups keep the configured pkb_features"
+                            : selection.fallbackReason()
+            ));
             out.println("PLAN full-scan");
             out.println("features=full-scan");
             return 0;
@@ -457,6 +466,9 @@ public final class WorkbenchAgentCommands {
         out.println(selection.narrowed()
                 ? "features=" + selection.featureProperty()
                 : "features=full-scan");
+        if (selection.narrowed()) {
+            out.println("nested-features=configured pkb_features");
+        }
         return 0;
     }
 

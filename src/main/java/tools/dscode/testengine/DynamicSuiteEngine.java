@@ -8,9 +8,11 @@ import org.junit.platform.engine.TestDescriptor;
 import org.junit.platform.engine.TestEngine;
 import org.junit.platform.engine.UniqueId;
 
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.TreeMap;
 
+import static io.cucumber.core.options.Constants.FEATURES_PROPERTY_NAME;
 import static io.cucumber.core.options.Constants.FILTER_NAME_PROPERTY_NAME;
 import static io.cucumber.core.options.Constants.FILTER_TAGS_PROPERTY_NAME;
 import static tools.dscode.common.reporting.logging.LogForwarder.logError;
@@ -19,6 +21,15 @@ import static tools.dscode.common.reporting.logging.LogForwarder.logTrace;
 public final class DynamicSuiteEngine implements TestEngine {
 
     public static final String ENGINE_ID = "pickleball-test-engine";
+
+    /**
+     * Workbench-only top-level feature list. When set, Cucumber discovery uses
+     * these paths. {@code pkb_features} is left alone so nested
+     * {@code SCENARIO} / {@code COMPONENT} / {@code CALL} / {@code RUN}
+     * lookups still see the configured feature set. A normal {@code mvn test}
+     * does not set this property.
+     */
+    public static final String TOP_LEVEL_FEATURES_PROPERTY = "pickleball.workbench.topFeatures";
 
     static {
         EngineFilterBootstrap.ensureEngineFilterApplied("DynamicSuiteEngine.<clinit>");
@@ -39,7 +50,10 @@ public final class DynamicSuiteEngine implements TestEngine {
             logTrace("[DynamicSuiteEngine] Discovery succeeded using suite subclass: " + suite.getClass().getName());
 
             MergedConfigurationParameters mergedParameters =
-                    new MergedConfigurationParameters(discoveryRequest.getConfigurationParameters(), suite.values());
+                    new MergedConfigurationParameters(
+                            discoveryRequest.getConfigurationParameters(),
+                            overlayTopLevelFeatures(suite.values())
+                    );
 
             logTrace("[DynamicSuiteEngine] Final discovery configuration parameters: "
                     + new TreeMap<>(materialize(mergedParameters)));
@@ -80,7 +94,10 @@ public final class DynamicSuiteEngine implements TestEngine {
             logTrace("[DynamicSuiteEngine] Using suite singleton: " + suite.getClass().getName());
 
             MergedConfigurationParameters mergedParameters =
-                    new MergedConfigurationParameters(request.getConfigurationParameters(), suite.values());
+                    new MergedConfigurationParameters(
+                            request.getConfigurationParameters(),
+                            overlayTopLevelFeatures(suite.values())
+                    );
 
             logTrace("[DynamicSuiteEngine] Final execution configuration parameters: "
                     + new TreeMap<>(materialize(mergedParameters)));
@@ -99,6 +116,30 @@ public final class DynamicSuiteEngine implements TestEngine {
             e.printStackTrace(System.err);
             throw e;
         }
+    }
+
+    /**
+     * Copies {@code suiteValues} and, when {@code topLevelFeatures} is non-blank,
+     * sets {@code cucumber.features} to that list. Does not change {@code pkb_features}
+     * and does not mutate {@code suiteValues}. A blank value returns the original map.
+     */
+    public static Map<String, String> overlayTopLevelFeatures(
+            Map<String, String> suiteValues,
+            String topLevelFeatures
+    ) {
+        if (suiteValues == null) {
+            return Map.of();
+        }
+        if (topLevelFeatures == null || topLevelFeatures.isBlank()) {
+            return suiteValues;
+        }
+        LinkedHashMap<String, String> copy = new LinkedHashMap<>(suiteValues);
+        copy.put(FEATURES_PROPERTY_NAME, topLevelFeatures.trim());
+        return copy;
+    }
+
+    static Map<String, String> overlayTopLevelFeatures(Map<String, String> suiteValues) {
+        return overlayTopLevelFeatures(suiteValues, System.getProperty(TOP_LEVEL_FEATURES_PROPERTY));
     }
 
     private static String firstNonBlank(String... values) {

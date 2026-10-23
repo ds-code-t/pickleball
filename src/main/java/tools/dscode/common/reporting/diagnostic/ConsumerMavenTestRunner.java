@@ -1,14 +1,13 @@
 package tools.dscode.common.reporting.diagnostic;
 
 import tools.dscode.common.runtime.ProcessTrees;
-import tools.dscode.testengine.PKB_props;
+import tools.dscode.testengine.DynamicSuiteEngine;
 
 import java.io.IOException;
 import java.io.PrintStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 
@@ -42,16 +41,24 @@ public final class ConsumerMavenTestRunner {
     }
 
     /**
-     * Puts selected feature paths into the Workbench runvars. A blank value leaves
-     * the original string unchanged so a normal full scan is not rewritten.
+     * Does not put selected feature paths into {@code pkb_features}. Nested
+     * {@code listPickles} reads that key. Top-level narrowing is a separate
+     * {@link DynamicSuiteEngine#TOP_LEVEL_FEATURES_PROPERTY} argument.
+     * A blank feature list leaves the original string unchanged.
      */
     public static String embedFeaturePaths(String compactRunVars, String featurePaths) {
         if (featurePaths == null || featurePaths.isBlank()) {
             return compactRunVars == null ? "" : compactRunVars;
         }
-        LinkedHashMap<String, String> values = PKB_props.parseAssignments(compactRunVars == null ? "" : compactRunVars);
-        values.put(PKB_props.PKB_FEATURES, featurePaths);
-        return PKB_props.serializeRunVars(values);
+        return compactRunVars == null ? "" : compactRunVars;
+    }
+
+    /** One Maven {@code -D} argument for top-level narrowing, or null when there is nothing to narrow. */
+    public static String topLevelFeaturesArgument(String featurePaths) {
+        if (featurePaths == null || featurePaths.isBlank()) {
+            return null;
+        }
+        return "-D" + DynamicSuiteEngine.TOP_LEVEL_FEATURES_PROPERTY + "=" + featurePaths;
     }
 
     private static List<String> build(
@@ -63,6 +70,10 @@ public final class ConsumerMavenTestRunner {
         List<String> command = new ArrayList<>(launchPrefix(wrapper(projectRoot)));
         command.add("test");
         command.add("-Dpkb_runvars=" + embedFeaturePaths(compactRunVars, featurePaths));
+        String topLevel = topLevelFeaturesArgument(featurePaths);
+        if (topLevel != null) {
+            command.add(topLevel);
+        }
         command.add("-Dpkb_run_purpose=" + purpose);
         if (Files.isRegularFile(projectRoot.resolve("pom.xml"))) {
             command.add(SUREFIRE_CUCUMBER_ENGINE);

@@ -78,6 +78,7 @@ final class WorkbenchCommandLine {
             String version,
             boolean planOnly,
             boolean refreshIndex,
+            boolean fullScan,
             List<String> selects,
             Long stepTimeoutSeconds,
             Long runTimeoutSeconds
@@ -102,14 +103,14 @@ final class WorkbenchCommandLine {
     static Parsed parse(String[] args) {
         Path cwd = Path.of("").toAbsolutePath().normalize();
         if (args == null || args.length == 0) {
-            return new Parsed("ui", cwd, null, null, null, null, null, new String[]{"ui", cwd.toString()}, Coordination.empty(), null, false, false, List.of(), null, null);
+            return new Parsed("ui", cwd, null, null, null, null, null, new String[]{"ui", cwd.toString()}, Coordination.empty(), null, false, false, false, List.of(), null, null);
         }
         String command = args[0];
         if ("export-guidance".equals(command)) {
             Path output = args.length >= 2 && !isFlag(args[1])
                     ? Path.of(args[1])
                     : Path.of(".pickleball");
-            return new Parsed(command, cwd, output, null, null, null, null, args.clone(), Coordination.empty(), null, false, false, List.of(), null, null);
+            return new Parsed(command, cwd, output, null, null, null, null, args.clone(), Coordination.empty(), null, false, false, false, List.of(), null, null);
         }
 
         String tags = null;
@@ -140,6 +141,7 @@ final class WorkbenchCommandLine {
         String version = null;
         boolean planOnly = false;
         boolean refreshIndex = false;
+        boolean fullScan = false;
         List<String> selects = new ArrayList<>();
         Long stepTimeoutSeconds = null;
         Long runTimeoutSeconds = null;
@@ -216,6 +218,11 @@ final class WorkbenchCommandLine {
             }
             if ("--refresh".equals(token)) {
                 refreshIndex = true;
+                absorb = null;
+                continue;
+            }
+            if ("--no-narrow".equals(token) || "--full-scan".equals(token)) {
+                fullScan = true;
                 absorb = null;
                 continue;
             }
@@ -499,12 +506,12 @@ final class WorkbenchCommandLine {
             forwarded.addAll(rest);
             return new Parsed(
                     command, project, null, tags, name, example, retention, forwarded.toArray(String[]::new),
-                    coordination, version, planOnly, refreshIndex, selects, stepTimeoutSeconds, runTimeoutSeconds
+                    coordination, version, planOnly, refreshIndex, fullScan, selects, stepTimeoutSeconds, runTimeoutSeconds
             );
         }
         return new Parsed(
                 command, project, null, tags, name, example, retention, args.clone(),
-                coordination, version, planOnly, refreshIndex, selects, stepTimeoutSeconds, runTimeoutSeconds
+                coordination, version, planOnly, refreshIndex, fullScan, selects, stepTimeoutSeconds, runTimeoutSeconds
         );
     }
 

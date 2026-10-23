@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 
+import tools.dscode.testengine.DynamicSuiteEngine;
 import tools.dscode.testengine.PKB_props;
 
 import java.nio.file.Files;
@@ -17,6 +18,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -95,15 +97,32 @@ class ConsumerMavenTestRunnerTest {
     }
 
     @Test
-    void featurePathsAreQuotedInsideRunVarsAndAbsentWhenBlank() {
+    void featurePathsStayOutOfRunVarsAndNarrowOnlyTheTopLevel() {
+        String features = "wd-file:/tmp/Business Exception/a.feature,wd-file:C:/proj/Business Exception/b.feature";
         String embedded = ConsumerMavenTestRunner.embedFeaturePaths(
-                "pkb_tags=@smoke",
-                "wd-file:/tmp/a.feature,wd-file:/tmp/b.feature"
+                "pkb_tags=@smoke, pkb_features=classpath:features",
+                features
         );
         var parsed = PKB_props.parseAssignments(embedded);
         assertEquals("@smoke", parsed.get("pkb_tags"));
-        assertEquals("wd-file:/tmp/a.feature,wd-file:/tmp/b.feature", parsed.get(PKB_props.PKB_FEATURES));
+        assertEquals("classpath:features", parsed.get(PKB_props.PKB_FEATURES));
         assertEquals("pkb_tags=@smoke", ConsumerMavenTestRunner.embedFeaturePaths("pkb_tags=@smoke", " "));
+        assertNull(ConsumerMavenTestRunner.topLevelFeaturesArgument(" "));
+
+        String argument = ConsumerMavenTestRunner.topLevelFeaturesArgument(features);
+        assertEquals("-D" + DynamicSuiteEngine.TOP_LEVEL_FEATURES_PROPERTY + "=" + features, argument);
+        assertTrue(argument.contains("Business Exception"));
+        assertTrue(argument.contains("C:/proj/Business Exception/b.feature"));
+
+        Map<String, String> suite = new LinkedHashMap<>();
+        suite.put(PKB_props.PKB_FEATURES, "classpath:features");
+        suite.put("cucumber.features", "classpath:features");
+        Map<String, String> overlay = DynamicSuiteEngine.overlayTopLevelFeatures(suite, features);
+        assertEquals("classpath:features", suite.get(PKB_props.PKB_FEATURES));
+        assertEquals("classpath:features", suite.get("cucumber.features"));
+        assertEquals("classpath:features", overlay.get(PKB_props.PKB_FEATURES));
+        assertEquals(features, overlay.get("cucumber.features"));
+        assertTrue(suite == DynamicSuiteEngine.overlayTopLevelFeatures(suite, "  "));
     }
 
     @Test
@@ -117,12 +136,16 @@ class ConsumerMavenTestRunnerTest {
         assertTrue(bareFailure.getMessage().contains("Invalid profile assignment"), bareFailure.getMessage());
         assertTrue(bareFailure.getMessage().contains("wd-file:C:/proj/second.feature"), bareFailure.getMessage());
 
-        String embedded = ConsumerMavenTestRunner.embedFeaturePaths("pkb_tags=@smoke", features);
+        String embedded = ConsumerMavenTestRunner.embedFeaturePaths(
+                "pkb_tags=@smoke, pkb_features=classpath:features",
+                features
+        );
         String stripped = embedded.replace("\"", "").replace("'", "");
         var parsed = PKB_props.parseAssignments(stripped);
         assertEquals("@smoke", parsed.get("pkb_tags"));
-        assertEquals(features, parsed.get(PKB_props.PKB_FEATURES));
-        assertEquals(features, PKB_props.parseAssignments(embedded).get(PKB_props.PKB_FEATURES));
+        assertEquals("classpath:features", parsed.get(PKB_props.PKB_FEATURES));
+        assertEquals(features, ConsumerMavenTestRunner.topLevelFeaturesArgument(features)
+                .substring(("-D" + DynamicSuiteEngine.TOP_LEVEL_FEATURES_PROPERTY + "=").length()));
 
         var preserved = PKB_props.parseAssignments("pkb_name=C:\\data\\, pkb_browser=chrome");
         assertEquals("C:\\data\\", preserved.get("pkb_name"));

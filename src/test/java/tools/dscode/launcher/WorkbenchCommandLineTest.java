@@ -88,12 +88,29 @@ class WorkbenchCommandLineTest {
         });
         assertTrue(parsed.planOnly());
         assertTrue(parsed.refreshIndex());
+        assertFalse(parsed.fullScan());
         assertEquals("Find term", parsed.name());
         assertEquals("@smoke", parsed.tags());
         assertEquals(List.of(
                 "src/test/resources/features/search.feature:9",
                 "src/test/resources/features/search.feature:13"
         ), parsed.selects());
+    }
+
+    @Test
+    void noNarrowAndFullScanSkipTopLevelNarrowing() {
+        WorkbenchCommandLine.Parsed noNarrow = WorkbenchCommandLine.parse(new String[]{
+                "discover", "--tags=@caller", "--name=The", "caller", "--no-narrow"
+        });
+        assertTrue(noNarrow.fullScan());
+        assertEquals("The caller", noNarrow.name());
+        assertEquals("@caller", noNarrow.tags());
+
+        WorkbenchCommandLine.Parsed fullScan = WorkbenchCommandLine.parse(new String[]{
+                "confirm", "--full-scan", "--tags=@caller"
+        });
+        assertTrue(fullScan.fullScan());
+        assertEquals("@caller", fullScan.tags());
     }
 
     @Test
