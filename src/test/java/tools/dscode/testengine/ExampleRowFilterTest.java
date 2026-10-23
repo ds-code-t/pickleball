@@ -13,8 +13,13 @@ import org.junit.platform.engine.TestDescriptor;
 import org.junit.platform.engine.UniqueId;
 import org.junit.platform.engine.support.descriptor.AbstractTestDescriptor;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.PrintStream;
+import java.net.URL;
+import java.net.URLClassLoader;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -359,6 +364,63 @@ class ExampleRowFilterTest {
         assertTrue(invalid.getMessage().contains("'5-3'"));
         assertFalse(invalid.getMessage().startsWith("No scenarios matched"));
         assertEquals(before, root.getChildren().size());
+    }
+
+    @Test
+    void classpathSpaceAndWindowsPathAreDecodedAndAMissingFileIsSkipped() throws Exception {
+        Path root = tempDir.resolve("Business Exception");
+        Files.createDirectories(root);
+        Path feature = root.resolve("spaced.feature");
+        Files.writeString(feature, """
+                Feature: Spaced
+                  Scenario: Kept
+                    Given yes
+                """);
+        String encoded = "classpath:Business%20Exception/spaced.feature";
+        String windows = "classpath:Business%20Exception\\spaced.feature";
+        String missing = "classpath:Missing%20Name/absent.feature";
+        assertEquals("Business Exception/spaced.feature", ExampleRowFilter.classpathResource(encoded));
+        assertEquals("Business Exception/spaced.feature", ExampleRowFilter.classpathResource(windows));
+        assertEquals("Missing Name/absent.feature", ExampleRowFilter.classpathResource(missing));
+
+        String rawWindows = feature.toAbsolutePath().toString().replace("/", "\\");
+        assertTrue(ExampleRowFilter.featureUri(rawWindows).toString().contains("Business%20Exception"));
+
+        URLClassLoader loader = new URLClassLoader(new URL[]{tempDir.toUri().toURL()}, null);
+        ClassLoader previous = Thread.currentThread().getContextClassLoader();
+        Thread.currentThread().setContextClassLoader(loader);
+        PrintStream previousErr = System.err;
+        ByteArrayOutputStream err = new ByteArrayOutputStream();
+        try {
+            System.setErr(new PrintStream(err, true, StandardCharsets.UTF_8));
+            TestDescriptor suite = suiteOf(
+                    encoded,
+                    windows,
+                    missing,
+                    feature.toUri().toString(),
+                    rawWindows
+            );
+            ExampleRowFilter.applyToDiscoveredSuite(suite, "1", null, null);
+            assertEquals(4, suite.getChildren().size(), err.toString(StandardCharsets.UTF_8));
+        } finally {
+            System.setErr(previousErr);
+            Thread.currentThread().setContextClassLoader(previous);
+            loader.close();
+        }
+        String warnings = err.toString(StandardCharsets.UTF_8);
+        assertTrue(warnings.contains("WARNING: pkb_example skipped unreadable feature"), warnings);
+        assertTrue(warnings.contains("Missing%20Name") || warnings.contains("Missing Name"), warnings);
+        assertFalse(warnings.contains("spaced.feature"), warnings);
+    }
+
+    private static TestDescriptor suiteOf(String... featureValues) {
+        UniqueId rootId = UniqueId.forEngine("cucumber");
+        RowNode root = new RowNode(rootId, "suite", TestDescriptor.Type.CONTAINER);
+        for (String featureValue : featureValues) {
+            UniqueId id = rootId.append("feature", featureValue).append("scenario", "2");
+            root.addChild(new RowNode(id, featureValue, TestDescriptor.Type.TEST));
+        }
+        return root;
     }
 
     private static List<Pickle> scan(String features, String example, String tags, String name, String featureName) {

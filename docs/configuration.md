@@ -435,6 +435,8 @@ Missing or blank `pkb_configpath` uses the classpath resource root `configs`. Pi
 
 Absent or blank `pkb_example` adds no filter.
 
+A classpath feature URI is decoded before the lookup, including `%20` for a space. A Windows separator `\` is treated as `/`. A feature that still cannot be read is skipped with `WARNING: pkb_example skipped unreadable feature` and does not abort the run. Other features in that scan are still filtered.
+
 Tokens are separated by whitespace:
 
 - An integer `N` is overall value row `N` of that scenario, counted straight through every Examples table. The header is not a value row. `5` with two tables of 3 value rows is table 2, row 2.

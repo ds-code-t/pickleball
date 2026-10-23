@@ -85,6 +85,8 @@ These commands stay on the Workbench launcher. They do not change a normal `mvn 
 
 When the feature index can narrow a `discover` or `confirm` selection, only the top-level Cucumber discovery is narrowed. The matching paths go to `-Dpickleball.workbench.topFeatures`. They are not written over `pkb_features`. Nested `SCENARIO` / `COMPONENT` / `CALL` / `RUN` still call `CucumberScanUtil.listPickles` with the configured feature set, so a scenario in another file is found, including a path with spaces. `--no-narrow` and `--full-scan` skip that top-level list. A normal `mvn test` does not set the property.
 
+`pkb_example` decodes a classpath feature URI before it opens the file. `%20` is a space, and a Windows `\` is a `/`. One unreadable feature logs `WARNING: pkb_example skipped unreadable feature` and is left out of that filter. It does not abort the rest of the run.
+
 ```text
 "-Dexec.args=plan --tags=@smoke --name='Checkout.*'"
 "-Dexec.args=discover --plan --select=src/test/resources/features/checkout.feature:42"

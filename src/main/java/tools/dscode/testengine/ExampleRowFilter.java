@@ -14,6 +14,8 @@ import org.junit.platform.engine.UniqueId;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -82,7 +84,7 @@ public final class ExampleRowFilter {
         ExampleRowFilter filter = parse(example);
         List<TestDescriptor> tests = new ArrayList<>();
         collectTests(root, tests);
-        Map<String, Feature> features = new HashMap<>();
+        Map<String, Optional<Feature>> features = new HashMap<>();
         List<TestDescriptor> selected = new ArrayList<>();
         List<Coordinates> coordinates = new ArrayList<>();
         for (TestDescriptor test : tests) {
@@ -91,6 +93,10 @@ public final class ExampleRowFilter {
             }
             Located located = locate(test, features);
             if (located == null) {
+                if (unreadable(features, segment(test.getUniqueId(), FEATURE_SEGMENT))) {
+                    test.removeFromHierarchy();
+                    continue;
+                }
                 throw new IllegalArgumentException(
                         "pkb_example could not locate a scenario row for " + test.getUniqueId()
                 );
@@ -208,7 +214,15 @@ public final class ExampleRowFilter {
                 || segment(test.getUniqueId(), SCENARIO_SEGMENT) != null);
     }
 
-    private static Located locate(TestDescriptor test, Map<String, Feature> features) {
+    private static boolean unreadable(Map<String, Optional<Feature>> features, String featureValue) {
+        if (featureValue == null) {
+            return false;
+        }
+        Optional<Feature> loaded = features.get(featureValue);
+        return loaded != null && loaded.isEmpty();
+    }
+
+    private static Located locate(TestDescriptor test, Map<String, Optional<Feature>> features) {
         String featureValue = segment(test.getUniqueId(), FEATURE_SEGMENT);
         String lineText = segment(test.getUniqueId(), EXAMPLE_SEGMENT);
         if (lineText == null) {
@@ -223,11 +237,11 @@ public final class ExampleRowFilter {
         } catch (NumberFormatException exception) {
             return null;
         }
-        Feature feature = features.computeIfAbsent(featureValue, ExampleRowFilter::loadFeature);
-        if (feature == null) {
+        Optional<Feature> feature = features.computeIfAbsent(featureValue, ExampleRowFilter::loadFeature);
+        if (feature.isEmpty()) {
             return null;
         }
-        for (Pickle pickle : feature.getPickles()) {
+        for (Pickle pickle : feature.get().getPickles()) {
             if (pickle.getLocation() != null && pickle.getLocation().getLine() == line) {
                 return new Located(pickle, coordinatesOf(pickle));
             }
@@ -235,41 +249,118 @@ public final class ExampleRowFilter {
         return null;
     }
 
-    private static Feature loadFeature(String featureValue) {
-        URI uri = URI.create(featureValue);
+    private static Optional<Feature> loadFeature(String featureValue) {
+        URI uri;
+        try {
+            uri = featureUri(featureValue);
+        } catch (RuntimeException exception) {
+            warnSkipped(featureValue, exception);
+            return Optional.empty();
+        }
         GherkinMessagesFeatureParser parser = new GherkinMessagesFeatureParser();
-        try (InputStream input = open(uri)) {
-            Optional<Feature> parsed = parser.parse(uri, input, UUID::randomUUID);
-            return parsed.orElse(null);
-        } catch (IOException exception) {
-            throw new IllegalArgumentException(
-                    "pkb_example could not read feature " + featureValue,
-                    exception
-            );
+        try (InputStream input = open(uri, featureValue)) {
+            if (input == null) {
+                return Optional.empty();
+            }
+            return parser.parse(uri, input, UUID::randomUUID);
+        } catch (RuntimeException | IOException exception) {
+            warnSkipped(featureValue, exception);
+            return Optional.empty();
         }
     }
 
-    private static InputStream open(URI uri) throws IOException {
-        String external = uri.toString();
-        if (external.toLowerCase(Locale.ROOT).startsWith("classpath:")) {
-            String resource = external.substring("classpath:".length());
-            while (resource.startsWith("/")) {
-                resource = resource.substring(1);
+    static URI featureUri(String featureValue) {
+        String value = featureValue == null ? "" : featureValue;
+        try {
+            URI uri = URI.create(value);
+            if (uri.getScheme() != null || !value.contains("\\")) {
+                return uri;
             }
+        } catch (IllegalArgumentException ignored) {
+            // A space or a raw Windows path is not a legal URI until it is normalized.
+        }
+        String normalized = value.replace('\\', '/');
+        if (normalized.regionMatches(true, 0, "classpath:", 0, "classpath:".length())) {
+            return URI.create("classpath:" + normalized.substring("classpath:".length()).replace(" ", "%20"));
+        }
+        try {
+            return Path.of(normalized).toUri();
+        } catch (RuntimeException failure) {
+            return URI.create(normalized.replace(" ", "%20"));
+        }
+    }
+
+    /**
+     * Classpath lookup key. Percent-encoding is decoded and Windows separators
+     * become {@code /} before {@link ClassLoader#getResourceAsStream}.
+     */
+    static String classpathResource(String featureValue) {
+        String external = featureValue == null ? "" : featureValue;
+        String resource;
+        try {
+            URI uri = URI.create(external);
+            if (uri.getScheme() != null && uri.getScheme().equalsIgnoreCase("classpath")) {
+                resource = uri.getSchemeSpecificPart();
+            } else if (external.toLowerCase(Locale.ROOT).startsWith("classpath:")) {
+                resource = decodeClasspath(external).substring("classpath:".length());
+            } else {
+                resource = external;
+            }
+        } catch (IllegalArgumentException invalid) {
+            resource = external.toLowerCase(Locale.ROOT).startsWith("classpath:")
+                    ? decodeClasspath(external).substring("classpath:".length())
+                    : external;
+        }
+        resource = resource.replace('\\', '/');
+        while (resource.startsWith("/")) {
+            resource = resource.substring(1);
+        }
+        return resource;
+    }
+
+    private static String decodeClasspath(String value) {
+        String resource = value;
+        if (resource.toLowerCase(Locale.ROOT).startsWith("classpath:")) {
+            resource = resource.substring("classpath:".length());
+        }
+        try {
+            return "classpath:" + URLDecoder.decode(resource.replace("+", "%2B"), StandardCharsets.UTF_8);
+        } catch (IllegalArgumentException invalid) {
+            return "classpath:" + resource;
+        }
+    }
+
+    private static void warnSkipped(String featureValue, Exception exception) {
+        String detail = exception.getMessage() == null ? exception.getClass().getSimpleName() : exception.getMessage();
+        System.err.println("WARNING: pkb_example skipped unreadable feature " + featureValue + ": " + detail);
+    }
+
+    private static InputStream open(URI uri, String featureValue) throws IOException {
+        String external = uri.toString();
+        String original = featureValue == null ? external : featureValue;
+        if (external.toLowerCase(Locale.ROOT).startsWith("classpath:")
+                || original.toLowerCase(Locale.ROOT).startsWith("classpath:")) {
+            String resource = classpathResource(original);
             ClassLoader loader = Thread.currentThread().getContextClassLoader();
             if (loader == null) {
                 loader = ExampleRowFilter.class.getClassLoader();
             }
             InputStream input = loader.getResourceAsStream(resource);
             if (input == null) {
-                throw new IOException("Classpath feature was not found: " + external);
+                warnSkipped(original, new IOException("Classpath feature was not found: " + resource));
+                return null;
             }
             return input;
         }
         try {
             return Files.newInputStream(Path.of(uri));
         } catch (RuntimeException | IOException first) {
-            return uri.toURL().openStream();
+            try {
+                return uri.toURL().openStream();
+            } catch (RuntimeException | IOException second) {
+                warnSkipped(original, second);
+                return null;
+            }
         }
     }
 
