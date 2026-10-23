@@ -11,7 +11,9 @@ import java.nio.file.Path;
 import java.util.List;
 
 import tools.dscode.common.coordination.AgentCoordination;
+import tools.dscode.control.protocol.WorkbenchFeatureIndex;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -147,5 +149,92 @@ class WorkbenchRunReportsTest {
         );
         assertEquals(2, consoleSteps);
         assertTrue(consoleOut.toString(StandardCharsets.UTF_8).contains("summary status=PASSED scenarios=1 steps=2"));
+    }
+
+    @Test
+    void prunedScenarioStillWritesRunSummaryAndNamedConsole() throws Exception {
+        Path project = tempDir.resolve("Program Files");
+        String runId = "check-1023";
+        Path run = AgentCoordination.runDirectory(project, runId);
+        Path passed = run.resolve("diagnostic").resolve(runId).resolve("scenarios").resolve("exec-pass");
+        Path failed = run.resolve("diagnostic").resolve(runId).resolve("scenarios").resolve("exec-fail");
+        Files.createDirectories(passed);
+        Files.createDirectories(failed);
+        String core = """
+                {"outcome":"PASSED","durationMillis":1200,"identity":{"scenarioName":"Pend case NEW UI"},"steps":{"executed":2,"passed":2}}
+                """;
+        Path coreFile = passed.resolve("summary.json");
+        Files.writeString(coreFile, core);
+        byte[] coreBefore = Files.readAllBytes(coreFile);
+        Files.writeString(failed.resolve("events.jsonl"), """
+                {"type":"scenario_start","identity":{"scenarioName":"C:\\\\Users\\\\Dan She'll\\\\page"}}
+                {"type":"step","keyword":"Then","text":"the file is saved","status":"FAILED","durationMillis":40,"errorMessage":"final XPath: //a\\nexpected: <yes> but was: <no>"}
+                {"type":"scenario_end","outcome":"FAILED"}
+                """);
+        Files.writeString(failed.resolve("trace.jsonl"), """
+                {"step":"Then the file is saved","type":"log","text":"C:/Program Files/Pickleball/body.xml"}
+                """);
+        String savedName = "C:\\Users\\Dan She'll\\page";
+        String console = """
+                Scenario: Pend case NEW UI # C:/Program Files/Pickleball/features/Page Response.feature:12
+                INFO: saved C:\\Users\\Dan She'll\\reports\\body.html
+                Scenario: C:\\Users\\Dan She'll\\page # C:/Program Files/Pickleball/features/save.feature:4
+                expected: <yes> but was: <no>
+                """;
+
+        ByteArrayOutputStream sink = new ByteArrayOutputStream();
+        int steps = WorkbenchRunReports.publish(
+                project,
+                runId,
+                List.of(hit("Pend case NEW UI"), hit(savedName)),
+                console,
+                "FAILED",
+                new PrintStream(sink, true, StandardCharsets.UTF_8)
+        );
+
+        assertTrue(steps >= 1, "steps=" + steps);
+        assertArrayEquals(coreBefore, Files.readAllBytes(coreFile));
+        String passedSummary = Files.readString(passed.resolve("workbench").resolve("summary.json"));
+        assertTrue(passedSummary.contains("\"scenario\" : \"Pend case NEW UI\""), passedSummary);
+        assertTrue(passedSummary.contains("\"status\" : \"PASSED\""), passedSummary);
+        assertTrue(passedSummary.contains("\"durationMillis\" : 1200"), passedSummary);
+
+        Path runSummary = run.resolve("workbench").resolve("summary.json");
+        assertTrue(Files.isRegularFile(runSummary), "missing " + runSummary);
+        String summary = Files.readString(runSummary);
+        assertTrue(Files.size(runSummary) > 0);
+        assertTrue(summary.contains("Pend case NEW UI"), summary);
+        assertTrue(summary.contains("1200"), summary);
+        assertTrue(summary.contains("Then the file is saved"), summary);
+        assertTrue(summary.contains("actual=no expected=yes"), summary);
+        assertTrue(Files.isRegularFile(run.resolve("workbench").resolve("trace-index.json")));
+        String traceIndex = Files.readString(run.resolve("workbench").resolve("trace-index.json"));
+        assertTrue(traceIndex.contains("Then the file is saved"), traceIndex);
+
+        Path consoleDir = run.resolve("console");
+        String pending = Files.readString(consoleDir.resolve("Pend_case_NEW_UI.txt"));
+        assertTrue(pending.contains("Page Response.feature"), pending);
+        assertTrue(pending.contains("Dan She'll"), pending);
+        assertFalse(pending.contains("but was"), pending);
+        String saved = Files.readString(consoleDir.resolve("C_Users_Dan_She_ll_page.txt"));
+        assertTrue(saved.contains("C:/Program Files/Pickleball/features/save.feature:4"), saved);
+        assertTrue(saved.contains("but was"), saved);
+        assertFalse(Files.exists(consoleDir.resolve("unassigned.txt")));
+        assertTrue(sink.toString(StandardCharsets.UTF_8).contains("summary status=FAILED"));
+    }
+
+    private static WorkbenchFeatureIndex.Hit hit(String scenarioName) {
+        return new WorkbenchFeatureIndex.Hit(
+                "C:/Program Files/Pickleball/features/save.feature",
+                "Save",
+                scenarioName,
+                1,
+                20,
+                0,
+                4,
+                List.of(),
+                List.of(),
+                List.of()
+        );
     }
 }

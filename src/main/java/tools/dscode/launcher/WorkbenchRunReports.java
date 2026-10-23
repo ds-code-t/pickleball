@@ -124,8 +124,12 @@ public final class WorkbenchRunReports {
         }
         int steps = 0;
         int scenarios = 0;
+        List<Map<String, Object>> bodies = new ArrayList<>();
+        List<Map<String, Object>> traces = new ArrayList<>();
         for (Path dir : currentRunScenarioDirs(project, runId)) {
-            writeScenario(dir);
+            Path written = writeScenario(dir);
+            bodies.add(readJsonObject(written));
+            traces.add(readJsonObject(dir.resolve("workbench").resolve("trace-index.json")));
             scenarios++;
             steps += stepCount(dir);
         }
@@ -135,6 +139,9 @@ public final class WorkbenchRunReports {
                 scenarios = indexed[0];
                 steps = indexed[1];
             }
+        } else if (steps == 0) {
+            int[] indexed = indexCounts(project, runId);
+            if (indexed != null && indexed[1] > 0) steps = indexed[1];
         }
         if (scenarios == 0 && steps == 0) {
             int[] fromConsole = consoleCounts(console);
@@ -142,15 +149,34 @@ public final class WorkbenchRunReports {
                 scenarios = fromConsole[0];
                 steps = fromConsole[1];
             }
+        } else if (steps == 0) {
+            int[] fromConsole = consoleCounts(console);
+            if (fromConsole != null && fromConsole[1] > 0) steps = fromConsole[1];
         }
         if (scenarios == 0) scenarios = names.size();
+        if (runId != null && !runId.isBlank()) {
+            try {
+                writeRunSummary(
+                        AgentCoordination.runDirectory(project, runId),
+                        status,
+                        bodies,
+                        traces,
+                        scenarios,
+                        steps
+                );
+            } catch (IllegalArgumentException invalid) {
+                // An unsafe run id already skipped the console write.
+            }
+        }
         if (out != null) out.println(compact(status, scenarios, steps, environment, browser));
         return steps;
     }
 
     /**
-     * Scenario counts belong to this run. A private diagnostic folder wins.
-     * The shared tree is only this run's directory, never every prior run.
+     * Scenario counts belong to this run. A private diagnostic folder wins when it
+     * already has a scenario directory. Passed scenarios often lose {@code events.jsonl}
+     * under retention {@code failed}; the core {@code summary.json} under {@code scenarios/}
+     * is still that directory. The shared tree is only this run, never every prior run.
      */
     private static List<Path> currentRunScenarioDirs(Path project, String runId) throws IOException {
         if (project == null || runId == null || runId.isBlank()) return List.of();
@@ -167,9 +193,22 @@ public final class WorkbenchRunReports {
 
     private static List<Path> scenarioDirs(Path root) throws IOException {
         if (root == null || !Files.isDirectory(root)) return List.of();
-        try (var walk = Files.walk(root, 4)) {
-            return walk.filter(path -> Files.isRegularFile(path.resolve("events.jsonl"))).toList();
+        try (var walk = Files.walk(root, 6)) {
+            return walk.filter(WorkbenchRunReports::scenarioDirectory).toList();
         }
+    }
+
+    /** A scenario folder still holding events, or the core summary left after dense evidence was pruned. */
+    private static boolean scenarioDirectory(Path path) {
+        if (path == null || !Files.isDirectory(path)) return false;
+        if (Files.isRegularFile(path.resolve("events.jsonl"))) return true;
+        Path parent = path.getParent();
+        if (parent == null || parent.getFileName() == null || !"scenarios".equals(parent.getFileName().toString())) {
+            return false;
+        }
+        return Files.isRegularFile(path.resolve("summary.json"))
+                || Files.isRegularFile(path.resolve("trace.jsonl"))
+                || Files.isRegularFile(path.resolve("trace.jsonl.gz"));
     }
 
     /** Full-scan runs often have no private scenario directory. The run index still has counts. */
@@ -273,11 +312,13 @@ public final class WorkbenchRunReports {
             boolean failed = steps.stream().anyMatch(step -> "FAILED".equals(text(step.get("status"))));
             status = steps.isEmpty() ? "" : failed ? "FAILED" : "PASSED";
         }
+        boolean thin = scenario.isBlank() || steps.isEmpty();
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("scenario", scenario);
         body.put("status", status);
         body.put("steps", steps);
         body.put("failures", failures);
+        if (thin) fillFromCoreSummary(scenarioDir, body);
         Path workbench = scenarioDir.resolve("workbench");
         Files.createDirectories(workbench);
         Path summary = workbench.resolve("summary.json");
@@ -288,6 +329,106 @@ public final class WorkbenchRunReports {
         }
         JSON.writeValue(workbench.resolve("trace-index.json").toFile(), traceIndex(scenarioDir.resolve("trace.jsonl")));
         return summary;
+    }
+
+    /**
+     * Run-level files the Workbench docs name: {@code runs/<id>/workbench/summary.json}
+     * and {@code trace-index.json}. Does not rewrite core scenario files.
+     */
+    private static void writeRunSummary(
+            Path runFolder,
+            String status,
+            List<Map<String, Object>> bodies,
+            List<Map<String, Object>> traces,
+            int scenarioCount,
+            int stepCount
+    ) throws IOException {
+        Path workbench = runFolder.resolve("workbench");
+        Files.createDirectories(workbench);
+        Map<String, Object> body = new LinkedHashMap<>();
+        if (bodies.size() == 1) {
+            body.putAll(bodies.getFirst());
+            if (text(body.get("status")).isBlank() && status != null) body.put("status", status);
+        } else {
+            body.put("status", status == null ? "" : status);
+            body.put("scenarios", bodies);
+            List<Object> steps = new ArrayList<>();
+            List<Object> failureRows = new ArrayList<>();
+            for (Map<String, Object> one : bodies) {
+                if (one.get("steps") instanceof List<?> list) steps.addAll(list);
+                if (one.get("failures") instanceof List<?> list) failureRows.addAll(list);
+            }
+            body.put("steps", steps);
+            body.put("failures", failureRows);
+        }
+        body.put("scenarioCount", scenarioCount);
+        body.put("stepCount", stepCount);
+        JSON.writeValue(workbench.resolve("summary.json").toFile(), body);
+        List<Map<String, Object>> spans = new ArrayList<>();
+        for (int index = 0; index < traces.size(); index++) {
+            String scenario = index < bodies.size() ? text(bodies.get(index).get("scenario")) : "";
+            Object rawSteps = traces.get(index).get("steps");
+            if (!(rawSteps instanceof List<?> list)) continue;
+            for (Object item : list) {
+                if (!(item instanceof Map<?, ?> map)) continue;
+                Map<String, Object> span = new LinkedHashMap<>();
+                if (!scenario.isBlank()) span.put("scenario", scenario);
+                for (Map.Entry<?, ?> entry : map.entrySet()) {
+                    span.put(String.valueOf(entry.getKey()), entry.getValue());
+                }
+                spans.add(span);
+            }
+        }
+        JSON.writeValue(workbench.resolve("trace-index.json").toFile(), Map.of("steps", spans));
+    }
+
+    private static void fillFromCoreSummary(Path scenarioDir, Map<String, Object> body) {
+        Path core = scenarioDir.resolve("summary.json");
+        if (!Files.isRegularFile(core)) return;
+        try {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> coreBody = JSON.readValue(core.toFile(), Map.class);
+            if (text(body.get("scenario")).isBlank()) {
+                body.put("scenario", scenarioNameFrom(coreBody));
+            }
+            if (text(body.get("status")).isBlank()) {
+                String outcome = firstText(coreBody, "outcome", "status");
+                if (!outcome.isBlank()) body.put("status", outcome);
+            }
+            if (!body.containsKey("durationMillis") && coreBody.get("durationMillis") != null) {
+                body.put("durationMillis", longValue(coreBody.get("durationMillis")));
+            }
+            Object coreSteps = coreBody.get("steps");
+            if (body.get("steps") instanceof List<?> list && list.isEmpty() && coreSteps instanceof List<?> steps) {
+                body.put("steps", steps);
+            }
+            if (body.get("failures") instanceof List<?> list && list.isEmpty()) {
+                String message = firstText(coreBody, "failureMessage", "message");
+                if (!message.isBlank()) body.put("failures", List.of(parseFailureText(message)));
+            }
+        } catch (IOException ignored) {
+            // A core summary that cannot be read is left unchanged.
+        }
+    }
+
+    private static String scenarioNameFrom(Map<String, Object> coreBody) {
+        Object identity = coreBody.get("identity");
+        if (identity instanceof Map<?, ?> map) {
+            String name = firstText(map, "scenarioName", "name");
+            if (!name.isBlank()) return name;
+        }
+        return firstText(coreBody, "scenario", "scenarioName", "name");
+    }
+
+    private static Map<String, Object> readJsonObject(Path file) {
+        if (file == null || !Files.isRegularFile(file)) return new LinkedHashMap<>();
+        try {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> raw = JSON.readValue(file.toFile(), Map.class);
+            return raw == null ? new LinkedHashMap<>() : raw;
+        } catch (IOException ignored) {
+            return new LinkedHashMap<>();
+        }
     }
 
     static Map<String, Object> parseFailureText(String message) {
@@ -445,11 +586,36 @@ public final class WorkbenchRunReports {
 
     private static String scenarioOnLine(String line, List<String> names) {
         String trimmed = line == null ? "" : line.trim();
-        String bare = trimmed.startsWith("Scenario:") ? trimmed.substring("Scenario:".length()).trim() : trimmed;
+        if (trimmed.isEmpty() || names == null || names.isEmpty()) return null;
+        String bare = stripScenarioKeyword(trimmed);
+        List<String> ordered = new ArrayList<>();
         for (String name : names) {
+            if (name != null && !name.isBlank()) ordered.add(name);
+        }
+        ordered.sort((left, right) -> Integer.compare(right.length(), left.length()));
+        for (String name : ordered) {
             if (name.equals(trimmed) || name.equals(bare)) return name;
+            if (bare.startsWith(name) && locationTail(bare.substring(name.length()))) return name;
         }
         return null;
+    }
+
+    /** Cucumber prints {@code Scenario:} or {@code Scenario Outline:} before the name. */
+    private static String stripScenarioKeyword(String trimmed) {
+        if (trimmed.startsWith("Scenario Outline:")) {
+            return trimmed.substring("Scenario Outline:".length()).trim();
+        }
+        if (trimmed.startsWith("Scenario:")) {
+            return trimmed.substring("Scenario:".length()).trim();
+        }
+        return trimmed;
+    }
+
+    /** True when nothing follows the name, or Cucumber's {@code # uri:line} location does. */
+    private static boolean locationTail(String rest) {
+        if (rest == null) return false;
+        String text = rest.stripLeading();
+        return text.isEmpty() || text.startsWith("#");
     }
 
     private static Path writeText(Path file, String text) throws IOException {

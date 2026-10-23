@@ -7,6 +7,9 @@ import org.junit.jupiter.api.io.TempDir;
 import tools.dscode.testengine.DynamicSuiteEngine;
 import tools.dscode.testengine.PKB_props;
 
+import java.io.ByteArrayOutputStream;
+import java.io.PrintStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
@@ -210,6 +213,33 @@ class ConsumerMavenTestRunnerTest {
         assertFalse(waiter.isAlive(), "waiter did not leave waitFor");
         assertTrue(thrown.get() instanceof InterruptedException, String.valueOf(thrown.get()));
         assertFalse(anyAlive(tree), "pids still alive: " + tree);
+    }
+
+    @Test
+    @Timeout(value = 30, unit = TimeUnit.SECONDS)
+    void wrapperOutputIsCopiedOntoTheStreamsTheCallerPassed() throws Exception {
+        Path message = project.resolve("message.txt");
+        Files.writeString(message, "C:\\Users\\Dan She'll\\body.html\n");
+        Path script = project.resolve("speak.sh");
+        Files.writeString(script, """
+                #!/bin/sh
+                printf '%s\\n' 'Scenario: Pend case NEW UI # C:/Program Files/Pickleball/page.feature:12'
+                cat "$1" >&2
+                """);
+        ByteArrayOutputStream outBytes = new ByteArrayOutputStream();
+        ByteArrayOutputStream errBytes = new ByteArrayOutputStream();
+        int exit = ConsumerMavenTestRunner.inheritIoLauncher().run(
+                List.of("/bin/sh", script.toString(), message.toString()),
+                project,
+                new PrintStream(outBytes, true, StandardCharsets.UTF_8),
+                new PrintStream(errBytes, true, StandardCharsets.UTF_8)
+        );
+        assertEquals(0, exit);
+        String out = outBytes.toString(StandardCharsets.UTF_8);
+        String err = errBytes.toString(StandardCharsets.UTF_8);
+        assertTrue(out.contains("Pend case NEW UI"), out);
+        assertTrue(out.contains("C:/Program Files/Pickleball/page.feature:12"), out);
+        assertTrue(err.contains("C:\\Users\\Dan She'll\\body.html"), err);
     }
 
     private static List<String> sleeperCommand(Path classes, Path pids, long sleepMs) {

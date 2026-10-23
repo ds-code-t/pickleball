@@ -4,6 +4,7 @@ import tools.dscode.common.runtime.ProcessTrees;
 import tools.dscode.testengine.DynamicSuiteEngine;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.PrintStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -176,17 +177,57 @@ public final class ConsumerMavenTestRunner {
 
     static ProcessLauncher inheritIoLauncher() {
         return (command, directory, out, err) -> {
+            // stdout and stderr must be the streams the caller passed in.
+            // inheritIO() writes to the JVM's original descriptors and skips them,
+            // so Workbench console capture stayed empty.
             ProcessBuilder builder = new ProcessBuilder(command)
                     .directory(directory.toFile())
-                    .inheritIO();
+                    .redirectInput(ProcessBuilder.Redirect.INHERIT);
             Process process = builder.start();
+            Thread output = pump(process.getInputStream(), out, "pickleball-maven-stdout");
+            Thread errors = pump(process.getErrorStream(), err, "pickleball-maven-stderr");
             try {
-                return process.waitFor();
+                int exit = process.waitFor();
+                output.join(30_000);
+                errors.join(30_000);
+                return exit;
             } catch (InterruptedException interrupted) {
                 ProcessTrees.killTree(process.toHandle());
+                closeQuietly(process.getInputStream());
+                closeQuietly(process.getErrorStream());
+                output.interrupt();
+                errors.interrupt();
                 Thread.currentThread().interrupt();
                 throw interrupted;
             }
         };
+    }
+
+    private static Thread pump(InputStream input, PrintStream target, String name) {
+        Thread thread = new Thread(() -> {
+            byte[] buffer = new byte[8192];
+            try (input) {
+                int read;
+                while ((read = input.read(buffer)) >= 0) {
+                    if (target != null && read > 0) {
+                        target.write(buffer, 0, read);
+                        target.flush();
+                    }
+                }
+            } catch (IOException ignored) {
+                // The process exiting, or an interrupt closing the pipe, ends the copy.
+            }
+        }, name);
+        thread.setDaemon(true);
+        thread.start();
+        return thread;
+    }
+
+    private static void closeQuietly(InputStream input) {
+        try {
+            input.close();
+        } catch (IOException ignored) {
+            // Closing a finished pipe is only to unblock the pump.
+        }
     }
 }
