@@ -3,10 +3,14 @@ package tools.dscode.launcher;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.io.ByteArrayOutputStream;
+import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+
+import tools.dscode.common.coordination.AgentCoordination;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -102,5 +106,46 @@ class WorkbenchRunReportsTest {
         assertFalse(pending.contains("other-line"), pending);
         assertTrue(other.contains("other-line"), other);
         assertFalse(other.contains("pending-line"), other);
+    }
+
+    @Test
+    void fullScanSummaryUsesTheRunIndexThenTheConsole() throws Exception {
+        Path project = tempDir.resolve("Business Exception");
+        Files.createDirectories(project);
+        String runId = "run-full";
+        Path index = AgentCoordination.runDirectory(project, runId)
+                .resolve("diagnostic").resolve(runId).resolve("run-index.json");
+        Files.createDirectories(index.getParent());
+        Files.writeString(index, """
+                {
+                  "runId": "run-full",
+                  "outcome": "PASSED",
+                  "counts": { "total": 1, "passed": 1, "failed": 0 },
+                  "steps": { "executed": 3, "passed": 3 }
+                }
+                """);
+        ByteArrayOutputStream indexedOut = new ByteArrayOutputStream();
+        int indexedSteps = WorkbenchRunReports.publish(
+                project, runId, List.of(), "1 Scenarios\n9 Steps\n", "PASSED",
+                new PrintStream(indexedOut, true, StandardCharsets.UTF_8)
+        );
+        assertEquals(3, indexedSteps);
+        assertTrue(indexedOut.toString(StandardCharsets.UTF_8).contains("summary status=PASSED scenarios=1 steps=3"));
+
+        ByteArrayOutputStream consoleOut = new ByteArrayOutputStream();
+        int consoleSteps = WorkbenchRunReports.publish(
+                project,
+                "run-console",
+                List.of(),
+                """
+                some log
+                1 Scenarios (1 passed)
+                2 Steps (2 passed)
+                """,
+                "PASSED",
+                new PrintStream(consoleOut, true, StandardCharsets.UTF_8)
+        );
+        assertEquals(2, consoleSteps);
+        assertTrue(consoleOut.toString(StandardCharsets.UTF_8).contains("summary status=PASSED scenarios=1 steps=2"));
     }
 }

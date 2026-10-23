@@ -87,6 +87,8 @@ When the feature index can narrow a `discover` or `confirm` selection, only the 
 
 `pkb_example` decodes a classpath feature URI before it opens the file. `%20` is a space, and a Windows `\` is a `/`. One unreadable feature logs `WARNING: pkb_example skipped unreadable feature` and is left out of that filter. It does not abort the rest of the run.
 
+`record.json` takes a failed outcome from `run-index.json` when that file exists, including `counts.errors` and outcome `ERROR`, and including `diagnostic/run-index.json`. `failureCount`, `failedScenario`, and `failureSummary` are filled from it. A full scan with no scenario directory prints `scenarios=` and `steps=` from that index, or from the console `Scenarios` / `Steps` lines.
+
 ```text
 "-Dexec.args=plan --tags=@smoke --name='Checkout.*'"
 "-Dexec.args=discover --plan --select=src/test/resources/features/checkout.feature:42"

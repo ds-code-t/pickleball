@@ -804,6 +804,120 @@ class WorkbenchAgentCommandsTest {
     }
 
     @Test
+    void discoverUpgradesAWorkerPassedRecordWhenTheFlatIndexHasAnError() throws Exception {
+        writeProjectWrapper();
+        Path features = tempDir.resolve("src/test/resources/features");
+        Files.createDirectories(features);
+        Files.writeString(features.resolve("boom.feature"), """
+                @boom
+                Feature: Boom
+                  Scenario: It errors
+                    Given no
+                """);
+        Path catalogDir = tempDir.resolve("reports/diagnostic-runs");
+        Files.createDirectories(catalogDir);
+        ByteArrayOutputStream stdout = new ByteArrayOutputStream();
+        int exit = WorkbenchAgentCommands.run(
+                new String[]{"discover", tempDir.toString(), "--tags=@boom", "--run-id=run-error"},
+                new PrintStream(stdout, true, StandardCharsets.UTF_8),
+                new PrintStream(new ByteArrayOutputStream(), true, StandardCharsets.UTF_8),
+                (project, command, out, err) -> {
+                    try {
+                        AgentCoordination.finish(project, "run-error", null, "PASSED");
+                        Path index = AgentCoordination.runDirectory(project, "run-error")
+                                .resolve("diagnostic").resolve("run-index.json");
+                        Files.createDirectories(index.getParent());
+                        Files.writeString(index, """
+                                {
+                                  "runId": "run-error",
+                                  "outcome": "ERROR",
+                                  "counts": { "total": 1, "passed": 0, "failed": 0, "errors": 1 },
+                                  "scenarios": [ { "name": "It errors", "outcome": "ERROR" } ]
+                                }
+                                """);
+                        Files.writeString(catalogDir.resolve("run-catalog.json"), """
+                                {
+                                  "schemaVersion": 1,
+                                  "runs": [
+                                    {
+                                      "runId": "run-error",
+                                      "outcome": "ERROR",
+                                      "runProfile": "pkb_tags=@boom",
+                                      "lineage": { "runPurpose": "workbench-discover" }
+                                    }
+                                  ]
+                                }
+                                """);
+                    } catch (Exception failure) {
+                        throw new RuntimeException(failure);
+                    }
+                    return 0;
+                }
+        );
+        assertEquals(1, exit);
+        String text = stdout.toString(StandardCharsets.UTF_8);
+        assertTrue(text.contains("summary status=FAILED"), text);
+        String record = Files.readString(
+                AgentCoordination.runDirectory(tempDir, "run-error").resolve(AgentCoordination.RECORD_FILE)
+        );
+        assertTrue(record.contains("\"status\" : \"FAILED\""), record);
+        assertTrue(record.contains("\"failureCount\" : 1"), record);
+        assertFalse(record.contains("\"status\" : \"PASSED\""), record);
+    }
+
+    @Test
+    void discoverFailureIgnoreUsesASurefireErrorWhenTheRunIndexIsMissing() throws Exception {
+        writeProjectWrapper();
+        Path features = tempDir.resolve("src/test/resources/features");
+        Files.createDirectories(features);
+        Files.writeString(features.resolve("boom.feature"), """
+                @boom
+                Feature: Boom
+                  Scenario: It errors
+                    Given no
+                """);
+        Path catalogDir = tempDir.resolve("reports/diagnostic-runs");
+        Files.createDirectories(catalogDir);
+        ByteArrayOutputStream stdout = new ByteArrayOutputStream();
+        int exit = WorkbenchAgentCommands.run(
+                new String[]{"discover", tempDir.toString(), "--tags=@boom", "--run-id=run-xml-error"},
+                new PrintStream(stdout, true, StandardCharsets.UTF_8),
+                new PrintStream(new ByteArrayOutputStream(), true, StandardCharsets.UTF_8),
+                (project, command, out, err) -> {
+                    try {
+                        Path report = project.resolve("target/surefire-reports/TEST-error.xml");
+                        Files.createDirectories(report.getParent());
+                        Files.writeString(report, """
+                                <testsuite name="boom" tests="1" failures="0" errors="1"></testsuite>
+                                """);
+                        Files.writeString(catalogDir.resolve("run-catalog.json"), """
+                                {
+                                  "schemaVersion": 1,
+                                  "runs": [
+                                    {
+                                      "runId": "run-xml-error",
+                                      "outcome": "PASSED",
+                                      "runProfile": "pkb_tags=@boom",
+                                      "lineage": { "runPurpose": "workbench-discover" }
+                                    }
+                                  ]
+                                }
+                                """);
+                    } catch (Exception failure) {
+                        throw new RuntimeException(failure);
+                    }
+                    return 0;
+                }
+        );
+        assertEquals(1, exit);
+        String record = Files.readString(
+                AgentCoordination.runDirectory(tempDir, "run-xml-error").resolve(AgentCoordination.RECORD_FILE)
+        );
+        assertTrue(record.contains("\"status\" : \"FAILED\""), record);
+        assertTrue(record.contains("\"failureCount\" : 1"), record);
+    }
+
+    @Test
     void secondDiscoverUsesItsOwnRunIndexNotThePreviousCatalog() throws Exception {
         writeProjectWrapper();
         Path features = tempDir.resolve("src/test/resources/features");

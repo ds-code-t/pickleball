@@ -167,6 +167,21 @@ public final class AgentCoordination {
     ) {
     }
 
+    /**
+     * What {@code run-index.json} says about this run. {@code failed} is true for
+     * outcome FAILED, ERROR, ERRORED, or AMBIGUOUS, for {@code counts.failed} /
+     * {@code counts.errors}, and for a scenario outcome of FAILED or ERROR.
+     */
+    public record DiagnosticSignal(
+            String outcome,
+            int failureCount,
+            boolean failedScenario,
+            String failureSummary,
+            boolean failed,
+            Path index
+    ) {
+    }
+
     public record InboxNote(Path file, String from, String at, String message, String record) {
     }
 
@@ -392,7 +407,7 @@ public final class AgentCoordination {
     }
 
     public static void finish(Path project, String runId, String learned, String status) {
-        finish(project, runId, learned, status, Instant.now(), null);
+        finish(project, runId, learned, status, Instant.now(), null, null);
     }
 
     public static void finish(
@@ -402,6 +417,24 @@ public final class AgentCoordination {
             String status,
             Instant when,
             Appendable out
+    ) {
+        finish(project, runId, learned, status, when, out, null);
+    }
+
+    /**
+     * Stops the run. When {@code run-index.json} is present it supplies the status
+     * and the failure fields, including after a worker already wrote PASSED.
+     * {@code TIMEOUT} and {@code EMPTY} are left alone. {@code observedFailures}
+     * is the Surefire or Gradle failure+error count used only when no index exists.
+     */
+    public static void finish(
+            Path project,
+            String runId,
+            String learned,
+            String status,
+            Instant when,
+            Appendable out,
+            Integer observedFailures
     ) {
         String safeRun = requireSafeId(runId, "run id");
         Instant clock = when == null ? Instant.now() : when;
@@ -414,28 +447,42 @@ public final class AgentCoordination {
             boolean alreadyStopped = existing.stoppedAt() != null && !existing.stoppedAt().isBlank();
             String learnedValue = blankToNull(learned);
             String keptLearned = learnedValue != null ? learnedValue : existing.learned();
-            if (!alreadyStopped) {
-                String statusValue = resolveStopStatus(status, existing, recordFile.getParent());
-                RunRecord updated = withStop(existing, keptLearned, clock.toString(), statusValue);
-                writeRecord(recordFile, updated);
-                String purpose = oneLine(firstNonBlank(learnedValue, existing.why(), statusValue));
-                appendLog(project, clock, existing.agentId(), existing.runId(), "stop", purpose, recordFile);
-                print(out, "run-id=" + existing.runId());
-                print(out, "run-record=" + recordFile);
-                return;
+            DiagnosticSignal signal = readDiagnosticSignal(project, safeRun);
+            String statusValue = resolveRecordStatus(status, existing, recordFile.getParent(), signal, alreadyStopped);
+            Integer failureCount = existing.failureCount();
+            Boolean failedScenario = existing.failedScenario();
+            String failureSummary = existing.failureSummary();
+            if (signal != null && signal.failed()) {
+                failureCount = signal.failureCount();
+                failedScenario = signal.failedScenario();
+                if (signal.failureSummary() != null) failureSummary = signal.failureSummary();
+            } else if ("FAILED".equalsIgnoreCase(statusValue)
+                    && (failureCount == null || failureCount == 0)
+                    && observedFailures != null
+                    && observedFailures > 0) {
+                failureCount = observedFailures;
+                failedScenario = true;
+                if (failureSummary == null || failureSummary.isBlank()) {
+                    failureSummary = "surefire errors+failures=" + observedFailures;
+                }
             }
-            if (learnedValue != null && !learnedValue.equals(existing.learned())) {
-                RunRecord updated = withStop(existing, learnedValue, existing.stoppedAt(), existing.status());
-                writeRecord(recordFile, updated);
-                appendLog(
-                        project,
-                        clock,
-                        existing.agentId(),
-                        existing.runId(),
-                        "note",
-                        oneLine(learnedValue),
-                        recordFile
+            boolean statusChanged = existing.status() == null || !existing.status().equals(statusValue);
+            boolean learnedChanged = learnedValue != null && !learnedValue.equals(existing.learned());
+            boolean failureChanged = !sameInteger(existing.failureCount(), failureCount)
+                    || !java.util.Objects.equals(existing.failedScenario(), failedScenario)
+                    || !java.util.Objects.equals(existing.failureSummary(), failureSummary);
+            if (!alreadyStopped || statusChanged || learnedChanged || failureChanged) {
+                String stoppedAt = alreadyStopped ? existing.stoppedAt() : clock.toString();
+                RunRecord updated = withStop(
+                        existing, keptLearned, stoppedAt, statusValue, failureCount, failedScenario, failureSummary
                 );
+                writeRecord(recordFile, updated);
+                if (!alreadyStopped) {
+                    String purpose = oneLine(firstNonBlank(learnedValue, existing.why(), statusValue));
+                    appendLog(project, clock, existing.agentId(), existing.runId(), "stop", purpose, recordFile);
+                } else if (learnedChanged) {
+                    appendLog(project, clock, existing.agentId(), existing.runId(), "note", oneLine(learnedValue), recordFile);
+                }
             }
             print(out, "run-id=" + existing.runId());
             print(out, "run-record=" + recordFile);
@@ -1361,7 +1408,15 @@ public final class AgentCoordination {
         }
     }
 
-    private static RunRecord withStop(RunRecord existing, String learned, String stoppedAt, String status) {
+    private static RunRecord withStop(
+            RunRecord existing,
+            String learned,
+            String stoppedAt,
+            String status,
+            Integer failureCount,
+            Boolean failedScenario,
+            String failureSummary
+    ) {
         return new RunRecord(
                 existing.runId(),
                 existing.agentId(),
@@ -1375,10 +1430,180 @@ public final class AgentCoordination {
                 status,
                 existing.dataPath(),
                 existing.pickleballVersion(),
-                existing.failureCount(),
-                existing.failedScenario(),
-                existing.failureSummary()
+                failureCount,
+                failedScenario,
+                failureSummary
         );
+    }
+
+    /**
+     * Windows-tolerant path. Strips a {@code \\?\} prefix and treats {@code \} as a separator
+     * so a recorded data path can be opened on either host.
+     */
+    public static Path flexiblePath(String raw) {
+        if (raw == null || raw.isBlank()) return null;
+        String text = raw.trim();
+        if (text.startsWith("\\\\?\\")) text = text.substring(4);
+        return Path.of(text.replace('\\', '/'));
+    }
+
+    /** Private diagnostic index, then the flat private index, then the shared run index. */
+    public static Path findRunIndex(Path project, String runId) {
+        if (project == null || runId == null || runId.isBlank()) return null;
+        Path runDir;
+        try {
+            runDir = runDirectory(project, runId);
+        } catch (RuntimeException failure) {
+            return null;
+        }
+        List<Path> candidates = new ArrayList<>();
+        candidates.add(runDir.resolve("diagnostic").resolve(runId).resolve("run-index.json"));
+        candidates.add(runDir.resolve("diagnostic").resolve("run-index.json"));
+        candidates.add(project.resolve("reports").resolve("diagnostic-runs").resolve(runId).resolve("run-index.json"));
+        Path record = runDir.resolve(RECORD_FILE);
+        if (Files.isRegularFile(record)) {
+            try {
+                String dataPath = JSON.readTree(record.toFile()).path("dataPath").asText("");
+                Path data = flexiblePath(dataPath);
+                if (data != null) {
+                    candidates.add(data.resolve("diagnostic").resolve(runId).resolve("run-index.json"));
+                    candidates.add(data.resolve("diagnostic").resolve("run-index.json"));
+                }
+            } catch (IOException ignored) {
+                // A record that cannot be read is not an index.
+            }
+        }
+        for (Path candidate : candidates) {
+            if (candidate != null && Files.isRegularFile(candidate)) return candidate;
+        }
+        Path walked = walkRunIndex(runDir, runId);
+        if (walked != null) return walked;
+        return walkRunIndex(project.resolve("reports").resolve("diagnostic-runs").resolve(runId), runId);
+    }
+
+    public static DiagnosticSignal readDiagnosticSignal(Path project, String runId) {
+        Path index = findRunIndex(project, runId);
+        if (index == null) return null;
+        try {
+            return signalFromIndex(JSON.readTree(index.toFile()), index);
+        } catch (IOException failure) {
+            return null;
+        }
+    }
+
+    private static Path walkRunIndex(Path root, String runId) {
+        if (root == null || !Files.isDirectory(root)) return null;
+        try (var walk = Files.walk(root, 6)) {
+            for (Path path : walk.filter(Files::isRegularFile).toList()) {
+                if (path.getFileName() == null || !"run-index.json".equals(path.getFileName().toString())) continue;
+                if (skipFailureScan(root, path)) continue;
+                Path parent = path.getParent();
+                if (parent != null && parent.getFileName() != null && runId.equals(parent.getFileName().toString())) {
+                    return path;
+                }
+                try {
+                    if (Files.size(path) > 2_000_000L) continue;
+                    String id = JSON.readTree(path.toFile()).path("runId").asText("");
+                    if (runId.equals(id)) return path;
+                } catch (IOException ignored) {
+                    // An unreadable index is not this run.
+                }
+            }
+        } catch (IOException ignored) {
+            return null;
+        }
+        return null;
+    }
+
+    private static DiagnosticSignal signalFromIndex(JsonNode root, Path index) {
+        if (root == null || !root.isObject()) return null;
+        String outcome = root.path("outcome").asText("");
+        JsonNode counts = root.get("counts");
+        int failed = counts == null ? 0 : counts.path("failed").asInt(0);
+        int errors = 0;
+        if (counts != null) {
+            errors = counts.path("errors").asInt(0);
+            if (errors == 0) errors = counts.path("error").asInt(0);
+        }
+        int failureCount = failed + errors;
+        boolean scenarioFailed = false;
+        String failedScenario = null;
+        JsonNode scenarios = root.get("scenarios");
+        if (scenarios != null && scenarios.isArray()) {
+            for (JsonNode scenario : scenarios) {
+                if (!failureOutcome(scenario.path("outcome").asText(""))) continue;
+                scenarioFailed = true;
+                if (failedScenario == null) {
+                    failedScenario = blankToNull(firstNonBlank(
+                            scenario.path("name").asText(null),
+                            scenario.path("scenarioName").asText(null),
+                            scenario.path("scenario").asText(null)
+                    ));
+                }
+            }
+        }
+        boolean failedSignal = failureOutcome(outcome) || failureCount > 0 || scenarioFailed;
+        if (!root.has("outcome") && failureCount == 0 && !scenarioFailed) return null;
+        if (failedSignal && failureCount < 1) failureCount = 1;
+        String summary = blankToNull(text(root, "failureSummary"));
+        if (summary == null && failedScenario != null) summary = failedScenario;
+        else if (summary == null && failedSignal) {
+            summary = "failed=" + failureCount + " errors=" + errors;
+        }
+        return new DiagnosticSignal(
+                outcome.isBlank() ? null : outcome,
+                failureCount,
+                failedSignal,
+                summary,
+                failedSignal,
+                index
+        );
+    }
+
+    private static boolean failureOutcome(String outcome) {
+        if (outcome == null || outcome.isBlank()) return false;
+        return "FAILED".equalsIgnoreCase(outcome)
+                || "ERROR".equalsIgnoreCase(outcome)
+                || "ERRORED".equalsIgnoreCase(outcome)
+                || "AMBIGUOUS".equalsIgnoreCase(outcome);
+    }
+
+    private static boolean sameInteger(Integer left, Integer right) {
+        if (left == null || right == null) return left == null && right == null;
+        return left.intValue() == right.intValue();
+    }
+
+    private static String resolveRecordStatus(
+            String requested,
+            RunRecord existing,
+            Path runDirectory,
+            DiagnosticSignal signal,
+            boolean alreadyStopped
+    ) {
+        String requestedValue = blankToNull(requested);
+        if (requestedValue != null && isProtectedStatus(requestedValue)) {
+            return requestedValue.toUpperCase(Locale.ROOT);
+        }
+        if (alreadyStopped && existing.status() != null && isProtectedStatus(existing.status())) {
+            return existing.status();
+        }
+        if (signal != null && signal.failed()) return "FAILED";
+        if (requestedValue != null && "FAILED".equalsIgnoreCase(requestedValue)) return "FAILED";
+        if (alreadyStopped && existing.status() != null && "FAILED".equalsIgnoreCase(existing.status().trim())) {
+            return "FAILED";
+        }
+        if (!alreadyStopped) return resolveStopStatus(requested, existing, runDirectory);
+        if (requestedValue != null
+                && !"PASSED".equalsIgnoreCase(requestedValue)
+                && !"STOPPED".equalsIgnoreCase(requestedValue)) {
+            return requestedValue;
+        }
+        return existing.status() == null ? requestedValue : existing.status();
+    }
+
+    private static boolean isProtectedStatus(String status) {
+        String value = status == null ? "" : status.trim();
+        return "TIMEOUT".equalsIgnoreCase(value) || "EMPTY".equalsIgnoreCase(value);
     }
 
     private static String startedVersion(Path project) {

@@ -219,7 +219,8 @@ public final class WorkbenchAgentCommands {
                     outcomeLearned(parsed, empty, plan.browser().browser()),
                     status,
                     java.time.Instant.now(),
-                    out
+                    out,
+                    observed.failureCount() > 0 ? observed.failureCount() : null
             );
             publishQuietly(parsed, run, selection, capturedOut, capturedErr, status, out, err);
             return recordDiscover(parsed, out, err, reported, run.runId());
@@ -292,7 +293,8 @@ public final class WorkbenchAgentCommands {
                     outcomeLearned(parsed, empty, retained.get(PKB_props.PKB_BROWSER)),
                     status,
                     java.time.Instant.now(),
-                    out
+                    out,
+                    observed.failureCount() > 0 ? observed.failureCount() : null
             );
             publishQuietly(parsed, run, selection, capturedOut, capturedErr, status, out, err);
             return printCatalog(parsed.project(), out, err, reported, "workbench-confirm", false, run.runId(), agentId(parsed));
@@ -1054,25 +1056,37 @@ public final class WorkbenchAgentCommands {
         return parsed.coordination().agentId();
     }
 
-    private record Observed(String status, int exitCode) {
+    private record Observed(String status, int exitCode, int failureCount, String failureSummary) {
+        private Observed(String status, int exitCode) {
+            this(status, exitCode, 0, null);
+        }
     }
 
     /**
      * Maven {@code testFailureIgnore} can exit 0 when scenarios failed.
-     * The current run's {@code run-index.json} is authoritative. Surefire XML is
-     * used only when that index was not written. Otherwise the Maven exit stands.
+     * The current run's {@code run-index.json} is authoritative, including a
+     * Surefire Error recorded as {@code counts.errors} or outcome {@code ERROR}.
+     * Surefire XML is used only when that index was not written.
      */
     private static Observed observe(Path project, String runId, int mavenExit, boolean empty) {
         if (empty) {
             return new Observed("EMPTY", mavenExit == 0 ? 1 : mavenExit);
         }
-        DiagnosticVerdict verdict = readDiagnosticVerdict(project, runId);
+        AgentCoordination.DiagnosticSignal signal = AgentCoordination.readDiagnosticSignal(project, runId);
+        if (signal != null && (signal.failed() || "PASSED".equalsIgnoreCase(signal.outcome()))) {
+            if (signal.failed()) {
+                int exit = mavenExit == 0 ? Math.max(signal.failureCount(), 1) : mavenExit;
+                return new Observed("FAILED", exit, Math.max(signal.failureCount(), 1), signal.failureSummary());
+            }
+            return new Observed("PASSED", 0);
+        }
+        DiagnosticVerdict verdict = surefireVerdict(project, AgentCoordination.runDirectory(project, runId).resolve(AgentCoordination.RECORD_FILE));
         if (verdict == null) {
             return new Observed(mavenExit == 0 ? "PASSED" : "FAILED", mavenExit);
         }
         if (verdict.failed()) {
             int exit = mavenExit == 0 ? Math.max(verdict.failures(), 1) : mavenExit;
-            return new Observed("FAILED", exit);
+            return new Observed("FAILED", exit, verdict.failures(), null);
         }
         if (verdict.passed()) {
             return new Observed("PASSED", 0);
@@ -1089,31 +1103,6 @@ public final class WorkbenchAgentCommands {
 
         boolean passed() {
             return failures == 0 && "PASSED".equalsIgnoreCase(outcome);
-        }
-    }
-
-    private static DiagnosticVerdict readDiagnosticVerdict(Path project, String runId) {
-        if (project == null || runId == null || runId.isBlank()) return null;
-        Path runDir = AgentCoordination.runDirectory(project, runId);
-        DiagnosticVerdict indexed = verdictFromIndex(runDir.resolve("diagnostic").resolve(runId).resolve("run-index.json"));
-        if (indexed != null) return indexed;
-        DiagnosticVerdict shared = verdictFromIndex(
-                project.resolve("reports").resolve("diagnostic-runs").resolve(runId).resolve("run-index.json")
-        );
-        if (shared != null) return shared;
-        return surefireVerdict(project, runDir.resolve(AgentCoordination.RECORD_FILE));
-    }
-
-    private static DiagnosticVerdict verdictFromIndex(Path index) {
-        if (index == null || !Files.isRegularFile(index)) return null;
-        try {
-            JsonNode root = JSON.readTree(index.toFile());
-            if (root == null || !root.isObject() || !root.has("outcome")) return null;
-            String outcome = root.path("outcome").asText("");
-            int failed = root.path("counts").path("failed").asInt(0);
-            return new DiagnosticVerdict(outcome, failed);
-        } catch (IOException failure) {
-            return null;
         }
     }
 

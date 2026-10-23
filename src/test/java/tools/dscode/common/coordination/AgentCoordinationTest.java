@@ -547,6 +547,37 @@ class AgentCoordinationTest {
     }
 
     @Test
+    void passedFinishIsUpgradedWhenTheIndexShowsASurefireError() throws Exception {
+        Path home = project.resolve("Business Exception");
+        Files.createDirectories(home);
+        AgentCoordination.Run run = AgentCoordination.begin(home, request("run-error", "agent-error"));
+        AgentCoordination.finish(home, run.runId(), null, "PASSED");
+        assertTrue(Files.readString(run.recordFile()).contains("\"status\" : \"PASSED\""));
+
+        Path index = run.diagnosticDirectory().resolve("run-index.json");
+        Files.createDirectories(index.getParent());
+        Files.writeString(index, """
+                {
+                  "runId": "run-error",
+                  "outcome": "ERROR",
+                  "counts": { "total": 1, "passed": 0, "failed": 0, "errors": 1 },
+                  "failureSummary": "Boom exploded",
+                  "scenarios": [ { "name": "It errors", "outcome": "ERROR" } ]
+                }
+                """);
+        String windows = "\\\\?\\" + index.toAbsolutePath().toString().replace("/", "\\");
+        assertEquals(index.toAbsolutePath().normalize(), AgentCoordination.flexiblePath(windows).toAbsolutePath().normalize());
+        assertTrue(Files.isRegularFile(AgentCoordination.flexiblePath(windows)));
+
+        AgentCoordination.finish(home, run.runId(), null, "PASSED");
+        String record = Files.readString(run.recordFile());
+        assertTrue(record.contains("\"status\" : \"FAILED\""), record);
+        assertTrue(record.contains("\"failureCount\" : 1"), record);
+        assertTrue(record.contains("It errors") || record.contains("Boom exploded"), record);
+        assertTrue(record.contains("\"failedScenario\" : true"), record);
+    }
+
+    @Test
     void edgeLockfileHoldsTheProfileTheSameWayAsChromeSingletonLock() throws Exception {
         AgentCoordination.Run edge = AgentCoordination.begin(project, request("run-edge", "agent-edge"));
         Path cookies = edge.browserProfileDirectory().resolve("Default").resolve("Cookies");

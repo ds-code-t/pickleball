@@ -1,5 +1,6 @@
 package tools.dscode.launcher;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import tools.dscode.common.coordination.AgentCoordination;
@@ -35,6 +36,8 @@ public final class WorkbenchRunReports {
     );
     private static final Pattern EXPECTED_LINE = Pattern.compile("(?im)^\\s*expected:\\s*(.+?)\\s*$");
     private static final Pattern ACTUAL_LINE = Pattern.compile("(?im)^\\s*actual:\\s*(.+?)\\s*$");
+    private static final Pattern SCENARIO_SUMMARY = Pattern.compile("(?m)^(\\d+)\\s+Scenarios?\\b");
+    private static final Pattern STEP_SUMMARY = Pattern.compile("(?m)^(\\d+)\\s+Steps?\\b");
 
     private WorkbenchRunReports() {
     }
@@ -101,6 +104,20 @@ public final class WorkbenchRunReports {
             scenarios++;
             steps += stepCount(dir);
         }
+        if (scenarios == 0) {
+            int[] indexed = indexCounts(project, runId);
+            if (indexed != null && (indexed[0] > 0 || indexed[1] > 0)) {
+                scenarios = indexed[0];
+                steps = indexed[1];
+            }
+        }
+        if (scenarios == 0 && steps == 0) {
+            int[] fromConsole = consoleCounts(console);
+            if (fromConsole != null) {
+                scenarios = fromConsole[0];
+                steps = fromConsole[1];
+            }
+        }
         if (scenarios == 0) scenarios = names.size();
         if (out != null) out.println(compact(status, scenarios, steps));
         return steps;
@@ -128,6 +145,47 @@ public final class WorkbenchRunReports {
         try (var walk = Files.walk(root, 4)) {
             return walk.filter(path -> Files.isRegularFile(path.resolve("events.jsonl"))).toList();
         }
+    }
+
+    /** Full-scan runs often have no private scenario directory. The run index still has counts. */
+    private static int[] indexCounts(Path project, String runId) {
+        Path index = AgentCoordination.findRunIndex(project, runId);
+        if (index == null) return null;
+        try {
+            JsonNode root = JSON.readTree(index.toFile());
+            JsonNode counts = root.get("counts");
+            if (counts == null || !counts.isObject() || !counts.has("total")) return null;
+            int scenarios = counts.path("total").asInt(0);
+            int stepCount = 0;
+            JsonNode steps = root.get("steps");
+            if (steps != null && steps.isObject()) {
+                if (steps.has("executed")) stepCount = steps.path("executed").asInt(0);
+                else if (steps.has("total")) stepCount = steps.path("total").asInt(0);
+                else {
+                    for (String key : List.of("passed", "failed", "skipped", "pending", "undefined")) {
+                        stepCount += steps.path(key).asInt(0);
+                    }
+                }
+            }
+            return new int[]{scenarios, stepCount};
+        } catch (IOException failure) {
+            return null;
+        }
+    }
+
+    private static int[] consoleCounts(String console) {
+        if (console == null || console.isBlank()) return null;
+        int scenarios = lastCount(SCENARIO_SUMMARY, console);
+        int steps = lastCount(STEP_SUMMARY, console);
+        if (scenarios < 0 && steps < 0) return null;
+        return new int[]{Math.max(scenarios, 0), Math.max(steps, 0)};
+    }
+
+    private static int lastCount(Pattern pattern, String text) {
+        Matcher matcher = pattern.matcher(text);
+        int value = -1;
+        while (matcher.find()) value = Integer.parseInt(matcher.group(1));
+        return value;
     }
 
     public static List<Path> saveConsole(Path runFolder, List<String> scenarioNames, String console) throws IOException {
