@@ -2,6 +2,8 @@ package tools.dscode.launcher;
 
 import org.junit.jupiter.api.Test;
 
+import java.io.ByteArrayOutputStream;
+import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -174,6 +176,141 @@ class WorkbenchCommandLineTest {
         });
         assertEquals("@smoke and not @wip", parsed.tags());
         assertEquals("Find term", parsed.name());
+    }
+
+    @Test
+    void splitTagsExpressionFailsBeforeAnythingRuns() {
+        String[] commands = {"plan", "discover", "confirm", "isolate", "hint", "session-start"};
+        for (String command : commands) {
+            IllegalArgumentException equalsForm = assertThrows(
+                    IllegalArgumentException.class,
+                    () -> WorkbenchCommandLine.parse(new String[]{command, "--tags=@A", "and", "not", "@B"})
+            );
+            assertSplitTagsMessage(equalsForm.getMessage());
+
+            IllegalArgumentException separateForm = assertThrows(
+                    IllegalArgumentException.class,
+                    () -> WorkbenchCommandLine.parse(new String[]{command, "--tags", "@A", "and", "not", "@B"})
+            );
+            assertSplitTagsMessage(separateForm.getMessage());
+        }
+
+        boolean[] maven = {false};
+        ByteArrayOutputStream stderr = new ByteArrayOutputStream();
+        ByteArrayOutputStream stdout = new ByteArrayOutputStream();
+        int discover = WorkbenchAgentCommands.run(
+                new String[]{"discover", "--tags=@A", "and", "not", "@B"},
+                new PrintStream(stdout, true, StandardCharsets.UTF_8),
+                new PrintStream(stderr, true, StandardCharsets.UTF_8),
+                (project, command, out, err) -> {
+                    maven[0] = true;
+                    return 0;
+                }
+        );
+        assertEquals(2, discover);
+        assertFalse(maven[0]);
+        assertEquals("", stdout.toString(StandardCharsets.UTF_8));
+        assertSplitTagsMessage(stderr.toString(StandardCharsets.UTF_8));
+
+        boolean[] planned = {false};
+        int plan = WorkbenchAgentCommands.run(
+                new String[]{"plan", "--tags=@A", "and", "not", "@B"},
+                new PrintStream(new ByteArrayOutputStream(), true, StandardCharsets.UTF_8),
+                new PrintStream(new ByteArrayOutputStream(), true, StandardCharsets.UTF_8),
+                (project, command, out, err) -> {
+                    planned[0] = true;
+                    return 0;
+                }
+        );
+        assertEquals(2, plan);
+        assertFalse(planned[0]);
+
+        boolean[] started = {false};
+        int isolate = WorkbenchSessionCommands.run(
+                new String[]{"isolate", "--tags=@A", "and", "not", "@B"},
+                new PrintStream(new ByteArrayOutputStream(), true, StandardCharsets.UTF_8),
+                new PrintStream(new ByteArrayOutputStream(), true, StandardCharsets.UTF_8),
+                launch -> {
+                    started[0] = true;
+                    throw new AssertionError("isolate must not start");
+                }
+        );
+        assertEquals(2, isolate);
+        assertFalse(started[0]);
+    }
+
+    @Test
+    void quotedTagsFileAndBase64AreUnchanged() throws Exception {
+        WorkbenchCommandLine.Parsed quoted = WorkbenchCommandLine.parse(new String[]{
+                "isolate", "--tags=@A and not @B"
+        });
+        assertEquals("@A and not @B", quoted.tags());
+        assertEquals("@A and not @B", quoted.forwarded()[3]);
+
+        WorkbenchCommandLine.Parsed separateQuoted = WorkbenchCommandLine.parse(new String[]{
+                "confirm", "--tags", "@smoke and not @wip", "--name=Find term"
+        });
+        assertEquals("@smoke and not @wip", separateQuoted.tags());
+        assertEquals("Find term", separateQuoted.name());
+
+        Path file = Files.createTempFile("pickleball-tags", ".txt");
+        try {
+            Files.writeString(file, "@smoke and (@wip or @slow)\n", StandardCharsets.UTF_8);
+            WorkbenchCommandLine.Parsed fromFile = WorkbenchCommandLine.parse(new String[]{
+                    "plan", "--tags-file=" + file.toAbsolutePath(), "--run-id=from-file"
+            });
+            assertEquals("@smoke and (@wip or @slow)", fromFile.tags());
+            assertEquals("from-file", fromFile.coordination().runId());
+        } finally {
+            Files.deleteIfExists(file);
+        }
+
+        String encoded = Base64.getEncoder().encodeToString(
+                "@nightly and not @wip".getBytes(StandardCharsets.UTF_8)
+        );
+        WorkbenchCommandLine.Parsed fromEncoded = WorkbenchCommandLine.parse(new String[]{
+                "discover", "--tags-b64=" + encoded, "--run-id=from-b64"
+        });
+        assertEquals("@nightly and not @wip", fromEncoded.tags());
+        assertEquals("from-b64", fromEncoded.coordination().runId());
+    }
+
+    @Test
+    void laterOptionIsNotAStrayTagWord() {
+        WorkbenchCommandLine.Parsed equalsForm = WorkbenchCommandLine.parse(new String[]{
+                "discover", "--tags=@A", "--run-id=x"
+        });
+        assertEquals("@A", equalsForm.tags());
+        assertEquals("x", equalsForm.coordination().runId());
+
+        WorkbenchCommandLine.Parsed separateForm = WorkbenchCommandLine.parse(new String[]{
+                "confirm", "--tags", "@smoke", "--run-id", "run-7"
+        });
+        assertEquals("@smoke", separateForm.tags());
+        assertEquals("run-7", separateForm.coordination().runId());
+
+        WorkbenchCommandLine.Parsed named = WorkbenchCommandLine.parse(new String[]{
+                "plan", "--tags=@smoke", "--name=The", "failing", "scenario", "--run-id=x"
+        });
+        assertEquals("@smoke", named.tags());
+        assertEquals("The failing scenario", named.name());
+        assertEquals("x", named.coordination().runId());
+
+        IllegalArgumentException splitBeforeOption = assertThrows(
+                IllegalArgumentException.class,
+                () -> WorkbenchCommandLine.parse(new String[]{
+                        "isolate", "--tags=@A", "and", "not", "@B", "--run-id=x"
+                })
+        );
+        assertSplitTagsMessage(splitBeforeOption.getMessage());
+        assertFalse(splitBeforeOption.getMessage().contains("run-id"));
+    }
+
+    private static void assertSplitTagsMessage(String message) {
+        assertTrue(message.contains("@A and not @B"), message);
+        assertTrue(message.contains("--tags='@A and not @B'"), message);
+        assertTrue(message.contains("--tags-file"), message);
+        assertTrue(message.contains("--tags-b64"), message);
     }
 
     @Test

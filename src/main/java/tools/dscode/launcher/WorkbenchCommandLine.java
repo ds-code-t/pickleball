@@ -144,19 +144,31 @@ final class WorkbenchCommandLine {
         Long stepTimeoutSeconds = null;
         Long runTimeoutSeconds = null;
         String absorb = null;
+        boolean tagsSplitOpen = false;
+        List<String> splitTags = new ArrayList<>();
         Path project = null;
         List<String> rest = new ArrayList<>();
         for (int index = 1; index < args.length; index++) {
             String token = args[index];
             if (token == null) continue;
+            if (tagsSplitOpen && isFlag(token) && !isTagsValueFlag(token)) {
+                tagsSplitOpen = false;
+                rejectSplitTags(tags, splitTags);
+            }
             if (token.startsWith("--tags=")) {
+                rejectSplitTags(tags, splitTags);
                 tags = token.substring("--tags=".length());
                 tagsFile = null;
+                absorb = null;
+                tagsSplitOpen = true;
                 continue;
             }
             if ("--tags".equals(token) && index + 1 < args.length) {
+                rejectSplitTags(tags, splitTags);
                 tags = args[++index];
                 tagsFile = null;
+                absorb = null;
+                tagsSplitOpen = true;
                 continue;
             }
             if (token.startsWith("--tags-file=") || "--tags-file".equals(token)) {
@@ -218,6 +230,7 @@ final class WorkbenchCommandLine {
                 continue;
             }
             if (isFeatureLineToken(token)) {
+                tagsSplitOpen = false;
                 selects.add(token);
                 absorb = null;
                 continue;
@@ -426,6 +439,15 @@ final class WorkbenchCommandLine {
                 rest.add(token);
                 continue;
             }
+            // An unquoted --tags value is split by PowerShell/Maven on spaces.
+            // Those leftover words are not a later option and are not a project path.
+            if (tagsSplitOpen && !looksLikeProject(token)) {
+                splitTags.add(token);
+                continue;
+            }
+            if (tagsSplitOpen) {
+                tagsSplitOpen = false;
+            }
             // Maven exec splits unquoted free-text flags into extra tokens.
             // The selector set most recently absorbs them.
             if (absorb != null && !looksLikeProject(token)) {
@@ -446,6 +468,7 @@ final class WorkbenchCommandLine {
             }
             rest.add(token);
         }
+        rejectSplitTags(tags, splitTags);
         if (project == null) project = cwd;
         if (tagsFile != null) {
             tags = readTagsFile(project, tagsFile);
@@ -556,6 +579,35 @@ final class WorkbenchCommandLine {
         if (inQuote) return "Tag quoting error: unmatched quote in " + tags;
         if (depth != 0) return "Tag quoting error: unmatched parenthesis in " + tags;
         return null;
+    }
+
+    private static void rejectSplitTags(String tags, List<String> splitTags) {
+        if (splitTags.isEmpty()) return;
+        String expression = joinTagExpression(tags, splitTags);
+        throw new IllegalArgumentException(
+                "Tag quoting error: the --tags expression was split by an unquoted space: "
+                        + expression
+                        + ". Quote it (--tags='"
+                        + expression
+                        + "') or use --tags-file / --tags-b64."
+        );
+    }
+
+    private static String joinTagExpression(String tags, List<String> tail) {
+        StringBuilder expression = new StringBuilder();
+        if (tags != null && !tags.isBlank()) {
+            expression.append(tags.trim());
+        }
+        for (String part : tail) {
+            if (part == null || part.isEmpty()) continue;
+            if (!expression.isEmpty()) expression.append(' ');
+            expression.append(part);
+        }
+        return expression.toString();
+    }
+
+    private static boolean isTagsValueFlag(String token) {
+        return token.startsWith("--tags=") || "--tags".equals(token);
     }
 
     private static String readTagsFile(Path project, String raw) {
