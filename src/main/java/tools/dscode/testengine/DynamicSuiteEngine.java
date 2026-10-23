@@ -45,8 +45,10 @@ public final class DynamicSuiteEngine implements TestEngine {
     @Override
     public TestDescriptor discover(EngineDiscoveryRequest discoveryRequest, UniqueId uniqueId) {
         try {
+            io.cucumber.core.runner.Phase4Timing.mark("discover-start");
             logTrace("[DynamicSuiteEngine] discover() called");
             PickleballRunner suite = DynamicSuiteBootstrap.initialize(discoveryRequest);
+            io.cucumber.core.runner.Phase4Timing.mark("runner-initialized");
             logTrace("[DynamicSuiteEngine] Discovery succeeded using suite subclass: " + suite.getClass().getName());
 
             MergedConfigurationParameters mergedParameters =
@@ -62,6 +64,7 @@ public final class DynamicSuiteEngine implements TestEngine {
                     new DynamicEngineDiscoveryRequest(discoveryRequest, mergedParameters);
 
             TestDescriptor discovered = delegate.discover(wrappedRequest, uniqueId);
+            io.cucumber.core.runner.Phase4Timing.mark("cucumber-discover-done");
             Map<String, String> config = materialize(mergedParameters);
             ExampleRowFilter.applyToDiscoveredSuite(
                     discovered,
@@ -88,6 +91,7 @@ public final class DynamicSuiteEngine implements TestEngine {
     @Override
     public void execute(ExecutionRequest request) {
         try {
+            io.cucumber.core.runner.Phase4Timing.mark("execute-start");
             logTrace("[DynamicSuiteEngine] execute() called");
 
             PickleballRunner suite = PickleballRunner.getInstance();

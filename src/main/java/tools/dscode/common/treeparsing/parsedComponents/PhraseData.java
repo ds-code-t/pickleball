@@ -87,6 +87,28 @@ public abstract class PhraseData extends PassedData {
         return termination == ';';
     }
 
+    /**
+     * 300 ms before a browser action lets the page settle. A literal save or
+     * any other action with no live session has nothing to settle, so the
+     * sleep is skipped. A session that is already open still waits.
+     */
+    private static void settleBeforeBrowserAction(OperationsInterface operation) {
+        if (!(operation instanceof ActionOperations)) return;
+        try (io.cucumber.core.runner.UntilPassTiming.Scope ignored =
+                     io.cucumber.core.runner.UntilPassTiming.open("action-preamble")) {
+            if (!liveBrowserSession()) return;
+            waitMilliseconds(300);
+        }
+    }
+
+    private static boolean liveBrowserSession() {
+        try {
+            return tools.dscode.coredefinitions.BrowserSteps.getCurrentDriverIfPresent() != null;
+        } catch (RuntimeException exception) {
+            return true;
+        }
+    }
+
     public SearchContext getSearchContext() {
         if (contextElement != null) {
             if (contextElement.element == null)
@@ -481,9 +503,7 @@ public abstract class PhraseData extends PassedData {
 
     public void runOperation() {
         OperationsInterface operation = actionOperation != null ? actionOperation : assertionOperation;
-        if (operation instanceof ActionOperations) {
-            waitMilliseconds(300);
-        }
+        settleBeforeBrowserAction(operation);
         if (operation == null && phraseType == PhraseType.CONDITIONAL) {
             // A single element has no assertion keyword after resolve. TRUE
             // uses ValueWrapper.isTruthy once booleanValues or elements exist.
@@ -526,9 +546,7 @@ public abstract class PhraseData extends PassedData {
 
     public void runUntilOperation() {
         OperationsInterface operation = actionOperation != null ? actionOperation : assertionOperation;
-        if (operation instanceof ActionOperations) {
-            waitMilliseconds(300);
-        }
+        settleBeforeBrowserAction(operation);
         operation.execute(this);
         if (result.failed()) {
             throw new RuntimeException("operation '" + operation + "' failed", result.error());

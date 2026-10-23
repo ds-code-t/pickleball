@@ -152,6 +152,7 @@ public abstract class PickleballRunner {
             if (coordination.who() != null) values.put(PKB_props.PKB_RUN_WHO, coordination.who());
             if (coordination.why() != null) values.put(PKB_props.PKB_RUN_WHY, coordination.why());
         }
+        io.cucumber.core.runner.Phase4Timing.mark("runner-ready");
     }
 
     public static String getOptionsString() {
@@ -221,9 +222,13 @@ public abstract class PickleballRunner {
     }
 
     private void applyLegacyFrameworkDefaults() {
-        String detectedGlue = DynamicSuiteBootstrap.detectDefaultGluePackage();
-        if (detectedGlue != null && !detectedGlue.isBlank()) {
-            values.putIfAbsent(GLUE_PROPERTY_NAME, detectedGlue);
+        String glue = values.get(GLUE_PROPERTY_NAME);
+        if (glue == null || glue.isBlank()) glue = values.get(PKB_GLUE);
+        if (glue == null || glue.isBlank()) {
+            String detectedGlue = DynamicSuiteBootstrap.detectDefaultGluePackage();
+            if (detectedGlue != null && !detectedGlue.isBlank()) {
+                values.putIfAbsent(GLUE_PROPERTY_NAME, detectedGlue);
+            }
         }
         values.putIfAbsent(FEATURES_PROPERTY_NAME, "classpath:features");
     }

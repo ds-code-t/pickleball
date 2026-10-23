@@ -2,7 +2,9 @@ package io.cucumber.core.gherkin.messages;
 
 import io.cucumber.core.gherkin.Feature;
 import io.cucumber.gherkin.GherkinDialect;
+import io.cucumber.gherkin.GherkinDialects;
 import io.cucumber.messages.types.InlinePickleArgument;
+import io.cucumber.messages.types.Pickle;
 import io.cucumber.messages.types.PickleStep;
 import io.cucumber.messages.types.PickleStepArgument;
 import io.cucumber.messages.types.PickleTable;
@@ -14,7 +16,11 @@ import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -23,6 +29,17 @@ import static tools.dscode.common.util.Reflect.getProperty;
 public class NGherkinFactory {
 
     private static final URI DEFAULT_URI = URI.create("memory:/single.feature");
+    private static final int PICKLE_CACHE_MAX = 128;
+    private static final int PICKLE_CACHE_MAX_CHARS = 16_384;
+    /** Parsed temporary features. Callers receive a copy, so a later mutation cannot leak. */
+    private static final Map<String, GherkinMessagesPickle> PICKLE_CACHE = Collections.synchronizedMap(
+            new LinkedHashMap<>(64, 0.75f, true) {
+                @Override
+                protected boolean removeEldestEntry(Map.Entry<String, GherkinMessagesPickle> eldest) {
+                    return size() > PICKLE_CACHE_MAX;
+                }
+            }
+    );
 
     public static GherkinMessagesStep createGherkinMessagesStep(PickleStep pickleStep,
                                                                 GherkinDialect dialect,
@@ -67,21 +84,64 @@ public class NGherkinFactory {
         }
 
         byte[] bytes = featureSrc.toString().getBytes(StandardCharsets.UTF_8);
-        try (InputStream in = new ByteArrayInputStream(bytes)) {
-            GherkinMessagesFeatureParser parser = new GherkinMessagesFeatureParser();
-            Optional<Feature> parsed =
-                    parser.parse(DEFAULT_URI, in, UUID::randomUUID);
+        String source = featureSrc.toString();
+        try (io.cucumber.core.runner.UntilPassTiming.Scope ignored =
+                     io.cucumber.core.runner.UntilPassTiming.open("gherkin-parse")) {
+            if (source.length() <= PICKLE_CACHE_MAX_CHARS) {
+                GherkinMessagesPickle cached = PICKLE_CACHE.get(source);
+                if (cached != null) {
+                    return copyPickle(cached);
+                }
+            }
+            try (InputStream in = new ByteArrayInputStream(bytes)) {
+                GherkinMessagesFeatureParser parser = new GherkinMessagesFeatureParser();
+                Optional<Feature> parsed =
+                        parser.parse(DEFAULT_URI, in, UUID::randomUUID);
 
-            GherkinMessagesFeature feature =
-                    (GherkinMessagesFeature) parsed.orElseThrow(
-                            () -> new IllegalStateException("No feature parsed from generated source"));
-            return (GherkinMessagesPickle) feature.getPickles()
-                    .stream()
-                    .findFirst()
-                    .orElseThrow(() -> new IllegalStateException("No pickles found"));
-        } catch (Exception e) {
-            throw new IllegalStateException("Error creating pickle", e);
+                GherkinMessagesFeature feature =
+                        (GherkinMessagesFeature) parsed.orElseThrow(
+                                () -> new IllegalStateException("No feature parsed from generated source"));
+                GherkinMessagesPickle pickle = (GherkinMessagesPickle) feature.getPickles()
+                        .stream()
+                        .findFirst()
+                        .orElseThrow(() -> new IllegalStateException("No pickles found"));
+                if (source.length() <= PICKLE_CACHE_MAX_CHARS) {
+                    PICKLE_CACHE.putIfAbsent(source, pickle);
+                }
+                return copyPickle(pickle);
+            } catch (RuntimeException e) {
+                throw e;
+            } catch (Exception e) {
+                throw new IllegalStateException("Error creating pickle", e);
+            }
         }
+    }
+
+    /**
+     * New step objects over the cached parse. Step ids stay so the query still
+     * resolves locations. Nesting and log text live on the copy.
+     */
+    private static GherkinMessagesPickle copyPickle(GherkinMessagesPickle source) {
+        Pickle message = (Pickle) getProperty(source, "pickle");
+        CucumberQuery query = (CucumberQuery) getProperty(source, "cucumberQuery");
+        List<PickleStep> steps = new ArrayList<>(message.getSteps().size());
+        for (PickleStep step : message.getSteps()) {
+            steps.add(CucumberDeepCloneUtil.deepClonePickleStep(step));
+        }
+        Pickle copy = new Pickle(
+                message.getId(),
+                message.getUri(),
+                message.getName(),
+                message.getLanguage(),
+                steps,
+                new ArrayList<>(message.getTags()),
+                new ArrayList<>(message.getAstNodeIds())
+        );
+        String language = message.getLanguage();
+        if (language == null || language.isBlank()) language = "en";
+        GherkinDialect dialect = GherkinDialects.getDialect(language)
+                .orElseGet(() -> GherkinDialects.getDialect("en").orElseThrow());
+        return new GherkinMessagesPickle(copy, source.getUri(), dialect, query);
     }
 
     private static boolean containsLineBreak(String argument) {

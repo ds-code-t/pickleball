@@ -223,7 +223,9 @@ public class StepExtension extends StepData {
             }
             executingPickleStepTestStep = pickleStepTestStep;
         } else {
-            executingPickleStepTestStep = resolveAndClone(getStepParsingMap());
+            try (UntilPassTiming.Scope ignored = UntilPassTiming.open("step-resolve")) {
+                executingPickleStepTestStep = resolveAndClone(getStepParsingMap());
+            }
         }
         executingPickleStepTestStep.getPickleStep().nestingLevel = getNestingLevel();
         executingPickleStepTestStep.getPickleStep().overrideLoggingText = overrideLoggingText;
@@ -239,11 +241,13 @@ public class StepExtension extends StepData {
         String stepText = executingPickleStepTestStep.getStep().getKeyword()
                 + " "
                 + executingPickleStepTestStep.getStepText().replaceFirst("^([:\\s]*)", "");
-        stepEntry = getParentEntryForStep(this)
-                .logWithType("STEP", stepText, stepLogLevel)
-                .tags("Step")
-                .start();
-        setDefaultEntry(getRunningStep().stepEntry);
+        try (UntilPassTiming.Scope ignored = UntilPassTiming.open("logging")) {
+            stepEntry = getParentEntryForStep(this)
+                    .logWithType("STEP", stepText, stepLogLevel)
+                    .tags("Step")
+                    .start();
+            setDefaultEntry(getRunningStep().stepEntry);
+        }
         lifecycle.fire(Phase.BEFORE_SCENARIO_STEP);
         result = finalizerAction == null
                 ? execute(executingPickleStepTestStep, executionMode)
@@ -275,15 +279,19 @@ public class StepExtension extends StepData {
     }
 
     public void finalizeStepEntryLogging() {
-        if (webDriverUsed != null && webDriverUsed.getSessionId() != null) {
-            if (isPresent(webDriverUsed)) {
-                stepEntry.info("Browser Alert is present, cannot take screenshot.");
-                stepEntry.stop();
+        try (UntilPassTiming.Scope ignoredReport = UntilPassTiming.open("report-attachment")) {
+            if (webDriverUsed != null && webDriverUsed.getSessionId() != null) {
+                if (isPresent(webDriverUsed)) {
+                    stepEntry.info("Browser Alert is present, cannot take screenshot.");
+                    stepEntry.stop();
+                } else {
+                    try (UntilPassTiming.Scope ignoredShot = UntilPassTiming.open("screenshot")) {
+                        stepEntry.screenshot("After Step").stop();
+                    }
+                }
             } else {
-                stepEntry.screenshot("After Step").stop();
+                stepEntry.stop();
             }
-        } else {
-            stepEntry.stop();
         }
     }
 
@@ -293,13 +301,15 @@ public class StepExtension extends StepData {
     ) {
         Instant start = Instant.now();
         try {
-            invokeAnyMethodOrThrow(
-                    executionPickleStepTestStep,
-                    "run",
-                    getTestCase(),
-                    getGlobalEventBus(),
-                    getTestCaseState(),
-                    executionMode);
+            try (UntilPassTiming.Scope ignored = UntilPassTiming.open("step-body")) {
+                invokeAnyMethodOrThrow(
+                        executionPickleStepTestStep,
+                        "run",
+                        getTestCase(),
+                        getGlobalEventBus(),
+                        getTestCaseState(),
+                        executionMode);
+            }
         } catch (Throwable t) {
             Throwable cause = t instanceof InvocationTargetException ? t.getCause() : t;
             Duration duration = Duration.between(start, Instant.now());

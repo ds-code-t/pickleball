@@ -86,6 +86,25 @@ class ConsumerMavenTestRunnerTest {
     }
 
     @Test
+    void mavenCommandIsQuietAndOfflineOnlyAfterAPreviousTestCompile() throws Exception {
+        Files.writeString(project.resolve("pom.xml"), "<project/>");
+        Files.writeString(project.resolve("mvnw"), "#!/bin/sh\n");
+        List<String> fresh = ConsumerMavenTestRunner.command(project, "pkb_tags=@one");
+        assertTrue(fresh.contains("-q"));
+        assertFalse(fresh.contains("-o"));
+        assertTrue(fresh.contains("test"));
+
+        Files.createDirectories(project.resolve("target/test-classes"));
+        List<String> again = ConsumerMavenTestRunner.command(project, "pkb_tags=@one");
+        assertTrue(again.contains("-o"));
+        assertTrue(again.contains("-q"));
+        assertFalse(again.contains("--offline"));
+        int offline = again.indexOf("-o");
+        int goal = again.indexOf("test");
+        assertTrue(offline < goal);
+    }
+
+    @Test
     void mavenCommandSkipsPlainJUnitWhileTheConsumerPomDoesNot() throws Exception {
         Files.writeString(project.resolve("pom.xml"), "<project/>");
         Path script = project.resolve("mvnw");

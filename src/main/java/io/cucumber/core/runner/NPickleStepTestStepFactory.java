@@ -124,10 +124,12 @@ public class NPickleStepTestStepFactory {
     }
 
     public static PickleStepDefinitionMatch getStepDefinitionMatch(URI uri, Step step) {
-        try {
-            return attemptStepDefinitionMatch(uri, step);
-        } catch (AmbiguousStepDefinitionsException e) {
-            throw new RuntimeException("Failed to find Step Definition match for step '" + step.getText() + "'", e);
+        try (UntilPassTiming.Scope ignored = UntilPassTiming.open("step-match")) {
+            try {
+                return attemptStepDefinitionMatch(uri, step);
+            } catch (AmbiguousStepDefinitionsException e) {
+                throw new RuntimeException("Failed to find Step Definition match for step '" + step.getText() + "'", e);
+            }
         }
     }
 

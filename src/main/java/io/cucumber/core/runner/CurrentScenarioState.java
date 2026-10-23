@@ -205,6 +205,7 @@ public class CurrentScenarioState extends ScenarioMapping {
 
 
     public void startScenarioRun() {
+        Phase4Timing.mark("scenario-start");
         Stagger.run(() -> SeleniumUtils.waitMilliseconds(toLongOrZero(resolveFromVarsOrDefault("pkb", 1100))));
         String scenarioName = pickle.getName() + " , Line " + pickle.getLocation().getLine();
         pickleballLog.info("Starting scenario: '" + scenarioName + "'");
@@ -465,7 +466,9 @@ public class CurrentScenarioState extends ScenarioMapping {
             currentStep.startTime = Instant.now();
         currentStep.runCount++;
         int lineConditionalMode = stepExtension.lineData == null ? 1 : stepExtension.lineData.lineConditionalMode;
-        stepExtension.lineData = createParsedLine(stepExtension);
+        try (UntilPassTiming.Scope ignoredParse = UntilPassTiming.open("line-parse")) {
+            stepExtension.lineData = createParsedLine(stepExtension);
+        }
         stepExtension.lineData.lineConditionalMode = lineConditionalMode;
         stepExtension.lineData.setInheritance(stepExtension);
         currentPhrase = (Phrase) stepExtension.lineData.inheritedPhrase;
@@ -580,60 +583,95 @@ public class CurrentScenarioState extends ScenarioMapping {
                 if (inheritancePhrase != null && inheritancePhrase.untilPhrase) {
                     int cloneRunCount = 0;
                     Instant cloneStartTime = null;
-                    while (true) {
-                        StepExtension clonedStep = stepCloner(
-                                inheritancePhrase,
-                                stepExtension,
-                                IGNORE_CHILDREN_IF_FALSE
-                        ).getFirst();
-                        clonedStep.runCount = cloneRunCount;
-                        clonedStep.startTime = cloneStartTime;
-                        clonedStep.overridePhrase = inheritancePhrase.clonePhrase(
-                                inheritancePhrase.getPreviousPhrase()
-                        );
-                        copyAssertionChainToNewPhrase(
-                                inheritancePhrase,
-                                clonedStep.overridePhrase
-                        );
-                        clonedStep.nextSibling = null;
-                        clonedStep.pickleStepTestStep.substituteStep = clonedStep
-                                .createNewStepExtension(
-                                        ", ---" + clonedStep.overridePhrase.assertionChain
-                                )
-                                .pickleStepTestStep;
-                        boolean overTime = clonedStep.reachedGlobalMaxDuration();
-                        boolean overCount = !overTime && clonedStep.reachedGlobalMaxRepetition();
-                        if (!overTime && !overCount) {
-                            long pause = StepData.untilPauseMillis(
-                                    clonedStep.startTime,
-                                    StepData.effectiveTimeout()
+                    boolean timingThisLoop = UntilPassTiming.requested() && !UntilPassTiming.active();
+                    if (timingThisLoop) UntilPassTiming.start();
+                    try {
+                        while (true) {
+                            boolean overTime = untilCapReached(cloneStartTime);
+                            boolean overCount = !overTime && StepData.repetitionLimitReached(
+                                    cloneRunCount,
+                                    StepData.effectiveMaxIterations()
                             );
-                            if (pause > 0) {
-                                waitMilliseconds(pause);
+                            if (overTime || overCount) {
+                                StepExtension failedStep = cloneUntilPass(inheritancePhrase, stepExtension);
+                                failedStep.runCount = cloneRunCount;
+                                failedStep.startTime = cloneStartTime;
+                                failedStep.checkGlobalMax();
+                                String limit = overTime
+                                        ? StepData.stepMaxTimeExceededMessage()
+                                        : "Until loop exhausted pkb_stepRepeatMaxCount "
+                                                + StepData.effectiveMaxIterations();
+                                exhaustedUntil = new RuntimeException(
+                                        limit
+                                                + " for step '"
+                                                + failedStep.pickleStepTestStep.getStepText()
+                                                + "'"
+                                );
+                                recordHardFailure(exhaustedUntil);
+                                break untilLimit;
                             }
-                            overTime = clonedStep.reachedGlobalMaxDuration();
-                            overCount = !overTime && clonedStep.reachedGlobalMaxRepetition();
+                            try (UntilPassTiming.Scope ignoredPass = UntilPassTiming.open("until-pass")) {
+                                StepExtension clonedStep;
+                                try (UntilPassTiming.Scope ignoredClone = UntilPassTiming.open("clone")) {
+                                    clonedStep = cloneUntilPass(inheritancePhrase, stepExtension);
+                                }
+                                clonedStep.runCount = cloneRunCount;
+                                clonedStep.startTime = cloneStartTime;
+                                clonedStep.overridePhrase = inheritancePhrase.clonePhrase(
+                                        inheritancePhrase.getPreviousPhrase()
+                                );
+                                copyAssertionChainToNewPhrase(
+                                        inheritancePhrase,
+                                        clonedStep.overridePhrase
+                                );
+                                clonedStep.nextSibling = null;
+                                try (UntilPassTiming.Scope ignoredSubstitute = UntilPassTiming.open("substitute-step")) {
+                                    clonedStep.pickleStepTestStep.substituteStep = clonedStep
+                                            .createNewStepExtension(
+                                                    ", ---" + clonedStep.overridePhrase.assertionChain
+                                            )
+                                            .pickleStepTestStep;
+                                }
+                                long pause = StepData.untilPauseMillis(
+                                        clonedStep.startTime,
+                                        StepData.effectiveTimeout()
+                                );
+                                try (UntilPassTiming.Scope ignoredPause = UntilPassTiming.open("pause")) {
+                                    if (pause > 0) {
+                                        waitMilliseconds(pause);
+                                    }
+                                }
+                                overTime = clonedStep.reachedGlobalMaxDuration();
+                                overCount = !overTime && clonedStep.reachedGlobalMaxRepetition();
+                                if (overTime || overCount) {
+                                    clonedStep.checkGlobalMax();
+                                    String limit = overTime
+                                            ? StepData.stepMaxTimeExceededMessage()
+                                            : "Until loop exhausted pkb_stepRepeatMaxCount "
+                                                    + StepData.effectiveMaxIterations();
+                                    exhaustedUntil = new RuntimeException(
+                                            limit
+                                                    + " for step '"
+                                                    + clonedStep.pickleStepTestStep.getStepText()
+                                                    + "'"
+                                    );
+                                    recordHardFailure(exhaustedUntil);
+                                    break untilLimit;
+                                }
+                                try (UntilPassTiming.Scope ignoredRun = UntilPassTiming.open("run-step")) {
+                                    runStep(clonedStep);
+                                }
+                                cloneStartTime = clonedStep.startTime;
+                                cloneRunCount = clonedStep.runCount;
+                                if (clonedStep.overridePhrase.phraseConditionalMode > 0)
+                                    break;
+                            }
                         }
-                        if (overTime || overCount) {
-                            clonedStep.checkGlobalMax();
-                            String limit = overTime
-                                    ? StepData.stepMaxTimeExceededMessage()
-                                    : "Until loop exhausted pkb_stepRepeatMaxCount "
-                                            + StepData.effectiveMaxIterations();
-                            exhaustedUntil = new RuntimeException(
-                                    limit
-                                            + " for step '"
-                                            + clonedStep.pickleStepTestStep.getStepText()
-                                            + "'"
-                            );
-                            recordHardFailure(exhaustedUntil);
-                            break untilLimit;
+                    } finally {
+                        if (timingThisLoop) {
+                            UntilPassTiming.publish();
+                            UntilPassTiming.stop();
                         }
-                        runStep(clonedStep);
-                        cloneStartTime = clonedStep.startTime;
-                        cloneRunCount = clonedStep.runCount;
-                        if (clonedStep.overridePhrase.phraseConditionalMode > 0)
-                            break;
                     }
 
                 } else {
@@ -652,6 +690,34 @@ public class CurrentScenarioState extends ScenarioMapping {
         runNextSibling(stepExtension);
         if (exhaustedUntil != null) {
             throw exhaustedUntil;
+        }
+    }
+
+    /**
+     * Same cap as {@link StepData#reachedGlobalMaxDuration()} without cloning
+     * a pass that is already over the limit.
+     */
+    private static boolean untilCapReached(Instant startTime) {
+        Duration cap = StepData.effectiveTimeout();
+        if (cap == null || cap.isNegative() || startTime == null) return false;
+        return Duration.between(startTime, Instant.now()).compareTo(cap) > 0;
+    }
+
+    /**
+     * The pass does not run the steps that follow the until. Cloning them and
+     * then dropping the sibling pointer was pure waste.
+     */
+    private static StepExtension cloneUntilPass(PhraseData inheritancePhrase, StepExtension stepExtension) {
+        StepBase savedNext = stepExtension.nextSibling;
+        stepExtension.nextSibling = null;
+        try {
+            return stepCloner(
+                    inheritancePhrase,
+                    stepExtension,
+                    IGNORE_CHILDREN_IF_FALSE
+            ).getFirst();
+        } finally {
+            stepExtension.nextSibling = savedNext;
         }
     }
 

@@ -69,6 +69,13 @@ public final class ConsumerMavenTestRunner {
             String purpose
     ) {
         List<String> command = new ArrayList<>(launchPrefix(wrapper(projectRoot)));
+        boolean mavenProject = Files.isRegularFile(projectRoot.toAbsolutePath().normalize().resolve("pom.xml"));
+        if (mavenProject) {
+            if (offlineSafe(projectRoot)) command.add("-o");
+            command.add("-q");
+        } else if (offlineSafe(projectRoot)) {
+            command.add("--offline");
+        }
         command.add("test");
         command.add("-Dpkb_runvars=" + embedFeaturePaths(compactRunVars, featurePaths));
         String topLevel = topLevelFeaturesArgument(featurePaths);
@@ -81,6 +88,24 @@ public final class ConsumerMavenTestRunner {
             command.add(PLATFORM_CUCUMBER_ENGINE);
         }
         return List.copyOf(command);
+    }
+
+    /**
+     * Offline is safe only after this project has already compiled tests, so
+     * the local repository has the resolved plugins and dependencies. A fresh
+     * checkout stays online. A normal {@code mvn test} does not call this.
+     */
+    static boolean offlineSafe(Path projectRoot) {
+        Path project = projectRoot.toAbsolutePath().normalize();
+        if (Files.isRegularFile(project.resolve("pom.xml"))) {
+            return Files.isDirectory(project.resolve("target/test-classes"));
+        }
+        if (Files.isRegularFile(project.resolve("build.gradle"))
+                || Files.isRegularFile(project.resolve("build.gradle.kts"))) {
+            return Files.isDirectory(project.resolve("build/classes/java/test"))
+                    || Files.isDirectory(project.resolve("build/classes/kotlin/test"));
+        }
+        return false;
     }
 
     public static int run(

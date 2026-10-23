@@ -44,7 +44,10 @@ public final class ParsedLine extends LineData {
                 state.evaluatingUntilCondition = true;
             }
             try {
-                stepExtension.overridePhrase.assertionChain.executeAssertionChain();
+                try (io.cucumber.core.runner.UntilPassTiming.Scope ignored =
+                             io.cucumber.core.runner.UntilPassTiming.open("condition")) {
+                    stepExtension.overridePhrase.assertionChain.executeAssertionChain();
+                }
             } finally {
                 if (state != null) {
                     state.evaluatingUntilCondition = previous;

@@ -56,7 +56,10 @@ public final class DiagnosticRuntime {
     }
 
     public static void beginStep(StepExtension step) {
-        if (DIAGNOSTIC_MODE && reporter != null) reporter.beginStep(step);
+        try (io.cucumber.core.runner.UntilPassTiming.Scope ignored =
+                     io.cucumber.core.runner.UntilPassTiming.open("diagnostics")) {
+            if (DIAGNOSTIC_MODE && reporter != null) reporter.beginStep(step);
+        }
     }
 
     public static void bindStepDefinition(StepExtension step) {
@@ -64,7 +67,10 @@ public final class DiagnosticRuntime {
     }
 
     public static void endStep(StepExtension step, Result result, Throwable error) {
-        if (DIAGNOSTIC_MODE && reporter != null) reporter.endStep(step, result, error);
+        try (io.cucumber.core.runner.UntilPassTiming.Scope ignored =
+                     io.cucumber.core.runner.UntilPassTiming.open("diagnostics")) {
+            if (DIAGNOSTIC_MODE && reporter != null) reporter.endStep(step, result, error);
+        }
     }
 
     public static void observeCapability(String capability) {

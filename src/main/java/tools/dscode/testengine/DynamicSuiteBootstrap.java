@@ -71,7 +71,21 @@ public final class DynamicSuiteBootstrap {
         }
     }
 
+    private static volatile boolean glueDetectionDone;
+    private static volatile String detectedGluePackage;
+
     static String detectDefaultGluePackage() {
+        if (glueDetectionDone) return detectedGluePackage;
+        synchronized (DynamicSuiteBootstrap.class) {
+            if (!glueDetectionDone) {
+                detectedGluePackage = scanForDefaultGluePackage();
+                glueDetectionDone = true;
+            }
+            return detectedGluePackage;
+        }
+    }
+
+    static String scanForDefaultGluePackage() {
         Set<String> packages = new LinkedHashSet<>();
 
         for (URI root : classpathRoots()) {
