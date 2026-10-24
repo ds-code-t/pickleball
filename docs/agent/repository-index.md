@@ -64,6 +64,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 ## Framework Java and AspectJ source
 
 - `src/main/aspectj/io/cucumber/core/cli/MainCliBootstrapAspect.aj`
+- `src/main/aspectj/io/cucumber/core/feature/FeatureParser_Cache.aj`
 - `src/main/aspectj/io/cucumber/core/gherkin/messages/PickleRunMetadataAspect.aj`
 - `src/main/aspectj/io/cucumber/core/runner/GetterOverrideSimple.aj`
 - `src/main/aspectj/io/cucumber/core/runner/PickleStepDefinitionMatchArgumentPaddingAspect.aj`
@@ -76,6 +77,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/aspectj/io/cucumber/core/runner/TestCase_Constructor_StepExtensionsRewrite.aj`
 - `src/main/aspectj/io/cucumber/core/runner/TestCase_ScenarioObjectScope.aj`
 - `src/main/aspectj/io/cucumber/core/runner/TestStepNoLoggingAspect.aj`
+- `src/main/aspectj/io/cucumber/core/runtime/FeaturePathFeatureSupplier_Cache.aj`
 - `src/main/aspectj/io/cucumber/gherkin/EncodingParserLineSwap.aj`
 - `src/main/aspectj/io/cucumber/gherkin/ForceNullValuesRowAspect.aj`
 - `src/main/aspectj/io/cucumber/gherkin/PickleCompilerAugment.aj`
@@ -130,6 +132,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/io/cucumber/core/runner/util/PickleStepArgUtils.java`
 - `src/main/java/io/cucumber/core/runner/util/PlaceHolderArg.java`
 - `src/main/java/io/cucumber/core/runner/util/TableUtils.java`
+- `src/main/java/io/cucumber/core/runtime/FeaturePathLoadCache.java`
 - `src/main/java/io/cucumber/core/stepexpression/DocStringBuilder.java`
 - `src/main/java/io/cucumber/java/en/ReturnStep.java`
 - `src/main/java/io/cucumber/messages/types/InlinePickleArgument.java`
@@ -432,6 +435,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/io/cucumber/core/gherkin/messages/MultilineArgumentPickleTest.java`
 - `src/test/java/io/cucumber/core/runner/StepRepetitionLimitTest.java`
 - `src/test/java/io/cucumber/core/runner/UntilPassOverheadTest.java`
+- `src/test/java/io/cucumber/core/runtime/FeaturePathLoadCacheTest.java`
 - `src/test/java/tools/dscode/common/assertions/AssertionClauseSplitterTest.java`
 - `src/test/java/tools/dscode/common/assertions/MultilineAssertFeatureTest.java`
 - `src/test/java/tools/dscode/common/assertions/MultilineAssertTest.java`

@@ -5,7 +5,9 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
@@ -15,6 +17,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
@@ -117,17 +120,30 @@ public final class WorkbenchFeatureIndex {
     public static Selection select(Request request) {
         Path root = request.projectRoot().toAbsolutePath().normalize();
         List<Path> files = discoverFiles(root, request.extraRoots());
-        Cache cache = request.refresh() ? Cache.empty() : Cache.load(cacheFile(root));
+        Path indexFile = cacheFile(root);
+        Cache cache = request.refresh() ? Cache.empty() : Cache.load(indexFile);
+        Map<String, long[]> stamps = request.refresh() ? Map.of() : loadStamps(statFile(indexFile));
         List<StoredFile> stored = new ArrayList<>();
+        Map<String, long[]> writtenStamps = new LinkedHashMap<>();
         int reparsed = 0;
         int cacheHits = 0;
         String unreadable = null;
         for (Path file : files) {
             String relative = relative(root, file);
             try {
+                BasicFileAttributes attributes = Files.readAttributes(file, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
+                long size = attributes.size();
+                long modified = attributes.lastModifiedTime().toMillis();
+                long[] stamp = stamps.get(relative);
+                StoredFile cached = cache.files.get(relative);
+                if (cached != null && stamp != null && stamp[0] == size && stamp[1] == modified) {
+                    stored.add(cached);
+                    writtenStamps.put(relative, new long[] {size, modified});
+                    cacheHits++;
+                    continue;
+                }
                 byte[] bytes = Files.readAllBytes(file);
                 String hash = sha256(bytes);
-                StoredFile cached = cache.files.get(relative);
                 if (cached != null && hash.equals(cached.sha256)) {
                     stored.add(cached);
                     cacheHits++;
@@ -135,12 +151,14 @@ public final class WorkbenchFeatureIndex {
                     stored.add(parse(root, file, relative, hash, bytes));
                     reparsed++;
                 }
+                writtenStamps.put(relative, new long[] {size, modified});
             } catch (IOException failure) {
                 unreadable = relative;
             }
         }
         try {
-            Cache.write(cacheFile(root), stored);
+            Cache.write(indexFile, stored);
+            writeStamps(statFile(indexFile), writtenStamps);
         } catch (IOException ignored) {
             // The next select falls back to a full parse. Narrowing still uses this pass.
         }
@@ -205,6 +223,52 @@ public final class WorkbenchFeatureIndex {
 
     public static Path cacheFile(Path projectRoot) {
         return PickleballLocalLayout.workbenchStateRoot(projectRoot).resolve(CACHE_FILE);
+    }
+
+    static Path statFile(Path cacheFile) {
+        return cacheFile.resolveSibling(cacheFile.getFileName().toString() + ".stat");
+    }
+
+    /**
+     * Size and last-modified time recorded beside {@code feature-index.v3}.
+     * A warm select trusts these and does not read the feature bytes again.
+     * A size or time change still hashes the bytes, and a hash change reparses.
+     */
+    private static Map<String, long[]> loadStamps(Path file) {
+        if (!Files.isRegularFile(file)) return Map.of();
+        try (DataInputStream in = new DataInputStream(Files.newInputStream(file))) {
+            if (in.readInt() != VERSION) return Map.of();
+            int count = in.readInt();
+            LinkedHashMap<String, long[]> stamps = new LinkedHashMap<>();
+            for (int i = 0; i < count; i++) {
+                String path = in.readUTF();
+                long size = in.readLong();
+                long modified = in.readLong();
+                stamps.put(path, new long[] {size, modified});
+            }
+            return stamps;
+        } catch (IOException failure) {
+            return Map.of();
+        }
+    }
+
+    private static void writeStamps(Path file, Map<String, long[]> stamps) throws IOException {
+        Files.createDirectories(file.getParent());
+        Path temp = file.resolveSibling(file.getFileName() + ".tmp");
+        try (DataOutputStream out = new DataOutputStream(Files.newOutputStream(temp))) {
+            out.writeInt(VERSION);
+            out.writeInt(stamps.size());
+            for (Map.Entry<String, long[]> entry : stamps.entrySet()) {
+                out.writeUTF(entry.getKey());
+                out.writeLong(entry.getValue()[0]);
+                out.writeLong(entry.getValue()[1]);
+            }
+        }
+        try {
+            Files.move(temp, file, java.nio.file.StandardCopyOption.REPLACE_EXISTING, java.nio.file.StandardCopyOption.ATOMIC_MOVE);
+        } catch (java.nio.file.AtomicMoveNotSupportedException failure) {
+            Files.move(temp, file, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+        }
     }
 
     /** Tiny feature Cucumber can open when the Workbench filter matched nothing. */

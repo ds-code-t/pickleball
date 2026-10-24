@@ -2,13 +2,28 @@ package tools.dscode.testengine;
 
 import io.cucumber.junit.platform.engine.CucumberTestEngine;
 import org.junit.platform.engine.ConfigurationParameters;
+import org.junit.platform.engine.DiscoverySelector;
 import org.junit.platform.engine.EngineDiscoveryRequest;
 import org.junit.platform.engine.ExecutionRequest;
 import org.junit.platform.engine.TestDescriptor;
 import org.junit.platform.engine.TestEngine;
 import org.junit.platform.engine.UniqueId;
+import org.junit.platform.engine.discovery.ClassSelector;
+import org.junit.platform.engine.discovery.ClasspathResourceSelector;
+import org.junit.platform.engine.discovery.ClasspathRootSelector;
+import org.junit.platform.engine.discovery.DirectorySelector;
+import org.junit.platform.engine.discovery.FileSelector;
+import org.junit.platform.engine.discovery.IterationSelector;
+import org.junit.platform.engine.discovery.MethodSelector;
+import org.junit.platform.engine.discovery.ModuleSelector;
+import org.junit.platform.engine.discovery.NestedClassSelector;
+import org.junit.platform.engine.discovery.NestedMethodSelector;
+import org.junit.platform.engine.discovery.PackageSelector;
+import org.junit.platform.engine.discovery.UniqueIdSelector;
+import org.junit.platform.engine.discovery.UriSelector;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 
@@ -42,6 +57,9 @@ public final class DynamicSuiteEngine implements TestEngine {
         return ENGINE_ID;
     }
 
+    private static String cachedDiscoverKey;
+    private static TestDescriptor cachedDiscoverDescriptor;
+
     @Override
     public TestDescriptor discover(EngineDiscoveryRequest discoveryRequest, UniqueId uniqueId) {
         try {
@@ -56,6 +74,12 @@ public final class DynamicSuiteEngine implements TestEngine {
                             discoveryRequest.getConfigurationParameters(),
                             overlayTopLevelFeatures(suite.values())
                     );
+            String discoverKey = discoverKey(uniqueId, discoveryRequest, mergedParameters);
+            TestDescriptor cached = takeCachedDiscover(discoverKey);
+            if (cached != null) {
+                io.cucumber.core.runner.Phase4Timing.mark("discover-cache-hit");
+                return cached;
+            }
 
             logTrace("[DynamicSuiteEngine] Final discovery configuration parameters: "
                     + new TreeMap<>(materialize(mergedParameters)));
@@ -80,6 +104,7 @@ public final class DynamicSuiteEngine implements TestEngine {
                             PKB_props.name()
                     )
             );
+            storeCachedDiscover(discoverKey, discovered);
             return discovered;
         } catch (RuntimeException e) {
             logError("[DynamicSuiteEngine] discover() failed: " + e.getMessage());
@@ -91,6 +116,7 @@ public final class DynamicSuiteEngine implements TestEngine {
     @Override
     public void execute(ExecutionRequest request) {
         try {
+            clearCachedDiscover();
             io.cucumber.core.runner.Phase4Timing.mark("execute-start");
             logTrace("[DynamicSuiteEngine] execute() called");
 
@@ -144,6 +170,69 @@ public final class DynamicSuiteEngine implements TestEngine {
 
     static Map<String, String> overlayTopLevelFeatures(Map<String, String> suiteValues) {
         return overlayTopLevelFeatures(suiteValues, System.getProperty(TOP_LEVEL_FEATURES_PROPERTY));
+    }
+
+    private static final List<Class<? extends DiscoverySelector>> SELECTOR_TYPES = List.of(
+            ClasspathRootSelector.class,
+            ClasspathResourceSelector.class,
+            ClassSelector.class,
+            MethodSelector.class,
+            NestedClassSelector.class,
+            NestedMethodSelector.class,
+            UniqueIdSelector.class,
+            PackageSelector.class,
+            FileSelector.class,
+            DirectorySelector.class,
+            UriSelector.class,
+            IterationSelector.class,
+            ModuleSelector.class
+    );
+
+    /**
+     * Surefire discovers, then discovers again, then executes. The second
+     * discovery is the same configuration and would rebuild every scenario.
+     * One reuse is enough. Execution clears the entry so a later run with
+     * the same configuration still sees current files. Selectors are part of
+     * the key, so a narrower second request does not reuse a wider tree.
+     */
+    private static String discoverKey(UniqueId uniqueId, EngineDiscoveryRequest request, ConfigurationParameters parameters) {
+        StringBuilder key = new StringBuilder();
+        key.append(uniqueId).append('\n');
+        for (Class<? extends DiscoverySelector> type : SELECTOR_TYPES) {
+            List<? extends DiscoverySelector> selectors = request.getSelectorsByType(type);
+            if (selectors.isEmpty()) {
+                continue;
+            }
+            key.append(type.getName()).append(':');
+            for (DiscoverySelector selector : selectors) {
+                key.append(selector).append('|');
+            }
+            key.append('\n');
+        }
+        for (Map.Entry<String, String> entry : materialize(parameters).entrySet()) {
+            key.append(entry.getKey()).append('=').append(entry.getValue()).append('\n');
+        }
+        return key.toString();
+    }
+
+    private static synchronized TestDescriptor takeCachedDiscover(String key) {
+        if (cachedDiscoverDescriptor == null || !key.equals(cachedDiscoverKey)) {
+            return null;
+        }
+        TestDescriptor hit = cachedDiscoverDescriptor;
+        cachedDiscoverDescriptor = null;
+        cachedDiscoverKey = null;
+        return hit;
+    }
+
+    private static synchronized void storeCachedDiscover(String key, TestDescriptor discovered) {
+        cachedDiscoverKey = key;
+        cachedDiscoverDescriptor = discovered;
+    }
+
+    private static synchronized void clearCachedDiscover() {
+        cachedDiscoverKey = null;
+        cachedDiscoverDescriptor = null;
     }
 
     private static String firstNonBlank(String... values) {
