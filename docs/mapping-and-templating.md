@@ -50,6 +50,8 @@ Given MAP TABLE VALUES TO RUN MAP
 
 The first row stores structured JSON at `payload`. The second stores the literal unresolved reference at `deferred`. The third resolves the normal current `payload` value and merges the converted JSON into that returned container in place.
 
+A cell that is XML is stored as that XML. It is not treated as an unresolved `<ref>` just because it starts with `<` and ends with `>`. `| plain | <R> <name>Adax</name></R> |` keeps the text, `INFO: plain=<Probe.plain>` prints it, and `<Probe.plain~XML;::name>` reads `Adax`. A namespace prefix works the same way, with or without an `xmlns` declaration: `<ns1:R xmlns:ns1="urn:pickleball:test"><name>Adax</name></ns1:R>`. A genuine one-token reference such as `<no.such.ref>` is still unresolved and is not stored. JSON and XML DocStrings are unchanged. A Windows path or a path with spaces in a cell is still ordinary text.
+
 ## Raw text and structured DocStrings
 
 `TEXT` resolves templates but keeps the final DocString as text:

@@ -269,10 +269,12 @@ public class MappingSteps extends CoreSteps {
     /**
      * Returns false when:
      * - input is null
-     * - input is a String or textual JsonNode whose trimmed value is enclosed
-     *   by either {@code <...>} or {@code ~[~...~]~}
+     * - input is a String or textual JsonNode whose trimmed value is one
+     *   unresolved reference ({@code <name>} or {@code ~[~name~]~})
      *
-     * Blank strings, empty arrays, and empty objects still return true here.
+     * XML is not a reference. A value that contains a closing tag, a
+     * self-closing tag, or more than one tag still returns true. Blank
+     * strings, empty arrays, and empty objects still return true here.
      */
     public static boolean hasNonNullValue(Object input) {
         if (input == null) {
@@ -283,13 +285,23 @@ public class MappingSteps extends CoreSteps {
         if (text == null) {
             return true;
         }
-        String trimmed = text.trim();
+        return !isUnresolvedCarrier(text.trim());
+    }
 
-        if (trimmed.startsWith("<") && trimmed.endsWith(">")) {
+    /**
+     * One {@code <name>} or {@code ~[~name~]~} token. XML, including a
+     * namespace prefix, is not a carrier.
+     */
+    private static boolean isUnresolvedCarrier(String trimmed) {
+        if (trimmed.startsWith("~[~") && trimmed.endsWith("~]~")) {
+            return true;
+        }
+        if (!(trimmed.startsWith("<") && trimmed.endsWith(">"))) {
             return false;
         }
-
-        if (trimmed.startsWith("~[~") && trimmed.endsWith("~]~")) {
+        if (trimmed.indexOf('<', 1) >= 0
+                || trimmed.contains("</")
+                || trimmed.contains("/>")) {
             return false;
         }
         return true;

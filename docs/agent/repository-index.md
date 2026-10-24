@@ -460,6 +460,8 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/control/protocol/PickleballVersionTest.java`
 - `src/test/java/tools/dscode/control/protocol/WorkbenchFeatureIndexParityTest.java`
 - `src/test/java/tools/dscode/coredefinitions/NavigationStepsTest.java`
+- `src/test/java/tools/dscode/coredefinitions/XmlTableCellFeatureTest.java`
+- `src/test/java/tools/dscode/coredefinitions/XmlTableCellTest.java`
 - `src/test/java/tools/dscode/expectedfailure/ExpectedFailureRunnerTest.java`
 - `src/test/java/tools/dscode/expectedfailure/ExpectedFailureSteps.java`
 - `src/test/java/tools/dscode/GuidancePackagingTest.java`
@@ -487,6 +489,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/resources/multiline-assert/multiline-assert.feature`
 - `src/test/resources/scenario-object/scenario-object.feature`
 - `src/test/resources/until-pass/literal-until.feature`
+- `src/test/resources/xml-table/xml-table.feature`
 
 ## Control API module
 
