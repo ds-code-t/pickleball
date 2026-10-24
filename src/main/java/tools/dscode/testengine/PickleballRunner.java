@@ -25,6 +25,7 @@ import static io.cucumber.core.options.Constants.FEATURES_PROPERTY_NAME;
 import static io.cucumber.core.options.Constants.FILTER_NAME_PROPERTY_NAME;
 import static io.cucumber.core.options.Constants.FILTER_TAGS_PROPERTY_NAME;
 import static io.cucumber.core.options.Constants.GLUE_PROPERTY_NAME;
+import static io.cucumber.core.options.Constants.PLUGIN_PROPERTY_NAME;
 import static io.cucumber.junit.platform.engine.Constants.PARALLEL_CONFIG_FIXED_MAX_POOL_SIZE_PROPERTY_NAME;
 import static io.cucumber.junit.platform.engine.Constants.PARALLEL_CONFIG_FIXED_PARALLELISM_PROPERTY_NAME;
 import static io.cucumber.junit.platform.engine.Constants.PARALLEL_CONFIG_STRATEGY_PROPERTY_NAME;
@@ -111,6 +112,7 @@ public abstract class PickleballRunner {
         applyLegacyFrameworkDefaults();
         syncCanonicalAndAliasKeys();
         alignCucumberNameFilterWithFind();
+        publishCucumberPlugins();
         syncReportPortalAliases(true);
         java.nio.file.Path projectRoot = PickleballLocalLayout.findProjectRoot(java.nio.file.Path.of(""));
         AgentCoordination.Run coordination = null;
@@ -201,6 +203,7 @@ public abstract class PickleballRunner {
         putCliOverride(PKB_GLUE, GLUE_PROPERTY_NAME, joinCommaSeparated(projection.glue));
         putCliReference(PKB_CUCUMBER_CLI_FEATURE_SELECTORS, formatCliArgs(projection.features));
         alignCucumberNameFilterWithFind();
+        publishCucumberPlugins();
 
         refreshRunProfile();
         refreshPkbOptions();
@@ -487,6 +490,16 @@ public abstract class PickleballRunner {
             if (aliasWins) values.put(canonical, value);
             else values.putIfAbsent(canonical, value);
         }
+    }
+
+    /**
+     * {@code pkb_plugins} is the consumer knob. Cucumber reads {@code cucumber.plugin}.
+     * A blank value leaves Cucumber's own default alone.
+     */
+    private void publishCucumberPlugins() {
+        String plugins = values.get(PKB_props.PKB_PLUGINS);
+        if (plugins == null || plugins.isBlank()) return;
+        values.put(PLUGIN_PROPERTY_NAME, plugins);
     }
 
     /**

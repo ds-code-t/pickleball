@@ -261,11 +261,13 @@ public final class WorkbenchRunReports {
         for (String name : names) {
             if (name != null && !name.isBlank()) parts.putIfAbsent(name, new StringBuilder());
         }
+        if (containsMarker(text, names)) {
+            return writeMarked(dir, parts, text);
+        }
         String current = null;
         boolean marked = false;
         for (String line : text.split("\\R", -1)) {
-            String next = WorkbenchConsoleTap.scenarioOnMarkedLine(line, names);
-            if (next == null) next = scenarioOnLine(line, names);
+            String next = scenarioOnLine(line, names);
             if (next != null) {
                 current = next;
                 marked = true;
@@ -288,6 +290,43 @@ public final class WorkbenchRunReports {
             written.add(writeText(dir.resolve(safe(entry.getKey()) + ".txt"), entry.getValue().toString()));
         }
         return written;
+    }
+
+    private static boolean containsMarker(String text, List<String> names) {
+        for (String line : text.split("\\R", -1)) {
+            if (WorkbenchConsoleTap.scenarioOnMarkedLine(line, names) != null) return true;
+        }
+        return false;
+    }
+
+    /** Marker lines are exact-name matches. The saved file does not keep the prefix. */
+    private static List<Path> writeMarked(Path dir, Map<String, StringBuilder> parts, String text) throws IOException {
+        String[] lines = text.split("\\R", -1);
+        int limit = lines.length;
+        if (limit > 0 && lines[limit - 1].isEmpty()) limit--;
+        StringBuilder unassigned = new StringBuilder();
+        for (int i = 0; i < limit; i++) {
+            String line = lines[i];
+            String name = WorkbenchConsoleTap.scenarioOnMarkedLine(line, namesOf(parts));
+            if (name != null) {
+                parts.get(name).append(WorkbenchConsoleTap.payload(line)).append('\n');
+            } else if (!line.isEmpty()) {
+                unassigned.append(line).append('\n');
+            }
+        }
+        List<Path> written = new ArrayList<>();
+        for (Map.Entry<String, StringBuilder> entry : parts.entrySet()) {
+            if (entry.getValue().isEmpty()) continue;
+            written.add(writeText(dir.resolve(safe(entry.getKey()) + ".txt"), entry.getValue().toString()));
+        }
+        if (!unassigned.isEmpty()) {
+            written.add(writeText(dir.resolve("unassigned.txt"), unassigned.toString()));
+        }
+        return written;
+    }
+
+    private static List<String> namesOf(Map<String, StringBuilder> parts) {
+        return List.copyOf(parts.keySet());
     }
 
     /** Post-run read of one scenario directory. Leaves core events, trace, and summary.json alone. */

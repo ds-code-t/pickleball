@@ -477,6 +477,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/VersionSwitchTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchAgentCommandsTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchCommandLineTest.java`
+- `src/test/java/tools/dscode/launcher/WorkbenchConsoleTapTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchElementInspectTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchLaunchTimingTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchPointerContractTest.java`
@@ -740,6 +741,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `maven-consumer-project/src/test/java/com/example/pickleball/AreaBControlFlowChecks.java`
 - `maven-consumer-project/src/test/java/com/example/pickleball/AreaCElementChecks.java`
 - `maven-consumer-project/src/test/java/com/example/pickleball/ConfigurationValidationSteps.java`
+- `maven-consumer-project/src/test/java/com/example/pickleball/ConsoleSplitSteps.java`
 - `maven-consumer-project/src/test/java/com/example/pickleball/ControlApiTestSteps.java`
 - `maven-consumer-project/src/test/java/com/example/pickleball/ControlBridgeTestSteps.java`
 - `maven-consumer-project/src/test/java/com/example/pickleball/ControlRuntimeObserverChecks.java`
@@ -804,6 +806,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `maven-consumer-project/src/test/resources/features/comma-single-element-condition.feature`
 - `maven-consumer-project/src/test/resources/features/component-scenarios.feature`
 - `maven-consumer-project/src/test/resources/features/configuration-system-properties.feature`
+- `maven-consumer-project/src/test/resources/features/console-split.feature`
 - `maven-consumer-project/src/test/resources/features/control-bridge.feature`
 - `maven-consumer-project/src/test/resources/features/data-element-all-phases.feature`
 - `maven-consumer-project/src/test/resources/features/data-element-native-collections.feature`

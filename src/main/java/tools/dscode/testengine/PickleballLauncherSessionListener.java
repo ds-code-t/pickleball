@@ -8,6 +8,8 @@ public final class PickleballLauncherSessionListener implements LauncherSessionL
     @Override
     public void launcherSessionOpened(LauncherSession session) {
         EngineFilterBootstrap.ensureEngineFilterApplied("LauncherSessionListener");
+        // Before Cucumber, and before a console appender that snapshots System.out.
+        tools.dscode.launcher.WorkbenchConsoleTap.installIfActive();
     }
 
     @Override

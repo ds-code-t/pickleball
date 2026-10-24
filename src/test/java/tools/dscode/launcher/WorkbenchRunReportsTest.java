@@ -265,6 +265,10 @@ class WorkbenchRunReportsTest {
         assertFalse(pendFile.isBlank());
         assertFalse(caseFile.isBlank());
         assertFalse(savedFile.isBlank());
+        assertFalse(pendFile.contains("# pkb-console"), pendFile);
+        assertFalse(caseFile.contains("# pkb-console"), caseFile);
+        assertFalse(savedFile.contains("# pkb-console"), savedFile);
+        assertFalse(console.contains("Scenario:"), console);
         Path unassigned = consoleDir.resolve("unassigned.txt");
         if (Files.exists(unassigned)) {
             assertTrue(Files.readString(unassigned).isBlank(), Files.readString(unassigned));

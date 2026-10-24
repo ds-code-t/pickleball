@@ -49,6 +49,7 @@ public final class DynamicSuiteEngine implements TestEngine {
     public static final String TOP_LEVEL_FEATURES_PROPERTY = "pickleball.workbench.topFeatures";
 
     static {
+        tools.dscode.launcher.WorkbenchConsoleTap.installIfActive();
         EngineFilterBootstrap.ensureEngineFilterApplied("DynamicSuiteEngine.<clinit>");
     }
 

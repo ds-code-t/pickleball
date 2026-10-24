@@ -105,6 +105,10 @@ dependencies {
     testRuntimeOnly("io.cucumber:html-formatter")
     testRuntimeOnly("io.cucumber:junit-xml-formatter")
     testRuntimeOnly("io.cucumber:testng-xml-formatter")
+    // Logback 1.3 stays on SLF4J 1.7, which this tree already uses.
+    // The console-tap test starts a real ConsoleAppender. It is test-only.
+    testImplementation("ch.qos.logback:logback-classic:1.3.15")
+    testImplementation("org.apache.logging.log4j:log4j-core:2.25.3")
 
     api("com.google.guava:guava:33.5.0-jre")
     api("com.fasterxml.jackson.core:jackson-databind:2.20.0")

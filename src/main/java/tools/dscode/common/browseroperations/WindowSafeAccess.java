@@ -2,6 +2,8 @@ package tools.dscode.common.browseroperations;
 
 import org.openqa.selenium.WebDriver;
 
+import tools.dscode.launcher.WorkbenchConsoleTap;
+
 import java.time.Duration;
 import java.util.concurrent.*;
 
@@ -25,7 +27,7 @@ public final class WindowSafeAccess {
     }
 
     private static String callWithTimeout(Callable<String> call, Duration timeout) {
-        Future<String> future = EXEC.submit(call);
+        Future<String> future = EXEC.submit(WorkbenchConsoleTap.carrying(call));
         try {
             return future.get(timeout.toMillis(), TimeUnit.MILLISECONDS);
         } catch (TimeoutException e) {
