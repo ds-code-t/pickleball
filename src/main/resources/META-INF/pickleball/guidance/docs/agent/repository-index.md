@@ -43,6 +43,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/diagnostic-reporting.md`
 - `docs/dynamic-control-api.md`
 - `docs/dynamic-steps.md`
+- `docs/experimental-features.md`
 - `docs/feature-status-notes.md`
 - `docs/getting-started.md`
 - `docs/java-values.md`
@@ -73,6 +74,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/aspectj/io/cucumber/core/runner/RunnerAfterCreateTestCaseAspect.aj`
 - `src/main/aspectj/io/cucumber/core/runner/StepResultCapture.aj`
 - `src/main/aspectj/io/cucumber/core/runner/TestCase_Constructor_StepExtensionsRewrite.aj`
+- `src/main/aspectj/io/cucumber/core/runner/TestCase_ScenarioObjectScope.aj`
 - `src/main/aspectj/io/cucumber/core/runner/TestStepNoLoggingAspect.aj`
 - `src/main/aspectj/io/cucumber/gherkin/EncodingParserLineSwap.aj`
 - `src/main/aspectj/io/cucumber/gherkin/ForceNullValuesRowAspect.aj`
@@ -106,6 +108,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/io/cucumber/core/runner/modularexecutions/FilePathResolver.java`
 - `src/main/java/io/cucumber/core/runner/NPickleStepTestStepFactory.java`
 - `src/main/java/io/cucumber/core/runner/OverrideSupport.java`
+- `src/main/java/io/cucumber/core/runner/Phase4Timing.java`
 - `src/main/java/io/cucumber/core/runner/PickleStepDefinitionMatches.java`
 - `src/main/java/io/cucumber/core/runner/PredefinedSteps.java`
 - `src/main/java/io/cucumber/core/runner/ScenarioStep.java`
@@ -116,6 +119,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/io/cucumber/core/runner/StepLogic.java`
 - `src/main/java/io/cucumber/core/runner/StepOverrideDispatcher.java`
 - `src/main/java/io/cucumber/core/runner/TypeSwitch.java`
+- `src/main/java/io/cucumber/core/runner/UntilPassTiming.java`
 - `src/main/java/io/cucumber/core/runner/util/ArgumentUtility.java`
 - `src/main/java/io/cucumber/core/runner/util/CallScope.java`
 - `src/main/java/io/cucumber/core/runner/util/CucumberQueryUtil.java`
@@ -396,6 +400,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/launcher/WorkbenchRunReports.java`
 - `src/main/java/tools/dscode/launcher/WorkbenchRuntimeLibs.java`
 - `src/main/java/tools/dscode/launcher/WorkbenchSessionCommands.java`
+- `src/main/java/tools/dscode/launcher/WorkbenchTagFallback.java`
 - `src/main/java/tools/dscode/misc/DummySteps.java`
 - `src/main/java/tools/dscode/parallelutilities/ParallelCountEstimator.java`
 - `src/main/java/tools/dscode/parallelutilities/Stagger.java`
@@ -424,12 +429,17 @@ This inventory helps coding agents discover relevant files. It does not replace 
 ## Framework tests
 
 - `src/test/java/io/cucumber/core/gherkin/messages/ConditionalArgumentPickleTest.java`
+- `src/test/java/io/cucumber/core/gherkin/messages/MultilineArgumentPickleTest.java`
 - `src/test/java/io/cucumber/core/runner/StepRepetitionLimitTest.java`
+- `src/test/java/io/cucumber/core/runner/UntilPassOverheadTest.java`
 - `src/test/java/tools/dscode/common/assertions/AssertionClauseSplitterTest.java`
+- `src/test/java/tools/dscode/common/assertions/MultilineAssertFeatureTest.java`
+- `src/test/java/tools/dscode/common/assertions/MultilineAssertTest.java`
 - `src/test/java/tools/dscode/common/coordination/AgentCoordinationTest.java`
 - `src/test/java/tools/dscode/common/coordination/PathPrefixResolutionTest.java`
 - `src/test/java/tools/dscode/common/coordination/RunConfigCopyRedactionTest.java`
 - `src/test/java/tools/dscode/common/coordination/RunConfigIsolationTest.java`
+- `src/test/java/tools/dscode/common/dataelements/NamespaceXmlTest.java`
 - `src/test/java/tools/dscode/common/domoperations/LoadingCategoryDefinitionTest.java`
 - `src/test/java/tools/dscode/common/driver/DriverDownloadFallbackTest.java`
 - `src/test/java/tools/dscode/common/mappings/ParsingMapGreaterThanMaskTest.java`
@@ -438,6 +448,8 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/common/reporting/diagnostic/AgentBrowserLadderTest.java`
 - `src/test/java/tools/dscode/common/reporting/diagnostic/AgentDiscoverPlannerTest.java`
 - `src/test/java/tools/dscode/common/reporting/diagnostic/ConsumerMavenTestRunnerTest.java`
+- `src/test/java/tools/dscode/common/reporting/diagnostic/DiagnosticSecretRedactionTest.java`
+- `src/test/java/tools/dscode/common/servicecalls/JdbcTypeMappingTest.java`
 - `src/test/java/tools/dscode/common/treeparsing/preparsing/ConditionalBranchArgumentTest.java`
 - `src/test/java/tools/dscode/common/treeparsing/preparsing/LazyBranchResolutionTest.java`
 - `src/test/java/tools/dscode/common/treeparsing/WithinRewriteScopeTest.java`
@@ -447,8 +459,10 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/control/protocol/PickleballLocalStoreTest.java`
 - `src/test/java/tools/dscode/control/protocol/PickleballVersionTest.java`
 - `src/test/java/tools/dscode/control/protocol/WorkbenchFeatureIndexParityTest.java`
+- `src/test/java/tools/dscode/coredefinitions/NavigationStepsTest.java`
 - `src/test/java/tools/dscode/expectedfailure/ExpectedFailureRunnerTest.java`
 - `src/test/java/tools/dscode/expectedfailure/ExpectedFailureSteps.java`
+- `src/test/java/tools/dscode/GuidancePackagingTest.java`
 - `src/test/java/tools/dscode/launcher/PickleballWorkbenchLauncherTest.java`
 - `src/test/java/tools/dscode/launcher/SessionHealthWaitTest.java`
 - `src/test/java/tools/dscode/launcher/VersionSwitchTest.java`
@@ -458,14 +472,21 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/WorkbenchPointerContractTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchRunReportsTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchSessionCommandsTest.java`
+- `src/test/java/tools/dscode/launcher/WorkbenchTagFallbackTest.java`
 - `src/test/java/tools/dscode/parallelutilities/ParallelCountEstimatorTest.java`
 - `src/test/java/tools/dscode/Release216BehaviorTest.java`
 - `src/test/java/tools/dscode/Release217Phase1Test.java`
+- `src/test/java/tools/dscode/scenarioobject/ScenarioObjectHookTest.java`
+- `src/test/java/tools/dscode/scenarioobject/ScenarioObjectSteps.java`
+- `src/test/java/tools/dscode/ScenarioObjectTest.java`
 - `src/test/java/tools/dscode/testengine/CucumberNameFilterTest.java`
 - `src/test/java/tools/dscode/testengine/DriverDownloadRedactionTest.java`
 - `src/test/java/tools/dscode/testengine/DynamicSuiteBootstrapWorkbenchRootTest.java`
 - `src/test/java/tools/dscode/testengine/ExampleRowFilterTest.java`
 - `src/test/resources/expected-failure/release-216-expected-failure.feature`
+- `src/test/resources/multiline-assert/multiline-assert.feature`
+- `src/test/resources/scenario-object/scenario-object.feature`
+- `src/test/resources/until-pass/literal-until.feature`
 
 ## Control API module
 

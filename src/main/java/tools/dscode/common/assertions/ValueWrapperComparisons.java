@@ -17,6 +17,8 @@ import static tools.dscode.common.reporting.logging.LogForwarder.logToDefaultLev
  * <p>
  * Rules:
  * - String comparisons normally use asNormalizedText()
+ * - If either raw value contains a line break, both sides keep that text:
+ *   CR/LF becomes LF and spaces are not collapsed
  * - If either arg is SINGLE_QUOTED → case-insensitive comparison
  * - If either arg is BACK_TICKED → use getValue().toString() for BOTH sides
  * - Numeric comparisons use asBigDecimal()
@@ -93,16 +95,50 @@ public final class ValueWrapperComparisons {
 
     private static String stringValue(ValueWrapper a, ValueWrapper b) {
         if (eitherBackTicked(a, b)) {
-            return a.getValue() == null ? null : a.getValue().toString();
+            return rawText(a);
+        }
+        if (eitherHasLineBreak(a, b)) {
+            return comparisonText(a);
         }
         return a.asNormalizedText();
     }
 
     private static String stringValueOther(ValueWrapper a, ValueWrapper b) {
         if (eitherBackTicked(a, b)) {
-            return b.getValue() == null ? null : b.getValue().toString();
+            return rawText(b);
+        }
+        if (eitherHasLineBreak(a, b)) {
+            return comparisonText(b);
         }
         return b.asNormalizedText();
+    }
+
+    private static String rawText(ValueWrapper value) {
+        if (value == null || value.getValue() == null) {
+            return null;
+        }
+        return value.getValue().toString();
+    }
+
+    private static boolean eitherHasLineBreak(ValueWrapper a, ValueWrapper b) {
+        return hasLineBreak(a) || hasLineBreak(b);
+    }
+
+    private static boolean hasLineBreak(ValueWrapper value) {
+        String text = rawText(value);
+        return text != null && (text.indexOf('\n') >= 0 || text.indexOf('\r') >= 0);
+    }
+
+    /**
+     * A line break stays a line break. CRLF and a lone CR are the same break as LF.
+     * Spaces are not collapsed; that remains the single-line rule.
+     */
+    private static String comparisonText(ValueWrapper value) {
+        String text = rawText(value);
+        if (text == null) {
+            return null;
+        }
+        return text.replace("\r\n", "\n").replace('\r', '\n');
     }
 
     private static boolean hasMargin(ValueWrapper margin) {

@@ -196,7 +196,7 @@ public enum AssertionOperations implements OperationsInterface {
             ElementMatch secondElement = phraseData.getElementMatchAfterOperation(RETURNS_VALUE);
 
             List<ValueWrapper> secondVals = secondElement.getValues().stream().map(val ->
-                    createLiteralRegexWrapper(val, name(), "", ".*")
+                    createLiteralRegexWrapper(val, name(), "", "(?s).*")
             ).toList();
 
 
@@ -221,7 +221,7 @@ public enum AssertionOperations implements OperationsInterface {
             ElementMatch secondElement = phraseData.getElementMatchAfterOperation(RETURNS_VALUE);
 
             List<ValueWrapper> secondVals = secondElement.getValues().stream().map(val ->
-                    createLiteralRegexWrapper(val, name(), ".*", "")
+                    createLiteralRegexWrapper(val, name(), "(?s).*", "")
             ).toList();
 
 
@@ -246,7 +246,7 @@ public enum AssertionOperations implements OperationsInterface {
             ElementMatch secondElement = phraseData.getElementMatchAfterOperation(RETURNS_VALUE);
 
             List<ValueWrapper> secondVals = secondElement.getValues().stream().map(val ->
-                    createLiteralRegexWrapper(val, name(), ".*", ".*")
+                    createLiteralRegexWrapper(val, name(), "(?s).*", "(?s).*")
             ).toList();
 
 

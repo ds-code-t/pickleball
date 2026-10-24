@@ -20,7 +20,7 @@ public class DynamicSteps  extends CoreSteps {
         executeDynamicStep(stepText);
     }
 
-    @Given("^,(.*)$")
+    @Given("^,(?s)(.*)$")
     public void executeDynamicStep(String stepText) {
         StepExtension currentStep = getRunningStep();
         currentStep.insertChildStepsByString(currentStep.lineData.lineComponents);

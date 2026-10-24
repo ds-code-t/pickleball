@@ -128,8 +128,13 @@ public final class QuoteParser extends LinkedHashMap<String, String> {
         return index > 0 && in.charAt(index - 1) == '\\';
     }
 
-    private static boolean isRegexLineTerminator(char c) {
-        return c == '\n' || c == '\r' || c == '\u0085' || c == '\u2028' || c == '\u2029';
+    /**
+     * NEL, line separator, and paragraph separator still end a quote, matching
+     * a regex dot. A line feed or carriage return does not: an ASSERT value
+     * can hold a multi-line string inside one pair of quotes.
+     */
+    private static boolean blocksQuoteSpan(char c) {
+        return c == '\u0085' || c == '\u2028' || c == '\u2029';
     }
 
     private static int countConsecutiveBackslashesBefore(String in, int index, int minIndex) {
@@ -143,15 +148,16 @@ public final class QuoteParser extends LinkedHashMap<String, String> {
     }
 
     /**
-     * Leftmost closer matching the former single-quote regex: first unescaped
-     * matching quote, with no regex line terminator in the span. Trailing even
-     * backslashes before the closer are not part of the captured inner value.
+     * Leftmost closer matching a single-quote span: first unescaped matching
+     * quote. A line feed or carriage return stays inside the span. NEL, LS, and
+     * PS still end it. Trailing even backslashes before the closer are not part
+     * of the captured inner value.
      */
     private static int findSingleQuoteClose(String in, int open, char quote) {
         int i = open + 1;
         while (i < in.length()) {
             char c = in.charAt(i);
-            if (isRegexLineTerminator(c)) {
+            if (blocksQuoteSpan(c)) {
                 return -1;
             }
             if (c == quote && (countConsecutiveBackslashesBefore(in, i, open + 1) % 2) == 0) {
@@ -190,7 +196,7 @@ public final class QuoteParser extends LinkedHashMap<String, String> {
         int i = contentStart;
         while (i < in.length()) {
             char c = in.charAt(i);
-            if (isRegexLineTerminator(c)) {
+            if (blocksQuoteSpan(c)) {
                 return -1;
             }
             if (in.startsWith(TRIPLE_SINGLE, i)

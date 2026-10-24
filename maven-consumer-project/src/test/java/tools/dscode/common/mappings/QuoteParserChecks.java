@@ -15,10 +15,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class QuoteParserChecks {
     private static final int LARGE_QUOTED_CHARS = 64 * 1024;
+    // LF and CR stay inside one span. NEL, LS, and PS still do not, so '.' does not match them.
     private static final Pattern LEGACY_SINGLE =
-            Pattern.compile("(?<!\\\\)(['\"`])((?:\\\\.|(?!\\1).)*?)(?<!\\\\)(?:\\\\\\\\)*\\1");
+            Pattern.compile("(?<!\\\\)(['\"`])((?:\\\\.|\\r\\n|\\n|\\r|(?!\\1).)*?)(?<!\\\\)(?:\\\\\\\\)*\\1");
     private static final Pattern LEGACY_TRIPLE =
-            Pattern.compile("(?<!\\\\)(?:\\\\\\\\)*(''')((?:\\\\.|(?!\\1).)*?)(?<!\\\\)(?:\\\\\\\\)*\\1");
+            Pattern.compile("(?<!\\\\)(?:\\\\\\\\)*(''')((?:\\\\.|\\r\\n|\\n|\\r|(?!\\1).)*?)(?<!\\\\)(?:\\\\\\\\)*\\1");
 
     @Test
     void scannerMatchesLegacyRegexOnSmallQuoteCases() {
