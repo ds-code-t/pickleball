@@ -616,12 +616,48 @@ public final class WorkbenchRunReports {
     }
 
     private static int stepCount(Path scenarioDir) throws IOException {
-        Path summary = scenarioDir.resolve("workbench").resolve("summary.json");
+        int listed = stepListSize(scenarioDir.resolve("workbench").resolve("summary.json"));
+        if (listed > 0) return listed;
+        return coreStepCount(scenarioDir.resolve("summary.json"));
+    }
+
+    /** A non-empty workbench step list wins. An empty list is not a count of zero steps. */
+    private static int stepListSize(Path summary) throws IOException {
         if (!Files.isRegularFile(summary)) return 0;
         @SuppressWarnings("unchecked")
         Map<String, Object> body = JSON.readValue(summary.toFile(), Map.class);
         Object steps = body.get("steps");
         return steps instanceof List<?> list ? list.size() : 0;
+    }
+
+    /**
+     * Core {@code summary.json} keeps a count map after retention deletes {@code events.jsonl}.
+     * Prefer {@code executed}, then {@code total}, then the sum of the outcome buckets.
+     */
+    private static int coreStepCount(Path summary) throws IOException {
+        if (!Files.isRegularFile(summary)) return 0;
+        @SuppressWarnings("unchecked")
+        Map<String, Object> body = JSON.readValue(summary.toFile(), Map.class);
+        Object steps = body.get("steps");
+        if (steps instanceof List<?> list) return list.size();
+        if (!(steps instanceof Map<?, ?> map)) return 0;
+        if (map.containsKey("executed")) return intValue(map.get("executed"));
+        if (map.containsKey("total")) return intValue(map.get("total"));
+        int sum = 0;
+        for (String key : List.of("passed", "failed", "skipped", "other")) {
+            sum += intValue(map.get(key));
+        }
+        return sum;
+    }
+
+    private static int intValue(Object value) {
+        if (value instanceof Number number) return number.intValue();
+        if (value == null) return 0;
+        try {
+            return Integer.parseInt(String.valueOf(value).trim());
+        } catch (NumberFormatException failure) {
+            return 0;
+        }
     }
 
     private static String scenarioOnLine(String line, List<String> names) {

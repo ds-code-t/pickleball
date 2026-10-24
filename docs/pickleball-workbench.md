@@ -95,7 +95,7 @@ Maven Surefire discovers, then discovers again, then executes. The second discov
 
 `pkb_example` decodes a classpath feature URI before it opens the file. `%20` is a space, and a Windows `\` is a `/`. One unreadable feature logs `WARNING: pkb_example skipped unreadable feature` and is left out of that filter. It does not abort the rest of the run.
 
-`record.json` takes a failed outcome from `run-index.json` when that file exists, including `counts.errors` and outcome `ERROR`, and including `diagnostic/run-index.json`. `failureCount`, `failedScenario`, and `failureSummary` are filled from it. A full scan with no scenario directory prints `scenarios=` and `steps=` from that index, or from the console `Scenarios` / `Steps` lines.
+`record.json` takes a failed outcome from `run-index.json` when that file exists, including `counts.errors` and outcome `ERROR`, and including `diagnostic/run-index.json`. `failureCount`, `failedScenario`, and `failureSummary` are filled from it. A full scan with no scenario directory prints `scenarios=` and `steps=` from that index, or from the console `Scenarios` / `Steps` lines. When scenario directories are present, `steps=` sums every scenario for retention `all`, `failed`, and `none`: the step list size when that list is not empty, otherwise the core summary `steps.executed` (then `total`, then `passed` + `failed` + `skipped` + `other`). The index is used only when that sum is 0.
 
 ```text
 "-Dexec.args=plan --tags=@smoke --name='Checkout.*'"

@@ -179,6 +179,10 @@ class WorkbenchRunReportsTest {
         Files.writeString(failed.resolve("trace.jsonl"), """
                 {"step":"Then the file is saved","type":"log","text":"C:/Program Files/Pickleball/body.xml"}
                 """);
+        Path index = run.resolve("diagnostic").resolve(runId).resolve("run-index.json");
+        Files.writeString(index, """
+                {"counts":{"total":2},"steps":{"executed":1}}
+                """);
         String savedName = "C:\\Users\\Dan She'll\\page";
         String console = """
                 Scenario: Pend case NEW UI # C:/Program Files/Pickleball/features/Page Response.feature:12
@@ -197,7 +201,7 @@ class WorkbenchRunReportsTest {
                 new PrintStream(sink, true, StandardCharsets.UTF_8)
         );
 
-        assertTrue(steps >= 1, "steps=" + steps);
+        assertEquals(3, steps);
         assertArrayEquals(coreBefore, Files.readAllBytes(coreFile));
         String passedSummary = Files.readString(passed.resolve("workbench").resolve("summary.json"));
         assertTrue(passedSummary.contains("\"scenario\" : \"Pend case NEW UI\""), passedSummary);
