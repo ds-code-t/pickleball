@@ -8,7 +8,12 @@ import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.net.URLEncoder;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import tools.dscode.common.coordination.AgentCoordination;
 import tools.dscode.control.protocol.WorkbenchFeatureIndex;
@@ -221,6 +226,114 @@ class WorkbenchRunReportsTest {
         assertTrue(saved.contains("but was"), saved);
         assertFalse(Files.exists(consoleDir.resolve("unassigned.txt")));
         assertTrue(sink.toString(StandardCharsets.UTF_8).contains("summary status=FAILED"));
+    }
+
+    @Test
+    void markedLinesSplitWithoutScenarioHeadersIncludingParallelNames() throws Exception {
+        Path project = tempDir.resolve("Program Files");
+        String runId = "check-console-tap";
+        String pending = "Pend";
+        String pendingCase = "Pend case";
+        String savedName = "C:\\Users\\Dan She'll\\page";
+        String console = ""
+                + mark(pending) + "alpha from Pend\n"
+                + mark(pendingCase) + "beta from Pend case only\n"
+                + mark(pending) + "gamma stays with Pend even if it mentions Pend case\n"
+                + mark(savedName) + "delta saved under C:\\Users\\Dan She'll\\page\n";
+
+        WorkbenchRunReports.publish(
+                project,
+                runId,
+                List.of(hit(pending), hit(pendingCase), hit(savedName)),
+                console,
+                "PASSED",
+                new PrintStream(new ByteArrayOutputStream(), true, StandardCharsets.UTF_8)
+        );
+
+        Path consoleDir = AgentCoordination.runDirectory(project, runId).resolve("console");
+        String pendFile = Files.readString(consoleDir.resolve("Pend.txt"));
+        String caseFile = Files.readString(consoleDir.resolve("Pend_case.txt"));
+        String savedFile = Files.readString(consoleDir.resolve("C_Users_Dan_She_ll_page.txt"));
+        assertTrue(pendFile.contains("alpha from Pend"), pendFile);
+        assertTrue(pendFile.contains("gamma stays with Pend"), pendFile);
+        assertFalse(pendFile.contains("beta from Pend case only"), pendFile);
+        assertTrue(caseFile.contains("beta from Pend case only"), caseFile);
+        assertFalse(caseFile.contains("alpha from Pend"), caseFile);
+        assertFalse(caseFile.contains("gamma stays with Pend"), caseFile);
+        assertTrue(savedFile.contains("delta saved"), savedFile);
+        assertTrue(savedFile.contains("C:\\Users\\Dan She'll\\page"), savedFile);
+        assertFalse(pendFile.isBlank());
+        assertFalse(caseFile.isBlank());
+        assertFalse(savedFile.isBlank());
+        Path unassigned = consoleDir.resolve("unassigned.txt");
+        if (Files.exists(unassigned)) {
+            assertTrue(Files.readString(unassigned).isBlank(), Files.readString(unassigned));
+        }
+    }
+
+    @Test
+    void consoleTapMarksOnlyTheWorkbenchThreadAndLeavesOtherPrintsAlone() throws Exception {
+        String previous = System.getProperty("pkb_run_purpose");
+        PrintStream out = System.out;
+        PrintStream err = System.err;
+        try {
+            System.setProperty("pkb_run_purpose", "workbench-discover");
+            ByteArrayOutputStream sink = new ByteArrayOutputStream();
+            PrintStream raw = new PrintStream(sink, true, StandardCharsets.UTF_8);
+            PrintStream wrapped = WorkbenchConsoleTap.wrap(raw);
+            wrapped.print("plain");
+            assertEquals("plain", sink.toString(StandardCharsets.UTF_8));
+
+            CountDownLatch started = new CountDownLatch(2);
+            var pool = Executors.newFixedThreadPool(2);
+            try {
+                Future<?> pend = pool.submit(() -> printAs(wrapped, "Pend", "P-line\n", started));
+                Future<?> longer = pool.submit(() -> printAs(wrapped, "Pend case", "C-line\n", started));
+                pend.get(10, TimeUnit.SECONDS);
+                longer.get(10, TimeUnit.SECONDS);
+            } finally {
+                pool.shutdownNow();
+            }
+            String text = sink.toString(StandardCharsets.UTF_8);
+            assertTrue(text.startsWith("plain"), text);
+            assertTrue(text.contains(mark("Pend") + "P-line"), text);
+            assertTrue(text.contains(mark("Pend case") + "C-line"), text);
+            assertFalse(text.contains(mark("Pend") + "C-line"), text);
+            assertTrue(WorkbenchConsoleTap.active());
+            assertFalse(WorkbenchConsoleTap.active(null));
+
+            System.clearProperty("pkb_run_purpose");
+            String before = sink.toString(StandardCharsets.UTF_8);
+            WorkbenchConsoleTap.enter("Pend case");
+            wrapped.print("quiet");
+            WorkbenchConsoleTap.leave();
+            assertEquals(before + "quiet", sink.toString(StandardCharsets.UTF_8));
+        } finally {
+            System.setOut(out);
+            System.setErr(err);
+            if (previous == null) System.clearProperty("pkb_run_purpose");
+            else System.setProperty("pkb_run_purpose", previous);
+        }
+    }
+
+    private static void printAs(PrintStream wrapped, String name, String line, CountDownLatch started) {
+        WorkbenchConsoleTap.enter(name);
+        try {
+            started.countDown();
+            if (!started.await(5, TimeUnit.SECONDS)) {
+                throw new IllegalStateException("threads did not start");
+            }
+            wrapped.print(line);
+        } catch (InterruptedException failure) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException(failure);
+        } finally {
+            WorkbenchConsoleTap.leave();
+        }
+    }
+
+    private static String mark(String name) {
+        return "# pkb-console " + URLEncoder.encode(name, StandardCharsets.UTF_8) + " ";
     }
 
     private static WorkbenchFeatureIndex.Hit hit(String scenarioName) {

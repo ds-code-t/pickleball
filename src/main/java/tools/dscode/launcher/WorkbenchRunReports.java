@@ -264,7 +264,8 @@ public final class WorkbenchRunReports {
         String current = null;
         boolean marked = false;
         for (String line : text.split("\\R", -1)) {
-            String next = scenarioOnLine(line, names);
+            String next = WorkbenchConsoleTap.scenarioOnMarkedLine(line, names);
+            if (next == null) next = scenarioOnLine(line, names);
             if (next != null) {
                 current = next;
                 marked = true;

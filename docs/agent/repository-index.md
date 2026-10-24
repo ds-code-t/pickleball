@@ -74,6 +74,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/aspectj/io/cucumber/core/runner/RegisterBothByList.aj`
 - `src/main/aspectj/io/cucumber/core/runner/RunnerAfterCreateTestCaseAspect.aj`
 - `src/main/aspectj/io/cucumber/core/runner/StepResultCapture.aj`
+- `src/main/aspectj/io/cucumber/core/runner/TestCase_ConsoleTap.aj`
 - `src/main/aspectj/io/cucumber/core/runner/TestCase_Constructor_StepExtensionsRewrite.aj`
 - `src/main/aspectj/io/cucumber/core/runner/TestCase_ScenarioObjectScope.aj`
 - `src/main/aspectj/io/cucumber/core/runner/TestStepNoLoggingAspect.aj`
@@ -399,6 +400,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/launcher/WorkbenchAgentCommands.java`
 - `src/main/java/tools/dscode/launcher/WorkbenchCliErrors.java`
 - `src/main/java/tools/dscode/launcher/WorkbenchCommandLine.java`
+- `src/main/java/tools/dscode/launcher/WorkbenchConsoleTap.java`
 - `src/main/java/tools/dscode/launcher/WorkbenchElementInspect.java`
 - `src/main/java/tools/dscode/launcher/WorkbenchLaunchTiming.java`
 - `src/main/java/tools/dscode/launcher/WorkbenchRunReports.java`
