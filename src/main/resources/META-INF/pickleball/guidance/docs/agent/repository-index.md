@@ -400,6 +400,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/launcher/WorkbenchCliErrors.java`
 - `src/main/java/tools/dscode/launcher/WorkbenchCommandLine.java`
 - `src/main/java/tools/dscode/launcher/WorkbenchElementInspect.java`
+- `src/main/java/tools/dscode/launcher/WorkbenchLaunchTiming.java`
 - `src/main/java/tools/dscode/launcher/WorkbenchRunReports.java`
 - `src/main/java/tools/dscode/launcher/WorkbenchRuntimeLibs.java`
 - `src/main/java/tools/dscode/launcher/WorkbenchSessionCommands.java`
@@ -475,6 +476,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/WorkbenchAgentCommandsTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchCommandLineTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchElementInspectTest.java`
+- `src/test/java/tools/dscode/launcher/WorkbenchLaunchTimingTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchPointerContractTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchRunReportsTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchSessionCommandsTest.java`

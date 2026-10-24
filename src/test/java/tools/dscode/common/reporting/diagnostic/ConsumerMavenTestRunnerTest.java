@@ -119,7 +119,7 @@ class ConsumerMavenTestRunnerTest {
     }
 
     @Test
-    void featurePathsStayOutOfRunVarsAndNarrowOnlyTheTopLevel() {
+    void featurePathsStayOutOfRunVarsAndNarrowOnlyTheTopLevel() throws Exception {
         String features = "wd-file:/tmp/Business Exception/a.feature,wd-file:C:/proj/Business Exception/b.feature";
         String embedded = ConsumerMavenTestRunner.embedFeaturePaths(
                 "pkb_tags=@smoke, pkb_features=classpath:features",
@@ -145,6 +145,12 @@ class ConsumerMavenTestRunnerTest {
         assertEquals("classpath:features", overlay.get(PKB_props.PKB_FEATURES));
         assertEquals(features, overlay.get("cucumber.features"));
         assertTrue(suite == DynamicSuiteEngine.overlayTopLevelFeatures(suite, "  "));
+
+        Path list = Files.createTempDirectory("top-features").resolve("list.txt");
+        Files.writeString(list, features);
+        Map<String, String> fromFile = DynamicSuiteEngine.overlayTopLevelFeatures(suite, "@" + list.toAbsolutePath());
+        assertEquals(features, fromFile.get("cucumber.features"));
+        assertEquals("classpath:features", suite.get("cucumber.features"));
     }
 
     @Test

@@ -1,5 +1,7 @@
 package tools.dscode.control.protocol;
 
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
@@ -41,6 +43,9 @@ import java.util.stream.Stream;
 public final class WorkbenchFeatureIndex {
     static final int VERSION = 3;
     public static final String CACHE_FILE = "feature-index.v3";
+    /** Inline {@code -D} list. Longer selections are a file so Windows can still start Maven. */
+    static final int FEATURE_LIST_INLINE_LIMIT = 4000;
+    private static final int IO_BUFFER = 65536;
     public static final String NO_MATCH_FEATURE = "no-match.feature";
 
     private WorkbenchFeatureIndex() {
@@ -156,11 +161,17 @@ public final class WorkbenchFeatureIndex {
                 unreadable = relative;
             }
         }
-        try {
-            Cache.write(indexFile, stored);
-            writeStamps(statFile(indexFile), writtenStamps);
-        } catch (IOException ignored) {
-            // The next select falls back to a full parse. Narrowing still uses this pass.
+        boolean unchanged = unreadable == null
+                && reparsed == 0
+                && cacheHits == files.size()
+                && stored.size() == cache.files.size();
+        if (!unchanged) {
+            try {
+                Cache.write(indexFile, stored);
+                writeStamps(statFile(indexFile), writtenStamps);
+            } catch (IOException ignored) {
+                // The next select falls back to a full parse. Narrowing still uses this pass.
+            }
         }
         if (unreadable != null) {
             return new Selection(
@@ -206,7 +217,7 @@ public final class WorkbenchFeatureIndex {
         boolean narrowed = filtered && subset;
         String property = null;
         if (narrowed && (!hits.isEmpty() || !forced.isEmpty())) {
-            property = featureProperty(root, hits, lineSpecific, forced);
+            property = spillFeatureList(root, featureProperty(root, hits, lineSpecific, forced));
         }
         return new Selection(
                 narrowed,
@@ -236,7 +247,7 @@ public final class WorkbenchFeatureIndex {
      */
     private static Map<String, long[]> loadStamps(Path file) {
         if (!Files.isRegularFile(file)) return Map.of();
-        try (DataInputStream in = new DataInputStream(Files.newInputStream(file))) {
+        try (DataInputStream in = new DataInputStream(new BufferedInputStream(Files.newInputStream(file), IO_BUFFER))) {
             if (in.readInt() != VERSION) return Map.of();
             int count = in.readInt();
             LinkedHashMap<String, long[]> stamps = new LinkedHashMap<>();
@@ -255,7 +266,7 @@ public final class WorkbenchFeatureIndex {
     private static void writeStamps(Path file, Map<String, long[]> stamps) throws IOException {
         Files.createDirectories(file.getParent());
         Path temp = file.resolveSibling(file.getFileName() + ".tmp");
-        try (DataOutputStream out = new DataOutputStream(Files.newOutputStream(temp))) {
+        try (DataOutputStream out = new DataOutputStream(new BufferedOutputStream(Files.newOutputStream(temp), IO_BUFFER))) {
             out.writeInt(VERSION);
             out.writeInt(stamps.size());
             for (Map.Entry<String, long[]> entry : stamps.entrySet()) {
@@ -326,6 +337,29 @@ public final class WorkbenchFeatureIndex {
             paths.add("wd-file:" + file.toString().replace('\\', '/'));
         }
         return String.join(",", paths);
+    }
+
+    /**
+     * A narrowed list longer than {@link #FEATURE_LIST_INLINE_LIMIT} is written beside the
+     * index and returned as {@code @absolute-path}. The test JVM reads that file. The
+     * Maven command line stays short enough for Windows.
+     */
+    private static String spillFeatureList(Path root, String property) {
+        if (property == null || property.length() <= FEATURE_LIST_INLINE_LIMIT) return property;
+        try {
+            Path file = PickleballLocalLayout.workbenchStateRoot(root).resolve("top-features.txt");
+            Files.createDirectories(file.getParent());
+            Path temp = file.resolveSibling("top-features.txt.tmp");
+            Files.writeString(temp, property, StandardCharsets.UTF_8);
+            try {
+                Files.move(temp, file, java.nio.file.StandardCopyOption.REPLACE_EXISTING, java.nio.file.StandardCopyOption.ATOMIC_MOVE);
+            } catch (java.nio.file.AtomicMoveNotSupportedException failure) {
+                Files.move(temp, file, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            }
+            return "@" + file.toAbsolutePath().normalize();
+        } catch (IOException failure) {
+            return property;
+        }
     }
 
     private static List<Hit> matchScenario(
@@ -851,7 +885,7 @@ public final class WorkbenchFeatureIndex {
 
         static Cache load(Path file) {
             if (!Files.isRegularFile(file)) return empty();
-            try (DataInputStream in = new DataInputStream(Files.newInputStream(file))) {
+            try (DataInputStream in = new DataInputStream(new BufferedInputStream(Files.newInputStream(file), IO_BUFFER))) {
                 if (in.readInt() != VERSION) return empty();
                 int count = in.readInt();
                 LinkedHashMap<String, StoredFile> files = new LinkedHashMap<>();
@@ -868,7 +902,7 @@ public final class WorkbenchFeatureIndex {
         static void write(Path file, List<StoredFile> stored) throws IOException {
             Files.createDirectories(file.getParent());
             Path temp = file.resolveSibling(file.getFileName() + ".tmp");
-            try (DataOutputStream out = new DataOutputStream(Files.newOutputStream(temp))) {
+            try (DataOutputStream out = new DataOutputStream(new BufferedOutputStream(Files.newOutputStream(temp), IO_BUFFER))) {
                 out.writeInt(VERSION);
                 out.writeInt(stored.size());
                 for (StoredFile item : stored) writeFile(out, item);

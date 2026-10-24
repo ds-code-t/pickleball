@@ -418,6 +418,38 @@ class WorkbenchFeatureIndexTest {
         assertEquals(0, selection.filesIndexed());
     }
 
+    @Test
+    void longNarrowedListIsAFileSoTheCommandLineStaysShort() throws Exception {
+        Path features = project.resolve("src/test/resources/features/region/module/pack");
+        Files.createDirectories(features);
+        for (int i = 0; i < 80; i++) {
+            Files.writeString(features.resolve("flow-" + i + ".feature"), """
+                    @keep
+                    Feature: Flow %d
+                      Scenario: Row %d
+                        Given ready
+                    """.formatted(i, i));
+        }
+        // One file outside the tag, otherwise the match covers every indexed file and stays a full scan.
+        Files.writeString(features.resolve("other.feature"), """
+                Feature: Other
+                  Scenario: Stay
+                    Given stay
+                """);
+        WorkbenchFeatureIndex.Selection selection = select("@keep", null, null, List.of(), true);
+        assertTrue(selection.narrowed(), selection.fallbackReason());
+        assertEquals(80, selection.hits().size());
+        assertEquals(81, selection.filesIndexed());
+        String property = selection.featureProperty();
+        assertTrue(property.startsWith("@"), property);
+        assertTrue(property.length() < WorkbenchFeatureIndex.FEATURE_LIST_INLINE_LIMIT, property);
+        String body = Files.readString(Path.of(property.substring(1)));
+        assertTrue(body.contains("flow-0.feature"), body.substring(0, Math.min(body.length(), 200)));
+        assertTrue(body.contains("flow-79.feature"));
+        assertFalse(body.contains("other.feature"));
+        assertTrue(body.length() > WorkbenchFeatureIndex.FEATURE_LIST_INLINE_LIMIT);
+    }
+
     private WorkbenchFeatureIndex.Selection select(
             String tags,
             String name,

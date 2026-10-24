@@ -177,6 +177,7 @@ public final class WorkbenchAgentCommands {
                 request(parsed, "discover")
         );
         try {
+            launchNote(parsed.project(), run.runId(), "command", "discover");
             echoFilters(parsed, out);
             AgentDiscoverPlanner.Plan plan = AgentDiscoverPlanner.discover(
                     parsed.project(),
@@ -194,6 +195,7 @@ public final class WorkbenchAgentCommands {
             WorkbenchFeatureIndex.Selection selection = select(
                     parsed.project(), parsed.tags(), parsed.name(), parsed.example(), parsed
             );
+            launchNote(parsed.project(), run.runId(), "index", indexDetail(selection));
             String mavenVars = mavenRunVars(selection, plan.runVars(), parsed.tags(), err);
             List<String> command = withCoordination(
                     ConsumerMavenTestRunner.command(
@@ -205,6 +207,7 @@ public final class WorkbenchAgentCommands {
             );
             ByteArrayOutputStream capturedOut = new ByteArrayOutputStream();
             ByteArrayOutputStream capturedErr = new ByteArrayOutputStream();
+            launchNote(parsed.project(), run.runId(), "maven-start", "");
             Bounded mavenResult = runBounded(
                     parsed,
                     command,
@@ -212,6 +215,7 @@ public final class WorkbenchAgentCommands {
                     new WorkbenchRunReports.Tee(err, capturedErr),
                     maven
             );
+            launchNote(parsed.project(), run.runId(), "maven-done", "exit=" + mavenResult.exit() + " timedOut=" + mavenResult.timedOut());
             if (mavenResult.timedOut()) {
                 publishQuietly(parsed, run, selection, capturedOut, capturedErr, "TIMEOUT", environment, browser, out, err);
                 return timeoutExit(parsed, run, out, err);
@@ -252,6 +256,7 @@ public final class WorkbenchAgentCommands {
                 request(parsed, "confirm")
         );
         try {
+            launchNote(parsed.project(), run.runId(), "command", "confirm");
             echoFilters(parsed, out);
             LastDiscoverSnapshot.Snapshot snapshot = LastDiscoverSnapshot.requireScoped(
                     parsed.project(),
@@ -277,6 +282,7 @@ public final class WorkbenchAgentCommands {
                     firstNonBlank(parsed.example(), retained.get(PKB_props.PKB_EXAMPLE)),
                     parsed
             );
+            launchNote(parsed.project(), run.runId(), "index", indexDetail(selection));
             out.println("Workbench confirm replaying Discover snapshot as pkb_runvars.");
             out.println("pkb_runvars=" + runVars);
             String mavenVars = mavenRunVars(
@@ -295,6 +301,7 @@ public final class WorkbenchAgentCommands {
             );
             ByteArrayOutputStream capturedOut = new ByteArrayOutputStream();
             ByteArrayOutputStream capturedErr = new ByteArrayOutputStream();
+            launchNote(parsed.project(), run.runId(), "maven-start", "");
             Bounded mavenResult = runBounded(
                     parsed,
                     command,
@@ -302,6 +309,7 @@ public final class WorkbenchAgentCommands {
                     new WorkbenchRunReports.Tee(err, capturedErr),
                     maven
             );
+            launchNote(parsed.project(), run.runId(), "maven-done", "exit=" + mavenResult.exit() + " timedOut=" + mavenResult.timedOut());
             if (mavenResult.timedOut()) {
                 publishQuietly(parsed, run, selection, capturedOut, capturedErr, "TIMEOUT", environment, browser, out, err);
                 return timeoutExit(parsed, run, out, err);
@@ -451,6 +459,30 @@ public final class WorkbenchAgentCommands {
             }
         }
         return selection.featureProperty();
+    }
+
+    private static void launchNote(Path project, String runId, String stage, String detail) {
+        Path folder = null;
+        try {
+            if (project != null && runId != null && !runId.isBlank()) {
+                folder = AgentCoordination.runDirectory(project, runId);
+            }
+        } catch (RuntimeException ignored) {
+            folder = null;
+        }
+        WorkbenchLaunchTiming.note(folder, stage, detail);
+    }
+
+    private static String indexDetail(WorkbenchFeatureIndex.Selection selection) {
+        if (selection == null) return "";
+        String property = selection.featureProperty();
+        return "files=" + selection.filesIndexed()
+                + " reparsed=" + selection.filesReparsed()
+                + " cacheHits=" + selection.cacheHits()
+                + " scenarios=" + selection.hits().size()
+                + " narrowed=" + selection.narrowed()
+                + " fullScan=" + selection.fullScanFallback()
+                + " listChars=" + (property == null ? 0 : property.length());
     }
 
     private static int printPlan(

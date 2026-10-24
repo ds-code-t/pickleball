@@ -22,6 +22,8 @@ import org.junit.platform.engine.discovery.PackageSelector;
 import org.junit.platform.engine.discovery.UniqueIdSelector;
 import org.junit.platform.engine.discovery.UriSelector;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -163,9 +165,34 @@ public final class DynamicSuiteEngine implements TestEngine {
         if (topLevelFeatures == null || topLevelFeatures.isBlank()) {
             return suiteValues;
         }
+        String expanded = expandTopLevelFeatures(topLevelFeatures);
+        if (expanded == null || expanded.isBlank()) {
+            return suiteValues;
+        }
         LinkedHashMap<String, String> copy = new LinkedHashMap<>(suiteValues);
-        copy.put(FEATURES_PROPERTY_NAME, topLevelFeatures.trim());
+        copy.put(FEATURES_PROPERTY_NAME, expanded);
         return copy;
+    }
+
+    /**
+     * {@code @/path/to/top-features.txt} is the short form Workbench passes when the
+     * path list would not fit a Windows command line. The file body is the same
+     * comma-separated {@code wd-file:} list an inline property would have been.
+     */
+    public static String expandTopLevelFeatures(String raw) {
+        if (raw == null) return null;
+        String value = raw.trim();
+        if (!value.startsWith("@")) return value;
+        String path = value.substring(1).trim();
+        if (path.isEmpty()) return value;
+        try {
+            return Files.readString(Path.of(path)).trim();
+        } catch (java.io.IOException failure) {
+            throw new IllegalStateException(
+                    "Could not read Workbench feature list " + path + ": " + failure.getMessage(),
+                    failure
+            );
+        }
     }
 
     static Map<String, String> overlayTopLevelFeatures(Map<String, String> suiteValues) {
