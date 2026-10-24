@@ -491,6 +491,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/scenarioobject/ScenarioObjectSteps.java`
 - `src/test/java/tools/dscode/ScenarioObjectTest.java`
 - `src/test/java/tools/dscode/testengine/CucumberNameFilterTest.java`
+- `src/test/java/tools/dscode/testengine/CucumberPluginPublishTest.java`
 - `src/test/java/tools/dscode/testengine/DriverDownloadRedactionTest.java`
 - `src/test/java/tools/dscode/testengine/DynamicSuiteBootstrapWorkbenchRootTest.java`
 - `src/test/java/tools/dscode/testengine/ExampleRowFilterTest.java`

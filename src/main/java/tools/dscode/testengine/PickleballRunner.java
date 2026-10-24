@@ -493,13 +493,26 @@ public abstract class PickleballRunner {
     }
 
     /**
-     * {@code pkb_plugins} is the consumer knob. Cucumber reads {@code cucumber.plugin}.
-     * A blank value leaves Cucumber's own default alone.
+     * {@code pkb_plugins} is copied to {@code cucumber.plugin} only for a Workbench
+     * run ({@code pkb_run_purpose} starting with {@code workbench-}). A blank value,
+     * and every normal run, leaves Cucumber's own plugin list alone.
      */
     private void publishCucumberPlugins() {
-        String plugins = values.get(PKB_props.PKB_PLUGINS);
-        if (plugins == null || plugins.isBlank()) return;
-        values.put(PLUGIN_PROPERTY_NAME, plugins);
+        String published = cucumberPluginForRun(
+                System.getProperty("pkb_run_purpose"),
+                values.get(PKB_props.PKB_PLUGINS)
+        );
+        if (published == null) return;
+        values.put(PLUGIN_PROPERTY_NAME, published);
+    }
+
+    /**
+     * @return the Cucumber plugin list to publish, or null when this run must not change it
+     */
+    static String cucumberPluginForRun(String runPurpose, String pkbPlugins) {
+        if (runPurpose == null || !runPurpose.startsWith("workbench-")) return null;
+        if (pkbPlugins == null || pkbPlugins.isBlank()) return null;
+        return pkbPlugins;
     }
 
     /**

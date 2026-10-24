@@ -42,6 +42,8 @@ public void globalTestDefaults() {
 }
 ```
 
+`PKB_props.plugins` stores `pkb_plugins`. That value is copied to Cucumber's `cucumber.plugin` only when `pkb_run_purpose` starts with `workbench-` and the value is not blank. A normal `mvn test` does not copy it. An unset or blank `pkb_plugins` leaves Cucumber's own plugin list unchanged on every run.
+
 Use `globalTestProperties()` only for project values that should intentionally outrank the shared and local property files:
 
 ```java

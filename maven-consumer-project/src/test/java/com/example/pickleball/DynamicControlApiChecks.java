@@ -166,18 +166,19 @@ public class DynamicControlApiChecks {
 
     @Test
     void fixedWaitHooksCanSuppressFrameworkPhraseDelays() {
-        int[] waits = {0};
+        ControlCallResult<Object> opened = DynamicControl.executeStep("navigate to: URL.workflow");
+        assertTrue(opened.successful(), () -> String.valueOf(opened.error()));
+
+        int[] saveWaits = {0};
         MappingContext context = MappingControl.custom(
                 "fixed wait hook",
                 MappingControl.nodeMap(MapConfigurations.MapType.OVERRIDE_MAP),
                 MappingControl.nodeMap(MapConfigurations.MapType.RUN_MAP)
         );
-
-        ControlCallResult<Object> result = ControlRuntime.withThreadHandler(
+        ControlCallResult<Object> saved = ControlRuntime.withThreadHandler(
                 event -> {
                     if (event.hook() == ControlHook.BEFORE_FIXED_WAIT) {
-                        waits[0]++;
-                        return ControlDecision.SKIP;
+                        saveWaits[0]++;
                     }
                     return ControlDecision.CONTINUE;
                 },
@@ -186,13 +187,27 @@ public class DynamicControlApiChecks {
                         context
                 )
         );
-
-        assertTrue(result.successful(), () -> String.valueOf(result.error()));
-        assertTrue(waits[0] > 0);
+        assertTrue(saved.successful(), () -> String.valueOf(saved.error()));
+        assertEquals(0, saveWaits[0]);
         assertEquals(
                 "fixed-wait-hook",
                 MappingControl.resolveText(context, "<fixedWaitHookValue>").value()
         );
+
+        int[] waits = {0};
+        ControlCallResult<Object> result = ControlRuntime.withThreadHandler(
+                event -> {
+                    if (event.hook() == ControlHook.BEFORE_FIXED_WAIT) {
+                        waits[0]++;
+                        return ControlDecision.SKIP;
+                    }
+                    return ControlDecision.CONTINUE;
+                },
+                () -> DynamicControl.executeStep(", click the \"Use Ready State\" Button")
+        );
+
+        assertTrue(result.successful(), () -> String.valueOf(result.error()));
+        assertTrue(waits[0] > 0);
     }
 
 

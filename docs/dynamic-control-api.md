@@ -20,6 +20,8 @@ The control API returns `SUCCESS`, `FAILED`, or `UNAVAILABLE` for exploratory op
 
 `ControlRuntime` exposes synchronous semantic hooks across scenario, step, phrase, Mapping, DOM, browser, driver, and service-call boundaries. Handlers may observe, pause by blocking, or use supported skip/value interception semantics. With no handler installed, original Pickleball behavior is retained.
 
+`BEFORE_FIXED_WAIT` and `AFTER_FIXED_WAIT` fire only when a framework fixed wait is about to run. A skip decision suppresses that wait. A literal `save` and a nested `RUN_STEP` do not take the 300 ms browser-settle sleep, even when a session is already open, so they do not emit `BEFORE_FIXED_WAIT`. A click, type, or other page action that still waits does.
+
 The bridge coordinator is an additive observer and does not replace the application's normal control handler.
 
 ## Consumer-side Control Bridge
