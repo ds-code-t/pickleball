@@ -489,9 +489,11 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/testengine/DriverDownloadRedactionTest.java`
 - `src/test/java/tools/dscode/testengine/DynamicSuiteBootstrapWorkbenchRootTest.java`
 - `src/test/java/tools/dscode/testengine/ExampleRowFilterTest.java`
+- `src/test/java/tools/dscode/untilpass/UntilPassBrowserSteps.java`
 - `src/test/resources/expected-failure/release-216-expected-failure.feature`
 - `src/test/resources/multiline-assert/multiline-assert.feature`
 - `src/test/resources/scenario-object/scenario-object.feature`
+- `src/test/resources/until-pass/literal-until-with-browser.feature`
 - `src/test/resources/until-pass/literal-until.feature`
 - `src/test/resources/xml-table/xml-table.feature`
 

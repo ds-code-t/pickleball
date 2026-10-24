@@ -19,6 +19,7 @@ import tools.dscode.common.mappings.MappingProcessor;
 import tools.dscode.common.reporting.logging.Level;
 import tools.dscode.testengine.DynamicSuiteEngine;
 import tools.dscode.testengine.PickleballRunner;
+import tools.dscode.untilpass.UntilPassBrowserSteps;
 
 import java.lang.reflect.Field;
 import java.util.ArrayList;
@@ -112,6 +113,73 @@ class UntilPassOverheadTest {
             CurrentScenarioState.currentScenarioState.remove();
             MappingProcessor.resetCommonMaps();
             UntilPassTiming.stop();
+            System.setProperties(before);
+            resetRunner();
+        }
+    }
+
+    @Test
+    @Timeout(value = 180, unit = TimeUnit.SECONDS)
+    void literalUntilWithABrowserSessionPaysNoBrowserWait() {
+        Properties before = new Properties();
+        before.putAll(System.getProperties());
+        int previousMax = StepData.globalMaxIterations;
+        Level previousLogLevel = PickleballRunner.LOG_LEVEL;
+        StepData.globalMaxIterations = 20;
+        try {
+            System.setProperty("pkb_features", "classpath:until-pass");
+            System.setProperty("cucumber.features", "classpath:until-pass");
+            System.setProperty("pkb_glue", "tools.dscode.coredefinitions,tools.dscode.untilpass");
+            System.setProperty("cucumber.glue", "tools.dscode.coredefinitions,tools.dscode.untilpass");
+            System.setProperty("pkb_tags", "@until-pass-browser");
+            System.setProperty("cucumber.filter.tags", "@until-pass-browser");
+            System.setProperty("pkb_loglevel", "error");
+            System.setProperty("cucumber.execution.parallel.enabled", "false");
+            System.setProperty("pickleball.until.passTiming", "true");
+            System.setProperty(
+                    "junit.platform.discovery.includeEngines",
+                    DynamicSuiteEngine.ENGINE_ID
+            );
+            resetRunner();
+
+            List<String> finished = new ArrayList<>();
+            LauncherDiscoveryRequest request = LauncherDiscoveryRequestBuilder.request()
+                    .selectors(DiscoverySelectors.selectClasspathResource("until-pass"))
+                    .filters(EngineFilter.includeEngines(DynamicSuiteEngine.ENGINE_ID))
+                    .build();
+            Launcher launcher = LauncherFactory.create();
+            launcher.execute(request, new TestExecutionListener() {
+                @Override
+                public void executionFinished(TestIdentifier testIdentifier, TestExecutionResult result) {
+                    if (testIdentifier.isTest()) {
+                        finished.add(testIdentifier.getDisplayName() + " " + result.getStatus());
+                    }
+                }
+            });
+
+            String report = UntilPassTiming.lastReport();
+            System.out.println(report);
+            System.out.println("click-settle-ms=" + UntilPassBrowserSteps.clickSettleMillis);
+            assertEquals(20, UntilPassTiming.lastPasses(), report + " saw " + finished);
+            double pause = UntilPassTiming.lastExclusiveMillisPerPass("pause");
+            double wall = UntilPassTiming.lastInclusiveMillisPerPass("until-pass");
+            double overhead = wall - pause;
+            double preamble = UntilPassTiming.lastExclusiveMillisPerPass("action-preamble");
+            assertTrue(pause >= 300 && pause <= 700, "pause " + pause + "\n" + report);
+            assertTrue(overhead < 100, "overhead " + overhead + "\n" + report);
+            assertTrue(preamble < 50, "action-preamble " + preamble + "\n" + report);
+            assertTrue(UntilPassBrowserSteps.clickSettleMillis >= 250, "click settle " + UntilPassBrowserSteps.clickSettleMillis);
+            assertTrue(
+                    finished.stream().anyMatch(line -> line.contains("literal until")),
+                    finished.toString()
+            );
+        } finally {
+            StepData.globalMaxIterations = previousMax;
+            PickleballRunner.LOG_LEVEL = previousLogLevel;
+            CurrentScenarioState.currentScenarioState.remove();
+            MappingProcessor.resetCommonMaps();
+            UntilPassTiming.stop();
+            UntilPassBrowserSteps.quit();
             System.setProperties(before);
             resetRunner();
         }

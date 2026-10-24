@@ -88,12 +88,14 @@ public abstract class PhraseData extends PassedData {
     }
 
     /**
-     * 300 ms before a browser action lets the page settle. A literal save or
-     * any other action with no live session has nothing to settle, so the
-     * sleep is skipped. A session that is already open still waits.
+     * 300 ms before a browser action lets the page settle. A literal save,
+     * a nested step, or any action with no live session has nothing to settle,
+     * so the sleep is skipped even when a browser session is already open.
+     * A click, type, or other page action still waits.
      */
     private static void settleBeforeBrowserAction(OperationsInterface operation) {
-        if (!(operation instanceof ActionOperations)) return;
+        if (!(operation instanceof ActionOperations action)) return;
+        if (action == ActionOperations.SAVE || action == ActionOperations.RUN_STEP) return;
         try (io.cucumber.core.runner.UntilPassTiming.Scope ignored =
                      io.cucumber.core.runner.UntilPassTiming.open("action-preamble")) {
             if (!liveBrowserSession()) return;
