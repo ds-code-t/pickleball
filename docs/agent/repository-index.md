@@ -408,6 +408,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/launcher/WorkbenchRuntimeLibs.java`
 - `src/main/java/tools/dscode/launcher/WorkbenchSessionCommands.java`
 - `src/main/java/tools/dscode/launcher/WorkbenchTagFallback.java`
+- `src/main/java/tools/dscode/launcher/WorkspaceLaunch.java`
 - `src/main/java/tools/dscode/misc/DummySteps.java`
 - `src/main/java/tools/dscode/parallelutilities/ParallelCountEstimator.java`
 - `src/main/java/tools/dscode/parallelutilities/Stagger.java`
@@ -487,6 +488,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/WorkbenchRunReportsTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchSessionCommandsTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchTagFallbackTest.java`
+- `src/test/java/tools/dscode/launcher/WorkspaceLaunchForkTest.java`
 - `src/test/java/tools/dscode/parallelutilities/ParallelCountEstimatorTest.java`
 - `src/test/java/tools/dscode/Release216BehaviorTest.java`
 - `src/test/java/tools/dscode/Release217Phase1Test.java`
@@ -498,7 +500,10 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/testengine/DriverDownloadRedactionTest.java`
 - `src/test/java/tools/dscode/testengine/DynamicSuiteBootstrapWorkbenchRootTest.java`
 - `src/test/java/tools/dscode/testengine/ExampleRowFilterTest.java`
+- `src/test/java/tools/dscode/testengine/Phase7SeedMain.java`
 - `src/test/java/tools/dscode/testengine/PlainResolutionGoldenTest.java`
+- `src/test/java/tools/dscode/testengine/WorkspaceDriverProbe.java`
+- `src/test/java/tools/dscode/testengine/WorkspaceLaunchEndToEndTest.java`
 - `src/test/java/tools/dscode/testengine/WorkspaceLaunchTest.java`
 - `src/test/java/tools/dscode/testengine/WorkspaceSeedTest.java`
 - `src/test/java/tools/dscode/untilpass/UntilPassBrowserSteps.java`
