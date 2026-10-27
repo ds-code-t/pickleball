@@ -5,6 +5,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import tools.dscode.control.protocol.Workspace;
+import tools.dscode.testengine.fixtures.BlankBrowserRunner;
+import tools.dscode.testengine.fixtures.WorkspaceSeedHooked;
 
 import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
@@ -48,11 +50,11 @@ class WorkspaceSeedTest {
     void consumerStyleHooksAreCapturedAndHeadlessIsOnlyTheFallback() throws Exception {
         clearPkbSystemProperties();
         System.setProperty(WorkspaceSeed.SEED_PROPERTY, "true");
-        BlankBrowser blank = new BlankBrowser();
+        BlankBrowserRunner blank = new BlankBrowserRunner();
         clearRunner();
         clearPkbSystemProperties();
         System.setProperty(WorkspaceSeed.SEED_PROPERTY, "true");
-        Hooked hooked = new Hooked();
+        WorkspaceSeedHooked hooked = new WorkspaceSeedHooked();
         clearRunner();
 
         Path hookedWorkspace = temp.resolve("hooked");
@@ -204,38 +206,5 @@ class WorkspaceSeedTest {
         values.put(PKB_props.PKB_BROWSER, browser);
         values.put(PKB_props.PKB_PARALLEL, "auto");
         return values;
-    }
-
-    public static final class Hooked extends PickleballRunner {
-        @Override
-        public void globalTestDefaults() {
-            values.put(PKB_props.PKB_GLUE, "com.example.steps");
-            values.put(PKB_props.PKB_FEATURES, "classpath:features");
-            values.put(PKB_props.PKB_DATA_PATH, "data");
-            values.put(PKB_props.PKB_CALL_PATH, "calls");
-            values.put(PKB_props.PKB_COMPONENT_PATH, "component");
-            values.put(PKB_props.PKB_CONFIG_PATH, "configs");
-            values.put(PKB_props.PKB_PARALLEL, "auto");
-            values.put(PKB_props.PKB_BROWSER, "firefox");
-        }
-
-        @Override
-        public void globalTestProperties() {
-            values.put(PKB_props.PKB_ENVIRONMENT, "qa");
-            values.put("pkb_hook_marker", "from-hook");
-        }
-    }
-
-    public static final class BlankBrowser extends PickleballRunner {
-        @Override
-        public void globalTestDefaults() {
-            values.put(PKB_props.PKB_GLUE, "com.example.steps");
-            values.put(PKB_props.PKB_FEATURES, "classpath:features");
-            values.put(PKB_props.PKB_DATA_PATH, "data");
-            values.put(PKB_props.PKB_CALL_PATH, "calls");
-            values.put(PKB_props.PKB_COMPONENT_PATH, "component");
-            values.put(PKB_props.PKB_CONFIG_PATH, "configs");
-            values.put(PKB_props.PKB_PARALLEL, "4");
-        }
     }
 }

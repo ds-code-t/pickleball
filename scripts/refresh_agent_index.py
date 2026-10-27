@@ -52,6 +52,9 @@ GROUPS: tuple[tuple[str, tuple[str, ...]], ...] = (
         "src/test/**/*.feature",
         "src/test/resources/**/*",
     )),
+    ("Framework runner fixtures", (
+        "src/runnerFixtures/**/*.java",
+    )),
     ("Control API module", (
         "pickleball-control-api/build.gradle",
         "pickleball-control-api/src/main/**/*",

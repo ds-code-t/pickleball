@@ -3,6 +3,8 @@ package tools.dscode.testengine;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import tools.dscode.testengine.fixtures.ConsumerStyleRunner;
+import tools.dscode.testengine.fixtures.ExampleRunner;
 
 import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
@@ -64,33 +66,5 @@ class PlainResolutionGoldenTest {
         StringBuilder out = new StringBuilder();
         sorted.forEach((key, value) -> out.append(key).append('=').append(value).append('\n'));
         return out.toString();
-    }
-
-    /** Example project: no hooks. Framework defaults only. */
-    public static final class ExampleRunner extends PickleballRunner {
-    }
-
-    /**
-     * Consumer-style project: hooks supply the six context keys, a browser,
-     * a fixed parallel count, and a marker that must survive plain resolution.
-     */
-    public static final class ConsumerStyleRunner extends PickleballRunner {
-        @Override
-        public void globalTestDefaults() {
-            values.put(PKB_props.PKB_GLUE, "com.example.steps");
-            values.put(PKB_props.PKB_FEATURES, "classpath:features");
-            values.put(PKB_props.PKB_DATA_PATH, "data");
-            values.put(PKB_props.PKB_CALL_PATH, "src/test/resources/calls");
-            values.put(PKB_props.PKB_COMPONENT_PATH, "src/test/resources/component");
-            values.put(PKB_props.PKB_CONFIG_PATH, "configs");
-            values.put(PKB_props.PKB_PARALLEL, "4");
-            values.put(PKB_props.PKB_BROWSER, "firefox");
-        }
-
-        @Override
-        public void globalTestProperties() {
-            values.put("pkb_environment", "qa");
-            values.put("pkb_hook_marker", "from-hook");
-        }
     }
 }

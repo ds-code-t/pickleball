@@ -1,6 +1,7 @@
 package tools.dscode.testengine;
 
 import tools.dscode.control.protocol.Workspace;
+import tools.dscode.testengine.fixtures.Phase7Hooked;
 
 /**
  * Resolve-only capture for the Phase 7 launch test.
@@ -25,7 +26,7 @@ public final class Phase7SeedMain {
                     parsed.fromRunId(),
                     null,
                     workspace -> {
-                        Hooked runner = new Hooked();
+                        Phase7Hooked runner = new Phase7Hooked();
                         WorkspaceSeed.writeCaptured(workspace, runner, parsed.reseed());
                     }
             );
@@ -39,28 +40,5 @@ public final class Phase7SeedMain {
             code = 1;
         }
         System.exit(code);
-    }
-
-    /** Consumer-style hooks. Capture freezes these; a later workspace edit must win at launch. */
-    public static final class Hooked extends PickleballRunner {
-        @Override
-        public void globalTestDefaults() {
-            values.put(PKB_props.PKB_GLUE, "com.example.steps");
-            values.put(PKB_props.PKB_FEATURES, "classpath:features");
-            values.put(PKB_props.PKB_DATA_PATH, "");
-            values.put(PKB_props.PKB_CALL_PATH, "src/test/resources/calls");
-            values.put(PKB_props.PKB_COMPONENT_PATH, "src/test/resources/component");
-            values.put(PKB_props.PKB_CONFIG_PATH, "wd-file:configs");
-            values.put(PKB_props.PKB_PARALLEL, Workspace.PARALLEL_AUTO);
-            values.put(PKB_props.PKB_BROWSER, "firefox");
-        }
-
-        @Override
-        public void globalTestProperties() {
-            values.put(PKB_props.PKB_BROWSER, "firefox");
-            values.put(PKB_props.PKB_PARALLEL, Workspace.PARALLEL_AUTO);
-            values.put("pkb_hook_marker", "from-hook");
-            values.put(PKB_props.PKB_RP_API_KEY, "do-not-store-this");
-        }
     }
 }

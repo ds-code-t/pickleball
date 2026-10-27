@@ -6,6 +6,7 @@ import org.openqa.selenium.chrome.ChromeOptions;
 import tools.dscode.common.driver.DriverConstruction;
 import tools.dscode.common.mappings.GlobalMappings;
 import tools.dscode.common.mappings.ParsingMap;
+import tools.dscode.testengine.fixtures.ProbeRunner;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -78,23 +79,5 @@ public final class WorkspaceDriverProbe {
         configs.fieldNames().forEachRemaining(names::add);
         names.sort(String.CASE_INSENSITIVE_ORDER);
         return names;
-    }
-
-    /**
-     * Hooks would force headless and a different marker. They must not run when
-     * {@code pkb_workspace} is set, so a workspace edit wins.
-     */
-    public static final class ProbeRunner extends PickleballRunner {
-        @Override
-        public void globalTestDefaults() {
-            values.put(PKB_props.PKB_BROWSER, "CHROME_HEADLESS");
-            values.put("pkb_hook_marker", "hook-ran-at-launch");
-        }
-
-        @Override
-        public void globalTestProperties() {
-            values.put(PKB_props.PKB_BROWSER, "CHROME_HEADLESS");
-            values.put("pkb_hook_marker", "hook-ran-at-launch");
-        }
     }
 }

@@ -46,6 +46,11 @@ tasks.withType(Javadoc).configureEach {
 
 sourceSets {
     main { java { srcDirs = ['src/main/java', 'src/main/aspectj'] } }
+    // Fixture runners must not land in build/classes/java/test. That directory is a
+    // consumer test-output root, and discovery requires exactly one runner there.
+    runnerFixtures {
+        java.srcDir 'src/runnerFixtures/java'
+    }
     test { java { srcDirs += ['src/test/aspectj'] } }
 }
 
@@ -90,6 +95,7 @@ dependencies {
     api("org.junit.platform:junit-platform-launcher:1.13.4")
     api("org.junit.jupiter:junit-jupiter-api:5.13.4")
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:5.13.4")
+    testImplementation sourceSets.runnerFixtures.output
     // cucumber-core is excluded from the test runtime so woven classes win.
     // That exclude also drops transitives only cucumber-core requests.
     // datatable and docstring are separate modules. They are not woven, and the
@@ -199,6 +205,11 @@ tasks.register('ajcMain', JavaExec) {
 tasks.named('compileJava').configure { enabled = false }
 // Make lifecycle compile depend on ajc
 tasks.named('classes') { dependsOn 'ajcMain' }
+
+tasks.named('compileRunnerFixturesJava') {
+    dependsOn tasks.named('classes')
+    classpath = files(sourceSets.main.output, sourceSets.main.compileClasspath)
+}
 
 // --- BINARY WEAVING OF DEPENDENCY JARS ---
 def wovenDir = layout.buildDirectory.dir('woven')

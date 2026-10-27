@@ -515,6 +515,16 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/resources/workspace-golden/plain-resolution.txt`
 - `src/test/resources/xml-table/xml-table.feature`
 
+## Framework runner fixtures
+
+- `src/runnerFixtures/java/tools/dscode/testengine/fixtures/BlankBrowserRunner.java`
+- `src/runnerFixtures/java/tools/dscode/testengine/fixtures/ConsumerStyleRunner.java`
+- `src/runnerFixtures/java/tools/dscode/testengine/fixtures/ExampleRunner.java`
+- `src/runnerFixtures/java/tools/dscode/testengine/fixtures/Phase7Hooked.java`
+- `src/runnerFixtures/java/tools/dscode/testengine/fixtures/ProbeRunner.java`
+- `src/runnerFixtures/java/tools/dscode/testengine/fixtures/WorkspaceLaunchHooked.java`
+- `src/runnerFixtures/java/tools/dscode/testengine/fixtures/WorkspaceSeedHooked.java`
+
 ## Control API module
 
 - `pickleball-control-api/build.gradle`

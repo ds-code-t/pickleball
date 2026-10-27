@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import tools.dscode.common.mappings.ParsingMap;
 import tools.dscode.control.protocol.Workspace;
+import tools.dscode.testengine.fixtures.WorkspaceLaunchHooked;
 
 import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
@@ -31,7 +32,7 @@ class WorkspaceLaunchTest {
     void saveProperties() {
         saved = new Properties();
         saved.putAll(System.getProperties());
-        Hooked.hookRan = false;
+        WorkspaceLaunchHooked.hookRan = false;
     }
 
     @AfterEach
@@ -61,9 +62,9 @@ class WorkspaceLaunchTest {
         System.setProperty(Workspace.PROPERTY, workspace.toString());
         System.setProperty(PKB_props.PKB_TAGS, "@smoke");
 
-        Hooked runner = new Hooked();
+        WorkspaceLaunchHooked runner = new WorkspaceLaunchHooked();
 
-        assertFalse(Hooked.hookRan);
+        assertFalse(WorkspaceLaunchHooked.hookRan);
         assertEquals("edge", runner.get(PKB_props.PKB_BROWSER));
         assertNull(runner.get("pkb_hook_marker"));
         assertEquals("@smoke", runner.get(PKB_props.PKB_TAGS));
@@ -81,7 +82,7 @@ class WorkspaceLaunchTest {
         values.remove(PKB_props.PKB_GLUE);
         Workspace.writeRunVars(workspace, values);
         System.setProperty(Workspace.PROPERTY, workspace.toString());
-        IllegalStateException failure = assertThrows(IllegalStateException.class, Hooked::new);
+        IllegalStateException failure = assertThrows(IllegalStateException.class, WorkspaceLaunchHooked::new);
         assertTrue(failure.getMessage().contains("pkb_glue"));
     }
 
@@ -95,18 +96,18 @@ class WorkspaceLaunchTest {
         assertEquals("${protected:pkb_rp_api_key}", Workspace.readRunVars(workspace).get("pkb_rp_api_key"));
         System.setProperty(Workspace.PROPERTY, workspace.toString());
 
-        Hooked runner = new Hooked();
+        WorkspaceLaunchHooked runner = new WorkspaceLaunchHooked();
 
         assertEquals("from-project", runner.get("pkb_rp_api_key"));
         assertEquals("${protected:pkb_rp_api_key}", Workspace.readRunVars(workspace).get("pkb_rp_api_key"));
-        assertFalse(Hooked.hookRan);
+        assertFalse(WorkspaceLaunchHooked.hookRan);
     }
 
     @Test
     void withoutWorkspaceHooksStillRun() {
         System.clearProperty(Workspace.PROPERTY);
-        Hooked runner = new Hooked();
-        assertTrue(Hooked.hookRan);
+        WorkspaceLaunchHooked runner = new WorkspaceLaunchHooked();
+        assertTrue(WorkspaceLaunchHooked.hookRan);
         assertEquals("from-hook", runner.get("pkb_hook_marker"));
         assertEquals("firefox", runner.get(PKB_props.PKB_BROWSER));
     }
@@ -122,23 +123,5 @@ class WorkspaceLaunchTest {
         values.put(PKB_props.PKB_BROWSER, "firefox");
         values.put(PKB_props.PKB_PARALLEL, "4");
         return values;
-    }
-
-    public static final class Hooked extends PickleballRunner {
-        static boolean hookRan;
-
-        @Override
-        public void globalTestDefaults() {
-            hookRan = true;
-            values.put(PKB_props.PKB_BROWSER, "firefox");
-            values.put("pkb_hook_marker", "from-hook");
-            values.put(PKB_props.PKB_GLUE, "com.example.steps");
-            values.put(PKB_props.PKB_FEATURES, "classpath:features");
-            values.put(PKB_props.PKB_DATA_PATH, "data");
-            values.put(PKB_props.PKB_CALL_PATH, "calls");
-            values.put(PKB_props.PKB_COMPONENT_PATH, "component");
-            values.put(PKB_props.PKB_CONFIG_PATH, "configs");
-            values.put(PKB_props.PKB_PARALLEL, "4");
-        }
     }
 }
