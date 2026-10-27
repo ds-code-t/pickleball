@@ -30,7 +30,7 @@ class AgentBrowserLadderTest {
     }
 
     @Test
-    void localBrowserPrefersChromeHeadlessAndIgnoresUnusedSauceYaml() throws Exception {
+    void localProjectBrowserIsKeptAndUnusedSauceYamlIsIgnored() throws Exception {
         writeProperties("pkb_browser=chrome\n");
         Path configs = tempDir.resolve("src/test/resources/configs");
         Files.createDirectories(configs);
@@ -40,7 +40,7 @@ class AgentBrowserLadderTest {
 
         AgentBrowserLadder.Decision decision = AgentBrowserLadder.select(tempDir);
 
-        assertEquals("CHROME_HEADLESS", decision.browser());
+        assertEquals("chrome", decision.browser());
         assertFalse(decision.remoteKept());
         assertEquals("chrome", decision.projectBrowser());
         assertNull(AgentBrowserLadder.fallbackIfHeadlessCannotStart(decision));

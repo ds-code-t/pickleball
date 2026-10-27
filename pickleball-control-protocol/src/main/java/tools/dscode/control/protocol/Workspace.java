@@ -337,6 +337,57 @@ public final class Workspace {
         return warnings;
     }
 
+    /**
+     * One {@code --runvar} parser. Selection keys update {@code selection} only.
+     * Other keys are written into the workspace when it already exists.
+     */
+    public static void applyLaunchEdits(
+            Path workspace,
+            Map<String, String> selection,
+            List<String> raw,
+            Appendable warnings
+    ) {
+        if (raw == null || raw.isEmpty()) return;
+        boolean present = workspace != null && exists(workspace);
+        Map<String, String> values = present ? new LinkedHashMap<>(readRunVars(workspace)) : new LinkedHashMap<>();
+        Map<String, String> original = Map.copyOf(values);
+        for (String item : raw) {
+            if (item == null || item.isBlank()) continue;
+            int equals = item.indexOf('=');
+            if (equals <= 0) {
+                appendWarning(warnings, "WARNING: --runvar ignored, expected key=value: " + item);
+                continue;
+            }
+            String key = item.substring(0, equals).trim().toLowerCase(Locale.ROOT);
+            String value = item.substring(equals + 1).trim();
+            if (!key.startsWith("pkb_")) key = "pkb_" + key;
+            String existing = selection != null && selection.get(key) != null ? selection.get(key) : values.get(key);
+            if (existing != null && !existing.equals(value)) {
+                appendWarning(warnings, "WARNING: --runvar " + key + " replaces " + existing + " with " + value);
+            }
+            if (SELECTION_KEYS.contains(key)) {
+                if (selection != null) selection.put(key, value);
+                continue;
+            }
+            values.put(key, value);
+        }
+        if (!present) return;
+        for (String key : SELECTION_KEYS) {
+            if (original.containsKey(key)) values.put(key, original.get(key));
+            else values.remove(key);
+        }
+        if (!values.equals(original)) writeRunVars(workspace, values);
+    }
+
+    private static void appendWarning(Appendable warnings, String message) {
+        if (warnings == null) return;
+        try {
+            warnings.append(message).append(System.lineSeparator());
+        } catch (IOException failure) {
+            throw new IllegalStateException(failure);
+        }
+    }
+
     public static Map<String, String> launchProperties(Path workspace, Map<String, String> selection) {
         Map<String, String> properties = new LinkedHashMap<>();
         properties.put(PROPERTY, workspace.toAbsolutePath().normalize().toString());

@@ -11,11 +11,9 @@ import java.util.Locale;
 import java.util.Properties;
 
 /**
- * Discover/Confirm browser selection for consumer AI agents.
- *
- * <p>Remote farm browsers already configured as the project's {@code pkb_browser}
- * are kept. Local or missing browsers prefer {@code CHROME_HEADLESS}. Unused
- * SAUCE/GRID/REMOTE yaml files under {@code configs/} are never auto-selected.</p>
+ * Names a remote farm browser. It does not choose a browser for a launch.
+ * The project browser is kept. {@code CHROME_HEADLESS} is used only when the
+ * project names none. Unused SAUCE/GRID/REMOTE yaml files are never selected.
  */
 public final class AgentBrowserLadder {
     public static final String CHROME_HEADLESS = "CHROME_HEADLESS";
@@ -33,19 +31,22 @@ public final class AgentBrowserLadder {
 
     public static Decision select(Path projectRoot) {
         String projectBrowser = readProjectBrowser(projectRoot);
-        if (isRemoteBrowser(projectBrowser)) {
+        if (projectBrowser == null || projectBrowser.isBlank()) {
             return new Decision(
-                    projectBrowser,
-                    projectBrowser,
-                    "project pkb_browser is a remote farm name; keep it",
-                    true
+                    CHROME_HEADLESS,
+                    "",
+                    "project names no browser; CHROME_HEADLESS is the only fallback",
+                    false
             );
         }
+        boolean remote = isRemoteBrowser(projectBrowser);
         return new Decision(
-                CHROME_HEADLESS,
-                projectBrowser == null ? "" : projectBrowser,
-                "local or unset pkb_browser prefers CHROME_HEADLESS",
-                false
+                projectBrowser,
+                projectBrowser,
+                remote
+                        ? "project pkb_browser is a remote farm name; keep it"
+                        : "project pkb_browser is kept",
+                remote
         );
     }
 

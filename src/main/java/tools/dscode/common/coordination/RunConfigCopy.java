@@ -5,7 +5,6 @@ import tools.dscode.control.protocol.PickleballPaths;
 import tools.dscode.control.protocol.RunConfigs;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.net.URI;
 import java.net.URL;
 import java.nio.file.FileSystem;
@@ -18,19 +17,11 @@ import java.util.Map;
 import java.util.stream.Stream;
 
 /**
- * Copies a consumer project's configs into one run directory.
- * The worker calls this after {@code pkb_configpath} is resolved and then loads this copy.
- * The copy is a faithful copy of the project files: real values and the original structure,
- * including nested YAML. It is not redacted. Redaction for logs and reports is a separate
- * path and does not rewrite the files the worker parses.
- * The copy is created once. A later start of the same run keeps edits.
- * A destination that contains only the bundled {@code CHROME_HEADLESS.yaml} is not finished.
- * A normal test never calls this. The run directory is not written back to {@code pkb_configpath}.
+ * Copies a consumer project's configs. The test JVM does not call this on launch.
+ * Workspace seed copies configs into the workspace instead. A normal test never calls this.
  */
 public final class RunConfigCopy {
     public static final String DIRECTORY_NAME = RunConfigs.DIRECTORY;
-    public static final String BUNDLED_CHROME_HEADLESS =
-            "META-INF/pickleball/configs/CHROME_HEADLESS.yaml";
 
     private RunConfigCopy() {
     }
@@ -55,7 +46,6 @@ public final class RunConfigCopy {
         } else {
             copyClasspath(selected, destination);
         }
-        ensureBundledHeadless(destination);
     }
 
     static String selectSource(Path project, String configuredPath) {
@@ -149,14 +139,6 @@ public final class RunConfigCopy {
         }
     }
 
-    private static void ensureBundledHeadless(Path destination) throws IOException {
-        if (hasBaseName(destination, "CHROME_HEADLESS")) return;
-        try (InputStream in = ResourceLocations.loader().getResourceAsStream(BUNDLED_CHROME_HEADLESS)) {
-            if (in == null) return;
-            Files.write(destination.resolve("CHROME_HEADLESS.yaml"), in.readAllBytes());
-        }
-    }
-
     private static boolean containsFile(Path root) throws IOException {
         if (!Files.isDirectory(root)) return false;
         try (Stream<Path> walk = Files.walk(root)) {
@@ -167,18 +149,6 @@ public final class RunConfigCopy {
     private static boolean bundledHeadlessFile(Path path) {
         Path name = path.getFileName();
         return name != null && "CHROME_HEADLESS.yaml".equalsIgnoreCase(name.toString());
-    }
-
-    private static boolean hasBaseName(Path root, String base) throws IOException {
-        if (!Files.isDirectory(root)) return false;
-        try (Stream<Path> walk = Files.walk(root)) {
-            return walk.filter(Files::isRegularFile).anyMatch(path -> {
-                String name = path.getFileName().toString();
-                int dot = name.lastIndexOf('.');
-                String stem = dot > 0 ? name.substring(0, dot) : name;
-                return stem.equalsIgnoreCase(base);
-            });
-        }
     }
 
     private static void copyTree(Path source, Path destination) throws IOException {

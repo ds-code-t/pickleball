@@ -136,32 +136,6 @@ public final class LastDiscoverSnapshot {
         return snapshot;
     }
 
-    public static Snapshot writeSealed(Path projectRoot, Map<String, String> runVars) throws IOException {
-        LinkedHashMap<String, String> copy = new LinkedHashMap<>();
-        if (runVars != null) {
-            runVars.forEach((key, value) -> {
-                if (key == null || key.isBlank()) return;
-                if (PKB_props.PKB_RUN_PROFILE.equals(key) || PKB_props.isRunProfileMemberKey(key)) return;
-                copy.put(key, value == null ? "" : value);
-            });
-        }
-        String runProfile = PKB_props.serializeRunVars(copy);
-        Snapshot snapshot = new Snapshot(
-                1,
-                SOURCE,
-                "",
-                "",
-                runProfile,
-                copy,
-                Instant.now().toString(),
-                true
-        );
-        Path file = file(projectRoot);
-        if (file.getParent() != null) Files.createDirectories(file.getParent());
-        JSON.writeValue(file.toFile(), snapshotToMap(snapshot));
-        return snapshot;
-    }
-
     public static CatalogRun latestCatalogRun(Path projectRoot) throws IOException {
         return latestCatalogRun(projectRoot, null);
     }

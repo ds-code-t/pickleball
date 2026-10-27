@@ -29,7 +29,7 @@ public final class AgentBrowserLadderChecks {
     }
 
     @Test
-    void localBrowserPrefersChromeHeadless() throws Exception {
+    void localProjectBrowserIsKept() throws Exception {
         Path project = Files.createTempDirectory("pkb-browser-ladder-local-");
         try {
             Path resources = project.resolve("src/test/resources");
@@ -38,7 +38,7 @@ public final class AgentBrowserLadderChecks {
             Files.writeString(resources.resolve("configs/SAUCE_CHROME.yaml"), "unused: true\n");
 
             AgentBrowserLadder.Decision decision = AgentBrowserLadder.select(project);
-            assertEquals("CHROME_HEADLESS", decision.browser());
+            assertEquals("chrome", decision.browser());
             assertFalse(decision.remoteKept());
             assertNull(AgentBrowserLadder.fallbackIfHeadlessCannotStart(decision));
         } finally {

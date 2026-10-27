@@ -8,6 +8,7 @@ import tools.dscode.testengine.PKB_props;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -53,105 +54,98 @@ class AgentDiscoverPlannerTest {
     }
 
     @Test
-    void isolateReplaysRetainedProfileWithoutReinheritingDefaults() {
-        LinkedHashMap<String, String> retained = new LinkedHashMap<>();
+    void isolateDoesNotForceParallelAndKeepsTheWorkspaceBrowser() throws Exception {
+        Path workspace = tools.dscode.control.protocol.Workspace.directory(tempDir, "run-1");
+        Map<String, String> retained = new LinkedHashMap<>();
         retained.put(PKB_props.PKB_BROWSER, "CHROME_HEADLESS");
         retained.put(PKB_props.PKB_PARALLEL, "12");
         retained.put(PKB_props.PKB_GLUE, "com.example.pickleball");
         retained.put(PKB_props.PKB_REPORTING_MODE, "diagnostic");
-        retained.put(PKB_props.PKB_PLUGINS, "");
+        tools.dscode.control.protocol.Workspace.writeRunVars(workspace, retained);
 
-        String isolate = AgentDiscoverPlanner.isolateRunVars(retained, "@failing", "Broken scenario");
+        Map<String, String> selection = new LinkedHashMap<>();
+        selection.put(PKB_props.PKB_TAGS, "@failing");
+        selection.put(PKB_props.PKB_NAME, "Broken scenario");
+        Map<String, String> launch = tools.dscode.control.protocol.Workspace.launchProperties(workspace, selection);
+        Map<String, String> stored = tools.dscode.control.protocol.Workspace.readRunVars(workspace);
 
-        assertTrue(isolate.contains("pkb_browser=CHROME_HEADLESS"));
-        assertTrue(isolate.contains("pkb_parallel=1"));
-        assertTrue(isolate.contains("pkb_glue=com.example.pickleball"));
-        assertTrue(isolate.contains("pkb_tags=@failing"));
-        assertTrue(isolate.contains("pkb_name="));
-        assertFalse(isolate.contains("pkb_parallel=12"));
-        assertFalse(isolate.contains("pkb_run_profile="));
-        assertFalse(isolate.contains("pretty"));
-        assertFalse(isolate.contains("@all"));
+        assertEquals("CHROME_HEADLESS", stored.get(PKB_props.PKB_BROWSER));
+        assertEquals("12", stored.get(PKB_props.PKB_PARALLEL));
+        assertEquals("com.example.pickleball", stored.get(PKB_props.PKB_GLUE));
+        assertEquals("@failing", launch.get(PKB_props.PKB_TAGS));
+        assertEquals("Broken scenario", launch.get(PKB_props.PKB_NAME));
+        assertFalse(launch.containsKey(PKB_props.PKB_PARALLEL));
+        assertFalse(launch.containsKey("pkb_runvars"));
+        assertFalse(launch.containsKey("pkb_run_profile"));
     }
 
     @Test
-    void discoverConfirmAndIsolateForwardExampleIntoRunVars() {
-        LinkedHashMap<String, String> retained = new LinkedHashMap<>();
-        retained.put(PKB_props.PKB_BROWSER, "CHROME_HEADLESS");
-        retained.put(PKB_props.PKB_PARALLEL, "12");
-        retained.put(PKB_props.PKB_GLUE, "com.example.pickleball");
-
+    void selectionExampleStaysOnTheLaunchAndParallelStaysInTheWorkspace() throws Exception {
+        Path workspace = tools.dscode.control.protocol.Workspace.directory(tempDir, "run-1");
+        tools.dscode.control.protocol.Workspace.writeRunVars(workspace, Map.of(
+                PKB_props.PKB_BROWSER, "CHROME_HEADLESS",
+                PKB_props.PKB_PARALLEL, "12",
+                PKB_props.PKB_GLUE, "com.example.pickleball"
+        ));
         String discover = AgentDiscoverPlanner.discover(
                 tempDir, "@smoke", null, null, "1 2 5 3.4 7-11"
         ).runVars();
-        String confirm = AgentDiscoverPlanner.confirmRunVars(
-                retained, "@one", null, null, "1 2 5 3.4 7-11"
-        );
-        String isolate = AgentDiscoverPlanner.isolateRunVars(
-                retained, "@failing", "Broken scenario", null, "1 2 5 3.4 7-11"
+        Map<String, String> launch = tools.dscode.control.protocol.Workspace.launchProperties(
+                workspace,
+                Map.of(PKB_props.PKB_EXAMPLE, "1 2 5 3.4 7-11", PKB_props.PKB_TAGS, "@failing")
         );
 
         assertTrue(discover.contains("pkb_example=1 2 5 3.4 7-11"));
         assertTrue(discover.contains("pkb_tags=@smoke"));
-        assertTrue(confirm.contains("pkb_example=1 2 5 3.4 7-11"));
-        assertTrue(confirm.contains("pkb_parallel=12"));
-        assertTrue(isolate.contains("pkb_example=1 2 5 3.4 7-11"));
-        assertTrue(isolate.contains("pkb_parallel=1"));
-        assertFalse(isolate.contains("pkb_parallel=12"));
+        assertEquals("1 2 5 3.4 7-11", launch.get(PKB_props.PKB_EXAMPLE));
+        assertEquals("12", tools.dscode.control.protocol.Workspace.readRunVars(workspace).get(PKB_props.PKB_PARALLEL));
+        assertFalse(launch.containsKey(PKB_props.PKB_PARALLEL));
     }
 
     @Test
-    void isolateKeepsSnapshotRetentionUnlessOverlaidAndStillForcesParallelOne() {
-        LinkedHashMap<String, String> retained = new LinkedHashMap<>();
+    void workspaceKeepsRetentionUnlessAnEditReplacesIt() throws Exception {
+        Path workspace = tools.dscode.control.protocol.Workspace.directory(tempDir, "run-1");
+        Map<String, String> retained = new LinkedHashMap<>();
         retained.put(PKB_props.PKB_BROWSER, "CHROME_HEADLESS");
         retained.put(PKB_props.PKB_PARALLEL, "12");
         retained.put(PKB_props.PKB_REPORT_RETENTION, "all");
+        tools.dscode.control.protocol.Workspace.writeRunVars(workspace, retained);
 
-        String kept = AgentDiscoverPlanner.isolateRunVars(retained, null, null);
-        String overlaid = AgentDiscoverPlanner.isolateRunVars(retained, null, null, "none");
-
-        assertTrue(kept.contains("pkb_reportretention=all"));
-        assertTrue(kept.contains("pkb_parallel=1"));
-        assertFalse(kept.contains("pkb_parallel=12"));
-        assertTrue(overlaid.contains("pkb_reportretention=none"));
-        assertTrue(overlaid.contains("pkb_parallel=1"));
-    }
-
-    @Test
-    void confirmReplaysSnapshotAndOverlaysSelection() {
-        Map<String, String> retained = Map.of(
-                PKB_props.PKB_BROWSER, "GRID_CHROME",
-                PKB_props.PKB_PARALLEL, "8",
-                PKB_props.PKB_REPORTING_MODE, "diagnostic"
+        assertEquals("all", tools.dscode.control.protocol.Workspace.readRunVars(workspace).get(PKB_props.PKB_REPORT_RETENTION));
+        assertEquals("12", tools.dscode.control.protocol.Workspace.readRunVars(workspace).get(PKB_props.PKB_PARALLEL));
+        tools.dscode.control.protocol.Workspace.applyLaunchEdits(
+                workspace, new LinkedHashMap<>(), List.of("pkb_reportretention=none"), new StringBuilder()
         );
-        String confirm = AgentDiscoverPlanner.confirmRunVars(retained, "@one", null);
-        assertTrue(confirm.contains("pkb_browser=GRID_CHROME"));
-        assertTrue(confirm.contains("pkb_parallel=8"));
-        assertTrue(confirm.contains("pkb_tags=@one"));
+        Map<String, String> stored = tools.dscode.control.protocol.Workspace.readRunVars(workspace);
+        assertEquals("none", stored.get(PKB_props.PKB_REPORT_RETENTION));
+        assertEquals("12", stored.get(PKB_props.PKB_PARALLEL));
     }
 
     @Test
-    void confirmKeepsSnapshotRetentionUnlessOverlaid() {
-        Map<String, String> retained = Map.of(
+    void confirmSelectionOverlaysTagsAndKeepsTheWorkspaceParallel() throws Exception {
+        Path workspace = tools.dscode.control.protocol.Workspace.directory(tempDir, "run-1");
+        tools.dscode.control.protocol.Workspace.writeRunVars(workspace, Map.of(
                 PKB_props.PKB_BROWSER, "GRID_CHROME",
                 PKB_props.PKB_PARALLEL, "8",
+                PKB_props.PKB_REPORTING_MODE, "diagnostic",
                 PKB_props.PKB_REPORT_RETENTION, "all"
+        ));
+        Map<String, String> launch = tools.dscode.control.protocol.Workspace.launchProperties(
+                workspace, Map.of(PKB_props.PKB_TAGS, "@one")
         );
-        String kept = AgentDiscoverPlanner.confirmRunVars(retained, "@one", null);
-        String overlaid = AgentDiscoverPlanner.confirmRunVars(retained, "@one", null, "none");
-
-        assertTrue(kept.contains("pkb_reportretention=all"));
-        assertFalse(kept.contains("pkb_reportretention=failed"));
-        assertTrue(overlaid.contains("pkb_reportretention=none"));
-        assertTrue(overlaid.contains("pkb_tags=@one"));
-        assertTrue(overlaid.contains("pkb_parallel=8"));
+        Map<String, String> stored = tools.dscode.control.protocol.Workspace.readRunVars(workspace);
+        assertEquals("GRID_CHROME", stored.get(PKB_props.PKB_BROWSER));
+        assertEquals("8", stored.get(PKB_props.PKB_PARALLEL));
+        assertEquals("all", stored.get(PKB_props.PKB_REPORT_RETENTION));
+        assertEquals("@one", launch.get(PKB_props.PKB_TAGS));
+        assertFalse(launch.containsKey("pkb_runvars"));
     }
 
     @Test
     void missingSnapshotFailsClearly() {
         IllegalStateException failure = assertThrows(
                 IllegalStateException.class,
-                () -> AgentDiscoverPlanner.isolateRunVars(Map.of(), null, null)
+                () -> LastDiscoverSnapshot.require(tempDir)
         );
         assertTrue(failure.getMessage().contains("No prior Discover snapshot"));
         assertFalse(failure.getMessage().toLowerCase().contains("mcp"));

@@ -32,7 +32,6 @@ import tools.dscode.common.treeparsing.parsedComponents.DataElementMatch;
 import tools.dscode.common.treeparsing.parsedComponents.ElementMatch;
 import tools.dscode.common.treeparsing.parsedComponents.PhraseData;
 
-import tools.dscode.common.coordination.AgentCoordination;
 import tools.dscode.common.resources.ResourceLocations;
 import tools.dscode.control.protocol.PickleballPaths;
 
@@ -87,7 +86,9 @@ public class ParsingMap extends MappingProcessor {
     public static final String CHROME_HEADLESS_CONFIG_KEY = "CHROME_HEADLESS";
 
     public static synchronized void initializeConfigs(String configuredPath) {
-        String path = configPathForCurrentRun(configuredPath);
+        String path = configuredPath == null || configuredPath.isBlank()
+                ? DEFAULT_CONFIG_PATH
+                : configuredPath.trim();
         JsonNode configsNode = loadConfigs(path, ResourceLocations.workingDirectory());
         ObjectNode configs;
         if (configsNode instanceof ObjectNode objectNode) {
@@ -120,23 +121,6 @@ public class ParsingMap extends MappingProcessor {
         } else {
             GLOBALS.root.set(CONFIGS_MAP_ROOT, configsNode);
         }
-    }
-
-    /**
-     * A private run reads its own config copy. A normal test, with no current
-     * run, keeps the project path.
-     */
-    static String configPathForCurrentRun(String configuredPath) {
-        AgentCoordination.Run run = AgentCoordination.current();
-        if (run != null) {
-            Path copy = run.configDirectory();
-            if (Files.isDirectory(copy)) {
-                return copy.toString();
-            }
-        }
-        return configuredPath == null || configuredPath.isBlank()
-                ? DEFAULT_CONFIG_PATH
-                : configuredPath.trim();
     }
 
     static void applyBundledBrowserDefaults(ObjectNode configs) {

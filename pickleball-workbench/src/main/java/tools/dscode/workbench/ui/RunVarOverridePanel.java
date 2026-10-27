@@ -24,9 +24,8 @@ import java.util.Map;
 import java.util.TreeMap;
 
 /**
- * Collapsible editor for the next worker's sealed RunVar snapshot.
- * Apply writes {@code pkb_overriderunvars} for the next launch only; it does not
- * mutate an in-flight worker. Unused, it changes no behavior.
+ * Collapsible editor for the next worker's run vars.
+ * Apply used to seal a snapshot. Sealed snapshots are gone; phase 5 writes the workspace file.
  */
 final class RunVarOverridePanel extends JPanel {
     static final List<String> BROWSER_CHOICES = List.of(
@@ -56,14 +55,11 @@ final class RunVarOverridePanel extends JPanel {
         toggle.setFocusable(false);
         toggle.addActionListener(event -> editor.setVisible(toggle.isSelected()));
         JButton load = WorkbenchTheme.flatButton("Load snapshot", "Load retained RunVars from LastDiscoverSnapshot");
-        JButton apply = WorkbenchTheme.accentButton("Apply sealed", "Write a sealed snapshot used on the next worker start");
         load.addActionListener(event -> loadSnapshot());
-        apply.addActionListener(event -> applySealed());
         header.add(toggle, BorderLayout.WEST);
         JPanel actions = new JPanel();
         actions.setOpaque(false);
         actions.add(load);
-        actions.add(apply);
         header.add(actions, BorderLayout.EAST);
         add(header, BorderLayout.NORTH);
 
@@ -86,24 +82,13 @@ final class RunVarOverridePanel extends JPanel {
         Map<String, String> values = new TreeMap<>();
         if (snapshot != null && snapshot.present()) {
             if (snapshot.runVars() != null) values.putAll(snapshot.runVars());
-            if (values.isEmpty() && snapshot.runProfile() != null && !snapshot.runProfile().isBlank()) {
-                values.putAll(LastDiscoverSnapshot.parseCompact(snapshot.runProfile()));
-            }
         }
         rebuildFields(values);
-        if (snapshot != null && snapshot.sealed()) {
-            status.setText("Loaded sealed snapshot. Apply writes the next worker -Dpkb_overriderunvars.");
-        } else if (snapshot != null && snapshot.present()) {
-            status.setText("Loaded LastDiscoverSnapshot. Apply seals it for the next worker launch.");
+        if (snapshot != null && snapshot.present()) {
+            status.setText("Loaded LastDiscoverSnapshot. Edit the run workspace before the next launch.");
         } else {
-            status.setText("No snapshot yet. Discover first, or type a complete sealed map and Apply.");
+            status.setText("No snapshot yet. Discover first.");
         }
-    }
-
-    void applySealed() {
-        Map<String, String> values = currentValues();
-        LastDiscoverSnapshot.writeSealed(projectRoot, values);
-        status.setText("Sealed snapshot saved. Next worker start uses -Dpkb_overriderunvars=. In-flight worker unchanged.");
     }
 
     Map<String, String> currentValues() {

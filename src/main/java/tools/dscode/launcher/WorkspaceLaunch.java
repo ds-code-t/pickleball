@@ -75,7 +75,6 @@ public final class WorkspaceLaunch {
                 null,
                 path -> capture(project, path, false)
         );
-        Map<String, String> values = new LinkedHashMap<>(Workspace.readRunVars(workspace));
         Map<String, String> selection = new LinkedHashMap<>();
         put(selection, PKB_props.PKB_TAGS, tags);
         put(selection, PKB_props.PKB_NAME, name);
@@ -84,13 +83,18 @@ public final class WorkspaceLaunch {
         put(selection, PKB_props.PKB_AGENT_ID, agentId);
         if (retention != null && !retention.isBlank()) {
             String parsed = ReportRetentionPolicy.parseExact(retention).name().toLowerCase(Locale.ROOT);
-            warnReplace(warnings, PKB_props.PKB_REPORT_RETENTION, values.get(PKB_props.PKB_REPORT_RETENTION), parsed);
-            values.put(PKB_props.PKB_REPORT_RETENTION, parsed);
+            Map<String, String> values = new LinkedHashMap<>(Workspace.readRunVars(workspace));
+            String existing = values.get(PKB_props.PKB_REPORT_RETENTION);
+            if (existing != null && !existing.equals(parsed)) {
+                warn(warnings, "WARNING: --runvar " + PKB_props.PKB_REPORT_RETENTION
+                        + " replaces " + existing + " with " + parsed);
+            }
+            if (!parsed.equals(existing)) {
+                values.put(PKB_props.PKB_REPORT_RETENTION, parsed);
+                Workspace.writeRunVars(workspace, values);
+            }
         }
-        applyCli(values, selection, cliRunVars, warnings);
-        if (!values.equals(Workspace.readRunVars(workspace))) {
-            Workspace.writeRunVars(workspace, values);
-        }
+        Workspace.applyLaunchEdits(workspace, selection, cliRunVars, warnings);
         stamp(workspace);
         return new Prepared(workspace, Map.copyOf(selection));
     }
@@ -158,39 +162,6 @@ public final class WorkspaceLaunch {
             throw new IllegalStateException("Workspace seed was interrupted for " + workspace, interrupted);
         } catch (IOException failure) {
             throw new IllegalStateException("Could not seed workspace " + workspace, failure);
-        }
-    }
-
-    private static void applyCli(
-            Map<String, String> values,
-            Map<String, String> selection,
-            List<String> raw,
-            Appendable warnings
-    ) {
-        if (raw == null) return;
-        for (String item : raw) {
-            if (item == null || item.isBlank()) continue;
-            int equals = item.indexOf('=');
-            if (equals <= 0) {
-                warn(warnings, "WARNING: --runvar ignored, expected key=value: " + item);
-                continue;
-            }
-            String key = item.substring(0, equals).trim().toLowerCase(Locale.ROOT);
-            String value = item.substring(equals + 1).trim();
-            if (!key.startsWith("pkb_")) key = "pkb_" + key;
-            if (Workspace.SELECTION_KEYS.contains(key)) {
-                warnReplace(warnings, key, selection.get(key) != null ? selection.get(key) : values.get(key), value);
-                selection.put(key, value);
-                continue;
-            }
-            warnReplace(warnings, key, values.get(key), value);
-            values.put(key, value);
-        }
-    }
-
-    private static void warnReplace(Appendable warnings, String key, String existing, String value) {
-        if (existing != null && !existing.equals(value)) {
-            warn(warnings, "WARNING: --runvar " + key + " replaces " + existing + " with " + value);
         }
     }
 

@@ -40,20 +40,8 @@ class RunVarOverridePanelTest {
     }
 
     @Test
-    void applySealedWritesSnapshotForNextWorkerLaunch(@TempDir Path tempDir) {
-        LastDiscoverSnapshot.writeSealed(tempDir, Map.of(
-                "pkb_glue", "com.example",
-                "pkb_features", "classpath:features",
-                "pkb_browser", "firefox"
-        ));
-        RunVarOverridePanel panel = new RunVarOverridePanel(tempDir);
-        panel.applySealed();
-
-        LastDiscoverSnapshot.Snapshot snapshot = LastDiscoverSnapshot.read(tempDir);
-        assertTrue(snapshot.sealed());
-        Map<String, String> properties = LastDiscoverSnapshot.workerSystemPropertiesIfPresent(tempDir);
-        assertFalse(properties.containsKey("pkb_overriderunvars"));
-        assertFalse(properties.containsKey("pkb_runvars"));
-        assertTrue(properties.isEmpty());
+    void panelDoesNotWriteASealedSnapshot(@TempDir Path tempDir) {
+        new RunVarOverridePanel(tempDir);
+        assertNull(LastDiscoverSnapshot.read(tempDir));
     }
 }

@@ -15,6 +15,7 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -112,14 +113,15 @@ class LastDiscoverSnapshotTest {
     }
 
     @Test
-    void multiFileFeatureListRoundTripsThroughTheWorkerRunVars() {
+    void featurePathsStayOnSelectionRatherThanACompactReplay() {
         String features = "wd-file:C:/proj/first.feature,wd-file:C:/proj/second.feature";
-        String compact = LastDiscoverSnapshot.serializeCompact(Map.of(
-                "pkb_features", features,
-                "pkb_tags", "@smoke"
-        ));
-        assertEquals(features, LastDiscoverSnapshot.parseCompact(compact).get("pkb_features"));
-        assertEquals("@smoke", LastDiscoverSnapshot.parseCompact(compact).get("pkb_tags"));
+        Map<String, String> launch = Workspace.launchProperties(
+                tempDir.resolve("workspace"),
+                Map.of("pkb_features", features, "pkb_tags", "@smoke")
+        );
+        assertEquals(features, launch.get("pkb_features"));
+        assertEquals("@smoke", launch.get("pkb_tags"));
+        assertFalse(launch.containsKey("pkb_runvars"));
     }
 
     @Test
@@ -224,17 +226,7 @@ class LastDiscoverSnapshotTest {
     }
 
     @Test
-    void writeSealedMarksSnapshotForOverrideReplay() {
-        LastDiscoverSnapshot.writeSealed(tempDir, Map.of(
-                "pkb_glue", "com.example",
-                "pkb_features", "classpath:features",
-                "pkb_browser", "firefox"
-        ));
-        LastDiscoverSnapshot.Snapshot snapshot = LastDiscoverSnapshot.read(tempDir);
-        assertTrue(snapshot.sealed());
-        Map<String, String> properties = LastDiscoverSnapshot.workerSystemPropertiesIfPresent(tempDir);
-        assertFalse(properties.containsKey("pkb_overriderunvars"));
-        assertFalse(properties.containsKey("pkb_runvars"));
-        assertTrue(properties.isEmpty());
+    void thereIsNoSealedSnapshotWriter() {
+        assertNull(LastDiscoverSnapshot.read(tempDir));
     }
 }

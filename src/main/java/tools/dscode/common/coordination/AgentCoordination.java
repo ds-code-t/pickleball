@@ -379,10 +379,6 @@ public final class AgentCoordination {
     }
 
     public static Run openConsumerRun(Path project, Appendable out) {
-        return openConsumerRun(project, out, null);
-    }
-
-    public static Run openConsumerRun(Path project, Appendable out, String configSource) {
         if (!launchRequestsPrivateRun()) {
             clearCurrent();
             return null;
@@ -397,14 +393,6 @@ public final class AgentCoordination {
                 "consumer-run"
         );
         Run run = begin(project, request, Instant.now(), out);
-        try {
-            ensureConfigs(project, run.dataDirectory(), configSource);
-        } catch (IOException failure) {
-            throw new IllegalStateException(
-                    "Could not copy configs for run " + run.runId() + ": " + failure.getMessage(),
-                    failure
-            );
-        }
         System.setProperty(PKB_props.PKB_RUN_ID, run.runId());
         System.setProperty(PKB_props.PKB_AGENT_ID, run.agentId());
         return run;
@@ -1009,10 +997,6 @@ public final class AgentCoordination {
 
     private static Path inboxDirectory(Path project, String agentFolder) {
         return PickleballLocalLayout.root(project).resolve(INBOX_DIRECTORY).resolve(agentFolder);
-    }
-
-    private static void ensureConfigs(Path project, Path data, String configSource) throws IOException {
-        RunConfigCopy.copyIfAbsent(project, data.resolve(RunConfigCopy.DIRECTORY_NAME), configSource);
     }
 
     private static void ensureTree(Path data) throws IOException {

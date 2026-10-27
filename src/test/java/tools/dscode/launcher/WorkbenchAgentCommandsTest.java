@@ -79,7 +79,8 @@ class WorkbenchAgentCommandsTest {
             Output output = run("hint", tempDir.toString());
 
             assertEquals(0, output.exitCode());
-            assertTrue(output.stdout().contains("pkb_browser=CHROME_HEADLESS"));
+            assertTrue(output.stdout().contains("pkb_browser=chrome"));
+            assertFalse(output.stdout().contains("pkb_browser=CHROME_HEADLESS"));
             assertTrue(output.stdout().contains("pkb_reportretention=failed"));
             assertTrue(output.stdout().contains("NEXT: run discover"));
             assertTrue(output.stdout().contains("Dry-run resolve"));
@@ -373,7 +374,7 @@ class WorkbenchAgentCommandsTest {
     }
 
     @Test
-    void discoverCopiesClasspathConfigsOnlyWhenTheWorkerOpensTheRun() throws Exception {
+    void discoverDoesNotCopyConfigsIntoTheRunDirectory() throws Exception {
         writeProjectWrapper();
         Path resources = tempDir.resolve("src/test/resources");
         Path qa = resources.resolve("qa-configs");
@@ -419,8 +420,7 @@ class WorkbenchAgentCommandsTest {
                             System.clearProperty("pkb_configpath");
                             AgentCoordination.Run adopted = AgentCoordination.openConsumerRun(
                                     project,
-                                    new StringBuilder(),
-                                    resolved
+                                    new StringBuilder()
                             );
                             assertEquals("run-qa", adopted.runId());
                             String recorded = System.getProperty("pkb_configpath");
@@ -455,7 +455,7 @@ class WorkbenchAgentCommandsTest {
 
         assertEquals(0, exit, () -> stderr.toString(StandardCharsets.UTF_8) + stdout.toString(StandardCharsets.UTF_8));
         Path copied = AgentCoordination.runDirectory(tempDir, "run-qa").resolve("config").resolve("MARKER.yaml");
-        assertEquals(markerText, Files.readString(copied));
+        assertFalse(Files.isRegularFile(copied));
         assertEquals(markerText, Files.readString(marker));
     }
 

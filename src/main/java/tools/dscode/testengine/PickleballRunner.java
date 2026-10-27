@@ -125,17 +125,9 @@ public abstract class PickleballRunner {
         java.nio.file.Path projectRoot = PickleballLocalLayout.findProjectRoot(java.nio.file.Path.of(""));
         AgentCoordination.Run coordination = null;
         if (AgentCoordination.launchRequestsPrivateRun()) {
-            coordination = AgentCoordination.openConsumerRun(
-                    projectRoot,
-                    System.out,
-                    values.get(PKB_CONFIG_PATH)
-            );
+            coordination = AgentCoordination.openConsumerRun(projectRoot, System.out);
         }
-        if (coordination != null && java.nio.file.Files.isDirectory(coordination.configDirectory())) {
-            ParsingMap.initializeConfigs(coordination.configDirectory().toString());
-        } else {
-            ParsingMap.initializeConfigs(values.get(PKB_CONFIG_PATH));
-        }
+        ParsingMap.initializeConfigs(values.get(PKB_CONFIG_PATH));
         refreshRunProfile();
         refreshPkbOptions();
 
