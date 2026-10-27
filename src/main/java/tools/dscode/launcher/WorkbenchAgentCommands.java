@@ -8,6 +8,7 @@ import tools.dscode.common.reporting.diagnostic.ConsumerMavenTestRunner;
 import tools.dscode.common.reporting.diagnostic.LastDiscoverSnapshot;
 import tools.dscode.control.protocol.PickleballLocalStore;
 import tools.dscode.control.protocol.WorkbenchFeatureIndex;
+import tools.dscode.control.protocol.Workspace;
 import tools.dscode.testengine.PKB_props;
 
 import java.io.ByteArrayOutputStream;
@@ -179,28 +180,34 @@ public final class WorkbenchAgentCommands {
         try {
             launchNote(parsed.project(), run.runId(), "command", "discover");
             echoFilters(parsed, out);
-            AgentDiscoverPlanner.Plan plan = AgentDiscoverPlanner.discover(
-                    parsed.project(),
-                    parsed.tags(),
-                    parsed.name(),
-                    parsed.retention(),
-                    parsed.example(),
-                    parsed.runVars(),
-                    err
-            );
-            out.println("Workbench discover " + plan.browser().reason() + ".");
-            out.println("pkb_runvars=" + plan.runVars());
-            String environment = runVar(plan.runVars(), PKB_props.PKB_ENVIRONMENT);
-            String browser = runVar(plan.runVars(), PKB_props.PKB_BROWSER);
             WorkbenchFeatureIndex.Selection selection = select(
                     parsed.project(), parsed.tags(), parsed.name(), parsed.example(), parsed
             );
             launchNote(parsed.project(), run.runId(), "index", indexDetail(selection));
-            String mavenVars = mavenRunVars(selection, plan.runVars(), parsed.tags(), err);
+            String tags = tagsForLaunch(selection, parsed.tags(), err);
+            WorkspaceLaunch.Prepared prepared = WorkspaceLaunch.prepare(
+                    parsed.project(),
+                    run.runId(),
+                    null,
+                    tags,
+                    parsed.name(),
+                    parsed.example(),
+                    run.runId(),
+                    run.agentId(),
+                    parsed.retention(),
+                    parsed.runVars(),
+                    err
+            );
+            Map<String, String> stored = Workspace.readRunVars(prepared.workspace());
+            String environment = blankToNull(stored.get(PKB_props.PKB_ENVIRONMENT));
+            String browser = blankToNull(stored.get(PKB_props.PKB_BROWSER));
+            out.println("workspace=" + prepared.workspace());
+            out.println("workspace-runvars=" + PKB_props.serializeRunVars(new java.util.TreeMap<>(stored)));
             List<String> command = withCoordination(
                     ConsumerMavenTestRunner.command(
                             parsed.project(),
-                            mavenVars,
+                            prepared.workspace(),
+                            prepared.selection(),
                             featurePaths(parsed, selection)
                     ),
                     run
@@ -264,17 +271,13 @@ public final class WorkbenchAgentCommands {
                     parsed.coordination().runId()
             );
             Map<String, String> retained = LastDiscoverSnapshot.retainedRunVars(snapshot);
-            String runVars = AgentDiscoverPlanner.confirmRunVars(
-                    retained,
-                    parsed.tags(),
-                    parsed.name(),
-                    parsed.retention(),
-                    parsed.example(),
-                    parsed.runVars(),
+            String fromRun = snapshot.runId();
+            Path fromWorkspace = fromRun == null ? null : Workspace.directory(parsed.project(), fromRun);
+            String tags = tagsForLaunch(
+                    null,
+                    firstNonBlank(parsed.tags(), retained.get(PKB_props.PKB_TAGS)),
                     err
             );
-            String environment = runVar(runVars, PKB_props.PKB_ENVIRONMENT);
-            String browser = firstNonBlank(runVar(runVars, PKB_props.PKB_BROWSER), retained.get(PKB_props.PKB_BROWSER));
             WorkbenchFeatureIndex.Selection selection = select(
                     parsed.project(),
                     firstNonBlank(parsed.tags(), retained.get(PKB_props.PKB_TAGS)),
@@ -282,19 +285,34 @@ public final class WorkbenchAgentCommands {
                     firstNonBlank(parsed.example(), retained.get(PKB_props.PKB_EXAMPLE)),
                     parsed
             );
+            tags = tagsForLaunch(selection, tags, err);
             launchNote(parsed.project(), run.runId(), "index", indexDetail(selection));
-            out.println("Workbench confirm replaying Discover snapshot as pkb_runvars.");
-            out.println("pkb_runvars=" + runVars);
-            String mavenVars = mavenRunVars(
-                    selection,
-                    runVars,
-                    firstNonBlank(parsed.tags(), retained.get(PKB_props.PKB_TAGS)),
+            WorkspaceLaunch.Prepared prepared = WorkspaceLaunch.prepare(
+                    parsed.project(),
+                    run.runId(),
+                    fromWorkspace != null && Workspace.exists(fromWorkspace) ? fromRun : null,
+                    tags,
+                    firstNonBlank(parsed.name(), retained.get(PKB_props.PKB_NAME)),
+                    firstNonBlank(parsed.example(), retained.get(PKB_props.PKB_EXAMPLE)),
+                    run.runId(),
+                    run.agentId(),
+                    parsed.retention(),
+                    parsed.runVars(),
                     err
             );
+            Map<String, String> stored = Workspace.readRunVars(prepared.workspace());
+            String environment = blankToNull(stored.get(PKB_props.PKB_ENVIRONMENT));
+            String browser = firstNonBlank(
+                    blankToNull(stored.get(PKB_props.PKB_BROWSER)),
+                    retained.get(PKB_props.PKB_BROWSER)
+            );
+            out.println("workspace=" + prepared.workspace());
+            out.println("workspace-runvars=" + PKB_props.serializeRunVars(new java.util.TreeMap<>(stored)));
             List<String> command = withCoordination(
                     ConsumerMavenTestRunner.confirmCommand(
                             parsed.project(),
-                            mavenVars,
+                            prepared.workspace(),
+                            prepared.selection(),
                             featurePaths(parsed, selection)
                     ),
                     run
@@ -826,7 +844,12 @@ public final class WorkbenchAgentCommands {
 
     private static List<String> withCoordination(List<String> command, AgentCoordination.Run run) {
         List<String> copy = new ArrayList<>(command);
-        copy.addAll(AgentCoordination.mavenProperties(run));
+        for (String property : AgentCoordination.mavenProperties(run)) {
+            int equals = property.indexOf('=');
+            String prefix = equals < 0 ? property : property.substring(0, equals + 1);
+            if (copy.stream().anyMatch(item -> item.startsWith(prefix))) continue;
+            copy.add(property);
+        }
         return List.copyOf(copy);
     }
 
@@ -1121,27 +1144,21 @@ public final class WorkbenchAgentCommands {
         }
     }
 
-    private static String mavenRunVars(
+    private static String tagsForLaunch(
             WorkbenchFeatureIndex.Selection selection,
-            String runVars,
             String tags,
             PrintStream err
     ) {
-        if (selection == null || !selection.fullScanFallback()) return runVars;
+        if (selection == null || !selection.fullScanFallback()) return tags;
         String reason = selection.fallbackReason() == null ? "" : selection.fallbackReason();
-        if (!reason.contains("unsupported tag expression")) return runVars;
-        String original = tags == null || tags.isBlank() ? runVar(runVars, PKB_props.PKB_TAGS) : tags;
+        if (!reason.contains("unsupported tag expression")) return tags;
+        String original = tags == null ? "" : tags;
         err.println(WorkbenchTagFallback.warning(reason, original));
         String rewritten = WorkbenchTagFallback.cucumberTags(original);
-        if (rewritten == null || rewritten.equals(original) || runVars == null) return runVars;
-        java.util.LinkedHashMap<String, String> values = new java.util.LinkedHashMap<>(PKB_props.parseAssignments(runVars));
-        values.put(PKB_props.PKB_TAGS, rewritten);
-        return PKB_props.serializeRunVars(values);
+        return rewritten == null || rewritten.isBlank() ? tags : rewritten;
     }
 
-    private static String runVar(String compact, String key) {
-        if (compact == null || compact.isBlank() || key == null) return null;
-        String value = PKB_props.parseAssignments(compact).get(key);
+    private static String blankToNull(String value) {
         return value == null || value.isBlank() ? null : value;
     }
 

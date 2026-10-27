@@ -3,12 +3,14 @@ package tools.dscode.launcher;
 import io.cucumber.core.gherkin.Pickle;
 import io.cucumber.core.runner.modularexecutions.CucumberScanUtil;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import tools.dscode.common.coordination.AgentCoordination;
 import tools.dscode.common.reporting.diagnostic.ConsumerMavenTestRunner;
 import tools.dscode.common.reporting.diagnostic.LastDiscoverSnapshot;
+import tools.dscode.control.protocol.Workspace;
 import tools.dscode.testengine.DynamicSuiteEngine;
 import tools.dscode.testengine.PKB_props;
 
@@ -20,6 +22,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -34,8 +37,20 @@ class WorkbenchAgentCommandsTest {
     @TempDir
     Path tempDir;
 
+    @BeforeEach
+    void captureSeedWithoutAConsumerRunner() {
+        WorkspaceLaunch.testCapture = workspace -> {
+            Map<String, String> values = new LinkedHashMap<>();
+            for (String key : Workspace.CONTEXT_KEYS) values.put(key, key);
+            values.put(PKB_props.PKB_BROWSER, "CHROME_HEADLESS");
+            values.put(PKB_props.PKB_PARALLEL, "auto");
+            Workspace.writeRunVars(workspace, values);
+        };
+    }
+
     @AfterEach
     void clearCoordination() {
+        WorkspaceLaunch.testCapture = null;
         AgentCoordination.clearCurrent();
         System.clearProperty(PKB_props.PKB_RUN_ID);
         System.clearProperty(PKB_props.PKB_AGENT_ID);
@@ -168,9 +183,10 @@ class WorkbenchAgentCommandsTest {
 
         assertEquals(1, exit);
         assertEquals(1, captured.size());
-        assertTrue(captured.getFirst().stream().anyMatch(item -> item.startsWith("-Dpkb_runvars=")));
-        assertTrue(captured.getFirst().stream().anyMatch(item ->
-                item.startsWith("-Dpkb_runvars=") && item.contains("pkb_reportretention=failed")));
+        assertTrue(captured.getFirst().stream().anyMatch(item -> item.startsWith("-Dpkb_workspace=")));
+        assertTrue(captured.getFirst().contains("-Dpkb_tags=@smoke"));
+        assertFalse(captured.getFirst().stream().anyMatch(item -> item.startsWith("-Dpkb_runvars=")));
+        assertFalse(captured.getFirst().stream().anyMatch(item -> item.startsWith("-Dpkb_reportretention=")));
         assertTrue(captured.getFirst().contains("-Dpkb_run_purpose=workbench-discover"));
         LastDiscoverSnapshot.Snapshot snapshot = LastDiscoverSnapshot.read(tempDir);
         assertTrue(snapshot.hasRunVars());
@@ -262,8 +278,9 @@ class WorkbenchAgentCommandsTest {
         assertFalse(printed.contains("status=PASSED"));
         assertTrue(printed.contains("pkb_reportretention=all"));
         assertFalse(printed.contains("pkb_reportretention=failed"));
-        assertTrue(captured.getFirst().stream().anyMatch(item ->
-                item.startsWith("-Dpkb_runvars=") && item.contains("pkb_reportretention=all")));
+        assertTrue(captured.getFirst().stream().anyMatch(item -> item.startsWith("-Dpkb_workspace=")));
+        assertFalse(captured.getFirst().stream().anyMatch(item -> item.startsWith("-Dpkb_runvars=")));
+        assertFalse(captured.getFirst().stream().anyMatch(item -> item.startsWith("-Dpkb_reportretention=")));
     }
 
     @Test
@@ -489,10 +506,8 @@ class WorkbenchAgentCommandsTest {
                 }
         );
         assertEquals(0, exit);
-        String runVars = captured.getFirst().stream().filter(item -> item.startsWith("-Dpkb_runvars=")).findFirst().orElseThrow();
-        var parsed = PKB_props.parseAssignments(runVars.substring("-Dpkb_runvars=".length()));
-        String paths = parsed.get(PKB_props.PKB_FEATURES);
-        assertTrue(paths == null || !paths.contains("needle.feature"), String.valueOf(paths));
+        assertFalse(captured.getFirst().stream().anyMatch(item -> item.startsWith("-Dpkb_features=")));
+        assertFalse(captured.getFirst().stream().anyMatch(item -> item.startsWith("-Dpkb_runvars=")));
         String top = topLevelArgument(captured.getFirst());
         assertTrue(top.contains("needle.feature"), top);
         assertFalse(top.contains("skip-0.feature"), top);
@@ -551,15 +566,8 @@ class WorkbenchAgentCommandsTest {
                 }
         );
         assertEquals(0, exit);
-        String runVars = captured.getFirst().stream()
-                .filter(item -> item.startsWith("-Dpkb_runvars="))
-                .findFirst()
-                .orElseThrow()
-                .substring("-Dpkb_runvars=".length());
-        String stripped = runVars.replace("\"", "").replace("'", "");
-        var parsed = PKB_props.parseAssignments(stripped);
-        String paths = parsed.get(PKB_props.PKB_FEATURES);
-        assertTrue(paths == null || (!paths.contains("keep-a.feature") && !paths.contains("keep-b.feature")), String.valueOf(paths));
+        assertFalse(captured.getFirst().stream().anyMatch(item -> item.startsWith("-Dpkb_features=")));
+        assertFalse(captured.getFirst().stream().anyMatch(item -> item.startsWith("-Dpkb_runvars=")));
         String top = topLevelArgument(captured.getFirst());
         assertTrue(top.contains("keep-a.feature"), top);
         assertTrue(top.contains("keep-b.feature"), top);
@@ -645,12 +653,8 @@ class WorkbenchAgentCommandsTest {
                 }
         );
         assertEquals(0, exit);
-        String runVars = captured.getFirst().stream()
-                .filter(item -> item.startsWith("-Dpkb_runvars="))
-                .findFirst()
-                .orElseThrow();
-        var parsed = PKB_props.parseAssignments(runVars.substring("-Dpkb_runvars=".length()));
-        assertFalse(String.valueOf(parsed.get(PKB_props.PKB_FEATURES)).contains("caller.feature"));
+        assertFalse(captured.getFirst().stream().anyMatch(item -> item.startsWith("-Dpkb_features=")));
+        assertFalse(captured.getFirst().stream().anyMatch(item -> item.startsWith("-Dpkb_runvars=")));
         String top = topLevelArgument(captured.getFirst());
         assertTrue(top.contains("caller.feature"), top);
         assertFalse(top.contains("callee.feature"), top);
@@ -1243,8 +1247,12 @@ class WorkbenchAgentCommandsTest {
         assertTrue(record.contains("EMPTY"), record);
         assertFalse(record.contains("PASSED"), record);
 
+        Path source = Workspace.directory(tempDir, "run-empty");
+        Map<String, String> seeded = new LinkedHashMap<>(Workspace.readRunVars(source));
+        seeded.put(PKB_props.PKB_BROWSER, "FIREFOX");
+        Workspace.writeRunVars(source, seeded);
         LastDiscoverSnapshot.write(tempDir, "run-empty", tempDir.resolve("reports/diagnostic-runs/run-catalog.json"),
-                "pkb_browser=FIREFOX, pkb_tags=@missing");
+                "pkb_browser=EDGE, pkb_tags=@missing");
         ByteArrayOutputStream confirmOut = new ByteArrayOutputStream();
         int confirm = WorkbenchAgentCommands.run(
                 new String[]{"confirm", tempDir.toString(), "--run-id=run-empty-confirm", "--example=9"},
@@ -1351,9 +1359,10 @@ class WorkbenchAgentCommandsTest {
                     return 0;
                 }
         );
-        String runVars = captured.getFirst().stream().filter(item -> item.startsWith("-Dpkb_runvars=")).findFirst().orElse("");
-        assertTrue(runVars.contains("pkb_tags=@alpha"), runVars);
-        assertFalse(runVars.contains("@beta"), runVars);
+        String runVars = captured.getFirst().stream().filter(item -> item.startsWith("-Dpkb_tags=")).findFirst().orElse("");
+        assertEquals("-Dpkb_tags=@alpha", runVars);
+        assertFalse(captured.getFirst().stream().anyMatch(item -> item.contains("@beta")), runVars);
+        assertFalse(captured.getFirst().stream().anyMatch(item -> item.contains("@newer")), runVars);
         assertFalse(runVars.contains("@newer"), runVars);
     }
 
@@ -1524,9 +1533,12 @@ class WorkbenchAgentCommandsTest {
                 }
         );
         assertEquals(0, exit);
-        String runVars = captured.getFirst().stream().filter(item -> item.startsWith("-Dpkb_runvars=")).findFirst().orElse("");
-        assertTrue(runVars.contains("pkb_environment=DEV"), runVars);
-        assertTrue(runVars.contains("pkb_parallel=3"), runVars);
+        assertTrue(captured.getFirst().contains("-Dpkb_parallel=3"));
+        assertFalse(captured.getFirst().stream().anyMatch(item -> item.startsWith("-Dpkb_runvars=")));
+        String workspaceArg = captured.getFirst().stream().filter(item -> item.startsWith("-Dpkb_workspace=")).findFirst().orElseThrow();
+        Map<String, String> stored = Workspace.readRunVars(Path.of(workspaceArg.substring("-Dpkb_workspace=".length())));
+        assertEquals("DEV", stored.get(PKB_props.PKB_ENVIRONMENT));
+        assertEquals("auto", stored.get(PKB_props.PKB_PARALLEL));
         String errors = stderr.toString(StandardCharsets.UTF_8);
         assertTrue(errors.contains("WARNING: --runvar pkb_parallel replaces"), errors);
         String record = Files.readString(
@@ -1572,8 +1584,8 @@ class WorkbenchAgentCommandsTest {
                 }
         );
         assertEquals(0, exit);
-        String runVars = captured.getFirst().stream().filter(item -> item.startsWith("-Dpkb_runvars=")).findFirst().orElse("");
-        String tags = String.valueOf(PKB_props.parseAssignments(runVars.substring("-Dpkb_runvars=".length())).get(PKB_props.PKB_TAGS));
+        String tags = captured.getFirst().stream().filter(item -> item.startsWith("-Dpkb_tags=")).findFirst().orElse("");
+        tags = tags.substring("-Dpkb_tags=".length());
         io.cucumber.tagexpressions.TagExpressionParser.parse(tags);
         assertFalse(tags.toLowerCase().contains("xor"), tags);
         assertTrue(tags.contains("or"), tags);
@@ -1593,8 +1605,8 @@ class WorkbenchAgentCommandsTest {
                     return 0;
                 }
         );
-        String escapedVars = escaped.getFirst().stream().filter(item -> item.startsWith("-Dpkb_runvars=")).findFirst().orElse("");
-        String escapedTags = String.valueOf(PKB_props.parseAssignments(escapedVars.substring("-Dpkb_runvars=".length())).get(PKB_props.PKB_TAGS));
+        String escapedTags = escaped.getFirst().stream().filter(item -> item.startsWith("-Dpkb_tags=")).findFirst().orElse("");
+        escapedTags = escapedTags.substring("-Dpkb_tags=".length());
         assertEquals("@smoke\\ xor\\ @wip", escapedTags);
         io.cucumber.tagexpressions.TagExpressionParser.parse(escapedTags);
     }

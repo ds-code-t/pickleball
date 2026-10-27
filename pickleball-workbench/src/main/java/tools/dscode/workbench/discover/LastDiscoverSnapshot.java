@@ -3,6 +3,7 @@ package tools.dscode.workbench.discover;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import tools.dscode.control.protocol.PickleballLocalLayout;
+import tools.dscode.control.protocol.Workspace;
 
 import java.io.IOException;
 import java.io.PrintStream;
@@ -12,6 +13,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.TreeMap;
 
 /**
@@ -96,20 +98,57 @@ public final class LastDiscoverSnapshot {
             PrintStream err
     ) {
         Snapshot snapshot = require(projectRoot);
-        String replayed = replay(snapshot, true, tags, name, example, cliRunVars, err);
-        if (snapshot.sealed()) {
-            return Map.of("pkb_overriderunvars", replayed);
+        if (snapshot.runId() == null || snapshot.runId().isBlank()) {
+            throw new IllegalStateException(
+                    "Discover snapshot has no run id, so there is no workspace to launch.");
         }
-        return Map.of("pkb_runvars", replayed);
+        Path workspace = Workspace.directory(projectRoot, snapshot.runId());
+        Map<String, String> selection = new LinkedHashMap<>();
+        putSelection(selection, "pkb_tags", tags);
+        putSelection(selection, "pkb_name", name);
+        putSelection(selection, "pkb_example", example);
+        applyLaunchEdits(workspace, selection, cliRunVars, err);
+        return Workspace.launchProperties(workspace, selection);
     }
 
     public static Map<String, String> workerSystemPropertiesIfPresent(Path projectRoot) {
         Snapshot snapshot = read(projectRoot);
-        if (snapshot == null || !snapshot.present()) return Map.of();
-        if (snapshot.sealed()) {
-            return Map.of("pkb_overriderunvars", replay(snapshot, true, null, null));
+        if (snapshot == null || !snapshot.present() || snapshot.runId() == null || snapshot.runId().isBlank()) {
+            return Map.of();
         }
-        return Map.of("pkb_runvars", replay(snapshot, true, null, null));
+        return Workspace.launchProperties(Workspace.directory(projectRoot, snapshot.runId()), Map.of());
+    }
+
+    private static void putSelection(Map<String, String> selection, String key, String value) {
+        if (value != null && !value.isBlank()) selection.put(key, value.trim());
+    }
+
+    /**
+     * Non-selection {@code --runvar} values are written into the workspace.
+     * Selection keys stay on the launch command and do not rewrite the file.
+     */
+    private static void applyLaunchEdits(
+            Path workspace,
+            Map<String, String> selection,
+            List<String> cliRunVars,
+            PrintStream err
+    ) {
+        if (cliRunVars == null || cliRunVars.isEmpty()) return;
+        boolean present = Workspace.exists(workspace);
+        Map<String, String> values = present
+                ? new LinkedHashMap<>(Workspace.readRunVars(workspace))
+                : new LinkedHashMap<>();
+        Map<String, String> original = Map.copyOf(values);
+        applyCliRunVars(values, cliRunVars, err);
+        for (String key : Workspace.SELECTION_KEYS) {
+            if (!Objects.equals(original.get(key), values.get(key))) {
+                String updated = values.get(key);
+                if (updated != null && !updated.isBlank()) selection.put(key, updated);
+                if (original.containsKey(key)) values.put(key, original.get(key));
+                else values.remove(key);
+            }
+        }
+        if (present) Workspace.writeRunVars(workspace, values);
     }
 
     public static String replay(Snapshot snapshot, boolean isolate, String tags, String name) {

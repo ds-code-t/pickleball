@@ -370,11 +370,7 @@ public final class WorkbenchApplication {
     }
 
     private static void printReplayedRunVars(PrintStream out, Map<String, String> workerProperties) {
-        if (workerProperties != null && workerProperties.containsKey("pkb_overriderunvars")) {
-            out.println("Replayed pkb_overriderunvars=" + workerProperties.get("pkb_overriderunvars"));
-            return;
-        }
-        out.println("Replayed pkb_runvars=" + (workerProperties == null ? null : workerProperties.get("pkb_runvars")));
+        out.println("workspace=" + (workerProperties == null ? null : workerProperties.get("pkb_workspace")));
     }
 
     static boolean stdinIsInteractiveTty() {

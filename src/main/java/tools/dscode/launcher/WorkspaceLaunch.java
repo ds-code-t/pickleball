@@ -1,0 +1,216 @@
+package tools.dscode.launcher;
+
+import tools.dscode.common.reporting.diagnostic.ReportRetentionPolicy;
+import tools.dscode.control.protocol.ControlProtocol;
+import tools.dscode.control.protocol.PickleballLocalLayout;
+import tools.dscode.control.protocol.Workspace;
+import tools.dscode.testengine.DynamicSuiteBootstrap;
+import tools.dscode.testengine.PKB_props;
+import tools.dscode.testengine.PickleballRunner;
+import tools.dscode.testengine.WorkspaceSeed;
+
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.function.Consumer;
+
+/**
+ * One launch preparation for every Workbench mode.
+ * Seed once, edit the workspace for non-selection overrides, then pass
+ * {@code -Dpkb_workspace} and selection keys only.
+ */
+public final class WorkspaceLaunch {
+    /**
+     * Framework tests set this because the suite has more than one runner.
+     * Production leaves it null and captures the consumer runner.
+     */
+    public static volatile Consumer<Path> testCapture;
+
+    private WorkspaceLaunch() {
+    }
+
+    public record Prepared(Path workspace, Map<String, String> selection) {
+    }
+
+    public static Prepared prepare(
+            Path project,
+            String runId,
+            String fromRunId,
+            String tags,
+            String name,
+            String example,
+            String retention,
+            List<String> cliRunVars,
+            Appendable warnings
+    ) {
+        return prepare(project, runId, fromRunId, tags, name, example, null, null, retention, cliRunVars, warnings);
+    }
+
+    public static Prepared prepare(
+            Path project,
+            String runId,
+            String fromRunId,
+            String tags,
+            String name,
+            String example,
+            String runIdProperty,
+            String agentId,
+            String retention,
+            List<String> cliRunVars,
+            Appendable warnings
+    ) {
+        Path own = Workspace.directory(project, runId);
+        boolean copy = fromRunId != null && !fromRunId.isBlank() && !Workspace.exists(own);
+        Path workspace = WorkspaceSeed.seed(
+                project,
+                runId,
+                false,
+                copy ? fromRunId : null,
+                null,
+                path -> capture(project, path, false)
+        );
+        Map<String, String> values = new LinkedHashMap<>(Workspace.readRunVars(workspace));
+        Map<String, String> selection = new LinkedHashMap<>();
+        put(selection, PKB_props.PKB_TAGS, tags);
+        put(selection, PKB_props.PKB_NAME, name);
+        put(selection, PKB_props.PKB_EXAMPLE, example);
+        put(selection, PKB_props.PKB_RUN_ID, runIdProperty == null ? runId : runIdProperty);
+        put(selection, PKB_props.PKB_AGENT_ID, agentId);
+        if (retention != null && !retention.isBlank()) {
+            String parsed = ReportRetentionPolicy.parseExact(retention).name().toLowerCase(Locale.ROOT);
+            warnReplace(warnings, PKB_props.PKB_REPORT_RETENTION, values.get(PKB_props.PKB_REPORT_RETENTION), parsed);
+            values.put(PKB_props.PKB_REPORT_RETENTION, parsed);
+        }
+        applyCli(values, selection, cliRunVars, warnings);
+        if (!values.equals(Workspace.readRunVars(workspace))) {
+            Workspace.writeRunVars(workspace, values);
+        }
+        stamp(workspace);
+        return new Prepared(workspace, Map.copyOf(selection));
+    }
+
+    /**
+     * Prefer {@code java -cp} of the synced consumer classpath. Tests inject
+     * {@link #testCapture}. In-process capture is only the fallback when sync
+     * has not written a classpath yet and this JVM can see the consumer runner.
+     */
+    static void capture(Path project, Path workspace, boolean reseed) {
+        Consumer<Path> hook = testCapture;
+        if (hook != null) {
+            hook.accept(workspace);
+            if (!Workspace.exists(workspace)) {
+                throw new IllegalStateException("Workspace seed did not write " + workspace);
+            }
+            return;
+        }
+        List<String> classpath = cachedClasspath(project);
+        if (!classpath.isEmpty()) {
+            forkSeed(project, workspace, reseed, classpath);
+            return;
+        }
+        PickleballRunner runner = DynamicSuiteBootstrap.initializeFromRuntimeClasspath();
+        WorkspaceSeed.writeCaptured(workspace, runner, reseed);
+    }
+
+    static List<String> cachedClasspath(Path project) {
+        if (project == null) return List.of();
+        Path file = PickleballLocalLayout.workbenchStateRoot(project).resolve("classpath.txt");
+        if (!Files.isRegularFile(file)) return List.of();
+        try {
+            return Files.readAllLines(file, StandardCharsets.UTF_8).stream()
+                    .map(String::trim)
+                    .filter(value -> !value.isBlank())
+                    .toList();
+        } catch (IOException failure) {
+            throw new IllegalStateException("Could not read Workbench classpath: " + file, failure);
+        }
+    }
+
+    private static void forkSeed(Path project, Path workspace, boolean reseed, List<String> classpath) {
+        List<String> command = new ArrayList<>();
+        command.add(Path.of(System.getProperty("java.home"), "bin", "java").toString());
+        command.add("-cp");
+        command.add(String.join(java.io.File.pathSeparator, classpath));
+        command.add(ControlProtocol.SEED_MAIN_CLASS);
+        command.add("--project=" + project.toAbsolutePath().normalize());
+        command.add("--workspace=" + workspace.toAbsolutePath().normalize());
+        if (reseed) command.add("--reseed");
+        ProcessBuilder builder = new ProcessBuilder(command).directory(project.toFile());
+        builder.redirectErrorStream(true);
+        try {
+            Process process = builder.start();
+            String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+            int exit = process.waitFor();
+            if (exit != 0 || !Workspace.exists(workspace)) {
+                throw new IllegalStateException(
+                        "Workspace seed failed for " + workspace + " exit=" + exit
+                                + (output.isBlank() ? "" : System.lineSeparator() + output)
+                );
+            }
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Workspace seed was interrupted for " + workspace, interrupted);
+        } catch (IOException failure) {
+            throw new IllegalStateException("Could not seed workspace " + workspace, failure);
+        }
+    }
+
+    private static void applyCli(
+            Map<String, String> values,
+            Map<String, String> selection,
+            List<String> raw,
+            Appendable warnings
+    ) {
+        if (raw == null) return;
+        for (String item : raw) {
+            if (item == null || item.isBlank()) continue;
+            int equals = item.indexOf('=');
+            if (equals <= 0) {
+                warn(warnings, "WARNING: --runvar ignored, expected key=value: " + item);
+                continue;
+            }
+            String key = item.substring(0, equals).trim().toLowerCase(Locale.ROOT);
+            String value = item.substring(equals + 1).trim();
+            if (!key.startsWith("pkb_")) key = "pkb_" + key;
+            if (Workspace.SELECTION_KEYS.contains(key)) {
+                warnReplace(warnings, key, selection.get(key) != null ? selection.get(key) : values.get(key), value);
+                selection.put(key, value);
+                continue;
+            }
+            warnReplace(warnings, key, values.get(key), value);
+            values.put(key, value);
+        }
+    }
+
+    private static void warnReplace(Appendable warnings, String key, String existing, String value) {
+        if (existing != null && !existing.equals(value)) {
+            warn(warnings, "WARNING: --runvar " + key + " replaces " + existing + " with " + value);
+        }
+    }
+
+    private static void warn(Appendable warnings, String message) {
+        if (warnings == null) return;
+        try {
+            warnings.append(message).append(System.lineSeparator());
+        } catch (java.io.IOException failure) {
+            throw new IllegalStateException(failure);
+        }
+    }
+
+    private static void put(Map<String, String> selection, String key, String value) {
+        if (value != null && !value.isBlank()) selection.put(key, value.trim());
+    }
+
+    private static void stamp(Path workspace) {
+        Path record = workspace.getParent() == null ? null : workspace.getParent().resolve("record.json");
+        if (record != null && Files.isRegularFile(record)) {
+            Workspace.writeFingerprint(record, Workspace.fingerprint(workspace));
+        }
+    }
+}

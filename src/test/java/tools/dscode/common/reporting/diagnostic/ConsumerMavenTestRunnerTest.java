@@ -34,7 +34,8 @@ class ConsumerMavenTestRunnerTest {
         boolean windows = System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win");
         Path script = project.resolve(windows ? "mvnw.cmd" : "mvnw");
         Files.writeString(script, windows ? "@echo off\r\n" : "#!/bin/sh\n");
-        List<String> command = ConsumerMavenTestRunner.command(project, "pkb_tags=@one");
+        Path workspace = project.resolve(".pickleball/runs/run-1/workspace");
+        List<String> command = ConsumerMavenTestRunner.command(project, workspace, Map.of(PKB_props.PKB_TAGS, "@one"));
         if (windows) {
             assertEquals(List.of("cmd.exe", "/d", "/c", script.toString()), command.subList(0, 4));
         } else {
@@ -46,7 +47,7 @@ class ConsumerMavenTestRunnerTest {
         Path jar = project.resolve(".mvn/wrapper/maven-wrapper.jar");
         Files.createDirectories(jar.getParent());
         Files.writeString(jar, "jar");
-        List<String> jarCommand = ConsumerMavenTestRunner.command(project, "pkb_tags=@one");
+        List<String> jarCommand = ConsumerMavenTestRunner.command(project, workspace, Map.of(PKB_props.PKB_TAGS, "@one"));
         assertEquals("-jar", jarCommand.get(1));
         assertEquals(jar.toString(), jarCommand.get(2));
 
@@ -67,15 +68,19 @@ class ConsumerMavenTestRunnerTest {
         Files.createDirectories(jar.getParent());
         Files.writeString(jar, "jar");
 
-        List<String> command = ConsumerMavenTestRunner.command(project, "pkb_tags=@one");
+        Path workspace = project.resolve(".pickleball/runs/run-1/workspace");
+        List<String> command = ConsumerMavenTestRunner.command(project, workspace, Map.of(PKB_props.PKB_TAGS, "@one"));
         assertEquals("-jar", command.get(1));
         assertEquals(jar.toString(), command.get(2));
         assertTrue(command.contains("test"));
-        assertTrue(command.stream().anyMatch(item -> item.startsWith("-Dpkb_runvars=")));
+        assertTrue(command.stream().anyMatch(item -> item.startsWith("-Dpkb_workspace=")));
+        assertTrue(command.contains("-Dpkb_tags=@one"));
+        assertFalse(command.stream().anyMatch(item -> item.startsWith("-Dpkb_runvars=")));
 
         Path script = project.resolve(windows ? "gradlew.bat" : "gradlew");
         Files.writeString(script, windows ? "@echo off\r\n" : "#!/bin/sh\n");
-        List<String> scriptCommand = ConsumerMavenTestRunner.confirmCommand(project, "pkb_tags=@one");
+        List<String> scriptCommand = ConsumerMavenTestRunner.confirmCommand(
+                project, workspace, Map.of(PKB_props.PKB_TAGS, "@one"));
         if (windows) {
             assertEquals(List.of("cmd.exe", "/d", "/c", script.toString()), scriptCommand.subList(0, 4));
         } else {
@@ -89,13 +94,14 @@ class ConsumerMavenTestRunnerTest {
     void mavenCommandIsQuietAndOfflineOnlyAfterAPreviousTestCompile() throws Exception {
         Files.writeString(project.resolve("pom.xml"), "<project/>");
         Files.writeString(project.resolve("mvnw"), "#!/bin/sh\n");
-        List<String> fresh = ConsumerMavenTestRunner.command(project, "pkb_tags=@one");
+        Path workspace = project.resolve(".pickleball/runs/run-1/workspace");
+        List<String> fresh = ConsumerMavenTestRunner.command(project, workspace, Map.of(PKB_props.PKB_TAGS, "@one"));
         assertTrue(fresh.contains("-q"));
         assertFalse(fresh.contains("-o"));
         assertTrue(fresh.contains("test"));
 
         Files.createDirectories(project.resolve("target/test-classes"));
-        List<String> again = ConsumerMavenTestRunner.command(project, "pkb_tags=@one");
+        List<String> again = ConsumerMavenTestRunner.command(project, workspace, Map.of(PKB_props.PKB_TAGS, "@one"));
         assertTrue(again.contains("-o"));
         assertTrue(again.contains("-q"));
         assertFalse(again.contains("--offline"));
@@ -109,7 +115,8 @@ class ConsumerMavenTestRunnerTest {
         Files.writeString(project.resolve("pom.xml"), "<project/>");
         Path script = project.resolve("mvnw");
         Files.writeString(script, "#!/bin/sh\n");
-        List<String> command = ConsumerMavenTestRunner.command(project, "pkb_tags=@smoke");
+        Path workspace = project.resolve(".pickleball/runs/run-1/workspace");
+        List<String> command = ConsumerMavenTestRunner.command(project, workspace, Map.of(PKB_props.PKB_TAGS, "@smoke"));
         assertTrue(command.contains(ConsumerMavenTestRunner.SUREFIRE_CUCUMBER_ENGINE));
         assertTrue(command.contains(ConsumerMavenTestRunner.PLATFORM_CUCUMBER_ENGINE));
 

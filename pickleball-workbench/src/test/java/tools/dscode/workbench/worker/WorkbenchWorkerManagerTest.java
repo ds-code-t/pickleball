@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import tools.dscode.control.protocol.ControlBridgeDescriptor;
 import tools.dscode.control.protocol.ControlProtocol;
+import tools.dscode.control.protocol.Workspace;
 import tools.dscode.workbench.sync.WorkbenchManifest;
 import tools.dscode.workbench.sync.WorkbenchSyncMode;
 
@@ -65,59 +66,43 @@ class WorkbenchWorkerManagerTest {
         Path dependency = tempDir.resolve("pickleball.jar").toAbsolutePath().normalize();
         Path anchor = project.resolve(".pickleball/workbench/sessions/test/anchor.feature");
 
+        Path workspace = Workspace.directory(project, "run-1");
         List<String> command = WorkbenchWorkerManager.workerCommand(
                 manifest(project, live, dependency),
                 List.of(live.toString(), dependency.toString()),
                 anchor,
-                Map.of("pkb_tags", "@smoke", "pkb_browser", "CHROME_HEADLESS")
+                Map.of("pkb_tags", "@smoke", "pkb_workspace", workspace.toString())
         );
 
         int outputRoot = command.indexOf(
                 "-D" + ControlProtocol.WORKBENCH_TEST_OUTPUT_ROOT_PROPERTY + "=" + live
         );
-        assertEquals("-Dpkb_browser=CHROME_HEADLESS", command.get(outputRoot + 1));
-        assertEquals("-Dpkb_tags=@smoke", command.get(outputRoot + 2));
+        assertEquals("-Dpkb_tags=@smoke", command.get(outputRoot + 1));
+        assertEquals("-Dpkb_workspace=" + workspace, command.get(outputRoot + 2));
         assertTrue(command.indexOf("-Dpkb_tags=@smoke") < command.indexOf("-cp"));
-    }
-
-    @Test
-    void isolateReplayUsesCompactPkbRunvarsNotRunProfileInput() {
-        Path project = tempDir.resolve("consumer").toAbsolutePath().normalize();
-        Path live = project.resolve(".pickleball/workbench/live/classes");
-        Path dependency = tempDir.resolve("pickleball.jar").toAbsolutePath().normalize();
-        Path anchor = project.resolve(".pickleball/workbench/sessions/test/anchor.feature");
-        String runVars = "pkb_browser=CHROME_HEADLESS, pkb_glue=com.example, pkb_parallel=1";
-
-        List<String> command = WorkbenchWorkerManager.workerCommand(
-                manifest(project, live, dependency),
-                List.of(live.toString(), dependency.toString()),
-                anchor,
-                Map.of("pkb_runvars", runVars)
-        );
-
-        assertTrue(command.contains("-Dpkb_runvars=" + runVars));
-        assertFalse(command.stream().anyMatch(item -> item.startsWith("-Dpkb_run_profile=")));
-        assertFalse(command.stream().anyMatch(item -> item.equals("-Dpkb_browser=chrome")));
-    }
-
-    @Test
-    void sealedSnapshotCommandUsesOverrideNotRunProfile() {
-        Path project = tempDir.resolve("consumer").toAbsolutePath().normalize();
-        Path live = project.resolve(".pickleball/workbench/live/classes");
-        Path dependency = tempDir.resolve("pickleball.jar").toAbsolutePath().normalize();
-        Path anchor = project.resolve(".pickleball/workbench/sessions/test/anchor.feature");
-        String compact = "pkb_browser=firefox, pkb_glue=com.example, pkb_features=classpath:features";
-
-        List<String> command = WorkbenchWorkerManager.workerCommand(
-                manifest(project, live, dependency),
-                List.of(live.toString(), dependency.toString()),
-                anchor,
-                Map.of("pkb_overriderunvars", compact)
-        );
-
-        assertTrue(command.contains("-Dpkb_overriderunvars=" + compact));
-        assertFalse(command.stream().anyMatch(item -> item.startsWith("-Dpkb_run_profile=")));
         assertFalse(command.stream().anyMatch(item -> item.startsWith("-Dpkb_runvars=")));
+    }
+
+    @Test
+    void isolateLaunchUsesWorkspaceNotCompactRunVars() {
+        Path project = tempDir.resolve("consumer").toAbsolutePath().normalize();
+        Path live = project.resolve(".pickleball/workbench/live/classes");
+        Path dependency = tempDir.resolve("pickleball.jar").toAbsolutePath().normalize();
+        Path anchor = project.resolve(".pickleball/workbench/sessions/test/anchor.feature");
+        Path workspace = Workspace.directory(project, "run-1");
+
+        List<String> command = WorkbenchWorkerManager.workerCommand(
+                manifest(project, live, dependency),
+                List.of(live.toString(), dependency.toString()),
+                anchor,
+                Map.of("pkb_workspace", workspace.toString(), "pkb_tags", "@broken")
+        );
+
+        assertTrue(command.contains("-Dpkb_workspace=" + workspace));
+        assertTrue(command.contains("-Dpkb_tags=@broken"));
+        assertFalse(command.stream().anyMatch(item -> item.startsWith("-Dpkb_runvars=")));
+        assertFalse(command.stream().anyMatch(item -> item.startsWith("-Dpkb_run_profile=")));
+        assertFalse(command.stream().anyMatch(item -> item.startsWith("-Dpkb_overriderunvars=")));
     }
 
     @Test

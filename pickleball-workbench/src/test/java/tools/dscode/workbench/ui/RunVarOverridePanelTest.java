@@ -52,8 +52,8 @@ class RunVarOverridePanelTest {
         LastDiscoverSnapshot.Snapshot snapshot = LastDiscoverSnapshot.read(tempDir);
         assertTrue(snapshot.sealed());
         Map<String, String> properties = LastDiscoverSnapshot.workerSystemPropertiesIfPresent(tempDir);
-        assertTrue(properties.containsKey("pkb_overriderunvars"));
+        assertFalse(properties.containsKey("pkb_overriderunvars"));
         assertFalse(properties.containsKey("pkb_runvars"));
-        assertTrue(properties.get("pkb_overriderunvars").contains("pkb_browser=firefox"));
+        assertTrue(properties.isEmpty());
     }
 }

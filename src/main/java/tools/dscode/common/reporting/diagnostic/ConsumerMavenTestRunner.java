@@ -1,6 +1,7 @@
 package tools.dscode.common.reporting.diagnostic;
 
 import tools.dscode.common.runtime.ProcessTrees;
+import tools.dscode.control.protocol.Workspace;
 import tools.dscode.testengine.DynamicSuiteEngine;
 
 import java.io.IOException;
@@ -11,6 +12,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 /** Invokes the consumer Maven or Gradle wrapper. A machine-wide install is not used. */
 public final class ConsumerMavenTestRunner {
@@ -25,20 +27,30 @@ public final class ConsumerMavenTestRunner {
     public static final String SUREFIRE_CUCUMBER_ENGINE = "-Dsurefire.includeJUnit5Engines=pickleball-test-engine";
     public static final String PLATFORM_CUCUMBER_ENGINE = "-Djunit.platform.discovery.includeEngines=pickleball-test-engine";
 
-    public static List<String> command(Path projectRoot, String compactRunVars) {
-        return command(projectRoot, compactRunVars, null);
+    public static List<String> command(Path projectRoot, Path workspace, Map<String, String> selection) {
+        return command(projectRoot, workspace, selection, null);
     }
 
-    public static List<String> command(Path projectRoot, String compactRunVars, String featurePaths) {
-        return build(projectRoot, compactRunVars, featurePaths, "workbench-discover");
+    public static List<String> command(
+            Path projectRoot,
+            Path workspace,
+            Map<String, String> selection,
+            String featurePaths
+    ) {
+        return build(projectRoot, workspace, selection, featurePaths, "workbench-discover");
     }
 
-    public static List<String> confirmCommand(Path projectRoot, String compactRunVars) {
-        return confirmCommand(projectRoot, compactRunVars, null);
+    public static List<String> confirmCommand(Path projectRoot, Path workspace, Map<String, String> selection) {
+        return confirmCommand(projectRoot, workspace, selection, null);
     }
 
-    public static List<String> confirmCommand(Path projectRoot, String compactRunVars, String featurePaths) {
-        return build(projectRoot, compactRunVars, featurePaths, "workbench-confirm");
+    public static List<String> confirmCommand(
+            Path projectRoot,
+            Path workspace,
+            Map<String, String> selection,
+            String featurePaths
+    ) {
+        return build(projectRoot, workspace, selection, featurePaths, "workbench-confirm");
     }
 
     /**
@@ -64,7 +76,8 @@ public final class ConsumerMavenTestRunner {
 
     private static List<String> build(
             Path projectRoot,
-            String compactRunVars,
+            Path workspace,
+            Map<String, String> selection,
             String featurePaths,
             String purpose
     ) {
@@ -77,7 +90,7 @@ public final class ConsumerMavenTestRunner {
             command.add("--offline");
         }
         command.add("test");
-        command.add("-Dpkb_runvars=" + embedFeaturePaths(compactRunVars, featurePaths));
+        command.addAll(Workspace.launchArguments(workspace, selection));
         String topLevel = topLevelFeaturesArgument(featurePaths);
         if (topLevel != null) {
             command.add(topLevel);

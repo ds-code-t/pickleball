@@ -3,6 +3,8 @@ package tools.dscode.workbench.discover;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import tools.dscode.control.protocol.Workspace;
+
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
@@ -31,7 +33,7 @@ class LastDiscoverSnapshotTest {
     }
 
     @Test
-    void isolateReplayUsesRetainedRunVarsAndForcesParallelOne() throws Exception {
+    void isolateLaunchPassesWorkspaceAndSelectionWithoutForcingParallel() throws Exception {
         Path file = LastDiscoverSnapshot.file(tempDir);
         Files.createDirectories(file.getParent());
         Files.writeString(file, """
@@ -49,21 +51,25 @@ class LastDiscoverSnapshotTest {
                   }
                 }
                 """);
+        Path workspace = Workspace.directory(tempDir, "run-1");
+        Workspace.writeRunVars(workspace, Map.of(
+                "pkb_browser", "CHROME_HEADLESS",
+                "pkb_glue", "com.example",
+                "pkb_parallel", "12"
+        ));
 
         Map<String, String> properties = LastDiscoverSnapshot.workerSystemProperties(
                 tempDir, "@broken", "Failing scenario"
         );
 
-        assertEquals(1, properties.size());
-        String runVars = properties.get("pkb_runvars");
-        assertTrue(runVars.contains("pkb_browser=CHROME_HEADLESS"));
-        assertTrue(runVars.contains("pkb_glue=com.example"));
-        assertTrue(runVars.contains("pkb_parallel=1"));
-        assertTrue(runVars.contains("pkb_tags=@broken"));
-        assertFalse(runVars.contains("pkb_parallel=12"));
-        assertFalse(runVars.contains("pkb_run_profile="));
-        assertFalse(runVars.contains("pretty"));
-        assertFalse(runVars.contains("@all"));
+        assertEquals(workspace.toAbsolutePath().normalize().toString(), properties.get("pkb_workspace"));
+        assertEquals("@broken", properties.get("pkb_tags"));
+        assertEquals("Failing scenario", properties.get("pkb_name"));
+        assertFalse(properties.containsKey("pkb_parallel"));
+        assertFalse(properties.containsKey("pkb_runvars"));
+        assertFalse(properties.containsKey("pkb_browser"));
+        assertEquals("12", Workspace.readRunVars(workspace).get("pkb_parallel"));
+        assertEquals("CHROME_HEADLESS", Workspace.readRunVars(workspace).get("pkb_browser"));
     }
 
     @Test
@@ -80,6 +86,11 @@ class LastDiscoverSnapshotTest {
                   }
                 }
                 """);
+        Path workspace = Workspace.directory(tempDir, "run-1");
+        Workspace.writeRunVars(workspace, Map.of(
+                "pkb_browser", "CHROME_HEADLESS",
+                "pkb_parallel", "12"
+        ));
         ByteArrayOutputStream err = new ByteArrayOutputStream();
         Map<String, String> properties = LastDiscoverSnapshot.workerSystemProperties(
                 tempDir,
@@ -89,10 +100,13 @@ class LastDiscoverSnapshotTest {
                 List.of("pkb_environment=DEV", "browser=EDGE"),
                 new PrintStream(err, true, StandardCharsets.UTF_8)
         );
-        String runVars = properties.get("pkb_runvars");
-        assertTrue(runVars.contains("pkb_environment=DEV"), runVars);
-        assertTrue(runVars.contains("pkb_browser=EDGE"), runVars);
-        assertTrue(runVars.contains("pkb_parallel=1"), runVars);
+        Map<String, String> stored = Workspace.readRunVars(workspace);
+        assertEquals("DEV", stored.get("pkb_environment"));
+        assertEquals("EDGE", stored.get("pkb_browser"));
+        assertEquals("12", stored.get("pkb_parallel"));
+        assertFalse(properties.containsKey("pkb_parallel"));
+        assertFalse(properties.containsKey("pkb_runvars"));
+        assertFalse(properties.containsKey("pkb_browser"));
         String warnings = err.toString(StandardCharsets.UTF_8);
         assertTrue(warnings.contains("WARNING: --runvar pkb_browser replaces CHROME_HEADLESS with EDGE"), warnings);
     }
@@ -128,10 +142,10 @@ class LastDiscoverSnapshotTest {
         Map<String, String> properties = LastDiscoverSnapshot.workerSystemProperties(
                 tempDir, "@broken", "Failing scenario", "1 2 5 3.4 7-11"
         );
-        String runVars = properties.get("pkb_runvars");
-        assertTrue(runVars.contains("pkb_example=1 2 5 3.4 7-11"));
-        assertTrue(runVars.contains("pkb_parallel=1"));
-        assertFalse(runVars.contains("pkb_parallel=12"));
+        assertEquals("1 2 5 3.4 7-11", properties.get("pkb_example"));
+        assertFalse(properties.containsKey("pkb_parallel"));
+        assertTrue(properties.containsKey("pkb_workspace"));
+        assertFalse(properties.containsKey("pkb_runvars"));
 
         Files.writeString(file, """
                 {
@@ -149,10 +163,11 @@ class LastDiscoverSnapshotTest {
         Map<String, String> sealed = LastDiscoverSnapshot.workerSystemProperties(
                 tempDir, "@broken", null, "1.1"
         );
-        assertTrue(sealed.containsKey("pkb_overriderunvars"));
+        assertTrue(sealed.containsKey("pkb_workspace"));
+        assertFalse(sealed.containsKey("pkb_overriderunvars"));
         assertFalse(sealed.containsKey("pkb_runvars"));
-        assertTrue(sealed.get("pkb_overriderunvars").contains("pkb_example=1.1"));
-        assertTrue(sealed.get("pkb_overriderunvars").contains("pkb_parallel=1"));
+        assertEquals("1.1", sealed.get("pkb_example"));
+        assertFalse(sealed.containsKey("pkb_parallel"));
     }
 
     @Test
@@ -178,14 +193,11 @@ class LastDiscoverSnapshotTest {
                 tempDir, "@broken", "Failing scenario"
         );
 
-        assertEquals(1, properties.size());
-        assertTrue(properties.containsKey("pkb_overriderunvars"));
+        assertTrue(properties.containsKey("pkb_workspace"));
+        assertEquals("@broken", properties.get("pkb_tags"));
+        assertFalse(properties.containsKey("pkb_overriderunvars"));
         assertFalse(properties.containsKey("pkb_runvars"));
-        String compact = properties.get("pkb_overriderunvars");
-        assertTrue(compact.contains("pkb_browser=CHROME_HEADLESS"));
-        assertTrue(compact.contains("pkb_parallel=1"));
-        assertTrue(compact.contains("pkb_tags=@broken"));
-        assertFalse(compact.contains("pkb_run_profile="));
+        assertFalse(properties.containsKey("pkb_parallel"));
     }
 
     @Test
@@ -206,7 +218,8 @@ class LastDiscoverSnapshotTest {
                 """);
 
         Map<String, String> properties = LastDiscoverSnapshot.workerSystemPropertiesIfPresent(tempDir);
-        assertTrue(properties.containsKey("pkb_runvars"));
+        assertTrue(properties.containsKey("pkb_workspace"));
+        assertFalse(properties.containsKey("pkb_runvars"));
         assertFalse(properties.containsKey("pkb_overriderunvars"));
     }
 
@@ -220,8 +233,8 @@ class LastDiscoverSnapshotTest {
         LastDiscoverSnapshot.Snapshot snapshot = LastDiscoverSnapshot.read(tempDir);
         assertTrue(snapshot.sealed());
         Map<String, String> properties = LastDiscoverSnapshot.workerSystemPropertiesIfPresent(tempDir);
-        assertTrue(properties.containsKey("pkb_overriderunvars"));
+        assertFalse(properties.containsKey("pkb_overriderunvars"));
         assertFalse(properties.containsKey("pkb_runvars"));
-        assertTrue(properties.get("pkb_overriderunvars").contains("pkb_browser=firefox"));
+        assertTrue(properties.isEmpty());
     }
 }

@@ -5,6 +5,7 @@ import tools.dscode.control.protocol.ControlBridgeCallResult;
 import tools.dscode.control.protocol.ControlBridgeDescriptor;
 import tools.dscode.control.protocol.ControlBridgeScenarioStatus;
 import tools.dscode.control.protocol.ControlProtocol;
+import tools.dscode.control.protocol.Workspace;
 import tools.dscode.workbench.bridge.ControlBridgeClient;
 import tools.dscode.workbench.sync.WorkbenchManifest;
 import tools.dscode.workbench.sync.WorkbenchSynchronizer;
@@ -81,6 +82,7 @@ public final class WorkbenchWorkerManager implements AutoCloseable {
         Map<String, String> properties = workerSystemProperties.isEmpty()
                 ? tools.dscode.workbench.discover.LastDiscoverSnapshot.workerSystemPropertiesIfPresent(projectRoot)
                 : workerSystemProperties;
+        ensureSeed(projectRoot, classpath, properties);
         ProcessBuilder builder = new ProcessBuilder(workerCommand(
                 manifest, classpath, anchor, properties
         ))
@@ -254,6 +256,38 @@ public final class WorkbenchWorkerManager implements AutoCloseable {
         command.add("@pickleball-workbench-anchor");
         command.add(anchorFeature.toAbsolutePath().normalize().toUri().toString());
         return List.copyOf(command);
+    }
+
+    /** Runs the resolve-only main when a launch names a workspace that is not on disk yet. */
+    static void ensureSeed(Path project, List<String> classpath, Map<String, String> properties) {
+        if (properties == null) return;
+        String configured = properties.get(Workspace.PROPERTY);
+        if (configured == null || configured.isBlank() || Workspace.exists(Path.of(configured))) return;
+        Path workspace = Path.of(configured).toAbsolutePath().normalize();
+        Path parent = workspace.getParent();
+        if (parent == null || parent.getFileName() == null) {
+            throw new IllegalStateException("Workspace path has no run id: " + workspace);
+        }
+        List<String> command = new ArrayList<>();
+        command.add(javaExecutable().toString());
+        command.add("-cp");
+        command.add(String.join(File.pathSeparator, classpath));
+        command.add(ControlProtocol.SEED_MAIN_CLASS);
+        command.add("--project=" + project.toAbsolutePath().normalize());
+        command.add("--run=" + parent.getFileName());
+        ProcessBuilder builder = new ProcessBuilder(command).directory(project.toFile());
+        try {
+            Process process = builder.start();
+            int exit = process.waitFor();
+            if (exit != 0 || !Workspace.exists(workspace)) {
+                throw new IllegalStateException("Workspace seed failed for " + workspace + " exit=" + exit);
+            }
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Workspace seed was interrupted for " + workspace, interrupted);
+        } catch (IOException failure) {
+            throw new IllegalStateException("Could not seed workspace " + workspace, failure);
+        }
     }
 
     private WorkerSession awaitBridge(
