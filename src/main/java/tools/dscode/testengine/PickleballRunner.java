@@ -577,6 +577,10 @@ public abstract class PickleballRunner {
 
         String parallel = get(PKB_PARALLEL);
         if (parallel != null && !parallel.isBlank()) {
+            if ("auto".equalsIgnoreCase(parallel.trim()) && WorkspaceSeed.captureKeepsParallelAuto()) {
+                values.put(PKB_PARALLEL, "auto");
+                return;
+            }
             String resolved = Integer.toString(ParallelCountEstimator.resolve(parallel));
             values.put(PKB_PARALLEL, resolved);
             values.putIfAbsent(PARALLEL_EXECUTION_ENABLED_PROPERTY_NAME, "true");

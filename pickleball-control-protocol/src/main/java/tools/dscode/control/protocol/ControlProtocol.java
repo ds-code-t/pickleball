@@ -8,6 +8,7 @@ public final class ControlProtocol {
     public static final int MINIMUM_COMPATIBLE_VERSION = 2;
 
     public static final String WORKER_MAIN_CLASS = "tools.dscode.testengine.WorkbenchWorkerMain";
+    public static final String SEED_MAIN_CLASS = "tools.dscode.testengine.WorkspaceSeedMain";
     public static final String WORKBENCH_TEST_OUTPUT_ROOT_PROPERTY =
             "pickleball.workbench.testOutputRoot";
     public static final String EMBEDDED_WORKBENCH_RESOURCE =

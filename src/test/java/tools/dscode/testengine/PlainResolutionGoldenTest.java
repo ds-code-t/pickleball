@@ -1,6 +1,7 @@
 package tools.dscode.testengine;
 
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Field;
@@ -8,6 +9,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
+import java.util.Properties;
 import java.util.TreeMap;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -18,9 +20,22 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
  */
 class PlainResolutionGoldenTest {
     private static final Path GOLDEN = Path.of("src/test/resources/workspace-golden/plain-resolution.txt");
+    private Properties saved;
+
+    @BeforeEach
+    void isolate() {
+        saved = new Properties();
+        saved.putAll(System.getProperties());
+        for (String key : System.getProperties().stringPropertyNames().toArray(String[]::new)) {
+            if (key.regionMatches(true, 0, "pkb_", 0, 4)) System.clearProperty(key);
+        }
+    }
 
     @AfterEach
     void clearRunner() throws Exception {
+        Properties live = System.getProperties();
+        live.clear();
+        live.putAll(saved);
         Field instance = PickleballRunner.class.getDeclaredField("INSTANCE");
         instance.setAccessible(true);
         instance.set(null, null);

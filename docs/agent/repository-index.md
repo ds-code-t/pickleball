@@ -428,6 +428,8 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/testengine/PkbPropertyValueNormalizer.java`
 - `src/main/java/tools/dscode/testengine/SensitiveConfiguration.java`
 - `src/main/java/tools/dscode/testengine/WorkbenchWorkerMain.java`
+- `src/main/java/tools/dscode/testengine/WorkspaceSeed.java`
+- `src/main/java/tools/dscode/testengine/WorkspaceSeedMain.java`
 - `src/main/java/tools/dscode/Values.java`
 - `src/main/resources/META-INF/pickleball/configs/CHROME_HEADLESS.yaml`
 - `src/main/resources/META-INF/services/org.junit.platform.engine.TestEngine`
@@ -498,6 +500,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/testengine/ExampleRowFilterTest.java`
 - `src/test/java/tools/dscode/testengine/PlainResolutionGoldenTest.java`
 - `src/test/java/tools/dscode/testengine/WorkspaceLaunchTest.java`
+- `src/test/java/tools/dscode/testengine/WorkspaceSeedTest.java`
 - `src/test/java/tools/dscode/untilpass/UntilPassBrowserSteps.java`
 - `src/test/resources/expected-failure/release-216-expected-failure.feature`
 - `src/test/resources/multiline-assert/multiline-assert.feature`

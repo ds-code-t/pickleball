@@ -749,6 +749,10 @@ final class PickleballProfiles {
         if (text == null || text.isBlank()) {
             return;
         }
+        if ("auto".equalsIgnoreCase(text.trim()) && WorkspaceSeed.captureKeepsParallelAuto()) {
+            resolved.put(PKB_PARALLEL, "auto");
+            return;
+        }
         resolved.put(PKB_PARALLEL, Integer.toString(ParallelCountEstimator.resolve(text)));
     }
 
