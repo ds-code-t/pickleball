@@ -2,8 +2,10 @@ package tools.dscode.workbench.ui;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import tools.dscode.control.protocol.Workspace;
 import tools.dscode.workbench.discover.LastDiscoverSnapshot;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
 
@@ -43,5 +45,30 @@ class RunVarOverridePanelTest {
     void panelDoesNotWriteASealedSnapshot(@TempDir Path tempDir) {
         new RunVarOverridePanel(tempDir);
         assertNull(LastDiscoverSnapshot.read(tempDir));
+    }
+
+    @Test
+    void saveWritesTheWorkspaceAndRefusesADiskChange(@TempDir Path tempDir) throws Exception {
+        Path file = LastDiscoverSnapshot.file(tempDir);
+        Files.createDirectories(file.getParent());
+        Files.writeString(file, """
+                {
+                  "runId": "run-1",
+                  "runVars": { "pkb_browser": "chrome" }
+                }
+                """);
+        Path workspace = Workspace.directory(tempDir, "run-1");
+        Workspace.writeRunVars(workspace, Map.of("pkb_browser", "chrome"));
+        RunVarOverridePanel panel = new RunVarOverridePanel(tempDir);
+        assertEquals("chrome", panel.currentValues().get("pkb_browser"));
+        panel.save();
+        assertTrue(panel.statusText().contains("Saved runvars.properties"));
+        assertEquals("chrome", Workspace.readRunVars(workspace).get("pkb_browser"));
+
+        Workspace.writeRunVars(workspace, Map.of("pkb_browser", "firefox"));
+        panel.save();
+        assertTrue(panel.statusText().contains("WARNING: workspace changed on disk"));
+        assertEquals("firefox", Workspace.readRunVars(workspace).get("pkb_browser"));
+        assertFalse(LastDiscoverSnapshot.read(tempDir).sealed());
     }
 }

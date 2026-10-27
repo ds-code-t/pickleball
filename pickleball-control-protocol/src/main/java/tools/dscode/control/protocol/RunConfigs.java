@@ -8,8 +8,9 @@ import java.util.List;
 import java.util.stream.Stream;
 
 /**
- * The config files of one run, under {@code .pickleball/runs/<run-id>/config}.
- * Agents and the Workbench Config tab both read and write this directory.
+ * Config files of one run workspace, under
+ * {@code .pickleball/runs/<run-id>/workspace/configs}.
+ * The Workbench Config tab and agent commands both read and write this directory.
  * Nothing here writes the consumer project's own configs.
  */
 public final class RunConfigs {
@@ -19,7 +20,7 @@ public final class RunConfigs {
     }
 
     public static Path directory(Path project, String runId) {
-        return RunView.runDirectory(project, runId).resolve(DIRECTORY);
+        return Workspace.configsDirectory(Workspace.directory(project, runId));
     }
 
     public static List<String> files(Path project, String runId) {
@@ -50,12 +51,7 @@ public final class RunConfigs {
     public static void write(Path project, String runId, String relative, String text) {
         Path root = directory(project, runId);
         Path file = resolve(root, relative);
-        try {
-            Files.createDirectories(file.getParent() == null ? root : file.getParent());
-            Files.writeString(file, text == null ? "" : text, StandardCharsets.UTF_8);
-        } catch (IOException failure) {
-            throw new IllegalStateException("Could not write " + file + ": " + failure.getMessage(), failure);
-        }
+        Workspace.atomicWriteString(file, text == null ? "" : text);
     }
 
     static Path resolve(Path root, String relative) {

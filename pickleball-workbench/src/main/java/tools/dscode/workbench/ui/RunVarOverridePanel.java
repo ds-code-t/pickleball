@@ -1,5 +1,6 @@
 package tools.dscode.workbench.ui;
 
+import tools.dscode.control.protocol.Workspace;
 import tools.dscode.workbench.discover.LastDiscoverSnapshot;
 
 import javax.swing.Box;
@@ -24,8 +25,9 @@ import java.util.Map;
 import java.util.TreeMap;
 
 /**
- * Collapsible editor for the next worker's run vars.
- * Apply used to seal a snapshot. Sealed snapshots are gone; phase 5 writes the workspace file.
+ * Collapsible editor for one run's workspace {@code runvars.properties}.
+ * Save writes that file atomically. A change on disk since load is a warning
+ * and is not overwritten. There is no sealed snapshot.
  */
 final class RunVarOverridePanel extends JPanel {
     static final List<String> BROWSER_CHOICES = List.of(
@@ -38,11 +40,13 @@ final class RunVarOverridePanel extends JPanel {
     static final List<String> PARALLEL_CHOICES = List.of("auto", "1", "2", "4", "8", "16");
 
     private final Path projectRoot;
-    private final JToggleButton toggle = new JToggleButton("Sealed RunVars");
+    private final JToggleButton toggle = new JToggleButton("Run vars");
     private final JPanel editor = new JPanel(new BorderLayout(6, 6));
     private final JPanel fields = new JPanel();
-    private final JLabel status = WorkbenchTheme.muted("Load LastDiscoverSnapshot, edit, Apply for next launch.");
+    private final JLabel status = WorkbenchTheme.muted("Edit the workspace run vars. Save writes runvars.properties.");
     private final List<FieldRow> rows = new ArrayList<>();
+    private String runId = "";
+    private Workspace.DiskStamp loadedStamp;
 
     RunVarOverridePanel(Path projectRoot) {
         this.projectRoot = projectRoot;
@@ -54,12 +58,15 @@ final class RunVarOverridePanel extends JPanel {
         toggle.setSelected(false);
         toggle.setFocusable(false);
         toggle.addActionListener(event -> editor.setVisible(toggle.isSelected()));
-        JButton load = WorkbenchTheme.flatButton("Load snapshot", "Load retained RunVars from LastDiscoverSnapshot");
+        JButton load = WorkbenchTheme.flatButton("Reload", "Reload run vars from the run workspace");
         load.addActionListener(event -> loadSnapshot());
+        JButton save = WorkbenchTheme.flatButton("Save", "Write runvars.properties in the run workspace");
+        save.addActionListener(event -> save());
         header.add(toggle, BorderLayout.WEST);
         JPanel actions = new JPanel();
         actions.setOpaque(false);
         actions.add(load);
+        actions.add(save);
         header.add(actions, BorderLayout.EAST);
         add(header, BorderLayout.NORTH);
 
@@ -79,16 +86,47 @@ final class RunVarOverridePanel extends JPanel {
 
     void loadSnapshot() {
         LastDiscoverSnapshot.Snapshot snapshot = LastDiscoverSnapshot.read(projectRoot);
+        runId = snapshot == null || snapshot.runId() == null ? "" : snapshot.runId().trim();
         Map<String, String> values = new TreeMap<>();
-        if (snapshot != null && snapshot.present()) {
+        Path workspace = runId.isEmpty() ? null : Workspace.directory(projectRoot, runId);
+        if (workspace != null && Workspace.exists(workspace)) {
+            values.putAll(Workspace.readRunVars(workspace));
+            loadedStamp = Workspace.stamp(workspace);
+            status.setText("Editing workspace run vars for " + runId + ". Save writes that file.");
+        } else if (snapshot != null && snapshot.present()) {
             if (snapshot.runVars() != null) values.putAll(snapshot.runVars());
-        }
-        rebuildFields(values);
-        if (snapshot != null && snapshot.present()) {
-            status.setText("Loaded LastDiscoverSnapshot. Edit the run workspace before the next launch.");
+            loadedStamp = null;
+            status.setText(runId.isEmpty()
+                    ? "Discover snapshot has no run id, so there is no workspace to edit."
+                    : "No workspace yet for " + runId + ". Seed before editing.");
         } else {
+            loadedStamp = null;
             status.setText("No snapshot yet. Discover first.");
         }
+        rebuildFields(values);
+    }
+
+    void save() {
+        if (runId.isEmpty()) {
+            status.setText("No run is open. Nothing was written.");
+            return;
+        }
+        Path workspace = Workspace.directory(projectRoot, runId);
+        if (!Workspace.exists(workspace)) {
+            status.setText("No workspace yet. Seed before editing. Nothing was written.");
+            return;
+        }
+        if (loadedStamp != null && Workspace.changedSince(workspace, loadedStamp)) {
+            status.setText("WARNING: workspace changed on disk. Reload before saving. Nothing was written.");
+            return;
+        }
+        Workspace.writeRunVars(workspace, currentValues());
+        loadedStamp = Workspace.stamp(workspace);
+        status.setText("Saved runvars.properties in the workspace for " + runId + ".");
+    }
+
+    String statusText() {
+        return status.getText();
     }
 
     Map<String, String> currentValues() {

@@ -134,7 +134,7 @@ final class WorkbenchFrame extends JFrame {
     private final JList<String> configFiles = new JList<>(configFileModel);
     private final JTextArea configEditor = new JTextArea();
     private final JLabel configStatus = new JLabel("No run is open.");
-    private final JButton configSave = WorkbenchTheme.flatButton("Save", "Write this file in the run's config copy");
+    private final JButton configSave = WorkbenchTheme.flatButton("Save", "Write this file in the run workspace");
     private String viewedRunId;
     private boolean viewedRunEditable;
     private boolean syncingConfig;
@@ -646,7 +646,7 @@ final class WorkbenchFrame extends JFrame {
         panel.setMinimumSize(new Dimension(0, 0));
 
         JLabel heading = WorkbenchTheme.heading("Run config");
-        heading.setToolTipText("Edits stay in this run's config copy. Project configs are not written.");
+        heading.setToolTipText("Edits stay in this run's workspace. Project configs are not written.");
         JPanel north = new JPanel(new BorderLayout(8, 0));
         north.setOpaque(false);
         north.add(heading, BorderLayout.WEST);

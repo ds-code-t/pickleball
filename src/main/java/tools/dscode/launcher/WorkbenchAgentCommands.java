@@ -7,9 +7,11 @@ import tools.dscode.common.reporting.diagnostic.AgentDiscoverPlanner;
 import tools.dscode.common.reporting.diagnostic.ConsumerMavenTestRunner;
 import tools.dscode.common.reporting.diagnostic.LastDiscoverSnapshot;
 import tools.dscode.control.protocol.PickleballLocalStore;
+import tools.dscode.control.protocol.RunConfigs;
 import tools.dscode.control.protocol.WorkbenchFeatureIndex;
 import tools.dscode.control.protocol.Workspace;
 import tools.dscode.testengine.PKB_props;
+import tools.dscode.testengine.WorkspaceSeed;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -62,6 +64,9 @@ public final class WorkbenchAgentCommands {
                 case "export-guidance" -> exportGuidance(parsed, out, err);
                 case "hint", "discover-hint" -> hint(parsed, out);
                 case "resolve-runvars" -> resolveRunVars(parsed, out);
+                case "workspace-show" -> workspaceShow(parsed, out, err);
+                case "workspace-edit" -> workspaceEdit(parsed, out, err);
+                case "workspace-seed" -> workspaceSeed(parsed, out, err);
                 case "discover" -> {
                     Integer rejected = rejectStepTimeout(parsed, err);
                     if (rejected != null) yield rejected;
@@ -125,6 +130,120 @@ public final class WorkbenchAgentCommands {
     private static int resolveRunVars(WorkbenchCommandLine.Parsed parsed, PrintStream out) {
         printDryRunResolve(parsed.project(), null, true, out);
         return 0;
+    }
+
+    private static int workspaceShow(WorkbenchCommandLine.Parsed parsed, PrintStream out, PrintStream err) {
+        String runId = parsed.coordination().runId();
+        if (runId == null || runId.isBlank()) {
+            err.println("workspace-show requires --run-id.");
+            return 2;
+        }
+        Path workspace = Workspace.directory(parsed.project(), runId);
+        out.println("workspace=" + workspace.toAbsolutePath().normalize());
+        if (!Workspace.exists(workspace)) {
+            out.println("present=false");
+            err.println("No workspace for " + runId + ". Run workspace-seed first.");
+            return 1;
+        }
+        out.println("present=true");
+        out.println("fingerprint=" + Workspace.fingerprint(workspace));
+        Workspace.readRunVars(workspace).forEach((key, value) -> out.println(key + "=" + value));
+        for (String file : RunConfigs.files(parsed.project(), runId)) {
+            out.println("config " + file);
+        }
+        return 0;
+    }
+
+    private static int workspaceEdit(WorkbenchCommandLine.Parsed parsed, PrintStream out, PrintStream err) {
+        String runId = parsed.coordination().runId();
+        if (runId == null || runId.isBlank()) {
+            err.println("workspace-edit requires --run-id.");
+            return 2;
+        }
+        Path workspace = Workspace.directory(parsed.project(), runId);
+        if (!Workspace.exists(workspace)) {
+            err.println("No workspace for " + runId + ". Run workspace-seed first.");
+            return 1;
+        }
+        String expect = flagValue(parsed.forwarded(), "--expect");
+        String fingerprint = Workspace.fingerprint(workspace);
+        if (expect != null && !expect.equals(fingerprint)) {
+            err.println("WARNING: workspace changed on disk. Nothing was written.");
+            err.println("fingerprint=" + fingerprint);
+            return 3;
+        }
+        String config = flagValue(parsed.forwarded(), "--config");
+        if (config == null && parsed.runVars().isEmpty()) {
+            err.println("workspace-edit requires --runvar and/or --config.");
+            return 2;
+        }
+        if (config != null) {
+            String text = parsed.coordination().text();
+            if (text == null) {
+                err.println("workspace-edit --config requires --text.");
+                return 2;
+            }
+            RunConfigs.write(parsed.project(), runId, config, text.endsWith("\n") ? text : text + "\n");
+        }
+        if (!parsed.runVars().isEmpty()) {
+            Map<String, String> selection = new LinkedHashMap<>();
+            Workspace.applyLaunchEdits(workspace, selection, parsed.runVars(), err);
+            if (!selection.isEmpty()) {
+                Map<String, String> values = new LinkedHashMap<>(Workspace.readRunVars(workspace));
+                values.putAll(selection);
+                Workspace.writeRunVars(workspace, values);
+            }
+        }
+        out.println("workspace=" + workspace.toAbsolutePath().normalize());
+        out.println("fingerprint=" + Workspace.fingerprint(workspace));
+        return 0;
+    }
+
+    private static int workspaceSeed(WorkbenchCommandLine.Parsed parsed, PrintStream out, PrintStream err) {
+        String runId = parsed.coordination().runId();
+        if (runId == null || runId.isBlank()) {
+            err.println("workspace-seed requires --run-id.");
+            return 2;
+        }
+        boolean reseed = hasFlag(parsed.forwarded(), "--reseed");
+        String fromRun = flagValue(parsed.forwarded(), "--from-run");
+        Path workspace = WorkspaceSeed.seed(
+                parsed.project(),
+                runId,
+                reseed,
+                fromRun,
+                null,
+                path -> WorkspaceLaunch.capture(parsed.project(), path, reseed)
+        );
+        out.println("workspace=" + workspace.toAbsolutePath().normalize());
+        out.println("fingerprint=" + Workspace.fingerprint(workspace));
+        out.println("present=true");
+        return 0;
+    }
+
+    private static boolean hasFlag(String[] args, String flag) {
+        if (args == null) return false;
+        for (String arg : args) {
+            if (flag.equals(arg)) return true;
+        }
+        return false;
+    }
+
+    private static String flagValue(String[] args, String name) {
+        if (args == null) return null;
+        String prefix = name + "=";
+        for (int index = 0; index < args.length; index++) {
+            String arg = args[index];
+            if (arg == null) continue;
+            if (arg.startsWith(prefix)) {
+                String value = arg.substring(prefix.length()).trim();
+                return value.isEmpty() ? null : value;
+            }
+            if (name.equals(arg) && index + 1 < args.length && args[index + 1] != null && !args[index + 1].isBlank()) {
+                return args[index + 1].trim();
+            }
+        }
+        return null;
     }
 
     private static void printDryRunResolve(

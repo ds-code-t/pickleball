@@ -412,5 +412,8 @@ class WorkbenchCommandLineTest {
         );
         assertEquals("resolve-runvars", parsed.command());
         assertTrue(WorkbenchCommandLine.isAgentCoreCommand("resolve-runvars"));
+        assertTrue(WorkbenchCommandLine.isAgentCoreCommand("workspace-show"));
+        assertTrue(WorkbenchCommandLine.isAgentCoreCommand("workspace-edit"));
+        assertTrue(WorkbenchCommandLine.isAgentCoreCommand("workspace-seed"));
     }
 }

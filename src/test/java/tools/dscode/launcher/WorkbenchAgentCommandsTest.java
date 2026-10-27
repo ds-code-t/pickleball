@@ -1611,6 +1611,70 @@ class WorkbenchAgentCommandsTest {
         io.cucumber.tagexpressions.TagExpressionParser.parse(escapedTags);
     }
 
+    @Test
+    void workspaceShowEditAndSeedUseTheSameFiles() throws Exception {
+        Output missing = run("workspace-show", tempDir.toString(), "--run-id=run-a");
+        assertEquals(1, missing.exitCode());
+        assertTrue(missing.stdout().contains("present=false"), missing.stdout());
+
+        Output seeded = run("workspace-seed", tempDir.toString(), "--run-id=run-a");
+        assertEquals(0, seeded.exitCode(), seeded.stderr());
+        assertTrue(seeded.stdout().contains("present=true"), seeded.stdout());
+        String fingerprint = seeded.stdout().lines()
+                .filter(line -> line.startsWith("fingerprint="))
+                .findFirst()
+                .orElseThrow()
+                .substring("fingerprint=".length());
+        Path workspace = Workspace.directory(tempDir, "run-a");
+        assertEquals("CHROME_HEADLESS", Workspace.readRunVars(workspace).get("pkb_browser"));
+        assertEquals("auto", Workspace.readRunVars(workspace).get("pkb_parallel"));
+
+        Output shown = run("workspace-show", tempDir.toString(), "--run-id=run-a");
+        assertEquals(0, shown.exitCode(), shown.stderr());
+        assertTrue(shown.stdout().contains("pkb_browser=CHROME_HEADLESS"), shown.stdout());
+        assertTrue(shown.stdout().contains("fingerprint=" + fingerprint), shown.stdout());
+
+        Output stale = run(
+                "workspace-edit", tempDir.toString(), "--run-id=run-a",
+                "--expect=not-the-fingerprint", "--runvar=pkb_browser=firefox"
+        );
+        assertEquals(3, stale.exitCode());
+        assertTrue(stale.stderr().contains("changed on disk"), stale.stderr());
+        assertEquals("CHROME_HEADLESS", Workspace.readRunVars(workspace).get("pkb_browser"));
+
+        Output edited = run(
+                "workspace-edit", tempDir.toString(), "--run-id=run-a",
+                "--expect=" + fingerprint,
+                "--runvar=pkb_browser=firefox",
+                "--runvar=pkb_parallel=4",
+                "--config=CHROME.yaml",
+                "--text=args: --disable-gpu"
+        );
+        assertEquals(0, edited.exitCode(), edited.stderr());
+        assertEquals("firefox", Workspace.readRunVars(workspace).get("pkb_browser"));
+        assertEquals("4", Workspace.readRunVars(workspace).get("pkb_parallel"));
+        assertTrue(Files.readString(workspace.resolve("configs").resolve("CHROME.yaml")).contains("--disable-gpu"));
+        String projectConfigs = tempDir.resolve("src/test/resources/configs/CHROME.yaml").toString();
+        assertFalse(Files.isRegularFile(Path.of(projectConfigs)));
+
+        Output copied = run("workspace-seed", tempDir.toString(), "--run-id=run-b", "--from-run=run-a");
+        assertEquals(0, copied.exitCode(), copied.stderr());
+        assertEquals("firefox", Workspace.readRunVars(Workspace.directory(tempDir, "run-b")).get("pkb_browser"));
+        assertEquals("firefox", Workspace.readRunVars(workspace).get("pkb_browser"));
+
+        WorkspaceLaunch.testCapture = path -> {
+            Map<String, String> values = new LinkedHashMap<>();
+            for (String key : Workspace.CONTEXT_KEYS) values.put(key, key);
+            values.put("pkb_browser", "edge");
+            values.put("pkb_parallel", "auto");
+            Workspace.writeRunVars(path, values);
+        };
+        Output reseeded = run("workspace-seed", tempDir.toString(), "--run-id=run-a", "--reseed");
+        assertEquals(0, reseeded.exitCode(), reseeded.stderr());
+        assertEquals("edge", Workspace.readRunVars(workspace).get("pkb_browser"));
+        assertEquals("firefox", Workspace.readRunVars(Workspace.directory(tempDir, "run-b")).get("pkb_browser"));
+    }
+
     private Output run(String... args) {
         ByteArrayOutputStream stdout = new ByteArrayOutputStream();
         ByteArrayOutputStream stderr = new ByteArrayOutputStream();

@@ -61,4 +61,24 @@ class ConfigTabModelTest {
                 RunConfigs.write(project, "run-a", "../src/test/resources/configs/CHROME.yaml", "marker: escaped\n"));
         assertEquals(projectBefore, Files.readString(projectFile));
     }
+
+    @Test
+    void saveRefusesWhenTheWorkspaceChangedOnDisk() throws Exception {
+        Path dir = RunConfigs.directory(project, "run-a");
+        Files.createDirectories(dir);
+        Files.writeString(dir.resolve("CHROME.yaml"), "marker: project\n");
+        ConfigTabModel tab = new ConfigTabModel();
+        tab.show(project, "run-a", true);
+        Files.writeString(dir.resolve("CHROME.yaml"), "marker: other\n");
+        tab.setDraft("marker: from-tab\n");
+        IllegalStateException failure = assertThrows(IllegalStateException.class, tab::save);
+        assertTrue(failure.getMessage().contains("changed on disk"));
+        assertEquals("marker: other\n", Files.readString(dir.resolve("CHROME.yaml")));
+
+        tab.show(project, "run-a", true);
+        tab.setDraft("marker: from-tab\n");
+        tab.save();
+        assertTrue(Files.readString(dir.resolve("CHROME.yaml")).contains("from-tab"));
+        assertTrue(tab.status().contains("workspace"));
+    }
 }

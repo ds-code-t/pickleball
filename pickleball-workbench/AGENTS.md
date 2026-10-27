@@ -68,12 +68,12 @@ java -cp pickleball-workbench-<version>.jar:<resolved-libs> tools.dscode.workben
 The UI is player-style and execution-oriented. Its primary layout is:
 
 ```text
-left rail: scenario name/tag filters + results; optional feature-file filter; collapsible Sealed RunVars panel
+left rail: scenario name/tag filters + results; optional feature-file filter; collapsible workspace run-var panel
 center:    Live Gherkin text editor + compact Step Editor / Command
 right:     Mapping | Config | Terminal | Explorer | Report
 ```
 
-The Sealed RunVars panel is JDK/Workbench-only: it displays a map and writes LastDiscoverSnapshot `sealed=true` for the next worker `-Dpkb_overriderunvars=`. It must not import `PKB_props`, `PickleballProfiles`, or Pickleball core. Panel edits do not mutate an in-flight worker. Unused, it changes no behavior. The panel shows `pkb_compositereport` and `pkb_scenarioreport`. Agent and Workbench runs default both to false. A normal test still writes both HTML reports. An explicit true writes that report again.
+The workspace run-var panel is JDK/Workbench-only: it edits `.pickleball/runs/<run-id>/workspace/runvars.properties` with an atomic write and a changed-on-disk warning. It must not import `PKB_props`, `PickleballProfiles`, or Pickleball core. It does not write a sealed snapshot and does not mutate an in-flight worker. The panel shows `pkb_compositereport` and `pkb_scenarioreport`. Agent and Workbench runs default both to false. A normal test still writes both HTML reports. An explicit true writes that report again. The Config tab edits `workspace/configs` in that same directory.
 
 The Workbench GUI is only a lightweight head over state and controls that already exist under the hood. Agents have direct access to that state and those controls, and direct control of the GUI controls, so they can collaborate with a person or present data and reports in the window. The GUI must not own behavior the agents cannot reach. Do not click JavaFX or WebView from tests. Do not embed Maven or Gradle. Agents run the project wrapper.
 

@@ -1,13 +1,15 @@
 package tools.dscode.workbench.ui;
 
 import tools.dscode.control.protocol.RunConfigs;
+import tools.dscode.control.protocol.Workspace;
 
 import java.nio.file.Path;
 import java.util.List;
 
 /**
- * View of one run's config copy. Showing it only reads. Saving writes that
- * copy and does not write the consumer project's configs.
+ * View of one run's workspace configs. Showing it only reads. Saving writes
+ * that copy atomically and does not write the consumer project's configs.
+ * A change on disk since the view was loaded is a warning and is not overwritten.
  */
 public final class ConfigTabModel {
     private Path project;
@@ -16,6 +18,7 @@ public final class ConfigTabModel {
     private String selected = "";
     private String draft = "";
     private String status = "No run is open.";
+    private Workspace.DiskStamp loadedStamp;
 
     public void show(Path project, String runId, boolean editable) {
         this.project = project;
@@ -51,8 +54,14 @@ public final class ConfigTabModel {
             status = "This run is read-only. The project configs were not written.";
             throw new IllegalStateException(status);
         }
+        Path workspace = Workspace.directory(project, runId);
+        if (loadedStamp != null && Workspace.changedSince(workspace, loadedStamp)) {
+            status = "WARNING: workspace changed on disk. Reload before saving. Nothing was written.";
+            throw new IllegalStateException(status);
+        }
         RunConfigs.write(project, runId, selected, draft);
-        status = "Saved " + selected + " in this run's config copy.";
+        loadedStamp = Workspace.stamp(workspace);
+        status = "Saved " + selected + " in this run's workspace.";
     }
 
     public String selected() {
@@ -79,6 +88,7 @@ public final class ConfigTabModel {
         if (project == null || runId.isEmpty()) {
             draft = "";
             status = "No run is open.";
+            loadedStamp = null;
             return;
         }
         if (selected.isEmpty()) {
@@ -86,14 +96,24 @@ public final class ConfigTabModel {
             status = editable
                     ? "This run has no config files."
                     : "Read-only. This run has no config files.";
+            rememberStamp();
             return;
         }
         try {
             draft = RunConfigs.read(project, runId, selected);
-            status = (editable ? "Editing " : "Read-only ") + selected + " in this run's config copy.";
+            status = (editable ? "Editing " : "Read-only ") + selected + " in this run's workspace.";
         } catch (RuntimeException failure) {
             draft = "";
             status = failure.getMessage();
         }
+        rememberStamp();
+    }
+
+    private void rememberStamp() {
+        if (project == null || runId.isEmpty()) {
+            loadedStamp = null;
+            return;
+        }
+        loadedStamp = Workspace.stamp(Workspace.directory(project, runId));
     }
 }
