@@ -103,6 +103,26 @@ public class ParsingMap extends MappingProcessor {
     }
 
     /**
+     * Loads the workspace configs directory as a plain copy. No private-run
+     * redirect and no bundled browser injection.
+     */
+    public static synchronized void initializeWorkspaceConfigs(Path configsDirectory) {
+        if (configsDirectory == null || !Files.isDirectory(configsDirectory)) {
+            GLOBALS.root.set(CONFIGS_MAP_ROOT, MAPPER.createObjectNode());
+            return;
+        }
+        String path = "wd-file:" + configsDirectory.toAbsolutePath().normalize();
+        JsonNode configsNode = loadConfigs(path, Path.of("").toAbsolutePath());
+        if (configsNode instanceof ObjectNode objectNode) {
+            GLOBALS.root.set(CONFIGS_MAP_ROOT, objectNode);
+        } else if (configsNode == null || configsNode.isNull()) {
+            GLOBALS.root.set(CONFIGS_MAP_ROOT, MAPPER.createObjectNode());
+        } else {
+            GLOBALS.root.set(CONFIGS_MAP_ROOT, configsNode);
+        }
+    }
+
+    /**
      * A private run reads its own config copy. A normal test, with no current
      * run, keeps the project path.
      */

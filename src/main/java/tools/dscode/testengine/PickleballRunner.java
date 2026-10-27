@@ -7,10 +7,14 @@ import tools.dscode.common.mappings.ParsingMap;
 import tools.dscode.common.reporting.logging.Level;
 import tools.dscode.control.protocol.PickleballLocalLayout;
 import tools.dscode.control.protocol.PickleballLocalStore;
+import tools.dscode.control.protocol.Workspace;
 import tools.dscode.parallelutilities.ParallelCountEstimator;
 
 import java.io.InputStream;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -73,6 +77,10 @@ public abstract class PickleballRunner {
         debug("Constructing suite subclass: " + getClass().getName());
         EngineFilterBootstrap.ensureEngineFilterApplied("PickleballRunner.<init>");
         INSTANCE = this;
+        if (loadWorkspace()) {
+            io.cucumber.core.runner.Phase4Timing.mark("runner-ready");
+            return;
+        }
 
         globalTestDefaults();
         normalizeReportPortalValues();
@@ -155,6 +163,118 @@ public abstract class PickleballRunner {
             if (coordination.why() != null) values.put(PKB_props.PKB_RUN_WHY, coordination.why());
         }
         io.cucumber.core.runner.Phase4Timing.mark("runner-ready");
+    }
+
+    /**
+     * Workbench launch. The workspace is the only source of run vars and configs.
+     * Hooks, property files, {@code -D} merges, and profiles do not run.
+     * Selection keys already on the command line override the file for this process.
+     * Protected references are filled from project properties. {@code pkb_parallel=auto}
+     * stays {@code auto} in the file and is resolved here.
+     */
+    private boolean loadWorkspace() {
+        String configured = System.getProperty(Workspace.PROPERTY);
+        if (configured == null || configured.isBlank()) return false;
+        Path workspace = Path.of(configured.trim());
+        Map<String, String> loaded = Workspace.readRunVars(workspace);
+        Workspace.requireContext(loaded);
+        values.clear();
+        values.putAll(loaded);
+        for (String key : Workspace.SELECTION_KEYS) {
+            String override = System.getProperty(key);
+            if (override != null && !override.isBlank()) values.put(key, override.trim());
+        }
+        resolveProtectedReferences(readProjectProperties());
+        applyPkbAliases();
+        syncCanonicalAndAliasKeys();
+        alignCucumberNameFilterWithFind();
+        publishCucumberPlugins();
+        syncReportPortalAliases(true);
+        refreshRunProfile();
+        refreshPkbOptions();
+        publishToSystemProperties();
+        applyDebugFlags();
+        ParsingMap.initializeWorkspaceConfigs(Workspace.configsDirectory(workspace));
+        String configuredLogLevel = get(PKB_LOGLEVEL);
+        String effectiveLogLevel = configuredLogLevel == null || configuredLogLevel.isBlank()
+                ? "INFO"
+                : configuredLogLevel.trim();
+        LOG_LEVEL = Level.valueOf(effectiveLogLevel.toUpperCase(Locale.ROOT));
+        debug("Loaded workspace " + workspace);
+        return true;
+    }
+
+    private void resolveProtectedReferences(Map<String, String> projectProperties) {
+        List<String> keys = new ArrayList<>(values.keySet());
+        for (String key : keys) {
+            String protectedKey = SensitiveConfiguration.protectedKey(values.get(key));
+            if (protectedKey == null) continue;
+            String resolved = projectProperties.get(protectedKey);
+            if (resolved == null || resolved.isBlank()) {
+                throw new IllegalArgumentException(
+                        "Workspace protected reference '" + protectedKey
+                                + "' was not found in project properties. Protected references are read from "
+                                + "project properties at launch; they are not stored as values."
+                );
+            }
+            values.put(key, resolved);
+        }
+    }
+
+    private static Map<String, String> readProjectProperties() {
+        LinkedHashMap<String, String> project = new LinkedHashMap<>();
+        for (String resource : List.of(
+                "pickleball.properties",
+                "pickleball_local.properties",
+                "pickleball_local2.properties"
+        )) {
+            loadClasspathProperties(resource, project);
+        }
+        Path working = Path.of("").toAbsolutePath();
+        for (Path file : List.of(
+                working.resolve("pickleball.properties"),
+                working.resolve("pickleball_local.properties"),
+                working.resolve("pickleball_local2.properties"),
+                working.resolve("src/test/resources/pickleball.properties"),
+                working.resolve("src/test/resources/pickleball_local.properties"),
+                working.resolve("src/test/resources/pickleball_local2.properties")
+        )) {
+            loadFileProperties(file, project);
+        }
+        return project;
+    }
+
+    private static void loadClasspathProperties(String resourceName, Map<String, String> into) {
+        try {
+            ClassLoader loader = Thread.currentThread().getContextClassLoader();
+            if (loader == null) loader = PickleballRunner.class.getClassLoader();
+            Enumeration<URL> resources = loader.getResources(resourceName);
+            while (resources.hasMoreElements()) {
+                URL url = resources.nextElement();
+                Properties props = new Properties();
+                try (InputStream in = url.openStream()) {
+                    props.load(new java.io.InputStreamReader(in, StandardCharsets.UTF_8));
+                }
+                for (String key : props.stringPropertyNames()) {
+                    into.put(normalizeConfigurationKey(key), props.getProperty(key));
+                }
+            }
+        } catch (Exception failure) {
+            throw new IllegalStateException("Could not read project properties " + resourceName, failure);
+        }
+    }
+
+    private static void loadFileProperties(Path file, Map<String, String> into) {
+        if (file == null || !Files.isRegularFile(file)) return;
+        Properties props = new Properties();
+        try (InputStream in = Files.newInputStream(file)) {
+            props.load(new java.io.InputStreamReader(in, StandardCharsets.UTF_8));
+        } catch (Exception failure) {
+            throw new IllegalStateException("Could not read project properties " + file, failure);
+        }
+        for (String key : props.stringPropertyNames()) {
+            into.put(normalizeConfigurationKey(key), props.getProperty(key));
+        }
     }
 
     public static String getOptionsString() {

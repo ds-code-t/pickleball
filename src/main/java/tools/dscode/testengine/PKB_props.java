@@ -68,6 +68,7 @@ public final class PKB_props {
     public static final String PKB_DRIVER_DOWNLOAD_PROXY = PKB_PREFIX + "driver_download_proxy";
     public static final String PKB_DRIVER_DOWNLOAD_NATIVE = PKB_PREFIX + "driver_download_native";
     public static final String PKB_DRIVER_DOWNLOAD_CA = PKB_PREFIX + "driver_download_ca";
+    public static final String PKB_WORKSPACE = PKB_PREFIX + "workspace";
 
     private static final Set<String> RUN_METADATA_KEYS = Set.of(
             PKB_INVESTIGATION_ID,
@@ -120,6 +121,7 @@ public final class PKB_props {
                 && !normalized.equals(PKB_RUN_PROFILE)
                 && !normalized.startsWith(PKB_RUN_PROFILE_PREFIX)
                 && !normalized.equals(PKB_OPTIONS)
+                && !normalized.equals(PKB_WORKSPACE)
                 && !normalized.startsWith(PKB_PROFILE + "_");
     }
 
