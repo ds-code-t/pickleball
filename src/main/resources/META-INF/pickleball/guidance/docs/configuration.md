@@ -476,7 +476,7 @@ The resolved integer is stamped into the final RunVars and `pkb_run_profile`. Wo
 
 The bundled headless config uses `--headless=new`, a fixed `--window-size=1920,1080`, no `MAXIMIZE`, and `QUIT_LOCAL_DRIVER`. Consumer `CHROME`, `EDGE`, `GRID`, and `SAUCE` yaml files are unchanged. Agents can set `pkb_browser=CHROME_HEADLESS` without copying yaml into the project.
 
-`pkb_browser` is that configuration name, not a path to a browser binary. A normal `mvn test` uses the project value. When `pkb_runvars` already sets `pkb_browser`, that member wins over a bare `-Dpkb_browser`. Workbench discover prints the name the browser ladder selected. See the ladder below.
+`pkb_browser` is that configuration name, not a path to a browser binary. A normal `mvn test` uses the project value. Workbench keeps that project browser in the run workspace. `CHROME_HEADLESS` is used only when the project names none.
 
 ## Local driver download
 
@@ -505,15 +505,17 @@ The installed browser major wins: Windows file version or registry, and `--versi
 
 Files go in Selenium Manager's cache: the `SE_CACHE_PATH` system property, otherwise the `SE_CACHE_PATH` environment variable, otherwise `cache-path` in `~/.cache/selenium/se-config.toml`, otherwise `~/.cache/selenium`, under `chromedriver/<platform>/<version>/` or `msedgedriver/<platform>/<version>/`. The launch also sets `driverExecutable` to the unzipped binary. Each transfer is capped at 20 seconds. A blocked transfer, unzip error, quarantine flag, antivirus lock, or certificate failure is a log line. It does not fail the test.
 
-## Agent Discover browser ladder
+## Workbench browser
 
-Workbench Discover/Confirm do not blindly MUST-use `CHROME_HEADLESS` for every project:
+Workbench does not replace the project browser with `CHROME_HEADLESS`:
 
-1. If `default_profile` / runner / retained `pkb_run_profile` `pkb_browser` is already a remote farm name (`SAUCE_*`, `GRID_*`, `REMOTE_*`, or clearly non-local), keep it. Those consumers run exclusively on the external farm.
-2. Otherwise prefer `CHROME_HEADLESS` (consumer yaml if present, else the JAR-bundled config above).
-3. If local headless cannot start and the project already defines and uses GRID/SAUCE/REMOTE as its `pkb_browser`, fall back to that project browser. Do not pick Sauce/Grid merely because unused yaml files exist in `configs/`.
+1. If the project names a browser, including a remote farm name (`SAUCE_*`, `GRID_*`, `REMOTE_*`), keep it.
+2. If the project names none, use `CHROME_HEADLESS` (consumer yaml if present, else the JAR-bundled config above).
+3. Do not pick Sauce or Grid merely because unused yaml files exist in `configs/`.
 
-Isolate stays one scenario and does not raise `pkb_parallel`.
+Isolate selects one scenario. It does not force `pkb_parallel=1`.
+
+`pkb_overriderunvars` is deprecated for Workbench. It still works for a plain `mvn test` that does not set `pkb_workspace`.
 
 ## Workbench start timeout
 

@@ -153,7 +153,7 @@ Controller/protocol migration checks must remain focused: use `@control-bridge` 
 
 `pkb_example` runs after `pkb_tags` and `pkb_name`. It keeps Examples rows. It is not a tag. A normal Scenario counts as row 1. The same selector is `--example` on Workbench `discover`, `confirm`, and `isolate`.
 
-Human `PickleballTests` defaults remain `pretty` and `@all`. Agents launching a bounded confirmation should not reuse those defaults. Use Workbench `confirm`, or a separate `pkb_runvars` command that honors the browser ladder:
+Human `PickleballTests` defaults remain `pretty` and `@all`. Agents launching a bounded confirmation should not reuse those defaults. Use Workbench `confirm`. The project browser is kept. `CHROME_HEADLESS` is only the fallback when the project names none:
 
 ```bash
 ./mvnw -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java "-Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher" "-Dexec.classpathScope=test" "-Dexec.args=confirm --tags=@the-failing-tag --name='The failing scenario' --example='1 2 5 3.4 7-11'"

@@ -43,7 +43,11 @@ pkb_run_profile
 
 `pkb_run_profile` is internal derived output only. Supplying `pkb_run_profile` or `pkb_run_profile.<pkb_var>` from a JVM property, Pickleball property file, runner configuration, inline profile, or YAML profile is an error. Controlled execution uses `pkb_runvars` / `pkb_runvars.<pkb_var>`. Sealed execution uses `pkb_overriderunvars` / `pkb_overriderunvars.<pkb_var>`. Never mix compact and expanded forms of the same control. Never mix sealed input with `pkb_runvars` or a `pkb_profile` selection meant to compose the run.
 
-## Sealed RunVars with `pkb_overriderunvars`
+## Sealed RunVars with `pkb_overriderunvars` (deprecated)
+
+`pkb_overriderunvars` is deprecated. Workbench does not use it. Discover, confirm, isolate, and workers launch with `-Dpkb_workspace` and selection keys. Edit `.pickleball/runs/<run-id>/workspace/` (`workspace-show`, `workspace-edit`, `workspace-seed`, or the Config tab). Isolate does not force `pkb_parallel=1`.
+
+It still works for a plain `mvn test` or `gradlew test` that does not set `pkb_workspace`. Removing it would change those runs, so the behavior below remains for that path only.
 
 Sealed input is **opt-in**. Missing/null/blank compact `pkb_overriderunvars` and no expanded `pkb_overriderunvars.*` members leaves sealed OFF; current resolution is unchanged.
 
@@ -92,7 +96,7 @@ Agent flow:
 4. Launch with `pkb_overriderunvars`.
 5. Compare `runProfileFingerprint` after the sealed run.
 
-Default Discover/Confirm stay on `pkb_runvars`. When a Workbench snapshot is marked sealed, the next worker launch uses `-Dpkb_overriderunvars=<compact complete map>`, never `-Dpkb_run_profile=`. If no sealed snapshot, replay stays on today's `pkb_runvars`.
+Default Workbench launches use the workspace. `pkb_overriderunvars` is deprecated and is not how a worker starts. When a plain run that does not set `pkb_workspace` opts into sealed input, that launch uses `-Dpkb_overriderunvars=<compact complete map>`, never `-Dpkb_run_profile=`.
 
 ## Normal configuration
 
@@ -456,8 +460,8 @@ pkb_compositeReport=false
 pkb_scenarioReport=false
 ```
 
-plus the narrowest useful `pkb_tags` / `pkb_name` / `pkb_example`. Those three narrow which scenarios and Examples rows run. They are not a second player. `example` and `pkb_example` are the same Examples-row filter. A normal Scenario counts as row 1. `--example='1 2 5 3.4 7-11'` keeps those rows in each scenario that tags and name already selected. `pkb_example` is not a tag. Multi-scenario Discover/Confirm use that high parallelism. When nobody is watching, live isolate stays one paused scenario (`pkb_parallel=1`) on a headless session started with `isolate`. When a Workbench window is already open, the same session commands drive that window. Do not open the GUI for your own testing. Open it to show a person a specific run, or when they ask. Close it when you are done showing it. While testing for yourself, stay headless. Opening the window loads the run you already have. It does not start a second test.
+plus the narrowest useful `pkb_tags` / `pkb_name` / `pkb_example`. Those three narrow which scenarios and Examples rows run. They are not a second player. `example` and `pkb_example` are the same Examples-row filter. A normal Scenario counts as row 1. `--example='1 2 5 3.4 7-11'` keeps those rows in each scenario that tags and name already selected. `pkb_example` is not a tag. Multi-scenario Discover/Confirm use that high parallelism. When nobody is watching, live isolate stays one paused scenario by selection. It does not force `pkb_parallel=1`. When a Workbench window is already open, the same session commands drive that window. Do not open the GUI for your own testing. Open it to show a person a specific run, or when they ask. Close it when you are done showing it. While testing for yourself, stay headless. Opening the window loads the run you already have. It does not start a second test.
 
-After Discover, inspect `pkb_run_profile` from `run-catalog.json`, `run-index.json`, or `summary.json`. Confirm and live isolate replay that retained profile through `pkb_runvars` (LastDiscoverSnapshot) unless the snapshot is marked sealed, in which case the next worker launch uses `-Dpkb_overriderunvars=<compact complete map>`. If there is no prior Discover snapshot, Workbench says so; it does not silently re-resolve from project defaults. The Workbench sealed-RunVars panel, if unused, changes no behavior; Apply writes a sealed snapshot for the **next** launch and does not mutate an in-flight worker.
+After Discover, inspect `pkb_run_profile` from `run-catalog.json`, `run-index.json`, or `summary.json`. Confirm and live isolate launch that run's workspace (`-Dpkb_workspace` plus selection keys). They do not pass `-Dpkb_runvars` or `-Dpkb_overriderunvars`. If there is no prior Discover snapshot, Workbench says so; it does not silently re-resolve from project defaults. The run-var panel edits `workspace/runvars.properties`. Save does not mutate an in-flight worker. `pkb_overriderunvars` is deprecated for Workbench and still works only when `pkb_workspace` is unset.
 
 Never supply `pkb_run_profile` as input. Workbench MCP `workbench_diagnostic_catalog`, `workbench_diagnostic_run`, and `workbench_diagnostic_summary` return the same retained `runProfile` when present. The consumer worker resolves the same snapshot internally through `PickleballRunner`; it does not accept `pkb_run_profile` as input.

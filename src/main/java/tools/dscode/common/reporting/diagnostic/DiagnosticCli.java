@@ -93,14 +93,14 @@ public final class DiagnosticCli {
                 ? Path.of(args[1]).toAbsolutePath().normalize()
                 : Path.of("").toAbsolutePath().normalize();
         AgentDiscoverPlanner.Plan plan = AgentDiscoverPlanner.discover(project, null, null);
-        out.println("Recommended complete diagnostic Discover `pkb_runvars` (Workbench honors the project browser ladder; headed Chrome / pretty / @all project defaults do not sneak in):");
+        out.println("Recommended complete diagnostic Discover `pkb_runvars` (Workbench keeps the project browser; CHROME_HEADLESS is only the fallback when the project names none):");
         out.println("pkb_runvars=" + plan.runVars());
         out.println();
         printDryRunResolve(project, out, plan.runVars(), false);
         out.println("Browser: " + plan.browser().browser() + " (" + plan.browser().reason() + ").");
-        out.println("Multi-scenario Discover/Confirm use this high pkb_parallel. Live isolate starts a headless Workbench session; then use execute-step / status / events / stop.");
-        out.println("The agent-facing entry is Pickleball Workbench (`hint` / `discover` / `confirm` / `isolate`), not a separate DiagnosticCli story. After Discover, confirm (and isolate/execute-step for live debug) replay the retained pkb_run_profile through pkb_runvars. Never supply pkb_run_profile as input.");
-        out.println("Sealed runs are opt-in: resolve → inspect → complete map including the six context keys → pkb_overriderunvars. Do not mix with pkb_runvars or pkb_profile. Compare runProfileFingerprint after the sealed run.");
+        out.println("Discover and confirm seed a workspace and launch with -Dpkb_workspace plus selection keys. Isolate does not force pkb_parallel=1.");
+        out.println("The agent-facing entry is Pickleball Workbench (`hint` / `discover` / `confirm` / `isolate` / `workspace-show` / `workspace-edit` / `workspace-seed`), not a separate DiagnosticCli story. Never supply pkb_run_profile as input.");
+        out.println("pkb_overriderunvars is deprecated for Workbench. It still works for a plain mvn test that does not set pkb_workspace.");
         out.println();
         out.println("After Discover, read reports/diagnostic-runs/run-catalog.json, then only the relevant run-index.json / summary.json.");
         out.println("NEXT: run discover");
@@ -140,7 +140,7 @@ public final class DiagnosticCli {
         out.println("Dry-run resolve of the launcher JVM, not the Discover worker (does not start tests, browsers, or Discover):");
         out.println("Do not treat resolve-runvars as the environment Discover will use. Trust the environment on the run record after Discover.");
         out.println(json().writeValueAsString(body));
-        out.println("Sealed launch uses -Dpkb_overriderunvars=<complete compact map>, never -Dpkb_run_profile=.");
+        out.println("pkb_overriderunvars is deprecated for Workbench. A plain run that does not set pkb_workspace can still use -Dpkb_overriderunvars=<complete compact map>, never -Dpkb_run_profile=.");
         out.println();
     }
 

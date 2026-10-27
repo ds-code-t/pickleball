@@ -113,15 +113,15 @@ public final class WorkbenchAgentCommands {
         AgentDiscoverPlanner.Plan plan = AgentDiscoverPlanner.discover(
                 parsed.project(), parsed.tags(), parsed.name(), parsed.retention(), parsed.example()
         );
-        out.println("Recommended complete diagnostic Discover `pkb_runvars` (Workbench honors the project browser ladder; headed Chrome / pretty / @all project defaults do not sneak in):");
+        out.println("Recommended complete diagnostic Discover `pkb_runvars` (Workbench keeps the project browser; CHROME_HEADLESS is only the fallback when the project names none):");
         out.println("pkb_runvars=" + plan.runVars());
         out.println();
         printDryRunResolve(parsed.project(), plan.runVars(), false, out);
         out.println("Browser: " + plan.browser().browser() + " (" + plan.browser().reason() + ").");
-        out.println("Multi-scenario Discover/Confirm use this high pkb_parallel. When a Workbench window is already open, only one agent drives that session with open-scenario, example, play, execute-step, stop, and diagnostic-run so the person sees it. Other agents stay headless on their own run ids. Otherwise isolate starts a headless session; then use execute-step / status / events / stop. Do not open the GUI for your own testing. Open it to show a person a specific run, or when they ask. Close it when you are done showing it. While testing for yourself, stay headless. Opening the window loads the run you already have. It does not start a second test. Same launcher, only change exec.args.");
+        out.println("Discover and confirm seed a workspace and launch with -Dpkb_workspace plus selection keys. Edit that workspace with workspace-show, workspace-edit, and workspace-seed before the next start. Isolate does not force pkb_parallel=1.");
+        out.println("When a Workbench window is already open, only one agent drives that session with open-scenario, example, play, execute-step, stop, and diagnostic-run so the person sees it. Other agents stay headless on their own run ids. Otherwise isolate starts a headless session; then use execute-step / status / events / stop. Do not open the GUI for your own testing. Open it to show a person a specific run, or when they ask. Close it when you are done showing it. While testing for yourself, stay headless. Opening the window loads the run you already have. It does not start a second test. Same launcher, only change exec.args.");
         out.println("Read the short log (.pickleball/agent-log) before and after a run, and during a long session, instead of the dense diagnostic log.");
-        out.println("After Discover, confirm (and isolate/execute-step for live debug) replay the retained pkb_run_profile through pkb_runvars. Never supply pkb_run_profile as input.");
-        out.println("Sealed runs are opt-in: resolve → inspect → complete map including the six context keys → pkb_overriderunvars. Do not mix with pkb_runvars or pkb_profile. Compare runProfileFingerprint after the sealed run.");
+        out.println("Never supply pkb_run_profile as input. pkb_overriderunvars is deprecated for Workbench. It still works for a plain mvn test that does not set pkb_workspace.");
         out.println();
         out.println("NEXT: run discover");
         return 0;
@@ -269,7 +269,7 @@ public final class WorkbenchAgentCommands {
         out.println("pkb_run_profile=" + resolved.runProfile());
         out.println("runProfileFingerprint=" + resolved.fingerprint());
         out.println("provenance=" + resolved.provenance());
-        out.println("Sealed launch uses -Dpkb_overriderunvars=<complete compact map>, never -Dpkb_run_profile=.");
+        out.println("pkb_overriderunvars is deprecated for Workbench. A plain run that does not set pkb_workspace can still use -Dpkb_overriderunvars=<complete compact map>, never -Dpkb_run_profile=.");
         out.println();
     }
 
