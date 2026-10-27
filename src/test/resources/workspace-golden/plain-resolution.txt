@@ -1,0 +1,13 @@
+EXAMPLE
+pkb_features=classpath:features
+CONSUMER
+pkb_browser=firefox
+pkb_callpath=src/test/resources/calls
+pkb_componentpath=src/test/resources/component
+pkb_configpath=configs
+pkb_datapath=data
+pkb_environment=qa
+pkb_features=classpath:features
+pkb_glue=com.example.steps
+pkb_hook_marker=from-hook
+pkb_parallel=4
