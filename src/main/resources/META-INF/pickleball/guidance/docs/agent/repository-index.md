@@ -500,6 +500,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/testengine/DriverDownloadRedactionTest.java`
 - `src/test/java/tools/dscode/testengine/DynamicSuiteBootstrapWorkbenchRootTest.java`
 - `src/test/java/tools/dscode/testengine/ExampleRowFilterTest.java`
+- `src/test/java/tools/dscode/testengine/MavenWorkspaceLaunchEndToEndTest.java`
 - `src/test/java/tools/dscode/testengine/Phase7SeedMain.java`
 - `src/test/java/tools/dscode/testengine/PlainResolutionGoldenTest.java`
 - `src/test/java/tools/dscode/testengine/WorkspaceDriverProbe.java`
