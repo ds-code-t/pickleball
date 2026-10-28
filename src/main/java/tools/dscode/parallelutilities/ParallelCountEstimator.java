@@ -1,10 +1,5 @@
 package tools.dscode.parallelutilities;
 
-import tools.dscode.common.reporting.diagnostic.AgentBrowserLadder;
-import tools.dscode.common.reporting.diagnostic.AgentDiscoverPlanner;
-
-import java.nio.file.Path;
-
 /**
  * Conservative high parallel-count estimate from JVM-visible CPU and heap.
  *
@@ -17,7 +12,8 @@ import java.nio.file.Path;
  *
  * <p>{@code pkb_parallel=auto} resolves to this estimate at run start. An
  * explicit positive integer is left unchanged. Omitting {@code pkb_parallel}
- * does not enable parallel execution.</p>
+ * does not enable parallel execution. This class does not build a Discover
+ * {@code pkb_runvars} string.</p>
  */
 public final class ParallelCountEstimator {
     public static final String AUTO_VALUE = "auto";
@@ -62,18 +58,5 @@ public final class ParallelCountEstimator {
                     "pkb_parallel must be a positive integer or 'auto', but was: " + configured,
                     exception);
         }
-    }
-
-    public static String recommendedDiscoverRunVars() {
-        return recommendedDiscoverRunVars(Path.of("").toAbsolutePath().normalize());
-    }
-
-    /** Browser comes from {@link AgentBrowserLadder}, not a hardcoded headless Chrome. */
-    public static String recommendedDiscoverRunVars(Path projectRoot) {
-        return recommendedDiscoverRunVars(AgentBrowserLadder.select(projectRoot).browser());
-    }
-
-    public static String recommendedDiscoverRunVars(String browser) {
-        return AgentDiscoverPlanner.recommendedDiscoverRunVars(browser);
     }
 }

@@ -95,7 +95,7 @@ public final class WorkspaceSeed {
         values.keySet().removeIf(Workspace.CAPTURE_EXCLUDED_KEYS::contains);
         Workspace.ensureContextKeys(values);
         String browser = values.get(PKB_props.PKB_BROWSER);
-        if (browser == null || browser.isBlank()) values.put(PKB_props.PKB_BROWSER, "CHROME_HEADLESS");
+        values.put(PKB_props.PKB_BROWSER, browserOrHeadless(browser));
         String configured = values.get(PKB_props.PKB_CONFIG_PATH);
         Path source = configured == null || configured.isBlank()
                 ? null
@@ -105,6 +105,48 @@ public final class WorkspaceSeed {
         List<String> warnings = Workspace.literalSecretWarnings(Workspace.configsDirectory(workspace));
         for (String warning : warnings) System.err.println(warning);
         return warnings;
+    }
+
+    /**
+     * Browser stored by a capture. A named project browser is kept.
+     * {@code CHROME_HEADLESS} is only the fallback when that value is blank.
+     */
+    public static String browserOrHeadless(String browser) {
+        if (browser == null || browser.isBlank()) return "CHROME_HEADLESS";
+        return browser.trim();
+    }
+
+    /**
+     * {@code pkb_browser} from the project property files a capture reads.
+     * Empty when the project names none. This is not a launch run-var builder.
+     */
+    public static String namedProjectBrowser(Path project) {
+        if (project == null) return "";
+        Path root = project.toAbsolutePath().normalize();
+        for (Path file : List.of(
+                root.resolve("src/test/resources/pickleball_local.properties"),
+                root.resolve("src/test/resources/pickleball.properties"),
+                root.resolve("src/main/resources/pickleball_local.properties"),
+                root.resolve("src/main/resources/pickleball.properties"),
+                root.resolve("pickleball_local.properties"),
+                root.resolve("pickleball.properties")
+        )) {
+            String browser = browserProperty(file);
+            if (!browser.isBlank()) return browser;
+        }
+        return "";
+    }
+
+    private static String browserProperty(Path file) {
+        if (!Files.isRegularFile(file)) return "";
+        Properties properties = new Properties();
+        try (var reader = Files.newBufferedReader(file, java.nio.charset.StandardCharsets.UTF_8)) {
+            properties.load(reader);
+        } catch (IOException ignored) {
+            return "";
+        }
+        String value = properties.getProperty(PKB_props.PKB_BROWSER);
+        return value == null ? "" : value.trim();
     }
 
     public static Inputs detect(Path project) {

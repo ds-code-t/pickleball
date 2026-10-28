@@ -258,7 +258,6 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/common/mappings/ScenarioMapping.java`
 - `src/main/java/tools/dscode/common/mappings/StepMapping.java`
 - `src/main/java/tools/dscode/common/mappings/ValueFormatting.java`
-- `src/main/java/tools/dscode/common/reporting/diagnostic/AgentBrowserLadder.java`
 - `src/main/java/tools/dscode/common/reporting/diagnostic/AgentDiscoverPlanner.java`
 - `src/main/java/tools/dscode/common/reporting/diagnostic/ConfigurationProvenance.java`
 - `src/main/java/tools/dscode/common/reporting/diagnostic/ConsumerMavenTestRunner.java`
@@ -448,7 +447,6 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/common/assertions/MultilineAssertTest.java`
 - `src/test/java/tools/dscode/common/coordination/AgentCoordinationTest.java`
 - `src/test/java/tools/dscode/common/coordination/PathPrefixResolutionTest.java`
-- `src/test/java/tools/dscode/common/coordination/RunConfigCopyRedactionTest.java`
 - `src/test/java/tools/dscode/common/coordination/RunConfigIsolationTest.java`
 - `src/test/java/tools/dscode/common/dataelements/NamespaceXmlTest.java`
 - `src/test/java/tools/dscode/common/domoperations/LoadingCategoryDefinitionTest.java`
@@ -456,7 +454,6 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/common/mappings/ParsingMapGreaterThanMaskTest.java`
 - `src/test/java/tools/dscode/common/mappings/queries/DocumentAndReservedFieldReadTest.java`
 - `src/test/java/tools/dscode/common/mappings/queries/TopLevelCollectionTest.java`
-- `src/test/java/tools/dscode/common/reporting/diagnostic/AgentBrowserLadderTest.java`
 - `src/test/java/tools/dscode/common/reporting/diagnostic/AgentDiscoverPlannerTest.java`
 - `src/test/java/tools/dscode/common/reporting/diagnostic/ConsumerMavenTestRunnerTest.java`
 - `src/test/java/tools/dscode/common/reporting/diagnostic/DiagnosticSecretRedactionTest.java`
@@ -801,7 +798,6 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `maven-consumer-project/src/test/java/tools/dscode/common/mappings/LazyBooleanSideTest.java`
 - `maven-consumer-project/src/test/java/tools/dscode/common/mappings/MappingDataRefactorChecks.java`
 - `maven-consumer-project/src/test/java/tools/dscode/common/mappings/QuoteParserChecks.java`
-- `maven-consumer-project/src/test/java/tools/dscode/common/reporting/diagnostic/AgentBrowserLadderChecks.java`
 - `maven-consumer-project/src/test/java/tools/dscode/common/reporting/diagnostic/Diagnostic213CompletionChecks.java`
 - `maven-consumer-project/src/test/java/tools/dscode/common/reporting/diagnostic/DiagnosticReportingChecks.java`
 - `maven-consumer-project/src/test/java/tools/dscode/common/reporting/diagnostic/InvestigationHandoffChecks.java`

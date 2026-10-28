@@ -72,11 +72,10 @@ class PathPrefixResolutionTest {
         assertFilesystem(fixture, "WD-FILE:configs", fixture.work.resolve("configs"), "from-work");
 
         Path absolute = Path.of("/opt/x/configs").normalize();
-        ResourceLocations.Location located = located(fixture, "wd-file:/opt/x/configs");
+        ResourceLocations.Location located = located("wd-file:/opt/x/configs", fixture.work);
         assertEquals(PickleballPaths.Kind.FILE_SYSTEM, located.kind());
         assertEquals(absolute, located.file());
-        assertEquals(absolute, RunConfigCopy.locate(fixture.project, "wd-file:/opt/x/configs", fixture.work).file());
-        assertNull(RunConfigCopy.resolveRoot(fixture.project, "wd-file:/opt/x/configs", fixture.work));
+        assertNull(ResourceLocations.existingDirectory("wd-file:/opt/x/configs", fixture.work));
         assertNull(ParsingMap.loadConfigs("wd-file:/opt/x/configs", fixture.work));
         assertNull(ResourceLocations.existingDirectory("wd-file:missing-configs", fixture.work));
         assertNull(ParsingMap.loadConfigs("wd-file:missing-configs", fixture.work));
@@ -87,28 +86,18 @@ class PathPrefixResolutionTest {
         Fixture fixture = fixture();
         useLoader(fixture.classpathRoot);
 
-        Path resolved = RunConfigCopy.resolveRoot(fixture.project, "configs", fixture.work);
+        Path resolved = ResourceLocations.existingDirectory("configs", fixture.work);
         assertEquals(fixture.classpathRoot.resolve("configs").toAbsolutePath().normalize(), resolved);
         assertFalse(resolved.startsWith(fixture.project));
         assertEquals("classpath-configs", marker(ParsingMap.loadConfigs("configs", fixture.work)));
 
-        Path fromWdFile = RunConfigCopy.resolveRoot(fixture.project, "wd-file:configs", fixture.project);
+        Path fromWdFile = ResourceLocations.existingDirectory("wd-file:configs", fixture.project);
         assertEquals(fixture.project.resolve("configs").toAbsolutePath().normalize(), fromWdFile);
         assertEquals("project-root", marker(ParsingMap.loadConfigs("wd-file:" + fixture.project.resolve("configs"), fixture.work)));
     }
 
     @Test
-    void aMissingFolderDoesNotThrowOrCopyTheProjectDecoy() throws Exception {
-        Fixture fixture = fixture();
-        useLoader(fixture.classpathRoot);
-        Path destination = temp.resolve("run-config");
-        RunConfigCopy.copyIfAbsent(fixture.project, destination, "wd-file:missing-configs", fixture.work);
-        assertFalse(Files.exists(destination.resolve("app.yaml")));
-        assertNull(ParsingMap.loadConfigs("wd-file:missing-configs", fixture.work));
-    }
-
-    @Test
-    void jarOnlyConfigsCopyAndLoad() throws Exception {
+    void jarOnlyConfigsLoadFromTheClasspath() throws Exception {
         Fixture fixture = fixture();
         Path jar = temp.resolve("configs.jar");
         try (OutputStream raw = Files.newOutputStream(jar); JarOutputStream jarOut = new JarOutputStream(raw)) {
@@ -121,12 +110,10 @@ class PathPrefixResolutionTest {
         try (URLClassLoader loader = new URLClassLoader(new URL[] {jar.toUri().toURL()}, null)) {
             useLoader(loader);
             assertNull(ResourceLocations.classpathDirectory("configs"));
-            Path destination = temp.resolve("jar-copy");
-            RunConfigCopy.copyIfAbsent(fixture.project, destination, "configs", fixture.work);
-            assertEquals("marker: from-jar\n", Files.readString(destination.resolve("app.yaml")));
-            assertFalse(Files.readString(destination.resolve("app.yaml")).contains("project-root"));
+            assertNull(ResourceLocations.existingDirectory("configs", fixture.work));
             assertEquals("from-jar", marker(ParsingMap.loadConfigs("configs", fixture.work)));
             assertEquals("from-jar", marker(ParsingMap.loadConfigs("file:configs", fixture.work)));
+            assertFalse(marker(ParsingMap.loadConfigs("configs", fixture.work)).contains("project-root"));
         }
     }
 
@@ -156,34 +143,33 @@ class PathPrefixResolutionTest {
     }
 
     private void assertClasspath(Fixture fixture, String configured, Path directory, String marker) {
-        ResourceLocations.Location location = located(fixture, configured);
+        String selected = selected(configured);
+        ResourceLocations.Location location = located(configured, fixture.work);
         assertEquals(PickleballPaths.Kind.CLASSPATH, location.kind(), String.valueOf(configured));
-        Path root = RunConfigCopy.resolveRoot(fixture.project, configured, fixture.work);
+        Path root = ResourceLocations.existingDirectory(selected, fixture.work);
         assertEquals(directory.toAbsolutePath().normalize(), root, String.valueOf(configured));
-        assertEquals(root, ResourceLocations.existingDirectory(selected(fixture, configured), fixture.work));
-        assertEquals(marker, marker(ParsingMap.loadConfigs(selected(fixture, configured), fixture.work)), String.valueOf(configured));
+        assertEquals(marker, marker(ParsingMap.loadConfigs(selected, fixture.work)), String.valueOf(configured));
         assertFalse(root.startsWith(fixture.project), String.valueOf(configured));
     }
 
     private void assertFilesystem(Fixture fixture, String configured, Path directory, String marker) {
-        ResourceLocations.Location location = located(fixture, configured);
+        ResourceLocations.Location location = located(configured, fixture.work);
         assertEquals(PickleballPaths.Kind.FILE_SYSTEM, location.kind(), configured);
         assertEquals(directory.toAbsolutePath().normalize(), location.file(), configured);
-        assertEquals(directory.toAbsolutePath().normalize(), RunConfigCopy.resolveRoot(fixture.project, configured, fixture.work));
+        assertEquals(
+                directory.toAbsolutePath().normalize(),
+                ResourceLocations.existingDirectory(selected(configured), fixture.work)
+        );
         assertEquals(marker, marker(ParsingMap.loadConfigs(configured, fixture.work)), configured);
     }
 
-    private ResourceLocations.Location located(Fixture fixture, String configured) {
-        ResourceLocations.Location direct = ResourceLocations.locate(selected(fixture, configured), fixture.work);
-        ResourceLocations.Location copied = RunConfigCopy.locate(fixture.project, configured, fixture.work);
-        assertEquals(direct.kind(), copied.kind(), String.valueOf(configured));
-        assertEquals(direct.classpathResource(), copied.classpathResource(), String.valueOf(configured));
-        assertEquals(direct.file(), copied.file(), String.valueOf(configured));
-        return direct;
+    private static ResourceLocations.Location located(String configured, Path work) {
+        return ResourceLocations.locate(selected(configured), work);
     }
 
-    private static String selected(Fixture fixture, String configured) {
-        return RunConfigCopy.selectSource(fixture.project, configured);
+    private static String selected(String configured) {
+        if (configured == null || configured.isBlank()) return "configs";
+        return configured.trim();
     }
 
     private static String marker(JsonNode node) {

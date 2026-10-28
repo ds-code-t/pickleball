@@ -49,28 +49,36 @@ public final class ParallelCountEstimatorChecks {
     }
 
     @Test
-    void recommendedDiscoverRunVarsIncludeEstimatedParallel() {
-        String runVars = ParallelCountEstimator.recommendedDiscoverRunVars();
-        assertTrue(runVars.contains("pkb_browser="));
-        assertTrue(runVars.contains("pkb_parallel=" + ParallelCountEstimator.estimate()));
-        assertTrue(runVars.contains("pkb_reportingmode=diagnostic"));
-        assertFalse(runVars.contains("pkb_parallel=80"));
-        assertFalse(runVars.contains("pkb_parallel=auto"));
-    }
-
-    @Test
-    void recommendedDiscoverRunVarsUseBrowserLadder() throws Exception {
-        Path project = Files.createTempDirectory("pkb-discover-runvars-");
+    void estimateIgnoresAProjectBrowserFile() throws Exception {
+        int before = ParallelCountEstimator.estimate();
+        Path project = Files.createTempDirectory("pkb-estimate-");
         try {
             Path resources = project.resolve("src/test/resources");
             Files.createDirectories(resources);
             Files.writeString(resources.resolve("pickleball.properties"), "pkb_browser=GRID_EDGE\n");
-            String runVars = ParallelCountEstimator.recommendedDiscoverRunVars(project);
-            assertTrue(runVars.contains("pkb_browser=GRID_EDGE"));
-            assertFalse(runVars.contains("pkb_browser=CHROME_HEADLESS"));
+            assertEquals(before, ParallelCountEstimator.estimate());
+            assertEquals(before, ParallelCountEstimator.resolve("auto"));
+            assertEquals(before, ParallelCountEstimator.resolve(" AUTO "));
+            assertTrue(ParallelCountEstimator.isAuto("auto"));
+            assertFalse(ParallelCountEstimator.isAuto("GRID_EDGE"));
+            assertTrue(before >= 2);
+            assertTrue(before <= 24);
+            assertFalse(Integer.toString(before).equals("auto"));
         } finally {
             deleteTree(project);
         }
+    }
+
+    @Test
+    void resolveRejectsABrowserNameInsteadOfBuildingRunVars() {
+        IllegalArgumentException failure = assertThrows(
+                IllegalArgumentException.class,
+                () -> ParallelCountEstimator.resolve("CHROME_HEADLESS")
+        );
+        assertTrue(failure.getMessage().contains("pkb_parallel"));
+        assertTrue(failure.getMessage().contains("CHROME_HEADLESS"));
+        assertThrows(IllegalArgumentException.class, () -> ParallelCountEstimator.resolve("GRID_EDGE"));
+        assertEquals(ParallelCountEstimator.estimate(), ParallelCountEstimator.resolve("auto"));
     }
 
     private static void deleteTree(Path root) throws Exception {

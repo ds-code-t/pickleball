@@ -79,9 +79,18 @@ class WorkbenchAgentCommandsTest {
             Output output = run("hint", tempDir.toString());
 
             assertEquals(0, output.exitCode());
+            assertTrue(output.stdout().contains("runvars.properties"));
+            assertTrue(output.stdout().contains("workspace/configs"));
+            assertTrue(output.stdout().contains("-Dpkb_workspace"));
+            assertTrue(output.stdout().contains("selection keys"));
+            assertTrue(output.stdout().contains("workspace-show"));
+            assertTrue(output.stdout().contains("workspace-edit"));
+            assertTrue(output.stdout().contains("workspace-seed"));
             assertTrue(output.stdout().contains("pkb_browser=chrome"));
             assertFalse(output.stdout().contains("pkb_browser=CHROME_HEADLESS"));
-            assertTrue(output.stdout().contains("pkb_reportretention=failed"));
+            assertTrue(output.stdout().contains("pkb_parallel=auto"));
+            assertFalse(output.stdout().contains("pkb_runvars="));
+            assertFalse(output.stdout().contains("Recommended complete diagnostic Discover"));
             assertTrue(output.stdout().contains("NEXT: run discover"));
             assertTrue(output.stdout().contains("Dry-run resolve"));
             assertTrue(output.stdout().contains("launcher JVM"));

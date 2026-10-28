@@ -465,7 +465,7 @@ max(2, min(availableProcessors, floor(maxMemoryMB / 512), 24))
 
 Chrome workers are RAM-heavy, so a 32-core / 64GiB box does not blindly pick 32 workers; the hard cap is 24, and heap can cap lower. Tiny heaps resolve to 2. An explicit numeric `pkb_parallel` is never overwritten. Omitting `pkb_parallel` does not enable parallel execution.
 
-The resolved integer is stamped into the final RunVars and `pkb_run_profile`. Workbench `hint` prints that estimated number in the recommended Discover `pkb_runvars` command.
+The resolved integer is stamped into the final RunVars and `pkb_run_profile`. The workspace file keeps `pkb_parallel=auto`; launch resolves it. Workbench `hint` does not print a recommended `pkb_runvars` string.
 
 ## Bundled `CHROME_HEADLESS`
 

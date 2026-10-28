@@ -7,6 +7,7 @@ import tools.dscode.control.protocol.PickleballLocalLayout;
 import tools.dscode.control.protocol.PickleballLocalStore;
 import tools.dscode.control.protocol.PickleballVersion;
 import tools.dscode.testengine.PKB_props;
+import tools.dscode.testengine.WorkspaceSeed;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -92,16 +93,19 @@ public final class DiagnosticCli {
         Path project = args.length == 2
                 ? Path.of(args[1]).toAbsolutePath().normalize()
                 : Path.of("").toAbsolutePath().normalize();
-        AgentDiscoverPlanner.Plan plan = AgentDiscoverPlanner.discover(project, null, null);
-        out.println("Recommended complete diagnostic Discover `pkb_runvars` (Workbench keeps the project browser; CHROME_HEADLESS is only the fallback when the project names none):");
-        out.println("pkb_runvars=" + plan.runVars());
-        out.println();
-        printDryRunResolve(project, out, plan.runVars(), false);
-        out.println("Browser: " + plan.browser().browser() + " (" + plan.browser().reason() + ").");
-        out.println("Discover and confirm seed a workspace and launch with -Dpkb_workspace plus selection keys. Isolate does not force pkb_parallel=1.");
+        String named = WorkspaceSeed.namedProjectBrowser(project);
+        out.println("Seed writes .pickleball/runs/<run-id>/workspace/runvars.properties and workspace/configs. Edit those files with workspace-show, workspace-edit, and workspace-seed before the next start.");
+        out.println("Discover and confirm launch with -Dpkb_workspace plus selection keys (pkb_tags, pkb_name, pkb_example, pkb_features, pkb_parallel, pkb_run_id, pkb_agent_id). Isolate does not force pkb_parallel=1.");
+        if (named.isBlank()) {
+            out.println("Browser: pkb_browser=CHROME_HEADLESS (project names no browser; CHROME_HEADLESS is the only fallback).");
+        } else {
+            out.println("Browser: pkb_browser=" + named + " (project pkb_browser is kept).");
+        }
+        out.println("pkb_parallel=auto stays auto in the workspace and is resolved at launch. Hint does not print a recommended pkb_runvars string.");
         out.println("The agent-facing entry is Pickleball Workbench (`hint` / `discover` / `confirm` / `isolate` / `workspace-show` / `workspace-edit` / `workspace-seed`), not a separate DiagnosticCli story. Never supply pkb_run_profile as input.");
         out.println("pkb_overriderunvars is deprecated for Workbench. It still works for a plain mvn test that does not set pkb_workspace.");
         out.println();
+        printDryRunResolve(project, out, false);
         out.println("After Discover, read reports/diagnostic-runs/run-catalog.json, then only the relevant run-index.json / summary.json.");
         out.println("NEXT: run discover");
         return 0;
@@ -112,23 +116,19 @@ public final class DiagnosticCli {
         Path project = args.length == 2
                 ? Path.of(args[1]).toAbsolutePath().normalize()
                 : Path.of("").toAbsolutePath().normalize();
-        printDryRunResolve(project, out, null, true);
+        printDryRunResolve(project, out, true);
         return 0;
     }
 
     private static void printDryRunResolve(
             Path project,
             PrintStream out,
-            String recommendedRunVars,
             boolean includeAmbient
     ) throws IOException {
         LinkedHashMap<String, String> values = loadProjectPkbValues(project);
         LinkedHashMap<String, String> jvm = new LinkedHashMap<>();
         if (includeAmbient) {
             PKB_props.copyJvmDryRunInputs(values, jvm, true, true);
-        }
-        if (recommendedRunVars != null && !recommendedRunVars.isBlank()) {
-            values.put(PKB_props.PKB_RUN_VARS, recommendedRunVars);
         }
         PKB_props.ResolvedRunVars resolved = PKB_props.resolveRunVars(values, jvm);
         Map<String, Object> body = new LinkedHashMap<>();

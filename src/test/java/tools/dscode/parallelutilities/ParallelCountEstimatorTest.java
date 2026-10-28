@@ -55,25 +55,15 @@ class ParallelCountEstimatorTest {
     }
 
     @Test
-    void recommendedDiscoverRunVarsIncludeEstimatedParallel() {
-        String runVars = ParallelCountEstimator.recommendedDiscoverRunVars();
-        assertTrue(runVars.contains("pkb_browser="));
-        assertTrue(runVars.contains("pkb_parallel=" + ParallelCountEstimator.estimate()));
-        assertTrue(runVars.contains("pkb_reportingmode=diagnostic"));
-        assertTrue(runVars.contains("pkb_loglevel=warn"));
-        assertTrue(runVars.contains("pkb_reportretention=failed"));
-        assertFalse(runVars.contains("pkb_parallel=80"));
-        assertFalse(runVars.contains("pkb_parallel=auto"));
-    }
-
-    @Test
-    void recommendedDiscoverRunVarsUseBrowserLadder() throws Exception {
+    void estimateIgnoresAProjectBrowserAndDoesNotBuildDiscoverRunVars() throws Exception {
+        int estimate = ParallelCountEstimator.estimate();
         Path resources = tempDir.resolve("src/test/resources");
         Files.createDirectories(resources);
         Files.writeString(resources.resolve("pickleball.properties"), "pkb_browser=SAUCE_CHROME\n");
-
-        String runVars = ParallelCountEstimator.recommendedDiscoverRunVars(tempDir);
-        assertTrue(runVars.contains("pkb_browser=SAUCE_CHROME"));
-        assertFalse(runVars.contains("pkb_browser=CHROME_HEADLESS"));
+        assertEquals(estimate, ParallelCountEstimator.estimate());
+        assertEquals(estimate, ParallelCountEstimator.resolve("auto"));
+        assertTrue(estimate >= ParallelCountEstimator.MIN_WORKERS);
+        assertTrue(estimate <= ParallelCountEstimator.MAX_WORKERS);
+        assertFalse(estimate == 80 && Runtime.getRuntime().availableProcessors() < 80);
     }
 }

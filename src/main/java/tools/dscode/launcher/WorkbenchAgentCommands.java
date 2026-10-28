@@ -3,7 +3,6 @@ package tools.dscode.launcher;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import tools.dscode.common.coordination.AgentCoordination;
-import tools.dscode.common.reporting.diagnostic.AgentDiscoverPlanner;
 import tools.dscode.common.reporting.diagnostic.ConsumerMavenTestRunner;
 import tools.dscode.common.reporting.diagnostic.LastDiscoverSnapshot;
 import tools.dscode.control.protocol.PickleballLocalStore;
@@ -110,25 +109,26 @@ public final class WorkbenchAgentCommands {
     }
 
     private static int hint(WorkbenchCommandLine.Parsed parsed, PrintStream out) {
-        AgentDiscoverPlanner.Plan plan = AgentDiscoverPlanner.discover(
-                parsed.project(), parsed.tags(), parsed.name(), parsed.retention(), parsed.example()
-        );
-        out.println("Recommended complete diagnostic Discover `pkb_runvars` (Workbench keeps the project browser; CHROME_HEADLESS is only the fallback when the project names none):");
-        out.println("pkb_runvars=" + plan.runVars());
-        out.println();
-        printDryRunResolve(parsed.project(), plan.runVars(), false, out);
-        out.println("Browser: " + plan.browser().browser() + " (" + plan.browser().reason() + ").");
-        out.println("Discover and confirm seed a workspace and launch with -Dpkb_workspace plus selection keys. Edit that workspace with workspace-show, workspace-edit, and workspace-seed before the next start. Isolate does not force pkb_parallel=1.");
+        String named = WorkspaceSeed.namedProjectBrowser(parsed.project());
+        out.println("Seed writes .pickleball/runs/<run-id>/workspace/runvars.properties and workspace/configs. Edit those files with workspace-show, workspace-edit, and workspace-seed before the next start.");
+        out.println("Discover and confirm launch with -Dpkb_workspace plus selection keys (pkb_tags, pkb_name, pkb_example, pkb_features, pkb_parallel, pkb_run_id, pkb_agent_id). Isolate does not force pkb_parallel=1.");
+        if (named.isBlank()) {
+            out.println("Browser: pkb_browser=CHROME_HEADLESS (project names no browser; CHROME_HEADLESS is the only fallback).");
+        } else {
+            out.println("Browser: pkb_browser=" + named + " (project pkb_browser is kept).");
+        }
+        out.println("pkb_parallel=auto stays auto in the workspace and is resolved at launch. Hint does not print a recommended pkb_runvars string.");
         out.println("When a Workbench window is already open, only one agent drives that session with open-scenario, example, play, execute-step, stop, and diagnostic-run so the person sees it. Other agents stay headless on their own run ids. Otherwise isolate starts a headless session; then use execute-step / status / events / stop. Do not open the GUI for your own testing. Open it to show a person a specific run, or when they ask. Close it when you are done showing it. While testing for yourself, stay headless. Opening the window loads the run you already have. It does not start a second test. Same launcher, only change exec.args.");
         out.println("Read the short log (.pickleball/agent-log) before and after a run, and during a long session, instead of the dense diagnostic log.");
         out.println("Never supply pkb_run_profile as input. pkb_overriderunvars is deprecated for Workbench. It still works for a plain mvn test that does not set pkb_workspace.");
         out.println();
         out.println("NEXT: run discover");
+        printDryRunResolve(parsed.project(), false, out);
         return 0;
     }
 
     private static int resolveRunVars(WorkbenchCommandLine.Parsed parsed, PrintStream out) {
-        printDryRunResolve(parsed.project(), null, true, out);
+        printDryRunResolve(parsed.project(), true, out);
         return 0;
     }
 
@@ -248,7 +248,6 @@ public final class WorkbenchAgentCommands {
 
     private static void printDryRunResolve(
             Path project,
-            String recommendedRunVars,
             boolean includeAmbient,
             PrintStream out
     ) {
@@ -258,9 +257,6 @@ public final class WorkbenchAgentCommands {
         LinkedHashMap<String, String> jvm = new LinkedHashMap<>();
         if (includeAmbient) {
             PKB_props.copyJvmDryRunInputs(values, jvm, true, true);
-        }
-        if (recommendedRunVars != null && !recommendedRunVars.isBlank()) {
-            values.put(PKB_props.PKB_RUN_VARS, recommendedRunVars);
         }
         PKB_props.ResolvedRunVars resolved = PKB_props.resolveRunVars(values, jvm);
         out.println("Dry-run resolve of the launcher JVM, not the Discover worker (does not start tests, browsers, or Discover):");

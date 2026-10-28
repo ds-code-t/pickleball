@@ -14,7 +14,6 @@ import tools.dscode.common.dataelements.DataElementPhaseTwoChecks;
 import tools.dscode.common.driver.ChromeHeadlessConfigChecks;
 import tools.dscode.common.mappings.MappingDataRefactorChecks;
 import tools.dscode.common.mappings.QuoteParserChecks;
-import tools.dscode.common.reporting.diagnostic.AgentBrowserLadderChecks;
 import tools.dscode.common.resources.PathPrefixChecks;
 import tools.dscode.common.reporting.diagnostic.Diagnostic213CompletionChecks;
 import tools.dscode.common.reporting.diagnostic.DiagnosticReportingChecks;
@@ -113,7 +112,6 @@ public final class InternalFrameworkTestSteps {
                     Diagnostic213CompletionChecks.class,
                     PickleballGuidanceChecks.class,
                     InvestigationHandoffChecks.class,
-                    AgentBrowserLadderChecks.class,
                     WorkbenchAgentCommandChecks.class
             );
         } finally {
