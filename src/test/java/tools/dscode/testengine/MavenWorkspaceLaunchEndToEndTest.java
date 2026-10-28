@@ -56,10 +56,10 @@ class MavenWorkspaceLaunchEndToEndTest {
     void mavenTestLaunchesTheEditedWorkspace() throws Exception {
         Path published = Path.of(
                 System.getProperty("user.home"),
-                ".m2", "repository", "tools", "dscode", "pickleball", "2.1.17", "pickleball-2.1.17.jar"
+                ".m2", "repository", "tools", "dscode", "pickleball", "2.1.18", "pickleball-2.1.18.jar"
         );
         assertTrue(Files.isRegularFile(published),
-                "publishToMavenLocal tools.dscode:pickleball:2.1.17 before this test: " + published);
+                "publishToMavenLocal tools.dscode:pickleball:2.1.18 before this test: " + published);
 
         Path project = project();
         Run prepared = run(project, List.of(
@@ -261,7 +261,7 @@ class MavenWorkspaceLaunchEndToEndTest {
                 <dependency>
                   <groupId>tools.dscode</groupId>
                   <artifactId>pickleball</artifactId>
-                  <version>2.1.17</version>
+                  <version>2.1.18</version>
                   <scope>test</scope>
                 </dependency>
               </dependencies>

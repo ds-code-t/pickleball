@@ -1,5 +1,9 @@
 # Release notes
 
+## 2.1.18
+
+_No changes yet._
+
 ## 2.1.17
 
 ### Breaking changes
