@@ -27,7 +27,7 @@ public final class LastDiscoverSnapshot {
     private LastDiscoverSnapshot() {
     }
 
-    public record Snapshot(String runId, String runProfile, Map<String, String> runVars, boolean sealed) {
+    public record Snapshot(String runId, String runProfile, Map<String, String> runVars) {
         public Snapshot {
             runVars = runVars == null ? Map.of() : Map.copyOf(runVars);
         }
@@ -57,8 +57,7 @@ public final class LastDiscoverSnapshot {
             return new Snapshot(
                     text(root, "runId"),
                     text(root, "runProfile"),
-                    runVars,
-                    root.path("sealed").asBoolean(false)
+                    runVars
             );
         } catch (IOException failure) {
             throw new IllegalStateException("Could not read Discover snapshot: " + file, failure);

@@ -14,9 +14,10 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-/** Reads and writes the last Workbench Discover snapshot for isolate/confirm replay.
- * Ordinary Discover snapshots replay as {@code pkb_runvars}. A snapshot marked sealed
- * is for the next worker launch as {@code pkb_overriderunvars}, never {@code pkb_run_profile}.
+/** Reads and writes the last Workbench Discover snapshot.
+ * Confirm uses it for the previous run id and for selection keys
+ * (tags, name, example). Launches load that run's workspace.
+ * The snapshot is not a run-var source and has no sealed flag.
  */
 public final class LastDiscoverSnapshot {
     private static final ObjectMapper JSON = new ObjectMapper().enable(SerializationFeature.INDENT_OUTPUT);
@@ -32,8 +33,7 @@ public final class LastDiscoverSnapshot {
             String catalogPath,
             String runProfile,
             Map<String, String> runVars,
-            String createdAt,
-            boolean sealed
+            String createdAt
     ) {
         public Snapshot {
             runVars = runVars == null ? Map.of() : Map.copyOf(runVars);
@@ -110,8 +110,7 @@ public final class LastDiscoverSnapshot {
                 catalogPath == null ? "" : catalogPath.toString(),
                 runProfile == null ? "" : runProfile,
                 runVars,
-                Instant.now().toString(),
-                false
+                Instant.now().toString()
         );
         Path file = file(projectRoot);
         if (file.getParent() != null) Files.createDirectories(file.getParent());
@@ -278,8 +277,7 @@ public final class LastDiscoverSnapshot {
                 text(raw.get("catalogPath")),
                 text(raw.get("runProfile")),
                 runVars,
-                text(raw.get("createdAt")),
-                booleanValue(raw.get("sealed"))
+                text(raw.get("createdAt"))
         );
     }
 
@@ -292,18 +290,11 @@ public final class LastDiscoverSnapshot {
         body.put("runProfile", snapshot.runProfile());
         body.put("runVars", snapshot.runVars());
         body.put("createdAt", snapshot.createdAt());
-        body.put("sealed", snapshot.sealed());
         return body;
     }
 
     private static String text(Object value) {
         return value == null ? "" : String.valueOf(value);
-    }
-
-    private static boolean booleanValue(Object value) {
-        if (value instanceof Boolean flag) return flag;
-        if (value == null) return false;
-        return "true".equalsIgnoreCase(String.valueOf(value).trim());
     }
 
     private static boolean isBlank(String value) {

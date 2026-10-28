@@ -69,6 +69,8 @@ class RunVarOverridePanelTest {
         panel.save();
         assertTrue(panel.statusText().contains("WARNING: workspace changed on disk"));
         assertEquals("firefox", Workspace.readRunVars(workspace).get("pkb_browser"));
-        assertFalse(LastDiscoverSnapshot.read(tempDir).sealed());
+        String snapshot = Files.readString(file);
+        assertFalse(snapshot.contains("\"sealed\""));
+        assertTrue(snapshot.contains("run-1"));
     }
 }

@@ -421,10 +421,7 @@ public final class WorkbenchAgentCommands {
             );
             Map<String, String> stored = Workspace.readRunVars(prepared.workspace());
             String environment = blankToNull(stored.get(PKB_props.PKB_ENVIRONMENT));
-            String browser = firstNonBlank(
-                    blankToNull(stored.get(PKB_props.PKB_BROWSER)),
-                    retained.get(PKB_props.PKB_BROWSER)
-            );
+            String browser = blankToNull(stored.get(PKB_props.PKB_BROWSER));
             out.println("workspace=" + prepared.workspace());
             out.println("workspace-runvars=" + PKB_props.serializeRunVars(new java.util.TreeMap<>(stored)));
             List<String> command = withCoordination(
