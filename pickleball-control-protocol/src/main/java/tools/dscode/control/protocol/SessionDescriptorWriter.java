@@ -5,7 +5,11 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
 import java.util.Optional;
+import java.util.stream.Stream;
 
 /**
  * Writes {@link SessionDescriptor} next to one live Workbench session.
@@ -60,5 +64,74 @@ public final class SessionDescriptorWriter {
         SessionDescriptor updated = current.withState(next, updatedAt);
         publish(project, updated, true);
         return updated;
+    }
+
+    /** Descriptor files under {@code .pickleball/runs}, ordered by run id. */
+    public static List<Path> files(Path project) {
+        Path root = RunView.runsRoot(project);
+        if (!Files.isDirectory(root)) return List.of();
+        List<Path> found = new ArrayList<>();
+        try (Stream<Path> children = Files.list(root)) {
+            children.filter(Files::isDirectory)
+                    .sorted(Comparator.comparing(path -> path.getFileName().toString()))
+                    .forEach(dir -> {
+                        Path file = dir.resolve(DIRECTORY).resolve(SessionDescriptor.FILE_NAME);
+                        if (Files.isRegularFile(file)) found.add(file);
+                    });
+        } catch (IOException failure) {
+            throw new IllegalStateException("Could not list session descriptors: " + failure.getMessage(), failure);
+        }
+        return List.copyOf(found);
+    }
+
+    /** Published sessions that are not {@code stopped}. */
+    public static List<Path> liveFiles(Path project) {
+        List<Path> live = new ArrayList<>();
+        for (Path file : files(project)) {
+            if (readFile(file).state() != SessionDescriptor.State.STOPPED) live.add(file);
+        }
+        return List.copyOf(live);
+    }
+
+    /**
+     * Finds a descriptor by session id, then by run id.
+     * Stopped sessions are included. An unknown id is empty.
+     */
+    public static Optional<Path> findFile(Path project, String id) {
+        if (id == null || id.isBlank()) throw new IllegalArgumentException("session id is required.");
+        String token = id.trim();
+        Path bySession = null;
+        Path byRun = null;
+        int sessionHits = 0;
+        int runHits = 0;
+        for (Path file : files(project)) {
+            SessionDescriptor descriptor = readFile(file);
+            if (token.equals(descriptor.sessionId())) {
+                sessionHits++;
+                bySession = file;
+            } else if (token.equals(descriptor.runId())) {
+                runHits++;
+                byRun = file;
+            }
+        }
+        if (sessionHits > 1) {
+            throw new IllegalStateException("More than one session descriptor has sessionId " + token + ".");
+        }
+        if (sessionHits == 1) return Optional.of(bySession);
+        if (runHits > 1) {
+            throw new IllegalStateException("More than one session descriptor has runId " + token + ".");
+        }
+        if (runHits == 1) return Optional.of(byRun);
+        return Optional.empty();
+    }
+
+    public static SessionDescriptor readFile(Path file) {
+        try {
+            return SessionDescriptor.parse(Files.readString(file, StandardCharsets.UTF_8));
+        } catch (IOException failure) {
+            throw new IllegalStateException("Could not read " + file + ": " + failure.getMessage(), failure);
+        } catch (RuntimeException failure) {
+            throw new IllegalStateException("Could not read " + file + ": " + failure.getMessage(), failure);
+        }
     }
 }

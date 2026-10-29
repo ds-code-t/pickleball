@@ -23,7 +23,8 @@ final class WorkbenchCommandLine {
             "workspace-show", "workspace-edit", "workspace-seed",
             "short-log", "note", "inbox", "finish",
             "presence", "post", "history", "gc-runs", "gc-versions", "use-version",
-            "inspect-page", "find-element"
+            "inspect-page", "find-element",
+            "session-list", "session-info"
     );
     static final Set<String> SESSION_CLIENT_COMMANDS = Set.of(
             "isolate", "session-start", "execute-step", "status", "events", "stop", "kill",
@@ -104,6 +105,7 @@ final class WorkbenchCommandLine {
     }
 
     static Parsed parse(String[] args) {
+        args = sessionQueryArgs(args);
         Path cwd = Path.of("").toAbsolutePath().normalize();
         if (args == null || args.length == 0) {
             return new Parsed("ui", cwd, null, null, null, null, null, new String[]{"ui", cwd.toString()}, Coordination.empty(), null, false, false, false, List.of(), List.of(), null, null);
@@ -541,6 +543,27 @@ final class WorkbenchCommandLine {
                 command, project, null, tags, name, example, retention, args.clone(),
                 coordination, version, planOnly, refreshIndex, fullScan, runVars, selects, stepTimeoutSeconds, runTimeoutSeconds
         );
+    }
+
+    /**
+     * {@code session list} and {@code session info <id>} read the descriptor.
+     * A bare {@code session} stays the forwarded controller launch.
+     */
+    private static String[] sessionQueryArgs(String[] args) {
+        if (args == null || args.length < 2 || !"session".equals(args[0])) return args;
+        if (!"list".equals(args[1]) && !"info".equals(args[1])) return args;
+        List<String> rewritten = new ArrayList<>();
+        rewritten.add("session-" + args[1]);
+        int index = 2;
+        if ("info".equals(args[1])) {
+            if (args.length < 3 || isFlag(args[2])) {
+                throw new IllegalArgumentException("Usage: session info <sessionId> [--json]");
+            }
+            rewritten.add("--id=" + args[2]);
+            index = 3;
+        }
+        for (int i = index; i < args.length; i++) rewritten.add(args[i]);
+        return rewritten.toArray(String[]::new);
     }
 
     private static Long parsePositiveSeconds(String value, String label) {

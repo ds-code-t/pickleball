@@ -7,6 +7,8 @@ import tools.dscode.common.reporting.diagnostic.ConsumerMavenTestRunner;
 import tools.dscode.common.reporting.diagnostic.LastDiscoverSnapshot;
 import tools.dscode.control.protocol.PickleballLocalStore;
 import tools.dscode.control.protocol.RunConfigs;
+import tools.dscode.control.protocol.SessionDescriptor;
+import tools.dscode.control.protocol.SessionDescriptorWriter;
 import tools.dscode.control.protocol.WorkbenchFeatureIndex;
 import tools.dscode.control.protocol.Workspace;
 import tools.dscode.testengine.PKB_props;
@@ -27,6 +29,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.concurrent.ExecutionException;
@@ -89,6 +92,8 @@ public final class WorkbenchAgentCommands {
                 case "use-version" -> useVersion(parsed, out, err);
                 case "inspect-page" -> inspectPage(parsed, out, err);
                 case "find-element" -> findElement(parsed, out, err);
+                case "session-list" -> sessionList(parsed, out, err);
+                case "session-info" -> sessionInfo(parsed, out, err);
                 default -> {
                     err.println("Unknown Workbench agent command: " + parsed.command());
                     yield 2;
@@ -219,6 +224,77 @@ public final class WorkbenchAgentCommands {
         out.println("fingerprint=" + Workspace.fingerprint(workspace));
         out.println("present=true");
         return 0;
+    }
+
+    private static int sessionList(WorkbenchCommandLine.Parsed parsed, PrintStream out, PrintStream err) {
+        boolean json = hasFlag(parsed.forwarded(), "--json");
+        List<Path> files = SessionDescriptorWriter.liveFiles(parsed.project());
+        if (json) {
+            List<String> documents = new ArrayList<>();
+            for (Path file : files) documents.add(readText(file));
+            out.print(jsonArray(documents));
+            return 0;
+        }
+        if (files.isEmpty()) {
+            out.println("(no live sessions)");
+            return 0;
+        }
+        for (Path file : files) {
+            SessionDescriptor descriptor = SessionDescriptorWriter.readFile(file);
+            out.println(String.join("\t",
+                    descriptor.sessionId(),
+                    descriptor.runId(),
+                    descriptor.state().wire(),
+                    textOrDash(descriptor.browserType()),
+                    textOrDash(descriptor.cdpDebuggerAddress()),
+                    textOrDash(descriptor.currentUrl())
+            ));
+        }
+        return 0;
+    }
+
+    private static int sessionInfo(WorkbenchCommandLine.Parsed parsed, PrintStream out, PrintStream err) {
+        String id = parsed.coordination().id();
+        if (id == null || id.isBlank()) {
+            err.println("Usage: session info <sessionId> [--json]");
+            return 2;
+        }
+        Optional<Path> file = SessionDescriptorWriter.findFile(parsed.project(), id);
+        if (file.isEmpty()) {
+            err.println("No session descriptor for " + id + ".");
+            return 1;
+        }
+        String text = readText(file.get());
+        if (!text.endsWith("\n")) text = text + "\n";
+        out.print(text);
+        return 0;
+    }
+
+    private static String readText(Path file) {
+        try {
+            return Files.readString(file);
+        } catch (IOException failure) {
+            throw new IllegalStateException("Could not read " + file + ": " + failure.getMessage(), failure);
+        }
+    }
+
+    private static String textOrDash(String value) {
+        return value == null || value.isBlank() ? "-" : value;
+    }
+
+    private static String jsonArray(List<String> documents) {
+        if (documents.isEmpty()) return "[]\n";
+        StringBuilder json = new StringBuilder("[\n");
+        for (int i = 0; i < documents.size(); i++) {
+            String[] lines = documents.get(i).stripTrailing().split("\n", -1);
+            for (int line = 0; line < lines.length; line++) {
+                json.append("  ").append(lines[line]);
+                if (line + 1 == lines.length && i + 1 < documents.size()) json.append(',');
+                json.append('\n');
+            }
+        }
+        json.append("]\n");
+        return json.toString();
     }
 
     private static boolean hasFlag(String[] args, String flag) {
