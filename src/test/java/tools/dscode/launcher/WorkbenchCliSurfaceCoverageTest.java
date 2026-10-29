@@ -148,6 +148,20 @@ class WorkbenchCliSurfaceCoverageTest {
     }
 
     @Test
+    void covers_command_help() {
+        Capture catalog = agent("help");
+        assertEquals(0, catalog.code, catalog.err);
+        assertTrue(catalog.out.contains("help <command>"), catalog.out);
+        assertTrue(catalog.out.contains(" discover "), catalog.out);
+        Capture usage = agent("help", "execute-step");
+        assertEquals(0, usage.code, usage.err);
+        assertTrue(usage.out.contains("Usage: execute-step"), usage.out);
+        Capture flag = agent("--help", "--json");
+        assertEquals(0, flag.code, flag.err);
+        assertTrue(flag.out.contains("Usage: --json"), flag.out);
+    }
+
+    @Test
     void covers_command_export_guidance() throws Exception {
         Path out = temp.resolve("guidance");
         Capture capture = agent("export-guidance", out.toString());

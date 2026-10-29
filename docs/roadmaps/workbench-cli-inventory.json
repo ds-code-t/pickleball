@@ -21,6 +21,7 @@
       "finish",
       "gc-runs",
       "gc-versions",
+      "help",
       "hint",
       "history",
       "inbox",

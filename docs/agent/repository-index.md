@@ -403,6 +403,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/launcher/SessionHealthWait.java`
 - `src/main/java/tools/dscode/launcher/WorkbenchAgentCommands.java`
 - `src/main/java/tools/dscode/launcher/WorkbenchCliErrors.java`
+- `src/main/java/tools/dscode/launcher/WorkbenchCliHelp.java`
 - `src/main/java/tools/dscode/launcher/WorkbenchCommandLine.java`
 - `src/main/java/tools/dscode/launcher/WorkbenchConsoleTap.java`
 - `src/main/java/tools/dscode/launcher/WorkbenchElementInspect.java`
@@ -482,6 +483,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/SessionHealthWaitTest.java`
 - `src/test/java/tools/dscode/launcher/VersionSwitchTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchAgentCommandsTest.java`
+- `src/test/java/tools/dscode/launcher/WorkbenchAgentUsabilityTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchCliCoverageGateTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchCliProcessCoverageTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchCliSurfaceCoverageTest.java`

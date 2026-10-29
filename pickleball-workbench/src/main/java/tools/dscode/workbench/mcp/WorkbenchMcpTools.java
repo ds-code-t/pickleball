@@ -17,6 +17,9 @@ import java.util.function.Function;
 
 /** MCP tool definitions that adapt the shared Workbench controller surface. */
 final class WorkbenchMcpTools {
+    private static final ThreadLocal<String> CURRENT_TOOL = new ThreadLocal<>();
+    private static final ThreadLocal<WorkbenchMcpTools> CURRENT = new ThreadLocal<>();
+
     private final WorkbenchServices services;
     private final ObjectMapper json;
     private final Map<String, ToolBinding> tools = new LinkedHashMap<>();
@@ -42,12 +45,25 @@ final class WorkbenchMcpTools {
     Object call(String name, Map<String, Object> arguments) {
         ToolBinding binding = tools.get(name);
         if (binding == null) {
-            throw new IllegalArgumentException("Unknown Workbench tool: " + name);
+            throw new IllegalArgumentException(
+                    "Unknown Workbench tool: " + name + ". Use tools/list. Do not invent workbench_* names."
+            );
         }
-        return WorkbenchCallContext.callAs(
-                WorkbenchLeaseHolder.AGENT,
-                () -> binding.action.apply(arguments == null ? Map.of() : arguments)
-        );
+        String previous = CURRENT_TOOL.get();
+        WorkbenchMcpTools previousTools = CURRENT.get();
+        CURRENT_TOOL.set(name);
+        CURRENT.set(this);
+        try {
+            return WorkbenchCallContext.callAs(
+                    WorkbenchLeaseHolder.AGENT,
+                    () -> binding.action.apply(arguments == null ? Map.of() : arguments)
+            );
+        } finally {
+            if (previous == null) CURRENT_TOOL.remove();
+            else CURRENT_TOOL.set(previous);
+            if (previousTools == null) CURRENT.remove();
+            else CURRENT.set(previousTools);
+        }
     }
 
     private void register() {
@@ -324,9 +340,31 @@ final class WorkbenchMcpTools {
     private static String text(Map<String, Object> args, String name) {
         Object value = args.get(name);
         if (!(value instanceof String text) || text.isBlank()) {
-            throw new IllegalArgumentException(name + " must not be blank.");
+            throw new IllegalArgumentException(missingArgument(name, value));
         }
         return text;
+    }
+
+    private static String missingArgument(String name, Object value) {
+        String tool = CURRENT_TOOL.get();
+        String who = tool == null || tool.isBlank() ? "This tool" : tool;
+        String description = argumentDescription(tool, name);
+        String detail = description.isBlank() ? "" : " (" + description + ")";
+        String got = value == null ? "It was omitted." : "Got " + value.getClass().getSimpleName() + ".";
+        return who + " requires " + name + detail + ". Pass a non-blank string. " + got;
+    }
+
+    private static String argumentDescription(String tool, String name) {
+        WorkbenchMcpTools current = CURRENT.get();
+        if (current == null || tool == null || name == null) return "";
+        ToolBinding binding = current.tools.get(tool);
+        if (binding == null) return "";
+        Object properties = binding.inputSchema.get("properties");
+        if (!(properties instanceof Map<?, ?> map)) return "";
+        Object property = map.get(name);
+        if (!(property instanceof Map<?, ?> spec)) return "";
+        Object description = spec.get("description");
+        return description == null ? "" : description.toString();
     }
 
     private static String optionalText(Map<String, Object> args, String name) {
@@ -352,7 +390,9 @@ final class WorkbenchMcpTools {
     @SuppressWarnings("unchecked")
     private Map<String, Object> investigationObject(Object value) {
         if (value == null) {
-            throw new IllegalArgumentException("investigation must be a JSON object.");
+            throw new IllegalArgumentException(
+                    "workbench_investigation_emit requires investigation (Investigation JSON object. Source of truth written to investigation.json.). Pass a JSON object."
+            );
         }
         Object parsed = value;
         if (parsed instanceof String text) {

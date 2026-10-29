@@ -24,7 +24,8 @@ final class WorkbenchCommandLine {
             "short-log", "note", "inbox", "finish",
             "presence", "post", "history", "gc-runs", "gc-versions", "use-version",
             "inspect-page", "find-element",
-            "session-list", "session-info", "session-hold", "session-release"
+            "session-list", "session-info", "session-hold", "session-release",
+            "help"
     );
     static final Set<String> SESSION_CLIENT_COMMANDS = Set.of(
             "isolate", "session-start", "execute-step", "status", "events", "stop", "kill",
@@ -117,15 +118,25 @@ final class WorkbenchCommandLine {
         return command != null && SESSION_CLIENT_COMMANDS.contains(command);
     }
 
+    static boolean isKnownCommand(String command) {
+        return isAgentCoreCommand(command) || isForwardedCommand(command) || isSessionClientCommand(command);
+    }
+
     static Parsed parse(String[] args) {
+        if (args != null && args.length > 0 && WorkbenchCliHelp.isHelpToken(args[0])) {
+            String[] rewritten = new String[args.length];
+            rewritten[0] = "help";
+            System.arraycopy(args, 1, rewritten, 1, args.length - 1);
+            args = rewritten;
+        }
         args = sessionQueryArgs(args);
         Path cwd = Path.of("").toAbsolutePath().normalize();
         if (args == null || args.length == 0) {
             return new Parsed("ui", cwd, null, null, null, null, null, new String[]{"ui", cwd.toString()}, Coordination.empty(), null, false, false, false, List.of(), List.of(), null, null);
         }
         String command = args[0];
-        if ("export-guidance".equals(command)) {
-            Path output = args.length >= 2 && !isFlag(args[1])
+        if ("export-guidance".equals(command) || "help".equals(command)) {
+            Path output = "export-guidance".equals(command) && args.length >= 2 && !isFlag(args[1])
                     ? Path.of(args[1])
                     : Path.of(".pickleball");
             return new Parsed(command, cwd, output, null, null, null, null, args.clone(), Coordination.empty(), null, false, false, false, List.of(), List.of(), null, null);
@@ -248,7 +259,9 @@ final class WorkbenchCommandLine {
             if (token.startsWith("--runvar=")) {
                 String value = token.substring("--runvar=".length()).trim();
                 if (value.isBlank() || !value.contains("=")) {
-                    throw new IllegalArgumentException("--runvar requires key=value.");
+                    throw new IllegalArgumentException(
+                            "Usage: --runvar=key=value (repeatable). Example: --runvar=pkb_browser=CHROME_HEADLESS"
+                    );
                 }
                 runVars.add(value);
                 absorb = null;
@@ -258,7 +271,9 @@ final class WorkbenchCommandLine {
             if ("--runvar".equals(token)) {
                 String value = index + 1 < args.length ? args[++index] : null;
                 if (value == null || value.isBlank() || !value.contains("=")) {
-                    throw new IllegalArgumentException("--runvar requires key=value.");
+                    throw new IllegalArgumentException(
+                            "Usage: --runvar=key=value (repeatable). Example: --runvar=pkb_browser=CHROME_HEADLESS"
+                    );
                 }
                 runVars.add(value.trim());
                 absorb = null;
@@ -585,12 +600,12 @@ final class WorkbenchCommandLine {
 
     private static Long parsePositiveSeconds(String value, String label) {
         if (value == null || value.isBlank()) {
-            throw new IllegalArgumentException(label + " requires a positive number of seconds.");
+            throw new IllegalArgumentException(label + " requires a positive number of seconds. Usage: " + label + "=<seconds>");
         }
         try {
             long seconds = Long.parseLong(value.trim());
             if (seconds <= 0) {
-                throw new IllegalArgumentException(label + " requires a positive number of seconds.");
+                throw new IllegalArgumentException(label + " requires a positive number of seconds. Usage: " + label + "=<seconds>");
             }
             return seconds;
         } catch (NumberFormatException failure) {

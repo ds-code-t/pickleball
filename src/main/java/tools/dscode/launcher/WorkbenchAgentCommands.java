@@ -107,8 +107,9 @@ public final class WorkbenchAgentCommands {
                 case "session-info" -> sessionInfo(parsed, out, err);
                 case "session-hold" -> sessionHold(parsed, out, err, true);
                 case "session-release" -> sessionHold(parsed, out, err, false);
+                case "help" -> help(args, out, err);
                 default -> {
-                    err.println("Unknown Workbench agent command: " + parsed.command());
+                    err.print(WorkbenchCliHelp.unknown(parsed.command()));
                     yield 2;
                 }
             };
@@ -127,6 +128,10 @@ public final class WorkbenchAgentCommands {
     }
 
     private static int hint(WorkbenchCommandLine.Parsed parsed, PrintStream out) {
+        if (jsonRequested(parsed)) {
+            printDryRunResolve(parsed.project(), false, true, "discover", out);
+            return 0;
+        }
         String named = WorkspaceSeed.namedProjectBrowser(parsed.project());
         out.println("Seed writes .pickleball/runs/<run-id>/workspace/runvars.properties and workspace/configs. Edit those files with workspace-show, workspace-edit, and workspace-seed before the next start.");
         out.println("Discover and confirm launch with -Dpkb_workspace plus selection keys (pkb_tags, pkb_name, pkb_example, pkb_features, pkb_parallel, pkb_run_id, pkb_agent_id). Isolate does not force pkb_parallel=1.");
@@ -141,33 +146,74 @@ public final class WorkbenchAgentCommands {
         out.println("Never supply pkb_run_profile as input. pkb_overriderunvars is deprecated for Workbench. It still works for a plain mvn test that does not set pkb_workspace.");
         out.println();
         out.println("NEXT: run discover");
-        printDryRunResolve(parsed.project(), false, out);
+        printDryRunResolve(parsed.project(), false, false, null, out);
+        return 0;
+    }
+
+    private static int help(String[] args, PrintStream out, PrintStream err) {
+        String topic = null;
+        if (args != null) {
+            for (int index = 1; index < args.length; index++) {
+                String token = args[index];
+                if (token == null || token.isBlank() || WorkbenchCliHelp.isHelpToken(token)) continue;
+                topic = token;
+                break;
+            }
+        }
+        if (topic == null) {
+            out.print(WorkbenchCliHelp.catalog());
+            return 0;
+        }
+        String page = WorkbenchCliHelp.forTopic(topic);
+        if (page == null) {
+            err.print(WorkbenchCliHelp.unknown(topic));
+            return 2;
+        }
+        out.print(page);
         return 0;
     }
 
     private static int resolveRunVars(WorkbenchCommandLine.Parsed parsed, PrintStream out) {
-        printDryRunResolve(parsed.project(), true, out);
+        printDryRunResolve(parsed.project(), true, jsonRequested(parsed), null, out);
         return 0;
     }
 
     private static int workspaceShow(WorkbenchCommandLine.Parsed parsed, PrintStream out, PrintStream err) {
         String runId = parsed.coordination().runId();
         if (runId == null || runId.isBlank()) {
-            err.println("workspace-show requires --run-id.");
+            err.println("Usage: workspace-show --run-id=<id> [--json]");
             return 2;
         }
         Path workspace = Workspace.directory(parsed.project(), runId);
-        out.println("workspace=" + workspace.toAbsolutePath().normalize());
-        if (!Workspace.exists(workspace)) {
-            out.println("present=false");
-            err.println("No workspace for " + runId + ". Run workspace-seed first.");
+        boolean present = Workspace.exists(workspace);
+        if (jsonRequested(parsed)) {
+            Map<String, Object> body = new LinkedHashMap<>();
+            body.put("present", present);
+            body.put("runId", runId);
+            body.put("workspace", workspace.toAbsolutePath().normalize().toString());
+            if (present) {
+                body.put("fingerprint", Workspace.fingerprint(workspace));
+                body.put("runvars", Workspace.readRunVars(workspace));
+                body.put("configs", RunConfigs.files(parsed.project(), runId));
+            } else {
+                body.put("error", "No workspace for " + runId + ". Usage: workspace-seed --run-id=" + runId);
+            }
+            out.println(writeJson(body));
+        } else {
+            out.println("workspace=" + workspace.toAbsolutePath().normalize());
+        }
+        if (!present) {
+            if (!jsonRequested(parsed)) out.println("present=false");
+            err.println("No workspace for " + runId + ". Usage: workspace-seed --run-id=" + runId);
             return 1;
         }
-        out.println("present=true");
-        out.println("fingerprint=" + Workspace.fingerprint(workspace));
-        Workspace.readRunVars(workspace).forEach((key, value) -> out.println(key + "=" + value));
-        for (String file : RunConfigs.files(parsed.project(), runId)) {
-            out.println("config " + file);
+        if (!jsonRequested(parsed)) {
+            out.println("present=true");
+            out.println("fingerprint=" + Workspace.fingerprint(workspace));
+            Workspace.readRunVars(workspace).forEach((key, value) -> out.println(key + "=" + value));
+            for (String file : RunConfigs.files(parsed.project(), runId)) {
+                out.println("config " + file);
+            }
         }
         return 0;
     }
@@ -175,12 +221,12 @@ public final class WorkbenchAgentCommands {
     private static int workspaceEdit(WorkbenchCommandLine.Parsed parsed, PrintStream out, PrintStream err) {
         String runId = parsed.coordination().runId();
         if (runId == null || runId.isBlank()) {
-            err.println("workspace-edit requires --run-id.");
+            err.println("Usage: workspace-edit --run-id=<id> (--runvar=key=value | --config=<relative> --text=<body>) [--expect=<fingerprint>]");
             return 2;
         }
         Path workspace = Workspace.directory(parsed.project(), runId);
         if (!Workspace.exists(workspace)) {
-            err.println("No workspace for " + runId + ". Run workspace-seed first.");
+            err.println("No workspace for " + runId + ". Usage: workspace-seed --run-id=" + runId);
             return 1;
         }
         String expect = flagValue(parsed.forwarded(), "--expect");
@@ -192,13 +238,13 @@ public final class WorkbenchAgentCommands {
         }
         String config = flagValue(parsed.forwarded(), "--config");
         if (config == null && parsed.runVars().isEmpty()) {
-            err.println("workspace-edit requires --runvar and/or --config.");
+            err.println("Usage: workspace-edit --run-id=<id> (--runvar=key=value | --config=<relative> --text=<body>) [--expect=<fingerprint>]");
             return 2;
         }
         if (config != null) {
             String text = parsed.coordination().text();
             if (text == null) {
-                err.println("workspace-edit --config requires --text.");
+                err.println("Usage: workspace-edit --config=<relative> --text=<body>");
                 return 2;
             }
             RunConfigs.write(parsed.project(), runId, config, text.endsWith("\n") ? text : text + "\n");
@@ -220,7 +266,7 @@ public final class WorkbenchAgentCommands {
     private static int workspaceSeed(WorkbenchCommandLine.Parsed parsed, PrintStream out, PrintStream err) {
         String runId = parsed.coordination().runId();
         if (runId == null || runId.isBlank()) {
-            err.println("workspace-seed requires --run-id.");
+            err.println("Usage: workspace-seed --run-id=<id> [--reseed] [--from-run=<id>]");
             return 2;
         }
         boolean reseed = hasFlag(parsed.forwarded(), "--reseed");
@@ -359,6 +405,8 @@ public final class WorkbenchAgentCommands {
     private static void printDryRunResolve(
             Path project,
             boolean includeAmbient,
+            boolean json,
+            String next,
             PrintStream out
     ) {
         PKB_props.ResolvedRunVars resolved = tools.dscode.testengine.PickleballRunner.previewLaunch(project);
@@ -366,6 +414,17 @@ public final class WorkbenchAgentCommands {
         // JVM system properties, so includeAmbient is not a second resolver.
         if (project == null && includeAmbient) {
             project = Path.of("");
+        }
+        if (json) {
+            Map<String, Object> body = new LinkedHashMap<>();
+            if (next != null) body.put("next", next);
+            body.put("sealed", resolved.sealed());
+            body.put("runProfileFingerprint", resolved.fingerprint());
+            body.put("pkb_run_profile", resolved.runProfile());
+            body.put("provenance", String.valueOf(resolved.provenance()));
+            body.put("note", "Dry-run of this JVM. Not the Discover worker. Trust record.json after discover. Do not pass pkb_run_profile.");
+            out.println(writeJson(body));
+            return;
         }
         out.println("Dry-run resolve of the launcher JVM, not the Discover worker (does not start tests, browsers, or Discover):");
         out.println("Do not treat resolve-runvars as the environment Discover will use. Trust the environment on the run record after Discover.");
@@ -716,6 +775,7 @@ public final class WorkbenchAgentCommands {
             PrintStream out,
             PrintStream err
     ) {
+        if (jsonRequested(parsed)) return printPlanJson(parsed, selection, out, err);
         out.println("tags=" + text(parsed.tags()));
         out.println("name=" + text(parsed.name()));
         out.println("example=" + text(parsed.example()));
@@ -762,6 +822,72 @@ public final class WorkbenchAgentCommands {
             out.println("nested-features=configured pkb_features");
         }
         return 0;
+    }
+
+    private static int printPlanJson(
+            WorkbenchCommandLine.Parsed parsed,
+            WorkbenchFeatureIndex.Selection selection,
+            PrintStream out,
+            PrintStream err
+    ) {
+        boolean full = selection.fullScanFallback() || parsed.fullScan();
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("tags", text(parsed.tags()));
+        body.put("name", text(parsed.name()));
+        body.put("example", text(parsed.example()));
+        body.put("select", parsed.selects());
+        body.put("fullScan", full);
+        int code = 0;
+        if (full) {
+            String warning = selection.fullScanFallback()
+                    && selection.fallbackReason() != null
+                    && selection.fallbackReason().contains("unsupported tag expression")
+                    ? WorkbenchTagFallback.warning(selection.fallbackReason(), parsed.tags())
+                    : "WARNING: full-scan fallback: " + (
+                    parsed.fullScan() && !selection.fullScanFallback()
+                            ? "top-level narrowing skipped (--no-narrow / --full-scan); nested lookups keep the configured pkb_features"
+                            : selection.fallbackReason()
+            );
+            body.put("warning", warning);
+            err.println(warning);
+        } else {
+            java.util.List<String> hits = new ArrayList<>();
+            for (WorkbenchFeatureIndex.Hit hit : selection.hits()) {
+                StringBuilder line = new StringBuilder();
+                line.append(hit.relativePath()).append(':').append(hit.line()).append(' ').append(hit.scenarioName());
+                if (hit.exampleRow() > 0) {
+                    line.append(" example ").append(hit.exampleRow());
+                    String arguments = hit.argumentText();
+                    if (!arguments.isEmpty()) line.append(' ').append(arguments);
+                }
+                hits.add(line.toString());
+            }
+            body.put("count", hits.size());
+            body.put("hits", hits);
+            if (hits.isEmpty()) {
+                String warning = "WARNING: no scenarios matched tags=" + text(parsed.tags())
+                        + " name=" + text(parsed.name())
+                        + " example=" + text(parsed.example())
+                        + " select=" + parsed.selects();
+                body.put("warning", warning);
+                err.println(warning);
+                code = 1;
+            }
+        }
+        out.println(writeJson(body));
+        return code;
+    }
+
+    private static boolean jsonRequested(WorkbenchCommandLine.Parsed parsed) {
+        return hasFlag(parsed == null ? null : parsed.forwarded(), "--json");
+    }
+
+    private static String writeJson(Object value) {
+        try {
+            return JSON.writeValueAsString(value);
+        } catch (IOException failure) {
+            throw new IllegalStateException("Could not write JSON.", failure);
+        }
     }
 
     private static String text(String value) {

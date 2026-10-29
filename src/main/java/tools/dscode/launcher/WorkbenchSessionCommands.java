@@ -569,12 +569,26 @@ public final class WorkbenchSessionCommands {
             PrintStream err,
             HttpClient http
     ) {
-        if (flags.run == null || flags.run.isBlank()) {
-            err.println("Usage: diagnostic-run --run=<id>");
-            return 2;
-        }
+        String target = diagnosticTarget(parsed, flags, err);
+        if (target == null) return 2;
         SessionState state = requireSession(parsed, http);
-        return postAndMaybeWait(parsed, state, flags, commandBody(parsed, flags), out, err, http);
+        Map<String, Object> body = commandBody(parsed, flags);
+        body.put("run", target);
+        return postAndMaybeWait(parsed, state, flags, body, out, err, http);
+    }
+
+    private static String diagnosticTarget(
+            WorkbenchCommandLine.Parsed parsed,
+            SessionFlags flags,
+            PrintStream err
+    ) {
+        String run = flags.run;
+        String runId = parsed.coordination().runId();
+        if (run != null && !run.isBlank()) return run;
+        if (runId != null && !runId.isBlank()) return runId;
+        err.println("Usage: diagnostic-run --run=<id>");
+        err.println("--run is the diagnostic pack. --run-id selects the live session and is the pack when --run is omitted.");
+        return null;
     }
 
     private static int postCommand(
@@ -638,6 +652,14 @@ public final class WorkbenchSessionCommands {
         String id = flags.id;
         if (id == null || id.isBlank()) {
             SessionState session = state.get();
+            if (jsonRequested(parsed)) {
+                Map<String, Object> body = new LinkedHashMap<>();
+                body.put("pid", session.pid());
+                body.put("url", session.url());
+                body.put("mode", session.mode());
+                printJson(out, body);
+                return 0;
+            }
             out.println("SESSION pid=" + session.pid() + " url=" + session.url() + " mode=" + session.mode());
             printTiming(out, parsed, http, session);
             return 0;
@@ -645,6 +667,16 @@ public final class WorkbenchSessionCommands {
         try {
             JsonNode view = getJson(http, state.get(), "/commands/" + id);
             String status = textOr(view, "status", "");
+            if (jsonRequested(parsed)) {
+                Map<String, Object> body = new LinkedHashMap<>();
+                body.put("id", id);
+                body.put("status", status);
+                if (view.has("result") && !view.get("result").isNull()) {
+                    body.put("result", JSON.convertValue(view.get("result"), Object.class));
+                }
+                printJson(out, body);
+                return terminalExit(status);
+            }
             out.println(id + " " + status);
             if (view.has("result")) out.println(view.get("result").toString());
             printTiming(out, parsed, http, state.get());
@@ -666,7 +698,9 @@ public final class WorkbenchSessionCommands {
         try {
             JsonNode events = postJson(http, state, "/tools/workbench_events", Map.of());
             out.println(events.toString());
-            out.println(formatReport(timingOf(events, runStarted(parsed), Instant.now()), sleepGaps(http, state)));
+            if (!jsonRequested(parsed)) {
+                out.println(formatReport(timingOf(events, runStarted(parsed), Instant.now()), sleepGaps(http, state)));
+            }
             return 0;
         } catch (RuntimeException failure) {
             err.println("Workbench events failed: " + failure.getMessage());
@@ -727,6 +761,23 @@ public final class WorkbenchSessionCommands {
         out.println("ACK SESSION killed pid=" + session.pid());
         finishRequestedRun(parsed, out, "STOPPED");
         return 0;
+    }
+
+    private static boolean jsonRequested(WorkbenchCommandLine.Parsed parsed) {
+        String[] args = parsed == null ? null : parsed.forwarded();
+        if (args == null) return false;
+        for (String arg : args) {
+            if ("--json".equals(arg)) return true;
+        }
+        return false;
+    }
+
+    private static void printJson(PrintStream out, Object value) {
+        try {
+            out.println(JSON.writeValueAsString(value));
+        } catch (IOException failure) {
+            throw new IllegalStateException("Could not write JSON.", failure);
+        }
     }
 
     private static void killTree(long pid) {
@@ -1371,7 +1422,7 @@ public final class WorkbenchSessionCommands {
                 if (token.startsWith("--session-file=")) {
                     sessionFile = token.substring("--session-file=".length()).trim();
                     if (sessionFile.isBlank()) {
-                        throw new IllegalArgumentException("--session-file requires a path.");
+                        throw new IllegalArgumentException("Usage: --session-file=<path>");
                     }
                     absorb = null;
                     continue;
@@ -1379,7 +1430,7 @@ public final class WorkbenchSessionCommands {
                 if ("--session-file".equals(token)) {
                     String value = index + 1 < args.length ? args[++index] : null;
                     if (value == null || value.isBlank()) {
-                        throw new IllegalArgumentException("--session-file requires a path.");
+                        throw new IllegalArgumentException("Usage: --session-file=<path>");
                     }
                     sessionFile = value.trim();
                     absorb = null;
@@ -1433,12 +1484,12 @@ public final class WorkbenchSessionCommands {
 
         private static Long positiveSeconds(String value, String label) {
             if (value == null || value.isBlank()) {
-                throw new IllegalArgumentException(label + " requires a positive number of seconds.");
+                throw new IllegalArgumentException(label + " requires a positive number of seconds. Usage: " + label + "=<seconds>");
             }
             try {
                 long seconds = Long.parseLong(value.trim());
                 if (seconds <= 0) {
-                    throw new IllegalArgumentException(label + " requires a positive number of seconds.");
+                    throw new IllegalArgumentException(label + " requires a positive number of seconds. Usage: " + label + "=<seconds>");
                 }
                 return seconds;
             } catch (NumberFormatException failure) {

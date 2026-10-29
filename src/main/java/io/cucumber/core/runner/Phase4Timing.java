@@ -4,9 +4,11 @@ import tools.dscode.launcher.WorkbenchLaunchTiming;
 
 /**
  * Launch-segment marks. A normal {@code mvn test} pays one boolean read and
- * prints nothing. A Workbench discover or confirm always prints the coarse
+ * prints nothing. A Workbench discover or confirm records the coarse
  * stages ({@code discover-start}, {@code runner-ready}, {@code cucumber-discover-done},
- * {@code execute-start}, {@code scenario-start}). Per-file parse marks stay off
+ * {@code execute-start}, {@code scenario-start}) in {@code launch-timing.txt}.
+ * Those lines stay off stderr unless {@code -Dpkb_workbench_timing=true}
+ * or {@code PKB_WORKBENCH_TIMING=1}. Per-file parse marks stay off
  * unless {@code -Dpickleball.phase4.timing=true}.
  */
 public final class Phase4Timing {

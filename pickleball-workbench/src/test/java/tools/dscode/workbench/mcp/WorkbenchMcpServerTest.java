@@ -37,6 +37,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class WorkbenchMcpServerTest {
@@ -250,6 +251,33 @@ class WorkbenchMcpServerTest {
         String text = ((McpSchema.TextContent) result.content().getFirst()).text();
         assertTrue(text.contains("paused interactive worker"));
         assertEquals(0, stops.get());
+    }
+
+    @Test
+    void missingExecuteStepTextNamesTheToolAndTheField() {
+        WorkbenchMcpTools tools = new WorkbenchMcpTools(fakeServices((method, args) -> null), JSON);
+        var result = tools.specifications().stream()
+                .filter(spec -> "workbench_execute_step".equals(spec.tool().name()))
+                .findFirst()
+                .orElseThrow()
+                .callHandler()
+                .apply(null, new McpSchema.CallToolRequest("workbench_execute_step", Map.of(), null));
+        assertTrue(Boolean.TRUE.equals(result.isError()));
+        String text = ((McpSchema.TextContent) result.content().getFirst()).text();
+        assertTrue(text.contains("workbench_execute_step requires text (Gherkin step text.)"), text);
+        assertTrue(text.contains("Pass a non-blank string"), text);
+        assertTrue(text.contains("It was omitted."), text);
+    }
+
+    @Test
+    void unknownToolPointsAtToolsList() {
+        WorkbenchMcpTools tools = new WorkbenchMcpTools(fakeServices((method, args) -> null), JSON);
+        IllegalArgumentException failure = assertThrows(
+                IllegalArgumentException.class,
+                () -> tools.call("workbench_not_a_tool", Map.of())
+        );
+        assertTrue(failure.getMessage().contains("Unknown Workbench tool: workbench_not_a_tool"), failure.getMessage());
+        assertTrue(failure.getMessage().contains("tools/list"), failure.getMessage());
     }
 
     @Test
