@@ -60,6 +60,8 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/reserved-element-names.md`
 - `docs/roadmaps/2.1.17-workspace-config.md`
 - `docs/roadmaps/2.1.18-direct-control-handoff.md`
+- `docs/roadmaps/2.1.18-workbench-coverage-findings.md`
+- `docs/roadmaps/2.1.18-workbench-full-coverage.md`
 - `docs/service-call-scenarios.md`
 - `docs/step-overrides.md`
 - `docs/workbench-thin-packaging-roadmap.md`
@@ -428,6 +430,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/testengine/PickleballRunner.java`
 - `src/main/java/tools/dscode/testengine/PKB_props.java`
 - `src/main/java/tools/dscode/testengine/PkbPropertyValueNormalizer.java`
+- `src/main/java/tools/dscode/testengine/ProjectPropertySources.java`
 - `src/main/java/tools/dscode/testengine/SensitiveConfiguration.java`
 - `src/main/java/tools/dscode/testengine/WorkbenchWorkerMain.java`
 - `src/main/java/tools/dscode/testengine/WorkspaceSeed.java`
@@ -479,6 +482,9 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/SessionHealthWaitTest.java`
 - `src/test/java/tools/dscode/launcher/VersionSwitchTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchAgentCommandsTest.java`
+- `src/test/java/tools/dscode/launcher/WorkbenchCliCoverageGateTest.java`
+- `src/test/java/tools/dscode/launcher/WorkbenchCliProcessCoverageTest.java`
+- `src/test/java/tools/dscode/launcher/WorkbenchCliSurfaceCoverageTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchCommandLineTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchConsoleTapTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchElementInspectTest.java`
@@ -503,6 +509,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/testengine/MavenWorkspaceLaunchEndToEndTest.java`
 - `src/test/java/tools/dscode/testengine/Phase7SeedMain.java`
 - `src/test/java/tools/dscode/testengine/PlainResolutionGoldenTest.java`
+- `src/test/java/tools/dscode/testengine/RunVarMatrixParityTest.java`
 - `src/test/java/tools/dscode/testengine/WorkspaceDriverProbe.java`
 - `src/test/java/tools/dscode/testengine/WorkspaceLaunchEndToEndTest.java`
 - `src/test/java/tools/dscode/testengine/WorkspaceLaunchTest.java`

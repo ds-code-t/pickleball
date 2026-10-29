@@ -98,6 +98,15 @@ Agent flow:
 
 Default Workbench launches use the workspace. `pkb_overriderunvars` is deprecated and is not how a worker starts. When a plain run that does not set `pkb_workspace` opts into sealed input, that launch uses `-Dpkb_overriderunvars=<compact complete map>`, never `-Dpkb_run_profile=`.
 
+## One resolution path
+
+Workbench launches and normal launches resolve RunVars through one composer, `PKB_props.resolveInto` (`PickleballProfiles.apply`). There is no second formula.
+
+- Property files (`pickleball.properties`, `pickleball_local.properties`, `pickleball_local2.properties`, on the classpath and under the project) are read by `ProjectPropertySources`. The runner, `resolve-runvars`, and Workbench `hint` all use that reader. Files are UTF-8. Later files overwrite earlier ones: `pickleball_local2` over `pickleball_local` over `pickleball.properties`, and `src/test/resources` over the project root.
+- A normal run calls `resolveInto` after `globalTestDefaults()`, the property files, system properties, and `globalTestProperties()`.
+- A Workbench run captures that resolved map once into `.pickleball/runs/<run-id>/workspace/`. `Workspace.loadForLaunch` is the only launch read. Selection keys (`pkb_tags`, `pkb_name`, `pkb_example`, `pkb_features`, `pkb_parallel`, `pkb_run_id`, `pkb_agent_id`) may override the copy for that process. Hooks and property files are not applied again. An agent edit of the copy is the final RunVar set.
+- `resolve-runvars` / `hint` print a dry-run of the launcher JVM through the same composer. That preview is not the Discover worker. Trust the run record after Discover.
+
 ## Normal configuration
 
 Without `pkb_profile` or `pkb_runvars`, normal Pickleball configuration is resolved into `default_profile` and becomes the active RunVars. The runner then serializes those effective RunVars into `pkb_run_profile`.

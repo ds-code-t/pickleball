@@ -87,6 +87,8 @@ normal properties / profiles / pkb_runvars
              scenario runtime
 ```
 
+That resolution is `PKB_props.resolveInto` for both a normal run and a Workbench dry-run. The Workbench worker does not resolve again: `Workspace.loadForLaunch` reads the workspace copy.
+
 Configuration data is not loaded during profile/RunVar resolution. `ParsingMap.initializeConfigs` binds the final source only after the effective RunVars and `pkb_configpath` are known.
 
 `<config:...>` and legacy `<configs...>` are runtime mapping data. Neither form can choose `pkb_configpath` or otherwise resolve `default_profile`, named profiles, `pkb_runvars`, or the final `pkb_run_profile`.
