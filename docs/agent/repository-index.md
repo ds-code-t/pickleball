@@ -487,6 +487,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/WorkbenchCliSurfaceCoverageTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchCommandLineTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchConsoleTapTest.java`
+- `src/test/java/tools/dscode/launcher/WorkbenchConsumerScenarioEndToEndTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchElementInspectTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchLaunchTimingTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchPointerContractTest.java`
@@ -507,8 +508,12 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/testengine/DynamicSuiteBootstrapWorkbenchRootTest.java`
 - `src/test/java/tools/dscode/testengine/ExampleRowFilterTest.java`
 - `src/test/java/tools/dscode/testengine/MavenWorkspaceLaunchEndToEndTest.java`
+- `src/test/java/tools/dscode/testengine/parity/LaunchObservationMain.java`
+- `src/test/java/tools/dscode/testengine/parity/LaunchParitySteps.java`
+- `src/test/java/tools/dscode/testengine/parity/LaunchSeedMain.java`
 - `src/test/java/tools/dscode/testengine/Phase7SeedMain.java`
 - `src/test/java/tools/dscode/testengine/PlainResolutionGoldenTest.java`
+- `src/test/java/tools/dscode/testengine/RunVarLaunchParityTest.java`
 - `src/test/java/tools/dscode/testengine/RunVarMatrixParityTest.java`
 - `src/test/java/tools/dscode/testengine/WorkspaceDriverProbe.java`
 - `src/test/java/tools/dscode/testengine/WorkspaceLaunchEndToEndTest.java`
@@ -516,6 +521,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/testengine/WorkspaceSeedTest.java`
 - `src/test/java/tools/dscode/untilpass/UntilPassBrowserSteps.java`
 - `src/test/resources/expected-failure/release-216-expected-failure.feature`
+- `src/test/resources/launch-parity/observe.feature`
 - `src/test/resources/multiline-assert/multiline-assert.feature`
 - `src/test/resources/scenario-object/scenario-object.feature`
 - `src/test/resources/until-pass/literal-until-with-browser.feature`
@@ -528,6 +534,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/runnerFixtures/java/tools/dscode/testengine/fixtures/BlankBrowserRunner.java`
 - `src/runnerFixtures/java/tools/dscode/testengine/fixtures/ConsumerStyleRunner.java`
 - `src/runnerFixtures/java/tools/dscode/testengine/fixtures/ExampleRunner.java`
+- `src/runnerFixtures/java/tools/dscode/testengine/fixtures/ParityHookRunner.java`
 - `src/runnerFixtures/java/tools/dscode/testengine/fixtures/Phase7Hooked.java`
 - `src/runnerFixtures/java/tools/dscode/testengine/fixtures/ProbeRunner.java`
 - `src/runnerFixtures/java/tools/dscode/testengine/fixtures/WorkspaceLaunchHooked.java`
@@ -807,6 +814,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `maven-consumer-project/src/test/java/com/example/pickleball/support/LocalTestSite.java`
 - `maven-consumer-project/src/test/java/com/example/pickleball/SyntaxProofSteps.java`
 - `maven-consumer-project/src/test/java/com/example/pickleball/tests/TokenizedQueryTest.java`
+- `maven-consumer-project/src/test/java/com/example/pickleball/WorkbenchCliProbeSteps.java`
 - `maven-consumer-project/src/test/java/io/cucumber/core/runner/ScenarioStepChecks.java`
 - `maven-consumer-project/src/test/java/io/cucumber/core/runner/ScenarioStepDataChecks.java`
 - `maven-consumer-project/src/test/java/tools/dscode/common/assertions/AssertionClauseSplitterChecks.java`
@@ -889,6 +897,8 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `maven-consumer-project/src/test/resources/features/step-state-elements.feature`
 - `maven-consumer-project/src/test/resources/features/syntax-since-2.1.14.feature`
 - `maven-consumer-project/src/test/resources/features/top-level-collection-index.feature`
+- `maven-consumer-project/src/test/resources/features/workbench-cli-fail.feature`
+- `maven-consumer-project/src/test/resources/features/workbench-cli-probe.feature`
 
 ## Maven consumer service-call definitions
 

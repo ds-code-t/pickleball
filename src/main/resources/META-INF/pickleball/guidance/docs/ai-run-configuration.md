@@ -102,10 +102,11 @@ Default Workbench launches use the workspace. `pkb_overriderunvars` is deprecate
 
 Workbench launches and normal launches resolve RunVars through one composer, `PKB_props.resolveInto` (`PickleballProfiles.apply`). There is no second formula.
 
-- Property files (`pickleball.properties`, `pickleball_local.properties`, `pickleball_local2.properties`, on the classpath and under the project) are read by `ProjectPropertySources`. The runner, `resolve-runvars`, and Workbench `hint` all use that reader. Files are UTF-8. Later files overwrite earlier ones: `pickleball_local2` over `pickleball_local` over `pickleball.properties`, and `src/test/resources` over the project root.
-- A normal run calls `resolveInto` after `globalTestDefaults()`, the property files, system properties, and `globalTestProperties()`.
+- Property files (`pickleball.properties`, `pickleball_local.properties`, `pickleball_local2.properties`) are read only by `ProjectPropertySources`. Classpath resources are loaded first (UTF-8), then the same names from the project root and `src/test/resources`. Later sources overwrite earlier ones: `pickleball_local2` over `pickleball_local` over `pickleball.properties`, and a project file over the classpath copy of the same name. A file `Properties` cannot load, including a bad `\u` escape, throws `IllegalStateException` (`Could not read project properties <file>`). The runner, `resolve-runvars`, and Workbench `hint` all use that reader.
+- A normal run and a dry-run call the same sequence, `PickleballRunner` `resolveShared`: `globalTestDefaults()`, those property files, JVM system properties, `globalTestProperties()`, JVM system properties again (a `-D` wins), then `PKB_props.resolveInto`.
+- Dry-run (`hint`, `resolve-runvars`, and `DiagnosticCli resolve-runvars`) constructs the consumer runner when this JVM can see exactly one concrete `PickleballRunner` on the preferred test-output root (`pickleball.workbench.testOutputRoot`, otherwise `target/test-classes`, `build/classes/java/test`, the Kotlin test-class directories, or a synced `workbench/live/classes`). That construction runs the hooks. It does not publish system properties, start Cucumber, or open a browser. When no consumer runner is visible, the preview uses empty hooks. `hint` and `resolve-runvars` both include the live JVM overlays. There is no second resolver.
 - A Workbench run captures that resolved map once into `.pickleball/runs/<run-id>/workspace/`. `Workspace.loadForLaunch` is the only launch read. Selection keys (`pkb_tags`, `pkb_name`, `pkb_example`, `pkb_features`, `pkb_parallel`, `pkb_run_id`, `pkb_agent_id`) may override the copy for that process. Hooks and property files are not applied again. An agent edit of the copy is the final RunVar set.
-- `resolve-runvars` / `hint` print a dry-run of the launcher JVM through the same composer. That preview is not the Discover worker. Trust the run record after Discover.
+- The dry-run matches a fresh normal launch, including hook values. It is still not the Discover worker. Discover launches from the saved copy, so an edited copy is what the run uses. Trust the run record after Discover.
 
 ## Normal configuration
 
@@ -395,7 +396,7 @@ PKB_props.overrideRunVars(Map.of(
 ));
 ```
 
-Dry-run resolve does **not** start tests or browsers. `DiagnosticCli resolve-runvars` and Workbench `hint` preview the launcher JVM, not the Discover worker. Do not treat that preview, including its `pkb_environment`, as the environment Discover will use. Trust the run record after Discover.
+Dry-run resolve does **not** start tests or browsers. `DiagnosticCli resolve-runvars` and Workbench `hint` / `resolve-runvars` construct the consumer runner when it is on the test classpath, run `globalTestDefaults()` and `globalTestProperties()`, and read property files with `ProjectPropertySources`. A bad property file fails the command. The preview matches a fresh normal launch. It is still the launcher JVM, not the Discover worker: a later workspace edit is not visible here, and hooks are not applied again at launch. Do not treat that preview, including its `pkb_environment`, as the environment Discover will use after the copy is edited. Trust the run record after Discover.
 
 ```java
 PKB_props.ResolvedRunVars preview = PKB_props.resolveRunVars(values);

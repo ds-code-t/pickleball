@@ -30,7 +30,7 @@ Each stronger source overwrites the same key from weaker sources. The naming is 
 
 The fully resolved normal RunVars become the in-memory `default_profile`. If neither `pkb_profile` nor `pkb_runvars` is supplied, that normal configuration becomes the effective RunVar set and is serialized into `pkb_run_profile`.
 
-`pickleball_local2.properties` is a third property file. It overwrites `pickleball_local.properties`, which overwrites `pickleball.properties`. Those three names are read from the classpath, the project root, and `src/test/resources` (later location wins). `ProjectPropertySources` is the only reader. A normal launch and Workbench `hint` / `resolve-runvars` both call `PKB_props.resolveInto`. A Workbench launch then reads the saved workspace copy with `Workspace.loadForLaunch` and does not apply hooks or property files again. See [One resolution path](ai-run-configuration.md#one-resolution-path).
+`pickleball_local2.properties` is a third property file. It overwrites `pickleball_local.properties`, which overwrites `pickleball.properties`. `ProjectPropertySources` is the only reader: classpath resources first (UTF-8), then the same names at the project root and under `src/test/resources`. A bad `\u` escape throws instead of being skipped. A normal launch and Workbench `hint` / `resolve-runvars` both construct the runner and call `resolveShared`, so `globalTestDefaults()` and `globalTestProperties()` are in the preview when the consumer runner is visible. A Workbench launch then reads the saved workspace copy with `Workspace.loadForLaunch` and does not apply hooks or property files again. See [One resolution path](ai-run-configuration.md#one-resolution-path).
 
 ```java
 @Override

@@ -87,7 +87,7 @@ normal properties / profiles / pkb_runvars
              scenario runtime
 ```
 
-That resolution is `PKB_props.resolveInto` for both a normal run and a Workbench dry-run. The Workbench worker does not resolve again: `Workspace.loadForLaunch` reads the workspace copy.
+That resolution is one sequence for a normal run and a Workbench dry-run: `PickleballRunner` `resolveShared` (hooks, then `ProjectPropertySources`, then `PKB_props.resolveInto`). The dry-run constructs the consumer runner when it is visible, so hook values are in the preview. The Workbench worker does not resolve again: `Workspace.loadForLaunch` reads the workspace copy.
 
 Configuration data is not loaded during profile/RunVar resolution. `ParsingMap.initializeConfigs` binds the final source only after the effective RunVars and `pkb_configpath` are known.
 
