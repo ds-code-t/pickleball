@@ -111,6 +111,6 @@ pkb_direct_control_provider=composite
 
 The value may instead be the path of a `composite` binary. Unset or blank means Pickleball does not start a provider. When it is set, Workbench may start that binary and pass the descriptor path, the session id, and the CDP address. The provider attaches, acts, and detaches under this contract. Its stdout and stderr go to that run's session log.
 
-The binary is found at runtime. `COMPOSITE_BIN` is the path. Otherwise a local dom-composite checkout may have `target/debug/composite` or `target/release/composite`. The Java binding is not on a registry. Builds and ordinary tests do not need the binary. A missing binary skips a provider check; it does not fail the suite.
+The binary is found at runtime. `COMPOSITE_BIN` is the path. Otherwise `COMPOSITE_HOME` or a sibling checkout named `dom-composite` next to the project may have `target/debug/composite` or `target/release/composite`. The Java binding is not on a registry. Builds and ordinary tests do not need the binary. A missing binary skips a provider check; it does not fail the suite.
 
 Pickleball writes the descriptor, the CLI, the hold, and the provider key. dom-composite stays a general tool and does not grow a Pickleball-only flag.
