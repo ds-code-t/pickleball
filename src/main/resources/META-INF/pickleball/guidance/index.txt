@@ -36,6 +36,7 @@ docs/pickleball-workbench.md
 docs/release-notes.md
 docs/reserved-element-names.md
 docs/roadmaps/2.1.17-workspace-config.md
+docs/roadmaps/2.1.18-direct-control-handoff.md
 docs/service-call-scenarios.md
 docs/step-overrides.md
 docs/workbench-thin-packaging-roadmap.md
