@@ -1188,6 +1188,14 @@ public final class WorkbenchSessionCommands {
     }
 
     static final class SessionFlags {
+        /**
+         * Flags this parser recognizes beyond {@link WorkbenchCommandLine#MAJOR_FLAGS}.
+         * {@code --session-file} is forwarded by session launch, not stored on this record.
+         */
+        static final List<String> MAJOR_FLAGS = List.of(
+                "--ack-only", "--wait", "--no-wait", "--force",
+                "--stop-after", "--feature", "--run", "--from-here", "--session-file"
+        );
         final String text;
         final String id;
         final String feature;

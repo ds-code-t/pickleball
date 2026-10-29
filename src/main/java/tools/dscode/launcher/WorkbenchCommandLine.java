@@ -34,6 +34,19 @@ final class WorkbenchCommandLine {
             "open-window", "close-window", "show-run"
     );
 
+    /**
+     * Flags {@link #parse} recognizes. Coverage walks this list, not a second copy.
+     */
+    static final List<String> MAJOR_FLAGS = List.of(
+            "--tags", "--tags-file", "--tags-b64",
+            "--name", "--example", "--plan", "--refresh", "--no-narrow", "--full-scan",
+            "--runvar", "--select", "--retention",
+            "--run-id", "--agent", "--agent-id", "--group", "--sequence",
+            "--who", "--why", "--learned", "--text", "--to", "--from", "--limit",
+            "--write", "--list", "--take", "--touch", "--sweep", "--renew", "--append",
+            "--id", "--version", "--ttl", "--step-timeout", "--run-timeout"
+    );
+
     private WorkbenchCommandLine() {
     }
 

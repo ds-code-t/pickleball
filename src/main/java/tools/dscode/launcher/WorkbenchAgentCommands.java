@@ -41,6 +41,14 @@ import java.util.concurrent.TimeoutException;
 
 /** Agent-facing Workbench verbs that run in the consumer JVM (not the controller JAR). */
 public final class WorkbenchAgentCommands {
+    /**
+     * Flags read from the raw argument vector rather than {@link WorkbenchCommandLine.Parsed} fields.
+     */
+    static final List<String> MAJOR_FLAGS = List.of(
+            "--json", "--expect", "--config", "--reseed", "--from-run",
+            "--html", "--category", "--status"
+    );
+
     private WorkbenchAgentCommands() {
     }
 
