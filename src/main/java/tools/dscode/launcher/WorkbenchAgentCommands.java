@@ -361,12 +361,12 @@ public final class WorkbenchAgentCommands {
             boolean includeAmbient,
             PrintStream out
     ) {
-        LinkedHashMap<String, String> values = new LinkedHashMap<>(PKB_props.readProjectProperties(project));
-        LinkedHashMap<String, String> jvm = new LinkedHashMap<>();
-        if (includeAmbient) {
-            PKB_props.copyJvmDryRunInputs(values, jvm, true, true);
+        PKB_props.ResolvedRunVars resolved = tools.dscode.testengine.PickleballRunner.previewLaunch(project);
+        // Hint and resolve-runvars share this preview. A normal launch always merges
+        // JVM system properties, so includeAmbient is not a second resolver.
+        if (project == null && includeAmbient) {
+            project = Path.of("");
         }
-        PKB_props.ResolvedRunVars resolved = PKB_props.resolveRunVars(values, jvm);
         out.println("Dry-run resolve of the launcher JVM, not the Discover worker (does not start tests, browsers, or Discover):");
         out.println("Do not treat resolve-runvars as the environment Discover will use. Trust the environment on the run record after Discover.");
         out.println("sealed=" + resolved.sealed());

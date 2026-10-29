@@ -101,7 +101,7 @@ class WorkbenchAgentCommandsTest {
             assertTrue(output.stdout().contains("pkb_overriderunvars") || output.stdout().contains("sealed="));
             assertTrue(output.stdout().contains("provenance="));
             assertFalse(output.stdout().contains("MUST"));
-            assertFalse(output.stdout().contains("pkb_parallel=80"));
+            assertTrue(output.stdout().contains("pkb_parallel=80"));
         } finally {
             restoreProperty("pkb_parallel", previousParallel);
             restoreProperty("pkb_runvars.pkb_parallel", previousRunVarsParallel);

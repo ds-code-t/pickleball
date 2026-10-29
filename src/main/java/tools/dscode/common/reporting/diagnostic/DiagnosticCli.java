@@ -125,12 +125,10 @@ public final class DiagnosticCli {
             PrintStream out,
             boolean includeAmbient
     ) throws IOException {
-        LinkedHashMap<String, String> values = new LinkedHashMap<>(PKB_props.readProjectProperties(project));
-        LinkedHashMap<String, String> jvm = new LinkedHashMap<>();
-        if (includeAmbient) {
-            PKB_props.copyJvmDryRunInputs(values, jvm, true, true);
+        PKB_props.ResolvedRunVars resolved = tools.dscode.testengine.PickleballRunner.previewLaunch(project);
+        if (project == null && includeAmbient) {
+            project = Path.of("");
         }
-        PKB_props.ResolvedRunVars resolved = PKB_props.resolveRunVars(values, jvm);
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("sealed", resolved.sealed());
         body.put("runProfile", resolved.runProfile());

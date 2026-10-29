@@ -132,6 +132,15 @@ public final class DynamicSuiteBootstrap {
         return glue;
     }
 
+    /**
+     * The consumer runner in the preferred test-output root, or null when this
+     * JVM is not a consumer test process. Dry-run and a normal launch use the
+     * same class so hook defaults are not a second formula.
+     */
+    public static Class<? extends PickleballRunner> findConsumerRunnerOrNull() {
+        return findDynamicSuiteSubclassInPreferredTestRoots();
+    }
+
     private static volatile Class<? extends PickleballRunner> DISCOVERED_SUITE_CLASS;
 
     public static Class<? extends PickleballRunner> getDiscoveredSuiteClass() {
@@ -343,7 +352,8 @@ public final class DynamicSuiteBootstrap {
         return s.endsWith("/target/test-classes/")
                 || s.endsWith("/build/classes/java/test/")
                 || s.endsWith("/build/classes/kotlin/test/")
-                || s.endsWith("/build/classes/test/");
+                || s.endsWith("/build/classes/test/")
+                || s.endsWith("/workbench/live/classes/");
     }
 
     private static List<URI> classpathRoots() {
