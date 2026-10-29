@@ -1,6 +1,7 @@
 package tools.dscode.testengine;
 
 import tools.dscode.common.resources.ResourceLocations;
+import tools.dscode.control.protocol.PickleballLocalLayout;
 import tools.dscode.control.protocol.Workspace;
 
 import java.io.File;
@@ -153,12 +154,33 @@ public final class WorkspaceSeed {
     }
 
     public static Inputs detect(Path project) {
+        List<String> classpath = syncedClasspath(project);
+        if (classpath.isEmpty()) classpath = runtimeClasspath();
         return new Inputs(
                 propertyFiles(project),
                 testClassesModifiedMillis(project),
-                classpathFingerprint(runtimeClasspath()),
+                classpathFingerprint(classpath),
                 resolutionInputs(System.getProperties(), System.getenv())
         );
+    }
+
+    /**
+     * The classpath {@code sync} wrote. A capture forks that list, so the seed
+     * cache key has to change when it changes. The launcher JVM classpath is
+     * only the fallback before the first sync.
+     */
+    static List<String> syncedClasspath(Path project) {
+        if (project == null) return List.of();
+        Path file = PickleballLocalLayout.workbenchStateRoot(project).resolve("classpath.txt");
+        if (!Files.isRegularFile(file)) return List.of();
+        try {
+            return Files.readAllLines(file, java.nio.charset.StandardCharsets.UTF_8).stream()
+                    .map(String::trim)
+                    .filter(value -> !value.isBlank())
+                    .toList();
+        } catch (IOException failure) {
+            throw new IllegalStateException("Could not read Workbench classpath: " + file, failure);
+        }
     }
 
     static List<String> runtimeClasspath() {

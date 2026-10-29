@@ -94,6 +94,7 @@ public final class WorkspaceLaunch {
                 Workspace.writeRunVars(workspace, values);
             }
         }
+        defaultDiagnosticReporting(workspace);
         Workspace.applyLaunchEdits(workspace, selection, cliRunVars, warnings);
         stamp(workspace);
         return new Prepared(workspace, Map.copyOf(selection));
@@ -163,6 +164,20 @@ public final class WorkspaceLaunch {
         } catch (IOException failure) {
             throw new IllegalStateException("Could not seed workspace " + workspace, failure);
         }
+    }
+
+    /**
+     * Discover's catalog is the diagnostic run index. A blank saved
+     * {@code pkb_reportingmode} becomes {@code diagnostic} once, here, before
+     * {@code --runvar} edits. An explicit value, including {@code normal}, stays.
+     * This is not a second resolver and does not reapply hooks.
+     */
+    private static void defaultDiagnosticReporting(Path workspace) {
+        Map<String, String> values = new LinkedHashMap<>(Workspace.readRunVars(workspace));
+        String reporting = values.get(PKB_props.PKB_REPORTING_MODE);
+        if (reporting != null && !reporting.isBlank()) return;
+        values.put(PKB_props.PKB_REPORTING_MODE, "diagnostic");
+        Workspace.writeRunVars(workspace, values);
     }
 
     private static void warn(Appendable warnings, String message) {

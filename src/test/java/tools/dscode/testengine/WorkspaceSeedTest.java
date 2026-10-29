@@ -170,7 +170,7 @@ class WorkspaceSeedTest {
     }
 
     @Test
-    void detectRecordsClasspathAndDashDAndEnvInputs() {
+    void detectRecordsClasspathAndDashDAndEnvInputs() throws Exception {
         System.setProperty("pkb_environment", "from-dash-d");
         System.setProperty(Workspace.PROPERTY, "/tmp/not-a-workspace");
         Properties system = new Properties();
@@ -186,6 +186,14 @@ class WorkspaceSeedTest {
         WorkspaceSeed.Inputs detected = WorkspaceSeed.detect(temp);
         assertFalse(detected.classpathFingerprint().isBlank());
         assertEquals("from-dash-d", detected.resolutionInputs().get("pkb_environment"));
+
+        Path classpath = tools.dscode.control.protocol.PickleballLocalLayout.workbenchStateRoot(temp).resolve("classpath.txt");
+        Files.createDirectories(classpath.getParent());
+        Files.writeString(classpath, temp.resolve("consumer.jar").toString() + "\n");
+        Files.writeString(temp.resolve("consumer.jar"), "jar");
+        WorkspaceSeed.Inputs synced = WorkspaceSeed.detect(temp);
+        assertTrue(synced.classpathFingerprint().contains("consumer.jar"), synced.classpathFingerprint());
+        assertFalse(synced.classpathFingerprint().equals(detected.classpathFingerprint()));
     }
 
     private void clearRunner() throws Exception {

@@ -1548,6 +1548,7 @@ class WorkbenchAgentCommandsTest {
         Map<String, String> stored = Workspace.readRunVars(Path.of(workspaceArg.substring("-Dpkb_workspace=".length())));
         assertEquals("DEV", stored.get(PKB_props.PKB_ENVIRONMENT));
         assertEquals("auto", stored.get(PKB_props.PKB_PARALLEL));
+        assertEquals("diagnostic", stored.get(PKB_props.PKB_REPORTING_MODE));
         String errors = stderr.toString(StandardCharsets.UTF_8);
         assertTrue(errors.contains("WARNING: --runvar pkb_parallel replaces"), errors);
         String record = Files.readString(
