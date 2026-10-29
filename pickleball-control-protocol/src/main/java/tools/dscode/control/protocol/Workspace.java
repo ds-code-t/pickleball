@@ -198,6 +198,21 @@ public final class Workspace {
         }
     }
 
+    /**
+     * Launch read of a workspace copy. Selection keys may override the file for this
+     * process. Hooks, property files, and profiles are not applied again.
+     */
+    public static LinkedHashMap<String, String> loadForLaunch(Path workspace, Map<String, String> selectionOverrides) {
+        LinkedHashMap<String, String> loaded = new LinkedHashMap<>(readRunVars(workspace));
+        requireContext(loaded);
+        if (selectionOverrides == null) return loaded;
+        for (String key : SELECTION_KEYS) {
+            String override = selectionOverrides.get(key);
+            if (override != null && !override.isBlank()) loaded.put(key, override.trim());
+        }
+        return loaded;
+    }
+
     public static void copyConfigs(Path source, Path workspace) {
         Path destination = configsDirectory(workspace);
         try {

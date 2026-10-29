@@ -124,10 +124,13 @@ public final class WorkspaceSeed {
         if (project == null) return "";
         Path root = project.toAbsolutePath().normalize();
         for (Path file : List.of(
+                root.resolve("src/test/resources/pickleball_local2.properties"),
                 root.resolve("src/test/resources/pickleball_local.properties"),
                 root.resolve("src/test/resources/pickleball.properties"),
+                root.resolve("src/main/resources/pickleball_local2.properties"),
                 root.resolve("src/main/resources/pickleball_local.properties"),
                 root.resolve("src/main/resources/pickleball.properties"),
+                root.resolve("pickleball_local2.properties"),
                 root.resolve("pickleball_local.properties"),
                 root.resolve("pickleball.properties")
         )) {

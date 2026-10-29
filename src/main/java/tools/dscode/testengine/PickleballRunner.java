@@ -111,8 +111,8 @@ public abstract class PickleballRunner {
         syncReportPortalAliases(false);
 
         suppressNonInvocationControlsWhenSealed();
-        PickleballProfiles.Resolution profileResolution =
-                PickleballProfiles.apply(values, systemRunVarOverrides, defaultRunVars, propertyFileRunVars);
+        PKB_props.ResolvedRunVars profileResolution = PKB_props.resolveInto(
+                values, systemRunVarOverrides, defaultRunVars, propertyFileRunVars);
         directRunVars = profileResolution.direct();
         sealedRunVars = profileResolution.sealed();
 
@@ -168,14 +168,14 @@ public abstract class PickleballRunner {
         String configured = System.getProperty(Workspace.PROPERTY);
         if (configured == null || configured.isBlank()) return false;
         Path workspace = Path.of(configured.trim());
-        Map<String, String> loaded = Workspace.readRunVars(workspace);
-        Workspace.requireContext(loaded);
-        values.clear();
-        values.putAll(loaded);
+        java.util.LinkedHashMap<String, String> selection = new java.util.LinkedHashMap<>();
         for (String key : Workspace.SELECTION_KEYS) {
             String override = System.getProperty(key);
-            if (override != null && !override.isBlank()) values.put(key, override.trim());
+            if (override != null) selection.put(key, override);
         }
+        java.util.Map<String, String> loaded = Workspace.loadForLaunch(workspace, selection);
+        values.clear();
+        values.putAll(loaded);
         resolveProtectedReferences(readProjectProperties());
         applyPkbAliases();
         syncCanonicalAndAliasKeys();
@@ -214,59 +214,7 @@ public abstract class PickleballRunner {
     }
 
     private static Map<String, String> readProjectProperties() {
-        LinkedHashMap<String, String> project = new LinkedHashMap<>();
-        for (String resource : List.of(
-                "pickleball.properties",
-                "pickleball_local.properties",
-                "pickleball_local2.properties"
-        )) {
-            loadClasspathProperties(resource, project);
-        }
-        Path working = Path.of("").toAbsolutePath();
-        for (Path file : List.of(
-                working.resolve("pickleball.properties"),
-                working.resolve("pickleball_local.properties"),
-                working.resolve("pickleball_local2.properties"),
-                working.resolve("src/test/resources/pickleball.properties"),
-                working.resolve("src/test/resources/pickleball_local.properties"),
-                working.resolve("src/test/resources/pickleball_local2.properties")
-        )) {
-            loadFileProperties(file, project);
-        }
-        return project;
-    }
-
-    private static void loadClasspathProperties(String resourceName, Map<String, String> into) {
-        try {
-            ClassLoader loader = Thread.currentThread().getContextClassLoader();
-            if (loader == null) loader = PickleballRunner.class.getClassLoader();
-            Enumeration<URL> resources = loader.getResources(resourceName);
-            while (resources.hasMoreElements()) {
-                URL url = resources.nextElement();
-                Properties props = new Properties();
-                try (InputStream in = url.openStream()) {
-                    props.load(new java.io.InputStreamReader(in, StandardCharsets.UTF_8));
-                }
-                for (String key : props.stringPropertyNames()) {
-                    into.put(normalizeConfigurationKey(key), props.getProperty(key));
-                }
-            }
-        } catch (Exception failure) {
-            throw new IllegalStateException("Could not read project properties " + resourceName, failure);
-        }
-    }
-
-    private static void loadFileProperties(Path file, Map<String, String> into) {
-        if (file == null || !Files.isRegularFile(file)) return;
-        Properties props = new Properties();
-        try (InputStream in = Files.newInputStream(file)) {
-            props.load(new java.io.InputStreamReader(in, StandardCharsets.UTF_8));
-        } catch (Exception failure) {
-            throw new IllegalStateException("Could not read project properties " + file, failure);
-        }
-        for (String key : props.stringPropertyNames()) {
-            into.put(normalizeConfigurationKey(key), props.getProperty(key));
-        }
+        return ProjectPropertySources.read(Path.of(""));
     }
 
     public static String getOptionsString() {
@@ -803,7 +751,7 @@ public abstract class PickleballRunner {
         return PKB_OPTIONS.equals(normalizePkbKey(key));
     }
 
-    private static String normalizeConfigurationKey(String key) {
+    static String normalizeConfigurationKey(String key) {
         String normalized = normalizePkbKey(key);
         if (normalized == null) {
             return null;

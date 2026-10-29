@@ -204,6 +204,11 @@ public final class PKB_props {
         return PickleballProfiles.fingerprint(values);
     }
 
+    /** Dry-run and launch property files. Same reader the runner uses. */
+    public static LinkedHashMap<String, String> readProjectProperties(java.nio.file.Path project) {
+        return ProjectPropertySources.read(project);
+    }
+
     /**
      * Dry-run resolve of Pickleball RunVars. Does not start tests, browsers, or a {@code PickleballRunner}.
      * Provenance values are {@code override}, {@code runvars}, {@code profile}, {@code jvm},
@@ -227,16 +232,41 @@ public final class PKB_props {
         }
         LinkedHashMap<String, String> working = new LinkedHashMap<>();
         values.forEach((key, value) -> working.put(key, value == null ? "" : value));
-        PickleballProfiles.Resolution resolution = PickleballProfiles.apply(
+        return resolveInto(
                 working,
-                runtimeRunVarOverrides == null ? Map.of() : runtimeRunVarOverrides
+                runtimeRunVarOverrides,
+                Map.of(),
+                PickleballProfiles.runVarMap(values)
         );
-        String profile = PickleballProfiles.serializeRunProfile(working);
+    }
+
+    /**
+     * Shared resolution entry for the runner and for dry-run callers.
+     * Mutates {@code values} the same way {@link PickleballProfiles#apply} always has.
+     * There is no second composer.
+     */
+    public static ResolvedRunVars resolveInto(
+            LinkedHashMap<String, String> values,
+            Map<String, String> runtimeRunVarOverrides,
+            Map<String, String> defaultRunVars,
+            Map<String, String> propertyFileRunVars
+    ) {
+        if (values == null) {
+            throw new IllegalArgumentException("values cannot be null");
+        }
+        PickleballProfiles.Resolution resolution = PickleballProfiles.apply(
+                values,
+                runtimeRunVarOverrides == null ? Map.of() : runtimeRunVarOverrides,
+                defaultRunVars == null ? Map.of() : defaultRunVars,
+                propertyFileRunVars == null ? Map.of() : propertyFileRunVars
+        );
+        String profile = PickleballProfiles.serializeRunProfile(values);
         return new ResolvedRunVars(
                 resolution.runVars(),
                 profile,
-                PickleballProfiles.fingerprint(working),
+                PickleballProfiles.fingerprint(values),
                 resolution.sealed(),
+                resolution.direct(),
                 resolution.provenance()
         );
     }
@@ -388,6 +418,7 @@ public final class PKB_props {
         private final String runProfile;
         private final String fingerprint;
         private final boolean sealed;
+        private final boolean direct;
         private final Map<String, String> provenance;
 
         ResolvedRunVars(
@@ -395,12 +426,14 @@ public final class PKB_props {
                 String runProfile,
                 String fingerprint,
                 boolean sealed,
+                boolean direct,
                 Map<String, String> provenance
         ) {
             this.runVars = runVars == null ? Map.of() : Collections.unmodifiableMap(new LinkedHashMap<>(runVars));
             this.runProfile = runProfile == null ? "" : runProfile;
             this.fingerprint = fingerprint == null ? "" : fingerprint;
             this.sealed = sealed;
+            this.direct = direct;
             this.provenance = provenance == null
                     ? Map.of()
                     : Collections.unmodifiableMap(new LinkedHashMap<>(provenance));
@@ -410,6 +443,7 @@ public final class PKB_props {
         public String runProfile() { return runProfile; }
         public String fingerprint() { return fingerprint; }
         public boolean sealed() { return sealed; }
+        public boolean direct() { return direct; }
         public Map<String, String> provenance() { return provenance; }
     }
 }

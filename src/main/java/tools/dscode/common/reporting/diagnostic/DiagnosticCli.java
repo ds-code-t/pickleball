@@ -125,7 +125,7 @@ public final class DiagnosticCli {
             PrintStream out,
             boolean includeAmbient
     ) throws IOException {
-        LinkedHashMap<String, String> values = loadProjectPkbValues(project);
+        LinkedHashMap<String, String> values = new LinkedHashMap<>(PKB_props.readProjectProperties(project));
         LinkedHashMap<String, String> jvm = new LinkedHashMap<>();
         if (includeAmbient) {
             PKB_props.copyJvmDryRunInputs(values, jvm, true, true);
@@ -142,29 +142,6 @@ public final class DiagnosticCli {
         out.println(json().writeValueAsString(body));
         out.println("pkb_overriderunvars is deprecated for Workbench. A plain run that does not set pkb_workspace can still use -Dpkb_overriderunvars=<complete compact map>, never -Dpkb_run_profile=.");
         out.println();
-    }
-
-    private static LinkedHashMap<String, String> loadProjectPkbValues(Path project) {
-        LinkedHashMap<String, String> values = new LinkedHashMap<>();
-        loadPropertiesFile(values, project.resolve("src/test/resources/pickleball.properties"));
-        loadPropertiesFile(values, project.resolve("src/test/resources/pickleball_local.properties"));
-        return values;
-    }
-
-    private static void loadPropertiesFile(Map<String, String> values, Path file) {
-        if (!Files.isRegularFile(file)) {
-            return;
-        }
-        java.util.Properties props = new java.util.Properties();
-        try (InputStream in = Files.newInputStream(file)) {
-            props.load(in);
-        } catch (IOException ignored) {
-            return;
-        }
-        for (String key : props.stringPropertyNames()) {
-            if (key == null) continue;
-            values.put(key.toLowerCase(java.util.Locale.ROOT), props.getProperty(key));
-        }
     }
 
     @SuppressWarnings("unchecked")
