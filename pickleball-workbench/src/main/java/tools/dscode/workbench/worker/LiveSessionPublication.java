@@ -123,16 +123,11 @@ final class LiveSessionPublication {
         Optional<SessionDescriptor> current = SessionDescriptorWriter.read(project, runId);
         if (current.isEmpty()) return;
         SessionDescriptor existing = current.get();
-        SessionDescriptor updated = new SessionDescriptor(
-                existing.sessionId(),
-                existing.runId(),
-                existing.workspacePath(),
+        SessionDescriptor updated = existing.withPage(
                 page.browserType() != null ? page.browserType() : existing.browserType(),
                 page.cdpDebuggerAddress() != null ? page.cdpDebuggerAddress() : existing.cdpDebuggerAddress(),
                 page.url() != null ? page.url() : existing.currentUrl(),
                 page.windowHandles() != null ? page.windowHandles() : existing.windowHandles(),
-                existing.state(),
-                existing.startedAt(),
                 Instant.now()
         );
         SessionDescriptorWriter.publish(project, updated, true);

@@ -85,6 +85,12 @@ class SessionDescriptorTest {
         assertEquals(null, read.currentUrl());
         assertEquals("edge", read.browserType());
         assertEquals(List.of(), read.windowHandles());
+        assertEquals(null, read.compositeSessionDir());
+        assertEquals(null, read.compositeSessionId());
+        String older = json.replace("  \"compositeSessionDir\": null,\n", "")
+                .replace("  \"compositeSessionId\": null,\n", "");
+        assertFalse(older.contains("compositeSession"));
+        assertEquals(descriptor, SessionDescriptor.parse(older));
     }
 
     @Test

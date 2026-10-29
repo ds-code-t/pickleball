@@ -61,7 +61,33 @@ class LiveSessionPublicationTest {
             assertFalse(Files.isRegularFile(SessionDescriptorWriter.file(project, "run-1").getParent().resolve("provider.log")));
 
             Path script = project.resolve("composite-test");
-            Files.writeString(script, "#!/bin/sh\necho descriptor=$PICKLEBALL_SESSION_DESCRIPTOR\nsleep 30\n");
+            Files.writeString(script, """
+                    #!/bin/sh
+                    echo "$@" >> "$0.calls"
+                    dir=""
+                    id=""
+                    op=""
+                    prev=""
+                    for arg in "$@"; do
+                      if [ "$prev" = "--session-dir" ]; then dir=$arg; fi
+                      if [ "$prev" = "--id" ]; then id=$arg; fi
+                      if [ "$prev" = "session" ]; then op=$arg; fi
+                      prev=$arg
+                    done
+                    mkdir -p "$dir"
+                    if [ "$op" = "attach" ]; then
+                      printf '%s\\n' "{\\"joined\\":\\"$id\\",\\"sessions\\":{\\"$id\\":{\\"id\\":\\"$id\\",\\"launched\\":false}}}" > "$dir/registry.json"
+                      printf '%s\\n' "{\\"id\\":\\"$id\\",\\"launched\\":false,\\"pid\\":null}"
+                      exit 0
+                    fi
+                    if [ "$op" = "close" ]; then
+                      printf '%s\\n' '{"joined":null,"sessions":{}}' > "$dir/registry.json"
+                      printf '%s\\n' "{\\"closed\\":true,\\"detached\\":true,\\"killed\\":false}"
+                      exit 0
+                    fi
+                    echo "unexpected $op" >&2
+                    exit 2
+                    """);
             assertTrue(script.toFile().setExecutable(true));
             Workspace.writeRunVars(
                     Workspace.directory(project, "run-1"),
@@ -71,12 +97,28 @@ class LiveSessionPublicationTest {
             publication.afterStep(new LiveSessionPublication.Page(
                     "chrome", "127.0.0.1:9222", "https://example.test/home", List.of("window-a")
             ));
-            String log = waitForLog(SessionDescriptorWriter.file(project, "run-1").getParent().resolve("provider.log"));
-            assertTrue(log.contains("descriptor="));
+            String log = Files.readString(SessionDescriptorWriter.file(project, "run-1").getParent().resolve("provider.log"));
+            assertTrue(log.contains("\"launched\":false"));
+            assertFalse(log.contains("PICKLEBALL_SESSION_DESCRIPTOR"));
+            SessionDescriptor attached = SessionDescriptorWriter.read(project, "run-1").orElseThrow();
+            Path sessionDir = DirectControlProvider.sessionDirectory(project, "run-1");
+            assertEquals(sessionDir.toString(), attached.compositeSessionDir());
+            assertEquals("session-1", attached.compositeSessionId());
             assertTrue(browser.isAlive());
+            publication.afterStep(new LiveSessionPublication.Page(
+                    "chrome", "127.0.0.1:9222", "https://example.test/next", List.of("window-a", "window-b")
+            ));
+            SessionDescriptor kept = SessionDescriptorWriter.read(project, "run-1").orElseThrow();
+            assertEquals(sessionDir.toString(), kept.compositeSessionDir());
+            assertEquals("session-1", kept.compositeSessionId());
+            assertEquals("https://example.test/next", kept.currentUrl());
             publication.closing();
             publication = null;
             assertTrue(browser.isAlive(), "provider detach must leave the browser running");
+            String calls = Files.readString(Path.of(script.toString() + ".calls"));
+            assertTrue(calls.contains("session attach"));
+            assertTrue(calls.contains("session close"));
+            assertTrue(calls.contains("--session-dir"));
             assertEquals(
                     SessionDescriptor.State.STOPPED,
                     SessionDescriptorWriter.read(project, "run-1").orElseThrow().state()
@@ -87,14 +129,6 @@ class LiveSessionPublicationTest {
             restore(DirectControlProvider.KEY, previous);
             restore(DirectControlProvider.RUNVARS_PROPERTY, member);
         }
-    }
-
-    private static String waitForLog(Path file) throws Exception {
-        for (int i = 0; i < 50; i++) {
-            if (Files.isRegularFile(file) && Files.size(file) > 0) return Files.readString(file);
-            Thread.sleep(20);
-        }
-        return Files.isRegularFile(file) ? Files.readString(file) : "";
     }
 
     private static void restore(String key, String value) {

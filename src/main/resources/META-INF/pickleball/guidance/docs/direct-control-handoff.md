@@ -24,6 +24,8 @@ The file is `.pickleball/runs/<runId>/session/descriptor.json`. It is written on
 | `currentUrl` | Current page, or null. |
 | `windowHandles` | WebDriver window handles. Empty when there are none. |
 | `state` | `idle`, `running`, `paused`, `held`, `stopping`, or `stopped`. |
+| `compositeSessionDir` | Absolute path of this run's composite registry, `.pickleball/runs/<runId>/session/composite`, or null when no provider has attached. An older file that omits the field means null. |
+| `compositeSessionId` | Id recorded by `composite session attach`, or null. Join with this id and `compositeSessionDir`. |
 | `startedAt` | ISO-8601 instant. Fixed for this session. |
 | `updatedAt` | ISO-8601 instant. Changes when the descriptor is replaced. |
 
@@ -47,13 +49,15 @@ If the address has no scheme, prefix `http://`. `127.0.0.1:9222` becomes `http:/
 
 Do not pass a `url`. Do not launch a browser. Attach requires the local-attach acknowledgement so composite records `launched: false`.
 
-CLI:
+CLI, when you are attaching yourself and Pickleball has not already attached:
 
 ```text
-composite session attach --cdp http://127.0.0.1:9222 --id <sessionId> --i-accept-local-attach
+composite session attach --cdp http://127.0.0.1:9222 --id <sessionId> --i-accept-local-attach --session-dir <directory>
 ```
 
-`composite attach --cdp ...` is the same command. Later commands in that process use `--session <sessionId>` or `--cdp` with the same address.
+Use a directory you own. Do not reuse `.pickleball/runs/<runId>/session/composite` while Pickleball's provider is attached; that id is already in the registry.
+
+`composite attach --cdp ...` is the same command. Later commands use `--session <sessionId> --session-dir <directory>`, or `--cdp` with the same address. Attach itself exits as soon as the registry entry is written.
 
 Java (`dev.domcomposite.Client`, binding 2.4.0). `openSession` sends `session create` / `POST /v1/session/create`. It takes the fields this contract names (`cdp` and `id`). Also pass `i_accept_local_attach` so composite records `launched: false`. Do not pass `url`. The CLI command that only attaches, and does not create a browser, is `composite session attach`.
 
@@ -79,7 +83,7 @@ Drive the page with composite's own CLI, MCP (`composite serve --stdio`), or HTT
 Close the composite session before Pickleball stops the run or closes the browser.
 
 ```text
-composite session close --id <sessionId>
+composite session close --id <sessionId> --session-dir <directory>
 ```
 
 `Session.close()` and `Client.close()` send that close. Closing a session this process did not launch sets `killed` false and does not stop Chrome or Edge. Detach drops the composite registry entry and the DevTools socket. It must not call WebDriver quit, must not kill the browser process, and must not delete the run directory.
@@ -109,8 +113,32 @@ Workspace `runvars.properties`, or the system property of the same name:
 pkb_direct_control_provider=composite
 ```
 
-The value may instead be the path of a `composite` binary. Unset or blank means Pickleball does not start a provider. When it is set, Workbench may start that binary and pass the descriptor path, the session id, and the CDP address. The provider attaches, acts, and detaches under this contract. Its stdout and stderr go to that run's session log.
+The value may instead be the path of a `composite` binary. Unset or blank means Pickleball does not start a provider. When it is set, and the live session has a CDP address, Workbench runs one short command and waits for it to exit (30 seconds). Attach is not a resident process. It records the session and prints JSON. A non-zero exit fails that start and names the exit code. Stdout and stderr go to that run's `session/provider.log`. Start and detach append a line to `.pickleball/agent-log`.
 
-The binary is found at runtime. `COMPOSITE_BIN` is the path. Otherwise `COMPOSITE_HOME` or a sibling checkout named `dom-composite` next to the project may have `target/debug/composite` or `target/release/composite`. The Java binding is not on a registry. Builds and ordinary tests do not need the binary. A missing binary skips a provider check; it does not fail the suite.
+Every command Pickleball runs passes the same per-run directory:
+
+```text
+--session-dir .pickleball/runs/<runId>/session/composite
+```
+
+The absolute directory and the id from the attach JSON are written on the descriptor as `compositeSessionDir` and `compositeSessionId`. Pickleball does not set `PICKLEBALL_SESSION_DESCRIPTOR`. Composite does not read it.
+
+Detach runs `session close` for that id and directory. It does not destroy a process. A session this command did not launch returns `"killed": false` and leaves Chrome or Edge running. A missing binary skips; it does not fail the run.
+
+The binary is found at runtime. `COMPOSITE_BIN` is the path. Otherwise `COMPOSITE_HOME` or a sibling checkout named `dom-composite` next to the project may have `target/debug/composite`, then `target/release/composite`. The Java binding is not on a registry. Builds and ordinary tests do not need the binary. A missing binary skips a provider check; it does not fail the suite.
+
+When those two descriptor fields are set, the session is already attached. Do not attach again. Join it:
+
+```text
+composite --session-dir <compositeSessionDir> query --session <compositeSessionId> --css 'body'
+```
+
+The same directory is the MCP join:
+
+```text
+composite --session-dir <compositeSessionDir> serve --stdio
+```
+
+Pass `compositeSessionId` on the later tool call. Close with `session close` only when you are the owner of that registry entry. If Pickleball started the provider, Pickleball closes it when the live session stops. Do not close it out from under a step that is still using it. Hold the session first.
 
 Pickleball writes the descriptor, the CLI, the hold, and the provider key. dom-composite stays a general tool and does not grow a Pickleball-only flag.

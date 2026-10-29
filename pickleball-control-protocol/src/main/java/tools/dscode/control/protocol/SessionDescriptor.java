@@ -26,13 +26,37 @@ public record SessionDescriptor(
         List<String> windowHandles,
         State state,
         Instant startedAt,
-        Instant updatedAt
+        Instant updatedAt,
+        String compositeSessionDir,
+        String compositeSessionId
 ) {
     public static final String SCHEMA = "session-descriptor.v1";
     public static final String CONTRACT_VERSION = "1";
     public static final String FILE_NAME = "descriptor.json";
 
     private static final Pattern TOKEN = Pattern.compile("[A-Za-z0-9][A-Za-z0-9._-]{0,119}");
+
+    /**
+     * Same descriptor without a composite session. Existing callers stay valid.
+     * A later attach fills {@code compositeSessionDir} and {@code compositeSessionId}.
+     */
+    public SessionDescriptor(
+            String sessionId,
+            String runId,
+            String workspacePath,
+            String browserType,
+            String cdpDebuggerAddress,
+            String currentUrl,
+            List<String> windowHandles,
+            State state,
+            Instant startedAt,
+            Instant updatedAt
+    ) {
+        this(
+                sessionId, runId, workspacePath, browserType, cdpDebuggerAddress, currentUrl,
+                windowHandles, state, startedAt, updatedAt, null, null
+        );
+    }
 
     public enum State {
         IDLE,
@@ -90,6 +114,11 @@ public record SessionDescriptor(
         if (startedAt == null || updatedAt == null) {
             throw new IllegalArgumentException("startedAt and updatedAt are required.");
         }
+        compositeSessionDir = blankToNull(compositeSessionDir);
+        compositeSessionId = blankToNull(compositeSessionId);
+        if (compositeSessionDir != null && !Path.of(compositeSessionDir).isAbsolute()) {
+            throw new IllegalArgumentException("compositeSessionDir must be an absolute path.");
+        }
     }
 
     public String contractVersion() {
@@ -106,7 +135,34 @@ public record SessionDescriptor(
         if (updated == null) throw new IllegalArgumentException("updatedAt is required.");
         return new SessionDescriptor(
                 sessionId, runId, workspacePath, browserType, cdpDebuggerAddress, currentUrl,
-                windowHandles, next, startedAt, updated
+                windowHandles, next, startedAt, updated,
+                compositeSessionDir, compositeSessionId
+        );
+    }
+
+    /** Same session, with the page fields replaced. Composite join fields stay. */
+    public SessionDescriptor withPage(
+            String browserType,
+            String cdpDebuggerAddress,
+            String currentUrl,
+            List<String> windowHandles,
+            Instant updated
+    ) {
+        if (updated == null) throw new IllegalArgumentException("updatedAt is required.");
+        return new SessionDescriptor(
+                sessionId, runId, workspacePath, browserType, cdpDebuggerAddress, currentUrl,
+                windowHandles, state, startedAt, updated,
+                compositeSessionDir, compositeSessionId
+        );
+    }
+
+    /** Records the composite registry directory and session id. State does not change. */
+    public SessionDescriptor withComposite(String sessionDir, String sessionId, Instant updated) {
+        if (updated == null) throw new IllegalArgumentException("updatedAt is required.");
+        return new SessionDescriptor(
+                this.sessionId, runId, workspacePath, browserType, cdpDebuggerAddress, currentUrl,
+                windowHandles, state, startedAt, updated,
+                sessionDir, sessionId
         );
     }
 
@@ -125,6 +181,8 @@ public record SessionDescriptor(
         appendHandles(json);
         json.append(",\n");
         field(json, "state", state.wire());
+        field(json, "compositeSessionDir", compositeSessionDir);
+        field(json, "compositeSessionId", compositeSessionId);
         field(json, "startedAt", startedAt.toString());
         json.append("  \"updatedAt\": ").append(quoted(updatedAt.toString())).append('\n');
         json.append("}\n");
@@ -154,7 +212,9 @@ public record SessionDescriptor(
                 handles(map.get("windowHandles")),
                 State.fromWire(requiredText(map, "state")),
                 instant(requiredText(map, "startedAt"), "startedAt"),
-                instant(requiredText(map, "updatedAt"), "updatedAt")
+                instant(requiredText(map, "updatedAt"), "updatedAt"),
+                optionalPresent(map, "compositeSessionDir"),
+                optionalPresent(map, "compositeSessionId")
         );
     }
 
@@ -247,6 +307,16 @@ public record SessionDescriptor(
 
     private static String optionalText(Map<String, Object> map, String key) {
         if (!map.containsKey(key)) throw new IllegalArgumentException("Missing " + key + ".");
+        return textOrNull(map, key);
+    }
+
+    /** Absent composite fields stay null so an older descriptor still parses. */
+    private static String optionalPresent(Map<String, Object> map, String key) {
+        if (!map.containsKey(key)) return null;
+        return textOrNull(map, key);
+    }
+
+    private static String textOrNull(Map<String, Object> map, String key) {
         Object value = map.get(key);
         if (value == null) return null;
         if (value instanceof String text) return text;
