@@ -105,8 +105,11 @@ class WorkbenchCliProcessCoverageTest {
         Files.writeString(workspace.resolve("runvars.properties"), "pkb_glue=\\uZZZZ\n", StandardCharsets.UTF_8);
         Run show = launch("workspace-show", temp.toString(), "--run-id=stale-1");
         assertEquals(1, show.exit, show.out + show.err);
-        assertTrue((show.err + show.out).contains("failed") || (show.err + show.out).contains("present=false")
-                || (show.err + show.out).contains("Could not read"), show.err + show.out);
+        String reported = show.err + show.out;
+        assertTrue(reported.contains("Workbench workspace-show failed:"), reported);
+        assertTrue(reported.contains("Could not read"), reported);
+        assertTrue(reported.contains("Malformed \\uxxxx encoding."), reported);
+        assertFalse(reported.contains("present=false"), reported);
     }
 
     @Test
@@ -235,6 +238,41 @@ class WorkbenchCliProcessCoverageTest {
         String record = Files.readString(temp.resolve(".pickleball/runs/ignore-proc/record.json"));
         assertTrue(record.contains("FAILED"), record);
         assertFalse(record.contains("\"status\" : \"PASSED\"") || record.contains("\"status\": \"PASSED\""), record);
+    }
+
+    @Test
+    @Timeout(value = 60, unit = TimeUnit.SECONDS)
+    void quotingPathsTagsAndNonAsciiSurviveTheProcess() throws Exception {
+        Path project = temp.resolve("My Projects");
+        Files.createDirectories(project.resolve("src/test/resources"));
+        Files.writeString(project.resolve("pom.xml"), "<project/>\n");
+        Path wrapper = project.resolve("mvnw.cmd");
+        Files.writeString(wrapper, """
+                #!/bin/sh
+                printf '%s\\n' "$@" > argv.txt
+                exit 0
+                """);
+        wrapper.toFile().setExecutable(true);
+        Files.writeString(project.resolve("src/test/resources/pickleball.properties"),
+                "pkb_name=caf\u00e9\npkb_configpath=wd-file:C:\\\\Users\\\\Dan\\\\My Projects\\\\configs\n",
+                StandardCharsets.UTF_8);
+
+        Run resolved = launch("resolve-runvars", project.toString());
+        assertEquals(0, resolved.exit, resolved.err);
+        assertTrue(resolved.out.contains("caf\u00e9"), resolved.out);
+        assertTrue(resolved.out.contains("My Projects"), resolved.out);
+
+        Run split = launch("plan", project.toString(), "--tags=@a", "and", "not", "@b");
+        assertEquals(2, split.exit, split.err);
+        assertTrue(split.err.contains("Tag quoting error: the --tags expression was split"), split.err);
+
+        Run expression = launch("discover", project.toString(), "--tags=@a and @b or not @c", "--run-id=quote-1");
+        assertTrue(expression.exit != 2, expression.out + expression.err);
+        assertFalse(expression.err.contains("Tag quoting error"), expression.err);
+        String argv = Files.readString(project.resolve("argv.txt"));
+        assertTrue(argv.contains("-Dpkb_tags=@a and @b or not @c"), argv);
+        assertFalse(argv.lines().anyMatch(line -> line.equals("and") || line.equals("or") || line.equals("not")), argv);
+        assertTrue(argv.lines().anyMatch(line -> line.contains("My Projects")), argv);
     }
 
     private static Run launchUnchecked(String... args) {
