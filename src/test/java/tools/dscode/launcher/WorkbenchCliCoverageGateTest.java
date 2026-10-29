@@ -8,7 +8,9 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
@@ -56,19 +58,21 @@ class WorkbenchCliCoverageGateTest {
 
     @Test
     void everyCommandAndMajorFlagHasACoverageTest() throws IOException {
-        Set<String> methods = coverageMethods();
+        Map<String, String> bodies = coverageBodies();
         List<String> missing = new ArrayList<>();
         for (String command : commands()) {
             String method = "covers_command_" + command.replace('-', '_');
-            if (!methods.contains(method)) missing.add(method + "  command " + command);
+            if (!bodies.containsKey(method)) missing.add(method + "  command " + command);
+            else if (!hasBehavior(bodies.get(method))) missing.add(method + "  command " + command + " is name-only");
         }
         for (String flag : flags()) {
             String method = "covers_flag_" + flag.substring(2).replace('-', '_');
-            if (!methods.contains(method)) missing.add(method + "  flag " + flag);
+            if (!bodies.containsKey(method)) missing.add(method + "  flag " + flag);
+            else if (!hasBehavior(bodies.get(method))) missing.add(method + "  flag " + flag + " is name-only");
         }
         assertTrue(
                 missing.isEmpty(),
-                "Workbench CLI coverage gate is red. Missing " + missing.size() + " test method(s):\n"
+                "Workbench CLI coverage gate is red. Missing " + missing.size() + " behavior test(s):\n"
                         + String.join("\n", missing)
         );
     }
@@ -96,17 +100,56 @@ class WorkbenchCliCoverageGateTest {
         return flags;
     }
 
-    private static Set<String> coverageMethods() throws IOException {
-        TreeSet<String> methods = new TreeSet<>();
+    private static Map<String, String> coverageBodies() throws IOException {
+        LinkedHashMap<String, String> methods = new LinkedHashMap<>();
         Path root = Path.of("src/test/java");
         if (!Files.isDirectory(root)) return methods;
         try (Stream<Path> files = Files.walk(root)) {
             for (Path file : files.filter(path -> path.toString().endsWith(".java")).toList()) {
-                Matcher matcher = COVERS.matcher(Files.readString(file));
-                while (matcher.find()) methods.add(matcher.group(1));
+                String text = Files.readString(file);
+                Matcher matcher = COVERS.matcher(text);
+                while (matcher.find()) {
+                    String name = matcher.group(1);
+                    int open = text.indexOf('{', matcher.end());
+                    if (open < 0) continue;
+                    methods.put(name, body(text, open));
+                }
             }
         }
         return methods;
+    }
+
+    private static String body(String text, int open) {
+        int depth = 0;
+        for (int index = open; index < text.length(); index++) {
+            char ch = text.charAt(index);
+            if (ch == '{') depth++;
+            else if (ch == '}') {
+                depth--;
+                if (depth == 0) return text.substring(open, index + 1);
+            }
+        }
+        return text.substring(open);
+    }
+
+    private static boolean hasBehavior(String body) {
+        if (body == null || !body.contains("assert")) return false;
+        return body.contains("agent(")
+                || body.contains("session(")
+                || body.contains("discover(")
+                || body.contains("WorkbenchAgentCommands")
+                || body.contains("WorkbenchSessionCommands.run")
+                || body.contains("ConsumerMavenTestRunner")
+                || body.contains("Files.")
+                || body.contains("Workspace.")
+                || body.contains("AgentCoordination.")
+                || body.contains("ProcessBuilder")
+                || body.contains("HttpServer")
+                || body.contains("launch(")
+                || body.contains("held(")
+                || body.contains("HeldSession")
+                || body.contains("assertHeld")
+                || body.contains("forwardedFailsClosed");
     }
 
     private static List<String> array(JsonNode root, String... path) {

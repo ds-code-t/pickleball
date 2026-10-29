@@ -8,18 +8,24 @@ import org.openqa.selenium.remote.RemoteWebDriver;
 import tools.dscode.common.treeparsing.parsedComponents.PhraseData;
 import tools.dscode.common.treeparsing.parsedComponents.phraseoperations.ActionOperations;
 
+import java.io.IOException;
 import java.lang.reflect.Method;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Opens one headless Chrome for the until-pass browser timing feature.
  * The session stays up across that feature's scenarios. The JUnit test quits it.
+ * The binary comes from an env var, a system property, or a filesystem search.
+ * When none of those exist, Selenium Manager chooses the binary.
  */
 public class UntilPassBrowserSteps {
-    public static final String CHROME_BINARY = "/opt/pw-browsers/chromium_headless_shell-1248/chrome-headless-shell-linux64/chrome-headless-shell";
-
     private static RemoteWebDriver driver;
     public static long clickSettleMillis = -1;
 
@@ -27,7 +33,8 @@ public class UntilPassBrowserSteps {
     public void openSession() {
         if (driver == null || driver.getSessionId() == null) {
             ChromeOptions options = new ChromeOptions();
-            options.setBinary(CHROME_BINARY);
+            String binary = chromeBinary();
+            if (binary != null) options.setBinary(binary);
             options.addArguments(
                     "--headless=new",
                     "--disable-gpu",
@@ -39,6 +46,51 @@ public class UntilPassBrowserSteps {
             driver.manage().timeouts().implicitlyWait(Duration.ofMillis(5000));
         }
         CurrentScenarioState.registerScenarioObject("CHROME", driver);
+    }
+
+    /**
+     * First existing executable wins. A missing candidate is skipped.
+     * {@code null} means do not call {@code setBinary}.
+     */
+    static String chromeBinary() {
+        List<String> candidates = new ArrayList<>();
+        add(candidates, System.getenv("PKB_CHROME_BINARY"));
+        add(candidates, System.getenv("CHROME_BINARY"));
+        add(candidates, System.getProperty("pickleball.chrome.binary"));
+        add(candidates, System.getProperty("webdriver.chrome.binary"));
+        add(candidates, "/opt/pw-browsers/chromium_headless_shell-1248/chrome-headless-shell-linux64/chrome-headless-shell");
+        String path = System.getenv("PATH");
+        if (path != null) {
+            for (String dir : path.split(java.io.File.pathSeparator)) {
+                add(candidates, Path.of(dir, "chrome").toString());
+                add(candidates, Path.of(dir, "google-chrome").toString());
+                add(candidates, Path.of(dir, "chromium").toString());
+                add(candidates, Path.of(dir, "chrome-headless-shell").toString());
+            }
+        }
+        Path bundled = Path.of("/opt/pw-browsers");
+        if (Files.isDirectory(bundled)) {
+            try (Stream<Path> walk = Files.walk(bundled, 6)) {
+                walk.filter(file -> Files.isRegularFile(file) && executableName(file)).forEach(file -> add(candidates, file.toString()));
+            } catch (IOException ignored) {
+                // Discovery is best-effort. Selenium Manager is the fallback.
+            }
+        }
+        for (String candidate : candidates) {
+            Path file = Path.of(candidate);
+            if (Files.isRegularFile(file) && Files.isExecutable(file)) return file.toString();
+        }
+        return null;
+    }
+
+    private static boolean executableName(Path file) {
+        String name = file.getFileName() == null ? "" : file.getFileName().toString();
+        return "chrome".equals(name) || "google-chrome".equals(name) || "chromium".equals(name)
+                || "chrome-headless-shell".equals(name);
+    }
+
+    private static void add(List<String> candidates, String value) {
+        if (value != null && !value.isBlank()) candidates.add(value.trim());
     }
 
     @Given("a click still waits to settle")
