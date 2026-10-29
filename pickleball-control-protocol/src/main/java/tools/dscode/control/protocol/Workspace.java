@@ -132,7 +132,7 @@ public final class Workspace {
         Properties properties = new Properties();
         try (InputStream in = Files.newInputStream(file)) {
             properties.load(new java.io.InputStreamReader(in, StandardCharsets.UTF_8));
-        } catch (IOException failure) {
+        } catch (IOException | IllegalArgumentException failure) {
             throw new IllegalStateException("Could not read " + file + ": " + failure.getMessage(), failure);
         }
         Map<String, String> values = new LinkedHashMap<>();
