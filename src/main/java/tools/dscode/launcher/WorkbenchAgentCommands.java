@@ -48,6 +48,9 @@ public final class WorkbenchAgentCommands {
             "--json", "--expect", "--config", "--reseed", "--from-run",
             "--html", "--category", "--status"
     );
+    private static final java.util.Set<String> KNOWN_FINISH_STATUSES = java.util.Set.of(
+            "PASSED", "FAILED", "EMPTY", "TIMEOUT", "STOPPED"
+    );
 
     private WorkbenchAgentCommands() {
     }
@@ -1017,12 +1020,22 @@ public final class WorkbenchAgentCommands {
             err.println("Usage: finish --run-id=<id> [--learned=<one line>] [--status=<status>]");
             return 2;
         }
+        String status = flag(parsed, "--status");
+        if (status == null || status.isBlank()) {
+            status = "STOPPED";
+        } else {
+            status = status.trim().toUpperCase(java.util.Locale.ROOT);
+            if (!KNOWN_FINISH_STATUSES.contains(status)) {
+                err.println("finish --status must be one of PASSED, FAILED, EMPTY, TIMEOUT, STOPPED: " + status);
+                return 2;
+            }
+        }
         try {
             AgentCoordination.finish(
                     parsed.project(),
                     runId,
                     parsed.coordination().learned(),
-                    "STOPPED",
+                    status,
                     java.time.Instant.now(),
                     out
             );

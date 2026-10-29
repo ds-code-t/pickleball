@@ -493,12 +493,12 @@ public final class WorkbenchSessionCommands {
     ) {
         Integer refused = refusedDriver(parsed, err);
         if (refused != null) return refused;
-        SessionState state = requireSession(parsed, http);
         String text = flags.text;
         if (text == null || text.isBlank()) {
             err.println("Usage: execute-step <gherkin> or execute-step --text=<gherkin> [--ack-only]");
             return 2;
         }
+        SessionState state = requireSession(parsed, http);
         Map<String, Object> body = commandBody(parsed, flags);
         body.put("text", text);
         return postAndMaybeWait(parsed, state, flags, body, out, err, http);
