@@ -41,6 +41,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/date-time-utilities.md`
 - `docs/diagnostic-lineage-metadata.md`
 - `docs/diagnostic-reporting.md`
+- `docs/direct-control-handoff.md`
 - `docs/dynamic-control-api.md`
 - `docs/dynamic-steps.md`
 - `docs/experimental-features.md`
