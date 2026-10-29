@@ -12,7 +12,9 @@ import tools.dscode.control.protocol.SessionDescriptorWriter;
 import tools.dscode.control.protocol.Workspace;
 
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.io.PrintStream;
+import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -24,6 +26,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+
+import com.sun.net.httpserver.HttpServer;
+
+import tools.dscode.control.protocol.PickleballLocalLayout;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -56,7 +62,7 @@ class WorkbenchCliSurfaceCoverageTest {
     }
 
     @Test
-    void covers_command_sync() {
+    void covers_command_sync() throws Exception {
         WorkbenchCommandLine.Parsed parsed = parse("sync", temp.toString(), "--tags=@smoke");
         assertEquals("sync", parsed.command());
         assertTrue(WorkbenchCommandLine.isForwardedCommand("sync"));
@@ -64,40 +70,45 @@ class WorkbenchCliSurfaceCoverageTest {
         assertFalse(WorkbenchCommandLine.isSessionClientCommand("sync"));
         assertEquals(List.of("sync", temp.toAbsolutePath().normalize().toString(), "--tags", "@smoke"),
                 List.of(parsed.forwarded()));
+        forwardedFailsClosed("sync");
     }
 
     @Test
-    void covers_command_worker_check() {
+    void covers_command_worker_check() throws Exception {
         WorkbenchCommandLine.Parsed parsed = parse("worker-check", temp.toString());
         assertEquals("worker-check", parsed.command());
         assertTrue(WorkbenchCommandLine.isForwardedCommand("worker-check"));
         assertEquals("worker-check", parsed.forwarded()[0]);
         assertEquals(temp.toAbsolutePath().normalize().toString(), parsed.forwarded()[1]);
+        forwardedFailsClosed("worker-check");
     }
 
     @Test
-    void covers_command_live_check() {
+    void covers_command_live_check() throws Exception {
         WorkbenchCommandLine.Parsed parsed = parse("live-check", temp.toString(), "--runvar=pkb_browser=CHROME_HEADLESS");
         assertEquals("live-check", parsed.command());
         assertTrue(List.of(parsed.forwarded()).contains("--runvar"));
         assertTrue(List.of(parsed.forwarded()).contains("pkb_browser=CHROME_HEADLESS"));
+        forwardedFailsClosed("live-check");
     }
 
     @Test
-    void covers_command_ui() {
+    void covers_command_ui() throws Exception {
         WorkbenchCommandLine.Parsed parsed = parse("ui", temp.toString(), "--run-id=run-1", "--agent=ada");
         assertEquals("ui", parsed.command());
         assertTrue(WorkbenchCommandLine.isForwardedCommand("ui"));
         assertEquals("run-1", parsed.coordination().runId());
         assertEquals("ada", parsed.coordination().agentId());
+        forwardedFailsClosed("ui");
     }
 
     @Test
-    void covers_command_mcp() {
+    void covers_command_mcp() throws Exception {
         WorkbenchCommandLine.Parsed parsed = parse("mcp", temp.toString());
         assertEquals("mcp", parsed.command());
         assertTrue(WorkbenchCommandLine.isForwardedCommand("mcp"));
         assertFalse(WorkbenchCommandLine.isSessionClientCommand("mcp"));
+        forwardedFailsClosed("mcp");
     }
 
     @Test
@@ -116,11 +127,12 @@ class WorkbenchCliSurfaceCoverageTest {
     }
 
     @Test
-    void covers_command_session() {
+    void covers_command_session() throws Exception {
         WorkbenchCommandLine.Parsed parsed = parse("session", temp.toString());
         assertEquals("session", parsed.command());
         assertTrue(WorkbenchCommandLine.isForwardedCommand("session"));
         assertFalse(WorkbenchCommandLine.isAgentCoreCommand("session"));
+        forwardedFailsClosed("session");
     }
 
     @Test
@@ -492,18 +504,21 @@ class WorkbenchCliSurfaceCoverageTest {
     }
 
     @Test
-    void covers_command_play() {
+    void covers_command_play() throws Exception {
         assertUnhealthy("play");
+        assertHeldCommand("play", "\"op\":\"play\"");
     }
 
     @Test
-    void covers_command_from_here() {
+    void covers_command_from_here() throws Exception {
         assertUnhealthy("from-here", "--text=Given next");
+        assertHeldCommand("from-here", "--text=Given next", "\"op\":\"from-here\"", "\"text\":\"Given next\"");
     }
 
     @Test
-    void covers_command_pause() {
+    void covers_command_pause() throws Exception {
         assertUnhealthy("pause");
+        assertHeldCommand("pause", "\"op\":\"pause\"");
     }
 
     @Test
@@ -529,33 +544,39 @@ class WorkbenchCliSurfaceCoverageTest {
     }
 
     @Test
-    void covers_command_save() {
+    void covers_command_save() throws Exception {
         assertUnhealthy("save");
+        assertHeldCommand("save", "\"op\":\"save\"");
     }
 
     @Test
-    void covers_command_refresh() {
+    void covers_command_refresh() throws Exception {
         assertUnhealthy("refresh");
+        assertHeldCommand("refresh", "\"op\":\"refresh\"");
     }
 
     @Test
-    void covers_command_session_sync() {
+    void covers_command_session_sync() throws Exception {
         assertUnhealthy("session-sync");
+        assertHeldCommand("session-sync", "\"op\":\"session-sync\"");
     }
 
     @Test
-    void covers_command_worker_start() {
+    void covers_command_worker_start() throws Exception {
         assertUnhealthy("worker-start");
+        assertHeldCommand("worker-start", "\"op\":\"worker-start\"");
     }
 
     @Test
-    void covers_command_worker_restart() {
+    void covers_command_worker_restart() throws Exception {
         assertUnhealthy("worker-restart");
+        assertHeldCommand("worker-restart", "\"op\":\"worker-restart\"");
     }
 
     @Test
-    void covers_command_worker_stop() {
+    void covers_command_worker_stop() throws Exception {
         assertUnhealthy("worker-stop");
+        assertHeldCommand("worker-stop", "\"op\":\"worker-stop\"");
     }
 
     @Test
@@ -599,13 +620,17 @@ class WorkbenchCliSurfaceCoverageTest {
     }
 
     @Test
-    void covers_flag_tags() {
+    void covers_flag_tags() throws Exception {
         WorkbenchCommandLine.Parsed parsed = parse("plan", "--tags=@smoke and @fast");
         assertEquals("@smoke and @fast", parsed.tags());
         IllegalArgumentException split = assertThrows(IllegalArgumentException.class,
                 () -> parse("plan", "--tags=@smoke", "and", "@fast"));
         assertTrue(split.getMessage().contains("quoting"));
         assertTrue(split.getMessage().contains("--tags-file") || split.getMessage().contains("--tags-b64"));
+        writeFeature("@smoke @fast", "Find term");
+        Capture capture = agent("plan", temp.toString(), "--tags=@smoke and @fast");
+        assertEquals(0, capture.code, capture.err);
+        assertTrue(capture.out.contains("Find term"), capture.out);
     }
 
     @Test
@@ -617,32 +642,53 @@ class WorkbenchCliSurfaceCoverageTest {
         IllegalArgumentException missing = assertThrows(IllegalArgumentException.class,
                 () -> parse("discover", temp.toString(), "--tags-file"));
         assertTrue(missing.getMessage().contains("quoting"));
+        writeFeature("@a @b", "Tagged from file");
+        Capture capture = agent("plan", temp.toString(), "--tags-file=" + file);
+        assertEquals(0, capture.code, capture.err);
+        assertTrue(capture.out.contains("Tagged from file"), capture.out);
     }
 
     @Test
-    void covers_flag_tags_b64() {
+    void covers_flag_tags_b64() throws Exception {
         String encoded = Base64.getEncoder().encodeToString("@a and @b".getBytes(StandardCharsets.UTF_8));
         WorkbenchCommandLine.Parsed parsed = parse("confirm", "--tags-b64=" + encoded);
         assertEquals("@a and @b", parsed.tags());
         IllegalArgumentException bad = assertThrows(IllegalArgumentException.class,
                 () -> parse("confirm", "--tags-b64=%%%"));
         assertTrue(bad.getMessage().contains("base64"));
+        writeFeature("@a @b", "Tagged from base64");
+        Capture capture = agent("plan", temp.toString(), "--tags-b64=" + encoded);
+        assertEquals(0, capture.code, capture.err);
+        assertTrue(capture.out.contains("Tagged from base64"), capture.out);
     }
 
     @Test
-    void covers_flag_name() {
+    void covers_flag_name() throws Exception {
         WorkbenchCommandLine.Parsed parsed = parse("discover", "--name=The", "failing", "scenario");
         assertEquals("The failing scenario", parsed.name());
         IllegalArgumentException bad = assertThrows(IllegalArgumentException.class,
                 () -> parse("discover", "--name=["));
         assertTrue(bad.getMessage().contains("Name quoting error"));
+        writeFeature("@smoke", "Find term");
+        Capture capture = agent("plan", temp.toString(), "--name=Find term");
+        assertEquals(0, capture.code, capture.err);
+        assertTrue(capture.out.contains("Find term"), capture.out);
+        Capture missed = agent("plan", temp.toString(), "--name=Absent");
+        assertFalse(missed.out.contains("Find term"), missed.out);
     }
 
     @Test
-    void covers_flag_example() {
+    void covers_flag_example() throws Exception {
         WorkbenchCommandLine.Parsed parsed = parse("isolate", "--example=1", "2", "7-11");
         assertEquals("1 2 7-11", parsed.example());
         assertTrue(List.of(parsed.forwarded()).contains("1 2 7-11"));
+        AtomicReference<WorkbenchSessionCommands.SessionLaunch> launch = new AtomicReference<>();
+        Capture capture = session(command -> {
+            launch.set(command);
+            return new ProcessBuilder("true").start();
+        }, "isolate", temp.toString(), "--example=4");
+        assertEquals(1, capture.code);
+        assertEquals("4", launch.get().example());
     }
 
     @Test
@@ -655,152 +701,286 @@ class WorkbenchCliSurfaceCoverageTest {
     }
 
     @Test
-    void covers_flag_refresh() {
+    void covers_flag_refresh() throws Exception {
         assertTrue(parse("plan", "--refresh").refreshIndex());
+        writeFeature("@smoke", "Find term");
+        Capture capture = agent("plan", temp.toString(), "--refresh", "--tags=@smoke");
+        assertEquals(0, capture.code, capture.err);
+        assertTrue(capture.out.contains("Find term"), capture.out);
     }
 
     @Test
-    void covers_flag_no_narrow() {
+    void covers_flag_no_narrow() throws Exception {
         WorkbenchCommandLine.Parsed parsed = parse("discover", "--no-narrow", "--tags=@caller");
         assertTrue(parsed.fullScan());
         assertEquals("@caller", parsed.tags());
+        writeFeature("@caller", "Caller scenario");
+        Capture narrowed = agent("plan", temp.toString(), "--tags=@caller");
+        assertEquals(0, narrowed.code, narrowed.err);
+        assertTrue(narrowed.out.contains("Caller scenario"), narrowed.out);
+        Capture capture = agent("plan", temp.toString(), "--no-narrow", "--tags=@caller");
+        assertEquals(0, capture.code, capture.err + capture.out);
+        assertTrue(capture.out.contains("PLAN full-scan"), capture.out);
+        assertTrue(capture.out.contains("features=full-scan"), capture.out);
+        assertTrue(capture.err.contains("--no-narrow"), capture.err);
+        assertFalse(capture.out.contains("Caller scenario"), capture.out);
     }
 
     @Test
-    void covers_flag_full_scan() {
+    void covers_flag_full_scan() throws Exception {
         assertTrue(parse("confirm", "--full-scan").fullScan());
+        writeFeature("@smoke", "Full scan");
+        Capture narrowed = agent("plan", temp.toString(), "--tags=@smoke");
+        assertEquals(0, narrowed.code, narrowed.err);
+        assertTrue(narrowed.out.contains("Full scan"), narrowed.out);
+        Capture capture = agent("plan", temp.toString(), "--full-scan", "--tags=@smoke");
+        assertEquals(0, capture.code, capture.err + capture.out);
+        assertTrue(capture.out.contains("PLAN full-scan"), capture.out);
+        assertTrue(capture.out.contains("features=full-scan"), capture.out);
+        assertTrue(capture.err.contains("--full-scan"), capture.err);
+        assertFalse(capture.out.contains("Full scan"), capture.out);
     }
 
     @Test
-    void covers_flag_runvar() {
+    void covers_flag_runvar() throws Exception {
         WorkbenchCommandLine.Parsed parsed = parse("discover", "--runvar=pkb_parallel=12", "--runvar", "pkb_browser=CHROME");
         assertEquals(List.of("pkb_parallel=12", "pkb_browser=CHROME"), parsed.runVars());
         IllegalArgumentException bad = assertThrows(IllegalArgumentException.class, () -> parse("discover", "--runvar=browser"));
         assertTrue(bad.getMessage().contains("key=value"));
+        writeFeature("@smoke", "Find term");
+        writeWrapper();
+        Capture capture = discover(0, "discover", temp.toString(), "--tags=@smoke", "--run-id=rv-1", "--runvar=pkb_environment=QA");
+        assertEquals(0, capture.code, capture.err + capture.out);
+        assertEquals("QA", Workspace.readRunVars(Workspace.directory(temp, "rv-1")).get("pkb_environment"));
     }
 
     @Test
-    void covers_flag_select() {
+    void covers_flag_select() throws Exception {
         WorkbenchCommandLine.Parsed parsed = parse("plan", "--select", "features/a.feature:4", "--select=features/b.feature:9");
         assertEquals(List.of("features/a.feature:4", "features/b.feature:9"), parsed.selects());
+        Path feature = writeFeature("@smoke", "Selected");
+        String selector = feature.toString() + ":3";
+        Capture capture = agent("plan", temp.toString(), "--select", selector);
+        assertEquals(0, capture.code, capture.err + capture.out);
+        assertTrue(capture.out.contains("Selected"), capture.out);
+        assertTrue(capture.out.contains(selector), capture.out);
     }
 
     @Test
-    void covers_flag_retention() {
+    void covers_flag_retention() throws Exception {
         assertEquals("failed", parse("discover", "--retention=failed").retention());
         assertEquals("none", parse("discover", "--retention", "NONE").retention());
         IllegalArgumentException bad = assertThrows(IllegalArgumentException.class,
                 () -> parse("discover", "--retention=always"));
         assertTrue(bad.getMessage().contains("failed"));
+        writeFeature("@smoke", "Find term");
+        writeWrapper();
+        Capture capture = discover(0, "discover", temp.toString(), "--tags=@smoke", "--run-id=ret-1", "--retention=none");
+        assertEquals(0, capture.code, capture.err + capture.out);
+        String record = Files.readString(AgentCoordination.runDirectory(temp, "ret-1").resolve("record.json"));
+        assertTrue(record.contains("ret-1"), record);
     }
 
     @Test
-    void covers_flag_run_id() {
+    void covers_flag_run_id() throws Exception {
         assertEquals("run-9", parse("finish", "--run-id=run-9").coordination().runId());
         assertEquals("run 9", parse("finish", "--run-id", "run 9").coordination().runId());
+        AgentCoordination.begin(temp, AgentCoordination.Request.of("run-9", "ada", null, null, null, null, "discover"));
+        Capture capture = agent("finish", temp.toString(), "--run-id=run-9", "--status=STOPPED");
+        assertEquals(0, capture.code, capture.err);
+        assertTrue(Files.readString(AgentCoordination.runDirectory(temp, "run-9").resolve("record.json")).contains("STOPPED"));
     }
 
     @Test
-    void covers_flag_agent() {
+    void covers_flag_agent() throws Exception {
         assertEquals("ada", parse("note", "--agent=ada").coordination().agentId());
+        Capture capture = agent("note", temp.toString(), "--agent=ada", "--text=from-ada");
+        assertEquals(0, capture.code, capture.err);
+        assertTrue(Files.readString(temp.resolve(".pickleball/agent-log")).contains("from-ada"), capture.out);
     }
 
     @Test
-    void covers_flag_agent_id() {
+    void covers_flag_agent_id() throws Exception {
         assertEquals("bea", parse("discover", "--agent-id=bea").coordination().agentId());
+        Capture capture = agent("note", temp.toString(), "--agent-id=bea", "--text=from-bea");
+        assertEquals(0, capture.code, capture.err);
+        assertTrue(Files.readString(temp.resolve(".pickleball/agent-log")).contains("from-bea"), capture.out);
     }
 
     @Test
-    void covers_flag_group() {
+    void covers_flag_group() throws Exception {
         assertEquals("wave", parse("discover", "--group=wave").coordination().group());
+        writeWrapper();
+        Capture capture = discover(0, "discover", temp.toString(), "--tags=@missing", "--run-id=grp-1", "--group=wave");
+        String record = Files.readString(AgentCoordination.runDirectory(temp, "grp-1").resolve("record.json"));
+        assertTrue(record.contains("wave"), record + capture.out);
     }
 
     @Test
-    void covers_flag_sequence() {
+    void covers_flag_sequence() throws Exception {
         assertEquals(3, parse("discover", "--sequence=3").coordination().sequence());
         IllegalArgumentException bad = assertThrows(IllegalArgumentException.class, () -> parse("discover", "--sequence=no"));
         assertTrue(bad.getMessage().contains("whole number"));
+        writeWrapper();
+        discover(0, "discover", temp.toString(), "--tags=@missing", "--run-id=seq-1", "--sequence=3");
+        String record = Files.readString(AgentCoordination.runDirectory(temp, "seq-1").resolve("record.json"));
+        assertTrue(record.contains("3"), record);
     }
 
     @Test
-    void covers_flag_who() {
+    void covers_flag_who() throws Exception {
         assertEquals("Dan She'll", parse("note", "--who=Dan", "She'll").coordination().who());
+        writeWrapper();
+        discover(0, "discover", temp.toString(), "--tags=@missing", "--run-id=who-1", "--who=Dan She'll");
+        String record = Files.readString(AgentCoordination.runDirectory(temp, "who-1").resolve("record.json"));
+        assertTrue(record.contains("Dan She'll"), record);
     }
 
     @Test
-    void covers_flag_why() {
+    void covers_flag_why() throws Exception {
         assertEquals("check the gap", parse("discover", "--why=check", "the", "gap").coordination().why());
+        writeWrapper();
+        discover(0, "discover", temp.toString(), "--tags=@missing", "--run-id=why-1", "--why=check the gap");
+        String record = Files.readString(AgentCoordination.runDirectory(temp, "why-1").resolve("record.json"));
+        assertTrue(record.contains("check the gap"), record);
     }
 
     @Test
-    void covers_flag_learned() {
+    void covers_flag_learned() throws Exception {
         assertEquals("index was stale", parse("finish", "--learned=index", "was", "stale").coordination().learned());
+        AgentCoordination.begin(temp, AgentCoordination.Request.of("learn-1", "ada", null, null, null, null, "discover"));
+        Capture capture = agent("finish", temp.toString(), "--run-id=learn-1", "--learned=index was stale", "--status=STOPPED");
+        assertEquals(0, capture.code, capture.err);
+        assertTrue(Files.readString(AgentCoordination.runDirectory(temp, "learn-1").resolve("record.json")).contains("index was stale"));
     }
 
     @Test
-    void covers_flag_text() {
+    void covers_flag_text() throws Exception {
         assertEquals("Given a step", parse("execute-step", "--text=Given", "a", "step").coordination().text());
+        assertHeldCommand("execute-step", "--text=Given a step", "\"text\":\"Given a step\"");
     }
 
     @Test
-    void covers_flag_to() {
+    void covers_flag_to() throws Exception {
         assertEquals("ada", parse("inbox", "--to=ada").coordination().inboxTo());
+        Capture capture = agent("inbox", temp.toString(), "--write", "--to=ada", "--text=ping-ada", "--from=bea");
+        assertEquals(0, capture.code, capture.err);
+        assertTrue(capture.out.contains("inbox="), capture.out);
+        Capture listed = agent("inbox", temp.toString(), "--list", "--agent=ada");
+        assertTrue(listed.out.contains("ping-ada"), listed.out);
     }
 
     @Test
-    void covers_flag_from() {
+    void covers_flag_from() throws Exception {
         assertEquals("bea", parse("inbox", "--from=bea").coordination().inboxFrom());
+        Capture capture = agent("inbox", temp.toString(), "--write", "--to=ada", "--from=bea", "--text=from-bea");
+        assertEquals(0, capture.code, capture.err);
+        Capture listed = agent("inbox", temp.toString(), "--list", "--agent=ada");
+        assertTrue(listed.out.contains("bea"), listed.out);
+        assertTrue(listed.out.contains("from-bea"), listed.out);
     }
 
     @Test
-    void covers_flag_limit() {
+    void covers_flag_limit() throws Exception {
         assertEquals(7, parse("short-log", "--limit=7").coordination().limit());
+        agent("note", temp.toString(), "--agent=ada", "--text=limit-line");
+        Capture capture = agent("short-log", temp.toString(), "--limit=1");
+        assertEquals(0, capture.code, capture.err);
+        assertTrue(capture.out.contains("limit-line") || capture.out.contains("short-log"), capture.out);
     }
 
     @Test
-    void covers_flag_write() {
+    void covers_flag_write() throws Exception {
         assertTrue(parse("inbox", "--write", "--text=hi").coordination().inboxWrite());
+        Capture capture = agent("inbox", temp.toString(), "--write", "--to=ada", "--text=written-note");
+        assertEquals(0, capture.code, capture.err);
+        assertTrue(capture.out.contains("inbox="), capture.out);
+        assertTrue(capture.out.contains(".pickleball"), capture.out);
     }
 
     @Test
-    void covers_flag_list() {
+    void covers_flag_list() throws Exception {
         assertTrue(parse("presence", "--list").coordination().inboxList());
+        Capture empty = agent("presence", temp.toString(), "--list");
+        assertEquals(0, empty.code, empty.err);
+        assertTrue(empty.out.contains("no presence") || empty.out.contains("presence"), empty.out);
     }
 
     @Test
-    void covers_flag_take() {
+    void covers_flag_take() throws Exception {
         assertTrue(parse("inbox", "--take").coordination().inboxTake());
+        agent("inbox", temp.toString(), "--write", "--to=ada", "--text=take-me");
+        Capture taken = agent("inbox", temp.toString(), "--take", "--agent=ada");
+        assertEquals(0, taken.code, taken.err);
+        assertTrue(taken.out.contains("take-me"), taken.out);
+        Capture again = agent("inbox", temp.toString(), "--list", "--agent=ada");
+        assertTrue(again.out.contains("no inbox"), again.out);
     }
 
     @Test
-    void covers_flag_touch() {
+    void covers_flag_touch() throws Exception {
         assertTrue(parse("presence", "--touch").coordination().touch());
+        Capture capture = agent("presence", temp.toString(), "--touch", "--agent=ada");
+        assertEquals(0, capture.code, capture.err);
+        assertTrue(capture.out.contains("presence="), capture.out);
+        assertTrue(Files.exists(Path.of(capture.out.substring(capture.out.indexOf("presence=") + "presence=".length()).trim())), capture.out);
     }
 
     @Test
-    void covers_flag_sweep() {
+    void covers_flag_sweep() throws Exception {
         assertTrue(parse("gc-runs", "--sweep").coordination().sweep());
         assertTrue(parse("presence", "--sweep").coordination().sweep());
+        agent("presence", temp.toString(), "--touch", "--agent=ada");
+        Capture capture = agent("presence", temp.toString(), "--sweep");
+        assertEquals(0, capture.code, capture.err);
+        assertTrue(capture.out.contains("presence-removed="), capture.out);
     }
 
     @Test
-    void covers_flag_renew() {
+    void covers_flag_renew() throws Exception {
         assertTrue(parse("post", "--renew").coordination().renew());
+        Capture written = agent("post", temp.toString(), "--write", "--to=all", "--text=renew-me", "--ttl=1h");
+        assertEquals(0, written.code, written.err + written.out);
+        String writtenPath = written.out.substring(written.out.indexOf("post=") + "post=".length()).trim();
+        String id = Path.of(writtenPath).getFileName().toString().replace(".json", "");
+        String before = Files.readString(Path.of(writtenPath));
+        Capture renewed = agent("post", temp.toString(), "--renew", "--id=" + id, "--ttl=2h");
+        assertEquals(0, renewed.code, renewed.err + renewed.out);
+        assertTrue(renewed.out.contains(id), renewed.out);
+        String after = Files.readString(Path.of(writtenPath));
+        assertFalse(before.equals(after), after);
+        assertTrue(after.contains("renew-me"), after);
     }
 
     @Test
-    void covers_flag_append() {
+    void covers_flag_append() throws Exception {
         assertTrue(parse("history", "--append").coordination().append());
+        Capture capture = agent("history", temp.toString(), "--append", "--text=history-line");
+        assertEquals(0, capture.code, capture.err);
+        assertTrue(capture.out.contains("history="), capture.out);
+        assertTrue(Files.readString(AgentCoordination.historyFile(temp)).contains("history-line"));
     }
 
     @Test
-    void covers_flag_id() {
+    void covers_flag_id() throws Exception {
         assertEquals("post-1", parse("post", "--id=post-1").coordination().id());
+        Capture written = agent("post", temp.toString(), "--write", "--to=all", "--text=identified", "--ttl=1h");
+        assertEquals(0, written.code, written.err + written.out);
+        String writtenPath = written.out.substring(written.out.indexOf("post=") + "post=".length()).trim();
+        String id = Path.of(writtenPath).getFileName().toString().replace(".json", "");
+        Capture missing = agent("post", temp.toString(), "--renew", "--id=post-1");
+        assertEquals(1, missing.code);
+        assertTrue(missing.err.contains("No post post-1"), missing.err);
+        Capture listed = agent("post", temp.toString(), "--list");
+        assertTrue(listed.out.contains(id), listed.out);
+        assertTrue(listed.out.contains("identified"), listed.out);
     }
 
     @Test
-    void covers_flag_version() {
+    void covers_flag_version() throws Exception {
         assertEquals("2.1.18", parse("use-version", "--version=2.1.18").version());
+        Capture capture = agent("use-version", temp.toString(), "--version=2.1.18");
+        assertTrue(capture.code == 0 || capture.err.contains("2.1.18") || capture.out.contains("2.1.18"), capture.out + capture.err);
     }
 
     @Test
@@ -848,66 +1028,107 @@ class WorkbenchCliSurfaceCoverageTest {
     }
 
     @Test
-    void covers_flag_ack_only() {
+    void covers_flag_ack_only() throws Exception {
         WorkbenchSessionCommands.SessionFlags flags = WorkbenchSessionCommands.SessionFlags.parse(
                 new String[]{"execute-step", "--text=Given one", "--ack-only"}
         );
         assertTrue(flags.ackOnly);
         assertFalse(flags.wait);
+        try (HeldSession held = HeldSession.open(temp)) {
+            held.succeedAfter = false;
+            Capture capture = session((launch) -> new ProcessBuilder("true").start(),
+                    "play", temp.toString(), "--ack-only");
+            assertEquals(0, capture.code, capture.err + capture.out);
+            assertTrue(capture.out.contains("ACK "), capture.out);
+            assertFalse(capture.out.contains("DONE "), capture.out);
+            assertTrue(held.body().contains("\"op\":\"play\""), held.body());
+        }
     }
 
     @Test
-    void covers_flag_wait() {
+    void covers_flag_wait() throws Exception {
         WorkbenchSessionCommands.SessionFlags flags = WorkbenchSessionCommands.SessionFlags.parse(
                 new String[]{"execute-step", "--no-wait", "--wait", "--text=Given one"}
         );
         assertTrue(flags.wait);
+        try (HeldSession held = HeldSession.open(temp)) {
+            held.succeedAfter = true;
+            Capture capture = session((launch) -> new ProcessBuilder("true").start(),
+                    "pause", temp.toString(), "--wait");
+            assertEquals(0, capture.code, capture.err + capture.out);
+            assertTrue(capture.out.contains("DONE "), capture.out);
+            assertTrue(capture.out.contains("SUCCESS"), capture.out);
+            assertTrue(held.body().contains("\"op\":\"pause\""), held.body());
+        }
     }
 
     @Test
-    void covers_flag_no_wait() {
+    void covers_flag_no_wait() throws Exception {
         WorkbenchSessionCommands.SessionFlags flags = WorkbenchSessionCommands.SessionFlags.parse(
                 new String[]{"play", "--no-wait"}
         );
         assertFalse(flags.wait);
+        try (HeldSession held = HeldSession.open(temp)) {
+            Capture capture = session((launch) -> new ProcessBuilder("true").start(),
+                    "refresh", temp.toString(), "--no-wait");
+            assertEquals(0, capture.code, capture.err + capture.out);
+            assertTrue(capture.out.contains("ACK "), capture.out);
+            assertFalse(capture.out.contains("DONE "), capture.out);
+            assertTrue(held.body().contains("\"op\":\"refresh\""), held.body());
+        }
     }
 
     @Test
-    void covers_flag_force() {
+    void covers_flag_force() throws Exception {
         assertTrue(WorkbenchSessionCommands.SessionFlags.parse(new String[]{"kill", "--force"}).force);
+        Process sleep = new ProcessBuilder("sleep", "30").start();
+        try (HeldSession held = HeldSession.open(temp)) {
+            held.setPid(sleep.pid());
+            Capture capture = session((launch) -> new ProcessBuilder("true").start(),
+                    "kill", temp.toString(), "--force");
+            assertEquals(0, capture.code, capture.err + capture.out);
+            assertTrue(capture.out.contains("ACK SESSION killed pid=" + sleep.pid()), capture.out);
+            assertFalse(sleep.isAlive());
+        } finally {
+            if (sleep.isAlive()) sleep.destroyForcibly();
+        }
     }
 
     @Test
-    void covers_flag_stop_after() {
+    void covers_flag_stop_after() throws Exception {
         WorkbenchSessionCommands.SessionFlags flags = WorkbenchSessionCommands.SessionFlags.parse(
                 new String[]{"play", "--stop-after=Then", "done"}
         );
         assertEquals("Then done", flags.stopAfter);
+        assertHeldCommand("play", "--stop-after=Then done", "--ack-only", "\"stopAfter\":\"Then done\"");
     }
 
     @Test
-    void covers_flag_feature() {
+    void covers_flag_feature() throws Exception {
         assertEquals("login.feature", WorkbenchSessionCommands.SessionFlags.parse(
                 new String[]{"open-scenario", "--feature=login.feature"}
         ).feature);
+        assertHeldCommand("open-scenario", "--feature=login.feature", "--ack-only", "\"feature\":\"login.feature\"");
     }
 
     @Test
-    void covers_flag_run() {
+    void covers_flag_run() throws Exception {
         assertEquals("run-9", WorkbenchSessionCommands.SessionFlags.parse(
                 new String[]{"diagnostic-run", "--run=run-9"}
         ).run);
+        assertHeldCommand("diagnostic-run", "--run=run-9", "--ack-only", "\"run\":\"run-9\"");
     }
 
     @Test
-    void covers_flag_from_here() {
+    void covers_flag_from_here() throws Exception {
         assertEquals("Given next", WorkbenchSessionCommands.SessionFlags.parse(
                 new String[]{"from-here", "--from-here=Given next"}
         ).fromHere);
+        assertHeldCommand("from-here", "--from-here=Given next", "--ack-only", "\"fromHere\":\"Given next\"");
     }
 
     @Test
-    void covers_flag_session_file() {
+    void covers_flag_session_file() throws Exception {
         Path sessionFile = temp.resolve("custom-session.json");
         WorkbenchCommandLine.Parsed parsed = parse(
                 "isolate", temp.toString(), "--session-file=" + sessionFile, "--run-id=sf-1"
@@ -915,6 +1136,12 @@ class WorkbenchCliSurfaceCoverageTest {
         assertTrue(List.of(parsed.forwarded()).contains("--session-file=" + sessionFile),
                 List.of(parsed.forwarded()).toString());
         assertEquals("sf-1", parsed.coordination().runId());
+        AtomicReference<WorkbenchSessionCommands.SessionLaunch> launch = new AtomicReference<>();
+        session(command -> {
+            launch.set(command);
+            return new ProcessBuilder("true").start();
+        }, "isolate", temp.toString(), "--session-file=" + sessionFile, "--run-id=sf-1");
+        assertEquals(sessionFile.toAbsolutePath().normalize(), launch.get().sessionFile().toAbsolutePath().normalize());
     }
 
     @Test
@@ -1067,6 +1294,40 @@ class WorkbenchCliSurfaceCoverageTest {
 
     private Capture last;
 
+    private void forwardedFailsClosed(String command) throws Exception {
+        String java = Path.of(System.getProperty("java.home"), "bin", "java").toString();
+        Process process = new ProcessBuilder(
+                java, "-cp", System.getProperty("java.class.path"),
+                "tools.dscode.launcher.PickleballWorkbenchLauncher",
+                command, temp.toString()
+        ).start();
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        ByteArrayOutputStream err = new ByteArrayOutputStream();
+        Thread stdout = new Thread(() -> {
+            try (var input = process.getInputStream()) {
+                input.transferTo(out);
+            } catch (IOException ignored) {
+                // The process ending closes the pipe.
+            }
+        });
+        Thread stderr = new Thread(() -> {
+            try (var input = process.getErrorStream()) {
+                input.transferTo(err);
+            } catch (IOException ignored) {
+                // The process ending closes the pipe.
+            }
+        });
+        stdout.start();
+        stderr.start();
+        boolean finished = process.waitFor(30, TimeUnit.SECONDS);
+        if (!finished) process.destroyForcibly();
+        stdout.join(2_000);
+        stderr.join(2_000);
+        String text = out.toString(StandardCharsets.UTF_8) + err.toString(StandardCharsets.UTF_8);
+        assertTrue(finished && process.exitValue() != 0, command + "\n" + text);
+        assertTrue(text.contains("Could not launch") || text.contains("missing") || text.contains("Workbench"), text);
+    }
+
     private void assertUnhealthy(String... args) {
         String[] full = new String[args.length + 1];
         full[0] = args[0];
@@ -1112,11 +1373,12 @@ class WorkbenchCliSurfaceCoverageTest {
         return html;
     }
 
-    private void writeFeature(String tag, String scenario) throws Exception {
+    private Path writeFeature(String tag, String scenario) throws Exception {
         Path features = temp.resolve("src/test/resources/features");
         Files.createDirectories(features);
-        Files.writeString(features.resolve("one.feature"),
-                tag + "\nFeature: One\n  Scenario: " + scenario + "\n    Given one\n");
+        Path file = features.resolve("one.feature");
+        Files.writeString(file, tag + "\nFeature: One\n  Scenario: " + scenario + "\n    Given one\n");
+        return file;
     }
 
     private void writeWrapper() throws Exception {
@@ -1195,5 +1457,112 @@ class WorkbenchCliSurfaceCoverageTest {
     }
 
     private record Capture(int code, String out, String err) {
+    }
+
+    private void assertHeldCommand(String command, String... rest) throws Exception {
+        List<String> args = new ArrayList<>();
+        args.add(command);
+        args.add(temp.toString());
+        List<String> needles = new ArrayList<>();
+        boolean ack = false;
+        for (String token : rest) {
+            if (token.indexOf('"') >= 0) {
+                needles.add(token);
+            } else {
+                args.add(token);
+                if ("--ack-only".equals(token)) ack = true;
+            }
+        }
+        if (!ack) args.add("--ack-only");
+        try (HeldSession held = HeldSession.open(temp)) {
+            Capture capture = session((launch) -> new ProcessBuilder("true").start(), args.toArray(String[]::new));
+            assertEquals(0, capture.code, capture.err + capture.out);
+            assertTrue(capture.out.contains("ACK "), capture.out);
+            for (String needle : needles) {
+                assertTrue(held.body().contains(needle), held.body() + "\n" + capture.out + capture.err);
+            }
+        }
+    }
+
+    /**
+     * Live {@code cli-session.json} for this JVM. {@code /commands} records the posted op.
+     */
+    private static final class HeldSession implements AutoCloseable {
+        private final HttpServer http;
+        private final Path stateFile;
+        private final StringBuilder seen = new StringBuilder();
+        private volatile boolean succeedAfter;
+        private volatile long pid = ProcessHandle.current().pid();
+
+        private HeldSession(HttpServer http, Path stateFile) {
+            this.http = http;
+            this.stateFile = stateFile;
+        }
+
+        static HeldSession open(Path project) throws IOException {
+            HttpServer http = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+            HeldSession[] box = new HeldSession[1];
+            http.createContext("/health", exchange -> write(exchange, 200, "{\"status\":\"ok\"}"));
+            http.createContext("/commands", exchange -> {
+                String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+                HeldSession current = box[0];
+                if (current != null && "POST".equals(exchange.getRequestMethod())) {
+                    current.seen.append(body);
+                    write(exchange, 200, "{\"id\":\"step-held\",\"status\":\"QUEUED\"}");
+                    return;
+                }
+                String status = current != null && current.succeedAfter ? "SUCCESS" : "STILL_WORKING";
+                write(exchange, 200, "{\"id\":\"step-held\",\"status\":\"" + status + "\"}");
+            });
+            http.start();
+            Path stateFile = PickleballLocalLayout.cliSessionState(project);
+            Files.createDirectories(stateFile.getParent());
+            HeldSession session = new HeldSession(http, stateFile);
+            box[0] = session;
+            session.writeState(project);
+            return session;
+        }
+
+        String body() {
+            return seen.toString();
+        }
+
+        void setPid(long pid) throws IOException {
+            this.pid = pid;
+            String text = Files.readString(stateFile).replaceAll("\"pid\"\\s*:\\s*\\d+", "\"pid\": " + pid);
+            Files.writeString(stateFile, text);
+        }
+
+        private void writeState(Path project) throws IOException {
+            String url = "http://127.0.0.1:" + http.getAddress().getPort();
+            Files.writeString(stateFile, """
+                    {
+                      "url": "%s",
+                      "token": "test-token",
+                      "pid": %d,
+                      "project": "%s",
+                      "mode": "cli-session"
+                    }
+                    """.formatted(url, pid, project.toString().replace("\\", "\\\\").replace("\"", "\\\"")));
+        }
+
+        @Override
+        public void close() {
+            http.stop(0);
+            try {
+                Files.deleteIfExists(stateFile);
+            } catch (IOException ignored) {
+                // The next test writes its own session file.
+            }
+        }
+
+        private static void write(com.sun.net.httpserver.HttpExchange exchange, int status, String body) throws IOException {
+            byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().add("Content-Type", "application/json");
+            exchange.sendResponseHeaders(status, bytes.length);
+            try (java.io.OutputStream out = exchange.getResponseBody()) {
+                out.write(bytes);
+            }
+        }
     }
 }

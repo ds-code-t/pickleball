@@ -120,7 +120,7 @@ public final class WorkbenchSessionCommands {
         }
         try {
             return switch (parsed.command()) {
-                case "isolate", "session-start" -> sessionStart(parsed, out, err, starter, http);
+                case "isolate", "session-start" -> sessionStart(parsed, flags, out, err, starter, http);
                 case "execute-step" -> executeStep(parsed, flags, out, err, http);
                 case "insert-step", "update-step" -> textCommand(parsed, flags, out, err, http);
                 case "open-scenario" -> openScenario(parsed, flags, out, err, http);
@@ -395,6 +395,7 @@ public final class WorkbenchSessionCommands {
 
     private static int sessionStart(
             WorkbenchCommandLine.Parsed parsed,
+            SessionFlags flags,
             PrintStream out,
             PrintStream err,
             DetachedStarter starter,
@@ -427,7 +428,7 @@ public final class WorkbenchSessionCommands {
         }
 
         Path logFile = run.sessionDirectory().resolve("session.log");
-        Path sessionFile = run.sessionStateFile();
+        Path sessionFile = requestedSessionFile(project, flags, run);
         Process process;
         try {
             process = starter.start(new SessionLaunch(
@@ -1098,6 +1099,18 @@ public final class WorkbenchSessionCommands {
         }
     }
 
+    /**
+     * {@code --session-file} overrides the per-run state file. The same path is
+     * what the controller is told to write and what this process waits on.
+     */
+    private static Path requestedSessionFile(Path project, SessionFlags flags, AgentCoordination.Run run) {
+        if (flags == null || flags.sessionFile == null || flags.sessionFile.isBlank()) {
+            return run.sessionStateFile();
+        }
+        Path requested = Path.of(flags.sessionFile);
+        return (requested.isAbsolute() ? requested : project.resolve(requested)).normalize();
+    }
+
     static Path sessionFile(Path project) {
         return PickleballLocalLayout.cliSessionState(project);
     }
@@ -1190,7 +1203,7 @@ public final class WorkbenchSessionCommands {
     static final class SessionFlags {
         /**
          * Flags this parser recognizes beyond {@link WorkbenchCommandLine#MAJOR_FLAGS}.
-         * {@code --session-file} is forwarded by session launch, not stored on this record.
+         * {@code --session-file} is the state file session launch forwards to the controller.
          */
         static final List<String> MAJOR_FLAGS = List.of(
                 "--ack-only", "--wait", "--no-wait", "--force",
@@ -1202,6 +1215,7 @@ public final class WorkbenchSessionCommands {
         final String run;
         final String fromHere;
         final String stopAfter;
+        final String sessionFile;
         final boolean ackOnly;
         final boolean wait;
         final boolean force;
@@ -1215,6 +1229,7 @@ public final class WorkbenchSessionCommands {
                 String run,
                 String fromHere,
                 String stopAfter,
+                String sessionFile,
                 boolean ackOnly,
                 boolean wait,
                 boolean force,
@@ -1227,6 +1242,7 @@ public final class WorkbenchSessionCommands {
             this.run = run;
             this.fromHere = fromHere;
             this.stopAfter = stopAfter;
+            this.sessionFile = sessionFile;
             this.ackOnly = ackOnly;
             this.wait = wait;
             this.force = force;
@@ -1241,6 +1257,7 @@ public final class WorkbenchSessionCommands {
             String run = null;
             String fromHere = null;
             String stopAfter = null;
+            String sessionFile = null;
             boolean ackOnly = false;
             boolean wait = true;
             boolean force = false;
@@ -1249,7 +1266,7 @@ public final class WorkbenchSessionCommands {
             String absorb = null;
             List<String> words = new ArrayList<>();
             if (args == null) {
-                return new SessionFlags(null, null, null, null, null, null, false, true, false, null, null);
+                return new SessionFlags(null, null, null, null, null, null, null, false, true, false, null, null);
             }
             for (int index = 1; index < args.length; index++) {
                 String token = args[index];
@@ -1351,6 +1368,23 @@ public final class WorkbenchSessionCommands {
                     absorb = null;
                     continue;
                 }
+                if (token.startsWith("--session-file=")) {
+                    sessionFile = token.substring("--session-file=".length()).trim();
+                    if (sessionFile.isBlank()) {
+                        throw new IllegalArgumentException("--session-file requires a path.");
+                    }
+                    absorb = null;
+                    continue;
+                }
+                if ("--session-file".equals(token)) {
+                    String value = index + 1 < args.length ? args[++index] : null;
+                    if (value == null || value.isBlank()) {
+                        throw new IllegalArgumentException("--session-file requires a path.");
+                    }
+                    sessionFile = value.trim();
+                    absorb = null;
+                    continue;
+                }
                 if (token.startsWith("--tags=") || token.startsWith("--name=")) {
                     absorb = null;
                     continue;
@@ -1392,7 +1426,7 @@ public final class WorkbenchSessionCommands {
                 }
             }
             return new SessionFlags(
-                    text, id, feature, run, fromHere, stopAfter, ackOnly, wait, force,
+                    text, id, feature, run, fromHere, stopAfter, sessionFile, ackOnly, wait, force,
                     stepTimeoutSeconds, runTimeoutSeconds
             );
         }
