@@ -539,6 +539,7 @@ final class ControlBridgeCoordinator implements ControlHookHandler, AutoCloseabl
         boolean truncated = source.length() > MAX_PAGE_SOURCE_CHARS;
         if (truncated) source = source.substring(0, MAX_PAGE_SOURCE_CHARS);
         Dimension size = driver.manage().window().getSize();
+        org.openqa.selenium.Capabilities capabilities = driver.getCapabilities();
         return new ControlBridgeBrowserPageResult(
                 "SUCCESS",
                 new ControlBridgeBrowserPage(
@@ -549,7 +550,9 @@ final class ControlBridgeCoordinator implements ControlHookHandler, AutoCloseabl
                         size.getWidth(),
                         size.getHeight(),
                         source,
-                        truncated
+                        truncated,
+                        DebuggerAddress.from(capabilities),
+                        DebuggerAddress.browserType(capabilities)
                 ),
                 null,
                 lane.status(lanes.size())

@@ -22,6 +22,7 @@ public final class WorkbenchLiveSession implements AutoCloseable {
     private final Path projectRoot;
     private final Map<String, String> workerProperties;
     private final WorkbenchWorkerManager workers;
+    private final LiveSessionPublication publication;
 
     public WorkbenchLiveSession(Path projectRoot) {
         this(projectRoot, Map.of());
@@ -31,10 +32,12 @@ public final class WorkbenchLiveSession implements AutoCloseable {
         this.projectRoot = projectRoot.toAbsolutePath().normalize();
         this.workerProperties = workerSystemProperties == null ? Map.of() : Map.copyOf(workerSystemProperties);
         this.workers = new WorkbenchWorkerManager(this.projectRoot, this.workerProperties);
+        this.publication = new LiveSessionPublication(this.projectRoot, this.workerProperties);
     }
 
-    /** Run id the hold gate reads. Blank when this session was not given one. */
+    /** Run id the hold gate reads. Blank until the live session is open, unless one was given. */
     public String sessionRunId() {
+        if (publication.runId() != null) return publication.runId();
         String id = workerProperties.get("pkb_run_id");
         if (id == null || id.isBlank()) return null;
         return id.trim();
@@ -45,6 +48,10 @@ public final class WorkbenchLiveSession implements AutoCloseable {
      * A hold is left in place.
      */
     public void noteSessionState(SessionDescriptor.State state) {
+        if (publication.runId() != null) {
+            publication.playback(state);
+            return;
+        }
         String runId = sessionRunId();
         if (runId == null || state == null) return;
         Optional<SessionDescriptor> current = SessionDescriptorWriter.read(projectRoot, runId);
@@ -55,11 +62,16 @@ public final class WorkbenchLiveSession implements AutoCloseable {
     }
 
     public WorkbenchWorkerStatus start() {
-        return workers.startInteractive();
+        WorkbenchWorkerStatus status = workers.startInteractive();
+        publication.opened(status.sessionId());
+        return status;
     }
 
     public WorkbenchWorkerStatus restart() {
-        return workers.restartInteractive();
+        publication.closing();
+        WorkbenchWorkerStatus status = workers.restartInteractive();
+        publication.opened(status.sessionId());
+        return status;
     }
 
     public WorkbenchWorkerStatus status() {
@@ -71,6 +83,7 @@ public final class WorkbenchLiveSession implements AutoCloseable {
     }
 
     public WorkbenchWorkerStatus stop() {
+        publication.closing();
         return workers.stop();
     }
 
@@ -79,10 +92,14 @@ public final class WorkbenchLiveSession implements AutoCloseable {
     }
 
     public ControlBridgeCallResult executeStep(String text, String argument) {
-        SessionStepGate.awaitAdvance(projectRoot, sessionRunId(), SessionStepGate.DEFAULT_WAIT);
-        return call(binding -> binding.client().executeStep(
-                binding.scenarioId(), text, argument, COMMAND_TIMEOUT_SECONDS
-        ));
+        publication.beforeStep();
+        try {
+            return call(binding -> binding.client().executeStep(
+                    binding.scenarioId(), text, argument, COMMAND_TIMEOUT_SECONDS
+            ));
+        } finally {
+            publication.afterStep(currentPage());
+        }
     }
 
     public ControlBridgeStepResolution resolveStep(String text, String argument) {
@@ -218,7 +235,26 @@ public final class WorkbenchLiveSession implements AutoCloseable {
 
     @Override
     public void close() {
+        publication.closing();
         workers.close();
+    }
+
+    private LiveSessionPublication.Page currentPage() {
+        try {
+            ControlBridgeBrowserPageResult result = browserPage();
+            if (result == null || result.page() == null || !"SUCCESS".equals(result.status())) {
+                return LiveSessionPublication.Page.none();
+            }
+            ControlBridgeBrowserPage page = result.page();
+            return new LiveSessionPublication.Page(
+                    page.browserType(),
+                    page.cdpDebuggerAddress(),
+                    page.url(),
+                    page.windowHandles()
+            );
+        } catch (RuntimeException failure) {
+            return LiveSessionPublication.Page.none();
+        }
     }
 
     private <T> T call(Function<Binding, T> operation) {

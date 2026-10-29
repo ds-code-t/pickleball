@@ -486,7 +486,9 @@ class WorkbenchUiControllerTest {
                                             1280,
                                             720,
                                             "<html>Pickleball Test Lab</html>",
-                                            false
+                                            false,
+                                            "127.0.0.1:9222",
+                                            "chrome"
                                     ),
                                     null,
                                     runtime()

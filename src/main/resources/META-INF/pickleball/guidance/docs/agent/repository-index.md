@@ -576,10 +576,12 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-control-api/src/main/java/tools/dscode/control/bridge/ControlBridgeStepResolver.java`
 - `pickleball-control-api/src/main/java/tools/dscode/control/bridge/ControlBridgeValue.java`
 - `pickleball-control-api/src/main/java/tools/dscode/control/bridge/ControlBridgeValueResult.java`
+- `pickleball-control-api/src/main/java/tools/dscode/control/bridge/DebuggerAddress.java`
 - `pickleball-control-api/src/test/java/com/example/glue/SampleGlue.java`
 - `pickleball-control-api/src/test/java/tools/dscode/control/api/PageElementQueryTest.java`
 - `pickleball-control-api/src/test/java/tools/dscode/control/api/StepMapSeedsTest.java`
 - `pickleball-control-api/src/test/java/tools/dscode/control/bridge/ControlBridgeStepResolverTest.java`
+- `pickleball-control-api/src/test/java/tools/dscode/control/bridge/DebuggerAddressTest.java`
 
 ## Neutral control protocol module
 
@@ -717,6 +719,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/WorkbenchRuntimeBoundary.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/WorkbenchServices.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/WorkbenchSessionActions.java`
+- `pickleball-workbench/src/main/java/tools/dscode/workbench/worker/LiveSessionPublication.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/worker/WorkbenchLiveSession.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/worker/WorkbenchWorkerManager.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/worker/WorkbenchWorkerStatus.java`
@@ -766,6 +769,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/WorkbenchControllerLeaseTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/WorkbenchRuntimeBoundaryTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/WorkbenchSessionActionsTest.java`
+- `pickleball-workbench/src/test/java/tools/dscode/workbench/worker/LiveSessionPublicationTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/worker/WorkbenchLiveSessionTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/worker/WorkbenchWorkerManagerTest.java`
 

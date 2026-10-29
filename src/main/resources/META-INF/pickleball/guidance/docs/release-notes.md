@@ -2,7 +2,14 @@
 
 ## 2.1.18
 
-_No changes yet._
+Direct-control handoff for a live Workbench session. A normal `mvn test` or `gradlew test` does not read `pkb_direct_control_provider` and does not write a session descriptor.
+
+- Headless isolate and the GUI share `WorkbenchLiveSession`. That session writes `.pickleball/runs/<runId>/session/descriptor.json` (`session-descriptor.v1`, contract `"1"`). The CDP address is `se:cdp` when Selenium published it, otherwise `goog:chromeOptions` or `ms:edgeOptions` `debuggerAddress`. No address stays null. Chrome and Edge set `browserType`. The file is replaced atomically and refreshed when the page changes.
+- `session list` prints one line per session that is not `stopped`, or a JSON array with `--json`. `session info <sessionId>` prints the descriptor file. `--json` prints those same bytes. `<sessionId>` may be the run id.
+- `session hold <sessionId>` sets `held`. The next step waits. `session release <sessionId>` restores the state from when the hold began (`running` or `paused`). `pause` and `play` update the same descriptor. A hold is not overwritten by playback.
+- Optional `pkb_direct_control_provider=composite`, or a path to the binary, in that run's `runvars.properties` or the system property of the same name (the `pkb_runvars.pkb_direct_control_provider` form too). Blank starts nothing. `composite` resolves `COMPOSITE_BIN`, then `COMPOSITE_HOME` or a sibling `dom-composite` checkout (`target/debug/composite`, then `target/release/composite`). The provider is `composite session attach --cdp <url> --id <sessionId> --i-accept-local-attach`. Stdout and stderr go to the run's `session/provider.log`. Start and detach append a line to `.pickleball/agent-log`. Detach stops only that process. A missing binary skips; it does not fail the run.
+- When `record.json` already exists, a live session adds `sessionDescriptor` with the absolute descriptor path. A normal run does not add it.
+- The attach contract is [Direct-control handoff](direct-control-handoff.md). dom-composite stays a general tool. Pickleball still owns the browser.
 
 ## 2.1.17
 
