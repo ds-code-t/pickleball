@@ -3,6 +3,8 @@ package tools.dscode.workbench;
 import tools.dscode.control.protocol.ControlBridgeCallResult;
 import tools.dscode.control.protocol.ControlBridgePageQueryResult;
 import tools.dscode.control.protocol.ExampleRowSelector;
+import tools.dscode.control.protocol.SessionDescriptor;
+import tools.dscode.control.protocol.SessionStepGate;
 import tools.dscode.control.protocol.WindowDriver;
 import tools.dscode.workbench.catalog.ConsumerFeatureCatalog;
 import tools.dscode.workbench.lease.WorkbenchCallContext;
@@ -143,6 +145,7 @@ public final class WorkbenchSessionActions {
     }
 
     public Map<String, Object> pause() {
+        services.noteSessionState(SessionDescriptor.State.PAUSED);
         if (window != null) {
             show(Window::pause);
             return accepted("pause", "PAUSED");
@@ -152,6 +155,7 @@ public final class WorkbenchSessionActions {
     }
 
     public Map<String, Object> stopPlayback() {
+        services.noteSessionState(SessionDescriptor.State.PAUSED);
         if (window != null) {
             show(Window::stopPlayback);
             return accepted("stop", "STOPPED");
@@ -421,6 +425,7 @@ public final class WorkbenchSessionActions {
     }
 
     private Map<String, Object> play(boolean fromHere, String stepId) {
+        services.noteSessionState(SessionDescriptor.State.RUNNING);
         if (window != null) {
             show(client -> {
                 if (fromHere) client.playFromHere(stepId);
@@ -445,7 +450,18 @@ public final class WorkbenchSessionActions {
             else services.playback().playFromStart();
             int executed = 0;
             int guard = Math.max(1, services.playback().playPlan().steps().size()) + 2;
+            String runId = services.sessionRunId();
             while (services.playback().running() && executed < guard) {
+                if (runId != null) {
+                    SessionDescriptor.State state = SessionStepGate.awaitAdvance(
+                            services.projectRoot(), runId, SessionStepGate.DEFAULT_WAIT
+                    );
+                    if (state == SessionDescriptor.State.PAUSED
+                            || state == SessionDescriptor.State.STOPPING
+                            || state == SessionDescriptor.State.STOPPED) {
+                        break;
+                    }
+                }
                 GherkinPlayPlan.Step step = services.playback().nextPlanStep().orElse(null);
                 if (step == null) break;
                 int before = services.playback().planIndex();

@@ -134,4 +134,74 @@ public final class SessionDescriptorWriter {
             throw new IllegalStateException("Could not read " + file + ": " + failure.getMessage(), failure);
         }
     }
+
+    public static final String HOLD_FILE = "hold.json";
+
+    /**
+     * Sets {@code held} and remembers the state to restore.
+     * A second hold does not replace that remembered state.
+     */
+    public static SessionDescriptor hold(Path project, String id, Instant updatedAt) {
+        Located located = locate(project, id);
+        if (located.descriptor().state() == SessionDescriptor.State.HELD) {
+            return transition(project, located.descriptor().runId(), SessionDescriptor.State.HELD, updatedAt);
+        }
+        SessionDescriptor.State resume = located.descriptor().state();
+        if (resume != SessionDescriptor.State.RUNNING && resume != SessionDescriptor.State.PAUSED) {
+            throw new IllegalStateException(
+                    "Cannot hold a session that is " + resume.wire() + "."
+            );
+        }
+        Path sidecar = located.file().getParent().resolve(HOLD_FILE);
+        Workspace.atomicWriteString(sidecar, "{\"resume\":\"" + resume.wire() + "\"}\n");
+        try {
+            return transition(project, located.descriptor().runId(), SessionDescriptor.State.HELD, updatedAt);
+        } catch (RuntimeException failure) {
+            try {
+                Files.deleteIfExists(sidecar);
+            } catch (IOException ignored) {
+                // The descriptor was not replaced.
+            }
+            throw failure;
+        }
+    }
+
+    /** Restores the state remembered by {@link #hold}. */
+    public static SessionDescriptor release(Path project, String id, Instant updatedAt) {
+        Located located = locate(project, id);
+        if (located.descriptor().state() != SessionDescriptor.State.HELD) {
+            throw new IllegalStateException(
+                    "Session " + id + " is " + located.descriptor().state().wire() + ", not held."
+            );
+        }
+        SessionDescriptor.State resume = remembered(located.file().getParent());
+        SessionDescriptor updated = transition(project, located.descriptor().runId(), resume, updatedAt);
+        try {
+            Files.deleteIfExists(located.file().getParent().resolve(HOLD_FILE));
+        } catch (IOException failure) {
+            throw new IllegalStateException("Could not clear the hold: " + failure.getMessage(), failure);
+        }
+        return updated;
+    }
+
+    private static Located locate(Path project, String id) {
+        Path file = findFile(project, id).orElseThrow(() ->
+                new IllegalStateException("No session descriptor for " + id + "."));
+        return new Located(file, readFile(file));
+    }
+
+    private static SessionDescriptor.State remembered(Path sessionDirectory) {
+        Path sidecar = sessionDirectory.resolve(HOLD_FILE);
+        if (!Files.isRegularFile(sidecar)) return SessionDescriptor.State.RUNNING;
+        try {
+            String text = Files.readString(sidecar, StandardCharsets.UTF_8);
+            if (text.contains("\"paused\"")) return SessionDescriptor.State.PAUSED;
+            return SessionDescriptor.State.RUNNING;
+        } catch (IOException failure) {
+            throw new IllegalStateException("Could not read " + sidecar + ": " + failure.getMessage(), failure);
+        }
+    }
+
+    private record Located(Path file, SessionDescriptor descriptor) {
+    }
 }

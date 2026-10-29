@@ -94,6 +94,8 @@ public final class WorkbenchAgentCommands {
                 case "find-element" -> findElement(parsed, out, err);
                 case "session-list" -> sessionList(parsed, out, err);
                 case "session-info" -> sessionInfo(parsed, out, err);
+                case "session-hold" -> sessionHold(parsed, out, err, true);
+                case "session-release" -> sessionHold(parsed, out, err, false);
                 default -> {
                     err.println("Unknown Workbench agent command: " + parsed.command());
                     yield 2;
@@ -268,6 +270,27 @@ public final class WorkbenchAgentCommands {
         if (!text.endsWith("\n")) text = text + "\n";
         out.print(text);
         return 0;
+    }
+
+    private static int sessionHold(WorkbenchCommandLine.Parsed parsed, PrintStream out, PrintStream err, boolean hold) {
+        String id = parsed.coordination().id();
+        String verb = hold ? "hold" : "release";
+        if (id == null || id.isBlank()) {
+            err.println("Usage: session " + verb + " <sessionId> [--json]");
+            return 2;
+        }
+        try {
+            SessionDescriptor updated = hold
+                    ? SessionDescriptorWriter.hold(parsed.project(), id, java.time.Instant.now())
+                    : SessionDescriptorWriter.release(parsed.project(), id, java.time.Instant.now());
+            String text = readText(SessionDescriptorWriter.file(parsed.project(), updated.runId()));
+            if (!text.endsWith("\n")) text = text + "\n";
+            out.print(text);
+            return 0;
+        } catch (IllegalStateException failure) {
+            err.println(failure.getMessage());
+            return 1;
+        }
     }
 
     private static String readText(Path file) {

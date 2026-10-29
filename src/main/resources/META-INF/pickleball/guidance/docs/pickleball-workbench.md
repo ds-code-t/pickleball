@@ -153,6 +153,8 @@ Project sync, starting a run, and any other long load run off the Swing event th
 | Close the window | `close-window` closes the window. It does not delete the run directory, stop a headless run, or erase the short log. |
 | List live direct-control sessions | `session list` (add `--json` for a JSON array). One line per descriptor whose state is not `stopped`. |
 | Show one session descriptor | `session info <sessionId>` prints `.pickleball/runs/<runId>/session/descriptor.json`. `--json` prints the same bytes. |
+| Hold step advance | `session hold <sessionId>` sets the descriptor to `held`. Workbench does not start the next step while it is `held`. |
+| Release a hold | `session release <sessionId>` restores the state from when the hold began (`running` or `paused`). |
 
 A live session publishes that descriptor so dom-composite 2.4.0 can attach to the browser Pickleball already owns. The file, `session list`, and `session info` are the same source. The window shows the CLI output and does not keep a second copy. Attach, detach, and hold are specified in [Direct-control handoff](direct-control-handoff.md). A normal `mvn test` does not write the file. A bare `session` command is still the controller launch.
 

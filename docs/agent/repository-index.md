@@ -627,6 +627,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/RunView.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/SessionDescriptor.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/SessionDescriptorWriter.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/SessionStepGate.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/SleepGapMonitor.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/WindowDriver.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/WorkbenchFeatureIndex.java`
@@ -640,6 +641,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/RunConfigsTest.java`
 - `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/RunWindowTest.java`
 - `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/SessionDescriptorTest.java`
+- `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/SessionHoldTest.java`
 - `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/SleepGapMonitorTest.java`
 - `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/WorkbenchFeatureIndexTest.java`
 - `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/WorkspaceTest.java`

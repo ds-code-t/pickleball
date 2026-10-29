@@ -119,7 +119,47 @@ class WorkbenchSessionQueryTest {
         assertEquals("session-list", list.command());
         assertTrue(WorkbenchCommandLine.isAgentCoreCommand("session-list"));
         assertTrue(WorkbenchCommandLine.isAgentCoreCommand("session-info"));
+        assertTrue(WorkbenchCommandLine.isAgentCoreCommand("session-hold"));
+        assertTrue(WorkbenchCommandLine.isAgentCoreCommand("session-release"));
         assertEquals(temp.toAbsolutePath().normalize(), list.project());
+    }
+
+    @Test
+    void holdAndReleaseMatchTheDescriptor() throws Exception {
+        Instant started = Instant.parse("2026-10-29T16:10:00Z");
+        SessionDescriptor running = new SessionDescriptor(
+                "session-1",
+                "run-1",
+                temp.resolve("workspace").toAbsolutePath().normalize().toString(),
+                "chrome",
+                "127.0.0.1:9222",
+                null,
+                List.of(),
+                SessionDescriptor.State.RUNNING,
+                started,
+                started
+        );
+        SessionDescriptorWriter.publish(temp, running, true);
+
+        Capture held = run("session", "hold", "session-1", temp.toString());
+        assertEquals(0, held.code);
+        String file = Files.readString(SessionDescriptorWriter.file(temp, "run-1"));
+        assertEquals(file, held.out);
+        assertTrue(file.contains("\"state\": \"held\""));
+
+        Capture released = run("session", "release", "run-1", temp.toString());
+        assertEquals(0, released.code);
+        String after = Files.readString(SessionDescriptorWriter.file(temp, "run-1"));
+        assertEquals(after, released.out);
+        assertTrue(after.contains("\"state\": \"running\""));
+
+        Capture usage = run("session", "hold");
+        assertEquals(2, usage.code);
+        assertTrue(usage.err.contains("Usage: session hold <sessionId> [--json]"));
+
+        Capture missing = run("session", "release", "missing", temp.toString());
+        assertEquals(1, missing.code);
+        assertTrue(missing.err.contains("No session descriptor for missing."));
     }
 
     private Capture run(String... args) {

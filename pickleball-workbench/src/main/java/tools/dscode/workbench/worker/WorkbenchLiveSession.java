@@ -5,6 +5,7 @@ import tools.dscode.workbench.bridge.ControlBridgeClient;
 import tools.dscode.workbench.terminal.WorkerLogFiles;
 
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -18,6 +19,8 @@ import java.util.function.Function;
 public final class WorkbenchLiveSession implements AutoCloseable {
     private static final int COMMAND_TIMEOUT_SECONDS = 60;
 
+    private final Path projectRoot;
+    private final Map<String, String> workerProperties;
     private final WorkbenchWorkerManager workers;
 
     public WorkbenchLiveSession(Path projectRoot) {
@@ -25,7 +28,30 @@ public final class WorkbenchLiveSession implements AutoCloseable {
     }
 
     public WorkbenchLiveSession(Path projectRoot, Map<String, String> workerSystemProperties) {
-        this.workers = new WorkbenchWorkerManager(projectRoot, workerSystemProperties);
+        this.projectRoot = projectRoot.toAbsolutePath().normalize();
+        this.workerProperties = workerSystemProperties == null ? Map.of() : Map.copyOf(workerSystemProperties);
+        this.workers = new WorkbenchWorkerManager(this.projectRoot, this.workerProperties);
+    }
+
+    /** Run id the hold gate reads. Blank when this session was not given one. */
+    public String sessionRunId() {
+        String id = workerProperties.get("pkb_run_id");
+        if (id == null || id.isBlank()) return null;
+        return id.trim();
+    }
+
+    /**
+     * Reflects playback on the descriptor when this session has a run id.
+     * A hold is left in place.
+     */
+    public void noteSessionState(SessionDescriptor.State state) {
+        String runId = sessionRunId();
+        if (runId == null || state == null) return;
+        Optional<SessionDescriptor> current = SessionDescriptorWriter.read(projectRoot, runId);
+        if (current.isEmpty()) return;
+        if (current.get().state() == SessionDescriptor.State.HELD && state != SessionDescriptor.State.HELD) return;
+        if (!current.get().state().allows(state)) return;
+        SessionDescriptorWriter.transition(projectRoot, runId, state, Instant.now());
     }
 
     public WorkbenchWorkerStatus start() {
@@ -53,6 +79,7 @@ public final class WorkbenchLiveSession implements AutoCloseable {
     }
 
     public ControlBridgeCallResult executeStep(String text, String argument) {
+        SessionStepGate.awaitAdvance(projectRoot, sessionRunId(), SessionStepGate.DEFAULT_WAIT);
         return call(binding -> binding.client().executeStep(
                 binding.scenarioId(), text, argument, COMMAND_TIMEOUT_SECONDS
         ));

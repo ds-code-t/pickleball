@@ -24,7 +24,7 @@ final class WorkbenchCommandLine {
             "short-log", "note", "inbox", "finish",
             "presence", "post", "history", "gc-runs", "gc-versions", "use-version",
             "inspect-page", "find-element",
-            "session-list", "session-info"
+            "session-list", "session-info", "session-hold", "session-release"
     );
     static final Set<String> SESSION_CLIENT_COMMANDS = Set.of(
             "isolate", "session-start", "execute-step", "status", "events", "stop", "kill",
@@ -546,18 +546,22 @@ final class WorkbenchCommandLine {
     }
 
     /**
-     * {@code session list} and {@code session info <id>} read the descriptor.
-     * A bare {@code session} stays the forwarded controller launch.
+     * {@code session list}, {@code session info}, {@code session hold}, and
+     * {@code session release} read or update the descriptor. A bare
+     * {@code session} stays the forwarded controller launch.
      */
     private static String[] sessionQueryArgs(String[] args) {
         if (args == null || args.length < 2 || !"session".equals(args[0])) return args;
-        if (!"list".equals(args[1]) && !"info".equals(args[1])) return args;
+        String verb = args[1];
+        if (!"list".equals(verb) && !"info".equals(verb) && !"hold".equals(verb) && !"release".equals(verb)) {
+            return args;
+        }
         List<String> rewritten = new ArrayList<>();
-        rewritten.add("session-" + args[1]);
+        rewritten.add("session-" + verb);
         int index = 2;
-        if ("info".equals(args[1])) {
+        if (!"list".equals(verb)) {
             if (args.length < 3 || isFlag(args[2])) {
-                throw new IllegalArgumentException("Usage: session info <sessionId> [--json]");
+                throw new IllegalArgumentException("Usage: session " + verb + " <sessionId> [--json]");
             }
             rewritten.add("--id=" + args[2]);
             index = 3;
