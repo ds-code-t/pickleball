@@ -114,6 +114,7 @@ maven-consumer-project/src/test/resources/features/run-step-parameter-variations
 maven-consumer-project/src/test/resources/features/scenario-data-references.feature
 maven-consumer-project/src/test/resources/features/scenario-marker-data.feature
 maven-consumer-project/src/test/resources/features/scenario-step-markers.feature
+maven-consumer-project/src/test/resources/features/separate-line-else.feature
 maven-consumer-project/src/test/resources/features/service-call-execution.feature
 maven-consumer-project/src/test/resources/features/single-element-condition.feature
 maven-consumer-project/src/test/resources/features/step-override-bridge.feature

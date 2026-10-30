@@ -508,6 +508,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/WorkbenchTagFallbackTest.java`
 - `src/test/java/tools/dscode/launcher/WorkspaceLaunchForkTest.java`
 - `src/test/java/tools/dscode/parallelutilities/ParallelCountEstimatorTest.java`
+- `src/test/java/tools/dscode/release/Release217ReportedBugsTest.java`
 - `src/test/java/tools/dscode/Release216BehaviorTest.java`
 - `src/test/java/tools/dscode/Release217Phase1Test.java`
 - `src/test/java/tools/dscode/scenarioobject/ScenarioObjectHookTest.java`
@@ -516,6 +517,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/testengine/CucumberNameFilterTest.java`
 - `src/test/java/tools/dscode/testengine/CucumberPluginPublishTest.java`
 - `src/test/java/tools/dscode/testengine/DriverDownloadRedactionTest.java`
+- `src/test/java/tools/dscode/testengine/DynamicSuiteBootstrapAccess.java`
 - `src/test/java/tools/dscode/testengine/DynamicSuiteBootstrapWorkbenchRootTest.java`
 - `src/test/java/tools/dscode/testengine/ExampleRowFilterTest.java`
 - `src/test/java/tools/dscode/testengine/MavenWorkspaceLaunchEndToEndTest.java`
@@ -916,6 +918,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `maven-consumer-project/src/test/resources/features/scenario-data-references.feature`
 - `maven-consumer-project/src/test/resources/features/scenario-marker-data.feature`
 - `maven-consumer-project/src/test/resources/features/scenario-step-markers.feature`
+- `maven-consumer-project/src/test/resources/features/separate-line-else.feature`
 - `maven-consumer-project/src/test/resources/features/service-call-execution.feature`
 - `maven-consumer-project/src/test/resources/features/single-element-condition.feature`
 - `maven-consumer-project/src/test/resources/features/step-override-bridge.feature`

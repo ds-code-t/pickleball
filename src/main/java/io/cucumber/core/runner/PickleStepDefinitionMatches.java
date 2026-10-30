@@ -138,7 +138,13 @@ public final class PickleStepDefinitionMatches {
         public Object invoke(Object proxy, Method called, Object[] args) throws Throwable {
             switch (called.getName()) {
                 case "execute":
-                    target.invoke(null);
+                    try {
+                        target.invoke(null);
+                    } catch (java.lang.reflect.InvocationTargetException failure) {
+                        // Rethrow the step's own failure so the proxy does not wrap it in a
+                        // message-less UndeclaredThrowableException (2.1.17 bug 4).
+                        throw failure.getCause() == null ? failure : failure.getCause();
+                    }
                     return null;
                 case "parameterInfos":
                     return Collections.<ParameterInfo>emptyList();

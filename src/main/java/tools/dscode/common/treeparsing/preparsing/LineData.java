@@ -45,8 +45,7 @@ public abstract class LineData implements Cloneable {
     public void setInheritance(StepBase currentStep) {
         stepExtension = currentStep;
 
-        PhraseData previousSiblingInheritancePhrase = nearestSiblingInheritance(currentStep.previousSibling);
-        previousSiblingConditionalState = previousSiblingInheritancePhrase == null ? 1 : previousSiblingInheritancePhrase.phraseConditionalMode;
+        previousSiblingConditionalState = nearestSiblingConditionalState(currentStep.previousSibling);
         StepBase parentStep = currentStep.parentStep;
         inheritedPhrase = getInheritancePhrase(parentStep);
         inheritedConditionalState = inheritedPhrase == null ? 1 : inheritedPhrase.phraseConditionalMode;
@@ -64,15 +63,34 @@ public abstract class LineData implements Cloneable {
      * earlier sibling that does, so a step between a false IF and ELSE does not
      * hide that IF.
      */
-    private static PhraseData nearestSiblingInheritance(StepBase sibling) {
+    private static int nearestSiblingConditionalState(StepBase sibling) {
         while (sibling != null) {
             PhraseData phrase = getInheritancePhrase(sibling);
             if (phrase != null) {
-                return phrase;
+                return phrase.phraseConditionalMode;
+            }
+            PhraseData tail = singleLineConditionalTail(sibling);
+            if (tail != null) {
+                return tail.phraseConditionalMode;
             }
             sibling = sibling.previousSibling;
         }
-        return null;
+        return 1;
+    }
+
+    /**
+     * A single-line {@code IF: ... THEN: ...} (or separate-line ELSE-IF) has no
+     * block inheritance phrase, but its last executed phrase carries the chain
+     * state exactly as an inline ELSE on the same line would see it.
+     */
+    static PhraseData singleLineConditionalTail(StepBase sibling) {
+        if (sibling == null || sibling.lineData == null) return null;
+        List<PhraseData> executed = sibling.lineData.executedPhrases;
+        if (executed.isEmpty()) return null;
+        String first = executed.getFirst().getConditional();
+        first = first == null ? "" : first.trim().toLowerCase();
+        if (!first.startsWith("if") && !first.startsWith("else")) return null;
+        return executed.getLast();
     }
 
     public List<String> lineComponents = new ArrayList<>();

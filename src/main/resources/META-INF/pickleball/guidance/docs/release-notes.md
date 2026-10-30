@@ -2,6 +2,13 @@
 
 ## 2.1.18
 
+Fixes for bugs reported against 2.1.17:
+
+- A separate-line `ELSE:` or `ELSE-IF:` after a single-line `IF: ... THEN: ...` now runs when the `IF:` was false. It used to be skipped. Block and inline conditionals are unchanged.
+- `Values.softFail` from a Java step definition: the top-level JUnit throwable is no longer a message-less `UndeclaredThrowableException`. Its message contains the soft-failure text.
+- A Workbench feature folder with a space (`wd-file:my features`) is percent-encoded into the Cucumber `file:` URI. A path without such characters is unchanged.
+- Under `mvn exec:java`, when `java.class.path` has no test output root, Workspace seed capture and suite discovery also read the context class loader's file URLs, so the consumer runner subclass is found. The resolve-cache key includes those entries, so a cache captured without the runner is not reused. A normal run, whose test output is on `java.class.path`, is unchanged.
+
 Direct-control handoff for a live Workbench session. A normal `mvn test` or `gradlew test` does not read `pkb_direct_control_provider` and does not write a session descriptor.
 
 - A warm launch adds `-o` (Maven) or `--offline` (Gradle) once the project has compiled test classes. If that offline launch fails only because a build plugin or provider was never downloaded (output contains `in offline mode` or `has not been downloaded from it before`), `discover` and `confirm` re-run the same command once without the offline flag and write `stage=maven-retry-online` to `launch-timing.txt`. Any other failure is reported as is. A normal `mvn test` is unchanged.

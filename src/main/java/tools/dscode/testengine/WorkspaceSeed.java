@@ -4,7 +4,6 @@ import tools.dscode.common.resources.ResourceLocations;
 import tools.dscode.control.protocol.PickleballLocalLayout;
 import tools.dscode.control.protocol.Workspace;
 
-import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -184,9 +183,7 @@ public final class WorkspaceSeed {
     }
 
     static List<String> runtimeClasspath() {
-        String classpath = System.getProperty("java.class.path", "");
-        if (classpath.isBlank()) return List.of();
-        return List.of(classpath.split(File.pathSeparator, -1));
+        return DynamicSuiteBootstrap.effectiveClasspathEntries();
     }
 
     /**
