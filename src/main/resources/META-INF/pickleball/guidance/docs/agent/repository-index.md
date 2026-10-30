@@ -468,6 +468,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/common/reporting/diagnostic/ConsumerMavenTestRunnerTest.java`
 - `src/test/java/tools/dscode/common/reporting/diagnostic/DiagnosticIndexRebuilderSqliteTest.java`
 - `src/test/java/tools/dscode/common/reporting/diagnostic/DiagnosticSecretRedactionTest.java`
+- `src/test/java/tools/dscode/common/reporting/diagnostic/DiscoverHintJvmLeakTest.java`
 - `src/test/java/tools/dscode/common/servicecalls/JdbcTypeMappingTest.java`
 - `src/test/java/tools/dscode/common/treeparsing/preparsing/ConditionalBranchArgumentTest.java`
 - `src/test/java/tools/dscode/common/treeparsing/preparsing/LazyBranchResolutionTest.java`
