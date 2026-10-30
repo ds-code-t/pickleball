@@ -998,8 +998,10 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `REVIEW.md`
 - `scripts/agent_validate.ps1`
 - `scripts/agent_validate.sh`
+- `scripts/FeatureScanTiming.java`
 - `scripts/refresh_agent_index.py`
 - `scripts/sync_consumer_guidance.py`
+- `scripts/time_feature_scan.py`
 - `scripts/verify_agent_contract.py`
 
 ## .pickleball owners

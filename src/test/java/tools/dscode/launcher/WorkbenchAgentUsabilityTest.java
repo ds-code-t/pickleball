@@ -102,11 +102,12 @@ class WorkbenchAgentUsabilityTest {
         assertTrue(unknown.contains("fix: discover"), unknown);
         assertFalse(unknown.contains("fix: Usage: help <command>"), unknown);
         String golden = Files.readString(Path.of("src/test/resources/workbench-help-golden.txt"));
-        String catalog = WorkbenchCliHelp.catalog();
-        for (String line : golden.lines().map(String::strip).filter(item -> !item.isEmpty()).toList()) {
-            String haystack = line.startsWith("fix:") ? unknown : line.startsWith("Usage: query") ? WorkbenchCliHelp.usage("query") : catalog;
-            assertTrue(haystack.contains(line), line);
-        }
+        assertEquals(golden, WorkbenchCliHelp.catalog());
+        assertEquals(golden, WorkbenchCliHelp.forTopic("help"));
+        assertEquals(
+                "Usage: query <runs|get|query|search|props|errors> [--run-id=<id>] [--scenario=<id>] [--kind=run|scenario|step|event|property|artifact|error|log] [--text=<words>] [--status=<outcome>] [--fields=<a,b>] [--limit=<n>] [--cursor=<token>] [--id=<id>]\n",
+                WorkbenchCliHelp.usage("query")
+        );
     }
 
     private static WorkbenchCommandLine.Parsed parse(String... args) {
@@ -159,6 +160,7 @@ class WorkbenchAgentUsabilityTest {
         Capture json = agent("resolve-runvars", temp.toString(), "--json");
         assertEquals(0, json.code, json.err);
         assertFalse(json.out.contains("Dry-run resolve"), json.out);
+        assertTrue(json.out.contains("\"runProfileFingerprint\""), json.out);
         assertTrue(json.out.contains("\"workbenchReportingModeDefault\":\"diagnostic\""), json.out);
         assertTrue(json.out.contains("Trust record.json after discover"), json.out);
         assertEquals(1, json.out.strip().lines().count());
