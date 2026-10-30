@@ -2,6 +2,8 @@
 
 ## 2.1.18
 
+- One-shot Workbench commands (`help`, `plan`, `hint`, `status`, `query`, `events`, `workspace-show`, `workspace-edit`, `workspace-seed`) share one launch path. A successful `discover` or `workspace-seed` writes `classpath.cache` under the Workbench state root (`.pickleball/v/<version>/workbench` when `current.json` is complete, otherwise `.pickleball/workbench`). The file is a Java argument-file classpath from the synced worker classpath, or from Maven `dependency:build-classpath` / the Gradle test runtime classpath, plus already-extracted controller jars. The next one-shot is `java -cp @classpath.cache tools.dscode.launcher.PickleballWorkbenchLauncher <args>` and does not start `mvnw` or `gradlew`. A missing cache, a missing entry, or a newer `pom.xml` / `build.gradle` falls back to the project wrapper. `help` with no cache still runs that launcher jar and the static `WorkbenchCliHelp` catalog. `discover`, `confirm`, and `isolate` still use the wrapper when they build or launch a worker. `.pickleball/open/pickleball-workbench.sh` (and the `.cmd` / `.ps1` openers) take the same path when you pass a one-shot verb. A normal `mvn test` does not read the cache.
+
 Fixes for bugs reported against 2.1.17:
 
 - A separate-line `ELSE:` or `ELSE-IF:` after a single-line `IF: ... THEN: ...` now runs when the `IF:` was false. It used to be skipped. Block and inline conditionals are unchanged.

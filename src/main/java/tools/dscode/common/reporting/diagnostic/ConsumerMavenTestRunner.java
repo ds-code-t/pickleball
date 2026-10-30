@@ -169,6 +169,16 @@ public final class ConsumerMavenTestRunner {
         }
     }
 
+    /** Project wrapper script, or the wrapper jar when the script is absent. */
+    public static Path wrapperPath(Path projectRoot) {
+        return wrapper(projectRoot);
+    }
+
+    /** {@code java -jar} for a wrapper jar, otherwise the wrapper script. */
+    public static List<String> wrapperLaunchPrefix(Path launcher) {
+        return launchPrefix(launcher);
+    }
+
     static Path wrapper(Path projectRoot) {
         Path project = projectRoot.toAbsolutePath().normalize();
         boolean mavenFile = Files.isRegularFile(project.resolve("pom.xml"));

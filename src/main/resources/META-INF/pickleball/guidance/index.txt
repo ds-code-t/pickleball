@@ -30,6 +30,7 @@ docs/getting-started.md
 docs/java-values.md
 docs/key-parser-dsl.md
 docs/log-and-assert-steps.md
+docs/maintainer/2.1.18-consumer-report-fixes.md
 docs/mapping-and-templating.md
 docs/nested-steps.md
 docs/object-registration.md

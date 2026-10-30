@@ -8,6 +8,8 @@ import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.FileTime;
+import java.time.Instant;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -82,6 +84,60 @@ class PickleballLocalStoreTest {
         assertTrue(cmd.contains("SNAPSHOT"));
         assertTrue(cmd.contains("PROJECT:~-1"));
         assertTrue(ps.contains("SNAPSHOT"));
+        assertTrue(sh.contains("classpath.cache"));
+        assertTrue(sh.contains("-cp"));
+        assertTrue(sh.contains("tools.dscode.launcher.PickleballWorkbenchLauncher"));
+        assertTrue(sh.indexOf("classpath.cache") < sh.indexOf("exec-maven-plugin"));
+        assertTrue(cmd.contains("classpath.cache"));
+        assertTrue(ps.contains("classpath.cache"));
+    }
+
+    @Test
+    void openScriptOneShotDoesNotStartMavenWhenTheCacheIsFresh() throws Exception {
+        Path project = tempDir.resolve("script-consumer");
+        Files.createDirectories(project.resolve(".pickleball/open"));
+        Files.writeString(project.resolve("pom.xml"), "<project/>\n");
+        Files.write(project.resolve("pickleball-test.jar"), new byte[]{1, 2, 3});
+        Path cache = project.resolve(".pickleball/workbench/classpath.cache");
+        Files.createDirectories(cache.getParent());
+        Files.writeString(cache, "\"/tmp/pickleball-oneshot.jar\"\n");
+        Files.setLastModifiedTime(project.resolve("pom.xml"), FileTime.from(Instant.now().minusSeconds(60)));
+        Path javaHome = tempDir.resolve("java-home");
+        Path bin = javaHome.resolve("bin");
+        Files.createDirectories(bin);
+        Files.writeString(bin.resolve("java"), """
+                #!/bin/sh
+                printf '%s\\n' "$@" > "$(dirname "$0")/recorded"
+                exit 0
+                """);
+        bin.resolve("java").toFile().setExecutable(true);
+        Path mvnw = project.resolve("mvnw");
+        Files.writeString(mvnw, """
+                #!/bin/sh
+                echo maven >> "$PWD/maven-ran"
+                exit 9
+                """);
+        mvnw.toFile().setExecutable(true);
+        Path script = project.resolve(".pickleball/open/pickleball-workbench.sh");
+        Files.writeString(script, PickleballLocalStore.unixOpenScript());
+        script.toFile().setExecutable(true);
+
+        ProcessBuilder builder = new ProcessBuilder(script.toString(), "hint")
+                .directory(project.toFile())
+                .redirectErrorStream(true);
+        builder.environment().put("JAVA_HOME", javaHome.toString());
+        builder.environment().put("PATH", bin + ":" + builder.environment().getOrDefault("PATH", ""));
+        Process process = builder.start();
+        String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+        int exit = process.waitFor();
+        assertEquals(0, exit, output);
+        String recorded = Files.readString(bin.resolve("recorded"));
+        assertTrue(recorded.contains("-cp"), recorded);
+        assertTrue(recorded.contains("classpath.cache"), recorded);
+        assertTrue(recorded.contains("tools.dscode.launcher.PickleballWorkbenchLauncher"), recorded);
+        assertTrue(recorded.contains("hint"), recorded);
+        assertFalse(recorded.contains("mvnw"), recorded);
+        assertFalse(Files.isRegularFile(project.resolve("maven-ran")), output);
     }
 
     @Test

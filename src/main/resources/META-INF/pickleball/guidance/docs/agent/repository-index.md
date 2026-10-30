@@ -51,6 +51,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/java-values.md`
 - `docs/key-parser-dsl.md`
 - `docs/log-and-assert-steps.md`
+- `docs/maintainer/2.1.18-consumer-report-fixes.md`
 - `docs/mapping-and-templating.md`
 - `docs/nested-steps.md`
 - `docs/object-registration.md`
@@ -411,6 +412,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/launcher/WorkbenchConsoleTap.java`
 - `src/main/java/tools/dscode/launcher/WorkbenchElementInspect.java`
 - `src/main/java/tools/dscode/launcher/WorkbenchLaunchTiming.java`
+- `src/main/java/tools/dscode/launcher/WorkbenchOneShotLaunch.java`
 - `src/main/java/tools/dscode/launcher/WorkbenchRunReports.java`
 - `src/main/java/tools/dscode/launcher/WorkbenchRuntimeLibs.java`
 - `src/main/java/tools/dscode/launcher/WorkbenchSessionCommands.java`
@@ -501,6 +503,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/WorkbenchConsumerScenarioEndToEndTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchElementInspectTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchLaunchTimingTest.java`
+- `src/test/java/tools/dscode/launcher/WorkbenchOneShotLaunchTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchPointerContractTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchRunReportsTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchSessionCommandsTest.java`

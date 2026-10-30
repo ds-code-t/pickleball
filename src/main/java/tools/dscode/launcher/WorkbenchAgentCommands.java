@@ -286,6 +286,7 @@ public final class WorkbenchAgentCommands {
         out.println("workspace=" + workspace.toAbsolutePath().normalize());
         out.println("fingerprint=" + Workspace.fingerprint(workspace));
         out.println("present=true");
+        WorkbenchOneShotLaunch.capture(parsed.project(), err);
         return 0;
     }
 
@@ -514,6 +515,7 @@ public final class WorkbenchAgentCommands {
                     browser
             );
             publishQuietly(parsed, run, selection, capturedOut, capturedErr, status, environment, browser, out, err);
+            WorkbenchOneShotLaunch.capture(parsed.project(), err);
             return recordDiscover(parsed, out, err, reported, run.runId());
         } catch (RuntimeException failure) {
             finishQuietly(parsed.project(), run.runId(), "FAILED", out);

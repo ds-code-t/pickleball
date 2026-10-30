@@ -193,11 +193,11 @@ Gradle consumers can expose the same dependency-owned launcher without resolving
 tasks.register('pickleballWorkbench', JavaExec) {
     classpath = sourceSets.test.runtimeClasspath
     mainClass = 'tools.dscode.launcher.PickleballWorkbenchLauncher'
-    args 'hint' // Discover helper; pass 'discover' / 'confirm' / 'isolate' / 'execute-step'. Optional host: 'mcp', projectDir.absolutePath. Humans: 'ui'.
+    args = (project.findProperty('pkbArgs') ?: 'hint').toString().split('\\s+')
 }
 ```
 
-Run it with `./gradlew pickleballWorkbench` (or `gradlew.bat pickleballWorkbench`). The task uses the consumer's resolved test runtime only to locate the tiny launcher and nested bytes; actual controller code still starts in a separate `java -cp` process.
+Run it with `./gradlew pickleballWorkbench` (or `gradlew.bat pickleballWorkbench`). Pass `-PpkbArgs='hint'` (or `plan`, `status`, `query`, `events`, `workspace-show`) when the task should forward those arguments; the default in the snippet above stays `hint`. The task uses the consumer's resolved test runtime only to locate the tiny launcher and nested bytes; actual controller code still starts in a separate `java -cp` process. After `discover` or `workspace-seed` has written `classpath.cache`, prefer `java -cp @classpath.cache tools.dscode.launcher.PickleballWorkbenchLauncher hint` (the opener script does this). That does not start Gradle or Maven. `discover`, `confirm`, and `isolate` still use the wrapper when they build or launch a worker.
 
 The launcher streams the nested payload (it does not load the controller JAR into a byte array), hashes SHA-256 while copying, and rejects payloads larger than 32 MiB. The nested JAR is thin: Workbench classes plus shaded `pickleball-control-protocol` only. OpenJFX, MCP, and Jackson are resolved at launch into `.pickleball/v/<version>/workbench/lib/<version>/` when `current.json` is complete (legacy `.pickleball/workbench/lib/<version>/` otherwise). It extracts atomically to:
 
