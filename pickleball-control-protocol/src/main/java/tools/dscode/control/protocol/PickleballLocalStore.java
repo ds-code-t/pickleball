@@ -42,6 +42,7 @@ public final class PickleballLocalStore {
 
     public static int exportGuidance(Path target, PrintStream out, PrintStream err) throws IOException {
         Path root = target.toAbsolutePath().normalize();
+        out.println(buildLine());
         if (PickleballLocalLayout.isPickleballDirectory(root)) {
             ensureGuidanceIgnored(root, out, err);
             Path project = root.getParent() == null
@@ -861,6 +862,12 @@ public final class PickleballLocalStore {
             throw new IOException("Bundled Pickleball guidance is missing: " + relative);
         }
         return input;
+    }
+
+    /** One line naming the running Pickleball version and the commit it was built from. */
+    static String buildLine() {
+        return "Pickleball " + runningVersion() + " built from commit "
+                + PickleballVersion.runningCommit(PickleballLocalStore.class);
     }
 
     static String runningVersion() {

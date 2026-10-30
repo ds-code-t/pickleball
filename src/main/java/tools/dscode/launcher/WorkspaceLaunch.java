@@ -73,7 +73,7 @@ public final class WorkspaceLaunch {
                 false,
                 copy ? fromRunId : null,
                 null,
-                path -> capture(project, path, false)
+                path -> capture(project, path, false, warnings)
         );
         Map<String, String> selection = new LinkedHashMap<>();
         put(selection, PKB_props.PKB_TAGS, tags);
@@ -105,7 +105,7 @@ public final class WorkspaceLaunch {
      * {@link #testCapture}. In-process capture is only the fallback when sync
      * has not written a classpath yet and this JVM can see the consumer runner.
      */
-    static void capture(Path project, Path workspace, boolean reseed) {
+    static void capture(Path project, Path workspace, boolean reseed, Appendable warnings) {
         Consumer<Path> hook = testCapture;
         if (hook != null) {
             hook.accept(workspace);
@@ -120,6 +120,8 @@ public final class WorkspaceLaunch {
             return;
         }
         PickleballRunner runner = DynamicSuiteBootstrap.initializeFromRuntimeClasspath();
+        String fallback = defaultSuiteWarning(runner == null ? null : runner.getClass());
+        if (fallback != null) warn(warnings, fallback);
         WorkspaceSeed.writeCaptured(workspace, runner, reseed);
     }
 
@@ -178,6 +180,15 @@ public final class WorkspaceLaunch {
         if (reporting != null && !reporting.isBlank()) return;
         values.put(PKB_props.PKB_REPORTING_MODE, "diagnostic");
         Workspace.writeRunVars(workspace, values);
+    }
+
+    /** Warning text when seed capture used the built-in DefaultDynamicSuite, else null. */
+    static String defaultSuiteWarning(Class<?> runnerType) {
+        if (!DynamicSuiteBootstrap.isDefaultSuite(runnerType)) return null;
+        return "WARNING: workspace seed found no consumer runner and fell back to DefaultDynamicSuite, "
+                + "so runner hook defaults were not captured. Compile the tests (mvn test-compile) "
+                + "so the consumer PickleballRunner subclass is in target/test-classes, "
+                + "then run workspace-seed --reseed.";
     }
 
     private static void warn(Appendable warnings, String message) {

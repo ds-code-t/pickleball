@@ -143,6 +143,11 @@ public final class DynamicSuiteBootstrap {
 
     private static volatile Class<? extends PickleballRunner> DISCOVERED_SUITE_CLASS;
 
+    /** True when {@code type} is the built-in suite used when no consumer runner is found. */
+    public static boolean isDefaultSuite(Class<?> type) {
+        return type == DefaultDynamicSuite.class;
+    }
+
     public static Class<? extends PickleballRunner> getDiscoveredSuiteClass() {
         return DISCOVERED_SUITE_CLASS;
     }

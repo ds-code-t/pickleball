@@ -281,7 +281,7 @@ public final class WorkbenchAgentCommands {
                 reseed,
                 fromRun,
                 null,
-                path -> WorkspaceLaunch.capture(parsed.project(), path, reseed)
+                path -> WorkspaceLaunch.capture(parsed.project(), path, reseed, err)
         );
         out.println("workspace=" + workspace.toAbsolutePath().normalize());
         out.println("fingerprint=" + Workspace.fingerprint(workspace));
@@ -1745,7 +1745,12 @@ public final class WorkbenchAgentCommands {
         );
     }
 
-    private static int printCatalog(
+    static final String NO_RETAINED_PROFILE_WARNING =
+            "WARNING: Workbench finished but run-catalog.json has no retained pkb_run_profile. "
+                    + "The run result stands. To retain the profile, set pkb_reportingmode=diagnostic "
+                    + "in the workspace runvars (workspace-edit) and run again.";
+
+    static int printCatalog(
             Path project,
             PrintStream out,
             PrintStream err,
@@ -1759,8 +1764,8 @@ public final class WorkbenchAgentCommands {
             LastDiscoverSnapshot.CatalogRun latest = LastDiscoverSnapshot.catalogRun(project, purpose, runId);
             if (latest == null) latest = LastDiscoverSnapshot.latestCatalogRun(project);
             if (latest == null || latest.runProfile() == null || latest.runProfile().isBlank()) {
-                err.println("Workbench finished but run-catalog.json has no retained pkb_run_profile.");
-                return mavenExit == 0 ? 1 : mavenExit;
+                err.println(NO_RETAINED_PROFILE_WARNING);
+                return mavenExit;
             }
             if (writeSnapshot) {
                 LastDiscoverSnapshot.write(project, latest.runId(), latest.catalog(), latest.runProfile(), agentId);

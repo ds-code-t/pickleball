@@ -9,6 +9,9 @@ Fixes for bugs reported against 2.1.17:
 - A Workbench feature folder with a space (`wd-file:my features`) is percent-encoded into the Cucumber `file:` URI. A path without such characters is unchanged.
 - Under `mvn exec:java`, when `java.class.path` has no test output root, Workspace seed capture and suite discovery also read the context class loader's file URLs, so the consumer runner subclass is found. The resolve-cache key includes those entries, so a cache captured without the runner is not reused. A normal run, whose test output is on `java.class.path`, is unchanged.
 - `META-INF/pickleball-build.properties` again records `commit`, `branch`, `dirty`, and `workingTreeDiffHash`. On Gradle 9 the git calls failed silently and every build was stamped with a blank commit, so two builds of one version could not be told apart.
+- `export-guidance` prints a first line `Pickleball <version> built from commit <sha>` (`unknown` when the build recorded no commit). `AGENTS.md` now says never reuse a published version number and has a release checklist: verify the version resolves through Maven Central mirrors before announcing.
+- When `discover` / `confirm` finish but `run-catalog.json` has no retained `pkb_run_profile`, Workbench prints a `WARNING:` that says to set `pkb_reportingmode=diagnostic` with `workspace-edit` and run again, and keeps Maven's exit code. It used to turn a passing run into exit 1.
+- When Workspace seed capture runs in-process and finds no consumer runner, it prints a `WARNING:` naming the `DefaultDynamicSuite` fallback and saying to run `mvn test-compile`, then `workspace-seed --reseed`. Capture still succeeds.
 
 Direct-control handoff for a live Workbench session. A normal `mvn test` or `gradlew test` does not read `pkb_direct_control_provider` and does not write a session descriptor.
 
