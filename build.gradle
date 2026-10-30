@@ -402,6 +402,12 @@ tasks.register('verifySqliteNotPublished') {
 }
 
 tasks.named('test') {
+    testLogging {
+        events 'failed'
+        exceptionFormat 'full'
+        showCauses true
+        showStackTraces true
+    }
     dependsOn tasks.named('verifySqliteNotPublished')
 }
 

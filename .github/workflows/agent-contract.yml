@@ -48,8 +48,21 @@ jobs:
 
       - name: Test and publish framework locally
         run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq xvfb
           chmod +x gradlew
-          ./gradlew test publishToMavenLocal
+          xvfb-run -a ./gradlew test publishToMavenLocal
+
+      - name: Upload test reports on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          if-no-files-found: ignore
+          path: |
+            build/reports/tests/test/**
+            build/test-results/**
+            maven-consumer-project/target/surefire-reports/**
+            maven-consumer-project/target/pickleball/**
 
       - name: Test Maven consumer project
         run: |
