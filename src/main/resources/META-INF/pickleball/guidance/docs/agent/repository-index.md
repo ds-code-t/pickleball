@@ -484,6 +484,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/GuidancePackagingTest.java`
 - `src/test/java/tools/dscode/launcher/PickleballWorkbenchLauncherTest.java`
 - `src/test/java/tools/dscode/launcher/Release218RecommendationsTest.java`
+- `src/test/java/tools/dscode/launcher/SecretRedactionTest.java`
 - `src/test/java/tools/dscode/launcher/SessionHealthWaitTest.java`
 - `src/test/java/tools/dscode/launcher/VersionSwitchTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchAgentCommandsTest.java`
@@ -653,6 +654,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/GherkinKeywords.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/InvestigationHandoff.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/JsonLite.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/OutputFormatter.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/PickleballArtifactLocator.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/PickleballLocalLayout.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/PickleballLocalStore.java`
@@ -661,6 +663,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/RunConfigs.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/RunIndexFinder.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/RunView.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/SecretRedactor.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/SessionDescriptor.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/SessionDescriptorWriter.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/SessionStepGate.java`
@@ -680,6 +683,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/RunConfigsTest.java`
 - `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/RunIndexFinderTest.java`
 - `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/RunWindowTest.java`
+- `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/SecretRedactorTest.java`
 - `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/SessionDescriptorTest.java`
 - `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/SessionHoldTest.java`
 - `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/SleepGapMonitorTest.java`

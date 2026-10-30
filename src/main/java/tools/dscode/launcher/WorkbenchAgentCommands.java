@@ -11,6 +11,8 @@ import tools.dscode.control.protocol.RunConfigs;
 import tools.dscode.control.protocol.SessionDescriptor;
 import tools.dscode.control.protocol.SessionDescriptorWriter;
 import tools.dscode.control.protocol.WorkbenchFeatureIndex;
+import tools.dscode.control.protocol.OutputFormatter;
+import tools.dscode.control.protocol.SecretRedactor;
 import tools.dscode.control.protocol.Workspace;
 import tools.dscode.testengine.PKB_props;
 import tools.dscode.testengine.WorkspaceSeed;
@@ -74,52 +76,67 @@ public final class WorkbenchAgentCommands {
             err.println(failure.getMessage());
             return 2;
         }
+        SecretRedactor.noteAssignments(parsed.runVars());
+        noteWorkspaceSecrets(parsed);
+        PrintStream safeOut = OutputFormatter.wrap(out);
+        PrintStream safeErr = OutputFormatter.wrap(err);
         try {
             return switch (parsed.command()) {
-                case "export-guidance" -> exportGuidance(parsed, out, err);
-                case "hint", "discover-hint" -> hint(parsed, out, err);
-                case "resolve-runvars" -> resolveRunVars(parsed, out);
-                case "workspace-show" -> workspaceShow(parsed, out, err);
-                case "workspace-edit" -> workspaceEdit(parsed, out, err);
-                case "workspace-seed" -> workspaceSeed(parsed, out, err);
+                case "export-guidance" -> exportGuidance(parsed, safeOut, safeErr);
+                case "hint", "discover-hint" -> hint(parsed, safeOut, safeErr);
+                case "resolve-runvars" -> resolveRunVars(parsed, safeOut);
+                case "workspace-show" -> workspaceShow(parsed, safeOut, safeErr);
+                case "workspace-edit" -> workspaceEdit(parsed, safeOut, safeErr);
+                case "workspace-seed" -> workspaceSeed(parsed, safeOut, safeErr);
                 case "discover" -> {
-                    Integer rejected = rejectStepTimeout(parsed, err);
+                    Integer rejected = rejectStepTimeout(parsed, safeErr);
                     if (rejected != null) yield rejected;
-                    yield parsed.planOnly() ? plan(parsed, out, err) : discover(parsed, out, err, maven);
+                    yield parsed.planOnly() ? plan(parsed, safeOut, safeErr) : discover(parsed, safeOut, safeErr, maven);
                 }
                 case "confirm" -> {
-                    Integer rejected = rejectStepTimeout(parsed, err);
+                    Integer rejected = rejectStepTimeout(parsed, safeErr);
                     if (rejected != null) yield rejected;
-                    yield parsed.planOnly() ? plan(parsed, out, err) : confirm(parsed, out, err, maven);
+                    yield parsed.planOnly() ? plan(parsed, safeOut, safeErr) : confirm(parsed, safeOut, safeErr, maven);
                 }
-                case "plan" -> plan(parsed, out, err);
-                case "short-log" -> shortLog(parsed, out, err);
-                case "note" -> note(parsed, out, err);
-                case "inbox" -> inbox(parsed, out, err);
-                case "finish" -> finish(parsed, out, err);
-                case "presence" -> presence(parsed, out, err);
-                case "post" -> post(parsed, out, err);
-                case "history" -> history(parsed, out, err);
-                case "gc-runs" -> gcRuns(parsed, out, err);
-                case "gc-versions" -> gcVersions(parsed, out, err);
-                case "use-version" -> useVersion(parsed, out, err);
-                case "inspect-page" -> inspectPage(parsed, out, err);
-                case "find-element" -> findElement(parsed, out, err);
-                case "query" -> query(parsed, out, err);
-                case "session-list" -> sessionList(parsed, out, err);
-                case "session-info" -> sessionInfo(parsed, out, err);
-                case "session-hold" -> sessionHold(parsed, out, err, true);
-                case "session-release" -> sessionHold(parsed, out, err, false);
-                case "help" -> help(args, out, err);
+                case "plan" -> plan(parsed, safeOut, safeErr);
+                case "short-log" -> shortLog(parsed, safeOut, safeErr);
+                case "note" -> note(parsed, safeOut, safeErr);
+                case "inbox" -> inbox(parsed, safeOut, safeErr);
+                case "finish" -> finish(parsed, safeOut, safeErr);
+                case "presence" -> presence(parsed, safeOut, safeErr);
+                case "post" -> post(parsed, safeOut, safeErr);
+                case "history" -> history(parsed, safeOut, safeErr);
+                case "gc-runs" -> gcRuns(parsed, safeOut, safeErr);
+                case "gc-versions" -> gcVersions(parsed, safeOut, safeErr);
+                case "use-version" -> useVersion(parsed, safeOut, safeErr);
+                case "inspect-page" -> inspectPage(parsed, safeOut, safeErr);
+                case "find-element" -> findElement(parsed, safeOut, safeErr);
+                case "query" -> query(parsed, safeOut, safeErr);
+                case "session-list" -> sessionList(parsed, safeOut, safeErr);
+                case "session-info" -> sessionInfo(parsed, safeOut, safeErr);
+                case "session-hold" -> sessionHold(parsed, safeOut, safeErr, true);
+                case "session-release" -> sessionHold(parsed, safeOut, safeErr, false);
+                case "help" -> help(args, safeOut, safeErr);
                 default -> {
-                    err.print(WorkbenchCliHelp.unknown(parsed.command()));
+                    safeErr.print(WorkbenchCliHelp.unknown(parsed.command()));
                     yield 2;
                 }
             };
         } catch (RuntimeException failure) {
-            err.println("Workbench " + parsed.command() + " failed: " + WorkbenchCliErrors.explain(failure));
+            safeErr.println("Workbench " + parsed.command() + " failed: " + WorkbenchCliErrors.explain(failure));
             return 1;
+        } finally {
+            SecretRedactor.clear();
         }
+    }
+
+    private static void noteWorkspaceSecrets(WorkbenchCommandLine.Parsed parsed) {
+        if (parsed.project() == null) return;
+        String runId = parsed.coordination().runId();
+        if (runId == null || runId.isBlank()) return;
+        Path workspace = Workspace.directory(parsed.project(), runId);
+        if (!Workspace.exists(workspace)) return;
+        SecretRedactor.noteAll(Workspace.readRunVars(workspace));
     }
 
     private static int exportGuidance(WorkbenchCommandLine.Parsed parsed, PrintStream out, PrintStream err) {
@@ -207,8 +224,10 @@ public final class WorkbenchAgentCommands {
             body.put("workspace", workspace.toAbsolutePath().normalize().toString());
             if (present) {
                 body.put("fingerprint", Workspace.fingerprint(workspace));
-                body.put("runvars", Workspace.readRunVars(workspace));
-                body.put("computed", new java.util.ArrayList<>(WorkspaceSeed.computedKeys(parsed.project(), Workspace.readRunVars(workspace))));
+                Map<String, String> runvars = Workspace.readRunVars(workspace);
+                SecretRedactor.noteAll(runvars);
+                body.put("runvars", OutputFormatter.redactMap(runvars));
+                body.put("computed", new java.util.ArrayList<>(WorkspaceSeed.computedKeys(parsed.project(), runvars)));
                 body.put("configs", RunConfigs.files(parsed.project(), runId));
             } else {
                 body.put("error", "No workspace for " + runId);
@@ -226,12 +245,19 @@ public final class WorkbenchAgentCommands {
         if (!jsonRequested(parsed)) {
             out.println("present=true");
             out.println("fingerprint=" + Workspace.fingerprint(workspace));
-            java.util.Set<String> computed = WorkspaceSeed.computedKeys(parsed.project(), Workspace.readRunVars(workspace));
-            Workspace.readRunVars(workspace).forEach((key, value) -> {
-                String shown = value == null || value.isEmpty() ? "\"\"" : value;
+            Map<String, String> runvars = Workspace.readRunVars(workspace);
+            SecretRedactor.noteAll(runvars);
+            java.util.Set<String> computed = WorkspaceSeed.computedKeys(parsed.project(), runvars);
+            boolean redacted = false;
+            for (Map.Entry<String, String> entry : runvars.entrySet()) {
+                String key = entry.getKey();
+                String value = entry.getValue();
+                if (SecretRedactor.leaks(key, value)) redacted = true;
+                String shown = OutputFormatter.shown(key, value);
                 String mark = computed.contains(key) ? " computed" : "";
                 out.println(key + "=" + shown + mark);
-            });
+            }
+            if (redacted) err.println("fix: " + SecretRedactor.HINT);
             for (String file : RunConfigs.files(parsed.project(), runId)) {
                 out.println("config " + file);
             }
@@ -502,10 +528,11 @@ public final class WorkbenchAgentCommands {
                     err
             );
             Map<String, String> stored = Workspace.readRunVars(prepared.workspace());
+            SecretRedactor.noteAll(stored);
             String environment = blankToNull(stored.get(PKB_props.PKB_ENVIRONMENT));
             String browser = blankToNull(stored.get(PKB_props.PKB_BROWSER));
             out.println("workspace=" + prepared.workspace());
-            out.println("workspace-runvars=" + PKB_props.serializeRunVars(new java.util.TreeMap<>(stored)));
+            out.println("workspace-runvars=" + OutputFormatter.launchEcho(stored));
             List<String> command = withCoordination(
                     ConsumerMavenTestRunner.command(
                             parsed.project(),
@@ -607,10 +634,11 @@ public final class WorkbenchAgentCommands {
                     err
             );
             Map<String, String> stored = Workspace.readRunVars(prepared.workspace());
+            SecretRedactor.noteAll(stored);
             String environment = blankToNull(stored.get(PKB_props.PKB_ENVIRONMENT));
             String browser = blankToNull(stored.get(PKB_props.PKB_BROWSER));
             out.println("workspace=" + prepared.workspace());
-            out.println("workspace-runvars=" + PKB_props.serializeRunVars(new java.util.TreeMap<>(stored)));
+            out.println("workspace-runvars=" + OutputFormatter.launchEcho(stored));
             List<String> command = withCoordination(
                     ConsumerMavenTestRunner.confirmCommand(
                             parsed.project(),

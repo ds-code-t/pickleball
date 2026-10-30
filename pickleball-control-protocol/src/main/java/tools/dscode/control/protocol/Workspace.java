@@ -404,7 +404,11 @@ public final class Workspace {
             if (!key.startsWith("pkb_")) key = "pkb_" + key;
             String existing = selection != null && selection.get(key) != null ? selection.get(key) : values.get(key);
             if (existing != null && !existing.equals(value)) {
-                appendWarning(warnings, "WARNING: --runvar " + key + " replaces " + shown(existing) + " with " + shown(value));
+                appendWarning(warnings, "WARNING: --runvar " + key + " replaces "
+                        + OutputFormatter.shown(key, existing) + " with " + OutputFormatter.shown(key, value));
+                if (SecretRedactor.leaks(key, existing) || SecretRedactor.leaks(key, value)) {
+                    appendWarning(warnings, "fix: " + SecretRedactor.HINT);
+                }
             }
             if (SELECTION_KEYS.contains(key)) {
                 if (selection != null) selection.put(key, value);

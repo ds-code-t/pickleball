@@ -4,10 +4,13 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import tools.dscode.common.coordination.AgentCoordination;
 import tools.dscode.common.runtime.ProcessTrees;
+import tools.dscode.control.protocol.OutputFormatter;
 import tools.dscode.control.protocol.PickleballLocalLayout;
 import tools.dscode.control.protocol.RunView;
+import tools.dscode.control.protocol.SecretRedactor;
 import tools.dscode.control.protocol.SleepGapMonitor;
 import tools.dscode.control.protocol.WindowDriver;
+import tools.dscode.control.protocol.Workspace;
 
 import java.io.IOException;
 import java.io.PrintStream;
@@ -122,32 +125,47 @@ public final class WorkbenchSessionCommands {
             err.println(failure.getMessage());
             return 2;
         }
+        SecretRedactor.noteAssignments(parsed.runVars());
+        noteWorkspaceSecrets(parsed);
+        PrintStream safeOut = OutputFormatter.wrap(out);
+        PrintStream safeErr = OutputFormatter.wrap(err);
         try {
             return switch (parsed.command()) {
-                case "isolate", "session-start" -> sessionStart(parsed, flags, out, err, starter, http);
-                case "execute-step" -> executeStep(parsed, flags, out, err, http);
-                case "insert-step", "update-step" -> textCommand(parsed, flags, out, err, http);
-                case "open-scenario" -> openScenario(parsed, flags, out, err, http);
-                case "example" -> example(parsed, flags, out, err, http);
-                case "diagnostic-run" -> diagnosticRun(parsed, flags, out, err, http);
+                case "isolate", "session-start" -> sessionStart(parsed, flags, safeOut, safeErr, starter, http);
+                case "execute-step" -> executeStep(parsed, flags, safeOut, safeErr, http);
+                case "insert-step", "update-step" -> textCommand(parsed, flags, safeOut, safeErr, http);
+                case "open-scenario" -> openScenario(parsed, flags, safeOut, safeErr, http);
+                case "example" -> example(parsed, flags, safeOut, safeErr, http);
+                case "diagnostic-run" -> diagnosticRun(parsed, flags, safeOut, safeErr, http);
                 case "play", "from-here", "pause", "save", "refresh",
                      "session-sync", "worker-start", "worker-restart", "worker-stop" ->
-                        postCommand(parsed, flags, out, err, http);
-                case "status" -> status(parsed, flags, out, err, http);
-                case "events" -> events(parsed, flags, out, err, http);
-                case "stop", "kill" -> stop(parsed, flags, out, err, http);
-                case "open-window" -> openWindow(parsed, out, err, http, uiStarter);
-                case "close-window" -> closeWindow(parsed, out, err, http);
-                case "show-run" -> showRun(parsed, out, err, http);
+                        postCommand(parsed, flags, safeOut, safeErr, http);
+                case "status" -> status(parsed, flags, safeOut, safeErr, http);
+                case "events" -> events(parsed, flags, safeOut, safeErr, http);
+                case "stop", "kill" -> stop(parsed, flags, safeOut, safeErr, http);
+                case "open-window" -> openWindow(parsed, safeOut, safeErr, http, uiStarter);
+                case "close-window" -> closeWindow(parsed, safeOut, safeErr, http);
+                case "show-run" -> showRun(parsed, safeOut, safeErr, http);
                 default -> {
-                    err.println("Unknown Workbench session command: " + parsed.command());
+                    safeErr.println("Unknown Workbench session command: " + parsed.command());
                     yield 2;
                 }
             };
         } catch (RuntimeException failure) {
-            err.println("Workbench " + parsed.command() + " failed: " + WorkbenchCliErrors.explain(failure));
+            safeErr.println("Workbench " + parsed.command() + " failed: " + WorkbenchCliErrors.explain(failure));
             return 1;
+        } finally {
+            SecretRedactor.clear();
         }
+    }
+
+    private static void noteWorkspaceSecrets(WorkbenchCommandLine.Parsed parsed) {
+        if (parsed.project() == null) return;
+        String runId = parsed.coordination().runId();
+        if (runId == null || runId.isBlank()) return;
+        Path workspace = Workspace.directory(parsed.project(), runId);
+        if (!Workspace.exists(workspace)) return;
+        SecretRedactor.noteAll(Workspace.readRunVars(workspace));
     }
 
     static Process startControllerSession(SessionLaunch launch) throws IOException {

@@ -47,7 +47,7 @@ Do not treat resolve-runvars as the environment Discover will use. After you edi
 
 Workbench resolves run vars once into `.pickleball/runs/<run-id>/workspace/runvars.properties` and copies configs to `workspace/configs`. Every launch mode passes only `-Dpkb_workspace` plus selection keys (`pkb_tags`, `pkb_name`, `pkb_example`, `pkb_features`, `pkb_parallel`, `pkb_run_id`, `pkb_agent_id`). Edit those files before the next start. The GUI Config tab and the run-var panel write the same files, atomically, and warn instead of overwriting a change already on disk.
 
-- `workspace-show --run-id=<id>` prints `workspace=`, `fingerprint=`, the run vars, and each config path. A blank value is `""`. A key that is missing from the project property files, or stored as a different value, is marked ` computed`.
+- `workspace-show --run-id=<id>` prints `workspace=`, `fingerprint=`, the run vars, and each config path. A blank value is `""`. A key that is missing from the project property files, or stored as a different value, is marked ` computed`. A plain secret value prints as `<redacted>`, and stderr adds `fix: secret redacted; use workspace-show for reference`. A stored `${protected:key}` or `$(protected:key)` prints as written. The same redaction is used for the `workspace-edit` replace warning, the discover and confirm `workspace-runvars=` line, and MCP tool JSON.
 - `workspace-edit --run-id=<id> --runvar=key=value` writes a run var. `--config=<relative> --text=<body>` writes one config file. `--expect=<fingerprint>` from `workspace-show` refuses the write when the workspace changed.
 - `workspace-seed --run-id=<id>` captures the consumer runner. `--from-run=<id>` copies an earlier workspace. `--reseed` replaces the existing one.
 

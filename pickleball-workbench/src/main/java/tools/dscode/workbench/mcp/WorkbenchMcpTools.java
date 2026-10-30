@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.modelcontextprotocol.server.McpServerFeatures;
 import io.modelcontextprotocol.spec.McpSchema;
 import tools.dscode.control.protocol.AgentLog;
+import tools.dscode.control.protocol.OutputFormatter;
+import tools.dscode.control.protocol.SecretRedactor;
 import tools.dscode.control.protocol.ControlBridgeMappingSnapshot;
 import tools.dscode.control.protocol.DiagnosticQuery;
 import tools.dscode.workbench.WorkbenchServices;
@@ -422,7 +424,8 @@ final class WorkbenchMcpTools {
 
     private McpSchema.CallToolResult result(Object value, boolean error) {
         try {
-            String text = json.writeValueAsString(value);
+            Object safe = OutputFormatter.redactValue(value);
+            String text = SecretRedactor.scrub(json.writeValueAsString(safe));
             return McpSchema.CallToolResult.builder()
                     .content(List.of(McpSchema.TextContent.builder(text).build()))
                     .isError(error)

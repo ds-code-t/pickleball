@@ -55,7 +55,7 @@ confirm --run-id=row-1
 summary status=PASSED
 ```
 
-`record.json` `environment` is the resolved value, or `unset` when `pkb_environment` was not set. `workspace-show` prints `""` for a blank value and ` computed` when the key is not the project-file value. Do not treat resolve-runvars as the environment Discover will use. `pkb_overriderunvars` is not how confirm launches. The Workbench GUI is only a lightweight head over state and controls that already exist under the hood.
+`record.json` `environment` is the resolved value, or `unset` when `pkb_environment` was not set. `workspace-show` prints `""` for a blank value and ` computed` when the key is not the project-file value. Secrets print `<redacted>`. Stored `${protected:key}` stays. Do not treat resolve-runvars as the environment Discover will use. `pkb_overriderunvars` is not how confirm launches. The Workbench GUI is only a lightweight head over state and controls that already exist under the hood.
 
 ## Query loop
 
