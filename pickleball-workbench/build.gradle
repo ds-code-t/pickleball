@@ -72,6 +72,9 @@ dependencies {
     implementation "io.modelcontextprotocol.sdk:mcp-core:${mcpSdkVersion}"
     implementation "io.modelcontextprotocol.sdk:mcp-json-jackson2:${mcpSdkVersion}"
 
+    // Optional diagnostic index. Runtime only, not shaded, not in the published POM.
+    runtimeOnly 'org.xerial:sqlite-jdbc:3.47.2.0'
+
     testImplementation 'org.junit.jupiter:junit-jupiter:5.13.4'
     testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.13.4'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher:1.13.4'
@@ -489,6 +492,20 @@ tasks.register('verifyWorkbenchRuntimeBoundary') {
                         "Workbench ${configurationName} resolved a Pickleball core JAR: " +
                                 forbiddenFiles
                 )
+            }
+            def sqlite = artifacts.any { artifact ->
+                def component = artifact.id.componentIdentifier
+                component instanceof org.gradle.api.artifacts.component.ModuleComponentIdentifier &&
+                        component.group == 'org.xerial' &&
+                        component.module == 'sqlite-jdbc'
+            }
+            if (configurationName == 'runtimeClasspath' && !sqlite) {
+                throw new GradleException(
+                        'Workbench runtimeClasspath must resolve org.xerial:sqlite-jdbc for the optional diagnostic index.'
+                )
+            }
+            if (configurationName == 'compileClasspath' && sqlite) {
+                throw new GradleException('sqlite-jdbc must be Workbench runtimeOnly, not a compile dependency.')
             }
         }
     }
