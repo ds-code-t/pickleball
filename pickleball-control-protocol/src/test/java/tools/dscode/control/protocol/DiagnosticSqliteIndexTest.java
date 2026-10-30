@@ -5,6 +5,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.FileTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -64,6 +65,53 @@ class DiagnosticSqliteIndexTest {
 
         assertEquals(inserted, DiagnosticSqliteIndex.rebuild(project));
         assertEquals(sorted(expected), sorted(DiagnosticSqliteIndex.storedBodies(project)));
+    }
+
+    @Test
+    void searchRefreshesWhenSourcesAreNewerThanTheIndex() throws Exception {
+        assertTrue(DiagnosticSqliteIndex.driverPresent(), "sqlite-jdbc is a test runtime dependency");
+        Path scenario = project.resolve("reports/diagnostic-runs/run-sql/scenarios/scene-sql");
+        Files.createDirectories(scenario);
+        Files.writeString(project.resolve("reports/diagnostic-runs/run-catalog.json"), """
+                {"runs":[{"runId":"run-sql","outcome":"FAILED","purpose":"sqlite-token-alpha"}]}
+                """);
+        Files.writeString(project.resolve("reports/diagnostic-runs/run-sql/run-index.json"), """
+                {"runId":"run-sql","outcome":"FAILED","scenarios":[{"scenarioId":"scene-sql","name":"Scene","outcome":"FAILED"}]}
+                """);
+        Files.writeString(scenario.resolve("events.jsonl"), """
+                {"type":"step","eventSeq":1,"text":"Then sqlite-token-alpha","status":"FAILED"}
+                """);
+        assertTrue(DiagnosticSqliteIndex.rebuild(project) > 0);
+        Path database = DiagnosticSqliteIndex.database(project);
+        assertFalse(DiagnosticQuery.query(project, Map.of("op", "search", "text", "sqlite-token-later")).json()
+                .contains("sqlite-token-later"));
+
+        Files.writeString(scenario.resolve("events.jsonl"), """
+                {"type":"step","eventSeq":1,"text":"Then sqlite-token-alpha","status":"FAILED"}
+                {"type":"step","eventSeq":2,"text":"Then sqlite-token-later","status":"PASSED"}
+                """);
+        Path later = project.resolve("reports/diagnostic-runs/run-later/scenarios/scene-later");
+        Files.createDirectories(later);
+        Files.writeString(project.resolve("reports/diagnostic-runs/run-later/run-index.json"), """
+                {"runId":"run-later","outcome":"FAILED","scenarios":[{"scenarioId":"scene-later","name":"Later","outcome":"FAILED"}]}
+                """);
+        Files.writeString(later.resolve("events.jsonl"), """
+                {"type":"step","eventSeq":1,"text":"Then sqlite-token-fresh","status":"FAILED"}
+                """);
+        FileTime bumped = FileTime.fromMillis(Files.getLastModifiedTime(database).toMillis() + 5_000L);
+        Files.setLastModifiedTime(scenario.resolve("events.jsonl"), bumped);
+        Files.setLastModifiedTime(project.resolve("reports/diagnostic-runs/run-later/run-index.json"), bumped);
+        Files.setLastModifiedTime(later.resolve("events.jsonl"), bumped);
+
+        DiagnosticQuery.Outcome updated = DiagnosticQuery.query(project, Map.of("op", "search", "text", "sqlite-token-later"));
+        assertEquals(0, updated.exit(), updated.json());
+        assertTrue(updated.json().contains("sqlite-token-later"), updated.json());
+        assertTrue(updated.json().contains("diagnostics.db"), updated.json());
+
+        DiagnosticQuery.Outcome fresh = DiagnosticQuery.query(project, Map.of("op", "search", "text", "sqlite-token-fresh"));
+        assertEquals(0, fresh.exit(), fresh.json());
+        assertTrue(fresh.json().contains("sqlite-token-fresh"), fresh.json());
+        assertTrue(fresh.json().contains("diagnostics.db"), fresh.json());
     }
 
     private List<String> collectedBodies() {

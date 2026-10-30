@@ -33,6 +33,23 @@ public final class DiagnosticQuery {
             "run", "scenario", "step", "event", "property", "artifact", "error", "log"
     );
 
+    private static final ThreadLocal<Boolean> INDEX_BUILD = ThreadLocal.withInitial(() -> Boolean.FALSE);
+
+    /** True while {@link DiagnosticSqliteIndex#rebuild} is reading these files into the disposable index. */
+    static boolean indexing() {
+        return Boolean.TRUE.equals(INDEX_BUILD.get());
+    }
+
+    static boolean beginIndexBuild() {
+        boolean previous = indexing();
+        INDEX_BUILD.set(Boolean.TRUE);
+        return previous;
+    }
+
+    static void endIndexBuild(boolean previous) {
+        INDEX_BUILD.set(previous);
+    }
+
     private DiagnosticQuery() {
     }
 
@@ -98,6 +115,7 @@ public final class DiagnosticQuery {
         List<Map<String, Object>> matched = null;
         String where = null;
         if ("search".equals(op) && !unpaged(request)) {
+            DiagnosticSqliteIndex.refreshIfStale(root);
             List<Map<String, Object>> indexed = DiagnosticSqliteIndex.find(root, needle, runId, kind);
             if (indexed != null) {
                 matched = indexed;
@@ -346,6 +364,7 @@ public final class DiagnosticQuery {
                 if (!safeId(str(map.get("runId")))) continue;
                 runs.add(map);
             }
+            if (indexing()) mergeOnDiskRuns(project, runs);
             return new Catalog(runs, where, false);
         }
         List<Map<String, Object>> runs = new ArrayList<>();
@@ -371,6 +390,34 @@ public final class DiagnosticQuery {
                 ? "reports/diagnostic-runs"
                 : ".pickleball/runs";
         return new Catalog(runs, discovered, false);
+    }
+
+    /** A stale catalog must not hide a run directory that already has a run-index. Used only while rebuilding the disposable index. */
+    private static void mergeOnDiskRuns(Path project, List<Map<String, Object>> runs) throws IOException {
+        Set<String> listed = new TreeSet<>();
+        for (Map<String, Object> run : runs) {
+            String id = str(run.get("runId"));
+            if (id != null) listed.add(id);
+        }
+        Set<String> seen = new TreeSet<>();
+        collectRunDirs(project.resolve("reports").resolve("diagnostic-runs"), seen);
+        Path runsRoot = project.resolve(".pickleball").resolve("runs");
+        if (Files.isDirectory(runsRoot)) {
+            try (DirectoryStream<Path> stream = Files.newDirectoryStream(runsRoot)) {
+                for (Path child : stream) {
+                    if (!Files.isDirectory(child)) continue;
+                    String name = child.getFileName().toString();
+                    if (!safeId(name)) continue;
+                    if (resolve(project, name).index != null) seen.add(name);
+                }
+            }
+        }
+        for (String name : seen) {
+            if (listed.contains(name)) continue;
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("runId", name);
+            runs.add(row);
+        }
     }
 
     private static void collectRunDirs(Path root, Set<String> seen) throws IOException {

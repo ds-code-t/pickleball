@@ -1,7 +1,9 @@
 package tools.dscode.control.protocol;
 
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.FileTime;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
@@ -34,6 +36,34 @@ public final class DiagnosticSqliteIndex {
 
     /** @return inserted rows, or {@code -1} when SQLite is not on the classpath */
     public static int rebuild(Path project) {
+        if (project == null || !driverPresent()) return -1;
+        boolean previous = DiagnosticQuery.beginIndexBuild();
+        try {
+            return rebuildUnlocked(project);
+        } finally {
+            DiagnosticQuery.endIndexBuild(previous);
+        }
+    }
+
+    /**
+     * When the disposable index exists and a source file is strictly newer, rebuild it
+     * before a search. A missing database stays missing so search can fall back to the files.
+     *
+     * @return true when a rebuild ran
+     */
+    public static boolean refreshIfStale(Path project) {
+        if (project == null || !driverPresent()) return false;
+        Path db = database(project);
+        if (!Files.isRegularFile(db)) return false;
+        try {
+            if (!sourcesNewerThan(project, Files.getLastModifiedTime(db))) return false;
+        } catch (IOException failure) {
+            return false;
+        }
+        return rebuild(project) >= 0;
+    }
+
+    private static int rebuildUnlocked(Path project) {
         if (project == null || !driverPresent()) return -1;
         Path db = database(project);
         try {
@@ -133,6 +163,41 @@ public final class DiagnosticSqliteIndex {
         } catch (ClassNotFoundException failure) {
             return false;
         }
+    }
+
+    private static boolean sourcesNewerThan(Path project, FileTime dbTime) throws IOException {
+        Path runs = project.resolve("reports").resolve("diagnostic-runs");
+        if (treeNewer(runs, dbTime, false)) return true;
+        Path agent = project.resolve(".pickleball").resolve("agent-log");
+        if (Files.isRegularFile(agent) && Files.getLastModifiedTime(agent).compareTo(dbTime) > 0) return true;
+        Path rooted = project.resolve(".pickleball").resolve("runs");
+        if (treeNewer(rooted, dbTime, true)) return true;
+        Path workerLogs = project.resolve(".pickleball").resolve("workbench").resolve("logs");
+        return treeNewer(workerLogs, dbTime, true);
+    }
+
+    /** {@code narrowed} keeps JSON, JSONL, and {@code worker-*.log}. The diagnostic-runs tree keeps every other file except the index itself. */
+    private static boolean treeNewer(Path root, FileTime dbTime, boolean narrowed) throws IOException {
+        if (!Files.isDirectory(root)) return false;
+        try (var walk = Files.walk(root)) {
+            for (Path path : walk.filter(Files::isRegularFile).toList()) {
+                if (skipIndexFile(path)) continue;
+                if (narrowed && !indexSource(path)) continue;
+                if (Files.getLastModifiedTime(path).compareTo(dbTime) > 0) return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean skipIndexFile(Path path) {
+        String name = path.getFileName() == null ? "" : path.getFileName().toString();
+        return FILE_NAME.equals(name) || (FILE_NAME + "-wal").equals(name) || (FILE_NAME + "-shm").equals(name);
+    }
+
+    private static boolean indexSource(Path path) {
+        String name = path.getFileName() == null ? "" : path.getFileName().toString();
+        if (name.startsWith("worker-") && name.endsWith(".log")) return true;
+        return name.endsWith(".json") || name.endsWith(".jsonl") || name.endsWith(".jsonl.gz");
     }
 
     private static Connection open(Path db) throws Exception {
