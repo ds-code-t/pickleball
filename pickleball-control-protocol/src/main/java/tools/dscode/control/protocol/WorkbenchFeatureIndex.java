@@ -42,6 +42,8 @@ import java.util.stream.Stream;
  */
 public final class WorkbenchFeatureIndex {
     static final int VERSION = 3;
+    /** The only feature-index implementation. A Rust sidecar was measured and not added. */
+    public static final String IMPLEMENTATION = "java";
     public static final String CACHE_FILE = "feature-index.v3";
     /** Inline {@code -D} list. Longer selections are a file so Windows can still start Maven. */
     static final int FEATURE_LIST_INLINE_LIMIT = 4000;

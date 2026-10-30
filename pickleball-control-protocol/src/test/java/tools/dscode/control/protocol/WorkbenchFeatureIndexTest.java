@@ -18,6 +18,11 @@ class WorkbenchFeatureIndexTest {
     Path project;
 
     @Test
+    void javaIsTheOnlyFeatureIndexImplementation() {
+        assertEquals("java", WorkbenchFeatureIndex.IMPLEMENTATION);
+    }
+
+    @Test
     void cacheHitMissAndHashInvalidation() throws Exception {
         Path features = project.resolve("src/test/resources/features");
         Files.createDirectories(features);
