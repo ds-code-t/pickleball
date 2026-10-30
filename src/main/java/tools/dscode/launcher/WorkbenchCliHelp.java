@@ -32,14 +32,23 @@ final class WorkbenchCliHelp {
             Map.entry("example", "Usage: example --example=<rows>"),
             Map.entry("finish", "Usage: finish --run-id=<id> [--learned=<one line>] [--status=PASSED|FAILED|EMPTY|TIMEOUT|STOPPED]"),
             Map.entry("note", "Usage: note --text=<one line> [--agent=<id>] [--run-id=<id>]"),
-            Map.entry("inbox", "Usage: inbox --write --to=<agent-id|any> --text=<one line> | inbox --list|--take --agent=<id>"),
             Map.entry("short-log", "Usage: short-log [--limit=<n>]"),
             Map.entry("export-guidance", "Usage: export-guidance [output-directory]"),
             Map.entry("session-list", "Usage: session list [--json]"),
             Map.entry("session-info", "Usage: session info <sessionId> [--json]"),
-            Map.entry("session-hold", "Usage: session hold <sessionId>"),
-            Map.entry("session-release", "Usage: session release <sessionId>"),
-            Map.entry("query", "Usage: query <runs|get|query|search|props|errors> [--run-id=<id>] [--scenario=<id>] [--kind=run|scenario|step|event|property|artifact|error|log] [--text=<words>] [--status=<outcome>] [--fields=<a,b>] [--limit=<n>] [--cursor=<token>] [--id=<id>]")
+            Map.entry("session-hold", "Usage: session hold <sessionId> [--json]"),
+            Map.entry("session-release", "Usage: session release <sessionId> [--json]"),
+            Map.entry("query", "Usage: query <runs|get|query|search|props|errors> [--run-id=<id>] [--scenario=<id>] [--kind=run|scenario|step|event|property|artifact|error|log] [--text=<words>] [--status=<outcome>] [--fields=<a,b>] [--limit=<n>] [--cursor=<token>] [--id=<id>]"),
+            Map.entry("use-version", "Usage: use-version --version=<safe-version>"),
+            Map.entry("find-element", "Usage: find-element --category=<Button> [--text=<label>] [--html=<file>]"),
+            Map.entry("presence", "Usage: presence --touch --agent=<id> [--run-id=<id>] | presence --list | presence --sweep"),
+            Map.entry("post", "Usage: post --write --to=<agent-id|all> --text=<one line> [--run-id=<id>] [--ttl=1h] | post --renew --id=<id> [--ttl=1h]"),
+            Map.entry("history", "Usage: history --append --text=<one line>"),
+            Map.entry("insert-step", "Usage: insert-step --text=<gherkin>"),
+            Map.entry("update-step", "Usage: update-step --text=<gherkin>"),
+            Map.entry("show-run", "Usage: show-run --run-id=<id>"),
+            Map.entry("open-window", "Usage: open-window --run-id=<id>"),
+            Map.entry("inbox", "Usage: inbox --write --to=<agent-id|any> --text=<one line> [--from=<agent-id>] [--run-id=<id>] | inbox --list|--take --agent=<id>")
     );
 
     private static final Map<String, String> FLAGS = Map.ofEntries(
@@ -111,6 +120,18 @@ final class WorkbenchCliHelp {
         return null;
     }
 
+    /** {@code error} plus the one usage-table row for {@code key}. */
+    static String usageError(String error, String key) {
+        String page = key == null || key.isBlank() ? null : forTopic(key);
+        String fix = page == null ? "help" : page.strip();
+        return structured(error, fix);
+    }
+
+    /** Every launcher failure is these two lines. {@code fix} is the recovery, not a second copy of {@code error}. */
+    static String structured(String error, String fix) {
+        return "error: " + error + "\nfix: " + fix + "\n";
+    }
+
     static String unknown(String command) {
         String shown = command == null || command.isBlank() ? "(none)" : command;
         StringBuilder text = new StringBuilder();
@@ -119,7 +140,8 @@ final class WorkbenchCliHelp {
         if (near != null) text.append("Did you mean: ").append(near).append('\n');
         text.append("Usage: help\n");
         text.append("Usage: help <command>\n");
-        text.append("fix: Usage: help <command>\n");
+        text.append("error: Unknown Workbench command: ").append(shown).append('\n');
+        text.append("fix: ").append(near == null ? "help" : near).append('\n');
         return text.toString();
     }
 

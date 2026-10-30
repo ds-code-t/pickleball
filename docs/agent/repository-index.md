@@ -503,6 +503,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/WorkbenchSessionCommandsTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchSessionQueryTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchShellQuotingTest.java`
+- `src/test/java/tools/dscode/launcher/WorkbenchStructuredErrorTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchTagFallbackTest.java`
 - `src/test/java/tools/dscode/launcher/WorkspaceLaunchForkTest.java`
 - `src/test/java/tools/dscode/parallelutilities/ParallelCountEstimatorTest.java`
@@ -775,6 +776,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/mcp/WorkbenchCommandQueueTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/mcp/WorkbenchMcpRetrievalTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/mcp/WorkbenchMcpServerTest.java`
+- `pickleball-workbench/src/test/java/tools/dscode/workbench/mcp/WorkbenchStructuredErrorTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/nav/WorkbenchGoResolverTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/player/EditorTabStateTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/player/GherkinBlockDocumentTest.java`

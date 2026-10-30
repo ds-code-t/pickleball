@@ -47,7 +47,8 @@ final class WorkbenchMcpTools {
         ToolBinding binding = tools.get(name);
         if (binding == null) {
             throw new IllegalArgumentException(
-                    "Unknown Workbench tool: " + name + ". Use tools/list. Do not invent workbench_* names."
+                    "error: Unknown Workbench tool: " + name + ".\n"
+                            + "fix: Use tools/list. Do not invent workbench_* names.\n"
             );
         }
         String previous = CURRENT_TOOL.get();
@@ -432,7 +433,8 @@ final class WorkbenchMcpTools {
         String description = argumentDescription(tool, name);
         String detail = description.isBlank() ? "" : " (" + description + ")";
         String got = value == null ? "It was omitted." : "Got " + value.getClass().getSimpleName() + ".";
-        return who + " requires " + name + detail + ". Pass a non-blank string. " + got;
+        return "error: " + who + " requires " + name + detail + ". " + got
+                + "\nfix: Pass a non-blank string.";
     }
 
     private static String argumentDescription(String tool, String name) {
@@ -472,22 +474,23 @@ final class WorkbenchMcpTools {
     private Map<String, Object> investigationObject(Object value) {
         if (value == null) {
             throw new IllegalArgumentException(
-                    "workbench_investigation_emit requires investigation (Investigation JSON object. Source of truth written to investigation.json.). Pass a JSON object."
+                    "error: workbench_investigation_emit requires investigation.\n"
+                            + "fix: Pass a JSON object.\n"
             );
         }
         Object parsed = value;
         if (parsed instanceof String text) {
             if (text.isBlank()) {
-                throw new IllegalArgumentException("investigation must be a JSON object.");
+                throw new IllegalArgumentException("error: investigation must be a JSON object.\nfix: Pass a JSON object.\n");
             }
             try {
                 parsed = json.readValue(text, LinkedHashMap.class);
             } catch (Exception failure) {
-                throw new IllegalArgumentException("investigation must be a JSON object.");
+                throw new IllegalArgumentException("error: investigation must be a JSON object.\nfix: Pass a JSON object.\n");
             }
         }
         if (!(parsed instanceof Map<?, ?>)) {
-            throw new IllegalArgumentException("investigation must be a JSON object.");
+            throw new IllegalArgumentException("error: investigation must be a JSON object.\nfix: Pass a JSON object.\n");
         }
         return json.convertValue(parsed, LinkedHashMap.class);
     }

@@ -184,7 +184,7 @@ public final class WorkbenchAgentCommands {
     private static int workspaceShow(WorkbenchCommandLine.Parsed parsed, PrintStream out, PrintStream err) {
         String runId = parsed.coordination().runId();
         if (runId == null || runId.isBlank()) {
-            err.println("Usage: workspace-show --run-id=<id> [--json]");
+            err.print(WorkbenchCliHelp.usageError("missing --run-id", "workspace-show"));
             return 2;
         }
         Path workspace = Workspace.directory(parsed.project(), runId);
@@ -199,7 +199,8 @@ public final class WorkbenchAgentCommands {
                 body.put("runvars", Workspace.readRunVars(workspace));
                 body.put("configs", RunConfigs.files(parsed.project(), runId));
             } else {
-                body.put("error", "No workspace for " + runId + ". Usage: workspace-seed --run-id=" + runId);
+                body.put("error", "No workspace for " + runId);
+                body.put("fix", WorkbenchCliHelp.usage("workspace-seed").strip());
             }
             out.println(writeJson(body));
         } else {
@@ -207,7 +208,7 @@ public final class WorkbenchAgentCommands {
         }
         if (!present) {
             if (!jsonRequested(parsed)) out.println("present=false");
-            err.println("No workspace for " + runId + ". Usage: workspace-seed --run-id=" + runId);
+            err.print(WorkbenchCliHelp.usageError("No workspace for " + runId, "workspace-seed"));
             return 1;
         }
         if (!jsonRequested(parsed)) {
@@ -224,12 +225,12 @@ public final class WorkbenchAgentCommands {
     private static int workspaceEdit(WorkbenchCommandLine.Parsed parsed, PrintStream out, PrintStream err) {
         String runId = parsed.coordination().runId();
         if (runId == null || runId.isBlank()) {
-            err.println("Usage: workspace-edit --run-id=<id> (--runvar=key=value | --config=<relative> --text=<body>) [--expect=<fingerprint>]");
+            err.print(WorkbenchCliHelp.usageError("missing --run-id", "workspace-edit"));
             return 2;
         }
         Path workspace = Workspace.directory(parsed.project(), runId);
         if (!Workspace.exists(workspace)) {
-            err.println("No workspace for " + runId + ". Usage: workspace-seed --run-id=" + runId);
+            err.print(WorkbenchCliHelp.usageError("No workspace for " + runId, "workspace-seed"));
             return 1;
         }
         String expect = flagValue(parsed.forwarded(), "--expect");
@@ -241,13 +242,13 @@ public final class WorkbenchAgentCommands {
         }
         String config = flagValue(parsed.forwarded(), "--config");
         if (config == null && parsed.runVars().isEmpty()) {
-            err.println("Usage: workspace-edit --run-id=<id> (--runvar=key=value | --config=<relative> --text=<body>) [--expect=<fingerprint>]");
+            err.print(WorkbenchCliHelp.usageError("missing --runvar or --config", "workspace-edit"));
             return 2;
         }
         if (config != null) {
             String text = parsed.coordination().text();
             if (text == null) {
-                err.println("Usage: workspace-edit --config=<relative> --text=<body>");
+                err.print(WorkbenchCliHelp.usageError("missing --text", "workspace-edit"));
                 return 2;
             }
             RunConfigs.write(parsed.project(), runId, config, text.endsWith("\n") ? text : text + "\n");
@@ -269,7 +270,7 @@ public final class WorkbenchAgentCommands {
     private static int workspaceSeed(WorkbenchCommandLine.Parsed parsed, PrintStream out, PrintStream err) {
         String runId = parsed.coordination().runId();
         if (runId == null || runId.isBlank()) {
-            err.println("Usage: workspace-seed --run-id=<id> [--reseed] [--from-run=<id>]");
+            err.print(WorkbenchCliHelp.usageError("missing --run-id", "workspace-seed"));
             return 2;
         }
         boolean reseed = hasFlag(parsed.forwarded(), "--reseed");
@@ -318,7 +319,7 @@ public final class WorkbenchAgentCommands {
     private static int sessionInfo(WorkbenchCommandLine.Parsed parsed, PrintStream out, PrintStream err) {
         String id = parsed.coordination().id();
         if (id == null || id.isBlank()) {
-            err.println("Usage: session info <sessionId> [--json]");
+            err.print(WorkbenchCliHelp.usageError("missing sessionId", "session-info"));
             return 2;
         }
         Optional<Path> file = SessionDescriptorWriter.findFile(parsed.project(), id);
@@ -336,7 +337,7 @@ public final class WorkbenchAgentCommands {
         String id = parsed.coordination().id();
         String verb = hold ? "hold" : "release";
         if (id == null || id.isBlank()) {
-            err.println("Usage: session " + verb + " <sessionId> [--json]");
+            err.print(WorkbenchCliHelp.usageError("missing sessionId", "session-" + verb));
             return 2;
         }
         try {
@@ -915,7 +916,7 @@ public final class WorkbenchAgentCommands {
         String op = queryOp(parsed.forwarded());
         if (op == null) {
             String usage = WorkbenchCliHelp.usage("query");
-            err.print(usage);
+            err.print(WorkbenchCliHelp.usageError("missing op", "query"));
             out.println(tools.dscode.control.protocol.JsonLite.write(Map.of(
                     "v", 1,
                     "error", "missing op",
@@ -942,8 +943,10 @@ public final class WorkbenchAgentCommands {
         DiagnosticQuery.Outcome outcome = DiagnosticQuery.query(parsed.project(), request);
         out.println(outcome.json());
         if (outcome.exit() != 0) {
+            Object message = outcome.body().get("error");
             Object fix = outcome.body().get("fix");
-            if (fix != null) err.println(fix);
+            if (message != null) err.println("error: " + message);
+            if (fix != null) err.println("fix: " + fix);
             return outcome.exit();
         }
         try {
@@ -996,7 +999,7 @@ public final class WorkbenchAgentCommands {
     private static int note(WorkbenchCommandLine.Parsed parsed, PrintStream out, PrintStream err) {
         String text = firstText(parsed);
         if (text == null) {
-            err.println("Usage: note --text=<one line> [--agent=<id>] [--run-id=<id>]");
+            err.print(WorkbenchCliHelp.usageError("missing --text", "note"));
             return 2;
         }
         AgentCoordination.note(
@@ -1018,7 +1021,7 @@ public final class WorkbenchAgentCommands {
         if (write) {
             String message = firstText(parsed);
             if (message == null) {
-                err.println("Usage: inbox --write --to=<agent-id|any> --text=<one line> [--from=<agent-id>] [--run-id=<id>]");
+                err.print(WorkbenchCliHelp.usageError("missing --text", "inbox"));
                 return 2;
             }
             String from = flags.inboxFrom() != null ? flags.inboxFrom() : flags.agentId();
@@ -1034,7 +1037,7 @@ public final class WorkbenchAgentCommands {
         }
         String agent = flags.agentId() != null ? flags.agentId() : flags.inboxTo();
         if (agent == null || agent.isBlank()) {
-            err.println("Usage: inbox --list|--take --agent=<id>");
+            err.print(WorkbenchCliHelp.usageError("missing --agent", "inbox"));
             return 2;
         }
         java.util.List<AgentCoordination.InboxNote> notes = take
@@ -1071,7 +1074,7 @@ public final class WorkbenchAgentCommands {
         }
         String agent = flags.agentId();
         if (agent == null || agent.isBlank()) {
-            err.println("Usage: presence --touch --agent=<id> [--run-id=<id>] | presence --list | presence --sweep");
+            err.print(WorkbenchCliHelp.usageError("missing --agent", "presence"));
             return 2;
         }
         AgentCoordination.Presence row = AgentCoordination.touchPresence(
@@ -1099,7 +1102,7 @@ public final class WorkbenchAgentCommands {
         }
         if (flags.renew()) {
             if (flags.id() == null) {
-                err.println("Usage: post --renew --id=<id> [--ttl=1h]");
+                err.print(WorkbenchCliHelp.usageError("missing --id", "post"));
                 return 2;
             }
             AgentCoordination.BoardPost renewed = AgentCoordination.renewPost(
@@ -1112,7 +1115,7 @@ public final class WorkbenchAgentCommands {
         if (write) {
             String message = firstText(parsed);
             if (message == null || flags.inboxTo() == null) {
-                err.println("Usage: post --write --to=<agent-id|all> --text=<one line> [--run-id=<id>] [--ttl=1h]");
+                err.print(WorkbenchCliHelp.usageError("missing --to or --text", "post"));
                 return 2;
             }
             String from = flags.inboxFrom() != null ? flags.inboxFrom() : flags.agentId();
@@ -1146,7 +1149,7 @@ public final class WorkbenchAgentCommands {
         if (flags.append() || (flags.text() != null && !flags.inboxList())) {
             String text = firstText(parsed);
             if (text == null) {
-                err.println("Usage: history --append --text=<one line>");
+                err.print(WorkbenchCliHelp.usageError("missing --text", "history"));
                 return 2;
             }
             AgentCoordination.appendHistory(parsed.project(), text);
@@ -1183,7 +1186,7 @@ public final class WorkbenchAgentCommands {
 
     private static int useVersion(WorkbenchCommandLine.Parsed parsed, PrintStream out, PrintStream err) {
         if (parsed.version() == null || parsed.version().isBlank()) {
-            err.println("Usage: use-version --version=<safe-version>");
+            err.print(WorkbenchCliHelp.usageError("missing --version", "use-version"));
             return 2;
         }
         try {
@@ -1199,14 +1202,20 @@ public final class WorkbenchAgentCommands {
             try {
                 return java.time.Duration.parse(value.toUpperCase(java.util.Locale.ROOT));
             } catch (RuntimeException failure) {
-                throw new IllegalArgumentException("ttl must be a duration such as 1h or PT1H: " + raw);
+                throw new IllegalArgumentException(WorkbenchCliHelp.structured(
+                        "ttl must be a duration such as 1h or PT1H: " + raw,
+                        "Pass --ttl=1h, 30m, or PT1H."
+                ));
             }
         }
         java.util.regex.Matcher matcher = java.util.regex.Pattern
                 .compile("^(\\d+)\\s*([smhd])$", java.util.regex.Pattern.CASE_INSENSITIVE)
                 .matcher(value);
         if (!matcher.matches()) {
-            throw new IllegalArgumentException("ttl must be a duration such as 1h, 30m, or PT1H: " + raw);
+            throw new IllegalArgumentException(WorkbenchCliHelp.structured(
+                    "ttl must be a duration such as 1h, 30m, or PT1H: " + raw,
+                    "Pass --ttl=1h, 30m, or PT1H."
+            ));
         }
         long amount = Long.parseLong(matcher.group(1));
         return switch (matcher.group(2).toLowerCase(java.util.Locale.ROOT)) {
@@ -1214,14 +1223,17 @@ public final class WorkbenchAgentCommands {
             case "m" -> java.time.Duration.ofMinutes(amount);
             case "h" -> java.time.Duration.ofHours(amount);
             case "d" -> java.time.Duration.ofDays(amount);
-            default -> throw new IllegalArgumentException("ttl must be a duration such as 1h or PT1H: " + raw);
+            default -> throw new IllegalArgumentException(WorkbenchCliHelp.structured(
+                    "ttl must be a duration such as 1h or PT1H: " + raw,
+                    "Pass --ttl=1h, 30m, or PT1H."
+            ));
         };
     }
 
     private static int finish(WorkbenchCommandLine.Parsed parsed, PrintStream out, PrintStream err) {
         String runId = parsed.coordination().runId();
         if (runId == null || runId.isBlank()) {
-            err.println("Usage: finish --run-id=<id> [--learned=<one line>] [--status=<status>]");
+            err.print(WorkbenchCliHelp.usageError("missing --run-id", "finish"));
             return 2;
         }
         String status = flag(parsed, "--status");
@@ -1230,7 +1242,10 @@ public final class WorkbenchAgentCommands {
         } else {
             status = status.trim().toUpperCase(java.util.Locale.ROOT);
             if (!KNOWN_FINISH_STATUSES.contains(status)) {
-                err.println("finish --status must be one of PASSED, FAILED, EMPTY, TIMEOUT, STOPPED: " + status);
+                err.println(WorkbenchCliHelp.structured(
+                        "finish --status must be one of PASSED, FAILED, EMPTY, TIMEOUT, STOPPED: " + status,
+                        WorkbenchCliHelp.usage("finish").strip()
+                ));
                 return 2;
             }
         }
@@ -1328,7 +1343,7 @@ public final class WorkbenchAgentCommands {
     private static int findElement(WorkbenchCommandLine.Parsed parsed, PrintStream out, PrintStream err) {
         String category = flag(parsed, "--category");
         if (category == null || category.isBlank()) {
-            err.println("Usage: find-element --category=<Button> [--text=<label>] [--html=<file>]");
+            err.print(WorkbenchCliHelp.usageError("missing --category", "find-element"));
             return 2;
         }
         String htmlFlag = flag(parsed, "--html");
@@ -1376,7 +1391,7 @@ public final class WorkbenchAgentCommands {
         java.util.Optional<WorkbenchSessionCommands.SessionState> session =
                 WorkbenchSessionCommands.readHealthy(parsed.project(), http);
         if (session.isEmpty()) {
-            err.println("start a session first");
+            err.println(WorkbenchCliHelp.structured("start a session first", "isolate, then retry this command."));
             return 2;
         }
         String op = category == null || category.isBlank() ? "inspect-page" : "find-element";

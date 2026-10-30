@@ -88,13 +88,19 @@ class WorkbenchAgentUsabilityTest {
     @Test
     void deprecatedFlagAliasesNormalizeToTheCanonicalFlag() throws Exception {
         assertEquals("alias-1", parse("discover", "--runId=alias-1").coordination().runId());
+        assertTrue(WorkbenchCommandLine.aliasNotices().contains("notice: --runId is --run-id"));
         assertEquals("ada", parse("note", "--agentId=ada", "--text=hi").coordination().agentId());
+        assertTrue(WorkbenchCommandLine.aliasNotices().contains("notice: --agentId is --agent-id"));
         assertEquals("any", parse("inbox", "--to=all", "--text=hi").coordination().inboxTo());
+        assertTrue(WorkbenchCommandLine.aliasNotices().contains("notice: --to=all is --to=any"));
         WorkbenchCommandLine.Parsed session = parse("session", "info", "--run-id=alias-1");
         assertEquals("session-info", session.command());
         assertEquals("alias-1", session.coordination().id());
+        assertTrue(WorkbenchCommandLine.aliasNotices().contains("notice: session info --run-id is the session id"));
         String unknown = WorkbenchCliHelp.unknown("disover");
-        assertTrue(unknown.contains("fix: Usage: help <command>"), unknown);
+        assertTrue(unknown.contains("error: Unknown Workbench command: disover"), unknown);
+        assertTrue(unknown.contains("fix: discover"), unknown);
+        assertFalse(unknown.contains("fix: Usage: help <command>"), unknown);
         String golden = Files.readString(Path.of("src/test/resources/workbench-help-golden.txt"));
         String catalog = WorkbenchCliHelp.catalog();
         for (String line : golden.lines().map(String::strip).filter(item -> !item.isEmpty()).toList()) {

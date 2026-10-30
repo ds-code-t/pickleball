@@ -122,6 +122,13 @@ final class WorkbenchCommandLine {
         return isAgentCoreCommand(command) || isForwardedCommand(command) || isSessionClientCommand(command);
     }
 
+    private static final ThreadLocal<List<String>> ALIAS_NOTICES = ThreadLocal.withInitial(ArrayList::new);
+
+    /** One-line notices from the last {@link #parse} on this thread. Deprecated spellings still work. */
+    static List<String> aliasNotices() {
+        return List.copyOf(ALIAS_NOTICES.get());
+    }
+
     static Parsed parse(String[] args) {
         if (args != null && args.length > 0 && WorkbenchCliHelp.isHelpToken(args[0])) {
             String[] rewritten = new String[args.length];
@@ -129,6 +136,7 @@ final class WorkbenchCommandLine {
             System.arraycopy(args, 1, rewritten, 1, args.length - 1);
             args = rewritten;
         }
+        ALIAS_NOTICES.get().clear();
         args = sessionQueryArgs(normalizeFlags(args));
         Path cwd = Path.of("").toAbsolutePath().normalize();
         if (args == null || args.length == 0) {
@@ -209,7 +217,7 @@ final class WorkbenchCommandLine {
                         : (index + 1 < args.length ? args[++index] : null);
                 tagsFile = blankToNull(value);
                 if (tagsFile == null) {
-                    throw new IllegalArgumentException("Tag quoting error: --tags-file needs a path.");
+                    throw cliError("Tag quoting error: --tags-file needs a path.", "Pass --tags-file=<path>. See help --tags.");
                 }
                 continue;
             }
@@ -259,9 +267,7 @@ final class WorkbenchCommandLine {
             if (token.startsWith("--runvar=")) {
                 String value = token.substring("--runvar=".length()).trim();
                 if (value.isBlank() || !value.contains("=")) {
-                    throw new IllegalArgumentException(
-                            "Usage: --runvar=key=value (repeatable). Example: --runvar=pkb_browser=CHROME_HEADLESS"
-                    );
+                    throw usageFailure("--runvar requires key=value", "--runvar");
                 }
                 runVars.add(value);
                 absorb = null;
@@ -271,9 +277,7 @@ final class WorkbenchCommandLine {
             if ("--runvar".equals(token)) {
                 String value = index + 1 < args.length ? args[++index] : null;
                 if (value == null || value.isBlank() || !value.contains("=")) {
-                    throw new IllegalArgumentException(
-                            "Usage: --runvar=key=value (repeatable). Example: --runvar=pkb_browser=CHROME_HEADLESS"
-                    );
+                    throw usageFailure("--runvar requires key=value", "--runvar");
                 }
                 runVars.add(value.trim());
                 absorb = null;
@@ -583,13 +587,23 @@ final class WorkbenchCommandLine {
         for (int index = 0; index < copy.length; index++) {
             String token = copy[index];
             if (token == null) continue;
-            if (token.startsWith("--runId=")) copy[index] = "--run-id=" + token.substring("--runId=".length());
-            else if ("--runId".equals(token)) copy[index] = "--run-id";
-            else if (token.startsWith("--agentId=")) copy[index] = "--agent-id=" + token.substring("--agentId=".length());
-            else if ("--agentId".equals(token)) copy[index] = "--agent-id";
-            else if (token.startsWith("--to=") && "all".equalsIgnoreCase(token.substring("--to=".length()))) {
+            if (token.startsWith("--runId=")) {
+                ALIAS_NOTICES.get().add("notice: --runId is --run-id");
+                copy[index] = "--run-id=" + token.substring("--runId=".length());
+            } else if ("--runId".equals(token)) {
+                ALIAS_NOTICES.get().add("notice: --runId is --run-id");
+                copy[index] = "--run-id";
+            } else if (token.startsWith("--agentId=")) {
+                ALIAS_NOTICES.get().add("notice: --agentId is --agent-id");
+                copy[index] = "--agent-id=" + token.substring("--agentId=".length());
+            } else if ("--agentId".equals(token)) {
+                ALIAS_NOTICES.get().add("notice: --agentId is --agent-id");
+                copy[index] = "--agent-id";
+            } else if (token.startsWith("--to=") && "all".equalsIgnoreCase(token.substring("--to=".length()))) {
+                ALIAS_NOTICES.get().add("notice: --to=all is --to=any");
                 copy[index] = "--to=any";
             } else if ("--to".equals(token) && index + 1 < copy.length && "all".equalsIgnoreCase(copy[index + 1])) {
+                ALIAS_NOTICES.get().add("notice: --to=all is --to=any");
                 copy[index + 1] = "any";
             }
         }
@@ -611,13 +625,18 @@ final class WorkbenchCommandLine {
         rewritten.add("session-" + verb);
         int index = 2;
         if (!"list".equals(verb)) {
-            if (args.length >= 3 && (args[2].startsWith("--run-id=") || args[2].startsWith("--id="))) {
+            if (args.length >= 4 && ("--run-id".equals(args[2]) || "--id".equals(args[2])) && !isFlag(args[3])) {
+                if ("--run-id".equals(args[2])) ALIAS_NOTICES.get().add("notice: session " + verb + " --run-id is the session id");
+                rewritten.add("--id=" + args[3]);
+                index = 4;
+            } else if (args.length >= 3 && (args[2].startsWith("--run-id=") || args[2].startsWith("--id="))) {
+                if (args[2].startsWith("--run-id=")) ALIAS_NOTICES.get().add("notice: session " + verb + " --run-id is the session id");
                 rewritten.add("--id=" + args[2].substring(args[2].indexOf('=') + 1));
                 index = 3;
             } else if (args.length < 3 || isFlag(args[2])) {
-                throw new IllegalArgumentException(
-                        "error: missing sessionId\nfix: Usage: session " + verb + " <sessionId> [--json]"
-                );
+                String fix = WorkbenchCliHelp.usage("session-" + verb);
+                if (fix == null) fix = "Usage: session " + verb + " <sessionId> [--json]";
+                throw new IllegalArgumentException(WorkbenchCliHelp.structured("missing sessionId", fix.strip()));
             } else {
                 rewritten.add("--id=" + args[2]);
                 index = 3;
@@ -627,29 +646,37 @@ final class WorkbenchCommandLine {
         return rewritten.toArray(String[]::new);
     }
 
+    private static IllegalArgumentException usageFailure(String error, String key) {
+        return new IllegalArgumentException(WorkbenchCliHelp.usageError(error, key));
+    }
+
+    private static IllegalArgumentException cliError(String error, String fix) {
+        return new IllegalArgumentException(WorkbenchCliHelp.structured(error, fix));
+    }
+
     private static Long parsePositiveSeconds(String value, String label) {
         if (value == null || value.isBlank()) {
-            throw new IllegalArgumentException(label + " requires a positive number of seconds. Usage: " + label + "=<seconds>");
+            throw usageFailure(label + " requires a positive number of seconds", label);
         }
         try {
             long seconds = Long.parseLong(value.trim());
             if (seconds <= 0) {
-                throw new IllegalArgumentException(label + " requires a positive number of seconds. Usage: " + label + "=<seconds>");
+                throw usageFailure(label + " requires a positive number of seconds", label);
             }
             return seconds;
         } catch (NumberFormatException failure) {
-            throw new IllegalArgumentException(label + " must be a whole number of seconds: " + value);
+            throw cliError(label + " must be a whole number of seconds: " + value, "Pass a positive whole number. See help " + label + ".");
         }
     }
 
     private static Integer parseWholeNumber(String value, String label) {
         if (value == null || value.isBlank()) {
-            throw new IllegalArgumentException(label + " requires a whole number.");
+            throw cliError(label + " requires a whole number.", "Pass a whole number. See help " + label + ".");
         }
         try {
             return Integer.valueOf(value.trim());
         } catch (NumberFormatException failure) {
-            throw new IllegalArgumentException(label + " must be a whole number: " + value);
+            throw cliError(label + " must be a whole number: " + value, "Pass a whole number. See help " + label + ".");
         }
     }
 
@@ -664,14 +691,15 @@ final class WorkbenchCommandLine {
     static void validateFilters(String tags, String name) {
         String tagError = tagQuotingError(tags);
         if (tagError != null) {
-            throw new IllegalArgumentException(tagError);
+            throw cliError(tagError, "Quote the expression (--tags='...'), or use --tags-file / --tags-b64. See help --tags.");
         }
         if (name == null || name.isBlank()) return;
         try {
             Pattern.compile(name);
         } catch (PatternSyntaxException failure) {
-            throw new IllegalArgumentException(
-                    "Name quoting error: unparseable expression '" + name + "' (" + failure.getDescription() + ")"
+            throw cliError(
+                    "Name quoting error: unparseable expression '" + name + "' (" + failure.getDescription() + ")",
+                    "Pass a valid Java regular expression as one argument."
             );
         }
     }
@@ -703,12 +731,9 @@ final class WorkbenchCommandLine {
     private static void rejectSplitTags(String tags, List<String> splitTags) {
         if (splitTags.isEmpty()) return;
         String expression = joinTagExpression(tags, splitTags);
-        throw new IllegalArgumentException(
-                "Tag quoting error: the --tags expression was split by an unquoted space: "
-                        + expression
-                        + ". Quote it (--tags='"
-                        + expression
-                        + "') or use --tags-file / --tags-b64."
+        throw cliError(
+                "Tag quoting error: the --tags expression was split by an unquoted space: " + expression,
+                "Quote it (--tags='" + expression + "') or use --tags-file / --tags-b64."
         );
     }
 
@@ -736,13 +761,16 @@ final class WorkbenchCommandLine {
             file = Files.isRegularFile(inProject) ? inProject : file.toAbsolutePath().normalize();
         }
         if (!Files.isRegularFile(file)) {
-            throw new IllegalArgumentException("Tag quoting error: tags file not found: " + raw);
+            throw cliError("Tag quoting error: tags file not found: " + raw, "Pass a path that exists, or use --tags / --tags-b64.");
         }
         try {
             return Files.readString(file, StandardCharsets.UTF_8).trim();
         } catch (java.io.IOException failure) {
             throw new IllegalArgumentException(
-                    "Tag quoting error: could not read tags file " + raw + ": " + failure.getMessage(),
+                    WorkbenchCliHelp.structured(
+                            "Tag quoting error: could not read tags file " + raw + ": " + failure.getMessage(),
+                            "Pass a readable UTF-8 file, or use --tags / --tags-b64."
+                    ),
                     failure
             );
         }
@@ -750,13 +778,13 @@ final class WorkbenchCommandLine {
 
     private static String decodeTags(String value) {
         if (value == null || value.isBlank()) {
-            throw new IllegalArgumentException("Tag quoting error: --tags-b64 needs an encoded expression.");
+            throw cliError("Tag quoting error: --tags-b64 needs an encoded expression.", "Pass the base64 of the UTF-8 expression. See help --tags.");
         }
         try {
             byte[] decoded = Base64.getDecoder().decode(value.trim());
             return new String(decoded, StandardCharsets.UTF_8).trim();
         } catch (IllegalArgumentException failure) {
-            throw new IllegalArgumentException("Tag quoting error: --tags-b64 is not valid base64.");
+            throw cliError("Tag quoting error: --tags-b64 is not valid base64.", "Pass the base64 of the UTF-8 expression. See help --tags.");
         }
     }
 

@@ -567,7 +567,7 @@ workbench_diagnostic_run
 workbench_diagnostic_summary
 ```
 
-The same files are also queried, not globbed, by the launcher `query` command and by six thin MCP forwarders (`wb_runs`, `wb_get`, `wb_query`, `wb_search`, `wb_props`, `wb_errors`). They share `DiagnosticQuery`. Default output is compact JSON with `where`, a small limit, and `…+N more, use cursor`. Worker `worker-*.log` tails are included when the kind is `log`. `help` says discover, then plan, then run. `--runId` means `--run-id`, `--agentId` means `--agent-id`, and `--to=all` means `--to=any`. See [Diagnostic query](diagnostic-query.md).
+The same files are also queried, not globbed, by the launcher `query` command and by six thin MCP forwarders (`wb_runs`, `wb_get`, `wb_query`, `wb_search`, `wb_props`, `wb_errors`). They share `DiagnosticQuery`. Default output is compact JSON with `where`, a small limit, and `…+N more, use cursor`. Worker `worker-*.log` tails are included when the kind is `log`. `help` says discover, then plan, then run. Usage text is one table (`WorkbenchCliHelp`). A failure is `error:` and `fix:` (the table row, or the nearest command). `--runId` means `--run-id`, `--agentId` means `--agent-id`, and `--to=all` means `--to=any`; each deprecated spelling prints one `notice:` line. `session info|hold|release --run-id` is the session id. See [Diagnostic query](diagnostic-query.md).
 
 Human investigation handoff (writes `.pickleball/investigations/<id>/` and returns the relative `report.html` path only):
 

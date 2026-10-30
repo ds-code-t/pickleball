@@ -248,7 +248,7 @@ public final class WorkbenchSessionCommands {
     ) {
         String runId = parsed.coordination().runId();
         if (runId == null || runId.isBlank()) {
-            err.println("Usage: " + parsed.command() + " --run-id=<id>");
+            err.print(WorkbenchCliHelp.usageError("missing --run-id", parsed.command()));
             return 2;
         }
         RunView.Loaded loaded;
@@ -496,7 +496,7 @@ public final class WorkbenchSessionCommands {
         if (refused != null) return refused;
         String text = flags.text;
         if (text == null || text.isBlank()) {
-            err.println("Usage: execute-step <gherkin> or execute-step --text=<gherkin> [--ack-only]");
+            err.print(WorkbenchCliHelp.usageError("missing gherkin", "execute-step"));
             return 2;
         }
         SessionState state = requireSession(parsed, http);
@@ -513,7 +513,7 @@ public final class WorkbenchSessionCommands {
             HttpClient http
     ) {
         if (flags.text == null || flags.text.isBlank()) {
-            err.println("Usage: " + parsed.command() + " --text=<gherkin>");
+            err.print(WorkbenchCliHelp.usageError("missing gherkin", parsed.command()));
             return 2;
         }
         Integer refused = refusedDriver(parsed, err);
@@ -532,7 +532,7 @@ public final class WorkbenchSessionCommands {
         boolean featureBlank = flags.feature == null || flags.feature.isBlank();
         boolean nameBlank = parsed.name() == null || parsed.name().isBlank();
         if (featureBlank && nameBlank) {
-            err.println("Usage: open-scenario --feature=<path-or-name> --name=<scenario> [--example=<rows>]");
+            err.print(WorkbenchCliHelp.usageError("missing --feature and --name", "open-scenario"));
             return 2;
         }
         Integer refused = refusedDriver(parsed, err);
@@ -551,7 +551,7 @@ public final class WorkbenchSessionCommands {
         String selector = parsed.example();
         if (selector == null || selector.isBlank()) selector = flags.text;
         if (selector == null || selector.isBlank()) {
-            err.println("Usage: example --example=<rows>");
+            err.print(WorkbenchCliHelp.usageError("missing --example", "example"));
             return 2;
         }
         Integer refused = refusedDriver(parsed, err);
@@ -586,7 +586,7 @@ public final class WorkbenchSessionCommands {
         String runId = parsed.coordination().runId();
         if (run != null && !run.isBlank()) return run;
         if (runId != null && !runId.isBlank()) return runId;
-        err.println("Usage: diagnostic-run --run=<id>");
+        err.print(WorkbenchCliHelp.usageError("missing --run", "diagnostic-run"));
         err.println("--run is the diagnostic pack. --run-id selects the live session and is the pack when --run is omitted.");
         return null;
     }
@@ -1422,7 +1422,7 @@ public final class WorkbenchSessionCommands {
                 if (token.startsWith("--session-file=")) {
                     sessionFile = token.substring("--session-file=".length()).trim();
                     if (sessionFile.isBlank()) {
-                        throw new IllegalArgumentException("Usage: --session-file=<path>");
+                        throw new IllegalArgumentException(WorkbenchCliHelp.usageError("--session-file needs a path", "--session-file"));
                     }
                     absorb = null;
                     continue;
@@ -1430,7 +1430,7 @@ public final class WorkbenchSessionCommands {
                 if ("--session-file".equals(token)) {
                     String value = index + 1 < args.length ? args[++index] : null;
                     if (value == null || value.isBlank()) {
-                        throw new IllegalArgumentException("Usage: --session-file=<path>");
+                        throw new IllegalArgumentException(WorkbenchCliHelp.usageError("--session-file needs a path", "--session-file"));
                     }
                     sessionFile = value.trim();
                     absorb = null;
@@ -1484,12 +1484,16 @@ public final class WorkbenchSessionCommands {
 
         private static Long positiveSeconds(String value, String label) {
             if (value == null || value.isBlank()) {
-                throw new IllegalArgumentException(label + " requires a positive number of seconds. Usage: " + label + "=<seconds>");
+                throw new IllegalArgumentException(WorkbenchCliHelp.usageError(
+                        label + " requires a positive number of seconds", label
+                ));
             }
             try {
                 long seconds = Long.parseLong(value.trim());
                 if (seconds <= 0) {
-                    throw new IllegalArgumentException(label + " requires a positive number of seconds. Usage: " + label + "=<seconds>");
+                    throw new IllegalArgumentException(WorkbenchCliHelp.usageError(
+                        label + " requires a positive number of seconds", label
+                ));
                 }
                 return seconds;
             } catch (NumberFormatException failure) {

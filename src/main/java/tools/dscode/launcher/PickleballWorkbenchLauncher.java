@@ -55,6 +55,7 @@ public final class PickleballWorkbenchLauncher {
         WorkbenchCommandLine.Parsed parsed;
         try {
             parsed = WorkbenchCommandLine.parse(args);
+            for (String notice : WorkbenchCommandLine.aliasNotices()) System.err.println(notice);
         } catch (IllegalArgumentException failure) {
             System.err.println(failure.getMessage());
             System.exit(2);
