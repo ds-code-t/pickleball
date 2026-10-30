@@ -526,7 +526,7 @@ public final class WorkbenchAgentCommands {
             }
             int exit = mavenResult.exit();
             boolean empty = selection.matchedNone();
-            Observed observed = observe(parsed.project(), run.runId(), exit, empty);
+            Observed observed = observe(parsed.project(), run.runId(), exit, empty, captured(capturedOut, capturedErr));
             String status = observed.status();
             int reported = observed.exitCode();
             if ("LAUNCH_ERROR".equals(status)) printLaunchError(run.runId(), capturedOut, capturedErr, err, exit);
@@ -631,7 +631,7 @@ public final class WorkbenchAgentCommands {
             }
             int exit = mavenResult.exit();
             boolean empty = selection.matchedNone();
-            Observed observed = observe(parsed.project(), run.runId(), exit, empty);
+            Observed observed = observe(parsed.project(), run.runId(), exit, empty, captured(capturedOut, capturedErr));
             String status = observed.status();
             int reported = observed.exitCode();
             if ("LAUNCH_ERROR".equals(status)) printLaunchError(run.runId(), capturedOut, capturedErr, err, exit);
@@ -1811,13 +1811,20 @@ public final class WorkbenchAgentCommands {
      * Surefire Error recorded as {@code counts.errors} or outcome {@code ERROR}.
      * Surefire XML is used only when that index was not written.
      */
-    private static Observed observe(Path project, String runId, int mavenExit, boolean empty) {
+    private static Observed observe(Path project, String runId, int mavenExit, boolean empty, String console) {
         if (empty) {
             return new Observed("EMPTY", mavenExit == 0 ? 1 : mavenExit);
         }
         AgentCoordination.DiagnosticSignal signal = AgentCoordination.readDiagnosticSignal(
                 project, runId, recordStarted(AgentCoordination.runDirectory(project, runId).resolve(AgentCoordination.RECORD_FILE))
         );
+        DiagnosticVerdict verdict = surefireVerdict(project, AgentCoordination.runDirectory(project, runId).resolve(AgentCoordination.RECORD_FILE));
+        int recordedSteps = WorkbenchRunReports.recordedExecutedSteps(project, runId, console);
+        boolean failed = (signal != null && signal.failed()) || (verdict != null && verdict.failed());
+        if (failed && recordedSteps == 0) {
+            int exit = mavenExit == 0 ? 1 : mavenExit;
+            return new Observed("LAUNCH_ERROR", exit);
+        }
         if (signal != null && (signal.failed() || "PASSED".equalsIgnoreCase(signal.outcome()))) {
             if (signal.failed()) {
                 int exit = mavenExit == 0 ? Math.max(signal.failureCount(), 1) : mavenExit;
@@ -1825,7 +1832,6 @@ public final class WorkbenchAgentCommands {
             }
             return new Observed("PASSED", 0);
         }
-        DiagnosticVerdict verdict = surefireVerdict(project, AgentCoordination.runDirectory(project, runId).resolve(AgentCoordination.RECORD_FILE));
         if (mavenExit != 0 && inconclusive(signal) && (verdict == null || (!verdict.failed() && !verdict.passed()))) {
             return new Observed("LAUNCH_ERROR", mavenExit);
         }
@@ -1840,6 +1846,10 @@ public final class WorkbenchAgentCommands {
             return new Observed("PASSED", 0);
         }
         return new Observed(mavenExit == 0 ? "PASSED" : "FAILED", mavenExit);
+    }
+
+    private static String captured(ByteArrayOutputStream out, ByteArrayOutputStream err) {
+        return out.toString(StandardCharsets.UTF_8) + err.toString(StandardCharsets.UTF_8);
     }
 
     private record DiagnosticVerdict(String outcome, int failures) {

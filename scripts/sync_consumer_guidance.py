@@ -36,6 +36,7 @@ CONSUMER_REFERENCE_TREES = (
 MAX_REFERENCE_FILE_BYTES = 2 * 1024 * 1024
 MAX_REFERENCE_TOTAL_BYTES = 10 * 1024 * 1024
 # Maintainer pages stay in docs/ and out of the consumer guidance mirror.
+# refresh_agent_index drops MAINTAINER_ONLY_DOCS from the source index too.
 MAINTAINER_ONLY_DOCS = (
     "docs/tech-debt.md",
 )
@@ -43,10 +44,15 @@ MAINTAINER_ONLY_PREFIXES = (
     "docs/maintainer/",
     "docs/roadmaps/",
 )
+# Planning notes stay in the source repository index. Export omits them.
+EXPORT_ONLY_DOCS = (
+    "docs/ai-diagnostic-reporting-plan.md",
+    "docs/workbench-thin-packaging-roadmap.md",
+)
 
 
 def excluded_consumer_doc(doc_path: str) -> bool:
-    if doc_path in MAINTAINER_ONLY_DOCS:
+    if doc_path in MAINTAINER_ONLY_DOCS or doc_path in EXPORT_ONLY_DOCS:
         return True
     return any(doc_path.startswith(prefix) for prefix in MAINTAINER_ONLY_PREFIXES)
 
@@ -137,7 +143,9 @@ def consumer_doc_bytes(relative: str, source: Path) -> bytes:
         text = data.decode("utf-8")
         kept = [
             line for line in text.splitlines(keepends=True)
-            if "docs/maintainer/" not in line and "docs/roadmaps/" not in line
+            if "docs/maintainer/" not in line
+            and "docs/roadmaps/" not in line
+            and not any(path in line for path in EXPORT_ONLY_DOCS)
         ]
         data = "".join(kept).encode("utf-8")
     if Path(relative).name != "README.md":
@@ -147,7 +155,7 @@ def consumer_doc_bytes(relative: str, source: Path) -> bytes:
 
 def strip_maintainer_only_sections(text: str) -> str:
     """Drop README sections that only link to maintainer-only docs."""
-    excluded_names = {Path(path).name for path in MAINTAINER_ONLY_DOCS}
+    excluded_names = {Path(path).name for path in (*MAINTAINER_ONLY_DOCS, *EXPORT_ONLY_DOCS)}
     lines = text.splitlines(keepends=True)
     kept: list[str] = []
     index = 0

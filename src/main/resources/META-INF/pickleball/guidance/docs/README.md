@@ -46,7 +46,6 @@ When these docs are materialized from the Maven dependency with Workbench `expor
 - [Workbench live player](pickleball-workbench-player.md) — click-to-seek playhead, Play from start, Step vs From Here, wait-at-end add-and-continue, in-place Gherkin editing, and the default local-site demo.
 - [Diagnostic lineage and metadata](diagnostic-lineage-metadata.md) — distinguish lineage annotations, execution/evidence RunVars, controls, and derived evidence.
 - [Diagnostic reporting](diagnostic-reporting.md) — sparse-first AI evidence, source provenance, step/capability metadata, trace evidence, screenshots/fingerprints, comparison, and retention.
-- [AI diagnostic reporting plan](ai-diagnostic-reporting-plan.md) — current sparse-first investigation and controlled-rerun architecture.
 
 ## Experimental features
 

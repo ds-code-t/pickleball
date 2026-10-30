@@ -28,7 +28,7 @@ public class PickleballGuidanceChecks {
         ByteArrayOutputStream output = new ByteArrayOutputStream();
 
         int status = DiagnosticCli.run(
-                new String[]{"guidance"},
+                new String[]{"guidance", "--detail"},
                 new PrintStream(output, true, StandardCharsets.UTF_8),
                 System.err
         );
@@ -118,6 +118,24 @@ public class PickleballGuidanceChecks {
             assertTrue(guide.indexOf("## Maintainer-only: pointer-eval harness")
                     > guide.indexOf("## When the core Pickleball repository is also present"));
         }
+
+    @Test
+    void guidanceDefaultsToTheShortGuide() {
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        int status = DiagnosticCli.run(
+                new String[]{"guidance"},
+                new PrintStream(output, true, StandardCharsets.UTF_8),
+                System.err
+        );
+        assertEquals(0, status);
+        String guide = output.toString(StandardCharsets.UTF_8);
+        assertTrue(guide.contains("# Pickleball Consumer Agent Guide"));
+        assertTrue(guide.contains("The fingerprint comes from `workspace-show`"));
+        assertFalse(guide.contains("# Workbench agent detail"));
+        assertFalse(guide.contains("Moved out of the first-read guide"));
+        assertFalse(guide.contains("Diagnostic investigation protocol"));
+        assertFalse(guide.contains("Maintainer-only: pointer-eval harness"));
+    }
 
     @Test
     void diagnosticCliHelpListsCommandsAndUnknownCommandsFailClearly() {
@@ -340,10 +358,19 @@ public class PickleballGuidanceChecks {
             assertTrue(guide.contains("Do not copy, modify, or execute files"));
             assertTrue(guide.contains("one front door"));
             assertTrue(guide.contains("PickleballWorkbenchLauncher"));
-            assertTrue(guide.contains("Maintainer-only: pointer-eval harness"));
-            assertTrue(guide.contains("@agent-pointer-eval"));
+            assertFalse(guide.contains("Maintainer-only: pointer-eval harness"));
+            assertFalse(guide.contains("@agent-pointer-eval"));
             assertTrue(guide.contains("-Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher"));
             assertTrue(guide.contains("-Dexec.args=isolate"));
+            String detail = Files.readString(root.resolve("docs/workbench-agent-detail.md"));
+            assertTrue(detail.contains("Maintainer-only: pointer-eval harness"));
+            assertTrue(detail.contains("@agent-pointer-eval"));
+            assertTrue(detail.indexOf("## Maintainer-only: pointer-eval harness")
+                    > detail.indexOf("## When the core Pickleball repository is also present"));
+            assertFalse(managedFiles.contains("docs/ai-diagnostic-reporting-plan.md"));
+            assertFalse(managedFiles.contains("docs/workbench-thin-packaging-roadmap.md"));
+            assertTrue(managedFiles.stream().noneMatch(path -> path.startsWith("docs/maintainer/")));
+            assertTrue(managedFiles.stream().noneMatch(path -> path.startsWith("docs/roadmaps/")));
 
             String consumerProject = Files.readString(root.resolve("docs/consumer-project.md"));
             assertTrue(consumerProject.contains("keep console verbosity low"));

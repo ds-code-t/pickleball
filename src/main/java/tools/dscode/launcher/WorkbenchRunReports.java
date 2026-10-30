@@ -244,6 +244,59 @@ public final class WorkbenchRunReports {
         }
     }
 
+    /**
+     * Steps this run recorded as executed, or {@code -1} when no step count was written.
+     * A missing {@code steps} object is unknown, not zero. An explicit {@code executed: 0}
+     * (index, scenario summary, or a console {@code N Steps} line) is zero.
+     */
+    static int recordedExecutedSteps(Path project, String runId, String console) {
+        Integer recorded = null;
+        Path index = AgentCoordination.findRunIndex(project, runId);
+        if (index != null && Files.isRegularFile(index)) {
+            try {
+                JsonNode root = JSON.readTree(index.toFile());
+                JsonNode steps = root.get("steps");
+                if (steps != null && steps.isObject()) {
+                    int[] counts = indexCounts(project, runId);
+                    recorded = counts == null ? 0 : counts[1];
+                }
+            } catch (IOException ignored) {
+                // An unreadable index is not a step count.
+            }
+        }
+        try {
+            for (Path dir : currentRunScenarioDirs(project, runId)) {
+                Integer core = explicitStepCount(dir.resolve("summary.json"));
+                if (core == null) continue;
+                recorded = recorded == null ? core : Math.max(recorded, core);
+            }
+        } catch (IOException ignored) {
+            // A missing scenario tree is not a step count.
+        }
+        if (console != null && STEP_SUMMARY.matcher(console).find()) {
+            int consoleSteps = Math.max(lastCount(STEP_SUMMARY, console), 0);
+            recorded = recorded == null ? consoleSteps : Math.max(recorded, consoleSteps);
+        }
+        return recorded == null ? -1 : recorded;
+    }
+
+    /** {@code null} when the summary did not record a step count. */
+    private static Integer explicitStepCount(Path summary) throws IOException {
+        if (!Files.isRegularFile(summary)) return null;
+        JsonNode root = JSON.readTree(summary.toFile());
+        if (!root.has("steps")) return null;
+        JsonNode steps = root.get("steps");
+        if (steps.isArray()) return steps.size();
+        if (!steps.isObject()) return null;
+        if (steps.has("executed")) return steps.path("executed").asInt(0);
+        if (steps.has("total")) return steps.path("total").asInt(0);
+        int sum = 0;
+        for (String key : List.of("passed", "failed", "skipped", "other")) {
+            sum += steps.path(key).asInt(0);
+        }
+        return sum;
+    }
+
     private static int[] consoleCounts(String console) {
         if (console == null || console.isBlank()) return null;
         int scenarios = lastCount(SCENARIO_SUMMARY, console);

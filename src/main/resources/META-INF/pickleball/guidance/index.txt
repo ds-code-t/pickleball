@@ -5,7 +5,6 @@ docs/agent/change-checklist.md
 docs/agent/feature-map.md
 docs/agent/prompt-examples.md
 docs/agent/repository-index.md
-docs/ai-diagnostic-reporting-plan.md
 docs/ai-run-configuration.md
 docs/block-conditionals.md
 docs/component-scenarios.md
@@ -40,7 +39,6 @@ docs/reserved-element-names.md
 docs/service-call-scenarios.md
 docs/step-overrides.md
 docs/workbench-agent-detail.md
-docs/workbench-thin-packaging-roadmap.md
 maven-consumer-project/pom.xml
 maven-consumer-project/src/test/java/com/example/pickleball/PickleballTests.java
 maven-consumer-project/src/test/java/com/example/pickleball/support/LocalTestSite.java

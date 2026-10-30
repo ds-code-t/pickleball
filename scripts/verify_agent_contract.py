@@ -441,8 +441,6 @@ def validate_dependency_owned_guidance(errors: list[str]) -> None:
         "version-matched",
         "Generated Maven consumer reference",
         "maven-consumer-project/",
-        "@agent-pointer-eval",
-        "Maintainer-only: pointer-eval harness",
         "-Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher",
     ):
         if required not in text:
@@ -454,13 +452,17 @@ def validate_dependency_owned_guidance(errors: list[str]) -> None:
     chooser_start = text.find("## Tool chooser")
     live_start = text.find("### Live isolation loop")
     first_read = text.find("## First-read")
-    maintainer = text.find("## Maintainer-only: pointer-eval harness")
-    if chooser_start < 0 or live_start < 0 or first_read < 0 or maintainer < 0:
+    if chooser_start < 0 or live_start < 0 or first_read < 0:
         errors.append(
             "docs/consumer-agent-guide.md must keep Tool chooser, Live isolation loop, "
-            "First-read, and Maintainer-only pointer-eval sections."
+            "and First-read sections."
         )
         return
+    if "Maintainer-only: pointer-eval harness" in text or "@agent-pointer-eval" in text:
+        errors.append(
+            "docs/consumer-agent-guide.md must not carry the maintainer pointer-eval "
+            "section; it lives in docs/workbench-agent-detail.md."
+        )
 
     chooser = text[chooser_start:live_start]
     live = text[live_start:first_read]
@@ -520,11 +522,27 @@ def validate_dependency_owned_guidance(errors: list[str]) -> None:
         errors.append(
             "docs/consumer-agent-guide.md must not send new investigations under v/<version>/."
         )
-    if maintainer < text.find("## When the core Pickleball repository is also present"):
-        errors.append(
-            "@agent-pointer-eval guidance must stay maintainer-only at the bottom of "
-            "docs/consumer-agent-guide.md."
-        )
+    detail_path = ROOT / "docs" / "workbench-agent-detail.md"
+    if not detail_path.is_file():
+        errors.append("Missing docs/workbench-agent-detail.md")
+    else:
+        detail = detail_path.read_text(encoding="utf-8")
+        for required in (
+            "Maintainer-only: pointer-eval harness",
+            "@agent-pointer-eval",
+        ):
+            if required not in detail:
+                errors.append(
+                    "docs/workbench-agent-detail.md must retain pointer-eval guidance "
+                    f"({required})."
+                )
+        core = detail.find("## When the core Pickleball repository is also present")
+        maintainer = detail.find("## Maintainer-only: pointer-eval harness")
+        if core < 0 or maintainer < 0 or maintainer < core:
+            errors.append(
+                "@agent-pointer-eval guidance must stay maintainer-only after the core-repo "
+                "section in docs/workbench-agent-detail.md."
+            )
 
     workbench = ROOT / "docs" / "pickleball-workbench.md"
     if workbench.is_file():

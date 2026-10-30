@@ -73,18 +73,16 @@ public final class DiagnosticCli {
     }
 
     private static int guidance(String[] args, PrintStream out) throws IOException {
-        requireLength(args, 1, 1, "guidance");
+        boolean detail = args.length == 2 && "--detail".equals(args[1]);
+        if (!detail) requireLength(args, 1, 1, "guidance [--detail]");
         try (InputStream input = guidanceResource(AGENT_GUIDE)) {
             out.print(new String(input.readAllBytes(), StandardCharsets.UTF_8));
         }
-        // The first-read file stays short. The same command still prints the longer notes.
-        String detail = "docs/workbench-agent-detail.md";
-        InputStream extra = DiagnosticCli.class.getClassLoader().getResourceAsStream(GUIDANCE_ROOT + detail);
-        if (extra != null) {
-            try (InputStream input = extra) {
-                out.println();
-                out.print(new String(input.readAllBytes(), StandardCharsets.UTF_8));
-            }
+        if (!detail) return 0;
+        String relative = "docs/workbench-agent-detail.md";
+        try (InputStream input = guidanceResource(relative)) {
+            out.println();
+            out.print(new String(input.readAllBytes(), StandardCharsets.UTF_8));
         }
         return 0;
     }
@@ -282,7 +280,7 @@ public final class DiagnosticCli {
     private static void usage(PrintStream out) {
         out.println("Pickleball diagnostic utility");
         out.println("The consumer AI-agent entry is Pickleball Workbench (PickleballWorkbenchLauncher), not DiagnosticCli.");
-        out.println("  DiagnosticCli guidance");
+        out.println("  DiagnosticCli guidance [--detail]");
         out.println("  DiagnosticCli export-guidance [output-directory]");
         out.println("  DiagnosticCli discover-hint [project]");
         out.println("  DiagnosticCli resolve-runvars [project]");

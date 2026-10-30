@@ -26,7 +26,6 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/agent/prompt-examples.md`
 - `docs/agent/README.md`
 - `docs/agent/repository-index.md`
-- `docs/ai-diagnostic-reporting-plan.md`
 - `docs/ai-run-configuration.md`
 - `docs/block-conditionals.md`
 - `docs/component-scenarios.md`
@@ -62,7 +61,6 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/service-call-scenarios.md`
 - `docs/step-overrides.md`
 - `docs/workbench-agent-detail.md`
-- `docs/workbench-thin-packaging-roadmap.md`
 
 ## Framework Java and AspectJ source
 

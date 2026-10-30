@@ -455,7 +455,7 @@ public final class AgentCoordination {
     /**
      * Stops the run. When {@code run-index.json} is present it supplies the status
      * and the failure fields, including after a worker already wrote PASSED.
-     * {@code TIMEOUT} and {@code EMPTY} are left alone. {@code observedFailures}
+     * {@code TIMEOUT}, {@code EMPTY}, and {@code LAUNCH_ERROR} are left alone. {@code observedFailures}
      * is the Surefire or Gradle failure+error count used only when no index exists.
      * {@code environment} and {@code browser} come from the resolved run vars.
      */
@@ -1617,7 +1617,9 @@ public final class AgentCoordination {
 
     private static boolean isProtectedStatus(String status) {
         String value = status == null ? "" : status.trim();
-        return "TIMEOUT".equalsIgnoreCase(value) || "EMPTY".equalsIgnoreCase(value);
+        return "TIMEOUT".equalsIgnoreCase(value)
+                || "EMPTY".equalsIgnoreCase(value)
+                || "LAUNCH_ERROR".equalsIgnoreCase(value);
     }
 
     private static String startedVersion(Path project) {

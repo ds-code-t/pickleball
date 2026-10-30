@@ -140,6 +140,96 @@ class WorkbenchLaunchCorrectnessTest {
         assertEquals("[ERROR] Failed to execute goal example:compile", WorkbenchAgentCommands.launchCause("[ERROR] Failed to execute goal example:compile\n"));
     }
 
+    @Test
+    void beforeAllHookThatThrowsIsLaunchErrorWithTheConsoleCause() throws Exception {
+        writeFeature();
+        Path hook = temp.resolve("src/test/java/com/example/site/BeforeAllSite.java");
+        Files.createDirectories(hook.getParent());
+        Files.writeString(hook, """
+                package com.example.site;
+                import io.cucumber.java.BeforeAll;
+                import java.net.BindException;
+                public final class BeforeAllSite {
+                    @BeforeAll
+                    public static void open() throws Exception {
+                        throw new BindException("Address already in use");
+                    }
+                }
+                """);
+        ByteArrayOutputStream stdout = new ByteArrayOutputStream();
+        ByteArrayOutputStream stderr = new ByteArrayOutputStream();
+        int exit = WorkbenchAgentCommands.run(
+                new String[]{"discover", temp.toString(), "--run-id=run-hook", "--tags=@smoke"},
+                new PrintStream(stdout, true, StandardCharsets.UTF_8),
+                new PrintStream(stderr, true, StandardCharsets.UTF_8),
+                (project, command, out, err) -> {
+                    err.println("java.lang.RuntimeException: before-all");
+                    err.println("Caused by: java.net.BindException: Address already in use");
+                    try {
+                        Path run = AgentCoordination.runDirectory(project, "run-hook").resolve("diagnostic").resolve("run-hook");
+                        Files.createDirectories(run.resolve("scenarios").resolve("s1"));
+                        Files.writeString(run.resolve("run-index.json"), """
+                                {
+                                  "runId": "run-hook",
+                                  "outcome": "FAILED",
+                                  "counts": { "total": 1, "passed": 0, "failed": 1 },
+                                  "steps": { "executed": 0, "passed": 0, "failed": 0, "skipped": 0 }
+                                }
+                                """);
+                        Files.writeString(run.resolve("scenarios").resolve("s1").resolve("summary.json"), """
+                                {"outcome":"FAILED","steps":{"executed":0,"passed":0,"failed":0,"skipped":0,"other":0}}
+                                """);
+                    } catch (Exception failure) {
+                        throw new RuntimeException(failure);
+                    }
+                    return 1;
+                }
+        );
+        assertEquals(1, exit);
+        String out = stdout.toString(StandardCharsets.UTF_8);
+        String err = stderr.toString(StandardCharsets.UTF_8);
+        assertTrue(out.contains("summary status=LAUNCH_ERROR scenarios=0 steps=0"), out);
+        assertFalse(out.contains("summary status=FAILED"), out);
+        assertTrue(err.contains("error: Caused by: java.net.BindException: Address already in use"), err);
+        assertTrue(err.contains("fix: Full output is in .pickleball/runs/run-hook/console/"), err);
+        String record = Files.readString(AgentCoordination.runDirectory(temp, "run-hook").resolve("record.json"));
+        assertTrue(record.contains("LAUNCH_ERROR"), record);
+        assertTrue(Files.readString(hook).contains("@BeforeAll"));
+    }
+
+    @Test
+    void failedScenarioThatRanAStepStaysFailed() throws Exception {
+        writeFeature();
+        ByteArrayOutputStream stdout = new ByteArrayOutputStream();
+        int exit = WorkbenchAgentCommands.run(
+                new String[]{"discover", temp.toString(), "--run-id=run-step", "--tags=@smoke"},
+                new PrintStream(stdout, true, StandardCharsets.UTF_8),
+                new PrintStream(new ByteArrayOutputStream(), true, StandardCharsets.UTF_8),
+                (project, command, out, err) -> {
+                    try {
+                        Path index = AgentCoordination.runDirectory(project, "run-step")
+                                .resolve("diagnostic").resolve("run-index.json");
+                        Files.createDirectories(index.getParent());
+                        Files.writeString(index, """
+                                {
+                                  "runId": "run-step",
+                                  "outcome": "FAILED",
+                                  "counts": { "total": 1, "passed": 0, "failed": 1 },
+                                  "steps": { "executed": 1, "passed": 0, "failed": 1 }
+                                }
+                                """);
+                    } catch (Exception failure) {
+                        throw new RuntimeException(failure);
+                    }
+                    return 1;
+                }
+        );
+        assertEquals(1, exit);
+        String out = stdout.toString(StandardCharsets.UTF_8);
+        assertTrue(out.contains("summary status=FAILED"), out);
+        assertFalse(out.contains("summary status=LAUNCH_ERROR"), out);
+    }
+
     private void writeFeature() throws Exception {
         boolean windows = System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win");
         Path script = temp.resolve(windows ? "mvnw.cmd" : "mvnw");

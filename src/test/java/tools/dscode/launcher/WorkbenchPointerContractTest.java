@@ -113,6 +113,12 @@ class WorkbenchPointerContractTest {
         assertTrue(text.contains("or `unset`"), text);
         assertTrue(text.contains("Several live sessions must pass `--run-id`"), text);
         assertTrue(text.contains("docs/workbench-agent-detail.md"), text);
+        assertTrue(text.contains("workspace="), text);
+        assertTrue(text.contains("fingerprint="), text);
+        assertTrue(text.contains("The fingerprint comes from `workspace-show`"), text);
+        assertTrue(text.contains("-Dexec.args=execute-step --text-file=step.txt"), text);
+        assertTrue(text.contains("-Dexec.args=execute-step --text-b64"), text);
+        assertFalse(text.contains("Maintainer-only: pointer-eval harness"), text);
         assertTrue(Files.size(Path.of("docs/workbench-agent-detail.md")) > bytes);
     }
 
@@ -124,16 +130,30 @@ class WorkbenchPointerContractTest {
                 String relative = packaged.relativize(path).toString().replace('\\', '/');
                 assertFalse(relative.startsWith("docs/maintainer/"), relative);
                 assertFalse(relative.startsWith("docs/roadmaps/"), relative);
+                assertFalse(relative.endsWith("ai-diagnostic-reporting-plan.md"), relative);
+                assertFalse(relative.endsWith("workbench-thin-packaging-roadmap.md"), relative);
             });
         }
         String index = Files.readString(packaged.resolve("index.txt"));
         assertFalse(index.contains("docs/maintainer/"));
         assertFalse(index.contains("docs/roadmaps/"));
+        assertFalse(index.contains("docs/ai-diagnostic-reporting-plan.md"));
+        assertFalse(index.contains("docs/workbench-thin-packaging-roadmap.md"));
         String packagedIndex = Files.readString(packaged.resolve("docs/agent/repository-index.md"));
         assertFalse(packagedIndex.contains("docs/maintainer/"));
         assertFalse(packagedIndex.contains("docs/roadmaps/"));
+        assertFalse(packagedIndex.contains("docs/ai-diagnostic-reporting-plan.md"));
+        assertFalse(packagedIndex.contains("docs/workbench-thin-packaging-roadmap.md"));
+        String packagedReadme = Files.readString(packaged.resolve("docs/README.md"));
+        assertFalse(packagedReadme.contains("ai-diagnostic-reporting-plan.md"));
+        assertFalse(packagedReadme.contains("workbench-thin-packaging-roadmap.md"));
         assertTrue(Files.isRegularFile(Path.of("docs/maintainer/2.1.18-consumer-report-fixes.md")));
         assertTrue(Files.isRegularFile(Path.of("docs/roadmaps/workbench-cli-inventory.json")));
         assertTrue(Files.isRegularFile(Path.of("docs/tech-debt.md")));
+        assertTrue(Files.isRegularFile(Path.of("docs/ai-diagnostic-reporting-plan.md")));
+        assertTrue(Files.isRegularFile(Path.of("docs/workbench-thin-packaging-roadmap.md")));
+        String sourceIndex = Files.readString(Path.of("docs/agent/repository-index.md"));
+        assertTrue(sourceIndex.contains("docs/ai-diagnostic-reporting-plan.md"));
+        assertTrue(sourceIndex.contains("docs/workbench-thin-packaging-roadmap.md"));
     }
 }
