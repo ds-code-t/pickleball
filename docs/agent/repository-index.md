@@ -535,6 +535,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/resources/scenario-object/scenario-object.feature`
 - `src/test/resources/until-pass/literal-until-with-browser.feature`
 - `src/test/resources/until-pass/literal-until.feature`
+- `src/test/resources/workbench-help-golden.txt`
 - `src/test/resources/workspace-golden/plain-resolution.txt`
 - `src/test/resources/xml-table/xml-table.feature`
 

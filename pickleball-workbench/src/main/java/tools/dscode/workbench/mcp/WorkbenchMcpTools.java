@@ -68,7 +68,7 @@ final class WorkbenchMcpTools {
     }
 
     private void register() {
-        add("workbench_sync", "Synchronize the selected consumer project. Skips Maven/Gradle when Java/build/dependencies are unchanged; resources-only refresh when only features/config/data changed. Live buffer edits do not require this.", schema(Map.of()),
+        add("workbench_sync", "Synchronize the consumer project. Skips a rebuild when Java, the build, and dependencies are unchanged.", schema(Map.of()),
                 args -> services.synchronize());
         add("workbench_sync_status", "Read the current Workbench synchronization manifest.", schema(Map.of()),
                 args -> services.synchronizationStatus());
@@ -113,7 +113,7 @@ final class WorkbenchMcpTools {
                 schema(Map.of()),
                 args -> services.requestSave());
 
-        add("workbench_execute_step", "Execute raw Gherkin in the paused live scenario. A FAILED result leaves the worker paused so you can inspect or retry; it is not an MCP error and does not stop the worker.",
+        add("workbench_execute_step", "Execute raw Gherkin in the paused live scenario. FAILED stays paused and is not an MCP error.",
                 schema(Map.of(
                         "text", stringProperty("Gherkin step text."),
                         "argument", stringProperty("Optional DocString-style argument text.")
@@ -157,7 +157,7 @@ final class WorkbenchMcpTools {
                 args -> services.events(longValue(args, "afterSequence"), integer(args, "limit")));
         add("workbench_browser_page", "Read current browser page evidence.", schema(Map.of()),
                 args -> services.browserPage());
-        add("workbench_browser_screenshot", "Capture current browser screenshot evidence. Prefer workbench_browser_page or workbench_element_inspect unless the image itself is required.", schema(Map.of()),
+        add("workbench_browser_screenshot", "Capture the current browser screenshot. Prefer workbench_browser_page unless the image is required.", schema(Map.of()),
                 args -> services.browserScreenshot());
         add("workbench_element_inspect", "Inspect browser elements using Pickleball element vocabulary.",
                 schema(Map.of(
@@ -219,7 +219,7 @@ final class WorkbenchMcpTools {
                 args -> Map.of("removed", services.clearStepOverrides()));
 
         add("workbench_diagnostic_catalog",
-                "Read reports/diagnostic-runs/run-catalog.json as sparse JSON, including each run's pkb_run_profile when retained. Do not glob the diagnostic tree.",
+                "Read run-catalog.json as sparse JSON, including each run's retained pkb_run_profile. Do not glob.",
                 schema(Map.of()),
                 args -> services.diagnosticCatalog());
         add("workbench_diagnostic_run",
@@ -292,7 +292,7 @@ final class WorkbenchMcpTools {
                 )),
                 args -> retrieval("errors", args));
         add("workbench_investigation_emit",
-                "Write .pickleball/investigations/<id>/{investigation.json,report.html}. New handoffs always use that root path. A legacy v/<version>/investigations/<id> tree is still readable when the root path is absent. Returns the relative report.html path only. Does not copy the diagnostic pack or embed PNG bytes.",
+                "Write .pickleball/investigations/<id>/investigation.json and report.html. Returns the report path only.",
                 schema(Map.of(
                         "investigation", Map.of(
                                 "type", "object",
@@ -302,7 +302,7 @@ final class WorkbenchMcpTools {
                 ), "investigation"),
                 args -> services.emitInvestigation(investigationObject(args.get("investigation"))));
         add("workbench_go",
-                "Navigate Explorer, peek a retained-run file, or switch Report/Mapping/Terminal. UI attach plus a control lease are required to move the window. Headless: validate and echo the resolved target. Does not write files.",
+                "Navigate Explorer, Report, Mapping, or Terminal. Headless calls validate the target and do not write.",
                 schema(Map.of(
                         "link", Map.of(
                                 "type", "object",

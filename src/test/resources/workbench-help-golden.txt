@@ -1,0 +1,3 @@
+decide: discover, then plan, then run. plan lists the scenarios. run is confirm, or isolate then execute-step.
+Usage: query <runs|get|query|search|props|errors>
+fix: Usage: help <command>

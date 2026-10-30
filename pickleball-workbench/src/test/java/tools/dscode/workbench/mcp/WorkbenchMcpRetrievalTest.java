@@ -99,6 +99,17 @@ class WorkbenchMcpRetrievalTest {
         assertThrows(WorkbenchMcpTools.ToolFailure.class, () -> tools.call("wb_props", Map.of()));
     }
 
+    @Test
+    void everyToolDescriptionIsOneShortLine() {
+        WorkbenchMcpTools tools = new WorkbenchMcpTools(services(project), JSON);
+        assertTrue(tools.names().size() >= 40);
+        for (var spec : tools.specifications()) {
+            String description = spec.tool().description();
+            assertFalse(description.contains("\n"), spec.tool().name() + " " + description);
+            assertTrue(description.length() <= 160, spec.tool().name() + " " + description.length() + " " + description);
+        }
+    }
+
     private static WorkbenchServices services(Path project) {
         return (WorkbenchServices) Proxy.newProxyInstance(
                 WorkbenchServices.class.getClassLoader(),

@@ -82,6 +82,29 @@ class WorkbenchAgentUsabilityTest {
         }
         assertTrue(catalog.contains("PKB_WORKBENCH_TIMING=1"), catalog);
         assertTrue(catalog.contains("--json"), catalog);
+        assertTrue(catalog.contains("decide: discover, then plan, then run"), catalog);
+    }
+
+    @Test
+    void deprecatedFlagAliasesNormalizeToTheCanonicalFlag() throws Exception {
+        assertEquals("alias-1", parse("discover", "--runId=alias-1").coordination().runId());
+        assertEquals("ada", parse("note", "--agentId=ada", "--text=hi").coordination().agentId());
+        assertEquals("any", parse("inbox", "--to=all", "--text=hi").coordination().inboxTo());
+        WorkbenchCommandLine.Parsed session = parse("session", "info", "--run-id=alias-1");
+        assertEquals("session-info", session.command());
+        assertEquals("alias-1", session.coordination().id());
+        String unknown = WorkbenchCliHelp.unknown("disover");
+        assertTrue(unknown.contains("fix: Usage: help <command>"), unknown);
+        String golden = Files.readString(Path.of("src/test/resources/workbench-help-golden.txt"));
+        String catalog = WorkbenchCliHelp.catalog();
+        for (String line : golden.lines().map(String::strip).filter(item -> !item.isEmpty()).toList()) {
+            String haystack = line.startsWith("fix:") ? unknown : line.startsWith("Usage: query") ? WorkbenchCliHelp.usage("query") : catalog;
+            assertTrue(haystack.contains(line), line);
+        }
+    }
+
+    private static WorkbenchCommandLine.Parsed parse(String... args) {
+        return WorkbenchCommandLine.parse(args);
     }
 
     @Test

@@ -840,30 +840,72 @@ public final class DiagnosticQuery {
     }
 
     private static Scan logs(Path project, String runId) throws IOException {
-        Path file = project.resolve(".pickleball").resolve("agent-log");
-        if (!Files.isRegularFile(file)) return new Scan(List.of(), false);
-        List<String> lines = Files.readAllLines(file, StandardCharsets.UTF_8);
-        boolean capped = lines.size() > SCAN_LINES;
-        int start = capped ? lines.size() - SCAN_LINES : 0;
         List<Map<String, Object>> items = new ArrayList<>();
-        for (int index = start; index < lines.size(); index++) {
-            String line = lines.get(index);
-            if (line.isBlank()) continue;
-            String[] parts = line.split("\t", 6);
-            String text = parts.length >= 5 ? parts[4] : line;
-            String loggedRun = parts.length >= 3 ? parts[2] : null;
-            if (runId != null && loggedRun != null && !"-".equals(loggedRun) && !runId.equals(loggedRun)) continue;
-            Map<String, Object> item = new LinkedHashMap<>();
-            item.put("kind", "log");
-            item.put("id", Integer.toString(index + 1));
-            item.put("seq", index + 1);
-            item.put("source", "agent-log");
-            item.put("runId", "-".equals(loggedRun) ? null : loggedRun);
-            item.put("text", clip(text));
-            item.put("where", ".pickleball/agent-log");
-            items.add(item);
+        boolean capped = false;
+        Path file = project.resolve(".pickleball").resolve("agent-log");
+        if (Files.isRegularFile(file)) {
+            List<String> lines = Files.readAllLines(file, StandardCharsets.UTF_8);
+            capped = lines.size() > SCAN_LINES;
+            int start = capped ? lines.size() - SCAN_LINES : 0;
+            for (int index = start; index < lines.size(); index++) {
+                String line = lines.get(index);
+                if (line.isBlank()) continue;
+                String[] parts = line.split("\t", 6);
+                String text = parts.length >= 5 ? parts[4] : line;
+                String loggedRun = parts.length >= 3 ? parts[2] : null;
+                if (runId != null && loggedRun != null && !"-".equals(loggedRun) && !runId.equals(loggedRun)) continue;
+                Map<String, Object> item = new LinkedHashMap<>();
+                item.put("kind", "log");
+                item.put("id", Integer.toString(index + 1));
+                item.put("seq", index + 1);
+                item.put("source", "agent-log");
+                item.put("runId", "-".equals(loggedRun) ? null : loggedRun);
+                item.put("text", clip(text));
+                item.put("where", ".pickleball/agent-log");
+                items.add(item);
+            }
         }
+        capped = appendWorkerLogs(project, items) || capped;
         return new Scan(items, capped);
+    }
+
+    /** Last lines of worker stdout/stderr so agents can query them with the short log. */
+    private static boolean appendWorkerLogs(Path project, List<Map<String, Object>> items) throws IOException {
+        Path root = project.resolve(".pickleball");
+        if (!Files.isDirectory(root)) return false;
+        boolean capped = false;
+        try (var walk = Files.walk(root, 6)) {
+            List<Path> files = walk.filter(Files::isRegularFile)
+                    .filter(path -> {
+                        String name = path.getFileName() == null ? "" : path.getFileName().toString();
+                        return name.startsWith("worker-") && name.endsWith(".log");
+                    })
+                    .sorted()
+                    .toList();
+            int seq = items.size();
+            for (Path log : files) {
+                List<String> lines = Files.readAllLines(log, StandardCharsets.UTF_8);
+                int start = 0;
+                if (lines.size() > 40) {
+                    start = lines.size() - 40;
+                    capped = true;
+                }
+                for (int index = start; index < lines.size(); index++) {
+                    String line = lines.get(index);
+                    if (line.isBlank()) continue;
+                    seq++;
+                    Map<String, Object> item = new LinkedHashMap<>();
+                    item.put("kind", "log");
+                    item.put("id", "worker-" + seq);
+                    item.put("seq", seq);
+                    item.put("source", "worker");
+                    item.put("text", clip(line));
+                    item.put("where", relative(project, log));
+                    items.add(item);
+                }
+            }
+        }
+        return capped;
     }
 
     private static Map<String, Object> project(Map<String, Object> item, String fields) {

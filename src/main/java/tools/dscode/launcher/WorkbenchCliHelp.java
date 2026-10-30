@@ -70,6 +70,7 @@ final class WorkbenchCliHelp {
         StringBuilder text = new StringBuilder();
         text.append("Pickleball Workbench. help <command> prints usage. help <flag> prints that flag.\n");
         text.append("exit 0 ok, 1 failed, 2 usage. --json is one JSON object and no preamble.\n");
+        text.append("decide: discover, then plan, then run. plan lists the scenarios. run is confirm, or isolate then execute-step.\n");
         text.append("Timing is .pickleball/runs/<id>/launch-timing.txt. Stderr timing only when PKB_WORKBENCH_TIMING=1 or -Dpkb_workbench_timing=true.\n");
         text.append("Do not pass pkb_run_profile. Do not open the GUI to test yourself. isolate is the headless session.\n");
         text.append("run: discover confirm plan hint discover-hint resolve-runvars\n");
@@ -118,6 +119,7 @@ final class WorkbenchCliHelp {
         if (near != null) text.append("Did you mean: ").append(near).append('\n');
         text.append("Usage: help\n");
         text.append("Usage: help <command>\n");
+        text.append("fix: Usage: help <command>\n");
         return text.toString();
     }
 

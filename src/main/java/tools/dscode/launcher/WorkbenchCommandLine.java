@@ -129,7 +129,7 @@ final class WorkbenchCommandLine {
             System.arraycopy(args, 1, rewritten, 1, args.length - 1);
             args = rewritten;
         }
-        args = sessionQueryArgs(args);
+        args = sessionQueryArgs(normalizeFlags(args));
         Path cwd = Path.of("").toAbsolutePath().normalize();
         if (args == null || args.length == 0) {
             return new Parsed("ui", cwd, null, null, null, null, null, new String[]{"ui", cwd.toString()}, Coordination.empty(), null, false, false, false, List.of(), List.of(), null, null);
@@ -574,6 +574,29 @@ final class WorkbenchCommandLine {
     }
 
     /**
+     * Deprecated spellings of the canonical flags. {@code --runId} is {@code --run-id}.
+     * {@code --to=all} is {@code --to=any}. {@code session info --run-id=} is the positional id.
+     */
+    private static String[] normalizeFlags(String[] args) {
+        if (args == null) return null;
+        String[] copy = args.clone();
+        for (int index = 0; index < copy.length; index++) {
+            String token = copy[index];
+            if (token == null) continue;
+            if (token.startsWith("--runId=")) copy[index] = "--run-id=" + token.substring("--runId=".length());
+            else if ("--runId".equals(token)) copy[index] = "--run-id";
+            else if (token.startsWith("--agentId=")) copy[index] = "--agent-id=" + token.substring("--agentId=".length());
+            else if ("--agentId".equals(token)) copy[index] = "--agent-id";
+            else if (token.startsWith("--to=") && "all".equalsIgnoreCase(token.substring("--to=".length()))) {
+                copy[index] = "--to=any";
+            } else if ("--to".equals(token) && index + 1 < copy.length && "all".equalsIgnoreCase(copy[index + 1])) {
+                copy[index + 1] = "any";
+            }
+        }
+        return copy;
+    }
+
+    /**
      * {@code session list}, {@code session info}, {@code session hold}, and
      * {@code session release} read or update the descriptor. A bare
      * {@code session} stays the forwarded controller launch.
@@ -588,11 +611,17 @@ final class WorkbenchCommandLine {
         rewritten.add("session-" + verb);
         int index = 2;
         if (!"list".equals(verb)) {
-            if (args.length < 3 || isFlag(args[2])) {
-                throw new IllegalArgumentException("Usage: session " + verb + " <sessionId> [--json]");
+            if (args.length >= 3 && (args[2].startsWith("--run-id=") || args[2].startsWith("--id="))) {
+                rewritten.add("--id=" + args[2].substring(args[2].indexOf('=') + 1));
+                index = 3;
+            } else if (args.length < 3 || isFlag(args[2])) {
+                throw new IllegalArgumentException(
+                        "error: missing sessionId\nfix: Usage: session " + verb + " <sessionId> [--json]"
+                );
+            } else {
+                rewritten.add("--id=" + args[2]);
+                index = 3;
             }
-            rewritten.add("--id=" + args[2]);
-            index = 3;
         }
         for (int i = index; i < args.length; i++) rewritten.add(args[i]);
         return rewritten.toArray(String[]::new);
