@@ -993,8 +993,20 @@ class WorkbenchCliSurfaceCoverageTest {
     @Test
     void covers_flag_version() throws Exception {
         assertEquals("2.1.18", parse("use-version", "--version=2.1.18").version());
+        Capture missing = agent("use-version", temp.toString());
+        assertEquals(2, missing.code, missing.err);
+        assertTrue(missing.err.contains("Usage: use-version --version=<safe-version>"), missing.err);
+        Path version = tools.dscode.control.protocol.PickleballLocalLayout.versionRootForProject(temp, "2.1.18");
+        Files.createDirectories(version);
+        Files.writeString(version.resolve("AGENT-GUIDE.md"), "guide\n");
+        Files.writeString(version.resolve("GUIDANCE-MANIFEST.json"), "{\"pickleballVersion\":\"2.1.18\"}\n");
+        Capture absent = agent("use-version", temp.toString(), "--version=9.9.9");
+        assertEquals(1, absent.code, absent.err + absent.out);
+        assertTrue(absent.err.contains("export-guidance"), absent.err);
+        assertFalse(absent.out.contains("current="), absent.out);
         Capture capture = agent("use-version", temp.toString(), "--version=2.1.18");
-        assertTrue(capture.code == 0 || capture.err.contains("2.1.18") || capture.out.contains("2.1.18"), capture.out + capture.err);
+        assertEquals(0, capture.code, capture.err + capture.out);
+        assertTrue(capture.out.contains("current=2.1.18"), capture.out);
     }
 
     @Test
@@ -1139,6 +1151,17 @@ class WorkbenchCliSurfaceCoverageTest {
                 new String[]{"from-here", "--from-here=Given next"}
         ).fromHere);
         assertHeldCommand("from-here", "--from-here=Given next", "--ack-only", "\"fromHere\":\"Given next\"");
+    }
+
+    @Test
+    void playerAndWorkerVerbsPostToAHeldSession() throws Exception {
+        for (String verb : List.of(
+                "play", "pause", "save", "refresh",
+                "worker-start", "worker-restart", "worker-stop"
+        )) {
+            assertHeldCommand(verb, "\"op\":\"" + verb + "\"");
+        }
+        assertHeldCommand("from-here", "--from-here=4", "--ack-only", "\"op\":\"from-here\"", "\"fromHere\":\"4\"");
     }
 
     @Test

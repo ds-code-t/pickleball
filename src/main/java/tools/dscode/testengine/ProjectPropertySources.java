@@ -2,6 +2,7 @@ package tools.dscode.testengine;
 
 import java.io.InputStream;
 import java.net.URL;
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -12,7 +13,10 @@ import java.util.Properties;
 
 /**
  * The only reader for {@code pickleball.properties} and its local overlays.
- * The runner, Workbench dry-run, and {@code resolve-runvars} all call {@link #read}.
+ * A normal launch reads classpath resources as ISO-8859-1, which is what
+ * {@link Properties#load(InputStream)} did before 2.1.18. Project-root and
+ * {@code src/test/resources} files are a Workbench addition and are not part
+ * of a normal launch.
  */
 final class ProjectPropertySources {
     static final List<String> CLASSPATH_RESOURCES = List.of(
@@ -20,6 +24,10 @@ final class ProjectPropertySources {
             "pickleball_local.properties",
             "pickleball_local2.properties"
     );
+    /** Historical {@code Properties.load(InputStream)} encoding. */
+    static final Charset NORMAL_CHARSET = StandardCharsets.ISO_8859_1;
+    /** Encoding of the Workbench-only project files. */
+    static final Charset WORKBENCH_FILE_CHARSET = StandardCharsets.UTF_8;
 
     private ProjectPropertySources() {
     }
@@ -37,14 +45,28 @@ final class ProjectPropertySources {
     }
 
     /**
-     * Classpath resources first, then project files. Later sources overwrite earlier ones.
-     * Same order {@link PickleballRunner} used before this reader was shared.
+     * Classpath resources only, ISO-8859-1. Later classpath copies overwrite earlier ones.
+     * The path is ignored: a normal launch does not read project files.
      */
-    static LinkedHashMap<String, String> read(Path root) {
+    static LinkedHashMap<String, String> read(Path ignored) {
+        return readNormal();
+    }
+
+    static LinkedHashMap<String, String> readNormal() {
         LinkedHashMap<String, String> project = new LinkedHashMap<>();
         for (String resource : CLASSPATH_RESOURCES) {
             loadClasspath(resource, project);
         }
+        return project;
+    }
+
+    /**
+     * Workbench seed, dry-run, and protected-reference lookup. Classpath resources
+     * stay ISO-8859-1. Project-root and {@code src/test/resources} files are then
+     * read as UTF-8 and overwrite the classpath copy of the same key.
+     */
+    static LinkedHashMap<String, String> readWorkbench(Path root) {
+        LinkedHashMap<String, String> project = readNormal();
         for (Path file : files(root)) {
             loadFile(file, project);
         }
@@ -60,7 +82,7 @@ final class ProjectPropertySources {
                 URL url = resources.nextElement();
                 Properties props = new Properties();
                 try (InputStream in = url.openStream()) {
-                    props.load(new java.io.InputStreamReader(in, StandardCharsets.UTF_8));
+                    props.load(in);
                 }
                 copy(props, into);
             }
@@ -73,7 +95,7 @@ final class ProjectPropertySources {
         if (file == null || !Files.isRegularFile(file)) return;
         Properties props = new Properties();
         try (InputStream in = Files.newInputStream(file)) {
-            props.load(new java.io.InputStreamReader(in, StandardCharsets.UTF_8));
+            props.load(new java.io.InputStreamReader(in, WORKBENCH_FILE_CHARSET));
         } catch (Exception failure) {
             throw new IllegalStateException("Could not read project properties " + file, failure);
         }

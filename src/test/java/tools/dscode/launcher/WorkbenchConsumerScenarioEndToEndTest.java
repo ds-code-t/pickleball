@@ -82,8 +82,10 @@ class WorkbenchConsumerScenarioEndToEndTest {
         syncConsumer();
         String runId = "wb-ignore";
         Path mavenConfig = PROJECT.resolve(".mvn/maven.config");
+        byte[] previousConfig = Files.isRegularFile(mavenConfig) ? Files.readAllBytes(mavenConfig) : null;
         deleteRun(runId);
         try {
+            Files.createDirectories(mavenConfig.getParent());
             Files.writeString(mavenConfig, "-Dmaven.test.failure.ignore=true\n");
             Run discover = launchExec(
                     "discover", PROJECT.toString(),
@@ -94,11 +96,16 @@ class WorkbenchConsumerScenarioEndToEndTest {
             assertEquals(1, discover.exit, discover.text());
             assertTrue(discover.out.contains("summary status=FAILED"), discover.text());
             assertFalse(discover.out.contains("summary status=PASSED"), discover.text());
+            Path timing = AgentCoordination.runDirectory(PROJECT, runId).resolve("launch-timing.txt");
+            String timingText = Files.readString(timing);
+            assertTrue(timingText.contains("stage=maven-done"), timingText);
+            assertTrue(timingText.contains("exit=0"), timingText);
             String record = Files.readString(AgentCoordination.runDirectory(PROJECT, runId).resolve("record.json"));
             assertTrue(record.contains("FAILED"), record);
             assertFalse(record.contains("\"status\" : \"PASSED\"") || record.contains("\"status\": \"PASSED\""), record);
         } finally {
-            Files.deleteIfExists(mavenConfig);
+            if (previousConfig == null) Files.deleteIfExists(mavenConfig);
+            else Files.write(mavenConfig, previousConfig);
             deleteRun(runId);
         }
     }

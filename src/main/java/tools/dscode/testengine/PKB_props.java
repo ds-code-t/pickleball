@@ -204,9 +204,13 @@ public final class PKB_props {
         return PickleballProfiles.fingerprint(values);
     }
 
-    /** Dry-run and launch property files. Same reader the runner uses. */
+    /**
+     * Workbench property files. Classpath resources are ISO-8859-1. Project-root
+     * and {@code src/test/resources} files are UTF-8 and apply only on this path.
+     * A normal launch uses classpath resources alone.
+     */
     public static LinkedHashMap<String, String> readProjectProperties(java.nio.file.Path project) {
-        return ProjectPropertySources.read(project);
+        return ProjectPropertySources.readWorkbench(project);
     }
 
     /**

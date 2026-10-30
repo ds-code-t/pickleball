@@ -35,7 +35,7 @@ public final class ParityHookRunner extends PickleballRunner {
     @Override
     public void globalTestProperties() {
         mark("properties");
-        if ("properties".equals(mode()) || "both".equals(mode())) {
+        if ("properties".equals(mode()) || "both".equals(mode()) || "file-and-properties".equals(mode())) {
             values.put(PKB_props.PKB_BROWSER, "from-properties");
             values.put("pkb_hook_prop", "from-properties");
         }

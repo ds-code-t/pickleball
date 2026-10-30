@@ -750,6 +750,7 @@ tasks.test {
         includeEngines("junit-jupiter")
     }
     dependsOn("expandWoven")
+    dependsOn("publishToMavenLocal")
 
     // Put woven classes FIRST so they beat the unwoven dependency jars
     classpath = files(wovenExpanded) + classpath

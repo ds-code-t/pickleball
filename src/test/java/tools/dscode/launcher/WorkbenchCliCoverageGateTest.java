@@ -75,6 +75,13 @@ class WorkbenchCliCoverageGateTest {
                 "Workbench CLI coverage gate is red. Missing " + missing.size() + " behavior test(s):\n"
                         + String.join("\n", missing)
         );
+        String version = bodies.get("covers_flag_version");
+        assertTrue(version != null
+                        && version.contains("assertEquals(0")
+                        && version.contains("current=2.1.18")
+                        && version.contains("--version=2.1.18")
+                        && !version.contains("code == 0 ||"),
+                "covers_flag_version must switch a real exported version and assert exit 0");
     }
 
     private static void assertFlagsPresent(String source, List<String> flags) throws IOException {
@@ -134,6 +141,7 @@ class WorkbenchCliCoverageGateTest {
 
     private static boolean hasBehavior(String body) {
         if (body == null || !body.contains("assert")) return false;
+        if (body.contains("code == 0 ||")) return false;
         return body.contains("agent(")
                 || body.contains("session(")
                 || body.contains("discover(")

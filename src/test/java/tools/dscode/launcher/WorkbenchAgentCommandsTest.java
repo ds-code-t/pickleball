@@ -93,6 +93,7 @@ class WorkbenchAgentCommandsTest {
             assertFalse(output.stdout().contains("Recommended complete diagnostic Discover"));
             assertTrue(output.stdout().contains("NEXT: run discover"));
             assertTrue(output.stdout().contains("Dry-run resolve"));
+            assertTrue(output.stdout().contains("pkb_reportingmode=diagnostic"));
             assertTrue(output.stdout().contains("launcher JVM"));
             assertTrue(output.stdout().contains("not the Discover worker"));
             assertTrue(output.stdout().contains("Do not treat resolve-runvars as the environment Discover will use"));
@@ -118,6 +119,7 @@ class WorkbenchAgentCommandsTest {
 
         assertEquals(0, output.exitCode());
         assertTrue(output.stdout().contains("Dry-run resolve"));
+        assertTrue(output.stdout().contains("pkb_reportingmode=diagnostic"));
         assertTrue(output.stdout().contains("launcher JVM"));
         assertTrue(output.stdout().contains("not the Discover worker"));
         assertTrue(output.stdout().contains("Do not treat resolve-runvars as the environment Discover will use"));
@@ -1683,6 +1685,28 @@ class WorkbenchAgentCommandsTest {
         assertEquals(0, reseeded.exitCode(), reseeded.stderr());
         assertEquals("edge", Workspace.readRunVars(workspace).get("pkb_browser"));
         assertEquals("firefox", Workspace.readRunVars(Workspace.directory(tempDir, "run-b")).get("pkb_browser"));
+    }
+
+    @Test
+    void prepareDoesNotRewriteTheSavedCopyOnALaterRun() throws Exception {
+        WorkspaceLaunch.Prepared first = WorkspaceLaunch.prepare(
+                tempDir, "stable-1", null, "@smoke", null, null, null, null, null, List.of(), new StringBuilder()
+        );
+        Path file = Workspace.runvarsFile(first.workspace());
+        assertTrue(Files.readString(file).contains("pkb_reportingmode=diagnostic"));
+        Map<String, String> edited = new java.util.LinkedHashMap<>(Workspace.readRunVars(first.workspace()));
+        edited.put(PKB_props.PKB_BROWSER, "EDGE");
+        Workspace.writeRunVars(first.workspace(), edited);
+        byte[] snapshot = Files.readAllBytes(file);
+        java.nio.file.attribute.FileTime modified = Files.getLastModifiedTime(file);
+        Thread.sleep(30);
+        WorkspaceLaunch.prepare(
+                tempDir, "stable-1", null, "@smoke", null, null, null, null, null, List.of(), new StringBuilder()
+        );
+        assertEquals("EDGE", Workspace.readRunVars(first.workspace()).get(PKB_props.PKB_BROWSER));
+        assertEquals("diagnostic", Workspace.readRunVars(first.workspace()).get(PKB_props.PKB_REPORTING_MODE));
+        org.junit.jupiter.api.Assertions.assertArrayEquals(snapshot, Files.readAllBytes(file));
+        assertEquals(modified, Files.getLastModifiedTime(file));
     }
 
     private Output run(String... args) {

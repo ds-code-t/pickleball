@@ -61,7 +61,9 @@ class RunVarMatrixParityTest {
         write("src/test/resources/pickleball_local.properties", "pkb_parallel=2\n");
         write("src/test/resources/pickleball_local2.properties", "pkb_parallel=4\n");
 
-        Map<String, String> read = ProjectPropertySources.read(tempDir);
+        Map<String, String> normal = ProjectPropertySources.read(tempDir);
+        assertFalse(normal.containsKey("pkb_browser"), normal.toString());
+        Map<String, String> read = ProjectPropertySources.readWorkbench(tempDir);
         assertEquals("from-local2", read.get("pkb_browser"));
         assertEquals("from-test", read.get("pkb_environment"));
         assertEquals("file:configs", read.get("pkb_configpath"));

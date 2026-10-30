@@ -48,24 +48,32 @@ public class UntilPassBrowserSteps {
         CurrentScenarioState.registerScenarioObject("CHROME", driver);
     }
 
+    static String chromeBinary() {
+        return chromeBinary(System.getenv("PATH"));
+    }
+
     /**
      * First existing executable wins. A missing candidate is skipped.
      * {@code null} means do not call {@code setBinary}.
+     * Windows {@code .exe} names are searched beside the Unix names.
      */
-    static String chromeBinary() {
+    static String chromeBinary(String path) {
         List<String> candidates = new ArrayList<>();
         add(candidates, System.getenv("PKB_CHROME_BINARY"));
         add(candidates, System.getenv("CHROME_BINARY"));
         add(candidates, System.getProperty("pickleball.chrome.binary"));
         add(candidates, System.getProperty("webdriver.chrome.binary"));
         add(candidates, "/opt/pw-browsers/chromium_headless_shell-1248/chrome-headless-shell-linux64/chrome-headless-shell");
-        String path = System.getenv("PATH");
         if (path != null) {
             for (String dir : path.split(java.io.File.pathSeparator)) {
                 add(candidates, Path.of(dir, "chrome").toString());
+                add(candidates, Path.of(dir, "chrome.exe").toString());
                 add(candidates, Path.of(dir, "google-chrome").toString());
+                add(candidates, Path.of(dir, "google-chrome.exe").toString());
                 add(candidates, Path.of(dir, "chromium").toString());
+                add(candidates, Path.of(dir, "chromium.exe").toString());
                 add(candidates, Path.of(dir, "chrome-headless-shell").toString());
+                add(candidates, Path.of(dir, "chrome-headless-shell.exe").toString());
             }
         }
         Path bundled = Path.of("/opt/pw-browsers");
@@ -86,7 +94,9 @@ public class UntilPassBrowserSteps {
     private static boolean executableName(Path file) {
         String name = file.getFileName() == null ? "" : file.getFileName().toString();
         return "chrome".equals(name) || "google-chrome".equals(name) || "chromium".equals(name)
-                || "chrome-headless-shell".equals(name);
+                || "chrome-headless-shell".equals(name)
+                || "chrome.exe".equalsIgnoreCase(name) || "google-chrome.exe".equalsIgnoreCase(name)
+                || "chromium.exe".equalsIgnoreCase(name) || "chrome-headless-shell.exe".equalsIgnoreCase(name);
     }
 
     private static void add(List<String> candidates, String value) {

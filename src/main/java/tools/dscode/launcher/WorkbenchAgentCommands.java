@@ -421,12 +421,14 @@ public final class WorkbenchAgentCommands {
             body.put("sealed", resolved.sealed());
             body.put("runProfileFingerprint", resolved.fingerprint());
             body.put("pkb_run_profile", resolved.runProfile());
+            body.put("workbenchReportingModeDefault", "diagnostic");
             body.put("provenance", String.valueOf(resolved.provenance()));
             body.put("note", "Dry-run of this JVM. Not the Discover worker. Trust record.json after discover. Do not pass pkb_run_profile.");
             out.println(writeJson(body));
             return;
         }
         out.println("Dry-run resolve of the launcher JVM, not the Discover worker (does not start tests, browsers, or Discover):");
+        out.println("Workbench launch default when the saved copy is blank: pkb_reportingmode=diagnostic");
         out.println("Do not treat resolve-runvars as the environment Discover will use. Trust the environment on the run record after Discover.");
         out.println("sealed=" + resolved.sealed());
         out.println("pkb_run_profile=" + resolved.runProfile());

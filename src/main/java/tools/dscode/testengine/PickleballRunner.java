@@ -238,9 +238,12 @@ public abstract class PickleballRunner {
     }
 
     private void mergeProjectProperties(Path propertyRoot) {
-        Map<String, String> loaded = ProjectPropertySources.read(
-                propertyRoot == null ? Path.of("") : propertyRoot
-        );
+        Path root = propertyRoot == null ? Path.of("") : propertyRoot;
+        boolean workbenchLocations = Boolean.TRUE.equals(PREVIEW.get())
+                || WorkspaceSeed.captureKeepsParallelAuto();
+        Map<String, String> loaded = workbenchLocations
+                ? ProjectPropertySources.readWorkbench(root)
+                : ProjectPropertySources.readNormal();
         for (Map.Entry<String, String> entry : loaded.entrySet()) {
             String normalized = entry.getKey();
             String value = entry.getValue();
@@ -309,7 +312,7 @@ public abstract class PickleballRunner {
     }
 
     private static Map<String, String> readProjectProperties() {
-        return ProjectPropertySources.read(Path.of(""));
+        return ProjectPropertySources.readWorkbench(Path.of(""));
     }
 
     public static String getOptionsString() {

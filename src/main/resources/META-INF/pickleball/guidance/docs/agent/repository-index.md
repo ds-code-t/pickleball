@@ -59,6 +59,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/release-notes.md`
 - `docs/reserved-element-names.md`
 - `docs/roadmaps/2.1.17-workspace-config.md`
+- `docs/roadmaps/2.1.18-agent-retrieval.md`
 - `docs/roadmaps/2.1.18-direct-control-handoff.md`
 - `docs/roadmaps/2.1.18-workbench-coverage-findings.md`
 - `docs/roadmaps/2.1.18-workbench-full-coverage.md`
@@ -411,6 +412,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/launcher/WorkbenchRunReports.java`
 - `src/main/java/tools/dscode/launcher/WorkbenchRuntimeLibs.java`
 - `src/main/java/tools/dscode/launcher/WorkbenchSessionCommands.java`
+- `src/main/java/tools/dscode/launcher/WorkbenchShellQuoting.java`
 - `src/main/java/tools/dscode/launcher/WorkbenchTagFallback.java`
 - `src/main/java/tools/dscode/launcher/WorkspaceLaunch.java`
 - `src/main/java/tools/dscode/misc/DummySteps.java`
@@ -496,6 +498,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/WorkbenchRunReportsTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchSessionCommandsTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchSessionQueryTest.java`
+- `src/test/java/tools/dscode/launcher/WorkbenchShellQuotingTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchTagFallbackTest.java`
 - `src/test/java/tools/dscode/launcher/WorkspaceLaunchForkTest.java`
 - `src/test/java/tools/dscode/parallelutilities/ParallelCountEstimatorTest.java`
@@ -515,6 +518,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/testengine/parity/LaunchSeedMain.java`
 - `src/test/java/tools/dscode/testengine/Phase7SeedMain.java`
 - `src/test/java/tools/dscode/testengine/PlainResolutionGoldenTest.java`
+- `src/test/java/tools/dscode/testengine/ProjectPropertySourcesTest.java`
 - `src/test/java/tools/dscode/testengine/RunVarLaunchParityTest.java`
 - `src/test/java/tools/dscode/testengine/RunVarMatrixParityTest.java`
 - `src/test/java/tools/dscode/testengine/WorkspaceDriverProbe.java`
@@ -522,6 +526,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/testengine/WorkspaceLaunchTest.java`
 - `src/test/java/tools/dscode/testengine/WorkspaceSeedTest.java`
 - `src/test/java/tools/dscode/untilpass/UntilPassBrowserSteps.java`
+- `src/test/java/tools/dscode/untilpass/UntilPassChromeLookupTest.java`
 - `src/test/resources/expected-failure/release-216-expected-failure.feature`
 - `src/test/resources/launch-parity/observe.feature`
 - `src/test/resources/multiline-assert/multiline-assert.feature`

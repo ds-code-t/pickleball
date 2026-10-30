@@ -61,6 +61,13 @@ class RunVarLaunchParityTest {
                     assertTrue(profile.contains("caf\u00e9"), profile);
                     assertFalse(profile.contains("pkb_browser=from-defaults"), profile);
                 });
+        assertCell(outputRoot, "properties-hook-overrides-file", true, "file-and-properties", Map.of(),
+                "pkb_browser=from-file\npkb_hook_prop=from-file\n", profile -> {
+                    assertTrue(profile.contains("pkb_browser=from-properties"), profile);
+                    assertTrue(profile.contains("pkb_hook_prop=from-properties"), profile);
+                    assertFalse(profile.contains("pkb_browser=from-file"), profile);
+                    assertFalse(profile.contains("pkb_hook_prop=from-file"), profile);
+                });
         assertCell(outputRoot, "jvm-overrides-hooks", true, "both",
                 Map.of(PKB_props.PKB_BROWSER, "from-jvm"), null, profile -> {
                     assertTrue(profile.contains("pkb_browser=from-jvm"), profile);
@@ -152,8 +159,11 @@ class RunVarLaunchParityTest {
         } else {
             installRunner();
         }
+        Path classpathProps = null;
         if (properties != null) {
-            Files.writeString(project.resolve("src/test/resources/pickleball.properties"), properties, StandardCharsets.UTF_8);
+            classpathProps = project.resolve("props-cp");
+            Files.createDirectories(classpathProps);
+            Files.writeString(classpathProps.resolve("pickleball.properties"), properties, StandardCharsets.ISO_8859_1);
         }
         Path observed = project.resolve("observed.txt");
         Path hookFile = project.resolve("hooks.txt");
@@ -177,10 +187,10 @@ class RunVarLaunchParityTest {
         scenarioProps.add("-Dpickleball.parity.out=" + observed);
         if (withRunner) scenarioProps.add("-Dpickleball.parity.hookfile=" + hookFile);
         Run scenario = fork(project, java(scenarioProps, "tools.dscode.testengine.parity.LaunchObservationMain",
-                List.of(observed.toString())));
+                List.of(observed.toString()), classpathProps));
         assertEquals(0, scenario.exit, name + "\n" + scenario.text());
         Run dry = fork(project, java(shared, PickleballWorkbenchLauncher.class.getName(),
-                List.of("resolve-runvars", project.toString())));
+                List.of("resolve-runvars", project.toString()), classpathProps));
         assertEquals(0, dry.exit, name + "\n" + dry.text());
         String observedProfile = Files.readString(observed, StandardCharsets.UTF_8).trim();
         String dryProfile = profileLine(dry.out);
@@ -214,6 +224,10 @@ class RunVarLaunchParityTest {
     }
 
     private static List<String> java(List<String> properties, String main, List<String> args) {
+        return java(properties, main, args, null);
+    }
+
+    private static List<String> java(List<String> properties, String main, List<String> args, Path extraClasspathLast) {
         List<String> command = new ArrayList<>();
         command.add(Path.of(System.getProperty("java.home"), "bin", "java").toString());
         command.addAll(properties);
@@ -225,6 +239,9 @@ class RunVarLaunchParityTest {
         }
         String classpath = System.getProperty("java.class.path");
         if (output != null) classpath = output + java.io.File.pathSeparator + classpath;
+        if (extraClasspathLast != null) {
+            classpath = classpath + java.io.File.pathSeparator + extraClasspathLast.toAbsolutePath().normalize();
+        }
         command.add(classpath);
         command.add(main);
         command.addAll(args);

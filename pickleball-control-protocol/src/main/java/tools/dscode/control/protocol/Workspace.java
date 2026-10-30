@@ -425,7 +425,9 @@ public final class Workspace {
         String field = "\"" + FINGERPRINT_FIELD + "\"";
         String assignment = field + " : \"" + fingerprint + "\"";
         try {
-            String text = Files.isRegularFile(recordFile) ? Files.readString(recordFile) : "{\n}\n";
+            String text = Files.isRegularFile(recordFile) ? Files.readString(recordFile) : "";
+            if (!text.isEmpty() && text.contains(assignment)) return;
+            if (text.isEmpty()) text = "{\n}\n";
             String updated;
             if (text.contains(field)) {
                 updated = text.replaceAll(

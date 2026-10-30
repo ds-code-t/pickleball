@@ -130,7 +130,7 @@ class WorkbenchAgentUsabilityTest {
         Capture json = agent("resolve-runvars", temp.toString(), "--json");
         assertEquals(0, json.code, json.err);
         assertFalse(json.out.contains("Dry-run resolve"), json.out);
-        assertTrue(json.out.contains("\"runProfileFingerprint\""), json.out);
+        assertTrue(json.out.contains("\"workbenchReportingModeDefault\":\"diagnostic\""), json.out);
         assertTrue(json.out.contains("Trust record.json after discover"), json.out);
         assertEquals(1, json.out.strip().lines().count());
     }
