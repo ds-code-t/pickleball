@@ -212,33 +212,11 @@ public final class DirectControlProvider {
 
     private static void note(Path project, String runId, String event, String purpose) {
         if (project == null) return;
-        String line = String.join("\t",
-                Instant.now().toString(),
-                "-",
-                runId == null || runId.isBlank() ? "-" : one(runId),
-                one(event),
-                one(purpose),
-                "-"
-        );
-        Path file = PickleballLocalLayout.root(project).resolve("agent-log");
         try {
-            Files.createDirectories(file.getParent());
-            Files.writeString(
-                    file,
-                    line + "\n",
-                    StandardCharsets.UTF_8,
-                    StandardOpenOption.CREATE,
-                    StandardOpenOption.WRITE,
-                    StandardOpenOption.APPEND
-            );
+            AgentLog.append(project, Instant.now(), "-", runId, event, purpose, null);
         } catch (IOException failure) {
             throw new IllegalStateException("Could not append the short log: " + failure.getMessage(), failure);
         }
-    }
-
-    private static String one(String value) {
-        String cleaned = value == null ? "-" : value.replace('\t', ' ').replace('\n', ' ').replace('\r', ' ').trim();
-        return cleaned.isEmpty() ? "-" : cleaned;
     }
 
     private static String blank(String value) {

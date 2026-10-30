@@ -3,6 +3,7 @@ package tools.dscode.workbench.mcp;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.modelcontextprotocol.server.McpServerFeatures;
 import io.modelcontextprotocol.spec.McpSchema;
+import tools.dscode.control.protocol.AgentLog;
 import tools.dscode.control.protocol.ControlBridgeMappingSnapshot;
 import tools.dscode.control.protocol.DiagnosticQuery;
 import tools.dscode.workbench.WorkbenchServices;
@@ -10,6 +11,9 @@ import tools.dscode.workbench.nav.WorkbenchGoLink;
 import tools.dscode.workbench.lease.WorkbenchCallContext;
 import tools.dscode.workbench.lease.WorkbenchLeaseHolder;
 
+import java.io.IOException;
+import java.nio.file.Path;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -220,20 +224,31 @@ final class WorkbenchMcpTools {
                 args -> Map.of("removed", services.clearStepOverrides()));
 
         add("workbench_diagnostic_catalog",
-                "Read run-catalog.json as sparse JSON, including each run's retained pkb_run_profile. Do not glob.",
+                "Deprecated alias of wb_runs. Compact JSON including each run's retained pkb_run_profile. Do not glob.",
                 schema(Map.of()),
-                args -> services.diagnosticCatalog());
+                args -> retrieval("runs", args));
         add("workbench_diagnostic_run",
-                "Read one run's run-index.json and clusters.json, including the retained pkb_run_profile. Does not return events, traces, or screenshots.",
+                "Deprecated alias of wb_get. One run record including the retained pkb_run_profile. No events or screenshots.",
                 schema(Map.of("runId", stringProperty("Diagnostic run directory name from the catalog.")), "runId"),
-                args -> services.diagnosticRun(text(args, "runId")));
+                args -> {
+                    text(args, "runId");
+                    Map<String, Object> copy = new LinkedHashMap<>(args);
+                    copy.putIfAbsent("kind", "run");
+                    return retrieval("get", copy);
+                });
         add("workbench_diagnostic_summary",
-                "Read one scenario summary.json, including the retained pkb_run_profile. Does not return events.jsonl, traces, or PNG bytes.",
+                "Deprecated alias of wb_get. One scenario summary including the retained pkb_run_profile. No events.jsonl.",
                 schema(Map.of(
                         "runId", stringProperty("Diagnostic run directory name from the catalog."),
                         "scenarioId", stringProperty("Scenario directory name under that run.")
                 ), "runId", "scenarioId"),
-                args -> services.diagnosticScenarioSummary(text(args, "runId"), text(args, "scenarioId")));
+                args -> {
+                    text(args, "runId");
+                    text(args, "scenarioId");
+                    Map<String, Object> copy = new LinkedHashMap<>(args);
+                    copy.putIfAbsent("kind", "scenario");
+                    return retrieval("get", copy);
+                });
         add("wb_runs",
                 "List retained diagnostic runs as compact JSON. Default limit 20 plus cursor.",
                 schema(Map.of(
@@ -337,7 +352,25 @@ final class WorkbenchMcpTools {
         }
         DiagnosticQuery.Outcome outcome = DiagnosticQuery.query(services.projectRoot(), request);
         if (outcome.exit() != 0) throw new ToolFailure(outcome.body());
+        appendQueryLog(op, args);
         return outcome.body();
+    }
+
+    /** Same columns as a successful launcher {@code query}: event {@code query}, purpose is the verb. */
+    private void appendQueryLog(String op, Map<String, Object> args) {
+        Path project = services.projectRoot();
+        if (project == null) return;
+        String run = null;
+        if (args != null) {
+            Object value = args.get("runId");
+            if (value instanceof String text && !text.isBlank()) run = text;
+            else if (value != null && !String.valueOf(value).isBlank()) run = String.valueOf(value);
+        }
+        try {
+            AgentLog.append(project, Instant.now(), "-", run, "query", op, null);
+        } catch (IOException ignored) {
+            // The JSON answer is already computed. A short-log failure does not hide it.
+        }
     }
 
     static final class ToolFailure extends RuntimeException {

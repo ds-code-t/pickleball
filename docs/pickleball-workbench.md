@@ -559,7 +559,7 @@ workbench_step_override_remove
 workbench_step_override_clear
 ```
 
-Sparse diagnostic readers (do not glob `reports/diagnostic-runs`; these return JSON only and do not dump events, traces, or PNG bytes). Catalog, run-index, and summary payloads include the retained `pkb_run_profile` when present:
+Sparse diagnostic readers. Do not glob `reports/diagnostic-runs`. Prefer `query` and the six `wb_*` tools. The three older names are deprecated aliases of that same path (`workbench_diagnostic_catalog` is `wb_runs`; `workbench_diagnostic_run` and `workbench_diagnostic_summary` are `wb_get`). They return compact JSON, not a file dump, and do not include `events.jsonl`, traces, or PNG bytes. Retained `pkb_run_profile` is `wb_props` / `query props`. Each successful call appends one `query` line to `.pickleball/agent-log`, the same line the launcher writes:
 
 ```text
 workbench_diagnostic_catalog
@@ -567,7 +567,7 @@ workbench_diagnostic_run
 workbench_diagnostic_summary
 ```
 
-The same files are also queried, not globbed, by the launcher `query` command and by six thin MCP forwarders (`wb_runs`, `wb_get`, `wb_query`, `wb_search`, `wb_props`, `wb_errors`). They share `DiagnosticQuery`. Default output is compact JSON with `where`, a small limit, and `…+N more, use cursor`. Worker `worker-*.log` tails are included when the kind is `log`. `help` says discover, then plan, then run. Usage text is one table (`WorkbenchCliHelp`). A failure is `error:` and `fix:` (the table row, or the nearest command). `--runId` means `--run-id`, `--agentId` means `--agent-id`, and `--to=all` means `--to=any`; each deprecated spelling prints one `notice:` line. `session info|hold|release --run-id` is the session id. Wrapper launches pass arguments as a `ProcessBuilder` list, so they are not shell-quoted. A PowerShell `-Command` string uses `WorkbenchShellQuoting` (single quotes, apostrophe doubled); that is the Windows proxy download, the browser file version, and `Unblock-File`. See [Diagnostic query](diagnostic-query.md).
+The same files are also queried, not globbed, by the launcher `query` command and by six thin MCP forwarders (`wb_runs`, `wb_get`, `wb_query`, `wb_search`, `wb_props`, `wb_errors`). They share `DiagnosticQuery`. `RunIndexFinder` is the only run-index locator (`AgentCoordination.findRunIndex` delegates to it). Default output is compact JSON with `where`, a small limit, and `…+N more, use cursor`. Worker `worker-*.log` tails are included when the kind is `log`. A successful MCP retrieval writes the same short-log line as `query`. `help` says discover, then plan, then run. Usage text is one table (`WorkbenchCliHelp`). A failure is `error:` and `fix:` (the table row, or the nearest command). `--runId` means `--run-id`, `--agentId` means `--agent-id`, and `--to=all` means `--to=any`; each deprecated spelling prints one `notice:` line. `session info|hold|release --run-id` is the session id. Wrapper launches pass arguments as a `ProcessBuilder` list, so they are not shell-quoted. A PowerShell `-Command` string uses `WorkbenchShellQuoting` (single quotes, apostrophe doubled); that is the Windows proxy download, the browser file version, and `Unblock-File`. See [Diagnostic query](diagnostic-query.md).
 
 Human investigation handoff (writes `.pickleball/investigations/<id>/` and returns the relative `report.html` path only):
 

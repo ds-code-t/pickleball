@@ -4,9 +4,11 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
+import tools.dscode.control.protocol.AgentLog;
 import tools.dscode.control.protocol.ControlProtocol;
 import tools.dscode.control.protocol.PickleballLocalLayout;
 import tools.dscode.control.protocol.PickleballVersion;
+import tools.dscode.control.protocol.RunIndexFinder;
 import tools.dscode.control.protocol.WindowDriver;
 import tools.dscode.testengine.PKB_props;
 import tools.dscode.testengine.PickleballRunner;
@@ -63,7 +65,7 @@ public final class AgentCoordination {
     public static final Duration POST_TTL = Duration.ofHours(24);
     public static final Duration RUN_PAYLOAD_STALE = Duration.ofHours(24);
     public static final long HISTORY_MAX_BYTES = 10L * 1024L * 1024L;
-    public static final int PURPOSE_LIMIT = 240;
+    public static final int PURPOSE_LIMIT = AgentLog.PURPOSE_LIMIT;
 
     private static final ObjectMapper JSON = new ObjectMapper()
             .enable(SerializationFeature.INDENT_OUTPUT);
@@ -528,26 +530,16 @@ public final class AgentCoordination {
             Path record
     ) throws IOException {
         Instant clock = when == null ? Instant.now() : when;
-        String line = String.join("\t",
-                clock.toString(),
-                oneField(agentId),
-                oneField(runId),
-                oneField(event),
-                oneLine(purpose),
-                record == null ? "-" : oneField(record.toString())
+        AgentLog.append(
+                project,
+                clock,
+                agentId,
+                runId,
+                event,
+                purpose,
+                record == null ? null : record.toString()
         );
-        Path file = logFile(project);
-        Files.createDirectories(file.getParent());
-        byte[] bytes = (line + "\n").getBytes(StandardCharsets.UTF_8);
-        try (FileChannel channel = FileChannel.open(
-                file,
-                StandardOpenOption.CREATE,
-                StandardOpenOption.WRITE,
-                StandardOpenOption.APPEND
-        )) {
-            channel.write(ByteBuffer.wrap(bytes));
-        }
-        pruneIfStale(project, file, clock);
+        pruneIfStale(project, logFile(project), clock);
     }
 
     public static List<String> readLog(Path project) throws IOException {
@@ -951,11 +943,7 @@ public final class AgentCoordination {
     }
 
     public static String oneLine(String value) {
-        if (value == null || value.isBlank()) return "-";
-        String collapsed = value.replace('\t', ' ').replace('\r', ' ').replace('\n', ' ').strip();
-        if (collapsed.isEmpty()) return "-";
-        if (collapsed.length() <= PURPOSE_LIMIT) return collapsed;
-        return collapsed.substring(0, PURPOSE_LIMIT);
+        return AgentLog.oneLine(value);
     }
 
     private static List<InboxNote> readInbox(Path project, String agentId, boolean take) {
@@ -1460,44 +1448,12 @@ public final class AgentCoordination {
      * so a recorded data path can be opened on either host.
      */
     public static Path flexiblePath(String raw) {
-        if (raw == null || raw.isBlank()) return null;
-        String text = raw.trim();
-        if (text.startsWith("\\\\?\\")) text = text.substring(4);
-        return Path.of(text.replace('\\', '/'));
+        return RunIndexFinder.flexible(raw);
     }
 
     /** Private diagnostic index, then the flat private index, then the shared run index. */
     public static Path findRunIndex(Path project, String runId) {
-        if (project == null || runId == null || runId.isBlank()) return null;
-        Path runDir;
-        try {
-            runDir = runDirectory(project, runId);
-        } catch (RuntimeException failure) {
-            return null;
-        }
-        List<Path> candidates = new ArrayList<>();
-        candidates.add(runDir.resolve("diagnostic").resolve(runId).resolve("run-index.json"));
-        candidates.add(runDir.resolve("diagnostic").resolve("run-index.json"));
-        candidates.add(project.resolve("reports").resolve("diagnostic-runs").resolve(runId).resolve("run-index.json"));
-        Path record = runDir.resolve(RECORD_FILE);
-        if (Files.isRegularFile(record)) {
-            try {
-                String dataPath = JSON.readTree(record.toFile()).path("dataPath").asText("");
-                Path data = flexiblePath(dataPath);
-                if (data != null) {
-                    candidates.add(data.resolve("diagnostic").resolve(runId).resolve("run-index.json"));
-                    candidates.add(data.resolve("diagnostic").resolve("run-index.json"));
-                }
-            } catch (IOException ignored) {
-                // A record that cannot be read is not an index.
-            }
-        }
-        for (Path candidate : candidates) {
-            if (candidate != null && Files.isRegularFile(candidate)) return candidate;
-        }
-        Path walked = walkRunIndex(runDir, runId);
-        if (walked != null) return walked;
-        return walkRunIndex(project.resolve("reports").resolve("diagnostic-runs").resolve(runId), runId);
+        return RunIndexFinder.find(project, runId);
     }
 
     public static DiagnosticSignal readDiagnosticSignal(Path project, String runId) {
@@ -1508,30 +1464,6 @@ public final class AgentCoordination {
         } catch (IOException failure) {
             return null;
         }
-    }
-
-    private static Path walkRunIndex(Path root, String runId) {
-        if (root == null || !Files.isDirectory(root)) return null;
-        try (var walk = Files.walk(root, 6)) {
-            for (Path path : walk.filter(Files::isRegularFile).toList()) {
-                if (path.getFileName() == null || !"run-index.json".equals(path.getFileName().toString())) continue;
-                if (skipFailureScan(root, path)) continue;
-                Path parent = path.getParent();
-                if (parent != null && parent.getFileName() != null && runId.equals(parent.getFileName().toString())) {
-                    return path;
-                }
-                try {
-                    if (Files.size(path) > 2_000_000L) continue;
-                    String id = JSON.readTree(path.toFile()).path("runId").asText("");
-                    if (runId.equals(id)) return path;
-                } catch (IOException ignored) {
-                    // An unreadable index is not this run.
-                }
-            }
-        } catch (IOException ignored) {
-            return null;
-        }
-        return null;
     }
 
     private static DiagnosticSignal signalFromIndex(JsonNode root, Path index) {

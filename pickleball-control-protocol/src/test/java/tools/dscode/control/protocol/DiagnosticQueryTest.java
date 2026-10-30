@@ -163,6 +163,38 @@ class DiagnosticQueryTest {
         assertTrue(logs.json().contains("worker-1.err.log"), logs.json());
     }
 
+    @Test
+    void deepRunIndexUsesTheSharedFinderAndSkipsProfileDirs() throws Exception {
+        Path index = project.resolve(".pickleball/runs/run-deep/a/b/c/d/run-deep/run-index.json");
+        Files.createDirectories(index.getParent());
+        Files.writeString(index, "{\"runId\":\"ignored\",\"outcome\":\"FAILED\",\"failureSummary\":\"deep boom\"}");
+        Path skipped = project.resolve(".pickleball/runs/run-deep/browser-profile/run-deep/run-index.json");
+        Files.createDirectories(skipped.getParent());
+        Files.writeString(skipped, "{\"runId\":\"run-deep\",\"outcome\":\"PASSED\"}");
+        Files.createDirectories(project.resolve("reports/diagnostic-runs"));
+        Files.writeString(project.resolve("reports/diagnostic-runs/run-catalog.json"),
+                "{\"runs\":[{\"runId\":\"run-deep\"}]}");
+        DiagnosticQuery.Outcome got = DiagnosticQuery.query(project, Map.of("op", "get", "runId", "run-deep"));
+        assertEquals(0, got.exit(), got.json());
+        assertTrue(got.json().contains("FAILED"), got.json());
+        assertTrue(got.json().contains("a/b/c/d/run-deep/run-index.json"), got.json());
+        assertFalse(got.json().contains("browser-profile"), got.json());
+    }
+
+    @Test
+    void sharedDirectoryWithoutAnIndexStillResolves() throws Exception {
+        Path scenario = project.resolve("reports/diagnostic-runs/run-bare/scenarios/scene");
+        Files.createDirectories(scenario);
+        Files.writeString(scenario.resolve("summary.json"), "{\"name\":\"Bare\",\"outcome\":\"PASSED\"}");
+        Files.writeString(project.resolve("reports/diagnostic-runs/run-catalog.json"),
+                "{\"runs\":[{\"runId\":\"run-bare\",\"outcome\":\"PASSED\"}]}");
+        DiagnosticQuery.Outcome got = DiagnosticQuery.query(project, Map.of(
+                "op", "get", "runId", "run-bare", "kind", "scenario", "scenarioId", "scene"
+        ));
+        assertEquals(0, got.exit(), got.json());
+        assertTrue(got.json().contains("Bare"), got.json());
+    }
+
     private void writeFixture() throws Exception {
         Path root = project.resolve("reports/diagnostic-runs");
         Path scenario = root.resolve("run-1/scenarios/scenario-1");

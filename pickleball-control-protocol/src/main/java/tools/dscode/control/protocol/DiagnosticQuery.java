@@ -439,57 +439,11 @@ public final class DiagnosticQuery {
     }
 
     static Resolved resolve(Path project, String runId) throws IOException {
-        List<Path> candidates = new ArrayList<>();
-        Path runDir = project.resolve(".pickleball").resolve("runs").resolve(runId);
-        candidates.add(runDir.resolve("diagnostic").resolve(runId).resolve("run-index.json"));
-        candidates.add(runDir.resolve("diagnostic").resolve("run-index.json"));
-        Path shared = project.resolve("reports").resolve("diagnostic-runs").resolve(runId).resolve("run-index.json");
-        candidates.add(shared);
-        Path record = runDir.resolve("record.json");
-        if (Files.isRegularFile(record)) {
-            try {
-                Map<String, Object> body = JsonLite.object(readJson(record));
-                String dataPath = body == null ? null : str(body.get("dataPath"));
-                Path data = flexible(dataPath);
-                if (data != null) {
-                    candidates.add(data.resolve("diagnostic").resolve(runId).resolve("run-index.json"));
-                    candidates.add(data.resolve("diagnostic").resolve("run-index.json"));
-                }
-            } catch (RuntimeException ignored) {
-                // An unreadable record is not an index.
-            }
-        }
-        for (Path candidate : candidates) {
-            if (candidate != null && Files.isRegularFile(candidate)) {
-                return new Resolved(candidate, candidate.getParent(), relative(project, candidate));
-            }
-        }
-        Path walked = walkIndex(runDir, runId);
-        if (walked == null) walked = walkIndex(shared.getParent(), runId);
-        if (walked != null) return new Resolved(walked, walked.getParent(), relative(project, walked));
-        Path sharedRoot = shared.getParent();
+        Path found = RunIndexFinder.find(project, runId);
+        if (found != null) return new Resolved(found, found.getParent(), relative(project, found));
+        Path sharedRoot = project.resolve("reports").resolve("diagnostic-runs").resolve(runId);
         if (Files.isDirectory(sharedRoot)) return new Resolved(null, sharedRoot, relative(project, sharedRoot));
         return new Resolved(null, null, null);
-    }
-
-    private static Path walkIndex(Path root, String runId) throws IOException {
-        if (root == null || !Files.isDirectory(root)) return null;
-        try (var walk = Files.walk(root, 5)) {
-            for (Path path : walk.filter(Files::isRegularFile).toList()) {
-                if (path.getFileName() == null || !"run-index.json".equals(path.getFileName().toString())) continue;
-                if (Files.size(path) > FILE_BYTES) continue;
-                try {
-                    Map<String, Object> body = JsonLite.object(readJson(path));
-                    if (body != null && runId.equals(str(body.get("runId")))) return path;
-                } catch (RuntimeException ignored) {
-                    Path parent = path.getParent();
-                    if (parent != null && parent.getFileName() != null && runId.equals(parent.getFileName().toString())) {
-                        return path;
-                    }
-                }
-            }
-        }
-        return null;
     }
 
     private static Map<String, Object> runItem(Path project, Map<String, Object> row) throws IOException {
@@ -1015,13 +969,6 @@ public final class DiagnosticQuery {
         } catch (RuntimeException failure) {
             return file.getFileName() == null ? "" : file.getFileName().toString();
         }
-    }
-
-    private static Path flexible(String raw) {
-        if (raw == null || raw.isBlank()) return null;
-        String text = raw.trim();
-        if (text.startsWith("\\\\?\\")) text = text.substring(4);
-        return Path.of(text.replace('\\', '/'));
     }
 
     private static boolean safeId(String id) {
