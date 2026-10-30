@@ -18,7 +18,7 @@ From the consumer project, with Pickleball on the test classpath (`classpathScop
 mvnw -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java "-Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher" "-Dexec.classpathScope=test" "-Dexec.args=discover"
 ```
 
-Windows is the same command with `mvnw.cmd`. A Gradle consumer that exposes the launcher task uses `gradlew` or `gradlew.bat`.
+Windows is the same command with `mvnw.cmd`. A Gradle consumer that exposes the launcher task uses `gradlew` or `gradlew.bat`. The launcher and the wrapper are argument arrays. Do not shell-quote those. Quote only when you paste a value into a PowerShell `-Command` string: single quotes, and an apostrophe is doubled (`WorkbenchShellQuoting`).
 
 Same launcher for `hint`, `discover`, `confirm`, `plan`, `resolve-runvars`, `workspace-show`, `workspace-edit`, `workspace-seed`, `short-log`, `note`, `inbox`, `finish`, `presence`, `post`, `history`, `gc-runs`, `gc-versions`, `use-version`, `isolate`, `execute-step`, `status`, `events`, `stop`, `open-scenario`, `example`, `play`, `from-here`, `pause`, `insert-step`, `update-step`, `diagnostic-run`, `save`, `refresh`, `session-sync`, `worker-start`, `worker-restart`, `worker-stop`, `open-window`, `close-window`, `show-run`, `inspect-page`, `find-element`, `session list`, `session info`, `session hold`, and `session release` — change `exec.args` only.
 
