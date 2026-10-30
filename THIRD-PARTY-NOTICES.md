@@ -26,7 +26,7 @@ The following components are licensed under the Apache License 2.0:
 - com.aventstack:extentreports:5.1.2
 - com.epam.reportportal:client-java:5.4.8
 
-- org.seleniumhq.selenium:selenium-java:4.38.0
+- org.seleniumhq.selenium:selenium-java:[4.44,5.0)
 - org.apache.poi:poi-ooxml:5.5.1
 
 - com.googlecode.aviator:aviator:5.4.3
