@@ -51,7 +51,9 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/java-values.md`
 - `docs/key-parser-dsl.md`
 - `docs/log-and-assert-steps.md`
+- `docs/maintainer/2.1.18-consumer-report-2.md`
 - `docs/maintainer/2.1.18-consumer-report-fixes.md`
+- `docs/maintainer/2.1.18-meta-deep-dive.md`
 - `docs/mapping-and-templating.md`
 - `docs/nested-steps.md`
 - `docs/object-registration.md`
