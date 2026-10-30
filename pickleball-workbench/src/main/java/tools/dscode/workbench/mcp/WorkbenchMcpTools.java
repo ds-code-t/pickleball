@@ -113,7 +113,7 @@ final class WorkbenchMcpTools {
                 schema(Map.of()),
                 args -> services.requestSave());
 
-        add("workbench_execute_step", "Execute raw Gherkin in the paused live scenario. FAILED stays paused and is not an MCP error.",
+        add("workbench_execute_step", "Execute raw Gherkin in the paused live scenario. A FAILED result does not stop the worker and is not an MCP error.",
                 schema(Map.of(
                         "text", stringProperty("Gherkin step text."),
                         "argument", stringProperty("Optional DocString-style argument text.")
