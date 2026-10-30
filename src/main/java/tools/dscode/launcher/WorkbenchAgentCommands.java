@@ -413,9 +413,9 @@ public final class WorkbenchAgentCommands {
             String next,
             PrintStream out
     ) {
-        PKB_props.ResolvedRunVars resolved = tools.dscode.testengine.PickleballRunner.previewLaunch(project);
-        // Hint and resolve-runvars share this preview. A normal launch always merges
-        // JVM system properties, so includeAmbient is not a second resolver.
+        PKB_props.ResolvedRunVars resolved = tools.dscode.testengine.PickleballRunner.previewLaunch(project, includeAmbient);
+        // Hint and resolve-runvars share this preview. Hint (includeAmbient=false) resolves
+        // only from project/workspace files so the caller JVM's -D values do not leak.
         if (project == null && includeAmbient) {
             project = Path.of("");
         }

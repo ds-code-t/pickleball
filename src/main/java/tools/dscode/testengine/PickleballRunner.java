@@ -63,6 +63,7 @@ public abstract class PickleballRunner {
     private static volatile PickleballRunner INSTANCE;
     private static final ThreadLocal<Boolean> PREVIEW = new ThreadLocal<>();
     private static final ThreadLocal<Path> PREVIEW_PROJECT = new ThreadLocal<>();
+    private static final ThreadLocal<Boolean> PREVIEW_PROJECT_ONLY = new ThreadLocal<>();
 
     protected final LinkedHashMap<String, String> values = new LinkedHashMap<>();
     private final Map<String, String> readOnlyValues = Collections.unmodifiableMap(values);
@@ -81,6 +82,15 @@ public abstract class PickleballRunner {
      * reads the saved copy and does not call this again.
      */
     public static PKB_props.ResolvedRunVars previewLaunch(Path project) {
+        return previewLaunch(project, true);
+    }
+
+    /**
+     * Dry-run like {@link #previewLaunch(Path)}. With {@code includeJvm=false} the preview
+     * resolves only from hooks and project/workspace property files and ignores this JVM's
+     * system properties (used by hint, so a live suite's {@code -Dpkb_parallel=80} does not leak).
+     */
+    public static PKB_props.ResolvedRunVars previewLaunch(Path project, boolean includeJvm) {
         synchronized (PickleballRunner.class) {
             Path root = project == null
                     ? Path.of("").toAbsolutePath().normalize()
@@ -89,6 +99,7 @@ public abstract class PickleballRunner {
             PickleballRunner previous = INSTANCE;
             PREVIEW.set(Boolean.TRUE);
             PREVIEW_PROJECT.set(root);
+            if (!includeJvm) PREVIEW_PROJECT_ONLY.set(Boolean.TRUE);
             try {
                 PickleballRunner created = type.getDeclaredConstructor().newInstance();
                 if (created.previewResult == null) {
@@ -103,6 +114,7 @@ public abstract class PickleballRunner {
             } finally {
                 PREVIEW.remove();
                 PREVIEW_PROJECT.remove();
+                PREVIEW_PROJECT_ONLY.remove();
                 INSTANCE = previous;
             }
         }
@@ -455,7 +467,12 @@ public abstract class PickleballRunner {
     /** The live runner, or null when no suite has started. Does not bootstrap one. */
     public static PickleballRunner rawInstance() { return INSTANCE; }
 
+    private static boolean previewIgnoresJvm() {
+        return Boolean.TRUE.equals(PREVIEW.get()) && Boolean.TRUE.equals(PREVIEW_PROJECT_ONLY.get());
+    }
+
     private void mergeAllSystemProperties() {
+        if (previewIgnoresJvm()) return;
         Properties sys = System.getProperties();
         int count = 0;
         int skipped = 0;
@@ -482,6 +499,10 @@ public abstract class PickleballRunner {
      * fail-closed on mixed controls.
      */
     private void suppressNonInvocationControlsWhenSealed() {
+        if (previewIgnoresJvm()) {
+            stripNonInvocationControlsWhenSealed(values, false, false);
+            return;
+        }
         boolean profileFromJvm = notBlank(System.getProperty(PKB_PROFILE));
         boolean runVarsFromJvm = notBlank(System.getProperty(PKB_RUN_VARS));
         if (!runVarsFromJvm) {
@@ -535,7 +556,7 @@ public abstract class PickleballRunner {
                     values.putIfAbsent(key.toLowerCase(Locale.ROOT), reportPortal.getProperty(key));
                 }
             }
-            Properties system = System.getProperties();
+            Properties system = previewIgnoresJvm() ? new Properties() : System.getProperties();
             for (String key : system.stringPropertyNames()) {
                 String canonical = normalizeConfigurationKey(key);
                 if (canonical == null || !canonical.startsWith("rp.")) continue;

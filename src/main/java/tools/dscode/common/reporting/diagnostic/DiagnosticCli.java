@@ -125,7 +125,7 @@ public final class DiagnosticCli {
             PrintStream out,
             boolean includeAmbient
     ) throws IOException {
-        PKB_props.ResolvedRunVars resolved = tools.dscode.testengine.PickleballRunner.previewLaunch(project);
+        PKB_props.ResolvedRunVars resolved = tools.dscode.testengine.PickleballRunner.previewLaunch(project, includeAmbient);
         if (project == null && includeAmbient) {
             project = Path.of("");
         }
