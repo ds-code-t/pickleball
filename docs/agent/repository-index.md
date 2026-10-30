@@ -68,6 +68,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/roadmaps/2.1.18-workbench-full-coverage.md`
 - `docs/service-call-scenarios.md`
 - `docs/step-overrides.md`
+- `docs/workbench-agent-detail.md`
 - `docs/workbench-thin-packaging-roadmap.md`
 
 ## Framework Java and AspectJ source

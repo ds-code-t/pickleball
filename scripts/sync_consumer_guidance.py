@@ -39,6 +39,16 @@ MAX_REFERENCE_TOTAL_BYTES = 10 * 1024 * 1024
 MAINTAINER_ONLY_DOCS = (
     "docs/tech-debt.md",
 )
+MAINTAINER_ONLY_PREFIXES = (
+    "docs/maintainer/",
+    "docs/roadmaps/",
+)
+
+
+def excluded_consumer_doc(doc_path: str) -> bool:
+    if doc_path in MAINTAINER_ONLY_DOCS:
+        return True
+    return any(doc_path.startswith(prefix) for prefix in MAINTAINER_ONLY_PREFIXES)
 
 
 def is_maintainer_local(path: Path) -> bool:
@@ -109,11 +119,10 @@ def expected_files() -> dict[str, bytes]:
 
     files["AGENT-GUIDE.md"] = AGENT_SOURCE.read_bytes()
 
-    excluded = set(MAINTAINER_ONLY_DOCS)
     for source in sorted(DOCS_ROOT.rglob("*.md")):
         relative = source.relative_to(DOCS_ROOT).as_posix()
         doc_path = f"docs/{relative}"
-        if doc_path in excluded:
+        if excluded_consumer_doc(doc_path):
             continue
         files[doc_path] = consumer_doc_bytes(doc_path, source)
 
@@ -124,6 +133,13 @@ def expected_files() -> dict[str, bytes]:
 
 def consumer_doc_bytes(relative: str, source: Path) -> bytes:
     data = source.read_bytes()
+    if relative == "docs/agent/repository-index.md":
+        text = data.decode("utf-8")
+        kept = [
+            line for line in text.splitlines(keepends=True)
+            if "docs/maintainer/" not in line and "docs/roadmaps/" not in line
+        ]
+        data = "".join(kept).encode("utf-8")
     if Path(relative).name != "README.md":
         return data
     return strip_maintainer_only_sections(data.decode("utf-8")).encode("utf-8")

@@ -77,6 +77,15 @@ public final class DiagnosticCli {
         try (InputStream input = guidanceResource(AGENT_GUIDE)) {
             out.print(new String(input.readAllBytes(), StandardCharsets.UTF_8));
         }
+        // The first-read file stays short. The same command still prints the longer notes.
+        String detail = "docs/workbench-agent-detail.md";
+        InputStream extra = DiagnosticCli.class.getClassLoader().getResourceAsStream(GUIDANCE_ROOT + detail);
+        if (extra != null) {
+            try (InputStream input = extra) {
+                out.println();
+                out.print(new String(input.readAllBytes(), StandardCharsets.UTF_8));
+            }
+        }
         return 0;
     }
 

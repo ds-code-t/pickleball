@@ -51,7 +51,6 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/java-values.md`
 - `docs/key-parser-dsl.md`
 - `docs/log-and-assert-steps.md`
-- `docs/maintainer/2.1.18-consumer-report-fixes.md`
 - `docs/mapping-and-templating.md`
 - `docs/nested-steps.md`
 - `docs/object-registration.md`
@@ -60,14 +59,9 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/README.md`
 - `docs/release-notes.md`
 - `docs/reserved-element-names.md`
-- `docs/roadmaps/2.1.17-workspace-config.md`
-- `docs/roadmaps/2.1.18-agent-retrieval-fixes.md`
-- `docs/roadmaps/2.1.18-agent-retrieval.md`
-- `docs/roadmaps/2.1.18-direct-control-handoff.md`
-- `docs/roadmaps/2.1.18-workbench-coverage-findings.md`
-- `docs/roadmaps/2.1.18-workbench-full-coverage.md`
 - `docs/service-call-scenarios.md`
 - `docs/step-overrides.md`
+- `docs/workbench-agent-detail.md`
 - `docs/workbench-thin-packaging-roadmap.md`
 
 ## Framework Java and AspectJ source

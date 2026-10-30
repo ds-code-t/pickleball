@@ -95,4 +95,45 @@ class WorkbenchPointerContractTest {
         assertFalse(chooser.contains("attach.json"));
         assertFalse(chooser.contains("ui ."));
     }
+
+    @Test
+    void firstReadGuideStaysSmallAndShowsTheDiscoverEditConfirmLoop() throws Exception {
+        Path guide = Path.of("docs/consumer-agent-guide.md");
+        long bytes = Files.size(guide);
+        assertTrue(bytes <= 5 * 1024, "first-read guide is " + bytes + " bytes");
+        String text = Files.readString(guide);
+        assertTrue(text.contains("--text-file=step.txt"), text);
+        assertTrue(text.contains("base64 -w0"), text);
+        assertTrue(text.contains("[Convert]::ToBase64String"), text);
+        assertTrue(text.contains("certutil -encodehex"), text);
+        assertTrue(text.contains("summary status=FAILED"), text);
+        assertTrue(text.contains("workspace-edit --run-id=row-1"), text);
+        assertTrue(text.contains("summary status=PASSED"), text);
+        assertTrue(text.contains("confirm --run-id=row-1"), text);
+        assertTrue(text.contains("or `unset`"), text);
+        assertTrue(text.contains("Several live sessions must pass `--run-id`"), text);
+        assertTrue(text.contains("docs/workbench-agent-detail.md"), text);
+        assertTrue(Files.size(Path.of("docs/workbench-agent-detail.md")) > bytes);
+    }
+
+    @Test
+    void packagedGuidanceLeavesMaintainerAndRoadmapDocsInTheRepo() throws Exception {
+        Path packaged = Path.of("src/main/resources/META-INF/pickleball/guidance");
+        try (var walk = Files.walk(packaged)) {
+            walk.filter(Files::isRegularFile).forEach(path -> {
+                String relative = packaged.relativize(path).toString().replace('\\', '/');
+                assertFalse(relative.startsWith("docs/maintainer/"), relative);
+                assertFalse(relative.startsWith("docs/roadmaps/"), relative);
+            });
+        }
+        String index = Files.readString(packaged.resolve("index.txt"));
+        assertFalse(index.contains("docs/maintainer/"));
+        assertFalse(index.contains("docs/roadmaps/"));
+        String packagedIndex = Files.readString(packaged.resolve("docs/agent/repository-index.md"));
+        assertFalse(packagedIndex.contains("docs/maintainer/"));
+        assertFalse(packagedIndex.contains("docs/roadmaps/"));
+        assertTrue(Files.isRegularFile(Path.of("docs/maintainer/2.1.18-consumer-report-fixes.md")));
+        assertTrue(Files.isRegularFile(Path.of("docs/roadmaps/workbench-cli-inventory.json")));
+        assertTrue(Files.isRegularFile(Path.of("docs/tech-debt.md")));
+    }
 }
