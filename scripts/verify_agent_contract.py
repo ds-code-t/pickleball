@@ -7,6 +7,8 @@ import argparse
 import hashlib
 import os
 from pathlib import Path
+import posixpath
+import re
 import subprocess
 import sys
 
@@ -559,6 +561,54 @@ def validate_dependency_owned_guidance(errors: list[str]) -> None:
             )
 
 
+def validate_exported_doc_links(errors: list[str]) -> None:
+    """Fail when an exported markdown file links to a doc that was not exported."""
+    packaged = ROOT / "src" / "main" / "resources" / "META-INF" / "pickleball" / "guidance"
+    if not packaged.is_dir():
+        errors.append("Packaged guidance is missing; cannot check exported doc links.")
+        return
+    exported = {
+        path.relative_to(packaged).as_posix()
+        for path in packaged.rglob("*")
+        if path.is_file()
+    }
+    link_pattern = re.compile(r"\[[^\]]*\]\(([^)\s]+)(?:\s+[^)]*)?\)")
+    backtick_pattern = re.compile(r"`(docs/[A-Za-z0-9_./-]+\.md)`")
+    fence = re.compile(r"```.*?```", re.DOTALL)
+    for path in sorted(packaged.rglob("*.md")):
+        relative = path.relative_to(packaged).as_posix()
+        text = fence.sub("", path.read_text(encoding="utf-8"))
+        targets = [match.group(1) for match in link_pattern.finditer(text)]
+        targets.extend(match.group(1) for match in backtick_pattern.finditer(text))
+        for target in targets:
+            resolved = resolve_exported_doc(relative, target)
+            if resolved is None:
+                continue
+            if resolved in exported:
+                continue
+            errors.append(
+                f"Exported {relative} links to {resolved}, which is not in the guidance export."
+            )
+
+
+def resolve_exported_doc(from_relative: str, target: str) -> str | None:
+    raw = target.strip()
+    if not raw or raw.startswith(("#", "http://", "https://", "mailto:")):
+        return None
+    raw = raw.split("#", 1)[0].split("?", 1)[0].strip()
+    if not raw or raw.endswith("/"):
+        return None
+    if raw.startswith("docs/") or raw.startswith("maven-consumer-project/") or raw == "AGENT-GUIDE.md":
+        resolved = posixpath.normpath(raw)
+    else:
+        resolved = posixpath.normpath(posixpath.join(posixpath.dirname(from_relative), raw))
+    if resolved.startswith("../") or "/../" in f"/{resolved}":
+        return None
+    if not resolved.endswith(".md"):
+        return None
+    return resolved
+
+
 def validate_consumer_reference_build_hook(errors: list[str]) -> None:
     settings = ROOT / "settings.gradle"
     if not settings.is_file():
@@ -785,6 +835,7 @@ def main() -> int:
     validate_consumer_bridge(errors)
     validate_consumer_readme(errors)
     validate_dependency_owned_guidance(errors)
+    validate_exported_doc_links(errors)
     validate_agent_pointer_eval_harness(errors)
     validate_consumer_reference_build_hook(errors)
     validate_consumer_tracked_artifacts(errors)

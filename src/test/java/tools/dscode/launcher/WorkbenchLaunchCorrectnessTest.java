@@ -7,12 +7,22 @@ import tools.dscode.control.protocol.AgentLog;
 import tools.dscode.control.protocol.Workspace;
 import tools.dscode.testengine.PKB_props;
 
+import javax.tools.DiagnosticCollector;
+import javax.tools.JavaCompiler;
+import javax.tools.JavaFileObject;
+import javax.tools.ToolProvider;
+
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.net.URL;
+import java.net.URLClassLoader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
@@ -163,38 +173,40 @@ class WorkbenchLaunchCorrectnessTest {
                 new PrintStream(stdout, true, StandardCharsets.UTF_8),
                 new PrintStream(stderr, true, StandardCharsets.UTF_8),
                 (project, command, out, err) -> {
-                    err.println("java.lang.RuntimeException: before-all");
-                    err.println("Caused by: java.net.BindException: Address already in use");
-                    try {
-                        Path run = AgentCoordination.runDirectory(project, "run-hook").resolve("diagnostic").resolve("run-hook");
-                        Files.createDirectories(run.resolve("scenarios").resolve("s1"));
-                        Files.writeString(run.resolve("run-index.json"), """
-                                {
-                                  "runId": "run-hook",
-                                  "outcome": "FAILED",
-                                  "counts": { "total": 1, "passed": 0, "failed": 1 },
-                                  "steps": { "executed": 0, "passed": 0, "failed": 0, "skipped": 0 }
-                                }
-                                """);
-                        Files.writeString(run.resolve("scenarios").resolve("s1").resolve("summary.json"), """
-                                {"outcome":"FAILED","steps":{"executed":0,"passed":0,"failed":0,"skipped":0,"other":0}}
-                                """);
-                    } catch (Exception failure) {
-                        throw new RuntimeException(failure);
-                    }
-                    return 1;
+                try {
+                    runCompiledBeforeAll(hook, err);
+                    Path run = AgentCoordination.runDirectory(project, "run-hook").resolve("diagnostic").resolve("run-hook");
+                    Files.createDirectories(run.resolve("scenarios").resolve("s1"));
+                    Files.writeString(run.resolve("run-index.json"), """
+                            {
+                              "runId": "run-hook",
+                              "outcome": "FAILED",
+                              "counts": { "total": 1, "passed": 0, "failed": 1 },
+                              "steps": { "executed": 0, "passed": 0, "failed": 0, "skipped": 0 }
+                            }
+                            """);
+                    Files.writeString(run.resolve("scenarios").resolve("s1").resolve("summary.json"), """
+                            {"outcome":"FAILED","steps":{"executed":0,"passed":0,"failed":0,"skipped":0,"other":0}}
+                            """);
+                } catch (Exception failure) {
+                    throw new RuntimeException(failure);
                 }
+                return 1;
+            }
         );
         assertEquals(1, exit);
         String out = stdout.toString(StandardCharsets.UTF_8);
         String err = stderr.toString(StandardCharsets.UTF_8);
         assertTrue(out.contains("summary status=LAUNCH_ERROR scenarios=0 steps=0"), out);
         assertFalse(out.contains("summary status=FAILED"), out);
-        assertTrue(err.contains("error: Caused by: java.net.BindException: Address already in use"), err);
-        assertTrue(err.contains("fix: Full output is in .pickleball/runs/run-hook/console/"), err);
+        assertTrue(err.contains("error: java.net.BindException: Address already in use")
+                || err.contains("error: Caused by: java.net.BindException: Address already in use"), err);
+        assertTrue(err.contains("fix: A before-all hook or launch step failed before any step ran; see .pickleball/runs/run-hook/console/"), err);
         String record = Files.readString(AgentCoordination.runDirectory(temp, "run-hook").resolve("record.json"));
         assertTrue(record.contains("LAUNCH_ERROR"), record);
         assertTrue(Files.readString(hook).contains("@BeforeAll"));
+        String saved = Files.readString(AgentCoordination.runDirectory(temp, "run-hook").resolve("console").resolve("The_one.txt"));
+        assertTrue(saved.contains("BeforeAllSite.open"), saved);
     }
 
     @Test
@@ -228,6 +240,40 @@ class WorkbenchLaunchCorrectnessTest {
         String out = stdout.toString(StandardCharsets.UTF_8);
         assertTrue(out.contains("summary status=FAILED"), out);
         assertFalse(out.contains("summary status=LAUNCH_ERROR"), out);
+    }
+
+    /** Compiles the fixture and invokes it so the console stack is a real BindException. */
+    private static void runCompiledBeforeAll(Path source, PrintStream err) throws Exception {
+        JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
+        if (compiler == null) {
+            throw new IllegalStateException("JDK compiler is required to run the before-all fixture");
+        }
+        Path classes = Files.createTempDirectory("before-all-classes");
+        DiagnosticCollector<JavaFileObject> diagnostics = new DiagnosticCollector<>();
+        try (var files = compiler.getStandardFileManager(diagnostics, Locale.ROOT, StandardCharsets.UTF_8)) {
+            Boolean compiled = compiler.getTask(
+                    null,
+                    files,
+                    diagnostics,
+                    List.of("-classpath", System.getProperty("java.class.path"), "-d", classes.toString()),
+                    null,
+                    files.getJavaFileObjects(source)
+            ).call();
+            if (!Boolean.TRUE.equals(compiled)) {
+                throw new IllegalStateException("before-all fixture did not compile: " + diagnostics.getDiagnostics());
+            }
+        }
+        try (URLClassLoader loader = new URLClassLoader(new URL[]{classes.toUri().toURL()}, WorkbenchLaunchCorrectnessTest.class.getClassLoader())) {
+            Method open = loader.loadClass("com.example.site.BeforeAllSite").getDeclaredMethod("open");
+            try {
+                open.invoke(null);
+                throw new AssertionError("before-all hook returned");
+            } catch (InvocationTargetException thrown) {
+                Throwable cause = thrown.getCause();
+                if (cause == null) throw thrown;
+                cause.printStackTrace(err);
+            }
+        }
     }
 
     private void writeFeature() throws Exception {

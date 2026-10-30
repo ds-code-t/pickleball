@@ -529,7 +529,7 @@ public final class WorkbenchAgentCommands {
             Observed observed = observe(parsed.project(), run.runId(), exit, empty, captured(capturedOut, capturedErr));
             String status = observed.status();
             int reported = observed.exitCode();
-            if ("LAUNCH_ERROR".equals(status)) printLaunchError(run.runId(), capturedOut, capturedErr, err, exit);
+            if ("LAUNCH_ERROR".equals(status)) printLaunchError(run.runId(), capturedOut, capturedErr, err, exit, observed.zeroSteps());
             if (empty) printEmpty(parsed, browser, out, err);
             AgentCoordination.finish(
                     parsed.project(),
@@ -634,7 +634,7 @@ public final class WorkbenchAgentCommands {
             Observed observed = observe(parsed.project(), run.runId(), exit, empty, captured(capturedOut, capturedErr));
             String status = observed.status();
             int reported = observed.exitCode();
-            if ("LAUNCH_ERROR".equals(status)) printLaunchError(run.runId(), capturedOut, capturedErr, err, exit);
+            if ("LAUNCH_ERROR".equals(status)) printLaunchError(run.runId(), capturedOut, capturedErr, err, exit, observed.zeroSteps());
             if (empty) printEmpty(parsed, browser, out, err);
             AgentCoordination.finish(
                     parsed.project(),
@@ -1674,15 +1674,16 @@ public final class WorkbenchAgentCommands {
             ByteArrayOutputStream capturedOut,
             ByteArrayOutputStream capturedErr,
             PrintStream err,
-            int exit
+            int exit,
+            boolean zeroSteps
     ) {
         String captured = capturedOut.toString(StandardCharsets.UTF_8) + capturedErr.toString(StandardCharsets.UTF_8);
         String cause = launchCause(captured);
         if (cause == null || cause.isBlank()) cause = "Maven exited " + exit + " before any scenario.";
-        err.print(WorkbenchCliHelp.structured(
-                cause,
-                "Full output is in .pickleball/runs/" + runId + "/console/"
-        ));
+        String fix = zeroSteps
+                ? "A before-all hook or launch step failed before any step ran; see .pickleball/runs/" + runId + "/console/"
+                : "Full output is in .pickleball/runs/" + runId + "/console/";
+        err.print(WorkbenchCliHelp.structured(cause, fix));
     }
 
     static String launchCause(String captured) {
@@ -1799,9 +1800,13 @@ public final class WorkbenchAgentCommands {
         return false;
     }
 
-    private record Observed(String status, int exitCode, int failureCount, String failureSummary) {
+    private record Observed(String status, int exitCode, int failureCount, String failureSummary, boolean zeroSteps) {
         private Observed(String status, int exitCode) {
-            this(status, exitCode, 0, null);
+            this(status, exitCode, 0, null, false);
+        }
+
+        private Observed(String status, int exitCode, int failureCount, String failureSummary) {
+            this(status, exitCode, failureCount, failureSummary, false);
         }
     }
 
@@ -1823,7 +1828,7 @@ public final class WorkbenchAgentCommands {
         boolean failed = (signal != null && signal.failed()) || (verdict != null && verdict.failed());
         if (failed && recordedSteps == 0) {
             int exit = mavenExit == 0 ? 1 : mavenExit;
-            return new Observed("LAUNCH_ERROR", exit);
+            return new Observed("LAUNCH_ERROR", exit, 0, null, true);
         }
         if (signal != null && (signal.failed() || "PASSED".equalsIgnoreCase(signal.outcome()))) {
             if (signal.failed()) {

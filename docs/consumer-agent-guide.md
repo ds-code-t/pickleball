@@ -1,18 +1,18 @@
 # Pickleball Consumer Agent Guide
 
-First-read only. Longer notes: `docs/workbench-agent-detail.md`. `DiagnosticCli guidance` prints this page. `guidance --detail` appends that file.
+First-read only. Longer notes: `docs/workbench-agent-detail.md` (`guidance --detail`).
 
 ## Tool chooser
 
-Pickleball Workbench is the one front door. Do not open the GUI for your own testing. While testing for yourself, stay headless. When a window is already open, only one agent drives it. One window has one driver. Other agents stay headless on their own run id. Agents are not daemons. Read `run-catalog.json` after discover. Do not start a live worker. Pass `--retention` on that discover. **Live debug** is isolate, then execute-step. Never supply `pkb_run_profile` as input.
+Pickleball Workbench is the one front door. Do not open the GUI for your own testing. While testing for yourself, stay headless. When a window is already open, only one agent drives it. One window has one driver. Other agents stay headless on their own run id. Agents are not daemons: each command is a one-shot process. Read `run-catalog.json` after discover. Do not start a live worker; a live worker is only for isolate and execute-step debugging. Pass `--retention` on that discover. **Live debug** is isolate, then execute-step. Never supply `pkb_run_profile` as input.
 
 Run `mvnw` or `mvnw.cmd` (`gradlew` or `gradlew.bat`). Do not require a machine-wide Maven or Gradle install.
 
 ```text
-mvnw -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java "-Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher" "-Dexec.classpathScope=test" "-Dexec.args=discover"
+./mvnw -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java "-Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher" "-Dexec.classpathScope=test" "-Dexec.args=discover"
 ```
 
-only change `exec.args`: `-Dexec.args=discover`, `-Dexec.args=isolate`, `execute-step`, `confirm`. After `discover` or `workspace-seed`, one-shots are `java -cp @classpath.cache tools.dscode.launcher.PickleballWorkbenchLauncher <args>` and do not start the wrapper. Discover, confirm, and isolate still use the wrapper.
+only change `exec.args`: `-Dexec.args=discover`, `-Dexec.args=isolate`, `execute-step`, `confirm`. After `discover` or `workspace-seed`, one-shots are `java -cp @classpath.cache tools.dscode.launcher.PickleballWorkbenchLauncher <args>`. Discover, confirm, and isolate still use the wrapper.
 
 Read the short log `.pickleball/agent-log` before, after, and during a run. Board: `presence --touch`, `post --write`, `history --append`. Paths: `.pickleball/investigations/`, `.pickleball/presence/`, `.pickleball/posts/`, `.pickleball/history.log`. `gc-runs` deletes old run payloads, not investigations.
 
@@ -24,20 +24,18 @@ Read the short log `.pickleball/agent-log` before, after, and during a run. Boar
 4. `elapsed-step-ms=idle` when no step is running. `sleep-gap=` is a machine sleep, not a Gherkin sleep step.
 5. Emit with `workbench_investigation_emit`. `workbench_diagnostic_catalog` is a deprecated alias of `wb_runs`.
 
-Pass `--text-file=step.txt` or `--text-b64`.
-
 ```bash
-printf '%s' 'Then the "Save" button is visible' | base64 -w0
-mvnw -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java "-Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher" "-Dexec.classpathScope=test" "-Dexec.args=execute-step --text-file=step.txt"
+b64=$(printf '%s' 'Then the "Save" button is visible' | base64 -w0)
+./mvnw -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java "-Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher" "-Dexec.classpathScope=test" "-Dexec.args=execute-step --text-b64=$b64"
 ```
 
 ```powershell
-[Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes('Then the "Save" button is visible'))
-mvnw.cmd -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java "-Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher" "-Dexec.classpathScope=test" "-Dexec.args=execute-step --text-b64=<base64>"
+$b64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes('Then the "Save" button is visible'))
+.\mvnw.cmd -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java "-Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher" "-Dexec.classpathScope=test" "-Dexec.args=execute-step --text-b64=$b64"
 ```
 
 ```bat
-certutil -encodehex step.txt step.b64 0x40000001
+>step.txt echo Then the "Save" button is visible
 mvnw.cmd -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java "-Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher" "-Dexec.classpathScope=test" "-Dexec.args=execute-step --text-file=step.txt"
 ```
 

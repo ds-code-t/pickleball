@@ -105,7 +105,15 @@ class WorkbenchPointerContractTest {
         assertTrue(text.contains("--text-file=step.txt"), text);
         assertTrue(text.contains("base64 -w0"), text);
         assertTrue(text.contains("[Convert]::ToBase64String"), text);
-        assertTrue(text.contains("certutil -encodehex"), text);
+        assertTrue(text.contains("./mvnw"), text);
+        assertTrue(text.contains(">step.txt echo Then the \"Save\" button is visible"), text);
+        assertTrue(text.contains("--text-b64=$b64"), text);
+        assertFalse(text.contains("--text-b64=<base64>"), text);
+        assertFalse(text.contains("<base64>"), text);
+        int certutil = text.indexOf("certutil -encodehex");
+        if (certutil >= 0) {
+            assertTrue(text.substring(certutil).contains("--text-b64=%B64%"), text);
+        }
         assertTrue(text.contains("summary status=FAILED"), text);
         assertTrue(text.contains("workspace-edit --run-id=row-1"), text);
         assertTrue(text.contains("summary status=PASSED"), text);
@@ -155,5 +163,59 @@ class WorkbenchPointerContractTest {
         String sourceIndex = Files.readString(Path.of("docs/agent/repository-index.md"));
         assertTrue(sourceIndex.contains("docs/ai-diagnostic-reporting-plan.md"));
         assertTrue(sourceIndex.contains("docs/workbench-thin-packaging-roadmap.md"));
+        String sourceMap = Files.readString(Path.of("docs/agent/feature-map.md"));
+        String packagedMap = Files.readString(packaged.resolve("docs/agent/feature-map.md"));
+        assertFalse(sourceMap.contains("docs/ai-diagnostic-reporting-plan.md"), sourceMap);
+        assertFalse(packagedMap.contains("docs/ai-diagnostic-reporting-plan.md"), packagedMap);
+        assertFalse(packagedMap.contains("docs/workbench-thin-packaging-roadmap.md"), packagedMap);
+        assertExportedDocsDoNotLinkOutsideTheExport(packaged);
+    }
+
+    private static void assertExportedDocsDoNotLinkOutsideTheExport(Path packaged) throws Exception {
+        java.util.Set<String> exported = new java.util.HashSet<>();
+        try (var walk = Files.walk(packaged)) {
+            walk.filter(Files::isRegularFile).forEach(path ->
+                    exported.add(packaged.relativize(path).toString().replace('\\', '/')));
+        }
+        java.util.regex.Pattern link = java.util.regex.Pattern.compile("\\[[^\\]]*\\]\\(([^)\\s]+)(?:\\s+[^)]*)?\\)");
+        java.util.regex.Pattern backtick = java.util.regex.Pattern.compile("`(docs/[A-Za-z0-9_./-]+\\.md)`");
+        try (var walk = Files.walk(packaged)) {
+            for (Path path : walk.filter(file -> Files.isRegularFile(file) && file.toString().endsWith(".md")).toList()) {
+                String relative = packaged.relativize(path).toString().replace('\\', '/');
+                String text = Files.readString(path).replaceAll("(?s)```.*?```", "");
+                java.util.List<String> targets = new java.util.ArrayList<>();
+                java.util.regex.Matcher links = link.matcher(text);
+                while (links.find()) targets.add(links.group(1));
+                java.util.regex.Matcher ticks = backtick.matcher(text);
+                while (ticks.find()) targets.add(ticks.group(1));
+                for (String target : targets) {
+                    String resolved = resolveExportedDoc(relative, target);
+                    if (resolved == null || exported.contains(resolved)) continue;
+                    throw new AssertionError("Exported " + relative + " links to " + resolved + ", which is not exported");
+                }
+            }
+        }
+    }
+
+    private static String resolveExportedDoc(String fromRelative, String target) {
+        String raw = target == null ? "" : target.trim();
+        if (raw.isEmpty() || raw.startsWith("#") || raw.startsWith("http://") || raw.startsWith("https://") || raw.startsWith("mailto:")) {
+            return null;
+        }
+        int hash = raw.indexOf('#');
+        if (hash >= 0) raw = raw.substring(0, hash);
+        int query = raw.indexOf('?');
+        if (query >= 0) raw = raw.substring(0, query);
+        raw = raw.trim();
+        if (raw.isEmpty() || raw.endsWith("/")) return null;
+        String resolved;
+        if (raw.startsWith("docs/") || raw.startsWith("maven-consumer-project/") || "AGENT-GUIDE.md".equals(raw)) {
+            resolved = java.nio.file.Path.of(raw).normalize().toString().replace('\\', '/');
+        } else {
+            String base = fromRelative.contains("/") ? fromRelative.substring(0, fromRelative.lastIndexOf('/')) : "";
+            resolved = java.nio.file.Path.of(base, raw).normalize().toString().replace('\\', '/');
+        }
+        if (resolved.startsWith("../") || !resolved.endsWith(".md")) return null;
+        return resolved;
     }
 }
