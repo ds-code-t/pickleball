@@ -567,6 +567,8 @@ workbench_diagnostic_run
 workbench_diagnostic_summary
 ```
 
+The same files are also queried, not globbed, by the launcher `query` command and by six thin MCP forwarders (`wb_runs`, `wb_get`, `wb_query`, `wb_search`, `wb_props`, `wb_errors`). They share `DiagnosticQuery`. Default output is compact JSON with `where`, a small limit, and `…+N more, use cursor`. See [Diagnostic query](diagnostic-query.md).
+
 Human investigation handoff (writes `.pickleball/investigations/<id>/` and returns the relative `report.html` path only):
 
 ```text

@@ -23,7 +23,7 @@ final class WorkbenchCommandLine {
             "workspace-show", "workspace-edit", "workspace-seed",
             "short-log", "note", "inbox", "finish",
             "presence", "post", "history", "gc-runs", "gc-versions", "use-version",
-            "inspect-page", "find-element",
+            "inspect-page", "find-element", "query",
             "session-list", "session-info", "session-hold", "session-release",
             "help"
     );

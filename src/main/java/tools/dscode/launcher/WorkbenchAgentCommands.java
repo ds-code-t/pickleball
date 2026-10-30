@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import tools.dscode.common.coordination.AgentCoordination;
 import tools.dscode.common.reporting.diagnostic.ConsumerMavenTestRunner;
 import tools.dscode.common.reporting.diagnostic.LastDiscoverSnapshot;
+import tools.dscode.control.protocol.DiagnosticQuery;
 import tools.dscode.control.protocol.PickleballLocalStore;
 import tools.dscode.control.protocol.RunConfigs;
 import tools.dscode.control.protocol.SessionDescriptor;
@@ -46,7 +47,8 @@ public final class WorkbenchAgentCommands {
      */
     static final List<String> MAJOR_FLAGS = List.of(
             "--json", "--expect", "--config", "--reseed", "--from-run",
-            "--html", "--category", "--status"
+            "--html", "--category", "--status",
+            "--kind", "--scenario", "--cursor", "--fields"
     );
     private static final java.util.Set<String> KNOWN_FINISH_STATUSES = java.util.Set.of(
             "PASSED", "FAILED", "EMPTY", "TIMEOUT", "STOPPED"
@@ -103,6 +105,7 @@ public final class WorkbenchAgentCommands {
                 case "use-version" -> useVersion(parsed, out, err);
                 case "inspect-page" -> inspectPage(parsed, out, err);
                 case "find-element" -> findElement(parsed, out, err);
+                case "query" -> query(parsed, out, err);
                 case "session-list" -> sessionList(parsed, out, err);
                 case "session-info" -> sessionInfo(parsed, out, err);
                 case "session-hold" -> sessionHold(parsed, out, err, true);
@@ -899,6 +902,72 @@ public final class WorkbenchAgentCommands {
     private static String firstNonBlank(String primary, String fallback) {
         if (primary != null && !primary.isBlank()) return primary;
         return fallback;
+    }
+
+    private static int query(WorkbenchCommandLine.Parsed parsed, PrintStream out, PrintStream err) {
+        String op = queryOp(parsed.forwarded());
+        if (op == null) {
+            String usage = WorkbenchCliHelp.usage("query");
+            err.print(usage);
+            out.println(tools.dscode.control.protocol.JsonLite.write(Map.of(
+                    "v", 1,
+                    "error", "missing op",
+                    "fix", usage.strip()
+            )));
+            return 2;
+        }
+        Map<String, Object> request = new LinkedHashMap<>();
+        request.put("op", op);
+        if (parsed.coordination().runId() != null) request.put("runId", parsed.coordination().runId());
+        String scenario = flag(parsed, "--scenario");
+        if (scenario != null && !scenario.isBlank()) request.put("scenarioId", scenario);
+        String kind = flag(parsed, "--kind");
+        if (kind != null && !kind.isBlank()) request.put("kind", kind);
+        if (parsed.coordination().text() != null) request.put("text", parsed.coordination().text());
+        String fields = flag(parsed, "--fields");
+        if (fields != null && !fields.isBlank()) request.put("fields", fields);
+        if (parsed.coordination().limit() != null) request.put("limit", parsed.coordination().limit());
+        String cursor = flag(parsed, "--cursor");
+        if (cursor != null && !cursor.isBlank()) request.put("cursor", cursor);
+        String status = flag(parsed, "--status");
+        if (status != null && !status.isBlank()) request.put("status", status);
+        if (parsed.coordination().id() != null) request.put("id", parsed.coordination().id());
+        DiagnosticQuery.Outcome outcome = DiagnosticQuery.query(parsed.project(), request);
+        out.println(outcome.json());
+        if (outcome.exit() != 0) {
+            Object fix = outcome.body().get("fix");
+            if (fix != null) err.println(fix);
+            return outcome.exit();
+        }
+        try {
+            String agent = parsed.coordination().agentId();
+            String run = parsed.coordination().runId();
+            AgentCoordination.appendLog(
+                    parsed.project(),
+                    Instant.now(),
+                    agent == null || agent.isBlank() ? "-" : agent,
+                    run == null || run.isBlank() ? "-" : run,
+                    "query",
+                    op,
+                    null
+            );
+        } catch (IOException ignored) {
+            // The JSON answer is already printed. A short-log failure does not hide it.
+        }
+        return 0;
+    }
+
+    private static String queryOp(String[] args) {
+        if (args == null) return null;
+        for (int index = 1; index < args.length; index++) {
+            String token = args[index];
+            if (token == null || token.startsWith("-")) continue;
+            if ("runs".equals(token) || "get".equals(token) || "query".equals(token)
+                    || "search".equals(token) || "props".equals(token) || "errors".equals(token)) {
+                return token;
+            }
+        }
+        return null;
     }
 
     private static int shortLog(WorkbenchCommandLine.Parsed parsed, PrintStream out, PrintStream err) {

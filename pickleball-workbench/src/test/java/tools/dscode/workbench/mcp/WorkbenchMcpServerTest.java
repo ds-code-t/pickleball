@@ -81,6 +81,12 @@ class WorkbenchMcpServerTest {
             "workbench_diagnostic_catalog",
             "workbench_diagnostic_run",
             "workbench_diagnostic_summary",
+            "wb_runs",
+            "wb_get",
+            "wb_query",
+            "wb_search",
+            "wb_props",
+            "wb_errors",
             "workbench_investigation_emit",
             "workbench_go"
     );

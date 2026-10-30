@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.modelcontextprotocol.server.McpServerFeatures;
 import io.modelcontextprotocol.spec.McpSchema;
 import tools.dscode.control.protocol.ControlBridgeMappingSnapshot;
+import tools.dscode.control.protocol.DiagnosticQuery;
 import tools.dscode.workbench.WorkbenchServices;
 import tools.dscode.workbench.nav.WorkbenchGoLink;
 import tools.dscode.workbench.lease.WorkbenchCallContext;
@@ -232,6 +233,64 @@ final class WorkbenchMcpTools {
                         "scenarioId", stringProperty("Scenario directory name under that run.")
                 ), "runId", "scenarioId"),
                 args -> services.diagnosticScenarioSummary(text(args, "runId"), text(args, "scenarioId")));
+        add("wb_runs",
+                "List retained diagnostic runs as compact JSON. Default limit 20 plus cursor.",
+                schema(Map.of(
+                        "limit", integerProperty("Page size. Default 20, max 100."),
+                        "cursor", stringProperty("nextCursor from the previous page."),
+                        "fields", stringProperty("Comma-separated fields."),
+                        "status", stringProperty("Outcome filter such as FAILED.")
+                )),
+                args -> retrieval("runs", args));
+        add("wb_get",
+                "Get one diagnostic record by runId and kind. Ids and a relative where, not a file dump.",
+                schema(Map.of(
+                        "runId", stringProperty("Run id from wb_runs."),
+                        "kind", stringProperty("run, scenario, step, event, property, artifact, error, or log."),
+                        "scenarioId", stringProperty("Scenario id when kind is scenario, step, event, or artifact."),
+                        "id", stringProperty("Event seq, artifact id, or scenario id.")
+                ), "runId"),
+                args -> retrieval("get", args));
+        add("wb_query",
+                "Filter diagnostic records. Compact JSON, explicit fields, limit and cursor.",
+                schema(Map.of(
+                        "runId", stringProperty("Optional run id."),
+                        "scenarioId", stringProperty("Optional scenario id."),
+                        "kind", stringProperty("run, scenario, step, event, property, artifact, error, or log."),
+                        "text", stringProperty("Optional substring."),
+                        "status", stringProperty("Optional outcome or step status."),
+                        "fields", stringProperty("Comma-separated fields."),
+                        "limit", integerProperty("Page size. Default 20, max 100."),
+                        "cursor", stringProperty("nextCursor from the previous page.")
+                )),
+                args -> retrieval("query", args));
+        add("wb_search",
+                "Search event, error, scenario, and short-log text. Returns ids and where.",
+                schema(Map.of(
+                        "text", stringProperty("Substring to find."),
+                        "runId", stringProperty("Optional run id."),
+                        "kind", stringProperty("Optional kind filter."),
+                        "limit", integerProperty("Page size. Default 20, max 100."),
+                        "cursor", stringProperty("nextCursor from the previous page.")
+                ), "text"),
+                args -> retrieval("search", args));
+        add("wb_props",
+                "List retained run properties (runProfile and scalar configuration). Values are clipped.",
+                schema(Map.of(
+                        "runId", stringProperty("Run id from wb_runs."),
+                        "limit", integerProperty("Page size. Default 20, max 100."),
+                        "cursor", stringProperty("nextCursor from the previous page.")
+                ), "runId"),
+                args -> retrieval("props", args));
+        add("wb_errors",
+                "List failure records with a one-line stack head. Truncation says …+N more, use cursor.",
+                schema(Map.of(
+                        "runId", stringProperty("Optional run id. Omit to scan the catalog."),
+                        "scenarioId", stringProperty("Optional scenario id."),
+                        "limit", integerProperty("Page size. Default 20, max 100."),
+                        "cursor", stringProperty("nextCursor from the previous page.")
+                )),
+                args -> retrieval("errors", args));
         add("workbench_investigation_emit",
                 "Write .pickleball/investigations/<id>/{investigation.json,report.html}. New handoffs always use that root path. A legacy v/<version>/investigations/<id> tree is still readable when the root path is absent. Returns the relative report.html path only. Does not copy the diagnostic pack or embed PNG bytes.",
                 schema(Map.of(
@@ -269,6 +328,26 @@ final class WorkbenchMcpTools {
                 });
     }
 
+    private Object retrieval(String op, Map<String, Object> args) {
+        Map<String, Object> request = new LinkedHashMap<>();
+        request.put("op", op);
+        for (String key : List.of("runId", "scenarioId", "kind", "text", "fields", "cursor", "status", "id", "limit")) {
+            if (args != null && args.containsKey(key) && args.get(key) != null) request.put(key, args.get(key));
+        }
+        DiagnosticQuery.Outcome outcome = DiagnosticQuery.query(services.projectRoot(), request);
+        if (outcome.exit() != 0) throw new ToolFailure(outcome.body());
+        return outcome.body();
+    }
+
+    static final class ToolFailure extends RuntimeException {
+        final Map<String, Object> body;
+
+        ToolFailure(Map<String, Object> body) {
+            super(String.valueOf(body.get("error")));
+            this.body = body;
+        }
+    }
+
     private void add(
             String name,
             String description,
@@ -292,6 +371,8 @@ final class WorkbenchMcpTools {
         try {
             Object value = call(name, arguments);
             return result(value, false);
+        } catch (ToolFailure failure) {
+            return result(failure.body, true);
         } catch (RuntimeException failure) {
             return result(Map.of(
                     "error", failure.getClass().getSimpleName(),

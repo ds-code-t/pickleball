@@ -40,6 +40,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/data-values-and-elements.md`
 - `docs/date-time-utilities.md`
 - `docs/diagnostic-lineage-metadata.md`
+- `docs/diagnostic-query.md`
 - `docs/diagnostic-reporting.md`
 - `docs/direct-control-handoff.md`
 - `docs/dynamic-control-api.md`
@@ -637,10 +638,12 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/ControlBridgeValue.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/ControlBridgeValueResult.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/ControlProtocol.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/DiagnosticQuery.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/DirectControlProvider.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/ExampleRowSelector.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/GherkinKeywords.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/InvestigationHandoff.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/JsonLite.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/PickleballArtifactLocator.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/PickleballLocalLayout.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/PickleballLocalStore.java`
@@ -658,6 +661,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-control-protocol/src/main/resources/tools/dscode/control/protocol/gherkin-keywords.tsv`
 - `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/ControlBridgeStepResolutionTest.java`
 - `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/ControlProtocolStepSeedTest.java`
+- `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/DiagnosticQueryTest.java`
 - `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/DirectControlProviderTest.java`
 - `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/ExampleRowSelectorTest.java`
 - `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/PickleballPathsTest.java`
@@ -763,6 +767,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/mapping/MappingValueCodecTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/mcp/WorkbenchAttachServerTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/mcp/WorkbenchCommandQueueTest.java`
+- `pickleball-workbench/src/test/java/tools/dscode/workbench/mcp/WorkbenchMcpRetrievalTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/mcp/WorkbenchMcpServerTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/nav/WorkbenchGoResolverTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/player/EditorTabStateTest.java`

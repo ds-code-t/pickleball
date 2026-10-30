@@ -1456,6 +1456,86 @@ class WorkbenchCliSurfaceCoverageTest {
         return WorkbenchCommandLine.parse(args);
     }
 
+    @Test
+    void covers_command_query() throws Exception {
+        writeQueryFixture();
+        Capture missing = agent("query", temp.toString());
+        assertEquals(2, missing.code);
+        assertTrue(missing.err.contains("Usage: query"), missing.err);
+        assertTrue(missing.out.contains("\"error\":\"missing op\""), missing.out);
+        Capture runs = agent("query", "runs", temp.toString());
+        assertEquals(0, runs.code, runs.err);
+        assertTrue(runs.out.contains("\"runId\":\"q-1\""), runs.out);
+        assertTrue(runs.out.contains("\"where\""));
+        assertEquals(1, runs.out.strip().lines().count());
+        assertTrue(Files.readString(temp.resolve(".pickleball/agent-log")).contains("query"));
+        Capture search = agent("query", "search", temp.toString(), "--text=needle");
+        assertEquals(0, search.code, search.err);
+        assertTrue(search.out.contains("needle"), search.out);
+        assertTrue(search.out.getBytes(java.nio.charset.StandardCharsets.UTF_8).length <= 4096);
+    }
+
+    @Test
+    void covers_flag_kind() throws Exception {
+        writeQueryFixture();
+        Capture capture = agent("query", "query", temp.toString(), "--run-id=q-1", "--kind=step");
+        assertEquals(0, capture.code, capture.err);
+        assertTrue(capture.out.contains("\"kind\":\"step\""), capture.out);
+        assertTrue(capture.out.contains("Given needle"), capture.out);
+        assertTrue(WorkbenchCliHelp.forTopic("--kind").contains("Usage: --kind"));
+    }
+
+    @Test
+    void covers_flag_scenario() throws Exception {
+        writeQueryFixture();
+        Capture capture = agent("query", "get", temp.toString(), "--run-id=q-1", "--kind=scenario", "--scenario=scene-q");
+        assertEquals(0, capture.code, capture.err);
+        assertTrue(capture.out.contains("scene-q"), capture.out);
+        assertTrue(capture.out.contains("Named"), capture.out);
+        assertTrue(WorkbenchCliHelp.forTopic("--scenario").contains("--scenario=<id>"));
+    }
+
+    @Test
+    void covers_flag_cursor() throws Exception {
+        writeQueryFixture();
+        Capture capture = agent("query", "runs", temp.toString(), "--limit=1", "--cursor=1");
+        assertEquals(0, capture.code, capture.err);
+        assertTrue(capture.out.contains("q-2"), capture.out);
+        assertFalse(capture.out.contains("\"runId\":\"q-1\""));
+        assertTrue(WorkbenchCliHelp.forTopic("--cursor").contains("nextCursor"));
+    }
+
+    @Test
+    void covers_flag_fields() throws Exception {
+        writeQueryFixture();
+        Capture capture = agent("query", "runs", temp.toString(), "--fields=runId", "--limit=5");
+        assertEquals(0, capture.code, capture.err);
+        assertTrue(capture.out.contains("\"runId\":\"q-1\""), capture.out);
+        assertFalse(capture.out.contains("\"outcome\""));
+        assertTrue(WorkbenchCliHelp.forTopic("--fields").contains("--fields"));
+    }
+
+    private void writeQueryFixture() throws Exception {
+        Path root = temp.resolve("reports/diagnostic-runs");
+        Path scenario = root.resolve("q-1/scenarios/scene-q");
+        Files.createDirectories(scenario);
+        Files.writeString(root.resolve("run-catalog.json"), """
+                {"runs":[
+                  {"runId":"q-1","outcome":"FAILED"},
+                  {"runId":"q-2","outcome":"PASSED"}
+                ]}
+                """);
+        Files.writeString(root.resolve("q-1/run-index.json"), """
+                {"runId":"q-1","outcome":"FAILED","scenarios":[{"scenarioId":"scene-q","name":"Named","outcome":"FAILED"}]}
+                """);
+        Files.writeString(scenario.resolve("summary.json"), """
+                {"name":"Named","outcome":"FAILED"}
+                """);
+        Files.writeString(scenario.resolve("events.jsonl"), """
+                {"type":"step","eventSeq":1,"text":"Given needle","status":"FAILED","message":"needle"}
+                """);
+    }
+
     private Capture agent(String... args) {
         ByteArrayOutputStream stdout = new ByteArrayOutputStream();
         ByteArrayOutputStream stderr = new ByteArrayOutputStream();

@@ -38,20 +38,25 @@ final class WorkbenchCliHelp {
             Map.entry("session-list", "Usage: session list [--json]"),
             Map.entry("session-info", "Usage: session info <sessionId> [--json]"),
             Map.entry("session-hold", "Usage: session hold <sessionId>"),
-            Map.entry("session-release", "Usage: session release <sessionId>")
+            Map.entry("session-release", "Usage: session release <sessionId>"),
+            Map.entry("query", "Usage: query <runs|get|query|search|props|errors> [--run-id=<id>] [--scenario=<id>] [--kind=run|scenario|step|event|property|artifact|error|log] [--text=<words>] [--status=<outcome>] [--fields=<a,b>] [--limit=<n>] [--cursor=<token>] [--id=<id>]")
     );
 
-    private static final Map<String, String> FLAGS = Map.of(
-            "--run-id", "Usage: --run-id=<id>\nLive session and run directory under .pickleball/runs. On diagnostic-run, --run=<id> is the diagnostic pack. When --run is omitted, --run-id is that pack.",
-            "--agent", "Usage: --agent=<id>\nSame value as --agent-id.",
-            "--agent-id", "Usage: --agent-id=<id>\nSame value as --agent.",
-            "--json", "Usage: --json\nOne compact JSON object on stdout and no preamble. workspace-show, resolve-runvars, hint, plan, session list, session info, status, and events.",
-            "--runvar", "Usage: --runvar=key=value\nRepeatable. Example: --runvar=pkb_browser=CHROME_HEADLESS. Never pass pkb_run_profile.",
-            "--run", "Usage: diagnostic-run --run=<id>\nDiagnostic pack id. Not the live-session flag. Prefer this over --run-id when the pack and the session differ. --run-id selects the live session and is the pack when --run is omitted.",
-            "--tags", "Usage: --tags=<expr>\nQuote a value that contains spaces: --tags='@A and not @B'. Or use --tags-file=<path> or --tags-b64=<base64 of the UTF-8 expression>.",
-            "--session-file", "Usage: --session-file=<path>\nisolate and session-start wait on this file. The default is that run's cli-session.json.",
-            "--step-timeout", "Usage: --step-timeout=<seconds>\nPositive whole number of seconds. execute-step only. discover and confirm reject it; use --run-timeout.",
-            "--run-timeout", "Usage: --run-timeout=<seconds>\nPositive whole number of seconds. discover, confirm, and execute-step."
+    private static final Map<String, String> FLAGS = Map.ofEntries(
+            Map.entry("--run-id", "Usage: --run-id=<id>\nLive session and run directory under .pickleball/runs. On diagnostic-run, --run=<id> is the diagnostic pack. When --run is omitted, --run-id is that pack."),
+            Map.entry("--agent", "Usage: --agent=<id>\nSame value as --agent-id."),
+            Map.entry("--agent-id", "Usage: --agent-id=<id>\nSame value as --agent."),
+            Map.entry("--json", "Usage: --json\nOne compact JSON object on stdout and no preamble. workspace-show, resolve-runvars, hint, plan, session list, session info, status, and events."),
+            Map.entry("--runvar", "Usage: --runvar=key=value\nRepeatable. Example: --runvar=pkb_browser=CHROME_HEADLESS. Never pass pkb_run_profile."),
+            Map.entry("--run", "Usage: diagnostic-run --run=<id>\nDiagnostic pack id. Not the live-session flag. Prefer this over --run-id when the pack and the session differ. --run-id selects the live session and is the pack when --run is omitted."),
+            Map.entry("--tags", "Usage: --tags=<expr>\nQuote a value that contains spaces: --tags='@A and not @B'. Or use --tags-file=<path> or --tags-b64=<base64 of the UTF-8 expression>."),
+            Map.entry("--session-file", "Usage: --session-file=<path>\nisolate and session-start wait on this file. The default is that run's cli-session.json."),
+            Map.entry("--step-timeout", "Usage: --step-timeout=<seconds>\nPositive whole number of seconds. execute-step only. discover and confirm reject it; use --run-timeout."),
+            Map.entry("--run-timeout", "Usage: --run-timeout=<seconds>\nPositive whole number of seconds. discover, confirm, and execute-step."),
+            Map.entry("--kind", "Usage: --kind=run|scenario|step|event|property|artifact|error|log\nquery and query get. Default for query is event when --run-id is set, otherwise run."),
+            Map.entry("--scenario", "Usage: --scenario=<id>\nScenario directory name under the run. query get, query query, and query errors."),
+            Map.entry("--cursor", "Usage: --cursor=<token>\nPage token from nextCursor. The truncated line says …+N more, use cursor."),
+            Map.entry("--fields", "Usage: --fields=<a,b>\nComma-separated item fields. Omit it for the compact default.")
     );
 
     private WorkbenchCliHelp() {
@@ -73,6 +78,7 @@ final class WorkbenchCliHelp {
         text.append("coordination: short-log note inbox finish presence post history gc-runs gc-versions use-version export-guidance\n");
         text.append("descriptors: session list | session info <sessionId> [--json] | session hold <sessionId> | session release <sessionId>\n");
         text.append("page: inspect-page find-element\n");
+        text.append("retrieval: query runs | query get | query query | query search | query props | query errors\n");
         text.append("controller: sync worker-check live-check ui mcp session\n");
         text.append("all:");
         for (String command : commands()) text.append(' ').append(command);

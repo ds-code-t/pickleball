@@ -30,6 +30,7 @@
       "plan",
       "post",
       "presence",
+      "query",
       "resolve-runvars",
       "session-hold",
       "session-info",
@@ -125,7 +126,11 @@
     "--from-run",
     "--html",
     "--category",
-    "--status"
+    "--status",
+    "--kind",
+    "--scenario",
+    "--cursor",
+    "--fields"
   ],
   "exitCodes": [
     {
