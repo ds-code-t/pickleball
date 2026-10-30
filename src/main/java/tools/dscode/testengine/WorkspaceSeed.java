@@ -9,10 +9,12 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.function.Consumer;
 
@@ -101,10 +103,49 @@ public final class WorkspaceSeed {
                 ? null
                 : ResourceLocations.existingDirectory(configured, ResourceLocations.workingDirectory());
         Workspace.copyConfigs(source, workspace);
-        Workspace.writeRunVars(workspace, values);
-        List<String> warnings = Workspace.literalSecretWarnings(Workspace.configsDirectory(workspace));
+        Set<String> keep = runnerComputedSecretKeys(values);
+        Workspace.writeRunVars(workspace, values, keep);
+        List<String> warnings = new ArrayList<>(Workspace.literalSecretWarnings(Workspace.configsDirectory(workspace)));
+        warnings.addAll(runnerComputedSecretWarnings(values));
         for (String warning : warnings) System.err.println(warning);
         return warnings;
+    }
+
+    /**
+     * Sensitive runner values with no project-property source. A
+     * {@code ${protected:key}} reference would fail at launch, so the workspace
+     * keeps the value and the caller warns.
+     */
+    public static List<String> runnerComputedSecretWarnings(Map<String, String> values) {
+        return runnerComputedSecrets(values).warnings();
+    }
+
+    public static Set<String> runnerComputedSecretKeys(Map<String, String> values) {
+        return runnerComputedSecrets(values).keys();
+    }
+
+    private record SecretKeep(Set<String> keys, List<String> warnings) {
+    }
+
+    private static SecretKeep runnerComputedSecrets(Map<String, String> values) {
+        Set<String> keys = new LinkedHashSet<>();
+        List<String> warnings = new ArrayList<>();
+        if (values == null || values.isEmpty()) return new SecretKeep(keys, warnings);
+        Map<String, String> properties = ProjectPropertySources.readWorkbench(Path.of(""));
+        values.forEach((rawKey, rawValue) -> {
+            if (rawKey == null || rawKey.isBlank()) return;
+            String key = Workspace.normalizeKey(rawKey);
+            if (!Workspace.isSensitiveKey(key)) return;
+            String text = rawValue == null ? "" : rawValue;
+            if (text.isBlank() || Workspace.protectedKey(text) != null) return;
+            String fromFile = properties.get(key);
+            if (fromFile != null && !fromFile.isBlank()) return;
+            keys.add(key);
+            warnings.add("WARNING: " + key
+                    + " was set by the runner and is not in project properties, so the workspace keeps the value. "
+                    + "A ${protected:" + key + "} reference would fail at launch.");
+        });
+        return new SecretKeep(Set.copyOf(keys), List.copyOf(warnings));
     }
 
     /**

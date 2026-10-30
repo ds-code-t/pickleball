@@ -124,6 +124,7 @@ public final class WorkbenchRunReports {
         }
         int steps = 0;
         int scenarios = 0;
+        boolean launchError = status != null && "LAUNCH_ERROR".equalsIgnoreCase(status.trim());
         List<Map<String, Object>> bodies = new ArrayList<>();
         List<Map<String, Object>> traces = new ArrayList<>();
         for (Path dir : currentRunScenarioDirs(project, runId)) {
@@ -133,27 +134,33 @@ public final class WorkbenchRunReports {
             scenarios++;
             steps += stepCount(dir);
         }
-        if (scenarios == 0) {
+        if (launchError) {
+            scenarios = 0;
+            steps = 0;
+            bodies.clear();
+            traces.clear();
+        }
+        if (!launchError && scenarios == 0) {
             int[] indexed = indexCounts(project, runId);
             if (indexed != null && (indexed[0] > 0 || indexed[1] > 0)) {
                 scenarios = indexed[0];
                 steps = indexed[1];
             }
-        } else if (steps == 0) {
+        } else if (!launchError && steps == 0) {
             int[] indexed = indexCounts(project, runId);
             if (indexed != null && indexed[1] > 0) steps = indexed[1];
         }
-        if (scenarios == 0 && steps == 0) {
+        if (!launchError && scenarios == 0 && steps == 0) {
             int[] fromConsole = consoleCounts(console);
             if (fromConsole != null) {
                 scenarios = fromConsole[0];
                 steps = fromConsole[1];
             }
-        } else if (steps == 0) {
+        } else if (!launchError && steps == 0) {
             int[] fromConsole = consoleCounts(console);
             if (fromConsole != null && fromConsole[1] > 0) steps = fromConsole[1];
         }
-        if (scenarios == 0) scenarios = names.size();
+        if (!launchError && scenarios == 0) scenarios = names.size();
         if (runId != null && !runId.isBlank()) {
             try {
                 writeRunSummary(

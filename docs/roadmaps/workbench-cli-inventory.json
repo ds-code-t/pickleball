@@ -105,7 +105,8 @@
     "--version",
     "--ttl",
     "--step-timeout",
-    "--run-timeout"
+    "--run-timeout",
+    "--quiet"
   ],
   "sessionFlags": [
     "--ack-only",

@@ -116,13 +116,15 @@ public final class WorkspaceLaunch {
         }
         List<String> classpath = cachedClasspath(project);
         if (!classpath.isEmpty()) {
-            forkSeed(project, workspace, reseed, classpath);
+            forkSeed(project, workspace, reseed, classpath, warnings);
             return;
         }
         PickleballRunner runner = DynamicSuiteBootstrap.initializeFromRuntimeClasspath();
         String fallback = defaultSuiteWarning(runner == null ? null : runner.getClass());
         if (fallback != null) warn(warnings, fallback);
-        WorkspaceSeed.writeCaptured(workspace, runner, reseed);
+        for (String warning : WorkspaceSeed.writeCaptured(workspace, runner, reseed)) {
+            warn(warnings, warning);
+        }
     }
 
     static List<String> cachedClasspath(Path project) {
@@ -139,7 +141,7 @@ public final class WorkspaceLaunch {
         }
     }
 
-    private static void forkSeed(Path project, Path workspace, boolean reseed, List<String> classpath) {
+    private static void forkSeed(Path project, Path workspace, boolean reseed, List<String> classpath, Appendable warnings) {
         List<String> command = new ArrayList<>();
         command.add(Path.of(System.getProperty("java.home"), "bin", "java").toString());
         command.add("-cp");
@@ -159,6 +161,10 @@ public final class WorkspaceLaunch {
                         "Workspace seed failed for " + workspace + " exit=" + exit
                                 + (output.isBlank() ? "" : System.lineSeparator() + output)
                 );
+            }
+            for (String line : output.split("\\R")) {
+                String trimmed = line.strip();
+                if (trimmed.startsWith("WARNING:") || trimmed.startsWith("WARN:")) warn(warnings, trimmed);
             }
         } catch (InterruptedException interrupted) {
             Thread.currentThread().interrupt();

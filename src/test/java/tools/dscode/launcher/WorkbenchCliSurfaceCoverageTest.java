@@ -715,6 +715,16 @@ class WorkbenchCliSurfaceCoverageTest {
     }
 
     @Test
+    void covers_flag_quiet() {
+        WorkbenchCommandLine.Parsed parsed = parse("discover", "--quiet", "--tags=@smoke");
+        assertTrue(parsed.quiet());
+        Capture capture = agent("discover", temp.toString(), "--quiet", "--plan", "--tags=@none");
+        assertEquals(1, capture.code);
+        assertFalse(capture.out.contains("# pkb-console"), capture.out);
+        assertFalse(capture.out.contains("summary status="), capture.out);
+    }
+
+    @Test
     void covers_flag_refresh() throws Exception {
         assertTrue(parse("plan", "--refresh").refreshIndex());
         writeFeature("@smoke", "Find term");

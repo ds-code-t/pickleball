@@ -308,6 +308,31 @@ public final class AgentCoordination {
             if (Files.isRegularFile(recordFile)) {
                 RunRecord existing = readRecord(recordFile);
                 ensureTree(data);
+                if (logStart) {
+                    String purpose = oneLine(firstNonBlank(safe.why(), safe.purpose(), "run"));
+                    RunRecord reset = new RunRecord(
+                            existing.runId(),
+                            existing.agentId(),
+                            existing.group(),
+                            existing.sequence(),
+                            existing.who(),
+                            existing.why(),
+                            existing.learned(),
+                            clock.toString(),
+                            null,
+                            "RUNNING",
+                            existing.dataPath() == null ? data.toString() : existing.dataPath(),
+                            existing.pickleballVersion(),
+                            null,
+                            null,
+                            null,
+                            existing.environment(),
+                            existing.browser()
+                    );
+                    writeRecord(recordFile, reset);
+                    appendLog(project, clock, existing.agentId(), runId, "start", purpose, recordFile);
+                    existing = reset;
+                }
                 Run adopted = toRun(project, data, recordFile, existing);
                 activate(adopted);
                 print(out, "run-id=" + adopted.runId());
@@ -456,7 +481,8 @@ public final class AgentCoordination {
             boolean alreadyStopped = existing.stoppedAt() != null && !existing.stoppedAt().isBlank();
             String learnedValue = blankToNull(learned);
             String keptLearned = learnedValue != null ? learnedValue : existing.learned();
-            DiagnosticSignal signal = readDiagnosticSignal(project, safeRun);
+            Instant startedAt = parseInstant(existing.startedAt());
+            DiagnosticSignal signal = readDiagnosticSignal(project, safeRun, startedAt);
             String statusValue = resolveRecordStatus(status, existing, recordFile.getParent(), signal, alreadyStopped);
             Integer failureCount = existing.failureCount();
             Boolean failedScenario = existing.failedScenario();
@@ -475,6 +501,11 @@ public final class AgentCoordination {
                     failureSummary = "surefire errors+failures=" + observedFailures;
                 }
             }
+            if ("PASSED".equalsIgnoreCase(statusValue) && (signal == null || !signal.failed())) {
+                failureCount = null;
+                failedScenario = null;
+                failureSummary = null;
+            }
             String environmentValue = firstNonBlank(environment, existing.environment());
             String browserValue = firstNonBlank(browser, existing.browser());
             boolean statusChanged = existing.status() == null || !existing.status().equals(statusValue);
@@ -484,7 +515,9 @@ public final class AgentCoordination {
                     || !java.util.Objects.equals(existing.failureSummary(), failureSummary);
             boolean contextChanged = !java.util.Objects.equals(blankToNull(existing.environment()), environmentValue)
                     || !java.util.Objects.equals(blankToNull(existing.browser()), browserValue);
-            if (!alreadyStopped || statusChanged || learnedChanged || failureChanged || contextChanged) {
+            boolean sessionStop = "STOPPED".equalsIgnoreCase(blankToNull(status));
+            if (!alreadyStopped || statusChanged || learnedChanged || failureChanged || contextChanged
+                    || (alreadyStopped && sessionStop)) {
                 String stoppedAt = alreadyStopped ? existing.stoppedAt() : clock.toString();
                 RunRecord updated = withStop(
                         existing,
@@ -500,6 +533,9 @@ public final class AgentCoordination {
                 writeRecord(recordFile, updated);
                 if (!alreadyStopped) {
                     String purpose = oneLine(firstNonBlank(learnedValue, existing.why(), statusValue));
+                    appendLog(project, clock, existing.agentId(), existing.runId(), "stop", purpose, recordFile);
+                } else if (sessionStop) {
+                    String purpose = oneLine(firstNonBlank(learnedValue, existing.why(), "STOPPED"));
                     appendLog(project, clock, existing.agentId(), existing.runId(), "stop", purpose, recordFile);
                 } else if (learnedChanged) {
                     appendLog(project, clock, existing.agentId(), existing.runId(), "note", oneLine(learnedValue), recordFile);
@@ -1457,11 +1493,37 @@ public final class AgentCoordination {
     }
 
     public static DiagnosticSignal readDiagnosticSignal(Path project, String runId) {
+        return readDiagnosticSignal(project, runId, null);
+    }
+
+    /**
+     * Same as {@link #readDiagnosticSignal(Path, String)} except an index last
+     * modified before {@code notBefore} is ignored. A relaunch must not inherit
+     * the previous run's outcome.
+     */
+    public static DiagnosticSignal readDiagnosticSignal(Path project, String runId, Instant notBefore) {
         Path index = findRunIndex(project, runId);
         if (index == null) return null;
+        if (notBefore != null) {
+            try {
+                Instant modified = Files.getLastModifiedTime(index).toInstant();
+                if (modified.isBefore(notBefore.minusSeconds(2))) return null;
+            } catch (IOException failure) {
+                return null;
+            }
+        }
         try {
             return signalFromIndex(JSON.readTree(index.toFile()), index);
         } catch (IOException failure) {
+            return null;
+        }
+    }
+
+    private static Instant parseInstant(String text) {
+        if (text == null || text.isBlank()) return null;
+        try {
+            return Instant.parse(text.trim());
+        } catch (RuntimeException ignored) {
             return null;
         }
     }

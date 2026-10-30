@@ -260,9 +260,10 @@ public final class WorkbenchApplication {
         IsolateArgs parsed = projectCommandArgs(args, "isolate");
         Map<String, String> workerProperties;
         try {
-            workerProperties = tools.dscode.workbench.discover.LastDiscoverSnapshot.workerSystemProperties(
+            workerProperties = new java.util.LinkedHashMap<>(tools.dscode.workbench.discover.LastDiscoverSnapshot.workerSystemProperties(
                     parsed.project(), parsed.tags(), parsed.name(), parsed.example(), parsed.runVars(), err
-            );
+            ));
+            workerProperties.put("pkb_run_purpose", "workbench-isolate");
         } catch (RuntimeException failure) {
             err.println(failure.getMessage());
             err.println("Workbench CLI isolate failed.");
@@ -322,6 +323,7 @@ public final class WorkbenchApplication {
         if (parsed.agentId() != null && !parsed.agentId().isBlank()) {
             workerProperties.put("pkb_agent_id", parsed.agentId());
         }
+        workerProperties.put("pkb_run_purpose", "workbench-session");
 
         CountDownLatch done = new CountDownLatch(1);
         AtomicBoolean stopping = new AtomicBoolean();

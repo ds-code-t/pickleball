@@ -502,6 +502,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/WorkbenchConsoleTapTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchConsumerScenarioEndToEndTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchElementInspectTest.java`
+- `src/test/java/tools/dscode/launcher/WorkbenchLaunchCorrectnessTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchLaunchTimingTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchOneShotLaunchTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchPointerContractTest.java`

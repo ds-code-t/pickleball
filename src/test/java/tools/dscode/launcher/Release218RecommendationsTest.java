@@ -2,15 +2,21 @@ package tools.dscode.launcher;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import tools.dscode.control.protocol.Workspace;
 import tools.dscode.testengine.DynamicSuiteBootstrap;
+import tools.dscode.testengine.PKB_props;
 import tools.dscode.testengine.PickleballRunner;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -19,7 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class Release218RecommendationsTest {
 
     @Test
-    void missingRetainedProfileWarnsAndKeepsTheMavenExit(@TempDir Path project) {
+    void missingRetainedProfileWarnsAndKeepsTheMavenExit(@TempDir Path project) throws Exception {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         ByteArrayOutputStream err = new ByteArrayOutputStream();
         int exit = WorkbenchAgentCommands.printCatalog(project,
@@ -27,14 +33,47 @@ class Release218RecommendationsTest {
                 new PrintStream(err, true, StandardCharsets.UTF_8),
                 0, "discover", false, "run-x", null);
         assertEquals(0, exit);
-        String text = err.toString(StandardCharsets.UTF_8);
+        String idle = err.toString(StandardCharsets.UTF_8);
+        assertFalse(idle.contains(WorkbenchAgentCommands.NO_RETAINED_PROFILE_WARNING), idle);
+
+        ByteArrayOutputStream failedErr = new ByteArrayOutputStream();
+        int failed = WorkbenchAgentCommands.printCatalog(project,
+                new PrintStream(new ByteArrayOutputStream()),
+                new PrintStream(failedErr, true, StandardCharsets.UTF_8),
+                3, "discover", false, "run-x", null);
+        assertEquals(3, failed);
+        assertFalse(failedErr.toString(StandardCharsets.UTF_8).contains(WorkbenchAgentCommands.NO_RETAINED_PROFILE_WARNING));
+
+        Path scenario = project.resolve(".pickleball").resolve("runs").resolve("run-x")
+                .resolve("diagnostic").resolve("scenarios").resolve("one");
+        Files.createDirectories(scenario);
+        Files.writeString(scenario.resolve("summary.json"), "{\"outcome\":\"PASSED\"}\n");
+        ByteArrayOutputStream ranErr = new ByteArrayOutputStream();
+        int ran = WorkbenchAgentCommands.printCatalog(project,
+                new PrintStream(new ByteArrayOutputStream(), true, StandardCharsets.UTF_8),
+                new PrintStream(ranErr, true, StandardCharsets.UTF_8),
+                0, "discover", false, "run-x", null);
+        assertEquals(0, ran);
+        String text = ranErr.toString(StandardCharsets.UTF_8);
         assertTrue(text.contains("WARNING: Workbench finished but run-catalog.json has no retained pkb_run_profile."), text);
         assertTrue(text.contains("pkb_reportingmode=diagnostic"), text);
 
-        int failed = WorkbenchAgentCommands.printCatalog(project,
-                new PrintStream(new ByteArrayOutputStream()), new PrintStream(new ByteArrayOutputStream()),
-                3, "discover", false, "run-x", null);
-        assertEquals(3, failed);
+        Map<String, String> values = new LinkedHashMap<>();
+        values.put(PKB_props.PKB_GLUE, "com.example");
+        values.put(PKB_props.PKB_FEATURES, "features");
+        values.put(PKB_props.PKB_DATA_PATH, "data");
+        values.put(PKB_props.PKB_CALL_PATH, "calls");
+        values.put(PKB_props.PKB_COMPONENT_PATH, "component");
+        values.put(PKB_props.PKB_CONFIG_PATH, "configs");
+        values.put(PKB_props.PKB_REPORTING_MODE, "diagnostic");
+        Workspace.writeRunVars(Workspace.directory(project, "run-x"), values);
+        ByteArrayOutputStream diagnosticErr = new ByteArrayOutputStream();
+        int diagnostic = WorkbenchAgentCommands.printCatalog(project,
+                new PrintStream(new ByteArrayOutputStream(), true, StandardCharsets.UTF_8),
+                new PrintStream(diagnosticErr, true, StandardCharsets.UTF_8),
+                0, "discover", false, "run-x", null);
+        assertEquals(0, diagnostic);
+        assertFalse(diagnosticErr.toString(StandardCharsets.UTF_8).contains(WorkbenchAgentCommands.NO_RETAINED_PROFILE_WARNING));
     }
 
     @Test

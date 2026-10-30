@@ -12,6 +12,7 @@ import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -146,17 +147,41 @@ public final class Workspace {
     /**
      * Writes runvars atomically. Sensitive values are stored as protected
      * references. {@code pkb_parallel=auto} is kept as {@code auto}.
+     * Keys in {@code keepLiteral} stay as the captured value. A sensitive key
+     * already stored as a literal stays a literal on later writes.
      */
     public static void writeRunVars(Path workspace, Map<String, String> runVars) {
-        Map<String, String> stored = protect(runVars);
+        writeRunVars(workspace, runVars, Set.of());
+    }
+
+    public static void writeRunVars(Path workspace, Map<String, String> runVars, Set<String> keepLiteral) {
+        Set<String> keep = new LinkedHashSet<>();
+        if (keepLiteral != null) {
+            for (String key : keepLiteral) {
+                if (key != null && !key.isBlank()) keep.add(normalizeKey(key));
+            }
+        }
+        Path file = runvarsFile(workspace);
+        if (Files.isRegularFile(file)) {
+            readRunVars(workspace).forEach((key, value) -> {
+                if (isSensitiveKey(key) && value != null && !value.isBlank() && protectedKey(value) == null) {
+                    keep.add(normalizeKey(key));
+                }
+            });
+        }
+        Map<String, String> stored = protect(runVars, keep);
         StringBuilder body = new StringBuilder();
         new TreeMap<>(stored).forEach((key, value) -> {
             body.append(escape(key)).append('=').append(escape(value == null ? "" : value)).append('\n');
         });
-        atomicWrite(runvarsFile(workspace), body.toString().getBytes(StandardCharsets.UTF_8));
+        atomicWrite(file, body.toString().getBytes(StandardCharsets.UTF_8));
     }
 
     public static Map<String, String> protect(Map<String, String> runVars) {
+        return protect(runVars, Set.of());
+    }
+
+    public static Map<String, String> protect(Map<String, String> runVars, Set<String> keepLiteral) {
         Map<String, String> stored = new LinkedHashMap<>();
         if (runVars == null) return stored;
         runVars.forEach((key, value) -> {
@@ -168,7 +193,8 @@ public final class Workspace {
                 return;
             }
             String text = value == null ? "" : value;
-            if (isSensitiveKey(normalized) && !text.isBlank() && protectedKey(text) == null) {
+            boolean keep = keepLiteral != null && keepLiteral.contains(normalized);
+            if (isSensitiveKey(normalized) && !text.isBlank() && protectedKey(text) == null && !keep) {
                 stored.put(normalized, protectedReference(normalized));
             } else {
                 stored.put(normalized, text);

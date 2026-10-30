@@ -12,8 +12,8 @@ import java.util.TreeSet;
 final class WorkbenchCliHelp {
     private static final Map<String, String> USAGE = Map.ofEntries(
             Map.entry("help", "Usage: help [command|flag]"),
-            Map.entry("discover", "Usage: discover [--tags=<expr>] [--name=<regex>] [--example=<rows>] [--select=<path:line>] [--plan] [--refresh] [--no-narrow|--full-scan] [--runvar=key=value] [--retention=all|failed|none] [--run-id=<id>] [--agent=<id>] [--run-timeout=<seconds>]"),
-            Map.entry("confirm", "Usage: confirm [--tags=<expr>] [--name=<regex>] [--example=<rows>] [--select=<path:line>] [--runvar=key=value] [--run-id=<id>] [--agent=<id>] [--run-timeout=<seconds>]"),
+            Map.entry("discover", "Usage: discover [--tags=<expr>] [--name=<regex>] [--example=<rows>] [--select=<path:line>] [--plan] [--quiet] [--refresh] [--no-narrow|--full-scan] [--runvar=key=value] [--retention=all|failed|none] [--run-id=<id>] [--agent=<id>] [--run-timeout=<seconds>]"),
+            Map.entry("confirm", "Usage: confirm [--tags=<expr>] [--name=<regex>] [--example=<rows>] [--select=<path:line>] [--quiet] [--runvar=key=value] [--run-id=<id>] [--agent=<id>] [--run-timeout=<seconds>]"),
             Map.entry("plan", "Usage: plan [--tags=<expr>] [--name=<regex>] [--example=<rows>] [--select=<path:line>] [--refresh] [--json]"),
             Map.entry("hint", "Usage: hint [--json]"),
             Map.entry("discover-hint", "Usage: discover-hint [--json]"),

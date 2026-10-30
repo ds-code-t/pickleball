@@ -361,13 +361,18 @@ final class WorkbenchMcpTools {
         Path project = services.projectRoot();
         if (project == null) return;
         String run = null;
+        String agent = null;
         if (args != null) {
             Object value = args.get("runId");
             if (value instanceof String text && !text.isBlank()) run = text;
             else if (value != null && !String.valueOf(value).isBlank()) run = String.valueOf(value);
+            Object named = args.get("agentId");
+            if (named == null) named = args.get("agent");
+            if (named != null && !String.valueOf(named).isBlank()) agent = String.valueOf(named);
         }
+        if (agent == null || agent.isBlank()) agent = AgentLog.recordedAgent(project, run);
         try {
-            AgentLog.append(project, Instant.now(), "-", run, "query", op, null);
+            AgentLog.append(project, Instant.now(), agent == null || agent.isBlank() ? "-" : agent, run, "query", op, null);
         } catch (IOException ignored) {
             // The JSON answer is already computed. A short-log failure does not hide it.
         }

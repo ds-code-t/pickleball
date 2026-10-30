@@ -8,6 +8,7 @@ import java.nio.file.Path;
 import java.time.Instant;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class AgentLogTest {
@@ -25,5 +26,15 @@ class AgentLogTest {
         assertEquals(6, second.split("\t", -1).length, second);
         assertTrue(second.endsWith("\t-\t-\tquery\tx y\trec"), second);
         assertEquals(AgentLog.PURPOSE_LIMIT, AgentLog.oneLine("p".repeat(300)).length());
+    }
+
+    @Test
+    void recordedAgentReadsTheRunRecordAndRejectsAnUnsafeId() throws Exception {
+        assertNull(AgentLog.recordedAgent(project, "missing"));
+        assertNull(AgentLog.recordedAgent(project, "../escape"));
+        Path record = project.resolve(".pickleball").resolve("runs").resolve("run-7").resolve("record.json");
+        Files.createDirectories(record.getParent());
+        Files.writeString(record, "{ \"agentId\" : \"agent-7\", \"runId\" : \"run-7\" }\n");
+        assertEquals("agent-7", AgentLog.recordedAgent(project, "run-7"));
     }
 }

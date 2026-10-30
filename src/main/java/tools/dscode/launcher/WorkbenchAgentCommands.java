@@ -77,7 +77,7 @@ public final class WorkbenchAgentCommands {
         try {
             return switch (parsed.command()) {
                 case "export-guidance" -> exportGuidance(parsed, out, err);
-                case "hint", "discover-hint" -> hint(parsed, out);
+                case "hint", "discover-hint" -> hint(parsed, out, err);
                 case "resolve-runvars" -> resolveRunVars(parsed, out);
                 case "workspace-show" -> workspaceShow(parsed, out, err);
                 case "workspace-edit" -> workspaceEdit(parsed, out, err);
@@ -130,9 +130,10 @@ public final class WorkbenchAgentCommands {
         }
     }
 
-    private static int hint(WorkbenchCommandLine.Parsed parsed, PrintStream out) {
+    private static int hint(WorkbenchCommandLine.Parsed parsed, PrintStream out, PrintStream err) {
         if (jsonRequested(parsed)) {
             printDryRunResolve(parsed.project(), false, true, "discover", out);
+            warnRunnerSecrets(parsed.project(), err);
             return 0;
         }
         String named = WorkspaceSeed.namedProjectBrowser(parsed.project());
@@ -150,7 +151,17 @@ public final class WorkbenchAgentCommands {
         out.println();
         out.println("NEXT: run discover");
         printDryRunResolve(parsed.project(), false, false, null, out);
+        warnRunnerSecrets(parsed.project(), err);
         return 0;
+    }
+
+    private static void warnRunnerSecrets(Path project, PrintStream err) {
+        if (err == null) return;
+        PKB_props.ResolvedRunVars resolved = tools.dscode.testengine.PickleballRunner.previewLaunch(project, false);
+        Map<String, String> values = PKB_props.parseAssignments(resolved.runProfile());
+        for (String warning : WorkspaceSeed.runnerComputedSecretWarnings(values)) {
+            err.println(warning);
+        }
     }
 
     private static int help(String[] args, PrintStream out, PrintStream err) {
@@ -286,6 +297,15 @@ public final class WorkbenchAgentCommands {
         out.println("workspace=" + workspace.toAbsolutePath().normalize());
         out.println("fingerprint=" + Workspace.fingerprint(workspace));
         out.println("present=true");
+        try {
+            Map<String, String> stored = Workspace.readRunVars(workspace);
+            String profile = PKB_props.serializeRunVars(new java.util.TreeMap<>(stored));
+            LastDiscoverSnapshot.write(
+                    parsed.project(), runId, null, profile, parsed.coordination().agentId()
+            );
+        } catch (IOException failure) {
+            err.println("WARNING: discover snapshot was not written. " + failure.getMessage());
+        }
         WorkbenchOneShotLaunch.capture(parsed.project(), err);
         return 0;
     }
@@ -502,6 +522,7 @@ public final class WorkbenchAgentCommands {
             Observed observed = observe(parsed.project(), run.runId(), exit, empty);
             String status = observed.status();
             int reported = observed.exitCode();
+            if ("LAUNCH_ERROR".equals(status)) printLaunchError(run.runId(), capturedOut, capturedErr, err, exit);
             if (empty) printEmpty(parsed, browser, out, err);
             AgentCoordination.finish(
                     parsed.project(),
@@ -536,13 +557,20 @@ public final class WorkbenchAgentCommands {
         try {
             launchNote(parsed.project(), run.runId(), "command", "confirm");
             echoFilters(parsed, out);
-            LastDiscoverSnapshot.Snapshot snapshot = LastDiscoverSnapshot.requireScoped(
-                    parsed.project(),
-                    parsed.coordination().agentId(),
-                    parsed.coordination().runId()
-            );
-            Map<String, String> retained = LastDiscoverSnapshot.retainedRunVars(snapshot);
-            String fromRun = snapshot.runId();
+            LastDiscoverSnapshot.Snapshot snapshot = null;
+            Map<String, String> retained = new LinkedHashMap<>();
+            String fromRun = null;
+            try {
+                snapshot = LastDiscoverSnapshot.requireScoped(
+                        parsed.project(),
+                        parsed.coordination().agentId(),
+                        parsed.coordination().runId()
+                );
+                retained = LastDiscoverSnapshot.retainedRunVars(snapshot);
+                fromRun = snapshot.runId();
+            } catch (RuntimeException missing) {
+                if (!Workspace.exists(Workspace.directory(parsed.project(), run.runId()))) throw missing;
+            }
             Path fromWorkspace = fromRun == null ? null : Workspace.directory(parsed.project(), fromRun);
             String tags = tagsForLaunch(
                     null,
@@ -599,6 +627,7 @@ public final class WorkbenchAgentCommands {
             Observed observed = observe(parsed.project(), run.runId(), exit, empty);
             String status = observed.status();
             int reported = observed.exitCode();
+            if ("LAUNCH_ERROR".equals(status)) printLaunchError(run.runId(), capturedOut, capturedErr, err, exit);
             if (empty) printEmpty(parsed, browser, out, err);
             AgentCoordination.finish(
                     parsed.project(),
@@ -636,8 +665,9 @@ public final class WorkbenchAgentCommands {
             ByteArrayOutputStream capturedErr,
             MavenRunner maven
     ) {
-        Bounded result = runBounded(parsed, command,
-                new WorkbenchRunReports.Tee(out, capturedOut), new WorkbenchRunReports.Tee(err, capturedErr), maven);
+        PrintStream captureOut = new PrintStream(capturedOut, true, StandardCharsets.UTF_8);
+        PrintStream captureErr = new PrintStream(capturedErr, true, StandardCharsets.UTF_8);
+        Bounded result = runBounded(parsed, command, captureOut, captureErr, maven);
         if (result.timedOut() || result.exit() == 0 || !ConsumerMavenTestRunner.hasOfflineFlag(command)) return result;
         String text = capturedOut.toString(java.nio.charset.StandardCharsets.UTF_8)
                 + capturedErr.toString(java.nio.charset.StandardCharsets.UTF_8);
@@ -646,8 +676,7 @@ public final class WorkbenchAgentCommands {
         err.println("Workbench: offline launch is missing a build plugin; retrying once online.");
         capturedOut.reset();
         capturedErr.reset();
-        return runBounded(parsed, ConsumerMavenTestRunner.withoutOffline(command),
-                new WorkbenchRunReports.Tee(out, capturedOut), new WorkbenchRunReports.Tee(err, capturedErr), maven);
+        return runBounded(parsed, ConsumerMavenTestRunner.withoutOffline(command), captureOut, captureErr, maven);
     }
 
     /**
@@ -970,6 +999,9 @@ public final class WorkbenchAgentCommands {
         try {
             String agent = parsed.coordination().agentId();
             String run = parsed.coordination().runId();
+            if (agent == null || agent.isBlank()) {
+                agent = tools.dscode.control.protocol.AgentLog.recordedAgent(parsed.project(), run);
+            }
             AgentCoordination.appendLog(
                     parsed.project(),
                     Instant.now(),
@@ -1583,6 +1615,7 @@ public final class WorkbenchAgentCommands {
     ) {
         try {
             String console = capturedOut.toString(StandardCharsets.UTF_8) + capturedErr.toString(StandardCharsets.UTF_8);
+            boolean quiet = parsed.quiet();
             WorkbenchRunReports.publish(
                     parsed.project(),
                     run.runId(),
@@ -1591,8 +1624,11 @@ public final class WorkbenchAgentCommands {
                     status,
                     environment,
                     browser,
-                    out
+                    quiet ? null : out
             );
+            if (!quiet && out != null && run.runId() != null && !run.runId().isBlank()) {
+                out.println("console=.pickleball/runs/" + run.runId() + "/console/");
+            }
         } catch (Exception failure) {
             err.println("Workbench summary was not written: " + failure.getMessage());
         }
@@ -1620,6 +1656,141 @@ public final class WorkbenchAgentCommands {
         return parsed.coordination().agentId();
     }
 
+    private static boolean inconclusive(AgentCoordination.DiagnosticSignal signal) {
+        if (signal == null || signal.outcome() == null || signal.outcome().isBlank()) return true;
+        return "RUNNING".equalsIgnoreCase(signal.outcome()) || "IN_PROGRESS".equalsIgnoreCase(signal.outcome());
+    }
+
+    private static void printLaunchError(
+            String runId,
+            ByteArrayOutputStream capturedOut,
+            ByteArrayOutputStream capturedErr,
+            PrintStream err,
+            int exit
+    ) {
+        String captured = capturedOut.toString(StandardCharsets.UTF_8) + capturedErr.toString(StandardCharsets.UTF_8);
+        String cause = launchCause(captured);
+        if (cause == null || cause.isBlank()) cause = "Maven exited " + exit + " before any scenario.";
+        err.print(WorkbenchCliHelp.structured(
+                cause,
+                "Full output is in .pickleball/runs/" + runId + "/console/"
+        ));
+    }
+
+    static String launchCause(String captured) {
+        if (captured == null || captured.isBlank()) return null;
+        String caused = null;
+        String exception = null;
+        String error = null;
+        for (String raw : captured.split("\\R")) {
+            String line = raw.strip();
+            if (line.isEmpty()) continue;
+            if (line.startsWith("Caused by:")) {
+                caused = line;
+                continue;
+            }
+            if (!line.startsWith("at ") && !line.startsWith("[ERROR]")
+                    && (line.contains("Exception") || line.matches(".*\\bError:.*"))) {
+                exception = line;
+            }
+            if (line.startsWith("[ERROR]") && !mavenNoise(line)) error = line;
+        }
+        if (caused != null) return caused;
+        if (exception != null) return exception;
+        return error;
+    }
+
+    private static boolean mavenNoise(String line) {
+        return line.contains("Please refer")
+                || line.contains("To see the full stack")
+                || line.contains("Re-run Maven")
+                || line.contains("-> [Help");
+    }
+
+    static boolean shouldWarnMissingProfile(Path project, String runId) {
+        if (!testsRan(project, runId)) return false;
+        if (project == null || runId == null || runId.isBlank()) return false;
+        Path workspace = Workspace.directory(project, runId);
+        if (!Workspace.exists(workspace)) return true;
+        String mode = Workspace.readRunVars(workspace).get(PKB_props.PKB_REPORTING_MODE);
+        if (mode == null || mode.isBlank()) return true;
+        return !"diagnostic".equalsIgnoreCase(mode.trim());
+    }
+
+    private static boolean testsRan(Path project, String runId) {
+        if (project == null || runId == null || runId.isBlank()) return false;
+        try {
+            if (hasScenarioDir(AgentCoordination.runDirectory(project, runId).resolve("diagnostic"))) return true;
+            if (hasScenarioDir(project.resolve("reports").resolve("diagnostic-runs").resolve(runId))) return true;
+        } catch (RuntimeException | IOException ignored) {
+            // An unsafe run id is not evidence that tests ran.
+        }
+        Path index = AgentCoordination.findRunIndex(project, runId);
+        if (index != null && Files.isRegularFile(index)) {
+            try {
+                JsonNode root = JSON.readTree(index.toFile());
+                int total = root.path("counts").path("total").asInt(0);
+                if (total > 0 && "COMPLETE".equalsIgnoreCase(root.path("completion").asText(""))) return true;
+            } catch (IOException ignored) {
+                // Unreadable index is not a completed run.
+            }
+        }
+        Instant started = recordStarted(safeRecord(project, runId));
+        return surefireTestsRan(project, started);
+    }
+
+    private static Path safeRecord(Path project, String runId) {
+        try {
+            return AgentCoordination.runDirectory(project, runId).resolve(AgentCoordination.RECORD_FILE);
+        } catch (RuntimeException ignored) {
+            return null;
+        }
+    }
+
+    private static boolean hasScenarioDir(Path root) throws IOException {
+        if (root == null || !Files.isDirectory(root)) return false;
+        try (var walk = Files.walk(root, 6)) {
+            return walk.anyMatch(path -> {
+                if (!Files.isDirectory(path)) return false;
+                Path parent = path.getParent();
+                if (parent == null || parent.getFileName() == null) return false;
+                if (!"scenarios".equals(parent.getFileName().toString())) return false;
+                return Files.isRegularFile(path.resolve("events.jsonl"))
+                        || Files.isRegularFile(path.resolve("summary.json"));
+            });
+        }
+    }
+
+    private static boolean surefireTestsRan(Path project, Instant started) {
+        Pattern tests = Pattern.compile("\\btests=\"(\\d+)\"");
+        for (Path dir : List.of(
+                project.resolve("target").resolve("surefire-reports"),
+                project.resolve("build").resolve("test-results").resolve("test")
+        )) {
+            if (!Files.isDirectory(dir)) continue;
+            try (var children = Files.list(dir)) {
+                for (Path file : children.filter(Files::isRegularFile).toList()) {
+                    String name = file.getFileName() == null ? "" : file.getFileName().toString();
+                    if (!name.endsWith(".xml")) continue;
+                    if (started != null && !surefireBelongsToRun(file, started)) continue;
+                    String text;
+                    try {
+                        text = Files.readString(file);
+                    } catch (IOException ignored) {
+                        continue;
+                    }
+                    Matcher matcher = tests.matcher(text);
+                    while (matcher.find()) {
+                        if (Integer.parseInt(matcher.group(1)) > 0) return true;
+                    }
+                }
+            } catch (IOException ignored) {
+                // A missing report directory is not a result.
+            }
+        }
+        return false;
+    }
+
     private record Observed(String status, int exitCode, int failureCount, String failureSummary) {
         private Observed(String status, int exitCode) {
             this(status, exitCode, 0, null);
@@ -1636,7 +1807,9 @@ public final class WorkbenchAgentCommands {
         if (empty) {
             return new Observed("EMPTY", mavenExit == 0 ? 1 : mavenExit);
         }
-        AgentCoordination.DiagnosticSignal signal = AgentCoordination.readDiagnosticSignal(project, runId);
+        AgentCoordination.DiagnosticSignal signal = AgentCoordination.readDiagnosticSignal(
+                project, runId, recordStarted(AgentCoordination.runDirectory(project, runId).resolve(AgentCoordination.RECORD_FILE))
+        );
         if (signal != null && (signal.failed() || "PASSED".equalsIgnoreCase(signal.outcome()))) {
             if (signal.failed()) {
                 int exit = mavenExit == 0 ? Math.max(signal.failureCount(), 1) : mavenExit;
@@ -1645,6 +1818,9 @@ public final class WorkbenchAgentCommands {
             return new Observed("PASSED", 0);
         }
         DiagnosticVerdict verdict = surefireVerdict(project, AgentCoordination.runDirectory(project, runId).resolve(AgentCoordination.RECORD_FILE));
+        if (mavenExit != 0 && inconclusive(signal) && (verdict == null || (!verdict.failed() && !verdict.passed()))) {
+            return new Observed("LAUNCH_ERROR", mavenExit);
+        }
         if (verdict == null) {
             return new Observed(mavenExit == 0 ? "PASSED" : "FAILED", mavenExit);
         }
@@ -1766,7 +1942,7 @@ public final class WorkbenchAgentCommands {
             LastDiscoverSnapshot.CatalogRun latest = LastDiscoverSnapshot.catalogRun(project, purpose, runId);
             if (latest == null) latest = LastDiscoverSnapshot.latestCatalogRun(project);
             if (latest == null || latest.runProfile() == null || latest.runProfile().isBlank()) {
-                err.println(NO_RETAINED_PROFILE_WARNING);
+                if (shouldWarnMissingProfile(project, runId)) err.println(NO_RETAINED_PROFILE_WARNING);
                 return mavenExit;
             }
             if (writeSnapshot) {

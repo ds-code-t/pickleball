@@ -45,7 +45,7 @@ final class WorkbenchCommandLine {
             "--run-id", "--agent", "--agent-id", "--group", "--sequence",
             "--who", "--why", "--learned", "--text", "--to", "--from", "--limit",
             "--write", "--list", "--take", "--touch", "--sweep", "--renew", "--append",
-            "--id", "--version", "--ttl", "--step-timeout", "--run-timeout"
+            "--id", "--version", "--ttl", "--step-timeout", "--run-timeout", "--quiet"
     );
 
     private WorkbenchCommandLine() {
@@ -98,7 +98,8 @@ final class WorkbenchCommandLine {
             List<String> runVars,
             List<String> selects,
             Long stepTimeoutSeconds,
-            Long runTimeoutSeconds
+            Long runTimeoutSeconds,
+            boolean quiet
     ) {
         public Parsed {
             selects = selects == null ? List.of() : List.copyOf(selects);
@@ -140,14 +141,14 @@ final class WorkbenchCommandLine {
         args = sessionQueryArgs(normalizeFlags(args));
         Path cwd = Path.of("").toAbsolutePath().normalize();
         if (args == null || args.length == 0) {
-            return new Parsed("ui", cwd, null, null, null, null, null, new String[]{"ui", cwd.toString()}, Coordination.empty(), null, false, false, false, List.of(), List.of(), null, null);
+            return new Parsed("ui", cwd, null, null, null, null, null, new String[]{"ui", cwd.toString()}, Coordination.empty(), null, false, false, false, List.of(), List.of(), null, null, false);
         }
         String command = args[0];
         if ("export-guidance".equals(command) || "help".equals(command)) {
             Path output = "export-guidance".equals(command) && args.length >= 2 && !isFlag(args[1])
                     ? Path.of(args[1])
                     : Path.of(".pickleball");
-            return new Parsed(command, cwd, output, null, null, null, null, args.clone(), Coordination.empty(), null, false, false, false, List.of(), List.of(), null, null);
+            return new Parsed(command, cwd, output, null, null, null, null, args.clone(), Coordination.empty(), null, false, false, false, List.of(), List.of(), null, null, false);
         }
 
         String tags = null;
@@ -183,6 +184,7 @@ final class WorkbenchCommandLine {
         List<String> selects = new ArrayList<>();
         Long stepTimeoutSeconds = null;
         Long runTimeoutSeconds = null;
+        boolean quiet = false;
         String absorb = null;
         boolean tagsSplitOpen = false;
         List<String> splitTags = new ArrayList<>();
@@ -251,6 +253,11 @@ final class WorkbenchCommandLine {
             }
             if ("--plan".equals(token)) {
                 planOnly = true;
+                absorb = null;
+                continue;
+            }
+            if ("--quiet".equals(token)) {
+                quiet = true;
                 absorb = null;
                 continue;
             }
@@ -568,12 +575,12 @@ final class WorkbenchCommandLine {
             forwarded.addAll(rest);
             return new Parsed(
                     command, project, null, tags, name, example, retention, forwarded.toArray(String[]::new),
-                    coordination, version, planOnly, refreshIndex, fullScan, runVars, selects, stepTimeoutSeconds, runTimeoutSeconds
+                    coordination, version, planOnly, refreshIndex, fullScan, runVars, selects, stepTimeoutSeconds, runTimeoutSeconds, quiet
             );
         }
         return new Parsed(
                 command, project, null, tags, name, example, retention, args.clone(),
-                coordination, version, planOnly, refreshIndex, fullScan, runVars, selects, stepTimeoutSeconds, runTimeoutSeconds
+                coordination, version, planOnly, refreshIndex, fullScan, runVars, selects, stepTimeoutSeconds, runTimeoutSeconds, quiet
         );
     }
 

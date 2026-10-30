@@ -202,9 +202,33 @@ class AgentCoordinationTest {
     @Test
     void adoptingAnExistingRunDoesNotWriteASecondStartLine() throws Exception {
         AgentCoordination.begin(project, request("run-adopt", "agent-adopt"));
-        AgentCoordination.begin(project, request("run-adopt", "agent-adopt"));
+        AgentCoordination.begin(project, request("run-adopt", "agent-adopt"), Instant.now(), null, false);
         long starts = AgentCoordination.readLog(project).stream().filter(line -> line.contains("\tstart\t")).count();
         assertEquals(1, starts);
+    }
+
+    @Test
+    void relaunchRewritesStatusCountsAndWritesStartAndStop() throws Exception {
+        AgentCoordination.Run run = AgentCoordination.begin(project, request("run-again", "agent-again"));
+        AgentCoordination.finish(project, run.runId(), "first", "FAILED");
+        String failed = Files.readString(run.recordFile());
+        assertTrue(failed.contains("\"status\" : \"FAILED\""), failed);
+        AgentCoordination.begin(project, request("run-again", "agent-again"));
+        String reset = Files.readString(run.recordFile());
+        assertTrue(reset.contains("\"status\" : \"RUNNING\""), reset);
+        assertTrue(reset.contains("\"stoppedAt\" : null"), reset);
+        assertTrue(reset.contains("\"failureCount\" : null"), reset);
+        long starts = AgentCoordination.readLog(project).stream().filter(line -> line.contains("\tstart\t")).count();
+        assertEquals(2, starts);
+        AgentCoordination.finish(project, run.runId(), null, "PASSED");
+        String passed = Files.readString(run.recordFile());
+        assertTrue(passed.contains("\"status\" : \"PASSED\""), passed);
+        assertFalse(passed.contains("\"failureCount\" : 1"), passed);
+        long stops = AgentCoordination.readLog(project).stream().filter(line -> line.contains("\tstop\t")).count();
+        assertEquals(2, stops);
+        AgentCoordination.finish(project, run.runId(), null, "STOPPED");
+        long stopsAfterSession = AgentCoordination.readLog(project).stream().filter(line -> line.contains("\tstop\t")).count();
+        assertEquals(3, stopsAfterSession);
     }
 
     @Test

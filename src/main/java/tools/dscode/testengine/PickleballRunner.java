@@ -286,6 +286,10 @@ public abstract class PickleballRunner {
         java.util.Map<String, String> loaded = Workspace.loadForLaunch(workspace, selection);
         values.clear();
         values.putAll(loaded);
+        String purpose = System.getProperty(PKB_props.PKB_RUN_PURPOSE);
+        if (purpose != null && !purpose.isBlank()) {
+            values.put(PKB_props.PKB_RUN_PURPOSE, purpose.trim());
+        }
         resolveProtectedReferences(readProjectProperties());
         applyPkbAliases();
         syncCanonicalAndAliasKeys();

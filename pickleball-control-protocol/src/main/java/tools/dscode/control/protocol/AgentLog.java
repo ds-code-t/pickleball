@@ -8,6 +8,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.time.Instant;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * The one writer for {@code .pickleball/agent-log}.
@@ -67,5 +69,27 @@ public final class AgentLog {
         if (collapsed.isEmpty()) return "-";
         if (collapsed.length() <= PURPOSE_LIMIT) return collapsed;
         return collapsed.substring(0, PURPOSE_LIMIT);
+    }
+
+    private static final Pattern AGENT_ID = Pattern.compile("\"agentId\"\\s*:\\s*\"([^\"]*)\"");
+
+    /**
+     * Agent id stored on {@code .pickleball/runs/<runId>/record.json}, or null
+     * when the run or the field is missing. Query lines use this when the
+     * caller did not pass {@code --agent}.
+     */
+    public static String recordedAgent(Path project, String runId) {
+        if (project == null || runId == null || runId.isBlank()) return null;
+        if (runId.indexOf('/') >= 0 || runId.indexOf('\\') >= 0 || runId.contains("..")) return null;
+        Path record = PickleballLocalLayout.root(project).resolve("runs").resolve(runId).resolve("record.json");
+        if (!Files.isRegularFile(record)) return null;
+        try {
+            Matcher matcher = AGENT_ID.matcher(Files.readString(record, StandardCharsets.UTF_8));
+            if (!matcher.find()) return null;
+            String id = matcher.group(1).trim();
+            return id.isEmpty() ? null : id;
+        } catch (IOException ignored) {
+            return null;
+        }
     }
 }
