@@ -490,13 +490,7 @@ public final class WorkbenchAgentCommands {
             ByteArrayOutputStream capturedOut = new ByteArrayOutputStream();
             ByteArrayOutputStream capturedErr = new ByteArrayOutputStream();
             launchNote(parsed.project(), run.runId(), "maven-start", "");
-            Bounded mavenResult = runBounded(
-                    parsed,
-                    command,
-                    new WorkbenchRunReports.Tee(out, capturedOut),
-                    new WorkbenchRunReports.Tee(err, capturedErr),
-                    maven
-            );
+            Bounded mavenResult = runWithOnlineFallback(parsed, run.runId(), command, out, err, capturedOut, capturedErr, maven);
             launchNote(parsed.project(), run.runId(), "maven-done", "exit=" + mavenResult.exit() + " timedOut=" + mavenResult.timedOut());
             if (mavenResult.timedOut()) {
                 publishQuietly(parsed, run, selection, capturedOut, capturedErr, "TIMEOUT", environment, browser, out, err);
@@ -592,13 +586,7 @@ public final class WorkbenchAgentCommands {
             ByteArrayOutputStream capturedOut = new ByteArrayOutputStream();
             ByteArrayOutputStream capturedErr = new ByteArrayOutputStream();
             launchNote(parsed.project(), run.runId(), "maven-start", "");
-            Bounded mavenResult = runBounded(
-                    parsed,
-                    command,
-                    new WorkbenchRunReports.Tee(out, capturedOut),
-                    new WorkbenchRunReports.Tee(err, capturedErr),
-                    maven
-            );
+            Bounded mavenResult = runWithOnlineFallback(parsed, run.runId(), command, out, err, capturedOut, capturedErr, maven);
             launchNote(parsed.project(), run.runId(), "maven-done", "exit=" + mavenResult.exit() + " timedOut=" + mavenResult.timedOut());
             if (mavenResult.timedOut()) {
                 publishQuietly(parsed, run, selection, capturedOut, capturedErr, "TIMEOUT", environment, browser, out, err);
@@ -630,6 +618,34 @@ public final class WorkbenchAgentCommands {
     }
 
     private record Bounded(int exit, boolean timedOut) {
+    }
+
+    /**
+     * Runs the launch. When a warm offline launch fails only because a plugin or provider was never
+     * downloaded, it re-runs once online and notes stage=maven-retry-online.
+     */
+    private static Bounded runWithOnlineFallback(
+            WorkbenchCommandLine.Parsed parsed,
+            String runId,
+            List<String> command,
+            PrintStream out,
+            PrintStream err,
+            ByteArrayOutputStream capturedOut,
+            ByteArrayOutputStream capturedErr,
+            MavenRunner maven
+    ) {
+        Bounded result = runBounded(parsed, command,
+                new WorkbenchRunReports.Tee(out, capturedOut), new WorkbenchRunReports.Tee(err, capturedErr), maven);
+        if (result.timedOut() || result.exit() == 0 || !ConsumerMavenTestRunner.hasOfflineFlag(command)) return result;
+        String text = capturedOut.toString(java.nio.charset.StandardCharsets.UTF_8)
+                + capturedErr.toString(java.nio.charset.StandardCharsets.UTF_8);
+        if (!ConsumerMavenTestRunner.offlineResolutionFailure(text)) return result;
+        launchNote(parsed.project(), runId, "maven-retry-online", "offlineExit=" + result.exit());
+        err.println("Workbench: offline launch is missing a build plugin; retrying once online.");
+        capturedOut.reset();
+        capturedErr.reset();
+        return runBounded(parsed, ConsumerMavenTestRunner.withoutOffline(command),
+                new WorkbenchRunReports.Tee(out, capturedOut), new WorkbenchRunReports.Tee(err, capturedErr), maven);
     }
 
     /**

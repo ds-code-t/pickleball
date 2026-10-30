@@ -108,6 +108,11 @@ class MavenWorkspaceLaunchEndToEndTest {
         }
 
         Run launched = run(project, command, 4);
+        if (launched.exit != 0 && ConsumerMavenTestRunner.hasOfflineFlag(command)
+                && ConsumerMavenTestRunner.offlineResolutionFailure(launched.text())) {
+            // Same one-time online retry the Workbench launch makes (stage=maven-retry-online).
+            launched = run(project, ConsumerMavenTestRunner.withoutOffline(command), 4);
+        }
         String evidence = launched.text() + "\n" + surefireText(project) + "\n" + probeFile(project);
         String probe = probeFile(project);
         assertEquals(0, launched.exit, evidence);

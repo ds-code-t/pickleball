@@ -519,3 +519,5 @@ mvnw -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java "-Dexec.mainClass=tools.d
 ```
 
 or `-Dpkb_runvars="pkb_tags=@agent-pointer-eval, pkb_browser=CHROME_HEADLESS"`. Do not add this tag to consumer `AGENTS.md` or Copilot pointer files.
+
+A warm launch adds `-o` (Maven) or `--offline` (Gradle) once the project has compiled test classes. If that offline launch fails only because a build plugin or provider was never downloaded (output contains `in offline mode` or `has not been downloaded from it before`), `discover` and `confirm` re-run the same command once without the offline flag and write `stage=maven-retry-online` to `launch-timing.txt`. Any other failure is reported as is. A normal `mvn test` is unchanged.

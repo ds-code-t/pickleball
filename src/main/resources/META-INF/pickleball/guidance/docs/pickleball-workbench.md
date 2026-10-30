@@ -695,3 +695,5 @@ For changed consumer bridge behavior, use only the affected focused tags—never
 ```
 
 Run these invocations sequentially because the scenarios deliberately verify the process-global bridge bootstrap.
+
+A warm launch adds `-o` (Maven) or `--offline` (Gradle) once the project has compiled test classes. If that offline launch fails only because a build plugin or provider was never downloaded (output contains `in offline mode` or `has not been downloaded from it before`), `discover` and `confirm` re-run the same command once without the offline flag and write `stage=maven-retry-online` to `launch-timing.txt`. Any other failure is reported as is. A normal `mvn test` is unchanged.

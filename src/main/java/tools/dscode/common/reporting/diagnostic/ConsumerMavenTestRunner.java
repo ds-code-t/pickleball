@@ -108,6 +108,26 @@ public final class ConsumerMavenTestRunner {
      * the local repository has the resolved plugins and dependencies. A fresh
      * checkout stays online. A normal {@code mvn test} does not call this.
      */
+    /** Build-tool output that means an offline launch failed only because a plugin or provider was never downloaded. */
+    public static boolean offlineResolutionFailure(String output) {
+        if (output == null) return false;
+        return output.contains("in offline mode") || output.contains("has not been downloaded from it before");
+    }
+
+    /** True when {@code command} carries the warm-launch offline flag ({@code -o} or {@code --offline}). */
+    public static boolean hasOfflineFlag(List<String> command) {
+        return command.contains("-o") || command.contains("--offline");
+    }
+
+    /** The same launch without the warm-launch offline flag. Every other argument is kept in order. */
+    public static List<String> withoutOffline(List<String> command) {
+        List<String> online = new ArrayList<>(command.size());
+        for (String argument : command) {
+            if (!argument.equals("-o") && !argument.equals("--offline")) online.add(argument);
+        }
+        return List.copyOf(online);
+    }
+
     static boolean offlineSafe(Path projectRoot) {
         Path project = projectRoot.toAbsolutePath().normalize();
         if (Files.isRegularFile(project.resolve("pom.xml"))) {
