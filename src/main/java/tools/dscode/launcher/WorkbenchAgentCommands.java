@@ -747,7 +747,11 @@ public final class WorkbenchAgentCommands {
                 );
             }
         }
-        return selection.featureProperty();
+        List<String> uris = WorkbenchFeatureIndex.prefilteredFeatures(selection);
+        if (uris.isEmpty()) return null;
+        String property = selection.featureProperty();
+        if (property != null && property.strip().startsWith("@")) return property.strip();
+        return String.join(",", uris);
     }
 
     private static void launchNote(Path project, String runId, String stage, String detail) {

@@ -14,7 +14,6 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
-import java.util.stream.Stream;
 
 /**
  * Project-owned feature/scenario index for the Workbench picker.
@@ -25,10 +24,9 @@ import java.util.stream.Stream;
  * value when it is already present in project-owned configuration. It does
  * not crawl a git worktree or invent a second project model.</p>
  *
- * <p>Feature/Scenario titles and Gherkin tags are read as structure labels for
- * browsing only. Feature, Rule, scenario/outline, and Examples tags are
- * inherited the same way Cucumber does. This class does not match or execute
- * steps and does not call Cucumber.</p>
+ * <p>Feature and scenario rows come from {@link WorkbenchFeatureIndex#indexedFeatures}.
+ * This class does not parse Gherkin a second time. It copies the scenario text for the
+ * picker. It does not match or execute steps and does not call Cucumber.</p>
  */
 public final class ConsumerFeatureCatalog {
     public enum BrowseMode {
@@ -252,109 +250,83 @@ public final class ConsumerFeatureCatalog {
 
     static List<FeatureEntry> discover(Path projectRoot, WorkbenchManifest manifest) {
         Path root = projectRoot.toAbsolutePath().normalize();
-        LinkedHashSet<Path> searchRoots = new LinkedHashSet<>();
-        addIfDirectory(searchRoots, root.resolve("src").resolve("test").resolve("resources").resolve("features"));
-        addIfDirectory(searchRoots, root.resolve("src").resolve("test").resolve("resources"));
-        if (manifest != null) {
-            for (String source : manifest.sourceRoots()) {
-                if (source == null || source.isBlank()) continue;
-                Path sourceRoot = Path.of(source).toAbsolutePath().normalize();
-                addIfDirectory(searchRoots, sourceRoot);
-                addIfDirectory(searchRoots, sourceRoot.resolve("features"));
-            }
-            if (manifest.liveOutput() != null && !manifest.liveOutput().isBlank()) {
-                Path live = Path.of(manifest.liveOutput()).toAbsolutePath().normalize();
-                addIfDirectory(searchRoots, live.resolve("features"));
-            }
-        }
-        for (Path configured : configuredFeatureRoots(root)) {
-            addIfDirectory(searchRoots, configured);
-        }
-
-        LinkedHashSet<Path> files = new LinkedHashSet<>();
-        for (Path searchRoot : searchRoots) {
-            collectFeatureFiles(searchRoot, files);
-        }
-
-        List<FeatureEntry> entries = new ArrayList<>();
-        LinkedHashSet<Path> seen = new LinkedHashSet<>();
-        for (Path file : files) {
-            Path absolute = file.toAbsolutePath().normalize();
-            if (!seen.add(absolute)) continue;
-            try {
-                entries.add(readFeature(root, absolute));
-            } catch (IOException ignored) {
-                // Skip unreadable files; the picker should not fail the whole catalog.
-            }
-        }
-        entries.sort(Comparator.comparing(FeatureEntry::relativePath, String.CASE_INSENSITIVE_ORDER));
-        readSharedIndex(root, manifest);
-        return List.copyOf(entries);
-    }
-
-    /**
-     * The picker and {@code plan}/{@code discover} share {@code feature-index.v3}.
-     * A failure here leaves the catalog entries already parsed; it does not hide features.
-     */
-    private static void readSharedIndex(Path root, WorkbenchManifest manifest) {
         List<Path> extras = new ArrayList<>();
         if (manifest != null) {
             for (String source : manifest.sourceRoots()) {
                 if (source == null || source.isBlank()) continue;
                 extras.add(Path.of(source));
             }
-        }
-        try {
-            WorkbenchFeatureIndex.select(new WorkbenchFeatureIndex.Request(
-                    root,
-                    extras,
-                    null,
-                    null,
-                    null,
-                    List.of(),
-                    false
-            ));
-        } catch (RuntimeException ignored) {
-            // The text catalog remains usable when the shared index cannot be written.
-        }
-    }
-
-    static List<Path> configuredFeatureRoots(Path projectRoot) {
-        List<Path> roots = new ArrayList<>();
-        List<Path> propertyFiles = List.of(
-                projectRoot.resolve("src").resolve("test").resolve("resources").resolve("pickleball.properties"),
-                projectRoot.resolve("src").resolve("main").resolve("resources").resolve("pickleball.properties"),
-                projectRoot.resolve("pickleball.properties")
-        );
-        for (Path file : propertyFiles) {
-            if (!Files.isRegularFile(file)) continue;
-            try {
-                for (String line : Files.readAllLines(file, StandardCharsets.UTF_8)) {
-                    String trimmed = line.strip();
-                    if (trimmed.startsWith("#") || !trimmed.contains("pkb_features")) continue;
-                    String value = featurePathValue(trimmed);
-                    for (String part : value.split(",")) {
-                        Path resolved = resolveConfiguredFeatures(projectRoot, part);
-                        if (resolved != null) roots.add(resolved);
-                    }
-                }
-            } catch (IOException ignored) {
-                // Configuration is optional discovery input.
+            if (manifest.liveOutput() != null && !manifest.liveOutput().isBlank()) {
+                extras.add(Path.of(manifest.liveOutput()).resolve("features"));
             }
         }
-        return roots;
-    }
-
-    static String featurePathValue(String line) {
-        int equals = line.indexOf('=');
-        if (equals < 0) return "";
-        String raw = line.substring(equals + 1).strip();
-        if (raw.startsWith("\"") && raw.endsWith("\"") && raw.length() >= 2) {
-            raw = raw.substring(1, raw.length() - 1);
+        List<WorkbenchFeatureIndex.IndexedFeature> indexed = WorkbenchFeatureIndex.indexedFeatures(
+                new WorkbenchFeatureIndex.Request(root, extras, null, null, null, List.of(), false)
+        );
+        List<FeatureEntry> entries = new ArrayList<>();
+        for (WorkbenchFeatureIndex.IndexedFeature feature : indexed) {
+            Path file = root.resolve(feature.relativePath()).toAbsolutePath().normalize();
+            if (!Files.isRegularFile(file)) continue;
+            entries.add(entryFromIndex(root, file, feature));
         }
-        return raw;
+        entries.sort(Comparator.comparing(FeatureEntry::relativePath, String.CASE_INSENSITIVE_ORDER));
+        return List.copyOf(entries);
     }
 
+    /**
+     * Picker rows come from the persistent index. File bytes are copied for the scenario
+     * body only; they are not parsed again.
+     */
+    private static FeatureEntry entryFromIndex(Path projectRoot, Path file, WorkbenchFeatureIndex.IndexedFeature indexed) {
+        List<String> lines;
+        try {
+            lines = Files.readAllLines(file, StandardCharsets.UTF_8);
+        } catch (IOException failure) {
+            lines = List.of();
+        }
+        List<String> header = new ArrayList<>();
+        for (String line : lines) {
+            String trimmed = line.strip();
+            if (trimmed.startsWith("Feature:") || trimmed.startsWith("Business Need:") || trimmed.startsWith("Ability:")) {
+                header.add(line);
+                break;
+            }
+        }
+        List<ScenarioEntry> scenarios = new ArrayList<>();
+        String relativePath = indexed.relativePath().replace('\\', '/');
+        for (WorkbenchFeatureIndex.IndexedScenario scenario : indexed.scenarios()) {
+            List<String> body = new ArrayList<>();
+            if (!header.isEmpty()) {
+                body.addAll(header);
+                body.add("");
+            }
+            int start = Math.max(0, scenario.startLine() - 1);
+            int end = Math.max(start, scenario.endLine() - 1);
+            for (int i = start; i <= end && i < lines.size(); i++) body.add(lines.get(i));
+            while (!body.isEmpty() && body.getLast().isBlank()) body.removeLast();
+            scenarios.add(new ScenarioEntry(
+                    scenario.name(),
+                    indexed.featureName(),
+                    file,
+                    relativePath,
+                    scenario.startLine(),
+                    scenario.endLine(),
+                    body,
+                    scenario.ownTags(),
+                    scenario.effectiveTags(),
+                    scenario.exampleRow(),
+                    scenario.exampleLabel(),
+                    scenario.focusLine()
+            ));
+        }
+        int slash = relativePath.lastIndexOf('/');
+        String directory = slash < 0 ? "" : relativePath.substring(0, slash);
+        String fileName = file.getFileName() == null ? relativePath : file.getFileName().toString();
+        String featureName = indexed.featureName().isBlank() ? fileName : indexed.featureName();
+        return new FeatureEntry(file, relativePath, featureName, directory, fileName, scenarios, indexed.featureTags());
+    }
+
+    /** Resolves one {@code pkb_features} token. {@code file:} and a bare relative path use test resources. */
     static Path resolveConfiguredFeatures(Path projectRoot, String value) {
         if (value == null || value.isBlank() || projectRoot == null) return null;
         PickleballPaths.Parsed parsed = PickleballPaths.parse(value.strip());
@@ -364,216 +336,5 @@ public final class ConsumerFeatureCatalog {
             return resource.isBlank() ? testResources : testResources.resolve(resource);
         }
         return PickleballPaths.toFile(parsed, Path.of("").toAbsolutePath());
-    }
-
-    static FeatureEntry readFeature(Path projectRoot, Path file) throws IOException {
-        List<String> lines = Files.readAllLines(file, StandardCharsets.UTF_8);
-        String featureName = "";
-        List<String> featureTags = List.of();
-        List<String> ruleTags = List.of();
-        List<String> pendingTags = new ArrayList<>();
-        String currentScenario = null;
-        int scenarioStart = -1;
-        boolean currentIsOutline = false;
-        List<String> currentOwnTags = List.of();
-        LinkedHashSet<String> currentExampleTags = new LinkedHashSet<>();
-        List<String> header = new ArrayList<>();
-        List<ScenarioEntry> scenarios = new ArrayList<>();
-        for (int i = 0; i < lines.size(); i++) {
-            String trimmed = lines.get(i).strip();
-            if (ScenarioFilter.isGherkinTagLine(trimmed)) {
-                pendingTags.addAll(ScenarioFilter.parseGherkinTagLine(trimmed));
-                continue;
-            }
-            if (trimmed.isEmpty() || trimmed.startsWith("#")) {
-                continue;
-            }
-            if (startsWithKeyword(trimmed, "Feature:")) {
-                featureName = trimmed.substring("Feature:".length()).strip();
-                featureTags = List.copyOf(pendingTags);
-                ruleTags = List.of();
-                pendingTags.clear();
-                header.add(lines.get(i));
-            } else if (startsWithKeyword(trimmed, "Rule:")) {
-                ruleTags = List.copyOf(pendingTags);
-                pendingTags.clear();
-            } else if (startsWithKeyword(trimmed, "Scenario Outline:")
-                    || startsWithKeyword(trimmed, "Scenario Template:")
-                    || startsWithKeyword(trimmed, "Scenario:")) {
-                if (currentScenario != null) {
-                    scenarios.addAll(scenarioAndExamples(
-                            projectRoot, file, featureName, featureTags, ruleTags,
-                            currentScenario, currentOwnTags, currentExampleTags,
-                            scenarioStart, i - 1, lines, header
-                    ));
-                }
-                currentIsOutline = startsWithKeyword(trimmed, "Scenario Outline:")
-                        || startsWithKeyword(trimmed, "Scenario Template:");
-                currentScenario = trimmed.contains(":")
-                        ? trimmed.substring(trimmed.indexOf(':') + 1).strip()
-                        : trimmed;
-                scenarioStart = i;
-                currentOwnTags = List.copyOf(pendingTags);
-                currentExampleTags.clear();
-                pendingTags.clear();
-            } else if (startsWithKeyword(trimmed, "Examples:") || startsWithKeyword(trimmed, "Example:")) {
-                if (currentIsOutline) {
-                    currentExampleTags.addAll(pendingTags);
-                }
-                pendingTags.clear();
-            } else {
-                pendingTags.clear();
-            }
-        }
-        if (currentScenario != null) {
-            scenarios.addAll(scenarioAndExamples(
-                    projectRoot, file, featureName, featureTags, ruleTags,
-                    currentScenario, currentOwnTags, currentExampleTags,
-                    scenarioStart, lines.size() - 1, lines, header
-            ));
-        }
-        Path relative = relativeTo(projectRoot, file);
-        String relativePath = relative.toString().replace('\\', '/');
-        Path parent = relative.getParent();
-        return new FeatureEntry(
-                file.toAbsolutePath().normalize(),
-                relativePath,
-                featureName,
-                parent == null ? "" : parent.toString().replace('\\', '/'),
-                file.getFileName().toString(),
-                scenarios,
-                featureTags
-        );
-    }
-
-    private static ScenarioEntry scenario(
-            Path projectRoot,
-            Path file,
-            String featureName,
-            List<String> featureTags,
-            List<String> ruleTags,
-            String name,
-            List<String> ownTags,
-            Set<String> exampleTags,
-            int start,
-            int end,
-            List<String> lines,
-            List<String> header
-    ) {
-        List<String> body = new ArrayList<>();
-        if (!header.isEmpty()) {
-            body.addAll(header);
-            if (body.getLast().isBlank() == false) body.add("");
-        }
-        for (int i = start; i <= end && i < lines.size(); i++) {
-            body.add(lines.get(i));
-        }
-        while (!body.isEmpty() && body.getLast().isBlank()) {
-            body.removeLast();
-        }
-        LinkedHashSet<String> effective = new LinkedHashSet<>();
-        effective.addAll(featureTags);
-        effective.addAll(ruleTags);
-        effective.addAll(ownTags);
-        if (exampleTags != null) effective.addAll(exampleTags);
-        ScenarioEntry base = new ScenarioEntry(
-                name,
-                featureName,
-                file.toAbsolutePath().normalize(),
-                relativeTo(projectRoot, file).toString().replace('\\', '/'),
-                start + 1,
-                end + 1,
-                body,
-                ownTags,
-                List.copyOf(effective),
-                0,
-                ""
-        );
-        return base;
-    }
-
-    private static List<ScenarioEntry> scenarioAndExamples(
-            Path projectRoot,
-            Path file,
-            String featureName,
-            List<String> featureTags,
-            List<String> ruleTags,
-            String name,
-            List<String> ownTags,
-            Set<String> exampleTags,
-            int start,
-            int end,
-            List<String> lines,
-            List<String> header
-    ) {
-        ScenarioEntry base = scenario(
-                projectRoot, file, featureName, featureTags, ruleTags,
-                name, ownTags, exampleTags, start, end, lines, header
-        );
-        List<ScenarioEntry> entries = new ArrayList<>();
-        entries.add(base);
-        List<String> tableHeader = null;
-        int dataRow = 0;
-        for (int i = start; i <= end && i < lines.size(); i++) {
-            String trimmed = lines.get(i).strip();
-            if (startsWithKeyword(trimmed, "Examples:") || startsWithKeyword(trimmed, "Example:")) {
-                tableHeader = null;
-                continue;
-            }
-            if (!trimmed.startsWith("|")) continue;
-            List<String> cells = new ArrayList<>();
-            String row = trimmed.startsWith("|") ? trimmed.substring(1) : trimmed;
-            if (row.endsWith("|")) row = row.substring(0, row.length() - 1);
-            for (String cell : row.split("\\|", -1)) cells.add(cell.strip());
-            if (tableHeader == null) {
-                tableHeader = cells;
-                continue;
-            }
-            dataRow++;
-            String label = String.join(" | ", cells);
-            entries.add(new ScenarioEntry(
-                    base.name(),
-                    base.featureName(),
-                    base.file(),
-                    base.relativePath(),
-                    base.startLine(),
-                    base.endLine(),
-                    base.lines(),
-                    base.tags(),
-                    base.effectiveTags(),
-                    dataRow,
-                    label,
-                    i + 1
-            ));
-        }
-        return entries;
-    }
-
-    private static boolean startsWithKeyword(String trimmed, String keyword) {
-        return trimmed.startsWith(keyword);
-    }
-
-    private static void addIfDirectory(Set<Path> roots, Path path) {
-        if (path != null && Files.isDirectory(path)) {
-            roots.add(path.toAbsolutePath().normalize());
-        }
-    }
-
-    private static void collectFeatureFiles(Path root, Set<Path> files) {
-        if (!Files.isDirectory(root)) return;
-        try (Stream<Path> walk = Files.walk(root, 8)) {
-            walk.filter(path -> Files.isRegularFile(path) && path.getFileName().toString().endsWith(".feature"))
-                    .forEach(path -> files.add(path.toAbsolutePath().normalize()));
-        } catch (IOException ignored) {
-            // A single unreadable directory must not hide the rest of the catalog.
-        }
-    }
-
-    private static Path relativeTo(Path projectRoot, Path file) {
-        try {
-            return projectRoot.relativize(file.toAbsolutePath().normalize());
-        } catch (IllegalArgumentException ignored) {
-            return file.getFileName();
-        }
     }
 }

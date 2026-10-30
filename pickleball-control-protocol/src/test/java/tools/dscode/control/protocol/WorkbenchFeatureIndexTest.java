@@ -393,7 +393,7 @@ class WorkbenchFeatureIndexTest {
 
     @Test
     void cacheSchemaVersionBumpForcesReparse() throws Exception {
-        assertEquals(3, WorkbenchFeatureIndex.VERSION);
+        assertEquals(4, WorkbenchFeatureIndex.VERSION);
         assertEquals("feature-index.v3", WorkbenchFeatureIndex.CACHE_FILE);
         Path features = project.resolve("src/test/resources/features");
         Files.createDirectories(features);
