@@ -9,6 +9,6 @@ session: isolate session-start execute-step status events stop kill open-scenari
 coordination: short-log note inbox finish presence post history gc-runs gc-versions use-version export-guidance
 descriptors: session list | session info <sessionId> [--json] | session hold <sessionId> | session release <sessionId>
 page: inspect-page find-element
-retrieval: query runs | query get | query query | query search | query props | query errors
+retrieval: query runs | query get | query query | query search | query props | query errors | query tail
 controller: sync worker-check live-check ui mcp session
 all: close-window confirm diagnostic-run discover discover-hint events example execute-step export-guidance find-element finish from-here gc-runs gc-versions help hint history inbox insert-step inspect-page isolate kill live-check mcp note open-scenario open-window pause plan play post presence query refresh resolve-runvars save session session-hold session-info session-list session-release session-start session-sync short-log show-run status stop sync ui update-step use-version worker-check worker-restart worker-start worker-stop workspace-edit workspace-seed workspace-show

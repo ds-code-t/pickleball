@@ -124,6 +124,52 @@ public final class WorkspaceSeed {
         return runnerComputedSecrets(values).keys();
     }
 
+    /**
+     * Keys in the workspace whose stored value is not the same non-computed
+     * project-file value. Classpath defaults do not count as the project file.
+     */
+    public static Set<String> computedKeys(Path project, Map<String, String> values) {
+        Set<String> computed = new LinkedHashSet<>();
+        if (values == null || values.isEmpty()) return computed;
+        Map<String, String> files = projectFileProperties(project);
+        values.forEach((rawKey, rawValue) -> {
+            if (rawKey == null || rawKey.isBlank()) return;
+            String key = Workspace.normalizeKey(rawKey);
+            String stored = rawValue == null ? "" : rawValue;
+            if (!files.containsKey(key) || !stored.equals(files.get(key))) computed.add(key);
+        });
+        return computed;
+    }
+
+    private static Map<String, String> projectFileProperties(Path project) {
+        Map<String, String> values = new LinkedHashMap<>();
+        if (project == null) return values;
+        Path root = project.toAbsolutePath().normalize();
+        for (Path file : List.of(
+                root.resolve("src/test/resources/pickleball_local2.properties"),
+                root.resolve("src/test/resources/pickleball_local.properties"),
+                root.resolve("src/test/resources/pickleball.properties"),
+                root.resolve("src/main/resources/pickleball_local2.properties"),
+                root.resolve("src/main/resources/pickleball_local.properties"),
+                root.resolve("src/main/resources/pickleball.properties"),
+                root.resolve("pickleball_local2.properties"),
+                root.resolve("pickleball_local.properties"),
+                root.resolve("pickleball.properties")
+        )) {
+            if (!Files.isRegularFile(file)) continue;
+            Properties properties = new Properties();
+            try (var reader = Files.newBufferedReader(file, java.nio.charset.StandardCharsets.UTF_8)) {
+                properties.load(reader);
+            } catch (IOException ignored) {
+                continue;
+            }
+            for (String key : properties.stringPropertyNames()) {
+                values.put(Workspace.normalizeKey(key), properties.getProperty(key));
+            }
+        }
+        return values;
+    }
+
     private record SecretKeep(Set<String> keys, List<String> warnings) {
     }
 

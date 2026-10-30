@@ -1,11 +1,16 @@
 package tools.dscode.control.protocol;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.charset.CharacterCodingException;
+import java.nio.charset.CharsetDecoder;
+import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -28,13 +33,14 @@ public final class DiagnosticQuery {
     private static final int TEXT_LIMIT = 160;
     private static final int SCAN_LINES = 20_000;
     private static final int FILE_BYTES = 4_000_000;
-    private static final Set<String> OPS = Set.of("runs", "get", "query", "search", "props", "errors");
+    private static final Set<String> OPS = Set.of("runs", "get", "query", "search", "props", "errors", "tail");
     private static final Set<String> KINDS = Set.of(
             "run", "scenario", "step", "event", "property", "artifact", "error", "log"
     );
 
-    private static final ThreadLocal<Boolean> INDEX_BUILD = ThreadLocal.withInitial(() -> Boolean.FALSE);
+    private static final ThreadLocal<List<String>> DECODE_WARNINGS = ThreadLocal.withInitial(ArrayList::new);
 
+    private static final ThreadLocal<Boolean> INDEX_BUILD = ThreadLocal.withInitial(() -> Boolean.FALSE);
     /** True while {@link DiagnosticSqliteIndex#rebuild} is reading these files into the disposable index. */
     static boolean indexing() {
         return Boolean.TRUE.equals(INDEX_BUILD.get());
@@ -61,13 +67,14 @@ public final class DiagnosticQuery {
     }
 
     static Outcome query(Path project, Map<String, ?> request, int budgetBytes) {
+        DECODE_WARNINGS.get().clear();
         if (project == null) {
             return error(2, "missing project", "Pass the consumer project directory.");
         }
         String op = text(request, "op");
         if (op == null || !OPS.contains(op)) {
             return error(2, "missing op",
-                    "Usage: query <runs|get|query|search|props|errors> [--run-id=<id>] [--kind=<kind>] [--limit=<n>] [--cursor=<token>]");
+                    "Usage: query <runs|get|query|search|props|errors|tail> [--run-id=<id>] [--kind=<kind>] [--limit=<n>] [--cursor=<token>]");
         }
         String runId = firstText(request, "runId", "run");
         String scenarioId = firstText(request, "scenarioId", "scenario");
@@ -102,6 +109,9 @@ public final class DiagnosticQuery {
         }
         if ("search".equals(op) && needle == null) {
             return error(2, "missing text", "Usage: query search --text=<words>");
+        }
+        if ("tail".equals(op) && runId == null) {
+            return error(2, "missing runId", "Usage: query tail --run-id=<id>");
         }
         if ("get".equals(op) && kind == null) kind = "run";
         if ("props".equals(op)) kind = "property";
@@ -182,6 +192,10 @@ public final class DiagnosticQuery {
             body.put("truncated", TRUNCATION_MARK + more + " more, use cursor");
         }
         if (capped) body.put("scanCapped", true);
+        List<String> decoded = DECODE_WARNINGS.get();
+        if (decoded != null && !decoded.isEmpty()) {
+            body.put("decodeWarnings", List.copyOf(decoded));
+        }
         return body;
     }
 
@@ -207,6 +221,12 @@ public final class DiagnosticQuery {
                 items.add(runItem(project, run));
             }
             return new Loaded(items, catalog.where, catalog.capped);
+        }
+        if ("tail".equals(op)) {
+            Scan tail = tailLines(project, runId);
+            List<Map<String, Object>> newestFirst = new ArrayList<>(tail.events);
+            Collections.reverse(newestFirst);
+            return new Loaded(newestFirst, ".pickleball/runs/" + runId, tail.capped);
         }
         List<String> runIds = new ArrayList<>();
         if (runId != null) runIds.add(runId);
@@ -326,6 +346,11 @@ public final class DiagnosticQuery {
     }
 
     private static boolean isErrorRow(Map<String, Object> event) {
+        String type = str(event.get("type"));
+        if (type != null && type.toUpperCase(Locale.ROOT).contains("SCENARIO_END")
+                && event.get("message") == null && event.get("stackHead") == null) {
+            return false;
+        }
         if ("error".equals(str(event.get("kind")))) return true;
         if (event.get("message") != null || event.get("stackHead") != null) return true;
         String status = str(event.get("status"));
@@ -506,12 +531,23 @@ public final class DiagnosticQuery {
                 sequence++;
                 Map<String, Object> map = JsonLite.object(row);
                 if (map == null) continue;
-                String id = firstNonBlank(str(map.get("scenarioId")), str(map.get("id")), str(map.get("executionId")));
-                String name = firstNonBlank(str(map.get("name")), str(map.get("scenarioName")), str(map.get("scenario")));
+                String id = firstNonBlank(
+                        str(map.get("scenarioId")),
+                        str(map.get("id")),
+                        str(map.get("executionId")),
+                        str(map.get("scenarioExecutionId"))
+                );
+                String name = firstNonBlank(
+                        str(map.get("name")),
+                        str(map.get("scenarioName")),
+                        str(map.get("scenario")),
+                        identityName(map.get("identity"))
+                );
                 if (id == null) id = name == null ? "scenario-" + sequence : slug(name, sequence);
                 if (!safeId(id)) id = "scenario-" + sequence;
                 if (!seen.add(id)) continue;
                 Path dir = scenarioDir(project, runId, resolved, id);
+                if (dir == null) dir = summaryDirectory(project, runId, resolved, str(map.get("summary")));
                 Path summary = dir == null ? null : dir.resolve("summary.json");
                 String where = summary != null && Files.isRegularFile(summary)
                         ? relative(project, summary)
@@ -528,18 +564,43 @@ public final class DiagnosticQuery {
                 children.sort(Comparator.comparing(path -> path.getFileName().toString()));
                 for (Path child : children) {
                     if (!Files.isDirectory(child)) continue;
-                    String id = child.getFileName().toString();
-                    if (!safeId(id) || !seen.add(id)) continue;
+                    String folderId = child.getFileName().toString();
+                    if (!safeId(folderId)) continue;
                     Path summary = child.resolve("summary.json");
                     String name = null;
                     String outcome = null;
+                    String summaryId = null;
+                    String summaryExec = null;
                     if (Files.isRegularFile(summary)) {
                         Map<String, Object> body = objectOrEmpty(summary);
-                        name = firstNonBlank(str(body.get("name")), str(body.get("scenarioName")));
+                        name = firstNonBlank(
+                                str(body.get("name")),
+                                str(body.get("scenarioName")),
+                                identityName(body.get("identity"))
+                        );
                         outcome = str(body.get("outcome"));
+                        summaryId = str(body.get("scenarioId"));
+                        summaryExec = firstNonBlank(str(body.get("scenarioExecutionId")), str(body.get("executionId")));
                     }
+                    int slot = indexOfScenario(found, folderId, summaryId, summaryExec);
                     String where = Files.isRegularFile(summary) ? relative(project, summary) : relative(project, child);
-                    found.add(new ScenarioRef(id, name, outcome, summary, child, where));
+                    if (slot >= 0) {
+                        ScenarioRef current = found.get(slot);
+                        found.set(slot, new ScenarioRef(
+                                current.id,
+                                firstNonBlank(current.name, name),
+                                firstNonBlank(current.outcome, outcome),
+                                summary != null && Files.isRegularFile(summary) ? summary : current.summary,
+                                child,
+                                where
+                        ));
+                        seen.add(folderId);
+                        if (summaryId != null) seen.add(summaryId);
+                        if (summaryExec != null) seen.add(summaryExec);
+                        continue;
+                    }
+                    if (!seen.add(folderId)) continue;
+                    found.add(new ScenarioRef(folderId, name, outcome, summary, child, where));
                 }
             }
         }
@@ -590,25 +651,24 @@ public final class DiagnosticQuery {
         boolean capped = false;
         int lineNo = 0;
         String where = relative(project, file);
-        try (var reader = Files.newBufferedReader(file, StandardCharsets.UTF_8)) {
-            String line;
-            while ((line = reader.readLine()) != null) {
-                lineNo++;
-                if (lineNo > SCAN_LINES) {
-                    capped = true;
-                    break;
-                }
-                if (line.isBlank()) continue;
-                Map<String, Object> body;
-                try {
-                    body = JsonLite.object(JsonLite.parse(line));
-                } catch (RuntimeException ignored) {
-                    continue;
-                }
-                if (body == null) continue;
-                events.add(eventItem(runId, scenario, body, lineNo, where));
+        List<String> lines = readLinesReplacing(file, project);
+        for (String line : lines) {
+            lineNo++;
+            if (lineNo > SCAN_LINES) {
+                capped = true;
+                break;
             }
+            if (line.isBlank()) continue;
+            Map<String, Object> body;
+            try {
+                body = JsonLite.object(JsonLite.parse(line));
+            } catch (RuntimeException ignored) {
+                continue;
+            }
+            if (body == null) continue;
+            events.add(eventItem(runId, scenario, body, lineNo, where));
         }
+        attachFailureStacks(events);
         return new Scan(events, capped);
     }
 
@@ -648,11 +708,20 @@ public final class DiagnosticQuery {
     }
 
     private static boolean isError(String type, String status, Map<String, Object> body) {
+        if (emptyScenarioEnd(type, body)) return false;
         String upperType = type == null ? "" : type.toUpperCase(Locale.ROOT);
         String upperStatus = status == null ? "" : status.toUpperCase(Locale.ROOT);
+        if ("FAILURE".equals(upperType)) return true;
         if ("FAILED".equals(upperStatus) || "ERROR".equals(upperStatus) || "SEVERE".equals(upperStatus)) return true;
         if (upperType.contains("ERROR") || upperType.contains("EXCEPTION") || "FAIL".equals(upperType)) return true;
-        return body.containsKey("exception") || body.containsKey("stack") || body.containsKey("stackTrace");
+        return body.containsKey("exception") || body.containsKey("stack") || body.containsKey("stackTrace")
+                || body.containsKey("failures");
+    }
+
+    private static boolean emptyScenarioEnd(String type, Map<String, Object> body) {
+        if (type == null || !type.toUpperCase(Locale.ROOT).contains("SCENARIO_END")) return false;
+        return stackHead(body) == null
+                && firstNonBlank(str(body.get("message")), str(body.get("error")), str(body.get("errorMessage"))) == null;
     }
 
     private static String stackHead(Object body) {
@@ -663,6 +732,19 @@ public final class DiagnosticQuery {
             stack = exception.get("stackTrace");
             if (stack == null) stack = exception.get("stack");
             if (stack == null) stack = exception.get("message");
+        }
+        if (stack == null && map.get("failures") instanceof List<?> failures && !failures.isEmpty()) {
+            Object first = failures.getFirst();
+            if (first instanceof Map<?, ?> failure) {
+                stack = failure.get("stackTrace");
+                if (stack == null) stack = failure.get("stack");
+                if (stack == null) {
+                    String klass = str(failure.get("class"));
+                    String message = str(failure.get("message"));
+                    if (klass != null && message != null) stack = klass + ": " + message;
+                    else stack = firstNonBlank(message, klass);
+                }
+            }
         }
         if (stack instanceof List<?> lines && !lines.isEmpty()) stack = lines.getFirst();
         if (stack == null) return null;
@@ -845,7 +927,7 @@ public final class DiagnosticQuery {
         boolean capped = false;
         Path file = project.resolve(".pickleball").resolve("agent-log");
         if (Files.isRegularFile(file)) {
-            List<String> lines = Files.readAllLines(file, StandardCharsets.UTF_8);
+            List<String> lines = readLinesReplacing(file, project);
             capped = lines.size() > SCAN_LINES;
             int start = capped ? lines.size() - SCAN_LINES : 0;
             for (int index = start; index < lines.size(); index++) {
@@ -885,7 +967,7 @@ public final class DiagnosticQuery {
                     .toList();
             int seq = items.size();
             for (Path log : files) {
-                List<String> lines = Files.readAllLines(log, StandardCharsets.UTF_8);
+                List<String> lines = readLinesReplacing(log, project);
                 int start = 0;
                 if (lines.size() > 40) {
                     start = lines.size() - 40;
@@ -949,13 +1031,7 @@ public final class DiagnosticQuery {
 
     private static Object readJson(Path file) throws IOException {
         long size = Files.size(file);
-        String text;
-        if (size > FILE_BYTES) {
-            byte[] bytes = Files.readAllBytes(file);
-            text = new String(bytes, 0, FILE_BYTES, StandardCharsets.UTF_8);
-        } else {
-            text = Files.readString(file, StandardCharsets.UTF_8);
-        }
+        String text = readTextReplacing(file, null, size > FILE_BYTES);
         if (text.startsWith("\uFEFF")) text = text.substring(1);
         return JsonLite.parse(text);
     }
@@ -984,7 +1060,7 @@ public final class DiagnosticQuery {
 
     private static String clip(String value) {
         if (value == null) return null;
-        String collapsed = value.replace('\n', ' ').replace('\r', ' ').strip();
+        String collapsed = stripInvisibles(value).replace('\n', ' ').replace('\r', ' ').strip();
         if (collapsed.length() <= TEXT_LIMIT) return collapsed;
         return collapsed.substring(0, TEXT_LIMIT) + "…";
     }
@@ -1047,7 +1123,7 @@ public final class DiagnosticQuery {
 
     private static String str(Object value) {
         if (value == null) return null;
-        String text = String.valueOf(value).trim();
+        String text = stripInvisibles(String.valueOf(value)).trim();
         return text.isEmpty() ? null : text;
     }
 
@@ -1077,6 +1153,167 @@ public final class DiagnosticQuery {
 
     private static int utf8(Map<String, Object> body) {
         return JsonLite.write(body).getBytes(StandardCharsets.UTF_8).length;
+    }
+
+    private static int indexOfScenario(List<ScenarioRef> found, String... ids) {
+        if (found == null || ids == null) return -1;
+        for (int index = 0; index < found.size(); index++) {
+            ScenarioRef scenario = found.get(index);
+            for (String id : ids) {
+                if (id == null) continue;
+                if (id.equals(scenario.id)) return index;
+            }
+        }
+        return -1;
+    }
+
+    private static Path summaryDirectory(Path project, String runId, Resolved resolved, String summary) {
+        if (summary == null || summary.isBlank()) return null;
+        for (Path root : scenarioRoots(project, runId, resolved)) {
+            Path file = root.resolve(summary);
+            if (Files.isRegularFile(file) && file.getParent() != null) return file.getParent();
+        }
+        return null;
+    }
+
+    private static String identityName(Object identity) {
+        Map<String, Object> map = JsonLite.object(identity);
+        if (map == null) return null;
+        return firstNonBlank(str(map.get("scenarioName")), str(map.get("name")));
+    }
+
+    private static void attachFailureStacks(List<Map<String, Object>> events) {
+        String head = null;
+        String message = null;
+        for (Map<String, Object> event : events) {
+            if (!"failure".equalsIgnoreCase(str(event.get("type")))) continue;
+            if (event.get("stackHead") != null) head = str(event.get("stackHead"));
+            if (event.get("message") != null) message = str(event.get("message"));
+        }
+        if (head == null && message == null) return;
+        for (Map<String, Object> event : events) {
+            if (!"step".equals(str(event.get("kind")))) continue;
+            String status = str(event.get("status"));
+            if (status == null || (!"FAILED".equalsIgnoreCase(status) && !"ERROR".equalsIgnoreCase(status))) continue;
+            if (event.get("stackHead") == null && head != null) event.put("stackHead", head);
+            if (event.get("message") == null && message != null) event.put("message", message);
+        }
+    }
+
+    private static Scan tailLines(Path project, String runId) throws IOException {
+        List<Map<String, Object>> items = new ArrayList<>();
+        boolean capped = false;
+        Path agent = project.resolve(".pickleball").resolve("agent-log");
+        if (Files.isRegularFile(agent)) {
+            List<String> lines = readLinesReplacing(agent, project);
+            int start = 0;
+            if (lines.size() > SCAN_LINES) {
+                start = lines.size() - SCAN_LINES;
+                capped = true;
+            }
+            for (int index = start; index < lines.size(); index++) {
+                String line = lines.get(index);
+                if (line.isBlank()) continue;
+                String[] parts = line.split("\t", 6);
+                String loggedRun = parts.length >= 3 ? parts[2] : null;
+                if (runId != null && loggedRun != null && !"-".equals(loggedRun) && !runId.equals(loggedRun)) continue;
+                items.add(logItem(index + 1, "agent-log", "-".equals(loggedRun) ? null : loggedRun,
+                        parts.length >= 5 ? parts[4] : line, ".pickleball/agent-log"));
+            }
+        }
+        List<Path> files = new ArrayList<>();
+        Path runDir = project.resolve(".pickleball").resolve("runs").resolve(runId);
+        if (Files.isDirectory(runDir)) {
+            try (var walk = Files.walk(runDir, 6)) {
+                walk.filter(Files::isRegularFile)
+                        .filter(path -> {
+                            String name = path.getFileName() == null ? "" : path.getFileName().toString();
+                            return name.endsWith(".log") || "session.log".equals(name);
+                        })
+                        .sorted()
+                        .forEach(files::add);
+            }
+        }
+        int seq = items.size();
+        for (Path log : files) {
+            List<String> lines = readLinesReplacing(log, project);
+            int start = 0;
+            if (lines.size() > 40) {
+                start = lines.size() - 40;
+                capped = true;
+            }
+            for (int index = start; index < lines.size(); index++) {
+                String line = lines.get(index);
+                if (line.isBlank()) continue;
+                seq++;
+                items.add(logItem(seq, "run-log", runId, line, relative(project, log)));
+            }
+        }
+        return new Scan(items, capped);
+    }
+
+    private static Map<String, Object> logItem(int seq, String source, String runId, String text, String where) {
+        Map<String, Object> item = new LinkedHashMap<>();
+        item.put("kind", "log");
+        item.put("id", Integer.toString(seq));
+        item.put("seq", seq);
+        item.put("source", source);
+        item.put("runId", runId);
+        item.put("text", clip(text));
+        item.put("where", where);
+        return item;
+    }
+
+    private static List<String> readLinesReplacing(Path file, Path project) {
+        String text = readTextReplacing(file, project, false);
+        if (text.isEmpty()) return List.of();
+        return List.of(text.split("\\R", -1));
+    }
+
+    private static String readTextReplacing(Path file, Path project, boolean cap) {
+        try {
+            byte[] bytes = Files.readAllBytes(file);
+            if (cap && bytes.length > FILE_BYTES) {
+                byte[] sliced = new byte[FILE_BYTES];
+                System.arraycopy(bytes, 0, sliced, 0, FILE_BYTES);
+                bytes = sliced;
+            }
+            try {
+                CharsetDecoder strict = StandardCharsets.UTF_8.newDecoder()
+                        .onMalformedInput(CodingErrorAction.REPORT)
+                        .onUnmappableCharacter(CodingErrorAction.REPORT);
+                return strict.decode(ByteBuffer.wrap(bytes)).toString();
+            } catch (CharacterCodingException failure) {
+                noteDecode(project, file);
+                CharsetDecoder replacing = StandardCharsets.UTF_8.newDecoder()
+                        .onMalformedInput(CodingErrorAction.REPLACE)
+                        .onUnmappableCharacter(CodingErrorAction.REPLACE);
+                return replacing.decode(ByteBuffer.wrap(bytes)).toString();
+            }
+        } catch (IOException failure) {
+            noteDecode(project, file);
+            return "";
+        }
+    }
+
+    private static void noteDecode(Path project, Path file) {
+        String name = project == null ? file.getFileName().toString() : relative(project, file);
+        List<String> warnings = DECODE_WARNINGS.get();
+        if (!warnings.contains(name)) warnings.add(name);
+    }
+
+    private static String stripInvisibles(String value) {
+        if (value == null || value.isEmpty()) return value == null ? "" : value;
+        StringBuilder out = new StringBuilder(value.length());
+        for (int index = 0; index < value.length(); ) {
+            int point = value.codePointAt(index);
+            if (point != 0xFEFF && point != 0x200B && point != 0x200C && point != 0x200D
+                    && point != 0x2060 && point != 0x180E) {
+                out.appendCodePoint(point);
+            }
+            index += Character.charCount(point);
+        }
+        return out.toString();
     }
 
     private static Outcome error(int exit, String error, String fix) {

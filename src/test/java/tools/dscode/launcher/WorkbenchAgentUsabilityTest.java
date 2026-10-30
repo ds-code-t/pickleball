@@ -105,7 +105,7 @@ class WorkbenchAgentUsabilityTest {
         assertEquals(golden, WorkbenchCliHelp.catalog());
         assertEquals(golden, WorkbenchCliHelp.forTopic("help"));
         assertEquals(
-                "Usage: query <runs|get|query|search|props|errors> [--run-id=<id>] [--scenario=<id>] [--kind=run|scenario|step|event|property|artifact|error|log] [--text=<words>] [--status=<outcome>] [--fields=<a,b>] [--limit=<n>] [--cursor=<token>] [--id=<id>]\n",
+                "Usage: query <runs|get|query|search|props|errors|tail> [--run-id=<id>] [--scenario=<id>] [--kind=run|scenario|step|event|property|artifact|error|log] [--text=<words>] [--status=<outcome>] [--fields=<a,b>] [--limit=<n>] [--cursor=<token>] [--id=<id>]\n",
                 WorkbenchCliHelp.usage("query")
         );
     }

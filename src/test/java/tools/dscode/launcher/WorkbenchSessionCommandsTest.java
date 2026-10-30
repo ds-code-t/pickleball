@@ -991,6 +991,66 @@ class WorkbenchSessionCommandsTest {
     private record Output(int exitCode, String stdout, String stderr) {
     }
 
+    @Test
+    @Timeout(value = 10, unit = TimeUnit.SECONDS)
+    void statusWithoutRunIdUsesTheOnlyLiveSession() throws Exception {
+        Path sessionFile = project.resolve(".pickleball/runs/only-live/session/cli-session.json");
+        try (FakeSession ignored = FakeSession.start(project, "cli-session", sessionFile)) {
+            Output output = run(
+                    new String[]{"status", project.toString()},
+                    launch -> {
+                        throw new AssertionError("status must not start a session");
+                    }
+            );
+            assertEquals(0, output.exitCode, output.stderr + output.stdout);
+            assertTrue(output.stdout.contains("SESSION pid="), output.stdout);
+            assertTrue(output.stdout.contains("elapsed-step-ms=idle"), output.stdout);
+        }
+    }
+
+    @Test
+    @Timeout(value = 10, unit = TimeUnit.SECONDS)
+    void statusWithoutRunIdListsSeveralLiveSessions() throws Exception {
+        Path first = project.resolve(".pickleball/runs/live-a/session/cli-session.json");
+        Path second = project.resolve(".pickleball/runs/live-b/session/cli-session.json");
+        try (FakeSession ignoredA = FakeSession.start(project, "cli-session", first);
+             FakeSession ignoredB = FakeSession.start(project, "cli-session", second)) {
+            Output output = run(
+                    new String[]{"status", project.toString()},
+                    launch -> {
+                        throw new AssertionError("status must not start a session");
+                    }
+            );
+            assertEquals(1, output.exitCode, output.stderr + output.stdout);
+            assertTrue(output.stderr.contains("Several live sessions"), output.stderr);
+            assertTrue(output.stderr.contains("run-id=live-a"), output.stderr);
+            assertTrue(output.stderr.contains("run-id=live-b"), output.stderr);
+        }
+    }
+
+    @Test
+    @Timeout(value = 10, unit = TimeUnit.SECONDS)
+    void executeStepFailureJsonIncludesTextPhraseMessageAndStack() throws Exception {
+        Path sessionFile = project.resolve(".pickleball/runs/fail-step/session/cli-session.json");
+        try (FakeSession session = FakeSession.start(project, "cli-session", sessionFile)) {
+            session.commandGet = """
+                    {"id":"step-held","status":"FAILED","result":{"phrase":"the \\"Save\\" button","message":"not visible","stackTrace":["java.lang.AssertionError: not visible","at Frame.java:4"]}}
+                    """;
+            Output output = run(
+                    new String[]{"execute-step", project.toString(), "--text=Then the \"Save\" button is visible"},
+                    launch -> {
+                        throw new AssertionError("execute-step must not start a session");
+                    }
+            );
+            assertEquals(1, output.exitCode, output.stderr + output.stdout);
+            assertTrue(output.stdout.contains("ACK step-held QUEUED Then the \"Save\" button is visible"), output.stdout);
+            assertTrue(output.stdout.contains("\"text\":\"Then the \\\"Save\\\" button is visible\""), output.stdout);
+            assertTrue(output.stdout.contains("\"phrase\":\"the \\\"Save\\\" button\""), output.stdout);
+            assertTrue(output.stdout.contains("\"message\":\"not visible\""), output.stdout);
+            assertTrue(output.stdout.contains("\"stackHead\":\"java.lang.AssertionError: not visible\""), output.stdout);
+        }
+    }
+
     /**
      * Placeholder controller process. Unix {@code sleep} is not on Windows PATH;
      * session-start must return without waiting for this child to exit.
@@ -1019,6 +1079,7 @@ class WorkbenchSessionCommandsTest {
         private volatile String healthJson = "{\"status\":\"ok\"}";
         private volatile int failGets;
         private volatile boolean succeedAfter;
+        private volatile String commandGet;
 
         private FakeSession(HttpServer http, Path stateFile, String url) {
             this.http = http;
@@ -1057,6 +1118,10 @@ class WorkbenchSessionCommandsTest {
                 if (current != null && current.failGets > 0) {
                     current.failGets--;
                     write(exchange, 503, "{\"error\":\"unavailable\"}");
+                    return;
+                }
+                if (current != null && current.commandGet != null) {
+                    write(exchange, 200, current.commandGet);
                     return;
                 }
                 if (current != null && current.succeedAfter) {

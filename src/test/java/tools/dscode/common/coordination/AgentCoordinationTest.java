@@ -121,6 +121,35 @@ class AgentCoordinationTest {
     }
 
     @Test
+    void newRunRecordsUnresolvedEnvironmentAsUnsetAndFinishKeepsAResolvedValue() throws Exception {
+        AgentCoordination.Run run = AgentCoordination.begin(project, request("run-env", "agent-env"));
+        String born = Files.readString(run.recordFile());
+        assertTrue(born.contains("\"environment\" : \"unset\"") || born.contains("\"environment\":\"unset\""), born);
+
+        AgentCoordination.finish(
+                project, run.runId(), null, "PASSED",
+                Instant.parse("2026-10-30T12:00:00Z"), new StringBuilder(), null, null, null
+        );
+        String kept = Files.readString(run.recordFile());
+        assertTrue(kept.contains("\"environment\" : \"unset\"") || kept.contains("\"environment\":\"unset\""), kept);
+
+        AgentCoordination.finish(
+                project, run.runId(), null, "PASSED",
+                Instant.parse("2026-10-30T12:01:00Z"), new StringBuilder(), null, "QA", null
+        );
+        String resolved = Files.readString(run.recordFile());
+        assertTrue(resolved.contains("\"environment\" : \"QA\"") || resolved.contains("\"environment\":\"QA\""), resolved);
+
+        AgentCoordination.finish(
+                project, run.runId(), null, "PASSED",
+                Instant.parse("2026-10-30T12:02:00Z"), new StringBuilder(), null, "  ", null
+        );
+        String still = Files.readString(run.recordFile());
+        assertTrue(still.contains("\"environment\" : \"QA\"") || still.contains("\"environment\":\"QA\""), still);
+        assertFalse(still.contains("\"environment\" : null"), still);
+    }
+
+    @Test
     void linesOlderThanThreeDaysAreRemovedAndNewerLinesStay() throws Exception {
         Instant now = Instant.parse("2026-10-01T12:00:00Z");
         Instant exactly = now.minus(Duration.ofDays(3));

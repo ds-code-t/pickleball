@@ -5,7 +5,7 @@ Agents read retained diagnostics through one service, `DiagnosticQuery`. JSON fi
 ## Command
 
 ```text
-query <runs|get|query|search|props|errors> [--run-id=<id>] [--scenario=<id>] [--kind=run|scenario|step|event|property|artifact|error|log] [--text=<words>] [--status=<outcome>] [--fields=<a,b>] [--limit=<n>] [--cursor=<token>] [--id=<id>]
+query <runs|get|query|search|props|errors|tail> [--run-id=<id>] [--scenario=<id>] [--kind=run|scenario|step|event|property|artifact|error|log] [--text=<words>] [--status=<outcome>] [--fields=<a,b>] [--limit=<n>] [--cursor=<token>] [--id=<id>]
 ```
 
 Stdout is one compact JSON object. Exit 0 is a page. Exit 2 is usage (`error` and `fix`). A successful query appends one `query` line to `.pickleball/agent-log` through `AgentLog`. The MCP tools, including the deprecated `workbench_diagnostic_*` aliases, append that same line. Dense `events.jsonl` bytes are not copied into that log.
@@ -17,7 +17,8 @@ Stdout is one compact JSON object. Exit 0 is a page. Exit 2 is usage (`error` an
 | `query query` | `wb_query` | Filtered records. `kind` defaults to `event` when `--run-id` is set, otherwise `run` |
 | `query search` | `wb_search` | Substring match across run, scenario, event, error, and short-log text |
 | `query props` | `wb_props` | Scalar `runProfile` entries and configuration / environment values |
-| `query errors` | `wb_errors` | Failures. `stackHead` is the first stack line only |
+| `query errors` | `wb_errors` | Failures. `stackHead` is the first stack line, copied from the failure event onto a failed step that has none. An empty `scenario_end` is not an error |
+| `query tail` | (launcher only) | Newest lines of `.pickleball/agent-log` for that run, then `*.log` under `.pickleball/runs/<id>`. Requires `--run-id` |
 
 Default `limit` is 20 (max 100). A short page sets `nextCursor` and `truncated` to `…+N more, use cursor`. Pass `--fields=runId,outcome` to drop every other item field. The default page is at most 4096 UTF-8 bytes; extra items move to the next cursor instead of blowing the context.
 
@@ -35,7 +36,7 @@ Default `limit` is 20 (max 100). A short page sets `nextCursor` and `truncated` 
 | artifact | `id`, `artifact` (`screenshot` or `trace`), `where` |
 | log | `source` (`agent-log`), `text`, `where` |
 
-Text fields clip at 160 characters. A missing catalog is an empty `items` list, not a guessed run. Delete a future index database and the files still answer; this reader does not require a database.
+Text fields clip at 160 characters and drop a BOM and zero-width characters. A missing catalog is an empty `items` list, not a guessed run. Delete a future index database and the files still answer; this reader does not require a database. One scenario is one row: an index `scenarioExecutionId` and the summary directory UUID are merged, and `name` comes from the index identity or the summary. `query search` decodes each file as UTF-8. A bad file is replaced, named in `decodeWarnings`, and does not fail the search. Worker logs are UTF-8 because the worker JVM is started with `-Dfile.encoding=UTF-8` and matching stdout and stderr encodings.
 
 ## Derived SQLite index
 

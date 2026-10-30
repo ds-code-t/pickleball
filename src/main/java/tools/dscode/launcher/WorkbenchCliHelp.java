@@ -23,9 +23,9 @@ final class WorkbenchCliHelp {
             Map.entry("workspace-seed", "Usage: workspace-seed --run-id=<id> [--reseed] [--from-run=<id>]"),
             Map.entry("isolate", "Usage: isolate [--tags=<expr>] [--name=<regex>] [--example=<rows>] [--runvar=key=value] [--run-id=<id>] [--agent=<id>] [--session-file=<path>]"),
             Map.entry("session-start", "Usage: session-start [--tags=<expr>] [--name=<regex>] [--example=<rows>] [--run-id=<id>] [--agent=<id>] [--session-file=<path>]"),
-            Map.entry("execute-step", "Usage: execute-step <gherkin> | execute-step --text=<gherkin> [--ack-only] [--step-timeout=<seconds>]"),
+            Map.entry("execute-step", "Usage: execute-step <gherkin> | execute-step --text=<gherkin> | --text-file=<path> | --text-b64=<base64> [--ack-only] [--step-timeout=<seconds>]"),
             Map.entry("status", "Usage: status [command-id] [--json] [--run-id=<id>]"),
-            Map.entry("events", "Usage: events [--json] [--run-id=<id>]"),
+            Map.entry("events", "Usage: events [--hooks] [--json] [--cursor=<token>] [--run-id=<id>]"),
             Map.entry("stop", "Usage: stop [--force] [--run-id=<id>]"),
             Map.entry("diagnostic-run", "Usage: diagnostic-run --run=<id> [--run-id=<live-session>]"),
             Map.entry("open-scenario", "Usage: open-scenario --feature=<path-or-name> --name=<scenario> [--example=<rows>]"),
@@ -38,7 +38,7 @@ final class WorkbenchCliHelp {
             Map.entry("session-info", "Usage: session info <sessionId> [--json]"),
             Map.entry("session-hold", "Usage: session hold <sessionId> [--json]"),
             Map.entry("session-release", "Usage: session release <sessionId> [--json]"),
-            Map.entry("query", "Usage: query <runs|get|query|search|props|errors> [--run-id=<id>] [--scenario=<id>] [--kind=run|scenario|step|event|property|artifact|error|log] [--text=<words>] [--status=<outcome>] [--fields=<a,b>] [--limit=<n>] [--cursor=<token>] [--id=<id>]"),
+            Map.entry("query", "Usage: query <runs|get|query|search|props|errors|tail> [--run-id=<id>] [--scenario=<id>] [--kind=run|scenario|step|event|property|artifact|error|log] [--text=<words>] [--status=<outcome>] [--fields=<a,b>] [--limit=<n>] [--cursor=<token>] [--id=<id>]"),
             Map.entry("use-version", "Usage: use-version --version=<safe-version>"),
             Map.entry("find-element", "Usage: find-element --category=<Button> [--text=<label>] [--html=<file>]"),
             Map.entry("presence", "Usage: presence --touch --agent=<id> [--run-id=<id>] | presence --list | presence --sweep"),
@@ -65,7 +65,10 @@ final class WorkbenchCliHelp {
             Map.entry("--kind", "Usage: --kind=run|scenario|step|event|property|artifact|error|log\nquery and query get. Default for query is event when --run-id is set, otherwise run."),
             Map.entry("--scenario", "Usage: --scenario=<id>\nScenario directory name under the run. query get, query query, and query errors."),
             Map.entry("--cursor", "Usage: --cursor=<token>\nPage token from nextCursor. The truncated line says …+N more, use cursor."),
-            Map.entry("--fields", "Usage: --fields=<a,b>\nComma-separated item fields. Omit it for the compact default.")
+            Map.entry("--fields", "Usage: --fields=<a,b>\nComma-separated item fields. Omit it for the compact default."),
+            Map.entry("--text-file", "Usage: --text-file=<path>\nUTF-8 file used as execute-step --text. Keeps inner quotes that a shell would strip."),
+            Map.entry("--text-b64", "Usage: --text-b64=<base64>\nBase64 of the UTF-8 step text. Use this when the shell strips quotes."),
+            Map.entry("--hooks", "Usage: --hooks\nevents prints the raw event stream. The default is step and phrase lines, paged like query.")
     );
 
     private WorkbenchCliHelp() {
@@ -88,7 +91,7 @@ final class WorkbenchCliHelp {
         text.append("coordination: short-log note inbox finish presence post history gc-runs gc-versions use-version export-guidance\n");
         text.append("descriptors: session list | session info <sessionId> [--json] | session hold <sessionId> | session release <sessionId>\n");
         text.append("page: inspect-page find-element\n");
-        text.append("retrieval: query runs | query get | query query | query search | query props | query errors\n");
+        text.append("retrieval: query runs | query get | query query | query search | query props | query errors | query tail\n");
         text.append("controller: sync worker-check live-check ui mcp session\n");
         text.append("all:");
         for (String command : commands()) text.append(' ').append(command);

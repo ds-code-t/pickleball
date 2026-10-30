@@ -1688,6 +1688,26 @@ class WorkbenchAgentCommandsTest {
     }
 
     @Test
+    void workspaceShowMarksComputedKeysAndLeavesMatchingProjectFileValuesUnmarked() throws Exception {
+        Path resources = tempDir.resolve("src/test/resources");
+        Files.createDirectories(resources);
+        Files.writeString(resources.resolve("pickleball.properties"),
+                "pkb_browser=CHROME_HEADLESS\npkb_parallel=2\n");
+        Map<String, String> values = new LinkedHashMap<>();
+        values.put("pkb_browser", "CHROME_HEADLESS");
+        values.put("pkb_parallel", "4");
+        values.put("pkb_tags", "@smoke");
+        Workspace.writeRunVars(Workspace.directory(tempDir, "run-computed"), values);
+
+        Output shown = run("workspace-show", tempDir.toString(), "--run-id=run-computed");
+        assertEquals(0, shown.exitCode(), shown.stderr());
+        assertTrue(shown.stdout().lines().anyMatch(line -> line.equals("pkb_browser=CHROME_HEADLESS")), shown.stdout());
+        assertTrue(shown.stdout().lines().anyMatch(line -> line.equals("pkb_parallel=4 computed")), shown.stdout());
+        assertTrue(shown.stdout().lines().anyMatch(line -> line.equals("pkb_tags=@smoke computed")), shown.stdout());
+        assertFalse(shown.stdout().lines().anyMatch(line -> line.equals("pkb_browser=CHROME_HEADLESS computed")), shown.stdout());
+    }
+
+    @Test
     void prepareDoesNotRewriteTheSavedCopyOnALaterRun() throws Exception {
         WorkspaceLaunch.Prepared first = WorkspaceLaunch.prepare(
                 tempDir, "stable-1", null, "@smoke", null, null, null, null, null, List.of(), new StringBuilder()

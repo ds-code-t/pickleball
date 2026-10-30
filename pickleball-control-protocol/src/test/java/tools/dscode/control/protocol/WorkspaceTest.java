@@ -167,6 +167,19 @@ class WorkspaceTest {
         assertFalse(Files.readString(record).contains("abc"));
     }
 
+    @Test
+    void blankOldRunvarIsShownAsEmptyQuotes() throws Exception {
+        Path workspace = temp.resolve("workspace");
+        Map<String, String> values = context();
+        values.put("pkb_environment", "");
+        Workspace.writeRunVars(workspace, values);
+        StringBuilder warnings = new StringBuilder();
+        Workspace.applyLaunchEdits(workspace, new LinkedHashMap<>(), List.of("pkb_environment=QA"), warnings);
+        assertTrue(warnings.toString().contains("replaces \"\" with QA"), warnings.toString());
+        assertFalse(warnings.toString().contains("replaces _"), warnings.toString());
+        assertEquals("QA", Workspace.readRunVars(workspace).get("pkb_environment"));
+    }
+
     private static Map<String, String> context() {
         Map<String, String> values = new LinkedHashMap<>();
         values.put("pkb_glue", "com.example");

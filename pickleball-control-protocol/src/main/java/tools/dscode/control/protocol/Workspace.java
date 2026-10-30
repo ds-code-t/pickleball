@@ -404,7 +404,7 @@ public final class Workspace {
             if (!key.startsWith("pkb_")) key = "pkb_" + key;
             String existing = selection != null && selection.get(key) != null ? selection.get(key) : values.get(key);
             if (existing != null && !existing.equals(value)) {
-                appendWarning(warnings, "WARNING: --runvar " + key + " replaces " + existing + " with " + value);
+                appendWarning(warnings, "WARNING: --runvar " + key + " replaces " + shown(existing) + " with " + shown(value));
             }
             if (SELECTION_KEYS.contains(key)) {
                 if (selection != null) selection.put(key, value);
@@ -418,6 +418,11 @@ public final class Workspace {
             else values.remove(key);
         }
         if (!values.equals(original)) writeRunVars(workspace, values);
+    }
+
+    public static String shown(String value) {
+        if (value == null || value.isEmpty()) return "\"\"";
+        return value;
     }
 
     private static void appendWarning(Appendable warnings, String message) {

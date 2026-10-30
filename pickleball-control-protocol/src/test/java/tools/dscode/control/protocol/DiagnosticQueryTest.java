@@ -195,6 +195,102 @@ class DiagnosticQueryTest {
         assertTrue(got.json().contains("Bare"), got.json());
     }
 
+    @Test
+    void searchReplacesBadBytesAndNamesTheFileWithoutFailing() throws Exception {
+        Path good = project.resolve(".pickleball/workbench/logs/worker-good.err.log");
+        Path bad = project.resolve(".pickleball/workbench/logs/worker-bad.err.log");
+        Files.createDirectories(good.getParent());
+        Files.write(good, new byte[]{'f', 'i', 'n', 'd', '-', 'm', 'e', ' ', (byte) 0x93, '\n'});
+        Files.write(bad, new byte[]{(byte) 0xFF, (byte) 0xFE, '\n'});
+        DiagnosticQuery.Outcome search = DiagnosticQuery.query(project, Map.of("op", "search", "text", "find-me"));
+        assertEquals(0, search.exit(), search.json());
+        assertTrue(search.json().contains("find-me"), search.json());
+        assertTrue(search.json().contains("worker-good.err.log"), search.json());
+        assertTrue(search.json().contains("worker-bad.err.log"), search.json());
+        assertTrue(search.json().contains("decodeWarnings"), search.json());
+    }
+
+    @Test
+    void scenarioRowsMergeIndexIdsWithSummaryUuidsAndFillName() throws Exception {
+        String uuid = "11111111-1111-1111-1111-111111111111";
+        Path scenario = project.resolve("reports/diagnostic-runs/run-merge/scenarios/" + uuid);
+        Files.createDirectories(scenario);
+        Files.writeString(project.resolve("reports/diagnostic-runs/run-catalog.json"),
+                "{\"runs\":[{\"runId\":\"run-merge\",\"outcome\":\"FAILED\"}]}");
+        Files.writeString(project.resolve("reports/diagnostic-runs/run-merge/run-index.json"), """
+                {"runId":"run-merge","outcome":"FAILED","scenarios":[
+                  {"scenarioExecutionId":"%s","outcome":"FAILED","identity":{"scenarioName":"Quoted step"}}
+                ]}
+                """.formatted(uuid));
+        Files.writeString(scenario.resolve("summary.json"), """
+                {"scenarioExecutionId":"%s","name":"Quoted step","outcome":"FAILED"}
+                """.formatted(uuid));
+        DiagnosticQuery.Outcome got = DiagnosticQuery.query(project, Map.of(
+                "op", "query", "runId", "run-merge", "kind", "scenario"
+        ));
+        assertEquals(0, got.exit(), got.json());
+        assertEquals(1, ((List<?>) got.body().get("items")).size(), got.json());
+        assertTrue(got.json().contains("\"name\":\"Quoted step\""), got.json());
+        assertFalse(got.json().contains("\"name\":null"), got.json());
+    }
+
+    @Test
+    void errorsTakeStackHeadFromTheFailureEventAndDropEmptyScenarioEnd() throws Exception {
+        Path scenario = project.resolve("reports/diagnostic-runs/run-err/scenarios/scene");
+        Files.createDirectories(scenario);
+        Files.writeString(project.resolve("reports/diagnostic-runs/run-catalog.json"),
+                "{\"runs\":[{\"runId\":\"run-err\",\"outcome\":\"FAILED\"}]}");
+        Files.writeString(project.resolve("reports/diagnostic-runs/run-err/run-index.json"),
+                "{\"runId\":\"run-err\",\"outcome\":\"FAILED\",\"scenarios\":[{\"scenarioId\":\"scene\",\"name\":\"Scene\",\"outcome\":\"FAILED\"}]}");
+        Files.writeString(scenario.resolve("summary.json"), "{\"name\":\"Scene\",\"outcome\":\"FAILED\"}");
+        Files.writeString(scenario.resolve("events.jsonl"), """
+                {"type":"step","eventSeq":1,"text":"Then stay","status":"FAILED","errorMessage":"left"}
+                {"type":"failure","eventSeq":2,"failures":[{"class":"java.lang.AssertionError","message":"left","stackTrace":["java.lang.AssertionError: left","at tools.dscode.Frame.stay(Frame.java:9)"]}]}
+                {"type":"scenario_end","eventSeq":3,"outcome":"FAILED"}
+                """);
+        DiagnosticQuery.Outcome errors = DiagnosticQuery.query(project, Map.of("op", "errors", "runId", "run-err"));
+        assertEquals(0, errors.exit(), errors.json());
+        assertTrue(errors.json().contains("\"stackHead\":\"java.lang.AssertionError: left\""), errors.json());
+        assertFalse(errors.json().contains("scenario_end"), errors.json());
+    }
+
+    @Test
+    void textFieldsDropZeroWidthCharactersAndBom() throws Exception {
+        Path scenario = project.resolve("reports/diagnostic-runs/run-zw/scenarios/scene");
+        Files.createDirectories(scenario);
+        Files.writeString(project.resolve("reports/diagnostic-runs/run-catalog.json"),
+                "{\"runs\":[{\"runId\":\"run-zw\",\"outcome\":\"PASSED\"}]}");
+        Files.writeString(project.resolve("reports/diagnostic-runs/run-zw/run-index.json"),
+                "{\"runId\":\"run-zw\",\"scenarios\":[{\"scenarioId\":\"scene\",\"name\":\"Clean\",\"outcome\":\"PASSED\"}]}");
+        Files.writeString(scenario.resolve("summary.json"), "{\"name\":\"Clean\",\"outcome\":\"PASSED\"}");
+        Files.writeString(scenario.resolve("events.jsonl"),
+                "{\"type\":\"step\",\"eventSeq\":1,\"text\":\"Then stay\\u200B\\uFEFF put\",\"status\":\"PASSED\"}\n");
+        DiagnosticQuery.Outcome steps = DiagnosticQuery.query(project, Map.of(
+                "op", "query", "runId", "run-zw", "kind", "step"
+        ));
+        assertEquals(0, steps.exit(), steps.json());
+        assertTrue(steps.json().contains("Then stay put"), steps.json());
+        assertFalse(steps.json().contains("\u200B"), steps.json());
+        assertFalse(steps.json().contains("\uFEFF"), steps.json());
+    }
+
+    @Test
+    void tailReturnsTheNewestRunLinesFirst() throws Exception {
+        Path log = project.resolve(".pickleball/runs/run-tail/session/session.log");
+        Files.createDirectories(log.getParent());
+        Files.writeString(log, "one\ntwo\nthree\n");
+        Files.createDirectories(project.resolve("reports/diagnostic-runs"));
+        Files.writeString(project.resolve("reports/diagnostic-runs/run-catalog.json"),
+                "{\"runs\":[{\"runId\":\"run-tail\"}]}");
+        DiagnosticQuery.Outcome tail = DiagnosticQuery.query(project, Map.of("op", "tail", "runId", "run-tail", "limit", 2));
+        assertEquals(0, tail.exit(), tail.json());
+        assertTrue(tail.json().contains("three"), tail.json());
+        assertTrue(tail.json().contains("two"), tail.json());
+        assertFalse(tail.json().contains("\"text\":\"one\""), tail.json());
+        String json = tail.json();
+        assertTrue(json.indexOf("three") < json.indexOf("two"), json);
+    }
+
     private void writeFixture() throws Exception {
         Path root = project.resolve("reports/diagnostic-runs");
         Path scenario = root.resolve("run-1/scenarios/scenario-1");

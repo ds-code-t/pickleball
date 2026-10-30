@@ -68,7 +68,8 @@ class WorkbenchSessionQueryTest {
         Capture list = run("session", "list", temp.toString());
         assertEquals(0, list.code);
         assertEquals(
-                "session-1\trun-1\trunning\tchrome\t127.0.0.1:9222\thttps://example.test/\n",
+                "sessionId\trunId\tstate\tbrowser\tcdp\turl\n"
+                        + "session-1\trun-1\trunning\tchrome\t127.0.0.1:9222\thttps://example.test/\n",
                 list.out
         );
 

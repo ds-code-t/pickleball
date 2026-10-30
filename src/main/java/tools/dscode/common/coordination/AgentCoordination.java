@@ -363,7 +363,7 @@ public final class AgentCoordination {
                     null,
                     null,
                     null,
-                    null,
+                    "unset",
                     null
             );
             writeRecord(recordFile, record);
@@ -507,6 +507,7 @@ public final class AgentCoordination {
                 failureSummary = null;
             }
             String environmentValue = firstNonBlank(environment, existing.environment());
+            if (environmentValue == null || environmentValue.isBlank()) environmentValue = "unset";
             String browserValue = firstNonBlank(browser, existing.browser());
             boolean statusChanged = existing.status() == null || !existing.status().equals(statusValue);
             boolean learnedChanged = learnedValue != null && !learnedValue.equals(existing.learned());

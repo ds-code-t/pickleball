@@ -208,6 +208,7 @@ public final class WorkbenchAgentCommands {
             if (present) {
                 body.put("fingerprint", Workspace.fingerprint(workspace));
                 body.put("runvars", Workspace.readRunVars(workspace));
+                body.put("computed", new java.util.ArrayList<>(WorkspaceSeed.computedKeys(parsed.project(), Workspace.readRunVars(workspace))));
                 body.put("configs", RunConfigs.files(parsed.project(), runId));
             } else {
                 body.put("error", "No workspace for " + runId);
@@ -225,7 +226,12 @@ public final class WorkbenchAgentCommands {
         if (!jsonRequested(parsed)) {
             out.println("present=true");
             out.println("fingerprint=" + Workspace.fingerprint(workspace));
-            Workspace.readRunVars(workspace).forEach((key, value) -> out.println(key + "=" + value));
+            java.util.Set<String> computed = WorkspaceSeed.computedKeys(parsed.project(), Workspace.readRunVars(workspace));
+            Workspace.readRunVars(workspace).forEach((key, value) -> {
+                String shown = value == null || value.isEmpty() ? "\"\"" : value;
+                String mark = computed.contains(key) ? " computed" : "";
+                out.println(key + "=" + shown + mark);
+            });
             for (String file : RunConfigs.files(parsed.project(), runId)) {
                 out.println("config " + file);
             }
@@ -323,6 +329,7 @@ public final class WorkbenchAgentCommands {
             out.println("(no live sessions)");
             return 0;
         }
+        out.println(String.join("\t", "sessionId", "runId", "state", "browser", "cdp", "url"));
         for (Path file : files) {
             SessionDescriptor descriptor = SessionDescriptorWriter.readFile(file);
             out.println(String.join("\t",
@@ -1023,7 +1030,8 @@ public final class WorkbenchAgentCommands {
             String token = args[index];
             if (token == null || token.startsWith("-")) continue;
             if ("runs".equals(token) || "get".equals(token) || "query".equals(token)
-                    || "search".equals(token) || "props".equals(token) || "errors".equals(token)) {
+                    || "search".equals(token) || "props".equals(token) || "errors".equals(token)
+                    || "tail".equals(token)) {
                 return token;
             }
         }

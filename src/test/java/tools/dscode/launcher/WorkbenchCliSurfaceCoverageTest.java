@@ -1559,6 +1559,57 @@ class WorkbenchCliSurfaceCoverageTest {
         return capture;
     }
 
+    @Test
+    void covers_flag_text_file() throws Exception {
+        Path file = temp.resolve("step.txt");
+        Files.writeString(file, "Then the \"Save\" button is visible");
+        WorkbenchSessionCommands.SessionFlags flags = WorkbenchSessionCommands.SessionFlags.parse(
+                new String[]{"execute-step", "--text-file=" + file}
+        );
+        assertEquals("Then the \"Save\" button is visible", flags.text);
+        try (HeldSession held = HeldSession.open(temp)) {
+            Capture capture = session((launch) -> new ProcessBuilder("true").start(),
+                    "execute-step", temp.toString(), "--text-file=" + file, "--ack-only");
+            assertEquals(0, capture.code, capture.err + capture.out);
+            assertTrue(capture.out.contains("ACK "), capture.out);
+            assertTrue(capture.out.contains("Then the \"Save\" button is visible"), capture.out);
+            assertTrue(held.body().contains("Save"), held.body());
+        }
+    }
+
+    @Test
+    void covers_flag_text_b64() throws Exception {
+        String encoded = java.util.Base64.getEncoder().encodeToString(
+                "Then the \"Save\" button is visible".getBytes(StandardCharsets.UTF_8)
+        );
+        WorkbenchSessionCommands.SessionFlags flags = WorkbenchSessionCommands.SessionFlags.parse(
+                new String[]{"execute-step", "--text-b64=" + encoded}
+        );
+        assertEquals("Then the \"Save\" button is visible", flags.text);
+        try (HeldSession held = HeldSession.open(temp)) {
+            Capture capture = session((launch) -> new ProcessBuilder("true").start(),
+                    "execute-step", temp.toString(), "--text-b64=" + encoded, "--ack-only");
+            assertEquals(0, capture.code, capture.err + capture.out);
+            assertTrue(capture.out.contains("Then the \"Save\" button is visible"), capture.out);
+            assertTrue(held.body().contains("\"text\":"), held.body());
+        }
+    }
+
+    @Test
+    void covers_flag_hooks() throws Exception {
+        assertTrue(WorkbenchSessionCommands.SessionFlags.parse(new String[]{"events", "--hooks"}).hooks);
+        try (HeldSession ignored = HeldSession.open(temp)) {
+            Capture filtered = session((launch) -> new ProcessBuilder("true").start(), "events", temp.toString());
+            assertEquals(0, filtered.code, filtered.err + filtered.out);
+            assertTrue(filtered.out.contains("step Given stay"), filtered.out);
+            assertFalse(filtered.out.contains("hook-only"), filtered.out);
+            Capture raw = session((launch) -> new ProcessBuilder("true").start(), "events", temp.toString(), "--hooks");
+            assertEquals(0, raw.code, raw.err + raw.out);
+            assertTrue(raw.out.contains("hook-only"), raw.out);
+            assertTrue(raw.out.contains("elapsed-run-ms="), raw.out);
+        }
+    }
+
     private Capture session(WorkbenchSessionCommands.DetachedStarter starter, String... args) {
         return session(starter, null, args);
     }
@@ -1630,6 +1681,10 @@ class WorkbenchCliSurfaceCoverageTest {
             HttpServer http = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
             HeldSession[] box = new HeldSession[1];
             http.createContext("/health", exchange -> write(exchange, 200, "{\"status\":\"ok\"}"));
+            http.createContext("/tools/workbench_events", exchange -> {
+                exchange.getRequestBody().readAllBytes();
+                write(exchange, 200, "{\"events\":[{\"type\":\"before\",\"text\":\"hook-only\"},{\"stepText\":\"Given stay\"}]}");
+            });
             http.createContext("/commands", exchange -> {
                 String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
                 HeldSession current = box[0];

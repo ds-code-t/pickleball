@@ -87,7 +87,7 @@ public final class WorkspaceLaunch {
             String existing = values.get(PKB_props.PKB_REPORT_RETENTION);
             if (existing != null && !existing.equals(parsed)) {
                 warn(warnings, "WARNING: --runvar " + PKB_props.PKB_REPORT_RETENTION
-                        + " replaces " + existing + " with " + parsed);
+                        + " replaces " + Workspace.shown(existing) + " with " + Workspace.shown(parsed));
             }
             if (!parsed.equals(existing)) {
                 values.put(PKB_props.PKB_REPORT_RETENTION, parsed);
