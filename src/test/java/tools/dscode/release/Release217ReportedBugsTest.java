@@ -5,7 +5,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import tools.dscode.control.protocol.PickleballPaths;
 
+import java.io.InputStream;
 import java.nio.file.Files;
+import java.util.Properties;
 import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -52,5 +54,19 @@ class Release217ReportedBugsTest {
     void pathWithoutIllegalCharactersIsUnchanged() {
         assertEquals("file:/tmp/features/a.feature:7",
                 PickleballPaths.toCucumberFeatureUri("wd-file:/tmp/features/a.feature:7"));
+    }
+
+    /** Bug 5: two builds of one version must be distinguishable by the embedded source commit. */
+    @Test
+    void builtArtifactCarriesTheSourceCommit() throws Exception {
+        Properties stamp = new Properties();
+        try (InputStream in = Release217ReportedBugsTest.class.getClassLoader()
+                .getResourceAsStream("META-INF/pickleball-build.properties")) {
+            assertTrue(in != null, "build provenance must be packaged");
+            stamp.load(in);
+        }
+        assertTrue(stamp.getProperty("commit", "").matches("[0-9a-f]{40}"),
+                "commit must be a full git SHA but was '" + stamp.getProperty("commit") + "'");
+        assertTrue(!stamp.getProperty("branch", "").isBlank() || !stamp.getProperty("commit", "").isBlank());
     }
 }

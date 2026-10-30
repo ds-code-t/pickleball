@@ -8,6 +8,7 @@ Fixes for bugs reported against 2.1.17:
 - `Values.softFail` from a Java step definition: the top-level JUnit throwable is no longer a message-less `UndeclaredThrowableException`. Its message contains the soft-failure text.
 - A Workbench feature folder with a space (`wd-file:my features`) is percent-encoded into the Cucumber `file:` URI. A path without such characters is unchanged.
 - Under `mvn exec:java`, when `java.class.path` has no test output root, Workspace seed capture and suite discovery also read the context class loader's file URLs, so the consumer runner subclass is found. The resolve-cache key includes those entries, so a cache captured without the runner is not reused. A normal run, whose test output is on `java.class.path`, is unchanged.
+- `META-INF/pickleball-build.properties` again records `commit`, `branch`, `dirty`, and `workingTreeDiffHash`. On Gradle 9 the git calls failed silently and every build was stamped with a blank commit, so two builds of one version could not be told apart.
 
 Direct-control handoff for a live Workbench session. A normal `mvn test` or `gradlew test` does not read `pkb_direct_control_provider` and does not write a session descriptor.
 
