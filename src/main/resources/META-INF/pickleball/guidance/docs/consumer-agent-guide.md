@@ -54,7 +54,7 @@ summary status=PASSED
 
 ## Query loop
 
-`query runs`, `query get --run-id=<id>`, `query search --text=<words>`, `query errors --run-id=<id>`, `query tail --run-id=<id>` (newest first). Default page is 20. Read `…+N more, use cursor`. Bad UTF-8 is named in `decodeWarnings` and does not fail the search. use the shallowest evidence layer. keep terminal logging minimal. `pkb_reportretention=failed` keeps failing scenarios.
+`query runs`, `query get --run-id=<id>`, `query search --text=<words>`, `query errors --run-id=<id>`, `query tail --run-id=<id>` (newest first). Default page is 20. Read `…+N more, use cursor`. Bad UTF-8 is named in `decodeWarnings` and does not fail the search. Agents use the shallowest evidence layer and keep terminal logging minimal. `pkb_reportretention=failed` keeps failing scenarios.
 
 ## First-read
 
