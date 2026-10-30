@@ -570,7 +570,7 @@ publishing {
                     d.appendNode('artifactId', a)
 
                     if (ga == "org.seleniumhq.selenium:selenium-java") {
-                        d.appendNode('version', '[4.0,5.0)')
+                        d.appendNode('version', '[4.44,5.0)')
                     } else {
                         d.appendNode('version', v)
                     }
