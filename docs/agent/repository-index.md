@@ -60,6 +60,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/release-notes.md`
 - `docs/reserved-element-names.md`
 - `docs/roadmaps/2.1.17-workspace-config.md`
+- `docs/roadmaps/2.1.18-agent-retrieval-fixes.md`
 - `docs/roadmaps/2.1.18-agent-retrieval.md`
 - `docs/roadmaps/2.1.18-direct-control-handoff.md`
 - `docs/roadmaps/2.1.18-workbench-coverage-findings.md`

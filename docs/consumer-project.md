@@ -175,6 +175,8 @@ The consumer `pom.xml` also defines Maven profiles such as:
 
 Feature files remain authoritative for exact scenario tags.
 
+Surefire `testFailureIgnore` is `${maven.test.failure.ignore}`, and that property defaults to `false`. A normal `./mvnw test` still fails the build when a scenario fails. `-Dmaven.test.failure.ignore=true` and `.mvn/maven.config` are honored. A literal `<testFailureIgnore>false</testFailureIgnore>` would ignore both. Workbench still reports `summary status=FAILED` and exits 1 when the run index says the scenario failed.
+
 ## Named profiles and controlled RunVars
 
 Reusable profiles live in `profiles.yaml`; local property-level overrides for matching profile names can live in `profiles_local.yaml`. Select one or more profiles with `pkb_profile`; selected names compose left-to-right and later profiles win.
