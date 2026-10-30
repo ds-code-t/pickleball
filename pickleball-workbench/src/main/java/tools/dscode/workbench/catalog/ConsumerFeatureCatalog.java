@@ -1,6 +1,7 @@
 package tools.dscode.workbench.catalog;
 
 import tools.dscode.control.protocol.PickleballPaths;
+import tools.dscode.control.protocol.WorkbenchFeatureIndex;
 import tools.dscode.workbench.sync.WorkbenchManifest;
 
 import java.io.IOException;
@@ -287,7 +288,35 @@ public final class ConsumerFeatureCatalog {
             }
         }
         entries.sort(Comparator.comparing(FeatureEntry::relativePath, String.CASE_INSENSITIVE_ORDER));
+        readSharedIndex(root, manifest);
         return List.copyOf(entries);
+    }
+
+    /**
+     * The picker and {@code plan}/{@code discover} share {@code feature-index.v3}.
+     * A failure here leaves the catalog entries already parsed; it does not hide features.
+     */
+    private static void readSharedIndex(Path root, WorkbenchManifest manifest) {
+        List<Path> extras = new ArrayList<>();
+        if (manifest != null) {
+            for (String source : manifest.sourceRoots()) {
+                if (source == null || source.isBlank()) continue;
+                extras.add(Path.of(source));
+            }
+        }
+        try {
+            WorkbenchFeatureIndex.select(new WorkbenchFeatureIndex.Request(
+                    root,
+                    extras,
+                    null,
+                    null,
+                    null,
+                    List.of(),
+                    false
+            ));
+        } catch (RuntimeException ignored) {
+            // The text catalog remains usable when the shared index cannot be written.
+        }
     }
 
     static List<Path> configuredFeatureRoots(Path projectRoot) {

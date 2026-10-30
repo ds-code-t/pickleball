@@ -114,15 +114,18 @@ public final class WorkbenchFeatureIndex {
             List<Hit> hits,
             int filesIndexed,
             int filesReparsed,
-            int cacheHits
+            int cacheHits,
+            long elapsedMillis
     ) {
         public Selection {
             fallbackReason = fallbackReason == null ? "" : fallbackReason;
             hits = List.copyOf(hits == null ? List.of() : hits);
+            if (elapsedMillis < 0) elapsedMillis = 0;
         }
     }
 
     public static Selection select(Request request) {
+        long started = System.nanoTime();
         Path root = request.projectRoot().toAbsolutePath().normalize();
         List<Path> files = discoverFiles(root, request.extraRoots());
         Path indexFile = cacheFile(root);
@@ -174,19 +177,19 @@ public final class WorkbenchFeatureIndex {
             }
         }
         if (unreadable != null) {
-            return new Selection(
+            return finish(started, new Selection(
                     false, true, false,
                     "unreadable feature " + unreadable,
-                    null, List.of(), files.size(), reparsed, cacheHits
-            );
+                    null, List.of(), files.size(), reparsed, cacheHits, 0
+            ));
         }
         TagExpression tags = TagExpression.compile(request.tags());
         if (tags.unsupported()) {
-            return new Selection(
+            return finish(started, new Selection(
                     false, true, false,
                     "unsupported tag expression: " + request.tags(),
-                    null, List.of(), files.size(), reparsed, cacheHits
-            );
+                    null, List.of(), files.size(), reparsed, cacheHits, 0
+            ));
         }
         Pattern name = compileName(request.name());
         ExampleRowSelector example = compileExample(request.example());
@@ -219,7 +222,7 @@ public final class WorkbenchFeatureIndex {
         if (narrowed && (!hits.isEmpty() || !forced.isEmpty())) {
             property = spillFeatureList(root, featureProperty(root, hits, lineSpecific, forced));
         }
-        return new Selection(
+        return finish(started, new Selection(
                 narrowed,
                 false,
                 narrowed && hits.isEmpty() && forced.isEmpty(),
@@ -228,7 +231,45 @@ public final class WorkbenchFeatureIndex {
                 hits,
                 stored.size(),
                 reparsed,
-                cacheHits
+                cacheHits,
+                0
+        ));
+    }
+
+    /** Feature URIs the launch passes to Cucumber before a full tree scan. Empty means do not narrow. */
+    public static List<String> prefilteredFeatures(Selection selection) {
+        if (selection == null || selection.fullScanFallback() || !selection.narrowed()) return List.of();
+        String property = selection.featureProperty();
+        if (property == null || property.isBlank()) return List.of();
+        String value = property.strip();
+        if (value.startsWith("@")) {
+            try {
+                value = Files.readString(Path.of(value.substring(1).strip()));
+            } catch (IOException failure) {
+                return List.of();
+            }
+        }
+        List<String> uris = new ArrayList<>();
+        for (String part : value.split(",")) {
+            String token = part.strip();
+            if (!token.isEmpty()) uris.add(token);
+        }
+        return List.copyOf(uris);
+    }
+
+    private static Selection finish(long startedNanos, Selection selection) {
+        long elapsed = (System.nanoTime() - startedNanos) / 1_000_000L;
+        return new Selection(
+                selection.narrowed(),
+                selection.fullScanFallback(),
+                selection.matchedNone(),
+                selection.fallbackReason(),
+                selection.featureProperty(),
+                selection.hits(),
+                selection.filesIndexed(),
+                selection.filesReparsed(),
+                selection.cacheHits(),
+                elapsed
         );
     }
 

@@ -42,6 +42,9 @@ class WorkbenchFeatureIndexTest {
         assertTrue(first.narrowed());
         assertTrue(first.featureProperty().contains("login.feature"));
         assertFalse(first.featureProperty().contains("other.feature"));
+        assertTrue(first.elapsedMillis() >= 0);
+        assertEquals(List.of(first.featureProperty()), java.util.List.of(String.join(",", WorkbenchFeatureIndex.prefilteredFeatures(first))));
+        assertEquals(1, WorkbenchFeatureIndex.prefilteredFeatures(first).size());
 
         WorkbenchFeatureIndex.Selection hit = select("@smoke", null, null, List.of(), false);
         assertEquals(0, hit.filesReparsed());

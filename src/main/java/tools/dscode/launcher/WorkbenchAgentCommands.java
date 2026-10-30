@@ -771,7 +771,8 @@ public final class WorkbenchAgentCommands {
                 + " scenarios=" + selection.hits().size()
                 + " narrowed=" + selection.narrowed()
                 + " fullScan=" + selection.fullScanFallback()
-                + " listChars=" + (property == null ? 0 : property.length());
+                + " listChars=" + (property == null ? 0 : property.length())
+                + " selectMs=" + selection.elapsedMillis();
     }
 
     private static int printPlan(
@@ -785,6 +786,7 @@ public final class WorkbenchAgentCommands {
         out.println("name=" + text(parsed.name()));
         out.println("example=" + text(parsed.example()));
         out.println("select=" + parsed.selects());
+        out.println("indexMs=" + selection.elapsedMillis());
         if (selection.fullScanFallback() || parsed.fullScan()) {
             if (selection.fullScanFallback()
                     && selection.fallbackReason() != null
@@ -842,6 +844,7 @@ public final class WorkbenchAgentCommands {
         body.put("example", text(parsed.example()));
         body.put("select", parsed.selects());
         body.put("fullScan", full);
+        body.put("indexMs", selection.elapsedMillis());
         int code = 0;
         if (full) {
             String warning = selection.fullScanFallback()

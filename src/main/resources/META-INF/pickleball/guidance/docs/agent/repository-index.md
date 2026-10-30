@@ -472,6 +472,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/common/treeparsing/preparsing/LazyBranchResolutionTest.java`
 - `src/test/java/tools/dscode/common/treeparsing/WithinRewriteScopeTest.java`
 - `src/test/java/tools/dscode/control/override/StepOverrideCompilerTest.java`
+- `src/test/java/tools/dscode/control/protocol/FeatureIndexPrefilterParityTest.java`
 - `src/test/java/tools/dscode/control/protocol/PickleballArtifactLocatorTest.java`
 - `src/test/java/tools/dscode/control/protocol/PickleballLocalLayoutTest.java`
 - `src/test/java/tools/dscode/control/protocol/PickleballLocalStoreTest.java`
