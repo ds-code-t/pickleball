@@ -36,3 +36,10 @@ Default `limit` is 20 (max 100). A short page sets `nextCursor` and `truncated` 
 | log | `source` (`agent-log`), `text`, `where` |
 
 Text fields clip at 160 characters. A missing catalog is an empty `items` list, not a guessed run. Delete a future index database and the files still answer; this reader does not require a database.
+
+## Derived SQLite index
+
+`reports/diagnostic-runs/diagnostics.db` is a disposable FTS5 copy of the same rows `DiagnosticQuery` reads from the JSON files. `DiagnosticIndexRebuilder.rebuildRunIndex` and `rebuildRunCatalog` refresh it when the driver `org.xerial:sqlite-jdbc` is on the classpath. The driver is a normal Pickleball dependency, like the other JDBC drivers, and is not shaded into the shadow jar. sqlite-jdbc carries the Windows, macOS, and Linux natives, so one rebuild test is the parity check on all three.
+
+The database is not a second source of truth. Delete it and the next catalog rebuild recreates it. `DiagnosticSqliteIndex.rebuild(project)` does the same from the files. `query search` uses the index when the file is present and falls back to the JSON files when it is missing or the driver is absent. MCP tools call the same `DiagnosticQuery`, so they follow that fallback. A hit still returns ids, a relative `where`, and a one-line stack head.
+

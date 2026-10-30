@@ -135,6 +135,7 @@ dependencies {
 
     // JDBC drivers are published as transitive dependencies. They are not shaded.
     implementation 'com.h2database:h2:2.3.232'
+    implementation 'org.xerial:sqlite-jdbc:3.47.2.0'
     implementation 'org.postgresql:postgresql:42.7.7'
     implementation 'com.microsoft.sqlserver:mssql-jdbc:12.10.1.jre11'
     implementation 'com.oracle.database.jdbc:ojdbc11:23.7.0.25.01'

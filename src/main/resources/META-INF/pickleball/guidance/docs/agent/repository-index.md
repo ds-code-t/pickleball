@@ -465,6 +465,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/common/mappings/queries/TopLevelCollectionTest.java`
 - `src/test/java/tools/dscode/common/reporting/diagnostic/AgentDiscoverPlannerTest.java`
 - `src/test/java/tools/dscode/common/reporting/diagnostic/ConsumerMavenTestRunnerTest.java`
+- `src/test/java/tools/dscode/common/reporting/diagnostic/DiagnosticIndexRebuilderSqliteTest.java`
 - `src/test/java/tools/dscode/common/reporting/diagnostic/DiagnosticSecretRedactionTest.java`
 - `src/test/java/tools/dscode/common/servicecalls/JdbcTypeMappingTest.java`
 - `src/test/java/tools/dscode/common/treeparsing/preparsing/ConditionalBranchArgumentTest.java`
@@ -639,6 +640,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/ControlBridgeValueResult.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/ControlProtocol.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/DiagnosticQuery.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/DiagnosticSqliteIndex.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/DirectControlProvider.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/ExampleRowSelector.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/GherkinKeywords.java`
@@ -662,6 +664,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/ControlBridgeStepResolutionTest.java`
 - `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/ControlProtocolStepSeedTest.java`
 - `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/DiagnosticQueryTest.java`
+- `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/DiagnosticSqliteIndexTest.java`
 - `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/DirectControlProviderTest.java`
 - `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/ExampleRowSelectorTest.java`
 - `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/PickleballPathsTest.java`

@@ -95,15 +95,24 @@ public final class DiagnosticQuery {
 
         Path root = project.toAbsolutePath().normalize();
         boolean capped = false;
-        List<Map<String, Object>> matched;
-        String where;
-        try {
-            Loaded loaded = load(root, op, runId, scenarioId, kind, needle, status, id);
-            matched = loaded.items;
-            where = loaded.where;
-            capped = loaded.capped;
-        } catch (IOException failure) {
-            return error(1, "unreadable diagnostics", "Could not read diagnostics: " + oneLine(failure.getMessage()));
+        List<Map<String, Object>> matched = null;
+        String where = null;
+        if ("search".equals(op) && !unpaged(request)) {
+            List<Map<String, Object>> indexed = DiagnosticSqliteIndex.find(root, needle, runId, kind);
+            if (indexed != null) {
+                matched = indexed;
+                where = "reports/diagnostic-runs/" + DiagnosticSqliteIndex.FILE_NAME;
+            }
+        }
+        if (matched == null) {
+            try {
+                Loaded loaded = load(root, op, runId, scenarioId, kind, needle, status, id);
+                matched = loaded.items;
+                where = loaded.where;
+                capped = loaded.capped;
+            } catch (IOException failure) {
+                return error(1, "unreadable diagnostics", "Could not read diagnostics: " + oneLine(failure.getMessage()));
+            }
         }
         int total = matched.size();
         if (offset > total) offset = total;
@@ -112,7 +121,7 @@ public final class DiagnosticQuery {
         for (int index = offset; index < end; index++) page.add(project(matched.get(index), fields));
 
         int budget = budgetBytes <= 0 ? DEFAULT_BUDGET_BYTES : budgetBytes;
-        boolean budgeted = fields == null && (request == null || request.get("limit") == null
+        boolean budgeted = !unpaged(request) && fields == null && (request == null || request.get("limit") == null
                 || limit <= DEFAULT_LIMIT);
         int dropped = 0;
         if (budgeted) {
@@ -964,7 +973,12 @@ public final class DiagnosticQuery {
             }
         }
         if (parsed < 1) throw new IllegalArgumentException(String.valueOf(parsed));
-        return Math.min(parsed, MAX_LIMIT);
+        int cap = unpaged(request) ? 100_000 : MAX_LIMIT;
+        return Math.min(parsed, cap);
+    }
+
+    private static boolean unpaged(Map<String, ?> request) {
+        return request != null && Boolean.TRUE.equals(request.get("unpaged"));
     }
 
     private static int cursor(String cursor) {
