@@ -14,8 +14,6 @@ import javax.tools.ToolProvider;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.charset.StandardCharsets;
@@ -25,6 +23,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+
+import io.cucumber.core.cli.Main;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -162,6 +162,12 @@ class WorkbenchLaunchCorrectnessTest {
                 public final class BeforeAllSite {
                     @BeforeAll
                     public static void open() throws Exception {
+                        for (StackTraceElement frame : Thread.currentThread().getStackTrace()) {
+                            if (frame.getClassName().startsWith("io.cucumber")) {
+                                System.err.println(frame);
+                                break;
+                            }
+                        }
                         throw new BindException("Address already in use");
                     }
                 }
@@ -207,6 +213,7 @@ class WorkbenchLaunchCorrectnessTest {
         assertTrue(Files.readString(hook).contains("@BeforeAll"));
         String saved = Files.readString(AgentCoordination.runDirectory(temp, "run-hook").resolve("console").resolve("The_one.txt"));
         assertTrue(saved.contains("BeforeAllSite.open"), saved);
+        assertTrue(saved.contains("io.cucumber"), saved);
     }
 
     @Test
@@ -242,13 +249,19 @@ class WorkbenchLaunchCorrectnessTest {
         assertFalse(out.contains("summary status=LAUNCH_ERROR"), out);
     }
 
-    /** Compiles the fixture and invokes it so the console stack is a real BindException. */
+    /** Compiles the fixture and runs it as a Cucumber @BeforeAll hook, not Method.invoke. */
     private static void runCompiledBeforeAll(Path source, PrintStream err) throws Exception {
         JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
         if (compiler == null) {
             throw new IllegalStateException("JDK compiler is required to run the before-all fixture");
         }
         Path classes = Files.createTempDirectory("before-all-classes");
+        Path feature = classes.resolveSibling("before-all.feature");
+        Files.writeString(feature, """
+                Feature: Hook
+                  Scenario: The one
+                    Given one
+                """);
         DiagnosticCollector<JavaFileObject> diagnostics = new DiagnosticCollector<>();
         try (var files = compiler.getStandardFileManager(diagnostics, Locale.ROOT, StandardCharsets.UTF_8)) {
             Boolean compiled = compiler.getTask(
@@ -263,17 +276,29 @@ class WorkbenchLaunchCorrectnessTest {
                 throw new IllegalStateException("before-all fixture did not compile: " + diagnostics.getDiagnostics());
             }
         }
+        Thread thread = Thread.currentThread();
+        ClassLoader previousLoader = thread.getContextClassLoader();
+        PrintStream previousOut = System.out;
+        PrintStream previousErr = System.err;
+        Throwable thrown = null;
         try (URLClassLoader loader = new URLClassLoader(new URL[]{classes.toUri().toURL()}, WorkbenchLaunchCorrectnessTest.class.getClassLoader())) {
-            Method open = loader.loadClass("com.example.site.BeforeAllSite").getDeclaredMethod("open");
+            thread.setContextClassLoader(loader);
+            System.setOut(err);
+            System.setErr(err);
             try {
-                open.invoke(null);
-                throw new AssertionError("before-all hook returned");
-            } catch (InvocationTargetException thrown) {
-                Throwable cause = thrown.getCause();
-                if (cause == null) throw thrown;
-                cause.printStackTrace(err);
+                Main.run(
+                        new String[]{"--glue", "com.example.site", "--monochrome", feature.toString()},
+                        loader
+                );
+            } catch (Throwable failure) {
+                thrown = failure;
             }
+        } finally {
+            System.setOut(previousOut);
+            System.setErr(previousErr);
+            thread.setContextClassLoader(previousLoader);
         }
+        if (thrown != null) thrown.printStackTrace(err);
     }
 
     private void writeFeature() throws Exception {

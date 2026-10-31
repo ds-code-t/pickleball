@@ -193,6 +193,32 @@ class WorkbenchRunReportsTest {
     }
 
     @Test
+    void summaryLineCountsPassesAndNamesTheFailedScenario() throws Exception {
+        Path project = tempDir.resolve("counts");
+        String runId = "run-counts";
+        Path run = AgentCoordination.runDirectory(project, runId);
+        Path pass = run.resolve("diagnostic").resolve(runId).resolve("scenarios").resolve("ok");
+        Path fail = run.resolve("diagnostic").resolve(runId).resolve("scenarios").resolve("bad");
+        Files.createDirectories(pass);
+        Files.createDirectories(fail);
+        Files.writeString(pass.resolve("summary.json"), """
+                {"outcome":"PASSED","identity":{"scenarioName":"Ok case"},"steps":{"executed":1,"passed":1}}
+                """);
+        Files.writeString(fail.resolve("summary.json"), """
+                {"outcome":"FAILED","identity":{"scenarioName":"Bad case"},"steps":{"executed":1,"failed":1}}
+                """);
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        WorkbenchRunReports.publish(
+                project, runId, List.of(), "", "FAILED",
+                new PrintStream(out, true, StandardCharsets.UTF_8)
+        );
+        String text = out.toString(StandardCharsets.UTF_8);
+        assertTrue(text.contains("passed=1"), text);
+        assertTrue(text.contains("failed=1"), text);
+        assertTrue(text.contains("failedScenarios=Bad case"), text);
+    }
+
+    @Test
     void prunedScenarioStillWritesRunSummaryAndNamedConsole() throws Exception {
         Path project = tempDir.resolve("Program Files");
         String runId = "check-1023";

@@ -86,6 +86,25 @@ public final class WorkbenchRunReports {
         return line.toString();
     }
 
+    public static String compact(
+            String status,
+            int scenarios,
+            int steps,
+            String environment,
+            String browser,
+            int passed,
+            int failed,
+            List<String> failedScenarios
+    ) {
+        StringBuilder line = new StringBuilder(compact(status, scenarios, steps, environment, browser));
+        if (passed >= 0) line.append(" passed=").append(passed);
+        if (failed >= 0) line.append(" failed=").append(failed);
+        if (failed > 0 && failedScenarios != null && !failedScenarios.isEmpty()) {
+            line.append(" failedScenarios=").append(String.join(",", failedScenarios));
+        }
+        return line.toString();
+    }
+
     /**
      * Writes per-scenario console files under the Workbench run folder and, when a
      * diagnostic scenario directory has events, a workbench summary and trace index.
@@ -175,8 +194,59 @@ public final class WorkbenchRunReports {
                 // An unsafe run id already skipped the console write.
             }
         }
-        if (out != null) out.println(compact(status, scenarios, steps, environment, browser));
+        if (out != null) {
+            int passed = 0;
+            int failed = 0;
+            List<String> failedNames = List.of();
+            if (!launchError) {
+                int[] counted = passFail(bodies);
+                passed = counted[0];
+                failed = counted[1];
+                failedNames = failedScenarioNames(bodies);
+            }
+            out.println(compact(status, scenarios, steps, environment, browser, passed, failed, failedNames));
+        }
         return steps;
+    }
+
+    private static int[] passFail(List<Map<String, Object>> bodies) {
+        int passed = 0;
+        int failed = 0;
+        if (bodies == null) return new int[]{0, 0};
+        for (Map<String, Object> body : bodies) {
+            String status = scenarioStatus(body);
+            if (isPassedStatus(status)) passed++;
+            else if (isFailedStatus(status)) failed++;
+        }
+        return new int[]{passed, failed};
+    }
+
+    private static List<String> failedScenarioNames(List<Map<String, Object>> bodies) {
+        List<String> names = new ArrayList<>();
+        if (bodies == null) return names;
+        for (Map<String, Object> body : bodies) {
+            if (!isFailedStatus(scenarioStatus(body))) continue;
+            String name = text(body.get("scenario"));
+            if (!name.isBlank()) names.add(name);
+        }
+        return names;
+    }
+
+    private static String scenarioStatus(Map<String, Object> body) {
+        if (body == null) return "";
+        String status = text(body.get("status"));
+        return status.isBlank() ? text(body.get("outcome")) : status;
+    }
+
+    private static boolean isPassedStatus(String status) {
+        return "PASSED".equalsIgnoreCase(status);
+    }
+
+    private static boolean isFailedStatus(String status) {
+        if (status == null || status.isBlank()) return false;
+        return "FAILED".equalsIgnoreCase(status)
+                || "ERROR".equalsIgnoreCase(status)
+                || "ERRORED".equalsIgnoreCase(status);
     }
 
     /**

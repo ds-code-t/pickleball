@@ -15,6 +15,6 @@ The session, in order:
 
 Each stage prints `stage=<name> exit=<code> seconds=<n>` and must finish inside the budget in the script. `record.json` for the compiled run must be `PASSED` and `finish` must set `stoppedAt`. Timings are also written to `maven-consumer-project/.pickleball/consumer-sim-timings.json`.
 
-Linux CI runs the script under `xvfb-run` after `publishToMavenLocal` in `.github/workflows/agent-contract.yml`. The Windows job is `.github/workflows/consumer-sim-windows.yml`. It uses PowerShell and `scripts/consumer_sim.ps1`, which runs the same Python harness. That harness calls `mvnw.cmd`.
+Linux CI runs the script under `xvfb-run` after `publishToMavenLocal` in `.github/workflows/agent-contract.yml` (job `validate`, which also runs the golden tests inside `gradlew test` and the full suite). The Windows harness is job `windows` in that same workflow. It uses PowerShell and `scripts/consumer_sim.ps1`, which runs the same Python harness and `mvnw.cmd`. Job `gate` fails unless `validate` and `windows` both succeed, so a release cannot go out on a green Linux job alone.
 
 A normal `mvn test` does not run this script.
