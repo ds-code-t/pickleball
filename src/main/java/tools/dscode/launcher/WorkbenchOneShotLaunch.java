@@ -27,10 +27,14 @@ import java.util.Set;
  * is complete, otherwise {@code .pickleball/workbench}). The file is one Java
  * argument-file classpath. The next one-shot is
  * {@code java -cp @classpath.cache tools.dscode.launcher.PickleballWorkbenchLauncher}.
- * No Maven or Gradle wrapper starts. A missing or stale cache falls back to the
- * project wrapper. {@code help} with no cache still uses that launcher jar and
- * {@link WorkbenchCliHelp} instead of the wrapper. {@code discover}, {@code confirm},
- * and {@code isolate} keep the wrapper when they must build or launch a worker.</p>
+ * No Maven or Gradle wrapper starts. When the cache is missing or stale, a
+ * one-shot resolves the test classpath and runs
+ * {@code java -cp @classpath.cache} so Java's exit code is kept
+ * ({@code mvn exec:java} turns exit 2 into 1). If that classpath cannot be
+ * resolved, the project wrapper is still the fallback. {@code help} with no
+ * cache still uses that launcher jar and {@link WorkbenchCliHelp} instead of
+ * the wrapper. {@code discover}, {@code confirm}, and {@code isolate} keep the
+ * wrapper when they must build or launch a worker.</p>
  */
 public final class WorkbenchOneShotLaunch {
     static final String CACHE_FILE = "classpath.cache";
@@ -132,8 +136,10 @@ public final class WorkbenchOneShotLaunch {
 
     /**
      * The process command for these launcher arguments. A fresh cache is
-     * {@code java -cp @classpath.cache} plus the launcher class. Otherwise the
-     * project wrapper, except {@code help}, which uses the launcher jar.
+     * {@code java -cp @classpath.cache} plus the launcher class. A one-shot
+     * with a missing or stale cache resolves that classpath and uses the same
+     * Java command so a usage error still exits 2. Otherwise the project
+     * wrapper, except {@code help}, which uses the launcher jar.
      */
     public static List<String> command(Path project, List<String> args) {
         List<String> launcherArgs = args == null ? List.of() : args;
@@ -145,7 +151,32 @@ public final class WorkbenchOneShotLaunch {
             Optional<Path> jar = launcherJar();
             if (jar.isPresent()) return jarCommand(jar.get(), launcherArgs);
         }
+        if (isOneShot(verb)) {
+            List<String> resolved = resolvedOneShotClasspath(project);
+            if (!resolved.isEmpty()) {
+                try {
+                    writeCache(project, resolved);
+                    return fastCommand(project, launcherArgs);
+                } catch (IOException ignored) {
+                    // The wrapper below still runs the launcher.
+                }
+            }
+        }
         return wrapperCommand(project, launcherArgs);
+    }
+
+    /** Test classpath for a one-shot whose cache is missing or stale. Empty when resolve fails. */
+    private static List<String> resolvedOneShotClasspath(Path project) {
+        if (project == null) return List.of();
+        try {
+            List<String> entries = new ArrayList<>(resolveWithWrapper(project, new StringBuilder()));
+            if (entries.isEmpty()) return List.of();
+            entries.addAll(0, existingOutputs(project));
+            addCodeSource(entries);
+            return existingUnique(entries);
+        } catch (IOException failure) {
+            return List.of();
+        }
     }
 
     public static int launch(Path project, List<String> args, PrintStream out, PrintStream err) {

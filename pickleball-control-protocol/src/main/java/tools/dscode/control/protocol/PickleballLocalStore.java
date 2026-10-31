@@ -468,10 +468,20 @@ public final class PickleballLocalStore {
                   exec "$JAVA" -jar "$JAR" "$@"
                 fi
                 if [ -f "$PROJECT/mvnw" ]; then
-                  exec "$PROJECT/mvnw" -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java "-Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher" "-Dexec.classpathScope=test" "-Dexec.args=$*"
+                  RESOLVED="$PROJECT/.pickleball/workbench/classpath.resolved"
+                  mkdir -p "$PROJECT/.pickleball/workbench"
+                  "$PROJECT/mvnw" -q org.apache.maven.plugins:maven-dependency-plugin:3.8.1:build-classpath -Dmdep.includeScope=test "-Dmdep.outputFile=$RESOLVED" >/dev/null 2>&1 || true
+                  if [ -s "$RESOLVED" ]; then
+                    exec "$JAVA" -cp "@$RESOLVED" tools.dscode.launcher.PickleballWorkbenchLauncher "$@"
+                  fi
                 fi
                 if [ -f "$PROJECT/mvnw.cmd" ]; then
-                  exec "$PROJECT/mvnw.cmd" -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java "-Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher" "-Dexec.classpathScope=test" "-Dexec.args=$*"
+                  RESOLVED="$PROJECT/.pickleball/workbench/classpath.resolved"
+                  mkdir -p "$PROJECT/.pickleball/workbench"
+                  "$PROJECT/mvnw.cmd" -q org.apache.maven.plugins:maven-dependency-plugin:3.8.1:build-classpath -Dmdep.includeScope=test "-Dmdep.outputFile=$RESOLVED" >/dev/null 2>&1 || true
+                  if [ -s "$RESOLVED" ]; then
+                    exec "$JAVA" -cp "@$RESOLVED" tools.dscode.launcher.PickleballWorkbenchLauncher "$@"
+                  fi
                 fi
                 if [ -f "$PROJECT/gradlew" ]; then
                   exec "$PROJECT/gradlew" -q pickleballWorkbench "-PpkbArgs=$*"
@@ -586,8 +596,13 @@ public final class PickleballLocalStore {
                   exit /b !ERRORLEVEL!
                 )
                 if exist "!PROJECT!\\mvnw.cmd" (
-                  "!PROJECT!\\mvnw.cmd" -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java "-Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher" "-Dexec.classpathScope=test" "-Dexec.args=%*"
-                  exit /b !ERRORLEVEL!
+                  set "RESOLVED=!PROJECT!\\.pickleball\\workbench\\classpath.resolved"
+                  if not exist "!PROJECT!\\.pickleball\\workbench" mkdir "!PROJECT!\\.pickleball\\workbench"
+                  "!PROJECT!\\mvnw.cmd" -q org.apache.maven.plugins:maven-dependency-plugin:3.8.1:build-classpath -Dmdep.includeScope=test "-Dmdep.outputFile=!RESOLVED!" >nul 2>&1
+                  if exist "!RESOLVED!" (
+                    "%JAVA%" -cp "@!RESOLVED!" tools.dscode.launcher.PickleballWorkbenchLauncher %*
+                    exit /b !ERRORLEVEL!
+                  )
                 )
                 if exist "!PROJECT!\\gradlew.bat" (
                   "!PROJECT!\\gradlew.bat" -q pickleballWorkbench "-PpkbArgs=%*"
@@ -706,10 +721,15 @@ public final class PickleballLocalStore {
                   & $java -jar $jar @args
                   exit $LASTEXITCODE
                 }
+                $resolved = Join-Path $project '.pickleball/workbench/classpath.resolved'
                 $mvnw = Join-Path $project 'mvnw.cmd'
                 if (Test-Path $mvnw) {
-                  & $mvnw -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java "-Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher" "-Dexec.classpathScope=test" "-Dexec.args=$($args -join ' ')"
-                  exit $LASTEXITCODE
+                  New-Item -ItemType Directory -Force -Path (Split-Path $resolved) | Out-Null
+                  & $mvnw -q org.apache.maven.plugins:maven-dependency-plugin:3.8.1:build-classpath -Dmdep.includeScope=test "-Dmdep.outputFile=$resolved" 2>$null
+                  if ((Test-Path $resolved) -and (Get-Item $resolved).Length -gt 0) {
+                    & $java -cp "@$resolved" tools.dscode.launcher.PickleballWorkbenchLauncher @args
+                    exit $LASTEXITCODE
+                  }
                 }
                 $gradlew = Join-Path $project 'gradlew.bat'
                 if (Test-Path $gradlew) {

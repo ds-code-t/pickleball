@@ -87,9 +87,14 @@ class PickleballLocalStoreTest {
         assertTrue(sh.contains("classpath.cache"));
         assertTrue(sh.contains("-cp"));
         assertTrue(sh.contains("tools.dscode.launcher.PickleballWorkbenchLauncher"));
-        assertTrue(sh.indexOf("classpath.cache") < sh.indexOf("exec-maven-plugin"));
+        assertTrue(sh.contains("build-classpath"));
+        assertFalse(sh.contains("exec-maven-plugin"), sh);
         assertTrue(cmd.contains("classpath.cache"));
+        assertTrue(cmd.contains("build-classpath"));
+        assertFalse(cmd.contains("exec-maven-plugin"), cmd);
         assertTrue(ps.contains("classpath.cache"));
+        assertTrue(ps.contains("build-classpath"));
+        assertFalse(ps.contains("exec-maven-plugin"), ps);
     }
 
     @Test
@@ -176,6 +181,58 @@ class PickleballLocalStoreTest {
         String guiRecorded = Files.readString(bin.resolve("recorded"));
         assertTrue(guiRecorded.lines().anyMatch("ui"::equals), guiRecorded);
         assertFalse(guiRecorded.contains("PickleballWorkbenchLauncher"), guiRecorded);
+    }
+
+    @Test
+    void staleCacheOneShotExitsWithJavaNotMaven() throws Exception {
+        Path project = tempDir.resolve("stale-exit");
+        Files.createDirectories(project.resolve(".pickleball/open"));
+        Files.writeString(project.resolve("pom.xml"), "<project/>\n");
+        Files.write(project.resolve("pickleball-test.jar"), new byte[]{1, 2, 3});
+        Path javaHome = tempDir.resolve("java-home-exit");
+        Path bin = javaHome.resolve("bin");
+        Files.createDirectories(bin);
+        Files.writeString(bin.resolve("java"), """
+                #!/bin/sh
+                printf '%s\\n' "$@" > "$(dirname "$0")/recorded"
+                exit 2
+                """);
+        bin.resolve("java").toFile().setExecutable(true);
+        Path mvnw = project.resolve("mvnw");
+        Files.writeString(mvnw, """
+                #!/bin/sh
+                echo "$@" >> "$PWD/mvn-args"
+                out=""
+                for arg in "$@"; do
+                  case "$arg" in
+                    -Dmdep.outputFile=*) out="${arg#-Dmdep.outputFile=}" ;;
+                  esac
+                done
+                if [ -n "$out" ]; then
+                  printf '%s\\n' "/tmp/pickleball-oneshot.jar" > "$out"
+                  exit 0
+                fi
+                exit 1
+                """);
+        mvnw.toFile().setExecutable(true);
+        Path script = project.resolve(".pickleball/open/pickleball-workbench.sh");
+        Files.writeString(script, PickleballLocalStore.unixOpenScript());
+        script.toFile().setExecutable(true);
+        ProcessBuilder builder = new ProcessBuilder(script.toString(), "not-a-verb")
+                .directory(project.toFile())
+                .redirectErrorStream(true);
+        builder.environment().put("JAVA_HOME", javaHome.toString());
+        builder.environment().put("PATH", bin + ":" + builder.environment().getOrDefault("PATH", ""));
+        Process process = builder.start();
+        String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+        assertEquals(2, process.waitFor(), output);
+        String recorded = Files.readString(bin.resolve("recorded"));
+        assertTrue(recorded.contains("-cp"), recorded);
+        assertTrue(recorded.contains("tools.dscode.launcher.PickleballWorkbenchLauncher"), recorded);
+        assertTrue(recorded.contains("not-a-verb"), recorded);
+        String maven = Files.readString(project.resolve("mvn-args"));
+        assertTrue(maven.contains("build-classpath"), maven);
+        assertFalse(maven.contains("exec-maven-plugin"), maven);
     }
 
     @Test

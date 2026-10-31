@@ -128,8 +128,8 @@ public final class WorkspaceSeed {
     }
 
     /**
-     * Keys in the workspace whose stored value is not the same non-computed
-     * project-file value. Classpath defaults do not count as the project file.
+     * Keys whose stored value differs from the same key in a project property
+     * file. A key that is not in those files is a default, not a computed override.
      */
     public static Set<String> computedKeys(Path project, Map<String, String> values) {
         Set<String> computed = new LinkedHashSet<>();
@@ -139,7 +139,8 @@ public final class WorkspaceSeed {
             if (rawKey == null || rawKey.isBlank()) return;
             String key = Workspace.normalizeKey(rawKey);
             String stored = rawValue == null ? "" : rawValue;
-            if (!files.containsKey(key) || !stored.equals(files.get(key))) computed.add(key);
+            if (!files.containsKey(key)) return;
+            if (!stored.equals(files.get(key))) computed.add(key);
         });
         return computed;
     }

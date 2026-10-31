@@ -1727,7 +1727,8 @@ class WorkbenchAgentCommandsTest {
         assertEquals(0, shown.exitCode(), shown.stderr());
         assertTrue(shown.stdout().lines().anyMatch(line -> line.equals("pkb_browser=CHROME_HEADLESS")), shown.stdout());
         assertTrue(shown.stdout().lines().anyMatch(line -> line.equals("pkb_parallel=4 computed")), shown.stdout());
-        assertTrue(shown.stdout().lines().anyMatch(line -> line.equals("pkb_tags=@smoke computed")), shown.stdout());
+        assertTrue(shown.stdout().lines().anyMatch(line -> line.equals("pkb_tags=@smoke")), shown.stdout());
+        assertFalse(shown.stdout().lines().anyMatch(line -> line.equals("pkb_tags=@smoke computed")), shown.stdout());
         assertFalse(shown.stdout().lines().anyMatch(line -> line.equals("pkb_browser=CHROME_HEADLESS computed")), shown.stdout());
     }
 

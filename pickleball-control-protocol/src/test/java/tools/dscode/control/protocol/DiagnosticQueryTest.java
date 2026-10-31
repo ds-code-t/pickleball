@@ -275,6 +275,109 @@ class DiagnosticQueryTest {
     }
 
     @Test
+    void textFieldsDropALeadingNonBreakingSpace() throws Exception {
+        Path scenario = project.resolve("reports/diagnostic-runs/run-nbsp/scenarios/scene");
+        Files.createDirectories(scenario);
+        Files.writeString(project.resolve("reports/diagnostic-runs/run-catalog.json"),
+                "{\"runs\":[{\"runId\":\"run-nbsp\",\"outcome\":\"PASSED\"}]}");
+        Files.writeString(project.resolve("reports/diagnostic-runs/run-nbsp/run-index.json"),
+                "{\"runId\":\"run-nbsp\",\"scenarios\":[{\"scenarioId\":\"scene\",\"name\":\"Clean\",\"outcome\":\"PASSED\"}]}");
+        Files.writeString(scenario.resolve("summary.json"), "{\"name\":\"Clean\",\"outcome\":\"PASSED\"}");
+        Files.writeString(scenario.resolve("events.jsonl"),
+                "{\"type\":\"step\",\"eventSeq\":1,\"text\":\"\\u00A0SCENARIO: stay\",\"status\":\"PASSED\"}\n");
+        DiagnosticQuery.Outcome steps = DiagnosticQuery.query(project, Map.of(
+                "op", "query", "runId", "run-nbsp", "kind", "step"
+        ));
+        assertEquals(0, steps.exit(), steps.json());
+        assertTrue(steps.json().contains("SCENARIO: stay"), steps.json());
+        assertFalse(steps.json().contains("\u00A0"), steps.json());
+        assertFalse(steps.json().contains("\"text\":\" SCENARIO: stay\""), steps.json());
+    }
+
+    @Test
+    void unknownFieldExits2AndNamesTheValidFields() throws Exception {
+        Files.createDirectories(project.resolve("reports/diagnostic-runs"));
+        Files.writeString(project.resolve("reports/diagnostic-runs/run-catalog.json"),
+                "{\"runs\":[{\"runId\":\"run-1\",\"outcome\":\"PASSED\"}]}");
+        DiagnosticQuery.Outcome known = DiagnosticQuery.query(project, Map.of(
+                "op", "runs", "fields", "runId"
+        ));
+        assertEquals(0, known.exit(), known.json());
+        assertTrue(known.json().contains("run-1"), known.json());
+        DiagnosticQuery.Outcome unknown = DiagnosticQuery.query(project, Map.of(
+                "op", "runs", "fields", "runId,notAField"
+        ));
+        assertEquals(2, unknown.exit(), unknown.json());
+        assertEquals("unknown field", unknown.body().get("error"));
+        assertTrue(String.valueOf(unknown.body().get("fix")).contains("runId"), unknown.json());
+        assertTrue(String.valueOf(unknown.body().get("fix")).contains("notAField")
+                || String.valueOf(unknown.body().get("fix")).toLowerCase(java.util.Locale.ROOT).contains("valid"), unknown.json());
+        assertFalse(unknown.json().contains("\"items\""), unknown.json());
+    }
+
+    @Test
+    void searchWhereNamesTheHitAndACappedScanSaysHowToNarrow() throws Exception {
+        Path older = project.resolve("reports/diagnostic-runs/run-older/scenarios/scene");
+        Path newer = project.resolve("reports/diagnostic-runs/run-newer");
+        Files.createDirectories(older);
+        Files.createDirectories(newer);
+        Files.writeString(project.resolve("reports/diagnostic-runs/run-catalog.json"), """
+                {"runs":[
+                  {"runId":"run-older","outcome":"FAILED"},
+                  {"runId":"run-newer","outcome":"PASSED"}
+                ]}
+                """);
+        Files.writeString(project.resolve("reports/diagnostic-runs/run-older/run-index.json"),
+                "{\"runId\":\"run-older\",\"outcome\":\"FAILED\",\"scenarios\":[{\"scenarioId\":\"scene\",\"name\":\"Older\",\"outcome\":\"FAILED\"}]}");
+        Files.writeString(older.resolve("summary.json"), "{\"name\":\"Older\",\"outcome\":\"FAILED\"}");
+        Files.writeString(older.resolve("events.jsonl"),
+                "{\"type\":\"step\",\"eventSeq\":1,\"text\":\"needle-only-here\",\"status\":\"FAILED\",\"message\":\"needle-only-here\"}\n");
+        Files.writeString(newer.resolve("run-index.json"),
+                "{\"runId\":\"run-newer\",\"outcome\":\"PASSED\"}");
+        DiagnosticQuery.Outcome search = DiagnosticQuery.query(project, Map.of("op", "search", "text", "needle-only-here"));
+        assertEquals(0, search.exit(), search.json());
+        assertTrue(String.valueOf(search.body().get("where")).contains("run-older"), search.json());
+        assertFalse(String.valueOf(search.body().get("where")).contains("run-newer"), search.json());
+
+        Path log = project.resolve(".pickleball/agent-log");
+        Files.createDirectories(log.getParent());
+        StringBuilder lines = new StringBuilder();
+        for (int index = 0; index < 20_001; index++) {
+            lines.append("2026-01-01T00:00:00Z\tagent\trun-cap\tnote\tline-").append(index).append("\t-\n");
+        }
+        Files.writeString(log, lines.toString());
+        DiagnosticQuery.Outcome capped = DiagnosticQuery.query(project, Map.of("op", "search", "text", "line-20000"));
+        assertEquals(0, capped.exit(), capped.json());
+        assertEquals(Boolean.TRUE, capped.body().get("scanCapped"));
+        String fix = String.valueOf(capped.body().get("fix"));
+        assertTrue(fix.contains("--run-id"), capped.json());
+    }
+
+    @Test
+    void tailPrefersNewestFailureRowsAndKeepsLogOrderWhenThereAreNone() throws Exception {
+        Path scenario = project.resolve("reports/diagnostic-runs/run-tail-fail/scenarios/scene");
+        Files.createDirectories(scenario);
+        Files.writeString(project.resolve("reports/diagnostic-runs/run-catalog.json"),
+                "{\"runs\":[{\"runId\":\"run-tail-fail\",\"outcome\":\"FAILED\"}]}");
+        Files.writeString(project.resolve("reports/diagnostic-runs/run-tail-fail/run-index.json"),
+                "{\"runId\":\"run-tail-fail\",\"outcome\":\"FAILED\",\"scenarios\":[{\"scenarioId\":\"scene\",\"name\":\"Scene\",\"outcome\":\"FAILED\"}]}");
+        Files.writeString(scenario.resolve("summary.json"), "{\"name\":\"Scene\",\"outcome\":\"FAILED\"}");
+        Files.writeString(scenario.resolve("events.jsonl"), """
+                {"type":"step","eventSeq":1,"text":"Then first","status":"FAILED","message":"first-boom"}
+                {"type":"step","eventSeq":2,"text":"Then second","status":"FAILED","message":"second-boom"}
+                """);
+        Path log = project.resolve(".pickleball/runs/run-tail-fail/session/session.log");
+        Files.createDirectories(log.getParent());
+        Files.writeString(log, "agent query noise\n");
+        DiagnosticQuery.Outcome tail = DiagnosticQuery.query(project, Map.of("op", "tail", "runId", "run-tail-fail", "limit", 2));
+        assertEquals(0, tail.exit(), tail.json());
+        assertTrue(tail.json().contains("second-boom"), tail.json());
+        assertTrue(tail.json().contains("first-boom"), tail.json());
+        assertTrue(tail.json().indexOf("second-boom") < tail.json().indexOf("first-boom"), tail.json());
+        assertFalse(tail.json().contains("agent query noise"), tail.json());
+    }
+
+    @Test
     void tailReturnsTheNewestRunLinesFirst() throws Exception {
         Path log = project.resolve(".pickleball/runs/run-tail/session/session.log");
         Files.createDirectories(log.getParent());

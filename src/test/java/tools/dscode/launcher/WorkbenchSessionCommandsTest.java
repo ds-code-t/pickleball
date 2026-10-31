@@ -1051,6 +1051,82 @@ class WorkbenchSessionCommandsTest {
         }
     }
 
+    @Test
+    @Timeout(value = 10, unit = TimeUnit.SECONDS)
+    void executeStepFailureJsonReadsTheNestedWorkerError() throws Exception {
+        Path sessionFile = project.resolve(".pickleball/runs/fail-nested/session/cli-session.json");
+        try (FakeSession session = FakeSession.start(project, "cli-session", sessionFile)) {
+            session.commandGet = """
+                    {"id":"step-held","status":"FAILED","result":{"status":"FAILED","valueText":null,"error":{"type":"FAILED","message":"Undefined step: Then missing","stackTrace":"io.cucumber.junit.UndefinedStepException: Undefined step: Then missing\\n\\tat cucumber.runtime.StepDefinitionMatch"},"runtime":{"phraseText":"missing","stepText":"Then missing"}}}
+                    """;
+            Output output = run(
+                    new String[]{"execute-step", project.toString(), "--text=Then missing"},
+                    launch -> {
+                        throw new AssertionError("execute-step must not start a session");
+                    }
+            );
+            assertEquals(1, output.exitCode, output.stderr + output.stdout);
+            assertTrue(output.stdout.contains("\"text\":\"Then missing\""), output.stdout);
+            assertTrue(output.stdout.contains("\"phrase\":\"missing\""), output.stdout);
+            assertTrue(output.stdout.contains("\"message\":\"Undefined step: Then missing\""), output.stdout);
+            assertTrue(output.stdout.contains("\"stackHead\":\"io.cucumber.junit.UndefinedStepException: Undefined step: Then missing\""), output.stdout);
+            assertFalse(output.stdout.contains("\"phrase\":null"), output.stdout);
+            assertFalse(output.stdout.contains("\"message\":null"), output.stdout);
+            assertFalse(output.stdout.contains("\"stackHead\":null"), output.stdout);
+        }
+    }
+
+    @Test
+    @Timeout(value = 10, unit = TimeUnit.SECONDS)
+    void statusIsIdleAfterTheStepHookClosesAndNotWhileBeforeStepIsOpen() throws Exception {
+        Path sessionFile = project.resolve(".pickleball/runs/idle-step/session/cli-session.json");
+        try (FakeSession session = FakeSession.start(project, "cli-session", sessionFile)) {
+            session.eventsJson = """
+                    {"events":[
+                      {"timestamp":"2026-07-20T12:00:00Z","hook":"BEFORE_STEP","stepText":"Then stay"},
+                      {"timestamp":"2026-07-20T12:00:03Z","hook":"AFTER_STEP","stepText":"Then stay"}
+                    ]}
+                    """;
+            Output paused = run(
+                    new String[]{"status", project.toString(), "--run-id=idle-step"},
+                    launch -> {
+                        throw new AssertionError("status must not start a session");
+                    }
+            );
+            assertEquals(0, paused.exitCode, paused.stderr + paused.stdout);
+            assertTrue(paused.stdout.contains("elapsed-step-ms=idle"), paused.stdout);
+
+            session.eventsJson = """
+                    {"events":[
+                      {"timestamp":"2026-07-20T12:00:00Z","stepText":"Then stay"}
+                    ]}
+                    """;
+            Output historical = run(
+                    new String[]{"status", project.toString(), "--run-id=idle-step"},
+                    launch -> {
+                        throw new AssertionError("status must not start a session");
+                    }
+            );
+            assertEquals(0, historical.exitCode, historical.stderr + historical.stdout);
+            assertTrue(historical.stdout.contains("elapsed-step-ms=idle"), historical.stdout);
+
+            session.eventsJson = """
+                    {"events":[
+                      {"timestamp":"2026-07-20T12:00:00Z","hook":"BEFORE_STEP","stepText":"Then stay"}
+                    ]}
+                    """;
+            Output running = run(
+                    new String[]{"status", project.toString(), "--run-id=idle-step"},
+                    launch -> {
+                        throw new AssertionError("status must not start a session");
+                    }
+            );
+            assertEquals(0, running.exitCode, running.stderr + running.stdout);
+            assertFalse(running.stdout.contains("elapsed-step-ms=idle"), running.stdout);
+            assertTrue(running.stdout.contains("elapsed-step-ms="), running.stdout);
+        }
+    }
+
     /**
      * Placeholder controller process. Unix {@code sleep} is not on Windows PATH;
      * session-start must return without waiting for this child to exit.

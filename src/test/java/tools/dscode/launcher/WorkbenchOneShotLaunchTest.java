@@ -12,6 +12,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -41,25 +42,82 @@ class WorkbenchOneShotLaunchTest {
     }
 
     @Test
-    void missingOrStaleCacheFallsBackToTheWrapper() throws Exception {
+    void missingOrStaleCacheUsesJavaClasspathWhenItResolves() throws Exception {
         Path project = projectWithWrapper();
         List<String> missing = WorkbenchOneShotLaunch.command(project, List.of("query", "runs"));
-        assertTrue(WorkbenchOneShotLaunch.usesWrapper(missing), missing.toString());
-        assertTrue(missing.stream().anyMatch(arg -> arg.contains("exec-maven-plugin")), missing.toString());
+        assertFalse(WorkbenchOneShotLaunch.usesWrapper(missing), missing.toString());
+        assertTrue(missing.contains("-cp"), missing.toString());
+        assertTrue(missing.contains(WorkbenchOneShotLaunch.MAIN_CLASS), missing.toString());
+        assertFalse(missing.stream().anyMatch(arg -> arg.contains("exec-maven-plugin")), missing.toString());
 
         Path cache = WorkbenchOneShotLaunch.cacheFile(project);
-        Files.createDirectories(cache.getParent());
         Path gone = project.resolve("missing.jar");
         Files.writeString(cache, WorkbenchOneShotLaunch.quote(gone.toString()) + "\n");
         List<String> broken = WorkbenchOneShotLaunch.command(project, List.of("status"));
-        assertTrue(WorkbenchOneShotLaunch.usesWrapper(broken), broken.toString());
+        assertFalse(WorkbenchOneShotLaunch.usesWrapper(broken), broken.toString());
+        assertTrue(broken.contains("-cp"), broken.toString());
 
-        Path present = project.resolve("dependency.jar");
-        Files.writeString(cache, WorkbenchOneShotLaunch.quote(present.toAbsolutePath().normalize().toString()) + "\n");
+        Files.writeString(cache, WorkbenchOneShotLaunch.quote(project.resolve("dependency.jar").toAbsolutePath().normalize().toString()) + "\n");
         Files.setLastModifiedTime(project.resolve("pom.xml"), FileTime.from(Instant.now().plusSeconds(120)));
         assertFalse(WorkbenchOneShotLaunch.fresh(project));
         List<String> stale = WorkbenchOneShotLaunch.command(project, List.of("plan"));
-        assertTrue(WorkbenchOneShotLaunch.usesWrapper(stale), stale.toString());
+        assertFalse(WorkbenchOneShotLaunch.usesWrapper(stale), stale.toString());
+        assertTrue(stale.contains("-cp"), stale.toString());
+    }
+
+    @Test
+    void unresolvableClasspathStillFallsBackToTheWrapper() throws Exception {
+        Path project = tempDir.resolve("no-classpath");
+        Files.createDirectories(project);
+        Files.writeString(project.resolve("pom.xml"), "<project/>\n");
+        Path mvnw = project.resolve("mvnw");
+        Files.writeString(mvnw, "#!/bin/sh\nexit 1\n");
+        mvnw.toFile().setExecutable(true);
+        List<String> missing = WorkbenchOneShotLaunch.command(project, List.of("query", "runs"));
+        assertTrue(WorkbenchOneShotLaunch.usesWrapper(missing), missing.toString());
+        assertTrue(missing.stream().anyMatch(arg -> arg.contains("exec-maven-plugin")), missing.toString());
+    }
+
+    @Test
+    void oneShotWithoutAFreshCacheKeepsJavaExit2() throws Exception {
+        Path project = tempDir.resolve("exit-two");
+        Files.createDirectories(project);
+        Files.writeString(project.resolve("pom.xml"), "<project/>\n");
+        Files.writeString(project.resolve("real.classpath"), System.getProperty("java.class.path"));
+        Path mvnw = project.resolve("mvnw");
+        Files.writeString(mvnw, """
+                #!/bin/sh
+                echo "$@" >> "$PWD/mvn-args"
+                out=""
+                for arg in "$@"; do
+                  case "$arg" in
+                    -Dmdep.outputFile=*) out="${arg#-Dmdep.outputFile=}" ;;
+                  esac
+                done
+                if [ -n "$out" ]; then
+                  cp "$PWD/real.classpath" "$out"
+                  exit 0
+                fi
+                exit 1
+                """);
+        mvnw.toFile().setExecutable(true);
+        java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+        java.io.ByteArrayOutputStream err = new java.io.ByteArrayOutputStream();
+        List<String> command = WorkbenchOneShotLaunch.command(project, List.of("status", "--step-timeout=nope"));
+        assertFalse(command.stream().anyMatch(arg -> arg.contains("exec-maven-plugin")), command.toString());
+        assertTrue(command.contains("-cp"), command.toString());
+        int exit = WorkbenchOneShotLaunch.launch(
+                project,
+                List.of("status", "--step-timeout=nope"),
+                new java.io.PrintStream(out),
+                new java.io.PrintStream(err)
+        );
+        String text = err.toString(StandardCharsets.UTF_8) + out.toString(StandardCharsets.UTF_8);
+        assertEquals(2, exit, text);
+        assertTrue(text.contains("error:"), text);
+        assertTrue(text.contains("fix:"), text);
+        String maven = Files.readString(project.resolve("mvn-args"));
+        assertFalse(maven.contains("exec-maven-plugin"), maven);
     }
 
     @Test

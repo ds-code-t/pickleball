@@ -1034,10 +1034,30 @@ public final class WorkbenchSessionCommands {
     private static String failureJson(String received, JsonNode result) {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("text", received == null ? "" : received);
-        body.put("phrase", firstResultText(result, "phrase", "failingPhrase", "phraseText"));
-        body.put("message", firstResultText(result, "message", "error", "errorMessage"));
+        String phrase = firstResultText(result, "phrase", "failingPhrase", "phraseText");
+        String message = firstResultText(result, "message", "errorMessage");
         String stack = firstResultText(result, "stackHead", "stack");
         if (stack == null) stack = firstStackLine(result);
+        JsonNode error = result == null ? null : result.get("error");
+        if (error != null && error.isObject()) {
+            if (message == null) message = firstResultText(error, "message", "errorMessage");
+            if (stack == null) stack = firstResultText(error, "stackHead", "stackTrace", "stack");
+        } else if (message == null && error != null && error.isTextual() && !error.asText("").isBlank()) {
+            message = error.asText();
+        }
+        if (stack != null) {
+            int newline = stack.indexOf('\n');
+            if (newline >= 0) stack = stack.substring(0, newline);
+            stack = stack.strip();
+            if (stack.isEmpty()) stack = null;
+        }
+        JsonNode runtime = result == null ? null : result.get("runtime");
+        if (phrase == null && runtime != null && runtime.isObject()) {
+            phrase = firstResultText(runtime, "phraseText", "phrase", "stepText");
+        }
+        if (phrase == null && received != null && !received.isBlank()) phrase = received;
+        body.put("phrase", phrase);
+        body.put("message", message);
         body.put("stackHead", stack);
         try {
             return JSON.writeValueAsString(body);
@@ -1306,10 +1326,15 @@ public final class WorkbenchSessionCommands {
             if (mark.step && mark.at != null) stepAt = mark.at;
         }
         long stepMs = stepAt == null ? 0 : Math.max(0, Duration.between(stepAt, clock).toMillis());
-        return new Timing(runMs, stepMs, stepAt != null);
+        boolean running = false;
+        for (Mark mark : marks) {
+            if (mark.opens) running = true;
+            if (mark.closes) running = false;
+        }
+        return new Timing(runMs, stepMs, running);
     }
 
-    private record Mark(Instant at, boolean step, String text) {
+    private record Mark(Instant at, boolean step, boolean opens, boolean closes, String text) {
     }
 
     private static List<Mark> eventMarks(JsonNode events) {
@@ -1328,8 +1353,11 @@ public final class WorkbenchSessionCommands {
             String hook = firstText(event, "hook", "type", "kind");
             boolean step = (stepText != null && !stepText.isBlank())
                     || (hook != null && hook.toUpperCase(Locale.ROOT).contains("STEP"));
+            String upper = hook == null ? "" : hook.toUpperCase(Locale.ROOT);
+            boolean closes = upper.contains("AFTER_STEP");
+            boolean opens = !closes && (upper.contains("BEFORE_STEP") || "RUNNING".equals(upper));
             String text = ((stepText == null ? "" : stepText) + " " + (phrase == null ? "" : phrase)).trim();
-            marks.add(new Mark(at, step, text));
+            marks.add(new Mark(at, step, opens, closes, text));
         }
         return marks;
     }

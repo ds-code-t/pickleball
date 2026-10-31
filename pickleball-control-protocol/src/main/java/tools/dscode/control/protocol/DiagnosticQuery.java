@@ -37,6 +37,11 @@ public final class DiagnosticQuery {
     private static final Set<String> KINDS = Set.of(
             "run", "scenario", "step", "event", "property", "artifact", "error", "log"
     );
+    private static final Set<String> FIELDS = Set.of(
+            "kind", "id", "seq", "runId", "scenarioId", "name", "outcome", "completion",
+            "purpose", "scenarioCount", "failed", "where", "type", "status", "text",
+            "message", "stackHead", "key", "value", "source", "artifact"
+    );
 
     private static final ThreadLocal<List<String>> DECODE_WARNINGS = ThreadLocal.withInitial(ArrayList::new);
 
@@ -103,6 +108,19 @@ public final class DiagnosticQuery {
             offset = cursor(text(request, "cursor"));
         } catch (IllegalArgumentException failure) {
             return error(2, "bad cursor", "Pass nextCursor from the previous page. Example: --cursor=20");
+        }
+        if (fields != null && !fields.isBlank()) {
+            List<String> unknown = new ArrayList<>();
+            for (String part : fields.split(",")) {
+                String name = part.trim();
+                if (!name.isEmpty() && !FIELDS.contains(name)) unknown.add(name);
+            }
+            if (!unknown.isEmpty()) {
+                List<String> valid = new ArrayList<>(FIELDS);
+                Collections.sort(valid);
+                return error(2, "unknown field",
+                        "Unknown field " + String.join(", ", unknown) + ". Valid fields: " + String.join(", ", valid) + ".");
+            }
         }
         if (("get".equals(op) || "props".equals(op)) && runId == null) {
             return error(2, "missing runId", "Usage: query " + op + " --run-id=<id>");
@@ -191,7 +209,10 @@ public final class DiagnosticQuery {
             body.put("nextCursor", Integer.toString(next));
             body.put("truncated", TRUNCATION_MARK + more + " more, use cursor");
         }
-        if (capped) body.put("scanCapped", true);
+        if (capped) {
+            body.put("scanCapped", true);
+            body.put("fix", "Scan stopped after " + SCAN_LINES + " lines. Narrow it with --run-id=<id>.");
+        }
         List<String> decoded = DECODE_WARNINGS.get();
         if (decoded != null && !decoded.isEmpty()) {
             body.put("decodeWarnings", List.copyOf(decoded));
@@ -223,6 +244,17 @@ public final class DiagnosticQuery {
             return new Loaded(items, catalog.where, catalog.capped);
         }
         if ("tail".equals(op)) {
+            Loaded failures = load(project, "errors", runId, null, "error", null, null, null);
+            if (!failures.items.isEmpty()) {
+                List<Map<String, Object>> newest = new ArrayList<>(failures.items);
+                Collections.reverse(newest);
+                String hitWhere = null;
+                for (Map<String, Object> item : newest) {
+                    hitWhere = str(item.get("where"));
+                    if (hitWhere != null) break;
+                }
+                return new Loaded(newest, hitWhere == null ? ".pickleball/runs/" + runId : hitWhere, failures.capped);
+            }
             Scan tail = tailLines(project, runId);
             List<Map<String, Object>> newestFirst = new ArrayList<>(tail.events);
             Collections.reverse(newestFirst);
@@ -340,6 +372,16 @@ public final class DiagnosticQuery {
             for (Map<String, Object> run : catalog.runs) {
                 Map<String, Object> item = runItem(project, run);
                 if (contains(item, needle)) items.add(item);
+            }
+        }
+        if ("search".equals(op) && !items.isEmpty()) {
+            for (Map<String, Object> item : items) {
+                if (needle != null && !contains(item, needle)) continue;
+                String hitWhere = str(item.get("where"));
+                if (hitWhere != null) {
+                    where = hitWhere;
+                    break;
+                }
             }
         }
         return new Loaded(items, where, capped);
@@ -1307,8 +1349,14 @@ public final class DiagnosticQuery {
         StringBuilder out = new StringBuilder(value.length());
         for (int index = 0; index < value.length(); ) {
             int point = value.codePointAt(index);
-            if (point != 0xFEFF && point != 0x200B && point != 0x200C && point != 0x200D
-                    && point != 0x2060 && point != 0x180E) {
+            if (point == 0xFEFF || point == 0x200B || point == 0x200C || point == 0x200D
+                    || point == 0x2060 || point == 0x180E) {
+                index += Character.charCount(point);
+                continue;
+            }
+            if (Character.isSpaceChar(point) && point != ' ' && point != '\n' && point != '\r' && point != '\t') {
+                out.append(' ');
+            } else {
                 out.appendCodePoint(point);
             }
             index += Character.charCount(point);

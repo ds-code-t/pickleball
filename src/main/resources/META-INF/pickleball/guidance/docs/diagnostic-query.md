@@ -18,11 +18,11 @@ Stdout is one compact JSON object. Exit 0 is a page. Exit 2 is usage (`error` an
 | `query search` | `wb_search` | Substring match across run, scenario, event, error, and short-log text |
 | `query props` | `wb_props` | Scalar `runProfile` entries and configuration / environment values |
 | `query errors` | `wb_errors` | Failures. `stackHead` is the first stack line, copied from the failure event onto a failed step that has none. An empty `scenario_end` is not an error |
-| `query tail` | (launcher only) | Newest lines of `.pickleball/agent-log` for that run, then `*.log` under `.pickleball/runs/<id>`. Requires `--run-id` |
+| `query tail` | (launcher only) | Newest failure rows for that run when it has any, otherwise the newest lines of `.pickleball/agent-log` and `*.log` under `.pickleball/runs/<id>`. Requires `--run-id` |
 
-Default `limit` is 20 (max 100). A short page sets `nextCursor` and `truncated` to `...+N more, use cursor`. Pass `--fields=runId,outcome` to drop every other item field. The default page is at most 4096 UTF-8 bytes; extra items move to the next cursor instead of blowing the context.
+Default `limit` is 20 (max 100). A short page sets `nextCursor` and `truncated` to `...+N more, use cursor`. Pass `--fields=runId,outcome` to drop every other item field. An unknown field name exits 2 and lists the valid fields. The default page is at most 4096 UTF-8 bytes; extra items move to the next cursor instead of blowing the context.
 
-`where` is the project-relative file that answered the row. `DiagnosticQuery` and `AgentCoordination.findRunIndex` both call `RunIndexFinder`: `.pickleball/runs/<id>/diagnostic/<id>/run-index.json`, then `diagnostic/run-index.json`, then `reports/diagnostic-runs/<id>/run-index.json`, then a `record.json` `dataPath`, then a depth-6 walk. The parent folder name matches before the JSON `runId`. `browser-profile`, `config`, and `scratch` are not walked. A JSON body over 2 MB is not read. When no index exists and `reports/diagnostic-runs/<id>` is a directory, the query still reads scenario files there. Screenshot bytes, traces, and absolute paths are not in the default payload. An artifact row carries an id (`frame-1.png`) and a relative `where`.
+`where` is the project-relative file that answered the row. For `query search` that file is the hit, not the last catalog run. `scanCapped` is true when a file was longer than the line cap, and `fix` names `--run-id` to narrow the scan. `DiagnosticQuery` and `AgentCoordination.findRunIndex` both call `RunIndexFinder`: `.pickleball/runs/<id>/diagnostic/<id>/run-index.json`, then `diagnostic/run-index.json`, then `reports/diagnostic-runs/<id>/run-index.json`, then a `record.json` `dataPath`, then a depth-6 walk. The parent folder name matches before the JSON `runId`. `browser-profile`, `config`, and `scratch` are not walked. A JSON body over 2 MB is not read. When no index exists and `reports/diagnostic-runs/<id>` is a directory, the query still reads scenario files there. Screenshot bytes, traces, and absolute paths are not in the default payload. An artifact row carries an id (`frame-1.png`) and a relative `where`.
 
 ## Record fields
 
@@ -36,7 +36,7 @@ Default `limit` is 20 (max 100). A short page sets `nextCursor` and `truncated` 
 | artifact | `id`, `artifact` (`screenshot` or `trace`), `where` |
 | log | `source` (`agent-log`), `text`, `where` |
 
-Text fields clip at 160 characters and drop a BOM and zero-width characters. A missing catalog is an empty `items` list, not a guessed run. Delete a future index database and the files still answer; this reader does not require a database. One scenario is one row: an index `scenarioExecutionId` and the summary directory UUID are merged, and `name` comes from the index identity or the summary. `query search` decodes each file as UTF-8. A bad file is replaced, named in `decodeWarnings`, and does not fail the search. Worker logs are UTF-8 because the worker JVM is started with `-Dfile.encoding=UTF-8` and matching stdout and stderr encodings.
+Text fields clip at 160 characters and drop a BOM, zero-width characters, and a leading non-breaking space. A missing catalog is an empty `items` list, not a guessed run. Delete a future index database and the files still answer; this reader does not require a database. One scenario is one row: an index `scenarioExecutionId` and the summary directory UUID are merged, and `name` comes from the index identity or the summary. `query search` decodes each file as UTF-8. A bad file is replaced, named in `decodeWarnings`, and does not fail the search. Worker logs are UTF-8 because the worker JVM is started with `-Dfile.encoding=UTF-8` and matching stdout and stderr encodings.
 
 ## Derived SQLite index
 
