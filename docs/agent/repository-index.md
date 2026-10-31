@@ -55,6 +55,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/maintainer/2.1.18-consumer-report-fixes.md`
 - `docs/maintainer/2.1.18-meta-deep-dive.md`
 - `docs/maintainer/2.1.18-structural-fixes.md`
+- `docs/maintainer/consumer-sim-harness.md`
 - `docs/mapping-and-templating.md`
 - `docs/nested-steps.md`
 - `docs/object-registration.md`

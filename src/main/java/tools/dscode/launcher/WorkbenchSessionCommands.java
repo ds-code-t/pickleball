@@ -1727,7 +1727,10 @@ public final class WorkbenchSessionCommands {
 
         private static String readTextFile(String path) {
             try {
-                return Files.readString(Path.of(path), StandardCharsets.UTF_8);
+                String text = Files.readString(Path.of(path), StandardCharsets.UTF_8);
+                text = text.replace("\r\n", "\n").replace('\r', '\n');
+                if (text.endsWith("\n")) text = text.substring(0, text.length() - 1);
+                return text;
             } catch (IOException failure) {
                 throw new IllegalArgumentException(WorkbenchCliHelp.usageError(
                         "--text-file could not be read: " + path, "--text-file"

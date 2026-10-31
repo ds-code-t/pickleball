@@ -48,6 +48,18 @@ final class WorkbenchCommandLine {
             "--id", "--version", "--ttl", "--step-timeout", "--run-timeout", "--quiet"
     );
 
+    /**
+     * Flags whose next token is a value, not a project path. Equals form
+     * ({@code --text-file=/abs}) is a flag even when the value contains
+     * {@code /} or {@code \}. Space form must consume that value too, or the
+     * path becomes the project and session lookup reports {@code never-started}.
+     */
+    private static final Set<String> TRAILING_VALUE_FLAGS = Set.of(
+            "--text-file", "--text-b64", "--session-file", "--feature", "--run", "--from-here",
+            "--stop-after", "--cursor", "--fields", "--config", "--from-run", "--expect",
+            "--category", "--status", "--kind", "--scenario", "--html"
+    );
+
     private WorkbenchCommandLine() {
     }
 
@@ -509,6 +521,9 @@ final class WorkbenchCommandLine {
             }
             if (isFlag(token)) {
                 rest.add(token);
+                if (takesSeparateValue(token) && index + 1 < args.length && !isFlag(args[index + 1])) {
+                    rest.add(args[++index]);
+                }
                 continue;
             }
             // An unquoted --tags value is split by PowerShell/Maven on spaces.
@@ -812,7 +827,18 @@ final class WorkbenchCommandLine {
     }
 
     private static boolean isFlag(String token) {
-        return token.startsWith("-") && token.length() > 1 && !looksLikePath(token);
+        if (token == null || token.length() < 2 || !token.startsWith("-")) return false;
+        return !looksLikePath(flagName(token));
+    }
+
+    private static String flagName(String token) {
+        int equals = token.indexOf('=');
+        return equals > 0 ? token.substring(0, equals) : token;
+    }
+
+    /** Space form of a path-or-value flag. Equals form already includes the value. */
+    private static boolean takesSeparateValue(String token) {
+        return token.indexOf('=') < 0 && TRAILING_VALUE_FLAGS.contains(token);
     }
 
     private static boolean looksLikePath(String token) {
