@@ -157,6 +157,42 @@ class WorkbenchRunReportsTest {
     }
 
     @Test
+    void secondDiscoverCountsOnlyTheNewAttempt() throws Exception {
+        Path project = tempDir.resolve("rerun");
+        Files.createDirectories(project);
+        String runId = "run-rerun";
+        AgentCoordination.Run run = AgentCoordination.begin(
+                project,
+                AgentCoordination.Request.of(runId, "agent-r", null, null, null, null, "discover")
+        );
+        Path oldScenario = run.diagnosticDirectory().resolve(runId).resolve("scenarios").resolve("old");
+        Files.createDirectories(oldScenario);
+        Files.writeString(oldScenario.resolve("events.jsonl"), "{\"type\":\"scenario_start\"}\n");
+        Files.writeString(
+                run.diagnosticDirectory().resolve(runId).resolve("run-index.json"),
+                "{\"runId\":\"run-rerun\",\"outcome\":\"FAILED\",\"counts\":{\"total\":1,\"failed\":1},\"steps\":{\"executed\":4}}"
+        );
+        AgentCoordination.begin(
+                project,
+                AgentCoordination.Request.of(runId, "agent-r", null, null, null, null, "discover")
+        );
+        Path fresh = run.diagnosticDirectory().resolve(runId).resolve("scenarios").resolve("fresh");
+        Files.createDirectories(fresh);
+        Files.writeString(fresh.resolve("summary.json"), """
+                {"outcome":"PASSED","identity":{"scenarioName":"Fresh"},"steps":{"executed":1,"passed":1}}
+                """);
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        WorkbenchRunReports.publish(
+                project, runId, List.of(), "", "PASSED",
+                new PrintStream(out, true, StandardCharsets.UTF_8)
+        );
+        String text = out.toString(StandardCharsets.UTF_8);
+        assertTrue(text.contains("scenarios=1"), text);
+        assertFalse(text.contains("scenarios=2"), text);
+        assertTrue(text.contains("steps=1"), text);
+    }
+
+    @Test
     void prunedScenarioStillWritesRunSummaryAndNamedConsole() throws Exception {
         Path project = tempDir.resolve("Program Files");
         String runId = "check-1023";

@@ -18,7 +18,7 @@ import java.util.regex.Pattern;
  * {@code diagnostic/run-index.json}, shared {@code reports/diagnostic-runs/<id>},
  * then the same two names under {@code record.json} {@code dataPath}. A walk of
  * depth 6 follows. The parent folder name wins before the JSON {@code runId}.
- * {@code browser-profile}, {@code config}, and {@code scratch} are skipped.
+ * {@code browser-profile}, {@code config}, {@code scratch}, and {@code attempts} are skipped.
  * A JSON body over 2 MB is not read.</p>
  */
 public final class RunIndexFinder {
@@ -107,7 +107,8 @@ public final class RunIndexFinder {
         }
         if (relative.getNameCount() == 0) return true;
         String first = relative.getName(0).toString();
-        return "browser-profile".equals(first) || "config".equals(first) || "scratch".equals(first);
+        return "browser-profile".equals(first) || "config".equals(first) || "scratch".equals(first)
+                || "attempts".equals(first);
     }
 
     private static String requireSafeId(String id) {

@@ -307,16 +307,18 @@ public final class AgentCoordination {
         try {
             if (Files.isRegularFile(recordFile)) {
                 RunRecord existing = readRecord(recordFile);
+                if (logStart) archivePreviousAttempt(data);
                 ensureTree(data);
                 if (logStart) {
                     String purpose = oneLine(firstNonBlank(safe.why(), safe.purpose(), "run"));
+                    String why = firstNonBlank(safe.why(), existing.why());
                     RunRecord reset = new RunRecord(
                             existing.runId(),
                             existing.agentId(),
                             existing.group(),
                             existing.sequence(),
                             existing.who(),
-                            existing.why(),
+                            why,
                             existing.learned(),
                             clock.toString(),
                             null,
@@ -519,7 +521,7 @@ public final class AgentCoordination {
             boolean sessionStop = "STOPPED".equalsIgnoreCase(blankToNull(status));
             if (!alreadyStopped || statusChanged || learnedChanged || failureChanged || contextChanged
                     || (alreadyStopped && sessionStop)) {
-                String stoppedAt = alreadyStopped ? existing.stoppedAt() : clock.toString();
+                String stoppedAt = clock.toString();
                 RunRecord updated = withStop(
                         existing,
                         keptLearned,
@@ -1031,6 +1033,41 @@ public final class AgentCoordination {
         Files.createDirectories(data.resolve("browser-profile"));
         Files.createDirectories(data.resolve("session"));
         Files.writeString(data.resolve("run-id.txt"), data.getFileName().toString() + "\n", StandardCharsets.UTF_8);
+    }
+
+    /**
+     * A relaunch keeps the previous diagnostic pack, but not on the path query
+     * and the summary walk. {@code attempts/} is outside {@code diagnostic/}.
+     */
+    private static void archivePreviousAttempt(Path data) throws IOException {
+        Path diagnostic = data.resolve("diagnostic");
+        if (!Files.isDirectory(diagnostic) || !attemptEvidence(diagnostic)) return;
+        Path attempts = data.resolve("attempts");
+        int next = 1;
+        if (Files.isDirectory(attempts)) {
+            try (var children = Files.list(attempts)) {
+                for (Path child : children.toList()) {
+                    String name = child.getFileName() == null ? "" : child.getFileName().toString();
+                    try {
+                        next = Math.max(next, Integer.parseInt(name) + 1);
+                    } catch (NumberFormatException ignored) {
+                        // A non-numeric sibling is not an attempt number.
+                    }
+                }
+            }
+        }
+        Path dest = attempts.resolve(Integer.toString(next)).resolve("diagnostic");
+        Files.createDirectories(dest.getParent());
+        Files.move(diagnostic, dest);
+    }
+
+    private static boolean attemptEvidence(Path diagnostic) throws IOException {
+        try (var walk = Files.walk(diagnostic, 4)) {
+            return walk.anyMatch(path -> {
+                String name = path.getFileName() == null ? "" : path.getFileName().toString();
+                return "run-index.json".equals(name) || "scenarios".equals(name);
+            });
+        }
     }
 
     private static void activate(Run run) {
@@ -1687,7 +1724,8 @@ public final class AgentCoordination {
         }
         if (relative.getNameCount() == 0) return true;
         String first = relative.getName(0).toString();
-        return "browser-profile".equals(first) || "config".equals(first) || "scratch".equals(first);
+        return "browser-profile".equals(first) || "config".equals(first) || "scratch".equals(first)
+                || "attempts".equals(first);
     }
 
     private static boolean jsonSignalsFailure(JsonNode node) {

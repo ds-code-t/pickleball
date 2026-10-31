@@ -261,6 +261,46 @@ class AgentCoordinationTest {
     }
 
     @Test
+    void relaunchArchivesThePreviousDiagnosticAndDoesNotReadItAsCurrent() throws Exception {
+        AgentCoordination.Run run = AgentCoordination.begin(project, request("run-attempt", "agent-attempt"));
+        Path scenario = run.diagnosticDirectory().resolve(run.runId()).resolve("scenarios").resolve("old-scenario");
+        Files.createDirectories(scenario);
+        Files.writeString(scenario.resolve("summary.json"), "{\"name\":\"Old failure\",\"outcome\":\"FAILED\"}\n");
+        Files.writeString(
+                run.diagnosticDirectory().resolve(run.runId()).resolve("run-index.json"),
+                "{\"runId\":\"run-attempt\",\"outcome\":\"FAILED\",\"counts\":{\"total\":1,\"failed\":1}}\n"
+        );
+        AgentCoordination.finish(project, run.runId(), null, "FAILED");
+        AgentCoordination.begin(project, request("run-attempt", "agent-attempt"));
+        Path archived = run.dataDirectory().resolve("attempts").resolve("1").resolve("diagnostic")
+                .resolve(run.runId()).resolve("scenarios").resolve("old-scenario").resolve("summary.json");
+        assertTrue(Files.isRegularFile(archived), archived.toString());
+        assertFalse(Files.exists(scenario));
+        assertNull(AgentCoordination.findRunIndex(project, run.runId()));
+    }
+
+    @Test
+    void relaunchUpdatesWhyAndALaterFinishMovesStoppedAt() throws Exception {
+        AgentCoordination.Run run = AgentCoordination.begin(
+                project,
+                AgentCoordination.Request.of("run-why", "agent-why", null, null, null, "first why", "discover")
+        );
+        AgentCoordination.finish(project, run.runId(), "first", "FAILED", Instant.parse("2026-01-01T00:00:00Z"), null);
+        AgentCoordination.begin(
+                project,
+                AgentCoordination.Request.of("run-why", "agent-why", null, null, null, "second why", "discover")
+        );
+        String reset = Files.readString(run.recordFile());
+        assertTrue(reset.contains("second why"), reset);
+        assertFalse(reset.contains("first why"), reset);
+        AgentCoordination.finish(project, run.runId(), "done", "PASSED", Instant.parse("2026-01-02T00:00:00Z"), null);
+        AgentCoordination.finish(project, run.runId(), "done later", "PASSED", Instant.parse("2026-02-01T00:00:00Z"), null);
+        String finished = Files.readString(run.recordFile());
+        assertTrue(finished.contains("2026-02-01T00:00:00Z"), finished);
+        assertFalse(finished.contains("2026-01-02T00:00:00Z"), finished);
+    }
+
+    @Test
     void unsafeIdsAndTheSharedInboxNameAreRejected() {
         assertThrows(IllegalArgumentException.class, () -> AgentCoordination.begin(project, request("../escape", "agent-a")));
         assertThrows(IllegalArgumentException.class, () -> AgentCoordination.begin(project, request("run-ok", "any")));

@@ -533,6 +533,7 @@ public final class WorkbenchAgentCommands {
             );
             Map<String, String> stored = Workspace.readRunVars(prepared.workspace());
             SecretRedactor.noteAll(stored);
+            rememberRunSnapshot(parsed.project(), run.runId(), run.agentId(), stored, prepared.selection());
             String environment = blankToNull(stored.get(PKB_props.PKB_ENVIRONMENT));
             String browser = blankToNull(stored.get(PKB_props.PKB_BROWSER));
             out.println("workspace=" + prepared.workspace());
@@ -579,6 +580,31 @@ public final class WorkbenchAgentCommands {
         } catch (RuntimeException failure) {
             finishQuietly(parsed.project(), run.runId(), "FAILED", out);
             throw failure;
+        }
+    }
+
+    /** The workspace prepared for this run is the snapshot, even when Maven never writes a catalog. */
+    private static void rememberRunSnapshot(
+            Path project,
+            String runId,
+            String agentId,
+            Map<String, String> stored,
+            Map<String, String> selection
+    ) {
+        Map<String, String> values = new LinkedHashMap<>();
+        if (stored != null) values.putAll(stored);
+        if (selection != null) {
+            selection.forEach((key, value) -> {
+                if (key != null && value != null && !value.isBlank()) values.put(key, value);
+            });
+        }
+        if (values.isEmpty()) return;
+        try {
+            String profile = PKB_props.serializeRunVars(new java.util.TreeMap<>(values));
+            if (profile == null || profile.isBlank()) return;
+            LastDiscoverSnapshot.write(project, runId, null, profile, agentId);
+        } catch (IOException ignored) {
+            // printCatalog still writes the catalog profile when the worker retains one.
         }
     }
 
@@ -639,6 +665,7 @@ public final class WorkbenchAgentCommands {
             );
             Map<String, String> stored = Workspace.readRunVars(prepared.workspace());
             SecretRedactor.noteAll(stored);
+            rememberRunSnapshot(parsed.project(), run.runId(), run.agentId(), stored, prepared.selection());
             String environment = blankToNull(stored.get(PKB_props.PKB_ENVIRONMENT));
             String browser = blankToNull(stored.get(PKB_props.PKB_BROWSER));
             out.println("workspace=" + prepared.workspace());

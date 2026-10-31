@@ -1360,9 +1360,17 @@ class WorkbenchAgentCommandsTest {
         assertTrue(LastDiscoverSnapshot.readScoped(tempDir, "agent-a", null).runProfile().contains("@alpha"));
         assertTrue(LastDiscoverSnapshot.read(tempDir).runProfile().contains("@beta"));
 
+        LastDiscoverSnapshot.write(tempDir, "run-a", tempDir.resolve("reports/diagnostic-runs/run-catalog.json"),
+                "pkb_browser=EDGE, pkb_tags=@poison", "agent-a");
+        LastDiscoverSnapshot.write(tempDir, "run-a", tempDir.resolve("reports/diagnostic-runs/run-catalog.json"),
+                "pkb_browser=CHROME_HEADLESS, pkb_tags=@alpha");
+        LastDiscoverSnapshot.Snapshot runWins = LastDiscoverSnapshot.readScoped(tempDir, "agent-a", "run-a");
+        assertTrue(runWins.runProfile().contains("@alpha"), runWins.runProfile());
+        assertFalse(runWins.runProfile().contains("@poison"), runWins.runProfile());
+
         List<List<String>> captured = new ArrayList<>();
         WorkbenchAgentCommands.run(
-                new String[]{"confirm", tempDir.toString(), "--agent=agent-a", "--run-id=run-a-confirm"},
+                new String[]{"confirm", tempDir.toString(), "--agent=agent-a", "--run-id=run-a"},
                 new PrintStream(new ByteArrayOutputStream(), true, StandardCharsets.UTF_8),
                 new PrintStream(new ByteArrayOutputStream(), true, StandardCharsets.UTF_8),
                 (project, command, out, err) -> {
@@ -1372,9 +1380,25 @@ class WorkbenchAgentCommandsTest {
         );
         String runVars = captured.getFirst().stream().filter(item -> item.startsWith("-Dpkb_tags=")).findFirst().orElse("");
         assertEquals("-Dpkb_tags=@alpha", runVars);
+        assertFalse(captured.getFirst().stream().anyMatch(item -> item.contains("@poison")), runVars);
         assertFalse(captured.getFirst().stream().anyMatch(item -> item.contains("@beta")), runVars);
         assertFalse(captured.getFirst().stream().anyMatch(item -> item.contains("@newer")), runVars);
-        assertFalse(runVars.contains("@newer"), runVars);
+    }
+
+    @Test
+    void failedDiscoverStillRecordsThatRunsSnapshot() throws Exception {
+        writeProjectWrapper();
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        int exit = WorkbenchAgentCommands.run(
+                new String[]{"discover", tempDir.toString(), "--run-id=run-fail", "--tags=@kept"},
+                new PrintStream(out, true, StandardCharsets.UTF_8),
+                new PrintStream(new ByteArrayOutputStream(), true, StandardCharsets.UTF_8),
+                (project, command, outStream, err) -> 1
+        );
+        assertEquals(1, exit);
+        LastDiscoverSnapshot.Snapshot snapshot = LastDiscoverSnapshot.readScoped(tempDir, "agent-other", "run-fail");
+        assertTrue(snapshot.runProfile().contains("@kept"), snapshot.runProfile());
+        assertFalse(snapshot.runProfile().contains("@other"), snapshot.runProfile());
     }
 
     @Test
