@@ -45,7 +45,6 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/dynamic-control-api.md`
 - `docs/dynamic-steps.md`
 - `docs/experimental-features.md`
-- `docs/feature-status-notes.md`
 - `docs/getting-started.md`
 - `docs/java-values.md`
 - `docs/key-parser-dsl.md`

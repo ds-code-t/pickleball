@@ -39,6 +39,7 @@ MAX_REFERENCE_TOTAL_BYTES = 10 * 1024 * 1024
 # refresh_agent_index drops MAINTAINER_ONLY_DOCS from the source index too.
 MAINTAINER_ONLY_DOCS = (
     "docs/tech-debt.md",
+    "docs/feature-status-notes.md",
 )
 MAINTAINER_ONLY_PREFIXES = (
     "docs/maintainer/",

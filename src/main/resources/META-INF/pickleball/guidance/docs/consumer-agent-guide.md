@@ -12,7 +12,7 @@ Run `mvnw` or `mvnw.cmd` (`gradlew` or `gradlew.bat`). Do not require a machine-
 ./mvnw -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java "-Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher" "-Dexec.classpathScope=test" "-Dexec.args=discover"
 ```
 
-only change `exec.args`: `-Dexec.args=discover`, `-Dexec.args=isolate`, `execute-step`, `confirm`. After `discover` or `workspace-seed`, one-shots are `java -cp @classpath.cache tools.dscode.launcher.PickleballWorkbenchLauncher <args>`. Discover, confirm, and isolate still use the wrapper.
+only change `exec.args`: `-Dexec.args=discover`, `-Dexec.args=isolate`, `execute-step`, `confirm`. One-shots: `java -cp "@.pickleball/v/<version>/workbench/classpath.cache"`. Quote @ in PowerShell. Discover, confirm, and isolate still use the wrapper.
 
 Read the short log `.pickleball/agent-log` before, after, and during a run. Board: `presence --touch`, `post --write`, `history --append`. Paths: `.pickleball/investigations/`, `.pickleball/presence/`, `.pickleball/posts/`, `.pickleball/history.log`. `gc-runs` deletes old run payloads, not investigations.
 
@@ -55,7 +55,7 @@ confirm --run-id=row-1
 summary status=PASSED
 ```
 
-`record.json` `environment` is the resolved value, or `unset` when `pkb_environment` was not set. `workspace-show` prints `""` for a blank value and ` computed` when the key is not the project-file value. Secrets print `<redacted>`. Stored `${protected:key}` stays. Do not treat resolve-runvars as the environment Discover will use. `pkb_overriderunvars` is not how confirm launches. The Workbench GUI is only a lightweight head over state and controls that already exist under the hood.
+`record.json` `environment` is the resolved value, or `unset` when `pkb_environment` was not set. `workspace-show` prints `""` for a blank value and ` computed` only when the value differs from the project file. Secrets print `<redacted>`. Stored `${protected:key}` stays. Do not treat resolve-runvars as the environment Discover will use. `pkb_overriderunvars` is not how confirm launches. The Workbench GUI is only a lightweight head over state and controls that already exist under the hood.
 
 ## Query loop
 
