@@ -244,6 +244,11 @@ public final class WorkbenchWorkerManager implements AutoCloseable {
     ) {
         List<String> command = new ArrayList<>();
         command.add(javaExecutable().toString());
+        command.add("-Dfile.encoding=UTF-8");
+        command.add("-Dstdout.encoding=UTF-8");
+        command.add("-Dstderr.encoding=UTF-8");
+        command.add("-Dsun.stdout.encoding=UTF-8");
+        command.add("-Dsun.stderr.encoding=UTF-8");
         command.add("-D" + ControlProtocol.WORKBENCH_TEST_OUTPUT_ROOT_PROPERTY
                 + "=" + manifest.liveOutputPath());
         systemProperties.entrySet().stream()

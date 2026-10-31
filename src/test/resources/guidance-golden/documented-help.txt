@@ -1,0 +1,179 @@
+# help
+Pickleball Workbench. help <command> prints usage. help <flag> prints that flag.
+exit 0 ok, 1 failed, 2 usage. --json is one JSON object and no preamble.
+decide: discover, then plan, then run. plan lists the scenarios. run is confirm, or isolate then execute-step.
+Timing is .pickleball/runs/<id>/launch-timing.txt. Stderr timing only when PKB_WORKBENCH_TIMING=1 or -Dpkb_workbench_timing=true.
+Do not pass pkb_run_profile. Do not open the GUI to test yourself. isolate is the headless session.
+run: discover confirm plan hint discover-hint resolve-runvars
+workspace: workspace-show workspace-edit workspace-seed
+session: isolate session-start execute-step status events stop kill open-scenario example play from-here pause insert-step update-step diagnostic-run save refresh session-sync worker-start worker-restart worker-stop open-window close-window show-run
+coordination: short-log note inbox finish presence post history gc-runs gc-versions use-version export-guidance
+descriptors: session list | session info <sessionId> [--json] | session hold <sessionId> | session release <sessionId>
+page: inspect-page find-element
+retrieval: query runs | query get | query query | query search | query props | query errors | query tail
+controller: sync worker-check live-check ui mcp session
+all: close-window confirm diagnostic-run discover discover-hint events example execute-step export-guidance find-element finish from-here gc-runs gc-versions help hint history inbox insert-step inspect-page isolate kill live-check mcp note open-scenario open-window pause plan play post presence query refresh resolve-runvars save session session-hold session-info session-list session-release session-start session-sync short-log show-run status stop sync ui update-step use-version worker-check worker-restart worker-start worker-stop workspace-edit workspace-seed workspace-show
+
+# help close-window
+Usage: close-window
+
+# help confirm
+Usage: confirm [--tags=<expr>] [--name=<regex>] [--example=<rows>] [--select=<path:line>] [--quiet] [--runvar=key=value] [--run-id=<id>] [--agent=<id>] [--run-timeout=<seconds>]
+
+# help diagnostic-run
+Usage: diagnostic-run --run=<id> [--run-id=<live-session>]
+
+# help discover
+Usage: discover [--tags=<expr>] [--name=<regex>] [--example=<rows>] [--select=<path:line>] [--plan] [--quiet] [--refresh] [--no-narrow|--full-scan] [--runvar=key=value] [--retention=all|failed|none] [--run-id=<id>] [--agent=<id>] [--run-timeout=<seconds>]
+
+# help discover-hint
+Usage: discover-hint [--json]
+
+# help events
+Usage: events [--hooks] [--json] [--cursor=<token>] [--run-id=<id>]
+
+# help example
+Usage: example --example=<rows>
+
+# help execute-step
+Usage: execute-step <gherkin> | execute-step --text=<gherkin> | --text-file=<path> | --text-b64=<base64> [--ack-only] [--step-timeout=<seconds>]
+
+# help export-guidance
+Usage: export-guidance [output-directory]
+
+# help find-element
+Usage: find-element --category=<Button> [--text=<label>] [--html=<file>]
+
+# help finish
+Usage: finish --run-id=<id> [--learned=<one line>] [--status=PASSED|FAILED|EMPTY|TIMEOUT|STOPPED]
+
+# help from-here
+Usage: from-here
+
+# help gc-runs
+Usage: gc-runs
+
+# help gc-versions
+Usage: gc-versions
+
+# help help
+Pickleball Workbench. help <command> prints usage. help <flag> prints that flag.
+exit 0 ok, 1 failed, 2 usage. --json is one JSON object and no preamble.
+decide: discover, then plan, then run. plan lists the scenarios. run is confirm, or isolate then execute-step.
+Timing is .pickleball/runs/<id>/launch-timing.txt. Stderr timing only when PKB_WORKBENCH_TIMING=1 or -Dpkb_workbench_timing=true.
+Do not pass pkb_run_profile. Do not open the GUI to test yourself. isolate is the headless session.
+run: discover confirm plan hint discover-hint resolve-runvars
+workspace: workspace-show workspace-edit workspace-seed
+session: isolate session-start execute-step status events stop kill open-scenario example play from-here pause insert-step update-step diagnostic-run save refresh session-sync worker-start worker-restart worker-stop open-window close-window show-run
+coordination: short-log note inbox finish presence post history gc-runs gc-versions use-version export-guidance
+descriptors: session list | session info <sessionId> [--json] | session hold <sessionId> | session release <sessionId>
+page: inspect-page find-element
+retrieval: query runs | query get | query query | query search | query props | query errors | query tail
+controller: sync worker-check live-check ui mcp session
+all: close-window confirm diagnostic-run discover discover-hint events example execute-step export-guidance find-element finish from-here gc-runs gc-versions help hint history inbox insert-step inspect-page isolate kill live-check mcp note open-scenario open-window pause plan play post presence query refresh resolve-runvars save session session-hold session-info session-list session-release session-start session-sync short-log show-run status stop sync ui update-step use-version worker-check worker-restart worker-start worker-stop workspace-edit workspace-seed workspace-show
+
+# help hint
+Usage: hint [--json]
+
+# help history
+Usage: history --append --text=<one line>
+
+# help inbox
+Usage: inbox --write --to=<agent-id|any> --text=<one line> [--from=<agent-id>] [--run-id=<id>] | inbox --list|--take --agent=<id>
+
+# help insert-step
+Usage: insert-step --text=<gherkin>
+
+# help inspect-page
+Usage: inspect-page
+
+# help isolate
+Usage: isolate [--tags=<expr>] [--name=<regex>] [--example=<rows>] [--runvar=key=value] [--run-id=<id>] [--agent=<id>] [--session-file=<path>]
+
+# help kill
+Usage: kill
+
+# help note
+Usage: note --text=<one line> [--agent=<id>] [--run-id=<id>]
+
+# help open-scenario
+Usage: open-scenario --feature=<path-or-name> --name=<scenario> [--example=<rows>]
+
+# help open-window
+Usage: open-window --run-id=<id>
+
+# help pause
+Usage: pause
+
+# help plan
+Usage: plan [--tags=<expr>] [--name=<regex>] [--example=<rows>] [--select=<path:line>] [--refresh] [--json]
+
+# help play
+Usage: play
+
+# help post
+Usage: post --write --to=<agent-id|all> --text=<one line> [--run-id=<id>] [--ttl=1h] | post --renew --id=<id> [--ttl=1h]
+
+# help presence
+Usage: presence --touch --agent=<id> [--run-id=<id>] | presence --list | presence --sweep
+
+# help query
+Usage: query <runs|get|query|search|props|errors|tail> [--run-id=<id>] [--scenario=<id>] [--kind=run|scenario|step|event|property|artifact|error|log] [--text=<words>] [--status=<outcome>] [--fields=<a,b>] [--limit=<n>] [--cursor=<token>] [--id=<id>]
+
+# help refresh
+Usage: refresh
+
+# help resolve-runvars
+Usage: resolve-runvars [--json]
+
+# help save
+Usage: save
+
+# help session
+Usage: session list [--json] | session info <sessionId> [--json] | session hold <sessionId> | session release <sessionId>
+Bare session starts the controller. Agents testing alone use isolate.
+
+# help session-start
+Usage: session-start [--tags=<expr>] [--name=<regex>] [--example=<rows>] [--run-id=<id>] [--agent=<id>] [--session-file=<path>]
+
+# help session-sync
+Usage: session-sync
+
+# help short-log
+Usage: short-log [--limit=<n>]
+
+# help show-run
+Usage: show-run --run-id=<id>
+
+# help status
+Usage: status [command-id] [--json] [--run-id=<id>]
+
+# help stop
+Usage: stop [--force] [--run-id=<id>]
+
+# help sync
+Usage: sync
+
+# help update-step
+Usage: update-step --text=<gherkin>
+
+# help use-version
+Usage: use-version --version=<safe-version>
+
+# help worker-restart
+Usage: worker-restart
+
+# help worker-start
+Usage: worker-start
+
+# help worker-stop
+Usage: worker-stop
+
+# help workspace-edit
+Usage: workspace-edit --run-id=<id> (--runvar=key=value | --config=<relative> --text=<body>) [--expect=<fingerprint>]
+
+# help workspace-seed
+Usage: workspace-seed --run-id=<id> [--reseed] [--from-run=<id>]
+
+# help workspace-show
+Usage: workspace-show --run-id=<id> [--json]

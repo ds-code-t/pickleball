@@ -121,6 +121,35 @@ class AgentCoordinationTest {
     }
 
     @Test
+    void newRunRecordsUnresolvedEnvironmentAsUnsetAndFinishKeepsAResolvedValue() throws Exception {
+        AgentCoordination.Run run = AgentCoordination.begin(project, request("run-env", "agent-env"));
+        String born = Files.readString(run.recordFile());
+        assertTrue(born.contains("\"environment\" : \"unset\"") || born.contains("\"environment\":\"unset\""), born);
+
+        AgentCoordination.finish(
+                project, run.runId(), null, "PASSED",
+                Instant.parse("2026-10-30T12:00:00Z"), new StringBuilder(), null, null, null
+        );
+        String kept = Files.readString(run.recordFile());
+        assertTrue(kept.contains("\"environment\" : \"unset\"") || kept.contains("\"environment\":\"unset\""), kept);
+
+        AgentCoordination.finish(
+                project, run.runId(), null, "PASSED",
+                Instant.parse("2026-10-30T12:01:00Z"), new StringBuilder(), null, "QA", null
+        );
+        String resolved = Files.readString(run.recordFile());
+        assertTrue(resolved.contains("\"environment\" : \"QA\"") || resolved.contains("\"environment\":\"QA\""), resolved);
+
+        AgentCoordination.finish(
+                project, run.runId(), null, "PASSED",
+                Instant.parse("2026-10-30T12:02:00Z"), new StringBuilder(), null, "  ", null
+        );
+        String still = Files.readString(run.recordFile());
+        assertTrue(still.contains("\"environment\" : \"QA\"") || still.contains("\"environment\":\"QA\""), still);
+        assertFalse(still.contains("\"environment\" : null"), still);
+    }
+
+    @Test
     void linesOlderThanThreeDaysAreRemovedAndNewerLinesStay() throws Exception {
         Instant now = Instant.parse("2026-10-01T12:00:00Z");
         Instant exactly = now.minus(Duration.ofDays(3));
@@ -202,9 +231,73 @@ class AgentCoordinationTest {
     @Test
     void adoptingAnExistingRunDoesNotWriteASecondStartLine() throws Exception {
         AgentCoordination.begin(project, request("run-adopt", "agent-adopt"));
-        AgentCoordination.begin(project, request("run-adopt", "agent-adopt"));
+        AgentCoordination.begin(project, request("run-adopt", "agent-adopt"), Instant.now(), null, false);
         long starts = AgentCoordination.readLog(project).stream().filter(line -> line.contains("\tstart\t")).count();
         assertEquals(1, starts);
+    }
+
+    @Test
+    void relaunchRewritesStatusCountsAndWritesStartAndStop() throws Exception {
+        AgentCoordination.Run run = AgentCoordination.begin(project, request("run-again", "agent-again"));
+        AgentCoordination.finish(project, run.runId(), "first", "FAILED");
+        String failed = Files.readString(run.recordFile());
+        assertTrue(failed.contains("\"status\" : \"FAILED\""), failed);
+        AgentCoordination.begin(project, request("run-again", "agent-again"));
+        String reset = Files.readString(run.recordFile());
+        assertTrue(reset.contains("\"status\" : \"RUNNING\""), reset);
+        assertTrue(reset.contains("\"stoppedAt\" : null"), reset);
+        assertTrue(reset.contains("\"failureCount\" : null"), reset);
+        long starts = AgentCoordination.readLog(project).stream().filter(line -> line.contains("\tstart\t")).count();
+        assertEquals(2, starts);
+        AgentCoordination.finish(project, run.runId(), null, "PASSED");
+        String passed = Files.readString(run.recordFile());
+        assertTrue(passed.contains("\"status\" : \"PASSED\""), passed);
+        assertFalse(passed.contains("\"failureCount\" : 1"), passed);
+        long stops = AgentCoordination.readLog(project).stream().filter(line -> line.contains("\tstop\t")).count();
+        assertEquals(2, stops);
+        AgentCoordination.finish(project, run.runId(), null, "STOPPED");
+        long stopsAfterSession = AgentCoordination.readLog(project).stream().filter(line -> line.contains("\tstop\t")).count();
+        assertEquals(3, stopsAfterSession);
+    }
+
+    @Test
+    void relaunchArchivesThePreviousDiagnosticAndDoesNotReadItAsCurrent() throws Exception {
+        AgentCoordination.Run run = AgentCoordination.begin(project, request("run-attempt", "agent-attempt"));
+        Path scenario = run.diagnosticDirectory().resolve(run.runId()).resolve("scenarios").resolve("old-scenario");
+        Files.createDirectories(scenario);
+        Files.writeString(scenario.resolve("summary.json"), "{\"name\":\"Old failure\",\"outcome\":\"FAILED\"}\n");
+        Files.writeString(
+                run.diagnosticDirectory().resolve(run.runId()).resolve("run-index.json"),
+                "{\"runId\":\"run-attempt\",\"outcome\":\"FAILED\",\"counts\":{\"total\":1,\"failed\":1}}\n"
+        );
+        AgentCoordination.finish(project, run.runId(), null, "FAILED");
+        AgentCoordination.begin(project, request("run-attempt", "agent-attempt"));
+        Path archived = run.dataDirectory().resolve("attempts").resolve("1").resolve("diagnostic")
+                .resolve(run.runId()).resolve("scenarios").resolve("old-scenario").resolve("summary.json");
+        assertTrue(Files.isRegularFile(archived), archived.toString());
+        assertFalse(Files.exists(scenario));
+        assertNull(AgentCoordination.findRunIndex(project, run.runId()));
+    }
+
+    @Test
+    void relaunchUpdatesWhyAndALaterFinishMovesStoppedAt() throws Exception {
+        AgentCoordination.Run run = AgentCoordination.begin(
+                project,
+                AgentCoordination.Request.of("run-why", "agent-why", null, null, null, "first why", "discover")
+        );
+        AgentCoordination.finish(project, run.runId(), "first", "FAILED", Instant.parse("2026-01-01T00:00:00Z"), null);
+        AgentCoordination.begin(
+                project,
+                AgentCoordination.Request.of("run-why", "agent-why", null, null, null, "second why", "discover")
+        );
+        String reset = Files.readString(run.recordFile());
+        assertTrue(reset.contains("second why"), reset);
+        assertFalse(reset.contains("first why"), reset);
+        AgentCoordination.finish(project, run.runId(), "done", "PASSED", Instant.parse("2026-01-02T00:00:00Z"), null);
+        AgentCoordination.finish(project, run.runId(), "done later", "PASSED", Instant.parse("2026-02-01T00:00:00Z"), null);
+        String finished = Files.readString(run.recordFile());
+        assertTrue(finished.contains("2026-02-01T00:00:00Z"), finished);
+        assertFalse(finished.contains("2026-01-02T00:00:00Z"), finished);
     }
 
     @Test

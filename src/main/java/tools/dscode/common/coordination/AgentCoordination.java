@@ -4,9 +4,11 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
+import tools.dscode.control.protocol.AgentLog;
 import tools.dscode.control.protocol.ControlProtocol;
 import tools.dscode.control.protocol.PickleballLocalLayout;
 import tools.dscode.control.protocol.PickleballVersion;
+import tools.dscode.control.protocol.RunIndexFinder;
 import tools.dscode.control.protocol.WindowDriver;
 import tools.dscode.testengine.PKB_props;
 import tools.dscode.testengine.PickleballRunner;
@@ -63,7 +65,7 @@ public final class AgentCoordination {
     public static final Duration POST_TTL = Duration.ofHours(24);
     public static final Duration RUN_PAYLOAD_STALE = Duration.ofHours(24);
     public static final long HISTORY_MAX_BYTES = 10L * 1024L * 1024L;
-    public static final int PURPOSE_LIMIT = 240;
+    public static final int PURPOSE_LIMIT = AgentLog.PURPOSE_LIMIT;
 
     private static final ObjectMapper JSON = new ObjectMapper()
             .enable(SerializationFeature.INDENT_OUTPUT);
@@ -305,7 +307,34 @@ public final class AgentCoordination {
         try {
             if (Files.isRegularFile(recordFile)) {
                 RunRecord existing = readRecord(recordFile);
+                if (logStart) archivePreviousAttempt(data);
                 ensureTree(data);
+                if (logStart) {
+                    String purpose = oneLine(firstNonBlank(safe.why(), safe.purpose(), "run"));
+                    String why = firstNonBlank(safe.why(), existing.why());
+                    RunRecord reset = new RunRecord(
+                            existing.runId(),
+                            existing.agentId(),
+                            existing.group(),
+                            existing.sequence(),
+                            existing.who(),
+                            why,
+                            existing.learned(),
+                            clock.toString(),
+                            null,
+                            "RUNNING",
+                            existing.dataPath() == null ? data.toString() : existing.dataPath(),
+                            existing.pickleballVersion(),
+                            null,
+                            null,
+                            null,
+                            existing.environment(),
+                            existing.browser()
+                    );
+                    writeRecord(recordFile, reset);
+                    appendLog(project, clock, existing.agentId(), runId, "start", purpose, recordFile);
+                    existing = reset;
+                }
                 Run adopted = toRun(project, data, recordFile, existing);
                 activate(adopted);
                 print(out, "run-id=" + adopted.runId());
@@ -336,7 +365,7 @@ public final class AgentCoordination {
                     null,
                     null,
                     null,
-                    null,
+                    "unset",
                     null
             );
             writeRecord(recordFile, record);
@@ -428,7 +457,7 @@ public final class AgentCoordination {
     /**
      * Stops the run. When {@code run-index.json} is present it supplies the status
      * and the failure fields, including after a worker already wrote PASSED.
-     * {@code TIMEOUT} and {@code EMPTY} are left alone. {@code observedFailures}
+     * {@code TIMEOUT}, {@code EMPTY}, and {@code LAUNCH_ERROR} are left alone. {@code observedFailures}
      * is the Surefire or Gradle failure+error count used only when no index exists.
      * {@code environment} and {@code browser} come from the resolved run vars.
      */
@@ -454,7 +483,8 @@ public final class AgentCoordination {
             boolean alreadyStopped = existing.stoppedAt() != null && !existing.stoppedAt().isBlank();
             String learnedValue = blankToNull(learned);
             String keptLearned = learnedValue != null ? learnedValue : existing.learned();
-            DiagnosticSignal signal = readDiagnosticSignal(project, safeRun);
+            Instant startedAt = parseInstant(existing.startedAt());
+            DiagnosticSignal signal = readDiagnosticSignal(project, safeRun, startedAt);
             String statusValue = resolveRecordStatus(status, existing, recordFile.getParent(), signal, alreadyStopped);
             Integer failureCount = existing.failureCount();
             Boolean failedScenario = existing.failedScenario();
@@ -473,7 +503,13 @@ public final class AgentCoordination {
                     failureSummary = "surefire errors+failures=" + observedFailures;
                 }
             }
+            if ("PASSED".equalsIgnoreCase(statusValue) && (signal == null || !signal.failed())) {
+                failureCount = null;
+                failedScenario = null;
+                failureSummary = null;
+            }
             String environmentValue = firstNonBlank(environment, existing.environment());
+            if (environmentValue == null || environmentValue.isBlank()) environmentValue = "unset";
             String browserValue = firstNonBlank(browser, existing.browser());
             boolean statusChanged = existing.status() == null || !existing.status().equals(statusValue);
             boolean learnedChanged = learnedValue != null && !learnedValue.equals(existing.learned());
@@ -482,8 +518,10 @@ public final class AgentCoordination {
                     || !java.util.Objects.equals(existing.failureSummary(), failureSummary);
             boolean contextChanged = !java.util.Objects.equals(blankToNull(existing.environment()), environmentValue)
                     || !java.util.Objects.equals(blankToNull(existing.browser()), browserValue);
-            if (!alreadyStopped || statusChanged || learnedChanged || failureChanged || contextChanged) {
-                String stoppedAt = alreadyStopped ? existing.stoppedAt() : clock.toString();
+            boolean sessionStop = "STOPPED".equalsIgnoreCase(blankToNull(status));
+            if (!alreadyStopped || statusChanged || learnedChanged || failureChanged || contextChanged
+                    || (alreadyStopped && sessionStop)) {
+                String stoppedAt = clock.toString();
                 RunRecord updated = withStop(
                         existing,
                         keptLearned,
@@ -498,6 +536,9 @@ public final class AgentCoordination {
                 writeRecord(recordFile, updated);
                 if (!alreadyStopped) {
                     String purpose = oneLine(firstNonBlank(learnedValue, existing.why(), statusValue));
+                    appendLog(project, clock, existing.agentId(), existing.runId(), "stop", purpose, recordFile);
+                } else if (sessionStop) {
+                    String purpose = oneLine(firstNonBlank(learnedValue, existing.why(), "STOPPED"));
                     appendLog(project, clock, existing.agentId(), existing.runId(), "stop", purpose, recordFile);
                 } else if (learnedChanged) {
                     appendLog(project, clock, existing.agentId(), existing.runId(), "note", oneLine(learnedValue), recordFile);
@@ -528,26 +569,16 @@ public final class AgentCoordination {
             Path record
     ) throws IOException {
         Instant clock = when == null ? Instant.now() : when;
-        String line = String.join("\t",
-                clock.toString(),
-                oneField(agentId),
-                oneField(runId),
-                oneField(event),
-                oneLine(purpose),
-                record == null ? "-" : oneField(record.toString())
+        AgentLog.append(
+                project,
+                clock,
+                agentId,
+                runId,
+                event,
+                purpose,
+                record == null ? null : record.toString()
         );
-        Path file = logFile(project);
-        Files.createDirectories(file.getParent());
-        byte[] bytes = (line + "\n").getBytes(StandardCharsets.UTF_8);
-        try (FileChannel channel = FileChannel.open(
-                file,
-                StandardOpenOption.CREATE,
-                StandardOpenOption.WRITE,
-                StandardOpenOption.APPEND
-        )) {
-            channel.write(ByteBuffer.wrap(bytes));
-        }
-        pruneIfStale(project, file, clock);
+        pruneIfStale(project, logFile(project), clock);
     }
 
     public static List<String> readLog(Path project) throws IOException {
@@ -951,11 +982,7 @@ public final class AgentCoordination {
     }
 
     public static String oneLine(String value) {
-        if (value == null || value.isBlank()) return "-";
-        String collapsed = value.replace('\t', ' ').replace('\r', ' ').replace('\n', ' ').strip();
-        if (collapsed.isEmpty()) return "-";
-        if (collapsed.length() <= PURPOSE_LIMIT) return collapsed;
-        return collapsed.substring(0, PURPOSE_LIMIT);
+        return AgentLog.oneLine(value);
     }
 
     private static List<InboxNote> readInbox(Path project, String agentId, boolean take) {
@@ -1006,6 +1033,41 @@ public final class AgentCoordination {
         Files.createDirectories(data.resolve("browser-profile"));
         Files.createDirectories(data.resolve("session"));
         Files.writeString(data.resolve("run-id.txt"), data.getFileName().toString() + "\n", StandardCharsets.UTF_8);
+    }
+
+    /**
+     * A relaunch keeps the previous diagnostic pack, but not on the path query
+     * and the summary walk. {@code attempts/} is outside {@code diagnostic/}.
+     */
+    private static void archivePreviousAttempt(Path data) throws IOException {
+        Path diagnostic = data.resolve("diagnostic");
+        if (!Files.isDirectory(diagnostic) || !attemptEvidence(diagnostic)) return;
+        Path attempts = data.resolve("attempts");
+        int next = 1;
+        if (Files.isDirectory(attempts)) {
+            try (var children = Files.list(attempts)) {
+                for (Path child : children.toList()) {
+                    String name = child.getFileName() == null ? "" : child.getFileName().toString();
+                    try {
+                        next = Math.max(next, Integer.parseInt(name) + 1);
+                    } catch (NumberFormatException ignored) {
+                        // A non-numeric sibling is not an attempt number.
+                    }
+                }
+            }
+        }
+        Path dest = attempts.resolve(Integer.toString(next)).resolve("diagnostic");
+        Files.createDirectories(dest.getParent());
+        Files.move(diagnostic, dest);
+    }
+
+    private static boolean attemptEvidence(Path diagnostic) throws IOException {
+        try (var walk = Files.walk(diagnostic, 4)) {
+            return walk.anyMatch(path -> {
+                String name = path.getFileName() == null ? "" : path.getFileName().toString();
+                return "run-index.json".equals(name) || "scenarios".equals(name);
+            });
+        }
     }
 
     private static void activate(Run run) {
@@ -1460,49 +1522,34 @@ public final class AgentCoordination {
      * so a recorded data path can be opened on either host.
      */
     public static Path flexiblePath(String raw) {
-        if (raw == null || raw.isBlank()) return null;
-        String text = raw.trim();
-        if (text.startsWith("\\\\?\\")) text = text.substring(4);
-        return Path.of(text.replace('\\', '/'));
+        return RunIndexFinder.flexible(raw);
     }
 
     /** Private diagnostic index, then the flat private index, then the shared run index. */
     public static Path findRunIndex(Path project, String runId) {
-        if (project == null || runId == null || runId.isBlank()) return null;
-        Path runDir;
-        try {
-            runDir = runDirectory(project, runId);
-        } catch (RuntimeException failure) {
-            return null;
-        }
-        List<Path> candidates = new ArrayList<>();
-        candidates.add(runDir.resolve("diagnostic").resolve(runId).resolve("run-index.json"));
-        candidates.add(runDir.resolve("diagnostic").resolve("run-index.json"));
-        candidates.add(project.resolve("reports").resolve("diagnostic-runs").resolve(runId).resolve("run-index.json"));
-        Path record = runDir.resolve(RECORD_FILE);
-        if (Files.isRegularFile(record)) {
-            try {
-                String dataPath = JSON.readTree(record.toFile()).path("dataPath").asText("");
-                Path data = flexiblePath(dataPath);
-                if (data != null) {
-                    candidates.add(data.resolve("diagnostic").resolve(runId).resolve("run-index.json"));
-                    candidates.add(data.resolve("diagnostic").resolve("run-index.json"));
-                }
-            } catch (IOException ignored) {
-                // A record that cannot be read is not an index.
-            }
-        }
-        for (Path candidate : candidates) {
-            if (candidate != null && Files.isRegularFile(candidate)) return candidate;
-        }
-        Path walked = walkRunIndex(runDir, runId);
-        if (walked != null) return walked;
-        return walkRunIndex(project.resolve("reports").resolve("diagnostic-runs").resolve(runId), runId);
+        return RunIndexFinder.find(project, runId);
     }
 
     public static DiagnosticSignal readDiagnosticSignal(Path project, String runId) {
+        return readDiagnosticSignal(project, runId, null);
+    }
+
+    /**
+     * Same as {@link #readDiagnosticSignal(Path, String)} except an index last
+     * modified before {@code notBefore} is ignored. A relaunch must not inherit
+     * the previous run's outcome.
+     */
+    public static DiagnosticSignal readDiagnosticSignal(Path project, String runId, Instant notBefore) {
         Path index = findRunIndex(project, runId);
         if (index == null) return null;
+        if (notBefore != null) {
+            try {
+                Instant modified = Files.getLastModifiedTime(index).toInstant();
+                if (modified.isBefore(notBefore.minusSeconds(2))) return null;
+            } catch (IOException failure) {
+                return null;
+            }
+        }
         try {
             return signalFromIndex(JSON.readTree(index.toFile()), index);
         } catch (IOException failure) {
@@ -1510,28 +1557,13 @@ public final class AgentCoordination {
         }
     }
 
-    private static Path walkRunIndex(Path root, String runId) {
-        if (root == null || !Files.isDirectory(root)) return null;
-        try (var walk = Files.walk(root, 6)) {
-            for (Path path : walk.filter(Files::isRegularFile).toList()) {
-                if (path.getFileName() == null || !"run-index.json".equals(path.getFileName().toString())) continue;
-                if (skipFailureScan(root, path)) continue;
-                Path parent = path.getParent();
-                if (parent != null && parent.getFileName() != null && runId.equals(parent.getFileName().toString())) {
-                    return path;
-                }
-                try {
-                    if (Files.size(path) > 2_000_000L) continue;
-                    String id = JSON.readTree(path.toFile()).path("runId").asText("");
-                    if (runId.equals(id)) return path;
-                } catch (IOException ignored) {
-                    // An unreadable index is not this run.
-                }
-            }
-        } catch (IOException ignored) {
+    private static Instant parseInstant(String text) {
+        if (text == null || text.isBlank()) return null;
+        try {
+            return Instant.parse(text.trim());
+        } catch (RuntimeException ignored) {
             return null;
         }
-        return null;
     }
 
     private static DiagnosticSignal signalFromIndex(JsonNode root, Path index) {
@@ -1622,7 +1654,9 @@ public final class AgentCoordination {
 
     private static boolean isProtectedStatus(String status) {
         String value = status == null ? "" : status.trim();
-        return "TIMEOUT".equalsIgnoreCase(value) || "EMPTY".equalsIgnoreCase(value);
+        return "TIMEOUT".equalsIgnoreCase(value)
+                || "EMPTY".equalsIgnoreCase(value)
+                || "LAUNCH_ERROR".equalsIgnoreCase(value);
     }
 
     private static String startedVersion(Path project) {
@@ -1690,7 +1724,8 @@ public final class AgentCoordination {
         }
         if (relative.getNameCount() == 0) return true;
         String first = relative.getName(0).toString();
-        return "browser-profile".equals(first) || "config".equals(first) || "scratch".equals(first);
+        return "browser-profile".equals(first) || "config".equals(first) || "scratch".equals(first)
+                || "attempts".equals(first);
     }
 
     private static boolean jsonSignalsFailure(JsonNode node) {

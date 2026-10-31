@@ -5,6 +5,7 @@ import io.cucumber.core.runner.GlobalState;
 import io.cucumber.core.runner.StepExtension;
 import tools.dscode.common.control.ControlDecision;
 import tools.dscode.common.control.ControlEvent;
+import tools.dscode.common.control.ControlExecutionScope;
 import tools.dscode.common.control.ControlHookHandler;
 import tools.dscode.common.treeparsing.parsedComponents.Phrase;
 import tools.dscode.control.protocol.ControlBridgeEvent;
@@ -41,7 +42,8 @@ final class ControlBridgeEventRecorder implements ControlHookHandler, AutoClosea
             return ControlDecision.CONTINUE;
         }
 
-        StepExtension step = GlobalState.getRunningStep();
+        StepExtension step = ControlExecutionScope.currentStepOverride();
+        if (step == null) step = GlobalState.getRunningStep();
         Phrase phrase = GlobalState.getRunningPhrase();
         ControlBridgeEvent snapshot = new ControlBridgeEvent(
                 sequence.incrementAndGet(),
@@ -65,6 +67,27 @@ final class ControlBridgeEventRecorder implements ControlHookHandler, AutoClosea
             }
         }
         return ControlDecision.CONTINUE;
+    }
+
+    /** One event for a detached execute-step, on the same stream as anchor hooks. */
+    void recordExecutedStep(String scenarioId, String scenarioName, String stepText, String status) {
+        if (closed) return;
+        ControlBridgeEvent snapshot = new ControlBridgeEvent(
+                sequence.incrementAndGet(),
+                Instant.now().toString(),
+                Thread.currentThread().threadId(),
+                scenarioId,
+                scenarioName,
+                "EXECUTE_STEP",
+                status == null ? "" : status,
+                clipped(stepText),
+                null
+        );
+        synchronized (lock) {
+            if (closed) return;
+            events.addLast(snapshot);
+            while (events.size() > MAX_EVENTS) events.removeFirst();
+        }
     }
 
     ControlBridgeEventPage page(

@@ -7,6 +7,8 @@ import argparse
 import hashlib
 import os
 from pathlib import Path
+import posixpath
+import re
 import subprocess
 import sys
 
@@ -441,8 +443,6 @@ def validate_dependency_owned_guidance(errors: list[str]) -> None:
         "version-matched",
         "Generated Maven consumer reference",
         "maven-consumer-project/",
-        "@agent-pointer-eval",
-        "Maintainer-only: pointer-eval harness",
         "-Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher",
     ):
         if required not in text:
@@ -454,13 +454,17 @@ def validate_dependency_owned_guidance(errors: list[str]) -> None:
     chooser_start = text.find("## Tool chooser")
     live_start = text.find("### Live isolation loop")
     first_read = text.find("## First-read")
-    maintainer = text.find("## Maintainer-only: pointer-eval harness")
-    if chooser_start < 0 or live_start < 0 or first_read < 0 or maintainer < 0:
+    if chooser_start < 0 or live_start < 0 or first_read < 0:
         errors.append(
             "docs/consumer-agent-guide.md must keep Tool chooser, Live isolation loop, "
-            "First-read, and Maintainer-only pointer-eval sections."
+            "and First-read sections."
         )
         return
+    if "Maintainer-only: pointer-eval harness" in text or "@agent-pointer-eval" in text:
+        errors.append(
+            "docs/consumer-agent-guide.md must not carry the maintainer pointer-eval "
+            "section; it lives in docs/workbench-agent-detail.md."
+        )
 
     chooser = text[chooser_start:live_start]
     live = text[live_start:first_read]
@@ -520,11 +524,27 @@ def validate_dependency_owned_guidance(errors: list[str]) -> None:
         errors.append(
             "docs/consumer-agent-guide.md must not send new investigations under v/<version>/."
         )
-    if maintainer < text.find("## When the core Pickleball repository is also present"):
-        errors.append(
-            "@agent-pointer-eval guidance must stay maintainer-only at the bottom of "
-            "docs/consumer-agent-guide.md."
-        )
+    detail_path = ROOT / "docs" / "workbench-agent-detail.md"
+    if not detail_path.is_file():
+        errors.append("Missing docs/workbench-agent-detail.md")
+    else:
+        detail = detail_path.read_text(encoding="utf-8")
+        for required in (
+            "Maintainer-only: pointer-eval harness",
+            "@agent-pointer-eval",
+        ):
+            if required not in detail:
+                errors.append(
+                    "docs/workbench-agent-detail.md must retain pointer-eval guidance "
+                    f"({required})."
+                )
+        core = detail.find("## When the core Pickleball repository is also present")
+        maintainer = detail.find("## Maintainer-only: pointer-eval harness")
+        if core < 0 or maintainer < 0 or maintainer < core:
+            errors.append(
+                "@agent-pointer-eval guidance must stay maintainer-only after the core-repo "
+                "section in docs/workbench-agent-detail.md."
+            )
 
     workbench = ROOT / "docs" / "pickleball-workbench.md"
     if workbench.is_file():
@@ -539,6 +559,54 @@ def validate_dependency_owned_guidance(errors: list[str]) -> None:
                 "docs/pickleball-workbench.md Gradle pickleballWorkbench example must not "
                 "default to mcp."
             )
+
+
+def validate_exported_doc_links(errors: list[str]) -> None:
+    """Fail when an exported markdown file links to a doc that was not exported."""
+    packaged = ROOT / "src" / "main" / "resources" / "META-INF" / "pickleball" / "guidance"
+    if not packaged.is_dir():
+        errors.append("Packaged guidance is missing; cannot check exported doc links.")
+        return
+    exported = {
+        path.relative_to(packaged).as_posix()
+        for path in packaged.rglob("*")
+        if path.is_file()
+    }
+    link_pattern = re.compile(r"\[[^\]]*\]\(([^)\s]+)(?:\s+[^)]*)?\)")
+    backtick_pattern = re.compile(r"`(docs/[A-Za-z0-9_./-]+\.md)`")
+    fence = re.compile(r"```.*?```", re.DOTALL)
+    for path in sorted(packaged.rglob("*.md")):
+        relative = path.relative_to(packaged).as_posix()
+        text = fence.sub("", path.read_text(encoding="utf-8"))
+        targets = [match.group(1) for match in link_pattern.finditer(text)]
+        targets.extend(match.group(1) for match in backtick_pattern.finditer(text))
+        for target in targets:
+            resolved = resolve_exported_doc(relative, target)
+            if resolved is None:
+                continue
+            if resolved in exported:
+                continue
+            errors.append(
+                f"Exported {relative} links to {resolved}, which is not in the guidance export."
+            )
+
+
+def resolve_exported_doc(from_relative: str, target: str) -> str | None:
+    raw = target.strip()
+    if not raw or raw.startswith(("#", "http://", "https://", "mailto:")):
+        return None
+    raw = raw.split("#", 1)[0].split("?", 1)[0].strip()
+    if not raw or raw.endswith("/"):
+        return None
+    if raw.startswith("docs/") or raw.startswith("maven-consumer-project/") or raw == "AGENT-GUIDE.md":
+        resolved = posixpath.normpath(raw)
+    else:
+        resolved = posixpath.normpath(posixpath.join(posixpath.dirname(from_relative), raw))
+    if resolved.startswith("../") or "/../" in f"/{resolved}":
+        return None
+    if not resolved.endswith(".md"):
+        return None
+    return resolved
 
 
 def validate_consumer_reference_build_hook(errors: list[str]) -> None:
@@ -767,6 +835,7 @@ def main() -> int:
     validate_consumer_bridge(errors)
     validate_consumer_readme(errors)
     validate_dependency_owned_guidance(errors)
+    validate_exported_doc_links(errors)
     validate_agent_pointer_eval_harness(errors)
     validate_consumer_reference_build_hook(errors)
     validate_consumer_tracked_artifacts(errors)

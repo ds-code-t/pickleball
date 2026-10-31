@@ -157,6 +157,68 @@ class WorkbenchRunReportsTest {
     }
 
     @Test
+    void secondDiscoverCountsOnlyTheNewAttempt() throws Exception {
+        Path project = tempDir.resolve("rerun");
+        Files.createDirectories(project);
+        String runId = "run-rerun";
+        AgentCoordination.Run run = AgentCoordination.begin(
+                project,
+                AgentCoordination.Request.of(runId, "agent-r", null, null, null, null, "discover")
+        );
+        Path oldScenario = run.diagnosticDirectory().resolve(runId).resolve("scenarios").resolve("old");
+        Files.createDirectories(oldScenario);
+        Files.writeString(oldScenario.resolve("events.jsonl"), "{\"type\":\"scenario_start\"}\n");
+        Files.writeString(
+                run.diagnosticDirectory().resolve(runId).resolve("run-index.json"),
+                "{\"runId\":\"run-rerun\",\"outcome\":\"FAILED\",\"counts\":{\"total\":1,\"failed\":1},\"steps\":{\"executed\":4}}"
+        );
+        AgentCoordination.begin(
+                project,
+                AgentCoordination.Request.of(runId, "agent-r", null, null, null, null, "discover")
+        );
+        Path fresh = run.diagnosticDirectory().resolve(runId).resolve("scenarios").resolve("fresh");
+        Files.createDirectories(fresh);
+        Files.writeString(fresh.resolve("summary.json"), """
+                {"outcome":"PASSED","identity":{"scenarioName":"Fresh"},"steps":{"executed":1,"passed":1}}
+                """);
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        WorkbenchRunReports.publish(
+                project, runId, List.of(), "", "PASSED",
+                new PrintStream(out, true, StandardCharsets.UTF_8)
+        );
+        String text = out.toString(StandardCharsets.UTF_8);
+        assertTrue(text.contains("scenarios=1"), text);
+        assertFalse(text.contains("scenarios=2"), text);
+        assertTrue(text.contains("steps=1"), text);
+    }
+
+    @Test
+    void summaryLineCountsPassesAndNamesTheFailedScenario() throws Exception {
+        Path project = tempDir.resolve("counts");
+        String runId = "run-counts";
+        Path run = AgentCoordination.runDirectory(project, runId);
+        Path pass = run.resolve("diagnostic").resolve(runId).resolve("scenarios").resolve("ok");
+        Path fail = run.resolve("diagnostic").resolve(runId).resolve("scenarios").resolve("bad");
+        Files.createDirectories(pass);
+        Files.createDirectories(fail);
+        Files.writeString(pass.resolve("summary.json"), """
+                {"outcome":"PASSED","identity":{"scenarioName":"Ok case"},"steps":{"executed":1,"passed":1}}
+                """);
+        Files.writeString(fail.resolve("summary.json"), """
+                {"outcome":"FAILED","identity":{"scenarioName":"Bad case"},"steps":{"executed":1,"failed":1}}
+                """);
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        WorkbenchRunReports.publish(
+                project, runId, List.of(), "", "FAILED",
+                new PrintStream(out, true, StandardCharsets.UTF_8)
+        );
+        String text = out.toString(StandardCharsets.UTF_8);
+        assertTrue(text.contains("passed=1"), text);
+        assertTrue(text.contains("failed=1"), text);
+        assertTrue(text.contains("failedScenarios=Bad case"), text);
+    }
+
+    @Test
     void prunedScenarioStillWritesRunSummaryAndNamedConsole() throws Exception {
         Path project = tempDir.resolve("Program Files");
         String runId = "check-1023";

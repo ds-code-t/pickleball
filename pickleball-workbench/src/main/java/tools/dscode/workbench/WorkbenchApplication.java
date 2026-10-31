@@ -73,7 +73,8 @@ public final class WorkbenchApplication {
                 case "session" -> session(args, out, err);
                 case "ui" -> ui(args);
                 case "mcp" -> throw new IllegalArgumentException(
-                        "MCP mode must be launched through the Workbench executable."
+                        "error: MCP mode must be launched through the Workbench executable.\n"
+                                + "fix: Usage: pickleball-workbench mcp <project>\n"
                 );
                 case "export-guidance", "hint", "discover-hint", "discover", "confirm", "plan",
                         "workspace-show", "workspace-edit", "workspace-seed" -> {
@@ -82,8 +83,8 @@ public final class WorkbenchApplication {
                     yield 2;
                 }
                 default -> {
-                    err.println("Unknown Workbench command: " + args[0]);
-                    err.println("Run with --help for available commands.");
+                    err.println("error: Unknown Workbench command: " + args[0]);
+                    err.println("fix: Run with --help for available commands.");
                     yield 2;
                 }
             };
@@ -259,9 +260,10 @@ public final class WorkbenchApplication {
         IsolateArgs parsed = projectCommandArgs(args, "isolate");
         Map<String, String> workerProperties;
         try {
-            workerProperties = tools.dscode.workbench.discover.LastDiscoverSnapshot.workerSystemProperties(
+            workerProperties = new java.util.LinkedHashMap<>(tools.dscode.workbench.discover.LastDiscoverSnapshot.workerSystemProperties(
                     parsed.project(), parsed.tags(), parsed.name(), parsed.example(), parsed.runVars(), err
-            );
+            ));
+            workerProperties.put("pkb_run_purpose", "workbench-isolate");
         } catch (RuntimeException failure) {
             err.println(failure.getMessage());
             err.println("Workbench CLI isolate failed.");
@@ -321,6 +323,7 @@ public final class WorkbenchApplication {
         if (parsed.agentId() != null && !parsed.agentId().isBlank()) {
             workerProperties.put("pkb_agent_id", parsed.agentId());
         }
+        workerProperties.put("pkb_run_purpose", "workbench-session");
 
         CountDownLatch done = new CountDownLatch(1);
         AtomicBoolean stopping = new AtomicBoolean();
@@ -410,10 +413,10 @@ public final class WorkbenchApplication {
     static IsolateArgs projectCommandArgs(String[] args, String command) {
         if (args.length < 2 || args[1].isBlank() || args[1].startsWith("-")) {
             throw new IllegalArgumentException(
-                    "Usage: pickleball-workbench " + command
+                    "error: missing project\nfix: Usage: pickleball-workbench " + command
                             + " <project> [--tags <expr>] [--name <expr>] [--example <rows>]"
                             + " [--runvar key=value]"
-                            + " [--session-file <path>] [--run-id <id>] [--agent-id <id>]"
+                            + " [--session-file <path>] [--run-id <id>] [--agent-id <id>]\n"
             );
         }
         String tags = null;
@@ -452,7 +455,7 @@ public final class WorkbenchApplication {
             } else if (token.startsWith("--runvar=")) {
                 String value = token.substring("--runvar=".length()).trim();
                 if (value.isBlank() || !value.contains("=")) {
-                    throw new IllegalArgumentException("--runvar requires key=value.");
+                    throw new IllegalArgumentException("error: --runvar requires key=value.\nfix: Pass --runvar key=value.\n");
                 }
                 runVars.add(value);
                 absorbName = false;
@@ -460,7 +463,7 @@ public final class WorkbenchApplication {
             } else if ("--runvar".equals(token) && index + 1 < args.length) {
                 String value = args[++index];
                 if (value == null || value.isBlank() || !value.contains("=")) {
-                    throw new IllegalArgumentException("--runvar requires key=value.");
+                    throw new IllegalArgumentException("error: --runvar requires key=value.\nfix: Pass --runvar key=value.\n");
                 }
                 runVars.add(value.trim());
                 absorbName = false;
@@ -732,7 +735,9 @@ public final class WorkbenchApplication {
 
     private static Path requiredProject(String[] args, String command) {
         if (args.length != 2 || args[1].isBlank()) {
-            throw new IllegalArgumentException("Usage: pickleball-workbench " + command + " <project>");
+            throw new IllegalArgumentException(
+                    "error: missing project\nfix: Usage: pickleball-workbench " + command + " <project>\n"
+            );
         }
         return Path.of(args[1]);
     }

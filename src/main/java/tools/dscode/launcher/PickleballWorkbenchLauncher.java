@@ -14,6 +14,7 @@ import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.io.PrintStream;
 import java.security.DigestInputStream;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -54,9 +55,15 @@ public final class PickleballWorkbenchLauncher {
         WorkbenchCommandLine.Parsed parsed;
         try {
             parsed = WorkbenchCommandLine.parse(args);
+            for (String notice : WorkbenchCommandLine.aliasNotices()) System.err.println(notice);
         } catch (IllegalArgumentException failure) {
             System.err.println(failure.getMessage());
             System.exit(2);
+            return;
+        }
+        Integer rejected = rejectUnknown(parsed, System.err);
+        if (rejected != null) {
+            System.exit(rejected);
             return;
         }
         Path project = parsed.project() != null
@@ -117,6 +124,16 @@ public final class PickleballWorkbenchLauncher {
             System.err.println("Could not launch Pickleball Workbench: " + failure.getMessage());
             System.exit(1);
         }
+    }
+
+    /**
+     * A typo must not extract the controller or start a JVM. The message names
+     * the closest command and the help usage.
+     */
+    static Integer rejectUnknown(WorkbenchCommandLine.Parsed parsed, PrintStream err) {
+        if (parsed == null || WorkbenchCommandLine.isKnownCommand(parsed.command())) return null;
+        err.print(WorkbenchCliHelp.unknown(parsed.command()));
+        return 2;
     }
 
     /**

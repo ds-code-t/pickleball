@@ -14,6 +14,7 @@ import tools.dscode.control.protocol.ControlBridgeStepOverride;
 import tools.dscode.control.protocol.ControlBridgeStepOverrideResult;
 import tools.dscode.control.protocol.ControlBridgeStepResolution;
 import tools.dscode.control.protocol.ControlBridgeValueResult;
+import tools.dscode.control.protocol.SessionDescriptor;
 import tools.dscode.workbench.lease.WorkbenchControlLease;
 import tools.dscode.workbench.lease.WorkbenchControlLeaseSnapshot;
 import tools.dscode.workbench.player.LivePlaybackCoordinator;
@@ -124,6 +125,15 @@ public interface WorkbenchServices extends AutoCloseable {
     WorkbenchWorkerStatus workerStatus();
 
     Path projectRoot();
+
+    /** Run id for the live descriptor, or null when this session has none. */
+    default String sessionRunId() {
+        return null;
+    }
+
+    /** Updates the live descriptor. A missing descriptor or a hold is left alone. */
+    default void noteSessionState(SessionDescriptor.State state) {
+    }
 
     Optional<WorkerLogFiles> workerLogFiles();
 

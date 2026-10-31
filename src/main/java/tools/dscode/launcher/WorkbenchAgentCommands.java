@@ -5,9 +5,14 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import tools.dscode.common.coordination.AgentCoordination;
 import tools.dscode.common.reporting.diagnostic.ConsumerMavenTestRunner;
 import tools.dscode.common.reporting.diagnostic.LastDiscoverSnapshot;
+import tools.dscode.control.protocol.DiagnosticQuery;
 import tools.dscode.control.protocol.PickleballLocalStore;
 import tools.dscode.control.protocol.RunConfigs;
+import tools.dscode.control.protocol.SessionDescriptor;
+import tools.dscode.control.protocol.SessionDescriptorWriter;
 import tools.dscode.control.protocol.WorkbenchFeatureIndex;
+import tools.dscode.control.protocol.OutputFormatter;
+import tools.dscode.control.protocol.SecretRedactor;
 import tools.dscode.control.protocol.Workspace;
 import tools.dscode.testengine.PKB_props;
 import tools.dscode.testengine.WorkspaceSeed;
@@ -27,6 +32,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.concurrent.ExecutionException;
@@ -38,6 +44,18 @@ import java.util.concurrent.TimeoutException;
 
 /** Agent-facing Workbench verbs that run in the consumer JVM (not the controller JAR). */
 public final class WorkbenchAgentCommands {
+    /**
+     * Flags read from the raw argument vector rather than {@link WorkbenchCommandLine.Parsed} fields.
+     */
+    static final List<String> MAJOR_FLAGS = List.of(
+            "--json", "--expect", "--config", "--reseed", "--from-run",
+            "--html", "--category", "--status",
+            "--kind", "--scenario", "--cursor", "--fields"
+    );
+    private static final java.util.Set<String> KNOWN_FINISH_STATUSES = java.util.Set.of(
+            "PASSED", "FAILED", "EMPTY", "TIMEOUT", "STOPPED"
+    );
+
     private WorkbenchAgentCommands() {
     }
 
@@ -58,45 +76,70 @@ public final class WorkbenchAgentCommands {
             err.println(failure.getMessage());
             return 2;
         }
+        SecretRedactor.noteAssignments(parsed.runVars());
+        noteWorkspaceSecrets(parsed);
+        PrintStream safeOut = OutputFormatter.wrap(out);
+        PrintStream safeErr = OutputFormatter.wrap(err);
         try {
             return switch (parsed.command()) {
-                case "export-guidance" -> exportGuidance(parsed, out, err);
-                case "hint", "discover-hint" -> hint(parsed, out);
-                case "resolve-runvars" -> resolveRunVars(parsed, out);
-                case "workspace-show" -> workspaceShow(parsed, out, err);
-                case "workspace-edit" -> workspaceEdit(parsed, out, err);
-                case "workspace-seed" -> workspaceSeed(parsed, out, err);
+                case "export-guidance" -> exportGuidance(parsed, safeOut, safeErr);
+                case "hint", "discover-hint" -> hint(parsed, safeOut, safeErr);
+                case "resolve-runvars" -> resolveRunVars(parsed, safeOut);
+                case "workspace-show" -> workspaceShow(parsed, safeOut, safeErr);
+                case "workspace-edit" -> workspaceEdit(parsed, safeOut, safeErr);
+                case "workspace-seed" -> workspaceSeed(parsed, safeOut, safeErr);
                 case "discover" -> {
-                    Integer rejected = rejectStepTimeout(parsed, err);
+                    Integer rejected = rejectStepTimeout(parsed, safeErr);
                     if (rejected != null) yield rejected;
-                    yield parsed.planOnly() ? plan(parsed, out, err) : discover(parsed, out, err, maven);
+                    yield parsed.planOnly() ? plan(parsed, safeOut, safeErr) : discover(parsed, safeOut, safeErr, maven);
                 }
                 case "confirm" -> {
-                    Integer rejected = rejectStepTimeout(parsed, err);
+                    Integer rejected = rejectStepTimeout(parsed, safeErr);
                     if (rejected != null) yield rejected;
-                    yield parsed.planOnly() ? plan(parsed, out, err) : confirm(parsed, out, err, maven);
+                    yield parsed.planOnly() ? plan(parsed, safeOut, safeErr) : confirm(parsed, safeOut, safeErr, maven);
                 }
-                case "plan" -> plan(parsed, out, err);
-                case "short-log" -> shortLog(parsed, out, err);
-                case "note" -> note(parsed, out, err);
-                case "inbox" -> inbox(parsed, out, err);
-                case "finish" -> finish(parsed, out, err);
-                case "presence" -> presence(parsed, out, err);
-                case "post" -> post(parsed, out, err);
-                case "history" -> history(parsed, out, err);
-                case "gc-runs" -> gcRuns(parsed, out, err);
-                case "gc-versions" -> gcVersions(parsed, out, err);
-                case "use-version" -> useVersion(parsed, out, err);
-                case "inspect-page" -> inspectPage(parsed, out, err);
-                case "find-element" -> findElement(parsed, out, err);
+                case "plan" -> plan(parsed, safeOut, safeErr);
+                case "short-log" -> shortLog(parsed, safeOut, safeErr);
+                case "note" -> note(parsed, safeOut, safeErr);
+                case "inbox" -> inbox(parsed, safeOut, safeErr);
+                case "finish" -> finish(parsed, safeOut, safeErr);
+                case "presence" -> presence(parsed, safeOut, safeErr);
+                case "post" -> post(parsed, safeOut, safeErr);
+                case "history" -> history(parsed, safeOut, safeErr);
+                case "gc-runs" -> gcRuns(parsed, safeOut, safeErr);
+                case "gc-versions" -> gcVersions(parsed, safeOut, safeErr);
+                case "use-version" -> useVersion(parsed, safeOut, safeErr);
+                case "inspect-page" -> inspectPage(parsed, safeOut, safeErr);
+                case "find-element" -> findElement(parsed, safeOut, safeErr);
+                case "query" -> query(parsed, safeOut, safeErr);
+                case "session-list" -> sessionList(parsed, safeOut, safeErr);
+                case "session-info" -> sessionInfo(parsed, safeOut, safeErr);
+                case "session-hold" -> sessionHold(parsed, safeOut, safeErr, true);
+                case "session-release" -> sessionHold(parsed, safeOut, safeErr, false);
+                case "help" -> help(args, safeOut, safeErr);
                 default -> {
-                    err.println("Unknown Workbench agent command: " + parsed.command());
+                    safeErr.print(WorkbenchCliHelp.unknown(parsed.command()));
                     yield 2;
                 }
             };
         } catch (RuntimeException failure) {
-            err.println("Workbench " + parsed.command() + " failed: " + WorkbenchCliErrors.explain(failure));
+            safeErr.println("Workbench " + parsed.command() + " failed: " + WorkbenchCliErrors.explain(failure));
             return 1;
+        } finally {
+            SecretRedactor.clear();
+        }
+    }
+
+    private static void noteWorkspaceSecrets(WorkbenchCommandLine.Parsed parsed) {
+        if (parsed.project() == null) return;
+        String runId = parsed.coordination().runId();
+        if (runId == null || runId.isBlank()) return;
+        Path workspace = Workspace.directory(parsed.project(), runId);
+        if (!Workspace.exists(workspace)) return;
+        try {
+            SecretRedactor.noteAll(Workspace.readRunVars(workspace));
+        } catch (RuntimeException ignored) {
+            // The command's own read reports "Workbench <command> failed:".
         }
     }
 
@@ -108,7 +151,12 @@ public final class WorkbenchAgentCommands {
         }
     }
 
-    private static int hint(WorkbenchCommandLine.Parsed parsed, PrintStream out) {
+    private static int hint(WorkbenchCommandLine.Parsed parsed, PrintStream out, PrintStream err) {
+        if (jsonRequested(parsed)) {
+            printDryRunResolve(parsed.project(), false, true, "discover", out);
+            warnRunnerSecrets(parsed.project(), err);
+            return 0;
+        }
         String named = WorkspaceSeed.namedProjectBrowser(parsed.project());
         out.println("Seed writes .pickleball/runs/<run-id>/workspace/runvars.properties and workspace/configs. Edit those files with workspace-show, workspace-edit, and workspace-seed before the next start.");
         out.println("Discover and confirm launch with -Dpkb_workspace plus selection keys (pkb_tags, pkb_name, pkb_example, pkb_features, pkb_parallel, pkb_run_id, pkb_agent_id). Isolate does not force pkb_parallel=1.");
@@ -123,33 +171,104 @@ public final class WorkbenchAgentCommands {
         out.println("Never supply pkb_run_profile as input. pkb_overriderunvars is deprecated for Workbench. It still works for a plain mvn test that does not set pkb_workspace.");
         out.println();
         out.println("NEXT: run discover");
-        printDryRunResolve(parsed.project(), false, out);
+        printDryRunResolve(parsed.project(), false, false, null, out);
+        warnRunnerSecrets(parsed.project(), err);
+        return 0;
+    }
+
+    private static void warnRunnerSecrets(Path project, PrintStream err) {
+        if (err == null) return;
+        Map<String, String> raw = new LinkedHashMap<>();
+        tools.dscode.testengine.PickleballRunner runner = tools.dscode.testengine.DynamicSuiteBootstrap.initializeFromRuntimeClasspath();
+        if (runner != null && runner.values() != null) {
+            runner.values().forEach((key, value) -> {
+                if (key != null && value != null) raw.put(key, value);
+            });
+        }
+        java.util.LinkedHashSet<String> once = new java.util.LinkedHashSet<>(WorkspaceSeed.runnerComputedSecretWarnings(raw));
+        for (String warning : once) err.println(warning);
+    }
+
+    private static int help(String[] args, PrintStream out, PrintStream err) {
+        String topic = null;
+        if (args != null) {
+            for (int index = 1; index < args.length; index++) {
+                String token = args[index];
+                if (token == null || token.isBlank() || WorkbenchCliHelp.isHelpToken(token)) continue;
+                topic = token;
+                break;
+            }
+        }
+        if (topic == null) {
+            out.print(WorkbenchCliHelp.catalog());
+            return 0;
+        }
+        String page = WorkbenchCliHelp.forTopic(topic);
+        if (page == null) {
+            err.print(WorkbenchCliHelp.unknown(topic));
+            return 2;
+        }
+        out.print(page);
         return 0;
     }
 
     private static int resolveRunVars(WorkbenchCommandLine.Parsed parsed, PrintStream out) {
-        printDryRunResolve(parsed.project(), true, out);
+        printDryRunResolve(parsed.project(), true, jsonRequested(parsed), null, out);
         return 0;
     }
 
     private static int workspaceShow(WorkbenchCommandLine.Parsed parsed, PrintStream out, PrintStream err) {
         String runId = parsed.coordination().runId();
         if (runId == null || runId.isBlank()) {
-            err.println("workspace-show requires --run-id.");
+            err.print(WorkbenchCliHelp.usageError("missing --run-id", "workspace-show"));
             return 2;
         }
         Path workspace = Workspace.directory(parsed.project(), runId);
-        out.println("workspace=" + workspace.toAbsolutePath().normalize());
-        if (!Workspace.exists(workspace)) {
-            out.println("present=false");
-            err.println("No workspace for " + runId + ". Run workspace-seed first.");
+        boolean present = Workspace.exists(workspace);
+        if (jsonRequested(parsed)) {
+            Map<String, Object> body = new LinkedHashMap<>();
+            body.put("present", present);
+            body.put("runId", runId);
+            body.put("workspace", workspace.toAbsolutePath().normalize().toString());
+            if (present) {
+                body.put("fingerprint", Workspace.fingerprint(workspace));
+                Map<String, String> runvars = Workspace.readRunVars(workspace);
+                SecretRedactor.noteAll(runvars);
+                body.put("runvars", OutputFormatter.redactMap(runvars));
+                body.put("computed", new java.util.ArrayList<>(WorkspaceSeed.computedKeys(parsed.project(), runvars)));
+                body.put("configs", RunConfigs.files(parsed.project(), runId));
+            } else {
+                body.put("error", "No workspace for " + runId);
+                body.put("fix", WorkbenchCliHelp.usage("workspace-seed").strip());
+            }
+            out.println(writeJson(body));
+        } else {
+            out.println("workspace=" + workspace.toAbsolutePath().normalize());
+        }
+        if (!present) {
+            if (!jsonRequested(parsed)) out.println("present=false");
+            err.print(WorkbenchCliHelp.usageError("No workspace for " + runId, "workspace-seed"));
             return 1;
         }
-        out.println("present=true");
-        out.println("fingerprint=" + Workspace.fingerprint(workspace));
-        Workspace.readRunVars(workspace).forEach((key, value) -> out.println(key + "=" + value));
-        for (String file : RunConfigs.files(parsed.project(), runId)) {
-            out.println("config " + file);
+        if (!jsonRequested(parsed)) {
+            out.println("present=true");
+            out.println("fingerprint=" + Workspace.fingerprint(workspace));
+            Map<String, String> runvars = Workspace.readRunVars(workspace);
+            SecretRedactor.noteAll(runvars);
+            java.util.Set<String> computed = WorkspaceSeed.computedKeys(parsed.project(), runvars);
+            boolean redacted = false;
+            for (Map.Entry<String, String> entry : runvars.entrySet()) {
+                String key = entry.getKey();
+                String value = entry.getValue();
+                if (SecretRedactor.leaks(key, value)) redacted = true;
+                String shown = OutputFormatter.shown(key, value);
+                String mark = computed.contains(key) ? " computed" : "";
+                out.println(key + "=" + shown + mark);
+            }
+            if (redacted) err.println("fix: " + SecretRedactor.HINT);
+            for (String file : RunConfigs.files(parsed.project(), runId)) {
+                out.println("config " + file);
+            }
         }
         return 0;
     }
@@ -157,12 +276,12 @@ public final class WorkbenchAgentCommands {
     private static int workspaceEdit(WorkbenchCommandLine.Parsed parsed, PrintStream out, PrintStream err) {
         String runId = parsed.coordination().runId();
         if (runId == null || runId.isBlank()) {
-            err.println("workspace-edit requires --run-id.");
+            err.print(WorkbenchCliHelp.usageError("missing --run-id", "workspace-edit"));
             return 2;
         }
         Path workspace = Workspace.directory(parsed.project(), runId);
         if (!Workspace.exists(workspace)) {
-            err.println("No workspace for " + runId + ". Run workspace-seed first.");
+            err.print(WorkbenchCliHelp.usageError("No workspace for " + runId, "workspace-seed"));
             return 1;
         }
         String expect = flagValue(parsed.forwarded(), "--expect");
@@ -174,13 +293,13 @@ public final class WorkbenchAgentCommands {
         }
         String config = flagValue(parsed.forwarded(), "--config");
         if (config == null && parsed.runVars().isEmpty()) {
-            err.println("workspace-edit requires --runvar and/or --config.");
+            err.print(WorkbenchCliHelp.usageError("missing --runvar or --config", "workspace-edit"));
             return 2;
         }
         if (config != null) {
             String text = parsed.coordination().text();
             if (text == null) {
-                err.println("workspace-edit --config requires --text.");
+                err.print(WorkbenchCliHelp.usageError("missing --text", "workspace-edit"));
                 return 2;
             }
             RunConfigs.write(parsed.project(), runId, config, text.endsWith("\n") ? text : text + "\n");
@@ -202,7 +321,7 @@ public final class WorkbenchAgentCommands {
     private static int workspaceSeed(WorkbenchCommandLine.Parsed parsed, PrintStream out, PrintStream err) {
         String runId = parsed.coordination().runId();
         if (runId == null || runId.isBlank()) {
-            err.println("workspace-seed requires --run-id.");
+            err.print(WorkbenchCliHelp.usageError("missing --run-id", "workspace-seed"));
             return 2;
         }
         boolean reseed = hasFlag(parsed.forwarded(), "--reseed");
@@ -213,12 +332,115 @@ public final class WorkbenchAgentCommands {
                 reseed,
                 fromRun,
                 null,
-                path -> WorkspaceLaunch.capture(parsed.project(), path, reseed)
+                path -> WorkspaceLaunch.capture(parsed.project(), path, reseed, err)
         );
         out.println("workspace=" + workspace.toAbsolutePath().normalize());
         out.println("fingerprint=" + Workspace.fingerprint(workspace));
         out.println("present=true");
+        try {
+            Map<String, String> stored = Workspace.readRunVars(workspace);
+            String profile = PKB_props.serializeRunVars(new java.util.TreeMap<>(stored));
+            LastDiscoverSnapshot.write(
+                    parsed.project(), runId, null, profile, parsed.coordination().agentId()
+            );
+        } catch (IOException failure) {
+            err.println("WARNING: discover snapshot was not written. " + failure.getMessage());
+        }
+        WorkbenchOneShotLaunch.capture(parsed.project(), err);
         return 0;
+    }
+
+    private static int sessionList(WorkbenchCommandLine.Parsed parsed, PrintStream out, PrintStream err) {
+        boolean json = hasFlag(parsed.forwarded(), "--json");
+        List<Path> files = SessionDescriptorWriter.liveFiles(parsed.project());
+        if (json) {
+            List<String> documents = new ArrayList<>();
+            for (Path file : files) documents.add(readText(file));
+            out.print(jsonArray(documents));
+            return 0;
+        }
+        if (files.isEmpty()) {
+            out.println("(no live sessions)");
+            return 0;
+        }
+        out.println(String.join("\t", "sessionId", "runId", "state", "browser", "cdp", "url"));
+        for (Path file : files) {
+            SessionDescriptor descriptor = SessionDescriptorWriter.readFile(file);
+            out.println(String.join("\t",
+                    descriptor.sessionId(),
+                    descriptor.runId(),
+                    descriptor.state().wire(),
+                    textOrDash(descriptor.browserType()),
+                    textOrDash(descriptor.cdpDebuggerAddress()),
+                    textOrDash(descriptor.currentUrl())
+            ));
+        }
+        return 0;
+    }
+
+    private static int sessionInfo(WorkbenchCommandLine.Parsed parsed, PrintStream out, PrintStream err) {
+        String id = parsed.coordination().id();
+        if (id == null || id.isBlank()) {
+            err.print(WorkbenchCliHelp.usageError("missing sessionId", "session-info"));
+            return 2;
+        }
+        Optional<Path> file = SessionDescriptorWriter.findFile(parsed.project(), id);
+        if (file.isEmpty()) {
+            err.println("No session descriptor for " + id + ".");
+            return 1;
+        }
+        String text = readText(file.get());
+        if (!text.endsWith("\n")) text = text + "\n";
+        out.print(text);
+        return 0;
+    }
+
+    private static int sessionHold(WorkbenchCommandLine.Parsed parsed, PrintStream out, PrintStream err, boolean hold) {
+        String id = parsed.coordination().id();
+        String verb = hold ? "hold" : "release";
+        if (id == null || id.isBlank()) {
+            err.print(WorkbenchCliHelp.usageError("missing sessionId", "session-" + verb));
+            return 2;
+        }
+        try {
+            SessionDescriptor updated = hold
+                    ? SessionDescriptorWriter.hold(parsed.project(), id, java.time.Instant.now())
+                    : SessionDescriptorWriter.release(parsed.project(), id, java.time.Instant.now());
+            String text = readText(SessionDescriptorWriter.file(parsed.project(), updated.runId()));
+            if (!text.endsWith("\n")) text = text + "\n";
+            out.print(text);
+            return 0;
+        } catch (IllegalStateException failure) {
+            err.println(failure.getMessage());
+            return 1;
+        }
+    }
+
+    private static String readText(Path file) {
+        try {
+            return Files.readString(file);
+        } catch (IOException failure) {
+            throw new IllegalStateException("Could not read " + file + ": " + failure.getMessage(), failure);
+        }
+    }
+
+    private static String textOrDash(String value) {
+        return value == null || value.isBlank() ? "-" : value;
+    }
+
+    private static String jsonArray(List<String> documents) {
+        if (documents.isEmpty()) return "[]\n";
+        StringBuilder json = new StringBuilder("[\n");
+        for (int i = 0; i < documents.size(); i++) {
+            String[] lines = documents.get(i).stripTrailing().split("\n", -1);
+            for (int line = 0; line < lines.length; line++) {
+                json.append("  ").append(lines[line]);
+                if (line + 1 == lines.length && i + 1 < documents.size()) json.append(',');
+                json.append('\n');
+            }
+        }
+        json.append("]\n");
+        return json.toString();
     }
 
     private static boolean hasFlag(String[] args, String flag) {
@@ -249,17 +471,30 @@ public final class WorkbenchAgentCommands {
     private static void printDryRunResolve(
             Path project,
             boolean includeAmbient,
+            boolean json,
+            String next,
             PrintStream out
     ) {
-        LinkedHashMap<String, String> values = new LinkedHashMap<>();
-        loadProperties(values, project.resolve("src/test/resources/pickleball.properties"));
-        loadProperties(values, project.resolve("src/test/resources/pickleball_local.properties"));
-        LinkedHashMap<String, String> jvm = new LinkedHashMap<>();
-        if (includeAmbient) {
-            PKB_props.copyJvmDryRunInputs(values, jvm, true, true);
+        PKB_props.ResolvedRunVars resolved = tools.dscode.testengine.PickleballRunner.previewLaunch(project, includeAmbient);
+        // Hint and resolve-runvars share this preview. Hint (includeAmbient=false) resolves
+        // only from project/workspace files so the caller JVM's -D values do not leak.
+        if (project == null && includeAmbient) {
+            project = Path.of("");
         }
-        PKB_props.ResolvedRunVars resolved = PKB_props.resolveRunVars(values, jvm);
+        if (json) {
+            Map<String, Object> body = new LinkedHashMap<>();
+            if (next != null) body.put("next", next);
+            body.put("sealed", resolved.sealed());
+            body.put("runProfileFingerprint", resolved.fingerprint());
+            body.put("pkb_run_profile", resolved.runProfile());
+            body.put("workbenchReportingModeDefault", "diagnostic");
+            body.put("provenance", String.valueOf(resolved.provenance()));
+            body.put("note", "Dry-run of this JVM. Not the Discover worker. Trust record.json after discover. Do not pass pkb_run_profile.");
+            out.println(writeJson(body));
+            return;
+        }
         out.println("Dry-run resolve of the launcher JVM, not the Discover worker (does not start tests, browsers, or Discover):");
+        out.println("Workbench launch default when the saved copy is blank: pkb_reportingmode=diagnostic");
         out.println("Do not treat resolve-runvars as the environment Discover will use. Trust the environment on the run record after Discover.");
         out.println("sealed=" + resolved.sealed());
         out.println("pkb_run_profile=" + resolved.runProfile());
@@ -267,19 +502,6 @@ public final class WorkbenchAgentCommands {
         out.println("provenance=" + resolved.provenance());
         out.println("pkb_overriderunvars is deprecated for Workbench. A plain run that does not set pkb_workspace can still use -Dpkb_overriderunvars=<complete compact map>, never -Dpkb_run_profile=.");
         out.println();
-    }
-
-    private static void loadProperties(Map<String, String> values, Path file) {
-        if (!java.nio.file.Files.isRegularFile(file)) return;
-        java.util.Properties props = new java.util.Properties();
-        try (java.io.InputStream in = java.nio.file.Files.newInputStream(file)) {
-            props.load(in);
-        } catch (IOException ignored) {
-            return;
-        }
-        for (String key : props.stringPropertyNames()) {
-            if (key != null) values.put(key.toLowerCase(java.util.Locale.ROOT), props.getProperty(key));
-        }
     }
 
     private static int discover(
@@ -314,10 +536,12 @@ public final class WorkbenchAgentCommands {
                     err
             );
             Map<String, String> stored = Workspace.readRunVars(prepared.workspace());
+            SecretRedactor.noteAll(stored);
+            rememberRunSnapshot(parsed.project(), run.runId(), run.agentId(), stored, prepared.selection());
             String environment = blankToNull(stored.get(PKB_props.PKB_ENVIRONMENT));
             String browser = blankToNull(stored.get(PKB_props.PKB_BROWSER));
             out.println("workspace=" + prepared.workspace());
-            out.println("workspace-runvars=" + PKB_props.serializeRunVars(new java.util.TreeMap<>(stored)));
+            out.println("workspace-runvars=" + OutputFormatter.launchEcho(stored));
             List<String> command = withCoordination(
                     ConsumerMavenTestRunner.command(
                             parsed.project(),
@@ -330,13 +554,7 @@ public final class WorkbenchAgentCommands {
             ByteArrayOutputStream capturedOut = new ByteArrayOutputStream();
             ByteArrayOutputStream capturedErr = new ByteArrayOutputStream();
             launchNote(parsed.project(), run.runId(), "maven-start", "");
-            Bounded mavenResult = runBounded(
-                    parsed,
-                    command,
-                    new WorkbenchRunReports.Tee(out, capturedOut),
-                    new WorkbenchRunReports.Tee(err, capturedErr),
-                    maven
-            );
+            Bounded mavenResult = runWithOnlineFallback(parsed, run.runId(), command, out, err, capturedOut, capturedErr, maven);
             launchNote(parsed.project(), run.runId(), "maven-done", "exit=" + mavenResult.exit() + " timedOut=" + mavenResult.timedOut());
             if (mavenResult.timedOut()) {
                 publishQuietly(parsed, run, selection, capturedOut, capturedErr, "TIMEOUT", environment, browser, out, err);
@@ -344,9 +562,10 @@ public final class WorkbenchAgentCommands {
             }
             int exit = mavenResult.exit();
             boolean empty = selection.matchedNone();
-            Observed observed = observe(parsed.project(), run.runId(), exit, empty);
+            Observed observed = observe(parsed.project(), run.runId(), exit, empty, captured(capturedOut, capturedErr));
             String status = observed.status();
             int reported = observed.exitCode();
+            if ("LAUNCH_ERROR".equals(status)) printLaunchError(run.runId(), capturedOut, capturedErr, err, exit, observed.zeroSteps());
             if (empty) printEmpty(parsed, browser, out, err);
             AgentCoordination.finish(
                     parsed.project(),
@@ -360,10 +579,36 @@ public final class WorkbenchAgentCommands {
                     browser
             );
             publishQuietly(parsed, run, selection, capturedOut, capturedErr, status, environment, browser, out, err);
+            WorkbenchOneShotLaunch.capture(parsed.project(), err);
             return recordDiscover(parsed, out, err, reported, run.runId());
         } catch (RuntimeException failure) {
             finishQuietly(parsed.project(), run.runId(), "FAILED", out);
             throw failure;
+        }
+    }
+
+    /** The workspace prepared for this run is the snapshot, even when Maven never writes a catalog. */
+    private static void rememberRunSnapshot(
+            Path project,
+            String runId,
+            String agentId,
+            Map<String, String> stored,
+            Map<String, String> selection
+    ) {
+        Map<String, String> values = new LinkedHashMap<>();
+        if (stored != null) values.putAll(stored);
+        if (selection != null) {
+            selection.forEach((key, value) -> {
+                if (key != null && value != null && !value.isBlank()) values.put(key, value);
+            });
+        }
+        if (values.isEmpty()) return;
+        try {
+            String profile = PKB_props.serializeRunVars(new java.util.TreeMap<>(values));
+            if (profile == null || profile.isBlank()) return;
+            LastDiscoverSnapshot.write(project, runId, null, profile, agentId);
+        } catch (IOException ignored) {
+            // printCatalog still writes the catalog profile when the worker retains one.
         }
     }
 
@@ -380,13 +625,20 @@ public final class WorkbenchAgentCommands {
         try {
             launchNote(parsed.project(), run.runId(), "command", "confirm");
             echoFilters(parsed, out);
-            LastDiscoverSnapshot.Snapshot snapshot = LastDiscoverSnapshot.requireScoped(
-                    parsed.project(),
-                    parsed.coordination().agentId(),
-                    parsed.coordination().runId()
-            );
-            Map<String, String> retained = LastDiscoverSnapshot.retainedRunVars(snapshot);
-            String fromRun = snapshot.runId();
+            LastDiscoverSnapshot.Snapshot snapshot = null;
+            Map<String, String> retained = new LinkedHashMap<>();
+            String fromRun = null;
+            try {
+                snapshot = LastDiscoverSnapshot.requireScoped(
+                        parsed.project(),
+                        parsed.coordination().agentId(),
+                        parsed.coordination().runId()
+                );
+                retained = LastDiscoverSnapshot.retainedRunVars(snapshot);
+                fromRun = snapshot.runId();
+            } catch (RuntimeException missing) {
+                if (!Workspace.exists(Workspace.directory(parsed.project(), run.runId()))) throw missing;
+            }
             Path fromWorkspace = fromRun == null ? null : Workspace.directory(parsed.project(), fromRun);
             String tags = tagsForLaunch(
                     null,
@@ -416,10 +668,12 @@ public final class WorkbenchAgentCommands {
                     err
             );
             Map<String, String> stored = Workspace.readRunVars(prepared.workspace());
+            SecretRedactor.noteAll(stored);
+            rememberRunSnapshot(parsed.project(), run.runId(), run.agentId(), stored, prepared.selection());
             String environment = blankToNull(stored.get(PKB_props.PKB_ENVIRONMENT));
             String browser = blankToNull(stored.get(PKB_props.PKB_BROWSER));
             out.println("workspace=" + prepared.workspace());
-            out.println("workspace-runvars=" + PKB_props.serializeRunVars(new java.util.TreeMap<>(stored)));
+            out.println("workspace-runvars=" + OutputFormatter.launchEcho(stored));
             List<String> command = withCoordination(
                     ConsumerMavenTestRunner.confirmCommand(
                             parsed.project(),
@@ -432,13 +686,7 @@ public final class WorkbenchAgentCommands {
             ByteArrayOutputStream capturedOut = new ByteArrayOutputStream();
             ByteArrayOutputStream capturedErr = new ByteArrayOutputStream();
             launchNote(parsed.project(), run.runId(), "maven-start", "");
-            Bounded mavenResult = runBounded(
-                    parsed,
-                    command,
-                    new WorkbenchRunReports.Tee(out, capturedOut),
-                    new WorkbenchRunReports.Tee(err, capturedErr),
-                    maven
-            );
+            Bounded mavenResult = runWithOnlineFallback(parsed, run.runId(), command, out, err, capturedOut, capturedErr, maven);
             launchNote(parsed.project(), run.runId(), "maven-done", "exit=" + mavenResult.exit() + " timedOut=" + mavenResult.timedOut());
             if (mavenResult.timedOut()) {
                 publishQuietly(parsed, run, selection, capturedOut, capturedErr, "TIMEOUT", environment, browser, out, err);
@@ -446,9 +694,10 @@ public final class WorkbenchAgentCommands {
             }
             int exit = mavenResult.exit();
             boolean empty = selection.matchedNone();
-            Observed observed = observe(parsed.project(), run.runId(), exit, empty);
+            Observed observed = observe(parsed.project(), run.runId(), exit, empty, captured(capturedOut, capturedErr));
             String status = observed.status();
             int reported = observed.exitCode();
+            if ("LAUNCH_ERROR".equals(status)) printLaunchError(run.runId(), capturedOut, capturedErr, err, exit, observed.zeroSteps());
             if (empty) printEmpty(parsed, browser, out, err);
             AgentCoordination.finish(
                     parsed.project(),
@@ -470,6 +719,34 @@ public final class WorkbenchAgentCommands {
     }
 
     private record Bounded(int exit, boolean timedOut) {
+    }
+
+    /**
+     * Runs the launch. When a warm offline launch fails only because a plugin or provider was never
+     * downloaded, it re-runs once online and notes stage=maven-retry-online.
+     */
+    private static Bounded runWithOnlineFallback(
+            WorkbenchCommandLine.Parsed parsed,
+            String runId,
+            List<String> command,
+            PrintStream out,
+            PrintStream err,
+            ByteArrayOutputStream capturedOut,
+            ByteArrayOutputStream capturedErr,
+            MavenRunner maven
+    ) {
+        PrintStream captureOut = new PrintStream(capturedOut, true, StandardCharsets.UTF_8);
+        PrintStream captureErr = new PrintStream(capturedErr, true, StandardCharsets.UTF_8);
+        Bounded result = runBounded(parsed, command, captureOut, captureErr, maven);
+        if (result.timedOut() || result.exit() == 0 || !ConsumerMavenTestRunner.hasOfflineFlag(command)) return result;
+        String text = capturedOut.toString(java.nio.charset.StandardCharsets.UTF_8)
+                + capturedErr.toString(java.nio.charset.StandardCharsets.UTF_8);
+        if (!ConsumerMavenTestRunner.offlineResolutionFailure(text)) return result;
+        launchNote(parsed.project(), runId, "maven-retry-online", "offlineExit=" + result.exit());
+        err.println("Workbench: offline launch is missing a build plugin; retrying once online.");
+        capturedOut.reset();
+        capturedErr.reset();
+        return runBounded(parsed, ConsumerMavenTestRunner.withoutOffline(command), captureOut, captureErr, maven);
     }
 
     /**
@@ -588,7 +865,11 @@ public final class WorkbenchAgentCommands {
                 );
             }
         }
-        return selection.featureProperty();
+        List<String> uris = WorkbenchFeatureIndex.prefilteredFeatures(selection);
+        if (uris.isEmpty()) return null;
+        String property = selection.featureProperty();
+        if (property != null && property.strip().startsWith("@")) return property.strip();
+        return String.join(",", uris);
     }
 
     private static void launchNote(Path project, String runId, String stage, String detail) {
@@ -612,7 +893,8 @@ public final class WorkbenchAgentCommands {
                 + " scenarios=" + selection.hits().size()
                 + " narrowed=" + selection.narrowed()
                 + " fullScan=" + selection.fullScanFallback()
-                + " listChars=" + (property == null ? 0 : property.length());
+                + " listChars=" + (property == null ? 0 : property.length())
+                + " selectMs=" + selection.elapsedMillis();
     }
 
     private static int printPlan(
@@ -621,10 +903,12 @@ public final class WorkbenchAgentCommands {
             PrintStream out,
             PrintStream err
     ) {
+        if (jsonRequested(parsed)) return printPlanJson(parsed, selection, out, err);
         out.println("tags=" + text(parsed.tags()));
         out.println("name=" + text(parsed.name()));
         out.println("example=" + text(parsed.example()));
         out.println("select=" + parsed.selects());
+        out.println("indexMs=" + selection.elapsedMillis());
         if (selection.fullScanFallback() || parsed.fullScan()) {
             if (selection.fullScanFallback()
                     && selection.fallbackReason() != null
@@ -669,6 +953,73 @@ public final class WorkbenchAgentCommands {
         return 0;
     }
 
+    private static int printPlanJson(
+            WorkbenchCommandLine.Parsed parsed,
+            WorkbenchFeatureIndex.Selection selection,
+            PrintStream out,
+            PrintStream err
+    ) {
+        boolean full = selection.fullScanFallback() || parsed.fullScan();
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("tags", text(parsed.tags()));
+        body.put("name", text(parsed.name()));
+        body.put("example", text(parsed.example()));
+        body.put("select", parsed.selects());
+        body.put("fullScan", full);
+        body.put("indexMs", selection.elapsedMillis());
+        int code = 0;
+        if (full) {
+            String warning = selection.fullScanFallback()
+                    && selection.fallbackReason() != null
+                    && selection.fallbackReason().contains("unsupported tag expression")
+                    ? WorkbenchTagFallback.warning(selection.fallbackReason(), parsed.tags())
+                    : "WARNING: full-scan fallback: " + (
+                    parsed.fullScan() && !selection.fullScanFallback()
+                            ? "top-level narrowing skipped (--no-narrow / --full-scan); nested lookups keep the configured pkb_features"
+                            : selection.fallbackReason()
+            );
+            body.put("warning", warning);
+            err.println(warning);
+        } else {
+            java.util.List<String> hits = new ArrayList<>();
+            for (WorkbenchFeatureIndex.Hit hit : selection.hits()) {
+                StringBuilder line = new StringBuilder();
+                line.append(hit.relativePath()).append(':').append(hit.line()).append(' ').append(hit.scenarioName());
+                if (hit.exampleRow() > 0) {
+                    line.append(" example ").append(hit.exampleRow());
+                    String arguments = hit.argumentText();
+                    if (!arguments.isEmpty()) line.append(' ').append(arguments);
+                }
+                hits.add(line.toString());
+            }
+            body.put("count", hits.size());
+            body.put("hits", hits);
+            if (hits.isEmpty()) {
+                String warning = "WARNING: no scenarios matched tags=" + text(parsed.tags())
+                        + " name=" + text(parsed.name())
+                        + " example=" + text(parsed.example())
+                        + " select=" + parsed.selects();
+                body.put("warning", warning);
+                err.println(warning);
+                code = 1;
+            }
+        }
+        out.println(writeJson(body));
+        return code;
+    }
+
+    private static boolean jsonRequested(WorkbenchCommandLine.Parsed parsed) {
+        return hasFlag(parsed == null ? null : parsed.forwarded(), "--json");
+    }
+
+    private static String writeJson(Object value) {
+        try {
+            return JSON.writeValueAsString(value);
+        } catch (IOException failure) {
+            throw new IllegalStateException("Could not write JSON.", failure);
+        }
+    }
+
     private static String text(String value) {
         return value == null || value.isBlank() ? "" : value;
     }
@@ -676,6 +1027,78 @@ public final class WorkbenchAgentCommands {
     private static String firstNonBlank(String primary, String fallback) {
         if (primary != null && !primary.isBlank()) return primary;
         return fallback;
+    }
+
+    private static int query(WorkbenchCommandLine.Parsed parsed, PrintStream out, PrintStream err) {
+        String op = queryOp(parsed.forwarded());
+        if (op == null) {
+            String usage = WorkbenchCliHelp.usage("query");
+            err.print(WorkbenchCliHelp.usageError("missing op", "query"));
+            out.println(tools.dscode.control.protocol.JsonLite.write(Map.of(
+                    "v", 1,
+                    "error", "missing op",
+                    "fix", usage.strip()
+            )));
+            return 2;
+        }
+        Map<String, Object> request = new LinkedHashMap<>();
+        request.put("op", op);
+        if (parsed.coordination().runId() != null) request.put("runId", parsed.coordination().runId());
+        String scenario = flag(parsed, "--scenario");
+        if (scenario != null && !scenario.isBlank()) request.put("scenarioId", scenario);
+        String kind = flag(parsed, "--kind");
+        if (kind != null && !kind.isBlank()) request.put("kind", kind);
+        if (parsed.coordination().text() != null) request.put("text", parsed.coordination().text());
+        String fields = flag(parsed, "--fields");
+        if (fields != null && !fields.isBlank()) request.put("fields", fields);
+        if (parsed.coordination().limit() != null) request.put("limit", parsed.coordination().limit());
+        String cursor = flag(parsed, "--cursor");
+        if (cursor != null && !cursor.isBlank()) request.put("cursor", cursor);
+        String status = flag(parsed, "--status");
+        if (status != null && !status.isBlank()) request.put("status", status);
+        if (parsed.coordination().id() != null) request.put("id", parsed.coordination().id());
+        DiagnosticQuery.Outcome outcome = DiagnosticQuery.query(parsed.project(), request);
+        out.println(outcome.json());
+        if (outcome.exit() != 0) {
+            Object message = outcome.body().get("error");
+            Object fix = outcome.body().get("fix");
+            if (message != null) err.println("error: " + message);
+            if (fix != null) err.println("fix: " + fix);
+            return outcome.exit();
+        }
+        try {
+            String agent = parsed.coordination().agentId();
+            String run = parsed.coordination().runId();
+            if (agent == null || agent.isBlank()) {
+                agent = tools.dscode.control.protocol.AgentLog.recordedAgent(parsed.project(), run);
+            }
+            AgentCoordination.appendLog(
+                    parsed.project(),
+                    Instant.now(),
+                    agent == null || agent.isBlank() ? "-" : agent,
+                    run == null || run.isBlank() ? "-" : run,
+                    "query",
+                    op,
+                    null
+            );
+        } catch (IOException ignored) {
+            // The JSON answer is already printed. A short-log failure does not hide it.
+        }
+        return 0;
+    }
+
+    private static String queryOp(String[] args) {
+        if (args == null) return null;
+        for (int index = 1; index < args.length; index++) {
+            String token = args[index];
+            if (token == null || token.startsWith("-")) continue;
+            if ("runs".equals(token) || "get".equals(token) || "query".equals(token)
+                    || "search".equals(token) || "props".equals(token) || "errors".equals(token)
+                    || "tail".equals(token)) {
+                return token;
+            }
+        }
+        return null;
     }
 
     private static int shortLog(WorkbenchCommandLine.Parsed parsed, PrintStream out, PrintStream err) {
@@ -697,7 +1120,7 @@ public final class WorkbenchAgentCommands {
     private static int note(WorkbenchCommandLine.Parsed parsed, PrintStream out, PrintStream err) {
         String text = firstText(parsed);
         if (text == null) {
-            err.println("Usage: note --text=<one line> [--agent=<id>] [--run-id=<id>]");
+            err.print(WorkbenchCliHelp.usageError("missing --text", "note"));
             return 2;
         }
         AgentCoordination.note(
@@ -719,7 +1142,7 @@ public final class WorkbenchAgentCommands {
         if (write) {
             String message = firstText(parsed);
             if (message == null) {
-                err.println("Usage: inbox --write --to=<agent-id|any> --text=<one line> [--from=<agent-id>] [--run-id=<id>]");
+                err.print(WorkbenchCliHelp.usageError("missing --text", "inbox"));
                 return 2;
             }
             String from = flags.inboxFrom() != null ? flags.inboxFrom() : flags.agentId();
@@ -735,7 +1158,7 @@ public final class WorkbenchAgentCommands {
         }
         String agent = flags.agentId() != null ? flags.agentId() : flags.inboxTo();
         if (agent == null || agent.isBlank()) {
-            err.println("Usage: inbox --list|--take --agent=<id>");
+            err.print(WorkbenchCliHelp.usageError("missing --agent", "inbox"));
             return 2;
         }
         java.util.List<AgentCoordination.InboxNote> notes = take
@@ -772,7 +1195,7 @@ public final class WorkbenchAgentCommands {
         }
         String agent = flags.agentId();
         if (agent == null || agent.isBlank()) {
-            err.println("Usage: presence --touch --agent=<id> [--run-id=<id>] | presence --list | presence --sweep");
+            err.print(WorkbenchCliHelp.usageError("missing --agent", "presence"));
             return 2;
         }
         AgentCoordination.Presence row = AgentCoordination.touchPresence(
@@ -800,7 +1223,7 @@ public final class WorkbenchAgentCommands {
         }
         if (flags.renew()) {
             if (flags.id() == null) {
-                err.println("Usage: post --renew --id=<id> [--ttl=1h]");
+                err.print(WorkbenchCliHelp.usageError("missing --id", "post"));
                 return 2;
             }
             AgentCoordination.BoardPost renewed = AgentCoordination.renewPost(
@@ -813,7 +1236,7 @@ public final class WorkbenchAgentCommands {
         if (write) {
             String message = firstText(parsed);
             if (message == null || flags.inboxTo() == null) {
-                err.println("Usage: post --write --to=<agent-id|all> --text=<one line> [--run-id=<id>] [--ttl=1h]");
+                err.print(WorkbenchCliHelp.usageError("missing --to or --text", "post"));
                 return 2;
             }
             String from = flags.inboxFrom() != null ? flags.inboxFrom() : flags.agentId();
@@ -847,7 +1270,7 @@ public final class WorkbenchAgentCommands {
         if (flags.append() || (flags.text() != null && !flags.inboxList())) {
             String text = firstText(parsed);
             if (text == null) {
-                err.println("Usage: history --append --text=<one line>");
+                err.print(WorkbenchCliHelp.usageError("missing --text", "history"));
                 return 2;
             }
             AgentCoordination.appendHistory(parsed.project(), text);
@@ -884,7 +1307,7 @@ public final class WorkbenchAgentCommands {
 
     private static int useVersion(WorkbenchCommandLine.Parsed parsed, PrintStream out, PrintStream err) {
         if (parsed.version() == null || parsed.version().isBlank()) {
-            err.println("Usage: use-version --version=<safe-version>");
+            err.print(WorkbenchCliHelp.usageError("missing --version", "use-version"));
             return 2;
         }
         try {
@@ -900,14 +1323,20 @@ public final class WorkbenchAgentCommands {
             try {
                 return java.time.Duration.parse(value.toUpperCase(java.util.Locale.ROOT));
             } catch (RuntimeException failure) {
-                throw new IllegalArgumentException("ttl must be a duration such as 1h or PT1H: " + raw);
+                throw new IllegalArgumentException(WorkbenchCliHelp.structured(
+                        "ttl must be a duration such as 1h or PT1H: " + raw,
+                        "Pass --ttl=1h, 30m, or PT1H."
+                ));
             }
         }
         java.util.regex.Matcher matcher = java.util.regex.Pattern
                 .compile("^(\\d+)\\s*([smhd])$", java.util.regex.Pattern.CASE_INSENSITIVE)
                 .matcher(value);
         if (!matcher.matches()) {
-            throw new IllegalArgumentException("ttl must be a duration such as 1h, 30m, or PT1H: " + raw);
+            throw new IllegalArgumentException(WorkbenchCliHelp.structured(
+                    "ttl must be a duration such as 1h, 30m, or PT1H: " + raw,
+                    "Pass --ttl=1h, 30m, or PT1H."
+            ));
         }
         long amount = Long.parseLong(matcher.group(1));
         return switch (matcher.group(2).toLowerCase(java.util.Locale.ROOT)) {
@@ -915,22 +1344,38 @@ public final class WorkbenchAgentCommands {
             case "m" -> java.time.Duration.ofMinutes(amount);
             case "h" -> java.time.Duration.ofHours(amount);
             case "d" -> java.time.Duration.ofDays(amount);
-            default -> throw new IllegalArgumentException("ttl must be a duration such as 1h or PT1H: " + raw);
+            default -> throw new IllegalArgumentException(WorkbenchCliHelp.structured(
+                    "ttl must be a duration such as 1h or PT1H: " + raw,
+                    "Pass --ttl=1h, 30m, or PT1H."
+            ));
         };
     }
 
     private static int finish(WorkbenchCommandLine.Parsed parsed, PrintStream out, PrintStream err) {
         String runId = parsed.coordination().runId();
         if (runId == null || runId.isBlank()) {
-            err.println("Usage: finish --run-id=<id> [--learned=<one line>] [--status=<status>]");
+            err.print(WorkbenchCliHelp.usageError("missing --run-id", "finish"));
             return 2;
+        }
+        String status = flag(parsed, "--status");
+        if (status == null || status.isBlank()) {
+            status = "STOPPED";
+        } else {
+            status = status.trim().toUpperCase(java.util.Locale.ROOT);
+            if (!KNOWN_FINISH_STATUSES.contains(status)) {
+                err.println(WorkbenchCliHelp.structured(
+                        "finish --status must be one of PASSED, FAILED, EMPTY, TIMEOUT, STOPPED: " + status,
+                        WorkbenchCliHelp.usage("finish").strip()
+                ));
+                return 2;
+            }
         }
         try {
             AgentCoordination.finish(
                     parsed.project(),
                     runId,
                     parsed.coordination().learned(),
-                    "STOPPED",
+                    status,
                     java.time.Instant.now(),
                     out
             );
@@ -1019,7 +1464,7 @@ public final class WorkbenchAgentCommands {
     private static int findElement(WorkbenchCommandLine.Parsed parsed, PrintStream out, PrintStream err) {
         String category = flag(parsed, "--category");
         if (category == null || category.isBlank()) {
-            err.println("Usage: find-element --category=<Button> [--text=<label>] [--html=<file>]");
+            err.print(WorkbenchCliHelp.usageError("missing --category", "find-element"));
             return 2;
         }
         String htmlFlag = flag(parsed, "--html");
@@ -1067,7 +1512,7 @@ public final class WorkbenchAgentCommands {
         java.util.Optional<WorkbenchSessionCommands.SessionState> session =
                 WorkbenchSessionCommands.readHealthy(parsed.project(), http);
         if (session.isEmpty()) {
-            err.println("start a session first");
+            err.println(WorkbenchCliHelp.structured("start a session first", "isolate, then retry this command."));
             return 2;
         }
         String op = category == null || category.isBlank() ? "inspect-page" : "find-element";
@@ -1241,6 +1686,7 @@ public final class WorkbenchAgentCommands {
     ) {
         try {
             String console = capturedOut.toString(StandardCharsets.UTF_8) + capturedErr.toString(StandardCharsets.UTF_8);
+            boolean quiet = parsed.quiet();
             WorkbenchRunReports.publish(
                     parsed.project(),
                     run.runId(),
@@ -1249,8 +1695,11 @@ public final class WorkbenchAgentCommands {
                     status,
                     environment,
                     browser,
-                    out
+                    quiet ? null : out
             );
+            if (!quiet && out != null && run.runId() != null && !run.runId().isBlank()) {
+                out.println("console=.pickleball/runs/" + run.runId() + "/console/");
+            }
         } catch (Exception failure) {
             err.println("Workbench summary was not written: " + failure.getMessage());
         }
@@ -1278,9 +1727,149 @@ public final class WorkbenchAgentCommands {
         return parsed.coordination().agentId();
     }
 
-    private record Observed(String status, int exitCode, int failureCount, String failureSummary) {
+    private static boolean inconclusive(AgentCoordination.DiagnosticSignal signal) {
+        if (signal == null || signal.outcome() == null || signal.outcome().isBlank()) return true;
+        return "RUNNING".equalsIgnoreCase(signal.outcome()) || "IN_PROGRESS".equalsIgnoreCase(signal.outcome());
+    }
+
+    private static void printLaunchError(
+            String runId,
+            ByteArrayOutputStream capturedOut,
+            ByteArrayOutputStream capturedErr,
+            PrintStream err,
+            int exit,
+            boolean zeroSteps
+    ) {
+        String captured = capturedOut.toString(StandardCharsets.UTF_8) + capturedErr.toString(StandardCharsets.UTF_8);
+        String cause = launchCause(captured);
+        if (cause == null || cause.isBlank()) cause = "Maven exited " + exit + " before any scenario.";
+        String fix = zeroSteps
+                ? "A before-all hook or launch step failed before any step ran; see .pickleball/runs/" + runId + "/console/"
+                : "Full output is in .pickleball/runs/" + runId + "/console/";
+        err.print(WorkbenchCliHelp.structured(cause, fix));
+    }
+
+    static String launchCause(String captured) {
+        if (captured == null || captured.isBlank()) return null;
+        String caused = null;
+        String exception = null;
+        String error = null;
+        for (String raw : captured.split("\\R")) {
+            String line = raw.strip();
+            if (line.isEmpty()) continue;
+            if (line.startsWith("Caused by:")) {
+                caused = line;
+                continue;
+            }
+            if (!line.startsWith("at ") && !line.startsWith("[ERROR]")
+                    && (line.contains("Exception") || line.matches(".*\\bError:.*"))) {
+                exception = line;
+            }
+            if (line.startsWith("[ERROR]") && !mavenNoise(line)) error = line;
+        }
+        if (caused != null) return caused;
+        if (exception != null) return exception;
+        return error;
+    }
+
+    private static boolean mavenNoise(String line) {
+        return line.contains("Please refer")
+                || line.contains("To see the full stack")
+                || line.contains("Re-run Maven")
+                || line.contains("-> [Help");
+    }
+
+    static boolean shouldWarnMissingProfile(Path project, String runId) {
+        if (!testsRan(project, runId)) return false;
+        if (project == null || runId == null || runId.isBlank()) return false;
+        Path workspace = Workspace.directory(project, runId);
+        if (!Workspace.exists(workspace)) return true;
+        String mode = Workspace.readRunVars(workspace).get(PKB_props.PKB_REPORTING_MODE);
+        if (mode == null || mode.isBlank()) return true;
+        return !"diagnostic".equalsIgnoreCase(mode.trim());
+    }
+
+    private static boolean testsRan(Path project, String runId) {
+        if (project == null || runId == null || runId.isBlank()) return false;
+        try {
+            if (hasScenarioDir(AgentCoordination.runDirectory(project, runId).resolve("diagnostic"))) return true;
+            if (hasScenarioDir(project.resolve("reports").resolve("diagnostic-runs").resolve(runId))) return true;
+        } catch (RuntimeException | IOException ignored) {
+            // An unsafe run id is not evidence that tests ran.
+        }
+        Path index = AgentCoordination.findRunIndex(project, runId);
+        if (index != null && Files.isRegularFile(index)) {
+            try {
+                JsonNode root = JSON.readTree(index.toFile());
+                int total = root.path("counts").path("total").asInt(0);
+                if (total > 0 && "COMPLETE".equalsIgnoreCase(root.path("completion").asText(""))) return true;
+            } catch (IOException ignored) {
+                // Unreadable index is not a completed run.
+            }
+        }
+        Instant started = recordStarted(safeRecord(project, runId));
+        return surefireTestsRan(project, started);
+    }
+
+    private static Path safeRecord(Path project, String runId) {
+        try {
+            return AgentCoordination.runDirectory(project, runId).resolve(AgentCoordination.RECORD_FILE);
+        } catch (RuntimeException ignored) {
+            return null;
+        }
+    }
+
+    private static boolean hasScenarioDir(Path root) throws IOException {
+        if (root == null || !Files.isDirectory(root)) return false;
+        try (var walk = Files.walk(root, 6)) {
+            return walk.anyMatch(path -> {
+                if (!Files.isDirectory(path)) return false;
+                Path parent = path.getParent();
+                if (parent == null || parent.getFileName() == null) return false;
+                if (!"scenarios".equals(parent.getFileName().toString())) return false;
+                return Files.isRegularFile(path.resolve("events.jsonl"))
+                        || Files.isRegularFile(path.resolve("summary.json"));
+            });
+        }
+    }
+
+    private static boolean surefireTestsRan(Path project, Instant started) {
+        Pattern tests = Pattern.compile("\\btests=\"(\\d+)\"");
+        for (Path dir : List.of(
+                project.resolve("target").resolve("surefire-reports"),
+                project.resolve("build").resolve("test-results").resolve("test")
+        )) {
+            if (!Files.isDirectory(dir)) continue;
+            try (var children = Files.list(dir)) {
+                for (Path file : children.filter(Files::isRegularFile).toList()) {
+                    String name = file.getFileName() == null ? "" : file.getFileName().toString();
+                    if (!name.endsWith(".xml")) continue;
+                    if (started != null && !surefireBelongsToRun(file, started)) continue;
+                    String text;
+                    try {
+                        text = Files.readString(file);
+                    } catch (IOException ignored) {
+                        continue;
+                    }
+                    Matcher matcher = tests.matcher(text);
+                    while (matcher.find()) {
+                        if (Integer.parseInt(matcher.group(1)) > 0) return true;
+                    }
+                }
+            } catch (IOException ignored) {
+                // A missing report directory is not a result.
+            }
+        }
+        return false;
+    }
+
+    private record Observed(String status, int exitCode, int failureCount, String failureSummary, boolean zeroSteps) {
         private Observed(String status, int exitCode) {
-            this(status, exitCode, 0, null);
+            this(status, exitCode, 0, null, false);
+        }
+
+        private Observed(String status, int exitCode, int failureCount, String failureSummary) {
+            this(status, exitCode, failureCount, failureSummary, false);
         }
     }
 
@@ -1290,11 +1879,20 @@ public final class WorkbenchAgentCommands {
      * Surefire Error recorded as {@code counts.errors} or outcome {@code ERROR}.
      * Surefire XML is used only when that index was not written.
      */
-    private static Observed observe(Path project, String runId, int mavenExit, boolean empty) {
+    private static Observed observe(Path project, String runId, int mavenExit, boolean empty, String console) {
         if (empty) {
             return new Observed("EMPTY", mavenExit == 0 ? 1 : mavenExit);
         }
-        AgentCoordination.DiagnosticSignal signal = AgentCoordination.readDiagnosticSignal(project, runId);
+        AgentCoordination.DiagnosticSignal signal = AgentCoordination.readDiagnosticSignal(
+                project, runId, recordStarted(AgentCoordination.runDirectory(project, runId).resolve(AgentCoordination.RECORD_FILE))
+        );
+        DiagnosticVerdict verdict = surefireVerdict(project, AgentCoordination.runDirectory(project, runId).resolve(AgentCoordination.RECORD_FILE));
+        int recordedSteps = WorkbenchRunReports.recordedExecutedSteps(project, runId, console);
+        boolean failed = (signal != null && signal.failed()) || (verdict != null && verdict.failed());
+        if (failed && recordedSteps == 0) {
+            int exit = mavenExit == 0 ? 1 : mavenExit;
+            return new Observed("LAUNCH_ERROR", exit, 0, null, true);
+        }
         if (signal != null && (signal.failed() || "PASSED".equalsIgnoreCase(signal.outcome()))) {
             if (signal.failed()) {
                 int exit = mavenExit == 0 ? Math.max(signal.failureCount(), 1) : mavenExit;
@@ -1302,7 +1900,9 @@ public final class WorkbenchAgentCommands {
             }
             return new Observed("PASSED", 0);
         }
-        DiagnosticVerdict verdict = surefireVerdict(project, AgentCoordination.runDirectory(project, runId).resolve(AgentCoordination.RECORD_FILE));
+        if (mavenExit != 0 && inconclusive(signal) && (verdict == null || (!verdict.failed() && !verdict.passed()))) {
+            return new Observed("LAUNCH_ERROR", mavenExit);
+        }
         if (verdict == null) {
             return new Observed(mavenExit == 0 ? "PASSED" : "FAILED", mavenExit);
         }
@@ -1314,6 +1914,10 @@ public final class WorkbenchAgentCommands {
             return new Observed("PASSED", 0);
         }
         return new Observed(mavenExit == 0 ? "PASSED" : "FAILED", mavenExit);
+    }
+
+    private static String captured(ByteArrayOutputStream out, ByteArrayOutputStream err) {
+        return out.toString(StandardCharsets.UTF_8) + err.toString(StandardCharsets.UTF_8);
     }
 
     private record DiagnosticVerdict(String outcome, int failures) {
@@ -1405,7 +2009,12 @@ public final class WorkbenchAgentCommands {
         );
     }
 
-    private static int printCatalog(
+    static final String NO_RETAINED_PROFILE_WARNING =
+            "WARNING: Workbench finished but run-catalog.json has no retained pkb_run_profile. "
+                    + "The run result stands. To retain the profile, set pkb_reportingmode=diagnostic "
+                    + "in the workspace runvars (workspace-edit) and run again.";
+
+    static int printCatalog(
             Path project,
             PrintStream out,
             PrintStream err,
@@ -1419,8 +2028,8 @@ public final class WorkbenchAgentCommands {
             LastDiscoverSnapshot.CatalogRun latest = LastDiscoverSnapshot.catalogRun(project, purpose, runId);
             if (latest == null) latest = LastDiscoverSnapshot.latestCatalogRun(project);
             if (latest == null || latest.runProfile() == null || latest.runProfile().isBlank()) {
-                err.println("Workbench finished but run-catalog.json has no retained pkb_run_profile.");
-                return mavenExit == 0 ? 1 : mavenExit;
+                if (shouldWarnMissingProfile(project, runId)) err.println(NO_RETAINED_PROFILE_WARNING);
+                return mavenExit;
             }
             if (writeSnapshot) {
                 LastDiscoverSnapshot.write(project, latest.runId(), latest.catalog(), latest.runProfile(), agentId);

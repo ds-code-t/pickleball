@@ -93,6 +93,7 @@ class WorkbenchAgentCommandsTest {
             assertFalse(output.stdout().contains("Recommended complete diagnostic Discover"));
             assertTrue(output.stdout().contains("NEXT: run discover"));
             assertTrue(output.stdout().contains("Dry-run resolve"));
+            assertTrue(output.stdout().contains("pkb_reportingmode=diagnostic"));
             assertTrue(output.stdout().contains("launcher JVM"));
             assertTrue(output.stdout().contains("not the Discover worker"));
             assertTrue(output.stdout().contains("Do not treat resolve-runvars as the environment Discover will use"));
@@ -101,7 +102,7 @@ class WorkbenchAgentCommandsTest {
             assertTrue(output.stdout().contains("pkb_overriderunvars") || output.stdout().contains("sealed="));
             assertTrue(output.stdout().contains("provenance="));
             assertFalse(output.stdout().contains("MUST"));
-            assertFalse(output.stdout().contains("pkb_parallel=80"));
+            assertFalse(output.stdout().contains("pkb_parallel=80"), output.stdout());
         } finally {
             restoreProperty("pkb_parallel", previousParallel);
             restoreProperty("pkb_runvars.pkb_parallel", previousRunVarsParallel);
@@ -118,6 +119,7 @@ class WorkbenchAgentCommandsTest {
 
         assertEquals(0, output.exitCode());
         assertTrue(output.stdout().contains("Dry-run resolve"));
+        assertTrue(output.stdout().contains("pkb_reportingmode=diagnostic"));
         assertTrue(output.stdout().contains("launcher JVM"));
         assertTrue(output.stdout().contains("not the Discover worker"));
         assertTrue(output.stdout().contains("Do not treat resolve-runvars as the environment Discover will use"));
@@ -1358,9 +1360,17 @@ class WorkbenchAgentCommandsTest {
         assertTrue(LastDiscoverSnapshot.readScoped(tempDir, "agent-a", null).runProfile().contains("@alpha"));
         assertTrue(LastDiscoverSnapshot.read(tempDir).runProfile().contains("@beta"));
 
+        LastDiscoverSnapshot.write(tempDir, "run-a", tempDir.resolve("reports/diagnostic-runs/run-catalog.json"),
+                "pkb_browser=EDGE, pkb_tags=@poison", "agent-a");
+        LastDiscoverSnapshot.write(tempDir, "run-a", tempDir.resolve("reports/diagnostic-runs/run-catalog.json"),
+                "pkb_browser=CHROME_HEADLESS, pkb_tags=@alpha");
+        LastDiscoverSnapshot.Snapshot runWins = LastDiscoverSnapshot.readScoped(tempDir, "agent-a", "run-a");
+        assertTrue(runWins.runProfile().contains("@alpha"), runWins.runProfile());
+        assertFalse(runWins.runProfile().contains("@poison"), runWins.runProfile());
+
         List<List<String>> captured = new ArrayList<>();
         WorkbenchAgentCommands.run(
-                new String[]{"confirm", tempDir.toString(), "--agent=agent-a", "--run-id=run-a-confirm"},
+                new String[]{"confirm", tempDir.toString(), "--agent=agent-a", "--run-id=run-a"},
                 new PrintStream(new ByteArrayOutputStream(), true, StandardCharsets.UTF_8),
                 new PrintStream(new ByteArrayOutputStream(), true, StandardCharsets.UTF_8),
                 (project, command, out, err) -> {
@@ -1370,9 +1380,25 @@ class WorkbenchAgentCommandsTest {
         );
         String runVars = captured.getFirst().stream().filter(item -> item.startsWith("-Dpkb_tags=")).findFirst().orElse("");
         assertEquals("-Dpkb_tags=@alpha", runVars);
+        assertFalse(captured.getFirst().stream().anyMatch(item -> item.contains("@poison")), runVars);
         assertFalse(captured.getFirst().stream().anyMatch(item -> item.contains("@beta")), runVars);
         assertFalse(captured.getFirst().stream().anyMatch(item -> item.contains("@newer")), runVars);
-        assertFalse(runVars.contains("@newer"), runVars);
+    }
+
+    @Test
+    void failedDiscoverStillRecordsThatRunsSnapshot() throws Exception {
+        writeProjectWrapper();
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        int exit = WorkbenchAgentCommands.run(
+                new String[]{"discover", tempDir.toString(), "--run-id=run-fail", "--tags=@kept"},
+                new PrintStream(out, true, StandardCharsets.UTF_8),
+                new PrintStream(new ByteArrayOutputStream(), true, StandardCharsets.UTF_8),
+                (project, command, outStream, err) -> 1
+        );
+        assertEquals(1, exit);
+        LastDiscoverSnapshot.Snapshot snapshot = LastDiscoverSnapshot.readScoped(tempDir, "agent-other", "run-fail");
+        assertTrue(snapshot.runProfile().contains("@kept"), snapshot.runProfile());
+        assertFalse(snapshot.runProfile().contains("@other"), snapshot.runProfile());
     }
 
     @Test
@@ -1548,6 +1574,7 @@ class WorkbenchAgentCommandsTest {
         Map<String, String> stored = Workspace.readRunVars(Path.of(workspaceArg.substring("-Dpkb_workspace=".length())));
         assertEquals("DEV", stored.get(PKB_props.PKB_ENVIRONMENT));
         assertEquals("auto", stored.get(PKB_props.PKB_PARALLEL));
+        assertEquals("diagnostic", stored.get(PKB_props.PKB_REPORTING_MODE));
         String errors = stderr.toString(StandardCharsets.UTF_8);
         assertTrue(errors.contains("WARNING: --runvar pkb_parallel replaces"), errors);
         String record = Files.readString(
@@ -1682,6 +1709,49 @@ class WorkbenchAgentCommandsTest {
         assertEquals(0, reseeded.exitCode(), reseeded.stderr());
         assertEquals("edge", Workspace.readRunVars(workspace).get("pkb_browser"));
         assertEquals("firefox", Workspace.readRunVars(Workspace.directory(tempDir, "run-b")).get("pkb_browser"));
+    }
+
+    @Test
+    void workspaceShowMarksComputedKeysAndLeavesMatchingProjectFileValuesUnmarked() throws Exception {
+        Path resources = tempDir.resolve("src/test/resources");
+        Files.createDirectories(resources);
+        Files.writeString(resources.resolve("pickleball.properties"),
+                "pkb_browser=CHROME_HEADLESS\npkb_parallel=2\n");
+        Map<String, String> values = new LinkedHashMap<>();
+        values.put("pkb_browser", "CHROME_HEADLESS");
+        values.put("pkb_parallel", "4");
+        values.put("pkb_tags", "@smoke");
+        Workspace.writeRunVars(Workspace.directory(tempDir, "run-computed"), values);
+
+        Output shown = run("workspace-show", tempDir.toString(), "--run-id=run-computed");
+        assertEquals(0, shown.exitCode(), shown.stderr());
+        assertTrue(shown.stdout().lines().anyMatch(line -> line.equals("pkb_browser=CHROME_HEADLESS")), shown.stdout());
+        assertTrue(shown.stdout().lines().anyMatch(line -> line.equals("pkb_parallel=4 computed")), shown.stdout());
+        assertTrue(shown.stdout().lines().anyMatch(line -> line.equals("pkb_tags=@smoke")), shown.stdout());
+        assertFalse(shown.stdout().lines().anyMatch(line -> line.equals("pkb_tags=@smoke computed")), shown.stdout());
+        assertFalse(shown.stdout().lines().anyMatch(line -> line.equals("pkb_browser=CHROME_HEADLESS computed")), shown.stdout());
+    }
+
+    @Test
+    void prepareDoesNotRewriteTheSavedCopyOnALaterRun() throws Exception {
+        WorkspaceLaunch.Prepared first = WorkspaceLaunch.prepare(
+                tempDir, "stable-1", null, "@smoke", null, null, null, null, null, List.of(), new StringBuilder()
+        );
+        Path file = Workspace.runvarsFile(first.workspace());
+        assertTrue(Files.readString(file).contains("pkb_reportingmode=diagnostic"));
+        Map<String, String> edited = new java.util.LinkedHashMap<>(Workspace.readRunVars(first.workspace()));
+        edited.put(PKB_props.PKB_BROWSER, "EDGE");
+        Workspace.writeRunVars(first.workspace(), edited);
+        byte[] snapshot = Files.readAllBytes(file);
+        java.nio.file.attribute.FileTime modified = Files.getLastModifiedTime(file);
+        Thread.sleep(30);
+        WorkspaceLaunch.prepare(
+                tempDir, "stable-1", null, "@smoke", null, null, null, null, null, List.of(), new StringBuilder()
+        );
+        assertEquals("EDGE", Workspace.readRunVars(first.workspace()).get(PKB_props.PKB_BROWSER));
+        assertEquals("diagnostic", Workspace.readRunVars(first.workspace()).get(PKB_props.PKB_REPORTING_MODE));
+        org.junit.jupiter.api.Assertions.assertArrayEquals(snapshot, Files.readAllBytes(file));
+        assertEquals(modified, Files.getLastModifiedTime(file));
     }
 
     private Output run(String... args) {

@@ -39,6 +39,8 @@ class ScenarioObjectHookTest {
             System.setProperty("cucumber.filter.tags", "@scenario-object");
             System.setProperty("pkb_loglevel", "error");
             System.setProperty("cucumber.execution.parallel.enabled", "false");
+            // Order-based assertions below need one scenario at a time; do not inherit a parallel run var.
+            System.setProperty("pkb_parallel", "1");
             System.setProperty("junit.platform.discovery.includeEngines", DynamicSuiteEngine.ENGINE_ID);
             resetRunner();
 

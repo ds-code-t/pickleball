@@ -52,6 +52,21 @@ class DynamicSuiteBootstrapWorkbenchRootTest {
     }
 
     @Test
+    void syncedLiveClassesAreAPreferredRootWithoutAnExplicitProperty() throws Exception {
+        String property = DynamicSuiteBootstrap.WORKBENCH_TEST_OUTPUT_ROOT_PROPERTY;
+        String previous = System.getProperty(property);
+        try {
+            System.clearProperty(property);
+            Path live = tempDir.resolve(".pickleball/v/2.1.18/workbench/live/classes");
+            Files.createDirectories(live);
+            assertTrue(DynamicSuiteBootstrap.isPreferredTestOutputRoot(live.toUri()));
+        } finally {
+            if (previous == null) System.clearProperty(property);
+            else System.setProperty(property, previous);
+        }
+    }
+
+    @Test
     void liveDetachedTypedLoggingAllowsUntypedParent() {
         Entry scenario = Entry.of("scenario");
         Entry detached = scenario.child("Detached control step");

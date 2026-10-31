@@ -42,6 +42,7 @@ public final class PickleballLocalStore {
 
     public static int exportGuidance(Path target, PrintStream out, PrintStream err) throws IOException {
         Path root = target.toAbsolutePath().normalize();
+        out.println(buildLine());
         if (PickleballLocalLayout.isPickleballDirectory(root)) {
             ensureGuidanceIgnored(root, out, err);
             Path project = root.getParent() == null
@@ -435,8 +436,61 @@ public final class PickleballLocalStore {
                   echo "Install tools.dscode:pickleball or run: java -jar pickleball-<version>.jar ui \\"$PROJECT\\"" >&2
                   exit 1
                 fi
+                # Every named verb goes to the launcher. No arguments is the GUI.
+                # An unknown verb exits 2 from the launcher. It is never rewritten to ui.
+                VERB="${1:-}"
+                if [ -z "$VERB" ]; then
+                  export PKB_OPEN_BOOTSTRAP=1
+                  exec "$JAVA" -jar "$JAR" ui "$PROJECT"
+                fi
+                CACHE=""
+                if [ -n "$VERSION" ]; then
+                  CAND="$PROJECT/.pickleball/v/$VERSION/workbench/classpath.cache"
+                  [ -f "$CAND" ] && CACHE="$CAND"
+                fi
+                if [ -z "$CACHE" ] && [ -f "$PROJECT/.pickleball/workbench/classpath.cache" ]; then
+                  CACHE="$PROJECT/.pickleball/workbench/classpath.cache"
+                fi
+                cache_fresh() {
+                  [ -n "$CACHE" ] && [ -s "$CACHE" ] || return 1
+                  for build in "$PROJECT/pom.xml" "$PROJECT/build.gradle" "$PROJECT/build.gradle.kts"; do
+                    if [ -f "$build" ] && [ "$build" -nt "$CACHE" ]; then
+                      return 1
+                    fi
+                  done
+                  return 0
+                }
+                if cache_fresh; then
+                  exec "$JAVA" -cp "@$CACHE" tools.dscode.launcher.PickleballWorkbenchLauncher "$@"
+                fi
+                if [ "$VERB" = "help" ]; then
+                  export PKB_OPEN_BOOTSTRAP=1
+                  exec "$JAVA" -jar "$JAR" "$@"
+                fi
+                if [ -f "$PROJECT/mvnw" ]; then
+                  RESOLVED="$PROJECT/.pickleball/workbench/classpath.resolved"
+                  mkdir -p "$PROJECT/.pickleball/workbench"
+                  "$PROJECT/mvnw" -q org.apache.maven.plugins:maven-dependency-plugin:3.8.1:build-classpath -Dmdep.includeScope=test "-Dmdep.outputFile=$RESOLVED" >/dev/null 2>&1 || true
+                  if [ -s "$RESOLVED" ]; then
+                    exec "$JAVA" -cp "@$RESOLVED" tools.dscode.launcher.PickleballWorkbenchLauncher "$@"
+                  fi
+                fi
+                if [ -f "$PROJECT/mvnw.cmd" ]; then
+                  RESOLVED="$PROJECT/.pickleball/workbench/classpath.resolved"
+                  mkdir -p "$PROJECT/.pickleball/workbench"
+                  "$PROJECT/mvnw.cmd" -q org.apache.maven.plugins:maven-dependency-plugin:3.8.1:build-classpath -Dmdep.includeScope=test "-Dmdep.outputFile=$RESOLVED" >/dev/null 2>&1 || true
+                  if [ -s "$RESOLVED" ]; then
+                    exec "$JAVA" -cp "@$RESOLVED" tools.dscode.launcher.PickleballWorkbenchLauncher "$@"
+                  fi
+                fi
+                if [ -f "$PROJECT/gradlew" ]; then
+                  exec "$PROJECT/gradlew" -q pickleballWorkbench "-PpkbArgs=$*"
+                fi
+                if [ -f "$PROJECT/gradlew.bat" ]; then
+                  exec "$PROJECT/gradlew.bat" -q pickleballWorkbench "-PpkbArgs=$*"
+                fi
                 export PKB_OPEN_BOOTSTRAP=1
-                exec "$JAVA" -jar "$JAR" ui "$PROJECT"
+                exec "$JAVA" -jar "$JAR" "$@"
                 """;
     }
 
@@ -523,8 +577,39 @@ public final class PickleballLocalStore {
                   echo Pickleball Workbench: no pickleball-*.jar found. 1>&2
                   exit /b 1
                 )
+                set "VERB=%~1"
+                set "CACHE="
+                if defined VERSION if exist "!PROJECT!\\.pickleball\\v\\!VERSION!\\workbench\\classpath.cache" set "CACHE=!PROJECT!\\.pickleball\\v\\!VERSION!\\workbench\\classpath.cache"
+                if not defined CACHE if exist "!PROJECT!\\.pickleball\\workbench\\classpath.cache" set "CACHE=!PROJECT!\\.pickleball\\workbench\\classpath.cache"
+                if "%VERB%"=="" (
+                  set "PKB_OPEN_BOOTSTRAP=1"
+                  "%JAVA%" -jar "%JAR%" ui "%PROJECT%"
+                  exit /b !ERRORLEVEL!
+                )
+                if defined CACHE (
+                  "%JAVA%" -cp "@!CACHE!" tools.dscode.launcher.PickleballWorkbenchLauncher %*
+                  exit /b !ERRORLEVEL!
+                )
+                if /I "%VERB%"=="help" (
+                  set "PKB_OPEN_BOOTSTRAP=1"
+                  "%JAVA%" -jar "!JAR!" %*
+                  exit /b !ERRORLEVEL!
+                )
+                if exist "!PROJECT!\\mvnw.cmd" (
+                  set "RESOLVED=!PROJECT!\\.pickleball\\workbench\\classpath.resolved"
+                  if not exist "!PROJECT!\\.pickleball\\workbench" mkdir "!PROJECT!\\.pickleball\\workbench"
+                  "!PROJECT!\\mvnw.cmd" -q org.apache.maven.plugins:maven-dependency-plugin:3.8.1:build-classpath -Dmdep.includeScope=test "-Dmdep.outputFile=!RESOLVED!" >nul 2>&1
+                  if exist "!RESOLVED!" (
+                    "%JAVA%" -cp "@!RESOLVED!" tools.dscode.launcher.PickleballWorkbenchLauncher %*
+                    exit /b !ERRORLEVEL!
+                  )
+                )
+                if exist "!PROJECT!\\gradlew.bat" (
+                  "!PROJECT!\\gradlew.bat" -q pickleballWorkbench "-PpkbArgs=%*"
+                  exit /b !ERRORLEVEL!
+                )
                 set "PKB_OPEN_BOOTSTRAP=1"
-                "%JAVA%" -jar "%JAR%" ui "%PROJECT%"
+                "%JAVA%" -jar "%JAR%" %*
                 """;
     }
 
@@ -602,8 +687,57 @@ public final class PickleballLocalStore {
                 if (-not $jar -or -not (Test-Path $jar)) {
                   throw 'Pickleball Workbench: no pickleball-*.jar found in Maven local or beside this script.'
                 }
+                $verb = if ($args.Count -gt 0) { [string]$args[0] } else { '' }
+                $cache = $null
+                if ($version) {
+                  $candidateCache = Join-Path $project ".pickleball/v/$version/workbench/classpath.cache"
+                  if (Test-Path $candidateCache) { $cache = $candidateCache }
+                }
+                if (-not $cache) {
+                  $legacyCache = Join-Path $project '.pickleball/workbench/classpath.cache'
+                  if (Test-Path $legacyCache) { $cache = $legacyCache }
+                }
+                $cacheFresh = $false
+                if ($cache -and (Get-Item $cache).Length -gt 0) {
+                  $cacheFresh = $true
+                  foreach ($buildName in @('pom.xml','build.gradle','build.gradle.kts')) {
+                    $build = Join-Path $project $buildName
+                    if ((Test-Path $build) -and ((Get-Item $build).LastWriteTimeUtc -gt (Get-Item $cache).LastWriteTimeUtc)) {
+                      $cacheFresh = $false
+                    }
+                  }
+                }
+                if (-not $verb) {
+                  $env:PKB_OPEN_BOOTSTRAP = '1'
+                  & $java -jar $jar ui $project
+                  exit $LASTEXITCODE
+                }
+                if ($cacheFresh) {
+                  & $java -cp "@$cache" tools.dscode.launcher.PickleballWorkbenchLauncher @args
+                  exit $LASTEXITCODE
+                }
+                if ($verb -eq 'help') {
+                  $env:PKB_OPEN_BOOTSTRAP = '1'
+                  & $java -jar $jar @args
+                  exit $LASTEXITCODE
+                }
+                $resolved = Join-Path $project '.pickleball/workbench/classpath.resolved'
+                $mvnw = Join-Path $project 'mvnw.cmd'
+                if (Test-Path $mvnw) {
+                  New-Item -ItemType Directory -Force -Path (Split-Path $resolved) | Out-Null
+                  & $mvnw -q org.apache.maven.plugins:maven-dependency-plugin:3.8.1:build-classpath -Dmdep.includeScope=test "-Dmdep.outputFile=$resolved" 2>$null
+                  if ((Test-Path $resolved) -and (Get-Item $resolved).Length -gt 0) {
+                    & $java -cp "@$resolved" tools.dscode.launcher.PickleballWorkbenchLauncher @args
+                    exit $LASTEXITCODE
+                  }
+                }
+                $gradlew = Join-Path $project 'gradlew.bat'
+                if (Test-Path $gradlew) {
+                  & $gradlew -q pickleballWorkbench "-PpkbArgs=$($args -join ' ')"
+                  exit $LASTEXITCODE
+                }
                 $env:PKB_OPEN_BOOTSTRAP = '1'
-                & $java -jar $jar ui $project
+                & $java -jar $jar @args
                 """;
     }
 
@@ -861,6 +995,12 @@ public final class PickleballLocalStore {
             throw new IOException("Bundled Pickleball guidance is missing: " + relative);
         }
         return input;
+    }
+
+    /** One line naming the running Pickleball version and the commit it was built from. */
+    static String buildLine() {
+        return "Pickleball " + runningVersion() + " built from commit "
+                + PickleballVersion.runningCommit(PickleballLocalStore.class);
     }
 
     static String runningVersion() {

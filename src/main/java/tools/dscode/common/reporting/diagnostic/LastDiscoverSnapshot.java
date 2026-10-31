@@ -53,17 +53,19 @@ public final class LastDiscoverSnapshot {
     }
 
     /**
-     * Prefers the agent snapshot, then that run's snapshot, then the shared file.
-     * A later agent's discover must not replace an earlier agent's filters.
+     * A run id uses that run's snapshot, then the shared file. It does not use
+     * the agent file, so a later discover by the same agent cannot replace this
+     * run's tags. With no run id, the agent file wins over the shared file.
      */
     public static Snapshot readScoped(Path projectRoot, String agentId, String runId) {
-        if (!isBlank(agentId)) {
-            Snapshot agent = readFile(PickleballLocalLayout.lastDiscoverSnapshot(projectRoot, "agent-" + agentId));
-            if (present(agent)) return agent;
-        }
         if (!isBlank(runId)) {
             Snapshot run = readFile(PickleballLocalLayout.lastDiscoverSnapshot(projectRoot, "run-" + runId));
             if (present(run)) return run;
+            return read(projectRoot);
+        }
+        if (!isBlank(agentId)) {
+            Snapshot agent = readFile(PickleballLocalLayout.lastDiscoverSnapshot(projectRoot, "agent-" + agentId));
+            if (present(agent)) return agent;
         }
         return read(projectRoot);
     }

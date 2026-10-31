@@ -18,6 +18,11 @@ class WorkbenchFeatureIndexTest {
     Path project;
 
     @Test
+    void javaIsTheOnlyFeatureIndexImplementation() {
+        assertEquals("java", WorkbenchFeatureIndex.IMPLEMENTATION);
+    }
+
+    @Test
     void cacheHitMissAndHashInvalidation() throws Exception {
         Path features = project.resolve("src/test/resources/features");
         Files.createDirectories(features);
@@ -42,6 +47,9 @@ class WorkbenchFeatureIndexTest {
         assertTrue(first.narrowed());
         assertTrue(first.featureProperty().contains("login.feature"));
         assertFalse(first.featureProperty().contains("other.feature"));
+        assertTrue(first.elapsedMillis() >= 0);
+        assertEquals(List.of(first.featureProperty()), java.util.List.of(String.join(",", WorkbenchFeatureIndex.prefilteredFeatures(first))));
+        assertEquals(1, WorkbenchFeatureIndex.prefilteredFeatures(first).size());
 
         WorkbenchFeatureIndex.Selection hit = select("@smoke", null, null, List.of(), false);
         assertEquals(0, hit.filesReparsed());
@@ -385,7 +393,7 @@ class WorkbenchFeatureIndexTest {
 
     @Test
     void cacheSchemaVersionBumpForcesReparse() throws Exception {
-        assertEquals(3, WorkbenchFeatureIndex.VERSION);
+        assertEquals(4, WorkbenchFeatureIndex.VERSION);
         assertEquals("feature-index.v3", WorkbenchFeatureIndex.CACHE_FILE);
         Path features = project.resolve("src/test/resources/features");
         Files.createDirectories(features);

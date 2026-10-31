@@ -20,6 +20,7 @@ import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.lang.reflect.Proxy;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.HashSet;
@@ -37,6 +38,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class WorkbenchMcpServerTest {
@@ -80,6 +82,12 @@ class WorkbenchMcpServerTest {
             "workbench_diagnostic_catalog",
             "workbench_diagnostic_run",
             "workbench_diagnostic_summary",
+            "wb_runs",
+            "wb_get",
+            "wb_query",
+            "wb_search",
+            "wb_props",
+            "wb_errors",
             "workbench_investigation_emit",
             "workbench_go"
     );
@@ -253,6 +261,33 @@ class WorkbenchMcpServerTest {
     }
 
     @Test
+    void missingExecuteStepTextNamesTheToolAndTheField() {
+        WorkbenchMcpTools tools = new WorkbenchMcpTools(fakeServices((method, args) -> null), JSON);
+        var result = tools.specifications().stream()
+                .filter(spec -> "workbench_execute_step".equals(spec.tool().name()))
+                .findFirst()
+                .orElseThrow()
+                .callHandler()
+                .apply(null, new McpSchema.CallToolRequest("workbench_execute_step", Map.of(), null));
+        assertTrue(Boolean.TRUE.equals(result.isError()));
+        String text = ((McpSchema.TextContent) result.content().getFirst()).text();
+        assertTrue(text.contains("workbench_execute_step requires text (Gherkin step text.)"), text);
+        assertTrue(text.contains("Pass a non-blank string"), text);
+        assertTrue(text.contains("It was omitted."), text);
+    }
+
+    @Test
+    void unknownToolPointsAtToolsList() {
+        WorkbenchMcpTools tools = new WorkbenchMcpTools(fakeServices((method, args) -> null), JSON);
+        IllegalArgumentException failure = assertThrows(
+                IllegalArgumentException.class,
+                () -> tools.call("workbench_not_a_tool", Map.of())
+        );
+        assertTrue(failure.getMessage().contains("Unknown Workbench tool: workbench_not_a_tool"), failure.getMessage());
+        assertTrue(failure.getMessage().contains("tools/list"), failure.getMessage());
+    }
+
+    @Test
     void stepResolveIsReadOnlyAndDoesNotExecute() throws Exception {
         AtomicBoolean resolved = new AtomicBoolean();
         AtomicBoolean executed = new AtomicBoolean();
@@ -293,20 +328,28 @@ class WorkbenchMcpServerTest {
 
     @Test
     void diagnosticToolsDelegateToSharedServicesAndStaySparse() throws Exception {
-        AtomicBoolean catalogCalled = new AtomicBoolean();
+        Path root = project.resolve("reports/diagnostic-runs");
+        Path scenario = root.resolve("run-1/scenarios/scenario-1");
+        Files.createDirectories(scenario);
+        Files.writeString(root.resolve("run-catalog.json"), """
+                {"runs":[{"runId":"run-1","outcome":"FAILED","runProfile":"pkb_browser=CHROME_HEADLESS"}]}
+                """);
+        Files.writeString(root.resolve("run-1/run-index.json"), """
+                {"runId":"run-1","outcome":"FAILED","runProfile":"pkb_browser=CHROME_HEADLESS",
+                 "scenarios":[{"scenarioId":"scenario-1","name":"Stay","outcome":"FAILED"}]}
+                """);
+        Files.writeString(scenario.resolve("summary.json"), """
+                {"scenarioId":"scenario-1","name":"Stay","outcome":"FAILED"}
+                """);
+        Files.writeString(scenario.resolve("events.jsonl"), """
+                {"type":"step","text":"hidden events.jsonl body"}
+                """);
+
         WorkbenchServices services = fakeServices((method, args) -> {
-            if ("diagnosticCatalog".equals(method)) {
-                catalogCalled.set(true);
-                return Map.of("available", true, "catalog", Map.of("runs", List.of(Map.of("runId", "run-1"))));
-            }
-            if ("diagnosticRun".equals(method)) {
-                assertEquals("run-1", args[0]);
-                return Map.of("runId", "run-1", "runIndex", Map.of("outcome", "FAILED"));
-            }
-            if ("diagnosticScenarioSummary".equals(method)) {
-                assertEquals("run-1", args[0]);
-                assertEquals("scenario-1", args[1]);
-                return Map.of("summary", Map.of("outcome", "FAILED"));
+            if ("projectRoot".equals(method)) return project;
+            if ("diagnosticCatalog".equals(method) || "diagnosticRun".equals(method)
+                    || "diagnosticScenarioSummary".equals(method)) {
+                throw new AssertionError(method + " is not the shared query path");
             }
             if ("emitInvestigation".equals(method)) {
                 assertEquals("form-1", ((Map<?, ?>) args[0]).get("pkb_investigation_id"));
@@ -321,22 +364,40 @@ class WorkbenchMcpServerTest {
         assertTrue(tools.names().contains("workbench_investigation_emit"));
         tools.specifications().stream()
                 .filter(spec -> spec.tool().name().startsWith("workbench_diagnostic_"))
-                .forEach(spec -> assertTrue(
-                        spec.tool().description().contains("pkb_run_profile"),
-                        spec.tool().name() + " should surface pkb_run_profile"
-                ));
+                .forEach(spec -> {
+                    assertTrue(
+                            spec.tool().description().contains("pkb_run_profile"),
+                            spec.tool().name() + " should surface pkb_run_profile"
+                    );
+                    assertTrue(
+                            spec.tool().description().contains("Deprecated alias"),
+                            spec.tool().name() + " should name the wb_* alias"
+                    );
+                });
         Object catalog = tools.call("workbench_diagnostic_catalog", Map.of());
-        assertTrue(catalogCalled.get());
-        assertTrue(JSON.writeValueAsString(catalog).contains("run-1"));
-        assertFalse(JSON.writeValueAsString(catalog).contains("events.jsonl"));
+        String catalogJson = JSON.writeValueAsString(catalog);
+        assertEquals(catalogJson, JSON.writeValueAsString(tools.call("wb_runs", Map.of())));
+        assertTrue(catalogJson.contains("run-1"));
+        assertFalse(catalogJson.contains("events.jsonl"));
 
         Object run = tools.call("workbench_diagnostic_run", Map.of("runId", "run-1"));
-        assertTrue(JSON.writeValueAsString(run).contains("FAILED"));
+        String runJson = JSON.writeValueAsString(run);
+        assertEquals(runJson, JSON.writeValueAsString(tools.call("wb_get", Map.of("runId", "run-1", "kind", "run"))));
+        assertTrue(runJson.contains("FAILED"));
+        assertFalse(runJson.contains("events.jsonl"));
         Object summary = tools.call("workbench_diagnostic_summary", Map.of(
                 "runId", "run-1",
                 "scenarioId", "scenario-1"
         ));
-        assertTrue(JSON.writeValueAsString(summary).contains("FAILED"));
+        String summaryJson = JSON.writeValueAsString(summary);
+        assertEquals(summaryJson, JSON.writeValueAsString(tools.call(
+                "wb_get", Map.of("runId", "run-1", "kind", "scenario", "scenarioId", "scenario-1")
+        )));
+        assertTrue(summaryJson.contains("FAILED"));
+        assertFalse(summaryJson.contains("events.jsonl"));
+        String log = Files.readString(project.resolve(".pickleball/agent-log"));
+        assertTrue(log.contains("\t-\t-\tquery\truns\t-"), log);
+        assertTrue(log.contains("\t-\trun-1\tquery\tget\t-"), log);
         Object emitted = tools.call("workbench_investigation_emit", Map.of(
                 "investigation", Map.of(
                         "pkb_investigation_id", "form-1",

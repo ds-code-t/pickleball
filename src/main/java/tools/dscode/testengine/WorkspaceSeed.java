@@ -1,18 +1,20 @@
 package tools.dscode.testengine;
 
 import tools.dscode.common.resources.ResourceLocations;
+import tools.dscode.control.protocol.PickleballLocalLayout;
 import tools.dscode.control.protocol.Workspace;
 
-import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.function.Consumer;
 
@@ -101,10 +103,99 @@ public final class WorkspaceSeed {
                 ? null
                 : ResourceLocations.existingDirectory(configured, ResourceLocations.workingDirectory());
         Workspace.copyConfigs(source, workspace);
-        Workspace.writeRunVars(workspace, values);
-        List<String> warnings = Workspace.literalSecretWarnings(Workspace.configsDirectory(workspace));
-        for (String warning : warnings) System.err.println(warning);
+        Set<String> keep = runnerComputedSecretKeys(values);
+        Workspace.writeRunVars(workspace, values, keep);
+        List<String> warnings = new ArrayList<>(new java.util.LinkedHashSet<>(
+                java.util.stream.Stream.concat(
+                        Workspace.literalSecretWarnings(Workspace.configsDirectory(workspace)).stream(),
+                        runnerComputedSecretWarnings(values).stream()
+                ).toList()
+        ));
         return warnings;
+    }
+
+    /**
+     * Sensitive runner values with no project-property source. A
+     * {@code ${protected:key}} reference would fail at launch, so the workspace
+     * keeps the value and the caller warns.
+     */
+    public static List<String> runnerComputedSecretWarnings(Map<String, String> values) {
+        return runnerComputedSecrets(values).warnings();
+    }
+
+    public static Set<String> runnerComputedSecretKeys(Map<String, String> values) {
+        return runnerComputedSecrets(values).keys();
+    }
+
+    /**
+     * Keys whose stored value differs from the same key in a project property
+     * file. A key that is not in those files is a default, not a computed override.
+     */
+    public static Set<String> computedKeys(Path project, Map<String, String> values) {
+        Set<String> computed = new LinkedHashSet<>();
+        if (values == null || values.isEmpty()) return computed;
+        Map<String, String> files = projectFileProperties(project);
+        values.forEach((rawKey, rawValue) -> {
+            if (rawKey == null || rawKey.isBlank()) return;
+            String key = Workspace.normalizeKey(rawKey);
+            String stored = rawValue == null ? "" : rawValue;
+            if (!files.containsKey(key)) return;
+            if (!stored.equals(files.get(key))) computed.add(key);
+        });
+        return computed;
+    }
+
+    private static Map<String, String> projectFileProperties(Path project) {
+        Map<String, String> values = new LinkedHashMap<>();
+        if (project == null) return values;
+        Path root = project.toAbsolutePath().normalize();
+        for (Path file : List.of(
+                root.resolve("src/test/resources/pickleball_local2.properties"),
+                root.resolve("src/test/resources/pickleball_local.properties"),
+                root.resolve("src/test/resources/pickleball.properties"),
+                root.resolve("src/main/resources/pickleball_local2.properties"),
+                root.resolve("src/main/resources/pickleball_local.properties"),
+                root.resolve("src/main/resources/pickleball.properties"),
+                root.resolve("pickleball_local2.properties"),
+                root.resolve("pickleball_local.properties"),
+                root.resolve("pickleball.properties")
+        )) {
+            if (!Files.isRegularFile(file)) continue;
+            Properties properties = new Properties();
+            try (var reader = Files.newBufferedReader(file, java.nio.charset.StandardCharsets.UTF_8)) {
+                properties.load(reader);
+            } catch (IOException ignored) {
+                continue;
+            }
+            for (String key : properties.stringPropertyNames()) {
+                values.put(Workspace.normalizeKey(key), properties.getProperty(key));
+            }
+        }
+        return values;
+    }
+
+    private record SecretKeep(Set<String> keys, List<String> warnings) {
+    }
+
+    private static SecretKeep runnerComputedSecrets(Map<String, String> values) {
+        Set<String> keys = new LinkedHashSet<>();
+        List<String> warnings = new ArrayList<>();
+        if (values == null || values.isEmpty()) return new SecretKeep(keys, warnings);
+        Map<String, String> properties = ProjectPropertySources.readWorkbench(Path.of(""));
+        values.forEach((rawKey, rawValue) -> {
+            if (rawKey == null || rawKey.isBlank()) return;
+            String key = Workspace.normalizeKey(rawKey);
+            if (!Workspace.isSensitiveKey(key)) return;
+            String text = rawValue == null ? "" : rawValue;
+            if (text.isBlank() || Workspace.protectedKey(text) != null) return;
+            String fromFile = properties.get(key);
+            if (fromFile != null && !fromFile.isBlank()) return;
+            keys.add(key);
+            warnings.add("WARNING: " + key
+                    + " was set by the runner and is not in project properties, so the workspace keeps the value. "
+                    + "A ${protected:" + key + "} reference would fail at launch.");
+        });
+        return new SecretKeep(Set.copyOf(keys), List.copyOf(warnings));
     }
 
     /**
@@ -124,10 +215,13 @@ public final class WorkspaceSeed {
         if (project == null) return "";
         Path root = project.toAbsolutePath().normalize();
         for (Path file : List.of(
+                root.resolve("src/test/resources/pickleball_local2.properties"),
                 root.resolve("src/test/resources/pickleball_local.properties"),
                 root.resolve("src/test/resources/pickleball.properties"),
+                root.resolve("src/main/resources/pickleball_local2.properties"),
                 root.resolve("src/main/resources/pickleball_local.properties"),
                 root.resolve("src/main/resources/pickleball.properties"),
+                root.resolve("pickleball_local2.properties"),
                 root.resolve("pickleball_local.properties"),
                 root.resolve("pickleball.properties")
         )) {
@@ -150,18 +244,37 @@ public final class WorkspaceSeed {
     }
 
     public static Inputs detect(Path project) {
+        List<String> classpath = syncedClasspath(project);
+        if (classpath.isEmpty()) classpath = runtimeClasspath();
         return new Inputs(
                 propertyFiles(project),
                 testClassesModifiedMillis(project),
-                classpathFingerprint(runtimeClasspath()),
+                classpathFingerprint(classpath),
                 resolutionInputs(System.getProperties(), System.getenv())
         );
     }
 
+    /**
+     * The classpath {@code sync} wrote. A capture forks that list, so the seed
+     * cache key has to change when it changes. The launcher JVM classpath is
+     * only the fallback before the first sync.
+     */
+    static List<String> syncedClasspath(Path project) {
+        if (project == null) return List.of();
+        Path file = PickleballLocalLayout.workbenchStateRoot(project).resolve("classpath.txt");
+        if (!Files.isRegularFile(file)) return List.of();
+        try {
+            return Files.readAllLines(file, java.nio.charset.StandardCharsets.UTF_8).stream()
+                    .map(String::trim)
+                    .filter(value -> !value.isBlank())
+                    .toList();
+        } catch (IOException failure) {
+            throw new IllegalStateException("Could not read Workbench classpath: " + file, failure);
+        }
+    }
+
     static List<String> runtimeClasspath() {
-        String classpath = System.getProperty("java.class.path", "");
-        if (classpath.isBlank()) return List.of();
-        return List.of(classpath.split(File.pathSeparator, -1));
+        return DynamicSuiteBootstrap.effectiveClasspathEntries();
     }
 
     /**
@@ -267,7 +380,9 @@ public final class WorkspaceSeed {
         try {
             seed(parsed.project(), parsed.runId(), parsed.reseed(), parsed.fromRunId(), null, workspace -> {
                 PickleballRunner runner = DynamicSuiteBootstrap.initializeFromRuntimeClasspath();
-                writeCaptured(workspace, runner, parsed.reseed());
+                for (String warning : writeCaptured(workspace, runner, parsed.reseed())) {
+                    System.err.println(warning);
+                }
             });
             System.out.println("workspace=" + Workspace.directory(parsed.project(), parsed.runId()));
             return 0;

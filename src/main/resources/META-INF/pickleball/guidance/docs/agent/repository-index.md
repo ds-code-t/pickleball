@@ -26,7 +26,6 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/agent/prompt-examples.md`
 - `docs/agent/README.md`
 - `docs/agent/repository-index.md`
-- `docs/ai-diagnostic-reporting-plan.md`
 - `docs/ai-run-configuration.md`
 - `docs/block-conditionals.md`
 - `docs/component-scenarios.md`
@@ -40,11 +39,12 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/data-values-and-elements.md`
 - `docs/date-time-utilities.md`
 - `docs/diagnostic-lineage-metadata.md`
+- `docs/diagnostic-query.md`
 - `docs/diagnostic-reporting.md`
+- `docs/direct-control-handoff.md`
 - `docs/dynamic-control-api.md`
 - `docs/dynamic-steps.md`
 - `docs/experimental-features.md`
-- `docs/feature-status-notes.md`
 - `docs/getting-started.md`
 - `docs/java-values.md`
 - `docs/key-parser-dsl.md`
@@ -57,10 +57,9 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/README.md`
 - `docs/release-notes.md`
 - `docs/reserved-element-names.md`
-- `docs/roadmaps/2.1.17-workspace-config.md`
 - `docs/service-call-scenarios.md`
 - `docs/step-overrides.md`
-- `docs/workbench-thin-packaging-roadmap.md`
+- `docs/workbench-agent-detail.md`
 
 ## Framework Java and AspectJ source
 
@@ -399,13 +398,16 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/launcher/SessionHealthWait.java`
 - `src/main/java/tools/dscode/launcher/WorkbenchAgentCommands.java`
 - `src/main/java/tools/dscode/launcher/WorkbenchCliErrors.java`
+- `src/main/java/tools/dscode/launcher/WorkbenchCliHelp.java`
 - `src/main/java/tools/dscode/launcher/WorkbenchCommandLine.java`
 - `src/main/java/tools/dscode/launcher/WorkbenchConsoleTap.java`
 - `src/main/java/tools/dscode/launcher/WorkbenchElementInspect.java`
 - `src/main/java/tools/dscode/launcher/WorkbenchLaunchTiming.java`
+- `src/main/java/tools/dscode/launcher/WorkbenchOneShotLaunch.java`
 - `src/main/java/tools/dscode/launcher/WorkbenchRunReports.java`
 - `src/main/java/tools/dscode/launcher/WorkbenchRuntimeLibs.java`
 - `src/main/java/tools/dscode/launcher/WorkbenchSessionCommands.java`
+- `src/main/java/tools/dscode/launcher/WorkbenchShellQuoting.java`
 - `src/main/java/tools/dscode/launcher/WorkbenchTagFallback.java`
 - `src/main/java/tools/dscode/launcher/WorkspaceLaunch.java`
 - `src/main/java/tools/dscode/misc/DummySteps.java`
@@ -426,6 +428,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/testengine/PickleballRunner.java`
 - `src/main/java/tools/dscode/testengine/PKB_props.java`
 - `src/main/java/tools/dscode/testengine/PkbPropertyValueNormalizer.java`
+- `src/main/java/tools/dscode/testengine/ProjectPropertySources.java`
 - `src/main/java/tools/dscode/testengine/SensitiveConfiguration.java`
 - `src/main/java/tools/dscode/testengine/WorkbenchWorkerMain.java`
 - `src/main/java/tools/dscode/testengine/WorkspaceSeed.java`
@@ -456,12 +459,17 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/common/mappings/queries/TopLevelCollectionTest.java`
 - `src/test/java/tools/dscode/common/reporting/diagnostic/AgentDiscoverPlannerTest.java`
 - `src/test/java/tools/dscode/common/reporting/diagnostic/ConsumerMavenTestRunnerTest.java`
+- `src/test/java/tools/dscode/common/reporting/diagnostic/DiagnosticCliGuidanceTest.java`
+- `src/test/java/tools/dscode/common/reporting/diagnostic/DiagnosticIndexRebuilderSqliteTest.java`
 - `src/test/java/tools/dscode/common/reporting/diagnostic/DiagnosticSecretRedactionTest.java`
+- `src/test/java/tools/dscode/common/reporting/diagnostic/DiscoverHintJvmLeakTest.java`
 - `src/test/java/tools/dscode/common/servicecalls/JdbcTypeMappingTest.java`
 - `src/test/java/tools/dscode/common/treeparsing/preparsing/ConditionalBranchArgumentTest.java`
 - `src/test/java/tools/dscode/common/treeparsing/preparsing/LazyBranchResolutionTest.java`
 - `src/test/java/tools/dscode/common/treeparsing/WithinRewriteScopeTest.java`
 - `src/test/java/tools/dscode/control/override/StepOverrideCompilerTest.java`
+- `src/test/java/tools/dscode/control/protocol/FeatureIndexPrefilterParityTest.java`
+- `src/test/java/tools/dscode/control/protocol/GuidanceExportBuildCommitTest.java`
 - `src/test/java/tools/dscode/control/protocol/PickleballArtifactLocatorTest.java`
 - `src/test/java/tools/dscode/control/protocol/PickleballLocalLayoutTest.java`
 - `src/test/java/tools/dscode/control/protocol/PickleballLocalStoreTest.java`
@@ -473,20 +481,34 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/expectedfailure/ExpectedFailureRunnerTest.java`
 - `src/test/java/tools/dscode/expectedfailure/ExpectedFailureSteps.java`
 - `src/test/java/tools/dscode/GuidancePackagingTest.java`
+- `src/test/java/tools/dscode/launcher/GuidanceCommandGoldenTest.java`
 - `src/test/java/tools/dscode/launcher/PickleballWorkbenchLauncherTest.java`
+- `src/test/java/tools/dscode/launcher/Release218RecommendationsTest.java`
+- `src/test/java/tools/dscode/launcher/SecretRedactionTest.java`
 - `src/test/java/tools/dscode/launcher/SessionHealthWaitTest.java`
 - `src/test/java/tools/dscode/launcher/VersionSwitchTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchAgentCommandsTest.java`
+- `src/test/java/tools/dscode/launcher/WorkbenchAgentUsabilityTest.java`
+- `src/test/java/tools/dscode/launcher/WorkbenchCliCoverageGateTest.java`
+- `src/test/java/tools/dscode/launcher/WorkbenchCliProcessCoverageTest.java`
+- `src/test/java/tools/dscode/launcher/WorkbenchCliSurfaceCoverageTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchCommandLineTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchConsoleTapTest.java`
+- `src/test/java/tools/dscode/launcher/WorkbenchConsumerScenarioEndToEndTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchElementInspectTest.java`
+- `src/test/java/tools/dscode/launcher/WorkbenchLaunchCorrectnessTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchLaunchTimingTest.java`
+- `src/test/java/tools/dscode/launcher/WorkbenchOneShotLaunchTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchPointerContractTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchRunReportsTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchSessionCommandsTest.java`
+- `src/test/java/tools/dscode/launcher/WorkbenchSessionQueryTest.java`
+- `src/test/java/tools/dscode/launcher/WorkbenchShellQuotingTest.java`
+- `src/test/java/tools/dscode/launcher/WorkbenchStructuredErrorTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchTagFallbackTest.java`
 - `src/test/java/tools/dscode/launcher/WorkspaceLaunchForkTest.java`
 - `src/test/java/tools/dscode/parallelutilities/ParallelCountEstimatorTest.java`
+- `src/test/java/tools/dscode/release/Release217ReportedBugsTest.java`
 - `src/test/java/tools/dscode/Release216BehaviorTest.java`
 - `src/test/java/tools/dscode/Release217Phase1Test.java`
 - `src/test/java/tools/dscode/scenarioobject/ScenarioObjectHookTest.java`
@@ -495,21 +517,32 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/testengine/CucumberNameFilterTest.java`
 - `src/test/java/tools/dscode/testengine/CucumberPluginPublishTest.java`
 - `src/test/java/tools/dscode/testengine/DriverDownloadRedactionTest.java`
+- `src/test/java/tools/dscode/testengine/DynamicSuiteBootstrapAccess.java`
 - `src/test/java/tools/dscode/testengine/DynamicSuiteBootstrapWorkbenchRootTest.java`
 - `src/test/java/tools/dscode/testengine/ExampleRowFilterTest.java`
 - `src/test/java/tools/dscode/testengine/MavenWorkspaceLaunchEndToEndTest.java`
+- `src/test/java/tools/dscode/testengine/parity/LaunchObservationMain.java`
+- `src/test/java/tools/dscode/testengine/parity/LaunchParitySteps.java`
+- `src/test/java/tools/dscode/testengine/parity/LaunchSeedMain.java`
 - `src/test/java/tools/dscode/testengine/Phase7SeedMain.java`
 - `src/test/java/tools/dscode/testengine/PlainResolutionGoldenTest.java`
+- `src/test/java/tools/dscode/testengine/ProjectPropertySourcesTest.java`
+- `src/test/java/tools/dscode/testengine/RunVarLaunchParityTest.java`
+- `src/test/java/tools/dscode/testengine/RunVarMatrixParityTest.java`
 - `src/test/java/tools/dscode/testengine/WorkspaceDriverProbe.java`
 - `src/test/java/tools/dscode/testengine/WorkspaceLaunchEndToEndTest.java`
 - `src/test/java/tools/dscode/testengine/WorkspaceLaunchTest.java`
 - `src/test/java/tools/dscode/testengine/WorkspaceSeedTest.java`
 - `src/test/java/tools/dscode/untilpass/UntilPassBrowserSteps.java`
+- `src/test/java/tools/dscode/untilpass/UntilPassChromeLookupTest.java`
 - `src/test/resources/expected-failure/release-216-expected-failure.feature`
+- `src/test/resources/guidance-golden/documented-help.txt`
+- `src/test/resources/launch-parity/observe.feature`
 - `src/test/resources/multiline-assert/multiline-assert.feature`
 - `src/test/resources/scenario-object/scenario-object.feature`
 - `src/test/resources/until-pass/literal-until-with-browser.feature`
 - `src/test/resources/until-pass/literal-until.feature`
+- `src/test/resources/workbench-help-golden.txt`
 - `src/test/resources/workspace-golden/plain-resolution.txt`
 - `src/test/resources/xml-table/xml-table.feature`
 
@@ -518,6 +551,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/runnerFixtures/java/tools/dscode/testengine/fixtures/BlankBrowserRunner.java`
 - `src/runnerFixtures/java/tools/dscode/testengine/fixtures/ConsumerStyleRunner.java`
 - `src/runnerFixtures/java/tools/dscode/testengine/fixtures/ExampleRunner.java`
+- `src/runnerFixtures/java/tools/dscode/testengine/fixtures/ParityHookRunner.java`
 - `src/runnerFixtures/java/tools/dscode/testengine/fixtures/Phase7Hooked.java`
 - `src/runnerFixtures/java/tools/dscode/testengine/fixtures/ProbeRunner.java`
 - `src/runnerFixtures/java/tools/dscode/testengine/fixtures/WorkspaceLaunchHooked.java`
@@ -573,14 +607,18 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-control-api/src/main/java/tools/dscode/control/bridge/ControlBridgeStepResolver.java`
 - `pickleball-control-api/src/main/java/tools/dscode/control/bridge/ControlBridgeValue.java`
 - `pickleball-control-api/src/main/java/tools/dscode/control/bridge/ControlBridgeValueResult.java`
+- `pickleball-control-api/src/main/java/tools/dscode/control/bridge/DebuggerAddress.java`
 - `pickleball-control-api/src/test/java/com/example/glue/SampleGlue.java`
 - `pickleball-control-api/src/test/java/tools/dscode/control/api/PageElementQueryTest.java`
 - `pickleball-control-api/src/test/java/tools/dscode/control/api/StepMapSeedsTest.java`
+- `pickleball-control-api/src/test/java/tools/dscode/control/bridge/ControlBridgeEventRecorderTest.java`
 - `pickleball-control-api/src/test/java/tools/dscode/control/bridge/ControlBridgeStepResolverTest.java`
+- `pickleball-control-api/src/test/java/tools/dscode/control/bridge/DebuggerAddressTest.java`
 
 ## Neutral control protocol module
 
 - `pickleball-control-protocol/build.gradle`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/AgentLog.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/ControlBridgeBoundedJsonEvidence.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/ControlBridgeBreakpoint.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/ControlBridgeBrowserPage.java`
@@ -611,27 +649,45 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/ControlBridgeValue.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/ControlBridgeValueResult.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/ControlProtocol.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/DiagnosticQuery.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/DiagnosticSqliteIndex.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/DirectControlProvider.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/ExampleRowSelector.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/GherkinKeywords.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/InvestigationHandoff.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/JsonLite.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/OutputFormatter.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/PickleballArtifactLocator.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/PickleballLocalLayout.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/PickleballLocalStore.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/PickleballPaths.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/PickleballVersion.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/RunConfigs.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/RunIndexFinder.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/RunView.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/SecretRedactor.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/SessionDescriptor.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/SessionDescriptorWriter.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/SessionStepGate.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/SleepGapMonitor.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/WindowDriver.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/WorkbenchFeatureIndex.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/Workspace.java`
 - `pickleball-control-protocol/src/main/resources/tools/dscode/control/protocol/gherkin-keywords.tsv`
+- `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/AgentLogTest.java`
 - `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/ControlBridgeStepResolutionTest.java`
 - `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/ControlProtocolStepSeedTest.java`
+- `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/DiagnosticQueryTest.java`
+- `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/DiagnosticSqliteIndexTest.java`
+- `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/DirectControlProviderTest.java`
 - `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/ExampleRowSelectorTest.java`
 - `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/PickleballPathsTest.java`
 - `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/RunConfigsTest.java`
+- `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/RunIndexFinderTest.java`
 - `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/RunWindowTest.java`
+- `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/SecretRedactorTest.java`
+- `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/SessionDescriptorTest.java`
+- `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/SessionHoldTest.java`
 - `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/SleepGapMonitorTest.java`
 - `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/WorkbenchFeatureIndexTest.java`
 - `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/WorkspaceTest.java`
@@ -707,6 +763,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/WorkbenchRuntimeBoundary.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/WorkbenchServices.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/WorkbenchSessionActions.java`
+- `pickleball-workbench/src/main/java/tools/dscode/workbench/worker/LiveSessionPublication.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/worker/WorkbenchLiveSession.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/worker/WorkbenchWorkerManager.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/worker/WorkbenchWorkerStatus.java`
@@ -729,7 +786,9 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/mapping/MappingValueCodecTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/mcp/WorkbenchAttachServerTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/mcp/WorkbenchCommandQueueTest.java`
+- `pickleball-workbench/src/test/java/tools/dscode/workbench/mcp/WorkbenchMcpRetrievalTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/mcp/WorkbenchMcpServerTest.java`
+- `pickleball-workbench/src/test/java/tools/dscode/workbench/mcp/WorkbenchStructuredErrorTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/nav/WorkbenchGoResolverTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/player/EditorTabStateTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/player/GherkinBlockDocumentTest.java`
@@ -756,6 +815,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/WorkbenchControllerLeaseTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/WorkbenchRuntimeBoundaryTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/WorkbenchSessionActionsTest.java`
+- `pickleball-workbench/src/test/java/tools/dscode/workbench/worker/LiveSessionPublicationTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/worker/WorkbenchLiveSessionTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/worker/WorkbenchWorkerManagerTest.java`
 
@@ -786,6 +846,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `maven-consumer-project/src/test/java/com/example/pickleball/support/LocalTestSite.java`
 - `maven-consumer-project/src/test/java/com/example/pickleball/SyntaxProofSteps.java`
 - `maven-consumer-project/src/test/java/com/example/pickleball/tests/TokenizedQueryTest.java`
+- `maven-consumer-project/src/test/java/com/example/pickleball/WorkbenchCliProbeSteps.java`
 - `maven-consumer-project/src/test/java/io/cucumber/core/runner/ScenarioStepChecks.java`
 - `maven-consumer-project/src/test/java/io/cucumber/core/runner/ScenarioStepDataChecks.java`
 - `maven-consumer-project/src/test/java/tools/dscode/common/assertions/AssertionClauseSplitterChecks.java`
@@ -862,12 +923,15 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `maven-consumer-project/src/test/resources/features/scenario-data-references.feature`
 - `maven-consumer-project/src/test/resources/features/scenario-marker-data.feature`
 - `maven-consumer-project/src/test/resources/features/scenario-step-markers.feature`
+- `maven-consumer-project/src/test/resources/features/separate-line-else.feature`
 - `maven-consumer-project/src/test/resources/features/service-call-execution.feature`
 - `maven-consumer-project/src/test/resources/features/single-element-condition.feature`
 - `maven-consumer-project/src/test/resources/features/step-override-bridge.feature`
 - `maven-consumer-project/src/test/resources/features/step-state-elements.feature`
 - `maven-consumer-project/src/test/resources/features/syntax-since-2.1.14.feature`
 - `maven-consumer-project/src/test/resources/features/top-level-collection-index.feature`
+- `maven-consumer-project/src/test/resources/features/workbench-cli-fail.feature`
+- `maven-consumer-project/src/test/resources/features/workbench-cli-probe.feature`
 
 ## Maven consumer service-call definitions
 
@@ -943,8 +1007,10 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `REVIEW.md`
 - `scripts/agent_validate.ps1`
 - `scripts/agent_validate.sh`
+- `scripts/FeatureScanTiming.java`
 - `scripts/refresh_agent_index.py`
 - `scripts/sync_consumer_guidance.py`
+- `scripts/time_feature_scan.py`
 - `scripts/verify_agent_contract.py`
 
 ## .pickleball owners

@@ -13,6 +13,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -74,6 +75,28 @@ class WorkspaceSeedTest {
         assertThrows(IllegalStateException.class, () -> WorkspaceSeed.writeCaptured(hookedWorkspace, hooked, false));
         WorkspaceSeed.writeCaptured(hookedWorkspace, blank, true);
         assertEquals("CHROME_HEADLESS", Workspace.readRunVars(hookedWorkspace).get(PKB_props.PKB_BROWSER));
+    }
+
+    @Test
+    void runnerComputedSecretWithoutAPropertySourceStaysALiteralAndWarns() throws Exception {
+        Map<String, String> values = new LinkedHashMap<>();
+        values.put(PKB_props.PKB_GLUE, "com.example");
+        values.put(PKB_props.PKB_FEATURES, "features");
+        values.put(PKB_props.PKB_DATA_PATH, "data");
+        values.put(PKB_props.PKB_CALL_PATH, "calls");
+        values.put(PKB_props.PKB_COMPONENT_PATH, "component");
+        values.put(PKB_props.PKB_CONFIG_PATH, "configs");
+        values.put("pkb_password", "runner-secret");
+        assertTrue(WorkspaceSeed.runnerComputedSecretKeys(values).contains("pkb_password"));
+        List<String> warnings = WorkspaceSeed.runnerComputedSecretWarnings(values);
+        assertEquals(1, warnings.size());
+        assertTrue(warnings.getFirst().contains("pkb_password"), warnings.toString());
+        assertTrue(warnings.getFirst().contains("not in project properties"), warnings.toString());
+        assertFalse(warnings.getFirst().contains("runner-secret"), warnings.toString());
+        Path workspace = temp.resolve("secrets");
+        Workspace.writeRunVars(workspace, values, WorkspaceSeed.runnerComputedSecretKeys(values));
+        assertEquals("runner-secret", Workspace.readRunVars(workspace).get("pkb_password"));
+        assertFalse(Files.readString(Workspace.runvarsFile(workspace)).contains("${protected:pkb_password}"));
     }
 
     @Test
@@ -170,7 +193,7 @@ class WorkspaceSeedTest {
     }
 
     @Test
-    void detectRecordsClasspathAndDashDAndEnvInputs() {
+    void detectRecordsClasspathAndDashDAndEnvInputs() throws Exception {
         System.setProperty("pkb_environment", "from-dash-d");
         System.setProperty(Workspace.PROPERTY, "/tmp/not-a-workspace");
         Properties system = new Properties();
@@ -186,6 +209,14 @@ class WorkspaceSeedTest {
         WorkspaceSeed.Inputs detected = WorkspaceSeed.detect(temp);
         assertFalse(detected.classpathFingerprint().isBlank());
         assertEquals("from-dash-d", detected.resolutionInputs().get("pkb_environment"));
+
+        Path classpath = tools.dscode.control.protocol.PickleballLocalLayout.workbenchStateRoot(temp).resolve("classpath.txt");
+        Files.createDirectories(classpath.getParent());
+        Files.writeString(classpath, temp.resolve("consumer.jar").toString() + "\n");
+        Files.writeString(temp.resolve("consumer.jar"), "jar");
+        WorkspaceSeed.Inputs synced = WorkspaceSeed.detect(temp);
+        assertTrue(synced.classpathFingerprint().contains("consumer.jar"), synced.classpathFingerprint());
+        assertFalse(synced.classpathFingerprint().equals(detected.classpathFingerprint()));
     }
 
     private void clearRunner() throws Exception {

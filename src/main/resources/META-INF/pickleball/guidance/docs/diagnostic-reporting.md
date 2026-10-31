@@ -72,6 +72,8 @@ Use the shallowest evidence layer that completely answers the question:
 
 Stop as soon as the evidence answers the question. Do not recursively ingest an entire diagnostic run.
 
+Agents should not open those files by hand. `query` (and the MCP tools `wb_runs`, `wb_get`, `wb_query`, `wb_search`, `wb_props`, `wb_errors`) call `DiagnosticQuery`, which reads this layout and returns compact JSON. `workbench_diagnostic_catalog` is a deprecated alias of `wb_runs`. `workbench_diagnostic_run` and `workbench_diagnostic_summary` are deprecated aliases of `wb_get`. A successful call appends one `query` line to `.pickleball/agent-log`. Every row has a relative `where` so the candidate `run-index.json` locations collapse to the file `RunIndexFinder` actually opened (the same finder `AgentCoordination.findRunIndex` uses). The default page is limited and ends with `...+N more, use cursor` when more rows exist. Schema and flags: [Diagnostic query](diagnostic-query.md). Prefer `query` / `wb_*` for a filter, a search, a property, or an error. `reports/diagnostic-runs/diagnostics.db` is a disposable FTS copy rebuilt by `DiagnosticIndexRebuilder`. The `sqlite-jdbc` driver is optional and is not shipped to a normal consumer. Search uses the index when the driver and the file are present, and the JSON files when either is missing. A search also rebuilds that file first when a source JSON, JSONL, run-index, short log, or worker log is newer than the database, including a run directory the catalog has not listed yet.
+
 ## Controlled diagnostic reruns
 
 Use the selected run's retained `runProfile` as the starting final RunVar contract. Replay it through `pkb_runvars`:

@@ -41,6 +41,9 @@ class WorkbenchWorkerManagerTest {
         );
 
         assertTrue(command.get(0).endsWith(WorkbenchProjectOs.javaName()));
+        assertTrue(command.contains("-Dfile.encoding=UTF-8"));
+        assertTrue(command.contains("-Dstdout.encoding=UTF-8"));
+        assertTrue(command.contains("-Dstderr.encoding=UTF-8"));
         assertTrue(command.contains(
                 "-D" + ControlProtocol.WORKBENCH_TEST_OUTPUT_ROOT_PROPERTY + "=" + live
         ));

@@ -25,7 +25,7 @@ class WorkspaceLaunchForkTest {
 
         IllegalStateException failure = assertThrows(
                 IllegalStateException.class,
-                () -> WorkspaceLaunch.capture(temp, workspace, false)
+                () -> WorkspaceLaunch.capture(temp, workspace, false, null)
         );
         assertTrue(failure.getMessage().contains("Workspace seed failed"), failure.getMessage());
         assertTrue(failure.getMessage().contains("exit="), failure.getMessage());

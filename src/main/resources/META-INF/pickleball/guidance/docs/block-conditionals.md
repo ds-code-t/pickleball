@@ -161,3 +161,14 @@ See [nested-and-block-conditionals.feature](../maven-consumer-project/src/test/r
 `IF:` only chooses a branch. For fail-on-false assertions with the same clause syntax, see [Log and assert steps](log-and-assert-steps.md).
 
 [Previous: Nested Steps](nested-steps.md) · [Documentation home](README.md) · [Next: Log and Assert Steps](log-and-assert-steps.md)
+
+## Separate-line ELSE after a single-line IF
+
+A separate `ELSE-IF:` or `ELSE:` step continues the chain of the nearest earlier single-line `IF: ... THEN: ...` step, the same way an inline `ELSE:` on that line would.
+
+```gherkin
+* IF: 1 == 2 THEN: , save "I" as "c"
+* ELSE: , save "F" as "c"
+```
+
+`c` is `F`. When the `IF:` was true, the separate `ELSE:` is skipped.

@@ -10,15 +10,13 @@ import tools.dscode.control.protocol.PickleballLocalStore;
 import tools.dscode.control.protocol.Workspace;
 import tools.dscode.parallelutilities.ParallelCountEstimator;
 
-import java.io.InputStream;
-import java.net.URL;
+import java.lang.reflect.Modifier;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.Enumeration;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -34,7 +32,6 @@ import static io.cucumber.junit.platform.engine.Constants.PARALLEL_CONFIG_FIXED_
 import static io.cucumber.junit.platform.engine.Constants.PARALLEL_CONFIG_FIXED_PARALLELISM_PROPERTY_NAME;
 import static io.cucumber.junit.platform.engine.Constants.PARALLEL_CONFIG_STRATEGY_PROPERTY_NAME;
 import static io.cucumber.junit.platform.engine.Constants.PARALLEL_EXECUTION_ENABLED_PROPERTY_NAME;
-import static tools.dscode.common.reporting.logging.LogForwarder.logError;
 import static tools.dscode.common.util.debug.DebugUtils.debugFlags;
 import static tools.dscode.testengine.PKB_props.PKB_CONFIG_PATH;
 import static tools.dscode.testengine.PKB_props.PKB_CUCUMBER_CLI_ARGS;
@@ -64,6 +61,9 @@ public abstract class PickleballRunner {
     }
 
     private static volatile PickleballRunner INSTANCE;
+    private static final ThreadLocal<Boolean> PREVIEW = new ThreadLocal<>();
+    private static final ThreadLocal<Path> PREVIEW_PROJECT = new ThreadLocal<>();
+    private static final ThreadLocal<Boolean> PREVIEW_PROJECT_ONLY = new ThreadLocal<>();
 
     protected final LinkedHashMap<String, String> values = new LinkedHashMap<>();
     private final Map<String, String> readOnlyValues = Collections.unmodifiableMap(values);
@@ -72,8 +72,83 @@ public abstract class PickleballRunner {
     private LinkedHashMap<String, String> defaultRunVars = new LinkedHashMap<>();
     private boolean directRunVars;
     private boolean sealedRunVars;
+    private PKB_props.ResolvedRunVars previewResult;
+
+    /**
+     * Dry-run of a normal launch. Uses the consumer runner when this JVM can see
+     * exactly one, including {@code globalTestDefaults()} and {@code globalTestProperties()}.
+     * Does not start tests, publish system properties, or open a browser.
+     * A workspace launch is a different path: {@link tools.dscode.control.protocol.Workspace#loadForLaunch}
+     * reads the saved copy and does not call this again.
+     */
+    public static PKB_props.ResolvedRunVars previewLaunch(Path project) {
+        return previewLaunch(project, true);
+    }
+
+    /**
+     * Dry-run like {@link #previewLaunch(Path)}. With {@code includeJvm=false} the preview
+     * resolves only from hooks and project/workspace property files and ignores this JVM's
+     * system properties (used by hint, so a live suite's {@code -Dpkb_parallel=80} does not leak).
+     */
+    public static PKB_props.ResolvedRunVars previewLaunch(Path project, boolean includeJvm) {
+        synchronized (PickleballRunner.class) {
+            Path root = project == null
+                    ? Path.of("").toAbsolutePath().normalize()
+                    : project.toAbsolutePath().normalize();
+            Class<? extends PickleballRunner> type = previewClass();
+            PickleballRunner previous = INSTANCE;
+            PREVIEW.set(Boolean.TRUE);
+            PREVIEW_PROJECT.set(root);
+            if (!includeJvm) PREVIEW_PROJECT_ONLY.set(Boolean.TRUE);
+            try {
+                PickleballRunner created = type.getDeclaredConstructor().newInstance();
+                if (created.previewResult == null) {
+                    throw new IllegalStateException("Preview did not resolve " + type.getName());
+                }
+                return created.previewResult;
+            } catch (ReflectiveOperationException failure) {
+                Throwable cause = failure.getCause();
+                if (cause instanceof RuntimeException runtime) throw runtime;
+                if (cause instanceof Error error) throw error;
+                throw new IllegalStateException("Could not preview runner " + type.getName(), failure);
+            } finally {
+                PREVIEW.remove();
+                PREVIEW_PROJECT.remove();
+                PREVIEW_PROJECT_ONLY.remove();
+                INSTANCE = previous;
+            }
+        }
+    }
+
+    private static Class<? extends PickleballRunner> previewClass() {
+        String named = System.getProperty("pickleball.preview.runner");
+        if (named != null && !named.isBlank()) {
+            try {
+                Class<?> type = Class.forName(named.trim());
+                if (!PickleballRunner.class.isAssignableFrom(type)
+                        || Modifier.isAbstract(type.getModifiers())
+                        || type == PickleballRunner.class) {
+                    throw new IllegalStateException("Not a concrete Pickleball runner: " + named);
+                }
+                return type.asSubclass(PickleballRunner.class);
+            } catch (ClassNotFoundException failure) {
+                throw new IllegalStateException("Could not load preview runner " + named, failure);
+            }
+        }
+        Class<? extends PickleballRunner> discovered = DynamicSuiteBootstrap.findConsumerRunnerOrNull();
+        return discovered == null ? EmptyHooks.class : discovered;
+    }
+
+    /** No hook overrides. Used when the launcher JVM has no consumer runner. */
+    public static final class EmptyHooks extends PickleballRunner {
+    }
 
     protected PickleballRunner() {
+        if (Boolean.TRUE.equals(PREVIEW.get())) {
+            INSTANCE = this;
+            previewResult = resolveShared(PREVIEW_PROJECT.get());
+            return;
+        }
         debug("Constructing suite subclass: " + getClass().getName());
         EngineFilterBootstrap.ensureEngineFilterApplied("PickleballRunner.<init>");
         INSTANCE = this;
@@ -82,54 +157,16 @@ public abstract class PickleballRunner {
             return;
         }
 
-        globalTestDefaults();
-        normalizeReportPortalValues();
-        defaultRunVars = snapshotRunVars();
-        debug("Values after globalTestDefaults(): " + values);
-
-        mergeResourcePropertiesOverwriting("pickleball.properties");
-        mergeResourcePropertiesOverwriting("pickleball_local.properties");
-        mergeResourcePropertiesOverwriting("pickleball_local2.properties");
-        debug("Values after resource property merge: " + values);
-
-        mergeAllSystemProperties();
-        debug("Values after system property merge: " + values);
-
-        globalTestProperties();
-        normalizeReportPortalValues();
-        debug("Values after globalTestProperties(): " + values);
-
-        mergeAllSystemProperties();
-        mergeReportPortalSourceProperties();
-        debug("Values after system property overrides: " + values);
-
-        /* Build default_profile from the fully resolved normal project configuration. */
-        applyPkbAliases();
-        syncReportPortalAliases(false);
-        applyLegacyFrameworkDefaults();
-        syncCanonicalAndAliasKeys();
-        syncReportPortalAliases(false);
-
-        suppressNonInvocationControlsWhenSealed();
-        PickleballProfiles.Resolution profileResolution =
-                PickleballProfiles.apply(values, systemRunVarOverrides, defaultRunVars, propertyFileRunVars);
+        PKB_props.ResolvedRunVars profileResolution = resolveShared(Path.of("").toAbsolutePath().normalize());
         directRunVars = profileResolution.direct();
         sealedRunVars = profileResolution.sealed();
 
-        applyPkbAliases();
-        applyLegacyFrameworkDefaults();
-        syncCanonicalAndAliasKeys();
-        alignCucumberNameFilterWithFind();
-        publishCucumberPlugins();
-        syncReportPortalAliases(true);
         java.nio.file.Path projectRoot = PickleballLocalLayout.findProjectRoot(java.nio.file.Path.of(""));
         AgentCoordination.Run coordination = null;
         if (AgentCoordination.launchRequestsPrivateRun()) {
             coordination = AgentCoordination.openConsumerRun(projectRoot, System.out);
         }
         ParsingMap.initializeConfigs(values.get(PKB_CONFIG_PATH));
-        refreshRunProfile();
-        refreshPkbOptions();
 
         debug("Final values after profile/RunVar resolution + alias sync: " + values);
         publishToSystemProperties();
@@ -158,6 +195,79 @@ public abstract class PickleballRunner {
     }
 
     /**
+     * The one resolution sequence. A normal constructor and a dry-run preview both call it.
+     * Property files come from {@link ProjectPropertySources}. Hooks run here, not again at
+     * a workspace launch.
+     */
+    private PKB_props.ResolvedRunVars resolveShared(Path propertyRoot) {
+        globalTestDefaults();
+        normalizeReportPortalValues();
+        defaultRunVars = snapshotRunVars();
+        debug("Values after globalTestDefaults(): " + values);
+
+        mergeProjectProperties(propertyRoot);
+        debug("Values after resource property merge: " + values);
+
+        mergeAllSystemProperties();
+        debug("Values after system property merge: " + values);
+
+        globalTestProperties();
+        normalizeReportPortalValues();
+        debug("Values after globalTestProperties(): " + values);
+
+        mergeAllSystemProperties();
+        mergeReportPortalSourceProperties();
+        debug("Values after system property overrides: " + values);
+
+        applyPkbAliases();
+        syncReportPortalAliases(false);
+        applyLegacyFrameworkDefaults();
+        syncCanonicalAndAliasKeys();
+        syncReportPortalAliases(false);
+
+        suppressNonInvocationControlsWhenSealed();
+        PKB_props.ResolvedRunVars profileResolution = PKB_props.resolveInto(
+                values, systemRunVarOverrides, defaultRunVars, propertyFileRunVars);
+        directRunVars = profileResolution.direct();
+        sealedRunVars = profileResolution.sealed();
+
+        applyPkbAliases();
+        applyLegacyFrameworkDefaults();
+        syncCanonicalAndAliasKeys();
+        alignCucumberNameFilterWithFind();
+        publishCucumberPlugins();
+        syncReportPortalAliases(true);
+        refreshRunProfile();
+        refreshPkbOptions();
+        return new PKB_props.ResolvedRunVars(
+                PickleballProfiles.runVarMap(values),
+                values.get(PKB_RUN_PROFILE),
+                PickleballProfiles.fingerprint(values),
+                profileResolution.sealed(),
+                profileResolution.direct(),
+                profileResolution.provenance()
+        );
+    }
+
+    private void mergeProjectProperties(Path propertyRoot) {
+        Path root = propertyRoot == null ? Path.of("") : propertyRoot;
+        boolean workbenchLocations = Boolean.TRUE.equals(PREVIEW.get())
+                || WorkspaceSeed.captureKeepsParallelAuto();
+        Map<String, String> loaded = workbenchLocations
+                ? ProjectPropertySources.readWorkbench(root)
+                : ProjectPropertySources.readNormal();
+        for (Map.Entry<String, String> entry : loaded.entrySet()) {
+            String normalized = entry.getKey();
+            String value = entry.getValue();
+            if (normalized == null) continue;
+            values.put(normalized, value);
+            if (PKB_props.isRunVariableKey(normalized)) {
+                propertyFileRunVars.put(normalized, value);
+            }
+        }
+    }
+
+    /**
      * Workbench launch. The workspace is the only source of run vars and configs.
      * Hooks, property files, {@code -D} merges, and profiles do not run.
      * Selection keys already on the command line override the file for this process.
@@ -168,13 +278,17 @@ public abstract class PickleballRunner {
         String configured = System.getProperty(Workspace.PROPERTY);
         if (configured == null || configured.isBlank()) return false;
         Path workspace = Path.of(configured.trim());
-        Map<String, String> loaded = Workspace.readRunVars(workspace);
-        Workspace.requireContext(loaded);
-        values.clear();
-        values.putAll(loaded);
+        java.util.LinkedHashMap<String, String> selection = new java.util.LinkedHashMap<>();
         for (String key : Workspace.SELECTION_KEYS) {
             String override = System.getProperty(key);
-            if (override != null && !override.isBlank()) values.put(key, override.trim());
+            if (override != null) selection.put(key, override);
+        }
+        java.util.Map<String, String> loaded = Workspace.loadForLaunch(workspace, selection);
+        values.clear();
+        values.putAll(loaded);
+        String purpose = System.getProperty(PKB_props.PKB_RUN_PURPOSE);
+        if (purpose != null && !purpose.isBlank()) {
+            values.put(PKB_props.PKB_RUN_PURPOSE, purpose.trim());
         }
         resolveProtectedReferences(readProjectProperties());
         applyPkbAliases();
@@ -214,59 +328,7 @@ public abstract class PickleballRunner {
     }
 
     private static Map<String, String> readProjectProperties() {
-        LinkedHashMap<String, String> project = new LinkedHashMap<>();
-        for (String resource : List.of(
-                "pickleball.properties",
-                "pickleball_local.properties",
-                "pickleball_local2.properties"
-        )) {
-            loadClasspathProperties(resource, project);
-        }
-        Path working = Path.of("").toAbsolutePath();
-        for (Path file : List.of(
-                working.resolve("pickleball.properties"),
-                working.resolve("pickleball_local.properties"),
-                working.resolve("pickleball_local2.properties"),
-                working.resolve("src/test/resources/pickleball.properties"),
-                working.resolve("src/test/resources/pickleball_local.properties"),
-                working.resolve("src/test/resources/pickleball_local2.properties")
-        )) {
-            loadFileProperties(file, project);
-        }
-        return project;
-    }
-
-    private static void loadClasspathProperties(String resourceName, Map<String, String> into) {
-        try {
-            ClassLoader loader = Thread.currentThread().getContextClassLoader();
-            if (loader == null) loader = PickleballRunner.class.getClassLoader();
-            Enumeration<URL> resources = loader.getResources(resourceName);
-            while (resources.hasMoreElements()) {
-                URL url = resources.nextElement();
-                Properties props = new Properties();
-                try (InputStream in = url.openStream()) {
-                    props.load(new java.io.InputStreamReader(in, StandardCharsets.UTF_8));
-                }
-                for (String key : props.stringPropertyNames()) {
-                    into.put(normalizeConfigurationKey(key), props.getProperty(key));
-                }
-            }
-        } catch (Exception failure) {
-            throw new IllegalStateException("Could not read project properties " + resourceName, failure);
-        }
-    }
-
-    private static void loadFileProperties(Path file, Map<String, String> into) {
-        if (file == null || !Files.isRegularFile(file)) return;
-        Properties props = new Properties();
-        try (InputStream in = Files.newInputStream(file)) {
-            props.load(new java.io.InputStreamReader(in, StandardCharsets.UTF_8));
-        } catch (Exception failure) {
-            throw new IllegalStateException("Could not read project properties " + file, failure);
-        }
-        for (String key : props.stringPropertyNames()) {
-            into.put(normalizeConfigurationKey(key), props.getProperty(key));
-        }
+        return ProjectPropertySources.readWorkbench(Path.of(""));
     }
 
     public static String getOptionsString() {
@@ -409,58 +471,12 @@ public abstract class PickleballRunner {
     /** The live runner, or null when no suite has started. Does not bootstrap one. */
     public static PickleballRunner rawInstance() { return INSTANCE; }
 
-    private void mergeResourcePropertiesIfMissing(String resourceName) {
-        try {
-            ClassLoader cl = Thread.currentThread().getContextClassLoader();
-            if (cl == null) cl = PickleballRunner.class.getClassLoader();
-            Enumeration<URL> resources = cl.getResources(resourceName);
-            int count = 0;
-            while (resources.hasMoreElements()) {
-                URL url = resources.nextElement();
-                count++;
-                debug("Loading resource properties from: " + url);
-                Properties props = new Properties();
-                try (InputStream in = url.openStream()) { props.load(in); }
-                for (String key : props.stringPropertyNames()) {
-                    values.putIfAbsent(normalizeConfigurationKey(key), props.getProperty(key));
-                }
-            }
-            debug("Loaded " + count + " resource(s) named " + resourceName);
-        } catch (Exception e) {
-            logError("[DynamicSuiteBase] Failed loading " + resourceName + ": " + e);
-            throw new RuntimeException("Failed loading " + resourceName, e);
-        }
-    }
-
-    private void mergeResourcePropertiesOverwriting(String resourceName) {
-        try {
-            ClassLoader cl = Thread.currentThread().getContextClassLoader();
-            if (cl == null) cl = PickleballRunner.class.getClassLoader();
-            Enumeration<URL> resources = cl.getResources(resourceName);
-            int count = 0;
-            while (resources.hasMoreElements()) {
-                URL url = resources.nextElement();
-                count++;
-                debug("Loading resource properties from: " + url);
-                Properties props = new Properties();
-                try (InputStream in = url.openStream()) { props.load(in); }
-                for (String key : props.stringPropertyNames()) {
-                    String normalized = normalizeConfigurationKey(key);
-                    String value = props.getProperty(key);
-                    values.put(normalized, value);
-                    if (PKB_props.isRunVariableKey(normalized)) {
-                        propertyFileRunVars.put(normalized, value);
-                    }
-                }
-            }
-            debug("Loaded " + count + " resource(s) named " + resourceName);
-        } catch (Exception e) {
-            logError("[DynamicSuiteBase] Failed loading " + resourceName + ": " + e);
-            throw new RuntimeException("Failed loading " + resourceName, e);
-        }
+    private static boolean previewIgnoresJvm() {
+        return Boolean.TRUE.equals(PREVIEW.get()) && Boolean.TRUE.equals(PREVIEW_PROJECT_ONLY.get());
     }
 
     private void mergeAllSystemProperties() {
+        if (previewIgnoresJvm()) return;
         Properties sys = System.getProperties();
         int count = 0;
         int skipped = 0;
@@ -487,6 +503,10 @@ public abstract class PickleballRunner {
      * fail-closed on mixed controls.
      */
     private void suppressNonInvocationControlsWhenSealed() {
+        if (previewIgnoresJvm()) {
+            stripNonInvocationControlsWhenSealed(values, false, false);
+            return;
+        }
         boolean profileFromJvm = notBlank(System.getProperty(PKB_PROFILE));
         boolean runVarsFromJvm = notBlank(System.getProperty(PKB_RUN_VARS));
         if (!runVarsFromJvm) {
@@ -540,7 +560,7 @@ public abstract class PickleballRunner {
                     values.putIfAbsent(key.toLowerCase(Locale.ROOT), reportPortal.getProperty(key));
                 }
             }
-            Properties system = System.getProperties();
+            Properties system = previewIgnoresJvm() ? new Properties() : System.getProperties();
             for (String key : system.stringPropertyNames()) {
                 String canonical = normalizeConfigurationKey(key);
                 if (canonical == null || !canonical.startsWith("rp.")) continue;
@@ -803,7 +823,7 @@ public abstract class PickleballRunner {
         return PKB_OPTIONS.equals(normalizePkbKey(key));
     }
 
-    private static String normalizeConfigurationKey(String key) {
+    static String normalizeConfigurationKey(String key) {
         String normalized = normalizePkbKey(key);
         if (normalized == null) {
             return null;

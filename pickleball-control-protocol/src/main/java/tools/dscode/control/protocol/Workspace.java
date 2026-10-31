@@ -12,6 +12,7 @@ import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -132,7 +133,7 @@ public final class Workspace {
         Properties properties = new Properties();
         try (InputStream in = Files.newInputStream(file)) {
             properties.load(new java.io.InputStreamReader(in, StandardCharsets.UTF_8));
-        } catch (IOException failure) {
+        } catch (IOException | IllegalArgumentException failure) {
             throw new IllegalStateException("Could not read " + file + ": " + failure.getMessage(), failure);
         }
         Map<String, String> values = new LinkedHashMap<>();
@@ -146,17 +147,41 @@ public final class Workspace {
     /**
      * Writes runvars atomically. Sensitive values are stored as protected
      * references. {@code pkb_parallel=auto} is kept as {@code auto}.
+     * Keys in {@code keepLiteral} stay as the captured value. A sensitive key
+     * already stored as a literal stays a literal on later writes.
      */
     public static void writeRunVars(Path workspace, Map<String, String> runVars) {
-        Map<String, String> stored = protect(runVars);
+        writeRunVars(workspace, runVars, Set.of());
+    }
+
+    public static void writeRunVars(Path workspace, Map<String, String> runVars, Set<String> keepLiteral) {
+        Set<String> keep = new LinkedHashSet<>();
+        if (keepLiteral != null) {
+            for (String key : keepLiteral) {
+                if (key != null && !key.isBlank()) keep.add(normalizeKey(key));
+            }
+        }
+        Path file = runvarsFile(workspace);
+        if (Files.isRegularFile(file)) {
+            readRunVars(workspace).forEach((key, value) -> {
+                if (isSensitiveKey(key) && value != null && !value.isBlank() && protectedKey(value) == null) {
+                    keep.add(normalizeKey(key));
+                }
+            });
+        }
+        Map<String, String> stored = protect(runVars, keep);
         StringBuilder body = new StringBuilder();
         new TreeMap<>(stored).forEach((key, value) -> {
             body.append(escape(key)).append('=').append(escape(value == null ? "" : value)).append('\n');
         });
-        atomicWrite(runvarsFile(workspace), body.toString().getBytes(StandardCharsets.UTF_8));
+        atomicWrite(file, body.toString().getBytes(StandardCharsets.UTF_8));
     }
 
     public static Map<String, String> protect(Map<String, String> runVars) {
+        return protect(runVars, Set.of());
+    }
+
+    public static Map<String, String> protect(Map<String, String> runVars, Set<String> keepLiteral) {
         Map<String, String> stored = new LinkedHashMap<>();
         if (runVars == null) return stored;
         runVars.forEach((key, value) -> {
@@ -168,7 +193,8 @@ public final class Workspace {
                 return;
             }
             String text = value == null ? "" : value;
-            if (isSensitiveKey(normalized) && !text.isBlank() && protectedKey(text) == null) {
+            boolean keep = keepLiteral != null && keepLiteral.contains(normalized);
+            if (isSensitiveKey(normalized) && !text.isBlank() && protectedKey(text) == null && !keep) {
                 stored.put(normalized, protectedReference(normalized));
             } else {
                 stored.put(normalized, text);
@@ -196,6 +222,21 @@ public final class Workspace {
                             + "pkb_componentpath, and pkb_configpath. Blank values are allowed; omitted keys are not."
             );
         }
+    }
+
+    /**
+     * Launch read of a workspace copy. Selection keys may override the file for this
+     * process. Hooks, property files, and profiles are not applied again.
+     */
+    public static LinkedHashMap<String, String> loadForLaunch(Path workspace, Map<String, String> selectionOverrides) {
+        LinkedHashMap<String, String> loaded = new LinkedHashMap<>(readRunVars(workspace));
+        requireContext(loaded);
+        if (selectionOverrides == null) return loaded;
+        for (String key : SELECTION_KEYS) {
+            String override = selectionOverrides.get(key);
+            if (override != null && !override.isBlank()) loaded.put(key, override.trim());
+        }
+        return loaded;
     }
 
     public static void copyConfigs(Path source, Path workspace) {
@@ -363,7 +404,11 @@ public final class Workspace {
             if (!key.startsWith("pkb_")) key = "pkb_" + key;
             String existing = selection != null && selection.get(key) != null ? selection.get(key) : values.get(key);
             if (existing != null && !existing.equals(value)) {
-                appendWarning(warnings, "WARNING: --runvar " + key + " replaces " + existing + " with " + value);
+                appendWarning(warnings, "WARNING: --runvar " + key + " replaces "
+                        + OutputFormatter.shown(key, existing) + " with " + OutputFormatter.shown(key, value));
+                if (SecretRedactor.leaks(key, existing) || SecretRedactor.leaks(key, value)) {
+                    appendWarning(warnings, "fix: " + SecretRedactor.HINT);
+                }
             }
             if (SELECTION_KEYS.contains(key)) {
                 if (selection != null) selection.put(key, value);
@@ -377,6 +422,11 @@ public final class Workspace {
             else values.remove(key);
         }
         if (!values.equals(original)) writeRunVars(workspace, values);
+    }
+
+    public static String shown(String value) {
+        if (value == null || value.isEmpty()) return "\"\"";
+        return value;
     }
 
     private static void appendWarning(Appendable warnings, String message) {
@@ -410,7 +460,9 @@ public final class Workspace {
         String field = "\"" + FINGERPRINT_FIELD + "\"";
         String assignment = field + " : \"" + fingerprint + "\"";
         try {
-            String text = Files.isRegularFile(recordFile) ? Files.readString(recordFile) : "{\n}\n";
+            String text = Files.isRegularFile(recordFile) ? Files.readString(recordFile) : "";
+            if (!text.isEmpty() && text.contains(assignment)) return;
+            if (text.isEmpty()) text = "{\n}\n";
             String updated;
             if (text.contains(field)) {
                 updated = text.replaceAll(
