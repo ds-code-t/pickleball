@@ -27,7 +27,9 @@ public final class Phase7SeedMain {
                     null,
                     workspace -> {
                         Phase7Hooked runner = new Phase7Hooked();
-                        WorkspaceSeed.writeCaptured(workspace, runner, parsed.reseed());
+                        for (String warning : WorkspaceSeed.writeCaptured(workspace, runner, parsed.reseed())) {
+                            System.err.println(warning);
+                        }
                     }
             );
             System.out.println("workspace=" + Workspace.directory(parsed.project(), parsed.runId()));

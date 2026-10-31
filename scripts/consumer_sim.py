@@ -7,8 +7,9 @@ after test-compile), isolate, execute-step via base64 and an absolute
 and finish. Asserts exit codes, summary lines, and record.json. Prints a
 timing line per stage and fails when a stage exceeds its budget.
 
-Linux CI calls this script. The windows-latest job calls it from PowerShell;
-the script itself picks mvnw or mvnw.cmd.
+Linux CI calls this script. The windows-latest job calls it from PowerShell.
+Wrappers are absolute paths. On Windows a .cmd/.bat is started with cmd.exe
+because CreateProcess does not run batch files and does not search the child cwd.
 """
 
 from __future__ import annotations
@@ -137,8 +138,8 @@ def configure_browser() -> None:
 
 
 def publish() -> None:
-    gradlew = "gradlew.bat" if os.name == "nt" else "./gradlew"
-    cmd = [gradlew, "publishToMavenLocal", "-x", "test", "--no-daemon"]
+    script = ROOT / ("gradlew.bat" if os.name == "nt" else "gradlew")
+    cmd = script_command(script, ["publishToMavenLocal", "-x", "test", "--no-daemon"])
     print("publish: " + " ".join(cmd), flush=True)
     completed = subprocess.run(cmd, cwd=ROOT)
     if completed.returncode != 0:
@@ -180,19 +181,17 @@ def run_stage(timings: list[dict], stage: str, launcher_args: list[str], allow_e
 
 def launcher(args: list[str], timeout: int) -> subprocess.CompletedProcess:
     exec_args = join_exec_args(args)
-    cmd = [
-        wrapper(),
+    return maven_cmd(script_command(wrapper_path(), [
         "-q",
         "org.codehaus.mojo:exec-maven-plugin:3.5.0:java",
         "-Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher",
         "-Dexec.classpathScope=test",
         "-Dexec.args=" + exec_args,
-    ]
-    return maven_cmd(cmd, timeout)
+    ]), timeout)
 
 
 def maven(args: list[str], timeout: int) -> subprocess.CompletedProcess:
-    return maven_cmd([wrapper(), *args], timeout)
+    return maven_cmd(script_command(wrapper_path(), args), timeout)
 
 
 def maven_cmd(cmd: list[str], timeout: int) -> subprocess.CompletedProcess:
@@ -219,10 +218,15 @@ def maven_cmd(cmd: list[str], timeout: int) -> subprocess.CompletedProcess:
         raise SystemExit(f"timeout after {timeout}s: {' '.join(cmd[:4])}") from failure
 
 
-def wrapper() -> str:
+def wrapper_path() -> Path:
+    return CONSUMER / ("mvnw.cmd" if os.name == "nt" else "mvnw")
+
+
+def script_command(script: Path, args: list[str]) -> list[str]:
     if os.name == "nt":
-        return "mvnw.cmd"
-    return "./mvnw"
+        comspec = os.environ.get("COMSPEC", "cmd.exe")
+        return [comspec, "/d", "/c", str(script), *args]
+    return [str(script), *args]
 
 
 def join_exec_args(args: list[str]) -> str:

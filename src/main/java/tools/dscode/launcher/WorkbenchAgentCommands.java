@@ -136,7 +136,11 @@ public final class WorkbenchAgentCommands {
         if (runId == null || runId.isBlank()) return;
         Path workspace = Workspace.directory(parsed.project(), runId);
         if (!Workspace.exists(workspace)) return;
-        SecretRedactor.noteAll(Workspace.readRunVars(workspace));
+        try {
+            SecretRedactor.noteAll(Workspace.readRunVars(workspace));
+        } catch (RuntimeException ignored) {
+            // The command's own read reports "Workbench <command> failed:".
+        }
     }
 
     private static int exportGuidance(WorkbenchCommandLine.Parsed parsed, PrintStream out, PrintStream err) {

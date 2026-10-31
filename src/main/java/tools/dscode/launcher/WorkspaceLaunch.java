@@ -162,7 +162,7 @@ public final class WorkspaceLaunch {
             return false;
         }
         List<String> entries = WorkbenchOneShotLaunch.testRuntimeEntries(root, warnings);
-        if (entries.isEmpty()) return false;
+        if (!hasConsumerOutput(root, entries)) return false;
         Path file = PickleballLocalLayout.workbenchStateRoot(root).resolve("classpath.txt");
         try {
             Files.createDirectories(file.getParent());
@@ -172,6 +172,22 @@ public final class WorkspaceLaunch {
             return false;
         }
         return !cachedClasspath(root).isEmpty();
+    }
+
+    /**
+     * A launcher code-source by itself is not a consumer classpath. The seed
+     * fork needs an output that lives in the consumer project.
+     */
+    private static boolean hasConsumerOutput(Path root, List<String> entries) {
+        if (entries == null || entries.isEmpty()) return false;
+        Path base = root.toAbsolutePath().normalize();
+        for (String entry : entries) {
+            if (entry == null || entry.isBlank()) continue;
+            Path path = Path.of(entry);
+            if (!path.isAbsolute()) path = base.resolve(path);
+            if (path.toAbsolutePath().normalize().startsWith(base)) return true;
+        }
+        return false;
     }
 
     static List<String> cachedClasspath(Path project) {
