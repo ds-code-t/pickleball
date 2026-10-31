@@ -482,6 +482,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/expectedfailure/ExpectedFailureRunnerTest.java`
 - `src/test/java/tools/dscode/expectedfailure/ExpectedFailureSteps.java`
 - `src/test/java/tools/dscode/GuidancePackagingTest.java`
+- `src/test/java/tools/dscode/launcher/GuidanceCommandGoldenTest.java`
 - `src/test/java/tools/dscode/launcher/PickleballWorkbenchLauncherTest.java`
 - `src/test/java/tools/dscode/launcher/Release218RecommendationsTest.java`
 - `src/test/java/tools/dscode/launcher/SecretRedactionTest.java`
@@ -536,6 +537,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/untilpass/UntilPassBrowserSteps.java`
 - `src/test/java/tools/dscode/untilpass/UntilPassChromeLookupTest.java`
 - `src/test/resources/expected-failure/release-216-expected-failure.feature`
+- `src/test/resources/guidance-golden/documented-help.txt`
 - `src/test/resources/launch-parity/observe.feature`
 - `src/test/resources/multiline-assert/multiline-assert.feature`
 - `src/test/resources/scenario-object/scenario-object.feature`
