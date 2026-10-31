@@ -436,13 +436,13 @@ public final class PickleballLocalStore {
                   echo "Install tools.dscode:pickleball or run: java -jar pickleball-<version>.jar ui \\"$PROJECT\\"" >&2
                   exit 1
                 fi
-                # One shared one-shot path. discover and workspace-seed write classpath.cache.
-                # help plan hint discover-hint status query events workspace-show workspace-edit workspace-seed
+                # Every named verb goes to the launcher. No arguments is the GUI.
+                # An unknown verb exits 2 from the launcher. It is never rewritten to ui.
                 VERB="${1:-}"
-                ONE_SHOT=0
-                case "$VERB" in
-                  help|plan|hint|discover-hint|status|query|events|workspace-show|workspace-edit|workspace-seed) ONE_SHOT=1 ;;
-                esac
+                if [ -z "$VERB" ]; then
+                  export PKB_OPEN_BOOTSTRAP=1
+                  exec "$JAVA" -jar "$JAR" ui "$PROJECT"
+                fi
                 CACHE=""
                 if [ -n "$VERSION" ]; then
                   CAND="$PROJECT/.pickleball/v/$VERSION/workbench/classpath.cache"
@@ -460,29 +460,27 @@ public final class PickleballLocalStore {
                   done
                   return 0
                 }
-                if [ "$ONE_SHOT" -eq 1 ]; then
-                  if cache_fresh; then
-                    exec "$JAVA" -cp "@$CACHE" tools.dscode.launcher.PickleballWorkbenchLauncher "$@"
-                  fi
-                  if [ "$VERB" = "help" ]; then
-                    export PKB_OPEN_BOOTSTRAP=1
-                    exec "$JAVA" -jar "$JAR" "$@"
-                  fi
-                  if [ -f "$PROJECT/mvnw" ]; then
-                    exec "$PROJECT/mvnw" -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java "-Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher" "-Dexec.classpathScope=test" "-Dexec.args=$*"
-                  fi
-                  if [ -f "$PROJECT/mvnw.cmd" ]; then
-                    exec "$PROJECT/mvnw.cmd" -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java "-Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher" "-Dexec.classpathScope=test" "-Dexec.args=$*"
-                  fi
-                  if [ -f "$PROJECT/gradlew" ]; then
-                    exec "$PROJECT/gradlew" -q pickleballWorkbench "-PpkbArgs=$*"
-                  fi
-                  if [ -f "$PROJECT/gradlew.bat" ]; then
-                    exec "$PROJECT/gradlew.bat" -q pickleballWorkbench "-PpkbArgs=$*"
-                  fi
+                if cache_fresh; then
+                  exec "$JAVA" -cp "@$CACHE" tools.dscode.launcher.PickleballWorkbenchLauncher "$@"
+                fi
+                if [ "$VERB" = "help" ]; then
+                  export PKB_OPEN_BOOTSTRAP=1
+                  exec "$JAVA" -jar "$JAR" "$@"
+                fi
+                if [ -f "$PROJECT/mvnw" ]; then
+                  exec "$PROJECT/mvnw" -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java "-Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher" "-Dexec.classpathScope=test" "-Dexec.args=$*"
+                fi
+                if [ -f "$PROJECT/mvnw.cmd" ]; then
+                  exec "$PROJECT/mvnw.cmd" -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java "-Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher" "-Dexec.classpathScope=test" "-Dexec.args=$*"
+                fi
+                if [ -f "$PROJECT/gradlew" ]; then
+                  exec "$PROJECT/gradlew" -q pickleballWorkbench "-PpkbArgs=$*"
+                fi
+                if [ -f "$PROJECT/gradlew.bat" ]; then
+                  exec "$PROJECT/gradlew.bat" -q pickleballWorkbench "-PpkbArgs=$*"
                 fi
                 export PKB_OPEN_BOOTSTRAP=1
-                exec "$JAVA" -jar "$JAR" ui "$PROJECT"
+                exec "$JAVA" -jar "$JAR" "$@"
                 """;
     }
 
@@ -570,39 +568,33 @@ public final class PickleballLocalStore {
                   exit /b 1
                 )
                 set "VERB=%~1"
-                set "ONE_SHOT=0"
-                if /I "%VERB%"=="help" set "ONE_SHOT=1"
-                if /I "%VERB%"=="plan" set "ONE_SHOT=1"
-                if /I "%VERB%"=="hint" set "ONE_SHOT=1"
-                if /I "%VERB%"=="discover-hint" set "ONE_SHOT=1"
-                if /I "%VERB%"=="status" set "ONE_SHOT=1"
-                if /I "%VERB%"=="query" set "ONE_SHOT=1"
-                if /I "%VERB%"=="events" set "ONE_SHOT=1"
-                if /I "%VERB%"=="workspace-show" set "ONE_SHOT=1"
-                if /I "%VERB%"=="workspace-edit" set "ONE_SHOT=1"
-                if /I "%VERB%"=="workspace-seed" set "ONE_SHOT=1"
                 set "CACHE="
                 if defined VERSION if exist "!PROJECT!\\.pickleball\\v\\!VERSION!\\workbench\\classpath.cache" set "CACHE=!PROJECT!\\.pickleball\\v\\!VERSION!\\workbench\\classpath.cache"
                 if not defined CACHE if exist "!PROJECT!\\.pickleball\\workbench\\classpath.cache" set "CACHE=!PROJECT!\\.pickleball\\workbench\\classpath.cache"
-                if "%ONE_SHOT%"=="1" if defined CACHE (
+                if "%VERB%"=="" (
+                  set "PKB_OPEN_BOOTSTRAP=1"
+                  "%JAVA%" -jar "%JAR%" ui "%PROJECT%"
+                  exit /b !ERRORLEVEL!
+                )
+                if defined CACHE (
                   "%JAVA%" -cp "@!CACHE!" tools.dscode.launcher.PickleballWorkbenchLauncher %*
                   exit /b !ERRORLEVEL!
                 )
-                if "%ONE_SHOT%"=="1" if /I "%VERB%"=="help" (
+                if /I "%VERB%"=="help" (
                   set "PKB_OPEN_BOOTSTRAP=1"
                   "%JAVA%" -jar "!JAR!" %*
                   exit /b !ERRORLEVEL!
                 )
-                if "%ONE_SHOT%"=="1" if exist "!PROJECT!\\mvnw.cmd" (
+                if exist "!PROJECT!\\mvnw.cmd" (
                   "!PROJECT!\\mvnw.cmd" -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java "-Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher" "-Dexec.classpathScope=test" "-Dexec.args=%*"
                   exit /b !ERRORLEVEL!
                 )
-                if "%ONE_SHOT%"=="1" if exist "!PROJECT!\\gradlew.bat" (
+                if exist "!PROJECT!\\gradlew.bat" (
                   "!PROJECT!\\gradlew.bat" -q pickleballWorkbench "-PpkbArgs=%*"
                   exit /b !ERRORLEVEL!
                 )
                 set "PKB_OPEN_BOOTSTRAP=1"
-                "%JAVA%" -jar "%JAR%" ui "%PROJECT%"
+                "%JAVA%" -jar "%JAR%" %*
                 """;
     }
 
@@ -681,7 +673,6 @@ public final class PickleballLocalStore {
                   throw 'Pickleball Workbench: no pickleball-*.jar found in Maven local or beside this script.'
                 }
                 $verb = if ($args.Count -gt 0) { [string]$args[0] } else { '' }
-                $oneShots = @('help','plan','hint','discover-hint','status','query','events','workspace-show','workspace-edit','workspace-seed')
                 $cache = $null
                 if ($version) {
                   $candidateCache = Join-Path $project ".pickleball/v/$version/workbench/classpath.cache"
@@ -701,29 +692,32 @@ public final class PickleballLocalStore {
                     }
                   }
                 }
-                if ($oneShots -contains $verb) {
-                  if ($cacheFresh) {
-                    & $java -cp "@$cache" tools.dscode.launcher.PickleballWorkbenchLauncher @args
-                    exit $LASTEXITCODE
-                  }
-                  if ($verb -eq 'help') {
-                    $env:PKB_OPEN_BOOTSTRAP = '1'
-                    & $java -jar $jar @args
-                    exit $LASTEXITCODE
-                  }
-                  $mvnw = Join-Path $project 'mvnw.cmd'
-                  if (Test-Path $mvnw) {
-                    & $mvnw -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java "-Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher" "-Dexec.classpathScope=test" "-Dexec.args=$($args -join ' ')"
-                    exit $LASTEXITCODE
-                  }
-                  $gradlew = Join-Path $project 'gradlew.bat'
-                  if (Test-Path $gradlew) {
-                    & $gradlew -q pickleballWorkbench "-PpkbArgs=$($args -join ' ')"
-                    exit $LASTEXITCODE
-                  }
+                if (-not $verb) {
+                  $env:PKB_OPEN_BOOTSTRAP = '1'
+                  & $java -jar $jar ui $project
+                  exit $LASTEXITCODE
+                }
+                if ($cacheFresh) {
+                  & $java -cp "@$cache" tools.dscode.launcher.PickleballWorkbenchLauncher @args
+                  exit $LASTEXITCODE
+                }
+                if ($verb -eq 'help') {
+                  $env:PKB_OPEN_BOOTSTRAP = '1'
+                  & $java -jar $jar @args
+                  exit $LASTEXITCODE
+                }
+                $mvnw = Join-Path $project 'mvnw.cmd'
+                if (Test-Path $mvnw) {
+                  & $mvnw -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java "-Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher" "-Dexec.classpathScope=test" "-Dexec.args=$($args -join ' ')"
+                  exit $LASTEXITCODE
+                }
+                $gradlew = Join-Path $project 'gradlew.bat'
+                if (Test-Path $gradlew) {
+                  & $gradlew -q pickleballWorkbench "-PpkbArgs=$($args -join ' ')"
+                  exit $LASTEXITCODE
                 }
                 $env:PKB_OPEN_BOOTSTRAP = '1'
-                & $java -jar $jar ui $project
+                & $java -jar $jar @args
                 """;
     }
 

@@ -13,7 +13,7 @@ import java.util.TreeMap;
 
 /**
  * Shared CLI and MCP text. Secret values go through {@link SecretRedactor}.
- * ASCII-only rendering is added with the path merge; this class is the one formatter.
+ * Ellipsis is ASCII {@code ...}.
  */
 public final class OutputFormatter {
     private OutputFormatter() {
@@ -68,6 +68,12 @@ public final class OutputFormatter {
         return value;
     }
 
+    /** U+2026 is a diamond on a default Windows console. CLI text uses ASCII. */
+    public static String ascii(String text) {
+        if (text == null) return "";
+        return text.replace("\u2026", "...");
+    }
+
     public static PrintStream wrap(PrintStream delegate) {
         if (delegate instanceof RedactingPrintStream) return delegate;
         return new RedactingPrintStream(delegate);
@@ -98,7 +104,7 @@ public final class OutputFormatter {
 
         @Override
         public void print(String s) {
-            super.print(SecretRedactor.scrub(s));
+            super.print(ascii(SecretRedactor.scrub(s)));
         }
 
         @Override

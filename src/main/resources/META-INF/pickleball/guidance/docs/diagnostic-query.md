@@ -20,7 +20,7 @@ Stdout is one compact JSON object. Exit 0 is a page. Exit 2 is usage (`error` an
 | `query errors` | `wb_errors` | Failures. `stackHead` is the first stack line, copied from the failure event onto a failed step that has none. An empty `scenario_end` is not an error |
 | `query tail` | (launcher only) | Newest lines of `.pickleball/agent-log` for that run, then `*.log` under `.pickleball/runs/<id>`. Requires `--run-id` |
 
-Default `limit` is 20 (max 100). A short page sets `nextCursor` and `truncated` to `…+N more, use cursor`. Pass `--fields=runId,outcome` to drop every other item field. The default page is at most 4096 UTF-8 bytes; extra items move to the next cursor instead of blowing the context.
+Default `limit` is 20 (max 100). A short page sets `nextCursor` and `truncated` to `...+N more, use cursor`. Pass `--fields=runId,outcome` to drop every other item field. The default page is at most 4096 UTF-8 bytes; extra items move to the next cursor instead of blowing the context.
 
 `where` is the project-relative file that answered the row. `DiagnosticQuery` and `AgentCoordination.findRunIndex` both call `RunIndexFinder`: `.pickleball/runs/<id>/diagnostic/<id>/run-index.json`, then `diagnostic/run-index.json`, then `reports/diagnostic-runs/<id>/run-index.json`, then a `record.json` `dataPath`, then a depth-6 walk. The parent folder name matches before the JSON `runId`. `browser-profile`, `config`, and `scratch` are not walked. A JSON body over 2 MB is not read. When no index exists and `reports/diagnostic-runs/<id>` is a directory, the query still reads scenario files there. Screenshot bytes, traces, and absolute paths are not in the default payload. An artifact row carries an id (`frame-1.png`) and a relative `where`.
 

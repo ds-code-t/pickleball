@@ -138,6 +138,44 @@ class PickleballLocalStoreTest {
         assertTrue(recorded.contains("hint"), recorded);
         assertFalse(recorded.contains("mvnw"), recorded);
         assertFalse(Files.isRegularFile(project.resolve("maven-ran")), output);
+
+        ProcessBuilder discover = new ProcessBuilder(script.toString(), "discover", "--tags=@smoke")
+                .directory(project.toFile())
+                .redirectErrorStream(true);
+        discover.environment().put("JAVA_HOME", javaHome.toString());
+        discover.environment().put("PATH", bin + ":" + discover.environment().getOrDefault("PATH", ""));
+        Process discoverProcess = discover.start();
+        String discoverOut = new String(discoverProcess.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+        assertEquals(0, discoverProcess.waitFor(), discoverOut);
+        String discovered = Files.readString(bin.resolve("recorded"));
+        assertTrue(discovered.contains("discover"), discovered);
+        assertTrue(discovered.contains("tools.dscode.launcher.PickleballWorkbenchLauncher"), discovered);
+        assertFalse(discovered.contains(" ui "), discovered);
+
+        ProcessBuilder unknown = new ProcessBuilder(script.toString(), "not-a-verb")
+                .directory(project.toFile())
+                .redirectErrorStream(true);
+        unknown.environment().put("JAVA_HOME", javaHome.toString());
+        unknown.environment().put("PATH", bin + ":" + unknown.environment().getOrDefault("PATH", ""));
+        Process unknownProcess = unknown.start();
+        String unknownOut = new String(unknownProcess.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+        assertEquals(0, unknownProcess.waitFor(), unknownOut);
+        String unknownRecorded = Files.readString(bin.resolve("recorded"));
+        assertTrue(unknownRecorded.contains("not-a-verb"), unknownRecorded);
+        assertTrue(unknownRecorded.contains("tools.dscode.launcher.PickleballWorkbenchLauncher"), unknownRecorded);
+        assertFalse(unknownRecorded.lines().anyMatch("ui"::equals), unknownRecorded);
+
+        ProcessBuilder gui = new ProcessBuilder(script.toString())
+                .directory(project.toFile())
+                .redirectErrorStream(true);
+        gui.environment().put("JAVA_HOME", javaHome.toString());
+        gui.environment().put("PATH", bin + ":" + gui.environment().getOrDefault("PATH", ""));
+        Process guiProcess = gui.start();
+        String guiOut = new String(guiProcess.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+        assertEquals(0, guiProcess.waitFor(), guiOut);
+        String guiRecorded = Files.readString(bin.resolve("recorded"));
+        assertTrue(guiRecorded.lines().anyMatch("ui"::equals), guiRecorded);
+        assertFalse(guiRecorded.contains("PickleballWorkbenchLauncher"), guiRecorded);
     }
 
     @Test

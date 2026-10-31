@@ -28,7 +28,7 @@ public final class DiagnosticQuery {
     public static final int MAX_LIMIT = 100;
     /** Default compact JSON stays under this many UTF-8 bytes. */
     public static final int DEFAULT_BUDGET_BYTES = 4096;
-    public static final String TRUNCATION_MARK = "…+";
+    public static final String TRUNCATION_MARK = "...+";
 
     private static final int TEXT_LIMIT = 160;
     private static final int SCAN_LINES = 20_000;
@@ -1062,7 +1062,7 @@ public final class DiagnosticQuery {
         if (value == null) return null;
         String collapsed = stripInvisibles(value).replace('\n', ' ').replace('\r', ' ').strip();
         if (collapsed.length() <= TEXT_LIMIT) return collapsed;
-        return collapsed.substring(0, TEXT_LIMIT) + "…";
+        return collapsed.substring(0, TEXT_LIMIT) + "...";
     }
 
     private static String oneLine(String value) {

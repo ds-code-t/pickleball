@@ -85,7 +85,7 @@ final class ControlBridgeRuntime implements AutoCloseable {
         long pid = ProcessHandle.current().pid();
         ControlBridgeEventRecorder eventRecorder = new ControlBridgeEventRecorder();
         ControlBridgeCoordinator coordinator = new ControlBridgeCoordinator(
-                runtimeId, pid, ControlProtocol.WORKER_CAPABILITIES, pauseFirstScenario
+                runtimeId, pid, ControlProtocol.WORKER_CAPABILITIES, pauseFirstScenario, eventRecorder
         );
 
         HttpServer server = null;

@@ -301,7 +301,7 @@ final class WorkbenchMcpTools {
                 ), "runId"),
                 args -> retrieval("props", args));
         add("wb_errors",
-                "List failure records with a one-line stack head. Truncation says …+N more, use cursor.",
+                "List failure records with a one-line stack head. Truncation says ...+N more, use cursor.",
                 schema(Map.of(
                         "runId", stringProperty("Optional run id. Omit to scan the catalog."),
                         "scenarioId", stringProperty("Optional scenario id."),

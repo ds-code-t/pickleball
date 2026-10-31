@@ -742,7 +742,7 @@ public final class WorkbenchSessionCommands {
                 body.put("limit", limit);
                 if (end < kept.size()) {
                     body.put("nextCursor", Integer.toString(end));
-                    body.put("truncated", "…+" + (kept.size() - end) + " more, use cursor");
+                    body.put("truncated", "...+" + (kept.size() - end) + " more, use cursor");
                 }
                 printJson(out, body);
                 return 0;
@@ -753,7 +753,7 @@ public final class WorkbenchSessionCommands {
                 for (JsonNode event : page) out.println(compactEvent(event));
             }
             if (end < kept.size()) {
-                out.println("…+" + (kept.size() - end) + " more, use cursor");
+                out.println("...+" + (kept.size() - end) + " more, use cursor");
                 out.println("nextCursor=" + end);
             }
             out.println(formatReport(timingOf(events, runStarted(parsed), Instant.now()), sleepGaps(http, state)));

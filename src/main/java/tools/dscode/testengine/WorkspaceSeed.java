@@ -105,9 +105,12 @@ public final class WorkspaceSeed {
         Workspace.copyConfigs(source, workspace);
         Set<String> keep = runnerComputedSecretKeys(values);
         Workspace.writeRunVars(workspace, values, keep);
-        List<String> warnings = new ArrayList<>(Workspace.literalSecretWarnings(Workspace.configsDirectory(workspace)));
-        warnings.addAll(runnerComputedSecretWarnings(values));
-        for (String warning : warnings) System.err.println(warning);
+        List<String> warnings = new ArrayList<>(new java.util.LinkedHashSet<>(
+                java.util.stream.Stream.concat(
+                        Workspace.literalSecretWarnings(Workspace.configsDirectory(workspace)).stream(),
+                        runnerComputedSecretWarnings(values).stream()
+                ).toList()
+        ));
         return warnings;
     }
 
@@ -376,7 +379,9 @@ public final class WorkspaceSeed {
         try {
             seed(parsed.project(), parsed.runId(), parsed.reseed(), parsed.fromRunId(), null, workspace -> {
                 PickleballRunner runner = DynamicSuiteBootstrap.initializeFromRuntimeClasspath();
-                writeCaptured(workspace, runner, parsed.reseed());
+                for (String warning : writeCaptured(workspace, runner, parsed.reseed())) {
+                    System.err.println(warning);
+                }
             });
             System.out.println("workspace=" + Workspace.directory(parsed.project(), parsed.runId()));
             return 0;

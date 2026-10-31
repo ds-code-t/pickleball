@@ -10,6 +10,7 @@ import tools.dscode.testengine.PickleballRunner;
 import tools.dscode.testengine.WorkspaceSeed;
 
 import java.io.IOException;
+import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -120,11 +121,57 @@ public final class WorkspaceLaunch {
             return;
         }
         PickleballRunner runner = DynamicSuiteBootstrap.initializeFromRuntimeClasspath();
-        String fallback = defaultSuiteWarning(runner == null ? null : runner.getClass());
-        if (fallback != null) warn(warnings, fallback);
+        boolean fallback = DynamicSuiteBootstrap.isDefaultSuite(runner == null ? null : runner.getClass());
+        if (fallback && compileAndPublishClasspath(project, warnings)) {
+            forkSeed(project, workspace, reseed, cachedClasspath(project), warnings);
+            return;
+        }
+        String message = defaultSuiteWarning(runner == null ? null : runner.getClass());
+        if (message != null) warn(warnings, message);
         for (String warning : WorkspaceSeed.writeCaptured(workspace, runner, reseed)) {
             warn(warnings, warning);
         }
+    }
+
+    /**
+     * Compile test classes, then publish a worker classpath so the seed fork
+     * sees the consumer runner. The launcher JVM does not.
+     */
+    private static boolean compileAndPublishClasspath(Path project, Appendable warnings) {
+        if (project == null) return false;
+        Path root = project.toAbsolutePath().normalize();
+        boolean maven = Files.isRegularFile(root.resolve("pom.xml"));
+        boolean gradle = Files.isRegularFile(root.resolve("build.gradle"))
+                || Files.isRegularFile(root.resolve("build.gradle.kts"));
+        if (!maven && !gradle) return false;
+        try {
+            java.io.ByteArrayOutputStream sink = new java.io.ByteArrayOutputStream();
+            PrintStream quiet = new PrintStream(sink, true, StandardCharsets.UTF_8);
+            int exit = tools.dscode.common.reporting.diagnostic.ConsumerMavenTestRunner.run(
+                    root,
+                    tools.dscode.common.reporting.diagnostic.ConsumerMavenTestRunner.compileCommand(root),
+                    quiet,
+                    quiet
+            );
+            if (exit != 0) {
+                warn(warnings, "WARNING: test-compile exited " + exit + ".");
+                return false;
+            }
+        } catch (RuntimeException failure) {
+            warn(warnings, "WARNING: test-compile did not run: " + failure.getMessage());
+            return false;
+        }
+        List<String> entries = WorkbenchOneShotLaunch.testRuntimeEntries(root, warnings);
+        if (entries.isEmpty()) return false;
+        Path file = PickleballLocalLayout.workbenchStateRoot(root).resolve("classpath.txt");
+        try {
+            Files.createDirectories(file.getParent());
+            Files.writeString(file, String.join("\n", entries) + "\n", StandardCharsets.UTF_8);
+        } catch (IOException failure) {
+            warn(warnings, "WARNING: could not write classpath.txt: " + failure.getMessage());
+            return false;
+        }
+        return !cachedClasspath(root).isEmpty();
     }
 
     static List<String> cachedClasspath(Path project) {

@@ -339,6 +339,19 @@ public final class WorkbenchOneShotLaunch {
         return jars;
     }
 
+    /** Test output directories plus the wrapper-resolved runtime classpath. */
+    static List<String> testRuntimeEntries(Path project, Appendable warnings) {
+        try {
+            List<String> entries = new ArrayList<>(existingOutputs(project));
+            entries.addAll(resolveWithWrapper(project, warnings));
+            addCodeSource(entries);
+            return existingUnique(entries);
+        } catch (IOException failure) {
+            warn(warnings, "WARNING: could not resolve the test classpath: " + failure.getMessage());
+            return List.of();
+        }
+    }
+
     private static List<String> resolveWithWrapper(Path project, Appendable warnings) throws IOException {
         Path root = project.toAbsolutePath().normalize();
         boolean maven = Files.isRegularFile(root.resolve("pom.xml"))

@@ -64,7 +64,7 @@ final class WorkbenchCliHelp {
             Map.entry("--run-timeout", "Usage: --run-timeout=<seconds>\nPositive whole number of seconds. discover, confirm, and execute-step."),
             Map.entry("--kind", "Usage: --kind=run|scenario|step|event|property|artifact|error|log\nquery and query get. Default for query is event when --run-id is set, otherwise run."),
             Map.entry("--scenario", "Usage: --scenario=<id>\nScenario directory name under the run. query get, query query, and query errors."),
-            Map.entry("--cursor", "Usage: --cursor=<token>\nPage token from nextCursor. The truncated line says …+N more, use cursor."),
+            Map.entry("--cursor", "Usage: --cursor=<token>\nPage token from nextCursor. The truncated line says ...+N more, use cursor."),
             Map.entry("--fields", "Usage: --fields=<a,b>\nComma-separated item fields. Omit it for the compact default."),
             Map.entry("--text-file", "Usage: --text-file=<path>\nUTF-8 file used as execute-step --text. Keeps inner quotes that a shell would strip."),
             Map.entry("--text-b64", "Usage: --text-b64=<base64>\nBase64 of the UTF-8 step text. Use this when the shell strips quotes."),

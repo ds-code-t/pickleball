@@ -40,6 +40,14 @@ public final class ConsumerMavenTestRunner {
         return build(projectRoot, workspace, selection, featurePaths, "workbench-discover");
     }
 
+    public static List<String> compileCommand(Path projectRoot) {
+        List<String> command = new ArrayList<>(launchPrefix(wrapper(projectRoot)));
+        boolean mavenProject = Files.isRegularFile(projectRoot.toAbsolutePath().normalize().resolve("pom.xml"));
+        if (mavenProject) command.add("-q");
+        command.add(mavenProject ? "test-compile" : "testClasses");
+        return List.copyOf(command);
+    }
+
     public static List<String> confirmCommand(Path projectRoot, Path workspace, Map<String, String> selection) {
         return confirmCommand(projectRoot, workspace, selection, null);
     }

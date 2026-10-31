@@ -103,12 +103,20 @@ final class ControlBridgeCoordinator implements ControlHookHandler, AutoCloseabl
     private final AtomicReference<CompletableFuture<ControlBridgeStatus>> nextPauseFuture = new AtomicReference<>();
 
     private volatile boolean closed;
+    private final ControlBridgeEventRecorder eventRecorder;
 
-    ControlBridgeCoordinator(String runtimeId, long pid, List<String> capabilities, boolean pauseFirstScenario) {
+    ControlBridgeCoordinator(
+            String runtimeId,
+            long pid,
+            List<String> capabilities,
+            boolean pauseFirstScenario,
+            ControlBridgeEventRecorder eventRecorder
+    ) {
         this.runtimeId = runtimeId;
         this.pid = pid;
         this.capabilities = List.copyOf(capabilities);
         this.pauseNextScenario.set(pauseFirstScenario);
+        this.eventRecorder = eventRecorder;
     }
 
     @Override
@@ -250,7 +258,15 @@ final class ControlBridgeCoordinator implements ControlHookHandler, AutoCloseabl
         return submit(
                 lane,
                 commandTimeout(timeoutSeconds),
-                () -> fromControlResult(DynamicControl.executeStep(text, argument == null ? "" : argument), lane),
+                () -> {
+                    ControlBridgeCallResult result = fromControlResult(
+                            DynamicControl.executeStep(text, argument == null ? "" : argument), lane
+                    );
+                    if (eventRecorder != null) {
+                        eventRecorder.recordExecutedStep(lane.scenarioId, lane.scenarioName, text, result.status());
+                    }
+                    return result;
+                },
                 (type, message) -> failed(type, message, lane.status(lanes.size())),
                 message -> unavailable(message, lane.status(lanes.size()))
         );

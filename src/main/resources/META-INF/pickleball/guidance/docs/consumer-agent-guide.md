@@ -59,7 +59,7 @@ summary status=PASSED
 
 ## Query loop
 
-`query runs|get|search|errors|tail` (tail is newest first). Read `…+N more, use cursor`. Bad UTF-8 is named in `decodeWarnings` and does not fail the search. Agents use the shallowest evidence layer and keep terminal logging minimal. `pkb_reportretention=failed` keeps failing scenarios.
+`query runs|get|search|errors|tail` (tail is newest first). Read `...+N more, use cursor`. Bad UTF-8 is named in `decodeWarnings` and does not fail the search. Agents use the shallowest evidence layer and keep terminal logging minimal. `pkb_reportretention=failed` keeps failing scenarios.
 
 ## First-read
 

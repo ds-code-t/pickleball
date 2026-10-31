@@ -80,12 +80,12 @@ class DiagnosticQueryTest {
         Files.writeString(root.resolve("run-catalog.json"), runs.toString());
 
         DiagnosticQuery.Outcome first = DiagnosticQuery.query(project, Map.of("op", "runs", "limit", 10));
-        assertTrue(first.json().contains("\"truncated\":\"…+15 more, use cursor\""), first.json());
+        assertTrue(first.json().contains("\"truncated\":\"...+15 more, use cursor\""), first.json());
         assertTrue(first.json().contains("\"nextCursor\":\"10\""));
         DiagnosticQuery.Outcome second = DiagnosticQuery.query(project, Map.of("op", "runs", "limit", 10, "cursor", "10"));
         assertTrue(second.json().contains("run-10"), second.json());
         assertFalse(second.json().contains("run-0\""));
-        assertTrue(second.json().contains("…+5 more, use cursor"));
+        assertTrue(second.json().contains("...+5 more, use cursor"));
 
         DiagnosticQuery.Outcome fields = DiagnosticQuery.query(project, Map.of(
                 "op", "runs", "limit", 1, "fields", "runId,outcome"
@@ -112,7 +112,7 @@ class DiagnosticQueryTest {
         assertEquals(0, outcome.exit());
         assertTrue(outcome.json().getBytes(StandardCharsets.UTF_8).length <= 280
                 || ((List<?>) outcome.body().get("items")).size() <= 1, outcome.json());
-        assertTrue(outcome.json().contains("…+"));
+        assertTrue(outcome.json().contains("...+"));
         assertTrue(outcome.json().contains("more, use cursor"));
     }
 

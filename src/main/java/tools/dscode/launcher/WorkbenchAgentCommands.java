@@ -174,11 +174,15 @@ public final class WorkbenchAgentCommands {
 
     private static void warnRunnerSecrets(Path project, PrintStream err) {
         if (err == null) return;
-        PKB_props.ResolvedRunVars resolved = tools.dscode.testengine.PickleballRunner.previewLaunch(project, false);
-        Map<String, String> values = PKB_props.parseAssignments(resolved.runProfile());
-        for (String warning : WorkspaceSeed.runnerComputedSecretWarnings(values)) {
-            err.println(warning);
+        Map<String, String> raw = new LinkedHashMap<>();
+        tools.dscode.testengine.PickleballRunner runner = tools.dscode.testengine.DynamicSuiteBootstrap.initializeFromRuntimeClasspath();
+        if (runner != null && runner.values() != null) {
+            runner.values().forEach((key, value) -> {
+                if (key != null && value != null) raw.put(key, value);
+            });
         }
+        java.util.LinkedHashSet<String> once = new java.util.LinkedHashSet<>(WorkspaceSeed.runnerComputedSecretWarnings(raw));
+        for (String warning : once) err.println(warning);
     }
 
     private static int help(String[] args, PrintStream out, PrintStream err) {
