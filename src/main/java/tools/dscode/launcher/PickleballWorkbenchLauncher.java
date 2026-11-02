@@ -131,7 +131,9 @@ public final class PickleballWorkbenchLauncher {
      * Keep the real status when this process is Maven {@code exec:java}.
      * That plugin can rewrite {@code System.exit} into an exception and Maven
      * then exits 1. {@code Runtime.halt} is not rewritten, so a rewritten or
-     * ignored {@code System.exit} still ends the process with {@code code}.
+     * ignored {@code System.exit} still ends the JVM with {@code code}.
+     * Apache {@code mvn.cmd} then maps every non-zero JVM status to 1; the
+     * project {@code mvnw.cmd} launches this same JVM and returns {@code code}.
      */
     static void exitProcess(int code) {
         keepExitCode(code, System::exit, status -> Runtime.getRuntime().halt(status));

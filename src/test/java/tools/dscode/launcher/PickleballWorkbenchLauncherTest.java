@@ -113,6 +113,23 @@ class PickleballWorkbenchLauncherTest {
     }
 
     @Test
+    void windowsWrapperReturnsTheJvmStatusInsteadOfMvnCmdCollapse() throws Exception {
+        String script = Files.readString(Path.of("maven-consumer-project", "mvnw.cmd"));
+        assertTrue(script.contains("org.codehaus.plexus.classworlds.launcher.Launcher"), script);
+        assertTrue(script.contains("set \"PKB_EXIT=%ERRORLEVEL%\""), script);
+        assertTrue(script.contains("exit /b %PKB_EXIT%"), script);
+        String homeLine = "Write-Output \"MAVEN_HOME=$MAVEN_HOME\"";
+        int homes = 0;
+        for (int from = 0; (from = script.indexOf(homeLine, from)) >= 0; from += homeLine.length()) {
+            homes++;
+        }
+        assertEquals(2, homes, script);
+        assertFalse(script.contains("(\"%__MVNW_CMD__%\" %*)"), script);
+        assertFalse(script.contains("set ERROR_CODE=1"), script);
+        assertFalse(script.contains("if ERRORLEVEL 1 goto error"), script);
+    }
+
+    @Test
     void extractUsesVersionedWorkbenchWhenCurrentJsonIsComplete() throws Exception {
         PickleballLocalLayout.writeCurrent(
                 tempDir.resolve(".pickleball"),
