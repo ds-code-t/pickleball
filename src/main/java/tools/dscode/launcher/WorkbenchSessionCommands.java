@@ -523,6 +523,7 @@ public final class WorkbenchSessionCommands {
                     parsed.runVars()
             ));
         } catch (IOException failure) {
+            WorkbenchSpeed.release(project);
             String reason = "Session start failed: " + WorkbenchCliErrors.explain(failure);
             finishReason(project, run.runId(), reason, out);
             throw new IllegalStateException(reason, failure);
@@ -553,9 +554,10 @@ public final class WorkbenchSessionCommands {
         if (outcome.kind() != SessionHealthWait.Kind.TIMED_OUT) {
             err.println("Workbench session process exited before becoming healthy. See " + logFile);
             finishReason(project, run.runId(), "Session start failed: the process exited before it was healthy.", out);
+            WorkbenchSpeed.release(project);
             return 1;
         }
-        destroyTimedOutSession(process, sessionFile);
+        destroyTimedOutSession(process, sessionFile, project);
         try {
             AgentCoordination.appendLog(
                     project,
@@ -846,6 +848,7 @@ public final class WorkbenchSessionCommands {
     ) {
         Integer refused = refusedDriver(parsed, err);
         if (refused != null) return refused;
+        WorkbenchSpeed.release(parsed.project());
         Optional<SessionState> state = resolveSession(parsed, http);
         if (state.isEmpty()) {
             out.println("ACK SESSION already-stopped");
@@ -909,7 +912,7 @@ public final class WorkbenchSessionCommands {
         }
     }
 
-    private static void destroyTimedOutSession(Process process, Path sessionFile) {
+    private static void destroyTimedOutSession(Process process, Path sessionFile, Path project) {
         if (process != null) {
             ProcessHandle handle;
             List<ProcessHandle> descendants;
@@ -948,6 +951,7 @@ public final class WorkbenchSessionCommands {
             if (handle != null) ProcessTrees.killTree(handle);
         }
         deleteSessionFile(sessionFile);
+        WorkbenchSpeed.release(project);
     }
 
     private static void killTree(long pid) {

@@ -13,6 +13,8 @@ import java.util.Optional;
  */
 public final class WarmProcess {
     public static final String FILE_NAME = "warm-jvm.v1";
+    /** Idle before a warm JVM exits. Blank, non-numeric, or non-positive config stays here. */
+    public static final long DEFAULT_IDLE_SECONDS = 900;
 
     private WarmProcess() {
     }
@@ -69,6 +71,16 @@ public final class WarmProcess {
             return Optional.empty();
         }
         return handle;
+    }
+
+    /**
+     * Deletes the handle, then kills that pid and its descendants.
+     * Delete first so a replacement JVM can write a new handle while the old tree dies.
+     */
+    public static void release(Path stateRoot) {
+        Optional<Handle> handle = read(stateRoot);
+        delete(stateRoot);
+        handle.ifPresent(found -> ProcessTree.kill(found.pid()));
     }
 
     public static void delete(Path stateRoot) {

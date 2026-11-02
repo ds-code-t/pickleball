@@ -166,11 +166,13 @@ def main() -> int:
         stopped = str(finished.get("stoppedAt") or "")
         assert_true(stopped.strip() != "", "finish did not set stoppedAt on " + RUN)
     finally:
+        warm_before_stop = warm_pids()
         if (CONSUMER / ".pickleball" / "runs" / RUN).exists():
             try:
                 run_stage(timings, "stop", ["stop", "--run-id=" + RUN, "--force"], allow_exit={0, 1, 2})
             except SystemExit:
                 pass
+        assert_warm_dead(warm_before_stop)
         write_timings(timings)
     assert_session_start(timings)
     print("consumer-sim OK")
@@ -222,9 +224,67 @@ def stop_warm(handle: Path) -> None:
     try:
         lines = handle.read_text(encoding="utf-8", errors="replace").splitlines()
         if len(lines) >= 2 and lines[1].strip().isdigit():
-            os.kill(int(lines[1].strip()), 15)
+            pid = int(lines[1].strip())
+            if os.name == "nt":
+                subprocess.run(
+                    ["taskkill", "/PID", str(pid), "/T", "/F"],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
+            else:
+                os.kill(pid, 15)
     except OSError:
         return
+
+
+def warm_pids() -> list[int]:
+    state = CONSUMER / ".pickleball"
+    pids: list[int] = []
+    if not state.is_dir():
+        return pids
+    handles = list(state.glob("workbench/warm-jvm.v1")) + list(state.glob("v/*/workbench/warm-jvm.v1"))
+    for handle in handles:
+        try:
+            lines = handle.read_text(encoding="utf-8", errors="replace").splitlines()
+        except OSError:
+            continue
+        if len(lines) >= 2 and lines[1].strip().isdigit():
+            pids.append(int(lines[1].strip()))
+    return pids
+
+
+def pid_alive(pid: int) -> bool:
+    if pid <= 0:
+        return False
+    if os.name == "nt":
+        completed = subprocess.run(
+            ["tasklist", "/FI", f"PID eq {pid}", "/FO", "CSV", "/NH"],
+            capture_output=True,
+            text=True,
+        )
+        return f'"{pid}"' in (completed.stdout or "")
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    except OSError:
+        return False
+    return True
+
+
+def assert_warm_dead(pids: list[int]) -> None:
+    """stop, idle, or owner death must leave no warm JVM. tasklist on Windows; no signal 0 there."""
+    deadline = time.time() + 15
+    pending = list(pids)
+    while time.time() < deadline:
+        pending = [pid for pid in pending if pid_alive(pid)]
+        pending.extend(pid for pid in warm_pids() if pid not in pending and pid_alive(pid))
+        if not pending:
+            return
+        time.sleep(0.2)
+    raise SystemExit("consumer-sim: warm JVM still alive after stop: " + ",".join(str(pid) for pid in pending))
 
 
 def assert_launch_gap(run_id: str) -> None:

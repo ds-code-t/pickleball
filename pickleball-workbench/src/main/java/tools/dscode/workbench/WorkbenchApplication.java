@@ -11,7 +11,9 @@ import tools.dscode.workbench.mcp.WorkbenchAttachServer;
 import tools.dscode.workbench.mcp.WorkbenchMcpServer;
 import tools.dscode.workbench.sync.WorkbenchManifest;
 import tools.dscode.workbench.sync.WorkbenchSynchronizer;
+import tools.dscode.control.protocol.PickleballLocalLayout;
 import tools.dscode.control.protocol.WindowDriver;
+import tools.dscode.control.protocol.speed.WarmProcess;
 import tools.dscode.workbench.ui.WorkbenchUi;
 import tools.dscode.workbench.worker.WorkbenchLiveSession;
 import tools.dscode.workbench.worker.WorkbenchWorkerManager;
@@ -302,6 +304,8 @@ public final class WorkbenchApplication {
         } catch (RuntimeException failure) {
             err.println("Workbench CLI isolate failed: " + failure.getMessage());
             return 1;
+        } finally {
+            releaseWarm(parsed.project());
         }
     }
 
@@ -345,6 +349,7 @@ public final class WorkbenchApplication {
                 } catch (RuntimeException ignored) {
                     // Best-effort worker stop on session shutdown.
                 }
+                releaseWarm(parsed.project());
                 done.countDown();
             };
             Path stateFile = parsed.sessionFile() == null
@@ -370,7 +375,13 @@ public final class WorkbenchApplication {
         } finally {
             if (server != null) server.close();
             if (controller != null) controller.close();
+            releaseWarm(parsed.project());
         }
+    }
+
+    private static void releaseWarm(Path project) {
+        if (project == null) return;
+        WarmProcess.release(PickleballLocalLayout.workbenchStateRoot(project));
     }
 
     private static void printReplayedRunVars(PrintStream out, Map<String, String> workerProperties) {

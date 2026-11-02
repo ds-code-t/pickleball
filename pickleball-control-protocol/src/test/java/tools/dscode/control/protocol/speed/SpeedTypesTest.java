@@ -81,6 +81,16 @@ class SpeedTypesTest {
     }
 
     @Test
+    void releaseDropsADeadHandleWithoutWaiting() throws Exception {
+        WarmProcess.write(root, new WarmProcess.Handle(1_000_000_001L, 9, "watch"));
+        long started = System.nanoTime();
+        WarmProcess.release(root);
+        long elapsedMs = (System.nanoTime() - started) / 1_000_000L;
+        assertFalse(Files.isRegularFile(WarmProcess.file(root)));
+        assertTrue(elapsedMs < 2_000, "release waited " + elapsedMs + "ms");
+    }
+
+    @Test
     void warmHandleIsReusableOnlyWhileThePidAndHashMatch() throws Exception {
         Process process = new ProcessBuilder("sleep", "30").start();
         try {

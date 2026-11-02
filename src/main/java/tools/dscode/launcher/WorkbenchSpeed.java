@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
 
 /**
  * One speed path for discover, confirm, and isolate. Cache hit skips Maven
@@ -29,6 +30,9 @@ import java.util.concurrent.TimeUnit;
 public final class WorkbenchSpeed {
     public static final String MODE_PROPERTY = "pkb_workbench_speed";
     public static final String MODE_ENV = "PKB_WORKBENCH_SPEED";
+    public static final String IDLE_PROPERTY = "pkb_workbench_warm_idle_timeout";
+    public static final String IDLE_ENV = "PKB_WORKBENCH_WARM_IDLE_TIMEOUT";
+    public static final String IDLE_RUNVAR = "pkb_runvars.pkb_workbench_warm_idle_timeout";
 
     private static final ThreadLocal<Boolean> DIRECT = ThreadLocal.withInitial(() -> Boolean.FALSE);
 
@@ -52,6 +56,42 @@ public final class WorkbenchSpeed {
 
     static boolean directEnabled() {
         return Boolean.TRUE.equals(DIRECT.get()) && !sequential();
+    }
+
+    /**
+     * Same key order as the Workbench worker start timeout.
+     * System property, environment, dotted {@code pkb_runvars} property,
+     * then a compact {@code pkb_runvars} member.
+     * Blank, non-numeric, or not greater than zero stays {@link WarmProcess#DEFAULT_IDLE_SECONDS}.
+     * Read when the warm JVM starts. A running JVM does not re-read it.
+     */
+    static long idleSeconds() {
+        return idleSeconds(System::getProperty, System::getenv);
+    }
+
+    static long idleSeconds(Function<String, String> property, Function<String, String> env) {
+        Function<String, String> readProperty = property == null ? key -> null : property;
+        Function<String, String> readEnv = env == null ? key -> null : env;
+        String raw = firstNonBlank(
+                readProperty.apply(IDLE_PROPERTY),
+                readEnv.apply(IDLE_ENV),
+                readProperty.apply(IDLE_RUNVAR),
+                compactValue(readProperty.apply("pkb_runvars"), IDLE_PROPERTY)
+        );
+        if (raw == null || raw.isBlank()) return WarmProcess.DEFAULT_IDLE_SECONDS;
+        try {
+            long seconds = Long.parseLong(raw.trim());
+            if (seconds <= 0) return WarmProcess.DEFAULT_IDLE_SECONDS;
+            return seconds;
+        } catch (NumberFormatException failure) {
+            return WarmProcess.DEFAULT_IDLE_SECONDS;
+        }
+    }
+
+    /** Stops the warm JVM for this project, including descendants. No handle is a no-op. */
+    static void release(Path project) {
+        if (project == null) return;
+        WarmProcess.release(state(project));
     }
 
     /**
@@ -157,6 +197,7 @@ public final class WorkbenchSpeed {
             for (String token : WorkbenchDirectRun.dashD(command)) writer.println(token);
             writer.println(".");
             writer.println(project.toAbsolutePath().normalize());
+            writer.println(Long.toString(ProcessHandle.current().pid()));
             BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8));
             String status = reader.readLine();
             if (status == null || !status.startsWith("EXIT ")) return Optional.empty();
@@ -173,31 +214,29 @@ public final class WorkbenchSpeed {
             }
             return Optional.of(exit);
         } catch (Exception failure) {
-            WarmProcess.delete(state);
+            WarmProcess.release(state);
             return Optional.empty();
         }
     }
 
     private static void stopStale(Path state) {
-        WarmProcess.read(state).ifPresent(handle -> {
-            if (WarmProcess.alive(handle.pid())) {
-                ProcessHandle.of(handle.pid()).ifPresent(ProcessHandle::destroy);
-            }
-        });
-        WarmProcess.delete(state);
+        WarmProcess.release(state);
     }
 
     private static boolean startDaemon(Path project, Path state, String watch) {
         ClasspathCache.Hit hit = ClasspathCache.load(state, InputFingerprint.lockHash(project));
         if (!hit.hit()) return false;
+        boolean windows = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).contains("win");
         List<String> command = new ArrayList<>();
-        command.add(Path.of(System.getProperty("java.home"), "bin",
-                System.getProperty("os.name", "").toLowerCase().contains("win") ? "java.exe" : "java").toString());
+        command.add(Path.of(System.getProperty("java.home"), "bin", windows ? "java.exe" : "java").toString());
+        if (Boolean.getBoolean("pkb_warm_test_child")) command.add("-Dpkb_warm_test_child=true");
         command.add("-cp");
         command.add(String.join(java.io.File.pathSeparator, hit.entries()));
         command.add(WorkbenchWarmMain.class.getName());
         command.add(state.toAbsolutePath().normalize().toString());
         command.add(watch);
+        command.add(Long.toString(ProcessHandle.current().pid()));
+        command.add(Long.toString(idleSeconds()));
         try {
             new ProcessBuilder(command)
                     .directory(project.toFile())
@@ -227,6 +266,27 @@ public final class WorkbenchSpeed {
             if (token == null) continue;
             String prefix = "-Dpkb_run_id=";
             if (token.startsWith(prefix)) return token.substring(prefix.length());
+        }
+        return null;
+    }
+
+    private static String firstNonBlank(String... values) {
+        if (values == null) return null;
+        for (String value : values) {
+            if (value != null && !value.isBlank()) return value.trim();
+        }
+        return null;
+    }
+
+    private static String compactValue(String compact, String key) {
+        if (compact == null || compact.isBlank() || key == null) return null;
+        for (String part : compact.split(",")) {
+            String token = part.trim();
+            int equals = token.indexOf('=');
+            if (equals <= 0) continue;
+            if (key.equals(token.substring(0, equals).trim())) {
+                return token.substring(equals + 1).trim();
+            }
         }
         return null;
     }

@@ -516,6 +516,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/WorkbenchStructuredErrorTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchTagFallbackTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchValidateTest.java`
+- `src/test/java/tools/dscode/launcher/WorkbenchWarmLifecycleTest.java`
 - `src/test/java/tools/dscode/launcher/WorkspaceLaunchForkTest.java`
 - `src/test/java/tools/dscode/parallelutilities/ParallelCountEstimatorTest.java`
 - `src/test/java/tools/dscode/release/Release217ReportedBugsTest.java`
@@ -684,6 +685,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/SleepGapMonitor.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/speed/ClasspathCache.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/speed/InputFingerprint.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/speed/ProcessTree.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/speed/StageScheduler.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/speed/WarmProcess.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/WindowDriver.java`
