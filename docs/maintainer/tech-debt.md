@@ -21,4 +21,6 @@ Items deferred from consumer retests and earlier roadmaps. Each entry has a shor
 - Full Maven startup still dominates one-shot and isolate times before the classpath cache is warm. Further reductions (daemon, persistent resolve, parallel stages) remain open.
 - Seed fork and compile stages are now visible (Report 5) but not overlapped.
 
+Dan's locked list for the next round (hook source tracking, Windows exit-code docs, comma lists for data and config path, short RUN aliases, path-list docs) is in `docs/maintainer/2.1.18-locked-list.md`.
+
 These items stay deferred. Do not implement them in 2.1.18.
