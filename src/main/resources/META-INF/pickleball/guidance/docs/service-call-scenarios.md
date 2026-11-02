@@ -25,7 +25,7 @@ When RUN
   | SERVICE CALL       | health | %health-full-url | http://127.0.0.1:8765 |
 ```
 
-`RunType` accepts `SCENARIO`, `SCENARIOS`, `COMPONENT SCENARIO`, `COMPONENT SCENARIOS`, `SERVICE CALL`, and `SERVICE CALLS`. Multiplicity belongs to each resolved row value: singular allows at most one match for that row, and plural allows multiple matches for that row.
+`RunType` accepts `SCENARIO`, `SCENARIOS`, `COMPONENT SCENARIO`, `COMPONENT SCENARIOS`, `SERVICE CALL`, and `SERVICE CALLS`. Short aliases are `COMPONENT` / `COMPONENTS` for component scenarios and `CALL` / `CALLS` / `SERVICE` / `SERVICES` for service calls. Singular allows at most one match for that row and is `error:` / `fix:` when several match. Plural allows multiple matches for that row. Full words are unchanged. Multiplicity belongs to each resolved row value.
 
 Inline syntax is shorthand for parameters common to all rows:
 

@@ -242,6 +242,51 @@ class WorkbenchSessionCommandsTest {
     }
 
     @Test
+    @Timeout(value = 12, unit = TimeUnit.SECONDS)
+    void sessionStartTimeoutKillsTheProcessTreeAndDeletesTheSessionFile() throws Exception {
+        String property = SessionHealthWait.START_TIMEOUT_PROPERTY;
+        String previous = System.getProperty(property);
+        Path pidFile = project.resolve("orphan-child.pid");
+        AtomicReference<Process> child = new AtomicReference<>();
+        AtomicReference<Path> sessionFile = new AtomicReference<>();
+        try {
+            System.setProperty(property, "1");
+            Output output = run(
+                    new String[]{"session-start", project.toString(), "--run-id=orphan-run", "--agent=agent-orphan"},
+                    launch -> {
+                        sessionFile.set(launch.sessionFile());
+                        Files.createDirectories(launch.sessionFile().getParent());
+                        Files.writeString(launch.sessionFile(), "{\"url\":\"http://127.0.0.1:9\",\"token\":\"t\",\"pid\":1}\n");
+                        Files.createDirectories(launch.logFile().getParent());
+                        Files.writeString(launch.logFile(), "progress stage=jvm\n");
+                        String script = "sleep 40 & echo $! > '" + pidFile.toAbsolutePath() + "'; wait";
+                        Process process = new ProcessBuilder("bash", "-c", script).start();
+                        child.set(process);
+                        return process;
+                    }
+            );
+            assertEquals(1, output.exitCode, output.stderr + output.stdout);
+            assertTrue(output.stderr.contains("error:"), output.stderr);
+            assertTrue(output.stderr.contains("fix:"), output.stderr);
+            assertTrue(output.stderr.contains("stage=jvm"), output.stderr);
+            assertTrue(output.stderr.contains("startup-timing:"), output.stderr);
+            Process parent = child.get();
+            assertNotNull(parent);
+            assertFalse(parent.isAlive(), "parent still alive");
+            assertTrue(Files.isRegularFile(pidFile), pidFile.toString());
+            long grandchild = Long.parseLong(Files.readString(pidFile).trim());
+            assertFalse(ProcessHandle.of(grandchild).map(ProcessHandle::isAlive).orElse(false), "child still alive");
+            assertFalse(Files.exists(sessionFile.get()), String.valueOf(sessionFile.get()));
+            String log = Files.readString(AgentCoordination.logFile(project));
+            assertTrue(log.contains("startup-timing"), log);
+        } finally {
+            restoreProperty(property, previous);
+            Process process = child.get();
+            if (process != null && process.isAlive()) process.destroyForcibly();
+        }
+    }
+
+    @Test
     @Timeout(value = 8, unit = TimeUnit.SECONDS)
     void sessionStartPrintsElapsedStageWhileTheHealthWaitRuns() throws Exception {
         String property = SessionHealthWait.START_TIMEOUT_PROPERTY;

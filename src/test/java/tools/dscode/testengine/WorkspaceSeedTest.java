@@ -7,6 +7,7 @@ import org.junit.jupiter.api.io.TempDir;
 import tools.dscode.control.protocol.Workspace;
 import tools.dscode.launcher.WorkbenchAgentCommands;
 import tools.dscode.testengine.fixtures.BlankBrowserRunner;
+import tools.dscode.testengine.fixtures.HookSourceRunner;
 import tools.dscode.testengine.fixtures.WorkspaceSeedHooked;
 
 import java.io.ByteArrayOutputStream;
@@ -150,6 +151,54 @@ class WorkspaceSeedTest {
             projectLocal.remove();
             System.clearProperty("pkb_loglevel");
         }
+    }
+
+    @Test
+    void hookPutRecordsPlainPkbAndSecretKeysAsHook() throws Exception {
+        clearPkbSystemProperties();
+        System.setProperty(WorkspaceSeed.SEED_PROPERTY, "true");
+        HookSourceRunner hooked = new HookSourceRunner();
+        clearRunner();
+        Path workspace = Workspace.directory(temp, "hook-put");
+        WorkspaceSeed.writeCaptured(workspace, hooked, false);
+        Map<String, String> sources = Workspace.readValueSources(workspace);
+        assertEquals("hook", sources.get("description"), sources.toString());
+        assertEquals("hook", sources.get("pkb_hook_marker"), sources.toString());
+        assertEquals("hook", sources.get("pkb_password"), sources.toString());
+        assertEquals("hook", sources.get(PKB_props.PKB_GLUE), sources.toString());
+        assertEquals("hook plain description", Workspace.readRunVars(workspace).get("description"));
+        assertEquals("runner-hook-secret-value", Workspace.readRunVars(workspace).get("pkb_password"));
+
+        ByteArrayOutputStream stdout = new ByteArrayOutputStream();
+        ByteArrayOutputStream stderr = new ByteArrayOutputStream();
+        int exit = WorkbenchAgentCommands.run(
+                new String[]{"workspace-show", temp.toString(), "--run-id=hook-put"},
+                new PrintStream(stdout, true, StandardCharsets.UTF_8),
+                new PrintStream(stderr, true, StandardCharsets.UTF_8)
+        );
+        String shown = stdout.toString(StandardCharsets.UTF_8);
+        assertEquals(0, exit, stderr.toString(StandardCharsets.UTF_8) + shown);
+        assertTrue(shown.contains("description=hook plain description source=hook computed"), shown);
+        assertTrue(shown.contains("pkb_hook_marker=from-hook source=hook computed"), shown);
+        assertTrue(shown.contains("pkb_password=<redacted> source=hook computed"), shown);
+        assertTrue(shown.contains("pkb_glue=com.example.steps source=hook computed"), shown);
+        assertFalse(shown.contains("runner-hook-secret-value"), shown);
+        assertFalse(stderr.toString(StandardCharsets.UTF_8).contains("runner-hook-secret-value"));
+
+        ByteArrayOutputStream jsonOut = new ByteArrayOutputStream();
+        int jsonExit = WorkbenchAgentCommands.run(
+                new String[]{"workspace-show", temp.toString(), "--run-id=hook-put", "--json"},
+                new PrintStream(jsonOut, true, StandardCharsets.UTF_8),
+                new PrintStream(new ByteArrayOutputStream(), true, StandardCharsets.UTF_8)
+        );
+        String json = jsonOut.toString(StandardCharsets.UTF_8);
+        assertEquals(0, jsonExit, json);
+        assertTrue(json.contains("\"description\":\"hook\""), json);
+        assertTrue(json.contains("\"pkb_hook_marker\":\"hook\""), json);
+        assertTrue(json.contains("\"pkb_password\":\"hook\""), json);
+        assertTrue(json.contains("\"description\""), json);
+        assertTrue(json.contains("hook plain description"), json);
+        assertFalse(json.contains("runner-hook-secret-value"), json);
     }
 
     @Test

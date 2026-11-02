@@ -27,7 +27,7 @@ SERVICE CALL
 SERVICE CALLS
 ```
 
-Multiplicity belongs to the resolved `RunType` for each row. Singular values allow at most one match for that row; plural values allow multiple matches for that row. Different rows in the same bare `RUN` may use different types and multiplicities.
+Multiplicity belongs to the resolved `RunType` for each row. Singular values allow at most one match for that row; plural values allow multiple matches for that row. `COMPONENT` / `COMPONENTS` are aliases of `COMPONENT SCENARIO` / `COMPONENT SCENARIOS`. Different rows in the same bare `RUN` may use different types and multiplicities.
 
 Inline step parameters are shorthand for values shared by the invocation rows, or for calls that do not need a DataTable. For example, these are concise forms when every row is a regular scenario:
 

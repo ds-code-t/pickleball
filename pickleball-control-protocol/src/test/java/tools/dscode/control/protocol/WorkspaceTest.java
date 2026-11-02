@@ -47,6 +47,25 @@ class WorkspaceTest {
     }
 
     @Test
+    void overlayConfigsKeepsEarlierFilesAndReplacesSameNames() throws Exception {
+        Path workspace = temp.resolve("overlay");
+        Path first = temp.resolve("first");
+        Path second = temp.resolve("second");
+        Files.createDirectories(first);
+        Files.createDirectories(second);
+        Files.writeString(first.resolve("kept.yaml"), "from: first\n");
+        Files.writeString(first.resolve("shared.yaml"), "from: first\n");
+        Files.writeString(second.resolve("shared.yaml"), "from: second\n");
+        Files.writeString(second.resolve("added.yaml"), "from: second\n");
+        Workspace.copyConfigs(first, workspace);
+        Workspace.overlayConfigs(second, workspace);
+        Path configs = Workspace.configsDirectory(workspace);
+        assertEquals("from: first\n", Files.readString(configs.resolve("kept.yaml")));
+        assertEquals("from: second\n", Files.readString(configs.resolve("shared.yaml")));
+        assertEquals("from: second\n", Files.readString(configs.resolve("added.yaml")));
+    }
+
+    @Test
     void atomicWriteLeavesNoPartialFileAndRoundTripsValues() throws Exception {
         Path workspace = temp.resolve("workspace");
         Map<String, String> values = context();

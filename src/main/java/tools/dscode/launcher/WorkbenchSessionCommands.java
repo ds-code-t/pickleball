@@ -402,7 +402,8 @@ public final class WorkbenchSessionCommands {
 
     /**
      * The forked controller does not inherit launcher {@code -D} properties.
-     * Pass the timeout the health wait already resolved so the worker wait matches.
+     * Pass the outer timeout the health wait already resolved. The worker
+     * derives a strictly shorter inner deadline from that same setting.
      */
     static List<String> withResolvedStartTimeout(List<String> command) {
         if (command == null || command.isEmpty()) return List.of();
@@ -501,6 +502,20 @@ public final class WorkbenchSessionCommands {
             err.println("Workbench session process exited before becoming healthy. See " + logFile);
             finishReason(project, run.runId(), "Session start failed: the process exited before it was healthy.", out);
             return 1;
+        }
+        destroyTimedOutSession(process, sessionFile);
+        try {
+            AgentCoordination.appendLog(
+                    project,
+                    Instant.now(),
+                    run.agentId(),
+                    run.runId(),
+                    "startup-timing",
+                    "elapsed=" + outcome.elapsedMs() + "ms stage=" + outcome.stage(),
+                    run.recordFile()
+            );
+        } catch (IOException ignored) {
+            // The timeout text is already on stderr.
         }
         finishReason(
                 project,
@@ -842,6 +857,47 @@ public final class WorkbenchSessionCommands {
         }
     }
 
+    private static void destroyTimedOutSession(Process process, Path sessionFile) {
+        if (process != null) {
+            ProcessHandle handle;
+            List<ProcessHandle> descendants;
+            try {
+                handle = process.toHandle();
+            } catch (RuntimeException ignored) {
+                handle = null;
+            }
+            if (handle != null) {
+                try {
+                    descendants = handle.descendants().toList();
+                } catch (RuntimeException ignored) {
+                    descendants = List.of();
+                }
+            } else {
+                descendants = List.of();
+            }
+            try {
+                process.destroy();
+            } catch (RuntimeException ignored) {
+                // Already gone.
+            }
+            sleep(Duration.ofMillis(400));
+            for (int index = descendants.size() - 1; index >= 0; index--) {
+                try {
+                    descendants.get(index).destroyForcibly();
+                } catch (RuntimeException ignored) {
+                    // The child can exit between the snapshot and the kill.
+                }
+            }
+            try {
+                process.destroyForcibly();
+            } catch (RuntimeException ignored) {
+                // Already gone.
+            }
+            if (handle != null) ProcessTrees.killTree(handle);
+        }
+        deleteSessionFile(sessionFile);
+    }
+
     private static void killTree(long pid) {
         ProcessHandle.of(pid).ifPresent(ProcessTrees::killTree);
     }
@@ -912,8 +968,11 @@ public final class WorkbenchSessionCommands {
             }
             out.println("DONE " + id + " " + status);
             if (view.has("result") && !view.get("result").isNull()) {
-                if ("SUCCESS".equals(status)) out.println(view.get("result").toString());
-                else out.println(failureJson(flags.text, view.get("result")));
+                JsonNode resultNode = view.get("result");
+                String errorLine = textOr(resultNode, "text", "");
+                if (errorLine.startsWith("error:")) out.println(errorLine);
+                if ("SUCCESS".equals(status)) out.println(resultNode.toString());
+                else out.println(failureJson(flags.text, resultNode));
             }
             return terminalExit(status);
         }
@@ -1054,11 +1113,30 @@ public final class WorkbenchSessionCommands {
         if (phrase != null) body.put("phrase", phrase);
         if (message != null) body.put("message", message);
         if (stack != null) body.put("stackHead", stack);
+        copyFailureField(body, result, "code");
+        copyFailureField(body, result, "cause");
+        copyFailureField(body, result, "valueText");
+        JsonNode nestedFailure = result == null ? null : result.get("failureJson");
+        if (nestedFailure != null && nestedFailure.isObject()) {
+            copyFailureField(body, nestedFailure, "code");
+            copyFailureField(body, nestedFailure, "cause");
+            copyFailureField(body, nestedFailure, "valueText");
+            if (!body.containsKey("message")) copyFailureField(body, nestedFailure, "message");
+        }
         try {
             return JSON.writeValueAsString(body);
         } catch (IOException failure) {
             throw new IllegalStateException("Could not write JSON.", failure);
         }
+    }
+
+    private static void copyFailureField(Map<String, Object> body, JsonNode node, String field) {
+        if (body == null || node == null || field == null || body.containsKey(field)) return;
+        JsonNode value = node.get(field);
+        if (value == null || value.isNull()) return;
+        String text = value.asText("");
+        if (text.isBlank()) return;
+        body.put(field, text);
     }
 
     private static List<JsonNode> eventRows(JsonNode events) {

@@ -4,7 +4,7 @@ First-read only. Longer notes: `docs/workbench-agent-detail.md`.
 
 ## Tool chooser
 
-Pickleball Workbench is the one front door. Do not open the GUI for your own testing. While testing for yourself, stay headless. When a window is already open, only one agent drives it. One window has one driver. Other agents stay headless on their own run id. Agents are not daemons: each command is a one-shot. Read `run-catalog.json` after discover. Do not start a live worker except for isolate and execute-step. Pass `--retention` on that discover. **Live debug** is isolate, then execute-step. Never supply `pkb_run_profile` as input.
+Pickleball Workbench is the one front door. Do not open the GUI for your own testing. While testing for yourself, stay headless. When a window is already open, only one agent is the one driver on their own run id. Agents are not daemons: each command is a one-shot. Read `run-catalog.json` after discover. Do not start a live worker except for isolate and execute-step. **Live debug** is isolate, then execute-step. Never supply `pkb_run_profile` as input.
 
 Run `mvnw` or `mvnw.cmd` (`gradlew` or `gradlew.bat`). Do not require a machine-wide Maven or Gradle install.
 
@@ -12,9 +12,9 @@ Run `mvnw` or `mvnw.cmd` (`gradlew` or `gradlew.bat`). Do not require a machine-
 ./mvnw -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java "-Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher" "-Dexec.classpathScope=test" "-Dexec.args=discover"
 ```
 
-only change `exec.args`: `-Dexec.args=discover`, `-Dexec.args=isolate`, `execute-step`, `confirm`. One-shots: `java -cp "@.pickleball/v/<version>/workbench/classpath.cache"`. Discover, confirm, and isolate use the wrapper.
+only change `exec.args`: `-Dexec.args=discover`, `-Dexec.args=isolate`, `execute-step`, `confirm`.
 
-Read the short log `.pickleball/agent-log`. Board: `presence --touch`, `post --write`, `history --append`. Paths: `.pickleball/investigations/`, `.pickleball/presence/`, `.pickleball/posts/`, `.pickleball/history.log`. `gc-runs` keeps investigations.
+Read the short log `.pickleball/agent-log`. Board: `presence --touch`, `post --write`, `history --append`. Paths: `.pickleball/investigations/`, `.pickleball/presence/`, `.pickleball/posts/`, `.pickleball/history.log`. `gc-runs`.
 
 ### Live isolation loop
 
@@ -54,7 +54,7 @@ confirm --run-id=row-1
 summary status=PASSED
 ```
 
-`record.json` `environment` is the resolved value, or `unset` when `pkb_environment` was not set. `workspace-show` prints `source=hook|properties|default|cli/override`. ` computed` means hook; reseed it. A secret `fix:` names the runner hook or that property file. Secrets print `<redacted>`. `${protected:key}` stays. `execute-step --text` warns and names `--text-b64` or `--text-file`. Do not treat resolve-runvars as the environment Discover will use. `pkb_overriderunvars` is not how confirm launches. The Workbench GUI is only a lightweight head over state and controls that already exist under the hood.
+`record.json` `environment` is resolved, or `unset`. Every hook key, not only `pkb_`, is `source=hook` and ` computed`. Secrets are `<redacted>`. `${protected:key}` stays. `execute-step` failure is one `error:` line; `--json` has code, message, cause, valueText. `session-start` timeout is `error:`/`fix:` and kills the tree. RUN aliases: COMPONENT(S), CALL(S), SERVICE(S). Paths, setter/comma/default/prefix (a comma always splits): features/features/yes/project/prefix; glue/glue/yes/project/packages; datapath/dataPath/first match/data/prefix; configpath/configPath/later wins/configs/prefix; callpath/callPath/yes/src/test/resources/calls/Cucumber; componentpath/componentPath/yes/src/test/resources/component/Cucumber. Do not treat resolve-runvars as the environment Discover will use. `pkb_overriderunvars` is not how confirm launches. The Workbench GUI is only a lightweight head over state and controls that already exist under the hood.
 
 
 | launch | usage exit |
@@ -63,10 +63,11 @@ summary status=PASSED
 | `java -cp` | 2 |
 | `./mvnw` exec:java | 2 |
 | PowerShell `.\mvnw.cmd` | 2 |
+| stock `mvn.cmd` | non-zero, not asserted as 2 |
 
 ## Query loop
 
-`query runs|get|search|errors|tail` (tail is newest first; one failure is one row and the step carries the root cause). Read `...+N more, use cursor`. Bad UTF-8 is named in `decodeWarnings`. Agents use the shallowest evidence layer and keep terminal logging minimal. `pkb_reportretention=failed` keeps failing scenarios.
+`query runs|get|search|errors|tail`. Agents use the shallowest evidence layer and keep terminal logging minimal. `pkb_reportretention=failed` keeps failing scenarios.
 
 ## First-read
 

@@ -2,13 +2,18 @@ package tools.dscode.workbench;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import tools.dscode.control.protocol.ControlBridgeCallResult;
+import tools.dscode.control.protocol.ControlBridgeError;
 import tools.dscode.control.protocol.PickleballLocalLayout;
 import tools.dscode.control.protocol.WindowDriver;
 import tools.dscode.workbench.lease.WorkbenchCallContext;
 import tools.dscode.workbench.lease.WorkbenchLeaseHolder;
+import tools.dscode.workbench.player.LivePlaybackCoordinator;
+import tools.dscode.workbench.player.LiveScenarioPlayer;
 import tools.dscode.workbench.player.WorkbenchSaveResult;
 
 import java.io.IOException;
+import java.lang.reflect.Proxy;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -80,6 +85,53 @@ class WorkbenchSessionActionsTest {
             assertTrue(invalid.getMessage().contains("'0'"));
             assertFalse(invalid.getMessage().startsWith("No scenarios matched"));
         }
+    }
+
+    @Test
+    void executeStepAndRunStepsSurfaceTheBridgeFailureInTextAndJson() {
+        LivePlaybackCoordinator playback = new LivePlaybackCoordinator(new LiveScenarioPlayer(List.of()));
+        playback.loadScenario(List.of(
+                "Feature: Shop",
+                "  Scenario: Buy",
+                "    When buy a"
+        ), project.resolve("shop.feature"));
+        ControlBridgeCallResult failed = new ControlBridgeCallResult(
+                "FAILED",
+                "string",
+                "seen-value",
+                new ControlBridgeError("ASSERTION", "left was not right", "java.lang.AssertionError: left was not right"),
+                null
+        );
+        WorkbenchServices services = (WorkbenchServices) Proxy.newProxyInstance(
+                WorkbenchServices.class.getClassLoader(),
+                new Class<?>[]{WorkbenchServices.class},
+                (proxy, method, args) -> {
+                    if ("playback".equals(method.getName())) return playback;
+                    if ("executeStep".equals(method.getName())) return failed;
+                    if (method.getReturnType() == boolean.class) return false;
+                    if (method.getReturnType() == int.class) return 0;
+                    return null;
+                }
+        );
+        WorkbenchSessionActions actions = new WorkbenchSessionActions(services);
+        Map<String, Object> step = actions.executeStep("When buy a");
+        assertEquals("FAILED", step.get("status"));
+        assertEquals("error: left was not right", WorkbenchSessionActions.render(step, false));
+        String stepJson = WorkbenchSessionActions.render(step, true);
+        assertTrue(stepJson.contains("\"code\":\"ASSERTION\""), stepJson);
+        assertTrue(stepJson.contains("\"message\":\"left was not right\""), stepJson);
+        assertTrue(stepJson.contains("\"cause\":\"java.lang.AssertionError: left was not right\""), stepJson);
+        assertTrue(stepJson.contains("\"valueText\":\"seen-value\""), stepJson);
+        assertFalse(stepJson.contains("runner-hook-secret"), stepJson);
+
+        Map<String, Object> played = actions.play();
+        assertEquals("FAILED", played.get("status"));
+        assertEquals("play", played.get("op"));
+        assertEquals("error: left was not right", WorkbenchSessionActions.render(played, false));
+        String playJson = WorkbenchSessionActions.render(played, true);
+        assertTrue(playJson.contains("\"message\":\"left was not right\""), playJson);
+        assertTrue(playJson.contains("\"valueText\":\"seen-value\""), playJson);
+        assertTrue(playJson.contains("\"code\":\"ASSERTION\""), playJson);
     }
 
     @Test

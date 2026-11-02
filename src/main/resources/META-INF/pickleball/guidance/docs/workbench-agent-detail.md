@@ -229,7 +229,15 @@ When RUN
   | SERVICE CALL       | health | %health-full-url |
 ```
 
-Treat `RunType` as the complete kind plus multiplicity. Valid values are `SCENARIO`, `SCENARIOS`, `COMPONENT SCENARIO`, `COMPONENT SCENARIOS`, `SERVICE CALL`, and `SERVICE CALLS`. Singular/plural validation is per row, not a property of the whole table. A nonblank table `RunType` overrides any inline type for that row.
+Treat `RunType` as the complete kind plus multiplicity. Valid values are `SCENARIO`, `SCENARIOS`, `COMPONENT SCENARIO`, `COMPONENT SCENARIOS`, `SERVICE CALL`, and `SERVICE CALLS`. Short aliases: `COMPONENT` / `COMPONENTS`, and `CALL` / `CALLS` / `SERVICE` / `SERVICES`. RUN step text stays uppercase and case-sensitive. Table cells are uppercased. Singular forms error (`error:` / `fix:`) when more than one scenario matches. Plural forms allow several. Full words are unchanged. Singular/plural validation is per row, not a property of the whole table. A nonblank table `RunType` overrides any inline type for that row.
+
+`pkb_datapath` and `pkb_configpath` accept the same comma lists as `pkb_features` and `pkb_glue`. Data lookup uses the first root that contains the document. Configs are deep-merged left to right. See the path table in `docs/consumer-project.md`. `pkb_callpath` and `pkb_componentpath` stay on Cucumber path rules.
+
+A live `session-start` that times out destroys the process, then forcibly destroys the tree, and deletes the session file. The message is `error:` / `fix:` and names the stage, the log tail, and `-Dpkb_workbench_worker_start_timeout`. The worker's inner deadline is shorter than that outer wait. Startup timing is on the worker log and `.pickleball/agent-log`.
+
+A FAILED `execute-step` or headless `play` / `from-here` prints one `error:` line. `--json` includes `code`, `message`, `cause`, and `valueText` from the bridge result.
+
+Stock Apache `mvn.cmd` (any version, including 3.2.0 and 3.3.x) collapses every non-zero JVM status to 1. Only this project's patched `mvnw.cmd` returns 2 for a usage error. `java -cp`, `java -jar`, and Linux `./mvnw` exit 2. A Windows script that needs the exact code must match the `error:` line or use `java -cp`.
 
 Use parameterized step text as shorthand when it eliminates the table or moves a value common to every row out of the table. For example:
 

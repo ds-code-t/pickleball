@@ -305,9 +305,18 @@ public final class Workspace {
     }
 
     public static void copyConfigs(Path source, Path workspace) {
+        copyInto(source, workspace, true);
+    }
+
+    /** Copies files onto an existing configs directory. Does not delete it first. */
+    public static void overlayConfigs(Path source, Path workspace) {
+        copyInto(source, workspace, false);
+    }
+
+    private static void copyInto(Path source, Path workspace, boolean replace) {
         Path destination = configsDirectory(workspace);
         try {
-            if (Files.isDirectory(destination)) {
+            if (replace && Files.isDirectory(destination)) {
                 deleteTree(destination);
             }
             Files.createDirectories(destination);

@@ -246,6 +246,19 @@ public class ModularScenariosChecks {
         assertTrue(plural.matches());
         assertEquals("COMPONENT SCENARIOS", plural.group(2));
         assertEquals(" %save_customer", plural.group(3));
+
+        Matcher component = pattern.matcher("RUN COMPONENT: Save");
+        assertTrue(component.matches());
+        assertEquals("COMPONENT", component.group(2));
+        Matcher calls = pattern.matcher("RUN CALLS: %health");
+        assertTrue(calls.matches());
+        assertEquals("CALLS", calls.group(2));
+        Matcher service = pattern.matcher("RUN SERVICE: Health");
+        assertTrue(service.matches());
+        assertEquals("SERVICE", service.group(2));
+        Matcher services = pattern.matcher("RUN SERVICES");
+        assertTrue(services.matches());
+        assertEquals("SERVICES", services.group(2));
     }
 
     @Test

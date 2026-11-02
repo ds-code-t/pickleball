@@ -47,7 +47,9 @@ public class ModularScenarios extends CoreSteps {
     static final String DEFAULT_DATA_PATH = "data";
     static final String DEFAULT_CALLS_PATH = "src/test/resources/calls";
     static final String DEFAULT_COMPONENT_PATH = "src/test/resources/component";
-    @Given("^RUN\\s*(?:\"([^\"]+)\"\\s+)?(?:(SCENARIOS?|COMPONENT SCENARIOS?|SERVICE CALLS?))?(?::(.*))?$")
+    static final String RUN_TYPE_PATTERN =
+            "SCENARIOS?|COMPONENT SCENARIOS?|COMPONENTS?|SERVICE CALLS?|SERVICES?|CALLS?";
+    @Given("^RUN\\s*(?:\"([^\"]+)\"\\s+)?(?:(" + RUN_TYPE_PATTERN + "))?(?::(.*))?$")
     public static void runScenarios(
             String inlineRunKey,
             String runTypeText,
@@ -756,11 +758,11 @@ public class ModularScenarios extends CoreSteps {
         }
         RunType runType = selection.runType();
         throw new IllegalArgumentException(
-                "RunType " + runType.stepText()
+                "error: RunType " + runType.stepText()
                         + " matched " + matchNames.size() + " "
                         + runType.matchType() + "s after ordering and limit were applied: "
                         + matchNames
-                        + ". Use " + runType.stepText() + "S for that invocation "
+                        + ". fix: Use " + runType.stepText() + "S for that invocation "
                         + "in the RunType column or RUN step shorthand."
         );
     }
@@ -1033,16 +1035,35 @@ public class ModularScenarios extends CoreSteps {
             return convenienceStepText;
         }
     }
-    private record RunSelection(
+    static String canonicalRunType(String text) {
+        String normalized = normalize(text).toUpperCase(Locale.ROOT);
+        return switch (normalized) {
+            case "COMPONENT" -> "COMPONENT SCENARIO";
+            case "COMPONENTS" -> "COMPONENT SCENARIOS";
+            case "CALL", "SERVICE" -> "SERVICE CALL";
+            case "CALLS", "SERVICES" -> "SERVICE CALLS";
+            default -> normalized;
+        };
+    }
+
+    static RunSelection runSelection(String text) {
+        return RunSelection.fromText(text);
+    }
+
+    static void rejectSingularMatches(List<String> matchNames, String runTypeText) {
+        validateRunSelectionMatchCount(matchNames, RunSelection.fromText(runTypeText));
+    }
+
+    record RunSelection(
             RunType runType,
             boolean allowMultiple
     ) {
         static RunSelection fromText(String text) {
-            String normalized = normalize(text).toUpperCase(Locale.ROOT);
-            boolean allowMultiple = normalized.endsWith("S");
+            String canonical = canonicalRunType(text);
+            boolean allowMultiple = canonical.endsWith("S");
             String singular = allowMultiple
-                    ? normalized.substring(0, normalized.length() - 1)
-                    : normalized;
+                    ? canonical.substring(0, canonical.length() - 1)
+                    : canonical;
             return new RunSelection(
                     RunType.fromStepText(singular),
                     allowMultiple

@@ -1,6 +1,8 @@
 package tools.dscode.workbench;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import tools.dscode.control.protocol.ControlBridgeCallResult;
+import tools.dscode.control.protocol.ControlBridgeError;
 import tools.dscode.control.protocol.ControlBridgePageQueryResult;
 import tools.dscode.control.protocol.ExampleRowSelector;
 import tools.dscode.control.protocol.SessionDescriptor;
@@ -76,6 +78,7 @@ public final class WorkbenchSessionActions {
     private final WorkbenchServices services;
     private volatile Window window;
     private volatile String selectedDiagnosticRun = "";
+    private static final ObjectMapper JSON = new ObjectMapper();
 
     public WorkbenchSessionActions(WorkbenchServices services) {
         this.services = Objects.requireNonNull(services, "services");
@@ -173,12 +176,15 @@ public final class WorkbenchSessionActions {
             throw new IllegalArgumentException("execute-step text must not be blank.");
         }
         ControlBridgeCallResult result = services.executeStep(text, "");
-        LinkedHashMap<String, Object> payload = new LinkedHashMap<>();
-        String status = result != null && "SUCCESS".equals(result.status()) ? "SUCCESS" : "FAILED";
-        payload.put("status", status);
-        payload.put("op", "execute-step");
-        payload.put("playback", status);
-        return payload;
+        if (result != null && "SUCCESS".equals(result.status())) {
+            LinkedHashMap<String, Object> payload = new LinkedHashMap<>();
+            payload.put("status", "SUCCESS");
+            payload.put("op", "execute-step");
+            payload.put("playback", "SUCCESS");
+            if (result.valueText() != null) payload.put("valueText", result.valueText());
+            return payload;
+        }
+        return bridgeFailure("execute-step", result);
     }
 
     public Map<String, Object> insertStep(String text) {
@@ -468,7 +474,7 @@ public final class WorkbenchSessionActions {
                 ControlBridgeCallResult result = services.executeStep(step.executeText(), "");
                 executed++;
                 if (result == null || !"SUCCESS".equals(result.status())) {
-                    LinkedHashMap<String, Object> failed = failed(op, result == null ? "no result" : result.status());
+                    Map<String, Object> failed = bridgeFailure(op, result);
                     failed.put("steps", executed);
                     return failed;
                 }
@@ -555,6 +561,52 @@ public final class WorkbenchSessionActions {
         payload.put("op", op);
         payload.put("playback", playback);
         return payload;
+    }
+
+    static LinkedHashMap<String, Object> bridgeFailure(String op, ControlBridgeCallResult result) {
+        LinkedHashMap<String, Object> payload = new LinkedHashMap<>();
+        payload.put("status", "FAILED");
+        payload.put("op", op);
+        payload.put("playback", "FAILED");
+        ControlBridgeError error = result == null ? null : result.error();
+        String code = error == null || error.type() == null || error.type().isBlank()
+                ? "FAILED"
+                : error.type();
+        String message = error == null || error.message() == null || error.message().isBlank()
+                ? (result == null || result.status() == null || result.status().isBlank() ? "no result" : result.status())
+                : error.message();
+        String cause = error == null || error.stackTrace() == null ? "" : error.stackTrace();
+        String valueText = result == null || result.valueText() == null ? "" : result.valueText();
+        payload.put("text", "error: " + message);
+        payload.put("message", message);
+        payload.put("valueText", valueText);
+        LinkedHashMap<String, Object> failure = new LinkedHashMap<>();
+        failure.put("code", code);
+        failure.put("message", message);
+        failure.put("cause", cause);
+        failure.put("valueText", valueText);
+        payload.put("failureJson", failure);
+        LinkedHashMap<String, Object> nested = new LinkedHashMap<>();
+        nested.put("type", code);
+        nested.put("message", message);
+        nested.put("stackTrace", cause);
+        payload.put("error", nested);
+        return payload;
+    }
+
+    public static String render(Map<String, Object> payload, boolean json) {
+        if (json) {
+            try {
+                return JSON.writeValueAsString(payload == null ? Map.of() : payload);
+            } catch (com.fasterxml.jackson.core.JsonProcessingException failure) {
+                throw new IllegalStateException("Could not write JSON.", failure);
+            }
+        }
+        Object text = payload == null ? null : payload.get("text");
+        if (text != null && !text.toString().isBlank()) return text.toString();
+        Object message = payload == null ? null : payload.get("message");
+        if (message != null && !message.toString().isBlank()) return "error: " + message;
+        return "";
     }
 
     private static LinkedHashMap<String, Object> failed(String op, String message) {

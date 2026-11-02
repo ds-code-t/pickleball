@@ -488,19 +488,19 @@ public abstract class PickleballRunner {
     public final Map<String, String> values() { return readOnlyValues; }
 
     /**
-     * Last writer of each run variable after resolution. One model for
-     * {@code workspace-show}: {@code cli/override} when a system property still
+     * Last writer of each stored key after resolution. One model for
+     * {@code workspace-show}: {@code cli/override} when a system run-var still
      * equals the final value, {@code hook} when {@code globalTestProperties}
      * or {@code globalTestDefaults} still equals it (including a hook that
-     * stored the same string as a property file), {@code properties} when the
-     * project file equals it, otherwise {@code default}.
+     * stored the same string as a property file, and a non-{@code pkb_} key),
+     * {@code properties} when the project file equals it, otherwise {@code default}.
      */
     public final Map<String, String> valueSources() {
         Map<String, String> sources = new LinkedHashMap<>();
         values.forEach((rawKey, rawValue) -> {
-            if (rawKey == null || !PKB_props.isRunVariableKey(rawKey)) return;
+            if (rawKey == null || rawKey.isBlank()) return;
             String key = normalizeConfigurationKey(rawKey);
-            if (key == null) return;
+            if (key == null || key.isBlank()) return;
             String fin = rawValue == null ? "" : rawValue;
             if (systemRunVarOverrides.containsKey(key)) {
                 String system = systemRunVarOverrides.get(key);
@@ -964,7 +964,7 @@ public abstract class PickleballRunner {
     private void noteHookWrite(String key, String value) {
         if (hookRecord == HookRecord.OFF || key == null) return;
         String normalized = normalizeConfigurationKey(key);
-        if (normalized == null || !PKB_props.isRunVariableKey(normalized)) return;
+        if (normalized == null || normalized.isBlank()) return;
         if (hookRecord == HookRecord.DEFAULTS) hookDefaultKeys.add(normalized);
         else hookPropertyKeys.add(normalized);
     }

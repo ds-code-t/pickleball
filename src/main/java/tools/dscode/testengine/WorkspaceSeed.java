@@ -1,5 +1,6 @@
 package tools.dscode.testengine;
 
+import tools.dscode.common.resources.PathLists;
 import tools.dscode.common.resources.ResourceLocations;
 import tools.dscode.control.protocol.PickleballLocalLayout;
 import tools.dscode.control.protocol.Workspace;
@@ -97,8 +98,12 @@ public final class WorkspaceSeed {
         }
         Map<String, String> values = new LinkedHashMap<>();
         if (runner != null) {
+            Map<String, String> classified = runner.valueSources();
             runner.values().forEach((key, value) -> {
-                if (key != null && PKB_props.isRunVariableKey(key) && value != null) values.put(key, value);
+                if (key == null || key.isBlank() || value == null) return;
+                String normalized = Workspace.normalizeKey(key);
+                boolean hook = "hook".equals(classified.get(key)) || "hook".equals(classified.get(normalized));
+                if (PKB_props.isRunVariableKey(key) || hook) values.put(key, value);
             });
         }
         values.keySet().removeIf(Workspace.CAPTURE_EXCLUDED_KEYS::contains);
@@ -106,10 +111,14 @@ public final class WorkspaceSeed {
         String browser = values.get(PKB_props.PKB_BROWSER);
         values.put(PKB_props.PKB_BROWSER, browserOrHeadless(browser));
         String configured = values.get(PKB_props.PKB_CONFIG_PATH);
-        Path source = configured == null || configured.isBlank()
-                ? null
-                : ResourceLocations.existingDirectory(configured, ResourceLocations.workingDirectory());
-        Workspace.copyConfigs(source, workspace);
+        if (configured != null && configured.indexOf(',') >= 0) {
+            copyConfigDirectories(PathLists.split(configured), workspace);
+        } else {
+            Path source = configured == null || configured.isBlank()
+                    ? null
+                    : ResourceLocations.existingDirectory(configured, ResourceLocations.workingDirectory());
+            Workspace.copyConfigs(source, workspace);
+        }
         Set<String> keep = runnerComputedSecretKeys(values);
         Workspace.writeRunVars(workspace, values, keep);
         writeSources(workspace, runner, values, browser);
@@ -120,6 +129,29 @@ public final class WorkspaceSeed {
                 ).toList()
         ));
         return warnings;
+    }
+
+    /**
+     * First directory replaces the workspace configs tree. Later directories
+     * overlay files and do not delete what the earlier directories wrote.
+     * A classpath directory inside a jar has no filesystem path and is skipped;
+     * runtime config load still merges it.
+     */
+    private static void copyConfigDirectories(List<String> paths, Path workspace) {
+        boolean copied = false;
+        if (paths != null) {
+            for (String part : paths) {
+                Path source = ResourceLocations.existingDirectory(part, ResourceLocations.workingDirectory());
+                if (source == null) continue;
+                if (!copied) {
+                    Workspace.copyConfigs(source, workspace);
+                    copied = true;
+                } else {
+                    Workspace.overlayConfigs(source, workspace);
+                }
+            }
+        }
+        if (!copied) Workspace.copyConfigs(null, workspace);
     }
 
     /**
@@ -204,13 +236,21 @@ public final class WorkspaceSeed {
             Map<String, String> values,
             String browserBeforeFallback
     ) {
-        Map<String, String> classified = runner == null ? Map.of() : runner.valueSources();
+        Map<String, String> classified = new LinkedHashMap<>();
+        if (runner != null) {
+            runner.valueSources().forEach((key, source) -> {
+                if (key == null || key.isBlank() || source == null) return;
+                classified.put(Workspace.normalizeKey(key), source);
+            });
+        }
+        Map<String, String> files = Workspace.projectFileValues(Path.of(""));
         Map<String, String> sources = new LinkedHashMap<>();
         values.forEach((rawKey, rawValue) -> {
             if (rawKey == null || rawKey.isBlank()) return;
             String key = Workspace.normalizeKey(rawKey);
+            String text = rawValue == null ? "" : rawValue;
             String source = classified.get(key);
-            sources.put(key, source == null ? "default" : source);
+            sources.put(key, source == null ? inferSource(key, text, files) : source);
         });
         if (browserBeforeFallback == null || browserBeforeFallback.isBlank()) {
             sources.put(Workspace.normalizeKey(PKB_props.PKB_BROWSER), "default");

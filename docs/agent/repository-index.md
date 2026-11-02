@@ -52,6 +52,9 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/log-and-assert-steps.md`
 - `docs/maintainer/2.1.18-consumer-report-2.md`
 - `docs/maintainer/2.1.18-consumer-report-fixes.md`
+- `docs/maintainer/2.1.18-locked-build-prompt.md`
+- `docs/maintainer/2.1.18-locked-list.md`
+- `docs/maintainer/2.1.18-locked-roadmap.md`
 - `docs/maintainer/2.1.18-meta-analysis-2.md`
 - `docs/maintainer/2.1.18-meta-deep-dive.md`
 - `docs/maintainer/2.1.18-report4.md`
@@ -314,6 +317,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/common/reporting/WorkBook.java`
 - `src/main/java/tools/dscode/common/reporting/WorkBookConsolePrinter.java`
 - `src/main/java/tools/dscode/common/reporting/WorkSheet.java`
+- `src/main/java/tools/dscode/common/resources/PathLists.java`
 - `src/main/java/tools/dscode/common/resources/ResourceLocations.java`
 - `src/main/java/tools/dscode/common/runtime/ProcessTrees.java`
 - `src/main/java/tools/dscode/common/seleniumextensions/AllContextsScan.java`
@@ -484,6 +488,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/common/reporting/diagnostic/DiagnosticIndexRebuilderSqliteTest.java`
 - `src/test/java/tools/dscode/common/reporting/diagnostic/DiagnosticSecretRedactionTest.java`
 - `src/test/java/tools/dscode/common/reporting/diagnostic/DiscoverHintJvmLeakTest.java`
+- `src/test/java/tools/dscode/common/resources/PathListSemanticsTest.java`
 - `src/test/java/tools/dscode/common/servicecalls/JdbcTypeMappingTest.java`
 - `src/test/java/tools/dscode/common/treeparsing/preparsing/ConditionalBranchArgumentTest.java`
 - `src/test/java/tools/dscode/common/treeparsing/preparsing/LazyBranchResolutionTest.java`
@@ -497,6 +502,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/control/protocol/PickleballVersionTest.java`
 - `src/test/java/tools/dscode/control/protocol/WorkbenchFeatureIndexParityTest.java`
 - `src/test/java/tools/dscode/coredefinitions/NavigationStepsTest.java`
+- `src/test/java/tools/dscode/coredefinitions/RunTypeAliasTest.java`
 - `src/test/java/tools/dscode/coredefinitions/XmlTableCellFeatureTest.java`
 - `src/test/java/tools/dscode/coredefinitions/XmlTableCellTest.java`
 - `src/test/java/tools/dscode/expectedfailure/ExpectedFailureRunnerTest.java`
@@ -572,6 +578,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/runnerFixtures/java/tools/dscode/testengine/fixtures/BlankBrowserRunner.java`
 - `src/runnerFixtures/java/tools/dscode/testengine/fixtures/ConsumerStyleRunner.java`
 - `src/runnerFixtures/java/tools/dscode/testengine/fixtures/ExampleRunner.java`
+- `src/runnerFixtures/java/tools/dscode/testengine/fixtures/HookSourceRunner.java`
 - `src/runnerFixtures/java/tools/dscode/testengine/fixtures/ParityHookRunner.java`
 - `src/runnerFixtures/java/tools/dscode/testengine/fixtures/Phase7Hooked.java`
 - `src/runnerFixtures/java/tools/dscode/testengine/fixtures/ProbeRunner.java`

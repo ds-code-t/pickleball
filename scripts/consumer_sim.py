@@ -54,6 +54,7 @@ BUDGETS = {
     "exec-java-split-tags": 300,
     "documented-exec-usage": 300,
     "documented-exec-split-tags": 300,
+    "stock-mvn-cmd": 180,
 }
 
 
@@ -87,6 +88,7 @@ def main() -> int:
         )
         assert_in(documented_tags, "Tag quoting error")
         assert_in(documented_tags, "fix:")
+        stock_wrapper(timings)
         run_stage(timings, "discover-uncompiled", [
             "discover", "--run-id=" + RUN_UNCOMPILED, "--tags=" + TAGS, "--name=" + NAME,
             "--runvar=pkb_browser=CHROME_HEADLESS", "--retention=failed", "--agent=consumer-sim",
@@ -222,6 +224,56 @@ def fail_text(stage: str, text: str, reason: str) -> None:
     print(f"FAIL {stage}: {reason}", file=sys.stderr)
     print(text, file=sys.stderr)
     raise SystemExit(1)
+
+
+def stock_wrapper(timings: list[dict]) -> None:
+    """Stock Apache mvn.cmd collapses every non-zero JVM status to 1.
+
+    Only the patched mvnw.cmd returns 2. This stage runs on Windows only.
+    It asserts a non-zero exit, error: and fix:, and no Maven BUILD FAILURE
+    stack. It does not assert exit 2.
+    """
+    if os.name != "nt":
+        print("stage=stock-mvn-cmd skipped (not Windows)", flush=True)
+        return
+    source = (CONSUMER / "mvnw.cmd").read_bytes()
+    text = source.decode("utf-8")
+    needle = "@call :pkbMaven %*"
+    if needle not in text:
+        raise SystemExit("stock wrapper patch point missing from mvnw.cmd")
+    patched = text.replace(needle, '@call "%__MVNW_CMD__%" %*', 1)
+    dest = CONSUMER / "stock-mvnw.cmd"
+    dest.write_bytes(patched.encode("utf-8"))
+    budget = BUDGETS["stock-mvn-cmd"]
+    started = time.monotonic()
+    try:
+        result = maven_cmd(script_command(dest, [
+            "-q",
+            "org.codehaus.mojo:exec-maven-plugin:3.5.0:java",
+            "-Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher",
+            "-Dexec.classpathScope=test",
+            "-Dexec.args=not-a-verb",
+        ]), budget + 30)
+    finally:
+        dest.unlink(missing_ok=True)
+    seconds = round(time.monotonic() - started, 3)
+    timings.append({
+        "stage": "stock-mvn-cmd",
+        "seconds": seconds,
+        "exit": result.returncode,
+        "stdout": result.stdout,
+        "stderr": result.stderr,
+    })
+    print(f"stage=stock-mvn-cmd exit={result.returncode} seconds={seconds}", flush=True)
+    combined = (result.stdout or "") + "\n" + (result.stderr or "")
+    if result.returncode == 0:
+        fail("stock-mvn-cmd", result, "stock mvn.cmd exit was 0")
+    if "error:" not in combined or "fix:" not in combined:
+        fail("stock-mvn-cmd", result, "missing error:/fix:")
+    if "BUILD FAILURE" in combined:
+        fail("stock-mvn-cmd", result, "Maven BUILD FAILURE stack leaked")
+    if seconds > budget:
+        fail("stock-mvn-cmd", result, f"exceeded budget {budget}s")
 
 
 def run_stage(timings: list[dict], stage: str, launcher_args: list[str], allow_exit: set[int], maven_args: list[str] | None = None):
