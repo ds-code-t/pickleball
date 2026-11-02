@@ -21,11 +21,12 @@ Items deferred from consumer retests and earlier roadmaps. Each entry has a shor
 - Full Maven startup still dominates one-shot and isolate times before the classpath cache is warm. Further reductions (daemon, persistent resolve, parallel stages) remain open.
 - Seed fork and compile stages are now visible (Report 5) but not overlapped.
 
-Dan's locked list for the next round (hook source tracking, Windows exit-code docs, comma lists for data and config path, short RUN aliases, path-list docs) is in `docs/maintainer/2.1.18-locked-list.md`.
+Dan's locked list for the next round (hook source tracking, Windows exit-code docs, comma lists for data and config path, short RUN aliases, path-list docs, session start timeout teardown, execute-step failure reason) is in `docs/maintainer/2.1.18-locked-list.md`.
 
 These items stay deferred. Do not implement them in 2.1.18.
 
 ## Bug (reported 2026-11-02, Dan, consumer testing on the previous 2.1.18 build): slow live-session start leaves an orphan session
+- **Moved to locked item 6** in `docs/maintainer/2.1.18-locked-list.md` (2026-11-02). Kept here for history only; implement it from the locked list.
 - Symptom: starting a Workbench/agent live session takes over 3 minutes and exceeds its own default startup timeout.
 - The isolate process then exits with code 1, but the live session (browser/driver/JVM) is left running.
 - Expected: startup well under the default timeout; on timeout, a clear `error:`/`fix:` message and full teardown of the session (no orphans).
