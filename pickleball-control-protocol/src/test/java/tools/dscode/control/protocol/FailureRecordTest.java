@@ -61,5 +61,11 @@ class FailureRecordTest {
         assertEquals("expected true", fromEvent.message());
         assertEquals("java.lang.AssertionError: expected true", fromEvent.stackHead());
         assertNull(FailureRecord.fromWorker(Map.of("type", "failure")));
+        Map<String, Object> colon = new LinkedHashMap<>();
+        colon.put("message", "Step: 'Then missing' failed");
+        colon.put("errorMessage", "Failed to find PickleStepDefinitionMatch for step text: 'Then missing'");
+        FailureRecord colonRecord = FailureRecord.fromWorker(colon);
+        assertEquals("Failed to find PickleStepDefinitionMatch for step text: 'Then missing'", colonRecord.message());
+        assertFalse(colonRecord.message().startsWith("Step:"));
     }
 }

@@ -47,11 +47,7 @@ public final class WorkbenchAgentCommands {
     /**
      * Flags read from the raw argument vector rather than {@link WorkbenchCommandLine.Parsed} fields.
      */
-    static final List<String> MAJOR_FLAGS = List.of(
-            "--json", "--expect", "--config", "--reseed", "--from-run",
-            "--html", "--category", "--status",
-            "--kind", "--scenario", "--cursor", "--fields"
-    );
+    static final List<String> MAJOR_FLAGS = WorkbenchCliFlags.AGENT;
     private static final java.util.Set<String> KNOWN_FINISH_STATUSES = java.util.Set.of(
             "PASSED", "FAILED", "EMPTY", "TIMEOUT", "STOPPED"
     );
@@ -192,26 +188,7 @@ public final class WorkbenchAgentCommands {
     }
 
     private static int help(String[] args, PrintStream out, PrintStream err) {
-        String topic = null;
-        if (args != null) {
-            for (int index = 1; index < args.length; index++) {
-                String token = args[index];
-                if (token == null || token.isBlank() || WorkbenchCliHelp.isHelpToken(token)) continue;
-                topic = token;
-                break;
-            }
-        }
-        if (topic == null) {
-            out.print(WorkbenchCliHelp.catalog());
-            return 0;
-        }
-        String page = WorkbenchCliHelp.forTopic(topic);
-        if (page == null) {
-            err.print(WorkbenchCliHelp.unknown(topic));
-            return 2;
-        }
-        out.print(page);
-        return 0;
+        return WorkbenchCliHelp.answer(args, out, err);
     }
 
     private static int resolveRunVars(WorkbenchCommandLine.Parsed parsed, PrintStream out) {
@@ -238,6 +215,8 @@ public final class WorkbenchAgentCommands {
                 SecretRedactor.noteAll(runvars);
                 body.put("runvars", OutputFormatter.redactMap(runvars));
                 body.put("computed", new java.util.ArrayList<>(WorkspaceSeed.computedKeys(parsed.project(), runvars)));
+                String fix = Workspace.secretFix(parsed.project(), runvars);
+                if (fix != null) body.put("fix", fix);
                 body.put("configs", RunConfigs.files(parsed.project(), runId));
             } else {
                 body.put("error", "No workspace for " + runId);
@@ -267,7 +246,10 @@ public final class WorkbenchAgentCommands {
                 String mark = computed.contains(key) ? " computed" : "";
                 out.println(key + "=" + shown + mark);
             }
-            if (redacted) err.println("fix: " + SecretRedactor.HINT);
+            if (redacted) {
+                String fix = Workspace.secretFix(parsed.project(), runvars);
+                if (fix != null) err.println("fix: " + fix);
+            }
             for (String file : RunConfigs.files(parsed.project(), runId)) {
                 out.println("config " + file);
             }

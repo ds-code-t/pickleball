@@ -398,6 +398,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/launcher/SessionHealthWait.java`
 - `src/main/java/tools/dscode/launcher/WorkbenchAgentCommands.java`
 - `src/main/java/tools/dscode/launcher/WorkbenchCliErrors.java`
+- `src/main/java/tools/dscode/launcher/WorkbenchCliFlags.java`
 - `src/main/java/tools/dscode/launcher/WorkbenchCliHelp.java`
 - `src/main/java/tools/dscode/launcher/WorkbenchCommandLine.java`
 - `src/main/java/tools/dscode/launcher/WorkbenchConsoleTap.java`

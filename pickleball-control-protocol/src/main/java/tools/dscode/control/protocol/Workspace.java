@@ -407,7 +407,9 @@ public final class Workspace {
                 appendWarning(warnings, "WARNING: --runvar " + key + " replaces "
                         + OutputFormatter.shown(key, existing) + " with " + OutputFormatter.shown(key, value));
                 if (SecretRedactor.leaks(key, existing) || SecretRedactor.leaks(key, value)) {
-                    appendWarning(warnings, "fix: " + SecretRedactor.HINT);
+                    String sample = SecretRedactor.leaks(key, existing) ? existing : value;
+                    String fix = secretFix(projectContaining(workspace), Map.of(key, sample));
+                    if (fix != null) appendWarning(warnings, "fix: " + fix);
                 }
             }
             if (SELECTION_KEYS.contains(key)) {
@@ -560,6 +562,95 @@ public final class Workspace {
         if (value == null || !value.startsWith(PROTECTED_PREFIX) || !value.endsWith(PROTECTED_SUFFIX)) return null;
         String key = value.substring(PROTECTED_PREFIX.length(), value.length() - PROTECTED_SUFFIX.length()).trim();
         return key.isEmpty() ? null : normalizeKey(key);
+    }
+
+    /**
+     * One source-aware secret fix for every leaked plain value in {@code values}.
+     * A key absent from the project property files names the runner hook.
+     * A key present in those files names the file. Null when nothing leaked.
+     */
+    public static String secretFix(Path project, Map<String, String> values) {
+        if (values == null || values.isEmpty()) return null;
+        java.util.LinkedHashSet<String> files = new java.util.LinkedHashSet<>();
+        boolean runner = false;
+        boolean any = false;
+        for (Map.Entry<String, String> entry : values.entrySet()) {
+            if (entry.getKey() == null) continue;
+            String key = normalizeKey(entry.getKey());
+            if (!SecretRedactor.leaks(key, entry.getValue())) continue;
+            any = true;
+            String source = projectFileSource(project, key);
+            if (source == null) runner = true;
+            else files.add(source);
+        }
+        if (!any) return null;
+        if (runner && files.isEmpty()) {
+            return SecretRedactor.fix("the runner hook (set by the runner and is not in project properties)");
+        }
+        if (!runner) return SecretRedactor.fix(String.join(", ", files));
+        return SecretRedactor.fix(
+                "the runner hook for keys that are not in a project property file, and "
+                        + String.join(", ", files) + " for keys that are"
+        );
+    }
+
+    /** UTF-8 project property values. Later files in the workbench scan overwrite earlier ones. */
+    public static Map<String, String> projectFileValues(Path project) {
+        return readProjectFiles(project).values;
+    }
+
+    /** Relative project-property path that supplied {@code key}, or null when the key is not in those files. */
+    public static String projectFileSource(Path project, String key) {
+        if (key == null || key.isBlank()) return null;
+        return readProjectFiles(project).sources.get(normalizeKey(key));
+    }
+
+    private record ProjectFiles(Map<String, String> values, Map<String, String> sources) {
+    }
+
+    private static ProjectFiles readProjectFiles(Path project) {
+        Map<String, String> values = new LinkedHashMap<>();
+        Map<String, String> sources = new LinkedHashMap<>();
+        if (project == null) return new ProjectFiles(values, sources);
+        Path root = project.toAbsolutePath().normalize();
+        for (Path file : List.of(
+                root.resolve("src/test/resources/pickleball_local2.properties"),
+                root.resolve("src/test/resources/pickleball_local.properties"),
+                root.resolve("src/test/resources/pickleball.properties"),
+                root.resolve("src/main/resources/pickleball_local2.properties"),
+                root.resolve("src/main/resources/pickleball_local.properties"),
+                root.resolve("src/main/resources/pickleball.properties"),
+                root.resolve("pickleball_local2.properties"),
+                root.resolve("pickleball_local.properties"),
+                root.resolve("pickleball.properties")
+        )) {
+            if (!Files.isRegularFile(file)) continue;
+            Properties properties = new Properties();
+            try (var reader = Files.newBufferedReader(file, StandardCharsets.UTF_8)) {
+                properties.load(reader);
+            } catch (IOException ignored) {
+                continue;
+            }
+            String relative = root.relativize(file).toString().replace('\\', '/');
+            for (String name : properties.stringPropertyNames()) {
+                String normalized = normalizeKey(name);
+                values.put(normalized, properties.getProperty(name));
+                sources.put(normalized, relative);
+            }
+        }
+        return new ProjectFiles(values, sources);
+    }
+
+    private static Path projectContaining(Path workspace) {
+        if (workspace == null) return Path.of("");
+        Path cursor = workspace.toAbsolutePath().normalize();
+        while (cursor != null) {
+            if (".pickleball".equals(String.valueOf(cursor.getFileName())) && cursor.getParent() != null) {
+                return cursor.getParent();
+            }
+            cursor = cursor.getParent();
+        }
+        return workspace;
     }
 
     public static String normalizeKey(String key) {

@@ -522,6 +522,7 @@ public final class WorkbenchSessionCommands {
         Integer refused = refusedDriver(parsed, err);
         if (refused != null) return refused;
         String text = flags.text;
+        if (flags.quoteWarning != null && !flags.quoteWarning.isBlank()) err.println(flags.quoteWarning);
         if (text == null || text.isBlank()) {
             err.print(WorkbenchCliHelp.usageError("missing gherkin", "execute-step"));
             return 2;
@@ -1501,11 +1502,7 @@ public final class WorkbenchSessionCommands {
          * Flags this parser recognizes beyond {@link WorkbenchCommandLine#MAJOR_FLAGS}.
          * {@code --session-file} is the state file session launch forwards to the controller.
          */
-        static final List<String> MAJOR_FLAGS = List.of(
-                "--ack-only", "--wait", "--no-wait", "--force",
-                "--stop-after", "--feature", "--run", "--from-here", "--session-file",
-                "--text-file", "--text-b64", "--hooks"
-        );
+        static final List<String> MAJOR_FLAGS = WorkbenchCliFlags.SESSION;
         final String text;
         final String id;
         final String feature;
@@ -1519,6 +1516,7 @@ public final class WorkbenchSessionCommands {
         final boolean hooks;
         final Long stepTimeoutSeconds;
         final Long runTimeoutSeconds;
+        final String quoteWarning;
 
         private SessionFlags(
                 String text,
@@ -1533,7 +1531,8 @@ public final class WorkbenchSessionCommands {
                 boolean force,
                 boolean hooks,
                 Long stepTimeoutSeconds,
-                Long runTimeoutSeconds
+                Long runTimeoutSeconds,
+                String quoteWarning
         ) {
             this.text = text;
             this.id = id;
@@ -1548,6 +1547,7 @@ public final class WorkbenchSessionCommands {
             this.hooks = hooks;
             this.stepTimeoutSeconds = stepTimeoutSeconds;
             this.runTimeoutSeconds = runTimeoutSeconds;
+            this.quoteWarning = quoteWarning;
         }
 
         static SessionFlags parse(String[] args) {
@@ -1569,18 +1569,21 @@ public final class WorkbenchSessionCommands {
             String absorb = null;
             List<String> words = new ArrayList<>();
             if (args == null) {
-                return new SessionFlags(null, null, null, null, null, null, null, false, true, false, false, null, null);
+                return new SessionFlags(null, null, null, null, null, null, null, false, true, false, false, null, null, null);
             }
+            boolean textFromFlag = false;
             for (int index = 1; index < args.length; index++) {
                 String token = args[index];
                 if (token == null) continue;
                 if (token.startsWith("--text=")) {
                     text = token.substring("--text=".length());
+                    textFromFlag = true;
                     absorb = null;
                     continue;
                 }
                 if ("--text".equals(token) && index + 1 < args.length) {
                     text = args[++index];
+                    textFromFlag = true;
                     absorb = null;
                     continue;
                 }
@@ -1747,8 +1750,10 @@ public final class WorkbenchSessionCommands {
             }
             if (textFile != null && !textFile.isBlank()) {
                 text = readTextFile(textFile);
+                textFromFlag = false;
             } else if (textB64 != null && !textB64.isBlank()) {
                 text = decodeText(textB64);
+                textFromFlag = false;
             }
             if (text == null && !words.isEmpty()) {
                 if ("status".equals(args[0]) && words.size() == 1) {
@@ -1758,10 +1763,33 @@ public final class WorkbenchSessionCommands {
                     if ("status".equals(args[0]) && id == null && words.size() == 1) id = words.getFirst();
                 }
             }
+            String warning = null;
+            if (textFromFlag && args.length > 0 && "execute-step".equals(args[0])) {
+                warning = quoteStripWarning(text, words);
+            }
             return new SessionFlags(
                     text, id, feature, run, fromHere, stopAfter, sessionFile, ackOnly, wait, force, hooks,
-                    stepTimeoutSeconds, runTimeoutSeconds
+                    stepTimeoutSeconds, runTimeoutSeconds, warning
             );
+        }
+
+        /**
+         * Non-fatal. Quoting through a shell or mvnw is not fixed; the warning
+         * points at {@code --text-b64} and {@code --text-file}.
+         */
+        static String quoteStripWarning(String text, List<String> leftover) {
+            if (text == null) return null;
+            int quotes = 0;
+            for (int index = 0; index < text.length(); index++) {
+                if (text.charAt(index) == '"') quotes++;
+            }
+            boolean unbalanced = quotes % 2 == 1;
+            boolean truncated = leftover != null && !leftover.isEmpty();
+            boolean stripped = !text.contains("\"")
+                    && text.matches("(?s).*\\b(?:the|a|an)\\s+\\S+\\s+(?:button|link|field|checkbox|element)\\b.*");
+            if (!unbalanced && !truncated && !stripped) return null;
+            return "WARNING: execute-step --text looks quote-stripped or truncated. "
+                    + "Pass the step with --text-b64 or --text-file. Quoting through mvnw is not fixed.";
         }
 
         private static String readTextFile(String path) {

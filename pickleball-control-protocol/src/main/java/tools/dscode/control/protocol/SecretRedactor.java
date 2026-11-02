@@ -13,7 +13,15 @@ import java.util.Set;
 public final class SecretRedactor {
     public static final String REDACTED = "<redacted>";
     public static final String HINT =
-            "secret redacted; the plain value is not printed. Read it from project properties, not from this command.";
+            "secret redacted; the plain value is not printed. Read it from the runner hook or the project property file that stores the key, not from this command.";
+
+    /** One fix sentence. {@code source} is the runner hook or the property file, never this command. */
+    public static String fix(String source) {
+        String where = source == null || source.isBlank()
+                ? "the runner hook"
+                : source.strip();
+        return "secret redacted; the plain value is not printed. Read it from " + where + ", not from this command.";
+    }
 
     private static final int SCRUB_MIN_LENGTH = 8;
     private static final ThreadLocal<Set<String>> KNOWN = ThreadLocal.withInitial(LinkedHashSet::new);

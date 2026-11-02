@@ -51,6 +51,7 @@ BUDGETS = {
     "stop": 60,
     "unknown-verb": 60,
     "exec-java-usage": 300,
+    "exec-java-split-tags": 300,
 }
 
 
@@ -71,6 +72,11 @@ def main() -> int:
         exec_usage = run_exec_stage(timings, "exec-java-usage", ["not-a-verb"], allow_exit={2})
         assert_in(exec_usage, "error:")
         assert_in(exec_usage, "fix:")
+        exec_tags = run_exec_stage(
+            timings, "exec-java-split-tags", ["plan", "--tags=@a", "and", "not", "@b"], allow_exit={2}
+        )
+        assert_in(exec_tags, "Tag quoting error")
+        assert_in(exec_tags, "fix:")
         run_stage(timings, "discover-uncompiled", [
             "discover", "--run-id=" + RUN_UNCOMPILED, "--tags=" + TAGS, "--name=" + NAME,
             "--runvar=pkb_browser=CHROME_HEADLESS", "--retention=failed", "--agent=consumer-sim",

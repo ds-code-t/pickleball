@@ -152,49 +152,43 @@ public final class WorkspaceSeed {
 
     /**
      * Keys whose stored value differs from the same key in a project property
-     * file. A key that is not in those files is a default, not a computed override.
+     * file, plus hook-computed keys (user, machine, Java vendor, time, and a
+     * runner-set secret) that are not in those files. A plain default such as
+     * {@code pkb_tags} is not marked.
      */
     public static Set<String> computedKeys(Path project, Map<String, String> values) {
         Set<String> computed = new LinkedHashSet<>();
         if (values == null || values.isEmpty()) return computed;
-        Map<String, String> files = projectFileProperties(project);
+        Map<String, String> files = Workspace.projectFileValues(project);
         values.forEach((rawKey, rawValue) -> {
             if (rawKey == null || rawKey.isBlank()) return;
             String key = Workspace.normalizeKey(rawKey);
             String stored = rawValue == null ? "" : rawValue;
-            if (!files.containsKey(key)) return;
-            if (!stored.equals(files.get(key))) computed.add(key);
+            if (files.containsKey(key)) {
+                if (!stored.equals(files.get(key))) computed.add(key);
+                return;
+            }
+            if (hookComputed(key) || runnerSuppliedSecret(key, stored)) computed.add(key);
         });
         return computed;
     }
 
-    private static Map<String, String> projectFileProperties(Path project) {
-        Map<String, String> values = new LinkedHashMap<>();
-        if (project == null) return values;
-        Path root = project.toAbsolutePath().normalize();
-        for (Path file : List.of(
-                root.resolve("src/test/resources/pickleball_local2.properties"),
-                root.resolve("src/test/resources/pickleball_local.properties"),
-                root.resolve("src/test/resources/pickleball.properties"),
-                root.resolve("src/main/resources/pickleball_local2.properties"),
-                root.resolve("src/main/resources/pickleball_local.properties"),
-                root.resolve("src/main/resources/pickleball.properties"),
-                root.resolve("pickleball_local2.properties"),
-                root.resolve("pickleball_local.properties"),
-                root.resolve("pickleball.properties")
-        )) {
-            if (!Files.isRegularFile(file)) continue;
-            Properties properties = new Properties();
-            try (var reader = Files.newBufferedReader(file, java.nio.charset.StandardCharsets.UTF_8)) {
-                properties.load(reader);
-            } catch (IOException ignored) {
-                continue;
-            }
-            for (String key : properties.stringPropertyNames()) {
-                values.put(Workspace.normalizeKey(key), properties.getProperty(key));
-            }
-        }
-        return values;
+    private static final Set<String> HOOK_COMPUTED_KEYS = Set.of(
+            "user", "user.name", "pkb_user",
+            "machine", "hostname", "os.name", "pkb_machine",
+            "java.vendor", "javavendor", "jvm.vendor", "pkb_java_vendor",
+            "time", "capturedat", "pkb_time"
+    );
+
+    private static boolean hookComputed(String key) {
+        return HOOK_COMPUTED_KEYS.contains(key);
+    }
+
+    private static boolean runnerSuppliedSecret(String key, String stored) {
+        return Workspace.isSensitiveKey(key)
+                && stored != null
+                && !stored.isBlank()
+                && Workspace.protectedKey(stored) == null;
     }
 
     private record SecretKeep(Set<String> keys, List<String> warnings) {

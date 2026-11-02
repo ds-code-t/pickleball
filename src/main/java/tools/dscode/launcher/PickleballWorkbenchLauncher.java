@@ -53,6 +53,19 @@ public final class PickleballWorkbenchLauncher {
     }
 
     public static void main(String[] args) {
+        if (WorkbenchCliHelp.isHelpRequest(args)) {
+            int code = WorkbenchCliHelp.answer(args, System.out, System.err);
+            if (code != 0) exitProcess(code);
+            return;
+        }
+        dispatch(args);
+    }
+
+    /**
+     * Every verb except help. Help must not reference this method: its bytecode
+     * names the agent and session command classes.
+     */
+    private static void dispatch(String[] args) {
         WorkbenchCommandLine.Parsed parsed;
         try {
             parsed = WorkbenchCommandLine.parse(args);
@@ -132,8 +145,9 @@ public final class PickleballWorkbenchLauncher {
      * That plugin can rewrite {@code System.exit} into an exception and Maven
      * then exits 1. {@code Runtime.halt} is not rewritten, so a rewritten or
      * ignored {@code System.exit} still ends the JVM with {@code code}.
-     * Apache {@code mvn.cmd} then maps every non-zero JVM status to 1; the
-     * project {@code mvnw.cmd} launches this same JVM and returns {@code code}.
+     * Apache {@code mvn.cmd} then maps every non-zero JVM status to 1. The
+     * project {@code mvnw.cmd} and Linux {@code mvnw} launch this same JVM and
+     * return {@code code}. They do not collapse a non-zero status to 1.
      */
     static void exitProcess(int code) {
         keepExitCode(code, System::exit, status -> Runtime.getRuntime().halt(status));

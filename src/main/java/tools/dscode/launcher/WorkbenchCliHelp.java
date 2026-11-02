@@ -1,5 +1,6 @@
 package tools.dscode.launcher;
 
+import java.io.PrintStream;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -78,10 +79,44 @@ final class WorkbenchCliHelp {
         return "help".equals(token) || "--help".equals(token) || "-h".equals(token);
     }
 
+    /** First argument is help, {@code --help}, or {@code -h}. */
+    static boolean isHelpRequest(String[] args) {
+        if (args == null || args.length == 0 || args[0] == null) return false;
+        return isHelpToken(args[0].trim());
+    }
+
+    /**
+     * The only help path. The thin controller jar can run this without Jackson
+     * and without initializing the agent or session command classes.
+     */
+    static int answer(String[] args, PrintStream out, PrintStream err) {
+        String topic = null;
+        if (args != null) {
+            for (int index = 1; index < args.length; index++) {
+                String token = args[index];
+                if (token == null || token.isBlank() || isHelpToken(token.trim())) continue;
+                topic = token.trim();
+                break;
+            }
+        }
+        if (topic == null) {
+            out.print(catalog());
+            return 0;
+        }
+        String page = forTopic(topic);
+        if (page == null) {
+            err.print(unknown(topic));
+            return 2;
+        }
+        out.print(page);
+        return 0;
+    }
+
     static String catalog() {
         StringBuilder text = new StringBuilder();
         text.append("Pickleball Workbench. help <command> prints usage. help <flag> prints that flag.\n");
         text.append("exit 0 ok, 1 failed, 2 usage. --json is one JSON object and no preamble.\n");
+        text.append("help is always available on the thin controller jar and does not load Jackson.\n");
         text.append("decide: discover, then plan, then run. plan lists the scenarios. run is confirm, or isolate then execute-step.\n");
         text.append("Timing is .pickleball/runs/<id>/launch-timing.txt. Stderr timing only when PKB_WORKBENCH_TIMING=1 or -Dpkb_workbench_timing=true.\n");
         text.append("Do not pass pkb_run_profile. Do not open the GUI to test yourself. isolate is the headless session.\n");
@@ -172,9 +207,7 @@ final class WorkbenchCliHelp {
     }
 
     private static boolean knownFlag(String token) {
-        return WorkbenchCommandLine.MAJOR_FLAGS.contains(token)
-                || WorkbenchSessionCommands.SessionFlags.MAJOR_FLAGS.contains(token)
-                || WorkbenchAgentCommands.MAJOR_FLAGS.contains(token);
+        return WorkbenchCliFlags.known(token);
     }
 
     private static String ensureNewline(String text) {

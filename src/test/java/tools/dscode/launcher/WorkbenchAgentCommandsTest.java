@@ -1733,6 +1733,42 @@ class WorkbenchAgentCommandsTest {
     }
 
     @Test
+    void workspaceShowMarksHookComputedKeysAndNamesTheSecretSource() throws Exception {
+        Map<String, String> hook = new LinkedHashMap<>();
+        hook.put("user", "ada");
+        hook.put("java.vendor", "Eclipse Adoptium");
+        hook.put("pkb_tags", "@smoke");
+        Workspace.writeRunVars(Workspace.directory(tempDir, "run-hook"), hook);
+        Path hookFile = Workspace.runvarsFile(Workspace.directory(tempDir, "run-hook"));
+        Files.writeString(hookFile, Files.readString(hookFile) + "pkb_password=runner-hook-secret-value\n");
+
+        Output shown = run("workspace-show", tempDir.toString(), "--run-id=run-hook");
+        assertEquals(0, shown.exitCode(), shown.stderr());
+        assertTrue(shown.stdout().lines().anyMatch(line -> line.equals("user=ada computed")), shown.stdout());
+        assertTrue(shown.stdout().lines().anyMatch(line -> line.equals("java.vendor=Eclipse Adoptium computed")), shown.stdout());
+        assertTrue(shown.stdout().lines().anyMatch(line -> line.equals("pkb_tags=@smoke")), shown.stdout());
+        assertFalse(shown.stdout().contains("pkb_tags=@smoke computed"), shown.stdout());
+        assertFalse(shown.stdout().contains("runner-hook-secret-value"), shown.stdout());
+        assertFalse(shown.stderr().contains("runner-hook-secret-value"), shown.stderr());
+        assertTrue(shown.stderr().contains("runner hook"), shown.stderr());
+        assertFalse(shown.stderr().contains("Read it from project properties"), shown.stderr());
+        assertTrue(shown.stdout().contains("pkb_password=<redacted> computed"), shown.stdout());
+
+        Path resources = tempDir.resolve("src/test/resources");
+        Files.createDirectories(resources);
+        Files.writeString(resources.resolve("pickleball.properties"), "pkb_token=file-token-secret\n");
+        Path filedWorkspace = Workspace.directory(tempDir, "run-file");
+        Files.createDirectories(filedWorkspace);
+        Files.writeString(Workspace.runvarsFile(filedWorkspace), "pkb_token=file-token-secret\n");
+        Output fileShown = run("workspace-show", tempDir.toString(), "--run-id=run-file");
+        assertEquals(0, fileShown.exitCode(), fileShown.stderr());
+        String combined = fileShown.stdout() + fileShown.stderr();
+        assertFalse(combined.contains("file-token-secret"), combined);
+        assertTrue(fileShown.stderr().contains("src/test/resources/pickleball.properties"), fileShown.stderr());
+        assertFalse(fileShown.stderr().contains("Read it from project properties, not from this command"), fileShown.stderr());
+    }
+
+    @Test
     void prepareDoesNotRewriteTheSavedCopyOnALaterRun() throws Exception {
         WorkspaceLaunch.Prepared first = WorkspaceLaunch.prepare(
                 tempDir, "stable-1", null, "@smoke", null, null, null, null, null, List.of(), new StringBuilder()

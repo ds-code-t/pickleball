@@ -33,6 +33,8 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -423,6 +425,12 @@ class WorkbenchSessionCommandsTest {
         assertTrue(passed.contains("id=9"), passed);
         assertFalse(failed.equals(passed), failed + " vs " + passed);
         assertEquals("step Given stay", plain);
+        String causeOnly = WorkbenchSessionCommands.compactEvent(mapper.readTree("""
+                {"stepText":"Then missing","message":"Failed to find PickleStepDefinitionMatch","sequence":2}
+                """));
+        assertTrue(causeOnly.contains("FAILED"), causeOnly);
+        assertTrue(causeOnly.contains("id=2"), causeOnly);
+        assertFalse(causeOnly.contains("null"), causeOnly);
 
         try (FakeSession session = FakeSession.start(project)) {
             session.eventsJson = """
@@ -1049,6 +1057,7 @@ class WorkbenchSessionCommandsTest {
             );
             assertEquals(0, output.exitCode, output.stderr + output.stdout);
             assertTrue(output.stdout.contains("SESSION pid="), output.stdout);
+            assertTrue(output.stdout.contains("status=idle"), output.stdout);
             assertTrue(output.stdout.contains("elapsed-step-ms=idle"), output.stdout);
         }
     }
@@ -1119,6 +1128,54 @@ class WorkbenchSessionCommandsTest {
             assertFalse(output.stdout.contains("\"message\":null"), output.stdout);
             assertFalse(output.stdout.contains("\"stackHead\":null"), output.stdout);
         }
+    }
+
+    @Test
+    @Timeout(value = 10, unit = TimeUnit.SECONDS)
+    void executeStepWarnsWhenTextLooksQuoteStrippedAndNamesTheSafeForms() throws Exception {
+        WorkbenchSessionCommands.SessionFlags stripped = WorkbenchSessionCommands.SessionFlags.parse(new String[]{
+                "execute-step", "--text=Then the Save button is visible"
+        });
+        assertNotNull(stripped.quoteWarning);
+        assertTrue(stripped.quoteWarning.contains("--text-b64"), stripped.quoteWarning);
+        assertTrue(stripped.quoteWarning.contains("--text-file"), stripped.quoteWarning);
+        WorkbenchSessionCommands.SessionFlags quoted = WorkbenchSessionCommands.SessionFlags.parse(new String[]{
+                "execute-step", "--text=Then the \"Save\" button is visible"
+        });
+        assertNull(quoted.quoteWarning);
+        WorkbenchSessionCommands.SessionFlags split = WorkbenchSessionCommands.SessionFlags.parse(new String[]{
+                "execute-step", "--text=Then", "the", "Save", "button", "is", "visible"
+        });
+        assertNotNull(split.quoteWarning);
+        assertEquals("Then", split.text);
+
+        Path sessionFile = project.resolve(".pickleball/runs/quote-warn/session/cli-session.json");
+        try (FakeSession session = FakeSession.start(project, "cli-session", sessionFile)) {
+            session.commandGet = """
+                    {"id":"step-held","status":"SUCCESS","result":{"status":"PASSED"}}
+                    """;
+            Output output = run(
+                    new String[]{"execute-step", project.toString(), "--text=Then the Save button is visible"},
+                    launch -> {
+                        throw new AssertionError("execute-step must not start a session");
+                    }
+            );
+            assertTrue(output.stderr.contains("--text-b64"), output.stderr);
+            assertTrue(output.stderr.contains("--text-file"), output.stderr);
+            assertTrue(output.stdout.contains("ACK"), output.stdout);
+            assertEquals(0, output.exitCode, output.stderr + output.stdout);
+        }
+    }
+
+    @Test
+    void idleReportNamesIdleForTheStatusAndTheStepClock() {
+        String report = WorkbenchSessionCommands.formatReport(
+                new WorkbenchSessionCommands.Timing(12, 0, false), List.of()
+        );
+        assertTrue(report.contains("status=idle"), report);
+        assertTrue(report.contains("elapsed-step-ms=idle"), report);
+        assertFalse(report.contains("elapsed-step-ms=0"), report);
+        assertFalse(report.contains("status=running"), report);
     }
 
     @Test

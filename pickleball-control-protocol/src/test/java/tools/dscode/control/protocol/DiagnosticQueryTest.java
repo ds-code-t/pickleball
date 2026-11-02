@@ -6,6 +6,7 @@ import org.junit.jupiter.api.io.TempDir;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -290,6 +291,64 @@ class DiagnosticQueryTest {
         assertEquals(0, errors.exit(), errors.json());
         assertTrue(errors.json().contains("\"stackHead\":\"java.lang.AssertionError: left\""), errors.json());
         assertFalse(errors.json().contains("scenario_end"), errors.json());
+        assertEquals(1, errorItems(errors).size(), errors.json());
+    }
+
+    @Test
+    void errorsPutTheUndefinedStepCauseOnOneRow() throws Exception {
+        Path scenario = project.resolve("reports/diagnostic-runs/run-undef/scenarios/scene");
+        Files.createDirectories(scenario);
+        Files.writeString(project.resolve("reports/diagnostic-runs/run-catalog.json"),
+                "{\"runs\":[{\"runId\":\"run-undef\",\"outcome\":\"FAILED\"}]}");
+        Files.writeString(project.resolve("reports/diagnostic-runs/run-undef/run-index.json"),
+                "{\"runId\":\"run-undef\",\"outcome\":\"FAILED\",\"scenarios\":[{\"scenarioId\":\"scene\",\"name\":\"Missing\",\"outcome\":\"FAILED\"}]}");
+        Files.writeString(scenario.resolve("summary.json"), "{\"name\":\"Missing\",\"outcome\":\"FAILED\"}");
+        Files.writeString(scenario.resolve("events.jsonl"), """
+                {"type":"step","eventSeq":1,"text":"Then missing","status":"FAILED","message":"Step: 'Then missing' failed"}
+                {"type":"failure","eventSeq":2,"message":"Failed to find PickleStepDefinitionMatch for step text: 'Then missing'","stackHead":"io.cucumber.junit.UndefinedStepException: Failed to find PickleStepDefinitionMatch for step text: 'Then missing'"}
+                """);
+        DiagnosticQuery.Outcome errors = DiagnosticQuery.query(project, Map.of("op", "errors", "runId", "run-undef"));
+        assertEquals(0, errors.exit(), errors.json());
+        List<Map<String, Object>> rows = errorItems(errors);
+        assertEquals(1, rows.size(), errors.json());
+        assertEquals("step", rows.getFirst().get("kind"));
+        assertTrue(String.valueOf(rows.getFirst().get("message")).contains("Failed to find PickleStepDefinitionMatch"), errors.json());
+        assertTrue(String.valueOf(rows.getFirst().get("stackHead")).contains("UndefinedStepException"), errors.json());
+        assertFalse(errors.json().contains("Step: 'Then missing' failed"), errors.json());
+        assertFalse(errors.json().contains("\"type\":\"failure\""), errors.json());
+    }
+
+    @Test
+    void errorsKeepOneRowForADefinedStepFailure() throws Exception {
+        Path scenario = project.resolve("reports/diagnostic-runs/run-defined/scenarios/scene");
+        Files.createDirectories(scenario);
+        Files.writeString(project.resolve("reports/diagnostic-runs/run-catalog.json"),
+                "{\"runs\":[{\"runId\":\"run-defined\",\"outcome\":\"FAILED\"}]}");
+        Files.writeString(project.resolve("reports/diagnostic-runs/run-defined/run-index.json"),
+                "{\"runId\":\"run-defined\",\"outcome\":\"FAILED\",\"scenarios\":[{\"scenarioId\":\"scene\",\"name\":\"Defined\",\"outcome\":\"FAILED\"}]}");
+        Files.writeString(scenario.resolve("summary.json"), "{\"name\":\"Defined\",\"outcome\":\"FAILED\"}");
+        Files.writeString(scenario.resolve("events.jsonl"), """
+                {"type":"step","eventSeq":1,"text":"Then stay","status":"FAILED","message":"left"}
+                {"type":"failure","eventSeq":2,"message":"left","stackHead":"java.lang.AssertionError: left"}
+                """);
+        DiagnosticQuery.Outcome errors = DiagnosticQuery.query(project, Map.of("op", "errors", "runId", "run-defined"));
+        assertEquals(0, errors.exit(), errors.json());
+        List<Map<String, Object>> rows = errorItems(errors);
+        assertEquals(1, rows.size(), errors.json());
+        assertEquals("left", rows.getFirst().get("message"));
+        assertEquals("java.lang.AssertionError: left", rows.getFirst().get("stackHead"));
+        assertFalse(errors.json().contains("\"type\":\"failure\""), errors.json());
+    }
+
+    @SuppressWarnings("unchecked")
+    private static List<Map<String, Object>> errorItems(DiagnosticQuery.Outcome errors) {
+        Object items = errors.body().get("items");
+        if (!(items instanceof List<?> list)) return List.of();
+        List<Map<String, Object>> rows = new ArrayList<>();
+        for (Object item : list) {
+            if (item instanceof Map<?, ?> map) rows.add((Map<String, Object>) map);
+        }
+        return rows;
     }
 
     @Test

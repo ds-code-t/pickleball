@@ -792,13 +792,11 @@ public final class DiagnosticQuery {
         String failureMessage = failure == null ? null : failure.message();
         String failureHead = failure == null ? null : failure.stackHead();
         if (failureMessage == null) {
-            failureMessage = firstNonBlank(str(body.get("message")), str(body.get("errorMessage")));
+            String rawMessage = firstNonBlank(str(body.get("message")), str(body.get("errorMessage")));
+            if (rawMessage != null && !FailureRecord.wrapper(rawMessage)) failureMessage = rawMessage;
         }
         if (failureHead == null) failureHead = stackHead(body);
         boolean error = isError(type, status, body);
-        if ((failureMessage == null || failureMessage.isBlank()) && "FAILED".equalsIgnoreCase(status)) {
-            failureMessage = firstNonBlank(str(body.get("text")), str(body.get("stepText")));
-        }
         if (error && (failureMessage == null || failureMessage.isBlank()) && (failureHead == null || failureHead.isBlank())) {
             error = false;
         }
@@ -1297,21 +1295,37 @@ public final class DiagnosticQuery {
     }
 
     private static void attachFailureStacks(List<Map<String, Object>> events) {
-        String head = null;
-        String message = null;
-        for (Map<String, Object> event : events) {
+        List<Integer> absorbed = new ArrayList<>();
+        for (int index = 0; index < events.size(); index++) {
+            Map<String, Object> event = events.get(index);
             if (!"failure".equalsIgnoreCase(str(event.get("type")))) continue;
-            if (event.get("stackHead") != null) head = str(event.get("stackHead"));
-            if (event.get("message") != null) message = str(event.get("message"));
+            String head = str(event.get("stackHead"));
+            String message = str(event.get("message"));
+            if ((head == null || head.isBlank()) && (message == null || message.isBlank())) continue;
+            Map<String, Object> step = precedingFailedStep(events, index);
+            if (step == null) continue;
+            String existing = str(step.get("message"));
+            if (message != null && !message.isBlank()
+                    && (existing == null || existing.isBlank() || FailureRecord.wrapper(existing)
+                    || existing.equals(str(step.get("text"))))) {
+                step.put("message", message);
+            }
+            if (head != null && !head.isBlank() && step.get("stackHead") == null) step.put("stackHead", head);
+            absorbed.add(index);
         }
-        if (head == null && message == null) return;
-        for (Map<String, Object> event : events) {
+        for (int cursor = absorbed.size() - 1; cursor >= 0; cursor--) events.remove((int) absorbed.get(cursor));
+    }
+
+    private static Map<String, Object> precedingFailedStep(List<Map<String, Object>> events, int index) {
+        for (int cursor = index - 1; cursor >= 0; cursor--) {
+            Map<String, Object> event = events.get(cursor);
             if (!"step".equals(str(event.get("kind")))) continue;
             String status = str(event.get("status"));
-            if (status == null || (!"FAILED".equalsIgnoreCase(status) && !"ERROR".equalsIgnoreCase(status))) continue;
-            if (event.get("stackHead") == null && head != null) event.put("stackHead", head);
-            if (event.get("message") == null && message != null) event.put("message", message);
+            if (status != null && ("FAILED".equalsIgnoreCase(status) || "ERROR".equalsIgnoreCase(status))) {
+                return event;
+            }
         }
+        return null;
     }
 
     private static Scan tailLines(Path project, String runId) throws IOException {

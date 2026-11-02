@@ -526,6 +526,26 @@ def validate_dependency_owned_guidance(errors: list[str]) -> None:
         errors.append(
             "docs/consumer-agent-guide.md must not send new investigations under v/<version>/."
         )
+    # Canonical size is the UTF-8 LF byte length of docs/consumer-agent-guide.md.
+    # A CRLF export is not the contract. The packaged AGENT-GUIDE.md must match.
+    GUIDE_LF_LIMIT = 5120
+    source_lf = text.replace("\r\n", "\n").replace("\r", "\n").encode("utf-8")
+    if len(source_lf) > GUIDE_LF_LIMIT:
+        errors.append(
+            "docs/consumer-agent-guide.md is "
+            f"{len(source_lf)} UTF-8 LF bytes; the limit is {GUIDE_LF_LIMIT}. "
+            "Measure LF bytes of that source file, not a CRLF export."
+        )
+    packaged = ROOT / "src" / "main" / "resources" / "META-INF" / "pickleball" / "guidance" / "AGENT-GUIDE.md"
+    if packaged.is_file():
+        packaged_lf = packaged.read_bytes().replace(b"\r\n", b"\n").replace(b"\r", b"\n")
+        if packaged_lf != source_lf:
+            errors.append(
+                "Packaged AGENT-GUIDE.md LF bytes must match docs/consumer-agent-guide.md "
+                f"({len(packaged_lf)} vs {len(source_lf)})."
+            )
+    else:
+        errors.append("Missing packaged AGENT-GUIDE.md")
     detail_path = ROOT / "docs" / "workbench-agent-detail.md"
     if not detail_path.is_file():
         errors.append("Missing docs/workbench-agent-detail.md")

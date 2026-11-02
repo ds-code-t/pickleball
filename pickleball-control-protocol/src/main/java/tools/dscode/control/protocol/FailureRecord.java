@@ -62,7 +62,7 @@ public record FailureRecord(
             if (phrase == null) phrase = firstText(map, "phraseText", "phrase", "stepText");
             if (stepText == null) stepText = firstText(map, "stepText", "step", "text");
         }
-        String message = firstText(body, "message", "errorMessage");
+        String message = firstRealText(body, "message", "errorMessage");
         String head = text(body.get("stackHead"));
         if (head == null) head = firstStackLine(body.get("stackTrace"));
         if (head == null) head = firstStackLine(body.get("stack"));
@@ -192,8 +192,19 @@ public record FailureRecord(
     static boolean wrapper(String message) {
         if (message == null || message.isBlank()) return true;
         String trimmed = message.strip();
-        return trimmed.matches("(?i)step\\s+'.*'\\s+failed.*")
-                || trimmed.matches("(?i)step\\s+\".*\"\\s+failed.*");
+        return trimmed.matches("(?i)step:?\\s+'.*'\\s+failed.*")
+                || trimmed.matches("(?i)step:?\\s+\".*\"\\s+failed.*");
+    }
+
+    private static String firstRealText(Map<?, ?> body, String... keys) {
+        String fallback = null;
+        for (String key : keys) {
+            String value = text(body.get(key));
+            if (value == null) continue;
+            if (!wrapper(value)) return value;
+            if (fallback == null) fallback = value;
+        }
+        return fallback;
     }
 
     private static String firstText(Map<?, ?> body, String... keys) {

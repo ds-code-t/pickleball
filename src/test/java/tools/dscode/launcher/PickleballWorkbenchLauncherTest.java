@@ -11,7 +11,10 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
+import java.util.concurrent.TimeUnit;
 import java.util.jar.JarOutputStream;
 import java.util.zip.ZipEntry;
 
@@ -281,6 +284,97 @@ class PickleballWorkbenchLauncherTest {
         assertEquals("confirm", confirm.command());
         assertEquals("Agent pointer eval failing fruit mismatch", confirm.name());
         assertEquals(Path.of("").toAbsolutePath().normalize(), confirm.project());
+    }
+
+    @Test
+    void helpExitsZeroWithoutJacksonAndUsageErrorsExit2() throws Exception {
+        String classpath = classpathWithoutJackson();
+        Run help = launch(classpath, "help");
+        assertEquals(0, help.exit, help.text());
+        assertTrue(help.out.contains("Pickleball Workbench"), help.text());
+        assertTrue(help.out.contains("thin controller jar"), help.text());
+        assertFalse(help.text().contains("NoClassDefFoundError"), help.text());
+        assertFalse(help.text().contains("ObjectMapper"), help.text());
+
+        Run flag = launch(classpath, "help", "--json");
+        assertEquals(0, flag.exit, flag.text());
+        assertTrue(flag.out.contains("Usage: --json"), flag.text());
+        assertFalse(flag.text().contains("NoClassDefFoundError"), flag.text());
+
+        Run unknownTopic = launch(classpath, "help", "not-a-command");
+        assertEquals(2, unknownTopic.exit, unknownTopic.text());
+        assertTrue(unknownTopic.err.contains("Unknown Workbench command"), unknownTopic.text());
+
+        Run unknown = launch(classpath, "not-a-verb");
+        assertEquals(2, unknown.exit, unknown.text());
+        assertTrue(unknown.text().contains("error:"), unknown.text());
+        assertTrue(unknown.text().contains("fix:"), unknown.text());
+
+        Run tags = launch(classpath, "plan", "--tags=@a", "and", "not", "@b");
+        assertEquals(2, tags.exit, tags.text());
+        assertTrue(tags.text().contains("Tag quoting error"), tags.text());
+        assertFalse(tags.text().contains("NoClassDefFoundError"), tags.text());
+    }
+
+    @Test
+    void linuxWrapperReturnsTheJvmStatusInsteadOfCollapsingToOne() throws Exception {
+        String script = Files.readString(Path.of("maven-consumer-project", "mvnw"));
+        assertTrue(script.contains("org.codehaus.plexus.classworlds.launcher.Launcher"), script);
+        assertTrue(script.contains("Do not collapse a non-zero status to 1"), script);
+        assertFalse(script.contains("exec \"$MAVEN_HOME/bin/$MVN_CMD\""), script);
+    }
+
+    private static String classpathWithoutJackson() {
+        String separator = System.getProperty("path.separator");
+        List<String> kept = new ArrayList<>();
+        for (String entry : System.getProperty("java.class.path").split(java.util.regex.Pattern.quote(separator))) {
+            String lower = entry.toLowerCase(Locale.ROOT);
+            if (lower.contains("jackson")) continue;
+            kept.add(entry);
+        }
+        return String.join(separator, kept);
+    }
+
+    private static Run launch(String classpath, String... args) throws Exception {
+        List<String> command = new ArrayList<>();
+        command.add(Path.of(System.getProperty("java.home"), "bin", javaExecutableName()).toString());
+        command.add("-cp");
+        command.add(classpath);
+        command.add("tools.dscode.launcher.PickleballWorkbenchLauncher");
+        command.addAll(List.of(args));
+        Process process = new ProcessBuilder(command).start();
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        ByteArrayOutputStream err = new ByteArrayOutputStream();
+        Thread stdout = pump(process.getInputStream(), out);
+        Thread stderr = pump(process.getErrorStream(), err);
+        boolean finished = process.waitFor(30, TimeUnit.SECONDS);
+        if (!finished) process.destroyForcibly();
+        stdout.join(2_000);
+        stderr.join(2_000);
+        return new Run(
+                finished ? process.exitValue() : -1,
+                out.toString(StandardCharsets.UTF_8),
+                err.toString(StandardCharsets.UTF_8)
+        );
+    }
+
+    private static Thread pump(java.io.InputStream input, ByteArrayOutputStream target) {
+        Thread thread = new Thread(() -> {
+            try (input) {
+                input.transferTo(target);
+            } catch (Exception ignored) {
+                // The process ending closes the pipe.
+            }
+        });
+        thread.setDaemon(true);
+        thread.start();
+        return thread;
+    }
+
+    private record Run(int exit, String out, String err) {
+        String text() {
+            return out + "\n" + err;
+        }
     }
 
     private static byte[] thinJar(String version, String... rows) throws IOException {

@@ -66,9 +66,10 @@ class SecretRedactionTest {
         assertTrue(shown.stdout().contains("pkb_rp_api_key=" + STORED_REFERENCE), shown.stdout());
         assertTrue(shown.stdout().contains("pkb_token=" + PAREN_REFERENCE), shown.stdout());
         assertTrue(shown.stdout().contains("pkb_browser=CHROME_HEADLESS"), shown.stdout());
-        assertTrue(shown.stdout().contains("fix: " + tools.dscode.control.protocol.SecretRedactor.HINT)
-                || shown.stderr().contains("fix: " + tools.dscode.control.protocol.SecretRedactor.HINT),
-                shown.stdout() + shown.stderr());
+        assertTrue(shown.stderr().contains("runner hook"), shown.stderr());
+        assertTrue(shown.stderr().contains("not from this command"), shown.stderr());
+        assertFalse(shown.stderr().contains("Read it from project properties"), shown.stderr());
+        assertFalse((shown.stdout() + shown.stderr()).contains(LITERAL), shown.stdout() + shown.stderr());
     }
 
     @Test
@@ -98,7 +99,9 @@ class SecretRedactionTest {
         assertFalse(edited.stdout().contains(REPLACEMENT), edited.stdout());
         assertFalse(edited.stderr().contains(REPLACEMENT), edited.stderr());
         assertTrue(edited.stderr().contains("<redacted>"), edited.stderr());
-        assertTrue(edited.stderr().contains(tools.dscode.control.protocol.SecretRedactor.HINT), edited.stderr());
+        assertTrue(edited.stderr().contains("runner hook"), edited.stderr());
+        assertTrue(edited.stderr().contains("not from this command"), edited.stderr());
+        assertFalse(edited.stderr().contains("Read it from project properties"), edited.stderr());
     }
 
     @Test
