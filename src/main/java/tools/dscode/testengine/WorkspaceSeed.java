@@ -74,6 +74,13 @@ public final class WorkspaceSeed {
         if (capture == null) {
             throw new IllegalStateException("Workspace seed has no resolver for " + workspace);
         }
+        if (reseed) {
+            try {
+                Files.deleteIfExists(Workspace.valueSourcesFile(workspace));
+            } catch (IOException failure) {
+                throw new IllegalStateException("Could not clear value sources at " + workspace, failure);
+            }
+        }
         capture.accept(workspace);
         if (!Workspace.exists(workspace)) {
             throw new IllegalStateException("Workspace seed did not write " + workspace);
@@ -105,6 +112,7 @@ public final class WorkspaceSeed {
         Workspace.copyConfigs(source, workspace);
         Set<String> keep = runnerComputedSecretKeys(values);
         Workspace.writeRunVars(workspace, values, keep);
+        writeSources(workspace, runner, values, browser);
         List<String> warnings = new ArrayList<>(new java.util.LinkedHashSet<>(
                 java.util.stream.Stream.concat(
                         Workspace.literalSecretWarnings(Workspace.configsDirectory(workspace)).stream(),
@@ -151,28 +159,84 @@ public final class WorkspaceSeed {
     }
 
     /**
-     * Keys whose stored value differs from the same key in a project property
-     * file, plus hook-computed keys (user, machine, Java vendor, time, and a
-     * runner-set secret) that are not in those files. A plain default such as
-     * {@code pkb_tags} is not marked.
+     * Keys whose source is {@code hook}. A hook value needs a reseed. Property
+     * files, defaults, and CLI overrides are not marked.
      */
     public static Set<String> computedKeys(Path project, Map<String, String> values) {
+        return computedKeys(project, null, values);
+    }
+
+    public static Set<String> computedKeys(Path project, Path workspace, Map<String, String> values) {
         Set<String> computed = new LinkedHashSet<>();
-        if (values == null || values.isEmpty()) return computed;
-        Map<String, String> files = Workspace.projectFileValues(project);
-        values.forEach((rawKey, rawValue) -> {
-            if (rawKey == null || rawKey.isBlank()) return;
-            String key = Workspace.normalizeKey(rawKey);
-            String stored = rawValue == null ? "" : rawValue;
-            if (files.containsKey(key)) {
-                if (!stored.equals(files.get(key))) computed.add(key);
-                return;
-            }
-            if (hookComputed(key) || runnerSuppliedSecret(key, stored)) computed.add(key);
+        sources(project, workspace, values).forEach((key, source) -> {
+            if ("hook".equals(source)) computed.add(key);
         });
         return computed;
     }
 
+    /**
+     * One source for every stored value: {@code hook}, {@code properties},
+     * {@code default}, or {@code cli/override}. A sidecar written at seed wins.
+     * An older workspace is classified from the key and the project files.
+     */
+    public static Map<String, String> sources(Path project, Path workspace, Map<String, String> values) {
+        Map<String, String> out = new LinkedHashMap<>();
+        if (values == null || values.isEmpty()) return out;
+        Map<String, String> stored = workspace == null ? Map.of() : Workspace.readValueSources(workspace);
+        boolean sidecar = workspace != null && Files.isRegularFile(Workspace.valueSourcesFile(workspace));
+        Map<String, String> files = Workspace.projectFileValues(project);
+        values.forEach((rawKey, rawValue) -> {
+            if (rawKey == null || rawKey.isBlank()) return;
+            String key = Workspace.normalizeKey(rawKey);
+            String text = rawValue == null ? "" : rawValue;
+            if (sidecar && stored.containsKey(key)) {
+                out.put(key, canonicalSource(stored.get(key)));
+                return;
+            }
+            out.put(key, inferSource(key, text, files));
+        });
+        return out;
+    }
+
+    private static void writeSources(
+            Path workspace,
+            PickleballRunner runner,
+            Map<String, String> values,
+            String browserBeforeFallback
+    ) {
+        Map<String, String> classified = runner == null ? Map.of() : runner.valueSources();
+        Map<String, String> sources = new LinkedHashMap<>();
+        values.forEach((rawKey, rawValue) -> {
+            if (rawKey == null || rawKey.isBlank()) return;
+            String key = Workspace.normalizeKey(rawKey);
+            String source = classified.get(key);
+            sources.put(key, source == null ? "default" : source);
+        });
+        if (browserBeforeFallback == null || browserBeforeFallback.isBlank()) {
+            sources.put(Workspace.normalizeKey(PKB_props.PKB_BROWSER), "default");
+        }
+        Workspace.writeValueSources(workspace, sources);
+    }
+
+    private static String canonicalSource(String source) {
+        if (source == null) return "default";
+        String token = source.trim();
+        return switch (token) {
+            case "hook", "properties", "default", "cli/override" -> token;
+            default -> "default";
+        };
+    }
+
+    private static String inferSource(String key, String stored, Map<String, String> files) {
+        if (hookComputed(key) || runnerSuppliedSecret(key, stored)) return "hook";
+        if (files.containsKey(key)) {
+            String filed = files.get(key);
+            return stored.equals(filed == null ? "" : filed) ? "properties" : "cli/override";
+        }
+        return "default";
+    }
+
+    /** Allowlist used only when a workspace has no value-sources sidecar. */
     private static final Set<String> HOOK_COMPUTED_KEYS = Set.of(
             "user", "user.name", "pkb_user",
             "machine", "hostname", "os.name", "pkb_machine",

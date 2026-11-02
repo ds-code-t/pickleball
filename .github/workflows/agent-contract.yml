@@ -68,6 +68,7 @@ jobs:
       - name: Consumer-simulation harness
         run: |
           chmod +x maven-consumer-project/mvnw scripts/consumer_sim.py
+          # Includes the documented ./mvnw exec:java launch (quoted -Dexec.*) and asserts exit 2.
           xvfb-run -a python3 scripts/consumer_sim.py
 
       - name: Test Maven consumer project
@@ -102,6 +103,7 @@ jobs:
         run: |
           .\gradlew.bat publishToMavenLocal -x test --no-daemon
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          # consumer_sim.py runs the documented mvnw.cmd exec:java line in Windows PowerShell and asserts exit 2.
           .\scripts\consumer_sim.ps1
           exit $LASTEXITCODE
 

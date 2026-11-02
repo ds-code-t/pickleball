@@ -91,12 +91,16 @@ public final class WorkspaceLaunch {
                         + " replaces " + Workspace.shown(existing) + " with " + Workspace.shown(parsed));
             }
             if (!parsed.equals(existing)) {
+                Map<String, String> before = Map.copyOf(values);
                 values.put(PKB_props.PKB_REPORT_RETENTION, parsed);
                 Workspace.writeRunVars(workspace, values);
+                markChanged(workspace, before, values, "cli/override");
             }
         }
         defaultDiagnosticReporting(workspace);
+        Map<String, String> beforeEdits = Workspace.readRunVars(workspace);
         Workspace.applyLaunchEdits(workspace, selection, cliRunVars, warnings);
+        markChanged(workspace, beforeEdits, Workspace.readRunVars(workspace), "cli/override");
         stamp(workspace);
         return new Prepared(workspace, Map.copyOf(selection));
     }
@@ -122,15 +126,28 @@ public final class WorkspaceLaunch {
         }
         PickleballRunner runner = DynamicSuiteBootstrap.initializeFromRuntimeClasspath();
         boolean fallback = DynamicSuiteBootstrap.isDefaultSuite(runner == null ? null : runner.getClass());
-        if (fallback && compileAndPublishClasspath(project, warnings)) {
-            forkSeed(project, workspace, reseed, cachedClasspath(project), warnings);
-            return;
+        if (fallback && buildProject(project)) {
+            stage(workspace, "compile", "start");
+            boolean compiled = compileAndPublishClasspath(project, warnings);
+            stage(workspace, "compile", compiled ? "exit=0" : "exit=failed");
+            if (compiled) {
+                forkSeed(project, workspace, reseed, cachedClasspath(project), warnings);
+                return;
+            }
         }
         String message = defaultSuiteWarning(runner == null ? null : runner.getClass());
         if (message != null) warn(warnings, message);
         for (String warning : WorkspaceSeed.writeCaptured(workspace, runner, reseed)) {
             warn(warnings, warning);
         }
+    }
+
+    private static boolean buildProject(Path project) {
+        if (project == null) return false;
+        Path root = project.toAbsolutePath().normalize();
+        return Files.isRegularFile(root.resolve("pom.xml"))
+                || Files.isRegularFile(root.resolve("build.gradle"))
+                || Files.isRegularFile(root.resolve("build.gradle.kts"));
     }
 
     /**
@@ -205,6 +222,7 @@ public final class WorkspaceLaunch {
     }
 
     private static void forkSeed(Path project, Path workspace, boolean reseed, List<String> classpath, Appendable warnings) {
+        stage(workspace, "seed-fork", "start");
         List<String> command = new ArrayList<>();
         command.add(Path.of(System.getProperty("java.home"), "bin", "java").toString());
         command.add("-cp");
@@ -220,19 +238,23 @@ public final class WorkspaceLaunch {
             String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
             int exit = process.waitFor();
             if (exit != 0 || !Workspace.exists(workspace)) {
+                stage(workspace, "seed-fork", "exit=" + exit);
                 throw new IllegalStateException(
                         "Workspace seed failed for " + workspace + " exit=" + exit
                                 + (output.isBlank() ? "" : System.lineSeparator() + output)
                 );
             }
+            stage(workspace, "seed-fork", "exit=0");
             for (String line : output.split("\\R")) {
                 String trimmed = line.strip();
                 if (trimmed.startsWith("WARNING:") || trimmed.startsWith("WARN:")) warn(warnings, trimmed);
             }
         } catch (InterruptedException interrupted) {
             Thread.currentThread().interrupt();
+            stage(workspace, "seed-fork", "exit=failed");
             throw new IllegalStateException("Workspace seed was interrupted for " + workspace, interrupted);
         } catch (IOException failure) {
+            stage(workspace, "seed-fork", "exit=failed");
             throw new IllegalStateException("Could not seed workspace " + workspace, failure);
         }
     }
@@ -249,6 +271,7 @@ public final class WorkspaceLaunch {
         if (reporting != null && !reporting.isBlank()) return;
         values.put(PKB_props.PKB_REPORTING_MODE, "diagnostic");
         Workspace.writeRunVars(workspace, values);
+        markChanged(workspace, Map.of(), Map.of(PKB_props.PKB_REPORTING_MODE, "diagnostic"), "default");
     }
 
     /** Warning text when seed capture used the built-in DefaultDynamicSuite, else null. */
@@ -278,5 +301,26 @@ public final class WorkspaceLaunch {
         if (record != null && Files.isRegularFile(record)) {
             Workspace.writeFingerprint(record, Workspace.fingerprint(workspace));
         }
+    }
+
+    private static void stage(Path workspace, String name, String detail) {
+        Path folder = workspace == null ? null : workspace.getParent();
+        WorkbenchLaunchTiming.note(folder, name, detail);
+    }
+
+    private static void markChanged(
+            Path workspace,
+            Map<String, String> before,
+            Map<String, String> after,
+            String source
+    ) {
+        List<String> changed = new ArrayList<>();
+        if (after != null) {
+            after.forEach((key, value) -> {
+                String previous = before == null ? null : before.get(key);
+                if (previous == null || !previous.equals(value)) changed.add(key);
+            });
+        }
+        if (!changed.isEmpty()) Workspace.markValueSources(workspace, changed, source);
     }
 }

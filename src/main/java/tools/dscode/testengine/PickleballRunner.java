@@ -18,6 +18,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -65,10 +66,15 @@ public abstract class PickleballRunner {
     private static final ThreadLocal<Path> PREVIEW_PROJECT = new ThreadLocal<>();
     private static final ThreadLocal<Boolean> PREVIEW_PROJECT_ONLY = new ThreadLocal<>();
 
-    protected final LinkedHashMap<String, String> values = new LinkedHashMap<>();
+    protected final LinkedHashMap<String, String> values = new HookTrackingMap();
     private final Map<String, String> readOnlyValues = Collections.unmodifiableMap(values);
     private final LinkedHashMap<String, String> systemRunVarOverrides = new LinkedHashMap<>();
     private final LinkedHashMap<String, String> propertyFileRunVars = new LinkedHashMap<>();
+    private final LinkedHashSet<String> hookDefaultKeys = new LinkedHashSet<>();
+    private final LinkedHashSet<String> hookPropertyKeys = new LinkedHashSet<>();
+    private final LinkedHashMap<String, String> hookDefaultValues = new LinkedHashMap<>();
+    private final LinkedHashMap<String, String> hookPropertyValues = new LinkedHashMap<>();
+    private HookRecord hookRecord = HookRecord.OFF;
     private LinkedHashMap<String, String> defaultRunVars = new LinkedHashMap<>();
     private boolean directRunVars;
     private boolean sealedRunVars;
@@ -218,8 +224,9 @@ public abstract class PickleballRunner {
      * a workspace launch.
      */
     private PKB_props.ResolvedRunVars resolveShared(Path propertyRoot) {
-        globalTestDefaults();
+        runHook(HookRecord.DEFAULTS, this::globalTestDefaults);
         normalizeReportPortalValues();
+        rememberHookValues(HookRecord.DEFAULTS);
         defaultRunVars = snapshotRunVars();
         debug("Values after globalTestDefaults(): " + values);
 
@@ -229,8 +236,9 @@ public abstract class PickleballRunner {
         mergeAllSystemProperties();
         debug("Values after system property merge: " + values);
 
-        globalTestProperties();
+        runHook(HookRecord.PROPERTIES, this::globalTestProperties);
         normalizeReportPortalValues();
+        rememberHookValues(HookRecord.PROPERTIES);
         debug("Values after globalTestProperties(): " + values);
 
         mergeAllSystemProperties();
@@ -478,6 +486,49 @@ public abstract class PickleballRunner {
     public void globalTestDefaults() {}
     public void globalTestProperties() {}
     public final Map<String, String> values() { return readOnlyValues; }
+
+    /**
+     * Last writer of each run variable after resolution. One model for
+     * {@code workspace-show}: {@code cli/override} when a system property still
+     * equals the final value, {@code hook} when {@code globalTestProperties}
+     * or {@code globalTestDefaults} still equals it (including a hook that
+     * stored the same string as a property file), {@code properties} when the
+     * project file equals it, otherwise {@code default}.
+     */
+    public final Map<String, String> valueSources() {
+        Map<String, String> sources = new LinkedHashMap<>();
+        values.forEach((rawKey, rawValue) -> {
+            if (rawKey == null || !PKB_props.isRunVariableKey(rawKey)) return;
+            String key = normalizeConfigurationKey(rawKey);
+            if (key == null) return;
+            String fin = rawValue == null ? "" : rawValue;
+            if (systemRunVarOverrides.containsKey(key)) {
+                String system = systemRunVarOverrides.get(key);
+                if (fin.equals(system == null ? "" : system)) {
+                    sources.put(key, "cli/override");
+                    return;
+                }
+            }
+            if (matchesRecorded(hookPropertyValues, key, fin)) {
+                sources.put(key, "hook");
+                return;
+            }
+            if (propertyFileRunVars.containsKey(key)) {
+                String filed = propertyFileRunVars.get(key);
+                if (fin.equals(filed == null ? "" : filed)) {
+                    sources.put(key, "properties");
+                    return;
+                }
+            }
+            if (matchesRecorded(hookDefaultValues, key, fin)) {
+                sources.put(key, "hook");
+                return;
+            }
+            sources.put(key, "default");
+        });
+        return sources;
+    }
+
     public final String get(String key) { return values.get(normalizeConfigurationKey(key)); }
     public static String getTestConfigurationValue(String key) { return getInstance().get(key); }
 
@@ -885,5 +936,46 @@ public abstract class PickleballRunner {
         return key.regionMatches(true, 0, PKB_PREFIX, 0, PKB_PREFIX.length())
                 ? key.toLowerCase(Locale.ROOT)
                 : key;
+    }
+
+    private static boolean matchesRecorded(Map<String, String> recorded, String key, String fin) {
+        if (!recorded.containsKey(key)) return false;
+        String hook = recorded.get(key);
+        return fin.equals(hook == null ? "" : hook);
+    }
+
+    private void runHook(HookRecord mode, Runnable hook) {
+        hookRecord = mode;
+        try {
+            hook.run();
+        } finally {
+            hookRecord = HookRecord.OFF;
+        }
+    }
+
+    private void rememberHookValues(HookRecord mode) {
+        LinkedHashSet<String> keys = mode == HookRecord.DEFAULTS ? hookDefaultKeys : hookPropertyKeys;
+        LinkedHashMap<String, String> target = mode == HookRecord.DEFAULTS ? hookDefaultValues : hookPropertyValues;
+        for (String key : keys) {
+            if (values.containsKey(key)) target.put(key, values.get(key));
+        }
+    }
+
+    private void noteHookWrite(String key, String value) {
+        if (hookRecord == HookRecord.OFF || key == null) return;
+        String normalized = normalizeConfigurationKey(key);
+        if (normalized == null || !PKB_props.isRunVariableKey(normalized)) return;
+        if (hookRecord == HookRecord.DEFAULTS) hookDefaultKeys.add(normalized);
+        else hookPropertyKeys.add(normalized);
+    }
+
+    private enum HookRecord { OFF, DEFAULTS, PROPERTIES }
+
+    private final class HookTrackingMap extends LinkedHashMap<String, String> {
+        @Override
+        public String put(String key, String value) {
+            noteHookWrite(key, value);
+            return super.put(key, value);
+        }
     }
 }

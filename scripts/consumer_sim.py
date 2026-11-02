@@ -52,6 +52,8 @@ BUDGETS = {
     "unknown-verb": 60,
     "exec-java-usage": 300,
     "exec-java-split-tags": 300,
+    "documented-exec-usage": 300,
+    "documented-exec-split-tags": 300,
 }
 
 
@@ -77,12 +79,21 @@ def main() -> int:
         )
         assert_in(exec_tags, "Tag quoting error")
         assert_in(exec_tags, "fix:")
+        documented_usage = run_documented_exec(timings, "documented-exec-usage", "not-a-verb")
+        assert_in(documented_usage, "error:")
+        assert_in(documented_usage, "fix:")
+        documented_tags = run_documented_exec(
+            timings, "documented-exec-split-tags", "plan --tags=@a and not @b"
+        )
+        assert_in(documented_tags, "Tag quoting error")
+        assert_in(documented_tags, "fix:")
         run_stage(timings, "discover-uncompiled", [
             "discover", "--run-id=" + RUN_UNCOMPILED, "--tags=" + TAGS, "--name=" + NAME,
             "--runvar=pkb_browser=CHROME_HEADLESS", "--retention=failed", "--agent=consumer-sim",
         ], allow_exit={0, 1})
         assert_record(RUN_UNCOMPILED)
         assert_summary_present(timings[-1])
+        assert_launch_gap(RUN_UNCOMPILED)
         run_stage(timings, "test-compile", [], maven_args=["-q", "test-compile"], allow_exit={0})
         run_stage(timings, "workspace-seed", [
             "workspace-seed", "--run-id=" + RUN, "--reseed",
@@ -181,6 +192,32 @@ def prepare_tree() -> None:
     classes = CONSUMER / "target" / "test-classes"
     if classes.exists():
         shutil.rmtree(classes)
+    state = CONSUMER / ".pickleball"
+    for classpath in state.glob("workbench/classpath.txt"):
+        classpath.unlink(missing_ok=True)
+    for classpath in state.glob("v/*/workbench/classpath.txt"):
+        classpath.unlink(missing_ok=True)
+
+
+def assert_launch_gap(run_id: str) -> None:
+    """index, then compile and seed-fork, then maven-start. Overlap stays deferred."""
+    timing = CONSUMER / ".pickleball" / "runs" / run_id / "launch-timing.txt"
+    text = timing.read_text(encoding="utf-8", errors="replace") if timing.is_file() else ""
+    positions = []
+    for stage in ("index", "compile", "seed-fork", "maven-start"):
+        token = f"stage={stage}"
+        at = text.find(token)
+        if at < 0:
+            fail_text(run_id, text, f"launch-timing.txt missing {token}")
+        positions.append(at)
+    if positions != sorted(positions):
+        fail_text(run_id, text, "launch-timing stages are out of order")
+
+
+def fail_text(stage: str, text: str, reason: str) -> None:
+    print(f"FAIL {stage}: {reason}", file=sys.stderr)
+    print(text, file=sys.stderr)
+    raise SystemExit(1)
 
 
 def run_stage(timings: list[dict], stage: str, launcher_args: list[str], allow_exit: set[int], maven_args: list[str] | None = None):
@@ -226,6 +263,71 @@ def run_exec_stage(timings: list[dict], stage: str, launcher_args: list[str], al
     if seconds > budget:
         fail(stage, result, f"exceeded budget {budget}s")
     return result
+
+
+def run_documented_exec(timings: list[dict], stage: str, exec_args: str):
+    """The agent-guide command, including its quotes, via bash or Windows PowerShell."""
+    budget = BUDGETS[stage]
+    started = time.monotonic()
+    result = documented_exec(exec_args, budget + 30)
+    seconds = round(time.monotonic() - started, 3)
+    row = {
+        "stage": stage,
+        "seconds": seconds,
+        "exit": result.returncode,
+        "stdout": result.stdout,
+        "stderr": result.stderr,
+    }
+    timings.append(row)
+    print(f"stage={stage} exit={result.returncode} seconds={seconds}", flush=True)
+    if result.returncode != 2:
+        fail(stage, result, f"documented launch exit {result.returncode} != 2")
+    if seconds > budget:
+        fail(stage, result, f"exceeded budget {budget}s")
+    return result
+
+
+def documented_exec(exec_args: str, timeout: int) -> subprocess.CompletedProcess:
+    """Exact form from docs/consumer-agent-guide.md. Not a Python argv list."""
+    quoted = (
+        "org.codehaus.mojo:exec-maven-plugin:3.5.0:java "
+        '"-Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher" '
+        '"-Dexec.classpathScope=test" '
+        f'"-Dexec.args={exec_args}"'
+    )
+    if os.name == "nt":
+        # A -Command string re-quotes and hides the bug. -File runs the guide line as written.
+        script = CONSUMER / ".pickleball" / "documented-exec.ps1"
+        script.parent.mkdir(parents=True, exist_ok=True)
+        script.write_text(
+            f".\\mvnw.cmd -q {quoted}\r\nexit $LASTEXITCODE\r\n",
+            encoding="utf-8",
+            newline="",
+        )
+        last = None
+        for host in powershell_hosts():
+            last = maven_cmd(
+                [host, "-NoProfile", "-NonInteractive", "-File", str(script)],
+                timeout,
+            )
+            if last.returncode != 2:
+                return last
+        return last
+    return maven_cmd(["bash", "-c", f"./mvnw -q {quoted}"], timeout)
+
+
+def powershell_hosts() -> list[str]:
+    system = os.environ.get("SystemRoot", r"C:\Windows")
+    windows_ps = str(Path(system) / "System32" / "WindowsPowerShell" / "v1.0" / "powershell.exe")
+    hosts = []
+    if Path(windows_ps).is_file():
+        hosts.append(windows_ps)
+    pwsh = shutil.which("pwsh")
+    if pwsh and pwsh not in hosts:
+        hosts.append(pwsh)
+    if not hosts:
+        hosts.append("powershell.exe")
+    return hosts
 
 
 def exec_java(args: list[str], timeout: int) -> subprocess.CompletedProcess:

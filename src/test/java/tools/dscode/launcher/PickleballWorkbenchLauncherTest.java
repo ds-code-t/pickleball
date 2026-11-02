@@ -121,6 +121,9 @@ class PickleballWorkbenchLauncherTest {
         assertTrue(script.contains("org.codehaus.plexus.classworlds.launcher.Launcher"), script);
         assertTrue(script.contains("set \"PKB_EXIT=%ERRORLEVEL%\""), script);
         assertTrue(script.contains("exit /b %PKB_EXIT%"), script);
+        assertTrue(script.contains("set \"PKB_RC=%ERRORLEVEL%\""), script);
+        assertTrue(script.contains("@exit %PKB_RC%"), script);
+        assertFalse(script.contains("@exit /b %ERRORLEVEL%"), script);
         String homeLine = "Write-Output \"MAVEN_HOME=$MAVEN_HOME\"";
         int homes = 0;
         for (int from = 0; (from = script.indexOf(homeLine, from)) >= 0; from += homeLine.length()) {

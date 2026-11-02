@@ -27,14 +27,16 @@ import java.util.stream.Stream;
 /**
  * One run's resolved configuration.
  *
- * <p>Layout: {@code .pickleball/runs/<runId>/workspace/runvars.properties} and
- * {@code workspace/configs}. Workbench, agents, and the test JVM all use this
- * class. There is no second reader or writer.</p>
+ * <p>Layout: {@code .pickleball/runs/<runId>/workspace/runvars.properties},
+ * {@code workspace/value-sources.properties}, and {@code workspace/configs}.
+ * Workbench, agents, and the test JVM all use this class. There is no second
+ * reader or writer.</p>
  */
 public final class Workspace {
     public static final String PROPERTY = "pkb_workspace";
     public static final String DIRECTORY = "workspace";
     public static final String RUNVARS_FILE = "runvars.properties";
+    public static final String VALUE_SOURCES_FILE = "value-sources.properties";
     public static final String CONFIGS_DIRECTORY = "configs";
     public static final String FINGERPRINT_FIELD = "workspaceFingerprint";
     public static final String CACHE_DIRECTORY = "resolve-cache";
@@ -177,6 +179,69 @@ public final class Workspace {
         atomicWrite(file, body.toString().getBytes(StandardCharsets.UTF_8));
     }
 
+    public static Path valueSourcesFile(Path workspace) {
+        return workspace.resolve(VALUE_SOURCES_FILE);
+    }
+
+    /** Empty when this workspace was seeded before sources were recorded. */
+    public static Map<String, String> readValueSources(Path workspace) {
+        Map<String, String> sources = new LinkedHashMap<>();
+        if (workspace == null) return sources;
+        Path file = valueSourcesFile(workspace);
+        if (!Files.isRegularFile(file)) return sources;
+        Properties properties = new Properties();
+        try (InputStream in = Files.newInputStream(file)) {
+            properties.load(new java.io.InputStreamReader(in, StandardCharsets.UTF_8));
+        } catch (IOException | IllegalArgumentException failure) {
+            throw new IllegalStateException("Could not read " + file + ": " + failure.getMessage(), failure);
+        }
+        for (String key : properties.stringPropertyNames()) {
+            if (key == null || key.isBlank()) continue;
+            String source = properties.getProperty(key);
+            sources.put(normalizeKey(key), source == null ? "" : source);
+        }
+        return sources;
+    }
+
+    public static void writeValueSources(Path workspace, Map<String, String> sources) {
+        StringBuilder body = new StringBuilder();
+        Map<String, String> ordered = new TreeMap<>();
+        if (sources != null) {
+            sources.forEach((key, value) -> {
+                if (key == null || key.isBlank() || value == null || value.isBlank()) return;
+                ordered.put(normalizeKey(key), value.trim());
+            });
+        }
+        ordered.forEach((key, value) -> body.append(escape(key)).append('=').append(escape(value)).append('\n'));
+        atomicWrite(valueSourcesFile(workspace), body.toString().getBytes(StandardCharsets.UTF_8));
+    }
+
+    /** Records {@code source} for keys a later edit changed. Missing keys are added. */
+    public static void markValueSources(Path workspace, Iterable<String> keys, String source) {
+        if (workspace == null || keys == null || source == null || source.isBlank()) return;
+        Map<String, String> sources = new LinkedHashMap<>(readValueSources(workspace));
+        boolean changed = false;
+        for (String key : keys) {
+            if (key == null || key.isBlank()) continue;
+            sources.put(normalizeKey(key), source.trim());
+            changed = true;
+        }
+        if (changed) writeValueSources(workspace, sources);
+    }
+
+    public static void copyValueSources(Path from, Path to) {
+        if (from == null || to == null) return;
+        Path source = valueSourcesFile(from);
+        if (!Files.isRegularFile(source)) return;
+        try {
+            if (to.getParent() != null) Files.createDirectories(to);
+            Files.createDirectories(to);
+            Files.copy(source, valueSourcesFile(to), StandardCopyOption.REPLACE_EXISTING);
+        } catch (IOException failure) {
+            throw new IllegalStateException("Could not copy value sources into " + to + ": " + failure.getMessage(), failure);
+        }
+    }
+
     public static Map<String, String> protect(Map<String, String> runVars) {
         return protect(runVars, Set.of());
     }
@@ -276,6 +341,7 @@ public final class Workspace {
             throw new IllegalStateException("Workspace already exists at " + to + ". Use --reseed to replace it.");
         }
         writeRunVars(to, readRunVars(from));
+        copyValueSources(from, to);
         copyConfigs(configsDirectory(from), to);
     }
 
@@ -292,6 +358,12 @@ public final class Workspace {
             digest.update("runvars\n".getBytes(StandardCharsets.UTF_8));
             if (Files.isRegularFile(runvars)) {
                 digest.update(Files.readAllBytes(runvars));
+            }
+            digest.update(new byte[]{0});
+            Path sources = valueSourcesFile(workspace);
+            digest.update("sources\n".getBytes(StandardCharsets.UTF_8));
+            if (Files.isRegularFile(sources)) {
+                digest.update(Files.readAllBytes(sources));
             }
             digest.update(new byte[]{0});
             Path configs = configsDirectory(workspace);

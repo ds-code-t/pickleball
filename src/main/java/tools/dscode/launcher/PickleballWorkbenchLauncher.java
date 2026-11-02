@@ -148,6 +148,9 @@ public final class PickleballWorkbenchLauncher {
      * Apache {@code mvn.cmd} then maps every non-zero JVM status to 1. The
      * project {@code mvnw.cmd} and Linux {@code mvnw} launch this same JVM and
      * return {@code code}. They do not collapse a non-zero status to 1.
+     * Windows PowerShell does not {@code CALL} {@code mvnw.cmd}. A top-level
+     * {@code exit /b} is reported as 1, so the wrapper ends with {@code exit}
+     * and this code.
      */
     static void exitProcess(int code) {
         keepExitCode(code, System::exit, status -> Runtime.getRuntime().halt(status));

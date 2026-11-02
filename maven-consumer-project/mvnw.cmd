@@ -42,7 +42,13 @@
 @REM Apache mvn.cmd maps every JVM status greater than 0 to exit 1.
 @REM Launch the same classworlds JVM the Unix mvn script execs, and return that status.
 @call :pkbMaven %*
-@exit /b %ERRORLEVEL%
+@REM PowerShell starts this file through cmd.exe and does not use CALL.
+@REM A top-level "exit /b N" is then reported as 1 for every non-zero JVM
+@REM status (consumer retest of 111dea5). "exit N" ends that cmd.exe with N,
+@REM which PowerShell reads as $LASTEXITCODE. The subroutine still uses
+@REM "exit /b" so a nested CALL returns. Linux mvnw execs the JVM directly.
+@set "PKB_RC=%ERRORLEVEL%"
+@exit %PKB_RC%
 
 :pkbNoMaven
 @echo Cannot start maven from wrapper >&2

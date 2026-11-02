@@ -214,7 +214,9 @@ public final class WorkbenchAgentCommands {
                 Map<String, String> runvars = Workspace.readRunVars(workspace);
                 SecretRedactor.noteAll(runvars);
                 body.put("runvars", OutputFormatter.redactMap(runvars));
-                body.put("computed", new java.util.ArrayList<>(WorkspaceSeed.computedKeys(parsed.project(), runvars)));
+                Map<String, String> sources = WorkspaceSeed.sources(parsed.project(), workspace, runvars);
+                body.put("sources", sources);
+                body.put("computed", new java.util.ArrayList<>(hookKeys(sources)));
                 String fix = Workspace.secretFix(parsed.project(), runvars);
                 if (fix != null) body.put("fix", fix);
                 body.put("configs", RunConfigs.files(parsed.project(), runId));
@@ -236,15 +238,16 @@ public final class WorkbenchAgentCommands {
             out.println("fingerprint=" + Workspace.fingerprint(workspace));
             Map<String, String> runvars = Workspace.readRunVars(workspace);
             SecretRedactor.noteAll(runvars);
-            java.util.Set<String> computed = WorkspaceSeed.computedKeys(parsed.project(), runvars);
+            Map<String, String> sources = WorkspaceSeed.sources(parsed.project(), workspace, runvars);
             boolean redacted = false;
             for (Map.Entry<String, String> entry : runvars.entrySet()) {
                 String key = entry.getKey();
                 String value = entry.getValue();
                 if (SecretRedactor.leaks(key, value)) redacted = true;
                 String shown = OutputFormatter.shown(key, value);
-                String mark = computed.contains(key) ? " computed" : "";
-                out.println(key + "=" + shown + mark);
+                String source = sources.getOrDefault(key, "default");
+                String mark = "hook".equals(source) ? " computed" : "";
+                out.println(key + "=" + shown + " source=" + source + mark);
             }
             if (redacted) {
                 String fix = Workspace.secretFix(parsed.project(), runvars);
@@ -289,6 +292,7 @@ public final class WorkbenchAgentCommands {
             RunConfigs.write(parsed.project(), runId, config, text.endsWith("\n") ? text : text + "\n");
         }
         if (!parsed.runVars().isEmpty()) {
+            Map<String, String> before = new LinkedHashMap<>(Workspace.readRunVars(workspace));
             Map<String, String> selection = new LinkedHashMap<>();
             Workspace.applyLaunchEdits(workspace, selection, parsed.runVars(), err);
             if (!selection.isEmpty()) {
@@ -296,6 +300,7 @@ public final class WorkbenchAgentCommands {
                 values.putAll(selection);
                 Workspace.writeRunVars(workspace, values);
             }
+            markChangedSources(workspace, before, Workspace.readRunVars(workspace), "cli/override");
         }
         out.println("workspace=" + workspace.toAbsolutePath().normalize());
         out.println("fingerprint=" + Workspace.fingerprint(workspace));
@@ -855,6 +860,31 @@ public final class WorkbenchAgentCommands {
         String property = selection.featureProperty();
         if (property != null && property.strip().startsWith("@")) return property.strip();
         return String.join(",", uris);
+    }
+
+    private static java.util.List<String> hookKeys(Map<String, String> sources) {
+        java.util.List<String> hooks = new java.util.ArrayList<>();
+        if (sources == null) return hooks;
+        sources.forEach((key, source) -> {
+            if ("hook".equals(source)) hooks.add(key);
+        });
+        return hooks;
+    }
+
+    private static void markChangedSources(
+            Path workspace,
+            Map<String, String> before,
+            Map<String, String> after,
+            String source
+    ) {
+        java.util.List<String> changed = new java.util.ArrayList<>();
+        if (after != null) {
+            after.forEach((key, value) -> {
+                String previous = before == null ? null : before.get(key);
+                if (previous == null || !previous.equals(value)) changed.add(key);
+            });
+        }
+        if (!changed.isEmpty()) Workspace.markValueSources(workspace, changed, source);
     }
 
     private static void launchNote(Path project, String runId, String stage, String detail) {

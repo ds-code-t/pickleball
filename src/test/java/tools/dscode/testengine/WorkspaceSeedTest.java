@@ -5,9 +5,12 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import tools.dscode.control.protocol.Workspace;
+import tools.dscode.launcher.WorkbenchAgentCommands;
 import tools.dscode.testengine.fixtures.BlankBrowserRunner;
 import tools.dscode.testengine.fixtures.WorkspaceSeedHooked;
 
+import java.io.ByteArrayOutputStream;
+import java.io.PrintStream;
 import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -65,16 +68,88 @@ class WorkspaceSeedTest {
         assertEquals("auto", captured.get(PKB_props.PKB_PARALLEL));
         assertEquals("from-hook", captured.get("pkb_hook_marker"));
         assertEquals("qa", captured.get(PKB_props.PKB_ENVIRONMENT));
+        assertEquals("hook", Workspace.readValueSources(hookedWorkspace).get("pkb_description"));
+        assertEquals("hook", Workspace.readValueSources(hookedWorkspace).get(PKB_props.PKB_BROWSER));
+        assertEquals("hook", Workspace.readValueSources(hookedWorkspace).get("pkb_hook_marker"));
+        String description = captured.get("pkb_description");
+        assertTrue(description.contains(System.getProperty("user.name")), description);
+        assertTrue(description.contains(java.util.Locale.getDefault().toString()), description);
+        assertTrue(description.contains(System.getProperty("java.vendor")), description);
         for (String key : Workspace.CONTEXT_KEYS) assertTrue(captured.containsKey(key), key);
         assertFalse(captured.containsKey(PKB_props.PKB_RUN_ID));
 
         Path blankWorkspace = temp.resolve("blank");
         WorkspaceSeed.writeCaptured(blankWorkspace, blank, false);
         assertEquals("CHROME_HEADLESS", Workspace.readRunVars(blankWorkspace).get(PKB_props.PKB_BROWSER));
+        assertEquals("default", Workspace.readValueSources(blankWorkspace).get(PKB_props.PKB_BROWSER));
 
         assertThrows(IllegalStateException.class, () -> WorkspaceSeed.writeCaptured(hookedWorkspace, hooked, false));
         WorkspaceSeed.writeCaptured(hookedWorkspace, blank, true);
         assertEquals("CHROME_HEADLESS", Workspace.readRunVars(hookedWorkspace).get(PKB_props.PKB_BROWSER));
+    }
+
+    @Test
+    void hookDescriptionFileDefaultAndCliOverrideEachKeepTheirSource() throws Exception {
+        clearPkbSystemProperties();
+        System.setProperty(WorkspaceSeed.SEED_PROPERTY, "true");
+        System.setProperty("pkb_loglevel", "error");
+        Path resources = temp.resolve("src/test/resources");
+        Files.createDirectories(resources);
+        Files.writeString(resources.resolve("pickleball.properties"), "pkb_tags=@from-file\n");
+        Field preview = PickleballRunner.class.getDeclaredField("PREVIEW");
+        preview.setAccessible(true);
+        @SuppressWarnings("unchecked")
+        ThreadLocal<Boolean> flag = (ThreadLocal<Boolean>) preview.get(null);
+        Field projectField = PickleballRunner.class.getDeclaredField("PREVIEW_PROJECT");
+        projectField.setAccessible(true);
+        @SuppressWarnings("unchecked")
+        ThreadLocal<Path> projectLocal = (ThreadLocal<Path>) projectField.get(null);
+        flag.set(Boolean.TRUE);
+        projectLocal.set(temp.toAbsolutePath().normalize());
+        try {
+            WorkspaceSeedHooked hooked = new WorkspaceSeedHooked();
+            Path workspace = Workspace.directory(temp, "described");
+            WorkspaceSeed.writeCaptured(workspace, hooked, false);
+            Map<String, String> sources = Workspace.readValueSources(workspace);
+            assertEquals("hook", sources.get("pkb_description"), sources.toString());
+            assertEquals("hook", sources.get(PKB_props.PKB_BROWSER), sources.toString());
+            assertEquals("properties", sources.get("pkb_tags"), sources.toString());
+            assertEquals("cli/override", sources.get("pkb_loglevel"), sources.toString());
+            ByteArrayOutputStream stdout = new ByteArrayOutputStream();
+            ByteArrayOutputStream stderr = new ByteArrayOutputStream();
+            int exit = WorkbenchAgentCommands.run(
+                    new String[]{"workspace-show", temp.toString(), "--run-id=described"},
+                    new PrintStream(stdout, true, StandardCharsets.UTF_8),
+                    new PrintStream(stderr, true, StandardCharsets.UTF_8)
+            );
+            String shown = stdout.toString(StandardCharsets.UTF_8);
+            assertEquals(0, exit, stderr.toString(StandardCharsets.UTF_8) + shown);
+            assertTrue(shown.contains("pkb_description="), shown);
+            assertTrue(shown.contains("source=hook computed"), shown);
+            assertTrue(shown.contains(System.getProperty("user.name")), shown);
+            assertTrue(shown.contains(System.getProperty("java.vendor")), shown);
+            assertTrue(shown.contains("pkb_tags=@from-file source=properties"), shown);
+            assertTrue(shown.contains("pkb_loglevel=error source=cli/override"), shown);
+            assertFalse(shown.contains("pkb_tags=@from-file source=properties computed"), shown);
+            assertFalse(shown.contains("pkb_loglevel=error source=cli/override computed"), shown);
+
+            BlankBrowserRunner blank = new BlankBrowserRunner();
+            WorkspaceSeed.writeCaptured(Workspace.directory(temp, "blank-show"), blank, false);
+            ByteArrayOutputStream blankOut = new ByteArrayOutputStream();
+            int blankExit = WorkbenchAgentCommands.run(
+                    new String[]{"workspace-show", temp.toString(), "--run-id=blank-show"},
+                    new PrintStream(blankOut, true, StandardCharsets.UTF_8),
+                    new PrintStream(new ByteArrayOutputStream(), true, StandardCharsets.UTF_8)
+            );
+            String blankShown = blankOut.toString(StandardCharsets.UTF_8);
+            assertEquals(0, blankExit, blankShown);
+            assertTrue(blankShown.contains("pkb_browser=CHROME_HEADLESS source=default"), blankShown);
+            assertFalse(blankShown.contains("pkb_browser=CHROME_HEADLESS source=default computed"), blankShown);
+        } finally {
+            flag.remove();
+            projectLocal.remove();
+            System.clearProperty("pkb_loglevel");
+        }
     }
 
     @Test

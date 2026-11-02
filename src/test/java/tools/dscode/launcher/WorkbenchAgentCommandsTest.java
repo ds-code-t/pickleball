@@ -1689,6 +1689,10 @@ class WorkbenchAgentCommandsTest {
         assertEquals(0, edited.exitCode(), edited.stderr());
         assertEquals("firefox", Workspace.readRunVars(workspace).get("pkb_browser"));
         assertEquals("4", Workspace.readRunVars(workspace).get("pkb_parallel"));
+        Output afterEdit = run("workspace-show", tempDir.toString(), "--run-id=run-a");
+        assertEquals(0, afterEdit.exitCode(), afterEdit.stderr());
+        assertTrue(afterEdit.stdout().contains("pkb_browser=firefox source=cli/override"), afterEdit.stdout());
+        assertTrue(afterEdit.stdout().contains("pkb_parallel=4 source=cli/override"), afterEdit.stdout());
         assertTrue(Files.readString(workspace.resolve("configs").resolve("CHROME.yaml")).contains("--disable-gpu"));
         String projectConfigs = tempDir.resolve("src/test/resources/configs/CHROME.yaml").toString();
         assertFalse(Files.isRegularFile(Path.of(projectConfigs)));
@@ -1725,11 +1729,10 @@ class WorkbenchAgentCommandsTest {
 
         Output shown = run("workspace-show", tempDir.toString(), "--run-id=run-computed");
         assertEquals(0, shown.exitCode(), shown.stderr());
-        assertTrue(shown.stdout().lines().anyMatch(line -> line.equals("pkb_browser=CHROME_HEADLESS")), shown.stdout());
-        assertTrue(shown.stdout().lines().anyMatch(line -> line.equals("pkb_parallel=4 computed")), shown.stdout());
-        assertTrue(shown.stdout().lines().anyMatch(line -> line.equals("pkb_tags=@smoke")), shown.stdout());
-        assertFalse(shown.stdout().lines().anyMatch(line -> line.equals("pkb_tags=@smoke computed")), shown.stdout());
-        assertFalse(shown.stdout().lines().anyMatch(line -> line.equals("pkb_browser=CHROME_HEADLESS computed")), shown.stdout());
+        assertTrue(shown.stdout().lines().anyMatch(line -> line.equals("pkb_browser=CHROME_HEADLESS source=properties")), shown.stdout());
+        assertTrue(shown.stdout().lines().anyMatch(line -> line.equals("pkb_parallel=4 source=cli/override")), shown.stdout());
+        assertTrue(shown.stdout().lines().anyMatch(line -> line.equals("pkb_tags=@smoke source=default")), shown.stdout());
+        assertFalse(shown.stdout().contains(" computed"), shown.stdout());
     }
 
     @Test
@@ -1744,15 +1747,15 @@ class WorkbenchAgentCommandsTest {
 
         Output shown = run("workspace-show", tempDir.toString(), "--run-id=run-hook");
         assertEquals(0, shown.exitCode(), shown.stderr());
-        assertTrue(shown.stdout().lines().anyMatch(line -> line.equals("user=ada computed")), shown.stdout());
-        assertTrue(shown.stdout().lines().anyMatch(line -> line.equals("java.vendor=Eclipse Adoptium computed")), shown.stdout());
-        assertTrue(shown.stdout().lines().anyMatch(line -> line.equals("pkb_tags=@smoke")), shown.stdout());
-        assertFalse(shown.stdout().contains("pkb_tags=@smoke computed"), shown.stdout());
+        assertTrue(shown.stdout().lines().anyMatch(line -> line.equals("user=ada source=hook computed")), shown.stdout());
+        assertTrue(shown.stdout().lines().anyMatch(line -> line.equals("java.vendor=Eclipse Adoptium source=hook computed")), shown.stdout());
+        assertTrue(shown.stdout().lines().anyMatch(line -> line.equals("pkb_tags=@smoke source=default")), shown.stdout());
+        assertFalse(shown.stdout().contains("pkb_tags=@smoke source=default computed"), shown.stdout());
         assertFalse(shown.stdout().contains("runner-hook-secret-value"), shown.stdout());
         assertFalse(shown.stderr().contains("runner-hook-secret-value"), shown.stderr());
         assertTrue(shown.stderr().contains("runner hook"), shown.stderr());
         assertFalse(shown.stderr().contains("Read it from project properties"), shown.stderr());
-        assertTrue(shown.stdout().contains("pkb_password=<redacted> computed"), shown.stdout());
+        assertTrue(shown.stdout().contains("pkb_password=<redacted> source=hook computed"), shown.stdout());
 
         Path resources = tempDir.resolve("src/test/resources");
         Files.createDirectories(resources);

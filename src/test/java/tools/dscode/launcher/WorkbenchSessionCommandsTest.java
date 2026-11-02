@@ -1139,6 +1139,7 @@ class WorkbenchSessionCommandsTest {
         assertNotNull(stripped.quoteWarning);
         assertTrue(stripped.quoteWarning.contains("--text-b64"), stripped.quoteWarning);
         assertTrue(stripped.quoteWarning.contains("--text-file"), stripped.quoteWarning);
+        assertTrue(stripped.quoteWarning.contains("mvnw"), stripped.quoteWarning);
         WorkbenchSessionCommands.SessionFlags quoted = WorkbenchSessionCommands.SessionFlags.parse(new String[]{
                 "execute-step", "--text=Then the \"Save\" button is visible"
         });

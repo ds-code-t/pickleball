@@ -54,7 +54,15 @@ confirm --run-id=row-1
 summary status=PASSED
 ```
 
-`record.json` `environment` is the resolved value, or `unset` when `pkb_environment` was not set. `workspace-show` marks ` computed` when a value differs or a hook key (user, machine, Java vendor, time) is absent. A secret `fix:` names the runner hook or that property file. Secrets print `<redacted>`. `${protected:key}` stays. `execute-step --text` warns and names `--text-b64` or `--text-file`. Usage errors exit 2 from `java -jar`, `java -cp`, `mvnw`, and `mvnw.cmd`. Thin-jar `help` does not load Jackson. Do not treat resolve-runvars as the environment Discover will use. `pkb_overriderunvars` is not how confirm launches. The Workbench GUI is only a lightweight head over state and controls that already exist under the hood.
+`record.json` `environment` is the resolved value, or `unset` when `pkb_environment` was not set. `workspace-show` prints `source=hook|properties|default|cli/override`. ` computed` means hook; reseed it. A secret `fix:` names the runner hook or that property file. Secrets print `<redacted>`. `${protected:key}` stays. `execute-step --text` warns and names `--text-b64` or `--text-file`. Thin-jar `help` does not load Jackson. Do not treat resolve-runvars as the environment Discover will use. `pkb_overriderunvars` is not how confirm launches. The Workbench GUI is only a lightweight head over state and controls that already exist under the hood.
+
+
+| launch | usage exit |
+| --- | --- |
+| `java -jar` | 2 |
+| `java -cp` | 2 |
+| `./mvnw` exec:java | 2 |
+| PowerShell `.\mvnw.cmd` | 2 |
 
 ## Query loop
 
@@ -69,8 +77,6 @@ summary status=PASSED
 ## Generated guidance lifecycle
 
 `export-guidance` writes version-matched managed guidance files and `GUIDANCE-MANIFEST.json`. It ignores `.pickleball` via `.gitignore` or `.git/info/exclude`. If export fails, treat any existing `.pickleball` contents as potentially stale. Stale does not mean an old run.
-
-An older Pickleball release whose exporter predates the manifest lifecycle may leave files behind.
 
 ## Generated Maven consumer reference
 
