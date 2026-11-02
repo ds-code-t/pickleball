@@ -21,6 +21,7 @@ import os
 import shutil
 import subprocess
 import sys
+import tempfile
 import time
 from pathlib import Path
 
@@ -230,6 +231,11 @@ def stock_wrapper(timings: list[dict]) -> None:
     """Stock Apache mvn.cmd collapses every non-zero JVM status to 1.
 
     Only the patched mvnw.cmd returns 2. This stage runs on Windows only.
+    The copy stays named mvnw.cmd. The wrapper turns that filename into
+    mvn.cmd under the Maven home (`$script -replace '^mvnw','mvn'`). A
+    different name looks for apache-maven/bin/<that name> and exits before
+    Maven runs. The copy is in a temp directory, next to .mvn, because the
+    wrapper reads distributionUrl from the script directory.
     It asserts a non-zero exit, error: and fix:, and no Maven BUILD FAILURE
     stack. It does not assert exit 2.
     """
@@ -237,16 +243,17 @@ def stock_wrapper(timings: list[dict]) -> None:
         print("stage=stock-mvn-cmd skipped (not Windows)", flush=True)
         return
     source = (CONSUMER / "mvnw.cmd").read_bytes()
-    text = source.decode("utf-8")
-    needle = "@call :pkbMaven %*"
-    if needle not in text:
+    needle = b"@call :pkbMaven %*"
+    if needle not in source:
         raise SystemExit("stock wrapper patch point missing from mvnw.cmd")
-    patched = text.replace(needle, '@call "%__MVNW_CMD__%" %*', 1)
-    dest = CONSUMER / "stock-mvnw.cmd"
-    dest.write_bytes(patched.encode("utf-8"))
+    patched = source.replace(needle, b'@call "%__MVNW_CMD__%" %*', 1)
     budget = BUDGETS["stock-mvn-cmd"]
     started = time.monotonic()
-    try:
+    with tempfile.TemporaryDirectory(prefix="pkb-stock-mvnw-") as temp_name:
+        temp = Path(temp_name)
+        dest = temp / "mvnw.cmd"
+        dest.write_bytes(patched)
+        shutil.copytree(CONSUMER / ".mvn", temp / ".mvn")
         result = maven_cmd(script_command(dest, [
             "-q",
             "org.codehaus.mojo:exec-maven-plugin:3.5.0:java",
@@ -254,8 +261,6 @@ def stock_wrapper(timings: list[dict]) -> None:
             "-Dexec.classpathScope=test",
             "-Dexec.args=not-a-verb",
         ]), budget + 30)
-    finally:
-        dest.unlink(missing_ok=True)
     seconds = round(time.monotonic() - started, 3)
     timings.append({
         "stage": "stock-mvn-cmd",
