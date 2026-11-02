@@ -24,3 +24,10 @@ Items deferred from consumer retests and earlier roadmaps. Each entry has a shor
 Dan's locked list for the next round (hook source tracking, Windows exit-code docs, comma lists for data and config path, short RUN aliases, path-list docs) is in `docs/maintainer/2.1.18-locked-list.md`.
 
 These items stay deferred. Do not implement them in 2.1.18.
+
+## Bug (reported 2026-11-02, Dan, consumer testing on the previous 2.1.18 build): slow live-session start leaves an orphan session
+- Symptom: starting a Workbench/agent live session takes over 3 minutes and exceeds its own default startup timeout.
+- The isolate process then exits with code 1, but the live session (browser/driver/JVM) is left running.
+- Expected: startup well under the default timeout; on timeout, a clear `error:`/`fix:` message and full teardown of the session (no orphans).
+- To reproduce: start a live session from a consumer project (e.g. myq-release-testing on Windows, mvnw.cmd), time the startup, then check for leftover processes after the exit.
+- Fix direction: profile the slow startup phase, make timeout teardown kill the whole session tree through one shared shutdown path, and add a test that injects a startup timeout and asserts that no process survives.
