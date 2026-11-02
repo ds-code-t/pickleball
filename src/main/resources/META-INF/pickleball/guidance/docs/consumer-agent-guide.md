@@ -12,7 +12,7 @@ Run `mvnw` or `mvnw.cmd` (`gradlew` or `gradlew.bat`). Do not require a machine-
 ./mvnw -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java "-Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher" "-Dexec.classpathScope=test" "-Dexec.args=discover"
 ```
 
-only change `exec.args`: `-Dexec.args=discover`, `-Dexec.args=isolate`, `execute-step`, `confirm`. One-shots: `java -cp "@.pickleball/v/<version>/workbench/classpath.cache"`. Discover, confirm, and isolate still use the wrapper.
+only change `exec.args`: `-Dexec.args=discover`, `-Dexec.args=isolate`, `execute-step`, `confirm`. One-shots: `java -cp "@.pickleball/v/<version>/workbench/classpath.cache"`. Discover, confirm, and isolate use the wrapper.
 
 Read the short log `.pickleball/agent-log`. Board: `presence --touch`, `post --write`, `history --append`. Paths: `.pickleball/investigations/`, `.pickleball/presence/`, `.pickleball/posts/`, `.pickleball/history.log`. `gc-runs` keeps investigations.
 
@@ -54,7 +54,7 @@ confirm --run-id=row-1
 summary status=PASSED
 ```
 
-`record.json` `environment` is the resolved value, or `unset` when `pkb_environment` was not set. `workspace-show` prints `source=hook|properties|default|cli/override`. ` computed` means hook; reseed it. A secret `fix:` names the runner hook or that property file. Secrets print `<redacted>`. `${protected:key}` stays. `execute-step --text` warns and names `--text-b64` or `--text-file`. Thin-jar `help` does not load Jackson. Do not treat resolve-runvars as the environment Discover will use. `pkb_overriderunvars` is not how confirm launches. The Workbench GUI is only a lightweight head over state and controls that already exist under the hood.
+`record.json` `environment` is the resolved value, or `unset` when `pkb_environment` was not set. `workspace-show` prints `source=hook|properties|default|cli/override`. ` computed` means hook; reseed it. A secret `fix:` names the runner hook or that property file. Secrets print `<redacted>`. `${protected:key}` stays. `execute-step --text` warns and names `--text-b64` or `--text-file`. Do not treat resolve-runvars as the environment Discover will use. `pkb_overriderunvars` is not how confirm launches. The Workbench GUI is only a lightweight head over state and controls that already exist under the hood.
 
 
 | launch | usage exit |
@@ -76,7 +76,7 @@ summary status=PASSED
 
 ## Generated guidance lifecycle
 
-`export-guidance` writes version-matched managed guidance files and `GUIDANCE-MANIFEST.json`. It ignores `.pickleball` via `.gitignore` or `.git/info/exclude`. If export fails, treat any existing `.pickleball` contents as potentially stale. Stale does not mean an old run.
+`export-guidance` writes version-matched managed guidance files and `GUIDANCE-MANIFEST.json`. It ignores `.pickleball` via `.gitignore` or `.git/info/exclude`. If export fails, treat any existing `.pickleball` contents as potentially stale. Stale does not mean an old run. An older Pickleball release whose exporter predates the manifest lifecycle may leave files.
 
 ## Generated Maven consumer reference
 
