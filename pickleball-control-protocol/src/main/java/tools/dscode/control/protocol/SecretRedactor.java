@@ -12,7 +12,8 @@ import java.util.Set;
  */
 public final class SecretRedactor {
     public static final String REDACTED = "<redacted>";
-    public static final String HINT = "secret redacted; use workspace-show for reference";
+    public static final String HINT =
+            "secret redacted; the plain value is not printed. Read it from project properties, not from this command.";
 
     private static final int SCRUB_MIN_LENGTH = 8;
     private static final ThreadLocal<Set<String>> KNOWN = ThreadLocal.withInitial(LinkedHashSet::new);

@@ -215,7 +215,7 @@ class WorkbenchRunReportsTest {
         String text = out.toString(StandardCharsets.UTF_8);
         assertTrue(text.contains("passed=1"), text);
         assertTrue(text.contains("failed=1"), text);
-        assertTrue(text.contains("failedScenarios=Bad case"), text);
+        assertTrue(text.contains("failedScenarios=[\"Bad case\"]"), text);
     }
 
     @Test

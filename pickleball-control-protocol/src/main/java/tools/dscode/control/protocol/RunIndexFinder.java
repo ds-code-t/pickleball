@@ -15,9 +15,11 @@ import java.util.regex.Pattern;
  * the shared run directory exists but no index file does.
  *
  * <p>Order: private {@code diagnostic/<id>/run-index.json}, flat private
- * {@code diagnostic/run-index.json}, shared {@code reports/diagnostic-runs/<id>},
- * then the same two names under {@code record.json} {@code dataPath}. A walk of
- * depth 6 follows. The parent folder name wins before the JSON {@code runId}.
+ * {@code diagnostic/run-index.json}. A private {@code .pickleball/runs/<id>} directory
+ * does not fall back to the shared tree or to {@code attempts/}. Otherwise the
+ * shared {@code reports/diagnostic-runs/<id>} index is next, then the same two
+ * names under {@code record.json} {@code dataPath}. A walk of depth 6 follows.
+ * The parent folder name wins before the JSON {@code runId}.
  * {@code browser-profile}, {@code config}, {@code scratch}, and {@code attempts} are skipped.
  * A JSON body over 2 MB is not read.</p>
  */
@@ -36,10 +38,13 @@ public final class RunIndexFinder {
         } catch (RuntimeException failure) {
             return null;
         }
+        boolean privateRun = Files.isDirectory(runDir);
         List<Path> candidates = new ArrayList<>();
         candidates.add(runDir.resolve("diagnostic").resolve(runId).resolve("run-index.json"));
         candidates.add(runDir.resolve("diagnostic").resolve("run-index.json"));
-        candidates.add(project.resolve("reports").resolve("diagnostic-runs").resolve(runId).resolve("run-index.json"));
+        if (!privateRun) {
+            candidates.add(project.resolve("reports").resolve("diagnostic-runs").resolve(runId).resolve("run-index.json"));
+        }
         Path record = runDir.resolve("record.json");
         if (Files.isRegularFile(record)) {
             try {
@@ -59,6 +64,7 @@ public final class RunIndexFinder {
         }
         Path walked = walk(runDir, runId);
         if (walked != null) return walked;
+        if (privateRun) return null;
         return walk(project.resolve("reports").resolve("diagnostic-runs").resolve(runId), runId);
     }
 

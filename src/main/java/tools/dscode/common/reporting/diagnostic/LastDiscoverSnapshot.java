@@ -184,6 +184,7 @@ public final class LastDiscoverSnapshot {
                 safeId
         );
         if (privateIndex != null) return privateIndex;
+        if (Files.isDirectory(AgentCoordination.runDirectory(project, safeId))) return null;
         return catalogRunFromIndex(
                 project.resolve("reports").resolve("diagnostic-runs").resolve(safeId).resolve("run-index.json"),
                 safeId

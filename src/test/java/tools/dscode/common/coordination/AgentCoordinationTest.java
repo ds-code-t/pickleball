@@ -276,6 +276,12 @@ class AgentCoordinationTest {
                 .resolve(run.runId()).resolve("scenarios").resolve("old-scenario").resolve("summary.json");
         assertTrue(Files.isRegularFile(archived), archived.toString());
         assertFalse(Files.exists(scenario));
+        Path stale = project.resolve("reports").resolve("diagnostic-runs").resolve(run.runId());
+        Files.createDirectories(stale.resolve("scenarios").resolve("stale-scenario"));
+        Files.writeString(
+                stale.resolve("run-index.json"),
+                "{\"runId\":\"run-attempt\",\"outcome\":\"FAILED\",\"counts\":{\"failed\":9}}\n"
+        );
         assertNull(AgentCoordination.findRunIndex(project, run.runId()));
     }
 

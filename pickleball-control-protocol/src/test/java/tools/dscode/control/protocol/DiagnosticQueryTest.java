@@ -19,6 +19,44 @@ class DiagnosticQueryTest {
     Path project;
 
     @Test
+    void privateRunIgnoresSharedAndArchivedFailures() throws Exception {
+        String id = "run-private";
+        Path shared = project.resolve("reports/diagnostic-runs").resolve(id).resolve("scenarios").resolve("old");
+        Files.createDirectories(shared);
+        Files.writeString(shared.resolve("summary.json"), "{\"name\":\"Old failure\",\"outcome\":\"FAILED\"}");
+        Files.writeString(shared.resolve("events.jsonl"),
+                "{\"type\":\"step\",\"eventSeq\":1,\"text\":\"Then old\",\"status\":\"FAILED\",\"message\":\"old-boom\"}\n");
+        Files.writeString(project.resolve("reports/diagnostic-runs").resolve(id).resolve("run-index.json"),
+                "{\"runId\":\"" + id + "\",\"outcome\":\"FAILED\",\"counts\":{\"failed\":4},"
+                        + "\"scenarios\":[{\"scenarioId\":\"old\",\"name\":\"Old failure\",\"outcome\":\"FAILED\"}]}");
+        Path archived = project.resolve(".pickleball/runs").resolve(id)
+                .resolve("attempts/1/diagnostic").resolve(id).resolve("scenarios/old");
+        Files.createDirectories(archived);
+        Files.writeString(archived.resolve("events.jsonl"),
+                "{\"type\":\"step\",\"eventSeq\":1,\"text\":\"Then archived\",\"status\":\"FAILED\",\"message\":\"archived-boom\"}\n");
+        Path current = project.resolve(".pickleball/runs").resolve(id)
+                .resolve("diagnostic").resolve(id).resolve("scenarios").resolve("now");
+        Files.createDirectories(current);
+        Files.writeString(project.resolve(".pickleball/runs").resolve(id).resolve("diagnostic").resolve(id).resolve("run-index.json"),
+                "{\"runId\":\"" + id + "\",\"outcome\":\"PASSED\",\"counts\":{\"total\":1,\"failed\":0},"
+                        + "\"scenarios\":[{\"scenarioId\":\"now\",\"name\":\"Now\",\"outcome\":\"PASSED\"}]}");
+        Files.writeString(current.resolve("summary.json"), "{\"name\":\"Now\",\"outcome\":\"PASSED\"}");
+        Files.writeString(current.resolve("events.jsonl"),
+                "{\"type\":\"step\",\"eventSeq\":1,\"text\":\"Then now\",\"status\":\"PASSED\"}\n"
+                        + "{\"type\":\"failure\",\"eventSeq\":2}\n");
+        Files.writeString(project.resolve(".pickleball/runs").resolve(id).resolve("record.json"),
+                "{\"runId\":\"" + id + "\"}\n");
+        DiagnosticQuery.Outcome errors = DiagnosticQuery.query(project, Map.of("op", "errors", "runId", id));
+        assertEquals(0, errors.exit(), errors.json());
+        assertFalse(errors.json().contains("old-boom"), errors.json());
+        assertFalse(errors.json().contains("archived-boom"), errors.json());
+        assertFalse(errors.json().contains("\"type\":\"failure\""), errors.json());
+        DiagnosticQuery.Outcome got = DiagnosticQuery.query(project, Map.of("op", "get", "runId", id, "kind", "run"));
+        assertTrue(got.json().contains("PASSED"), got.json());
+        assertFalse(String.valueOf(got.body().get("where")).contains("reports/diagnostic-runs"), got.json());
+    }
+
+    @Test
     void eachOpReadsTheFixtureAndStaysUnderTheDefaultBudget() throws Exception {
         writeFixture();
         DiagnosticQuery.Outcome runs = DiagnosticQuery.query(project, Map.of("op", "runs"));
@@ -355,11 +393,15 @@ class DiagnosticQueryTest {
 
     @Test
     void tailPrefersNewestFailureRowsAndKeepsLogOrderWhenThereAreNone() throws Exception {
-        Path scenario = project.resolve("reports/diagnostic-runs/run-tail-fail/scenarios/scene");
+        Path shared = project.resolve("reports/diagnostic-runs/run-tail-fail/scenarios/scene");
+        Files.createDirectories(shared);
+        Files.writeString(shared.resolve("events.jsonl"),
+                "{\"type\":\"step\",\"eventSeq\":1,\"text\":\"Then stale\",\"status\":\"FAILED\",\"message\":\"stale-boom\"}\n");
+        Path scenario = project.resolve(".pickleball/runs/run-tail-fail/diagnostic/run-tail-fail/scenarios/scene");
         Files.createDirectories(scenario);
         Files.writeString(project.resolve("reports/diagnostic-runs/run-catalog.json"),
                 "{\"runs\":[{\"runId\":\"run-tail-fail\",\"outcome\":\"FAILED\"}]}");
-        Files.writeString(project.resolve("reports/diagnostic-runs/run-tail-fail/run-index.json"),
+        Files.writeString(project.resolve(".pickleball/runs/run-tail-fail/diagnostic/run-tail-fail/run-index.json"),
                 "{\"runId\":\"run-tail-fail\",\"outcome\":\"FAILED\",\"scenarios\":[{\"scenarioId\":\"scene\",\"name\":\"Scene\",\"outcome\":\"FAILED\"}]}");
         Files.writeString(scenario.resolve("summary.json"), "{\"name\":\"Scene\",\"outcome\":\"FAILED\"}");
         Files.writeString(scenario.resolve("events.jsonl"), """
@@ -375,6 +417,7 @@ class DiagnosticQueryTest {
         assertTrue(tail.json().contains("first-boom"), tail.json());
         assertTrue(tail.json().indexOf("second-boom") < tail.json().indexOf("first-boom"), tail.json());
         assertFalse(tail.json().contains("agent query noise"), tail.json());
+        assertFalse(tail.json().contains("stale-boom"), tail.json());
     }
 
     @Test

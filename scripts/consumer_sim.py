@@ -41,12 +41,15 @@ BUDGETS = {
     "execute-step-b64": 180,
     "execute-step-file": 180,
     "events": 60,
+    "status": 60,
     "query-errors": 60,
     "query-tail": 60,
     "discover-rerun": 900,
+    "query-errors-after": 60,
     "confirm": 900,
     "finish": 60,
     "stop": 60,
+    "unknown-verb": 60,
 }
 
 
@@ -57,9 +60,13 @@ def main() -> int:
     if args.publish:
         publish()
     configure_browser()
+    test_classpath()
     timings: list[dict] = []
     try:
         prepare_tree()
+        unknown = run_stage(timings, "unknown-verb", ["not-a-verb"], allow_exit={2})
+        assert_in(unknown, "error:")
+        assert_in(unknown, "fix:")
         run_stage(timings, "discover-uncompiled", [
             "discover", "--run-id=" + RUN_UNCOMPILED, "--tags=" + TAGS, "--name=" + NAME,
             "--runvar=pkb_browser=CHROME_HEADLESS", "--retention=failed", "--agent=consumer-sim",
@@ -97,6 +104,9 @@ def main() -> int:
         assert_not_in(filed, STEP + "\r")
         events = run_stage(timings, "events", ["events", "--run-id=" + RUN], allow_exit={0})
         assert_true(events.stdout.strip() != "" or events.stderr.strip() != "", "events produced no output")
+        status = run_stage(timings, "status", ["status", "--run-id=" + RUN], allow_exit={0})
+        assert_in(status, "status=idle")
+        assert_in(status, "elapsed-step-ms=idle")
         run_stage(timings, "query-errors", ["query", "errors", "--run-id=" + RUN], allow_exit={0})
         run_stage(timings, "query-tail", ["query", "tail", "--run-id=" + RUN], allow_exit={0})
         rerun = run_stage(timings, "discover-rerun", [
@@ -104,6 +114,14 @@ def main() -> int:
             "--runvar=pkb_browser=CHROME_HEADLESS", "--retention=failed", "--agent=consumer-sim",
         ], allow_exit={0, 1})
         assert_in(rerun, "summary status=")
+        attempts = CONSUMER / ".pickleball" / "runs" / RUN / "attempts"
+        assert_true(attempts.is_dir(), "rerun did not archive the previous diagnostic attempt")
+        if "status=PASSED" in (rerun.stdout or ""):
+            assert_in(rerun, "failed=0")
+        after = run_stage(timings, "query-errors-after", ["query", "errors", "--run-id=" + RUN], allow_exit={0})
+        assert_not_in(after, "attempts/")
+        if "status=PASSED" in (rerun.stdout or ""):
+            assert_true('"matched":0' in after.stdout, "a passed rerun still reported errors: " + after.stdout[:500])
         confirm = run_stage(timings, "confirm", [
             "confirm", "--run-id=" + RUN, "--tags=" + TAGS, "--name=" + NAME,
             "--agent=consumer-sim",
@@ -180,14 +198,69 @@ def run_stage(timings: list[dict], stage: str, launcher_args: list[str], allow_e
 
 
 def launcher(args: list[str], timeout: int) -> subprocess.CompletedProcess:
-    exec_args = join_exec_args(args)
-    return maven_cmd(script_command(wrapper_path(), [
+    command = [
+        java_executable(),
+        "-cp",
+        test_classpath(),
+        "tools.dscode.launcher.PickleballWorkbenchLauncher",
+        *args,
+    ]
+    try:
+        return subprocess.run(
+            command,
+            cwd=CONSUMER,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=timeout,
+        )
+    except subprocess.TimeoutExpired as failure:
+        stdout = failure.stdout or ""
+        stderr = failure.stderr or ""
+        if isinstance(stdout, bytes):
+            stdout = stdout.decode("utf-8", "replace")
+        if isinstance(stderr, bytes):
+            stderr = stderr.decode("utf-8", "replace")
+        print(stdout[-4000:])
+        print(stderr[-4000:], file=sys.stderr)
+        raise SystemExit(f"timeout after {timeout}s: {' '.join(command[:6])}") from failure
+
+
+_TEST_CLASSPATH = None
+
+
+def java_executable() -> str:
+    home = os.environ.get("JAVA_HOME")
+    if home:
+        name = "java.exe" if os.name == "nt" else "java"
+        candidate = Path(home) / "bin" / name
+        if candidate.is_file():
+            return str(candidate)
+    return "java"
+
+
+def test_classpath() -> str:
+    global _TEST_CLASSPATH
+    if _TEST_CLASSPATH:
+        return _TEST_CLASSPATH
+    output = CONSUMER / ".pickleball" / "harness-classpath.txt"
+    output.parent.mkdir(parents=True, exist_ok=True)
+    resolved = maven_cmd(script_command(wrapper_path(), [
         "-q",
-        "org.codehaus.mojo:exec-maven-plugin:3.5.0:java",
-        "-Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher",
-        "-Dexec.classpathScope=test",
-        "-Dexec.args=" + exec_args,
-    ]), timeout)
+        "org.apache.maven.plugins:maven-dependency-plugin:3.8.1:build-classpath",
+        "-Dmdep.includeScope=test",
+        f"-Dmdep.outputFile={output.resolve().as_posix()}",
+    ]), 300)
+    if resolved.returncode != 0:
+        raise SystemExit("could not resolve the consumer test classpath\n" + resolved.stdout + resolved.stderr)
+    deps = output.read_text(encoding="utf-8", errors="replace").strip()
+    parts = [str((CONSUMER / "target" / "test-classes").resolve()), str((CONSUMER / "target" / "classes").resolve())]
+    if deps:
+        parts.append(deps)
+    _TEST_CLASSPATH = os.pathsep.join(parts)
+    return _TEST_CLASSPATH
 
 
 def maven(args: list[str], timeout: int) -> subprocess.CompletedProcess:

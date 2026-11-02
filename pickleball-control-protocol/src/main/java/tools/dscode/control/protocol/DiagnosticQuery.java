@@ -44,6 +44,7 @@ public final class DiagnosticQuery {
     );
 
     private static final ThreadLocal<List<String>> DECODE_WARNINGS = ThreadLocal.withInitial(ArrayList::new);
+    private static final ThreadLocal<Path> DECODE_SCOPE = new ThreadLocal<>();
 
     private static final ThreadLocal<Boolean> INDEX_BUILD = ThreadLocal.withInitial(() -> Boolean.FALSE);
     /** True while {@link DiagnosticSqliteIndex#rebuild} is reading these files into the disposable index. */
@@ -73,6 +74,7 @@ public final class DiagnosticQuery {
 
     static Outcome query(Path project, Map<String, ?> request, int budgetBytes) {
         DECODE_WARNINGS.get().clear();
+        DECODE_SCOPE.remove();
         if (project == null) {
             return error(2, "missing project", "Pass the consumer project directory.");
         }
@@ -139,6 +141,13 @@ public final class DiagnosticQuery {
         if ("query".equals(op) && kind == null) kind = runId == null ? "run" : "event";
 
         Path root = project.toAbsolutePath().normalize();
+        if (runId != null) {
+            Path privateDir = root.resolve(".pickleball").resolve("runs").resolve(runId);
+            Path sharedDir = root.resolve("reports").resolve("diagnostic-runs").resolve(runId);
+            if (Files.isDirectory(privateDir)) DECODE_SCOPE.set(privateDir);
+            else if (Files.isDirectory(sharedDir)) DECODE_SCOPE.set(sharedDir);
+        }
+        try {
         boolean capped = false;
         List<Map<String, Object>> matched = null;
         String where = null;
@@ -171,19 +180,22 @@ public final class DiagnosticQuery {
                 || limit <= DEFAULT_LIMIT);
         int dropped = 0;
         if (budgeted) {
-            while (page.size() > 1 && utf8(envelope(op, where, limit, total, offset, page, capped, 0)) > budget) {
+            while (page.size() > 1 && utf8(envelope(op, where, limit, total, offset, page, capped, 0, runId)) > budget) {
                 page.remove(page.size() - 1);
                 dropped++;
             }
         }
-        Map<String, Object> body = envelope(op, where, limit, total, offset, page, capped, dropped);
+        Map<String, Object> body = envelope(op, where, limit, total, offset, page, capped, dropped, runId);
         String json = JsonLite.write(body);
         if (budgeted && json.getBytes(StandardCharsets.UTF_8).length > budget && page.size() > 1) {
             page.subList(1, page.size()).clear();
-            body = envelope(op, where, limit, total, offset, page, capped, total - offset - 1);
+            body = envelope(op, where, limit, total, offset, page, capped, total - offset - 1, runId);
             json = JsonLite.write(body);
         }
         return new Outcome(body, json, 0);
+        } finally {
+            DECODE_SCOPE.remove();
+        }
     }
 
     private static Map<String, Object> envelope(
@@ -194,7 +206,8 @@ public final class DiagnosticQuery {
             int offset,
             List<Map<String, Object>> page,
             boolean capped,
-            int extraDropped
+            int extraDropped,
+            String runId
     ) {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("v", 1);
@@ -211,7 +224,9 @@ public final class DiagnosticQuery {
         }
         if (capped) {
             body.put("scanCapped", true);
-            body.put("fix", "Scan stopped after " + SCAN_LINES + " lines. Narrow it with --run-id=<id>.");
+            body.put("fix", runId == null || runId.isBlank()
+                    ? "Scan stopped after " + SCAN_LINES + " lines. Narrow it with --run-id=<id>."
+                    : "Scan stopped after " + SCAN_LINES + " lines. Page the rest with --cursor.");
         }
         List<String> decoded = DECODE_WARNINGS.get();
         if (decoded != null && !decoded.isEmpty()) {
@@ -368,7 +383,7 @@ public final class DiagnosticQuery {
             }
             if (where == null) where = ".pickleball/agent-log";
         }
-        if ("search".equals(op)) {
+        if ("search".equals(op) && runId == null) {
             for (Map<String, Object> run : catalog.runs) {
                 Map<String, Object> item = runItem(project, run);
                 if (contains(item, needle)) items.add(item);
@@ -390,6 +405,10 @@ public final class DiagnosticQuery {
     private static boolean isErrorRow(Map<String, Object> event) {
         String type = str(event.get("type"));
         if (type != null && type.toUpperCase(Locale.ROOT).contains("SCENARIO_END")
+                && event.get("message") == null && event.get("stackHead") == null) {
+            return false;
+        }
+        if ("error".equals(str(event.get("kind")))
                 && event.get("message") == null && event.get("stackHead") == null) {
             return false;
         }
@@ -432,6 +451,7 @@ public final class DiagnosticQuery {
                 runs.add(map);
             }
             if (indexing()) mergeOnDiskRuns(project, runs);
+            else addPrivateRuns(project, runs);
             return new Catalog(runs, where, false);
         }
         List<Map<String, Object>> runs = new ArrayList<>();
@@ -457,6 +477,31 @@ public final class DiagnosticQuery {
                 ? "reports/diagnostic-runs"
                 : ".pickleball/runs";
         return new Catalog(runs, discovered, false);
+    }
+
+    /** Current private attempts are part of the catalog even when the shared file is stale. */
+    private static void addPrivateRuns(Path project, List<Map<String, Object>> runs) throws IOException {
+        Set<String> listed = new TreeSet<>();
+        for (Map<String, Object> run : runs) {
+            String id = str(run.get("runId"));
+            if (id != null) listed.add(id);
+        }
+        Path runsRoot = project.resolve(".pickleball").resolve("runs");
+        if (!Files.isDirectory(runsRoot)) return;
+        try (DirectoryStream<Path> stream = Files.newDirectoryStream(runsRoot)) {
+            List<Path> children = new ArrayList<>();
+            for (Path child : stream) children.add(child);
+            children.sort(Comparator.comparing(path -> path.getFileName().toString()));
+            for (Path child : children) {
+                if (!Files.isDirectory(child)) continue;
+                String name = child.getFileName().toString();
+                if (!safeId(name) || listed.contains(name)) continue;
+                if (resolve(project, name).index == null) continue;
+                Map<String, Object> row = new LinkedHashMap<>();
+                row.put("runId", name);
+                runs.add(row);
+            }
+        }
     }
 
     /** A stale catalog must not hide a run directory that already has a run-index. Used only while rebuilding the disposable index. */
@@ -508,6 +553,7 @@ public final class DiagnosticQuery {
     static Resolved resolve(Path project, String runId) throws IOException {
         Path found = RunIndexFinder.find(project, runId);
         if (found != null) return new Resolved(found, found.getParent(), relative(project, found));
+        if (privateRunDirectory(project, runId)) return new Resolved(null, null, null);
         Path sharedRoot = project.resolve("reports").resolve("diagnostic-runs").resolve(runId);
         if (Files.isDirectory(sharedRoot)) return new Resolved(null, sharedRoot, relative(project, sharedRoot));
         return new Resolved(null, null, null);
@@ -659,12 +705,23 @@ public final class DiagnosticQuery {
 
     private static List<Path> scenarioRoots(Path project, String runId, Resolved resolved) {
         List<Path> roots = new ArrayList<>();
+        if (privateRunDirectory(project, runId)) {
+            Path runDir = project.resolve(".pickleball").resolve("runs").resolve(runId);
+            Path diagnostic = runDir.resolve("diagnostic");
+            if (resolved.runRoot != null && resolved.runRoot.startsWith(diagnostic)) roots.add(resolved.runRoot);
+            Path nested = diagnostic.resolve(runId);
+            if (!roots.contains(nested)) roots.add(nested);
+            if (!roots.contains(diagnostic)) roots.add(diagnostic);
+            return roots;
+        }
         if (resolved.runRoot != null) roots.add(resolved.runRoot);
         roots.add(project.resolve("reports").resolve("diagnostic-runs").resolve(runId));
-        Path runDir = project.resolve(".pickleball").resolve("runs").resolve(runId);
-        roots.add(runDir.resolve("diagnostic").resolve(runId));
-        roots.add(runDir.resolve("diagnostic"));
         return roots;
+    }
+
+    private static boolean privateRunDirectory(Path project, String runId) {
+        if (project == null || !safeId(runId)) return false;
+        return Files.isDirectory(project.resolve(".pickleball").resolve("runs").resolve(runId));
     }
 
     private static Map<String, Object> scenarioItem(String runId, ScenarioRef scenario) throws IOException {
@@ -731,7 +788,20 @@ public final class DiagnosticQuery {
         String status = firstNonBlank(str(body.get("status")), str(body.get("outcome")), str(body.get("level")));
         long seq = longValue(body.get("eventSeq"), longValue(body.get("seq"), lineNo));
         boolean step = "step".equalsIgnoreCase(type) || (type == null && str(body.get("stepText")) != null);
+        FailureRecord failure = FailureRecord.fromWorker(body);
+        String failureMessage = failure == null ? null : failure.message();
+        String failureHead = failure == null ? null : failure.stackHead();
+        if (failureMessage == null) {
+            failureMessage = firstNonBlank(str(body.get("message")), str(body.get("errorMessage")));
+        }
+        if (failureHead == null) failureHead = stackHead(body);
         boolean error = isError(type, status, body);
+        if ((failureMessage == null || failureMessage.isBlank()) && "FAILED".equalsIgnoreCase(status)) {
+            failureMessage = firstNonBlank(str(body.get("text")), str(body.get("stepText")));
+        }
+        if (error && (failureMessage == null || failureMessage.isBlank()) && (failureHead == null || failureHead.isBlank())) {
+            error = false;
+        }
         Map<String, Object> item = new LinkedHashMap<>();
         item.put("kind", step ? "step" : error ? "error" : "event");
         item.put("id", Long.toString(seq));
@@ -741,9 +811,9 @@ public final class DiagnosticQuery {
         item.put("type", type);
         item.put("status", status);
         item.put("text", clip(text));
-        if (error) {
-            item.put("message", clip(firstNonBlank(str(body.get("message")), text, str(body.get("error")))));
-            item.put("stackHead", stackHead(body));
+        if (error || (failure != null && failure.substantive())) {
+            if (failureMessage != null && !failureMessage.isBlank()) item.put("message", clip(failureMessage));
+            if (failureHead != null && !failureHead.isBlank()) item.put("stackHead", clip(failureHead));
         }
         item.put("where", where);
         return item;
@@ -880,9 +950,11 @@ public final class DiagnosticQuery {
             addFileScalars(items, runId, resolved.runRoot.resolve("configuration.json"), project);
             addFileScalars(items, runId, resolved.runRoot.resolve("environment.json"), project);
         }
-        Path shared = project.resolve("reports").resolve("diagnostic-runs").resolve(runId);
-        addFileScalars(items, runId, shared.resolve("configuration.json"), project);
-        addFileScalars(items, runId, shared.resolve("environment.json"), project);
+        if (!privateRunDirectory(project, runId)) {
+            Path shared = project.resolve("reports").resolve("diagnostic-runs").resolve(runId);
+            addFileScalars(items, runId, shared.resolve("configuration.json"), project);
+            addFileScalars(items, runId, shared.resolve("environment.json"), project);
+        }
         return items;
     }
 
@@ -1269,6 +1341,14 @@ public final class DiagnosticQuery {
             try (var walk = Files.walk(runDir, 6)) {
                 walk.filter(Files::isRegularFile)
                         .filter(path -> {
+                            try {
+                                Path relative = runDir.relativize(path);
+                                if (relative.getNameCount() > 0 && "attempts".equals(relative.getName(0).toString())) {
+                                    return false;
+                                }
+                            } catch (IllegalArgumentException ignored) {
+                                return false;
+                            }
                             String name = path.getFileName() == null ? "" : path.getFileName().toString();
                             return name.endsWith(".log") || "session.log".equals(name);
                         })
@@ -1339,6 +1419,15 @@ public final class DiagnosticQuery {
     }
 
     private static void noteDecode(Path project, Path file) {
+        Path scope = DECODE_SCOPE.get();
+        if (scope != null && file != null) {
+            try {
+                Path absolute = file.toAbsolutePath().normalize();
+                if (!absolute.startsWith(scope.toAbsolutePath().normalize())) return;
+            } catch (RuntimeException ignored) {
+                return;
+            }
+        }
         String name = project == null ? file.getFileName().toString() : relative(project, file);
         List<String> warnings = DECODE_WARNINGS.get();
         if (!warnings.contains(name)) warnings.add(name);

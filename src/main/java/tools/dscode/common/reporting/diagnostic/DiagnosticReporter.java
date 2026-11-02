@@ -1098,14 +1098,14 @@ final class DiagnosticReporter {
     }
 
     private static Path resolveRunsRoot(Map<String, String> values) {
-        String configured = find(values, PKB_DIAGNOSTIC_OUTPUT);
-        if (configured != null && !configured.isBlank()) {
-            return Path.of(configured.trim());
-        }
         String runId = find(values, PKB_RUN_ID);
         AgentCoordination.Run current = AgentCoordination.current();
         if (current != null && runId != null && runId.trim().equals(current.runId())) {
             return current.diagnosticDirectory();
+        }
+        String configured = find(values, PKB_DIAGNOSTIC_OUTPUT);
+        if (configured != null && !configured.isBlank()) {
+            return Path.of(configured.trim());
         }
         return Path.of("reports", "diagnostic-runs");
     }

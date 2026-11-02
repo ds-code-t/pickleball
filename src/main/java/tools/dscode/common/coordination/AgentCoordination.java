@@ -407,6 +407,29 @@ public final class AgentCoordination {
         }
     }
 
+    /**
+     * The worker JVM joins the run the launcher already opened. It does not
+     * archive, rewrite {@code record.json}, or log another start.
+     */
+    public static Run adoptPrivateRun(Path project) {
+        if (!launchRequestsPrivateRun()) {
+            clearCurrent();
+            return null;
+        }
+        String runId = System.getProperty(PKB_props.PKB_RUN_ID);
+        if (runId == null || runId.isBlank()) return openConsumerRun(project, System.out);
+        try {
+            Path data = runDirectory(project, runId);
+            Path recordFile = data.resolve(RECORD_FILE);
+            if (!Files.isRegularFile(recordFile)) return openConsumerRun(project, System.out);
+            Run adopted = toRun(project, data, recordFile, readRecord(recordFile));
+            activate(adopted);
+            return adopted;
+        } catch (RuntimeException | IOException failure) {
+            return openConsumerRun(project, System.out);
+        }
+    }
+
     public static Run openConsumerRun(Path project, Appendable out) {
         if (!launchRequestsPrivateRun()) {
             clearCurrent();
@@ -1058,7 +1081,11 @@ public final class AgentCoordination {
         }
         Path dest = attempts.resolve(Integer.toString(next)).resolve("diagnostic");
         Files.createDirectories(dest.getParent());
-        Files.move(diagnostic, dest);
+        try {
+            Files.move(diagnostic, dest, StandardCopyOption.ATOMIC_MOVE);
+        } catch (AtomicMoveNotSupportedException failure) {
+            Files.move(diagnostic, dest);
+        }
     }
 
     private static boolean attemptEvidence(Path diagnostic) throws IOException {

@@ -115,6 +115,29 @@ public final class WorkspaceSeed {
     }
 
     /**
+     * Retained profile with unresolvable {@code ${protected:key}} assignments removed.
+     * A reference whose key is present in project properties stays. The workspace file
+     * is unchanged; this is only the string agents replay.
+     */
+    public static String replayableProfile(String profile, Path project) {
+        if (profile == null || profile.isBlank()) return profile == null ? "" : profile;
+        java.util.LinkedHashMap<String, String> parsed;
+        try {
+            parsed = PKB_props.parseAssignments(profile);
+        } catch (RuntimeException failure) {
+            return profile;
+        }
+        Map<String, String> files = ProjectPropertySources.readWorkbench(project == null ? Path.of("") : project);
+        parsed.entrySet().removeIf(entry -> {
+            String key = Workspace.protectedKey(entry.getValue());
+            if (key == null) return false;
+            String fromFile = files.get(key);
+            return fromFile == null || fromFile.isBlank();
+        });
+        return PKB_props.serializeRunVars(parsed);
+    }
+
+    /**
      * Sensitive runner values with no project-property source. A
      * {@code ${protected:key}} reference would fail at launch, so the workspace
      * keeps the value and the caller warns.

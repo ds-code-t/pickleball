@@ -180,6 +180,8 @@ public final class WorkbenchAgentCommands {
         if (err == null) return;
         Map<String, String> raw = new LinkedHashMap<>();
         tools.dscode.testengine.PickleballRunner runner = tools.dscode.testengine.DynamicSuiteBootstrap.initializeFromRuntimeClasspath();
+        String suiteWarning = WorkspaceLaunch.defaultSuiteWarning(runner == null ? null : runner.getClass());
+        if (suiteWarning != null) err.println(suiteWarning);
         if (runner != null && runner.values() != null) {
             runner.values().forEach((key, value) -> {
                 if (key != null && value != null) raw.put(key, value);
@@ -604,7 +606,8 @@ public final class WorkbenchAgentCommands {
         }
         if (values.isEmpty()) return;
         try {
-            String profile = PKB_props.serializeRunVars(new java.util.TreeMap<>(values));
+            String profile = WorkspaceSeed.replayableProfile(
+                    PKB_props.serializeRunVars(new java.util.TreeMap<>(values)), project);
             if (profile == null || profile.isBlank()) return;
             LastDiscoverSnapshot.write(project, runId, null, profile, agentId);
         } catch (IOException ignored) {
@@ -1744,8 +1747,9 @@ public final class WorkbenchAgentCommands {
         String cause = launchCause(captured);
         if (cause == null || cause.isBlank()) cause = "Maven exited " + exit + " before any scenario.";
         String fix = zeroSteps
-                ? "A before-all hook or launch step failed before any step ran; see .pickleball/runs/" + runId + "/console/"
-                : "Full output is in .pickleball/runs/" + runId + "/console/";
+                ? "A before-all hook or launch step failed before any step ran. Read .pickleball/runs/"
+                + runId + "/console/ and fix that hook, then run again."
+                : "Read .pickleball/runs/" + runId + "/console/ and fix the reported cause, then run again.";
         err.print(WorkbenchCliHelp.structured(cause, fix));
     }
 
@@ -1792,8 +1796,12 @@ public final class WorkbenchAgentCommands {
     private static boolean testsRan(Path project, String runId) {
         if (project == null || runId == null || runId.isBlank()) return false;
         try {
-            if (hasScenarioDir(AgentCoordination.runDirectory(project, runId).resolve("diagnostic"))) return true;
-            if (hasScenarioDir(project.resolve("reports").resolve("diagnostic-runs").resolve(runId))) return true;
+            Path runDir = AgentCoordination.runDirectory(project, runId);
+            if (hasScenarioDir(runDir.resolve("diagnostic"))) return true;
+            if (!Files.isDirectory(runDir)
+                    && hasScenarioDir(project.resolve("reports").resolve("diagnostic-runs").resolve(runId))) {
+                return true;
+            }
         } catch (RuntimeException | IOException ignored) {
             // An unsafe run id is not evidence that tests ran.
         }
@@ -2031,11 +2039,16 @@ public final class WorkbenchAgentCommands {
                 if (shouldWarnMissingProfile(project, runId)) err.println(NO_RETAINED_PROFILE_WARNING);
                 return mavenExit;
             }
+            String profile = WorkspaceSeed.replayableProfile(latest.runProfile(), project);
+            if (profile == null || profile.isBlank()) {
+                if (shouldWarnMissingProfile(project, runId)) err.println(NO_RETAINED_PROFILE_WARNING);
+                return mavenExit;
+            }
             if (writeSnapshot) {
-                LastDiscoverSnapshot.write(project, latest.runId(), latest.catalog(), latest.runProfile(), agentId);
+                LastDiscoverSnapshot.write(project, latest.runId(), latest.catalog(), profile, agentId);
             }
             out.println("run-catalog.json: " + latest.catalog());
-            out.println("retained pkb_run_profile: " + latest.runProfile());
+            out.println("retained pkb_run_profile: " + profile);
             if (writeSnapshot) {
                 out.println("NEXT: confirm --tags/--name/--example. When a Workbench window is already open, drive that session with open-scenario, example, play, execute-step, stop, and diagnostic-run. Otherwise isolate, then execute-step / status / events / stop. Do not open the GUI for your own testing. Open it to show a person a specific run, or when they ask. Close it when you are done showing it. While testing for yourself, stay headless. Opening the window loads the run you already have. It does not start a second test.");
             }

@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import tools.dscode.common.coordination.AgentCoordination;
 import tools.dscode.common.runtime.ProcessTrees;
+import tools.dscode.control.protocol.FailureRecord;
 import tools.dscode.control.protocol.OutputFormatter;
 import tools.dscode.control.protocol.PickleballLocalLayout;
 import tools.dscode.control.protocol.RunView;
@@ -1036,68 +1037,27 @@ public final class WorkbenchSessionCommands {
     }
 
     private static String failureJson(String received, JsonNode result) {
+        Map<String, Object> raw = new LinkedHashMap<>();
+        if (result != null && result.isObject()) {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> converted = JSON.convertValue(result, Map.class);
+            if (converted != null) raw.putAll(converted);
+        }
+        FailureRecord record = FailureRecord.fromWorker(raw);
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("text", received == null ? "" : received);
-        String phrase = firstResultText(result, "phrase", "failingPhrase", "phraseText");
-        String message = firstResultText(result, "message", "errorMessage");
-        String stack = firstResultText(result, "stackHead", "stack");
-        if (stack == null) stack = firstStackLine(result);
-        JsonNode error = result == null ? null : result.get("error");
-        if (error != null && error.isObject()) {
-            if (message == null) message = firstResultText(error, "message", "errorMessage");
-            if (stack == null) stack = firstResultText(error, "stackHead", "stackTrace", "stack");
-        } else if (message == null && error != null && error.isTextual() && !error.asText("").isBlank()) {
-            message = error.asText();
-        }
-        if (stack != null) {
-            int newline = stack.indexOf('\n');
-            if (newline >= 0) stack = stack.substring(0, newline);
-            stack = stack.strip();
-            if (stack.isEmpty()) stack = null;
-        }
-        JsonNode runtime = result == null ? null : result.get("runtime");
-        if (phrase == null && runtime != null && runtime.isObject()) {
-            phrase = firstResultText(runtime, "phraseText", "phrase", "stepText");
-        }
-        if (phrase == null && received != null && !received.isBlank()) phrase = received;
-        body.put("phrase", phrase);
-        body.put("message", message);
-        body.put("stackHead", stack);
+        String phrase = record == null ? null : record.phrase();
+        if ((phrase == null || phrase.isBlank()) && received != null && !received.isBlank()) phrase = received;
+        String message = record == null ? null : record.message();
+        String stack = record == null ? null : record.stackHead();
+        if (phrase != null) body.put("phrase", phrase);
+        if (message != null) body.put("message", message);
+        if (stack != null) body.put("stackHead", stack);
         try {
             return JSON.writeValueAsString(body);
         } catch (IOException failure) {
             throw new IllegalStateException("Could not write JSON.", failure);
         }
-    }
-
-    private static String firstResultText(JsonNode result, String... fields) {
-        if (result == null) return null;
-        for (String field : fields) {
-            JsonNode value = result.get(field);
-            if (value != null && !value.isNull()) {
-                String text = value.isTextual() ? value.asText() : value.asText("");
-                if (!text.isBlank()) return text;
-            }
-        }
-        return null;
-    }
-
-    private static String firstStackLine(JsonNode result) {
-        if (result == null) return null;
-        JsonNode stack = result.get("stackTrace");
-        if (stack == null) stack = result.get("stack");
-        if (stack != null && stack.isArray() && !stack.isEmpty()) {
-            String line = stack.get(0).asText("");
-            return line.isBlank() ? null : line;
-        }
-        if (stack != null && stack.isTextual()) {
-            String text = stack.asText("");
-            int newline = text.indexOf('\n');
-            if (newline >= 0) text = text.substring(0, newline);
-            text = text.strip();
-            return text.isEmpty() ? null : text;
-        }
-        return null;
     }
 
     private static List<JsonNode> eventRows(JsonNode events) {
@@ -1137,10 +1097,17 @@ public final class WorkbenchSessionCommands {
     private static String compactEvent(JsonNode event) {
         String phrase = firstText(event, "phraseText", "phrase");
         String step = firstText(event, "stepText", "step", "text");
-        if (phrase != null && (step == null || phrase.equals(step))) return "phrase " + phrase;
-        if (step != null) return "step " + step;
-        if (phrase != null) return "phrase " + phrase;
-        return "step";
+        String line;
+        if (phrase != null && (step == null || phrase.equals(step))) line = "phrase " + phrase;
+        else if (step != null) line = "step " + step;
+        else if (phrase != null) line = "phrase " + phrase;
+        else line = "step";
+        String hook = firstText(event, "hook", "type", "kind");
+        if (hook != null && "EXECUTE_STEP".equalsIgnoreCase(hook)) {
+            String signature = firstText(event, "signature", "status");
+            if (signature != null && !signature.isBlank()) return line + " " + signature;
+        }
+        return line;
     }
 
     private static int eventCursor(WorkbenchCommandLine.Parsed parsed) {
@@ -1263,7 +1230,9 @@ public final class WorkbenchSessionCommands {
 
     static String formatReport(Timing timing, List<SleepGapMonitor.Gap> gaps) {
         String step = timing.stepRunning ? Long.toString(timing.elapsedStepMs) : "idle";
-        return "elapsed-run-ms=" + timing.elapsedRunMs
+        String status = timing.stepRunning ? "running" : "idle";
+        return "status=" + status
+                + System.lineSeparator() + "elapsed-run-ms=" + timing.elapsedRunMs
                 + System.lineSeparator() + "elapsed-step-ms=" + step
                 + System.lineSeparator() + formatSleepGaps(gaps);
     }
@@ -1358,7 +1327,7 @@ public final class WorkbenchSessionCommands {
             boolean step = (stepText != null && !stepText.isBlank())
                     || (hook != null && hook.toUpperCase(Locale.ROOT).contains("STEP"));
             String upper = hook == null ? "" : hook.toUpperCase(Locale.ROOT);
-            boolean closes = upper.contains("AFTER_STEP");
+            boolean closes = upper.contains("AFTER_STEP") || "EXECUTE_STEP".equals(upper);
             boolean opens = !closes && (upper.contains("BEFORE_STEP") || "RUNNING".equals(upper));
             String text = ((stepText == null ? "" : stepText) + " " + (phrase == null ? "" : phrase)).trim();
             marks.add(new Mark(at, step, opens, closes, text));

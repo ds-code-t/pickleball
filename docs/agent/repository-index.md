@@ -52,8 +52,10 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/log-and-assert-steps.md`
 - `docs/maintainer/2.1.18-consumer-report-2.md`
 - `docs/maintainer/2.1.18-consumer-report-fixes.md`
+- `docs/maintainer/2.1.18-meta-analysis-2.md`
 - `docs/maintainer/2.1.18-meta-deep-dive.md`
 - `docs/maintainer/2.1.18-structural-fixes.md`
+- `docs/maintainer/2.1.18-unification.md`
 - `docs/maintainer/consumer-sim-harness.md`
 - `docs/maintainer/guidance-goldens.md`
 - `docs/mapping-and-templating.md`
@@ -667,6 +669,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/DiagnosticSqliteIndex.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/DirectControlProvider.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/ExampleRowSelector.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/FailureRecord.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/GherkinKeywords.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/InvestigationHandoff.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/JsonLite.java`
@@ -695,6 +698,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/DiagnosticSqliteIndexTest.java`
 - `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/DirectControlProviderTest.java`
 - `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/ExampleRowSelectorTest.java`
+- `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/FailureRecordTest.java`
 - `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/PickleballPathsTest.java`
 - `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/RunConfigsTest.java`
 - `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/RunIndexFinderTest.java`

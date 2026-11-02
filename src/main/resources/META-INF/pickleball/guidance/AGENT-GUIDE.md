@@ -21,7 +21,7 @@ Read the short log `.pickleball/agent-log` before, after, and during a run. Boar
 1. `-Dexec.args=discover`, then `confirm` with narrow tags, name, and example. `open-scenario` drives a window that is already open.
 2. Nobody watching: `-Dexec.args=isolate`, then `execute-step`, `status`, `events`, `stop`.
 3. No `--run-id` uses the only live session. Several live sessions must pass `--run-id`.
-4. `elapsed-step-ms=idle` when no step is running. `sleep-gap=` is a machine sleep, not a Gherkin sleep step.
+4. `status=idle` or `status=running`. `elapsed-step-ms=idle` when no step is running. `sleep-gap=` is a machine sleep, not a Gherkin sleep step.
 5. Emit with `workbench_investigation_emit`. `workbench_diagnostic_catalog` is a deprecated alias of `wb_runs`.
 
 ```bash

@@ -158,9 +158,11 @@ public final class WorkbenchOneShotLaunch {
                     writeCache(project, resolved);
                     return fastCommand(project, launcherArgs);
                 } catch (IOException ignored) {
-                    // The wrapper below still runs the launcher.
+                    // A published launcher jar still preserves Java's exit code.
                 }
             }
+            Optional<Path> jar = launcherJar();
+            if (jar.isPresent()) return jarCommand(jar.get(), launcherArgs);
         }
         return wrapperCommand(project, launcherArgs);
     }

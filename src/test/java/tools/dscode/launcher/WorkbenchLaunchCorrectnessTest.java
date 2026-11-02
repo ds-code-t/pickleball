@@ -68,7 +68,7 @@ class WorkbenchLaunchCorrectnessTest {
         assertFalse(out.contains("# pkb-console"), out);
         assertTrue(out.contains("console=.pickleball/runs/run-dead/console/"), out);
         assertTrue(err.contains("error: Caused by: java.lang.IllegalStateException: fork died"), err);
-        assertTrue(err.contains("fix: Full output is in .pickleball/runs/run-dead/console/"), err);
+        assertTrue(err.contains("fix: Read .pickleball/runs/run-dead/console/ and fix the reported cause, then run again."), err);
         String saved = Files.readString(AgentCoordination.runDirectory(temp, "run-dead").resolve("console").resolve("The_one.txt"));
         assertTrue(saved.contains("fork died"), saved);
     }
@@ -207,7 +207,7 @@ class WorkbenchLaunchCorrectnessTest {
         assertFalse(out.contains("summary status=FAILED"), out);
         assertTrue(err.contains("error: java.net.BindException: Address already in use")
                 || err.contains("error: Caused by: java.net.BindException: Address already in use"), err);
-        assertTrue(err.contains("fix: A before-all hook or launch step failed before any step ran; see .pickleball/runs/run-hook/console/"), err);
+        assertTrue(err.contains("fix: A before-all hook or launch step failed before any step ran. Read .pickleball/runs/run-hook/console/ and fix that hook, then run again."), err);
         String record = Files.readString(AgentCoordination.runDirectory(temp, "run-hook").resolve("record.json"));
         assertTrue(record.contains("LAUNCH_ERROR"), record);
         assertTrue(Files.readString(hook).contains("@BeforeAll"));

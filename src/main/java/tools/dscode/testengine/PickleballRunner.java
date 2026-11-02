@@ -153,6 +153,7 @@ public abstract class PickleballRunner {
         EngineFilterBootstrap.ensureEngineFilterApplied("PickleballRunner.<init>");
         INSTANCE = this;
         if (loadWorkspace()) {
+            adoptLaunchedRun();
             io.cucumber.core.runner.Phase4Timing.mark("runner-ready");
             return;
         }
@@ -182,16 +183,33 @@ public abstract class PickleballRunner {
                 : configuredLogLevel.trim();
         LOG_LEVEL = Level.valueOf(effectiveLogLevel.toUpperCase(Locale.ROOT));
         if (coordination != null) {
-            values.put(PKB_props.PKB_RUN_ID, coordination.runId());
-            values.put(PKB_props.PKB_AGENT_ID, coordination.agentId());
-            if (coordination.group() != null) values.put(PKB_props.PKB_RUN_GROUP, coordination.group());
-            if (coordination.sequence() != null) {
-                values.put(PKB_props.PKB_RUN_SEQUENCE, coordination.sequence().toString());
-            }
-            if (coordination.who() != null) values.put(PKB_props.PKB_RUN_WHO, coordination.who());
-            if (coordination.why() != null) values.put(PKB_props.PKB_RUN_WHY, coordination.why());
+            copyCoordination(coordination);
         }
         io.cucumber.core.runner.Phase4Timing.mark("runner-ready");
+    }
+
+    /**
+     * Workbench worker. The launcher already archived the previous attempt.
+     * This JVM only adopts that run so diagnostics stay on its current tree.
+     */
+    private void adoptLaunchedRun() {
+        if (!AgentCoordination.launchRequestsPrivateRun()) return;
+        java.nio.file.Path projectRoot = PickleballLocalLayout.findProjectRoot(java.nio.file.Path.of(""));
+        AgentCoordination.Run coordination = AgentCoordination.adoptPrivateRun(projectRoot);
+        if (coordination == null) return;
+        copyCoordination(coordination);
+        publishToSystemProperties();
+    }
+
+    private void copyCoordination(AgentCoordination.Run coordination) {
+        if (coordination.runId() != null) values.put(PKB_props.PKB_RUN_ID, coordination.runId());
+        if (coordination.agentId() != null) values.put(PKB_props.PKB_AGENT_ID, coordination.agentId());
+        if (coordination.group() != null) values.put(PKB_props.PKB_RUN_GROUP, coordination.group());
+        if (coordination.sequence() != null) {
+            values.put(PKB_props.PKB_RUN_SEQUENCE, coordination.sequence().toString());
+        }
+        if (coordination.who() != null) values.put(PKB_props.PKB_RUN_WHO, coordination.who());
+        if (coordination.why() != null) values.put(PKB_props.PKB_RUN_WHY, coordination.why());
     }
 
     /**

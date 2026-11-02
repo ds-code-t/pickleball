@@ -74,6 +74,40 @@ public final class OutputFormatter {
         return text.replace("\u2026", "...");
     }
 
+    /** One JSON array of strings. Names that contain commas stay one element. */
+    public static String jsonStringArray(List<String> values) {
+        StringBuilder out = new StringBuilder("[");
+        if (values != null) {
+            boolean first = true;
+            for (String value : values) {
+                if (!first) out.append(',');
+                first = false;
+                out.append('"').append(escapeJson(ascii(value))).append('"');
+            }
+        }
+        return out.append(']').toString();
+    }
+
+    private static String escapeJson(String value) {
+        if (value == null) return "";
+        StringBuilder out = new StringBuilder(value.length() + 8);
+        for (int index = 0; index < value.length(); index++) {
+            char ch = value.charAt(index);
+            switch (ch) {
+                case '"' -> out.append("\\\"");
+                case '\\' -> out.append("\\\\");
+                case '\n' -> out.append("\\n");
+                case '\r' -> out.append("\\r");
+                case '\t' -> out.append("\\t");
+                default -> {
+                    if (ch < 0x20) out.append(String.format("\\u%04x", (int) ch));
+                    else out.append(ch);
+                }
+            }
+        }
+        return out.toString();
+    }
+
     public static PrintStream wrap(PrintStream delegate) {
         if (delegate instanceof RedactingPrintStream) return delegate;
         return new RedactingPrintStream(delegate);

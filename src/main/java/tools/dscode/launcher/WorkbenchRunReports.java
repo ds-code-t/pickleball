@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import tools.dscode.common.coordination.AgentCoordination;
+import tools.dscode.control.protocol.OutputFormatter;
 import tools.dscode.control.protocol.WorkbenchFeatureIndex;
 
 import java.io.ByteArrayOutputStream;
@@ -100,7 +101,7 @@ public final class WorkbenchRunReports {
         if (passed >= 0) line.append(" passed=").append(passed);
         if (failed >= 0) line.append(" failed=").append(failed);
         if (failed > 0 && failedScenarios != null && !failedScenarios.isEmpty()) {
-            line.append(" failedScenarios=").append(String.join(",", failedScenarios));
+            line.append(" failedScenarios=").append(OutputFormatter.jsonStringArray(failedScenarios));
         }
         return line.toString();
     }
@@ -264,6 +265,11 @@ public final class WorkbenchRunReports {
             return List.of();
         }
         List<Path> privateDirs = scenarioDirs(privateRoot);
+        try {
+            if (Files.isDirectory(AgentCoordination.runDirectory(project, runId))) return privateDirs;
+        } catch (IllegalArgumentException invalid) {
+            return privateDirs;
+        }
         if (!privateDirs.isEmpty()) return privateDirs;
         return scenarioDirs(project.resolve("reports").resolve("diagnostic-runs").resolve(runId));
     }
