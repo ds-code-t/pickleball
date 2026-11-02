@@ -38,6 +38,7 @@ BUDGETS = {
     "test-compile": 900,
     "workspace-seed": 180,
     "discover-compiled": 900,
+    "validate": 30,
     "isolate": 600,
     "execute-step-b64": 180,
     "execute-step-file": 180,
@@ -108,6 +109,13 @@ def main() -> int:
         assert_in(compiled, "summary status=PASSED")
         record = assert_record(RUN)
         assert_field(record, "status", "PASSED")
+        assert_cache_hit(RUN)
+        validated = run_stage(timings, "validate", [
+            "validate", "--tags=" + TAGS, "--name=" + NAME,
+        ], allow_exit={0})
+        assert_in(validated, "validate undefined=0")
+        assert_not_in(validated, "summary status=")
+        assert_validate_warm(validated.stdout)
         run_stage(timings, "isolate", [
             "isolate", "--run-id=" + RUN, "--tags=" + TAGS, "--name=" + NAME,
             "--runvar=pkb_browser=CHROME_HEADLESS", "--agent=consumer-sim",
@@ -164,6 +172,7 @@ def main() -> int:
             except SystemExit:
                 pass
         write_timings(timings)
+    assert_session_start(timings)
     print("consumer-sim OK")
     for row in timings:
         print(f"timing stage={row['stage']} seconds={row['seconds']} exit={row['exit']}")
@@ -204,21 +213,80 @@ def prepare_tree() -> None:
             classpath.unlink(missing_ok=True)
         for classpath in state.glob(f"v/*/workbench/{name}"):
             classpath.unlink(missing_ok=True)
+    for handle in list(state.glob("workbench/warm-jvm.v1")) + list(state.glob("v/*/workbench/warm-jvm.v1")):
+        stop_warm(handle)
+        handle.unlink(missing_ok=True)
+
+
+def stop_warm(handle: Path) -> None:
+    try:
+        lines = handle.read_text(encoding="utf-8", errors="replace").splitlines()
+        if len(lines) >= 2 and lines[1].strip().isdigit():
+            os.kill(int(lines[1].strip()), 15)
+    except OSError:
+        return
 
 
 def assert_launch_gap(run_id: str) -> None:
-    """index, then compile and seed-fork, then maven-start. Overlap stays deferred."""
+    """Index overlaps compile. Seed and maven-start still happen. Order of the pair is not fixed."""
     timing = CONSUMER / ".pickleball" / "runs" / run_id / "launch-timing.txt"
     text = timing.read_text(encoding="utf-8", errors="replace") if timing.is_file() else ""
-    positions = []
-    for stage in ("index", "compile", "seed-fork", "maven-start"):
+    for stage in ("index", "compile", "seed-fork", "overlap"):
         token = f"stage={stage}"
-        at = text.find(token)
-        if at < 0:
+        if token not in text:
             fail_text(run_id, text, f"launch-timing.txt missing {token}")
-        positions.append(at)
-    if positions != sorted(positions):
-        fail_text(run_id, text, "launch-timing stages are out of order")
+    if "index+compile" not in text and "compile+index" not in text:
+        fail_text(run_id, text, "launch-timing.txt has no index/compile overlap")
+    if "stage=maven-start" not in text and "stage=direct" not in text:
+        fail_text(run_id, text, "launch-timing.txt missing maven-start or direct")
+
+
+def assert_cache_hit(run_id: str) -> None:
+    timing = CONSUMER / ".pickleball" / "runs" / run_id / "launch-timing.txt"
+    text = timing.read_text(encoding="utf-8", errors="replace") if timing.is_file() else ""
+    marker = "cache-hit elapsedMs="
+    at = text.find(marker)
+    if at < 0:
+        fail_text(run_id, text, "launch-timing.txt missing maven cache-hit")
+    digits = []
+    for ch in text[at + len(marker):]:
+        if ch.isdigit():
+            digits.append(ch)
+        else:
+            break
+    elapsed = int("".join(digits) or "999999")
+    print(f"scoreboard maven-cache-hit run={run_id} elapsedMs={elapsed} target=1000", flush=True)
+    if elapsed >= 1000:
+        fail_text(run_id, text, f"maven cache-hit elapsedMs={elapsed} target < 1000")
+
+
+def assert_validate_warm(stdout: str) -> None:
+    marker = "elapsedMs="
+    at = stdout.rfind(marker)
+    if at < 0:
+        raise SystemExit("validate did not print elapsedMs")
+    digits = []
+    for ch in stdout[at + len(marker):]:
+        if ch.isdigit():
+            digits.append(ch)
+        else:
+            break
+    if not digits:
+        raise SystemExit("validate elapsedMs was not a number")
+    elapsed = int("".join(digits))
+    print(f"scoreboard validate elapsedMs={elapsed} target=2000", flush=True)
+    if elapsed >= 2000:
+        raise SystemExit(f"validate warm elapsedMs={elapsed} target < 2000")
+
+
+def assert_session_start(rows: list[dict]) -> None:
+    isolate = next((row for row in rows if row["stage"] == "isolate"), None)
+    if isolate is None:
+        raise SystemExit("isolate timing missing")
+    seconds = float(isolate["seconds"])
+    print(f"scoreboard session-start seconds={seconds} target=60", flush=True)
+    if seconds >= 60:
+        raise SystemExit(f"session start {seconds}s exceeded 60s")
 
 
 def fail_text(stage: str, text: str, reason: str) -> None:

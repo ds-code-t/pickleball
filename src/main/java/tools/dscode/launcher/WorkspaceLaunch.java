@@ -4,6 +4,7 @@ import tools.dscode.common.reporting.diagnostic.ReportRetentionPolicy;
 import tools.dscode.control.protocol.ControlProtocol;
 import tools.dscode.control.protocol.PickleballLocalLayout;
 import tools.dscode.control.protocol.Workspace;
+import tools.dscode.control.protocol.speed.InputFingerprint;
 import tools.dscode.testengine.DynamicSuiteBootstrap;
 import tools.dscode.testengine.PKB_props;
 import tools.dscode.testengine.PickleballRunner;
@@ -195,14 +196,46 @@ public final class WorkspaceLaunch {
     }
 
     /**
+     * Cache hit republishes the seed classpath and does not call the wrapper.
+     * A miss compiles, then stores the resolved list under the same hash.
+     */
+    static boolean warmClasspath(Path project, Path runFolder, Appendable warnings) {
+        if (testCapture != null) return true;
+        if (project == null) return false;
+        Path root = project.toAbsolutePath().normalize();
+        String hash = InputFingerprint.lockHash(root);
+        Path state = PickleballLocalLayout.workbenchStateRoot(root);
+        tools.dscode.control.protocol.speed.ClasspathCache.Hit hit =
+                tools.dscode.control.protocol.speed.ClasspathCache.load(state, hash);
+        if (hit.hit() && hasConsumerOutput(root, hit.entries())) {
+            try {
+                publishSeedClasspath(root, hit.entries());
+                WorkbenchLaunchTiming.note(runFolder, "compile", "cache-hit");
+                return true;
+            } catch (IOException failure) {
+                warn(warnings, "WARNING: classpath cache was not published: " + failure.getMessage());
+            }
+        }
+        WorkbenchLaunchTiming.note(runFolder, "compile", "start");
+        boolean compiled = compileAndPublishClasspath(root, warnings);
+        WorkbenchLaunchTiming.note(runFolder, "compile", compiled ? "exit=0" : "exit=failed");
+        if (compiled) {
+            WorkbenchSpeed.remember(root, cachedClasspath(root));
+        }
+        return compiled;
+    }
+
+    /**
      * Writes the pre-sync seed classpath and leaves {@code classpath.txt} alone.
      * A live-first session file stays the worker classpath.
      */
     static void publishSeedClasspath(Path project, List<String> entries) throws IOException {
-        Path file = PickleballLocalLayout.workbenchStateRoot(project)
-                .resolve(PickleballLocalLayout.SEED_CLASSPATH_FILE);
-        Files.createDirectories(file.getParent());
-        Files.writeString(file, String.join("\n", entries) + "\n", StandardCharsets.UTF_8);
+        synchronized (WorkspaceLaunch.class) {
+            Path file = PickleballLocalLayout.workbenchStateRoot(project)
+                    .resolve(PickleballLocalLayout.SEED_CLASSPATH_FILE);
+            Files.createDirectories(file.getParent());
+            Files.writeString(file, String.join("\n", entries) + "\n", StandardCharsets.UTF_8);
+        }
     }
 
     /**

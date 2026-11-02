@@ -68,6 +68,19 @@ class WorkbenchSessionCommandsTest {
     }
 
     @Test
+    void aHealthyCliSessionSharesTheControllerJvm() {
+        WorkbenchSessionCommands.SessionState cli = new WorkbenchSessionCommands.SessionState(
+                project, "http://127.0.0.1:9", "token", 4, "cli-session", project.resolve("cli.json")
+        );
+        WorkbenchSessionCommands.SessionState ui = new WorkbenchSessionCommands.SessionState(
+                project, "http://127.0.0.1:9", "token", 4, "ui-attach", project.resolve("ui.json")
+        );
+        assertTrue(WorkbenchSessionCommands.sharesController(cli));
+        assertFalse(WorkbenchSessionCommands.sharesController(ui));
+        assertFalse(WorkbenchSessionCommands.sharesController(null));
+    }
+
+    @Test
     @Timeout(value = 5, unit = TimeUnit.SECONDS)
     void sessionStartDetachesAndDoesNotWaitForTheControllerProcess() throws Exception {
         AtomicReference<FakeSession> started = new AtomicReference<>();

@@ -56,7 +56,12 @@ public final class WorkbenchAgentCommands {
     }
 
     public static int run(String[] args, PrintStream out, PrintStream err) {
-        return run(args, out, err, ConsumerMavenTestRunner::run);
+        WorkbenchSpeed.enableDirect();
+        try {
+            return run(args, out, err, ConsumerMavenTestRunner::run);
+        } finally {
+            WorkbenchSpeed.clearDirect();
+        }
     }
 
     static int run(
@@ -95,6 +100,9 @@ public final class WorkbenchAgentCommands {
                     yield parsed.planOnly() ? plan(parsed, safeOut, safeErr) : confirm(parsed, safeOut, safeErr, maven);
                 }
                 case "plan" -> plan(parsed, safeOut, safeErr);
+                case "validate" -> WorkbenchValidate.run(
+                        parsed.project(), parsed.tags(), parsed.name(), safeOut, safeErr
+                );
                 case "short-log" -> shortLog(parsed, safeOut, safeErr);
                 case "note" -> note(parsed, safeOut, safeErr);
                 case "inbox" -> inbox(parsed, safeOut, safeErr);
@@ -506,24 +514,11 @@ public final class WorkbenchAgentCommands {
         try {
             launchNote(parsed.project(), run.runId(), "command", "discover");
             echoFilters(parsed, out);
-            WorkbenchFeatureIndex.Selection selection = select(
-                    parsed.project(), parsed.tags(), parsed.name(), parsed.example(), parsed
+            LaunchPrep prep = prepareLaunch(
+                    parsed, run.runId(), null, parsed.tags(), parsed.name(), parsed.example(), run.agentId(), err
             );
-            launchNote(parsed.project(), run.runId(), "index", indexDetail(selection));
-            String tags = tagsForLaunch(selection, parsed.tags(), err);
-            WorkspaceLaunch.Prepared prepared = WorkspaceLaunch.prepare(
-                    parsed.project(),
-                    run.runId(),
-                    null,
-                    tags,
-                    parsed.name(),
-                    parsed.example(),
-                    run.runId(),
-                    run.agentId(),
-                    parsed.retention(),
-                    parsed.runVars(),
-                    err
-            );
+            WorkbenchFeatureIndex.Selection selection = prep.selection();
+            WorkspaceLaunch.Prepared prepared = prep.prepared();
             Map<String, String> stored = Workspace.readRunVars(prepared.workspace());
             SecretRedactor.noteAll(stored);
             rememberRunSnapshot(parsed.project(), run.runId(), run.agentId(), stored, prepared.selection());
@@ -542,9 +537,25 @@ public final class WorkbenchAgentCommands {
             );
             ByteArrayOutputStream capturedOut = new ByteArrayOutputStream();
             ByteArrayOutputStream capturedErr = new ByteArrayOutputStream();
-            launchNote(parsed.project(), run.runId(), "maven-start", "");
-            Bounded mavenResult = runWithOnlineFallback(parsed, run.runId(), command, out, err, capturedOut, capturedErr, maven);
-            launchNote(parsed.project(), run.runId(), "maven-done", "exit=" + mavenResult.exit() + " timedOut=" + mavenResult.timedOut());
+            PrintStream captureOut = new PrintStream(capturedOut, true, StandardCharsets.UTF_8);
+            PrintStream captureErr = new PrintStream(capturedErr, true, StandardCharsets.UTF_8);
+            java.util.Optional<Integer> direct = WorkbenchSpeed.tryDirect(
+                    parsed.project(), command, captureOut, captureErr
+            );
+            boolean trustedDirect = direct.isPresent() && (direct.get() == 0
+                    || AgentCoordination.findRunIndex(parsed.project(), run.runId()) != null);
+            Bounded mavenResult;
+            if (trustedDirect) {
+                out.print(capturedOut.toString(StandardCharsets.UTF_8));
+                err.print(capturedErr.toString(StandardCharsets.UTF_8));
+                mavenResult = new Bounded(direct.get(), false);
+                launchNote(parsed.project(), run.runId(), "maven-done", "direct exit=" + direct.get());
+            } else {
+                if (direct.isPresent()) launchNote(parsed.project(), run.runId(), "fallback", "fresh-jvm");
+                launchNote(parsed.project(), run.runId(), "maven-start", "");
+                mavenResult = runWithOnlineFallback(parsed, run.runId(), command, out, err, capturedOut, capturedErr, maven);
+                launchNote(parsed.project(), run.runId(), "maven-done", "exit=" + mavenResult.exit() + " timedOut=" + mavenResult.timedOut());
+            }
             if (mavenResult.timedOut()) {
                 publishQuietly(parsed, run, selection, capturedOut, capturedErr, "TIMEOUT", environment, browser, out, err);
                 return timeoutExit(parsed, run, out, err);
@@ -630,33 +641,23 @@ public final class WorkbenchAgentCommands {
                 if (!Workspace.exists(Workspace.directory(parsed.project(), run.runId()))) throw missing;
             }
             Path fromWorkspace = fromRun == null ? null : Workspace.directory(parsed.project(), fromRun);
-            String tags = tagsForLaunch(
+            String confirmTags = tagsForLaunch(
                     null,
                     firstNonBlank(parsed.tags(), retained.get(PKB_props.PKB_TAGS)),
                     err
             );
-            WorkbenchFeatureIndex.Selection selection = select(
-                    parsed.project(),
-                    firstNonBlank(parsed.tags(), retained.get(PKB_props.PKB_TAGS)),
-                    firstNonBlank(parsed.name(), retained.get(PKB_props.PKB_NAME)),
-                    firstNonBlank(parsed.example(), retained.get(PKB_props.PKB_EXAMPLE)),
-                    parsed
-            );
-            tags = tagsForLaunch(selection, tags, err);
-            launchNote(parsed.project(), run.runId(), "index", indexDetail(selection));
-            WorkspaceLaunch.Prepared prepared = WorkspaceLaunch.prepare(
-                    parsed.project(),
+            LaunchPrep prep = prepareLaunch(
+                    parsed,
                     run.runId(),
                     fromWorkspace != null && Workspace.exists(fromWorkspace) ? fromRun : null,
-                    tags,
+                    confirmTags,
                     firstNonBlank(parsed.name(), retained.get(PKB_props.PKB_NAME)),
                     firstNonBlank(parsed.example(), retained.get(PKB_props.PKB_EXAMPLE)),
-                    run.runId(),
                     run.agentId(),
-                    parsed.retention(),
-                    parsed.runVars(),
                     err
             );
+            WorkbenchFeatureIndex.Selection selection = prep.selection();
+            WorkspaceLaunch.Prepared prepared = prep.prepared();
             Map<String, String> stored = Workspace.readRunVars(prepared.workspace());
             SecretRedactor.noteAll(stored);
             rememberRunSnapshot(parsed.project(), run.runId(), run.agentId(), stored, prepared.selection());
@@ -675,9 +676,25 @@ public final class WorkbenchAgentCommands {
             );
             ByteArrayOutputStream capturedOut = new ByteArrayOutputStream();
             ByteArrayOutputStream capturedErr = new ByteArrayOutputStream();
-            launchNote(parsed.project(), run.runId(), "maven-start", "");
-            Bounded mavenResult = runWithOnlineFallback(parsed, run.runId(), command, out, err, capturedOut, capturedErr, maven);
-            launchNote(parsed.project(), run.runId(), "maven-done", "exit=" + mavenResult.exit() + " timedOut=" + mavenResult.timedOut());
+            PrintStream captureOut = new PrintStream(capturedOut, true, StandardCharsets.UTF_8);
+            PrintStream captureErr = new PrintStream(capturedErr, true, StandardCharsets.UTF_8);
+            java.util.Optional<Integer> direct = WorkbenchSpeed.tryDirect(
+                    parsed.project(), command, captureOut, captureErr
+            );
+            boolean trustedDirect = direct.isPresent() && (direct.get() == 0
+                    || AgentCoordination.findRunIndex(parsed.project(), run.runId()) != null);
+            Bounded mavenResult;
+            if (trustedDirect) {
+                out.print(capturedOut.toString(StandardCharsets.UTF_8));
+                err.print(capturedErr.toString(StandardCharsets.UTF_8));
+                mavenResult = new Bounded(direct.get(), false);
+                launchNote(parsed.project(), run.runId(), "maven-done", "direct exit=" + direct.get());
+            } else {
+                if (direct.isPresent()) launchNote(parsed.project(), run.runId(), "fallback", "fresh-jvm");
+                launchNote(parsed.project(), run.runId(), "maven-start", "");
+                mavenResult = runWithOnlineFallback(parsed, run.runId(), command, out, err, capturedOut, capturedErr, maven);
+                launchNote(parsed.project(), run.runId(), "maven-done", "exit=" + mavenResult.exit() + " timedOut=" + mavenResult.timedOut());
+            }
             if (mavenResult.timedOut()) {
                 publishQuietly(parsed, run, selection, capturedOut, capturedErr, "TIMEOUT", environment, browser, out, err);
                 return timeoutExit(parsed, run, out, err);
@@ -818,6 +835,74 @@ public final class WorkbenchAgentCommands {
             err.println(failure.getMessage());
             return 2;
         }
+    }
+
+    private record LaunchPrep(
+            WorkbenchFeatureIndex.Selection selection,
+            WorkspaceLaunch.Prepared prepared
+    ) {
+    }
+
+    /**
+     * Index overlaps classpath resolve. A cache hit also overlaps seed.
+     * Parallel failure uses the sequential select and prepare.
+     */
+    private static LaunchPrep prepareLaunch(
+            WorkbenchCommandLine.Parsed parsed,
+            String runId,
+            String fromRunId,
+            String tags,
+            String name,
+            String example,
+            String agentId,
+            PrintStream err
+    ) {
+        java.util.concurrent.atomic.AtomicReference<WorkspaceLaunch.Prepared> seeded =
+                new java.util.concurrent.atomic.AtomicReference<>();
+        java.util.Optional<WorkbenchFeatureIndex.Selection> overlapped = WorkbenchSpeed.indexBesideClasspath(
+                parsed.project(),
+                runId,
+                () -> select(parsed.project(), tags, name, example, parsed),
+                () -> {
+                    seeded.set(WorkspaceLaunch.prepare(
+                            parsed.project(),
+                            runId,
+                            fromRunId,
+                            tags,
+                            name,
+                            example,
+                            runId,
+                            agentId,
+                            parsed.retention(),
+                            parsed.runVars(),
+                            err
+                    ));
+                    return null;
+                },
+                err
+        );
+        WorkbenchFeatureIndex.Selection selection = overlapped.orElseGet(
+                () -> select(parsed.project(), tags, name, example, parsed)
+        );
+        launchNote(parsed.project(), runId, "index", indexDetail(selection));
+        String launchTags = tagsForLaunch(selection, tags, err);
+        WorkspaceLaunch.Prepared prepared = seeded.get();
+        if (prepared == null) {
+            prepared = WorkspaceLaunch.prepare(
+                    parsed.project(),
+                    runId,
+                    fromRunId,
+                    launchTags,
+                    name,
+                    example,
+                    runId,
+                    agentId,
+                    parsed.retention(),
+                    parsed.runVars(),
+                    err
+            );
+        }
+        return new LaunchPrep(selection, prepared);
     }
 
     private static WorkbenchFeatureIndex.Selection select(

@@ -88,6 +88,17 @@ class WorkbenchSessionActionsTest {
     }
 
     @Test
+    void openUiReusesThisControllerAndDoesNotDrive() throws Exception {
+        try (WorkbenchController controller = new WorkbenchController(project)) {
+            WorkbenchSessionActions actions = new WorkbenchSessionActions(controller);
+            Map<String, Object> opened = actions.dispatch("open-ui", Map.of("runId", "alpha"));
+            assertEquals("SUCCESS", opened.get("status"));
+            assertEquals("open-ui", opened.get("op"));
+            assertTrue(java.util.Set.of("HEADLESS", "OPENING").contains(String.valueOf(opened.get("playback"))));
+        }
+    }
+
+    @Test
     void executeStepAndRunStepsSurfaceTheBridgeFailureInTextAndJson() {
         LivePlaybackCoordinator playback = new LivePlaybackCoordinator(new LiveScenarioPlayer(List.of()));
         playback.loadScenario(List.of(

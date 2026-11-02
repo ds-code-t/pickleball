@@ -19,7 +19,7 @@ final class WorkbenchCommandLine {
             "sync", "worker-check", "live-check", "ui", "mcp", "isolate", "session-start", "session"
     );
     static final Set<String> AGENT_CORE_COMMANDS = Set.of(
-            "export-guidance", "hint", "discover-hint", "discover", "confirm", "plan", "resolve-runvars",
+            "export-guidance", "hint", "discover-hint", "discover", "confirm", "plan", "validate", "resolve-runvars",
             "workspace-show", "workspace-edit", "workspace-seed",
             "short-log", "note", "inbox", "finish",
             "presence", "post", "history", "gc-runs", "gc-versions", "use-version",

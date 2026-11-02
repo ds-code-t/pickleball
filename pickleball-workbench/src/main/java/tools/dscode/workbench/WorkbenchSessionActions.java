@@ -55,6 +55,7 @@ public final class WorkbenchSessionActions {
             "stop",
             "show-run",
             "close-window",
+            "open-ui",
             "inspect-page",
             "find-element"
     );
@@ -360,6 +361,7 @@ public final class WorkbenchSessionActions {
             case "stop" -> stopPlayback();
             case "show-run" -> showRun(first(args, "runId", "run"), args.get("agent"), Boolean.parseBoolean(args.get("claim")));
             case "close-window" -> closeWindow();
+            case "open-ui" -> openUi(first(args, "runId", "run"), args.get("agent"));
             case "inspect-page" -> pageQuery(null, null);
             case "find-element" -> pageQuery(args.get("category"), args.get("text"));
             default -> throw new IllegalArgumentException("Unknown session command: " + op);
@@ -370,6 +372,19 @@ public final class WorkbenchSessionActions {
         String phrase = args.get("stopAfter");
         if (phrase == null || phrase.isBlank()) return;
         services.player().stopAfter(phrase);
+    }
+
+    public Map<String, Object> openUi(String runId, String agentId) {
+        if (java.awt.GraphicsEnvironment.isHeadless()) {
+            return accepted("open-ui", "HEADLESS");
+        }
+        Thread thread = new Thread(
+                () -> tools.dscode.workbench.ui.WorkbenchUi.launch(services.projectRoot(), runId, agentId),
+                "pickleball-workbench-open-ui"
+        );
+        thread.setDaemon(true);
+        thread.start();
+        return accepted("open-ui", "OPENING");
     }
 
     public Map<String, Object> showRun(String runId, String agentId, boolean claim) {

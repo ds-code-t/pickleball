@@ -279,7 +279,7 @@ public final class WorkbenchApplication {
         }
 
         try {
-            new WorkbenchSynchronizer().sync(parsed.project());
+            WorkbenchSynchronizer.syncOverlapped(parsed.project());
             try (WorkbenchLiveSession live = new WorkbenchLiveSession(parsed.project(), workerProperties)) {
                 WorkbenchWorkerStatus started = live.start();
                 requireInteractiveWorker(started, "isolate");
@@ -330,7 +330,7 @@ public final class WorkbenchApplication {
         WorkbenchController controller = null;
         WorkbenchAttachServer server = null;
         try {
-            new WorkbenchSynchronizer().sync(parsed.project());
+            WorkbenchSynchronizer.syncOverlapped(parsed.project());
             controller = new WorkbenchController(parsed.project(), workerProperties);
             WorkbenchController live = controller;
             WorkbenchCallContext.runAs(WorkbenchLeaseHolder.AGENT, () -> {

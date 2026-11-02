@@ -16,6 +16,7 @@ final class WorkbenchCliHelp {
             Map.entry("discover", "Usage: discover [--tags=<expr>] [--name=<regex>] [--example=<rows>] [--select=<path:line>] [--plan] [--quiet] [--refresh] [--no-narrow|--full-scan] [--runvar=key=value] [--retention=all|failed|none] [--run-id=<id>] [--agent=<id>] [--run-timeout=<seconds>]"),
             Map.entry("confirm", "Usage: confirm [--tags=<expr>] [--name=<regex>] [--example=<rows>] [--select=<path:line>] [--quiet] [--runvar=key=value] [--run-id=<id>] [--agent=<id>] [--run-timeout=<seconds>]"),
             Map.entry("plan", "Usage: plan [--tags=<expr>] [--name=<regex>] [--example=<rows>] [--select=<path:line>] [--refresh] [--json]"),
+            Map.entry("validate", "Usage: validate [--tags=<expr>] [--name=<regex>] [--run-id=<id>]\nReports undefined steps, ambiguous glue, and unresolved RUN SCENARIO targets. Runs nothing."),
             Map.entry("hint", "Usage: hint [--json]"),
             Map.entry("discover-hint", "Usage: discover-hint [--json]"),
             Map.entry("resolve-runvars", "Usage: resolve-runvars [--json]"),
@@ -117,10 +118,10 @@ final class WorkbenchCliHelp {
         text.append("Pickleball Workbench. help <command> prints usage. help <flag> prints that flag.\n");
         text.append("exit 0 ok, 1 failed, 2 usage. --json is one JSON object and no preamble.\n");
         text.append("help is always available on the thin controller jar and does not load Jackson.\n");
-        text.append("decide: discover, then plan, then run. plan lists the scenarios. run is confirm, or isolate then execute-step.\n");
-        text.append("Timing is .pickleball/runs/<id>/launch-timing.txt. Stderr timing only when PKB_WORKBENCH_TIMING=1 or -Dpkb_workbench_timing=true.\n");
+        text.append("decide: discover, then plan, then run. plan lists the scenarios. validate checks steps and does not run. run is confirm, or isolate then execute-step.\n");
+        text.append("Timing is .pickleball/runs/<id>/launch-timing.txt. A cache hit skips Maven. Stderr timing only when PKB_WORKBENCH_TIMING=1 or -Dpkb_workbench_timing=true.\n");
         text.append("Do not pass pkb_run_profile. Do not open the GUI to test yourself. isolate is the headless session.\n");
-        text.append("run: discover confirm plan hint discover-hint resolve-runvars\n");
+        text.append("run: discover confirm plan validate hint discover-hint resolve-runvars\n");
         text.append("workspace: workspace-show workspace-edit workspace-seed\n");
         text.append("session: isolate session-start execute-step status events stop kill open-scenario example play from-here pause insert-step update-step diagnostic-run save refresh session-sync worker-start worker-restart worker-stop open-window close-window show-run\n");
         text.append("coordination: short-log note inbox finish presence post history gc-runs gc-versions use-version export-guidance\n");

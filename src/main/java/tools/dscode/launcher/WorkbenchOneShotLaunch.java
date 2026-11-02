@@ -42,7 +42,7 @@ public final class WorkbenchOneShotLaunch {
     static final String CACHE_FILE = "classpath.cache";
     static final String MAIN_CLASS = "tools.dscode.launcher.PickleballWorkbenchLauncher";
     static final Set<String> ONE_SHOTS = Set.of(
-            "help", "plan", "hint", "discover-hint",
+            "help", "plan", "hint", "discover-hint", "validate",
             "status", "query", "events",
             "workspace-show", "workspace-edit", "workspace-seed"
     );

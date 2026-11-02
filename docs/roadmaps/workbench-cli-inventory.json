@@ -38,6 +38,7 @@
       "session-release",
       "short-log",
       "use-version",
+      "validate",
       "workspace-edit",
       "workspace-seed",
       "workspace-show"

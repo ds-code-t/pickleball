@@ -22,7 +22,7 @@ Workbench owns synchronization, `.pickleball/workbench/` disposable state, worke
 
 `pickleball-control-protocol` owns immutable wire records, request/response envelopes, transport constants, capabilities, version/minimum-version negotiation, and JDK-only `.pickleball` layout/store helpers (`PickleballLocalLayout`, `PickleballVersion`, `PickleballArtifactLocator`, `PickleballLocalStore`). Worker-side bridge server/coordinator/bootstrap and all translation to runtime operations remain in Pickleball core.
 
-MCP and Swing are adapters over the same Workbench service seam. They must not introduce a second runtime implementation. A visible UI keeps one Workbench JVM and one consumer worker. An AI agent attaches to that live session through a localhost HTTP JSON facade; it must not start a second Workbench or a second worker.
+MCP and Swing are adapters over the same Workbench service seam. They must not introduce a second runtime implementation. A visible UI keeps one Workbench JVM and one consumer worker. An AI agent attaches to that live session through a localhost HTTP JSON facade; it must not start a second Workbench or a second worker. `open-window` posts `open-ui` to a healthy `cli-session` and starts Swing in that controller JVM. A second `ui` process starts only when that post does not report `playback=OPENING`.
 
 The canonical worker bridge environment is:
 

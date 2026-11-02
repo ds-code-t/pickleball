@@ -403,6 +403,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/launcher/WorkbenchCliHelp.java`
 - `src/main/java/tools/dscode/launcher/WorkbenchCommandLine.java`
 - `src/main/java/tools/dscode/launcher/WorkbenchConsoleTap.java`
+- `src/main/java/tools/dscode/launcher/WorkbenchDirectRun.java`
 - `src/main/java/tools/dscode/launcher/WorkbenchElementInspect.java`
 - `src/main/java/tools/dscode/launcher/WorkbenchLaunchTiming.java`
 - `src/main/java/tools/dscode/launcher/WorkbenchOneShotLaunch.java`
@@ -410,7 +411,10 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/launcher/WorkbenchRuntimeLibs.java`
 - `src/main/java/tools/dscode/launcher/WorkbenchSessionCommands.java`
 - `src/main/java/tools/dscode/launcher/WorkbenchShellQuoting.java`
+- `src/main/java/tools/dscode/launcher/WorkbenchSpeed.java`
 - `src/main/java/tools/dscode/launcher/WorkbenchTagFallback.java`
+- `src/main/java/tools/dscode/launcher/WorkbenchValidate.java`
+- `src/main/java/tools/dscode/launcher/WorkbenchWarmMain.java`
 - `src/main/java/tools/dscode/launcher/WorkspaceLaunch.java`
 - `src/main/java/tools/dscode/misc/DummySteps.java`
 - `src/main/java/tools/dscode/parallelutilities/ParallelCountEstimator.java`
@@ -508,8 +512,10 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/WorkbenchSessionCommandsTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchSessionQueryTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchShellQuotingTest.java`
+- `src/test/java/tools/dscode/launcher/WorkbenchSpeedCacheTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchStructuredErrorTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchTagFallbackTest.java`
+- `src/test/java/tools/dscode/launcher/WorkbenchValidateTest.java`
 - `src/test/java/tools/dscode/launcher/WorkspaceLaunchForkTest.java`
 - `src/test/java/tools/dscode/parallelutilities/ParallelCountEstimatorTest.java`
 - `src/test/java/tools/dscode/release/Release217ReportedBugsTest.java`
@@ -676,6 +682,10 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/SessionDescriptorWriter.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/SessionStepGate.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/SleepGapMonitor.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/speed/ClasspathCache.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/speed/InputFingerprint.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/speed/StageScheduler.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/speed/WarmProcess.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/WindowDriver.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/WorkbenchFeatureIndex.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/Workspace.java`
@@ -696,6 +706,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/SessionDescriptorTest.java`
 - `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/SessionHoldTest.java`
 - `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/SleepGapMonitorTest.java`
+- `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/speed/SpeedTypesTest.java`
 - `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/WorkbenchFeatureIndexTest.java`
 - `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/WorkspaceTest.java`
 

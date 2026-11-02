@@ -30,6 +30,9 @@ import java.util.Set;
 import java.util.UUID;
 
 import tools.dscode.control.protocol.PickleballLocalLayout;
+import tools.dscode.control.protocol.WorkbenchFeatureIndex;
+import tools.dscode.control.protocol.speed.ClasspathCache;
+import tools.dscode.control.protocol.speed.InputFingerprint;
 
 /** Uses the consumer build once, then materializes one effective Workbench live runtime. */
 public final class WorkbenchSynchronizer {
@@ -52,6 +55,12 @@ public final class WorkbenchSynchronizer {
     }
 
     public WorkbenchManifest sync(Path requestedProject) {
+        try {
+            WorkbenchManifest cached = syncFromClasspathCache(requestedProject);
+            if (cached != null) return cached;
+        } catch (RuntimeException ignored) {
+            // Cache materialize is optional. The wrapper path below still runs.
+        }
         WorkbenchProject project = WorkbenchProject.locate(requestedProject);
         Path stateRoot = WorkbenchManifest.workbenchRoot(project.root());
         WorkbenchManifest previous = WorkbenchManifest.readIfPresent(stateRoot);
@@ -181,6 +190,92 @@ public final class WorkbenchSynchronizer {
         replaceFile(stagedManifest, stateRoot.resolve("manifest.json"));
         replaceFile(stagedClasspath, stateRoot.resolve(PickleballLocalLayout.WORKER_CLASSPATH_FILE));
         return manifest;
+    }
+
+    /**
+     * When discover already resolved this pom hash and test classes exist,
+     * copy them into the live tree. No wrapper process.
+     */
+    static WorkbenchManifest syncFromClasspathCache(Path requestedProject) {
+        WorkbenchProject project = WorkbenchProject.locate(requestedProject);
+        Path root = project.root();
+        String hash = InputFingerprint.lockHash(root);
+        Path stateRoot = WorkbenchManifest.workbenchRoot(root);
+        ClasspathCache.Hit hit = ClasspathCache.load(stateRoot, hash);
+        if (!hit.hit()) return null;
+        List<OutputPath> outputs = new ArrayList<>();
+        List<String> dependencies = new ArrayList<>();
+        for (String entry : hit.entries()) {
+            Path path = Path.of(entry).toAbsolutePath().normalize();
+            if (!Files.exists(path)) return null;
+            if (isProjectOutput(root, path) && Files.isDirectory(path)) {
+                outputs.add(new OutputPath(path.toString().contains("test") ? "TEST" : "MAIN", path));
+            } else if (Files.exists(path)) {
+                dependencies.add(path.toString());
+            }
+        }
+        if (outputs.isEmpty() || dependencies.isEmpty()) return null;
+        Path staging = stateRoot.resolve(".sync-cache-" + UUID.randomUUID());
+        createDirectories(staging);
+        try {
+            return materialize(
+                    project,
+                    new SyncMetadata(sourceRoots(root), outputs, dependencies),
+                    staging,
+                    stateRoot,
+                    WorkbenchSyncMode.SKIPPED
+            );
+        } finally {
+            deleteTree(staging);
+        }
+    }
+
+    private static boolean isProjectOutput(Path root, Path path) {
+        Path target = root.resolve("target");
+        Path build = root.resolve("build");
+        return path.startsWith(target) || path.startsWith(build);
+    }
+
+    private static List<Path> sourceRoots(Path root) {
+        List<Path> roots = new ArrayList<>();
+        for (String relative : List.of("src/main/java", "src/test/java", "src/main/resources", "src/test/resources")) {
+            Path path = root.resolve(relative);
+            if (Files.isDirectory(path)) roots.add(path);
+        }
+        if (roots.isEmpty()) roots.add(root.resolve("src/test/java"));
+        return roots;
+    }
+
+    /** Index the catalog while sync runs. Sync failure still throws. Index failure does not. */
+    public static WorkbenchManifest syncOverlapped(Path project) {
+        String mode = System.getProperty("pkb_workbench_speed");
+        if (mode == null) mode = System.getenv("PKB_WORKBENCH_SPEED");
+        if (mode != null && "sequential".equalsIgnoreCase(mode.trim())) {
+            return new WorkbenchSynchronizer().sync(project);
+        }
+        java.util.concurrent.atomic.AtomicReference<WorkbenchManifest> manifest = new java.util.concurrent.atomic.AtomicReference<>();
+        java.util.concurrent.atomic.AtomicReference<RuntimeException> failure = new java.util.concurrent.atomic.AtomicReference<>();
+        tools.dscode.control.protocol.speed.StageScheduler.run(List.of(
+                        new tools.dscode.control.protocol.speed.StageScheduler.Task("sync", () -> {
+                            try {
+                                manifest.set(new WorkbenchSynchronizer().sync(project));
+                                return "sync";
+                            } catch (RuntimeException syncFailure) {
+                                failure.set(syncFailure);
+                                throw syncFailure;
+                            }
+                        }),
+                        new tools.dscode.control.protocol.speed.StageScheduler.Task("index", () -> {
+                            WorkbenchFeatureIndex.select(new WorkbenchFeatureIndex.Request(
+                                    project, List.of(), null, null, null, List.of(), false
+                            ));
+                            return "index";
+                        })
+                ), true);
+        if (failure.get() != null) throw failure.get();
+        WorkbenchManifest done = manifest.get();
+        if (done != null) return done;
+        return new WorkbenchSynchronizer().sync(project);
     }
 
     public static List<String> readWorkerClasspath(Path projectRoot) {

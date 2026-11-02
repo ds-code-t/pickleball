@@ -309,6 +309,20 @@ public final class WorkbenchSessionCommands {
                         + decision.state().liveRunId() + ".");
             }
         }
+        boolean sharedOpened = false;
+        if (window.isEmpty() && openIfClosed) {
+            boolean shared = tryShareController(
+                    parsed.project(), runId, parsed.coordination().agentId(), http
+            );
+            if (shared) {
+                long sharedDeadline = System.nanoTime() + OPEN_WINDOW_HEALTH_TIMEOUT.toNanos();
+                while (System.nanoTime() < sharedDeadline && openWindow(parsed.project(), http).isEmpty()) {
+                    sleep(POLL);
+                }
+                window = openWindow(parsed.project(), http);
+                sharedOpened = window.isPresent();
+            }
+        }
         if (window.isEmpty() && openIfClosed) {
             if (uiStarter == null) {
                 err.println("No Workbench window is open. open-window starts it; show-run does not.");
@@ -356,8 +370,46 @@ public final class WorkbenchSessionCommands {
                 : "";
         out.println("ACK WINDOW " + (openIfClosed ? "opened" : "shown")
                 + " run-id=" + loaded.runId()
-                + (decision != null && decision.driving() ? " driver=" + driver : " read-only"));
+                + (decision != null && decision.driving() ? " driver=" + driver : " read-only")
+                + (sharedOpened ? " controller=shared" : ""));
         return 0;
+    }
+
+    /**
+     * A healthy {@code cli-session} already is the controller. {@code open-ui}
+     * starts the window in that JVM. Any other answer falls back to {@code ui}.
+     */
+    static boolean sharesController(SessionState session) {
+        return session != null
+                && "cli-session".equals(session.mode())
+                && session.url() != null
+                && !session.url().isBlank()
+                && session.pid() > 0;
+    }
+
+    private static boolean tryShareController(Path project, String runId, String agentId, HttpClient http) {
+        Optional<SessionState> cli = readHealthyFile(sessionFile(project), project, http);
+        if (cli.isEmpty() || !sharesController(cli.get())) return false;
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("op", "open-ui");
+        if (runId != null && !runId.isBlank()) body.put("runId", runId);
+        if (agentId != null && !agentId.isBlank()) body.put("agent", agentId);
+        try {
+            JsonNode ack = postJson(http, cli.get(), "/commands", body);
+            String id = textOr(ack, "id", "");
+            if (id.isBlank()) return false;
+            for (int attempt = 0; attempt < 8; attempt++) {
+                JsonNode view = getJson(http, cli.get(), "/commands/" + id);
+                JsonNode result = view == null ? null : view.get("result");
+                if ("OPENING".equals(textOr(result, "playback", ""))) return true;
+                String status = textOr(view, "status", "");
+                if ("FAILED".equals(status) || "SUCCESS".equals(status)) return false;
+                sleep(Duration.ofMillis(50));
+            }
+        } catch (RuntimeException ignored) {
+            return false;
+        }
+        return false;
     }
 
     private static int closeWindow(

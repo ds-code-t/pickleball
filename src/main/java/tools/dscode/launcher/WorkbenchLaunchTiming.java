@@ -33,17 +33,19 @@ public final class WorkbenchLaunchTiming {
         if (echoStderr()) System.err.println(line);
         if (runFolder == null) return;
         Path file = runFolder.resolve(FILE_NAME);
-        try {
-            Files.createDirectories(runFolder);
-            Files.writeString(
-                    file,
-                    line + System.lineSeparator(),
-                    StandardCharsets.UTF_8,
-                    StandardOpenOption.CREATE,
-                    StandardOpenOption.APPEND
-            );
-        } catch (IOException ignored) {
-            // Timing must not fail the launch.
+        synchronized (WorkbenchLaunchTiming.class) {
+            try {
+                Files.createDirectories(runFolder);
+                Files.writeString(
+                        file,
+                        line + System.lineSeparator(),
+                        StandardCharsets.UTF_8,
+                        StandardOpenOption.CREATE,
+                        StandardOpenOption.APPEND
+                );
+            } catch (IOException ignored) {
+                // Timing must not fail the launch.
+            }
         }
     }
 

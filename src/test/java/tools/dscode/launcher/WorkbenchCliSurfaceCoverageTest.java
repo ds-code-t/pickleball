@@ -225,6 +225,16 @@ class WorkbenchCliSurfaceCoverageTest {
     }
 
     @Test
+    void covers_command_validate() throws Exception {
+        writeFeature("@smoke", "Find term");
+        Capture capture = agent("validate", temp.toString(), "--tags=@smoke", "--name=Find term");
+        assertEquals(1, capture.code, capture.err + capture.out);
+        assertTrue(capture.out.contains("undefined:"), capture.out);
+        assertTrue(capture.out.contains("validate undefined=1"), capture.out);
+        assertFalse(capture.out.contains("summary status="), capture.out);
+    }
+
+    @Test
     void covers_command_resolve_runvars() throws Exception {
         Files.createDirectories(temp.resolve("src/test/resources"));
         Files.writeString(temp.resolve("src/test/resources/pickleball.properties"), "pkb_parallel=4\npkb_name=caf\u00e9\n");
