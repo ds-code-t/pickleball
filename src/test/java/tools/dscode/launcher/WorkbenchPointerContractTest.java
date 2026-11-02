@@ -171,6 +171,47 @@ class WorkbenchPointerContractTest {
         assertExportedDocsDoNotLinkOutsideTheExport(packaged);
     }
 
+    @Test
+    void maintainerOnlySectionsStayOutOfTheExport() throws Exception {
+        String harness = Files.readString(Path.of("docs/maintainer/pointer-eval-harness.md"));
+        assertTrue(harness.contains("## Maintainer-only: pointer-eval harness"), harness);
+        assertTrue(harness.contains("@agent-pointer-eval"), harness);
+        assertTrue(harness.contains("agent-pointer-eval.feature"), harness);
+        assertTrue(harness.contains("Do not add `@all`"), harness);
+        assertTrue(harness.contains("discover-then-confirm"), harness);
+
+        Path docs = Path.of("docs");
+        try (var walk = Files.walk(docs)) {
+            for (Path path : walk.filter(file -> Files.isRegularFile(file) && file.toString().endsWith(".md")).toList()) {
+                String relative = docs.relativize(path).toString().replace('\\', '/');
+                if (relative.startsWith("maintainer/") || relative.startsWith("roadmaps/")) continue;
+                if (relative.equals("tech-debt.md") || relative.equals("feature-status-notes.md")) continue;
+                if (relative.equals("ai-diagnostic-reporting-plan.md")
+                        || relative.equals("workbench-thin-packaging-roadmap.md")) {
+                    continue;
+                }
+                assertNoMaintainerOnlySection(path);
+            }
+        }
+        Path packaged = Path.of("src/main/resources/META-INF/pickleball/guidance");
+        try (var walk = Files.walk(packaged)) {
+            walk.filter(file -> Files.isRegularFile(file) && file.toString().endsWith(".md"))
+                    .forEach(path -> {
+                        try {
+                            assertNoMaintainerOnlySection(path);
+                        } catch (Exception failure) {
+                            throw new RuntimeException(failure);
+                        }
+                    });
+        }
+    }
+
+    private static void assertNoMaintainerOnlySection(Path path) throws Exception {
+        String text = Files.readString(path);
+        assertFalse(text.contains("## Maintainer-only"), path.toString());
+        assertFalse(text.contains("Maintainer-only: pointer-eval harness"), path.toString());
+    }
+
     private static void assertExportedDocsDoNotLinkOutsideTheExport(Path packaged) throws Exception {
         java.util.Set<String> exported = new java.util.HashSet<>();
         try (var walk = Files.walk(packaged)) {

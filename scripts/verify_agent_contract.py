@@ -12,6 +12,8 @@ import re
 import subprocess
 import sys
 
+from sync_consumer_guidance import excluded_consumer_doc
+
 ROOT = Path(__file__).resolve().parents[1]
 TEMP_WORKSPACE = ".agent-work"
 TEMP_WORKSPACE_IGNORE = ".agent-work/"
@@ -463,7 +465,7 @@ def validate_dependency_owned_guidance(errors: list[str]) -> None:
     if "Maintainer-only: pointer-eval harness" in text or "@agent-pointer-eval" in text:
         errors.append(
             "docs/consumer-agent-guide.md must not carry the maintainer pointer-eval "
-            "section; it lives in docs/workbench-agent-detail.md."
+            "section; it lives in docs/maintainer/pointer-eval-harness.md."
         )
 
     chooser = text[chooser_start:live_start]
@@ -529,22 +531,13 @@ def validate_dependency_owned_guidance(errors: list[str]) -> None:
         errors.append("Missing docs/workbench-agent-detail.md")
     else:
         detail = detail_path.read_text(encoding="utf-8")
-        for required in (
-            "Maintainer-only: pointer-eval harness",
-            "@agent-pointer-eval",
-        ):
-            if required not in detail:
-                errors.append(
-                    "docs/workbench-agent-detail.md must retain pointer-eval guidance "
-                    f"({required})."
-                )
-        core = detail.find("## When the core Pickleball repository is also present")
-        maintainer = detail.find("## Maintainer-only: pointer-eval harness")
-        if core < 0 or maintainer < 0 or maintainer < core:
+        if "Maintainer-only: pointer-eval harness" in detail or "## Maintainer-only" in detail:
             errors.append(
-                "@agent-pointer-eval guidance must stay maintainer-only after the core-repo "
-                "section in docs/workbench-agent-detail.md."
+                "docs/workbench-agent-detail.md must not contain a maintainer-only section. "
+                "Pointer-eval guidance lives in docs/maintainer/pointer-eval-harness.md."
             )
+
+    validate_pointer_eval_stays_maintainer_only(errors)
 
     workbench = ROOT / "docs" / "pickleball-workbench.md"
     if workbench.is_file():
@@ -692,6 +685,48 @@ def parse_gherkin_tagged_elements(text: str) -> list[tuple[str, list[str]]]:
             elements.append((stripped, pending))
             pending = []
     return elements
+
+
+def validate_pointer_eval_stays_maintainer_only(errors: list[str]) -> None:
+    """The harness note is required in maintainer docs and forbidden in the export."""
+    relative = "docs/maintainer/pointer-eval-harness.md"
+    path = ROOT / relative
+    if not path.is_file():
+        errors.append("Missing maintainer pointer-eval harness: " + relative)
+    else:
+        text = path.read_text(encoding="utf-8")
+        for required in (
+            "## Maintainer-only: pointer-eval harness",
+            "@agent-pointer-eval",
+            "agent-pointer-eval.feature",
+            "Do not add `@all`",
+        ):
+            if required not in text:
+                errors.append(
+                    f"{relative} must retain pointer-eval guidance ({required})."
+                )
+    docs = ROOT / "docs"
+    if docs.is_dir():
+        for source in sorted(docs.rglob("*.md")):
+            doc_path = source.relative_to(ROOT).as_posix()
+            if excluded_consumer_doc(doc_path):
+                continue
+            body = source.read_text(encoding="utf-8")
+            if "## Maintainer-only" in body or "Maintainer-only: pointer-eval harness" in body:
+                errors.append(
+                    "Consumer-exported docs must not contain a maintainer-only section: "
+                    + doc_path
+                )
+    packaged = ROOT / "src" / "main" / "resources" / "META-INF" / "pickleball" / "guidance"
+    if not packaged.is_dir():
+        return
+    for exported in sorted(packaged.rglob("*.md")):
+        body = exported.read_text(encoding="utf-8")
+        if "## Maintainer-only" in body or "Maintainer-only: pointer-eval harness" in body:
+            errors.append(
+                "Exported guidance must not contain a maintainer-only section: "
+                + exported.relative_to(packaged).as_posix()
+            )
 
 
 def validate_agent_pointer_eval_harness(errors: list[str]) -> None:

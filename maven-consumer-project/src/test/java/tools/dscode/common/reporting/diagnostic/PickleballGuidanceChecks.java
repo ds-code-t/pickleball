@@ -103,8 +103,8 @@ public class PickleballGuidanceChecks {
             assertFalse(chooserList.toLowerCase().contains("do not maven-exec isolate"));
             assertFalse(chooserList.contains("Access probe"));
             assertFalse(chooserList.contains("CLI/Maven-primary"));
-            assertTrue(guide.contains("Maintainer-only: pointer-eval harness"));
-            assertTrue(guide.contains("@agent-pointer-eval"));
+            assertFalse(guide.contains("Maintainer-only: pointer-eval harness"));
+            assertFalse(guide.contains("## Maintainer-only"));
             String liveLoop = guide.substring(
                     guide.indexOf("### Live isolation loop"),
                     guide.indexOf("Generated guidance lifecycle")
@@ -113,10 +113,7 @@ public class PickleballGuidanceChecks {
             assertTrue(liveLoop.contains("execute-step"));
             assertTrue(liveLoop.contains("ACK SESSION") || liveLoop.contains("session"));
             assertFalse(liveLoop.toLowerCase().contains("do not maven-exec isolate"));
-            String maintainer = guide.substring(guide.indexOf("## Maintainer-only: pointer-eval harness"));
-            assertTrue(maintainer.contains("@agent-pointer-eval"));
-            assertTrue(guide.indexOf("## Maintainer-only: pointer-eval harness")
-                    > guide.indexOf("## When the core Pickleball repository is also present"));
+            assertTrue(guide.contains("## When the core Pickleball repository is also present"));
         }
 
     @Test
@@ -363,10 +360,20 @@ public class PickleballGuidanceChecks {
             assertTrue(guide.contains("-Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher"));
             assertTrue(guide.contains("-Dexec.args=isolate"));
             String detail = Files.readString(root.resolve("docs/workbench-agent-detail.md"));
-            assertTrue(detail.contains("Maintainer-only: pointer-eval harness"));
-            assertTrue(detail.contains("@agent-pointer-eval"));
-            assertTrue(detail.indexOf("## Maintainer-only: pointer-eval harness")
-                    > detail.indexOf("## When the core Pickleball repository is also present"));
+            assertFalse(detail.contains("Maintainer-only: pointer-eval harness"));
+            assertFalse(detail.contains("## Maintainer-only"));
+            assertTrue(detail.contains("## When the core Pickleball repository is also present"));
+            try (var exportedDocs = Files.walk(root.resolve("docs"))) {
+                exportedDocs.filter(path -> path.toString().endsWith(".md")).forEach(path -> {
+                    try {
+                        String body = Files.readString(path);
+                        assertFalse(body.contains("## Maintainer-only"), path.toString());
+                        assertFalse(body.contains("Maintainer-only: pointer-eval harness"), path.toString());
+                    } catch (java.io.IOException failure) {
+                        throw new java.io.UncheckedIOException(failure);
+                    }
+                });
+            }
             assertFalse(managedFiles.contains("docs/ai-diagnostic-reporting-plan.md"));
             assertFalse(managedFiles.contains("docs/workbench-thin-packaging-roadmap.md"));
             assertTrue(managedFiles.stream().noneMatch(path -> path.startsWith("docs/maintainer/")));

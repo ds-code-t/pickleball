@@ -47,7 +47,9 @@ class DiagnosticCliGuidanceTest {
         assertTrue(guide.contains("# Workbench agent detail"));
         assertTrue(guide.contains("Moved out of the first-read guide"));
         assertTrue(guide.contains("Diagnostic investigation protocol"));
-        assertTrue(guide.contains("Maintainer-only: pointer-eval harness"));
+        assertFalse(guide.contains("Maintainer-only: pointer-eval harness"));
+        assertFalse(guide.contains("## Maintainer-only"));
+        assertTrue(guide.contains("## When the core Pickleball repository is also present"));
         assertTrue(guide.indexOf("# Pickleball Consumer Agent Guide") < guide.indexOf("# Workbench agent detail"));
     }
 }
