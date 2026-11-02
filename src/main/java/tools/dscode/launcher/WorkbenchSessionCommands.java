@@ -1094,7 +1094,7 @@ public final class WorkbenchSessionCommands {
         return value != null && !value.isNull() && !value.asText("").isBlank();
     }
 
-    private static String compactEvent(JsonNode event) {
+    static String compactEvent(JsonNode event) {
         String phrase = firstText(event, "phraseText", "phrase");
         String step = firstText(event, "stepText", "step", "text");
         String line;
@@ -1102,12 +1102,50 @@ public final class WorkbenchSessionCommands {
         else if (step != null) line = "step " + step;
         else if (phrase != null) line = "phrase " + phrase;
         else line = "step";
-        String hook = firstText(event, "hook", "type", "kind");
-        if (hook != null && "EXECUTE_STEP".equalsIgnoreCase(hook)) {
-            String signature = firstText(event, "signature", "status");
-            if (signature != null && !signature.isBlank()) return line + " " + signature;
-        }
+        String outcome = eventOutcome(event);
+        if (outcome != null) line = line + " " + outcome;
+        String id = eventCommandId(event);
+        if (id != null) line = line + " id=" + id;
         return line;
+    }
+
+    /** FailureRecord wins. A Java method signature is not an outcome. */
+    private static String eventOutcome(JsonNode event) {
+        if (event == null || !event.isObject()) return null;
+        try {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> body = JSON.convertValue(event, Map.class);
+            FailureRecord record = FailureRecord.fromWorker(body);
+            if (record != null && record.substantive()) return "FAILED";
+        } catch (RuntimeException ignored) {
+            // A field that is not a failure map is not an outcome.
+        }
+        String status = outcomeToken(firstText(event, "status", "outcome"));
+        if (status == null && event.has("result") && event.get("result").isObject()) {
+            status = outcomeToken(firstText(event.get("result"), "status", "outcome"));
+        }
+        if (status == null) status = outcomeToken(firstText(event, "signature"));
+        return status;
+    }
+
+    private static String outcomeToken(String raw) {
+        if (raw == null || raw.isBlank()) return null;
+        return switch (raw.strip().toUpperCase(Locale.ROOT)) {
+            case "SUCCESS", "PASSED", "OK" -> "PASSED";
+            case "FAILED", "ERROR", "FAILURE", "ERRORED" -> "FAILED";
+            default -> null;
+        };
+    }
+
+    /** Execute-step command id when the event has one, otherwise the event sequence. */
+    private static String eventCommandId(JsonNode event) {
+        String command = firstText(event, "commandId", "command-id", "command_id");
+        if (command != null) return command;
+        if (event == null) return null;
+        JsonNode sequence = event.get("sequence");
+        if (sequence == null || sequence.isNull()) return null;
+        String text = sequence.asText("").strip();
+        return text.isEmpty() ? null : text;
     }
 
     private static int eventCursor(WorkbenchCommandLine.Parsed parsed) {

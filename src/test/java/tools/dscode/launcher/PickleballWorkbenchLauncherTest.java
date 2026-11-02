@@ -78,6 +78,41 @@ class PickleballWorkbenchLauncherTest {
     }
 
     @Test
+    void rewrittenSystemExitStillHaltsWithTheUsageCode() {
+        int[] halted = {-1};
+        int[] calls = {0};
+        PickleballWorkbenchLauncher.keepExitCode(
+                2,
+                code -> {
+                    throw new RuntimeException("System::exit was called with return code " + code);
+                },
+                code -> {
+                    calls[0]++;
+                    halted[0] = code;
+                }
+        );
+        assertEquals(2, halted[0]);
+        assertEquals(1, calls[0]);
+    }
+
+    @Test
+    void ignoredSystemExitStillHaltsWithTheUsageCode() {
+        int[] halted = {-1};
+        int[] calls = {0};
+        PickleballWorkbenchLauncher.keepExitCode(
+                2,
+                code -> {
+                },
+                code -> {
+                    calls[0]++;
+                    halted[0] = code;
+                }
+        );
+        assertEquals(2, halted[0]);
+        assertEquals(1, calls[0]);
+    }
+
+    @Test
     void extractUsesVersionedWorkbenchWhenCurrentJsonIsComplete() throws Exception {
         PickleballLocalLayout.writeCurrent(
                 tempDir.resolve(".pickleball"),

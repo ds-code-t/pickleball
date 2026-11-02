@@ -39,6 +39,8 @@ public final class WorkbenchRunReports {
     private static final Pattern ACTUAL_LINE = Pattern.compile("(?im)^\\s*actual:\\s*(.+?)\\s*$");
     private static final Pattern SCENARIO_SUMMARY = Pattern.compile("(?m)^(\\d+)\\s+Scenarios?\\b");
     private static final Pattern STEP_SUMMARY = Pattern.compile("(?m)^(\\d+)\\s+Steps?\\b");
+    /** Inline summary names. The rest are failedScenariosMore plus query errors. */
+    static final int FAILED_SCENARIOS_INLINE_CAP = 10;
 
     private WorkbenchRunReports() {
     }
@@ -101,9 +103,19 @@ public final class WorkbenchRunReports {
         if (passed >= 0) line.append(" passed=").append(passed);
         if (failed >= 0) line.append(" failed=").append(failed);
         if (failed > 0 && failedScenarios != null && !failedScenarios.isEmpty()) {
-            line.append(" failedScenarios=").append(OutputFormatter.jsonStringArray(failedScenarios));
+            appendFailedScenarios(line, failedScenarios);
         }
         return line.toString();
+    }
+
+    private static void appendFailedScenarios(StringBuilder line, List<String> failedScenarios) {
+        int shown = Math.min(FAILED_SCENARIOS_INLINE_CAP, failedScenarios.size());
+        line.append(" failedScenarios=")
+                .append(OutputFormatter.jsonStringArray(failedScenarios.subList(0, shown)));
+        int more = failedScenarios.size() - shown;
+        if (more > 0) {
+            line.append(" failedScenariosMore=").append(more).append(" query errors");
+        }
     }
 
     /**

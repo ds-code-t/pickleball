@@ -28,6 +28,21 @@ class WorkbenchConsumerScenarioEndToEndTest {
     private static final Path PROJECT = Path.of("maven-consumer-project").toAbsolutePath().normalize();
 
     @Test
+    @Timeout(value = 8, unit = TimeUnit.MINUTES)
+    void usageErrorThroughExecJavaExits2() throws Exception {
+        assertPublished();
+        Run unknown = launchExec("not-a-verb");
+        assertEquals(2, unknown.exit, unknown.text());
+        assertTrue(unknown.text().contains("error:"), unknown.text());
+        assertTrue(unknown.text().contains("fix:"), unknown.text());
+        Run tags = launchExec("plan", "--tags=@a", "and", "not", "@b");
+        assertEquals(2, tags.exit, tags.text());
+        assertTrue(tags.text().contains("error:"), tags.text());
+        assertTrue(tags.text().contains("fix:"), tags.text());
+        assertTrue(tags.text().contains("Tag quoting error"), tags.text());
+    }
+
+    @Test
     @Timeout(value = 20, unit = TimeUnit.MINUTES)
     void discoverRunsARealScenarioAndRecordsThePack() throws Exception {
         assertPublished();

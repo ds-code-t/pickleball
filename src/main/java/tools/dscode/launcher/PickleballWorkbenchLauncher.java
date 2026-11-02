@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.IntConsumer;
 
 /**
  * Extracts the version-matched, controller-only Workbench payload from the
@@ -58,12 +59,12 @@ public final class PickleballWorkbenchLauncher {
             for (String notice : WorkbenchCommandLine.aliasNotices()) System.err.println(notice);
         } catch (IllegalArgumentException failure) {
             System.err.println(failure.getMessage());
-            System.exit(2);
+            exitProcess(2);
             return;
         }
         Integer rejected = rejectUnknown(parsed, System.err);
         if (rejected != null) {
-            System.exit(rejected);
+            exitProcess(rejected);
             return;
         }
         Path project = parsed.project() != null
@@ -73,17 +74,17 @@ public final class PickleballWorkbenchLauncher {
             Optional<Path> hop = reexecJar(project);
             if (hop.isPresent()) {
                 int exitCode = reexec(hop.get(), args);
-                if (exitCode != 0) System.exit(exitCode);
+                if (exitCode != 0) exitProcess(exitCode);
                 return;
             }
         } catch (InterruptedException failure) {
             Thread.currentThread().interrupt();
             System.err.println("Pickleball Workbench launcher was interrupted.");
-            System.exit(1);
+            exitProcess(1);
             return;
         } catch (IOException failure) {
             System.err.println("Could not hop to the pinned Pickleball jar: " + failure.getMessage());
-            System.exit(1);
+            exitProcess(1);
             return;
         }
 
@@ -94,12 +95,12 @@ public final class PickleballWorkbenchLauncher {
 
         if (WorkbenchCommandLine.isAgentCoreCommand(parsed.command())) {
             int exitCode = WorkbenchAgentCommands.run(args, System.out, System.err);
-            if (exitCode != 0) System.exit(exitCode);
+            if (exitCode != 0) exitProcess(exitCode);
             return;
         }
         if (WorkbenchCommandLine.isSessionClientCommand(parsed.command())) {
             int exitCode = WorkbenchSessionCommands.run(args, System.out, System.err);
-            if (exitCode != 0) System.exit(exitCode);
+            if (exitCode != 0) exitProcess(exitCode);
             return;
         }
 
@@ -115,15 +116,35 @@ public final class PickleballWorkbenchLauncher {
                     .inheritIO()
                     .start();
             int exitCode = process.waitFor();
-            if (exitCode != 0) System.exit(exitCode);
+            if (exitCode != 0) exitProcess(exitCode);
         } catch (InterruptedException failure) {
             Thread.currentThread().interrupt();
             System.err.println("Pickleball Workbench launcher was interrupted.");
-            System.exit(1);
+            exitProcess(1);
         } catch (RuntimeException | IOException failure) {
             System.err.println("Could not launch Pickleball Workbench: " + failure.getMessage());
-            System.exit(1);
+            exitProcess(1);
         }
+    }
+
+    /**
+     * Keep the real status when this process is Maven {@code exec:java}.
+     * That plugin can rewrite {@code System.exit} into an exception and Maven
+     * then exits 1. {@code Runtime.halt} is not rewritten, so a rewritten or
+     * ignored {@code System.exit} still ends the process with {@code code}.
+     */
+    static void exitProcess(int code) {
+        keepExitCode(code, System::exit, status -> Runtime.getRuntime().halt(status));
+    }
+
+    static void keepExitCode(int code, IntConsumer systemExit, IntConsumer halt) {
+        try {
+            systemExit.accept(code);
+        } catch (Throwable blocked) {
+            halt.accept(code);
+            return;
+        }
+        halt.accept(code);
     }
 
     /**

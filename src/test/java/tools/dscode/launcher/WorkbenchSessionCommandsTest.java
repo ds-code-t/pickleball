@@ -402,6 +402,51 @@ class WorkbenchSessionCommandsTest {
 
     @Test
     @Timeout(value = 10, unit = TimeUnit.SECONDS)
+    void compactEventShowsPassedAndFailedWithTheCommandId() throws Exception {
+        ObjectMapper mapper = new ObjectMapper();
+        String failed = WorkbenchSessionCommands.compactEvent(mapper.readTree("""
+                {"stepText":"Given boom","status":"FAILED","message":"nope","commandId":"cmd-fail","sequence":4}
+                """));
+        String passed = WorkbenchSessionCommands.compactEvent(mapper.readTree("""
+                {"hook":"EXECUTE_STEP","stepText":"Given stay","signature":"SUCCESS","sequence":9}
+                """));
+        String plain = WorkbenchSessionCommands.compactEvent(mapper.readTree("""
+                {"hook":"BEFORE_STEP","stepText":"Given stay","signature":"com.example.Glue.stay()"}
+                """));
+        assertTrue(failed.startsWith("step Given boom "), failed);
+        assertTrue(failed.contains("FAILED"), failed);
+        assertTrue(failed.contains("id=cmd-fail"), failed);
+        assertFalse(failed.contains("id=4"), failed);
+        assertTrue(passed.startsWith("step Given stay "), passed);
+        assertTrue(passed.contains("PASSED"), passed);
+        assertFalse(passed.contains("SUCCESS"), passed);
+        assertTrue(passed.contains("id=9"), passed);
+        assertFalse(failed.equals(passed), failed + " vs " + passed);
+        assertEquals("step Given stay", plain);
+
+        try (FakeSession session = FakeSession.start(project)) {
+            session.eventsJson = """
+                    {"events":[
+                      {"stepText":"Given boom","status":"FAILED","message":"nope","commandId":"cmd-fail","sequence":4},
+                      {"hook":"EXECUTE_STEP","stepText":"Given stay","signature":"SUCCESS","sequence":9},
+                      {"hook":"BEFORE_STEP","stepText":"Given stay","signature":"com.example.Glue.stay()"}
+                    ]}
+                    """;
+            Output output = run(
+                    new String[]{"events", project.toString()},
+                    launch -> {
+                        throw new AssertionError("events must not start a session");
+                    }
+            );
+            assertEquals(0, output.exitCode, output.stderr + output.stdout);
+            assertTrue(output.stdout.contains(failed), output.stdout);
+            assertTrue(output.stdout.contains(passed), output.stdout);
+            assertTrue(output.stdout.contains("step Given stay\n") || output.stdout.contains("step Given stay\r\n"), output.stdout);
+        }
+    }
+
+    @Test
+    @Timeout(value = 10, unit = TimeUnit.SECONDS)
     void eventsPrintElapsedAndNoSleepGapFromStepText() throws Exception {
         try (FakeSession session = FakeSession.start(project)) {
             session.eventsJson = """

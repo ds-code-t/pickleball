@@ -29,8 +29,10 @@ import java.util.Set;
  * {@code java -cp @classpath.cache tools.dscode.launcher.PickleballWorkbenchLauncher}.
  * No Maven or Gradle wrapper starts. When the cache is missing or stale, a
  * one-shot resolves the test classpath and runs
- * {@code java -cp @classpath.cache} so Java's exit code is kept
- * ({@code mvn exec:java} turns exit 2 into 1). If that classpath cannot be
+ * {@code java -cp @classpath.cache} so Java's exit code is kept. The documented
+ * {@code mvnw exec:java} launch of this same main class also keeps a usage
+ * exit of 2: if the exec plugin rewrites {@code System.exit}, the launcher
+ * halts with that code. If the classpath cannot be
  * resolved, the project wrapper is still the fallback. {@code help} with no
  * cache still uses that launcher jar and {@link WorkbenchCliHelp} instead of
  * the wrapper. {@code discover}, {@code confirm}, and {@code isolate} keep the

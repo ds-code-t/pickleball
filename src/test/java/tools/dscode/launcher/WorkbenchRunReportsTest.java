@@ -1,5 +1,6 @@
 package tools.dscode.launcher;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -9,6 +10,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.net.URLEncoder;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
@@ -216,6 +218,29 @@ class WorkbenchRunReportsTest {
         assertTrue(text.contains("passed=1"), text);
         assertTrue(text.contains("failed=1"), text);
         assertTrue(text.contains("failedScenarios=[\"Bad case\"]"), text);
+        assertFalse(text.contains("failedScenariosMore"), text);
+    }
+
+    @Test
+    void summaryLineCapsTheFailedScenarioArray() throws Exception {
+        List<String> names = new ArrayList<>();
+        names.add("Case, \"quoted\"");
+        for (int index = 2; index <= 12; index++) names.add("Case " + index);
+        String line = WorkbenchRunReports.compact("FAILED", 12, 12, null, null, 0, 12, names);
+        int start = line.indexOf("failedScenarios=");
+        assertTrue(start >= 0, line);
+        start += "failedScenarios=".length();
+        int end = line.indexOf(']', start);
+        String array = line.substring(start, end + 1);
+        var parsed = new ObjectMapper().readTree(array);
+        assertTrue(parsed.isArray(), array);
+        assertEquals(10, parsed.size(), array);
+        assertEquals("Case, \"quoted\"", parsed.get(0).asText());
+        assertEquals("Case 10", parsed.get(9).asText());
+        assertTrue(line.contains("failedScenariosMore=2"), line);
+        assertTrue(line.contains("query errors"), line);
+        assertFalse(line.contains("Case 11"), line);
+        assertFalse(line.contains("Case 12"), line);
     }
 
     @Test

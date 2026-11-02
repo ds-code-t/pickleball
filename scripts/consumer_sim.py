@@ -50,6 +50,7 @@ BUDGETS = {
     "finish": 60,
     "stop": 60,
     "unknown-verb": 60,
+    "exec-java-usage": 300,
 }
 
 
@@ -67,6 +68,9 @@ def main() -> int:
         unknown = run_stage(timings, "unknown-verb", ["not-a-verb"], allow_exit={2})
         assert_in(unknown, "error:")
         assert_in(unknown, "fix:")
+        exec_usage = run_exec_stage(timings, "exec-java-usage", ["not-a-verb"], allow_exit={2})
+        assert_in(exec_usage, "error:")
+        assert_in(exec_usage, "fix:")
         run_stage(timings, "discover-uncompiled", [
             "discover", "--run-id=" + RUN_UNCOMPILED, "--tags=" + TAGS, "--name=" + NAME,
             "--runvar=pkb_browser=CHROME_HEADLESS", "--retention=failed", "--agent=consumer-sim",
@@ -195,6 +199,39 @@ def run_stage(timings: list[dict], stage: str, launcher_args: list[str], allow_e
     if seconds > budget:
         fail(stage, result, f"exceeded budget {budget}s")
     return result
+
+
+def run_exec_stage(timings: list[dict], stage: str, launcher_args: list[str], allow_exit: set[int]):
+    budget = BUDGETS[stage]
+    started = time.monotonic()
+    result = exec_java(launcher_args, budget + 30)
+    seconds = round(time.monotonic() - started, 3)
+    row = {
+        "stage": stage,
+        "seconds": seconds,
+        "exit": result.returncode,
+        "stdout": result.stdout,
+        "stderr": result.stderr,
+    }
+    timings.append(row)
+    print(f"stage={stage} exit={result.returncode} seconds={seconds}", flush=True)
+    if result.returncode not in allow_exit:
+        fail(stage, result, f"exit {result.returncode} not in {sorted(allow_exit)}")
+    if seconds > budget:
+        fail(stage, result, f"exceeded budget {budget}s")
+    return result
+
+
+def exec_java(args: list[str], timeout: int) -> subprocess.CompletedProcess:
+    """Documented mvnw exec:java. One argv so the shell does not split exec.args."""
+    command = script_command(wrapper_path(), [
+        "-q",
+        "org.codehaus.mojo:exec-maven-plugin:3.5.0:java",
+        "-Dexec.mainClass=tools.dscode.launcher.PickleballWorkbenchLauncher",
+        "-Dexec.classpathScope=test",
+        "-Dexec.args=" + " ".join(args),
+    ])
+    return maven_cmd(command, timeout)
 
 
 def launcher(args: list[str], timeout: int) -> subprocess.CompletedProcess:
