@@ -106,9 +106,10 @@ public final class WorkspaceLaunch {
     }
 
     /**
-     * Prefer {@code java -cp} of the synced consumer classpath. Tests inject
-     * {@link #testCapture}. In-process capture is only the fallback when sync
-     * has not written a classpath yet and this JVM can see the consumer runner.
+     * Prefer {@code java -cp} of the synced consumer classpath when that file
+     * still starts with live classes. Otherwise use the pre-sync seed classpath.
+     * Tests inject {@link #testCapture}. In-process capture is only the fallback
+     * when neither list exists and this JVM can see the consumer runner.
      */
     static void capture(Path project, Path workspace, boolean reseed, Appendable warnings) {
         Consumer<Path> hook = testCapture;
@@ -151,8 +152,12 @@ public final class WorkspaceLaunch {
     }
 
     /**
-     * Compile test classes, then publish a worker classpath so the seed fork
-     * sees the consumer runner. The launcher JVM does not.
+     * Compile test classes, then publish a seed-fork classpath so the seed
+     * JVM sees the consumer runner. The launcher JVM does not.
+     * <p>
+     * That list is {@code seed-classpath.txt}. {@code classpath.txt} is the
+     * session worker classpath and always starts with live classes. Sync is
+     * the only writer of that file; this method does not replace it.
      */
     private static boolean compileAndPublishClasspath(Path project, Appendable warnings) {
         if (project == null) return false;
@@ -180,15 +185,24 @@ public final class WorkspaceLaunch {
         }
         List<String> entries = WorkbenchOneShotLaunch.testRuntimeEntries(root, warnings);
         if (!hasConsumerOutput(root, entries)) return false;
-        Path file = PickleballLocalLayout.workbenchStateRoot(root).resolve("classpath.txt");
         try {
-            Files.createDirectories(file.getParent());
-            Files.writeString(file, String.join("\n", entries) + "\n", StandardCharsets.UTF_8);
+            publishSeedClasspath(root, entries);
         } catch (IOException failure) {
-            warn(warnings, "WARNING: could not write classpath.txt: " + failure.getMessage());
+            warn(warnings, "WARNING: could not write seed-classpath.txt: " + failure.getMessage());
             return false;
         }
         return !cachedClasspath(root).isEmpty();
+    }
+
+    /**
+     * Writes the pre-sync seed classpath and leaves {@code classpath.txt} alone.
+     * A live-first session file stays the worker classpath.
+     */
+    static void publishSeedClasspath(Path project, List<String> entries) throws IOException {
+        Path file = PickleballLocalLayout.workbenchStateRoot(project)
+                .resolve(PickleballLocalLayout.SEED_CLASSPATH_FILE);
+        Files.createDirectories(file.getParent());
+        Files.writeString(file, String.join("\n", entries) + "\n", StandardCharsets.UTF_8);
     }
 
     /**
@@ -209,7 +223,15 @@ public final class WorkspaceLaunch {
 
     static List<String> cachedClasspath(Path project) {
         if (project == null) return List.of();
-        Path file = PickleballLocalLayout.workbenchStateRoot(project).resolve("classpath.txt");
+        Path state = PickleballLocalLayout.workbenchStateRoot(project);
+        List<String> session = readClasspathLines(state.resolve(PickleballLocalLayout.WORKER_CLASSPATH_FILE));
+        if (PickleballLocalLayout.startsWithLiveClasses(state, session)) return session;
+        List<String> seed = readClasspathLines(state.resolve(PickleballLocalLayout.SEED_CLASSPATH_FILE));
+        if (!seed.isEmpty()) return seed;
+        return session;
+    }
+
+    private static List<String> readClasspathLines(Path file) {
         if (!Files.isRegularFile(file)) return List.of();
         try {
             return Files.readAllLines(file, StandardCharsets.UTF_8).stream()

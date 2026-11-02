@@ -193,10 +193,14 @@ def prepare_tree() -> None:
     if classes.exists():
         shutil.rmtree(classes)
     state = CONSUMER / ".pickleball"
-    for classpath in state.glob("workbench/classpath.txt"):
-        classpath.unlink(missing_ok=True)
-    for classpath in state.glob("v/*/workbench/classpath.txt"):
-        classpath.unlink(missing_ok=True)
+    # classpath.txt is the session worker classpath (live/classes first).
+    # seed-classpath.txt is only the pre-sync fork list. Drop both so the
+    # uncompiled discover must compile and record that stage.
+    for name in ("classpath.txt", "seed-classpath.txt"):
+        for classpath in state.glob(f"workbench/{name}"):
+            classpath.unlink(missing_ok=True)
+        for classpath in state.glob(f"v/*/workbench/{name}"):
+            classpath.unlink(missing_ok=True)
 
 
 def assert_launch_gap(run_id: str) -> None:

@@ -7,6 +7,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -34,6 +35,13 @@ public final class PickleballLocalLayout {
     public static final String OPEN_SCRIPT_UNIX = "pickleball-workbench.sh";
     public static final String OPEN_SCRIPT_CMD = "pickleball-workbench.cmd";
     public static final String OPEN_SCRIPT_POWERSHELL = "pickleball-workbench.ps1";
+    /** Session worker classpath. The first entry is always {@link #liveClasses}. */
+    public static final String WORKER_CLASSPATH_FILE = "classpath.txt";
+    /**
+     * Pre-sync seed fork classpath. Not the session worker classpath, and never
+     * a substitute for {@link #WORKER_CLASSPATH_FILE}.
+     */
+    public static final String SEED_CLASSPATH_FILE = "seed-classpath.txt";
 
     private static final Pattern JSON_STRING = Pattern.compile(
             "\"pickleballVersion\"\\s*:\\s*\"([^\"]+)\""
@@ -129,6 +137,23 @@ public final class PickleballLocalLayout {
             return versionWorkbench(root(projectRoot), version);
         }
         return workbenchStateRoot(projectRoot);
+    }
+
+    /** The one effective worker output. Session {@code classpath.txt} starts here. */
+    public static Path liveClasses(Path stateRoot) {
+        return stateRoot.resolve("live").resolve("classes").toAbsolutePath().normalize();
+    }
+
+    /** True when {@code entries} is a session worker classpath for this state root. */
+    public static boolean startsWithLiveClasses(Path stateRoot, List<String> entries) {
+        if (stateRoot == null || entries == null || entries.isEmpty()) return false;
+        String first = entries.getFirst();
+        if (first == null || first.isBlank()) return false;
+        try {
+            return Path.of(first).toAbsolutePath().normalize().equals(liveClasses(stateRoot));
+        } catch (RuntimeException failure) {
+            return false;
+        }
     }
 
     public static Path lastDiscoverSnapshot(Path projectRoot) {

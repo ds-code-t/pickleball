@@ -265,6 +265,38 @@ class WorkbenchSynchronizerTest {
     }
 
     @Test
+    void skipRebuildsAWorkerClasspathThatDoesNotStartWithLive() throws Exception {
+        MavenFixture fixture = MavenFixture.create(tempDir.resolve("order-consumer"));
+        RecordingRunner runner = fixture.runner();
+        WorkbenchSynchronizer synchronizer = new WorkbenchSynchronizer(runner);
+        WorkbenchManifest first = synchronizer.sync(fixture.projectRoot);
+        Path live = Path.of(first.liveOutput()).toAbsolutePath().normalize();
+        Path classpath = WorkbenchManifest.workbenchRoot(fixture.projectRoot).resolve("classpath.txt");
+        assertEquals(live.toString(), WorkbenchSynchronizer.readWorkerClasspath(fixture.projectRoot).getFirst());
+
+        Path testClasses = fixture.projectRoot.resolve("target/test-classes").toAbsolutePath().normalize();
+        Files.writeString(classpath, testClasses + "\n" + fixture.dependency + "\n", StandardCharsets.UTF_8);
+        IllegalStateException rejected = assertThrows(
+                IllegalStateException.class,
+                () -> WorkbenchSynchronizer.readWorkerClasspath(fixture.projectRoot)
+        );
+        assertTrue(rejected.getMessage().contains("must start with the one effective live output"), rejected.getMessage());
+
+        WorkbenchManifest second = synchronizer.sync(fixture.projectRoot);
+        assertEquals(WorkbenchSyncMode.SKIPPED.name(), second.syncMode());
+        assertEquals(1, runner.invocations.size());
+        List<String> restored = WorkbenchSynchronizer.readWorkerClasspath(fixture.projectRoot);
+        assertEquals(live.toString(), restored.getFirst());
+        assertEquals(fixture.dependency.toAbsolutePath().normalize().toString(), restored.get(1));
+
+        Files.delete(classpath);
+        WorkbenchManifest third = synchronizer.sync(fixture.projectRoot);
+        assertEquals(WorkbenchSyncMode.SKIPPED.name(), third.syncMode());
+        assertEquals(1, runner.invocations.size());
+        assertEquals(live.toString(), WorkbenchSynchronizer.readWorkerClasspath(fixture.projectRoot).getFirst());
+    }
+
+    @Test
     void refreshesResourcesWithoutTestCompileWhenOnlyFeaturesChanged() throws Exception {
         MavenFixture fixture = MavenFixture.create(tempDir.resolve("resource-consumer"));
         RecordingRunner runner = fixture.runner();
