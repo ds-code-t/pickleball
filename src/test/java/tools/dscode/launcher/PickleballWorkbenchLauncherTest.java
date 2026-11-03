@@ -317,6 +317,10 @@ class PickleballWorkbenchLauncherTest {
         assertEquals(2, tags.exit, tags.text());
         assertTrue(tags.text().contains("Tag quoting error"), tags.text());
         assertFalse(tags.text().contains("NoClassDefFoundError"), tags.text());
+
+        Run sync = launch(classpath, "sync", tempDir.toString());
+        assertFalse(sync.text().contains("NoClassDefFoundError"), sync.text());
+        assertFalse(sync.text().contains("ObjectMapper"), sync.text());
     }
 
     @Test

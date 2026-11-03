@@ -320,7 +320,7 @@ public record FailureRecord(
         Throwable cursor = error;
         while (cursor != null && seen.add(cursor)) {
             for (StackTraceElement element : cursor.getStackTrace()) {
-                if (element == null || frameworkFrame(element.getClassName())) continue;
+                if (element == null || !consumerFrame(element.getClassName())) continue;
                 return formatFrame(element);
             }
             cursor = cursor.getCause();
@@ -334,7 +334,7 @@ public record FailureRecord(
             String trimmed = line.strip();
             if (!trimmed.startsWith("at ")) continue;
             String className = frameClass(trimmed);
-            if (className == null || frameworkFrame(className)) continue;
+            if (!consumerFrame(className)) continue;
             return trimmed;
         }
         return null;
@@ -360,6 +360,15 @@ public record FailureRecord(
         int dot = method.lastIndexOf('.');
         if (dot <= 0) return null;
         return method.substring(0, dot);
+    }
+
+    /**
+     * A consumer frame has a package. Framework frames, and a bare name such as
+     * {@code Hidden}, are not copied into {@code stackHead}.
+     */
+    private static boolean consumerFrame(String className) {
+        if (className == null || className.isBlank() || frameworkFrame(className)) return false;
+        return className.indexOf('.') > 0;
     }
 
     private static boolean frameworkFrame(String className) {

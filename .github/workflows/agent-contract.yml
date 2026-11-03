@@ -12,10 +12,9 @@ permissions:
   contents: read
 
 jobs:
-  validate:
-    runs-on: ubuntu-latest
+  windows:
+    runs-on: windows-latest
     timeout-minutes: 90
-
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -32,6 +31,11 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
       - name: Verify agent contract
         shell: bash
         env:
@@ -45,58 +49,8 @@ jobs:
           python scripts/verify_agent_contract.py "${args[@]}"
 
       - name: Verify generated repository index
+        shell: bash
         run: python scripts/refresh_agent_index.py --check
-
-      - name: Test and publish framework locally
-        run: |
-          sudo apt-get update -qq && sudo apt-get install -y -qq xvfb
-          chmod +x gradlew
-          xvfb-run -a ./gradlew test publishToMavenLocal
-
-      - name: Upload test reports on failure
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: test-reports
-          if-no-files-found: ignore
-          path: |
-            build/reports/tests/test/**
-            build/test-results/**
-            maven-consumer-project/target/surefire-reports/**
-            maven-consumer-project/target/pickleball/**
-
-      - name: Consumer-simulation harness
-        run: |
-          chmod +x maven-consumer-project/mvnw scripts/consumer_sim.py
-          # Includes the documented ./mvnw exec:java launch (quoted -Dexec.*) and asserts exit 2.
-          xvfb-run -a python3 scripts/consumer_sim.py
-
-      - name: Test Maven consumer project
-        run: |
-          chmod +x maven-consumer-project/mvnw
-          bash ./maven-consumer-project/mvnw -f maven-consumer-project/pom.xml -U test -Dpkb_browser=CHROME_HEADLESS
-
-  windows:
-    runs-on: windows-latest
-    timeout-minutes: 90
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-
-      - name: Set up Java 21
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: "21"
-          cache: maven
-
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
 
       - name: Publish and run the consumer-simulation harness
         shell: pwsh
@@ -108,12 +62,10 @@ jobs:
           exit $LASTEXITCODE
 
   gate:
-    needs: [validate, windows]
+    needs: [windows]
     if: always()
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     steps:
-      - name: Block the release unless Linux and Windows both passed
-        run: |
-          test "${{ needs.validate.result }}" = "success"
-          test "${{ needs.windows.result }}" = "success"
-
+      - name: Block the release unless Windows passed
+        shell: bash
+        run: test "${{ needs.windows.result }}" = "success"

@@ -15,6 +15,8 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -28,12 +30,14 @@ class ControlBridgeClientTest {
     Path tempDir;
 
     private HttpServer server;
-    private String expectedToken;
+    private ExecutorService executor;
+    private volatile String expectedToken;
     private final List<ControlBridgeBreakpoint> breakpoints = new CopyOnWriteArrayList<>();
 
     @AfterEach
     void stopServer() {
         if (server != null) server.stop(0);
+        if (executor != null) executor.shutdownNow();
     }
 
     @Test
@@ -124,7 +128,8 @@ class ControlBridgeClientTest {
 
         IllegalStateException failure = assertThrows(IllegalStateException.class, client::status);
 
-        assertTrue(failure.getMessage().contains("HTTP 401"));
+        assertTrue(failure.getMessage() != null && failure.getMessage().contains("HTTP 401"),
+                failure.getMessage());
     }
 
     @Test
@@ -184,6 +189,8 @@ class ControlBridgeClientTest {
     private ControlBridgeDescriptor startProtocolServer(String token) throws IOException {
         expectedToken = token;
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        executor = Executors.newVirtualThreadPerTaskExecutor();
+        server.setExecutor(executor);
         server.createContext("/", this::handle);
         server.start();
         return descriptor(
@@ -199,6 +206,7 @@ class ControlBridgeClientTest {
             if (!("Bearer " + expectedToken).equals(
                     exchange.getRequestHeaders().getFirst("Authorization")
             )) {
+                exchange.getRequestBody().readAllBytes();
                 send(exchange, 401, java.util.Map.of("error", "unauthorized"));
                 return;
             }

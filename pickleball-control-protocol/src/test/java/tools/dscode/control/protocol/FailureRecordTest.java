@@ -110,4 +110,15 @@ class FailureRecordTest {
         assertFalse(worker.cause().contains("PickleStepTestStep"));
         assertFalse(worker.cause().contains("\n"));
     }
+
+    @Test
+    void unpackagedFrameIsNotTheStackHead() {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("message", "sqlite-token-alpha");
+        body.put("stack", "java.lang.AssertionError: sqlite-token-alpha\n\tat Hidden.frame(Hidden.java:4)");
+        FailureRecord record = FailureRecord.fromWorker(body);
+        assertEquals("java.lang.AssertionError: sqlite-token-alpha", record.stackHead());
+        assertFalse(record.stackHead().contains("Hidden.java"));
+        assertFalse(String.valueOf(record.toMap()).contains("Hidden.java"));
+    }
 }

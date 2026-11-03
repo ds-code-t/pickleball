@@ -15,6 +15,6 @@ The session, in order:
 
 Each stage prints `stage=<name> exit=<code> seconds=<n>` and must finish inside the budget in the script. `record.json` for the compiled run must be `PASSED` and `finish` must set `stoppedAt`. Timings are also written to `maven-consumer-project/.pickleball/consumer-sim-timings.json`.
 
-Linux CI runs the script under `xvfb-run` after `publishToMavenLocal` in `.github/workflows/agent-contract.yml` (job `validate`, which also runs the golden tests inside `gradlew test` and the full suite). The Windows harness is job `windows` in that same workflow. It uses PowerShell and `scripts/consumer_sim.ps1`, which runs the same Python harness and `mvnw.cmd`. Job `gate` fails unless `validate` and `windows` both succeed, so a release cannot go out on a green Linux job alone.
+Push and pull-request CI runs the harness only on Windows, in `.github/workflows/agent-contract.yml` (job `windows`). That job also checks the repository index and the agent contract, then `publishToMavenLocal -x test` and `scripts/consumer_sim.ps1` (PowerShell, `mvnw.cmd`). Job `gate` depends only on `windows`. There is no Linux or macOS CI job. Linux is verified locally on the maintainer box with JDK 21 (`/opt/jdk/jdk-21.0.13+9` in the sandbox, `/home/box/jdk/jdk-21.0.13+9` on the maintainer machine). macOS testing is tech debt. See `docs/maintainer/tech-debt.md`.
 
 A normal `mvn test` does not run this script.

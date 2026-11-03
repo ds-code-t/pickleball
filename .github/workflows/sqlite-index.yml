@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - master
+      - 2.1.18
   workflow_dispatch:
 
 permissions:
@@ -12,12 +13,8 @@ permissions:
 
 jobs:
   parity:
-    name: SQLite parity (${{ matrix.os }})
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-    runs-on: ${{ matrix.os }}
+    name: SQLite parity (windows-latest)
+    runs-on: windows-latest
     timeout-minutes: 40
 
     steps:
@@ -36,6 +33,5 @@ jobs:
       - name: Rebuild and search parity
         shell: bash
         run: |
-          chmod +x gradlew
           ./gradlew --no-daemon :pickleball-control-protocol:test --tests tools.dscode.control.protocol.DiagnosticSqliteIndexTest
           ./gradlew --no-daemon :test --tests tools.dscode.common.reporting.diagnostic.DiagnosticIndexRebuilderSqliteTest

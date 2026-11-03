@@ -1,5 +1,9 @@
 # Pickleball Tech Debt
 
+## CI hosts
+
+Push and pull-request CI runs Windows only (`.github/workflows/agent-contract.yml` jobs `windows` and `gate`, and `.github/workflows/sqlite-index.yml`). Linux is verified locally on the maintainer box with JDK 21 before a release, not in GitHub Actions. macOS testing is tech debt: sqlite-jdbc ships a macOS native, and the parity tests do not run on a macOS runner. Add a macOS job back only when Actions minutes allow it. Do not treat a green Windows job as a macOS result.
+
 Items deferred from consumer retests and earlier roadmaps. Each entry has a short description, origin report, and rough value/cost. Speed-related items (validate dry-run #4, isolate start #15, index/compile overlap 3-overlap, Maven daemon/persistent resolve, parallel stages, seed overlap) have been moved to the 2.1.18 speed roadmap and are no longer tech debt for 2.1.18. See `docs/maintainer/2.1.18-speed-roadmap.md`.
 
 ## From 2.1.18 Report 5 (consumer retest of 111dea5)
