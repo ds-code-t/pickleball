@@ -1,40 +1,97 @@
 package tools.dscode.control.api;
 
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
+import tools.dscode.common.composite.CompositeBinaryLocator;
+import tools.dscode.common.composite.CompositeLog;
+import tools.dscode.common.composite.CompositeMode;
+import tools.dscode.common.composite.CompositeRuntime;
+import tools.dscode.control.protocol.DirectControlProvider;
 
 import java.lang.reflect.Proxy;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.attribute.PosixFilePermission;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class PageElementQueryTest {
+    @TempDir
+    Path temp;
+
+    @BeforeEach
+    void isolate() {
+        CompositeRuntime.use(temp.resolve("project"), Map.of(), new ClassLoader(null) {
+        }, temp.resolve("home"));
+    }
+
+    @AfterEach
+    void clean() {
+        System.clearProperty(CompositeBinaryLocator.BIN_KEY);
+        System.clearProperty(CompositeMode.KEY);
+        System.clearProperty(CompositeLog.KEY);
+        System.clearProperty(CompositeLog.DIR_KEY);
+        CompositeRuntime.resetForTests();
+    }
+
     @Test
     void countsRawAndDisplayedElementsWithoutClicking() {
         AtomicInteger clicks = new AtomicInteger();
+        AtomicInteger finds = new AtomicInteger();
         List<WebElement> elements = List.of(
                 element(true, clicks),
                 element(false, clicks),
                 element(true, clicks)
         );
-        WebDriver driver = driver(elements);
+        WebDriver driver = driver(elements, finds);
         PageElementQuery.Hit hit = PageElementQuery.find(driver, "Button", "Save");
         assertEquals(3, hit.rawMatchCount());
         assertEquals(2, hit.visibleCount());
         assertEquals("the \"Save\" Button", hit.phrase());
         assertFalse(hit.xpath().isBlank(), hit.xpath());
         assertEquals(0, clicks.get());
+        assertTrue(finds.get() > 0);
     }
 
-    private static WebDriver driver(List<WebElement> elements) {
+    @Test
+    void liveFindUsesCompositeInsteadOfTheDriver() throws Exception {
+        Path binary = stub(temp.resolve("composite"));
+        CompositeRuntime.use(
+                temp.resolve("project"),
+                Map.of(DirectControlProvider.BIN_ENV, binary.toString()),
+                new ClassLoader(null) {
+                },
+                temp.resolve("home")
+        );
+        System.setProperty(CompositeLog.DIR_KEY, temp.resolve("logs").toString());
+        AtomicInteger finds = new AtomicInteger();
+        WebDriver driver = driver(List.of(), finds);
+        PageElementQuery.Hit hit = PageElementQuery.find(driver, "Button", "Save");
+        assertEquals(1, hit.rawMatchCount());
+        assertEquals(1, hit.visibleCount());
+        assertEquals(0, finds.get());
+        assertTrue(CompositeRuntime.primary());
+    }
+
+    private static WebDriver driver(List<WebElement> elements, AtomicInteger finds) {
         return (WebDriver) Proxy.newProxyInstance(
                 WebDriver.class.getClassLoader(),
                 new Class<?>[]{WebDriver.class},
                 (proxy, method, args) -> {
-                    if ("findElements".equals(method.getName())) return elements;
+                    if ("findElements".equals(method.getName())) {
+                        finds.incrementAndGet();
+                        return elements;
+                    }
                     if ("findElement".equals(method.getName())) {
                         throw new AssertionError("page query must not call findElement");
                     }
@@ -67,5 +124,48 @@ class PageElementQueryTest {
         if (type == double.class) return 0d;
         if (type == String.class) return "";
         return null;
+    }
+
+    private static Path stub(Path path) throws Exception {
+        String script = """
+                #!/usr/bin/env python3
+                import json, sys
+                for line in sys.stdin:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    req = json.loads(line)
+                    argv = req.get("argv") or []
+                    if "version" in argv:
+                        body = {"version": "2.4.0"}
+                    elif "create" in argv:
+                        body = {"ok": True, "id": "sess-1", "launched": False}
+                    elif "query" in argv:
+                        body = {"ok": True, "composite": [{
+                            "id": "main:1",
+                            "text": "Save",
+                            "role": "button",
+                            "bounds": {"x": 1, "y": 2, "width": 10, "height": 8},
+                            "attributes": {"id": "save"},
+                            "states": ["enabled"]
+                        }]}
+                    else:
+                        body = {"ok": True}
+                    sys.stdout.write(json.dumps({
+                        "id": req.get("id"),
+                        "exit": 0,
+                        "stdout": json.dumps(body) + "\\n",
+                        "stderr": ""
+                    }) + "\\n")
+                    sys.stdout.flush()
+                """;
+        Files.createDirectories(path.getParent());
+        Files.writeString(path, script);
+        Files.setPosixFilePermissions(path, Set.of(
+                PosixFilePermission.OWNER_READ,
+                PosixFilePermission.OWNER_WRITE,
+                PosixFilePermission.OWNER_EXECUTE
+        ));
+        return path;
     }
 }

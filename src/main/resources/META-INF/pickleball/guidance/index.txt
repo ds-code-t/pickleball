@@ -82,6 +82,7 @@ maven-consumer-project/src/test/resources/features/data-element-phase-3.feature
 maven-consumer-project/src/test/resources/features/date-time-utilities.feature
 maven-consumer-project/src/test/resources/features/diagnostic-reporting-validation.feature
 maven-consumer-project/src/test/resources/features/dialogs.feature
+maven-consumer-project/src/test/resources/features/dom-composite.feature
 maven-consumer-project/src/test/resources/features/dynamic-steps.feature
 maven-consumer-project/src/test/resources/features/example-row-proof.feature
 maven-consumer-project/src/test/resources/features/expression-plain-forms.feature

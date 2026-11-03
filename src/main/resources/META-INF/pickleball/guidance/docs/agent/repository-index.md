@@ -832,6 +832,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/mapping/MappingValueCodecTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/mcp/WorkbenchAttachServerTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/mcp/WorkbenchCommandQueueTest.java`
+- `pickleball-workbench/src/test/java/tools/dscode/workbench/mcp/WorkbenchInspectRoutingTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/mcp/WorkbenchMcpRetrievalTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/mcp/WorkbenchMcpServerTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/mcp/WorkbenchStructuredErrorTest.java`
@@ -945,6 +946,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `maven-consumer-project/src/test/resources/features/date-time-utilities.feature`
 - `maven-consumer-project/src/test/resources/features/diagnostic-reporting-validation.feature`
 - `maven-consumer-project/src/test/resources/features/dialogs.feature`
+- `maven-consumer-project/src/test/resources/features/dom-composite.feature`
 - `maven-consumer-project/src/test/resources/features/dynamic-steps.feature`
 - `maven-consumer-project/src/test/resources/features/example-row-proof.feature`
 - `maven-consumer-project/src/test/resources/features/expression-plain-forms.feature`

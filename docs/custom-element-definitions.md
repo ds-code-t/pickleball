@@ -163,9 +163,9 @@ The iframe and shadow helpers set the matching flag for you.
 
 The dictionary still owns the XPath for a built-in or custom category. `ElementOperations` is the only lookup. When dom-composite is the primary path, that XPath is sent as `xpath` and is not rewritten. A phrase that has not yet been turned into XPath is translated once by `SelectorTranslator`: known categories become `role=...`, and any other capitalized name, including `Product Card`, becomes `desc="..."`.
 
-The same translator covers an OS desktop element. Set the phrase source to desktop. A template image becomes `image=template=<path>`. OCR text becomes `image=ocr~="<text>"`. The pipeline starts with `source=desktop`. Click and type are web actions. Desktop support in 2.4.0 is query, OCR, and template matching through that one adapter.
+The same translator covers an OS desktop element. Set the phrase source to desktop. A template image becomes `image=template=<path>`. OCR text becomes `image=ocr~="<text>"`. The pipeline starts with `source=desktop`. Query, OCR, and template matching go through that one adapter. Desktop click and type do not. They fail with `error:` / `fix:` naming the missing `desktop click` or `desktop type` verb until `capabilities.desktop` lists it.
 
-Live Workbench `inspect-page` and `find-element` post to the worker. The worker calls `ElementControl`, which calls `ElementOperations`. Offline HTML inspect stays on the dictionary XPath (`source=offline-html`). There is no second locator implementation in the GUI or the CLI.
+Live Workbench `inspect-page` and `find-element` post to the worker. The worker calls `PageElementQuery`, which calls `ElementOperations`. `workbench_element_inspect` calls `ElementControl`, which calls `ElementOperations`. Offline HTML inspect stays on the dictionary XPath (`source=offline-html`). There is no second locator implementation in the GUI or the CLI.
 
 ## When to add a category
 

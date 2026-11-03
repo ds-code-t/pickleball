@@ -4,6 +4,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import tools.dscode.control.protocol.DirectControlProvider;
+
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -33,8 +35,10 @@ class CompositeLocationTest {
 
     @Test
     void missingBinaryIsEmptyAndFallsBackOnce() {
-        Optional<Path> found = CompositeBinaryLocator.locate(temp.resolve("project"), Map.of(), ClassLoader.getSystemClassLoader());
-        assertTrue(found.isEmpty());
+        Path project = temp.resolve("project");
+        Path home = temp.resolve("home");
+        CompositeRuntime.use(project, Map.of(), ClassLoader.getSystemClassLoader(), home);
+        assertTrue(CompositeBinaryLocator.locate().isEmpty());
         assertFalse(CompositeRuntime.primary());
         String line = CompositeLog.lastFallbackForTests();
         assertTrue(line != null && line.contains("error:"), line);
@@ -43,6 +47,30 @@ class CompositeLocationTest {
         System.setProperty(CompositeMode.KEY, "off");
         assertFalse(CompositeRuntime.primary());
         assertTrue(CompositeLog.lastFallbackForTests() == null);
+    }
+
+    @Test
+    void primaryFollowsTheInjectedBinaryNotTheHost() throws Exception {
+        Path project = temp.resolve("project");
+        Path home = temp.resolve("home");
+        ClassLoader loader = new ClassLoader(null) {
+        };
+        CompositeRuntime.use(project, Map.of(), loader, home);
+        assertFalse(CompositeRuntime.primary());
+        String missing = CompositeLog.lastFallbackForTests();
+        assertTrue(missing != null && missing.contains("error:") && missing.contains("fix:"), missing);
+
+        CompositeRuntime.resetForTests();
+        Path binary = stub(temp.resolve("present").resolve("composite"));
+        CompositeRuntime.use(
+                project,
+                Map.of(DirectControlProvider.BIN_ENV, binary.toString()),
+                loader,
+                home
+        );
+        assertTrue(CompositeRuntime.primary());
+        assertEquals("2.4.0", CompositeRuntime.current().version());
+        assertEquals(binary.toAbsolutePath().normalize(), CompositeRuntime.current().binary());
     }
 
     @Test

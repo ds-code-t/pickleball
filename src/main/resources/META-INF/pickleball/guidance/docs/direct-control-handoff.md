@@ -131,6 +131,24 @@ Element operations join an already-attached session when the driver publishes a 
 
 Logging is off unless `pkb_composite_log` is `all` or a comma list of `location`, `adapter`, `session`, `element`, `fallback`. Lines go to the CLI and to `composite-YYYY-MM-DD.log` under `pkb_composite_log_dir` (default the temp directory `pickleball-composite-logs`). One file is capped at 1 MiB.
 
+## Desktop click, type, and native classifiers
+
+composite 2.4.0 desktop verbs are only `list`, `attach`, `walk`, `query`, `resolve`, and `close`. Browser actions are `click`, `type`, and `scroll`. There is no `desktop click` and no `desktop type`. A desktop click or type in Pickleball fails immediately. The CLI always prints `error:` and `fix:`. It is not a silent no-op, and it is not hidden when logging is off.
+
+The `fix:` names the missing verb. Expected upstream verbs are `desktop click` and `desktop type`. When a later binary's `capabilities.desktop` array lists `click` or `type`, `DomCompositeAdapter` forwards that verb. No Pickleball change is required for the drop-in.
+
+Native binaries are not published. Pickleball extracts them when they are present:
+
+| Coordinate | Value |
+|---|---|
+| Maven | `dev.domcomposite:composite-native:2.4.0:<classifier>` |
+| Classifiers | `linux-x64`, `linux-aarch64`, `windows-x64`, `macos-aarch64`, `macos-x64` |
+| Binary entry | `composite`, or `composite.exe` on `windows-x64` |
+| Classpath | `dev/domcomposite/natives/<classifier>/composite[.exe]` |
+| Local jar | `~/.m2/repository/dev/domcomposite/composite-native/2.4.0/composite-native-2.4.0-<classifier>.jar` |
+
+The runtime decision reads one set of inputs: project directory, environment, class loader, and Maven home. Production uses the working directory, the process environment, the context class loader, and `user.home`. A test pins those four so a host binary, a host `COMPOSITE_BIN`, or a host `~/.m2` classifier cannot leak into that decision.
+
 When those two descriptor fields are set, the session is already attached. Do not attach again. Join it:
 
 ```text

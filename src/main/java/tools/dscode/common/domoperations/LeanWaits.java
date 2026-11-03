@@ -180,6 +180,7 @@ public final class LeanWaits {
 
         return wait.until(d -> {
             if (element == null) return null;
+            if (element instanceof tools.dscode.common.composite.CompositeWebElement) return element;
             Boolean connected = (Boolean) ((JavascriptExecutor) d)
                     .executeScript(IS_CONNECTED_JS, element);
             return Boolean.TRUE.equals(connected) ? element : null;

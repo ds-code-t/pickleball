@@ -7,14 +7,22 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 /**
  * Maps a Pickleball element phrase, or a Selenium {@link By} the execution
  * dictionary already built, onto one composite selector. XPath and CSS produced
- * by the dictionary pass through unchanged. Phrase text, quote type, context
- * words, and categories are translated here and nowhere else.
+ * by the dictionary pass through. A space between an XPath function name and
+ * {@code (} is removed first. Composite's parser rejects {@code not (}; the
+ * expression is otherwise unchanged. Phrase text, quote type, context words,
+ * and categories are translated here and nowhere else.
  */
 public final class SelectorTranslator {
+    private static final Pattern FUNCTION_SPACE = Pattern.compile(
+            "\\b(not|contains|translate|normalize-space|string-length|count|concat|position|last|"
+                    + "substring(?:-before|-after)?|starts-with|boolean|number|string|local-name|"
+                    + "namespace-uri|name|id|true|false|floor|ceiling|round|sum|lang)\\s+\\("
+    );
     private static final Map<String, String> ROLES = new LinkedHashMap<>();
 
     static {
@@ -64,7 +72,7 @@ public final class SelectorTranslator {
         String lower = kind.toLowerCase(Locale.ROOT);
         CompositeSelector selector;
         if (lower.contains("xpath")) {
-            selector = new CompositeSelector(value, null, null, "web", null, rendered);
+            selector = new CompositeSelector(executableXPath(value), null, null, "web", null, rendered);
         } else if (lower.contains("css")) {
             selector = new CompositeSelector(null, value, null, "web", null, rendered);
         } else if (lower.contains("id")) {
@@ -91,7 +99,7 @@ public final class SelectorTranslator {
             return new CompositeSelector(null, null, null, "web", null, "empty");
         }
         if (phrase.xpath() != null && !phrase.xpath().isBlank()) {
-            CompositeSelector exact = new CompositeSelector(phrase.xpath(), null, null, source(phrase), ordinal(phrase), label(phrase));
+            CompositeSelector exact = new CompositeSelector(executableXPath(phrase.xpath()), null, null, source(phrase), ordinal(phrase), label(phrase));
             CompositeLog.debug("element", "xpath passthrough " + exact.describe());
             return exact;
         }
@@ -203,6 +211,12 @@ public final class SelectorTranslator {
         } catch (NumberFormatException failure) {
             return null;
         }
+    }
+
+    /** Composite rejects {@code not (} and the same space on other XPath functions. */
+    static String executableXPath(String xpath) {
+        if (xpath == null || xpath.isBlank()) return xpath;
+        return FUNCTION_SPACE.matcher(xpath).replaceAll("$1(");
     }
 
     private static String role(String category) {

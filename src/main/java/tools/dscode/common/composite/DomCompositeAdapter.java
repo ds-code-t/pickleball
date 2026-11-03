@@ -8,14 +8,24 @@ import org.openqa.selenium.WebElement;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 /** The only composite call path for find, click, type, hover, scroll, keys, and desktop. */
 public final class DomCompositeAdapter {
+    /** Desktop verbs composite 2.4.0 reports. Click and type are not in this set. */
+    public static final List<String> DESKTOP_VERBS_2_4_0 = List.of(
+            "list", "attach", "walk", "query", "resolve", "close"
+    );
+
     private static final DomCompositeAdapter INSTANCE = new DomCompositeAdapter();
     private final ThreadLocal<ArrayDeque<String>> frames = ThreadLocal.withInitial(ArrayDeque::new);
     private final ThreadLocal<ArrayDeque<String>> shadows = ThreadLocal.withInitial(ArrayDeque::new);
+    private volatile Client verbClient;
+    private volatile Set<String> desktopVerbs;
 
     private DomCompositeAdapter() {
     }
@@ -43,17 +53,27 @@ public final class DomCompositeAdapter {
     }
 
     public void click(CompositeWebElement element) {
+        if (desktopSource(element)) {
+            desktopAct("click", element);
+            return;
+        }
         act("click", element, Map.of());
     }
 
     public void type(CompositeWebElement element, String text) {
+        if (desktopSource(element)) {
+            desktopAct("type", element, Map.of("text", text == null ? "" : text));
+            return;
+        }
         act("type", element, Map.of("text", text == null ? "" : text));
     }
 
     public void hover(CompositeWebElement element) {
         Map<String, Object> extra = new LinkedHashMap<>();
+        String id = element.attributes().get("id");
         String css = element.selector().css();
-        extra.put("force_hover", css != null && !css.isBlank() ? css : "true");
+        String hoverCss = id != null && !id.isBlank() ? "#" + id : css;
+        if (hoverCss != null && !hoverCss.isBlank()) extra.put("force_hover", hoverCss);
         act("query", element, extra);
     }
 
@@ -79,14 +99,87 @@ public final class DomCompositeAdapter {
     }
 
     public JsonNode desktop(String verb, ElementPhrase phrase) {
+        String name = verb == null || verb.isBlank() ? "query" : verb.trim();
+        if (desktopMutation(name)) requireDesktopVerb(name);
         ElementPhrase desktop = phrase.source() != null && phrase.source().equals("desktop")
                 ? phrase
                 : phrase.source("desktop");
         CompositeSelector selector = SelectorTranslator.phrase(desktop);
-        CompositeLog.info("adapter", "desktop " + verb + " " + selector.describe());
+        CompositeLog.info("adapter", "desktop " + name + " " + selector.describe());
         dev.domcomposite.Client open = CompositeRuntime.ensureClient();
         if (open == null) throw new IllegalStateException("composite client is not open");
-        return open.desktop(verb == null || verb.isBlank() ? "query" : verb, selector.body(List.of(), List.of()));
+        return open.desktop(name, selector.body(List.of(), List.of()));
+    }
+
+    private void desktopAct(String verb, CompositeWebElement element) {
+        desktopAct(verb, element, Map.of());
+    }
+
+    private void desktopAct(String verb, CompositeWebElement element, Map<String, Object> extra) {
+        requireDesktopVerb(verb);
+        Client open = CompositeRuntime.ensureClient();
+        if (open == null) throw new IllegalStateException("composite client is not open");
+        Map<String, Object> body = new LinkedHashMap<>(element.actionBody(list(frames), list(shadows)));
+        if (extra != null) body.putAll(extra);
+        CompositeLog.info("adapter", "desktop " + verb + " " + element.selector().describe());
+        open.desktop(verb, body);
+    }
+
+    private void requireDesktopVerb(String verb) {
+        Set<String> reported = desktopVerbs();
+        if (reported.contains(verb.toLowerCase(Locale.ROOT))) return;
+        String shown = reported.isEmpty() ? "(none)" : String.join(", ", reported);
+        String error = "dom-composite " + CompositeBinaryLocator.VERSION
+                + " has no desktop " + verb + " verb (capabilities.desktop is " + shown + ")";
+        String fix = "Upstream must add desktop verb `" + verb
+                + "`. Expected verbs are `desktop click` and `desktop type`. "
+                + "2.4.0 desktop verbs are " + String.join(", ", DESKTOP_VERBS_2_4_0) + ". "
+                + "Drop in dev.domcomposite:composite-native:" + CompositeBinaryLocator.VERSION
+                + " classifiers " + String.join(", ", CompositeBinaryLocator.CLASSIFIERS)
+                + ". The binary name is composite, or composite.exe on windows-x64. "
+                + "Classpath entry: dev/domcomposite/natives/<classifier>/composite[.exe]. "
+                + "Maven jar: ~/.m2/repository/dev/domcomposite/composite-native/"
+                + CompositeBinaryLocator.VERSION + "/composite-native-" + CompositeBinaryLocator.VERSION
+                + "-<classifier>.jar. When capabilities.desktop lists `" + verb
+                + "`, this adapter forwards it. No Pickleball change is required.";
+        CompositeLog.always(error, fix);
+        throw new IllegalStateException("error: " + error);
+    }
+
+    private Set<String> desktopVerbs() {
+        Client open = CompositeRuntime.ensureClient();
+        if (open == null) return Set.copyOf(DESKTOP_VERBS_2_4_0);
+        Set<String> cached = desktopVerbs;
+        if (open == verbClient && cached != null) return cached;
+        Set<String> loaded = loadDesktopVerbs(open);
+        verbClient = open;
+        desktopVerbs = loaded;
+        return loaded;
+    }
+
+    private static Set<String> loadDesktopVerbs(Client open) {
+        try {
+            JsonNode caps = open.capabilities();
+            JsonNode list = caps == null ? null : caps.get("desktop");
+            if (list == null || !list.isArray()) return Set.copyOf(DESKTOP_VERBS_2_4_0);
+            Set<String> verbs = new LinkedHashSet<>();
+            for (JsonNode item : list) {
+                String name = item.asText("").trim().toLowerCase(Locale.ROOT);
+                if (!name.isEmpty()) verbs.add(name);
+            }
+            return Set.copyOf(verbs);
+        } catch (RuntimeException ignored) {
+            return Set.copyOf(DESKTOP_VERBS_2_4_0);
+        }
+    }
+
+    private static boolean desktopMutation(String verb) {
+        return "click".equalsIgnoreCase(verb) || "type".equalsIgnoreCase(verb);
+    }
+
+    private static boolean desktopSource(CompositeWebElement element) {
+        if (element == null || element.selector() == null) return false;
+        return "desktop".equalsIgnoreCase(element.selector().source());
     }
 
     public void pushFrame(String id) {

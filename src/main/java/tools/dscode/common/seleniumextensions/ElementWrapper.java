@@ -135,6 +135,10 @@ public class ElementWrapper implements WebElement, WrapsElement {
 
     @SuppressWarnings("unchecked")
     private void takeSnapshot(WebElement snapshotElement) {
+        if (snapshotElement instanceof tools.dscode.common.composite.CompositeWebElement composite) {
+            takeCompositeSnapshot(composite);
+            return;
+        }
         ObjectNode snapshot = MAPPER.createObjectNode();
         JavascriptExecutor js = javascriptExecutor();
 
@@ -212,6 +216,27 @@ public class ElementWrapper implements WebElement, WrapsElement {
                 snapshotElement
         )).intValue();
         snapshot.put("sameTagIndex", sameTagIndex);
+        this.attributeSnapshot = snapshot;
+    }
+
+    private void takeCompositeSnapshot(tools.dscode.common.composite.CompositeWebElement element) {
+        ObjectNode snapshot = MAPPER.createObjectNode();
+        String tagName = safeTagName(element);
+        snapshot.put("tagName", tagName);
+        String textContent;
+        if ("textarea".equals(tagName) || "input".equals(tagName)) {
+            textContent = safeDomAttribute(element, "value");
+        } else {
+            textContent = element.getText();
+            if (textContent == null || textContent.isEmpty()) {
+                textContent = safeDomAttribute(element, "value");
+            }
+        }
+        snapshot.put("textContent", textContent == null ? "" : textContent);
+        ObjectNode attrNode = snapshot.putObject("attributes");
+        element.attributes().forEach(attrNode::put);
+        snapshot.put("siblingIndex", 0);
+        snapshot.put("sameTagIndex", 0);
         this.attributeSnapshot = snapshot;
     }
 
@@ -869,6 +894,14 @@ public class ElementWrapper implements WebElement, WrapsElement {
      * other WebDriver scrolling failures remain non-fatal.
      */
     public void scrollIntoView() {
+        if (element instanceof tools.dscode.common.composite.CompositeWebElement) {
+            try {
+                tools.dscode.common.composite.ElementOperations.scroll(driver, element, 0);
+            } catch (RuntimeException ignored) {
+                // The composite node is already a live hit. A scroll miss must not fail presence.
+            }
+            return;
+        }
         try {
             executeScript(CENTER_SCROLL_SCRIPT);
         } catch (StaleElementReferenceException stale) {

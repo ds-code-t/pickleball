@@ -313,7 +313,7 @@ For child steps, use [Nested Steps](nested-steps.md). For report-focused branch 
 
 ## Dom-composite translation
 
-Gherkin element phrases do not change. `SelectorTranslator` is the only place that turns a phrase into a dom-composite pipeline. `ExecutionDictionary` still builds the XPath it already built. That XPath, and any CSS, is passed through unchanged.
+Gherkin element phrases do not change. `SelectorTranslator` is the only place that turns a phrase into a dom-composite pipeline. `ExecutionDictionary` still builds the XPath it already built. That XPath, and any CSS, is passed through. A space between an XPath function name and `(` is removed, because composite rejects `not (`.
 
 | Phrase | Pipeline |
 |---|---|
@@ -328,10 +328,11 @@ Gherkin element phrases do not change. `SelectorTranslator` is the only place th
 
 `pkb_composite=auto` (the default) uses this path when the `composite` binary is present. `pkb_composite=off` keeps Selenium for that run and does not translate. See [Configuration](configuration.md).
 
-dom-composite 2.4.0 has click, type, and scroll. It has no double-click, context-click, or drag verb. On the composite path a double-click is two clicks, a context-click is one click, and a drag is click, then scroll by the offset, then click. Desktop queries use `source=desktop` with `image=template=` and `image=ocr~=`. A desktop session does not accept click or type. WebDriver stays for browser lifecycle only: navigation, window handles, and the CDP address.
+dom-composite 2.4.0 has click, type, and scroll. It has no double-click, context-click, or drag verb. On the composite path a double-click is two clicks, a context-click is one click, and a drag is click, then scroll by the offset, then click. A `press` of only letters and digits uses composite type. A lone `A`–`Z` is lowercased, matching the key parser. Named keys and chords (`ENTER`, `TAB`, `CONTROL[A]`, `A+B`, arrows) focus through a composite click, then use WebDriver Actions, because 2.4.0 has no keydown verb. Desktop queries use `source=desktop` with `image=template=` and `image=ocr~=`. Desktop `click` and `type` are refused with `error:` / `fix:`. The 2.4.0 desktop verbs are `list`, `attach`, `walk`, `query`, `resolve`, and `close`. Expected upstream verbs are `desktop click` and `desktop type`. When `capabilities.desktop` lists a verb, the same adapter forwards it. No Pickleball change is required for that drop-in. The native jar is `dev.domcomposite:composite-native:2.4.0` with classifiers `linux-x64`, `linux-aarch64`, `windows-x64`, `macos-aarch64`, and `macos-x64` (binary `composite`, or `composite.exe` on Windows). WebDriver stays for browser lifecycle only: navigation, window handles, and the CDP address.
 
 ## Working examples
 
+- [Dom-composite adapter actions, lookups, and backward-compatible phrases](../maven-consumer-project/src/test/resources/features/dom-composite.feature)
 - [Core dynamic-step playground](../maven-consumer-project/src/test/resources/features/dynamic-steps.feature)
 - [Form actions, state assertions, chains, and pointer actions](../maven-consumer-project/src/test/resources/features/forms-dynamic-steps.feature)
 - [The `it` placeholder, including a trailing phrase after `click it`](../maven-consumer-project/src/test/resources/features/it-placeholder.feature)

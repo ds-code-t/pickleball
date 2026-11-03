@@ -4,6 +4,7 @@ import org.openqa.selenium.By;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 import tools.dscode.common.assertions.ValueWrapper;
+import tools.dscode.common.composite.ElementOperations;
 import tools.dscode.common.domoperations.ExecutionDictionary;
 import tools.dscode.common.treeparsing.DefinitionContext;
 
@@ -16,8 +17,9 @@ import java.util.Set;
 
 /**
  * Read-only live element counts. Builds an XPath with the execution dictionary,
- * then calls {@code findElements} and {@code isDisplayed}. It does not click,
- * type, or add a wait.
+ * then calls {@link ElementOperations#findElements} and {@code isDisplayed}.
+ * It does not click, type, or add a wait. Composite is used when that runtime
+ * is primary. The implicit wait is zeroed around the legacy driver call.
  */
 public final class PageElementQuery {
     private static final String INTERACTIVE_XPATH =
@@ -80,7 +82,7 @@ public final class PageElementQuery {
             previous = null;
         }
         try {
-            List<WebElement> found = driver.findElements(By.xpath(xpath));
+            List<WebElement> found = ElementOperations.findElements(driver, By.xpath(xpath));
             return found == null ? List.of() : found;
         } finally {
             if (previous != null) {

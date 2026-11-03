@@ -6,6 +6,7 @@ import org.openqa.selenium.SearchContext;
 import org.openqa.selenium.StaleElementReferenceException;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.WrapsDriver;
+import tools.dscode.common.composite.CompositeWebElement;
 import tools.dscode.common.dataoperations.TextOp;
 import tools.dscode.common.dataoperations.TextPredicateMatcher;
 import tools.dscode.common.domoperations.ExecutionDictionary;
@@ -163,6 +164,10 @@ public final class NestedByLocator {
      * Selenium {@code getText()} can return an empty string for that button.
      */
     private static String matchText(JavascriptExecutor javascript, WebElement element) {
+        if (element instanceof CompositeWebElement) {
+            String visible = element.getText();
+            return visible == null ? "" : visible;
+        }
         if (javascript != null) {
             Object content = javascript.executeScript(
                     "var el = arguments[0]; return el.textContent == null ? '' : el.textContent;",
@@ -273,11 +278,17 @@ public final class NestedByLocator {
             NestingMode mode
     ) {
         JavascriptExecutor js = getJavascriptExecutor(context, matches);
-        if (js == null) {
+        if (js == null || compositeHits(matches)) {
             return null;
         }
 
-        Object raw = js.executeScript(JS_FILTER_BY_NESTING, matches, mode.name());
+        Object raw;
+        try {
+            raw = js.executeScript(JS_FILTER_BY_NESTING, matches, mode.name());
+        } catch (RuntimeException ignored) {
+            // Composite hits are not Selenium elements. The Java fallback filters those.
+            return null;
+        }
 
         if (!(raw instanceof List<?> flags) || flags.size() != matches.size()) {
             return null;
@@ -300,6 +311,7 @@ public final class NestedByLocator {
      * Breaks as soon as the answer becomes true for that element.
      */
     private static List<WebElement> deepestOnlyFallback(List<WebElement> matches, By within) {
+        if (compositeHits(matches)) return compositeDeepest(matches);
         Set<WebElement> matchSet = new HashSet<>(matches);
         List<WebElement> out = new ArrayList<>(matches.size());
 
@@ -331,6 +343,7 @@ public final class NestedByLocator {
      * Also stops early once only one possible outermost element remains.
      */
     private static List<WebElement> outermostOnlyFallback(List<WebElement> matches, By within) {
+        if (compositeHits(matches)) return compositeOutermost(matches);
         Set<WebElement> matchSet = new HashSet<>(matches);
         Set<WebElement> containedByAnotherMatch = new HashSet<>();
         int remainingPossibleOutermost = matches.size();
@@ -362,6 +375,55 @@ public final class NestedByLocator {
         }
 
         return out;
+    }
+
+    private static boolean compositeHits(List<WebElement> matches) {
+        for (WebElement el : matches) {
+            if (el instanceof CompositeWebElement) return true;
+        }
+        return false;
+    }
+
+    /** Drop a match when one of the other matches is inside it. Keep the original list if that would drop all of them. */
+    private static List<WebElement> compositeDeepest(List<WebElement> matches) {
+        Set<WebElement> containers = compositeContainers(matches);
+        if (containers.isEmpty()) return matches;
+        List<WebElement> out = new ArrayList<>();
+        for (WebElement el : matches) {
+            if (!containers.contains(el)) out.add(el);
+        }
+        return out.isEmpty() ? matches : out;
+    }
+
+    /** Drop a match when it sits inside another match. */
+    private static List<WebElement> compositeOutermost(List<WebElement> matches) {
+        Set<WebElement> contained = new HashSet<>();
+        for (WebElement inner : matches) {
+            if (!(inner instanceof CompositeWebElement composite)) continue;
+            for (WebElement ancestor : composite.ancestorElements()) {
+                if (!ancestor.equals(inner) && matches.contains(ancestor)) {
+                    contained.add(inner);
+                    break;
+                }
+            }
+        }
+        if (contained.isEmpty()) return matches;
+        List<WebElement> out = new ArrayList<>();
+        for (WebElement el : matches) {
+            if (!contained.contains(el)) out.add(el);
+        }
+        return out.isEmpty() ? matches : out;
+    }
+
+    private static Set<WebElement> compositeContainers(List<WebElement> matches) {
+        Set<WebElement> containers = new HashSet<>();
+        for (WebElement inner : matches) {
+            if (!(inner instanceof CompositeWebElement composite)) continue;
+            for (WebElement ancestor : composite.ancestorElements()) {
+                if (!ancestor.equals(inner) && matches.contains(ancestor)) containers.add(ancestor);
+            }
+        }
+        return containers;
     }
 
     /**

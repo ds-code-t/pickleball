@@ -10,6 +10,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Enumeration;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -38,25 +39,44 @@ public final class CompositeBinaryLocator {
     }
 
     public static Optional<Path> locate() {
-        return locate(Path.of("").toAbsolutePath(), System.getenv(), Thread.currentThread().getContextClassLoader());
+        return locate(CompositeRuntime.sources());
     }
 
     public static Optional<Path> locate(Path project, Map<String, String> env, ClassLoader loader) {
-        Map<String, String> environment = env == null ? Map.of() : env;
+        Map<String, String> properties = new LinkedHashMap<>();
+        copyProperty(properties, BIN_KEY);
+        copyProperty(properties, "pkb_runvars." + BIN_KEY);
+        copyProperty(properties, CompositeMode.KEY);
+        copyProperty(properties, "pkb_runvars." + CompositeMode.KEY);
+        String home = System.getProperty("user.home", "");
+        return locate(new CompositeRuntime.Sources(
+                project == null ? Path.of("").toAbsolutePath() : project,
+                env,
+                loader,
+                home.isBlank() ? null : Path.of(home),
+                properties,
+                true
+        ));
+    }
+
+    public static Optional<Path> locate(CompositeRuntime.Sources sources) {
+        CompositeRuntime.Sources resolved = sources == null ? CompositeRuntime.sources() : sources;
+        Map<String, String> environment = resolved.env() == null ? Map.of() : resolved.env();
+        Map<String, String> properties = resolved.properties() == null ? Map.of() : resolved.properties();
         String named = first(
-                text(System.getProperty(BIN_KEY)),
-                text(System.getProperty("pkb_runvars." + BIN_KEY)),
+                text(properties.get(BIN_KEY)),
+                text(properties.get("pkb_runvars." + BIN_KEY)),
                 text(environment.get(DirectControlProvider.BIN_ENV)),
                 text(environment.get(BIN_KEY))
         );
-        Path explicit = executable(named, project);
+        Path explicit = executable(named, resolved.project());
         if (explicit != null) {
             CompositeLog.info("location", "binary " + explicit);
             return Optional.of(explicit);
         }
         Optional<Path> discovered = DirectControlProvider.resolveBinary(
                 DirectControlProvider.TOKEN,
-                project,
+                resolved.project(),
                 environment
         );
         if (discovered.isPresent()) {
@@ -64,17 +84,17 @@ public final class CompositeBinaryLocator {
             return discovered;
         }
         String classifier = classifier();
-        Optional<Path> extracted = extractResource(loader, classifier);
+        Optional<Path> extracted = extractResource(resolved.loader(), classifier);
         if (extracted.isPresent()) {
             CompositeLog.info("location", "extracted " + classifier + " " + extracted.get());
             return extracted;
         }
-        Optional<Path> jar = extractMavenClassifier(classifier);
+        Optional<Path> jar = extractMavenClassifier(classifier, resolved.home());
         if (jar.isPresent()) {
             CompositeLog.info("location", "classifier " + classifier + " " + jar.get());
             return jar;
         }
-        if (CompositeMode.current().required()) {
+        if (CompositeMode.parse(CompositeMode.read(CompositeMode.KEY, resolved)).required()) {
             Path path = pathBinary(environment);
             if (path != null) {
                 CompositeLog.info("location", "PATH " + path);
@@ -111,11 +131,11 @@ public final class CompositeBinaryLocator {
         }
     }
 
-    static Optional<Path> extractMavenClassifier(String classifier) {
-        String home = System.getProperty("user.home");
-        if (home == null || home.isBlank()) return Optional.empty();
-        Path jar = Path.of(home, ".m2", "repository", "dev", "domcomposite", NATIVE_ARTIFACT, VERSION,
-                NATIVE_ARTIFACT + "-" + VERSION + "-" + classifier + ".jar");
+    static Optional<Path> extractMavenClassifier(String classifier, Path home) {
+        if (home == null || classifier == null) return Optional.empty();
+        Path jar = home.resolve(".m2").resolve("repository").resolve("dev").resolve("domcomposite")
+                .resolve(NATIVE_ARTIFACT).resolve(VERSION)
+                .resolve(NATIVE_ARTIFACT + "-" + VERSION + "-" + classifier + ".jar");
         if (!Files.isRegularFile(jar)) return Optional.empty();
         String name = binaryName(classifier);
         try (JarFile archive = new JarFile(jar.toFile())) {
@@ -183,6 +203,11 @@ public final class CompositeBinaryLocator {
         path = path.toAbsolutePath().normalize();
         if (!Files.isRegularFile(path) || !Files.isExecutable(path)) return null;
         return path;
+    }
+
+    private static void copyProperty(Map<String, String> properties, String key) {
+        String value = System.getProperty(key);
+        if (value != null) properties.put(key, value);
     }
 
     private static String first(String... values) {

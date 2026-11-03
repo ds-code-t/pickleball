@@ -47,6 +47,11 @@ class PrimaryPathAuditTest {
         assertTrue(source.contains("ElementOperations.findElements"), source);
         assertTrue(!source.contains("driver.findElement"), source);
         assertTrue(!source.contains("driver.findElements"), source);
+        String pageQuery = Files.readString(Path.of(
+                "pickleball-control-api/src/main/java/tools/dscode/control/api/PageElementQuery.java"));
+        assertTrue(pageQuery.contains("ElementOperations.findElements"), pageQuery);
+        assertTrue(!pageQuery.contains("driver.findElement"), pageQuery);
+        assertTrue(!pageQuery.contains("driver.findElements"), pageQuery);
     }
 
     private static void scan(Path path, List<String> leaks) {

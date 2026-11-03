@@ -71,7 +71,7 @@ A single literal character can be used directly:
 A B 1 . / -
 ```
 
-Key names match the Selenium `Keys` name in any case. `Enter`, `enter`, and `ENTER` are the Enter key. `Tab` and `Down` are the Tab and Down keys. `control[a]` and `CONTROL[A]` both hold Control and press the A key. A single letter is that key. `SPACE` is the space key. A space character separates sequential keys; it is not `+` and it is not the `SPACE` key. `+` presses keys together. `[ ]` holds the key or group before the brackets. An unknown name such as `NOT_A_KEY` fails with `Unknown key: NOT_A_KEY`.
+Key names match the Selenium `Keys` name in any case. `Enter`, `enter`, and `ENTER` are the Enter key. `Tab` and `Down` are the Tab and Down keys. `control[a]` and `CONTROL[A]` both hold Control and press the A key. A single letter is that key. `SPACE` is the space key. A space character separates sequential keys; it is not `+` and it is not the `SPACE` key. `+` presses keys together. `[ ]` holds the key or group before the brackets. An unknown name such as `NOT_A_KEY` fails with `Unknown key: NOT_A_KEY`. On the composite path, a sequence of only those single characters is inserted with composite type, and a lone A-Z is lowercased. Named keys, `+` chords, and `[ ]` holds focus the element with a composite click and then use WebDriver Actions, because composite 2.4.0 has no keydown verb.
 
 A multi-character token is interpreted as one key name, not as text. Write:
 

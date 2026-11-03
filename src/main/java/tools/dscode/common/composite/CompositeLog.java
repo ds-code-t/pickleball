@@ -25,6 +25,7 @@ public final class CompositeLog {
 
     private static final AtomicBoolean FALLBACK = new AtomicBoolean();
     private static volatile String lastFallback;
+    private static volatile String lastError;
 
     private CompositeLog() {
     }
@@ -32,10 +33,15 @@ public final class CompositeLog {
     public static void resetForTests() {
         FALLBACK.set(false);
         lastFallback = null;
+        lastError = null;
     }
 
     public static String lastFallbackForTests() {
         return lastFallback;
+    }
+
+    public static String lastErrorForTests() {
+        return lastError;
     }
 
     public static boolean enabled(String entity) {
@@ -70,6 +76,18 @@ public final class CompositeLog {
             System.err.println("error: " + error);
             System.err.println("fix: " + fix);
         }
+    }
+
+    /**
+     * Always printed. Desktop click and type use this so a missing upstream
+     * verb is not hidden behind {@code pkb_composite_log}.
+     */
+    public static void always(String error, String fix) {
+        String block = "error: " + error + "\nfix: " + fix;
+        lastError = block;
+        System.err.println("error: " + error);
+        System.err.println("fix: " + fix);
+        write(block, true);
     }
 
     public static void errorFix(String entity, String error, String fix) {

@@ -6,6 +6,7 @@ import org.openqa.selenium.remote.RemoteWebDriver;
 
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
@@ -23,23 +24,94 @@ public final class CompositeRuntime {
     private static volatile Decision decision;
     private static volatile Client client;
     private static volatile String joinedCdp;
+    private static volatile Sources override;
 
     private CompositeRuntime() {
     }
 
-    public static void resetForTests() {
-        Client open = client;
-        client = null;
+    /**
+     * The inputs {@link #decide(Sources)} reads. Production uses {@link #live()}.
+     * Tests call {@link #use(Path, Map, ClassLoader, Path)}, which installs an
+     * override with an empty property map so host {@code -D}, host env, cwd
+     * siblings, {@code ~/.m2}, and {@code PATH} cannot leak in.
+     */
+    public record Sources(
+            Path project,
+            Map<String, String> env,
+            ClassLoader loader,
+            Path home,
+            Map<String, String> properties,
+            boolean runVars
+    ) {
+        public Sources {
+            env = env == null ? Map.of() : Map.copyOf(env);
+            properties = properties == null ? Map.of() : Map.copyOf(properties);
+        }
+
+        public static Sources live() {
+            Map<String, String> properties = new LinkedHashMap<>();
+            for (String key : List.of(
+                    CompositeBinaryLocator.BIN_KEY,
+                    "pkb_runvars." + CompositeBinaryLocator.BIN_KEY,
+                    CompositeMode.KEY,
+                    "pkb_runvars." + CompositeMode.KEY,
+                    CompositeLog.KEY,
+                    "pkb_runvars." + CompositeLog.KEY,
+                    CompositeLog.DIR_KEY,
+                    "pkb_runvars." + CompositeLog.DIR_KEY
+            )) {
+                String value = System.getProperty(key);
+                if (value != null) properties.put(key, value);
+            }
+            String home = System.getProperty("user.home", "");
+            ClassLoader loader = Thread.currentThread().getContextClassLoader();
+            return new Sources(
+                    Path.of("").toAbsolutePath(),
+                    System.getenv(),
+                    loader == null ? ClassLoader.getSystemClassLoader() : loader,
+                    home.isBlank() ? null : Path.of(home),
+                    properties,
+                    true
+            );
+        }
+    }
+
+    /** Active test override, or null when this JVM should use {@link Sources#live()}. */
+    static Sources pinned() {
+        return override;
+    }
+
+    static Sources sources() {
+        Sources pinned = override;
+        return pinned != null ? pinned : Sources.live();
+    }
+
+    /**
+     * Pins the runtime decision to these inputs. Properties are empty, so a
+     * host {@code -Dpkb_composite*} or {@code PKB_COMPOSITE} is not visible
+     * until {@link #resetForTests()}.
+     */
+    public static void use(Path project, Map<String, String> env, ClassLoader loader, Path home) {
+        closeClient();
         decision = null;
         joinedCdp = null;
+        override = new Sources(
+                project == null ? Path.of("").toAbsolutePath() : project,
+                env,
+                loader,
+                home,
+                Map.of(),
+                false
+        );
         CompositeLog.resetForTests();
-        if (open != null) {
-            try {
-                open.close();
-            } catch (RuntimeException ignored) {
-                // The test stub may already have exited.
-            }
-        }
+    }
+
+    public static void resetForTests() {
+        closeClient();
+        decision = null;
+        joinedCdp = null;
+        override = null;
+        CompositeLog.resetForTests();
     }
 
     public static boolean primary() {
@@ -113,12 +185,16 @@ public final class CompositeRuntime {
     }
 
     private static Decision decide() {
-        CompositeMode mode = CompositeMode.current();
+        return decide(sources());
+    }
+
+    static Decision decide(Sources sources) {
+        CompositeMode mode = CompositeMode.parse(CompositeMode.read(CompositeMode.KEY, sources));
         if (mode.disabled()) {
             CompositeLog.debug("location", "pkb_composite=off");
             return Decision.legacy("off");
         }
-        Optional<Path> binary = CompositeBinaryLocator.locate();
+        Optional<Path> binary = CompositeBinaryLocator.locate(sources);
         if (binary.isEmpty()) {
             CompositeLog.fallbackOnce(MISSING, MISSING_FIX);
             return Decision.legacy("missing");
@@ -135,6 +211,18 @@ public final class CompositeRuntime {
                     MISSING_FIX
             );
             return Decision.legacy("client");
+        }
+    }
+
+    private static void closeClient() {
+        Client open = client;
+        client = null;
+        if (open != null) {
+            try {
+                open.close();
+            } catch (RuntimeException ignored) {
+                // The test stub may already have exited.
+            }
         }
     }
 

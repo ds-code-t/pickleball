@@ -1,6 +1,7 @@
 package tools.dscode.common.composite;
 
 import java.util.Locale;
+import java.util.Map;
 
 /**
  * {@code pkb_composite} selects the element backend for this run.
@@ -17,7 +18,12 @@ public enum CompositeMode {
     public static final String KEY = "pkb_composite";
 
     public static CompositeMode current() {
-        String raw = setting(KEY);
+        CompositeRuntime.Sources pinned = CompositeRuntime.pinned();
+        if (pinned != null) return parse(read(KEY, pinned));
+        return parse(setting(KEY));
+    }
+
+    public static CompositeMode parse(String raw) {
         if (raw == null) return AUTO;
         return switch (raw.toLowerCase(Locale.ROOT)) {
             case "off", "false", "legacy", "selenium" -> OFF;
@@ -34,7 +40,23 @@ public enum CompositeMode {
         return this == OFF;
     }
 
+    static String read(String key, CompositeRuntime.Sources sources) {
+        Map<String, String> properties = sources.properties() == null ? Map.of() : sources.properties();
+        String property = text(properties.get(key));
+        if (property != null) return property;
+        property = text(properties.get("pkb_runvars." + key));
+        if (property != null) return property;
+        Map<String, String> env = sources.env() == null ? Map.of() : sources.env();
+        property = text(env.get(key.toUpperCase(Locale.ROOT)));
+        if (property != null) return property;
+        property = text(env.get(key));
+        if (property != null) return property;
+        return sources.runVars() ? runVar(key) : null;
+    }
+
     static String setting(String key) {
+        CompositeRuntime.Sources pinned = CompositeRuntime.pinned();
+        if (pinned != null) return read(key, pinned);
         String property = text(System.getProperty(key));
         if (property != null) return property;
         property = text(System.getProperty("pkb_runvars." + key));

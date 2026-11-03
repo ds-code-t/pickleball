@@ -18,6 +18,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class SelectorAndAdapterTest {
@@ -62,6 +63,12 @@ class SelectorAndAdapterTest {
         assertEquals("//button[@id='save']", xpath.xpath());
         assertTrue(xpath.pipeline() == null);
 
+        CompositeSelector spaced = SelectorTranslator.fromBy(By.xpath("//input[( not ( @hidden ))]"));
+        assertEquals("//input[( not( @hidden ))]", spaced.xpath());
+        assertFalse(spaced.xpath().contains("not ("));
+        CompositeSelector kept = SelectorTranslator.fromBy(By.xpath("//a[true() and ( @id )]"));
+        assertTrue(kept.xpath().contains("and ("), kept.xpath());
+
         CompositeSelector css = SelectorTranslator.fromBy(By.cssSelector("#go"));
         assertEquals("#go", css.css());
 
@@ -77,7 +84,7 @@ class SelectorAndAdapterTest {
     @Test
     void adapterClicksTypesAndQueriesDesktopThroughOneClient() throws Exception {
         Path log = temp.resolve("calls.log");
-        Path binary = stub(temp.resolve("composite"), log);
+        Path binary = stub(temp.resolve("composite"), log, false);
         System.setProperty(CompositeBinaryLocator.BIN_KEY, binary.toString());
         System.setProperty(CompositeLog.DIR_KEY, temp.resolve("logs").toString());
         assertTrue(ElementOperations.primary());
@@ -102,6 +109,46 @@ class SelectorAndAdapterTest {
     }
 
     @Test
+    void desktopClickAndTypeNameTheMissingUpstreamVerb() throws Exception {
+        Path log = temp.resolve("calls.log");
+        Path binary = stub(temp.resolve("composite"), log, false);
+        System.setProperty(CompositeBinaryLocator.BIN_KEY, binary.toString());
+        System.setProperty(CompositeLog.DIR_KEY, temp.resolve("logs").toString());
+        IllegalStateException click = assertThrows(
+                IllegalStateException.class,
+                () -> ElementOperations.desktop("click", ElementPhrase.of("Button", "Save"))
+        );
+        assertTrue(click.getMessage().contains("desktop click"), click.getMessage());
+        String line = CompositeLog.lastErrorForTests();
+        assertTrue(line.contains("error:"), line);
+        assertTrue(line.contains("fix:"), line);
+        assertTrue(line.contains("desktop type"), line);
+        assertTrue(line.contains("dev.domcomposite:composite-native:2.4.0"), line);
+        assertTrue(line.contains("linux-x64"), line);
+        assertTrue(line.contains("composite.exe"), line);
+        assertTrue(line.contains("composite-native-2.4.0-<classifier>.jar"), line);
+        List<WebElement> found = DomCompositeAdapter.get().find(
+                SelectorTranslator.phrase(ElementPhrase.of("Button", "Save").source("desktop")));
+        CompositeWebElement element = assertInstanceOf(CompositeWebElement.class, found.get(0));
+        assertThrows(IllegalStateException.class, element::click);
+        assertThrows(IllegalStateException.class, () -> element.sendKeys("Ava"));
+        String calls = Files.readString(log);
+        assertFalse(calls.contains("desktop/click") || calls.contains("desktop click"), calls);
+    }
+
+    @Test
+    void desktopClickForwardsWhenCapabilitiesListsTheVerb() throws Exception {
+        Path log = temp.resolve("forward.log");
+        Path binary = stub(temp.resolve("forward").resolve("composite"), log, true);
+        System.setProperty(CompositeBinaryLocator.BIN_KEY, binary.toString());
+        System.setProperty(CompositeLog.DIR_KEY, temp.resolve("logs").toString());
+        ElementOperations.JsonDesktop hit = ElementOperations.desktop("click", ElementPhrase.of("Button", "Save"));
+        assertEquals(1, hit.size());
+        assertTrue(CompositeLog.lastErrorForTests() == null);
+        assertTrue(Files.readString(log).contains("desktop"), Files.readString(log));
+    }
+
+    @Test
     void missingBinaryUsesTheLegacySearchContext() {
         System.setProperty(CompositeMode.KEY, "off");
         AtomicInteger hits = new AtomicInteger();
@@ -123,7 +170,10 @@ class SelectorAndAdapterTest {
         assertEquals(1, hits.get());
     }
 
-    private static Path stub(Path path, Path log) throws Exception {
+    private static Path stub(Path path, Path log, boolean desktopClick) throws Exception {
+        String desktop = desktopClick
+                ? "[\"list\", \"attach\", \"walk\", \"query\", \"resolve\", \"close\", \"click\", \"type\"]"
+                : "[\"list\", \"attach\", \"walk\", \"query\", \"resolve\", \"close\"]";
         String script = """
                 #!/usr/bin/env python3
                 import json, sys
@@ -141,6 +191,8 @@ class SelectorAndAdapterTest {
                     joined = " ".join(argv)
                     if "version" in argv:
                         body = {"version": "2.4.0"}
+                    elif "capabilities" in argv:
+                        body = {"ok": True, "desktop": %s, "actions": ["click", "type", "scroll"]}
                     elif "create" in argv:
                         body = {"ok": True, "id": "sess-1", "launched": False}
                     elif "desktop" in argv or "query" in argv or "click" in argv or "type" in argv or "scroll" in argv:
@@ -162,7 +214,7 @@ class SelectorAndAdapterTest {
                         "stderr": ""
                     }) + "\\n")
                     sys.stdout.flush()
-                """.formatted(quote(log.toString()));
+                """.formatted(quote(log.toString()), desktop);
         Files.createDirectories(path.getParent());
         Files.writeString(path, script);
         Files.setPosixFilePermissions(path, Set.of(

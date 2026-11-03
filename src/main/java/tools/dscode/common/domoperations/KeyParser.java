@@ -103,7 +103,19 @@ public final class KeyParser {
 
         dbg("sendComplexKeys(driver, element) input=%s", quote(input));
         if (tools.dscode.common.composite.ElementOperations.primary()) {
-            tools.dscode.common.composite.ElementOperations.sendKeys(driver, element, input);
+            String plain = plainCharacters(input);
+            if (plain != null) {
+                if (!plain.isEmpty()) {
+                    tools.dscode.common.composite.ElementOperations.sendKeys(driver, element, plain);
+                }
+                return;
+            }
+            // composite 2.4.0 can insert text and click. It has no keydown verb, so
+            // named keys and chords use the same Actions parser after a composite focus.
+            tools.dscode.common.composite.ElementOperations.click(driver, element);
+            Actions actions = new Actions(driver);
+            parseInto(actions, input);
+            actions.perform();
             return;
         }
         Actions actions = new Actions(driver);
@@ -320,6 +332,27 @@ public final class KeyParser {
         }
 
         throw new IllegalArgumentException("Unknown key: " + token);
+    }
+
+    /** Letters and digits the composite type verb can insert.
+     *  null when the expression needs a real keydown (names, chords, holds).
+     *  A lone A is a, matching resolveKey. */
+    private static String plainCharacters(String input) {
+        if (input == null || input.isBlank()) return "";
+        int[] pos = {0};
+        StringBuilder out = new StringBuilder();
+        boolean saw = false;
+        while (true) {
+            skipSpaces(input, pos);
+            if (pos[0] >= input.length()) break;
+            char mark = input.charAt(pos[0]);
+            if (mark == '[' || mark == ']') return null;
+            List<CharSequence> group = parseGroup(input, pos);
+            if (group.size() != 1 || !(group.get(0) instanceof String text) || text.isEmpty()) return null;
+            out.append(text);
+            saw = true;
+        }
+        return saw ? out.toString() : "";
     }
 
     private static void pressAndReleaseGroup(Actions actions, List<CharSequence> group) {

@@ -13,6 +13,7 @@ import org.openqa.selenium.WebElement;
 
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 
@@ -20,6 +21,7 @@ import java.util.Objects;
 public final class CompositeWebElement implements WebElement {
     private final CompositeSelector selector;
     private final String nodeId;
+    private final String tag;
     private final String role;
     private final String text;
     private final String name;
@@ -35,8 +37,15 @@ public final class CompositeWebElement implements WebElement {
     CompositeWebElement(CompositeSelector selector, JsonNode node, int index) {
         this.selector = selector;
         JsonNode value = node == null ? null : node;
-        this.nodeId = text(value, "id", "element-" + index);
-        this.role = text(value, "role", text(value, "tag", "element"));
+        this.nodeId = first(
+                text(value, "id", ""),
+                text(value, "element_id", ""),
+                joinId(text(value, "frame_id", ""), text(value, "backend_node_id", "")),
+                "element-" + index
+        );
+        String nodeName = text(value, "node_name", text(value, "tag", ""));
+        this.tag = (nodeName.isBlank() ? text(value, "role", "element") : nodeName).toLowerCase(Locale.ROOT);
+        this.role = text(value, "role", this.tag);
         this.text = text(value, "text", text(value, "name", ""));
         this.name = text(value, "name", this.text);
         this.attributes = attributes(value);
@@ -68,10 +77,34 @@ public final class CompositeWebElement implements WebElement {
 
     Map<String, Object> actionBody(List<String> frames, List<String> shadows) {
         String id = attributes.get("id");
-        CompositeSelector action = id != null && !id.isBlank()
-                ? new CompositeSelector(null, "#" + id, null, selector.source(), null, selector.phrase())
-                : selector;
+        CompositeSelector action;
+        if (id != null && !id.isBlank() && usableToken(id)) {
+            action = new CompositeSelector(null, "#" + id, null, selector.source(), null, selector.phrase());
+        } else {
+            String local = localXPath();
+            action = local != null
+                    ? new CompositeSelector(local, null, null, selector.source(), null, selector.phrase())
+                    : selector;
+        }
         return action.body(frames, shadows);
+    }
+
+    /** A locator for this node alone. The lookup selector can match more than one node, and click rejects that. */
+    private String localXPath() {
+        if (tag == null || !tag.matches("[A-Za-z][A-Za-z0-9]*")) return null;
+        String name = attributes.get("name");
+        String value = attributes.get("value");
+        if (usableToken(name) && usableToken(value)) {
+            return "//*[@name='" + name + "' and @value='" + value + "']";
+        }
+        if (usableToken(name) && ("input".equals(tag) || "select".equals(tag) || "textarea".equals(tag) || "button".equals(tag) || "radio".equals(tag) || "checkbox".equals(tag) || "textbox".equals(tag))) {
+            return "//*[@name='" + name + "']";
+        }
+        String shown = text == null ? "" : text.trim().replaceAll("\\s+", " ");
+        if (!shown.isEmpty() && shown.length() <= 80 && usableToken(shown)) {
+            return "//*[normalize-space(.)='" + shown + "']";
+        }
+        return null;
     }
 
     @Override
@@ -102,7 +135,7 @@ public final class CompositeWebElement implements WebElement {
 
     @Override
     public String getTagName() {
-        return role == null ? "" : role;
+        return tag == null || tag.isBlank() ? role : tag;
     }
 
     @Override
@@ -147,7 +180,10 @@ public final class CompositeWebElement implements WebElement {
 
     @Override
     public List<WebElement> findElements(By by) {
-        return DomCompositeAdapter.get().find(by);
+        if (by == null) return List.of();
+        By scoped = scope(by);
+        if (scoped == null) return List.of();
+        return DomCompositeAdapter.get().find(scoped);
     }
 
     @Override
@@ -211,6 +247,47 @@ public final class CompositeWebElement implements WebElement {
         DomCompositeAdapter.get().pushFrame(id == null || id.isBlank() ? nodeId : id);
     }
 
+    /** Ancestors of this node. Empty when the node has no stable xpath anchor. */
+    public List<WebElement> ancestorElements() {
+        String anchor = xpathAnchor();
+        if (anchor == null) return List.of();
+        try {
+            return DomCompositeAdapter.get().find(By.xpath(anchor + "/ancestor::*"));
+        } catch (RuntimeException ignored) {
+            return List.of();
+        }
+    }
+
+    private By scope(By by) {
+        String raw = by.toString();
+        String prefix = "By.xpath: ";
+        if (!raw.startsWith(prefix)) return null;
+        String xp = raw.substring(prefix.length()).trim();
+        if (xp.startsWith("//") || xp.startsWith("(//") || xp.startsWith("(/")) return by;
+        String anchor = xpathAnchor();
+        if (anchor == null) return null;
+        if (xp.startsWith("(.//")) return By.xpath("(" + anchor + xp.substring(2));
+        if (xp.startsWith(".//")) return By.xpath(anchor + xp.substring(1));
+        if (xp.startsWith("./")) return By.xpath(anchor + xp.substring(1));
+        if (xp.startsWith(".")) return By.xpath(anchor + xp.substring(1));
+        if (xp.startsWith("/") || xp.startsWith("(")) return by;
+        return By.xpath(anchor + "/" + xp);
+    }
+
+    private String xpathAnchor() {
+        String id = attributes.get("id");
+        if (usableToken(id)) return "//*[@id='" + id + "']";
+        String name = attributes.get("name");
+        if (usableToken(name) && tag != null && tag.matches("[A-Za-z][A-Za-z0-9]*")) {
+            return "//" + tag.toLowerCase(Locale.ROOT) + "[@name='" + name + "']";
+        }
+        return null;
+    }
+
+    private static boolean usableToken(String value) {
+        return value != null && !value.isBlank() && value.indexOf('\'') < 0 && value.indexOf('"') < 0;
+    }
+
     @Override
     public boolean equals(Object other) {
         if (this == other) return true;
@@ -233,6 +310,19 @@ public final class CompositeWebElement implements WebElement {
         if ("id".equals(key) && attributes.containsKey("id")) return attributes.get("id");
         if ("role".equals(key)) return role;
         return attributes.get(key);
+    }
+
+    private static String first(String... values) {
+        if (values == null) return "";
+        for (String value : values) {
+            if (value != null && !value.isBlank()) return value;
+        }
+        return "";
+    }
+
+    private static String joinId(String frame, String backend) {
+        if (frame.isBlank() && backend.isBlank()) return "";
+        return frame + ":" + backend;
     }
 
     private static String text(JsonNode node, String field, String fallback) {
