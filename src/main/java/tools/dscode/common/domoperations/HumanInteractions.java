@@ -54,6 +54,14 @@ public final class HumanInteractions {
         }
 
         centerScroll(driver, element);
+        if (tools.dscode.common.composite.ElementOperations.primary()) {
+            java.util.List<WebElement> options = tools.dscode.common.composite.ElementOperations.findElements(element, By.cssSelector("option"));
+            if (index >= options.size()) {
+                throw new IllegalArgumentException("index " + index + " out of bounds (options=" + options.size() + ")");
+            }
+            tools.dscode.common.composite.ElementOperations.click(driver, options.get(index));
+            return;
+        }
 
         Select select = new Select(element);
         int optionCount = select.getOptions().size();
@@ -76,7 +84,7 @@ public final class HumanInteractions {
         String text = valueWrapper.asNormalizedText();
         boolean caseSensitive = valueWrapper.type.equals(ValueWrapper.ValueTypes.DOUBLE_QUOTED);
         String needle = caseSensitive ? text : text.toLowerCase(Locale.ROOT);
-        List<WebElement> matches = container.findElements(By.xpath(".//option | .//a"));
+        List<WebElement> matches = tools.dscode.common.composite.ElementOperations.findElements(container, By.xpath(".//option | .//a"));
 
         for (WebElement el : matches) {
             String hay = el.getText()
@@ -86,8 +94,13 @@ public final class HumanInteractions {
 
             if (!hay.equals(needle)) continue;
 
+            if (tools.dscode.common.composite.ElementOperations.primary()) {
+                tools.dscode.common.composite.ElementOperations.click(driver, el);
+                return;
+            }
+
             if ("option".equalsIgnoreCase(el.getTagName())) {
-                WebElement selectEl = el.findElement(By.xpath("ancestor::select[1]"));
+                WebElement selectEl = tools.dscode.common.composite.ElementOperations.findElement(el, By.xpath("ancestor::select[1]"));
                 centerScroll(driver, selectEl);
 
                 Select sel = new Select(selectEl);
@@ -119,6 +132,10 @@ public final class HumanInteractions {
     public static void click(WebDriver driver, WebElement el) {
         rejectForeignContext(el);
         Objects.requireNonNull(el, "element must not be null");
+        if (tools.dscode.common.composite.ElementOperations.primary()) {
+            tools.dscode.common.composite.ElementOperations.click(driver, el);
+            return;
+        }
         try {
             centerScroll(driver, el);
             new Actions(driver)
@@ -140,6 +157,11 @@ public final class HumanInteractions {
     public static void doubleClick(WebDriver driver, WebElement el) {
         rejectForeignContext(el);
         Objects.requireNonNull(el, "element must not be null");
+        if (tools.dscode.common.composite.ElementOperations.primary()) {
+            tools.dscode.common.composite.ElementOperations.click(driver, el);
+            tools.dscode.common.composite.ElementOperations.click(driver, el);
+            return;
+        }
         try {
             centerScroll(driver, el);
             new Actions(driver)
@@ -160,6 +182,10 @@ public final class HumanInteractions {
     public static void contextClick(WebDriver driver, WebElement el) {
         rejectForeignContext(el);
         Objects.requireNonNull(el, "element must not be null");
+        if (tools.dscode.common.composite.ElementOperations.primary()) {
+            tools.dscode.common.composite.ElementOperations.click(driver, el);
+            return;
+        }
         try {
             centerScroll(driver, el);
             new Actions(driver)
@@ -180,6 +206,10 @@ public final class HumanInteractions {
     public static void hover(WebDriver driver, WebElement el) {
         rejectForeignContext(el);
         Objects.requireNonNull(el, "element must not be null");
+        if (tools.dscode.common.composite.ElementOperations.primary()) {
+            tools.dscode.common.composite.ElementOperations.hover(driver, el);
+            return;
+        }
         try {
             centerScroll(driver, el);
             new Actions(driver)
@@ -195,6 +225,10 @@ public final class HumanInteractions {
         rejectForeignContext(target);
         Objects.requireNonNull(source, "source must not be null");
         Objects.requireNonNull(target, "target must not be null");
+        if (tools.dscode.common.composite.ElementOperations.primary()) {
+            tools.dscode.common.composite.ElementOperations.drag(driver, source, target, 0, 0);
+            return;
+        }
         try {
             centerScroll(driver, source);
             centerScroll(driver, target);
@@ -214,6 +248,10 @@ public final class HumanInteractions {
     public static void dragByOffset(WebDriver driver, WebElement source, int xOffset, int yOffset) {
         rejectForeignContext(source);
         Objects.requireNonNull(source, "source must not be null");
+        if (tools.dscode.common.composite.ElementOperations.primary()) {
+            tools.dscode.common.composite.ElementOperations.drag(driver, source, null, xOffset, yOffset);
+            return;
+        }
         try {
             centerScroll(driver, source);
             new Actions(driver)
@@ -236,6 +274,10 @@ public final class HumanInteractions {
     public static void wheelScrollBy(WebDriver driver, WebElement el, int deltaY) {
         rejectForeignContext(el);
         Objects.requireNonNull(el, "element must not be null");
+        if (tools.dscode.common.composite.ElementOperations.primary()) {
+            tools.dscode.common.composite.ElementOperations.scroll(driver, el, deltaY);
+            return;
+        }
         try {
             centerScroll(driver, el);
             new Actions(driver)
@@ -254,6 +296,11 @@ public final class HumanInteractions {
         rejectForeignContext(el);
         Objects.requireNonNull(el, "element must not be null");
         final String s = text == null ? "" : text.toString();
+        if (tools.dscode.common.composite.ElementOperations.primary()) {
+            tools.dscode.common.composite.ElementOperations.sendKeys(driver, el, "");
+            if (!s.isEmpty()) tools.dscode.common.composite.ElementOperations.sendKeys(driver, el, s);
+            return;
+        }
         try {
             focus(driver, el);
             el.sendKeys(Keys.chord(osControlKey(), "a"));
@@ -267,6 +314,10 @@ public final class HumanInteractions {
     public static void clear(WebDriver driver, WebElement el) {
         rejectForeignContext(el);
         Objects.requireNonNull(el, "element must not be null");
+        if (tools.dscode.common.composite.ElementOperations.primary()) {
+            tools.dscode.common.composite.ElementOperations.sendKeys(driver, el, "");
+            return;
+        }
         focus(driver, el);
         el.sendKeys(Keys.chord(osControlKey(), "a"));
         el.sendKeys(Keys.DELETE);
@@ -279,6 +330,10 @@ public final class HumanInteractions {
             return;
         }
         final String s = text == null ? "" : text.toString();
+        if (tools.dscode.common.composite.ElementOperations.primary()) {
+            if (!s.isEmpty()) tools.dscode.common.composite.ElementOperations.sendKeys(driver, el, s);
+            return;
+        }
         try {
             focus(driver, el);
             if (!s.isEmpty()) el.sendKeys(s);
@@ -289,6 +344,10 @@ public final class HumanInteractions {
 
     public static void typeText(WebDriver driver, CharSequence text) {
         final String s = text == null ? "" : text.toString();
+        if (tools.dscode.common.composite.ElementOperations.primary()) {
+            if (!s.isEmpty()) tools.dscode.common.composite.ElementOperations.keys(driver, s);
+            return;
+        }
         try {
             if (!s.isEmpty()) {
                 new Actions(driver).sendKeys(s).perform();
@@ -314,6 +373,10 @@ public final class HumanInteractions {
     }
 
     public static void sendKeys(WebDriver driver, CharSequence... keys) {
+        if (tools.dscode.common.composite.ElementOperations.primary()) {
+            tools.dscode.common.composite.ElementOperations.keys(driver, keys);
+            return;
+        }
         new Actions(driver)
                 .pause(SHORT)
                 .sendKeys(keys).pause(SHORT)
@@ -323,6 +386,10 @@ public final class HumanInteractions {
     public static void pressEnter(WebDriver driver, WebElement el) {
         rejectForeignContext(el);
         Objects.requireNonNull(el, "element must not be null");
+        if (tools.dscode.common.composite.ElementOperations.primary()) {
+            tools.dscode.common.composite.ElementOperations.sendKeys(driver, el, Keys.ENTER);
+            return;
+        }
         try {
             focus(driver, el);
             el.sendKeys(Keys.ENTER);
@@ -352,6 +419,10 @@ public final class HumanInteractions {
     public static void centerScroll(WebDriver driver, WebElement el) {
         rejectForeignContext(el);
         Objects.requireNonNull(el, "element must not be null");
+        if (tools.dscode.common.composite.ElementOperations.primary()) {
+            tools.dscode.common.composite.ElementOperations.scroll(driver, el, 0);
+            return;
+        }
         try {
             executeElementScript(driver, CENTER_SCROLL_SCRIPT, el);
         } catch (StaleElementReferenceException stale) {

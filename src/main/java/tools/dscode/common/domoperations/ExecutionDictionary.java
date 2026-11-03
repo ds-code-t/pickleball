@@ -1116,8 +1116,8 @@ public class ExecutionDictionary {
                     XPathy xpathy = resolveFinalXPath(category, value, op);
                     if (xpathy == null) return driver;
 
-                    WebElement frameEl = driver.findElement(By.xpath(xpathy.getXpath()));
-                    driver.switchTo().frame(frameEl);
+                    WebElement frameEl = tools.dscode.common.composite.ElementOperations.findElement(driver, By.xpath(xpathy.getXpath()));
+                    tools.dscode.common.composite.ElementOperations.enterFrame(driver, frameEl);
                     return driver;
                 });
     }
@@ -1131,8 +1131,8 @@ public class ExecutionDictionary {
                     XPathy xpathy = resolveFinalXPath(category, value, op);
                     if (xpathy == null) return context;
 
-                    WebElement frameEl = context.findElement(By.xpath(xpathy.getXpath()));
-                    driver.switchTo().frame(frameEl);
+                    WebElement frameEl = tools.dscode.common.composite.ElementOperations.findElement(context, By.xpath(xpathy.getXpath()));
+                    tools.dscode.common.composite.ElementOperations.enterFrame(driver, frameEl);
                     return driver;
                 });
     }
@@ -1148,8 +1148,8 @@ public class ExecutionDictionary {
                     XPathy xpathy = resolveFinalXPath(category, value, op);
                     if (xpathy == null) return driver;
 
-                    WebElement host = driver.findElement(By.xpath(xpathy.getXpath()));
-                    return host.getShadowRoot();
+                    WebElement host = tools.dscode.common.composite.ElementOperations.findElement(driver, By.xpath(xpathy.getXpath()));
+                    return tools.dscode.common.composite.ElementOperations.shadowRoot(host);
                 });
     }
 
@@ -1162,8 +1162,8 @@ public class ExecutionDictionary {
                     XPathy xpathy = resolveFinalXPath(category, value, op);
                     if (xpathy == null) return context;
 
-                    WebElement host = context.findElement(By.xpath(xpathy.getXpath()));
-                    return host.getShadowRoot();
+                    WebElement host = tools.dscode.common.composite.ElementOperations.findElement(context, By.xpath(xpathy.getXpath()));
+                    return tools.dscode.common.composite.ElementOperations.shadowRoot(host);
                 });
     }
 

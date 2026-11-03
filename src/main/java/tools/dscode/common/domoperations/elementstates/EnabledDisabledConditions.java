@@ -45,7 +45,7 @@ public final class EnabledDisabledConditions {
         }
 
         List<WebElement> matches =
-                element.findElements(By.xpath("self::*[" + DISABLED_DESC_OR_SELF_PRED + "]"));
+                tools.dscode.common.composite.ElementOperations.findElements(element, By.xpath("self::*[" + DISABLED_DESC_OR_SELF_PRED + "]"));
 
         return !matches.isEmpty();
     }

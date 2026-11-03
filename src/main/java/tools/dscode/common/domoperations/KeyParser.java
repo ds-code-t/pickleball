@@ -75,6 +75,10 @@ public final class KeyParser {
      */
     public static void sendComplexKeys(WebDriver driver, String input) {
         dbg("sendComplexKeys(driver) input=%s", quote(input));
+        if (tools.dscode.common.composite.ElementOperations.primary()) {
+            tools.dscode.common.composite.ElementOperations.keys(driver, input);
+            return;
+        }
         Actions actions = new Actions(driver);
         parseInto(actions, input);
         dbg("actions.perform()");
@@ -98,6 +102,10 @@ public final class KeyParser {
         }
 
         dbg("sendComplexKeys(driver, element) input=%s", quote(input));
+        if (tools.dscode.common.composite.ElementOperations.primary()) {
+            tools.dscode.common.composite.ElementOperations.sendKeys(driver, element, input);
+            return;
+        }
         Actions actions = new Actions(driver);
 
         // Preserve your existing behavior: target the element without forcing click/focus.

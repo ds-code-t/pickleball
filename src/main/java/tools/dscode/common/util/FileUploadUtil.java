@@ -47,7 +47,7 @@ public final class FileUploadUtil {
             throw new IllegalArgumentException("Upload file not found: " + file);
         }
 
-        fileInput.sendKeys(file.toString());
+        tools.dscode.common.composite.ElementOperations.sendKeys(driver, fileInput, file.toString());
     }
 
     // -----------------------

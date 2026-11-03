@@ -311,6 +311,25 @@ Start a new step when the inherited meaning would become unclear.
 
 For child steps, use [Nested Steps](nested-steps.md). For report-focused branch blocks, use [Block Conditionals](block-conditionals.md).
 
+## Dom-composite translation
+
+Gherkin element phrases do not change. `SelectorTranslator` is the only place that turns a phrase into a dom-composite pipeline. `ExecutionDictionary` still builds the XPath it already built. That XPath, and any CSS, is passed through unchanged.
+
+| Phrase | Pipeline |
+|---|---|
+| the `"Save"` Button | `role=button >> text="Save"` |
+| the Button containing `'log'` | `role=button >> text~="log"` (single quotes fold case) |
+| the Button matching `"Save"` | `role=button >> text="^Save$"` (full match) |
+| the `"Save"` Button in the `"Billing"` Section | context stages, then the target |
+| the `"Save"` Button after the `"Billing"` Section | context, then `below=1`, then the target |
+| the `"Save"` Button before the `"Billing"` Section | target, then `below=1`, then the context |
+| a custom `Product Card` | `desc="Product Card"` plus the text stage |
+| `first` / `2nd` / `last` | ordinal applied in Java after the hits (0, 1, -1) |
+
+`pkb_composite=auto` (the default) uses this path when the `composite` binary is present. `pkb_composite=off` keeps Selenium for that run and does not translate. See [Configuration](configuration.md).
+
+dom-composite 2.4.0 has click, type, and scroll. It has no double-click, context-click, or drag verb. On the composite path a double-click is two clicks, a context-click is one click, and a drag is click, then scroll by the offset, then click. Desktop queries use `source=desktop` with `image=template=` and `image=ocr~=`. A desktop session does not accept click or type. WebDriver stays for browser lifecycle only: navigation, window handles, and the CDP address.
+
 ## Working examples
 
 - [Core dynamic-step playground](../maven-consumer-project/src/test/resources/features/dynamic-steps.feature)

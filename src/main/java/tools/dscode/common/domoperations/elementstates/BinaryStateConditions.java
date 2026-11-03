@@ -60,7 +60,7 @@ public final class BinaryStateConditions {
 
         // 2) Broader attribute/ARIA/data-attribute semantics (original behavior)
         List<WebElement> matches =
-                element.findElements(By.xpath("self::*[" + ON_DESC_OR_SELF_PRED + "]"));
+                tools.dscode.common.composite.ElementOperations.findElements(element, By.xpath("self::*[" + ON_DESC_OR_SELF_PRED + "]"));
 
         return !matches.isEmpty();
     }

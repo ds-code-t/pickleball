@@ -127,7 +127,7 @@ public final class CollapsedExpandedConditions {
         if (element == null) {
             return false;
         }
-        List<WebElement> matches = element.findElements(By.xpath("self::*[" + predicate + "]"));
+        List<WebElement> matches = tools.dscode.common.composite.ElementOperations.findElements(element, By.xpath("self::*[" + predicate + "]"));
         return !matches.isEmpty();
     }
 }

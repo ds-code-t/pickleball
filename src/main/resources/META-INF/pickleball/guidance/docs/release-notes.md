@@ -1,5 +1,13 @@
 # Release notes
 
+## 2.1.19
+
+- dom-composite 2.4.0 is the element entry point when its binary is on the run. `DomCompositeAdapter` is the only path for find, click, type, hover, scroll, keys, wait, inspect, and desktop query. Existing Gherkin phrases, quote types, and context words (`in`, `from`, `for`, `after`, `before`) are unchanged. Dictionary XPath and CSS pass through. Other phrases become one composite pipeline.
+- `pkb_composite=auto` (default) uses that path when the binary is found and otherwise stays on Selenium for the run, with one `error:` / `fix:` line. `pkb_composite=on` always prints that line when the binary is missing. `pkb_composite=off` does not look for the binary. `pkb_composite_bin` is checked before `COMPOSITE_BIN`. Logging is off unless `pkb_composite_log` names `location`, `adapter`, `session`, `element`, `fallback`, or `all`.
+- The Java binding is vendored (`dev.domcomposite.Client`). Native binaries are not published here. A classifier jar `dev.domcomposite:composite-native:2.4.0` (`linux-x64`, `linux-aarch64`, `windows-x64`, `macos-aarch64`, `macos-x64`) is extracted when it is present. Otherwise set `COMPOSITE_BIN`, `COMPOSITE_HOME`, or build the sibling `dom-composite` checkout.
+- WebDriver remains for browser lifecycle only (navigation, window handles, CDP address, frame index). Double-click and context-click are click on this path. Drag is click, scroll, click. Desktop click and type are not in composite 2.4.0. Desktop query, OCR, and template matching are.
+- A normal `mvn test` or `gradlew test` with no composite binary is unchanged.
+
 ## 2.1.18
 
 - Every key a runner hook writes through `PKB_props.put` or a path setter, not only `pkb_` run vars, is `source=hook` and ` computed` in `workspace-show` text and `--json`. That includes a plain description, a `pkb_` marker, and a secret next to glue. A secret still prints `<redacted>`. Existing properties, default, and cli/override classification is unchanged. A normal `mvn test` is unchanged.

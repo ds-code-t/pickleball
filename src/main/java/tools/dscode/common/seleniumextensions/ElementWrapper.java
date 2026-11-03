@@ -162,7 +162,7 @@ public class ElementWrapper implements WebElement, WrapsElement {
 
         List<WebElement> children = withoutImplicitWait(
                 driver,
-                () -> snapshotElement.findElements(By.xpath("./*[@selected]"))
+                () -> tools.dscode.common.composite.ElementOperations.findElements(snapshotElement, By.xpath("./*[@selected]"))
         );
         StringBuilder childValue = new StringBuilder();
         for (WebElement child : children) {
@@ -434,7 +434,7 @@ public class ElementWrapper implements WebElement, WrapsElement {
                 }
                 WebElement d = withoutImplicitWait(
                         driver,
-                        () -> element.findElement(By.xpath(xpathExpr))
+                        () -> tools.dscode.common.composite.ElementOperations.findElement(element, By.xpath(xpathExpr))
                 );
                 String v = getAttrOrEmpty(d, attr);
                 if (!v.isEmpty()) {
@@ -470,7 +470,7 @@ public class ElementWrapper implements WebElement, WrapsElement {
                     final WebElement currentForParentLookup = current;
                     parent = withoutImplicitWait(
                             driver,
-                            () -> currentForParentLookup.findElement(By.xpath("parent::*"))
+                            () -> tools.dscode.common.composite.ElementOperations.findElement(currentForParentLookup, By.xpath("parent::*"))
                     );
                 } catch (NoSuchElementException | InvalidSelectorException e) {
                     break;
@@ -550,7 +550,7 @@ public class ElementWrapper implements WebElement, WrapsElement {
 
                 WebElement d = withoutImplicitWait(
                         driver,
-                        () -> element.findElement(By.xpath(xpathExpr))
+                        () -> tools.dscode.common.composite.ElementOperations.findElement(element, By.xpath(xpathExpr))
                 );
                 for (String attr : group) {
                     String v = getAttrOrEmpty(d, attr);
@@ -588,7 +588,7 @@ public class ElementWrapper implements WebElement, WrapsElement {
                     final WebElement currentForParentLookup = current;
                     parent = withoutImplicitWait(
                             driver,
-                            () -> currentForParentLookup.findElement(By.xpath("parent::*"))
+                            () -> tools.dscode.common.composite.ElementOperations.findElement(currentForParentLookup, By.xpath("parent::*"))
                     );
                 } catch (NoSuchElementException | InvalidSelectorException e) {
                     break;
@@ -641,7 +641,7 @@ public class ElementWrapper implements WebElement, WrapsElement {
     private static String buildChildrenShapePredicate(WebDriver driver, WebElement element) {
         List<WebElement> children = withoutImplicitWait(
                 driver,
-                () -> element.findElements(By.xpath("./*"))
+                () -> tools.dscode.common.composite.ElementOperations.findElements(element, By.xpath("./*"))
         );
         if (children.isEmpty()) {
             return "not(*)";
@@ -702,9 +702,9 @@ public class ElementWrapper implements WebElement, WrapsElement {
         return NestedByLocator.retainFullMatches(
                 withoutImplicitWait(
                         driver,
-                        () -> elementMatch.contextWrapper
-                                .getFinalSearchContext()
-                                .findElements(new By.ByXPath(xpathyWithId))
+                        () -> tools.dscode.common.composite.ElementOperations.findElements(
+                                elementMatch.contextWrapper.getFinalSearchContext(),
+                                new By.ByXPath(xpathyWithId))
                 ),
                 elementMatch
         );
@@ -747,21 +747,37 @@ public class ElementWrapper implements WebElement, WrapsElement {
 
     @Override
     public void click() {
+        if (tools.dscode.common.composite.ElementOperations.primary()) {
+            tools.dscode.common.composite.ElementOperations.click(driver, element);
+            return;
+        }
         executeVoidWithStaleRetry(WebElement::click);
     }
 
     @Override
     public void submit() {
+        if (tools.dscode.common.composite.ElementOperations.primary()) {
+            tools.dscode.common.composite.ElementOperations.click(driver, element);
+            return;
+        }
         executeVoidWithStaleRetry(WebElement::submit);
     }
 
     @Override
     public void sendKeys(CharSequence... keysToSend) {
+        if (tools.dscode.common.composite.ElementOperations.primary()) {
+            tools.dscode.common.composite.ElementOperations.sendKeys(driver, element, keysToSend);
+            return;
+        }
         executeVoidWithStaleRetry(currentElement -> currentElement.sendKeys(keysToSend));
     }
 
     @Override
     public void clear() {
+        if (tools.dscode.common.composite.ElementOperations.primary()) {
+            tools.dscode.common.composite.ElementOperations.sendKeys(driver, element, "");
+            return;
+        }
         executeVoidWithStaleRetry(WebElement::clear);
     }
 
@@ -803,17 +819,22 @@ public class ElementWrapper implements WebElement, WrapsElement {
     @Override
     public List<WebElement> findElements(By by) {
         Objects.requireNonNull(by, "by must not be null");
-        return executeWithStaleRetry(currentElement -> currentElement.findElements(by));
+        return executeWithStaleRetry(currentElement ->
+                tools.dscode.common.composite.ElementOperations.findElements(currentElement, by));
     }
 
     @Override
     public WebElement findElement(By by) {
         Objects.requireNonNull(by, "by must not be null");
-        return executeWithStaleRetry(currentElement -> currentElement.findElement(by));
+        return executeWithStaleRetry(currentElement ->
+                tools.dscode.common.composite.ElementOperations.findElement(currentElement, by));
     }
 
     @Override
     public SearchContext getShadowRoot() {
+        if (tools.dscode.common.composite.ElementOperations.primary()) {
+            return tools.dscode.common.composite.ElementOperations.shadowRoot(element);
+        }
         return executeWithStaleRetry(WebElement::getShadowRoot);
     }
 
@@ -945,8 +966,8 @@ public class ElementWrapper implements WebElement, WrapsElement {
                 .getXpath()
                 .replaceFirst("^//\\*", "descendant-or-self::*");
         executeVoidWithStaleRetry(currentElement -> {
-            WebElement closeButton = currentElement.findElement(new By.ByXPath(closeXpath));
-            closeButton.click();
+            WebElement closeButton = tools.dscode.common.composite.ElementOperations.findElement(currentElement, new By.ByXPath(closeXpath));
+            tools.dscode.common.composite.ElementOperations.click(driver, closeButton);
         });
     }
 

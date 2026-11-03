@@ -163,7 +163,7 @@ public final class AllContextsScan {
             }
             List<WebElement> found;
             try {
-                found = context.findElements(By.xpath(xpath));
+                found = tools.dscode.common.composite.ElementOperations.findElements(context, By.xpath(xpath));
             } catch (WebDriverException ignored) {
                 return;
             }
@@ -243,7 +243,7 @@ public final class AllContextsScan {
                     List<FrameRef> child = new ArrayList<>(path);
                     child.add(ref);
                     try {
-                        driver.switchTo().frame(frame);
+                        tools.dscode.common.composite.ElementOperations.enterFrame(driver, frame);
                         String childKey = key(child);
                         boolean foreign = startPath == null || !child.equals(startPath);
                         if (!searched.contains(childKey)) {
@@ -337,12 +337,12 @@ public final class AllContextsScan {
         }
 
         private void switchToRef(FrameRef ref) {
-            List<WebElement> frames = driver.findElements(By.cssSelector("iframe, frame"));
+            List<WebElement> frames = tools.dscode.common.composite.ElementOperations.findElements(driver, By.cssSelector("iframe, frame"));
             if (ref.id != null) {
                 for (WebElement frame : frames) {
                     try {
                         if (ref.id.equals(frame.getAttribute("id"))) {
-                            driver.switchTo().frame(frame);
+                            tools.dscode.common.composite.ElementOperations.enterFrame(driver, frame);
                             return;
                         }
                     } catch (WebDriverException ignored) {
@@ -354,7 +354,7 @@ public final class AllContextsScan {
                 for (WebElement frame : frames) {
                     try {
                         if (ref.name.equals(frame.getAttribute("name"))) {
-                            driver.switchTo().frame(frame);
+                            tools.dscode.common.composite.ElementOperations.enterFrame(driver, frame);
                             return;
                         }
                     } catch (WebDriverException ignored) {
@@ -429,7 +429,7 @@ public final class AllContextsScan {
 
         private List<WebElement> safeFrames(SearchContext context) {
             try {
-                return new ArrayList<>(context.findElements(By.cssSelector("iframe, frame")));
+                return new ArrayList<>(tools.dscode.common.composite.ElementOperations.findElements(context, By.cssSelector("iframe, frame")));
             } catch (WebDriverException ignored) {
                 return List.of();
             }

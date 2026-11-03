@@ -63,7 +63,7 @@ public final class BlankElementConditions {
             return false;
         }
         List<WebElement> matches =
-                element.findElements(By.xpath("self::*[" + BLANK_PRED + "]"));
+                tools.dscode.common.composite.ElementOperations.findElements(element, By.xpath("self::*[" + BLANK_PRED + "]"));
         return !matches.isEmpty();
     }
 

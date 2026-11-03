@@ -62,6 +62,22 @@ public final class CompositeRuntime {
         return client;
     }
 
+    /** Opens the thread session on demand. Returns null when this run is on Selenium. */
+    public static Client ensureClient() {
+        Client open = client();
+        if (open == null) return null;
+        if (open.currentSession() != null) return open;
+        Map<String, Object> config = new LinkedHashMap<>();
+        if (joinedCdp != null) {
+            config.put("cdp", joinedCdp);
+            config.put("i_accept_local_attach", true);
+        }
+        config.put("process", true);
+        open.openSession(config);
+        CompositeLog.info("session", "opened " + open.currentSession().id());
+        return open;
+    }
+
     /** Opens a client when the binary is present. Does not throw. */
     public static void attach(RemoteWebDriver driver) {
         try {

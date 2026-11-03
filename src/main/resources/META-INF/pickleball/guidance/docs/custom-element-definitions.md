@@ -159,6 +159,14 @@ dictionary.registerShadowRoot("Widget Host")
 
 The iframe and shadow helpers set the matching flag for you.
 
+## How a category reaches the page
+
+The dictionary still owns the XPath for a built-in or custom category. `ElementOperations` is the only lookup. When dom-composite is the primary path, that XPath is sent as `xpath` and is not rewritten. A phrase that has not yet been turned into XPath is translated once by `SelectorTranslator`: known categories become `role=...`, and any other capitalized name, including `Product Card`, becomes `desc="..."`.
+
+The same translator covers an OS desktop element. Set the phrase source to desktop. A template image becomes `image=template=<path>`. OCR text becomes `image=ocr~="<text>"`. The pipeline starts with `source=desktop`. Click and type are web actions. Desktop support in 2.4.0 is query, OCR, and template matching through that one adapter.
+
+Live Workbench `inspect-page` and `find-element` post to the worker. The worker calls `ElementControl`, which calls `ElementOperations`. Offline HTML inspect stays on the dictionary XPath (`source=offline-html`). There is no second locator implementation in the GUI or the CLI.
+
 ## When to add a category
 
 Add one when:

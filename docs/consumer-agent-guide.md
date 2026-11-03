@@ -54,7 +54,7 @@ confirm --run-id=row-1
 summary status=PASSED
 ```
 
-`record.json` `environment` is resolved, or `unset`. Every hook key, not only `pkb_`, is `source=hook` and ` computed`. Secrets are `<redacted>`. `${protected:key}` stays. `execute-step` failure is one `error:` line; `--json` has code, message, cause, valueText. `session-start` timeout is `error:`/`fix:` and kills the tree. RUN aliases: COMPONENT(S), CALL(S), SERVICE(S). Paths, setter/comma/default/prefix (a comma always splits): features/features/yes/project/prefix; glue/glue/yes/project/packages; datapath/dataPath/first match/data/prefix; configpath/configPath/later wins/configs/prefix; callpath/callPath/yes/src/test/resources/calls/Cucumber; componentpath/componentPath/yes/src/test/resources/component/Cucumber. Do not treat resolve-runvars as the environment Discover will use. `pkb_overriderunvars` is not how confirm launches. The Workbench GUI is only a lightweight head over state and controls that already exist under the hood.
+`record.json` `environment` is resolved, or `unset`. Every hook key, not only `pkb_`, is `source=hook` and ` computed`. Secrets are `<redacted>`. `${protected:key}` stays. `execute-step` failure is one `error:` line; `--json` has code, message, cause, valueText. `session-start` timeout is `error:`/`fix:` and kills the tree. RUN aliases: COMPONENT(S), CALL(S), SERVICE(S). A comma always splits paths. Elements use dom-composite when its binary is present, else Selenium (`pkb_composite=off` forces Selenium). Do not treat resolve-runvars as the environment Discover will use. `pkb_overriderunvars` is not how confirm launches. The Workbench GUI is only a lightweight head over state and controls that already exist under the hood.
 
 
 | launch | usage exit |

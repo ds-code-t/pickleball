@@ -221,7 +221,7 @@ public final class NestedByLocator {
         Objects.requireNonNull(locator, "locator");
         Objects.requireNonNull(mode, "mode");
 
-        List<WebElement> matches = context.findElements(locator);
+        List<WebElement> matches = tools.dscode.common.composite.ElementOperations.findElements(context, locator);
 
         if (displayedElementsOnly) {
             matches = filterDisplayed(matches);
@@ -306,7 +306,7 @@ public final class NestedByLocator {
         for (WebElement outer : matches) {
             boolean containsAnotherMatch = false;
 
-            List<WebElement> internal = outer.findElements(within);
+            List<WebElement> internal = tools.dscode.common.composite.ElementOperations.findElements(outer, within);
             for (WebElement inner : internal) {
                 if (inner.equals(outer)) continue;
                 if (!matchSet.contains(inner)) continue;
@@ -340,7 +340,7 @@ public final class NestedByLocator {
                 break;
             }
 
-            List<WebElement> internal = outer.findElements(within);
+            List<WebElement> internal = tools.dscode.common.composite.ElementOperations.findElements(outer, within);
             for (WebElement inner : internal) {
                 if (inner.equals(outer)) continue;
                 if (!matchSet.contains(inner)) continue;

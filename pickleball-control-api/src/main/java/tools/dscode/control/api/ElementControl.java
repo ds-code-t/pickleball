@@ -62,7 +62,7 @@ public final class ElementControl {
             }
 
             String xpath = resolution.xpath().getXpath();
-            List<WebElement> matches = driver.findElements(By.xpath(xpath));
+            List<WebElement> matches = tools.dscode.common.composite.ElementOperations.findElements(driver, By.xpath(xpath));
             int limit = boundedMax(maxElements);
             List<ElementEvidence> evidence = java.util.stream.IntStream.range(0, Math.min(limit, matches.size()))
                     .mapToObj(index -> evidence(driver, matches.get(index), index + 1))
@@ -116,25 +116,32 @@ public final class ElementControl {
 
     @SuppressWarnings("unchecked")
     private static Map<String, String> attributes(RemoteWebDriver driver, WebElement element) {
-        JavascriptExecutor javascript = driver;
-        Object raw = javascript.executeScript(
-                "const out={}; for (const a of arguments[0].attributes) out[a.name]=a.value; return out;",
-                element
-        );
-        if (!(raw instanceof Map<?, ?> map)) {
+        if (element instanceof tools.dscode.common.composite.CompositeWebElement composite) {
+            return composite.attributes();
+        }
+        try {
+            JavascriptExecutor javascript = driver;
+            Object raw = javascript.executeScript(
+                    "const out={}; for (const a of arguments[0].attributes) out[a.name]=a.value; return out;",
+                    element
+            );
+            if (!(raw instanceof Map<?, ?> map)) {
+                return Map.of();
+            }
+
+            TreeMap<String, String> sorted = new TreeMap<>();
+            map.forEach((key, value) -> {
+                if (key != null && sorted.size() < MAX_ATTRIBUTES) {
+                    sorted.put(
+                            String.valueOf(key),
+                            clip(Objects.toString(value, ""), MAX_ATTRIBUTE_VALUE_CHARS)
+                    );
+                }
+            });
+            return Collections.unmodifiableMap(new LinkedHashMap<>(sorted));
+        } catch (RuntimeException ignored) {
             return Map.of();
         }
-
-        TreeMap<String, String> sorted = new TreeMap<>();
-        map.forEach((key, value) -> {
-            if (key != null && sorted.size() < MAX_ATTRIBUTES) {
-                sorted.put(
-                        String.valueOf(key),
-                        clip(Objects.toString(value, ""), MAX_ATTRIBUTE_VALUE_CHARS)
-                );
-            }
-        });
-        return Collections.unmodifiableMap(new LinkedHashMap<>(sorted));
     }
 
     private static ExecutionDictionary.Op resolveOperation(String operation) {

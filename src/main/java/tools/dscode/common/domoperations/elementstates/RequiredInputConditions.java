@@ -53,7 +53,7 @@ public final class RequiredInputConditions {
         if (element == null) {
             return false;
         }
-        List<WebElement> matches = element.findElements(By.xpath("self::*[" + REQUIRED_DESC_OR_SELF_PRED + "]"));
+        List<WebElement> matches = tools.dscode.common.composite.ElementOperations.findElements(element, By.xpath("self::*[" + REQUIRED_DESC_OR_SELF_PRED + "]"));
         return !matches.isEmpty();
     }
 

@@ -235,7 +235,7 @@ public class ContextWrapper {
         if (searchContext instanceof WebElement && effective.strip().startsWith("//")) {
             effective = effective.replaceFirst("//", ".//");
         }
-        List<WebElement> found = searchContext.findElements(By.xpath(effective));
+        List<WebElement> found = tools.dscode.common.composite.ElementOperations.findElements(searchContext, By.xpath(effective));
         return found.isEmpty() ? null : found.getFirst();
     }
 
