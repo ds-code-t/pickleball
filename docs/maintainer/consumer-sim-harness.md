@@ -11,7 +11,10 @@ The session, in order:
 5. `execute-step --text-b64` and `execute-step --text-file=<absolute path>`.
 6. `events`, `query errors`, `query tail`.
 7. `discover` again on the same run id, then `confirm`, then `finish`.
-8. `stop --force` so the worker does not stay up.
+8. Report-7 symptoms (`report7()`): multiple run ids, regex and Cucumber-expression glue, a blank `pkb_glue`, validate over 2000 steps, `--quiet` line budget, `failedScenarios` path form, status right after `isolate`, and a second isolate checked against `startup-progress.json` and a 35s warm-restart budget.
+9. `stop --force` so the worker does not stay up.
+
+`python3 scripts/consumer_sim.py --report7-only` runs just that report-7 block (publish first). It exits 1 when any item fails.
 
 Each stage prints `stage=<name> exit=<code> seconds=<n>` and must finish inside the budget in the script. `record.json` for the compiled run must be `PASSED` and `finish` must set `stoppedAt`. Timings are also written to `maven-consumer-project/.pickleball/consumer-sim-timings.json`.
 

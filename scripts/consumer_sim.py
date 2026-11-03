@@ -63,11 +63,27 @@ BUDGETS = {
 def main() -> int:
     parser = argparse.ArgumentParser(description="Pickleball consumer-simulation harness")
     parser.add_argument("--publish", action="store_true", help="publish the framework to mavenLocal first")
+    parser.add_argument(
+        "--report7-only",
+        action="store_true",
+        help="run only the report-7 consumer scenarios (still requires a published build)",
+    )
     args = parser.parse_args()
     if args.publish:
         publish()
     configure_browser()
     test_classpath()
+    if args.report7_only:
+        timings: list[dict] = []
+        try:
+            prepare_tree()
+            run_stage(timings, "test-compile", [], maven_args=["-q", "test-compile"], allow_exit={0})
+            report7(timings)
+        finally:
+            stop_report7(timings)
+            write_timings(timings)
+        print("consumer-sim report7 recorded")
+        return 0
     timings: list[dict] = []
     try:
         prepare_tree()
@@ -165,6 +181,7 @@ def main() -> int:
         finished = assert_record(RUN)
         stopped = str(finished.get("stoppedAt") or "")
         assert_true(stopped.strip() != "", "finish did not set stoppedAt on " + RUN)
+        report7(timings)
     finally:
         warm_before_stop = warm_pids()
         if (CONSUMER / ".pickleball" / "runs" / RUN).exists():
@@ -685,6 +702,316 @@ def fail(stage: str, result: subprocess.CompletedProcess, message: str) -> None:
     print("--- stderr ---", file=sys.stderr)
     print(result.stderr[-6000:], file=sys.stderr)
     raise SystemExit(1)
+
+
+def report7(timings: list[dict]) -> None:
+    """Report-7 consumer symptoms. Each item records PASS or FAIL. Any FAIL exits 1.
+
+    These assert what the Windows consumer sees, not internal state. On a4c7ea6f
+    they fail. A later fix is done only when the same item passes.
+    """
+    results: list[dict] = []
+    try:
+        _report7_body(timings, results)
+    except Exception as failure:
+        _report7_note(results, "harness", False, type(failure).__name__ + ": " + str(failure))
+        raise
+    finally:
+        _report7_cleanup()
+        print("report7 scoreboard", flush=True)
+        for row in results:
+            print(f"report7 item={row['item']} result={row['result']} detail={row['detail']}", flush=True)
+    failed = [row["item"] for row in results if row["result"] != "PASS"]
+    if failed:
+        raise SystemExit("consumer-sim report7 FAIL " + ",".join(failed))
+
+
+def _report7_note(results: list[dict], item: str, ok: bool, detail: str) -> None:
+    results.append({"item": item, "result": "PASS" if ok else "FAIL", "detail": detail[:500]})
+    print(f"report7 item={item} result={'PASS' if ok else 'FAIL'} detail={detail[:300]}", flush=True)
+
+
+def _report7_cleanup() -> None:
+    for relative in (
+        "src/test/java/com/example/report7glue/Report7Steps.java",
+        "src/test/resources/features/report7-regex.feature",
+        "src/test/resources/features/report7-cap.feature",
+    ):
+        path = CONSUMER / relative
+        if path.is_file():
+            path.unlink()
+    for run_id in ("report7-a", "report7-b", "report7-c", "report7-quiet", "report7-fail"):
+        try:
+            launcher(["stop", "--run-id=" + run_id, "--force"], 30)
+        except SystemExit:
+            pass
+
+
+def _report7_files() -> None:
+    glue = CONSUMER / "src/test/java/com/example/report7glue/Report7Steps.java"
+    glue.parent.mkdir(parents=True, exist_ok=True)
+    glue.write_text(
+        "package com.example.report7glue;\n"
+        "import io.cucumber.java.en.Given;\n"
+        "public final class Report7Steps {\n"
+        "    @Given(\"report seven cucumber {int}\")\n"
+        "    public void cucumber(int count) {}\n"
+        "    @Given(\"^VERIFY DATA ADDRESS \\\"([^\\\"]+)\\\" HAS DATA TABLE WITH (\\\\d+) DATA ROWS$\")\n"
+        "    public void rows(String address, int count) {}\n"
+        "}\n",
+        encoding="utf-8",
+        newline="\n",
+    )
+    feature = CONSUMER / "src/test/resources/features/report7-regex.feature"
+    feature.parent.mkdir(parents=True, exist_ok=True)
+    feature.write_text(
+        "@report7-regex\n"
+        "Feature: Report 7 regex glue\n"
+        "  Scenario: Regex and expression steps\n"
+        "    Given report seven cucumber 3\n"
+        "    Given VERIFY DATA ADDRESS \"addr\" HAS DATA TABLE WITH 2 DATA ROWS\n",
+        encoding="utf-8",
+        newline="\n",
+    )
+    cap = CONSUMER / "src/test/resources/features/report7-cap.feature"
+    lines = ["@report7-cap", "Feature: Report 7 cap", "  Scenario: Lots"]
+    for index in range(2100):
+        lines.append(f"    Given missing report7 {index}")
+    lines.append("  Scenario: Later one")
+    lines.append("    Given missing report7 later-1")
+    lines.append("  Scenario: Later two")
+    lines.append("    Given missing report7 later-2")
+    cap.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
+
+
+def _report7_compile(timings: list[dict]) -> None:
+    """The consumer compiles before validate/isolate. The launcher classpath already points at target/test-classes."""
+    started = time.monotonic()
+    result = maven(["-q", "test-compile"], 300)
+    seconds = round(time.monotonic() - started, 3)
+    timings.append({
+        "stage": "report7-test-compile",
+        "seconds": seconds,
+        "exit": result.returncode,
+        "stdout": result.stdout,
+        "stderr": result.stderr,
+    })
+    print(f"stage=report7-test-compile exit={result.returncode} seconds={seconds}", flush=True)
+    if result.returncode != 0:
+        print((result.stdout or "")[-1500:], flush=True)
+        print((result.stderr or "")[-1500:], file=sys.stderr, flush=True)
+
+
+def _report7_launch(timings: list[dict], stage: str, args: list[str], timeout: int):
+    started = time.monotonic()
+    try:
+        result = launcher(args, timeout)
+    except SystemExit as failure:
+        result = subprocess.CompletedProcess(args, 124, "", str(failure))
+    seconds = round(time.monotonic() - started, 3)
+    timings.append({
+        "stage": stage,
+        "seconds": seconds,
+        "exit": result.returncode,
+        "stdout": result.stdout,
+        "stderr": result.stderr,
+    })
+    print(f"stage={stage} exit={result.returncode} seconds={seconds}", flush=True)
+    return result, seconds
+
+
+def _report7_body(timings: list[dict], results: list[dict]) -> None:
+    _report7_files()
+    _report7_compile(timings)
+    for run_id in ("report7-a", "report7-b", "report7-c"):
+        seeded, _ = _report7_launch(timings, "report7-seed-" + run_id, [
+            "workspace-seed", "--run-id=" + run_id, "--reseed",
+        ], 180)
+        if seeded.returncode != 0:
+            _report7_note(results, "seed-" + run_id, False, "workspace-seed exit " + str(seeded.returncode))
+    edits = {
+        "report7-a": "pkb_glue=com.example.report7glue",
+        "report7-b": "pkb_glue=com.example.pickleball",
+        "report7-c": "pkb_glue=",
+    }
+    for run_id, glue in edits.items():
+        edited, _ = _report7_launch(timings, "report7-edit-" + run_id, [
+            "workspace-edit", "--run-id=" + run_id,
+            "--runvar=" + glue,
+            "--runvar=pkb_browser=CHROME_HEADLESS",
+        ], 60)
+        if edited.returncode != 0:
+            _report7_note(results, "edit-" + run_id, False, (edited.stdout + edited.stderr)[-400:])
+
+    help_validate, _ = _report7_launch(timings, "report7-help-validate", ["help", "validate"], 60)
+    help_text = (help_validate.stdout or "") + "\n" + (help_validate.stderr or "")
+    _report7_note(
+        results, "4-validate-flags",
+        "--max-steps" in help_text and "--all" in help_text,
+        "help validate missing --max-steps/--all" if "--max-steps" not in help_text or "--all" not in help_text else "help lists --max-steps and --all",
+    )
+
+    capped, _ = _report7_launch(timings, "report7-validate-cap", [
+        "validate", "--tags=@report7-cap",
+    ], 120)
+    cap_text = (capped.stdout or "") + "\n" + (capped.stderr or "")
+    _report7_note(
+        results, "4-validate-skipped",
+        "capped=true" in cap_text and "skipped=2" in cap_text,
+        _snippet(cap_text, "capped=", "skipped="),
+    )
+    all_steps, _ = _report7_launch(timings, "report7-validate-all", [
+        "validate", "--tags=@report7-cap", "--all",
+    ], 180)
+    all_text = (all_steps.stdout or "") + "\n" + (all_steps.stderr or "")
+    _report7_note(
+        results, "4-validate-all",
+        "capped=false" in all_text and "skipped=0" in all_text and "later-2" in all_text,
+        _snippet(all_text, "capped=", "skipped=", "later-2"),
+    )
+
+    defined, _ = _report7_launch(timings, "report7-validate-a", [
+        "validate", "--run-id=report7-a", "--tags=@report7-regex",
+    ], 120)
+    defined_text = (defined.stdout or "") + "\n" + (defined.stderr or "")
+    workspace_a = "runs/report7-a/workspace" in defined_text.replace("\\", "/")
+    regex_defined = "undefined=0" in defined_text and "VERIFY DATA ADDRESS" not in defined_text.split("validate undefined=")[0][-200:]
+    # undefined=0 is the summary. A finding line would contain the step before that summary.
+    regex_clean = "undefined=0" in defined_text and "undefined:" not in defined_text
+    _report7_note(
+        results, "3-validate-run-workspace",
+        workspace_a and defined.returncode == 0,
+        _snippet(defined_text, "workspace=", "undefined="),
+    )
+    _report7_note(
+        results, "2-validate-regex",
+        regex_clean and "report seven cucumber" not in "\n".join(
+            line for line in defined_text.splitlines() if line.startswith("undefined:")
+        ),
+        _snippet(defined_text, "undefined"),
+    )
+    blank, _ = _report7_launch(timings, "report7-validate-c", [
+        "validate", "--run-id=report7-c", "--tags=@report7-regex",
+    ], 120)
+    blank_text = (blank.stdout or "") + "\n" + (blank.stderr or "")
+    _report7_note(
+        results, "3-validate-blank-glue",
+        "undefined:" in blank_text and "VERIFY DATA ADDRESS" in blank_text and "report seven cucumber" in blank_text,
+        _snippet(blank_text, "undefined"),
+    )
+
+    quiet, _ = _report7_launch(timings, "report7-quiet", [
+        "discover", "--quiet", "--run-id=report7-quiet", "--tags=" + TAGS, "--name=" + NAME,
+        "--runvar=pkb_browser=CHROME_HEADLESS", "--retention=failed", "--agent=consumer-sim",
+    ], 900)
+    quiet_lines = [line for line in (quiet.stdout or "").splitlines() if line.strip()]
+    noisy = [
+        line for line in quiet_lines
+        if not line.startswith("summary ") and not line.startswith("error:") and not line.startswith("fix:")
+    ]
+    _report7_note(
+        results, "6-quiet",
+        quiet.returncode in (0, 1) and not noisy and any(line.startswith("summary ") for line in quiet_lines),
+        "extra lines: " + " | ".join(noisy[:8]) if noisy else "summary only",
+    )
+
+    failed, _ = _report7_launch(timings, "report7-failed-paths", [
+        "discover", "--run-id=report7-fail", "--tags=@workbench-cli-fail",
+        "--runvar=pkb_browser=CHROME_HEADLESS", "--retention=failed", "--agent=consumer-sim",
+    ], 900)
+    fail_text = (failed.stdout or "") + "\n" + (failed.stderr or "")
+    relative = "src/test/resources/features/workbench-cli-fail.feature:4"
+    _report7_note(
+        results, "9-failed-scenarios",
+        failed.returncode != 0 and relative in fail_text and "file:" not in fail_text,
+        _snippet(fail_text, "failedScenarios"),
+    )
+
+    first, first_seconds = _report7_launch(timings, "report7-isolate-a", [
+        "isolate", "--run-id=report7-a", "--tags=@report7-regex", "--agent=consumer-sim",
+        "--runvar=pkb_browser=CHROME_HEADLESS",
+    ], 600)
+    descriptor = _read_descriptor("report7-a")
+    workspace_path = str(descriptor.get("workspacePath") or "").replace("\\", "/")
+    _report7_note(
+        results, "1-isolate-workspace",
+        first.returncode == 0
+        and workspace_path.endswith(".pickleball/runs/report7-a/workspace")
+        and "report7-b" not in workspace_path
+        and "report7-c" not in workspace_path,
+        "workspacePath=" + workspace_path + " exit=" + str(first.returncode),
+    )
+    status, _ = _report7_launch(timings, "report7-status-after-isolate", [
+        "status", "--run-id=report7-a",
+    ], 60)
+    status_text = (status.stdout or "") + "\n" + (status.stderr or "")
+    _report7_note(
+        results, "5-status-idle",
+        "status=idle" in status_text and "elapsed-step-ms=idle" in status_text,
+        _snippet(status_text, "status=", "elapsed-step-ms="),
+    )
+    first_progress = _read_progress("report7-a")
+    previous_last = ""
+    stages = first_progress.get("stages") if isinstance(first_progress, dict) else None
+    if isinstance(stages, list) and stages:
+        previous_last = str(stages[-1].get("stage") or "")
+    _report7_launch(timings, "report7-stop-a", ["stop", "--run-id=report7-a", "--force"], 60)
+    second, second_seconds = _report7_launch(timings, "report7-isolate-a-restart", [
+        "isolate", "--run-id=report7-a", "--tags=@report7-regex", "--agent=consumer-sim",
+        "--runvar=pkb_browser=CHROME_HEADLESS",
+    ], 600)
+    restarted = _read_progress("report7-a")
+    restarted_stages = restarted.get("stages") if isinstance(restarted, dict) else None
+    first_stage = ""
+    first_elapsed = None
+    if isinstance(restarted_stages, list) and restarted_stages:
+        first_stage = str(restarted_stages[0].get("stage") or "")
+        first_elapsed = restarted_stages[0].get("enteredElapsedMs")
+    stale = bool(previous_last) and first_stage == previous_last and first_elapsed == 0
+    _report7_note(
+        results, "7-startup-progress",
+        second.returncode == 0 and isinstance(restarted_stages, list) and restarted_stages and not stale,
+        f"previous={previous_last} first={first_stage}@{first_elapsed}",
+    )
+    _report7_note(
+        results, "8-restart-budget",
+        second.returncode == 0 and second_seconds <= 35,
+        f"restart_seconds={second_seconds} first_seconds={first_seconds} target=35",
+    )
+
+
+def _read_descriptor(run_id: str) -> dict:
+    path = CONSUMER / ".pickleball" / "runs" / run_id / "session" / "descriptor.json"
+    if not path.is_file():
+        return {}
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return {}
+
+
+def _read_progress(run_id: str) -> dict:
+    path = CONSUMER / ".pickleball" / "runs" / run_id / "session" / "startup-progress.json"
+    if not path.is_file():
+        return {}
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return {}
+
+
+def _snippet(text: str, *needles: str) -> str:
+    lines = []
+    for line in text.splitlines():
+        if any(needle in line for needle in needles):
+            lines.append(line.strip())
+    if not lines:
+        return text[-240:].replace("\n", " | ")
+    return " | ".join(lines[:6])
+
+
+def stop_report7(timings: list[dict]) -> None:
+    _report7_cleanup()
 
 
 def write_timings(timings: list[dict]) -> None:
