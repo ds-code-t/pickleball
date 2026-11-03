@@ -14,6 +14,7 @@ import tools.dscode.testengine.PKB_props;
 import tools.dscode.testengine.PickleballRunner;
 
 import java.io.IOException;
+import java.io.PrintStream;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
@@ -975,9 +976,55 @@ public final class AgentCoordination {
             if (name.equals(current) || running.contains(name)) continue;
             if (workbenchLive(child.resolve(PickleballLocalLayout.WORKBENCH_DIRECTORY))) continue;
             if (!versionExpired(child, clock)) continue;
-            if (deleteVersionTree(pickleball, child)) removed++;
+            if (deleteVersionTree(pickleball, child)) {
+                removed++;
+                appendHistory(project, "gc-versions removed v/" + name);
+            }
         }
         return new VersionSweep(removed);
+    }
+
+    /**
+     * Launch check. A usable {@code current.json} whose {@code v/<version>/} tree
+     * is gone is not silent. {@code gc-versions} records the command in
+     * {@code history.log}; anything else is just missing.
+     */
+    public static void warnMissingCurrentTree(Path project, PrintStream err) {
+        if (project == null || err == null) return;
+        Path pickleball = PickleballLocalLayout.root(project);
+        var current = PickleballLocalLayout.readCurrent(pickleball);
+        if (current.isEmpty() || !current.get().usable()) return;
+        String version = current.get().pickleballVersion();
+        if (!PickleballLocalLayout.isSafeVersion(version)) return;
+        Path root = PickleballLocalLayout.versionRoot(pickleball, version);
+        if (Files.isDirectory(root) && Files.isRegularFile(root.resolve(PickleballLocalLayout.AGENT_GUIDE))) return;
+        String deletedBy = deletionCommand(pickleball, version);
+        if (deletedBy == null) {
+            err.println("v/" + version + "/ is missing. run export-guidance");
+        } else {
+            err.println("v/" + version + "/ is missing. deleted by " + deletedBy + ". run export-guidance");
+        }
+    }
+
+    private static String deletionCommand(Path pickleball, String version) {
+        Path history = pickleball.resolve(HISTORY_FILE);
+        if (!Files.isRegularFile(history)) return null;
+        String needle = "removed v/" + version;
+        String found = null;
+        try {
+            for (String line : Files.readAllLines(history, StandardCharsets.UTF_8)) {
+                int at = line.indexOf(needle);
+                if (at < 0) continue;
+                String before = line.substring(0, at).strip();
+                if (before.endsWith("removed")) {
+                    before = before.substring(0, before.length() - "removed".length()).strip();
+                }
+                if (!before.isBlank()) found = before;
+            }
+        } catch (IOException ignored) {
+            return null;
+        }
+        return found;
     }
 
     public static List<String> mavenProperties(Run run) {

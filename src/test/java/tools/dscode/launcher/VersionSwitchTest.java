@@ -109,7 +109,8 @@ class VersionSwitchTest {
         assertTrue(Files.isRegularFile(pickleball.resolve("v/1.7.0/investigations/legacy/investigation.json")));
         assertTrue(Files.isRegularFile(pickleball.resolve("investigations/keep/report.html")));
         assertTrue(Files.isRegularFile(pickleball.resolve("runs/run-old/record.json")));
-        assertEquals("stay\n", Files.readString(pickleball.resolve("history.log")));
+        assertTrue(Files.readString(pickleball.resolve("history.log")).contains("stay"));
+        assertTrue(Files.readString(pickleball.resolve("history.log")).contains("gc-versions removed v/1.7.0"));
         assertEquals(0, AgentCoordination.sweepVersions(tempDir, now).versionsRemoved());
     }
 
@@ -138,6 +139,47 @@ class VersionSwitchTest {
         AgentCoordination.sweepVersions(tempDir, Instant.now());
         assertTrue(Files.isRegularFile(pickleball.resolve("v/2.0.0/AGENT-GUIDE.md")));
         assertTrue(Files.isRegularFile(pickleball.resolve("v/2.1.0/AGENT-GUIDE.md")));
+    }
+
+    @Test
+    void missingCurrentTreeSaysToExportGuidanceAndNamesTheDeletingCommand() throws Exception {
+        Path pickleball = tempDir.resolve(".pickleball");
+        writeComplete(pickleball, "2.0.0", "guide-two");
+        PickleballLocalLayout.writeCurrent(pickleball, PickleballLocalLayout.CurrentPointer.completeNow("2.0.0"));
+        deleteTree(pickleball.resolve("v/2.0.0"));
+        ByteArrayOutputStream err = new ByteArrayOutputStream();
+        AgentCoordination.warnMissingCurrentTree(tempDir, new PrintStream(err, true, StandardCharsets.UTF_8));
+        String missing = err.toString(StandardCharsets.UTF_8);
+        assertTrue(missing.contains("v/2.0.0/ is missing"), missing);
+        assertTrue(missing.contains("run export-guidance"), missing);
+        assertFalse(missing.contains("deleted by"), missing);
+
+        writeComplete(pickleball, "2.0.0", "guide-two");
+        err.reset();
+        AgentCoordination.warnMissingCurrentTree(tempDir, new PrintStream(err, true, StandardCharsets.UTF_8));
+        assertEquals("", err.toString(StandardCharsets.UTF_8));
+
+        writeComplete(pickleball, "1.7.0", "old-guide");
+        Instant now = Instant.parse("2026-10-06T12:00:00Z");
+        PickleballLocalLayout.writeLastUsed(pickleball.resolve("v/1.7.0"), now.minus(AgentCoordination.VERSION_UNUSED));
+        AgentCoordination.sweepVersions(tempDir, now);
+        assertFalse(Files.isRegularFile(pickleball.resolve("v/1.7.0/AGENT-GUIDE.md")));
+        PickleballLocalLayout.writeCurrent(pickleball, PickleballLocalLayout.CurrentPointer.completeNow("1.7.0"));
+        err.reset();
+        AgentCoordination.warnMissingCurrentTree(tempDir, new PrintStream(err, true, StandardCharsets.UTF_8));
+        String named = err.toString(StandardCharsets.UTF_8);
+        assertTrue(named.contains("v/1.7.0/ is missing"), named);
+        assertTrue(named.contains("deleted by gc-versions"), named);
+        assertTrue(named.contains("run export-guidance"), named);
+    }
+
+    private static void deleteTree(Path root) throws Exception {
+        if (!Files.exists(root)) return;
+        try (var walk = Files.walk(root)) {
+            for (Path path : walk.sorted(java.util.Comparator.reverseOrder()).toList()) {
+                Files.deleteIfExists(path);
+            }
+        }
     }
 
     private static void writeComplete(Path pickleball, String version, String marker) throws Exception {

@@ -356,9 +356,10 @@ def fail_text(stage: str, text: str, reason: str) -> None:
 
 
 def stock_wrapper(timings: list[dict]) -> None:
-    """Stock Apache mvn.cmd collapses every non-zero JVM status to 1.
+    """Stock Apache mvn.cmd and stock mvnw.cmd collapse every non-zero JVM status to 1.
 
-    Only the patched mvnw.cmd returns 2. This stage runs on Windows only.
+    A script that needs the exact code matches error: or uses java -cp.
+    This stage runs on Windows only.
     The copy stays named mvnw.cmd. The wrapper turns that filename into
     mvn.cmd under the Maven home (`$script -replace '^mvnw','mvn'`). A
     different name looks for apache-maven/bin/<that name> and exits before
