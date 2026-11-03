@@ -21,7 +21,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * Fails when a main-source file outside the classified allowlist grows a raw
  * WebDriver DOM read. Adapter files own the Selenium calls. Other allowlisted
  * files are outside the browser DOM (Swing, Gherkin, code-source, alerts,
- * window size) or are known gaps until a later phase removes them.
+ * window size). A cleaned file is not allowlisted. Every allowlisted file
+ * must still have at least one hit.
  */
 class DomAccessGuardTest {
     static final Pattern RAW = Pattern.compile(
@@ -61,16 +62,11 @@ class DomAccessGuardTest {
             "src/main/java/io/cucumber/core/runner/util/KeyFunctions.java",
             "src/main/java/tools/dscode/common/assertions/AssertionChain.java",
             "src/main/java/tools/dscode/common/browseroperations/BrowserAlerts.java",
-            "src/main/java/tools/dscode/common/composite/CompositeWebElement.java",
-            "src/main/java/tools/dscode/common/composite/DomCompositeAdapter.java",
             "src/main/java/tools/dscode/common/composite/ElementOperations.java",
             "src/main/java/tools/dscode/common/composite/ElementReads.java",
             "src/main/java/tools/dscode/common/reporting/diagnostic/ScenarioIdentity.java",
             "src/main/java/tools/dscode/common/reporting/diagnostic/SourceProvenance.java",
-            "src/main/java/tools/dscode/common/seleniumextensions/CompositeSnapshotProducer.java",
             "src/main/java/tools/dscode/common/seleniumextensions/ElementSnapshotScript.java",
-            "src/main/java/tools/dscode/common/seleniumextensions/SeleniumSnapshotProducer.java",
-            "src/main/java/tools/dscode/common/seleniumextensions/SnapshotProducers.java",
             "src/main/java/tools/dscode/common/treeparsing/parsedComponents/Phrase.java",
             "src/main/java/tools/dscode/launcher/WorkbenchElementInspect.java",
             "src/main/java/tools/dscode/launcher/WorkbenchOneShotLaunch.java",
@@ -83,6 +79,9 @@ class DomAccessGuardTest {
         TreeSet<String> unknown = new TreeSet<>(hits.keySet());
         unknown.removeAll(ALLOWED);
         assertTrue(unknown.isEmpty(), String.join("\n", unknown));
+        TreeSet<String> idle = new TreeSet<>(ALLOWED);
+        idle.removeAll(hits.keySet());
+        assertTrue(idle.isEmpty(), "allowlist entries with no guard hit:\n" + String.join("\n", idle));
         int count = hits.values().stream().mapToInt(List::size).sum();
         assertTrue(count > 0, "guard scan found nothing; the patterns no longer match the tree");
         for (String cleaned : List.of(
