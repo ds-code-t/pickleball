@@ -110,6 +110,62 @@ class WorkbenchWarmLifecycleTest {
     }
 
     @Test
+    @Timeout(value = 30, unit = TimeUnit.SECONDS)
+    void shortLivedCliExitLeavesTheWarmJvm() throws Exception {
+        Path state = state();
+        Process warm = startWarm(state, 0, 900);
+        Process cli = null;
+        try {
+            List<ProcessHandle> children = awaitTree(warm.pid());
+            cli = startHold(state);
+            awaitAlive(cli.pid());
+            cli.destroyForcibly();
+            assertTrue(cli.waitFor(10, TimeUnit.SECONDS));
+            Thread.sleep(1000);
+            assertTrue(WarmProcess.alive(warm.pid()), "a one-shot CLI must not be the warm owner");
+            assertTrue(alive(children.getFirst()), "the warm child must survive the CLI");
+            assertTrue(Files.isRegularFile(WarmProcess.file(state)));
+            int code = WorkbenchSessionCommands.run(
+                    new String[]{"stop", project.toString()},
+                    new PrintStream(new ByteArrayOutputStream(), true, StandardCharsets.UTF_8),
+                    new PrintStream(new ByteArrayOutputStream(), true, StandardCharsets.UTF_8),
+                    launch -> {
+                        throw new AssertionError("stop must not start a session");
+                    }
+            );
+            assertEquals(0, code);
+            awaitDead(warm.pid(), children);
+            assertFalse(Files.isRegularFile(WarmProcess.file(state)));
+        } finally {
+            if (cli != null) cli.destroyForcibly();
+            warm.destroyForcibly();
+        }
+    }
+
+    @Test
+    @Timeout(value = 40, unit = TimeUnit.SECONDS)
+    void longLivedOwnerClaimDeathKillsTheWarmJvm() throws Exception {
+        Path state = state();
+        Process owner = startHold(state);
+        Process warm = null;
+        try {
+            awaitAlive(owner.pid());
+            warm = startWarm(state, 0, 900);
+            List<ProcessHandle> children = awaitTree(warm.pid());
+            WarmProcess.claim(state, owner.pid());
+            assertEquals(owner.pid(), WarmProcess.liveOwner(state));
+            owner.destroyForcibly();
+            assertTrue(owner.waitFor(10, TimeUnit.SECONDS));
+            awaitDead(warm.pid(), children);
+            assertFalse(Files.isRegularFile(WarmProcess.file(state)));
+        } finally {
+            owner.destroyForcibly();
+            if (warm != null) warm.destroyForcibly();
+            WarmProcess.deleteOwner(state);
+        }
+    }
+
+    @Test
     @Timeout(value = 40, unit = TimeUnit.SECONDS)
     void parentDeathKillsTheWarmJvmAndItsChild() throws Exception {
         Path state = state();

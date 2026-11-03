@@ -91,6 +91,22 @@ class SpeedTypesTest {
     }
 
     @Test
+    void ownerClaimTracksOnlyALivePidAndReleaseClearsIt() throws Exception {
+        assertEquals(0L, WarmProcess.liveOwner(root));
+        WarmProcess.claim(root, ProcessHandle.current().pid());
+        assertEquals(ProcessHandle.current().pid(), WarmProcess.readOwner(root));
+        assertEquals(ProcessHandle.current().pid(), WarmProcess.liveOwner(root));
+        WarmProcess.claim(root, 1_000_000_001L);
+        assertEquals(1_000_000_001L, WarmProcess.readOwner(root));
+        assertEquals(0L, WarmProcess.liveOwner(root));
+        assertFalse(Files.isRegularFile(WarmProcess.ownerFile(root)));
+        WarmProcess.claim(root, ProcessHandle.current().pid());
+        WarmProcess.release(root);
+        assertEquals(0L, WarmProcess.liveOwner(root));
+        assertFalse(Files.isRegularFile(WarmProcess.ownerFile(root)));
+    }
+
+    @Test
     void warmHandleIsReusableOnlyWhileThePidAndHashMatch() throws Exception {
         Process process = new ProcessBuilder("sleep", "30").start();
         try {

@@ -97,8 +97,10 @@ public final class WorkbenchApplication {
     }
 
     static int runMcpProcess(String[] args, PrintStream protocolOut, PrintStream err) {
+        Path project = null;
         try {
-            Path project = requiredProject(args, "mcp");
+            project = requiredProject(args, "mcp");
+            claimWarm(project);
 
             // MCP stdio owns the original stdout stream. Redirect ordinary JVM stdout
             // before constructing SDK/controller services so diagnostics cannot corrupt it.
@@ -124,6 +126,8 @@ public final class WorkbenchApplication {
         } catch (RuntimeException failure) {
             err.println("Workbench mcp failed: " + failure.getMessage());
             return 1;
+        } finally {
+            releaseWarm(project);
         }
     }
 
@@ -244,6 +248,7 @@ public final class WorkbenchApplication {
 
     private static int ui(String[] args) {
         IsolateArgs parsed = projectCommandArgs(args, "ui");
+        claimWarm(parsed.project());
         try {
             if (parsed.runId() != null) {
                 WindowDriver.show(parsed.project(), parsed.runId(), parsed.agentId(), parsed.agentId() != null);
@@ -252,10 +257,15 @@ public final class WorkbenchApplication {
             }
         } catch (RuntimeException failure) {
             System.err.println(failure.getMessage());
+            releaseWarm(parsed.project());
             return 1;
         }
-        WorkbenchUi.launch(parsed.project(), parsed.runId(), parsed.agentId());
-        return 0;
+        try {
+            WorkbenchUi.launch(parsed.project(), parsed.runId(), parsed.agentId());
+            return 0;
+        } finally {
+            releaseWarm(parsed.project());
+        }
     }
 
     static int isolate(String[] args, PrintStream out, PrintStream err, boolean interactiveStdin) {
@@ -279,6 +289,7 @@ public final class WorkbenchApplication {
             err.println("While testing for yourself, stay headless. Do not open the GUI for your own testing.");
             return 2;
         }
+        claimWarm(parsed.project());
 
         try {
             WorkbenchSynchronizer.syncOverlapped(parsed.project());
@@ -328,6 +339,7 @@ public final class WorkbenchApplication {
             workerProperties.put("pkb_agent_id", parsed.agentId());
         }
         workerProperties.put("pkb_run_purpose", "workbench-session");
+        claimWarm(parsed.project());
 
         CountDownLatch done = new CountDownLatch(1);
         AtomicBoolean stopping = new AtomicBoolean();
@@ -377,6 +389,11 @@ public final class WorkbenchApplication {
             if (controller != null) controller.close();
             releaseWarm(parsed.project());
         }
+    }
+
+    private static void claimWarm(Path project) {
+        if (project == null) return;
+        WarmProcess.claim(PickleballLocalLayout.workbenchStateRoot(project), ProcessHandle.current().pid());
     }
 
     private static void releaseWarm(Path project) {

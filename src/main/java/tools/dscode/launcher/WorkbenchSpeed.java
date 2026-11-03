@@ -197,7 +197,7 @@ public final class WorkbenchSpeed {
             for (String token : WorkbenchDirectRun.dashD(command)) writer.println(token);
             writer.println(".");
             writer.println(project.toAbsolutePath().normalize());
-            writer.println(Long.toString(ProcessHandle.current().pid()));
+            writer.println(Long.toString(WarmProcess.liveOwner(state)));
             BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8));
             String status = reader.readLine();
             if (status == null || !status.startsWith("EXIT ")) return Optional.empty();
@@ -235,7 +235,7 @@ public final class WorkbenchSpeed {
         command.add(WorkbenchWarmMain.class.getName());
         command.add(state.toAbsolutePath().normalize().toString());
         command.add(watch);
-        command.add(Long.toString(ProcessHandle.current().pid()));
+        command.add(Long.toString(WarmProcess.liveOwner(state)));
         command.add(Long.toString(idleSeconds()));
         try {
             new ProcessBuilder(command)

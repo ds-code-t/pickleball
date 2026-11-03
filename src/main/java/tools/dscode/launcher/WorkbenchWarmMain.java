@@ -22,10 +22,11 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * One long-lived JVM. Later commands connect instead of starting Maven or a
+ * One long-lived JVM. Later CLI commands connect instead of starting Maven or a
  * new process. Each command runs in a fresh class loader so runner statics
- * do not leak. The process exits when its owner dies, when it has been idle,
- * or when the launcher deletes the handle and kills the tree.
+ * do not leak. A one-shot CLI is not an owner. The process exits when a
+ * long-lived owner dies (Workbench, MCP host, or session), when it has been
+ * idle, or when stop or session teardown deletes the handle and kills the tree.
  */
 public final class WorkbenchWarmMain {
     private static final AtomicBoolean EXITING = new AtomicBoolean();
@@ -102,6 +103,8 @@ public final class WorkbenchWarmMain {
                 Thread.currentThread().interrupt();
                 return;
             }
+            long filed = WarmProcess.readOwner(state);
+            if (filed > 0) parentPid = filed;
             if (exitDue(parentPid, busy, idleNanos, lastUsedNanos, System.nanoTime())) shutdown(state);
         }
     }

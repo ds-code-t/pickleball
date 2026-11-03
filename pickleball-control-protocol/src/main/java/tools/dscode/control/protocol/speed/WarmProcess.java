@@ -13,6 +13,8 @@ import java.util.Optional;
  */
 public final class WarmProcess {
     public static final String FILE_NAME = "warm-jvm.v1";
+    /** Pid of a long-lived owner (Workbench, MCP host, or session). A one-shot CLI does not write this. */
+    public static final String OWNER_FILE_NAME = "warm-owner.v1";
     /** Idle before a warm JVM exits. Blank, non-numeric, or non-positive config stays here. */
     public static final long DEFAULT_IDLE_SECONDS = 900;
 
@@ -74,13 +76,65 @@ public final class WarmProcess {
     }
 
     /**
-     * Deletes the handle, then kills that pid and its descendants.
+     * Deletes the handle and the owner claim, then kills that pid and its descendants.
      * Delete first so a replacement JVM can write a new handle while the old tree dies.
      */
     public static void release(Path stateRoot) {
         Optional<Handle> handle = read(stateRoot);
         delete(stateRoot);
+        deleteOwner(stateRoot);
         handle.ifPresent(found -> ProcessTree.kill(found.pid()));
+    }
+
+    /**
+     * Records a long-lived owner. The warm JVM adopts this pid and exits when it dies.
+     * A short-lived CLI must not call this. No warm JVM yet is fine; the next start reads the file.
+     */
+    public static void claim(Path stateRoot, long pid) {
+        if (stateRoot == null || pid <= 0) return;
+        try {
+            Files.createDirectories(stateRoot);
+            Files.writeString(ownerFile(stateRoot), Long.toString(pid) + "\n", StandardCharsets.UTF_8);
+        } catch (IOException ignored) {
+            // The next command starts with no owner rather than a partial claim.
+        }
+    }
+
+    /** Alive owner pid, or zero. A dead claim is removed so the next warm JVM is not tied to it. */
+    public static long liveOwner(Path stateRoot) {
+        long pid = readOwner(stateRoot);
+        if (pid <= 0) return 0L;
+        if (alive(pid)) return pid;
+        deleteOwner(stateRoot);
+        return 0L;
+    }
+
+    /** Owner file contents, including a pid that has already exited. Zero when the file is absent. */
+    public static long readOwner(Path stateRoot) {
+        if (stateRoot == null) return 0L;
+        Path path = ownerFile(stateRoot);
+        if (!Files.isRegularFile(path)) return 0L;
+        try {
+            String raw = Files.readString(path, StandardCharsets.UTF_8).trim();
+            if (raw.isEmpty()) return 0L;
+            long pid = Long.parseLong(raw);
+            return pid > 0 ? pid : 0L;
+        } catch (IOException | NumberFormatException failure) {
+            return 0L;
+        }
+    }
+
+    public static Path ownerFile(Path stateRoot) {
+        return stateRoot.resolve(OWNER_FILE_NAME);
+    }
+
+    public static void deleteOwner(Path stateRoot) {
+        if (stateRoot == null) return;
+        try {
+            Files.deleteIfExists(ownerFile(stateRoot));
+        } catch (IOException ignored) {
+            // A leftover dead pid is ignored by liveOwner.
+        }
     }
 
     public static void delete(Path stateRoot) {
