@@ -21,7 +21,7 @@ public final class SnapshotProducers {
         long start = System.nanoTime();
         boolean composite = element instanceof CompositeWebElement;
         ElementSnapshot snapshot = composite
-                ? ElementSnapshotScript.onComposite(driver, (CompositeWebElement) element)
+                ? CompositeSnapshotProducer.INSTANCE.snapshot(driver, element)
                 : SeleniumSnapshotProducer.INSTANCE.snapshot(driver, element);
         long durationMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
         logTrace("element-snapshot event=" + (event == null ? "create" : event)

@@ -347,6 +347,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/common/resources/ResourceLocations.java`
 - `src/main/java/tools/dscode/common/runtime/ProcessTrees.java`
 - `src/main/java/tools/dscode/common/seleniumextensions/AllContextsScan.java`
+- `src/main/java/tools/dscode/common/seleniumextensions/CompositeSnapshotProducer.java`
 - `src/main/java/tools/dscode/common/seleniumextensions/ContextWrapper.java`
 - `src/main/java/tools/dscode/common/seleniumextensions/ElementSnapshot.java`
 - `src/main/java/tools/dscode/common/seleniumextensions/ElementSnapshotScript.java`
@@ -509,6 +510,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/common/assertions/AssertionClauseSplitterTest.java`
 - `src/test/java/tools/dscode/common/assertions/MultilineAssertFeatureTest.java`
 - `src/test/java/tools/dscode/common/assertions/MultilineAssertTest.java`
+- `src/test/java/tools/dscode/common/composite/CompositeElements.java`
 - `src/test/java/tools/dscode/common/composite/CompositeLocationTest.java`
 - `src/test/java/tools/dscode/common/composite/PrimaryPathAuditTest.java`
 - `src/test/java/tools/dscode/common/composite/SelectorAndAdapterTest.java`
@@ -528,6 +530,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/common/reporting/diagnostic/DiagnosticSecretRedactionTest.java`
 - `src/test/java/tools/dscode/common/reporting/diagnostic/DiscoverHintJvmLeakTest.java`
 - `src/test/java/tools/dscode/common/resources/PathListSemanticsTest.java`
+- `src/test/java/tools/dscode/common/seleniumextensions/ElementSnapshotParityTest.java`
 - `src/test/java/tools/dscode/common/seleniumextensions/ElementWrapperSnapshotTest.java`
 - `src/test/java/tools/dscode/common/seleniumextensions/SeleniumSnapshotProducerTest.java`
 - `src/test/java/tools/dscode/common/seleniumextensions/SnapshotPages.java`
