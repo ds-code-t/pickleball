@@ -257,7 +257,7 @@ public enum ActionOperations implements OperationsInterface {
                     if (selection.elementTypes.contains(ElementType.HTML_TYPE)) {
 
                         ElementWrapper optionElement = selection.getElementWrappers().getFirst();
-                        if (optionElement.getTagName().equalsIgnoreCase("option")) {
+                        if ("option".equalsIgnoreCase(optionElement.snapshot().tag())) {
                             selectDropdownByIndex(getCurrentDriver(), dropDownWrapper, optionElement.getSameTagIndex());
                         } else {
                             click(getCurrentDriver(), optionElement);

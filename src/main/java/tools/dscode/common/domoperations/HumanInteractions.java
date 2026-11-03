@@ -35,7 +35,8 @@ public final class HumanInteractions {
     }
 
     public static void blur(WebDriver driver) {
-        ((JavascriptExecutor) driver).executeScript(
+        tools.dscode.common.composite.ElementOperations.script(
+                driver,
                 "if (document.activeElement) { document.activeElement.blur(); }"
         );
     }
@@ -63,15 +64,14 @@ public final class HumanInteractions {
             return;
         }
 
-        Select select = new Select(element);
-        int optionCount = select.getOptions().size();
+        int optionCount = tools.dscode.common.composite.ElementOperations.optionCount(element);
 
         if (index >= optionCount) {
             throw new IllegalArgumentException(
                     "index " + index + " out of bounds (options=" + optionCount + ")"
             );
         }
-        select.selectByIndex(index);
+        tools.dscode.common.composite.ElementOperations.selectByIndex(element, index);
     }
 
     public static void selectDropdownByVisibleText(WebDriver driver,
@@ -87,7 +87,7 @@ public final class HumanInteractions {
         List<WebElement> matches = tools.dscode.common.composite.ElementOperations.findElements(container, By.xpath(".//option | .//a"));
 
         for (WebElement el : matches) {
-            String hay = el.getText()
+            String hay = tools.dscode.common.composite.ElementOperations.text(el)
                     .trim()
                     .replaceAll("\\s+", " ");
             hay = caseSensitive ? hay : hay.toLowerCase(Locale.ROOT);
@@ -99,19 +99,14 @@ public final class HumanInteractions {
                 return;
             }
 
-            if ("option".equalsIgnoreCase(el.getTagName())) {
+            if ("option".equalsIgnoreCase(tools.dscode.common.composite.ElementOperations.tag(el))) {
                 WebElement selectEl = tools.dscode.common.composite.ElementOperations.findElement(el, By.xpath("ancestor::select[1]"));
                 centerScroll(driver, selectEl);
-
-                Select sel = new Select(selectEl);
-                List<WebElement> opts = sel.getOptions();
-                for (int i = 0; i < opts.size(); i++) {
-                    if (opts.get(i).equals(el)) {
-                        sel.selectByIndex(i);
-                        return;
-                    }
-                }
-                sel.selectByVisibleText(el.getText());
+                tools.dscode.common.composite.ElementOperations.selectMatching(
+                        selectEl,
+                        el,
+                        tools.dscode.common.composite.ElementOperations.text(el)
+                );
                 return;
             }
             centerScroll(driver, el);
@@ -138,7 +133,7 @@ public final class HumanInteractions {
         }
         try {
             centerScroll(driver, el);
-            new Actions(driver)
+            tools.dscode.common.composite.ElementOperations.actions(driver)
                     .moveToElement(el)
                     .pause(SHORT)
                     .click(el)
@@ -164,7 +159,7 @@ public final class HumanInteractions {
         }
         try {
             centerScroll(driver, el);
-            new Actions(driver)
+            tools.dscode.common.composite.ElementOperations.actions(driver)
                     .moveToElement(el).pause(SHORT)
                     .doubleClick(el)
                     .pause(SHORT)
@@ -172,7 +167,7 @@ public final class HumanInteractions {
         } catch (RuntimeException e) {
             try {
                 checkElementBeforeActions(el);
-                new Actions(driver).doubleClick(el).perform();
+                tools.dscode.common.composite.ElementOperations.actions(driver).doubleClick(el).perform();
             } catch (RuntimeException e2) {
                 jsDispatchMouse(driver, el, "dblclick");
             }
@@ -188,7 +183,7 @@ public final class HumanInteractions {
         }
         try {
             centerScroll(driver, el);
-            new Actions(driver)
+            tools.dscode.common.composite.ElementOperations.actions(driver)
                     .moveToElement(el).pause(MID)
                     .contextClick(el)
                     .pause(SHORT)
@@ -196,7 +191,7 @@ public final class HumanInteractions {
         } catch (RuntimeException e) {
             try {
                 checkElementBeforeActions(el);
-                new Actions(driver).contextClick(el).perform();
+                tools.dscode.common.composite.ElementOperations.actions(driver).contextClick(el).perform();
             } catch (RuntimeException e2) {
                 jsDispatchMouse(driver, el, "contextmenu");
             }
@@ -212,7 +207,7 @@ public final class HumanInteractions {
         }
         try {
             centerScroll(driver, el);
-            new Actions(driver)
+            tools.dscode.common.composite.ElementOperations.actions(driver)
                     .moveToElement(el).pause(Duration.ofMillis(250))
                     .build().perform();
         } catch (RuntimeException e) {
@@ -232,7 +227,7 @@ public final class HumanInteractions {
         try {
             centerScroll(driver, source);
             centerScroll(driver, target);
-            new Actions(driver)
+            tools.dscode.common.composite.ElementOperations.actions(driver)
                     .moveToElement(source).pause(SHORT)
                     .clickAndHold(source)
                     .pause(MID)
@@ -254,7 +249,7 @@ public final class HumanInteractions {
         }
         try {
             centerScroll(driver, source);
-            new Actions(driver)
+            tools.dscode.common.composite.ElementOperations.actions(driver)
                     .moveToElement(source).pause(SHORT)
                     .clickAndHold(source)
                     .pause(MID)
@@ -280,7 +275,7 @@ public final class HumanInteractions {
         }
         try {
             centerScroll(driver, el);
-            new Actions(driver)
+            tools.dscode.common.composite.ElementOperations.actions(driver)
                     .scrollByAmount(0, deltaY).pause(SHORT)
                     .build().perform();
         } catch (RuntimeException e) {
@@ -350,7 +345,7 @@ public final class HumanInteractions {
         }
         try {
             if (!s.isEmpty()) {
-                new Actions(driver).sendKeys(s).perform();
+                tools.dscode.common.composite.ElementOperations.actions(driver).sendKeys(s).perform();
             }
         } catch (RuntimeException e) {
             jsAppendValueToActive(driver, s);
@@ -359,7 +354,8 @@ public final class HumanInteractions {
 
     private static void jsAppendValueToActive(WebDriver driver, String text) {
         if (text == null || text.isEmpty()) return;
-        ((JavascriptExecutor) driver).executeScript(
+        tools.dscode.common.composite.ElementOperations.script(
+                driver,
                 """
                         const el = document.activeElement;
                         if (el && 'value' in el) {
@@ -377,7 +373,7 @@ public final class HumanInteractions {
             tools.dscode.common.composite.ElementOperations.keys(driver, keys);
             return;
         }
-        new Actions(driver)
+        tools.dscode.common.composite.ElementOperations.actions(driver)
                 .pause(SHORT)
                 .sendKeys(keys).pause(SHORT)
                 .build().perform();
@@ -435,7 +431,7 @@ public final class HumanInteractions {
     private static void focus(WebDriver driver, WebElement el) {
         centerScroll(driver, el);
         try {
-            new Actions(driver)
+            tools.dscode.common.composite.ElementOperations.actions(driver)
                     .moveToElement(el).pause(SHORT)
                     .click(el).pause(SHORT)
                     .build().perform();
@@ -466,7 +462,7 @@ public final class HumanInteractions {
      * WebElement it preserves normal Selenium behavior.
      */
     private static void checkElementBeforeActions(WebElement element) {
-        element.isEnabled();
+        tools.dscode.common.composite.ElementOperations.enabled(element);
     }
 
     /**
@@ -483,13 +479,13 @@ public final class HumanInteractions {
 
         Object[] extra = additionalArguments == null ? new Object[0] : additionalArguments;
         if (element instanceof ElementWrapper wrapper) {
-            return wrapper.executeScript(script, extra);
+            return tools.dscode.common.composite.ElementOperations.scriptOn(driver, wrapper, script, extra);
         }
 
         Object[] arguments = new Object[extra.length + 1];
         arguments[0] = element;
         System.arraycopy(extra, 0, arguments, 1, extra.length);
-        return ((JavascriptExecutor) driver).executeScript(script, arguments);
+        return tools.dscode.common.composite.ElementOperations.script(driver, script, arguments);
     }
 
     private static void jsFocus(WebDriver driver, WebElement el) {

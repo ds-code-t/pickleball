@@ -289,7 +289,7 @@ public class ElementWrapper implements WebElement, WrapsElement {
                     () -> findElements(By.xpath("descendant::*[contains(@class,'Read')]"))
             );
             if (!valueElements.isEmpty()) {
-                return cacheReturn(valueElements.getLast().getText());
+                return cacheReturn(tools.dscode.common.composite.ElementOperations.text(valueElements.getLast()));
             }
             if (getTagName().equals("td")) {
                 return cacheReturn(getText());
@@ -299,7 +299,7 @@ public class ElementWrapper implements WebElement, WrapsElement {
                     () -> findElements(By.xpath("*[normalize-space(.)][1]/following-sibling::*[descendant-or-self::*[text()]]"))
             );
             if (valueElements.size() == 1) {
-                return cacheReturn(valueElements.getLast().getText());
+                return cacheReturn(tools.dscode.common.composite.ElementOperations.text(valueElements.getLast()));
             }
         }
 
@@ -410,7 +410,7 @@ public class ElementWrapper implements WebElement, WrapsElement {
         Objects.requireNonNull(script, "script must not be null");
         JavascriptExecutor js = javascriptExecutor();
         return executeWithStaleRetry(currentElement ->
-                js.executeScript(script, prependElement(currentElement, arguments)));
+                tools.dscode.common.composite.ElementOperations.script(driver, script, prependElement(currentElement, arguments)));
     }
 
     /**
@@ -421,7 +421,7 @@ public class ElementWrapper implements WebElement, WrapsElement {
         Objects.requireNonNull(script, "script must not be null");
         JavascriptExecutor js = javascriptExecutor();
         return executeWithStaleRetry(currentElement ->
-                js.executeAsyncScript(script, prependElement(currentElement, arguments)));
+                tools.dscode.common.composite.ElementOperations.asyncScript(driver, script, prependElement(currentElement, arguments)));
     }
 
     @Override
@@ -471,17 +471,24 @@ public class ElementWrapper implements WebElement, WrapsElement {
 
     @Override
     public String getDomProperty(String name) {
-        return executeWithStaleRetry(currentElement -> currentElement.getDomProperty(name));
+        if ("value".equals(name)) return snapshot().value();
+        if (snapshot().hasAttribute(name)) return snapshot().attribute(name);
+        return executeWithStaleRetry(currentElement ->
+                tools.dscode.common.composite.ElementOperations.domProperty(currentElement, name));
     }
 
     @Override
     public String getDomAttribute(String name) {
-        return executeWithStaleRetry(currentElement -> currentElement.getDomAttribute(name));
+        if (snapshot().hasAttribute(name)) return snapshot().attribute(name);
+        return executeWithStaleRetry(currentElement ->
+                tools.dscode.common.composite.ElementOperations.domAttribute(currentElement, name));
     }
 
     @Override
     public String getAttribute(String name) {
-        return executeWithStaleRetry(currentElement -> currentElement.getAttribute(name));
+        if (snapshot().hasAttribute(name)) return snapshot().attribute(name);
+        return executeWithStaleRetry(currentElement ->
+                tools.dscode.common.composite.ElementOperations.attribute(currentElement, name));
     }
 
     @Override
@@ -496,12 +503,14 @@ public class ElementWrapper implements WebElement, WrapsElement {
 
     @Override
     public boolean isSelected() {
-        return executeWithStaleRetry(WebElement::isSelected);
+        return executeWithStaleRetry(current ->
+                tools.dscode.common.composite.ElementOperations.selected(current));
     }
 
     @Override
     public String getText() {
-        return executeWithStaleRetry(WebElement::getText);
+        return executeWithStaleRetry(currentElement ->
+                tools.dscode.common.composite.ElementOperations.text(currentElement));
     }
 
     @Override
@@ -523,27 +532,38 @@ public class ElementWrapper implements WebElement, WrapsElement {
         if (tools.dscode.common.composite.ElementOperations.primary()) {
             return tools.dscode.common.composite.ElementOperations.shadowRoot(element);
         }
-        return executeWithStaleRetry(WebElement::getShadowRoot);
+        return executeWithStaleRetry(currentElement ->
+                tools.dscode.common.composite.ElementOperations.shadowRoot(currentElement));
     }
 
     @Override
     public Point getLocation() {
-        return executeWithStaleRetry(WebElement::getLocation);
+        if (element instanceof tools.dscode.common.composite.CompositeWebElement) {
+            return tools.dscode.common.composite.ElementOperations.location(element);
+        }
+        return executeWithStaleRetry(current -> tools.dscode.common.composite.ElementOperations.location(current));
     }
 
     @Override
     public Dimension getSize() {
-        return executeWithStaleRetry(WebElement::getSize);
+        if (element instanceof tools.dscode.common.composite.CompositeWebElement) {
+            return tools.dscode.common.composite.ElementOperations.size(element);
+        }
+        return executeWithStaleRetry(current -> tools.dscode.common.composite.ElementOperations.size(current));
     }
 
     @Override
     public Rectangle getRect() {
-        return executeWithStaleRetry(WebElement::getRect);
+        if (element instanceof tools.dscode.common.composite.CompositeWebElement) {
+            return tools.dscode.common.composite.ElementOperations.rect(element);
+        }
+        return executeWithStaleRetry(current -> tools.dscode.common.composite.ElementOperations.rect(current));
     }
 
     @Override
     public String getCssValue(String propertyName) {
-        return executeWithStaleRetry(currentElement -> currentElement.getCssValue(propertyName));
+        return executeWithStaleRetry(currentElement ->
+                tools.dscode.common.composite.ElementOperations.css(currentElement, propertyName));
     }
 
     @Override
@@ -583,12 +603,12 @@ public class ElementWrapper implements WebElement, WrapsElement {
                 ExecutionDictionary.CategoryFlags.NON_DISPLAY_ELEMENT))
             return true;
         scrollIntoView();
-        return executeWithStaleRetry(WebElement::isDisplayed);
+        return executeWithStaleRetry(current -> tools.dscode.common.composite.ElementOperations.displayed(current));
     }
 
     public boolean screenReaderOnlyCheck() {
         if (possibleScreenReaderElement()) {
-            return !executeWithStaleRetry(WebElement::isDisplayed);
+            return !executeWithStaleRetry(current -> tools.dscode.common.composite.ElementOperations.displayed(current));
         }
         return false;
     }
@@ -609,7 +629,7 @@ public class ElementWrapper implements WebElement, WrapsElement {
 
     @Override
     public boolean isEnabled() {
-        return executeWithStaleRetry(WebElement::isEnabled);
+        return executeWithStaleRetry(current -> tools.dscode.common.composite.ElementOperations.enabled(current));
     }
 
     private static boolean isRequiredElement(WebElement currentElement) {

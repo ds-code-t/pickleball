@@ -259,7 +259,7 @@ public class SeleniumUtils {
 
     public static String safeDomAttribute(WebElement element, String name) {
         try {
-            return element.getDomAttribute(name);
+            return tools.dscode.common.composite.ElementOperations.domAttribute(element, name);
         } catch (WebDriverException e) {
             return null;
         }
@@ -267,7 +267,7 @@ public class SeleniumUtils {
 
     public static String safeDomProperty(WebElement element, String name) {
         try {
-            return element.getDomProperty(name);
+            return tools.dscode.common.composite.ElementOperations.domProperty(element, name);
         } catch (WebDriverException e) {
             return null;
         }

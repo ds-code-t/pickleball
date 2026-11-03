@@ -4,9 +4,11 @@ import org.openqa.selenium.By;
 import org.openqa.selenium.JavascriptExecutor;
 import org.openqa.selenium.SearchContext;
 import org.openqa.selenium.StaleElementReferenceException;
+import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.WrapsDriver;
 import tools.dscode.common.composite.CompositeWebElement;
+import tools.dscode.common.composite.ElementView;
 import tools.dscode.common.dataoperations.TextOp;
 import tools.dscode.common.dataoperations.TextPredicateMatcher;
 import tools.dscode.common.domoperations.ExecutionDictionary;
@@ -164,21 +166,8 @@ public final class NestedByLocator {
      * Selenium {@code getText()} can return an empty string for that button.
      */
     private static String matchText(JavascriptExecutor javascript, WebElement element) {
-        if (element instanceof CompositeWebElement) {
-            String visible = element.getText();
-            return visible == null ? "" : visible;
-        }
-        if (javascript != null) {
-            Object content = javascript.executeScript(
-                    "var el = arguments[0]; return el.textContent == null ? '' : el.textContent;",
-                    element
-            );
-            if (content != null && !content.toString().isBlank()) {
-                return content.toString();
-            }
-        }
-        String visible = element.getText();
-        return visible == null ? "" : visible;
+        WebDriver driver = javascript instanceof WebDriver web ? web : null;
+        return tools.dscode.common.composite.ElementOperations.textContent(driver, element);
     }
 
     public static <T> ArrayList<T> sampleEvery(List<T> list, int startIndex, int step) {
@@ -229,7 +218,7 @@ public final class NestedByLocator {
         List<WebElement> matches = tools.dscode.common.composite.ElementOperations.findElements(context, locator);
 
         if (displayedElementsOnly) {
-            matches = filterDisplayed(matches);
+            matches = filterDisplayed(context, matches);
         }
 
         logTrace("elements-find-matches.size(): " + matches.size());
@@ -258,12 +247,13 @@ public final class NestedByLocator {
         return out;
     }
 
-    private static List<WebElement> filterDisplayed(List<WebElement> matches) {
+    private static List<WebElement> filterDisplayed(SearchContext context, List<WebElement> matches) {
+        if (matches == null || matches.isEmpty()) return matches == null ? List.of() : matches;
+        WebDriver driver = context instanceof WebDriver web ? web : null;
+        List<ElementView> views = tools.dscode.common.composite.ElementOperations.describe(driver, matches);
         List<WebElement> displayed = new ArrayList<>(matches.size());
-        for (WebElement el : matches) {
-            if (el.isDisplayed()) {
-                displayed.add(el);
-            }
+        for (int i = 0; i < matches.size() && i < views.size(); i++) {
+            if (views.get(i).displayed()) displayed.add(matches.get(i));
         }
         return displayed;
     }
@@ -284,7 +274,8 @@ public final class NestedByLocator {
 
         Object raw;
         try {
-            raw = js.executeScript(JS_FILTER_BY_NESTING, matches, mode.name());
+            raw = tools.dscode.common.composite.ElementOperations.script(
+                    (WebDriver) js, JS_FILTER_BY_NESTING, matches, mode.name());
         } catch (RuntimeException ignored) {
             // Composite hits are not Selenium elements. The Java fallback filters those.
             return null;

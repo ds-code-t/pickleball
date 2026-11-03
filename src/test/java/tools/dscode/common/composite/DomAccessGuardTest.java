@@ -65,24 +65,13 @@ class DomAccessGuardTest {
             "src/main/java/tools/dscode/common/composite/DomCompositeAdapter.java",
             "src/main/java/tools/dscode/common/composite/ElementOperations.java",
             "src/main/java/tools/dscode/common/composite/ElementReads.java",
-            "src/main/java/tools/dscode/common/domoperations/HumanInteractions.java",
-            "src/main/java/tools/dscode/common/domoperations/KeyParser.java",
-            "src/main/java/tools/dscode/common/domoperations/LeanWaits.java",
-            "src/main/java/tools/dscode/common/domoperations/NestedByLocator.java",
-            "src/main/java/tools/dscode/common/domoperations/SeleniumUtils.java",
-            "src/main/java/tools/dscode/common/domoperations/elementstates/BinaryStateConditions.java",
             "src/main/java/tools/dscode/common/reporting/diagnostic/ScenarioIdentity.java",
             "src/main/java/tools/dscode/common/reporting/diagnostic/SourceProvenance.java",
-            "src/main/java/tools/dscode/common/seleniumextensions/AllContextsScan.java",
             "src/main/java/tools/dscode/common/seleniumextensions/CompositeSnapshotProducer.java",
-            "src/main/java/tools/dscode/common/seleniumextensions/ContextWrapper.java",
             "src/main/java/tools/dscode/common/seleniumextensions/ElementSnapshotScript.java",
-            "src/main/java/tools/dscode/common/seleniumextensions/ElementWrapper.java",
             "src/main/java/tools/dscode/common/seleniumextensions/SeleniumSnapshotProducer.java",
-            "src/main/java/tools/dscode/common/seleniumextensions/SnapshotLookup.java",
             "src/main/java/tools/dscode/common/seleniumextensions/SnapshotProducers.java",
             "src/main/java/tools/dscode/common/treeparsing/parsedComponents/Phrase.java",
-            "src/main/java/tools/dscode/common/treeparsing/parsedComponents/phraseoperations/ActionOperations.java",
             "src/main/java/tools/dscode/launcher/WorkbenchElementInspect.java",
             "src/main/java/tools/dscode/launcher/WorkbenchOneShotLaunch.java",
             "src/main/java/tools/dscode/testengine/ExampleRowFilter.java"
@@ -98,7 +87,18 @@ class DomAccessGuardTest {
         assertTrue(count > 0, "guard scan found nothing; the patterns no longer match the tree");
         for (String cleaned : List.of(
                 "pickleball-control-api/src/main/java/tools/dscode/control/api/PageElementQuery.java",
-                "pickleball-control-api/src/main/java/tools/dscode/control/api/ElementControl.java"
+                "pickleball-control-api/src/main/java/tools/dscode/control/api/ElementControl.java",
+                "src/main/java/tools/dscode/common/domoperations/HumanInteractions.java",
+                "src/main/java/tools/dscode/common/domoperations/KeyParser.java",
+                "src/main/java/tools/dscode/common/domoperations/LeanWaits.java",
+                "src/main/java/tools/dscode/common/domoperations/NestedByLocator.java",
+                "src/main/java/tools/dscode/common/domoperations/SeleniumUtils.java",
+                "src/main/java/tools/dscode/common/domoperations/elementstates/BinaryStateConditions.java",
+                "src/main/java/tools/dscode/common/seleniumextensions/AllContextsScan.java",
+                "src/main/java/tools/dscode/common/seleniumextensions/ContextWrapper.java",
+                "src/main/java/tools/dscode/common/seleniumextensions/ElementWrapper.java",
+                "src/main/java/tools/dscode/common/seleniumextensions/SnapshotLookup.java",
+                "src/main/java/tools/dscode/common/treeparsing/parsedComponents/phraseoperations/ActionOperations.java"
         )) {
             assertFalse(hits.containsKey(cleaned), cleaned + " still has raw DOM reads: " + hits.get(cleaned));
         }

@@ -55,7 +55,7 @@ public final class BinaryStateConditions {
         //    - <input type="checkbox|radio">
         //    - <option>
         if (isSeleniumSelectable(element)) {
-            return element.isSelected();
+            return tools.dscode.common.composite.ElementOperations.selected(element);
         }
 
         // 2) Broader attribute/ARIA/data-attribute semantics (original behavior)
@@ -75,7 +75,7 @@ public final class BinaryStateConditions {
     private static boolean isSeleniumSelectable(WebElement element) {
         // Be defensive: some drivers can throw for getTagName/getAttribute on stale elements.
         // Let those exceptions bubble the same way isSelected() would.
-        String tag = element.getTagName();
+        String tag = tools.dscode.common.composite.ElementOperations.tag(element);
         if (tag == null) {
             return false;
         }
@@ -85,7 +85,7 @@ public final class BinaryStateConditions {
         }
 
         if ("input".equalsIgnoreCase(tag)) {
-            String type = element.getAttribute("type");
+            String type = tools.dscode.common.composite.ElementOperations.attribute(element, "type");
             return "checkbox".equalsIgnoreCase(type) || "radio".equalsIgnoreCase(type);
         }
 

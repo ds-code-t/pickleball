@@ -138,11 +138,11 @@ public final class AllContextsScan {
                     searched.add(key(startPath));
                 }
                 if (startPath == null || !startPath.isEmpty()) {
-                    driver.switchTo().defaultContent();
+                    tools.dscode.common.composite.ElementOperations.defaultContent(driver);
                     searchDocument(driver, List.of(), 0, true);
                     searched.add(key(List.of()));
                 }
-                driver.switchTo().defaultContent();
+                tools.dscode.common.composite.ElementOperations.defaultContent(driver);
                 scanFrames(driver, List.of(), 0);
             } catch (WebDriverException ignored) {
                 // A closed window or a driver that cannot switch still returns whatever matched.
@@ -171,9 +171,13 @@ public final class AllContextsScan {
         }
 
         private void accept(List<WebElement> found, List<FrameRef> path, boolean foreign) {
-            for (WebElement element : found) {
+            if (found == null || found.isEmpty()) return;
+            List<tools.dscode.common.composite.ElementView> views =
+                    tools.dscode.common.composite.ElementOperations.describe(driver, found);
+            for (int i = 0; i < found.size(); i++) {
+                WebElement element = found.get(i);
                 try {
-                    if (!element.isDisplayed()) {
+                    if (i >= views.size() || !views.get(i).displayed()) {
                         continue;
                     }
                     if (foreign) {
@@ -200,7 +204,7 @@ public final class AllContextsScan {
             }
             for (WebElement host : hosts) {
                 try {
-                    SearchContext shadow = host.getShadowRoot();
+                    SearchContext shadow = tools.dscode.common.composite.ElementOperations.shadowRoot(host);
                     if (shadow == null) {
                         continue;
                     }
@@ -278,7 +282,7 @@ public final class AllContextsScan {
                     return;
                 }
                 try {
-                    SearchContext shadow = host.getShadowRoot();
+                    SearchContext shadow = tools.dscode.common.composite.ElementOperations.shadowRoot(host);
                     if (shadow != null) {
                         scanFrames(shadow, path, depth + 1);
                     }
@@ -290,7 +294,8 @@ public final class AllContextsScan {
 
         private boolean sameOriginFrame(WebElement frame) {
             try {
-                Object accessible = ((JavascriptExecutor) driver).executeScript(
+                Object accessible = tools.dscode.common.composite.ElementOperations.script(
+                        driver,
                         "var frame = arguments[0];"
                                 + " try { return !!(frame.contentDocument && frame.contentDocument.documentElement); }"
                                 + " catch (e) { return false; }",
@@ -307,7 +312,7 @@ public final class AllContextsScan {
                 if (originalWindow != null) {
                     driver.switchTo().window(originalWindow);
                 }
-                driver.switchTo().defaultContent();
+                tools.dscode.common.composite.ElementOperations.defaultContent(driver);
                 if (startPath != null) {
                     for (FrameRef ref : startPath) {
                         switchToRef(ref);
@@ -327,7 +332,7 @@ public final class AllContextsScan {
         }
 
         private void restorePath(List<FrameRef> path) {
-            driver.switchTo().defaultContent();
+            tools.dscode.common.composite.ElementOperations.defaultContent(driver);
             if (path == null) {
                 return;
             }
@@ -341,7 +346,7 @@ public final class AllContextsScan {
             if (ref.id != null) {
                 for (WebElement frame : frames) {
                     try {
-                        if (ref.id.equals(frame.getAttribute("id"))) {
+                        if (ref.id.equals(tools.dscode.common.composite.ElementOperations.attribute(frame, "id"))) {
                             tools.dscode.common.composite.ElementOperations.enterFrame(driver, frame);
                             return;
                         }
@@ -353,7 +358,7 @@ public final class AllContextsScan {
             if (ref.name != null) {
                 for (WebElement frame : frames) {
                     try {
-                        if (ref.name.equals(frame.getAttribute("name"))) {
+                        if (ref.name.equals(tools.dscode.common.composite.ElementOperations.attribute(frame, "name"))) {
                             tools.dscode.common.composite.ElementOperations.enterFrame(driver, frame);
                             return;
                         }
@@ -362,12 +367,12 @@ public final class AllContextsScan {
                     }
                 }
             }
-            driver.switchTo().frame(ref.index);
+            tools.dscode.common.composite.ElementOperations.enterFrame(driver, ref.index);
         }
 
         private List<FrameRef> capturePath() {
             try {
-                Object raw = ((JavascriptExecutor) driver).executeScript(FRAME_PATH_JS);
+                Object raw = tools.dscode.common.composite.ElementOperations.script(driver, FRAME_PATH_JS);
                 if (!(raw instanceof List<?> list)) {
                     warnPath();
                     return null;
@@ -397,7 +402,7 @@ public final class AllContextsScan {
                 return List.of();
             }
             try {
-                Object raw = ((JavascriptExecutor) driver).executeScript(SHADOW_MATCH_JS, host, selfXpath);
+                Object raw = tools.dscode.common.composite.ElementOperations.script(driver, SHADOW_MATCH_JS, host, selfXpath);
                 return castElements(raw);
             } catch (WebDriverException ignored) {
                 return List.of();
@@ -417,7 +422,8 @@ public final class AllContextsScan {
 
         private List<WebElement> shadowHosts(SearchContext context) {
             try {
-                Object raw = ((JavascriptExecutor) driver).executeScript(
+                Object raw = tools.dscode.common.composite.ElementOperations.script(
+                        driver,
                         SHADOW_HOSTS_JS,
                         context instanceof WebDriver ? null : context
                 );
@@ -544,8 +550,8 @@ public final class AllContextsScan {
     private record FrameRef(String id, String name, int index) {
         static FrameRef from(WebElement frame, int index) {
             return new FrameRef(
-                    blankToNull(frame.getAttribute("id")),
-                    blankToNull(frame.getAttribute("name")),
+                    blankToNull(tools.dscode.common.composite.ElementOperations.attribute(frame, "id")),
+                    blankToNull(tools.dscode.common.composite.ElementOperations.attribute(frame, "name")),
                     index
             );
         }

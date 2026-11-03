@@ -19,9 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class PrimaryPathAuditTest {
     private static final Set<String> LEGACY = Set.of(
-            "ElementOperations.java",
-            "HumanInteractions.java",
-            "KeyParser.java"
+            "ElementOperations.java"
     );
     private static final Pattern CALL = Pattern.compile(
             "(?<!ElementOperations)\\.(findElement|findElements)\\(|new Actions\\("

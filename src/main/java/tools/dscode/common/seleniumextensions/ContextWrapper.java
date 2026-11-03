@@ -211,14 +211,14 @@ public class ContextWrapper {
             if (anchor == null) {
                 return List.of();
             }
-            Rectangle anchorRect = anchor.getRect();
+            Rectangle anchorRect = tools.dscode.common.composite.ElementOperations.rect(anchor);
             List<WebElement> next = new ArrayList<>();
             for (WebElement candidate : current) {
                 if (candidate.equals(anchor)) {
                     continue;
                 }
                 try {
-                    if (spatiallyRelated(relation.relation(), anchorRect, candidate.getRect())) {
+                    if (spatiallyRelated(relation.relation(), anchorRect, tools.dscode.common.composite.ElementOperations.rect(candidate))) {
                         next.add(candidate);
                     }
                 } catch (StaleElementReferenceException ignored) {

@@ -79,7 +79,7 @@ public final class KeyParser {
             tools.dscode.common.composite.ElementOperations.keys(driver, input);
             return;
         }
-        Actions actions = new Actions(driver);
+        Actions actions = tools.dscode.common.composite.ElementOperations.actions(driver);
         parseInto(actions, input);
         dbg("actions.perform()");
         actions.perform();
@@ -113,12 +113,12 @@ public final class KeyParser {
             // composite 2.4.0 can insert text and click. It has no keydown verb, so
             // named keys and chords use the same Actions parser after a composite focus.
             tools.dscode.common.composite.ElementOperations.click(driver, element);
-            Actions actions = new Actions(driver);
+            Actions actions = tools.dscode.common.composite.ElementOperations.actions(driver);
             parseInto(actions, input);
             actions.perform();
             return;
         }
-        Actions actions = new Actions(driver);
+        Actions actions = tools.dscode.common.composite.ElementOperations.actions(driver);
 
         // Preserve your existing behavior: target the element without forcing click/focus.
         dbg("targeting element via actions.sendKeys(element, \"\")");

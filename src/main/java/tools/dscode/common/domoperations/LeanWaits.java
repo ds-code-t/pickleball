@@ -114,7 +114,7 @@ public final class LeanWaits {
                 .ignoring(WebDriverException.class);
 
         readyWait.until(d -> {
-            Object stateObj = ((JavascriptExecutor) d).executeScript("return document.readyState");
+            Object stateObj = tools.dscode.common.composite.ElementOperations.script(d, "return document.readyState");
             String state = stateObj == null ? "null" : stateObj.toString();
             return "complete".equals(state);
         });
@@ -137,7 +137,7 @@ public final class LeanWaits {
                 .ignoring(WebDriverException.class);
 
         quietWait.until((Function<WebDriver, Boolean>) d -> {
-            Object result = ((JavascriptExecutor) d).executeAsyncScript(QUIET_PERIOD_JS, 300);
+            Object result = tools.dscode.common.composite.ElementOperations.asyncScript(d, QUIET_PERIOD_JS, 300);
             if (result instanceof Boolean b) {
                 return b;
             }
@@ -159,7 +159,7 @@ public final class LeanWaits {
 
         return wait.until(d -> {
             if (element == null) return null;
-            return element.isDisplayed() ? element : null;
+            return tools.dscode.common.composite.ElementOperations.displayed(element) ? element : null;
         });
     }
 
@@ -181,8 +181,7 @@ public final class LeanWaits {
         return wait.until(d -> {
             if (element == null) return null;
             if (element instanceof tools.dscode.common.composite.CompositeWebElement) return element;
-            Boolean connected = (Boolean) ((JavascriptExecutor) d)
-                    .executeScript(IS_CONNECTED_JS, element);
+            Boolean connected = (Boolean) tools.dscode.common.composite.ElementOperations.script(d, IS_CONNECTED_JS, element);
             return Boolean.TRUE.equals(connected) ? element : null;
         });
     }

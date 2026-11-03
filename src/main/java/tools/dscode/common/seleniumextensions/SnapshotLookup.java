@@ -37,10 +37,10 @@ public final class SnapshotLookup {
     public static List<String> candidates(CompositeWebElement element) {
         Set<String> ordered = new LinkedHashSet<>();
         if (element == null) return List.of();
-        String tag = element.getTagName() == null ? "" : element.getTagName().toLowerCase(Locale.ROOT);
+        String tag = element.nodeTag() == null ? "" : element.nodeTag().toLowerCase(Locale.ROOT);
         Map<String, String> attributes = element.attributes();
         addAttributeCandidates(ordered, tag, attributes);
-        addTextCandidate(ordered, tag, element.getText());
+        addTextCandidate(ordered, tag, element.nodeText());
         CompositeSelector selector = element.selector();
         if (selector != null) {
             addIfLocator(ordered, selector.css());

@@ -59,6 +59,14 @@ public final class CompositeWebElement implements WebElement {
         this.height = bounds == null ? 0 : bounds.path("height").asInt(0);
     }
 
+    public String nodeTag() {
+        return getTagName();
+    }
+
+    public String nodeText() {
+        return text == null ? "" : text;
+    }
+
     public CompositeSelector selector() {
         return selector;
     }
