@@ -55,6 +55,8 @@ public final class WorkbenchSynchronizer {
     }
 
     public WorkbenchManifest sync(Path requestedProject) {
+        WorkbenchManifest reused = trySkipUnchanged(requestedProject);
+        if (reused != null) return reused;
         try {
             WorkbenchManifest cached = syncFromClasspathCache(requestedProject);
             if (cached != null) return cached;
@@ -190,6 +192,29 @@ public final class WorkbenchSynchronizer {
         replaceFile(stagedManifest, stateRoot.resolve("manifest.json"));
         replaceFile(stagedClasspath, stateRoot.resolve(PickleballLocalLayout.WORKER_CLASSPATH_FILE));
         return manifest;
+    }
+
+    /**
+     * When the previous manifest, live classes, and cheap input fingerprints still match,
+     * do not materialize or hash jars. The first sync after a fingerprint change still
+     * materializes once and stores the cheap hash.
+     */
+    private WorkbenchManifest trySkipUnchanged(Path requestedProject) {
+        try {
+            WorkbenchProject project = WorkbenchProject.locate(requestedProject);
+            Path stateRoot = WorkbenchManifest.workbenchRoot(project.root());
+            WorkbenchManifest previous = WorkbenchManifest.readIfPresent(stateRoot);
+            if (previous == null) return null;
+            if (!WorkbenchSyncInputs.snapshotReady(stateRoot)) return null;
+            if (!WorkbenchSyncInputs.compiledOutputsPresent(previous)) return null;
+            WorkbenchSyncInputs inputs = WorkbenchSyncInputs.capture(project, previous);
+            if (WorkbenchSyncPlanner.decide(previous, inputs, true) != WorkbenchSyncMode.SKIPPED) return null;
+            int jars = previous.dependencyClasspath() == null ? 0 : previous.dependencyClasspath().size();
+            System.err.println("progress stage=classpath-cache hashed=false jars=" + jars);
+            return skip(previous, inputs, stateRoot);
+        } catch (RuntimeException ignored) {
+            return null;
+        }
     }
 
     /**
@@ -719,8 +744,32 @@ public final class WorkbenchSynchronizer {
         }
     }
 
+    /**
+     * Names the cache-hit work that sits between {@code index-end} and {@code jvm}:
+     * every dependency jar is read and SHA-256'd. A later unchanged start does not.
+     */
+    private static void noteJarHash(List<String> dependencies) {
+        if (dependencies == null || dependencies.isEmpty()) return;
+        int jars = 0;
+        long bytes = 0L;
+        for (String dependency : dependencies) {
+            if (dependency == null || dependency.isBlank()) continue;
+            Path path = Path.of(dependency).toAbsolutePath().normalize();
+            if (!Files.isRegularFile(path)) continue;
+            jars++;
+            try {
+                bytes += Files.size(path);
+            } catch (IOException ignored) {
+                // The hash loop reports the failure if the file cannot be read.
+            }
+        }
+        if (jars == 0) return;
+        System.err.println("progress stage=jar-hash jars=" + jars + " bytes=" + bytes);
+    }
+
     private static String fingerprint(Path classes, List<String> dependencies) {
         try {
+            noteJarHash(dependencies);
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
             updateDirectoryDigest(digest, classes);
             for (String dependency : dependencies) {

@@ -452,6 +452,26 @@ public final class WorkbenchSessionCommands {
         return null;
     }
 
+    private static void truncateSessionLog(Path logFile) {
+        if (logFile == null) return;
+        try {
+            Path parent = logFile.getParent();
+            if (parent != null) Files.createDirectories(parent);
+            Files.writeString(
+                    logFile,
+                    "",
+                    StandardCharsets.UTF_8,
+                    java.nio.file.StandardOpenOption.CREATE,
+                    java.nio.file.StandardOpenOption.TRUNCATE_EXISTING,
+                    java.nio.file.StandardOpenOption.WRITE
+            );
+            Path progress = parent == null ? null : parent.resolve(SessionHealthWait.PROGRESS_FILE);
+            if (progress != null) Files.deleteIfExists(progress);
+        } catch (IOException failure) {
+            throw new IllegalStateException("Could not truncate " + logFile, failure);
+        }
+    }
+
     /**
      * The forked controller does not inherit launcher {@code -D} properties.
      * Pass the outer timeout the health wait already resolved. The worker
@@ -508,6 +528,8 @@ public final class WorkbenchSessionCommands {
         }
 
         Path logFile = run.sessionDirectory().resolve("session.log");
+        truncateSessionLog(logFile);
+        Map<Path, Long> logBaseline = SessionHealthWait.baselineSizes(project, logFile);
         Path sessionFile = requestedSessionFile(project, flags, run);
         Process process;
         try {
@@ -543,7 +565,8 @@ public final class WorkbenchSessionCommands {
                 err,
                 SessionHealthWait.timeout(Map.of()),
                 SessionHealthWait.progressEvery(),
-                POLL
+                POLL,
+                logBaseline
         );
         if (outcome.kind() == SessionHealthWait.Kind.HEALTHY && found[0] != null) {
             SessionState state = found[0];

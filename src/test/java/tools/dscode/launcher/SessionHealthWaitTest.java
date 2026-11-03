@@ -210,6 +210,51 @@ class SessionHealthWaitTest {
 
     @Test
     @Timeout(value = 5, unit = TimeUnit.SECONDS)
+    void aNewWaitDropsAStageLeftInAnOlderLogTheNewestLogAndTheProgressFile() throws Exception {
+        Path session = project.resolve("session").resolve("session.log");
+        Files.createDirectories(session.getParent());
+        Files.writeString(session, "progress stage=prior-newest\n");
+        Path logs = project.resolve(".pickleball").resolve("workbench").resolve("logs");
+        Files.createDirectories(logs);
+        Path older = logs.resolve("worker-older.err.log");
+        Path newest = logs.resolve("worker-newest.err.log");
+        Files.writeString(older, "progress stage=prior-older\n");
+        Files.writeString(newest, "progress stage=prior-newest\n");
+        Files.setLastModifiedTime(older, FileTime.fromMillis(1_000L));
+        Files.setLastModifiedTime(newest, FileTime.fromMillis(System.currentTimeMillis() + 86_400_000L));
+        Path progress = session.getParent().resolve(SessionHealthWait.PROGRESS_FILE);
+        Files.writeString(progress, "{\"stages\":[{\"stage\":\"prior-newest\",\"enteredElapsedMs\":0}]}");
+        assertEquals("prior-newest", SessionHealthWait.currentStage(project, session));
+
+        Files.writeString(session, "");
+        Files.deleteIfExists(progress);
+        Map<Path, Long> baseline = SessionHealthWait.baselineSizes(project, session);
+        assertFalse("prior-newest".equals(SessionHealthWait.currentStage(project, session, baseline)));
+        assertFalse("prior-older".equals(SessionHealthWait.currentStage(project, session, baseline)));
+        Files.writeString(session, "progress stage=index-end\nprogress stage=jvm\n");
+
+        long started = System.nanoTime();
+        SessionHealthWait.Outcome outcome = SessionHealthWait.waitFor(
+                () -> System.nanoTime() - started > Duration.ofMillis(40).toNanos(),
+                () -> true,
+                project,
+                session,
+                new PrintStream(new ByteArrayOutputStream(), true, StandardCharsets.UTF_8),
+                new PrintStream(new ByteArrayOutputStream(), true, StandardCharsets.UTF_8),
+                Duration.ofSeconds(2),
+                Duration.ofMillis(15),
+                Duration.ofMillis(5),
+                baseline
+        );
+        assertEquals(SessionHealthWait.Kind.HEALTHY, outcome.kind());
+        String json = Files.readString(progress);
+        assertFalse(json.contains("prior-newest"), json);
+        assertFalse(json.contains("prior-older"), json);
+        assertTrue(json.contains("jvm"), json);
+    }
+
+    @Test
+    @Timeout(value = 5, unit = TimeUnit.SECONDS)
     void timeoutWithoutAMarkerUsesTheGenericStage() {
         Path log = project.resolve("session.log");
         ByteArrayOutputStream stderr = new ByteArrayOutputStream();

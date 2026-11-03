@@ -596,6 +596,36 @@ class WorkbenchSynchronizerTest {
         assertTrue(Files.isRegularFile(WorkbenchManifest.workbenchRoot(project).resolve("live/classes/Runner.class")));
     }
 
+    @Test
+    void secondSyncDoesNotHashUnchangedJars() throws Exception {
+        Path project = consumerProject("warm-jars");
+        Path jar = tempDir.resolve("bulk.jar");
+        Files.write(jar, new byte[1024 * 1024]);
+        storeDiscoverCache(project, List.of(
+                project.resolve("target/test-classes").toString(),
+                jar.toString()
+        ));
+        String first = syncCaptured(project);
+        assertTrue(first.contains("progress stage=jar-hash"), first);
+        assertTrue(first.contains("jars=1"), first);
+        String second = syncCaptured(project);
+        assertTrue(second.contains("progress stage=classpath-cache"), second);
+        assertTrue(second.contains("hashed=false"), second);
+        assertFalse(second.contains("progress stage=jar-hash"), second);
+    }
+
+    private static String syncCaptured(Path project) {
+        ByteArrayOutputStream err = new ByteArrayOutputStream();
+        PrintStream previous = System.err;
+        System.setErr(new PrintStream(err, true, StandardCharsets.UTF_8));
+        try {
+            assertEquals(0, syncWithoutMaven(project));
+        } finally {
+            System.setErr(previous);
+        }
+        return err.toString(StandardCharsets.UTF_8);
+    }
+
     private Path consumerProject(String name) throws IOException {
         Path project = tempDir.resolve(name);
         Files.createDirectories(project.resolve("target/test-classes"));
