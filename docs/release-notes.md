@@ -2,6 +2,7 @@
 
 ## 2.1.18
 
+- `execute-step --text` with no double quotes warns and names `--text-b64` and `--text-file`, including `*, save E.`. A phrase that is missing a required value throws `syntax error: missing value` (or `missing element`) instead of a null failure. A normal `mvn test` is unchanged.
 - The warm JVM exits when its state file disappears, including during a run. `stop` kills that pid from `warm-jvm.pid` even if `warm-jvm.v1` is already gone. `status` is `idle` until a `BEFORE_STEP` is open or a session command is in flight. A bare `RUNNING` mark is not a step. `/health` `running` is true only while a command is in flight. A normal `mvn test` is unchanged.
 - A resolve-cache hit keeps a runner secret that has no project property as a literal and prints the same warning as a miss. Copying a workspace does not turn that literal into `${protected:key}`. The cache key includes the resolve-cache format and the running build, so a copy written by an older build is not reused. A normal `mvn test` is unchanged.
 - Every key a runner hook writes through `PKB_props.put` or a path setter, not only `pkb_` run vars, is `source=hook` and ` computed` in `workspace-show` text and `--json`. That includes a plain description, a `pkb_` marker, and a secret next to glue. A secret still prints `<redacted>`. Existing properties, default, and cli/override classification is unchanged. A normal `mvn test` is unchanged.

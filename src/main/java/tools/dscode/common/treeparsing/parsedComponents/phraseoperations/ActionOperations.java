@@ -108,6 +108,7 @@ public enum ActionOperations implements OperationsInterface {
             }
 
             final ElementMatch valueElement = firstValueElement;
+            if (valueElement == null) PhraseSyntax.missing("value");
             boolean regexMatchSave = regexMatchElement != null;
             boolean regexMatchWithReference = regexMatchSave && regexMatchElement.defaultText.type != ValueWrapper.ValueTypes.BACK_TICKED;
             String regexReference = regexMatchWithReference ? regexMatchElement.defaultText.toString() : "";

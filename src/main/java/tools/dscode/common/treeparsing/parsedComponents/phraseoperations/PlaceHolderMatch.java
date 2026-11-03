@@ -43,7 +43,13 @@ public class PlaceHolderMatch extends ElementMatch {
 
     public ElementMatch getReplacementElement() {
         if (replacementElement == null) {
-            findReplacementElement();
+            if (elementMatcher != null && parentPhrase != null) findReplacementElement();
+            if (replacementElement == null) {
+                String part = elementMatcher != null && elementMatcher.matches(ElementType.RETURNS_VALUE)
+                        ? "value"
+                        : "element";
+                PhraseSyntax.missing(part);
+            }
             elementTypes = new HashSet<>(replacementElement.elementTypes);
         }
         return replacementElement;

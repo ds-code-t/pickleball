@@ -1944,9 +1944,8 @@ public final class WorkbenchSessionCommands {
             }
             boolean unbalanced = quotes % 2 == 1;
             boolean truncated = leftover != null && !leftover.isEmpty();
-            boolean stripped = !text.contains("\"")
-                    && text.matches("(?s).*\\b(?:the|a|an)\\s+\\S+\\s+(?:button|link|field|checkbox|element)\\b.*");
-            if (!unbalanced && !truncated && !stripped) return null;
+            boolean unquoted = quotes == 0;
+            if (!unbalanced && !truncated && !unquoted) return null;
             return "WARNING: execute-step --text looks quote-stripped or truncated. "
                     + "Pass the step with --text-b64 or --text-file. Quoting through mvnw is not fixed.";
         }

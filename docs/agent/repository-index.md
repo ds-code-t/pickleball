@@ -352,6 +352,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/common/treeparsing/parsedComponents/phraseoperations/ElementMatcher.java`
 - `src/main/java/tools/dscode/common/treeparsing/parsedComponents/phraseoperations/ElementMatching.java`
 - `src/main/java/tools/dscode/common/treeparsing/parsedComponents/phraseoperations/OperationsInterface.java`
+- `src/main/java/tools/dscode/common/treeparsing/parsedComponents/phraseoperations/PhraseSyntax.java`
 - `src/main/java/tools/dscode/common/treeparsing/parsedComponents/phraseoperations/PlaceHolderMatch.java`
 - `src/main/java/tools/dscode/common/treeparsing/parsedComponents/ValueMatch.java`
 - `src/main/java/tools/dscode/common/treeparsing/ParsedLine.java`
@@ -497,6 +498,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/common/reporting/diagnostic/DiscoverHintJvmLeakTest.java`
 - `src/test/java/tools/dscode/common/resources/PathListSemanticsTest.java`
 - `src/test/java/tools/dscode/common/servicecalls/JdbcTypeMappingTest.java`
+- `src/test/java/tools/dscode/common/treeparsing/PhraseSyntaxTest.java`
 - `src/test/java/tools/dscode/common/treeparsing/preparsing/ConditionalBranchArgumentTest.java`
 - `src/test/java/tools/dscode/common/treeparsing/preparsing/LazyBranchResolutionTest.java`
 - `src/test/java/tools/dscode/common/treeparsing/WithinRewriteScopeTest.java`

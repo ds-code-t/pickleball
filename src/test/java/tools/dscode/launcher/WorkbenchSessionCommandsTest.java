@@ -1207,6 +1207,12 @@ class WorkbenchSessionCommandsTest {
         });
         assertNotNull(split.quoteWarning);
         assertEquals("Then", split.text);
+        WorkbenchSessionCommands.SessionFlags star = WorkbenchSessionCommands.SessionFlags.parse(new String[]{
+                "execute-step", "--text=*, save E."
+        });
+        assertNotNull(star.quoteWarning);
+        assertTrue(star.quoteWarning.contains("--text-b64"), star.quoteWarning);
+        assertEquals("*, save E.", star.text);
 
         Path sessionFile = project.resolve(".pickleball/runs/quote-warn/session/cli-session.json");
         try (FakeSession session = FakeSession.start(project, "cli-session", sessionFile)) {
