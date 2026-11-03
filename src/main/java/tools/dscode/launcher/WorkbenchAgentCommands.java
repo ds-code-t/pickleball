@@ -1158,6 +1158,7 @@ public final class WorkbenchAgentCommands {
         String status = flag(parsed, "--status");
         if (status != null && !status.isBlank()) request.put("status", status);
         if (parsed.coordination().id() != null) request.put("id", parsed.coordination().id());
+        if (hasFlag(parsed.forwarded(), "--verbose")) request.put("verbose", true);
         DiagnosticQuery.Outcome outcome = DiagnosticQuery.query(parsed.project(), request);
         out.println(outcome.json());
         if (outcome.exit() != 0) {

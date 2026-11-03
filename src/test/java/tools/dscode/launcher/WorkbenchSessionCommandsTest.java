@@ -1190,6 +1190,27 @@ class WorkbenchSessionCommandsTest {
 
     @Test
     @Timeout(value = 10, unit = TimeUnit.SECONDS)
+    void executeStepFailureJsonUsesTheExternalFrameAndTheTopCause() throws Exception {
+        Path sessionFile = project.resolve(".pickleball/runs/fail-frame/session/cli-session.json");
+        try (FakeSession session = FakeSession.start(project, "cli-session", sessionFile)) {
+            session.commandGet = """
+                    {"id":"step-held","status":"FAILED","result":{"phrase":"buy","message":"expected <true> but was <false>","stackTrace":"java.lang.RuntimeException: Step 'Then buy' failed\\n\\tat io.cucumber.core.runner.PickleStepTestStep.run(PickleStepTestStep.java:80)\\nCaused by: java.lang.AssertionError: expected <true> but was <false>\\n\\tat com.example.ShopSteps.buy(ShopSteps.java:42)\\n\\tat tools.dscode.StepExtension.resolve(StepExtension.java:3)","cause":"java.lang.RuntimeException: Step 'Then buy' failed\\n\\tat io.cucumber.core.runner.PickleStepTestStep.run(PickleStepTestStep.java:80)\\nCaused by: java.lang.AssertionError: expected <true> but was <false>\\n\\tat com.example.ShopSteps.buy(ShopSteps.java:42)"}}
+                    """;
+            Output output = run(
+                    new String[]{"execute-step", project.toString(), "--text=Then buy"},
+                    launch -> {
+                        throw new AssertionError("execute-step must not start a session");
+                    }
+            );
+            assertEquals(1, output.exitCode, output.stderr + output.stdout);
+            assertTrue(output.stdout.contains("\"stackHead\":\"at com.example.ShopSteps.buy(ShopSteps.java:42)\""), output.stdout);
+            assertTrue(output.stdout.contains("\"cause\":\"Caused by: java.lang.AssertionError: expected <true> but was <false>\""), output.stdout);
+            assertFalse(output.stdout.contains("PickleStepTestStep"), output.stdout);
+        }
+    }
+
+    @Test
+    @Timeout(value = 10, unit = TimeUnit.SECONDS)
     void executeStepWarnsWhenTextLooksQuoteStrippedAndNamesTheSafeForms() throws Exception {
         WorkbenchSessionCommands.SessionFlags stripped = WorkbenchSessionCommands.SessionFlags.parse(new String[]{
                 "execute-step", "--text=Then the Save button is visible"

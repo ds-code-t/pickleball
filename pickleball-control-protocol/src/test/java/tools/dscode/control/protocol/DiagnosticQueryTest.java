@@ -451,6 +451,67 @@ class DiagnosticQueryTest {
     }
 
     @Test
+    void scopedSearchCapsOnlyThatRunsLines() throws Exception {
+        Path log = project.resolve(".pickleball/agent-log");
+        Files.createDirectories(log.getParent());
+        StringBuilder lines = new StringBuilder();
+        for (int index = 0; index < 20_001; index++) {
+            lines.append("2026-01-01T00:00:00Z\tagent\trun-other\tnote\tother-").append(index).append("\t-\n");
+        }
+        lines.append("2026-01-01T00:00:00Z\tagent\trun-mine\tnote\tmine-hit\t-\n");
+        Files.writeString(log, lines.toString());
+        Path foreign = project.resolve(".pickleball/workbench/logs/worker-foreign.err.log");
+        Files.createDirectories(foreign.getParent());
+        Files.writeString(foreign, "noise\n".repeat(50));
+        Files.createDirectories(project.resolve("reports/diagnostic-runs"));
+        Files.writeString(project.resolve("reports/diagnostic-runs/run-catalog.json"),
+                "{\"runs\":[{\"runId\":\"run-mine\"}]}");
+        DiagnosticQuery.Outcome scoped = DiagnosticQuery.query(project, Map.of(
+                "op", "search", "runId", "run-mine", "text", "mine-hit"));
+        assertEquals(0, scoped.exit(), scoped.json());
+        assertFalse(Boolean.TRUE.equals(scoped.body().get("scanCapped")), scoped.json());
+        assertTrue(scoped.json().contains("mine-hit"), scoped.json());
+        assertFalse(scoped.json().contains("other-20000"), scoped.json());
+        assertFalse(scoped.json().contains("worker-foreign"), scoped.json());
+
+        StringBuilder own = new StringBuilder();
+        for (int index = 0; index < 20_001; index++) {
+            own.append("2026-01-01T00:00:00Z\tagent\trun-mine\tnote\town-").append(index).append("\t-\n");
+        }
+        Files.writeString(log, own.toString());
+        DiagnosticQuery.Outcome capped = DiagnosticQuery.query(project, Map.of(
+                "op", "search", "runId", "run-mine", "text", "own-20000"));
+        assertEquals(0, capped.exit(), capped.json());
+        assertEquals(Boolean.TRUE, capped.body().get("scanCapped"));
+        String fix = String.valueOf(capped.body().get("fix"));
+        assertTrue(fix.contains("--cursor"), capped.json());
+        assertFalse(fix.contains("--run-id"), capped.json());
+    }
+
+    @Test
+    void verboseQueryIncludesTheCauseChain() throws Exception {
+        Path scenario = project.resolve("reports/diagnostic-runs/run-cause/scenarios/scene");
+        Files.createDirectories(scenario);
+        Files.writeString(project.resolve("reports/diagnostic-runs/run-catalog.json"),
+                "{\"runs\":[{\"runId\":\"run-cause\",\"outcome\":\"FAILED\"}]}");
+        Files.writeString(project.resolve("reports/diagnostic-runs/run-cause/run-index.json"),
+                "{\"runId\":\"run-cause\",\"outcome\":\"FAILED\",\"scenarios\":[{\"scenarioId\":\"scene\",\"name\":\"Buy\",\"outcome\":\"FAILED\"}]}");
+        Files.writeString(scenario.resolve("summary.json"), "{\"name\":\"Buy\",\"outcome\":\"FAILED\"}");
+        Files.writeString(scenario.resolve("events.jsonl"), """
+                {"type":"failure","eventSeq":1,"message":"expected true","failures":[{"class":"io.cucumber.core.exception.CucumberException","message":"Step 'Then buy' failed","causes":[{"class":"java.lang.AssertionError","message":"expected true"}],"stackTrace":["at io.cucumber.core.runner.PickleStepTestStep.run(PickleStepTestStep.java:80)","at com.example.ShopSteps.buy(ShopSteps.java:42)"]}]}
+                """);
+        DiagnosticQuery.Outcome plain = DiagnosticQuery.query(project, Map.of("op", "errors", "runId", "run-cause"));
+        assertEquals(0, plain.exit(), plain.json());
+        assertTrue(plain.json().contains("\"stackHead\":\"at com.example.ShopSteps.buy(ShopSteps.java:42)\""), plain.json());
+        assertTrue(plain.json().contains("Caused by: java.lang.AssertionError: expected true"), plain.json());
+        assertFalse(plain.json().contains("causeChain"), plain.json());
+        DiagnosticQuery.Outcome verbose = DiagnosticQuery.query(project, Map.of(
+                "op", "errors", "runId", "run-cause", "verbose", true));
+        assertEquals(0, verbose.exit(), verbose.json());
+        assertTrue(verbose.json().contains("causeChain"), verbose.json());
+    }
+
+    @Test
     void tailPrefersNewestFailureRowsAndKeepsLogOrderWhenThereAreNone() throws Exception {
         Path shared = project.resolve("reports/diagnostic-runs/run-tail-fail/scenarios/scene");
         Files.createDirectories(shared);

@@ -1172,6 +1172,7 @@ public final class WorkbenchSessionCommands {
         if (phrase != null) body.put("phrase", phrase);
         if (message != null) body.put("message", message);
         if (stack != null) body.put("stackHead", stack);
+        if (record != null && record.cause() != null) body.put("cause", record.cause());
         copyFailureField(body, result, "code");
         copyFailureField(body, result, "cause");
         copyFailureField(body, result, "valueText");
@@ -1181,6 +1182,11 @@ public final class WorkbenchSessionCommands {
             copyFailureField(body, nestedFailure, "cause");
             copyFailureField(body, nestedFailure, "valueText");
             if (!body.containsKey("message")) copyFailureField(body, nestedFailure, "message");
+        }
+        Object copiedCause = body.get("cause");
+        if (copiedCause instanceof String causeText) {
+            String shortened = FailureRecord.displayCause(causeText);
+            if (shortened != null) body.put("cause", shortened);
         }
         try {
             return JSON.writeValueAsString(body);

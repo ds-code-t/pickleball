@@ -2,6 +2,7 @@
 
 ## 2.1.18
 
+- `query` sets `scanCapped` from the lines that match `--run-id`, not from the whole `.pickleball/agent-log`. A scoped query reads worker logs only under `.pickleball/runs/<id>`. `stackHead` is the first frame outside Pickleball and Cucumber; when every frame is framework code it stays `class: message`. `cause` is the top `Caused by:` line, not the stack dump. `query --verbose` adds `causeChain`. `failedScenarios` adds `path:line` and `example <line>` when the scenario identity has them. A normal `mvn test` is unchanged.
 - `validate` uses the runner's Cucumber expressions, including Pickleball core steps, and expands Scenario Outline placeholders before matching. A long suite prints `validate progress` and stops at 2000 steps with `capped=true` and `fix: narrow validate with --tags or --name`. A normal `mvn test` is unchanged.
 - `execute-step --text` with no double quotes warns and names `--text-b64` and `--text-file`, including `*, save E.`. A phrase that is missing a required value throws `syntax error: missing value` (or `missing element`) instead of a null failure. A normal `mvn test` is unchanged.
 - The warm JVM exits when its state file disappears, including during a run. `stop` kills that pid from `warm-jvm.pid` even if `warm-jvm.v1` is already gone. `status` is `idle` until a `BEFORE_STEP` is open or a session command is in flight. A bare `RUNNING` mark is not a step. `/health` `running` is true only while a command is in flight. A normal `mvn test` is unchanged.

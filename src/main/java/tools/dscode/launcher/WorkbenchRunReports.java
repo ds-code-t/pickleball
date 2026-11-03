@@ -291,9 +291,39 @@ public final class WorkbenchRunReports {
         for (Map<String, Object> body : bodies) {
             if (!isFailedStatus(scenarioStatus(body))) continue;
             String name = text(body.get("scenario"));
-            if (!name.isBlank()) names.add(name);
+            if (!name.isBlank()) names.add(scenarioLabel(name, body));
         }
         return names;
+    }
+
+    /** Name, then `path:line` and `example <line>` when the identity recorded them. */
+    private static String scenarioLabel(String name, Map<String, Object> body) {
+        String uri = text(body.get("featureUri")).replace('\\', '/');
+        Long line = positiveLine(body.get("scenarioLine"));
+        Long example = positiveLine(body.get("exampleLine"));
+        StringBuilder label = new StringBuilder(name);
+        if (!uri.isBlank()) {
+            label.append(' ').append(uri);
+            if (line != null) label.append(':').append(line);
+        }
+        if (example != null) label.append(" example ").append(example);
+        return label.toString();
+    }
+
+    private static Long positiveLine(Object value) {
+        if (value == null) return null;
+        long parsed;
+        if (value instanceof Number number) parsed = number.longValue();
+        else {
+            String raw = String.valueOf(value).trim();
+            if (raw.isEmpty()) return null;
+            try {
+                parsed = Long.parseLong(raw);
+            } catch (NumberFormatException failure) {
+                return null;
+            }
+        }
+        return parsed > 0 ? parsed : null;
     }
 
     private static String scenarioStatus(Map<String, Object> body) {
@@ -533,12 +563,14 @@ public final class WorkbenchRunReports {
         List<Map<String, Object>> events = readJsonLines(scenarioDir.resolve("events.jsonl"));
         String scenario = "";
         String status = "";
+        Object identity = null;
         List<Map<String, Object>> steps = new ArrayList<>();
         List<Map<String, Object>> failures = new ArrayList<>();
         for (Map<String, Object> event : events) {
             String type = text(event.get("type"));
             if ("scenario_start".equals(type)) {
-                scenario = identityName(event.get("identity"));
+                identity = event.get("identity");
+                scenario = identityName(identity);
             } else if ("scenario_end".equals(type) && status.isBlank()) {
                 status = text(event.get("outcome"));
             } else if ("step".equals(type)) {
@@ -557,6 +589,7 @@ public final class WorkbenchRunReports {
         body.put("status", status);
         body.put("steps", steps);
         body.put("failures", failures);
+        copyScenarioLocation(body, identity);
         if (thin) fillFromCoreSummary(scenarioDir, body);
         Path workbench = scenarioDir.resolve("workbench");
         Files.createDirectories(workbench);
@@ -630,6 +663,7 @@ public final class WorkbenchRunReports {
             if (text(body.get("scenario")).isBlank()) {
                 body.put("scenario", scenarioNameFrom(coreBody));
             }
+            copyScenarioLocation(body, coreBody.get("identity"));
             if (text(body.get("status")).isBlank()) {
                 String outcome = firstText(coreBody, "outcome", "status");
                 if (!outcome.isBlank()) body.put("status", outcome);
@@ -657,6 +691,22 @@ public final class WorkbenchRunReports {
             if (!name.isBlank()) return name;
         }
         return firstText(coreBody, "scenario", "scenarioName", "name");
+    }
+
+    private static void copyScenarioLocation(Map<String, Object> body, Object identity) {
+        if (!(identity instanceof Map<?, ?> map)) return;
+        if (text(body.get("featureUri")).isBlank()) {
+            String uri = firstText(map, "featureUri", "uri");
+            if (!uri.isBlank()) body.put("featureUri", uri.replace('\\', '/'));
+        }
+        if (positiveLine(body.get("scenarioLine")) == null) {
+            Long line = positiveLine(map.get("scenarioLine"));
+            if (line != null) body.put("scenarioLine", line);
+        }
+        if (positiveLine(body.get("exampleLine")) == null) {
+            Long line = positiveLine(map.get("exampleLine"));
+            if (line != null) body.put("exampleLine", line);
+        }
     }
 
     private static Map<String, Object> readJsonObject(Path file) {
