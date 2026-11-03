@@ -64,6 +64,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/maintainer/2.1.18-structural-fixes.md`
 - `docs/maintainer/2.1.18-unification.md`
 - `docs/maintainer/2.1.19-dom-composite-roadmap.md`
+- `docs/maintainer/2.1.19-element-snapshot-roadmap.md`
 - `docs/maintainer/consumer-sim-harness.md`
 - `docs/maintainer/guidance-goldens.md`
 - `docs/maintainer/pointer-eval-harness.md`
@@ -347,7 +348,12 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/common/runtime/ProcessTrees.java`
 - `src/main/java/tools/dscode/common/seleniumextensions/AllContextsScan.java`
 - `src/main/java/tools/dscode/common/seleniumextensions/ContextWrapper.java`
+- `src/main/java/tools/dscode/common/seleniumextensions/ElementSnapshot.java`
+- `src/main/java/tools/dscode/common/seleniumextensions/ElementSnapshotScript.java`
 - `src/main/java/tools/dscode/common/seleniumextensions/ElementWrapper.java`
+- `src/main/java/tools/dscode/common/seleniumextensions/SeleniumSnapshotProducer.java`
+- `src/main/java/tools/dscode/common/seleniumextensions/SnapshotLookup.java`
+- `src/main/java/tools/dscode/common/seleniumextensions/SnapshotProducers.java`
 - `src/main/java/tools/dscode/common/servicecalls/JdbcServiceCall.java`
 - `src/main/java/tools/dscode/common/servicecalls/RestAssuredUtil.java`
 - `src/main/java/tools/dscode/common/trace/InstanceRegistry.java`
@@ -522,6 +528,9 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/common/reporting/diagnostic/DiagnosticSecretRedactionTest.java`
 - `src/test/java/tools/dscode/common/reporting/diagnostic/DiscoverHintJvmLeakTest.java`
 - `src/test/java/tools/dscode/common/resources/PathListSemanticsTest.java`
+- `src/test/java/tools/dscode/common/seleniumextensions/ElementWrapperSnapshotTest.java`
+- `src/test/java/tools/dscode/common/seleniumextensions/SeleniumSnapshotProducerTest.java`
+- `src/test/java/tools/dscode/common/seleniumextensions/SnapshotPages.java`
 - `src/test/java/tools/dscode/common/servicecalls/JdbcTypeMappingTest.java`
 - `src/test/java/tools/dscode/common/treeparsing/preparsing/ConditionalBranchArgumentTest.java`
 - `src/test/java/tools/dscode/common/treeparsing/preparsing/LazyBranchResolutionTest.java`
@@ -598,6 +607,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/testengine/WorkspaceSeedTest.java`
 - `src/test/java/tools/dscode/untilpass/UntilPassBrowserSteps.java`
 - `src/test/java/tools/dscode/untilpass/UntilPassChromeLookupTest.java`
+- `src/test/resources/element-snapshot/fixture.html`
 - `src/test/resources/expected-failure/release-216-expected-failure.feature`
 - `src/test/resources/guidance-golden/documented-help.txt`
 - `src/test/resources/launch-parity/observe.feature`

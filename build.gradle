@@ -175,6 +175,7 @@ dependencies {
     implementation('org.seleniumhq.selenium:selenium-java') {
         version { strictly('[4.44,5.0)') }
     }
+    testImplementation('org.seleniumhq.selenium:htmlunit3-driver:4.44.0')
 
     implementation files('libs/xpathy-3.0.0.jar')
 }

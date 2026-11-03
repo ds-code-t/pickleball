@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
@@ -144,6 +145,21 @@ public class ElementMatch {
         this.startIndex = startIndex;
         this.position = position;
         this.fullText = (fullText == null || fullText.isBlank()) ? "PlaceHolder" : fullText;
+    }
+
+    /**
+     * An element that was already resolved, not a phrase parse.
+     * {@link tools.dscode.common.seleniumextensions.ElementWrapper#forResolvedElement}
+     * uses this so a snapshot can be taken without running the parser.
+     * Phrase search still builds an {@link ElementMatch} from a match node.
+     */
+    public static ElementMatch resolved(String category) {
+        String name = category == null || category.isBlank() ? "Element" : category;
+        ElementMatch match = new ElementMatch(null, 0, 0, name);
+        match.category = name;
+        match.elementTypes = EnumSet.noneOf(ElementType.class);
+        match.selectionType = "";
+        return match;
     }
 
 

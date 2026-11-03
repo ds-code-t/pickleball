@@ -36,7 +36,13 @@ public class ElementWrapper implements WebElement, WrapsElement {
 
     private final WebDriver driver;
     public WebElement element;
-    public ObjectNode attributeSnapshot;
+    private ElementSnapshot elementSnapshot;
+    /**
+     * Computed by {@link #getElementReturnValue()} and kept off the snapshot.
+     * Null means not computed yet. An empty string is a computed blank.
+     */
+    private String elementReturnValue;
+    private final Map<String, String> extraSnapshotValues = new HashMap<>();
     private final String xpath1;
     private final String xpath2;
     public final ElementMatch elementMatch;
@@ -78,15 +84,27 @@ public class ElementWrapper implements WebElement, WrapsElement {
     }
 
     ElementWrapper(WebElement element, ElementMatch elementMatch, Integer matchIndex) {
-        this.driver = elementMatch.parentPhrase.getDriver();
+        this(elementMatch.parentPhrase.getDriver(), element, elementMatch, matchIndex);
+    }
+
+    /**
+     * Snapshot one element the caller already resolved.
+     * Phrase search still goes through {@link #getWrappedElements(ElementMatch)}.
+     */
+    public static ElementWrapper forResolvedElement(WebDriver driver, WebElement element) {
+        Objects.requireNonNull(driver, "driver");
+        Objects.requireNonNull(element, "element");
+        return new ElementWrapper(driver, element, ElementMatch.resolved("Text"), 1);
+    }
+
+    private ElementWrapper(WebDriver driver, WebElement element, ElementMatch elementMatch, Integer matchIndex) {
+        this.driver = Objects.requireNonNull(driver, "driver");
         this.matchIndex = matchIndex;
         this.elementMatch = elementMatch;
         this.foreignContext = false;
         this.element = Objects.requireNonNull(element, "element must not be null");
 
-        takeSnapshot(this.element);
-        if (debugFlags.contains("elementsnapshot"))
-            System.out.println(attributeSnapshot.toPrettyString());
+        assignSnapshot(this.element, "create");
         this.xpath1 = buildXPathForElement(driver, element, 10, 30,
                 List.of("id", "data-user-id"),
                 List.of("name", "title"),
@@ -109,7 +127,7 @@ public class ElementWrapper implements WebElement, WrapsElement {
         this.elementMatch = elementMatch;
         this.foreignContext = true;
         this.element = null;
-        this.attributeSnapshot = MAPPER.createObjectNode();
+        this.elementSnapshot = ElementSnapshot.empty();
         this.xpath1 = "";
         this.xpath2 = "";
     }
@@ -128,181 +146,125 @@ public class ElementWrapper implements WebElement, WrapsElement {
 
     public void takeSnapshot() {
         executeWithStaleRetry(currentElement -> {
-            takeSnapshot(currentElement);
+            assignSnapshot(currentElement, "refresh");
             return null;
         });
     }
 
-    @SuppressWarnings("unchecked")
-    private void takeSnapshot(WebElement snapshotElement) {
-        if (snapshotElement instanceof tools.dscode.common.composite.CompositeWebElement composite) {
-            takeCompositeSnapshot(composite);
-            return;
-        }
-        ObjectNode snapshot = MAPPER.createObjectNode();
-        JavascriptExecutor js = javascriptExecutor();
-
-        String tagName = safeTagName(snapshotElement);
-        snapshot.put("tagName", tagName);
-
-        String textContent;
-        if ("textarea".equals(tagName) || "input".equals(tagName)) {
-            textContent = safeDomAttribute(snapshotElement, "value");
-        } else if ("select".equals(tagName)) {
-            textContent = (String) js.executeScript(
-                    "var sel = arguments[0]; return sel.options[sel.selectedIndex] ? sel.options[sel.selectedIndex].text : '';",
-                    snapshotElement
-            );
-        } else {
-            textContent = (String) js.executeScript(
-                    "return arguments[0].innerText;",
-                    snapshotElement
-            );
-            if (textContent == null || textContent.isEmpty()) {
-                textContent = safeDomAttribute(snapshotElement, "value");
-            }
-        }
-        snapshot.put("textContent", textContent == null ? "" : textContent);
-
-        List<WebElement> children = withoutImplicitWait(
-                driver,
-                () -> tools.dscode.common.composite.ElementOperations.findElements(snapshotElement, By.xpath("./*[@selected]"))
-        );
-        StringBuilder childValue = new StringBuilder();
-        for (WebElement child : children) {
-            String value = safeDomAttribute(child, "value");
-            childValue.append(value == null ? child.getText() : value);
-        }
-        if (!children.isEmpty()) {
-            snapshot.put("childValue", childValue.toString());
-        }
-
-        Map<String, String> attrs = (Map<String, String>) js.executeScript(
-                "var el = arguments[0];" +
-                        "var out = {}; " +
-                        "for (var i = 0; i < el.attributes.length; i++) {" +
-                        "  var a = el.attributes[i];" +
-                        "  out[a.name] = a.value;" +
-                        "}" +
-                        "return out;",
-                snapshotElement
-        );
-        ObjectNode attrNode = snapshot.putObject("attributes");
-        if (attrs != null) {
-            attrs.forEach(attrNode::put);
-        }
-
-        int siblingIndex = ((Number) js.executeScript(
-                "var el = arguments[0];" +
-                        "var i = 0;" +
-                        "while (el.previousElementSibling) {" +
-                        "  el = el.previousElementSibling;" +
-                        "  i++;" +
-                        "}" +
-                        "return i;",
-                snapshotElement
-        )).intValue();
-        snapshot.put("siblingIndex", siblingIndex);
-
-        int sameTagIndex = ((Number) js.executeScript(
-                "var el = arguments[0];" +
-                        "var tag = el.tagName;" +
-                        "var i = 0;" +
-                        "while (el.previousElementSibling) {" +
-                        "  el = el.previousElementSibling;" +
-                        "  if (el.tagName === tag) i++;" +
-                        "}" +
-                        "return i;",
-                snapshotElement
-        )).intValue();
-        snapshot.put("sameTagIndex", sameTagIndex);
-        this.attributeSnapshot = snapshot;
+    /**
+     * The snapshot taken at construction, or the last refresh. Never null
+     * after construction. Reads do not take a new snapshot.
+     */
+    public ElementSnapshot snapshot() {
+        return elementSnapshot == null ? ElementSnapshot.empty() : elementSnapshot;
     }
 
-    private void takeCompositeSnapshot(tools.dscode.common.composite.CompositeWebElement element) {
-        ObjectNode snapshot = MAPPER.createObjectNode();
-        String tagName = safeTagName(element);
-        snapshot.put("tagName", tagName);
-        String textContent;
-        if ("textarea".equals(tagName) || "input".equals(tagName)) {
-            textContent = safeDomAttribute(element, "value");
-        } else {
-            textContent = element.getText();
-            if (textContent == null || textContent.isEmpty()) {
-                textContent = safeDomAttribute(element, "value");
-            }
+    private void assignSnapshot(WebElement snapshotElement, String event) {
+        this.elementSnapshot = SnapshotProducers.capture(driver, snapshotElement, event);
+        this.elementReturnValue = null;
+        this.extraSnapshotValues.clear();
+        if (debugFlags.contains("elementsnapshot")) {
+            logTrace(attributeView().toPrettyString());
         }
-        snapshot.put("textContent", textContent == null ? "" : textContent);
-        ObjectNode attrNode = snapshot.putObject("attributes");
-        element.attributes().forEach(attrNode::put);
-        snapshot.put("siblingIndex", 0);
-        snapshot.put("sameTagIndex", 0);
-        this.attributeSnapshot = snapshot;
     }
 
+    /**
+     * JSON view of the snapshot, rebuilt on each call. The return-value cache
+     * is included when it has been computed. Prefer {@link #snapshot()}.
+     *
+     * @deprecated Callers should read {@link #snapshot()}. This view stays so
+     * older JSON field names ({@code tagName}, {@code textContent},
+     * {@code childValue}) keep working.
+     */
+    @Deprecated
     public ObjectNode getAttributeSnapshot() {
-        return attributeSnapshot;
+        return attributeView();
+    }
+
+    private ObjectNode attributeView() {
+        ElementSnapshot shot = snapshot();
+        ObjectNode node = MAPPER.createObjectNode();
+        node.put("tagName", shot.tag());
+        node.put("textContent", shot.text());
+        if (shot.selectedValue() != null) node.put("childValue", shot.selectedValue());
+        ObjectNode attributes = node.putObject("attributes");
+        shot.attributes().forEach(attributes::put);
+        node.put("siblingIndex", shot.siblingIndex());
+        node.put("sameTagIndex", shot.sameTagIndex());
+        if (shot.nodeId() != null) node.put("nodeId", shot.nodeId());
+        if (!shot.stableSelector().isEmpty()) node.put("stableSelector", shot.stableSelector());
+        if (elementReturnValue != null) node.put(ELEMENT_RETURN_VALUE, elementReturnValue);
+        extraSnapshotValues.forEach((key, value) -> {
+            if (key.startsWith("attributes.")) attributes.put(key.substring("attributes.".length()), value);
+            else node.put(key, value);
+        });
+        return node;
     }
 
     public ValueWrapper getElementReturnValue() {
         rejectIfForeignContext();
-        if (attributeSnapshot.has(ELEMENT_RETURN_VALUE))
-            return createValueWrapper(attributeSnapshot.get(ELEMENT_RETURN_VALUE).asText());
+        if (elementReturnValue != null) return createValueWrapper(elementReturnValue);
 
         scrollIntoView();
-        switch (elementMatch.category) {
-            case "Field":
-                List<WebElement> valueElements = withoutImplicitWait(
-                        driver,
-                        () -> findElements(By.xpath("descendant::*[contains(@class,'Read')]"))
-                );
-                if (!valueElements.isEmpty()) {
-                    String returnVal = valueElements.getLast().getText();
-                    attributeSnapshot.put(ELEMENT_RETURN_VALUE, returnVal);
-                    return createValueWrapper(returnVal);
-                }
-                if (getTagName().equals("td")) {
-                    String returnVal = getText();
-                    attributeSnapshot.put(ELEMENT_RETURN_VALUE, returnVal);
-                    return createValueWrapper(returnVal);
-                }
-                valueElements = withoutImplicitWait(
-                        driver,
-                        () -> findElements(By.xpath("*[normalize-space(.)][1]/following-sibling::*[descendant-or-self::*[text()]]"))
-                );
-                if (valueElements.size() == 1) {
-                    String returnVal = valueElements.getLast().getText();
-                    attributeSnapshot.put(ELEMENT_RETURN_VALUE, returnVal);
-                    return createValueWrapper(returnVal);
-                }
-                break;
+        if (elementMatch != null && "Field".equals(elementMatch.category)) {
+            List<WebElement> valueElements = withoutImplicitWait(
+                    driver,
+                    () -> findElements(By.xpath("descendant::*[contains(@class,'Read')]"))
+            );
+            if (!valueElements.isEmpty()) {
+                return cacheReturn(valueElements.getLast().getText());
+            }
+            if (getTagName().equals("td")) {
+                return cacheReturn(getText());
+            }
+            valueElements = withoutImplicitWait(
+                    driver,
+                    () -> findElements(By.xpath("*[normalize-space(.)][1]/following-sibling::*[descendant-or-self::*[text()]]"))
+            );
+            if (valueElements.size() == 1) {
+                return cacheReturn(valueElements.getLast().getText());
+            }
         }
 
-        for (String key : elementMatch.defaultValueKeys) {
-            ObjectNode node;
-            if (key.startsWith("attributes.")) {
-                node = (ObjectNode) attributeSnapshot.get("attributes");
-                key = key.substring("attributes.".length());
-            } else {
-                node = attributeSnapshot;
-            }
-            if (node.has(key)) {
-                String returnVal = node.get(key).asText();
-                attributeSnapshot.put(ELEMENT_RETURN_VALUE, returnVal);
-                return createValueWrapper(returnVal);
-            } else if (DOM_PROPERTY_FALLBACK_KEYS.contains(key)) {
-                String fallbackKey = key;
-                String returnVal = executeWithStaleRetry(
-                        currentElement -> safeDomProperty(currentElement, fallbackKey));
-                if (returnVal != null) {
-                    node.put(key, returnVal);
-                    attributeSnapshot.put(ELEMENT_RETURN_VALUE, returnVal);
-                    return createValueWrapper(returnVal);
-                }
-            }
+        List<String> keys = elementMatch == null || elementMatch.defaultValueKeys == null
+                ? List.of()
+                : elementMatch.defaultValueKeys;
+        for (String key : keys) {
+            if (key == null || ELEMENT_RETURN_VALUE.equals(key)) continue;
+            String found = lookupDefaultKey(key);
+            if (found != null) return cacheReturn(found);
         }
-        attributeSnapshot.put(ELEMENT_RETURN_VALUE, "");
-        return createValueWrapper("");
+        return cacheReturn("");
+    }
+
+    private ValueWrapper cacheReturn(String returnVal) {
+        elementReturnValue = returnVal == null ? "" : returnVal;
+        return createValueWrapper(elementReturnValue);
+    }
+
+    private String lookupDefaultKey(String key) {
+        if (key.startsWith("attributes.")) {
+            String name = key.substring("attributes.".length());
+            if (snapshot().hasAttribute(name)) return snapshot().attribute(name);
+            if (DOM_PROPERTY_FALLBACK_KEYS.contains(name)) return propertyFallback(name, true);
+            return null;
+        }
+        if ("childValue".equals(key) || "selectedValue".equals(key)) return snapshot().selectedValue();
+        if ("textContent".equals(key) || "text".equals(key)) return snapshot().text();
+        if ("tagName".equals(key) || "tag".equals(key)) return snapshot().tag();
+        if ("siblingIndex".equals(key)) return Integer.toString(snapshot().siblingIndex());
+        if ("sameTagIndex".equals(key)) return Integer.toString(snapshot().sameTagIndex());
+        if ("stableSelector".equals(key)) return snapshot().stableSelector();
+        if ("nodeId".equals(key)) return snapshot().nodeId();
+        if (DOM_PROPERTY_FALLBACK_KEYS.contains(key)) return propertyFallback(key, false);
+        return null;
+    }
+
+    private String propertyFallback(String key, boolean attribute) {
+        String returnVal = executeWithStaleRetry(currentElement -> safeDomProperty(currentElement, key));
+        if (returnVal == null) return null;
+        extraSnapshotValues.put(attribute ? "attributes." + key : key, returnVal);
+        return returnVal;
     }
 
     private static <T> T withoutImplicitWait(WebDriver driver,
@@ -355,7 +317,7 @@ public class ElementWrapper implements WebElement, WrapsElement {
         WebElement refreshedElement = refindUniqueElement();
         safeWaitForElementReady(driver, refreshedElement, Duration.ofSeconds(60));
         this.element = refreshedElement;
-        takeSnapshot(refreshedElement);
+        assignSnapshot(refreshedElement, "refresh");
         return refreshedElement;
     }
 
@@ -1005,39 +967,25 @@ public class ElementWrapper implements WebElement, WrapsElement {
     }
 
     public String getSnapshotAttribute(String name) {
-        if (attributeSnapshot == null) return null;
-        return attributeSnapshot
-                .path("attributes")
-                .path(name)
-                .asText(null);
+        if (name == null) return null;
+        if (snapshot().hasAttribute(name)) return snapshot().attribute(name);
+        return extraSnapshotValues.get("attributes." + name);
     }
 
     public boolean snapshotAttributeEqualsIgnoreCase(String name, String... candidates) {
-        if (attributeSnapshot == null || candidates == null) {
-            return false;
-        }
-        String value = attributeSnapshot
-                .path("attributes")
-                .path(name)
-                .asText(null);
-        if (value == null) {
-            return false;
-        }
+        if (candidates == null) return false;
+        String value = getSnapshotAttribute(name);
+        if (value == null) return false;
         for (String candidate : candidates) {
-            if (value.trim().equalsIgnoreCase(candidate.trim())) {
-                return true;
-            }
+            if (candidate != null && value.trim().equalsIgnoreCase(candidate.trim())) return true;
         }
         return false;
     }
 
     public boolean snapshotContainsAnyAttribute(String... keys) {
-        if (attributeSnapshot == null || keys == null || keys.length == 0) {
-            return false;
-        }
-        var attributesNode = attributeSnapshot.path("attributes");
+        if (keys == null || keys.length == 0) return false;
         for (String key : keys) {
-            if (key != null && attributesNode.has(key)) {
+            if (key != null && (snapshot().hasAttribute(key) || extraSnapshotValues.containsKey("attributes." + key))) {
                 return true;
             }
         }
@@ -1045,27 +993,44 @@ public class ElementWrapper implements WebElement, WrapsElement {
     }
 
     public String getSnapshotValue(String key) {
-        if (attributeSnapshot == null) return null;
-
-        if (attributeSnapshot.has(key))
-            return attributeSnapshot.get(key).asText(null);
-
-        return attributeSnapshot
-                .path("attributes")
-                .path(key)
-                .asText(null);
+        if (key == null) return null;
+        ElementSnapshot shot = snapshot();
+        switch (key) {
+            case "tagName":
+            case "tag":
+                return shot.tag();
+            case "textContent":
+            case "text":
+                return shot.text();
+            case "childValue":
+            case "selectedValue":
+                return shot.selectedValue();
+            case "siblingIndex":
+                return Integer.toString(shot.siblingIndex());
+            case "sameTagIndex":
+                return Integer.toString(shot.sameTagIndex());
+            case "stableSelector":
+                return shot.stableSelector();
+            case "nodeId":
+                return shot.nodeId();
+            default:
+                break;
+        }
+        if (extraSnapshotValues.containsKey(key)) return extraSnapshotValues.get(key);
+        if (shot.hasAttribute(key)) return shot.attribute(key);
+        return extraSnapshotValues.get("attributes." + key);
     }
 
     @Override
     public String getTagName() {
-        return attributeSnapshot.get("tagName").asText("");
+        return snapshot().tag();
     }
 
     public int getIndex() {
-        return attributeSnapshot.get("siblingIndex").intValue();
+        return snapshot().siblingIndex();
     }
 
     public int getSameTagIndex() {
-        return attributeSnapshot.get("sameTagIndex").intValue();
+        return snapshot().sameTagIndex();
     }
 }
