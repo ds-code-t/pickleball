@@ -9,6 +9,7 @@ A consumer normally needs the Pickleball test dependency and one runner extendin
 - Java 21
 - the project's wrapper: `mvnw` or `mvnw.cmd`, `gradlew` or `gradlew.bat`, or `java -jar` on the wrapper jar. Pick the script from the OS. Do not require a machine-wide Maven or Gradle install
 - a Selenium-supported browser for browser scenarios
+- optional: the `composite` binary from [dom-composite](https://github.com/ds-code-t/dom-composite) 2.4.0 when element operations should use that entry point. Without it, Pickleball keeps Selenium for that run. Set `COMPOSITE_BIN` or `pkb_composite_bin` to the binary. See [Configuration](configuration.md).
 
 ## Maven dependency
 

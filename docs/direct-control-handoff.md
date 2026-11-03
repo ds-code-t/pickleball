@@ -125,7 +125,11 @@ The absolute directory and the id from the attach JSON are written on the descri
 
 Detach runs `session close` for that id and directory. It does not destroy a process. A session this command did not launch returns `"killed": false` and leaves Chrome or Edge running. A missing binary skips; it does not fail the run.
 
-The binary is found at runtime. `COMPOSITE_BIN` is the path. Otherwise `COMPOSITE_HOME` or a sibling checkout named `dom-composite` next to the project may have `target/debug/composite`, then `target/release/composite`. The Java binding is not on a registry. Builds and ordinary tests do not need the binary. A missing binary skips a provider check; it does not fail the suite.
+The binary is found at runtime by `CompositeBinaryLocator`, the same order the provider already used, plus native classifiers. `pkb_composite_bin` is first, then `COMPOSITE_BIN`, then `COMPOSITE_HOME` or a sibling checkout named `dom-composite` (`target/debug/composite`, then `target/release/composite`). Next is a classpath file `dev/domcomposite/natives/<classifier>/composite` (`linux-x64`, `linux-aarch64`, `windows-x64`, `macos-aarch64`, `macos-x64`; Windows uses `composite.exe`) or the unreleased Maven classifier jar `dev.domcomposite:composite-native:2.4.0:<classifier>`. `pkb_composite=on` also accepts an executable named `composite` on `PATH`. The Java binding `dev.domcomposite.Client` / `Session` (2.4.0) is vendored in this repository because it is not on a registry. Builds and ordinary tests do not need the binary. A missing binary logs once (`error:` / `fix:`) and that run keeps the legacy Selenium element path. `pkb_composite=off` skips the lookup. `pkb_composite=auto` is the default.
+
+Element operations join an already-attached session when the driver publishes a CDP address. That join uses `Client.openSession` with `cdp` and `i_accept_local_attach`. It does not launch a second browser and it does not replace `pkb_direct_control_provider`.
+
+Logging is off unless `pkb_composite_log` is `all` or a comma list of `location`, `adapter`, `session`, `element`, `fallback`. Lines go to the CLI and to `composite-YYYY-MM-DD.log` under `pkb_composite_log_dir` (default the temp directory `pickleball-composite-logs`). One file is capped at 1 MiB.
 
 When those two descriptor fields are set, the session is already attached. Do not attach again. Join it:
 

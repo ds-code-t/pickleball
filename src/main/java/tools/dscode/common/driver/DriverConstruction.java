@@ -13,6 +13,7 @@ import org.openqa.selenium.chromium.ChromiumOptions;
 import org.openqa.selenium.edge.EdgeDriver;
 import org.openqa.selenium.edge.EdgeDriverService;
 import org.openqa.selenium.edge.EdgeOptions;
+import tools.dscode.common.composite.CompositeRuntime;
 import org.openqa.selenium.remote.RemoteWebDriver;
 import org.openqa.selenium.remote.http.ClientConfig;
 import org.openqa.selenium.remote.service.DriverService;
@@ -267,17 +268,17 @@ public final class DriverConstruction {
         if ("edge".equals(browserName)) {
             EdgeOptions options = buildEdgeOptions(driverConfig, fullConfiguration, true);
             EdgeDriverService built = buildEdgeService(service, capture);
-            return built != null && clientConfig != null ? new EdgeDriver(built, options, clientConfig)
+            return ready(built != null && clientConfig != null ? new EdgeDriver(built, options, clientConfig)
                     : built != null ? new EdgeDriver(built, options)
                     : clientConfig != null ? new EdgeDriver(options, clientConfig)
-                    : new EdgeDriver(options);
+                    : new EdgeDriver(options));
         }
         ChromeOptions options = buildChromeOptions(driverConfig, fullConfiguration, true);
         ChromeDriverService built = buildChromeService(service, capture);
-        return built != null && clientConfig != null ? new ChromeDriver(built, options, clientConfig)
+        return ready(built != null && clientConfig != null ? new ChromeDriver(built, options, clientConfig)
                 : built != null ? new ChromeDriver(built, options)
                 : clientConfig != null ? new ChromeDriver(options, clientConfig)
-                : new ChromeDriver(options);
+                : new ChromeDriver(options));
     }
 
     public static RemoteWebDriver createRemoteDriver(
@@ -296,10 +297,16 @@ public final class DriverConstruction {
         ClientConfig clientConfig = buildClientConfig(connection);
         Boolean enableTracing = toBoolean(toJavaValue(connection.get("enableTracing")));
 
-        return clientConfig != null && enableTracing != null ? new RemoteWebDriver(new URL(remoteUrl), capabilities, clientConfig, enableTracing)
+        return ready(clientConfig != null && enableTracing != null ? new RemoteWebDriver(new URL(remoteUrl), capabilities, clientConfig, enableTracing)
                 : clientConfig != null ? new RemoteWebDriver(new URL(remoteUrl), capabilities, clientConfig)
                 : enableTracing != null ? new RemoteWebDriver(new URL(remoteUrl), capabilities, enableTracing)
-                : new RemoteWebDriver(new URL(remoteUrl), capabilities);
+                : new RemoteWebDriver(new URL(remoteUrl), capabilities));
+    }
+
+    /** Locates dom-composite when a browser session starts. A missing binary does not fail the driver. */
+    private static RemoteWebDriver ready(RemoteWebDriver driver) {
+        CompositeRuntime.attach(driver);
+        return driver;
     }
 
     public static MutableCapabilities buildRemoteCapabilities(

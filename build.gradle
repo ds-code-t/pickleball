@@ -166,7 +166,12 @@ dependencies {
     // Align all io.cucumber modules in THIS build, and also share alignment intent with consumers (Gradle)
     api(platform("io.cucumber:cucumber-bom:${cucumberVersion}"))
 
-    // xpath and selenium
+    // xpath and selenium. Browser lifecycle stays here.
+    // dom-composite 2.4.0 Java binding (dev.domcomposite.Client / Session) is vendored
+    // under src/main/java/dev/domcomposite from github.com/ds-code-t/dom-composite
+    // commit d63887c. It is not on Maven Central (maven.deploy.skip). Native
+    // classifiers are optional: classpath dev/domcomposite/natives/<os-arch>/composite
+    // or dev.domcomposite:composite-native:2.4.0:<classifier>. See docs/configuration.md.
     implementation('org.seleniumhq.selenium:selenium-java') {
         version { strictly('[4.44,5.0)') }
     }
