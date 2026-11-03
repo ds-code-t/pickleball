@@ -32,7 +32,17 @@ RUN = "sim-compiled"
 TAGS = "@log-assert-steps"
 NAME = "TRACE.DEBUG.INFO"
 STEP = 'INFO: harness "quoted" step'
-# Generous CI budgets. They fail a hang or a large regression, not a warm laptop.
+# A prior session's stage must not reappear in the next start's startup-progress.json.
+PRIOR_OLDER = "prior-older"
+PRIOR_NEWEST = "prior-newest"
+# Warm cache-hit gap from index-end to jvm. a4c7ea6f SHA-256s every jar in that
+# window (about a second per GiB here). The skip path does not. 1500ms is above
+# the skip path (~200ms on Linux) and below that re-hash. Override with PKB_INDEX_JVM_BUDGET_MS.
+INDEX_JVM_BUDGET_MS = int(os.environ.get("PKB_INDEX_JVM_BUDGET_MS", "1500"))
+# Many real jars, large enough that hashing them blows the budget on a4c7ea6f.
+BULK_JARS = int(os.environ.get("PKB_BULK_JARS", "40"))
+BULK_MIB = int(os.environ.get("PKB_BULK_MIB", "64"))
+
 BUDGETS = {
     "discover-uncompiled": 900,
     "test-compile": 900,
@@ -732,6 +742,7 @@ def _report7_note(results: list[dict], item: str, ok: bool, detail: str) -> None
 
 
 def _report7_cleanup() -> None:
+    _restore_classpath_caches()
     for relative in (
         "src/test/java/com/example/report7glue/Report7Steps.java",
         "src/test/resources/features/report7-regex.feature",
@@ -963,28 +974,287 @@ def _report7_body(timings: list[dict], results: list[dict]) -> None:
     if isinstance(stages, list) and stages:
         previous_last = str(stages[-1].get("stage") or "")
     _report7_launch(timings, "report7-stop-a", ["stop", "--run-id=report7-a", "--force"], 60)
+    _ensure_classpath_cache(timings)
+    bulk = _inflate_consumer_classpath()
+    _plant_prior_session("report7-a", previous_last)
+    leaked, leaked_seconds = _report7_launch(timings, "report7-isolate-prior-leak", [
+        "isolate", "--run-id=report7-a", "--tags=@report7-regex", "--agent=consumer-sim",
+        "--runvar=pkb_browser=CHROME_HEADLESS",
+    ], 600)
+    leaked_text = _progress_text("report7-a")
+    leaked_names = _stage_names(_read_progress("report7-a"))
+    planted = [name for name in (PRIOR_OLDER, PRIOR_NEWEST) if name in leaked_text]
+    _report7_note(
+        results, "7-startup-progress",
+        leaked.returncode == 0 and not planted,
+        f"previous={previous_last} planted={planted} stages={leaked_names} seconds={leaked_seconds}",
+    )
+    _report7_launch(timings, "report7-stop-prior", ["stop", "--run-id=report7-a", "--force"], 60)
+    _clear_prior_session("report7-a")
+    log_before = _log_snapshot()
     second, second_seconds = _report7_launch(timings, "report7-isolate-a-restart", [
         "isolate", "--run-id=report7-a", "--tags=@report7-regex", "--agent=consumer-sim",
         "--runvar=pkb_browser=CHROME_HEADLESS",
     ], 600)
-    restarted = _read_progress("report7-a")
-    restarted_stages = restarted.get("stages") if isinstance(restarted, dict) else None
-    first_stage = ""
-    first_elapsed = None
-    if isinstance(restarted_stages, list) and restarted_stages:
-        first_stage = str(restarted_stages[0].get("stage") or "")
-        first_elapsed = restarted_stages[0].get("enteredElapsedMs")
-    stale = bool(previous_last) and first_stage == previous_last and first_elapsed == 0
-    _report7_note(
-        results, "7-startup-progress",
-        second.returncode == 0 and isinstance(restarted_stages, list) and restarted_stages and not stale,
-        f"previous={previous_last} first={first_stage}@{first_elapsed}",
+    gap_ms, between, observed = _index_jvm_gap("report7-a")
+    work = _gap_work("report7-a", log_before)
+    gap_ok = (
+        second.returncode == 0
+        and gap_ms is not None
+        and gap_ms <= INDEX_JVM_BUDGET_MS
     )
     _report7_note(
         results, "8-restart-budget",
-        second.returncode == 0 and second_seconds <= 35,
-        f"restart_seconds={second_seconds} first_seconds={first_seconds} target=35",
+        gap_ok,
+        (
+            f"index_end_to_jvm_ms={gap_ms} budget_ms={INDEX_JVM_BUDGET_MS} "
+            f"between=[{between}] work=[{work}] jars={bulk['jars']} bytes={bulk['bytes']} "
+            f"restart_seconds={second_seconds} stages={observed}"
+        ),
     )
+
+
+_CACHE_SNAPSHOTS: list[tuple[Path, str]] = []
+
+
+def _classpath_caches() -> list[Path]:
+    root = CONSUMER / ".pickleball"
+    if not root.is_dir():
+        return []
+    return sorted(root.rglob("resolved-classpath.v1"))
+
+
+def _ensure_classpath_cache(timings: list[dict]) -> None:
+    if _classpath_caches():
+        return
+    _report7_launch(timings, "report7-cache-discover", [
+        "discover", "--run-id=report7-cache", "--tags=@report7-regex",
+        "--runvar=pkb_browser=CHROME_HEADLESS", "--agent=consumer-sim",
+    ], 900)
+
+
+def _inflate_consumer_classpath() -> dict:
+    """Append many jars to the resolved consumer classpath the cache-hit path hashes."""
+    caches = _classpath_caches()
+    folder = CONSUMER / ".pickleball" / "bulk-classpath"
+    if folder.exists():
+        shutil.rmtree(folder)
+    folder.mkdir(parents=True)
+    jars: list[Path] = []
+    for index in range(BULK_JARS):
+        path = folder / f"bulk-{index:03d}.jar"
+        _write_stored_jar(path, BULK_MIB * 1024 * 1024)
+        jars.append(path.resolve())
+    added = "\n".join(str(path) for path in jars)
+    for cache in caches:
+        original = cache.read_text(encoding="utf-8")
+        _CACHE_SNAPSHOTS.append((cache, original))
+        body = original
+        if not body.endswith("\n"):
+            body += "\n"
+        cache.write_text(body + added + "\n", encoding="utf-8")
+    return {"jars": len(jars), "bytes": BULK_JARS * BULK_MIB * 1024 * 1024, "caches": len(caches)}
+
+
+def _write_stored_jar(path: Path, payload_bytes: int) -> None:
+    """A valid stored-method jar so the worker can open it. The payload is what SHA-256 reads."""
+    import struct
+    name = b"payload.bin"
+    local = struct.pack(
+        "<IHHHHHIIIHH",
+        0x04034B50, 20, 0, 0, 0, 0, 0, payload_bytes, payload_bytes, len(name), 0,
+    )
+    central = struct.pack(
+        "<IHHHHHHIIIHHHHHII",
+        0x02014B50, 20, 20, 0, 0, 0, 0, 0, payload_bytes, payload_bytes,
+        len(name), 0, 0, 0, 0, 0, 0,
+    )
+    offset = len(local) + len(name) + payload_bytes
+    eocd = struct.pack(
+        "<IHHHHIIH",
+        0x06054B50, 0, 0, 1, 1, len(central) + len(name), offset, 0,
+    )
+    zero = b"\0" * (1024 * 1024)
+    with path.open("wb") as handle:
+        handle.write(local)
+        handle.write(name)
+        remaining = payload_bytes
+        while remaining:
+            chunk = zero if remaining >= len(zero) else zero[:remaining]
+            handle.write(chunk)
+            remaining -= len(chunk)
+        handle.write(central)
+        handle.write(name)
+        handle.write(eocd)
+
+
+def _workbench_logs() -> Path:
+    root = CONSUMER / ".pickleball"
+    version = ""
+    current = root / "current.json"
+    if current.is_file():
+        try:
+            pointer = json.loads(current.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            pointer = {}
+        if pointer.get("complete") and pointer.get("pickleballVersion"):
+            version = str(pointer["pickleballVersion"])
+    if version and "/" not in version and "\\" not in version and ".." not in version:
+        logs = root / "v" / version / "workbench" / "logs"
+    else:
+        logs = root / "workbench" / "logs"
+    logs.mkdir(parents=True, exist_ok=True)
+    return logs
+
+
+def _plant_prior_session(run_id: str, previous_last: str) -> None:
+    """Leave a prior stage in an older log, the newest log, and startup-progress.json."""
+    logs = _workbench_logs()
+    older = logs / "worker-older.err.log"
+    newest = logs / "worker-newest.err.log"
+    older.write_text(f"left by the previous session\nprogress stage={PRIOR_OLDER}\n", encoding="utf-8")
+    newest.write_text(
+        f"left by the previous session\nprogress stage={previous_last or PRIOR_NEWEST}\n"
+        f"progress stage={PRIOR_NEWEST}\n",
+        encoding="utf-8",
+    )
+    os.utime(older, (1_000_000_000, 1_000_000_000))
+    future = time.time() + 24 * 3600
+    os.utime(newest, (future, future))
+    session = CONSUMER / ".pickleball" / "runs" / run_id / "session"
+    session.mkdir(parents=True, exist_ok=True)
+    log = session / "session.log"
+    with log.open("a", encoding="utf-8") as handle:
+        handle.write(f"progress stage={PRIOR_NEWEST}\n")
+    progress = session / "startup-progress.json"
+    existing = _read_progress(run_id)
+    stages = existing.get("stages") if isinstance(existing.get("stages"), list) else []
+    stages = list(stages)
+    stages.insert(0, {"stage": PRIOR_OLDER, "enteredElapsedMs": 0})
+    stages.insert(0, {"stage": PRIOR_NEWEST, "enteredElapsedMs": 0})
+    progress.write_text(json.dumps({"stages": stages}), encoding="utf-8")
+
+
+def _clear_prior_session(run_id: str) -> None:
+    root = CONSUMER / ".pickleball"
+    for name in ("worker-older.err.log", "worker-newest.err.log"):
+        for path in root.rglob(name):
+            path.unlink(missing_ok=True)
+    log = root / "runs" / run_id / "session" / "session.log"
+    if log.is_file():
+        text = log.read_text(encoding="utf-8", errors="replace")
+        kept = [
+            line for line in text.splitlines(keepends=True)
+            if PRIOR_OLDER not in line and PRIOR_NEWEST not in line
+        ]
+        log.write_text("".join(kept), encoding="utf-8")
+
+
+def _progress_text(run_id: str) -> str:
+    path = CONSUMER / ".pickleball" / "runs" / run_id / "session" / "startup-progress.json"
+    if not path.is_file():
+        return ""
+    return path.read_text(encoding="utf-8", errors="replace")
+
+
+def _stage_names(progress: dict) -> list[str]:
+    stages = progress.get("stages") if isinstance(progress, dict) else None
+    if not isinstance(stages, list):
+        return []
+    return [str(stage.get("stage") or "") for stage in stages if isinstance(stage, dict)]
+
+
+def _index_jvm_gap(run_id: str) -> tuple[int | None, str, str]:
+    progress = _read_progress(run_id)
+    stages = progress.get("stages") if isinstance(progress, dict) else None
+    if not isinstance(stages, list):
+        return None, "", ""
+    index_at = None
+    between: list[str] = []
+    observed: list[str] = []
+    for stage in stages:
+        if not isinstance(stage, dict):
+            continue
+        name = str(stage.get("stage") or "")
+        elapsed = stage.get("enteredElapsedMs")
+        observed.append(f"{name}@{elapsed}")
+        if name == "index-end" and index_at is None:
+            index_at = elapsed
+            continue
+        if index_at is None:
+            continue
+        if name == "jvm":
+            try:
+                return int(elapsed) - int(index_at), ",".join(between), ",".join(observed)
+            except (TypeError, ValueError):
+                return None, ",".join(between), ",".join(observed)
+        between.append(f"{name}@{elapsed}")
+    return None, ",".join(between), ",".join(observed)
+
+
+def _log_snapshot() -> dict[Path, int]:
+    snaps: dict[Path, int] = {}
+    root = CONSUMER / ".pickleball"
+    if not root.is_dir():
+        return snaps
+    for path in root.rglob("*"):
+        if not path.is_file():
+            continue
+        if not (path.name.endswith(".log") or path.name.endswith(".txt")):
+            continue
+        try:
+            snaps[path] = path.stat().st_size
+        except OSError:
+            continue
+    return snaps
+
+
+def _gap_work(run_id: str, snaps: dict[Path, int] | None = None) -> str:
+    """Progress lines appended during this start. Names the work between index-end and jvm."""
+    root = CONSUMER / ".pickleball"
+    if not root.is_dir():
+        return ""
+    interesting: list[str] = []
+    files = [root / "runs" / run_id / "session" / "session.log"]
+    files.extend(root.rglob("*.err.log"))
+    seen: set[Path] = set()
+    for path in files:
+        if path in seen or not path.is_file():
+            continue
+        seen.add(path)
+        try:
+            size = path.stat().st_size
+        except OSError:
+            continue
+        if size > 4_000_000:
+            continue
+        data = path.read_bytes()
+        mark = 0 if snaps is None else snaps.get(path, 0)
+        if len(data) < mark:
+            chunk = data
+        else:
+            chunk = data[mark:]
+        text = chunk.decode("utf-8", errors="replace")
+        for line in text.splitlines():
+            stripped = line.strip()
+            if "progress stage=" not in stripped and "cache-hit" not in stripped and "jar-hash" not in stripped:
+                continue
+            if stripped in interesting:
+                continue
+            interesting.append(stripped)
+    return " | ".join(interesting[:12])
+
+
+def _restore_classpath_caches() -> None:
+    for path, original in _CACHE_SNAPSHOTS:
+        try:
+            path.write_text(original, encoding="utf-8")
+        except OSError:
+            pass
+    _CACHE_SNAPSHOTS.clear()
+    folder = CONSUMER / ".pickleball" / "bulk-classpath"
+    if folder.exists():
+        shutil.rmtree(folder, ignore_errors=True)
 
 
 def _read_descriptor(run_id: str) -> dict:

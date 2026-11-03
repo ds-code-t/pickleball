@@ -102,27 +102,6 @@ final class SessionHealthWait {
             Duration progressEvery,
             Duration poll
     ) {
-        return waitFor(healthy, alive, project, sessionLog, out, err, timeout, progressEvery, poll, null);
-    }
-
-    /**
-     * {@code baseline} is the size of each log at session start. Only bytes appended
-     * after that count, so a previous session's last stage is not this start's first mark.
-     * A file that did not exist yet, or that shrank, is read in full. A null baseline
-     * keeps the previous whole-file read.
-     */
-    static Outcome waitFor(
-            BooleanSupplier healthy,
-            BooleanSupplier alive,
-            Path project,
-            Path sessionLog,
-            PrintStream out,
-            PrintStream err,
-            Duration timeout,
-            Duration progressEvery,
-            Duration poll,
-            Map<Path, Long> baseline
-    ) {
         Duration limit = timeout == null || timeout.isZero() || timeout.isNegative() ? DEFAULT_TIMEOUT : timeout;
         Duration every = progressEvery == null || progressEvery.isZero() || progressEvery.isNegative()
                 ? PROGRESS_EVERY
@@ -142,7 +121,7 @@ final class SessionHealthWait {
                 }
                 return new Outcome(Kind.DIED, timeline.current(), elapsedMs(started));
             }
-            String stage = currentStage(project, sessionLog, baseline);
+            String stage = currentStage(project, sessionLog);
             if (timeline.observe(stage, elapsedMs(started))) {
                 writeTimeline(sessionLog, timeline);
             }
@@ -160,7 +139,7 @@ final class SessionHealthWait {
             return new Outcome(Kind.HEALTHY, timeline.current(), elapsedMs(started));
         }
         if (timeline.isEmpty()) {
-            timeline.observe(currentStage(project, sessionLog, baseline), elapsedMs(started));
+            timeline.observe(currentStage(project, sessionLog), elapsedMs(started));
         }
         long elapsed = elapsedMs(started);
         writeTimeline(sessionLog, timeline);
@@ -176,21 +155,8 @@ final class SessionHealthWait {
         return "session-start progress elapsed=" + millis + "ms stage=" + where;
     }
 
-    static Map<Path, Long> baselineSizes(Path project, Path sessionLog) {
-        Map<Path, Long> sizes = new java.util.LinkedHashMap<>();
-        for (Path file : logCandidates(project, sessionLog)) {
-            if (file == null) continue;
-            sizes.put(file.toAbsolutePath().normalize(), fileSize(file));
-        }
-        return sizes;
-    }
-
     static String currentStage(Path project, Path sessionLog) {
-        return currentStage(project, sessionLog, null);
-    }
-
-    static String currentStage(Path project, Path sessionLog, Map<Path, Long> baseline) {
-        StageHit hit = latestStage(logCandidates(project, sessionLog), baseline);
+        StageHit hit = latestStage(logCandidates(project, sessionLog));
         return hit == null ? GENERIC_STAGE : hit.stage;
     }
 
@@ -266,15 +232,11 @@ final class SessionHealthWait {
     }
 
     static StageHit latestStage(List<Path> files) {
-        return latestStage(files, null);
-    }
-
-    static StageHit latestStage(List<Path> files, Map<Path, Long> baseline) {
         if (files == null || files.isEmpty()) return null;
         StageHit best = null;
         for (Path file : files) {
             if (file == null || !Files.isRegularFile(file)) continue;
-            String stage = lastStage(file, startOffset(file, baseline));
+            String stage = lastStage(file);
             if (stage == null) continue;
             long modified = lastModified(file);
             if (best == null || modified > best.modifiedMillis
@@ -283,24 +245,6 @@ final class SessionHealthWait {
             }
         }
         return best;
-    }
-
-    private static long startOffset(Path file, Map<Path, Long> baseline) {
-        if (baseline == null || file == null) return 0L;
-        Path key = file.toAbsolutePath().normalize();
-        if (!baseline.containsKey(key)) return 0L;
-        long mark = baseline.get(key);
-        long size = fileSize(file);
-        if (size < mark) return 0L;
-        return mark;
-    }
-
-    private static long fileSize(Path file) {
-        try {
-            return Files.isRegularFile(file) ? Files.size(file) : 0L;
-        } catch (IOException failure) {
-            return 0L;
-        }
     }
 
     static List<String> tailLines(Path file, int max) {
@@ -316,11 +260,7 @@ final class SessionHealthWait {
     }
 
     private static String lastStage(Path file) {
-        return lastStage(file, 0L);
-    }
-
-    private static String lastStage(Path file, long offset) {
-        String text = tailText(file, offset);
+        String text = tailText(file);
         if (text.isEmpty()) return null;
         Matcher matcher = STAGE_LINE.matcher(text);
         String stage = null;
@@ -329,21 +269,14 @@ final class SessionHealthWait {
     }
 
     private static String tailText(Path file) {
-        return tailText(file, 0L);
-    }
-
-    private static String tailText(Path file, long offset) {
         if (file == null || !Files.isRegularFile(file)) return "";
         try {
             long size = Files.size(file);
-            long start = Math.max(0L, offset);
-            if (size <= start) return "";
-            long available = size - start;
-            int take = (int) Math.min(available, TAIL_BYTES);
-            long position = size - take;
+            if (size <= 0) return "";
+            int take = (int) Math.min(size, TAIL_BYTES);
             byte[] buf = new byte[take];
             try (var channel = Files.newByteChannel(file)) {
-                channel.position(position);
+                channel.position(size - take);
                 int read = 0;
                 while (read < take) {
                     int n = channel.read(ByteBuffer.wrap(buf, read, take - read));

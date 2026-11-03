@@ -11,7 +11,7 @@ The session, in order:
 5. `execute-step --text-b64` and `execute-step --text-file=<absolute path>`.
 6. `events`, `query errors`, `query tail`.
 7. `discover` again on the same run id, then `confirm`, then `finish`.
-8. Report-7 symptoms (`report7()`): multiple run ids, regex and Cucumber-expression glue, a blank `pkb_glue`, validate over 2000 steps, `--quiet` line budget, `failedScenarios` path form, status right after `isolate`, and a second isolate checked against `startup-progress.json` and a 35s warm-restart budget.
+8. Report-7 symptoms (`report7()`): multiple run ids, regex and Cucumber-expression glue, a blank `pkb_glue`, validate over 2000 steps, `--quiet` line budget, `failedScenarios` path form, status right after `isolate`, a start whose `startup-progress.json` must not keep a stage left in an older log, the newest log, or the previous progress file, and an index-end to jvm gap on a large cache-hit classpath (40 jars, 64 MiB each) gated at 1500ms.
 9. `stop --force` so the worker does not stay up.
 
 `python3 scripts/consumer_sim.py --report7-only` runs just that report-7 block (publish first). It exits 1 when any item fails. The `failedScenarios` check reads the summary line only: `pkb_run_profile:` contains the letters `file:` and is not a URI.
