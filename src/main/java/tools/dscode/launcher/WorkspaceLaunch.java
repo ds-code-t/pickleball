@@ -75,7 +75,8 @@ public final class WorkspaceLaunch {
                 false,
                 copy ? fromRunId : null,
                 null,
-                path -> capture(project, path, false, warnings)
+                path -> capture(project, path, false, warnings),
+                warnings
         );
         Map<String, String> selection = new LinkedHashMap<>();
         put(selection, PKB_props.PKB_TAGS, tags);
@@ -139,9 +140,7 @@ public final class WorkspaceLaunch {
         }
         String message = defaultSuiteWarning(runner == null ? null : runner.getClass());
         if (message != null) warn(warnings, message);
-        for (String warning : WorkspaceSeed.writeCaptured(workspace, runner, reseed)) {
-            warn(warnings, warning);
-        }
+        WorkspaceSeed.writeCaptured(workspace, runner, reseed);
     }
 
     private static boolean buildProject(Path project) {
@@ -300,10 +299,6 @@ public final class WorkspaceLaunch {
                 );
             }
             stage(workspace, "seed-fork", "exit=0");
-            for (String line : output.split("\\R")) {
-                String trimmed = line.strip();
-                if (trimmed.startsWith("WARNING:") || trimmed.startsWith("WARN:")) warn(warnings, trimmed);
-            }
         } catch (InterruptedException interrupted) {
             Thread.currentThread().interrupt();
             stage(workspace, "seed-fork", "exit=failed");

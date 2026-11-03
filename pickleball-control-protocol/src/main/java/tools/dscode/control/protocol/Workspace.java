@@ -40,6 +40,8 @@ public final class Workspace {
     public static final String CONFIGS_DIRECTORY = "configs";
     public static final String FINGERPRINT_FIELD = "workspaceFingerprint";
     public static final String CACHE_DIRECTORY = "resolve-cache";
+    /** Bumped when a cached workspace would no longer match a fresh capture. */
+    public static final String CACHE_FORMAT = "2";
     public static final String PARALLEL_AUTO = "auto";
 
     public static final List<String> CONTEXT_KEYS = List.of(
@@ -349,9 +351,28 @@ public final class Workspace {
         if (exists(to)) {
             throw new IllegalStateException("Workspace already exists at " + to + ". Use --reseed to replace it.");
         }
-        writeRunVars(to, readRunVars(from));
+        Map<String, String> values = readRunVars(from);
+        writeRunVars(to, values, literalSensitiveKeys(values));
         copyValueSources(from, to);
         copyConfigs(configsDirectory(from), to);
+    }
+
+    /**
+     * Sensitive values already stored as literals. A copy keeps them.
+     * Re-protecting would turn a runner secret into {@code ${protected:key}}
+     * and drop the value a cache hit has to restore.
+     */
+    public static Set<String> literalSensitiveKeys(Map<String, String> values) {
+        Set<String> keep = new LinkedHashSet<>();
+        if (values == null) return keep;
+        values.forEach((key, value) -> {
+            if (key == null || key.isBlank()) return;
+            String normalized = normalizeKey(key);
+            if (isSensitiveKey(normalized) && value != null && !value.isBlank() && protectedKey(value) == null) {
+                keep.add(normalized);
+            }
+        });
+        return keep;
     }
 
     public static void replaceWorkspace(Path from, Path to) {
@@ -576,8 +597,25 @@ public final class Workspace {
             String classpathFingerprint,
             Map<String, String> inputs
     ) {
+        return cacheKey(propertyFiles, testClassesModifiedMillis, classpathFingerprint, inputs, cacheIdentity());
+    }
+
+    /** Format plus the running build. An older entry hashes to a different key. */
+    public static String cacheIdentity() {
+        return CACHE_FORMAT + "|" + PickleballVersion.running(Workspace.class);
+    }
+
+    public static String cacheKey(
+            Map<String, byte[]> propertyFiles,
+            long testClassesModifiedMillis,
+            String classpathFingerprint,
+            Map<String, String> inputs,
+            String format
+    ) {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            digest.update((format == null ? "" : format).getBytes(StandardCharsets.UTF_8));
+            digest.update(new byte[]{0});
             if (propertyFiles != null) {
                 new TreeMap<>(propertyFiles).forEach((name, bytes) -> {
                     digest.update(name.getBytes(StandardCharsets.UTF_8));

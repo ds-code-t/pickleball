@@ -12,6 +12,7 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -171,6 +172,22 @@ class WorkspaceTest {
         Workspace.restoreCache(project, first, other);
         assertEquals("firefox", Workspace.readRunVars(other).get("pkb_browser"));
         assertThrows(IllegalStateException.class, () -> Workspace.restoreCache(project, first, other));
+    }
+
+    @Test
+    void copyKeepsALiteralRunnerSecret() throws Exception {
+        Path project = temp.resolve("project");
+        Path from = Workspace.directory(project, "run-1");
+        Map<String, String> values = context();
+        values.put("pkb_password", "runner-secret");
+        Workspace.writeRunVars(from, values, java.util.Set.of("pkb_password"));
+        String key = Workspace.cacheKey(Map.of(), 1L, "cp", Map.of());
+        Workspace.storeCache(project, key, from);
+        Path restored = Workspace.directory(project, "run-2");
+        Workspace.restoreCache(project, key, restored);
+        assertEquals("runner-secret", Workspace.readRunVars(restored).get("pkb_password"));
+        assertFalse(Files.readString(Workspace.runvarsFile(restored)).contains("${protected:pkb_password}"));
+        assertNotEquals(key, Workspace.cacheKey(Map.of(), 1L, "cp", Map.of(), "1"));
     }
 
     @Test

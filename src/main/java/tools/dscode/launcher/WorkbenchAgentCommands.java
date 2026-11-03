@@ -329,7 +329,8 @@ public final class WorkbenchAgentCommands {
                 reseed,
                 fromRun,
                 null,
-                path -> WorkspaceLaunch.capture(parsed.project(), path, reseed, err)
+                path -> WorkspaceLaunch.capture(parsed.project(), path, reseed, err),
+                err
         );
         out.println("workspace=" + workspace.toAbsolutePath().normalize());
         out.println("fingerprint=" + Workspace.fingerprint(workspace));
