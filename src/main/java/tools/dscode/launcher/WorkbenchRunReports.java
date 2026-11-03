@@ -41,6 +41,11 @@ public final class WorkbenchRunReports {
     private static final Pattern STEP_SUMMARY = Pattern.compile("(?m)^(\\d+)\\s+Steps?\\b");
     /** Inline summary names. The rest are failedScenariosMore plus query errors. */
     static final int FAILED_SCENARIOS_INLINE_CAP = 10;
+    /**
+     * Worker stdout is routing and wrapper noise. Both launch modes keep it in the
+     * console files. Turning this on still strips {@link WorkbenchConsoleTap#MARKER}.
+     */
+    static final boolean REPLAY_WORKER_STDOUT = false;
 
     private WorkbenchRunReports() {
     }
@@ -116,6 +121,52 @@ public final class WorkbenchRunReports {
         if (more > 0) {
             line.append(" failedScenariosMore=").append(more).append(" query errors");
         }
+    }
+
+    /**
+     * Drops {@code # pkb-console} lines. Other lines stay, in order.
+     * This is the only rule that decides whether a worker line may be shown.
+     */
+    public static String filterConsoleMarkers(String captured) {
+        if (captured == null || captured.isEmpty()) return "";
+        StringBuilder kept = new StringBuilder();
+        String[] lines = captured.split("\\R", -1);
+        int limit = lines.length;
+        if (limit > 0 && lines[limit - 1].isEmpty()) limit--;
+        for (int i = 0; i < limit; i++) {
+            if (lines[i].contains(WorkbenchConsoleTap.MARKER)) continue;
+            kept.append(lines[i]).append('\n');
+        }
+        return kept.toString();
+    }
+
+    /**
+     * The one agent-facing launch report for direct/warm and the wrapper.
+     * The summary is always printed. Quiet drops every other report line.
+     * A launch fault (no usable test result) prints {@code error:} / {@code fix:}.
+     * An ordinary {@code FAILED} does not.
+     */
+    public static void presentLaunch(
+            PrintStream out,
+            PrintStream err,
+            String capturedWorker,
+            boolean quiet,
+            String summary,
+            String consolePointer,
+            String launchFaultCause,
+            String launchFaultFix
+    ) {
+        if (err != null && launchFaultCause != null && !launchFaultCause.isBlank()) {
+            err.print(WorkbenchCliHelp.structured(
+                    launchFaultCause,
+                    launchFaultFix == null ? "" : launchFaultFix
+            ));
+        }
+        if (out == null) return;
+        String worker = filterConsoleMarkers(capturedWorker);
+        if (REPLAY_WORKER_STDOUT && !quiet && !worker.isBlank()) out.print(worker);
+        if (summary != null && !summary.isBlank()) out.println(summary.strip());
+        if (!quiet && consolePointer != null && !consolePointer.isBlank()) out.println(consolePointer);
     }
 
     /**

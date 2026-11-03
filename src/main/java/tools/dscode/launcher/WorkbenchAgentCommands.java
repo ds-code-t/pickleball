@@ -546,8 +546,6 @@ public final class WorkbenchAgentCommands {
                     || AgentCoordination.findRunIndex(parsed.project(), run.runId()) != null);
             Bounded mavenResult;
             if (trustedDirect) {
-                out.print(capturedOut.toString(StandardCharsets.UTF_8));
-                err.print(capturedErr.toString(StandardCharsets.UTF_8));
                 mavenResult = new Bounded(direct.get(), false);
                 launchNote(parsed.project(), run.runId(), "maven-done", "direct exit=" + direct.get());
             } else {
@@ -557,7 +555,7 @@ public final class WorkbenchAgentCommands {
                 launchNote(parsed.project(), run.runId(), "maven-done", "exit=" + mavenResult.exit() + " timedOut=" + mavenResult.timedOut());
             }
             if (mavenResult.timedOut()) {
-                publishQuietly(parsed, run, selection, capturedOut, capturedErr, "TIMEOUT", environment, browser, out, err);
+                publishQuietly(parsed, run, selection, capturedOut, capturedErr, "TIMEOUT", environment, browser, out, err, null);
                 return timeoutExit(parsed, run, out, err);
             }
             int exit = mavenResult.exit();
@@ -565,7 +563,9 @@ public final class WorkbenchAgentCommands {
             Observed observed = observe(parsed.project(), run.runId(), exit, empty, captured(capturedOut, capturedErr));
             String status = observed.status();
             int reported = observed.exitCode();
-            if ("LAUNCH_ERROR".equals(status)) printLaunchError(run.runId(), capturedOut, capturedErr, err, exit, observed.zeroSteps());
+            String[] fault = "LAUNCH_ERROR".equals(status)
+                    ? launchFault(run.runId(), capturedOut, capturedErr, exit, observed.zeroSteps())
+                    : null;
             if (empty) printEmpty(parsed, browser, out, err);
             AgentCoordination.finish(
                     parsed.project(),
@@ -578,7 +578,7 @@ public final class WorkbenchAgentCommands {
                     environment,
                     browser
             );
-            publishQuietly(parsed, run, selection, capturedOut, capturedErr, status, environment, browser, out, err);
+            publishQuietly(parsed, run, selection, capturedOut, capturedErr, status, environment, browser, out, err, fault);
             WorkbenchOneShotLaunch.capture(parsed.project(), err);
             return recordDiscover(parsed, out, err, reported, run.runId());
         } catch (RuntimeException failure) {
@@ -685,8 +685,6 @@ public final class WorkbenchAgentCommands {
                     || AgentCoordination.findRunIndex(parsed.project(), run.runId()) != null);
             Bounded mavenResult;
             if (trustedDirect) {
-                out.print(capturedOut.toString(StandardCharsets.UTF_8));
-                err.print(capturedErr.toString(StandardCharsets.UTF_8));
                 mavenResult = new Bounded(direct.get(), false);
                 launchNote(parsed.project(), run.runId(), "maven-done", "direct exit=" + direct.get());
             } else {
@@ -696,7 +694,7 @@ public final class WorkbenchAgentCommands {
                 launchNote(parsed.project(), run.runId(), "maven-done", "exit=" + mavenResult.exit() + " timedOut=" + mavenResult.timedOut());
             }
             if (mavenResult.timedOut()) {
-                publishQuietly(parsed, run, selection, capturedOut, capturedErr, "TIMEOUT", environment, browser, out, err);
+                publishQuietly(parsed, run, selection, capturedOut, capturedErr, "TIMEOUT", environment, browser, out, err, null);
                 return timeoutExit(parsed, run, out, err);
             }
             int exit = mavenResult.exit();
@@ -704,7 +702,9 @@ public final class WorkbenchAgentCommands {
             Observed observed = observe(parsed.project(), run.runId(), exit, empty, captured(capturedOut, capturedErr));
             String status = observed.status();
             int reported = observed.exitCode();
-            if ("LAUNCH_ERROR".equals(status)) printLaunchError(run.runId(), capturedOut, capturedErr, err, exit, observed.zeroSteps());
+            String[] fault = "LAUNCH_ERROR".equals(status)
+                    ? launchFault(run.runId(), capturedOut, capturedErr, exit, observed.zeroSteps())
+                    : null;
             if (empty) printEmpty(parsed, browser, out, err);
             AgentCoordination.finish(
                     parsed.project(),
@@ -717,7 +717,7 @@ public final class WorkbenchAgentCommands {
                     environment,
                     browser
             );
-            publishQuietly(parsed, run, selection, capturedOut, capturedErr, status, environment, browser, out, err);
+            publishQuietly(parsed, run, selection, capturedOut, capturedErr, status, environment, browser, out, err, fault);
             return printCatalog(parsed.project(), out, err, reported, "workbench-confirm", false, run.runId(), agentId(parsed));
         } catch (RuntimeException failure) {
             finishQuietly(parsed.project(), run.runId(), "FAILED", out);
@@ -1782,11 +1782,13 @@ public final class WorkbenchAgentCommands {
             String environment,
             String browser,
             PrintStream out,
-            PrintStream err
+            PrintStream err,
+            String[] fault
     ) {
         try {
             String console = capturedOut.toString(StandardCharsets.UTF_8) + capturedErr.toString(StandardCharsets.UTF_8);
-            boolean quiet = parsed.quiet();
+            ByteArrayOutputStream summarySink = new ByteArrayOutputStream();
+            PrintStream summaryOut = new PrintStream(summarySink, true, StandardCharsets.UTF_8);
             WorkbenchRunReports.publish(
                     parsed.project(),
                     run.runId(),
@@ -1795,11 +1797,22 @@ public final class WorkbenchAgentCommands {
                     status,
                     environment,
                     browser,
-                    quiet ? null : out
+                    summaryOut
             );
-            if (!quiet && out != null && run.runId() != null && !run.runId().isBlank()) {
-                out.println("console=.pickleball/runs/" + run.runId() + "/console/");
-            }
+            String summary = summarySink.toString(StandardCharsets.UTF_8).strip();
+            String pointer = run.runId() == null || run.runId().isBlank()
+                    ? null
+                    : "console=.pickleball/runs/" + run.runId() + "/console/";
+            WorkbenchRunReports.presentLaunch(
+                    out,
+                    err,
+                    capturedOut.toString(StandardCharsets.UTF_8),
+                    parsed.quiet(),
+                    summary,
+                    pointer,
+                    fault == null ? null : fault[0],
+                    fault == null ? null : fault[1]
+            );
         } catch (Exception failure) {
             err.println("Workbench summary was not written: " + failure.getMessage());
         }
@@ -1832,11 +1845,10 @@ public final class WorkbenchAgentCommands {
         return "RUNNING".equalsIgnoreCase(signal.outcome()) || "IN_PROGRESS".equalsIgnoreCase(signal.outcome());
     }
 
-    private static void printLaunchError(
+    private static String[] launchFault(
             String runId,
             ByteArrayOutputStream capturedOut,
             ByteArrayOutputStream capturedErr,
-            PrintStream err,
             int exit,
             boolean zeroSteps
     ) {
@@ -1847,7 +1859,7 @@ public final class WorkbenchAgentCommands {
                 ? "A before-all hook or launch step failed before any step ran. Read .pickleball/runs/"
                 + runId + "/console/ and fix that hook, then run again."
                 : "Read .pickleball/runs/" + runId + "/console/ and fix the reported cause, then run again.";
-        err.print(WorkbenchCliHelp.structured(cause, fix));
+        return new String[]{cause, fix};
     }
 
     static String launchCause(String captured) {

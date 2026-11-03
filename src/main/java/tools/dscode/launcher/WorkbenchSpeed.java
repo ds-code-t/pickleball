@@ -208,10 +208,6 @@ public final class WorkbenchSpeed {
                 captured.append(line).append(System.lineSeparator());
             }
             if (out != null && captured.length() > 0) out.print(captured);
-            if (exit != 0 && err != null) {
-                err.println("error: warm launch exited " + exit);
-                err.println("fix: rerun with -Dpkb_workbench_speed=sequential to use the wrapper.");
-            }
             return Optional.of(exit);
         } catch (Exception failure) {
             WarmProcess.release(state);
