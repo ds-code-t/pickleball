@@ -147,6 +147,13 @@ class WorkbenchLaunchOutputContractTest {
         assertFalse(capture.out.contains("summary status=LAUNCH_ERROR"), capture.toString());
         if (quiet) {
             assertFalse(capture.out.contains("console=.pickleball/runs/" + runId + "/console/"), capture.toString());
+            for (String line : capture.out.split("\\R")) {
+                if (line.isBlank()) continue;
+                assertTrue(
+                        line.startsWith("summary ") || line.startsWith("error:") || line.startsWith("fix:"),
+                        line
+                );
+            }
         } else {
             assertTrue(capture.out.contains("console=.pickleball/runs/" + runId + "/console/"), capture.toString());
         }

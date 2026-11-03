@@ -273,7 +273,7 @@ public final class WorkbenchApplication {
         Map<String, String> workerProperties;
         try {
             workerProperties = new java.util.LinkedHashMap<>(tools.dscode.workbench.discover.LastDiscoverSnapshot.workerSystemProperties(
-                    parsed.project(), parsed.tags(), parsed.name(), parsed.example(), parsed.runVars(), err
+                    parsed.project(), parsed.tags(), parsed.name(), parsed.example(), parsed.runVars(), err, parsed.runId()
             ));
             workerProperties.put("pkb_run_purpose", "workbench-isolate");
         } catch (RuntimeException failure) {
@@ -326,7 +326,7 @@ public final class WorkbenchApplication {
         Map<String, String> workerProperties;
         try {
             workerProperties = new LinkedHashMap<>(tools.dscode.workbench.discover.LastDiscoverSnapshot.workerSystemProperties(
-                    parsed.project(), parsed.tags(), parsed.name(), parsed.example(), parsed.runVars(), err
+                    parsed.project(), parsed.tags(), parsed.name(), parsed.example(), parsed.runVars(), err, parsed.runId()
             ));
         } catch (RuntimeException failure) {
             err.println(failure.getMessage());

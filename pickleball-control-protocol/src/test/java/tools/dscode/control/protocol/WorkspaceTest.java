@@ -216,6 +216,20 @@ class WorkspaceTest {
         assertEquals("QA", Workspace.readRunVars(workspace).get("pkb_environment"));
     }
 
+    @Test
+    void forRunIdUsesTheRequestedRunOrTheSnapshotRun() throws Exception {
+        Path requested = Workspace.forRunId(temp, "alpha");
+        assertEquals(Workspace.directory(temp, "alpha").toAbsolutePath().normalize(), requested);
+
+        IllegalStateException missing = assertThrows(IllegalStateException.class, () -> Workspace.forRunId(temp, " "));
+        assertTrue(missing.getMessage().contains("no prior Discover snapshot"), missing.getMessage());
+
+        Path snapshot = PickleballLocalLayout.lastDiscoverSnapshot(temp);
+        Files.createDirectories(snapshot.getParent());
+        Files.writeString(snapshot, "{\"runId\":\"beta\"}\n", StandardCharsets.UTF_8);
+        assertEquals(Workspace.directory(temp, "beta").toAbsolutePath().normalize(), Workspace.forRunId(temp, null));
+    }
+
     private static Map<String, String> context() {
         Map<String, String> values = new LinkedHashMap<>();
         values.put("pkb_glue", "com.example");

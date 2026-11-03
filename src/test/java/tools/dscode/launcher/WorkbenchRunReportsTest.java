@@ -243,6 +243,33 @@ class WorkbenchRunReportsTest {
     }
 
     @Test
+    void summaryLineRendersAFileUriAsAProjectRelativePath() throws Exception {
+        Path project = tempDir.resolve("located file");
+        String runId = "run-file-uri";
+        Path fail = AgentCoordination.runDirectory(project, runId)
+                .resolve("diagnostic").resolve(runId).resolve("scenarios").resolve("bad");
+        Files.createDirectories(fail);
+        Path feature = project.resolve("src/test/resources/features/shop.feature");
+        String uri = feature.toUri().toString();
+        assertTrue(uri.contains("%20"), uri);
+        assertTrue(uri.startsWith("file:"), uri);
+        Files.writeString(fail.resolve("summary.json"),
+                "{\"outcome\":\"FAILED\",\"identity\":{\"scenarioName\":\"Bad case\",\"featureUri\":\""
+                        + uri
+                        + "\",\"scenarioLine\":12,\"exampleLine\":40},\"steps\":{\"executed\":1,\"failed\":1}}");
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        WorkbenchRunReports.publish(
+                project, runId, List.of(), "", "FAILED",
+                new PrintStream(out, true, StandardCharsets.UTF_8)
+        );
+        String text = out.toString(StandardCharsets.UTF_8);
+        assertTrue(text.contains(
+                "failedScenarios=[\"Bad case src/test/resources/features/shop.feature:12 example 40\"]"
+        ), text);
+        assertFalse(text.contains("file:"), text);
+    }
+
+    @Test
     void summaryLineCapsTheFailedScenarioArray() throws Exception {
         List<String> names = new ArrayList<>();
         names.add("Case, \"quoted\"");

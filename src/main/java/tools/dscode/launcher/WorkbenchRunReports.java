@@ -10,6 +10,7 @@ import tools.dscode.control.protocol.WorkbenchFeatureIndex;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.PrintStream;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -266,7 +267,7 @@ public final class WorkbenchRunReports {
                 int[] counted = passFail(bodies);
                 passed = counted[0];
                 failed = counted[1];
-                failedNames = failedScenarioNames(bodies);
+                failedNames = failedScenarioNames(project, bodies);
             }
             out.println(compact(status, scenarios, steps, environment, browser, passed, failed, failedNames));
         }
@@ -285,20 +286,20 @@ public final class WorkbenchRunReports {
         return new int[]{passed, failed};
     }
 
-    private static List<String> failedScenarioNames(List<Map<String, Object>> bodies) {
+    private static List<String> failedScenarioNames(Path project, List<Map<String, Object>> bodies) {
         List<String> names = new ArrayList<>();
         if (bodies == null) return names;
         for (Map<String, Object> body : bodies) {
             if (!isFailedStatus(scenarioStatus(body))) continue;
             String name = text(body.get("scenario"));
-            if (!name.isBlank()) names.add(scenarioLabel(name, body));
+            if (!name.isBlank()) names.add(scenarioLabel(project, name, body));
         }
         return names;
     }
 
-    /** Name, then `path:line` and `example <line>` when the identity recorded them. */
-    private static String scenarioLabel(String name, Map<String, Object> body) {
-        String uri = text(body.get("featureUri")).replace('\\', '/');
+    /** Name, then project-relative {@code path:line} and {@code example <line>} when the identity recorded them. */
+    private static String scenarioLabel(Path project, String name, Map<String, Object> body) {
+        String uri = projectRelative(project, text(body.get("featureUri")));
         Long line = positiveLine(body.get("scenarioLine"));
         Long example = positiveLine(body.get("exampleLine"));
         StringBuilder label = new StringBuilder(name);
@@ -308,6 +309,44 @@ public final class WorkbenchRunReports {
         }
         if (example != null) label.append(" example ").append(example);
         return label.toString();
+    }
+
+    /** Display only. Does not change {@code ScenarioIdentity.canonicalSourceUri}. */
+    static String projectRelative(Path project, String raw) {
+        if (raw == null || raw.isBlank()) return "";
+        String text = raw.trim();
+        try {
+            if (text.regionMatches(true, 0, "file:", 0, 5)) {
+                return relativize(project, Path.of(URI.create(text)));
+            }
+        } catch (RuntimeException ignored) {
+            // A broken file URI falls through to the raw text with the scheme removed below.
+        }
+        if (text.regionMatches(true, 0, "classpath:", 0, 10)) {
+            String rest = text.substring("classpath:".length()).replace('\\', '/');
+            while (rest.startsWith("/")) rest = rest.substring(1);
+            if (rest.startsWith("src/")) return rest;
+            return "src/test/resources/" + rest;
+        }
+        String slashed = text.replace('\\', '/');
+        try {
+            Path path = Path.of(text);
+            if (path.isAbsolute()) return relativize(project, path);
+        } catch (RuntimeException ignored) {
+            return slashed;
+        }
+        return slashed;
+    }
+
+    private static String relativize(Path project, Path path) {
+        Path absolute = path.toAbsolutePath().normalize();
+        String shown = absolute.toString().replace('\\', '/');
+        if (project == null) return shown;
+        Path base = project.toAbsolutePath().normalize();
+        if (absolute.startsWith(base)) {
+            return base.relativize(absolute).toString().replace('\\', '/');
+        }
+        return shown;
     }
 
     private static Long positiveLine(Object value) {

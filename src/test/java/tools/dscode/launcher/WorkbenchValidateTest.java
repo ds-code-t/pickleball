@@ -110,5 +110,124 @@ class WorkbenchValidateTest {
         assertFalse(out.contains("missing " + (steps - 1)), out);
         long undefined = out.lines().filter(line -> line.startsWith("undefined:")).count();
         assertEquals(WorkbenchValidate.STEP_CAP, undefined, out);
+        assertTrue(out.contains("skipped=0"), out);
+    }
+
+    @Test
+    void regexGlueWithQuotesAndDigitsIsDefined() throws Exception {
+        Path feature = project.resolve("src/test/resources/features/regex.feature");
+        Files.createDirectories(feature.getParent());
+        Files.writeString(feature, """
+                Feature: Regex
+                  Scenario: Rows
+                    Given VERIFY DATA ADDRESS "addr" HAS DATA TABLE WITH 2 DATA ROWS
+                """);
+        Path glue = project.resolve("src/test/java/com/example/DataSteps.java");
+        Files.createDirectories(glue.getParent());
+        String annotation = "@Given(\"^VERIFY DATA ADDRESS \\\"([^\\\"]+)\\\" HAS DATA TABLE WITH (\\\\d+) DATA ROWS$\")";
+        Files.writeString(glue, "package com.example;\npublic class DataSteps {\n  " + annotation + "\n  void rows(String address, int count) {}\n}\n");
+        String source = Files.readString(glue);
+        assertTrue(source.contains("(\\\\d+)"), source);
+        ByteArrayOutputStream stdout = new ByteArrayOutputStream();
+        int code = WorkbenchValidate.run(project, null, null, new PrintStream(stdout, true, StandardCharsets.UTF_8), new PrintStream(new ByteArrayOutputStream()));
+        String out = stdout.toString(StandardCharsets.UTF_8);
+        assertEquals(0, code, out);
+        assertTrue(out.contains("undefined=0"), out);
+        assertFalse(out.contains("undefined:"), out);
+    }
+
+    @Test
+    void runIdUsesThatWorkspacesGlueAndBlankGlueDefinesNothing() throws Exception {
+        Path feature = project.resolve("src/test/resources/features/report7-regex.feature");
+        Files.createDirectories(feature.getParent());
+        Files.writeString(feature, """
+                @report7-regex
+                Feature: Report
+                  Scenario: Both
+                    Given report seven cucumber 3
+                    Given VERIFY DATA ADDRESS "addr" HAS DATA TABLE WITH 2 DATA ROWS
+                """);
+        Path glue = project.resolve("src/test/java/com/example/report7glue/Report7Steps.java");
+        Files.createDirectories(glue.getParent());
+        String annotation = "@Given(\"^VERIFY DATA ADDRESS \\\"([^\\\"]+)\\\" HAS DATA TABLE WITH (\\\\d+) DATA ROWS$\")";
+        Files.writeString(glue, """
+                package com.example.report7glue;
+                public class Report7Steps {
+                  @Given("report seven cucumber {int}")
+                  void cucumber(int count) {}
+                """ + "  " + annotation + "\n  void rows(String address, int count) {}\n}\n");
+        Path other = project.resolve("src/test/java/com/example/pickleball/OtherSteps.java");
+        Files.createDirectories(other.getParent());
+        Files.writeString(other, """
+                package com.example.pickleball;
+                public class OtherSteps {
+                  @Given("report seven cucumber {int}")
+                  void cucumber(int count) {}
+                }
+                """);
+        tools.dscode.control.protocol.Workspace.writeRunVars(
+                tools.dscode.control.protocol.Workspace.directory(project, "run-a"),
+                java.util.Map.of("pkb_glue", "com.example.report7glue")
+        );
+        tools.dscode.control.protocol.Workspace.writeRunVars(
+                tools.dscode.control.protocol.Workspace.directory(project, "run-c"),
+                java.util.Map.of("pkb_glue", "")
+        );
+        ByteArrayOutputStream definedOut = new ByteArrayOutputStream();
+        int defined = WorkbenchValidate.run(
+                project, "@report7-regex", null, "run-a", null, false,
+                new PrintStream(definedOut, true, StandardCharsets.UTF_8),
+                new PrintStream(new ByteArrayOutputStream())
+        );
+        String definedText = definedOut.toString(StandardCharsets.UTF_8);
+        assertEquals(0, defined, definedText);
+        assertTrue(definedText.contains("runs/run-a/workspace") || definedText.replace('\\', '/').contains("runs/run-a/workspace"), definedText);
+        assertTrue(definedText.contains("undefined=0"), definedText);
+
+        ByteArrayOutputStream blankOut = new ByteArrayOutputStream();
+        int blank = WorkbenchValidate.run(
+                project, "@report7-regex", null, "run-c", null, false,
+                new PrintStream(blankOut, true, StandardCharsets.UTF_8),
+                new PrintStream(new ByteArrayOutputStream())
+        );
+        String blankText = blankOut.toString(StandardCharsets.UTF_8);
+        assertEquals(1, blank, blankText);
+        assertTrue(blankText.contains("VERIFY DATA ADDRESS"), blankText);
+        assertTrue(blankText.contains("report seven cucumber"), blankText);
+    }
+
+    @Test
+    void maxStepsReportsSkippedScenariosAndAllWins() throws Exception {
+        Path feature = project.resolve("src/test/resources/features/cap.feature");
+        Files.createDirectories(feature.getParent());
+        Files.writeString(feature, """
+                @cap
+                Feature: Cap
+                  Scenario: Lots
+                    Given missing one
+                    Given missing two
+                    Given missing three
+                  Scenario: Later one
+                    Given missing later-1
+                  Scenario: Later two
+                    Given missing later-2
+                """);
+        ByteArrayOutputStream cappedOut = new ByteArrayOutputStream();
+        WorkbenchValidate.run(project, "@cap", null, null, 1, false,
+                new PrintStream(cappedOut, true, StandardCharsets.UTF_8),
+                new PrintStream(new ByteArrayOutputStream()));
+        String capped = cappedOut.toString(StandardCharsets.UTF_8);
+        assertTrue(capped.contains("capped=true"), capped);
+        assertTrue(capped.contains("skipped=2"), capped);
+        assertFalse(capped.contains("later-2"), capped);
+
+        ByteArrayOutputStream allOut = new ByteArrayOutputStream();
+        WorkbenchValidate.run(project, "@cap", null, null, 1, true,
+                new PrintStream(allOut, true, StandardCharsets.UTF_8),
+                new PrintStream(new ByteArrayOutputStream()));
+        String all = allOut.toString(StandardCharsets.UTF_8);
+        assertTrue(all.contains("capped=false"), all);
+        assertTrue(all.contains("skipped=0"), all);
+        assertTrue(all.contains("later-2"), all);
     }
 }

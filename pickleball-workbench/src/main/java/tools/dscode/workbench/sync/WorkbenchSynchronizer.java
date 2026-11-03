@@ -55,6 +55,8 @@ public final class WorkbenchSynchronizer {
     }
 
     public WorkbenchManifest sync(Path requestedProject) {
+        WorkbenchManifest reused = trySkipUnchanged(requestedProject);
+        if (reused != null) return reused;
         try {
             WorkbenchManifest cached = syncFromClasspathCache(requestedProject);
             if (cached != null) return cached;
@@ -190,6 +192,28 @@ public final class WorkbenchSynchronizer {
         replaceFile(stagedManifest, stateRoot.resolve("manifest.json"));
         replaceFile(stagedClasspath, stateRoot.resolve(PickleballLocalLayout.WORKER_CLASSPATH_FILE));
         return manifest;
+    }
+
+    /**
+     * When the previous manifest, live classes, and cheap input fingerprints still match,
+     * do not materialize or hash jars. The first sync after a fingerprint change still
+     * materializes once and stores the cheap hash.
+     */
+    private WorkbenchManifest trySkipUnchanged(Path requestedProject) {
+        try {
+            WorkbenchProject project = WorkbenchProject.locate(requestedProject);
+            Path stateRoot = WorkbenchManifest.workbenchRoot(project.root());
+            WorkbenchManifest previous = WorkbenchManifest.readIfPresent(stateRoot);
+            if (previous == null) return null;
+            if (!WorkbenchSyncInputs.snapshotReady(stateRoot)) return null;
+            if (!WorkbenchSyncInputs.compiledOutputsPresent(previous)) return null;
+            WorkbenchSyncInputs inputs = WorkbenchSyncInputs.capture(project, previous);
+            if (WorkbenchSyncPlanner.decide(previous, inputs, true) != WorkbenchSyncMode.SKIPPED) return null;
+            progress("classpath-cache");
+            return skip(previous, inputs, stateRoot);
+        } catch (RuntimeException ignored) {
+            return null;
+        }
     }
 
     /**

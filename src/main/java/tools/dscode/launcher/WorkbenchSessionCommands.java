@@ -452,6 +452,26 @@ public final class WorkbenchSessionCommands {
         return null;
     }
 
+    private static void truncateSessionLog(Path logFile) {
+        if (logFile == null) return;
+        try {
+            Path parent = logFile.getParent();
+            if (parent != null) Files.createDirectories(parent);
+            Files.writeString(
+                    logFile,
+                    "",
+                    StandardCharsets.UTF_8,
+                    java.nio.file.StandardOpenOption.CREATE,
+                    java.nio.file.StandardOpenOption.TRUNCATE_EXISTING,
+                    java.nio.file.StandardOpenOption.WRITE
+            );
+            Path progress = parent == null ? null : parent.resolve(SessionHealthWait.PROGRESS_FILE);
+            if (progress != null) Files.deleteIfExists(progress);
+        } catch (IOException failure) {
+            throw new IllegalStateException("Could not truncate " + logFile, failure);
+        }
+    }
+
     /**
      * The forked controller does not inherit launcher {@code -D} properties.
      * Pass the outer timeout the health wait already resolved. The worker
@@ -508,6 +528,8 @@ public final class WorkbenchSessionCommands {
         }
 
         Path logFile = run.sessionDirectory().resolve("session.log");
+        truncateSessionLog(logFile);
+        Map<Path, Long> logBaseline = SessionHealthWait.baselineSizes(project, logFile);
         Path sessionFile = requestedSessionFile(project, flags, run);
         Process process;
         try {
@@ -543,7 +565,8 @@ public final class WorkbenchSessionCommands {
                 err,
                 SessionHealthWait.timeout(Map.of()),
                 SessionHealthWait.progressEvery(),
-                POLL
+                POLL,
+                logBaseline
         );
         if (outcome.kind() == SessionHealthWait.Kind.HEALTHY && found[0] != null) {
             SessionState state = found[0];
@@ -1471,8 +1494,8 @@ public final class WorkbenchSessionCommands {
     }
 
     /**
-     * A step is running only while a {@code BEFORE_STEP} is open or a session
-     * command is in flight. A bare {@code RUNNING} mark is not a step.
+     * A step is running only while a session command is in flight.
+     * An open {@code BEFORE_STEP} with nothing queued is idle: isolate parks there.
      */
     static Timing timingOf(JsonNode events, Instant runStarted, Instant now, boolean commandInFlight) {
         Instant clock = now == null ? Instant.now() : now;
@@ -1492,12 +1515,7 @@ public final class WorkbenchSessionCommands {
             if (mark.step && mark.at != null) stepAt = mark.at;
         }
         long stepMs = stepAt == null ? 0 : Math.max(0, Duration.between(stepAt, clock).toMillis());
-        boolean openStep = false;
-        for (Mark mark : marks) {
-            if (mark.opens) openStep = true;
-            if (mark.closes) openStep = false;
-        }
-        boolean running = openStep || commandInFlight;
+        boolean running = commandInFlight;
         return new Timing(runMs, stepMs, running);
     }
 

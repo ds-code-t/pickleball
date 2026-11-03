@@ -14,7 +14,8 @@ final class WorkbenchCliFlags {
             "--run-id", "--agent", "--agent-id", "--group", "--sequence",
             "--who", "--why", "--learned", "--text", "--to", "--from", "--limit",
             "--write", "--list", "--take", "--touch", "--sweep", "--renew", "--append",
-            "--id", "--version", "--ttl", "--step-timeout", "--run-timeout", "--quiet"
+            "--id", "--version", "--ttl", "--step-timeout", "--run-timeout", "--quiet",
+            "--max-steps", "--all"
     );
 
     static final List<String> AGENT = List.of(

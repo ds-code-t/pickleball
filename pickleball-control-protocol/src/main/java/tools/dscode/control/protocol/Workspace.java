@@ -43,6 +43,13 @@ public final class Workspace {
     /** Bumped when a cached workspace would no longer match a fresh capture. */
     public static final String CACHE_FORMAT = "2";
     public static final String PARALLEL_AUTO = "auto";
+    /**
+     * Thrown when a launch has no run id and no Discover snapshot to borrow one from.
+     * Isolate and validate share this sentence.
+     */
+    public static final String NO_DISCOVER_SNAPSHOT =
+            "Workbench CLI isolate failed: no prior Discover snapshot. "
+                    + "Run Workbench discover first. Isolate will not silently re-resolve from project defaults.";
 
     public static final List<String> CONTEXT_KEYS = List.of(
             "pkb_glue",
@@ -115,6 +122,40 @@ public final class Workspace {
 
     public static Path directory(Path project, String runId) {
         return RunView.runDirectory(project, runId).resolve(DIRECTORY);
+    }
+
+    /**
+     * Workspace directory for {@code runId}. A blank id uses the shared Discover
+     * snapshot's run id. The directory is returned even when {@code runvars.properties}
+     * has not been written; callers that need the file use {@link #exists}.
+     */
+    public static Path forRunId(Path project, String runId) {
+        if (project == null) throw new IllegalArgumentException("A project is required.");
+        if (runId != null && !runId.isBlank()) {
+            return directory(project, runId.trim()).toAbsolutePath().normalize();
+        }
+        Path snapshot = PickleballLocalLayout.lastDiscoverSnapshot(project);
+        if (!Files.isRegularFile(snapshot)) {
+            throw new IllegalStateException(NO_DISCOVER_SNAPSHOT);
+        }
+        String fromSnapshot = snapshotRunId(snapshot);
+        if (fromSnapshot == null) {
+            throw new IllegalStateException("Discover snapshot has no run id, so there is no workspace to launch.");
+        }
+        return directory(project, fromSnapshot).toAbsolutePath().normalize();
+    }
+
+    private static final Pattern SNAPSHOT_RUN_ID = Pattern.compile("\"runId\"\\s*:\\s*\"([^\"]*)\"");
+
+    private static String snapshotRunId(Path snapshot) {
+        try {
+            Matcher matcher = SNAPSHOT_RUN_ID.matcher(Files.readString(snapshot, StandardCharsets.UTF_8));
+            if (!matcher.find()) return null;
+            String id = matcher.group(1).trim();
+            return id.isEmpty() ? null : id;
+        } catch (IOException failure) {
+            return null;
+        }
     }
 
     public static Path runvarsFile(Path workspace) {

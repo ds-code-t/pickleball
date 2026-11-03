@@ -578,6 +578,24 @@ class WorkbenchSynchronizerTest {
                 < text.indexOf("progress stage=index-end"), text);
     }
 
+    @Test
+    void secondSyncSkipsUnchangedClassesWithoutMaven() throws Exception {
+        Path project = consumerProject("warm-skip");
+        storeDiscoverCache(project, List.of(project.resolve("target/test-classes").toString()));
+        assertEquals(0, syncWithoutMaven(project));
+        ByteArrayOutputStream err = new ByteArrayOutputStream();
+        PrintStream previous = System.err;
+        System.setErr(new PrintStream(err, true, StandardCharsets.UTF_8));
+        try {
+            assertEquals(0, syncWithoutMaven(project));
+        } finally {
+            System.setErr(previous);
+        }
+        String text = err.toString(StandardCharsets.UTF_8);
+        assertTrue(text.contains("progress stage=classpath-cache"), text);
+        assertTrue(Files.isRegularFile(WorkbenchManifest.workbenchRoot(project).resolve("live/classes/Runner.class")));
+    }
+
     private Path consumerProject(String name) throws IOException {
         Path project = tempDir.resolve(name);
         Files.createDirectories(project.resolve("target/test-classes"));

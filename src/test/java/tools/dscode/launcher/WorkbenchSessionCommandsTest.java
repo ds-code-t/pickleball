@@ -1339,8 +1339,8 @@ class WorkbenchSessionCommandsTest {
                     }
             );
             assertEquals(0, running.exitCode, running.stderr + running.stdout);
-            assertFalse(running.stdout.contains("elapsed-step-ms=idle"), running.stdout);
-            assertTrue(running.stdout.contains("elapsed-step-ms="), running.stdout);
+            assertTrue(running.stdout.contains("status=idle"), running.stdout);
+            assertTrue(running.stdout.contains("elapsed-step-ms=idle"), running.stdout);
         }
     }
 

@@ -4,6 +4,7 @@ import io.cucumber.cucumberexpressions.Expression;
 import io.cucumber.cucumberexpressions.ExpressionFactory;
 import io.cucumber.cucumberexpressions.ParameterTypeRegistry;
 import tools.dscode.control.protocol.WorkbenchFeatureIndex;
+import tools.dscode.control.protocol.Workspace;
 
 import java.io.IOException;
 import java.io.PrintStream;
@@ -48,9 +49,9 @@ public final class WorkbenchValidate {
     private static final Pattern STEP = Pattern.compile(
             "^\\s*(?::+\\s*)?(?:Given|When|Then|And|But|\\*)\\s+(.*)$"
     );
-    private static final Pattern ANNOTATION = Pattern.compile(
-            "@(?:Given|When|Then|And|But)\\s*\\(\\s*([\"'])(.*?)\\1",
-            Pattern.DOTALL
+    /** Head of a step annotation, including an optional {@code value =}. The pattern itself is read as Java string literals. */
+    private static final Pattern ANNOTATION_HEAD = Pattern.compile(
+            "@(?:Given|When|Then|And|But)\\s*\\(\\s*(?:value\\s*=\\s*)?"
     );
     private static final Pattern RUN_TARGET = Pattern.compile(
             "^RUN SCENARIOS?\\s*:\\s*(.+)$"
@@ -63,13 +64,32 @@ public final class WorkbenchValidate {
     }
 
     public static int run(Path project, String tags, String name, PrintStream out, PrintStream err) {
+        return run(project, tags, name, null, null, false, out, err);
+    }
+
+    /**
+     * @param runId when set, glue comes only from that workspace's {@code pkb_glue}
+     *              (blank means no consumer patterns; core steps still match)
+     * @param maxSteps step budget; null keeps {@link #STEP_CAP}
+     * @param allSteps when true, there is no step cap ({@code --all} wins over {@code maxSteps})
+     */
+    public static int run(
+            Path project,
+            String tags,
+            String name,
+            String runId,
+            Integer maxSteps,
+            boolean allSteps,
+            PrintStream out,
+            PrintStream err
+    ) {
         if (project == null || !Files.isDirectory(project)) {
             if (err != null) err.print(WorkbenchCliHelp.usageError("missing project", "validate"));
             return 2;
         }
         long started = System.nanoTime();
         if (out != null) out.println("validate progress stage=glue");
-        List<String> glue = gluePatterns(project);
+        List<String> glue = glueFor(project, runId, out);
         WorkbenchFeatureIndex.Selection all = WorkbenchFeatureIndex.select(new WorkbenchFeatureIndex.Request(
                 project, List.of(), null, null, null, List.of(), false
         ));
@@ -79,7 +99,8 @@ public final class WorkbenchValidate {
                         project, List.of(), tags, name, null, List.of(), false))
                 : all;
         List<Finding> findings = new ArrayList<>();
-        Budget budget = new Budget();
+        int limit = allSteps ? Integer.MAX_VALUE : (maxSteps != null && maxSteps > 0 ? maxSteps : STEP_CAP);
+        Budget budget = new Budget(limit);
         if (out != null) progress(out, budget);
         for (WorkbenchFeatureIndex.Hit hit : selection.hits()) {
             if (budget.capped) break;
@@ -98,9 +119,10 @@ public final class WorkbenchValidate {
         int undefined = count(findings, "undefined");
         int ambiguous = count(findings, "ambiguous");
         int unresolved = count(findings, "unresolved");
+        int skipped = Math.max(0, selection.hits().size() - budget.scenarios);
         if (out != null) {
             if (budget.capped) {
-                out.println("fix: narrow validate with --tags or --name");
+                out.println("fix: narrow validate with --tags or --name, or pass --max-steps / --all");
             }
             for (Finding finding : findings) {
                 out.println(finding.kind() + ": " + finding.where() + " " + finding.text());
@@ -109,9 +131,22 @@ public final class WorkbenchValidate {
                     + " ambiguous=" + ambiguous
                     + " unresolved=" + unresolved
                     + " elapsedMs=" + elapsed
-                    + " capped=" + budget.capped);
+                    + " capped=" + budget.capped
+                    + " skipped=" + skipped);
         }
         return undefined + ambiguous + unresolved == 0 ? 0 : 1;
+    }
+
+    private static List<String> glueFor(Path project, String runId, PrintStream out) {
+        if (runId == null || runId.isBlank()) return gluePatterns(project);
+        Path workspace = Workspace.directory(project, runId.trim()).toAbsolutePath().normalize();
+        if (out != null) out.println("workspace=" + workspace);
+        String packages = "";
+        if (Workspace.exists(workspace)) {
+            String stored = Workspace.readRunVars(workspace).get("pkb_glue");
+            packages = stored == null ? "" : stored;
+        }
+        return gluePatternsForPackages(project, packages);
     }
 
     private static List<Finding> scanTree(
@@ -392,9 +427,27 @@ public final class WorkbenchValidate {
     }
 
     private static List<String> gluePatterns(Path project) {
+        return readJavaGlue(List.of(project.resolve("src/test/java"), project.resolve("src/main/java")));
+    }
+
+    /** Blank or missing packages contribute no consumer patterns. Subpackages are included. */
+    private static List<String> gluePatternsForPackages(Path project, String packages) {
+        if (packages == null || packages.isBlank()) return List.of();
+        List<Path> roots = new ArrayList<>();
+        for (String raw : packages.split(",")) {
+            String pkg = raw.trim();
+            if (pkg.isEmpty()) continue;
+            Path relative = Path.of(pkg.replace('.', '/'));
+            roots.add(project.resolve("src/test/java").resolve(relative));
+            roots.add(project.resolve("src/main/java").resolve(relative));
+        }
+        return readJavaGlue(roots);
+    }
+
+    private static List<String> readJavaGlue(List<Path> roots) {
         List<String> patterns = new ArrayList<>();
-        for (Path root : List.of(project.resolve("src/test/java"), project.resolve("src/main/java"))) {
-            if (!Files.isDirectory(root)) continue;
+        for (Path root : roots) {
+            if (root == null || !Files.isDirectory(root)) continue;
             try (Stream<Path> walk = Files.walk(root)) {
                 walk.filter(path -> path.toString().endsWith(".java")).forEach(file -> patterns.addAll(readGlue(file)));
             } catch (IOException ignored) {
@@ -407,12 +460,82 @@ public final class WorkbenchValidate {
     private static List<String> readGlue(Path file) {
         List<String> patterns = new ArrayList<>();
         try {
-            Matcher annotations = ANNOTATION.matcher(Files.readString(file, StandardCharsets.UTF_8));
-            while (annotations.find()) patterns.add(annotations.group(2));
+            String text = Files.readString(file, StandardCharsets.UTF_8);
+            Matcher annotations = ANNOTATION_HEAD.matcher(text);
+            while (annotations.find()) {
+                String pattern = readAnnotationValue(text, annotations.end());
+                if (pattern != null && !pattern.isBlank()) patterns.add(pattern);
+            }
         } catch (IOException ignored) {
             return List.of();
         }
         return patterns;
+    }
+
+    /** Java string literals joined by {@code +}. A non-literal (a constant) skips the annotation. */
+    static String readAnnotationValue(String text, int index) {
+        if (text == null) return null;
+        StringBuilder joined = new StringBuilder();
+        boolean any = false;
+        int cursor = index;
+        while (cursor < text.length()) {
+            while (cursor < text.length() && Character.isWhitespace(text.charAt(cursor))) cursor++;
+            if (cursor >= text.length()) return null;
+            char current = text.charAt(cursor);
+            if (current == ')') return any ? joined.toString() : null;
+            if (current != '"' && current != '\'') return null;
+            JavaLiteral literal = readJavaLiteral(text, cursor);
+            if (literal == null) return null;
+            joined.append(literal.value);
+            any = true;
+            cursor = literal.end;
+            while (cursor < text.length() && Character.isWhitespace(text.charAt(cursor))) cursor++;
+            if (cursor < text.length() && text.charAt(cursor) == '+') {
+                cursor++;
+                continue;
+            }
+            if (cursor < text.length() && text.charAt(cursor) == ')') return joined.toString();
+            return null;
+        }
+        return null;
+    }
+
+    private record JavaLiteral(String value, int end) {
+    }
+
+    private static JavaLiteral readJavaLiteral(String text, int start) {
+        char quote = text.charAt(start);
+        StringBuilder value = new StringBuilder();
+        for (int i = start + 1; i < text.length(); i++) {
+            char current = text.charAt(i);
+            if (current == '\\') {
+                if (i + 1 >= text.length()) return null;
+                char escaped = text.charAt(++i);
+                switch (escaped) {
+                    case 'n' -> value.append('\n');
+                    case 't' -> value.append('\t');
+                    case 'r' -> value.append('\r');
+                    case 'b' -> value.append('\b');
+                    case 'f' -> value.append('\f');
+                    case '\\', '"', '\'' -> value.append(escaped);
+                    case 'u' -> {
+                        if (i + 4 >= text.length()) return null;
+                        try {
+                            value.append((char) Integer.parseInt(text.substring(i + 1, i + 5), 16));
+                        } catch (NumberFormatException failure) {
+                            return null;
+                        }
+                        i += 4;
+                    }
+                    default -> value.append(escaped);
+                }
+                continue;
+            }
+            if (current == quote) return new JavaLiteral(value.toString(), i + 1);
+            if (current == '\n' || current == '\r') return null;
+            value.append(current);
+        }
+        return null;
     }
 
     private static void addFindings(List<Finding> into, List<Finding> more) {
@@ -434,12 +557,17 @@ public final class WorkbenchValidate {
     }
 
     private static final class Budget {
+        private final int limit;
         private int steps;
         private int scenarios;
         private boolean capped;
 
+        private Budget(int limit) {
+            this.limit = limit;
+        }
+
         private boolean tick(PrintStream progress) {
-            if (capped || steps >= STEP_CAP) {
+            if (capped || steps >= limit) {
                 capped = true;
                 return false;
             }

@@ -921,9 +921,16 @@ def _report7_body(timings: list[dict], results: list[dict]) -> None:
     ], 900)
     fail_text = (failed.stdout or "") + "\n" + (failed.stderr or "")
     relative = "src/test/resources/features/workbench-cli-fail.feature:4"
+    # The symptom is the failedScenarios value, not the whole transcript.
+    # "retained pkb_run_profile:" contains the letters "file:" and is not a URI.
+    scenario_text = "\n".join(
+        line for line in fail_text.splitlines() if "failedScenarios=" in line
+    )
     _report7_note(
         results, "9-failed-scenarios",
-        failed.returncode != 0 and relative in fail_text and "file:" not in fail_text,
+        failed.returncode != 0
+        and relative in scenario_text
+        and "file:" not in scenario_text,
         _snippet(fail_text, "failedScenarios"),
     )
 
