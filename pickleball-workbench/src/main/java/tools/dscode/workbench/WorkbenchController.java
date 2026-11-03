@@ -309,6 +309,16 @@ public final class WorkbenchController implements WorkbenchServices {
     }
 
     @Override
+    public String sessionRunId() {
+        return live.sessionRunId();
+    }
+
+    @Override
+    public void noteSessionState(SessionDescriptor.State state) {
+        live.noteSessionState(state);
+    }
+
+    @Override
     public Optional<WorkerLogFiles> workerLogFiles() {
         return live.workerLogFiles();
     }

@@ -32,6 +32,7 @@ import tools.dscode.common.treeparsing.parsedComponents.DataElementMatch;
 import tools.dscode.common.treeparsing.parsedComponents.ElementMatch;
 import tools.dscode.common.treeparsing.parsedComponents.PhraseData;
 
+import tools.dscode.common.resources.PathLists;
 import tools.dscode.common.resources.ResourceLocations;
 import tools.dscode.control.protocol.PickleballPaths;
 
@@ -86,10 +87,64 @@ public class ParsingMap extends MappingProcessor {
     public static final String CHROME_HEADLESS_CONFIG_KEY = "CHROME_HEADLESS";
 
     public static synchronized void initializeConfigs(String configuredPath) {
+        if (configuredPath != null && configuredPath.indexOf(',') >= 0) {
+            java.util.List<String> paths = PathLists.split(configuredPath);
+            if (paths.isEmpty()) {
+                installLoaded(loadConfigs(DEFAULT_CONFIG_PATH, ResourceLocations.workingDirectory()));
+                return;
+            }
+            if (paths.size() == 1) {
+                installLoaded(loadConfigs(paths.getFirst(), ResourceLocations.workingDirectory()));
+                return;
+            }
+            installLoaded(loadMergedConfigs(paths));
+            return;
+        }
         String path = configuredPath == null || configuredPath.isBlank()
                 ? DEFAULT_CONFIG_PATH
                 : configuredPath.trim();
-        JsonNode configsNode = loadConfigs(path, ResourceLocations.workingDirectory());
+        installLoaded(loadConfigs(path, ResourceLocations.workingDirectory()));
+    }
+
+    /**
+     * Deep-merges config trees left to right. A later object leaf replaces an
+     * earlier one. A later non-object replaces the accumulated tree. A null
+     * load is skipped. A single path is not merged; callers keep
+     * {@link #loadConfigs}.
+     */
+    public static JsonNode loadMergedConfigs(java.util.List<String> paths) {
+        JsonNode accumulated = null;
+        if (paths == null) return null;
+        for (String path : paths) {
+            if (path == null || path.isBlank()) continue;
+            accumulated = mergeConfigTrees(
+                    accumulated,
+                    loadConfigs(path, ResourceLocations.workingDirectory())
+            );
+        }
+        return accumulated;
+    }
+
+    public static JsonNode mergeConfigTrees(JsonNode base, JsonNode overlay) {
+        if (overlay == null || overlay.isNull()) return base;
+        if (!(overlay instanceof ObjectNode overlayObject)) return overlay.deepCopy();
+        if (!(base instanceof ObjectNode baseObject)) return overlay.deepCopy();
+        ObjectNode merged = baseObject.deepCopy();
+        overlayObject.fields().forEachRemaining(entry -> {
+            JsonNode value = entry.getValue();
+            JsonNode existing = merged.get(entry.getKey());
+            if (existing instanceof ObjectNode && value instanceof ObjectNode) {
+                merged.set(entry.getKey(), mergeConfigTrees(existing, value));
+            } else if (value == null || value.isNull()) {
+                merged.set(entry.getKey(), value);
+            } else {
+                merged.set(entry.getKey(), value.deepCopy());
+            }
+        });
+        return merged;
+    }
+
+    private static void installLoaded(JsonNode configsNode) {
         ObjectNode configs;
         if (configsNode instanceof ObjectNode objectNode) {
             configs = objectNode;

@@ -5,14 +5,19 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import tools.dscode.control.protocol.Workspace;
+import tools.dscode.launcher.WorkbenchAgentCommands;
 import tools.dscode.testengine.fixtures.BlankBrowserRunner;
+import tools.dscode.testengine.fixtures.HookSourceRunner;
 import tools.dscode.testengine.fixtures.WorkspaceSeedHooked;
 
+import java.io.ByteArrayOutputStream;
+import java.io.PrintStream;
 import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -64,16 +69,158 @@ class WorkspaceSeedTest {
         assertEquals("auto", captured.get(PKB_props.PKB_PARALLEL));
         assertEquals("from-hook", captured.get("pkb_hook_marker"));
         assertEquals("qa", captured.get(PKB_props.PKB_ENVIRONMENT));
+        assertEquals("hook", Workspace.readValueSources(hookedWorkspace).get("pkb_description"));
+        assertEquals("hook", Workspace.readValueSources(hookedWorkspace).get(PKB_props.PKB_BROWSER));
+        assertEquals("hook", Workspace.readValueSources(hookedWorkspace).get("pkb_hook_marker"));
+        String description = captured.get("pkb_description");
+        assertTrue(description.contains(System.getProperty("user.name")), description);
+        assertTrue(description.contains(java.util.Locale.getDefault().toString()), description);
+        assertTrue(description.contains(System.getProperty("java.vendor")), description);
         for (String key : Workspace.CONTEXT_KEYS) assertTrue(captured.containsKey(key), key);
         assertFalse(captured.containsKey(PKB_props.PKB_RUN_ID));
 
         Path blankWorkspace = temp.resolve("blank");
         WorkspaceSeed.writeCaptured(blankWorkspace, blank, false);
         assertEquals("CHROME_HEADLESS", Workspace.readRunVars(blankWorkspace).get(PKB_props.PKB_BROWSER));
+        assertEquals("default", Workspace.readValueSources(blankWorkspace).get(PKB_props.PKB_BROWSER));
 
         assertThrows(IllegalStateException.class, () -> WorkspaceSeed.writeCaptured(hookedWorkspace, hooked, false));
         WorkspaceSeed.writeCaptured(hookedWorkspace, blank, true);
         assertEquals("CHROME_HEADLESS", Workspace.readRunVars(hookedWorkspace).get(PKB_props.PKB_BROWSER));
+    }
+
+    @Test
+    void hookDescriptionFileDefaultAndCliOverrideEachKeepTheirSource() throws Exception {
+        clearPkbSystemProperties();
+        System.setProperty(WorkspaceSeed.SEED_PROPERTY, "true");
+        System.setProperty("pkb_loglevel", "error");
+        Path resources = temp.resolve("src/test/resources");
+        Files.createDirectories(resources);
+        Files.writeString(resources.resolve("pickleball.properties"), "pkb_tags=@from-file\n");
+        Field preview = PickleballRunner.class.getDeclaredField("PREVIEW");
+        preview.setAccessible(true);
+        @SuppressWarnings("unchecked")
+        ThreadLocal<Boolean> flag = (ThreadLocal<Boolean>) preview.get(null);
+        Field projectField = PickleballRunner.class.getDeclaredField("PREVIEW_PROJECT");
+        projectField.setAccessible(true);
+        @SuppressWarnings("unchecked")
+        ThreadLocal<Path> projectLocal = (ThreadLocal<Path>) projectField.get(null);
+        flag.set(Boolean.TRUE);
+        projectLocal.set(temp.toAbsolutePath().normalize());
+        try {
+            WorkspaceSeedHooked hooked = new WorkspaceSeedHooked();
+            Path workspace = Workspace.directory(temp, "described");
+            WorkspaceSeed.writeCaptured(workspace, hooked, false);
+            Map<String, String> sources = Workspace.readValueSources(workspace);
+            assertEquals("hook", sources.get("pkb_description"), sources.toString());
+            assertEquals("hook", sources.get(PKB_props.PKB_BROWSER), sources.toString());
+            assertEquals("properties", sources.get("pkb_tags"), sources.toString());
+            assertEquals("cli/override", sources.get("pkb_loglevel"), sources.toString());
+            ByteArrayOutputStream stdout = new ByteArrayOutputStream();
+            ByteArrayOutputStream stderr = new ByteArrayOutputStream();
+            int exit = WorkbenchAgentCommands.run(
+                    new String[]{"workspace-show", temp.toString(), "--run-id=described"},
+                    new PrintStream(stdout, true, StandardCharsets.UTF_8),
+                    new PrintStream(stderr, true, StandardCharsets.UTF_8)
+            );
+            String shown = stdout.toString(StandardCharsets.UTF_8);
+            assertEquals(0, exit, stderr.toString(StandardCharsets.UTF_8) + shown);
+            assertTrue(shown.contains("pkb_description="), shown);
+            assertTrue(shown.contains("source=hook computed"), shown);
+            assertTrue(shown.contains(System.getProperty("user.name")), shown);
+            assertTrue(shown.contains(System.getProperty("java.vendor")), shown);
+            assertTrue(shown.contains("pkb_tags=@from-file source=properties"), shown);
+            assertTrue(shown.contains("pkb_loglevel=error source=cli/override"), shown);
+            assertFalse(shown.contains("pkb_tags=@from-file source=properties computed"), shown);
+            assertFalse(shown.contains("pkb_loglevel=error source=cli/override computed"), shown);
+
+            BlankBrowserRunner blank = new BlankBrowserRunner();
+            WorkspaceSeed.writeCaptured(Workspace.directory(temp, "blank-show"), blank, false);
+            ByteArrayOutputStream blankOut = new ByteArrayOutputStream();
+            int blankExit = WorkbenchAgentCommands.run(
+                    new String[]{"workspace-show", temp.toString(), "--run-id=blank-show"},
+                    new PrintStream(blankOut, true, StandardCharsets.UTF_8),
+                    new PrintStream(new ByteArrayOutputStream(), true, StandardCharsets.UTF_8)
+            );
+            String blankShown = blankOut.toString(StandardCharsets.UTF_8);
+            assertEquals(0, blankExit, blankShown);
+            assertTrue(blankShown.contains("pkb_browser=CHROME_HEADLESS source=default"), blankShown);
+            assertFalse(blankShown.contains("pkb_browser=CHROME_HEADLESS source=default computed"), blankShown);
+        } finally {
+            flag.remove();
+            projectLocal.remove();
+            System.clearProperty("pkb_loglevel");
+        }
+    }
+
+    @Test
+    void hookPutRecordsPlainPkbAndSecretKeysAsHook() throws Exception {
+        clearPkbSystemProperties();
+        System.setProperty(WorkspaceSeed.SEED_PROPERTY, "true");
+        HookSourceRunner hooked = new HookSourceRunner();
+        clearRunner();
+        Path workspace = Workspace.directory(temp, "hook-put");
+        WorkspaceSeed.writeCaptured(workspace, hooked, false);
+        Map<String, String> sources = Workspace.readValueSources(workspace);
+        assertEquals("hook", sources.get("description"), sources.toString());
+        assertEquals("hook", sources.get("pkb_hook_marker"), sources.toString());
+        assertEquals("hook", sources.get("pkb_password"), sources.toString());
+        assertEquals("hook", sources.get(PKB_props.PKB_GLUE), sources.toString());
+        assertEquals("hook plain description", Workspace.readRunVars(workspace).get("description"));
+        assertEquals("runner-hook-secret-value", Workspace.readRunVars(workspace).get("pkb_password"));
+
+        ByteArrayOutputStream stdout = new ByteArrayOutputStream();
+        ByteArrayOutputStream stderr = new ByteArrayOutputStream();
+        int exit = WorkbenchAgentCommands.run(
+                new String[]{"workspace-show", temp.toString(), "--run-id=hook-put"},
+                new PrintStream(stdout, true, StandardCharsets.UTF_8),
+                new PrintStream(stderr, true, StandardCharsets.UTF_8)
+        );
+        String shown = stdout.toString(StandardCharsets.UTF_8);
+        assertEquals(0, exit, stderr.toString(StandardCharsets.UTF_8) + shown);
+        assertTrue(shown.contains("description=hook plain description source=hook computed"), shown);
+        assertTrue(shown.contains("pkb_hook_marker=from-hook source=hook computed"), shown);
+        assertTrue(shown.contains("pkb_password=<redacted> source=hook computed"), shown);
+        assertTrue(shown.contains("pkb_glue=com.example.steps source=hook computed"), shown);
+        assertFalse(shown.contains("runner-hook-secret-value"), shown);
+        assertFalse(stderr.toString(StandardCharsets.UTF_8).contains("runner-hook-secret-value"));
+
+        ByteArrayOutputStream jsonOut = new ByteArrayOutputStream();
+        int jsonExit = WorkbenchAgentCommands.run(
+                new String[]{"workspace-show", temp.toString(), "--run-id=hook-put", "--json"},
+                new PrintStream(jsonOut, true, StandardCharsets.UTF_8),
+                new PrintStream(new ByteArrayOutputStream(), true, StandardCharsets.UTF_8)
+        );
+        String json = jsonOut.toString(StandardCharsets.UTF_8);
+        assertEquals(0, jsonExit, json);
+        assertTrue(json.contains("\"description\":\"hook\""), json);
+        assertTrue(json.contains("\"pkb_hook_marker\":\"hook\""), json);
+        assertTrue(json.contains("\"pkb_password\":\"hook\""), json);
+        assertTrue(json.contains("\"description\""), json);
+        assertTrue(json.contains("hook plain description"), json);
+        assertFalse(json.contains("runner-hook-secret-value"), json);
+    }
+
+    @Test
+    void runnerComputedSecretWithoutAPropertySourceStaysALiteralAndWarns() throws Exception {
+        Map<String, String> values = new LinkedHashMap<>();
+        values.put(PKB_props.PKB_GLUE, "com.example");
+        values.put(PKB_props.PKB_FEATURES, "features");
+        values.put(PKB_props.PKB_DATA_PATH, "data");
+        values.put(PKB_props.PKB_CALL_PATH, "calls");
+        values.put(PKB_props.PKB_COMPONENT_PATH, "component");
+        values.put(PKB_props.PKB_CONFIG_PATH, "configs");
+        values.put("pkb_password", "runner-secret");
+        assertTrue(WorkspaceSeed.runnerComputedSecretKeys(values).contains("pkb_password"));
+        List<String> warnings = WorkspaceSeed.runnerComputedSecretWarnings(values);
+        assertEquals(1, warnings.size());
+        assertTrue(warnings.getFirst().contains("pkb_password"), warnings.toString());
+        assertTrue(warnings.getFirst().contains("not in project properties"), warnings.toString());
+        assertFalse(warnings.getFirst().contains("runner-secret"), warnings.toString());
+        Path workspace = temp.resolve("secrets");
+        Workspace.writeRunVars(workspace, values, WorkspaceSeed.runnerComputedSecretKeys(values));
+        assertEquals("runner-secret", Workspace.readRunVars(workspace).get("pkb_password"));
+        assertFalse(Files.readString(Workspace.runvarsFile(workspace)).contains("${protected:pkb_password}"));
     }
 
     @Test
@@ -170,7 +317,7 @@ class WorkspaceSeedTest {
     }
 
     @Test
-    void detectRecordsClasspathAndDashDAndEnvInputs() {
+    void detectRecordsClasspathAndDashDAndEnvInputs() throws Exception {
         System.setProperty("pkb_environment", "from-dash-d");
         System.setProperty(Workspace.PROPERTY, "/tmp/not-a-workspace");
         Properties system = new Properties();
@@ -186,6 +333,14 @@ class WorkspaceSeedTest {
         WorkspaceSeed.Inputs detected = WorkspaceSeed.detect(temp);
         assertFalse(detected.classpathFingerprint().isBlank());
         assertEquals("from-dash-d", detected.resolutionInputs().get("pkb_environment"));
+
+        Path classpath = tools.dscode.control.protocol.PickleballLocalLayout.workbenchStateRoot(temp).resolve("classpath.txt");
+        Files.createDirectories(classpath.getParent());
+        Files.writeString(classpath, temp.resolve("consumer.jar").toString() + "\n");
+        Files.writeString(temp.resolve("consumer.jar"), "jar");
+        WorkspaceSeed.Inputs synced = WorkspaceSeed.detect(temp);
+        assertTrue(synced.classpathFingerprint().contains("consumer.jar"), synced.classpathFingerprint());
+        assertFalse(synced.classpathFingerprint().equals(detected.classpathFingerprint()));
     }
 
     private void clearRunner() throws Exception {

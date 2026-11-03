@@ -175,6 +175,8 @@ The consumer `pom.xml` also defines Maven profiles such as:
 
 Feature files remain authoritative for exact scenario tags.
 
+Surefire `testFailureIgnore` is `${maven.test.failure.ignore}`, and that property defaults to `false`. A normal `./mvnw test` still fails the build when a scenario fails. `-Dmaven.test.failure.ignore=true` and `.mvn/maven.config` are honored. A literal `<testFailureIgnore>false</testFailureIgnore>` would ignore both. Workbench still reports `summary status=FAILED` and exits 1 when the run index says the scenario failed.
+
 ## Named profiles and controlled RunVars
 
 Reusable profiles live in `profiles.yaml`; local property-level overrides for matching profile names can live in `profiles_local.yaml`. Select one or more profiles with `pkb_profile`; selected names compose left-to-right and later profiles win.
@@ -220,6 +222,21 @@ Changed in 2.1.15. A path with no prefix is a classpath resource, including a pa
 | `classpath:` | resources folder (classpath) |
 | `wd-file:X` | `<working directory>/X` |
 | `wd-file:/X` | absolute path `/X` |
+
+## Path settings
+
+A comma always splits a path setting and is never part of a folder name. Blank entries and a trailing comma are dropped. A value with no comma is one path. `pkb_datapath` uses the first root that has the document. `pkb_configpath` deep-merges in order; a later leaf replaces an earlier one, and a later non-object replaces the tree. `pkb_features` and `pkb_glue` keep their existing list behavior.
+
+`pkb_componentpath` and `pkb_callpath` follow Cucumber path rules (project-relative defaults `src/test/resources/component` and `src/test/resources/calls`). `pkb_features`, `pkb_datapath`, and `pkb_configpath` follow the prefix table above.
+
+| Setting | Hook setter | Comma list | Default | Prefix rules |
+|---|---|---|---|---|
+| `pkb_features` | `PKB_props.features` | yes | (project) | Pickleball prefix table |
+| `pkb_glue` | `PKB_props.glue` | yes | (project) | package names, not path prefixes |
+| `pkb_datapath` | `PKB_props.dataPath` | yes, first match | `data` | Pickleball prefix table |
+| `pkb_configpath` | `PKB_props.configPath` | yes, merged later-wins | `configs` | Pickleball prefix table |
+| `pkb_callpath` | `PKB_props.callPath` | yes | `src/test/resources/calls` | Cucumber path rules |
+| `pkb_componentpath` | `PKB_props.componentPath` | yes | `src/test/resources/component` | Cucumber path rules |
 
 ## Diagnostic reporting
 

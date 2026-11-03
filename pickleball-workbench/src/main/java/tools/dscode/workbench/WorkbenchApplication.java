@@ -11,7 +11,9 @@ import tools.dscode.workbench.mcp.WorkbenchAttachServer;
 import tools.dscode.workbench.mcp.WorkbenchMcpServer;
 import tools.dscode.workbench.sync.WorkbenchManifest;
 import tools.dscode.workbench.sync.WorkbenchSynchronizer;
+import tools.dscode.control.protocol.PickleballLocalLayout;
 import tools.dscode.control.protocol.WindowDriver;
+import tools.dscode.control.protocol.speed.WarmProcess;
 import tools.dscode.workbench.ui.WorkbenchUi;
 import tools.dscode.workbench.worker.WorkbenchLiveSession;
 import tools.dscode.workbench.worker.WorkbenchWorkerManager;
@@ -73,7 +75,8 @@ public final class WorkbenchApplication {
                 case "session" -> session(args, out, err);
                 case "ui" -> ui(args);
                 case "mcp" -> throw new IllegalArgumentException(
-                        "MCP mode must be launched through the Workbench executable."
+                        "error: MCP mode must be launched through the Workbench executable.\n"
+                                + "fix: Usage: pickleball-workbench mcp <project>\n"
                 );
                 case "export-guidance", "hint", "discover-hint", "discover", "confirm", "plan",
                         "workspace-show", "workspace-edit", "workspace-seed" -> {
@@ -82,8 +85,8 @@ public final class WorkbenchApplication {
                     yield 2;
                 }
                 default -> {
-                    err.println("Unknown Workbench command: " + args[0]);
-                    err.println("Run with --help for available commands.");
+                    err.println("error: Unknown Workbench command: " + args[0]);
+                    err.println("fix: Run with --help for available commands.");
                     yield 2;
                 }
             };
@@ -94,8 +97,10 @@ public final class WorkbenchApplication {
     }
 
     static int runMcpProcess(String[] args, PrintStream protocolOut, PrintStream err) {
+        Path project = null;
         try {
-            Path project = requiredProject(args, "mcp");
+            project = requiredProject(args, "mcp");
+            claimWarm(project);
 
             // MCP stdio owns the original stdout stream. Redirect ordinary JVM stdout
             // before constructing SDK/controller services so diagnostics cannot corrupt it.
@@ -121,6 +126,8 @@ public final class WorkbenchApplication {
         } catch (RuntimeException failure) {
             err.println("Workbench mcp failed: " + failure.getMessage());
             return 1;
+        } finally {
+            releaseWarm(project);
         }
     }
 
@@ -241,6 +248,7 @@ public final class WorkbenchApplication {
 
     private static int ui(String[] args) {
         IsolateArgs parsed = projectCommandArgs(args, "ui");
+        claimWarm(parsed.project());
         try {
             if (parsed.runId() != null) {
                 WindowDriver.show(parsed.project(), parsed.runId(), parsed.agentId(), parsed.agentId() != null);
@@ -249,19 +257,25 @@ public final class WorkbenchApplication {
             }
         } catch (RuntimeException failure) {
             System.err.println(failure.getMessage());
+            releaseWarm(parsed.project());
             return 1;
         }
-        WorkbenchUi.launch(parsed.project(), parsed.runId(), parsed.agentId());
-        return 0;
+        try {
+            WorkbenchUi.launch(parsed.project(), parsed.runId(), parsed.agentId());
+            return 0;
+        } finally {
+            releaseWarm(parsed.project());
+        }
     }
 
     static int isolate(String[] args, PrintStream out, PrintStream err, boolean interactiveStdin) {
         IsolateArgs parsed = projectCommandArgs(args, "isolate");
         Map<String, String> workerProperties;
         try {
-            workerProperties = tools.dscode.workbench.discover.LastDiscoverSnapshot.workerSystemProperties(
+            workerProperties = new java.util.LinkedHashMap<>(tools.dscode.workbench.discover.LastDiscoverSnapshot.workerSystemProperties(
                     parsed.project(), parsed.tags(), parsed.name(), parsed.example(), parsed.runVars(), err
-            );
+            ));
+            workerProperties.put("pkb_run_purpose", "workbench-isolate");
         } catch (RuntimeException failure) {
             err.println(failure.getMessage());
             err.println("Workbench CLI isolate failed.");
@@ -275,9 +289,10 @@ public final class WorkbenchApplication {
             err.println("While testing for yourself, stay headless. Do not open the GUI for your own testing.");
             return 2;
         }
+        claimWarm(parsed.project());
 
         try {
-            new WorkbenchSynchronizer().sync(parsed.project());
+            WorkbenchSynchronizer.syncOverlapped(parsed.project());
             try (WorkbenchLiveSession live = new WorkbenchLiveSession(parsed.project(), workerProperties)) {
                 WorkbenchWorkerStatus started = live.start();
                 requireInteractiveWorker(started, "isolate");
@@ -300,6 +315,8 @@ public final class WorkbenchApplication {
         } catch (RuntimeException failure) {
             err.println("Workbench CLI isolate failed: " + failure.getMessage());
             return 1;
+        } finally {
+            releaseWarm(parsed.project());
         }
     }
 
@@ -321,13 +338,15 @@ public final class WorkbenchApplication {
         if (parsed.agentId() != null && !parsed.agentId().isBlank()) {
             workerProperties.put("pkb_agent_id", parsed.agentId());
         }
+        workerProperties.put("pkb_run_purpose", "workbench-session");
+        claimWarm(parsed.project());
 
         CountDownLatch done = new CountDownLatch(1);
         AtomicBoolean stopping = new AtomicBoolean();
         WorkbenchController controller = null;
         WorkbenchAttachServer server = null;
         try {
-            new WorkbenchSynchronizer().sync(parsed.project());
+            WorkbenchSynchronizer.syncOverlapped(parsed.project());
             controller = new WorkbenchController(parsed.project(), workerProperties);
             WorkbenchController live = controller;
             WorkbenchCallContext.runAs(WorkbenchLeaseHolder.AGENT, () -> {
@@ -342,6 +361,7 @@ public final class WorkbenchApplication {
                 } catch (RuntimeException ignored) {
                     // Best-effort worker stop on session shutdown.
                 }
+                releaseWarm(parsed.project());
                 done.countDown();
             };
             Path stateFile = parsed.sessionFile() == null
@@ -367,7 +387,18 @@ public final class WorkbenchApplication {
         } finally {
             if (server != null) server.close();
             if (controller != null) controller.close();
+            releaseWarm(parsed.project());
         }
+    }
+
+    private static void claimWarm(Path project) {
+        if (project == null) return;
+        WarmProcess.claim(PickleballLocalLayout.workbenchStateRoot(project), ProcessHandle.current().pid());
+    }
+
+    private static void releaseWarm(Path project) {
+        if (project == null) return;
+        WarmProcess.release(PickleballLocalLayout.workbenchStateRoot(project));
     }
 
     private static void printReplayedRunVars(PrintStream out, Map<String, String> workerProperties) {
@@ -410,10 +441,10 @@ public final class WorkbenchApplication {
     static IsolateArgs projectCommandArgs(String[] args, String command) {
         if (args.length < 2 || args[1].isBlank() || args[1].startsWith("-")) {
             throw new IllegalArgumentException(
-                    "Usage: pickleball-workbench " + command
+                    "error: missing project\nfix: Usage: pickleball-workbench " + command
                             + " <project> [--tags <expr>] [--name <expr>] [--example <rows>]"
                             + " [--runvar key=value]"
-                            + " [--session-file <path>] [--run-id <id>] [--agent-id <id>]"
+                            + " [--session-file <path>] [--run-id <id>] [--agent-id <id>]\n"
             );
         }
         String tags = null;
@@ -452,7 +483,7 @@ public final class WorkbenchApplication {
             } else if (token.startsWith("--runvar=")) {
                 String value = token.substring("--runvar=".length()).trim();
                 if (value.isBlank() || !value.contains("=")) {
-                    throw new IllegalArgumentException("--runvar requires key=value.");
+                    throw new IllegalArgumentException("error: --runvar requires key=value.\nfix: Pass --runvar key=value.\n");
                 }
                 runVars.add(value);
                 absorbName = false;
@@ -460,7 +491,7 @@ public final class WorkbenchApplication {
             } else if ("--runvar".equals(token) && index + 1 < args.length) {
                 String value = args[++index];
                 if (value == null || value.isBlank() || !value.contains("=")) {
-                    throw new IllegalArgumentException("--runvar requires key=value.");
+                    throw new IllegalArgumentException("error: --runvar requires key=value.\nfix: Pass --runvar key=value.\n");
                 }
                 runVars.add(value.trim());
                 absorbName = false;
@@ -732,7 +763,9 @@ public final class WorkbenchApplication {
 
     private static Path requiredProject(String[] args, String command) {
         if (args.length != 2 || args[1].isBlank()) {
-            throw new IllegalArgumentException("Usage: pickleball-workbench " + command + " <project>");
+            throw new IllegalArgumentException(
+                    "error: missing project\nfix: Usage: pickleball-workbench " + command + " <project>\n"
+            );
         }
         return Path.of(args[1]);
     }

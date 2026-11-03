@@ -2,6 +2,7 @@ package tools.dscode.workbench.catalog;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import tools.dscode.control.protocol.WorkbenchFeatureIndex;
 import tools.dscode.workbench.sync.WorkbenchManifest;
 import tools.dscode.workbench.sync.WorkbenchSyncMode;
 
@@ -62,6 +63,32 @@ class ConsumerFeatureCatalogTest {
         assertEquals(1, catalog.visibleScenarios().size());
         assertEquals("IF ELSE branch", catalog.visibleScenarios().getFirst().name());
         assertTrue(catalog.visibleScenarios().getFirst().lines().getFirst().startsWith("Feature:"));
+    }
+
+    @Test
+    void catalogScanReadsTheSameMtimeIndexAsPlan() throws Exception {
+        Path features = project.resolve("src/test/resources/features");
+        Files.createDirectories(features);
+        Files.writeString(features.resolve("login.feature"), """
+                @smoke
+                Feature: Sign in
+                  Scenario: Valid password
+                    Given a user
+                """);
+        Files.writeString(features.resolve("other.feature"), """
+                Feature: Other
+                  Scenario: Stay
+                    Given stay
+                """);
+        ConsumerFeatureCatalog.scan(project, null);
+        WorkbenchFeatureIndex.Selection indexed = WorkbenchFeatureIndex.select(new WorkbenchFeatureIndex.Request(
+                project, List.of(), "@smoke", null, null, List.of(), false
+        ));
+        assertTrue(indexed.cacheHits() >= 1, "catalog scan should have written feature-index.v3");
+        assertTrue(indexed.elapsedMillis() >= 0);
+        assertEquals("Valid password", indexed.hits().getFirst().scenarioName());
+        assertTrue(indexed.hits().getFirst().tags().contains("smoke"));
+        assertEquals(1, WorkbenchFeatureIndex.prefilteredFeatures(indexed).size());
     }
 
     @Test

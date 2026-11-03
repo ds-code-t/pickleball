@@ -41,6 +41,9 @@ class WorkbenchWorkerManagerTest {
         );
 
         assertTrue(command.get(0).endsWith(WorkbenchProjectOs.javaName()));
+        assertTrue(command.contains("-Dfile.encoding=UTF-8"));
+        assertTrue(command.contains("-Dstdout.encoding=UTF-8"));
+        assertTrue(command.contains("-Dstderr.encoding=UTF-8"));
         assertTrue(command.contains(
                 "-D" + ControlProtocol.WORKBENCH_TEST_OUTPUT_ROOT_PROPERTY + "=" + live
         ));
@@ -211,29 +214,45 @@ class WorkbenchWorkerManagerTest {
 
     @Test
     void workerStartTimeoutDefaultsToThreeMinutesAndHonorsOverrides() {
-        assertEquals(Duration.ofSeconds(180), WorkbenchWorkerManager.START_TIMEOUT);
-        assertEquals(Duration.ofSeconds(180), WorkbenchWorkerManager.startTimeout(Map.of()));
+        assertEquals(Duration.ofSeconds(170), WorkbenchWorkerManager.START_TIMEOUT);
+        assertTrue(WorkbenchWorkerManager.START_TIMEOUT.compareTo(Duration.ofSeconds(180)) < 0);
+        assertEquals(Duration.ofSeconds(170), WorkbenchWorkerManager.startTimeout(Map.of()));
+        assertEquals(
+                WorkbenchWorkerManager.innerDeadline(Duration.ofSeconds(180)),
+                WorkbenchWorkerManager.START_TIMEOUT
+        );
         String property = WorkbenchWorkerManager.START_TIMEOUT_PROPERTY;
         String previous = System.getProperty(property);
         String previousRunVars = System.getProperty("pkb_runvars");
         String previousDotted = System.getProperty(WorkbenchWorkerManager.START_TIMEOUT_RUNVAR);
         try {
             System.setProperty(property, "12");
-            assertEquals(Duration.ofSeconds(12), WorkbenchWorkerManager.startTimeout(Map.of()));
+            assertEquals(
+                    WorkbenchWorkerManager.innerDeadline(Duration.ofSeconds(12)),
+                    WorkbenchWorkerManager.startTimeout(Map.of())
+            );
+            assertEquals(Duration.ofMillis(9_600), WorkbenchWorkerManager.startTimeout(Map.of()));
+            assertTrue(WorkbenchWorkerManager.startTimeout(Map.of()).compareTo(Duration.ofSeconds(12)) < 0);
             System.clearProperty(property);
             System.setProperty("pkb_runvars", "pkb_browser=CHROME_HEADLESS, pkb_workbench_worker_start_timeout=45");
-            assertEquals(Duration.ofSeconds(45), WorkbenchWorkerManager.startTimeout(Map.of()));
+            assertEquals(
+                    WorkbenchWorkerManager.innerDeadline(Duration.ofSeconds(45)),
+                    WorkbenchWorkerManager.startTimeout(Map.of())
+            );
             System.clearProperty("pkb_runvars");
             System.setProperty(WorkbenchWorkerManager.START_TIMEOUT_RUNVAR, "30");
-            assertEquals(Duration.ofSeconds(30), WorkbenchWorkerManager.startTimeout(Map.of()));
+            assertEquals(
+                    WorkbenchWorkerManager.innerDeadline(Duration.ofSeconds(30)),
+                    WorkbenchWorkerManager.startTimeout(Map.of())
+            );
             System.clearProperty(WorkbenchWorkerManager.START_TIMEOUT_RUNVAR);
             assertEquals(
-                    Duration.ofSeconds(90),
+                    WorkbenchWorkerManager.innerDeadline(Duration.ofSeconds(90)),
                     WorkbenchWorkerManager.startTimeout(Map.of(
                             "pkb_runvars", "pkb_workbench_worker_start_timeout=90"
                     ))
             );
-            assertEquals(Duration.ofSeconds(180), WorkbenchWorkerManager.startTimeout(Map.of(property, "nope")));
+            assertEquals(Duration.ofSeconds(170), WorkbenchWorkerManager.startTimeout(Map.of(property, "nope")));
         } finally {
             restore(property, previous);
             restore("pkb_runvars", previousRunVars);
@@ -258,6 +277,13 @@ class WorkbenchWorkerManagerTest {
         assertTrue(detail.contains("stage=anchor-parse"));
         assertTrue(detail.contains("last-worker-output="));
         assertTrue(detail.contains("progress stage=paused"));
+        StringBuilder timing = new StringBuilder();
+        WorkbenchWorkerManager.markStage(log, "compile", System.nanoTime(), timing);
+        String marked = Files.readString(log);
+        assertTrue(marked.contains("progress stage=compile"), marked);
+        assertTrue(marked.contains("progress stage=maven elapsed="), marked);
+        assertTrue(timing.toString().startsWith("maven="), timing.toString());
+        assertTrue(timing.toString().endsWith("ms"), timing.toString());
     }
 
     @Test

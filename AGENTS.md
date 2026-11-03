@@ -269,6 +269,14 @@ If a required validation cannot run, state exactly what was not run and why. Nev
 - Keep changes focused on the requested behavior.
 - Do not perform unrelated refactors.
 - Do not change versions, publish remote artifacts, create releases, or push branches unless explicitly requested.
+- Never reuse a published version number. Once a version is on Maven Central or JitPack, any further change ships under a new version, even a one-line fix. `export-guidance` prints `Pickleball <version> built from commit <sha>` so two builds can be told apart.
+
+### Release checklist
+
+1. Bump the version; never republish an existing one.
+2. Confirm `META-INF/pickleball-build.properties` in the built jar has a non-blank `commit`.
+3. Publish.
+4. Before announcing, verify the new version resolves through Maven Central and its mirrors (for example `mvn -U dependency:get -Dartifact=<group>:pickleball:<version>` from a clean local repository, plus the search.maven.org listing). Do not announce or tell consumers to upgrade until it resolves.
 - Do not edit generated build output.
 - Preserve backward compatibility unless the user explicitly approves a breaking change.
 - Dynamic-control additions must remain opt-in: no handler/API call means normal scenario traversal, ParsingMap construction/order, NodeMap references, resolution, and writes retain their pre-control behavior.

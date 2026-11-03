@@ -7,7 +7,7 @@ plugins {
 }
 
 group = 'tools.dscode'
-version = '2.1.17'
+version = '2.1.18'
 
 repositories {
     mavenCentral()
@@ -134,7 +134,10 @@ dependencies {
     api('io.rest-assured:rest-assured:6.0.0')
 
     // JDBC drivers are published as transitive dependencies. They are not shaded.
+    // sqlite-jdbc is not one of them. The Workbench controller resolves it as a
+    // runtime library. A normal consumer classpath and this POM do not include it.
     implementation 'com.h2database:h2:2.3.232'
+    testRuntimeOnly 'org.xerial:sqlite-jdbc:3.47.2.0'
     implementation 'org.postgresql:postgresql:42.7.7'
     implementation 'com.microsoft.sqlserver:mssql-jdbc:12.10.1.jre11'
     implementation 'com.oracle.database.jdbc:ojdbc11:23.7.0.25.01'
@@ -374,6 +377,40 @@ tasks.shadowJar {
     zip64 = true
 }
 
+tasks.register('verifySqliteNotPublished') {
+    group = 'verification'
+    description = 'sqlite-jdbc stays off the published POM and the consumer shadow JAR.'
+    dependsOn tasks.named('generatePomFileForMavenPublication'), tasks.named('shadowJar')
+    doLast {
+        def pom = layout.buildDirectory.file('publications/maven/pom-default.xml').get().asFile.text
+        if (pom.contains('sqlite-jdbc') || pom.contains('org.xerial')) {
+            throw new GradleException('Published Pickleball POM must not include sqlite-jdbc.')
+        }
+        def jar = tasks.named('shadowJar').get().archiveFile.get().asFile
+        def zip = new java.util.zip.ZipFile(jar)
+        try {
+            def hit = zip.entries().find { entry ->
+                entry.name.startsWith('org/sqlite/') || entry.name.contains('sqlite-jdbc')
+            }
+            if (hit != null) {
+                throw new GradleException('Consumer shadow JAR must not ship sqlite-jdbc: ' + hit.name)
+            }
+        } finally {
+            zip.close()
+        }
+    }
+}
+
+tasks.named('test') {
+    testLogging {
+        events 'failed'
+        exceptionFormat 'full'
+        showCauses true
+        showStackTraces true
+    }
+    dependsOn tasks.named('verifySqliteNotPublished')
+}
+
 tasks.register('verifyEmbeddedWorkbench') {
     group = 'verification'
     description = 'Verifies the outer Pickleball JAR embeds exactly the controller-only Workbench payload.'
@@ -563,6 +600,7 @@ publishing {
 
                     if (!g || !a || !v) return
                     if (bundledOrOverriddenGA.contains(ga)) return
+                    if (ga == 'org.xerial:sqlite-jdbc') return
                     if (!added.add(ga)) return
 
                     def d = depsNode.appendNode('dependency')
@@ -750,6 +788,7 @@ tasks.test {
         includeEngines("junit-jupiter")
     }
     dependsOn("expandWoven")
+    dependsOn("publishToMavenLocal")
 
     // Put woven classes FIRST so they beat the unwoven dependency jars
     classpath = files(wovenExpanded) + classpath

@@ -21,7 +21,7 @@ consumer worker JVM
   -> owns Pickleball, Cucumber, DynamicControl, Mapping/ParsingMap/NodeMap, browser, and service behavior
 ```
 
-The player, picker, Mapping editor, Terminal, and Diagnostic explorer do not change this boundary. Swing and WebView are presentation adapters over `WorkbenchServices` / `WorkbenchController`. Automatic buffered execution and add-and-continue use the existing `executeStep` worker contract; Workbench does not invent a second Gherkin matcher. WebView JavaScript never executes Gherkin.
+The player, picker, Mapping editor, Terminal, and Diagnostic explorer do not change this boundary. Swing and WebView are presentation adapters over `WorkbenchServices` / `WorkbenchController`. Automatic buffered execution and add-and-continue use the existing `executeStep` worker contract; Workbench does not invent a second Gherkin matcher. WebView JavaScript never executes Gherkin. The Play, From Here, and Pause controls call the launcher commands `play`, `from-here`, and `pause`. Those commands do not start a test when no healthy session is open.
 
 ## Feature and scenario picker
 

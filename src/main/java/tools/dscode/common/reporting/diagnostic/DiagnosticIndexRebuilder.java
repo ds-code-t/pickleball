@@ -3,6 +3,8 @@ package tools.dscode.common.reporting.diagnostic;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 
+import tools.dscode.control.protocol.DiagnosticSqliteIndex;
+
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -78,6 +80,7 @@ public final class DiagnosticIndexRebuilder {
         rebuildMissingFingerprints(runRoot.resolve("scenarios"));
         writeAtomic(runRoot.resolve("run-index.json"), index);
         rebuildClusters(runRoot, scenarios);
+        syncSqlite(runRoot == null ? null : runRoot.getParent());
         return index;
     }
 
@@ -112,6 +115,27 @@ public final class DiagnosticIndexRebuilder {
                 "updatedAt", Instant.now().toString(),
                 "runs", runs
         ));
+        syncSqlite(runsRoot);
+    }
+
+    /** The index is derived. A missing driver or a bad native library leaves the JSON rebuild alone. */
+    private static void syncSqlite(Path runsRoot) {
+        try {
+            Path project = projectAboveDiagnosticRuns(runsRoot);
+            if (project != null) DiagnosticSqliteIndex.rebuild(project);
+        } catch (Throwable ignored) {
+            // JSON files remain the source of truth.
+        }
+    }
+
+    private static Path projectAboveDiagnosticRuns(Path runsRoot) {
+        if (runsRoot == null || runsRoot.getFileName() == null) return null;
+        if (!"diagnostic-runs".equals(runsRoot.getFileName().toString())) return null;
+        Path reports = runsRoot.getParent();
+        if (reports == null || reports.getFileName() == null || !"reports".equals(reports.getFileName().toString())) {
+            return null;
+        }
+        return reports.getParent();
     }
 
     private static List<Map<String, Object>> readScenarioSummaries(Path scenariosRoot) throws IOException {

@@ -176,7 +176,7 @@ final class PickleballProfiles {
         return new Resolution(direct, false, selectedProfiles, finalRunVars, provenance.forRunVars(finalRunVars));
     }
 
-    private static Map<String, String> runVarMap(Map<String, String> values) {
+    static Map<String, String> runVarMap(Map<String, String> values) {
         LinkedHashMap<String, String> out = new LinkedHashMap<>();
         if (values == null) {
             return out;

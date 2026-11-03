@@ -93,7 +93,32 @@ public final class PickleballPaths {
             return CLASSPATH + resource;
         }
         String fileText = parsed.fileText() == null ? "" : parsed.fileText().replace('\\', '/');
-        return FILE + fileText;
+        return FILE + encodeIllegalUriCharacters(fileText);
+    }
+
+    /**
+     * Percent-encodes characters that are not legal in a URI (spaces, for
+     * example) so Cucumber can parse a feature folder such as
+     * {@code wd-file:my features}. Text without such characters, including
+     * {@code :line} suffixes, is returned unchanged.
+     */
+    static String encodeIllegalUriCharacters(String text) {
+        StringBuilder out = null;
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
+            boolean legal = c < 0x80 && (Character.isLetterOrDigit(c) || "-._~/:!$&'()*+,;=@%".indexOf(c) >= 0);
+            if (legal) {
+                if (out != null) out.append(c);
+                continue;
+            }
+            if (out == null) out = new StringBuilder(text.substring(0, i));
+            int end = Character.isHighSurrogate(c) && i + 1 < text.length() ? i + 2 : i + 1;
+            for (byte b : text.substring(i, end).getBytes(java.nio.charset.StandardCharsets.UTF_8)) {
+                out.append('%').append(String.format("%02X", b & 0xFF));
+            }
+            i = end - 1;
+        }
+        return out == null ? text : out.toString();
     }
 
     public static String toCucumberFeatures(String commaSeparated) {

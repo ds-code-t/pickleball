@@ -45,8 +45,8 @@ import static tools.dscode.common.dataoperations.TableQueries.findHeaders;
 import static tools.dscode.common.dataoperations.TableQueries.findRows;
 import static tools.dscode.common.evaluations.AviatorUtil.eval;
 import static tools.dscode.common.evaluations.AviatorUtil.evalToBoolean;
+import static tools.dscode.common.mappings.FileAndDataParsing.buildJsonFromDataRoots;
 import static tools.dscode.common.mappings.FileAndDataParsing.buildJsonFromPath;
-import static tools.dscode.common.mappings.FileAndDataParsing.buildJsonFromPathUnderRoot;
 import static tools.dscode.common.mappings.GlobalMappings.GLOBALS;
 import static tools.dscode.common.mappings.NodeMap.getNodeMap;
 import static tools.dscode.common.mappings.ValueFormatting.MAPPER;
@@ -975,7 +975,7 @@ public abstract class MappingProcessor implements Map<String, Object> {
         if (query.startsWith(DATA_REFERENCE_PREFIX)) {
             String dataReference = query.substring(DATA_REFERENCE_PREFIX.length());
             if (dataReference.startsWith("/")) {
-                return buildJsonFromPathUnderRoot(
+                return buildJsonFromDataRoots(
                         configuredOrDefaultDataPath(),
                         dataReference.substring(1)
                 );

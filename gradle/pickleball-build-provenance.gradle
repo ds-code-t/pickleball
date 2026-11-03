@@ -5,17 +5,16 @@ import java.net.URI
 // Embeds the exact Pickleball source revision used to build the Maven artifact.
 def buildInfoDir = layout.buildDirectory.dir('generated/pickleball-build-provenance')
 
+// Gradle 9 removed Project.exec inside task actions; a plain process keeps the stamp populated.
+def gitWorkDir = rootProject.projectDir
 def gitText = { Object... args ->
     try {
-        def stdout = new ByteArrayOutputStream()
-        def stderr = new ByteArrayOutputStream()
-        def result = exec {
-            commandLine(['git'] + args.collect { String.valueOf(it) })
-            standardOutput = stdout
-            errorOutput = stderr
-            ignoreExitValue = true
-        }
-        result.exitValue == 0 ? stdout.toString(StandardCharsets.UTF_8).trim() : ''
+        Process process = new ProcessBuilder(['git'] + args.collect { String.valueOf(it) })
+                .directory(gitWorkDir)
+                .redirectError(ProcessBuilder.Redirect.DISCARD)
+                .start()
+        String out = new String(process.inputStream.readAllBytes(), StandardCharsets.UTF_8)
+        process.waitFor() == 0 ? out.trim() : ''
     } catch (Throwable ignored) {
         ''
     }

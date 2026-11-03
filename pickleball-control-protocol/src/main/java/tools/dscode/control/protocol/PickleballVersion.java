@@ -144,6 +144,26 @@ public final class PickleballVersion implements Comparable<PickleballVersion> {
         return matcher.matches() ? matcher.group(1) : "unknown";
     }
 
+    /**
+     * Git commit recorded in {@code META-INF/pickleball-build.properties} by the
+     * build provenance task, or {@code unknown} when the build did not record one.
+     */
+    public static String runningCommit(Class<?> type) {
+        Class<?> source = type == null ? PickleballVersion.class : type;
+        try (InputStream input = source.getClassLoader()
+                .getResourceAsStream("META-INF/pickleball-build.properties")) {
+            if (input != null) {
+                Properties properties = new Properties();
+                properties.load(input);
+                String commit = properties.getProperty("commit");
+                if (commit != null && !commit.isBlank()) return commit.trim();
+            }
+        } catch (IOException ignored) {
+            // Reported as unknown.
+        }
+        return "unknown";
+    }
+
     public static String runningArtifactFile(Class<?> type) {
         return runningJar(type).map(Path::getFileName).map(Path::toString).orElse("");
     }

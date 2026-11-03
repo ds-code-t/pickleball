@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import tools.dscode.common.coordination.AgentCoordination;
+import tools.dscode.control.protocol.OutputFormatter;
 import tools.dscode.control.protocol.WorkbenchFeatureIndex;
 
 import java.io.ByteArrayOutputStream;
@@ -38,6 +39,8 @@ public final class WorkbenchRunReports {
     private static final Pattern ACTUAL_LINE = Pattern.compile("(?im)^\\s*actual:\\s*(.+?)\\s*$");
     private static final Pattern SCENARIO_SUMMARY = Pattern.compile("(?m)^(\\d+)\\s+Scenarios?\\b");
     private static final Pattern STEP_SUMMARY = Pattern.compile("(?m)^(\\d+)\\s+Steps?\\b");
+    /** Inline summary names. The rest are failedScenariosMore plus query errors. */
+    static final int FAILED_SCENARIOS_INLINE_CAP = 10;
 
     private WorkbenchRunReports() {
     }
@@ -86,6 +89,35 @@ public final class WorkbenchRunReports {
         return line.toString();
     }
 
+    public static String compact(
+            String status,
+            int scenarios,
+            int steps,
+            String environment,
+            String browser,
+            int passed,
+            int failed,
+            List<String> failedScenarios
+    ) {
+        StringBuilder line = new StringBuilder(compact(status, scenarios, steps, environment, browser));
+        if (passed >= 0) line.append(" passed=").append(passed);
+        if (failed >= 0) line.append(" failed=").append(failed);
+        if (failed > 0 && failedScenarios != null && !failedScenarios.isEmpty()) {
+            appendFailedScenarios(line, failedScenarios);
+        }
+        return line.toString();
+    }
+
+    private static void appendFailedScenarios(StringBuilder line, List<String> failedScenarios) {
+        int shown = Math.min(FAILED_SCENARIOS_INLINE_CAP, failedScenarios.size());
+        line.append(" failedScenarios=")
+                .append(OutputFormatter.jsonStringArray(failedScenarios.subList(0, shown)));
+        int more = failedScenarios.size() - shown;
+        if (more > 0) {
+            line.append(" failedScenariosMore=").append(more).append(" query errors");
+        }
+    }
+
     /**
      * Writes per-scenario console files under the Workbench run folder and, when a
      * diagnostic scenario directory has events, a workbench summary and trace index.
@@ -124,6 +156,7 @@ public final class WorkbenchRunReports {
         }
         int steps = 0;
         int scenarios = 0;
+        boolean launchError = status != null && "LAUNCH_ERROR".equalsIgnoreCase(status.trim());
         List<Map<String, Object>> bodies = new ArrayList<>();
         List<Map<String, Object>> traces = new ArrayList<>();
         for (Path dir : currentRunScenarioDirs(project, runId)) {
@@ -133,27 +166,33 @@ public final class WorkbenchRunReports {
             scenarios++;
             steps += stepCount(dir);
         }
-        if (scenarios == 0) {
+        if (launchError) {
+            scenarios = 0;
+            steps = 0;
+            bodies.clear();
+            traces.clear();
+        }
+        if (!launchError && scenarios == 0) {
             int[] indexed = indexCounts(project, runId);
             if (indexed != null && (indexed[0] > 0 || indexed[1] > 0)) {
                 scenarios = indexed[0];
                 steps = indexed[1];
             }
-        } else if (steps == 0) {
+        } else if (!launchError && steps == 0) {
             int[] indexed = indexCounts(project, runId);
             if (indexed != null && indexed[1] > 0) steps = indexed[1];
         }
-        if (scenarios == 0 && steps == 0) {
+        if (!launchError && scenarios == 0 && steps == 0) {
             int[] fromConsole = consoleCounts(console);
             if (fromConsole != null) {
                 scenarios = fromConsole[0];
                 steps = fromConsole[1];
             }
-        } else if (steps == 0) {
+        } else if (!launchError && steps == 0) {
             int[] fromConsole = consoleCounts(console);
             if (fromConsole != null && fromConsole[1] > 0) steps = fromConsole[1];
         }
-        if (scenarios == 0) scenarios = names.size();
+        if (!launchError && scenarios == 0) scenarios = names.size();
         if (runId != null && !runId.isBlank()) {
             try {
                 writeRunSummary(
@@ -168,8 +207,59 @@ public final class WorkbenchRunReports {
                 // An unsafe run id already skipped the console write.
             }
         }
-        if (out != null) out.println(compact(status, scenarios, steps, environment, browser));
+        if (out != null) {
+            int passed = 0;
+            int failed = 0;
+            List<String> failedNames = List.of();
+            if (!launchError) {
+                int[] counted = passFail(bodies);
+                passed = counted[0];
+                failed = counted[1];
+                failedNames = failedScenarioNames(bodies);
+            }
+            out.println(compact(status, scenarios, steps, environment, browser, passed, failed, failedNames));
+        }
         return steps;
+    }
+
+    private static int[] passFail(List<Map<String, Object>> bodies) {
+        int passed = 0;
+        int failed = 0;
+        if (bodies == null) return new int[]{0, 0};
+        for (Map<String, Object> body : bodies) {
+            String status = scenarioStatus(body);
+            if (isPassedStatus(status)) passed++;
+            else if (isFailedStatus(status)) failed++;
+        }
+        return new int[]{passed, failed};
+    }
+
+    private static List<String> failedScenarioNames(List<Map<String, Object>> bodies) {
+        List<String> names = new ArrayList<>();
+        if (bodies == null) return names;
+        for (Map<String, Object> body : bodies) {
+            if (!isFailedStatus(scenarioStatus(body))) continue;
+            String name = text(body.get("scenario"));
+            if (!name.isBlank()) names.add(name);
+        }
+        return names;
+    }
+
+    private static String scenarioStatus(Map<String, Object> body) {
+        if (body == null) return "";
+        String status = text(body.get("status"));
+        return status.isBlank() ? text(body.get("outcome")) : status;
+    }
+
+    private static boolean isPassedStatus(String status) {
+        return "PASSED".equalsIgnoreCase(status);
+    }
+
+    private static boolean isFailedStatus(String status) {
+        if (status == null || status.isBlank()) return false;
+        return "FAILED".equalsIgnoreCase(status)
+                || "ERROR".equalsIgnoreCase(status)
+                || "ERRORED".equalsIgnoreCase(status);
     }
 
     /**
@@ -187,6 +277,11 @@ public final class WorkbenchRunReports {
             return List.of();
         }
         List<Path> privateDirs = scenarioDirs(privateRoot);
+        try {
+            if (Files.isDirectory(AgentCoordination.runDirectory(project, runId))) return privateDirs;
+        } catch (IllegalArgumentException invalid) {
+            return privateDirs;
+        }
         if (!privateDirs.isEmpty()) return privateDirs;
         return scenarioDirs(project.resolve("reports").resolve("diagnostic-runs").resolve(runId));
     }
@@ -235,6 +330,59 @@ public final class WorkbenchRunReports {
         } catch (IOException failure) {
             return null;
         }
+    }
+
+    /**
+     * Steps this run recorded as executed, or {@code -1} when no step count was written.
+     * A missing {@code steps} object is unknown, not zero. An explicit {@code executed: 0}
+     * (index, scenario summary, or a console {@code N Steps} line) is zero.
+     */
+    static int recordedExecutedSteps(Path project, String runId, String console) {
+        Integer recorded = null;
+        Path index = AgentCoordination.findRunIndex(project, runId);
+        if (index != null && Files.isRegularFile(index)) {
+            try {
+                JsonNode root = JSON.readTree(index.toFile());
+                JsonNode steps = root.get("steps");
+                if (steps != null && steps.isObject()) {
+                    int[] counts = indexCounts(project, runId);
+                    recorded = counts == null ? 0 : counts[1];
+                }
+            } catch (IOException ignored) {
+                // An unreadable index is not a step count.
+            }
+        }
+        try {
+            for (Path dir : currentRunScenarioDirs(project, runId)) {
+                Integer core = explicitStepCount(dir.resolve("summary.json"));
+                if (core == null) continue;
+                recorded = recorded == null ? core : Math.max(recorded, core);
+            }
+        } catch (IOException ignored) {
+            // A missing scenario tree is not a step count.
+        }
+        if (console != null && STEP_SUMMARY.matcher(console).find()) {
+            int consoleSteps = Math.max(lastCount(STEP_SUMMARY, console), 0);
+            recorded = recorded == null ? consoleSteps : Math.max(recorded, consoleSteps);
+        }
+        return recorded == null ? -1 : recorded;
+    }
+
+    /** {@code null} when the summary did not record a step count. */
+    private static Integer explicitStepCount(Path summary) throws IOException {
+        if (!Files.isRegularFile(summary)) return null;
+        JsonNode root = JSON.readTree(summary.toFile());
+        if (!root.has("steps")) return null;
+        JsonNode steps = root.get("steps");
+        if (steps.isArray()) return steps.size();
+        if (!steps.isObject()) return null;
+        if (steps.has("executed")) return steps.path("executed").asInt(0);
+        if (steps.has("total")) return steps.path("total").asInt(0);
+        int sum = 0;
+        for (String key : List.of("passed", "failed", "skipped", "other")) {
+            sum += steps.path(key).asInt(0);
+        }
+        return sum;
     }
 
     private static int[] consoleCounts(String console) {

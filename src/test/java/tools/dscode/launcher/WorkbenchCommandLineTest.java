@@ -416,4 +416,50 @@ class WorkbenchCommandLineTest {
         assertTrue(WorkbenchCommandLine.isAgentCoreCommand("workspace-edit"));
         assertTrue(WorkbenchCommandLine.isAgentCoreCommand("workspace-seed"));
     }
+
+    /**
+     * Consumer command: {@code execute-step --text-file=<absolute>} and the space form.
+     * A path inside the flag must not become the project (that lookup reports never-started).
+     */
+    @Test
+    void textFileAbsoluteAndSpaceFormsStayOnTheProject() throws Exception {
+        Path project = Path.of("").toAbsolutePath().normalize();
+        Path file = Files.createTempFile("pickleball-step", ".txt");
+        try {
+            Files.writeString(file, "INFO: harness \"quoted\" step\r\n", StandardCharsets.UTF_8);
+            String absolute = file.toAbsolutePath().normalize().toString();
+            WorkbenchCommandLine.Parsed equals = WorkbenchCommandLine.parse(new String[]{
+                    "execute-step", "--run-id=sim-compiled", "--text-file=" + absolute
+            });
+            assertEquals(project, equals.project());
+            assertEquals("sim-compiled", equals.coordination().runId());
+
+            WorkbenchCommandLine.Parsed spaced = WorkbenchCommandLine.parse(new String[]{
+                    "execute-step", "--run-id=sim-compiled", "--text-file", absolute
+            });
+            assertEquals(project, spaced.project());
+            assertEquals("sim-compiled", spaced.coordination().runId());
+
+            String windows = "C:\\abs\\consumer\\step.txt";
+            WorkbenchCommandLine.Parsed windowsEquals = WorkbenchCommandLine.parse(new String[]{
+                    "execute-step", "--run-id=sim-compiled", "--text-file=" + windows
+            });
+            assertEquals(project, windowsEquals.project());
+            WorkbenchCommandLine.Parsed windowsSpace = WorkbenchCommandLine.parse(new String[]{
+                    "execute-step", "--run-id=sim-compiled", "--text-file", windows
+            });
+            assertEquals(project, windowsSpace.project());
+
+            WorkbenchSessionCommands.SessionFlags flags = WorkbenchSessionCommands.SessionFlags.parse(new String[]{
+                    "execute-step", "--text-file=" + absolute
+            });
+            assertEquals("INFO: harness \"quoted\" step", flags.text);
+            WorkbenchSessionCommands.SessionFlags spacedFlags = WorkbenchSessionCommands.SessionFlags.parse(new String[]{
+                    "execute-step", "--text-file", absolute
+            });
+            assertEquals("INFO: harness \"quoted\" step", spacedFlags.text);
+        } finally {
+            Files.deleteIfExists(file);
+        }
+    }
 }

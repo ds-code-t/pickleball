@@ -355,7 +355,7 @@ public final class WorkbenchAttachServer implements AutoCloseable {
         if (value instanceof Map<?, ?> map) {
             return (Map<String, Object>) map;
         }
-        throw new IllegalArgumentException("Tool arguments must be a JSON object.");
+        throw new IllegalArgumentException("error: Tool arguments must be a JSON object.\nfix: Pass a JSON object.\n");
     }
 
     private static String string(Map<String, Object> body, String key) {

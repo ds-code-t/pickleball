@@ -41,7 +41,9 @@ import java.util.stream.Stream;
  * description such as {@code Note:} is not a keyword and does not force inclusion.</p>
  */
 public final class WorkbenchFeatureIndex {
-    static final int VERSION = 3;
+    static final int VERSION = 4;
+    /** The only feature-index implementation. A Rust sidecar was measured and not added. */
+    public static final String IMPLEMENTATION = "java";
     public static final String CACHE_FILE = "feature-index.v3";
     /** Inline {@code -D} list. Longer selections are a file so Windows can still start Maven. */
     static final int FEATURE_LIST_INLINE_LIMIT = 4000;
@@ -114,15 +116,172 @@ public final class WorkbenchFeatureIndex {
             List<Hit> hits,
             int filesIndexed,
             int filesReparsed,
-            int cacheHits
+            int cacheHits,
+            long elapsedMillis
     ) {
         public Selection {
             fallbackReason = fallbackReason == null ? "" : fallbackReason;
             hits = List.copyOf(hits == null ? List.of() : hits);
+            if (elapsedMillis < 0) elapsedMillis = 0;
         }
     }
 
     public static Selection select(Request request) {
+        long started = System.nanoTime();
+        Loaded loaded = load(request);
+        if (loaded.unreadable != null) {
+            return finish(started, new Selection(
+                    false, true, false,
+                    "unreadable feature " + loaded.unreadable,
+                    null, List.of(), loaded.fileCount, loaded.reparsed, loaded.cacheHits, 0
+            ));
+        }
+        TagExpression tags = TagExpression.compile(request.tags());
+        if (tags.unsupported()) {
+            return finish(started, new Selection(
+                    false, true, false,
+                    "unsupported tag expression: " + request.tags(),
+                    null, List.of(), loaded.fileCount, loaded.reparsed, loaded.cacheHits, 0
+            ));
+        }
+        Pattern name = compileName(request.name());
+        ExampleRowSelector example = compileExample(request.example());
+        List<FeatureLine> lines = parseSelectors(request.selects());
+        List<Hit> hits = new ArrayList<>();
+        List<String> forced = new ArrayList<>();
+        for (StoredFile file : loaded.stored) {
+            if (file.unindexable) {
+                forced.add(file.relativePath);
+                continue;
+            }
+            for (StoredScenario scenario : file.scenarios) {
+                hits.addAll(matchScenario(file, scenario, tags, name, example, lines));
+            }
+        }
+        hits.sort(Comparator
+                .comparing(Hit::relativePath)
+                .thenComparingInt(Hit::line)
+                .thenComparingInt(Hit::exampleRow));
+        boolean filtered = hasFilter(request, lines);
+        boolean lineSpecific = !lines.isEmpty();
+        Set<String> matchedFiles = new LinkedHashSet<>();
+        for (Hit hit : hits) matchedFiles.add(hit.relativePath());
+        Set<String> included = new LinkedHashSet<>(matchedFiles);
+        included.addAll(forced);
+        boolean coversAllFiles = !loaded.stored.isEmpty() && included.size() == loaded.stored.size();
+        boolean subset = !coversAllFiles || lineSpecific || (filtered && hits.isEmpty() && forced.isEmpty());
+        boolean narrowed = filtered && subset;
+        String property = null;
+        if (narrowed && (!hits.isEmpty() || !forced.isEmpty())) {
+            property = spillFeatureList(loaded.root, featureProperty(loaded.root, hits, lineSpecific, forced));
+        }
+        return finish(started, new Selection(
+                narrowed,
+                false,
+                narrowed && hits.isEmpty() && forced.isEmpty(),
+                "",
+                property,
+                hits,
+                loaded.stored.size(),
+                loaded.reparsed,
+                loaded.cacheHits,
+                0
+        ));
+    }
+
+    /**
+     * Scenarios already stored in {@code feature-index.v3}. The picker uses this list
+     * instead of parsing feature files a second time. A warm call does not re-read bytes
+     * whose size and mtime still match.
+     */
+    public static List<IndexedFeature> indexedFeatures(Request request) {
+        Loaded loaded = load(request);
+        List<IndexedFeature> features = new ArrayList<>();
+        for (StoredFile file : loaded.stored) {
+            features.add(indexedFeature(file));
+        }
+        return List.copyOf(features);
+    }
+
+    public record IndexedFeature(
+            String relativePath,
+            String featureName,
+            List<String> featureTags,
+            List<IndexedScenario> scenarios
+    ) {
+        public IndexedFeature {
+            relativePath = relativePath == null ? "" : relativePath;
+            featureName = featureName == null ? "" : featureName;
+            featureTags = List.copyOf(featureTags == null ? List.of() : featureTags);
+            scenarios = List.copyOf(scenarios == null ? List.of() : scenarios);
+        }
+    }
+
+    public record IndexedScenario(
+            String name,
+            int startLine,
+            int endLine,
+            int exampleRow,
+            int focusLine,
+            List<String> ownTags,
+            List<String> effectiveTags,
+            String exampleLabel
+    ) {
+        public IndexedScenario {
+            name = name == null ? "" : name;
+            ownTags = List.copyOf(ownTags == null ? List.of() : ownTags);
+            effectiveTags = List.copyOf(effectiveTags == null ? List.of() : effectiveTags);
+            exampleLabel = exampleLabel == null ? "" : exampleLabel;
+            if (focusLine <= 0) focusLine = startLine;
+        }
+    }
+
+    private static IndexedFeature indexedFeature(StoredFile file) {
+        List<IndexedScenario> scenarios = new ArrayList<>();
+        if (!file.unindexable) {
+            for (StoredScenario scenario : file.scenarios) {
+                LinkedHashSet<String> effective = new LinkedHashSet<>(scenario.tags);
+                for (StoredExample row : scenario.examples) effective.addAll(row.tags);
+                scenarios.add(new IndexedScenario(
+                        scenario.name,
+                        scenario.keywordLine,
+                        scenario.endLine,
+                        0,
+                        scenario.keywordLine,
+                        scenario.ownTags,
+                        List.copyOf(effective),
+                        ""
+                ));
+                for (StoredExample row : scenario.examples) {
+                    LinkedHashSet<String> rowTags = new LinkedHashSet<>(scenario.tags);
+                    rowTags.addAll(row.tags);
+                    scenarios.add(new IndexedScenario(
+                            scenario.name,
+                            scenario.keywordLine,
+                            scenario.endLine,
+                            row.row,
+                            row.line,
+                            scenario.ownTags,
+                            List.copyOf(rowTags),
+                            String.join(" | ", row.values)
+                    ));
+                }
+            }
+        }
+        return new IndexedFeature(file.relativePath, file.featureName, file.featureTags, scenarios);
+    }
+
+    private record Loaded(
+            Path root,
+            List<StoredFile> stored,
+            int reparsed,
+            int cacheHits,
+            int fileCount,
+            String unreadable
+    ) {
+    }
+
+    private static Loaded load(Request request) {
         Path root = request.projectRoot().toAbsolutePath().normalize();
         List<Path> files = discoverFiles(root, request.extraRoots());
         Path indexFile = cacheFile(root);
@@ -173,62 +332,43 @@ public final class WorkbenchFeatureIndex {
                 // The next select falls back to a full parse. Narrowing still uses this pass.
             }
         }
-        if (unreadable != null) {
-            return new Selection(
-                    false, true, false,
-                    "unreadable feature " + unreadable,
-                    null, List.of(), files.size(), reparsed, cacheHits
-            );
-        }
-        TagExpression tags = TagExpression.compile(request.tags());
-        if (tags.unsupported()) {
-            return new Selection(
-                    false, true, false,
-                    "unsupported tag expression: " + request.tags(),
-                    null, List.of(), files.size(), reparsed, cacheHits
-            );
-        }
-        Pattern name = compileName(request.name());
-        ExampleRowSelector example = compileExample(request.example());
-        List<FeatureLine> lines = parseSelectors(request.selects());
-        List<Hit> hits = new ArrayList<>();
-        List<String> forced = new ArrayList<>();
-        for (StoredFile file : stored) {
-            if (file.unindexable) {
-                forced.add(file.relativePath);
-                continue;
-            }
-            for (StoredScenario scenario : file.scenarios) {
-                hits.addAll(matchScenario(file, scenario, tags, name, example, lines));
+        return new Loaded(root, stored, reparsed, cacheHits, files.size(), unreadable);
+    }
+
+    /** Feature URIs the launch passes to Cucumber before a full tree scan. Empty means do not narrow. */
+    public static List<String> prefilteredFeatures(Selection selection) {
+        if (selection == null || selection.fullScanFallback() || !selection.narrowed()) return List.of();
+        String property = selection.featureProperty();
+        if (property == null || property.isBlank()) return List.of();
+        String value = property.strip();
+        if (value.startsWith("@")) {
+            try {
+                value = Files.readString(Path.of(value.substring(1).strip()));
+            } catch (IOException failure) {
+                return List.of();
             }
         }
-        hits.sort(Comparator
-                .comparing(Hit::relativePath)
-                .thenComparingInt(Hit::line)
-                .thenComparingInt(Hit::exampleRow));
-        boolean filtered = hasFilter(request, lines);
-        boolean lineSpecific = !lines.isEmpty();
-        Set<String> matchedFiles = new LinkedHashSet<>();
-        for (Hit hit : hits) matchedFiles.add(hit.relativePath());
-        Set<String> included = new LinkedHashSet<>(matchedFiles);
-        included.addAll(forced);
-        boolean coversAllFiles = !stored.isEmpty() && included.size() == stored.size();
-        boolean subset = !coversAllFiles || lineSpecific || (filtered && hits.isEmpty() && forced.isEmpty());
-        boolean narrowed = filtered && subset;
-        String property = null;
-        if (narrowed && (!hits.isEmpty() || !forced.isEmpty())) {
-            property = spillFeatureList(root, featureProperty(root, hits, lineSpecific, forced));
+        List<String> uris = new ArrayList<>();
+        for (String part : value.split(",")) {
+            String token = part.strip();
+            if (!token.isEmpty()) uris.add(token);
         }
+        return List.copyOf(uris);
+    }
+
+    private static Selection finish(long startedNanos, Selection selection) {
+        long elapsed = (System.nanoTime() - startedNanos) / 1_000_000L;
         return new Selection(
-                narrowed,
-                false,
-                narrowed && hits.isEmpty() && forced.isEmpty(),
-                "",
-                property,
-                hits,
-                stored.size(),
-                reparsed,
-                cacheHits
+                selection.narrowed(),
+                selection.fullScanFallback(),
+                selection.matchedNone(),
+                selection.fallbackReason(),
+                selection.featureProperty(),
+                selection.hits(),
+                selection.filesIndexed(),
+                selection.filesReparsed(),
+                selection.cacheHits(),
+                elapsed
         );
     }
 
@@ -585,7 +725,8 @@ public final class WorkbenchFeatureIndex {
         String currentName = null;
         int keywordLine = -1;
         int rangeStart = -1;
-        List<String> ownTags = List.of();
+        List<String> ownOnly = List.of();
+        List<String> effectiveTags = List.of();
         List<StoredExample> examples = new ArrayList<>();
         List<String> exampleHeader = null;
         List<String> exampleTags = List.of();
@@ -649,12 +790,13 @@ public final class WorkbenchFeatureIndex {
             if (starts(trimmed, "Scenario Outline:") || starts(trimmed, "Scenario Template:")
                     || starts(trimmed, "Scenario:") || starts(trimmed, "Example:")) {
                 if (currentName != null) {
-                    scenarios.add(scenario(currentName, keywordLine, rangeStart, lineNo - 1, ownTags, examples));
+                    scenarios.add(scenario(currentName, keywordLine, rangeStart, lineNo - 1, effectiveTags, ownOnly, examples));
                 }
                 currentName = trimmed.substring(trimmed.indexOf(':') + 1).strip();
                 keywordLine = lineNo;
                 rangeStart = pendingStart > 0 ? pendingStart : lineNo;
-                ownTags = merge(featureTags, ruleTags, pending);
+                ownOnly = List.copyOf(pending);
+                effectiveTags = merge(featureTags, ruleTags, pending);
                 pending.clear();
                 pendingStart = -1;
                 examples = new ArrayList<>();
@@ -707,10 +849,10 @@ public final class WorkbenchFeatureIndex {
             pendingStart = -1;
         }
         if (currentName != null) {
-            scenarios.add(scenario(currentName, keywordLine, rangeStart, rawLines.length, ownTags, examples));
+            scenarios.add(scenario(currentName, keywordLine, rangeStart, rawLines.length, effectiveTags, ownOnly, examples));
         }
         if (unindexable) scenarios = List.of();
-        return new StoredFile(relative, hash, featureName, scenarios, unindexable);
+        return new StoredFile(relative, hash, featureName, featureTags, scenarios, unindexable);
     }
 
     /**
@@ -778,9 +920,10 @@ public final class WorkbenchFeatureIndex {
             int rangeStart,
             int endLine,
             List<String> tags,
+            List<String> ownTags,
             List<StoredExample> examples
     ) {
-        return new StoredScenario(name, keywordLine, rangeStart, Math.max(keywordLine, endLine), tags, examples);
+        return new StoredScenario(name, keywordLine, rangeStart, Math.max(keywordLine, endLine), tags, ownTags, examples);
     }
 
     private static List<String> merge(List<String> feature, List<String> rule, List<String> own) {
@@ -859,6 +1002,7 @@ public final class WorkbenchFeatureIndex {
             int rangeStart,
             int endLine,
             List<String> tags,
+            List<String> ownTags,
             List<StoredExample> examples
     ) {
     }
@@ -867,6 +1011,7 @@ public final class WorkbenchFeatureIndex {
             String relativePath,
             String sha256,
             String featureName,
+            List<String> featureTags,
             List<StoredScenario> scenarios,
             boolean unindexable
     ) {
@@ -918,6 +1063,7 @@ public final class WorkbenchFeatureIndex {
             out.writeUTF(file.relativePath);
             out.writeUTF(file.sha256);
             out.writeUTF(file.featureName == null ? "" : file.featureName);
+            writeList(out, file.featureTags);
             out.writeBoolean(file.unindexable);
             out.writeInt(file.scenarios.size());
             for (StoredScenario scenario : file.scenarios) {
@@ -926,6 +1072,7 @@ public final class WorkbenchFeatureIndex {
                 out.writeInt(scenario.rangeStart);
                 out.writeInt(scenario.endLine);
                 writeList(out, scenario.tags);
+                writeList(out, scenario.ownTags);
                 out.writeInt(scenario.examples.size());
                 for (StoredExample example : scenario.examples) {
                     out.writeInt(example.line);
@@ -943,6 +1090,7 @@ public final class WorkbenchFeatureIndex {
             String path = in.readUTF();
             String hash = in.readUTF();
             String feature = in.readUTF();
+            List<String> featureTags = readList(in);
             boolean unindexable = in.readBoolean();
             int scenarios = in.readInt();
             List<StoredScenario> parsed = new ArrayList<>();
@@ -952,6 +1100,7 @@ public final class WorkbenchFeatureIndex {
                 int range = in.readInt();
                 int end = in.readInt();
                 List<String> tags = readList(in);
+                List<String> own = readList(in);
                 int examples = in.readInt();
                 List<StoredExample> rows = new ArrayList<>();
                 for (int row = 0; row < examples; row++) {
@@ -960,9 +1109,9 @@ public final class WorkbenchFeatureIndex {
                             readList(in), readList(in), readList(in)
                     ));
                 }
-                parsed.add(new StoredScenario(name, keyword, range, end, tags, rows));
+                parsed.add(new StoredScenario(name, keyword, range, end, tags, own, rows));
             }
-            return new StoredFile(path, hash, feature, parsed, unindexable);
+            return new StoredFile(path, hash, feature, featureTags, parsed, unindexable);
         }
 
         private static void writeList(DataOutputStream out, List<String> values) throws IOException {

@@ -7,6 +7,7 @@ import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 
 import javax.xml.parsers.DocumentBuilderFactory;
+
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
@@ -27,6 +28,11 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+
+import tools.dscode.control.protocol.PickleballLocalLayout;
+import tools.dscode.control.protocol.WorkbenchFeatureIndex;
+import tools.dscode.control.protocol.speed.ClasspathCache;
+import tools.dscode.control.protocol.speed.InputFingerprint;
 
 /** Uses the consumer build once, then materializes one effective Workbench live runtime. */
 public final class WorkbenchSynchronizer {
@@ -49,6 +55,12 @@ public final class WorkbenchSynchronizer {
     }
 
     public WorkbenchManifest sync(Path requestedProject) {
+        try {
+            WorkbenchManifest cached = syncFromClasspathCache(requestedProject);
+            if (cached != null) return cached;
+        } catch (RuntimeException ignored) {
+            // Cache materialize is optional. The wrapper path below still runs.
+        }
         WorkbenchProject project = WorkbenchProject.locate(requestedProject);
         Path stateRoot = WorkbenchManifest.workbenchRoot(project.root());
         WorkbenchManifest previous = WorkbenchManifest.readIfPresent(stateRoot);
@@ -133,12 +145,8 @@ public final class WorkbenchSynchronizer {
         );
         String fingerprint = fingerprint(stagedBaseClasses, dependencies);
         Path finalBaseClasses = stateRoot.resolve("base").resolve("classes").toAbsolutePath().normalize();
-        Path finalLiveClasses = stateRoot.resolve("live").resolve("classes").toAbsolutePath().normalize();
-
-        List<String> classpathEntries = new ArrayList<>(dependencies.size() + 1);
-        classpathEntries.add(finalLiveClasses.toString());
-        classpathEntries.addAll(dependencies);
-        assertNoBaseClasspath(stateRoot, classpathEntries);
+        Path finalLiveClasses = PickleballLocalLayout.liveClasses(stateRoot);
+        List<String> classpathEntries = workerClasspath(stateRoot, dependencies);
 
         WorkbenchManifest manifest = new WorkbenchManifest(
                 WorkbenchManifest.CURRENT_SCHEMA,
@@ -172,7 +180,7 @@ public final class WorkbenchSynchronizer {
         );
 
         Path stagedManifest = staging.resolve("manifest.json");
-        Path stagedClasspath = staging.resolve("classpath.txt");
+        Path stagedClasspath = staging.resolve(PickleballLocalLayout.WORKER_CLASSPATH_FILE);
         manifest.write(stagedManifest);
         writeLines(stagedClasspath, classpathEntries);
 
@@ -180,13 +188,99 @@ public final class WorkbenchSynchronizer {
         replaceDirectory(stagedBase, stateRoot.resolve("base"));
         replaceDirectory(stagedLive, stateRoot.resolve("live"));
         replaceFile(stagedManifest, stateRoot.resolve("manifest.json"));
-        replaceFile(stagedClasspath, stateRoot.resolve("classpath.txt"));
+        replaceFile(stagedClasspath, stateRoot.resolve(PickleballLocalLayout.WORKER_CLASSPATH_FILE));
         return manifest;
+    }
+
+    /**
+     * When discover already resolved this pom hash and test classes exist,
+     * copy them into the live tree. No wrapper process.
+     */
+    static WorkbenchManifest syncFromClasspathCache(Path requestedProject) {
+        WorkbenchProject project = WorkbenchProject.locate(requestedProject);
+        Path root = project.root();
+        String hash = InputFingerprint.lockHash(root);
+        Path stateRoot = WorkbenchManifest.workbenchRoot(root);
+        ClasspathCache.Hit hit = ClasspathCache.load(stateRoot, hash);
+        if (!hit.hit()) return null;
+        List<OutputPath> outputs = new ArrayList<>();
+        List<String> dependencies = new ArrayList<>();
+        for (String entry : hit.entries()) {
+            Path path = Path.of(entry).toAbsolutePath().normalize();
+            if (!Files.exists(path)) return null;
+            if (isProjectOutput(root, path) && Files.isDirectory(path)) {
+                outputs.add(new OutputPath(path.toString().contains("test") ? "TEST" : "MAIN", path));
+            } else if (Files.exists(path)) {
+                dependencies.add(path.toString());
+            }
+        }
+        if (outputs.isEmpty() || dependencies.isEmpty()) return null;
+        Path staging = stateRoot.resolve(".sync-cache-" + UUID.randomUUID());
+        createDirectories(staging);
+        try {
+            return materialize(
+                    project,
+                    new SyncMetadata(sourceRoots(root), outputs, dependencies),
+                    staging,
+                    stateRoot,
+                    WorkbenchSyncMode.SKIPPED
+            );
+        } finally {
+            deleteTree(staging);
+        }
+    }
+
+    private static boolean isProjectOutput(Path root, Path path) {
+        Path target = root.resolve("target");
+        Path build = root.resolve("build");
+        return path.startsWith(target) || path.startsWith(build);
+    }
+
+    private static List<Path> sourceRoots(Path root) {
+        List<Path> roots = new ArrayList<>();
+        for (String relative : List.of("src/main/java", "src/test/java", "src/main/resources", "src/test/resources")) {
+            Path path = root.resolve(relative);
+            if (Files.isDirectory(path)) roots.add(path);
+        }
+        if (roots.isEmpty()) roots.add(root.resolve("src/test/java"));
+        return roots;
+    }
+
+    /** Index the catalog while sync runs. Sync failure still throws. Index failure does not. */
+    public static WorkbenchManifest syncOverlapped(Path project) {
+        String mode = System.getProperty("pkb_workbench_speed");
+        if (mode == null) mode = System.getenv("PKB_WORKBENCH_SPEED");
+        if (mode != null && "sequential".equalsIgnoreCase(mode.trim())) {
+            return new WorkbenchSynchronizer().sync(project);
+        }
+        java.util.concurrent.atomic.AtomicReference<WorkbenchManifest> manifest = new java.util.concurrent.atomic.AtomicReference<>();
+        java.util.concurrent.atomic.AtomicReference<RuntimeException> failure = new java.util.concurrent.atomic.AtomicReference<>();
+        tools.dscode.control.protocol.speed.StageScheduler.run(List.of(
+                        new tools.dscode.control.protocol.speed.StageScheduler.Task("sync", () -> {
+                            try {
+                                manifest.set(new WorkbenchSynchronizer().sync(project));
+                                return "sync";
+                            } catch (RuntimeException syncFailure) {
+                                failure.set(syncFailure);
+                                throw syncFailure;
+                            }
+                        }),
+                        new tools.dscode.control.protocol.speed.StageScheduler.Task("index", () -> {
+                            WorkbenchFeatureIndex.select(new WorkbenchFeatureIndex.Request(
+                                    project, List.of(), null, null, null, List.of(), false
+                            ));
+                            return "index";
+                        })
+                ), true);
+        if (failure.get() != null) throw failure.get();
+        WorkbenchManifest done = manifest.get();
+        if (done != null) return done;
+        return new WorkbenchSynchronizer().sync(project);
     }
 
     public static List<String> readWorkerClasspath(Path projectRoot) {
         Path stateRoot = WorkbenchManifest.workbenchRoot(projectRoot);
-        Path file = stateRoot.resolve("classpath.txt");
+        Path file = stateRoot.resolve(PickleballLocalLayout.WORKER_CLASSPATH_FILE);
         try {
             List<String> entries = Files.readAllLines(file, StandardCharsets.UTF_8).stream()
                     .map(String::trim)
@@ -196,10 +290,10 @@ public final class WorkbenchSynchronizer {
                 throw new IllegalStateException("Workbench classpath is empty: " + file);
             }
             assertNoBaseClasspath(stateRoot, entries);
-            Path expectedLive = stateRoot.resolve("live").resolve("classes").toAbsolutePath().normalize();
-            if (!Path.of(entries.getFirst()).toAbsolutePath().normalize().equals(expectedLive)) {
+            if (!PickleballLocalLayout.startsWithLiveClasses(stateRoot, entries)) {
                 throw new IllegalStateException(
-                        "Workbench classpath must start with the one effective live output: " + expectedLive
+                        "Workbench classpath must start with the one effective live output: "
+                                + PickleballLocalLayout.liveClasses(stateRoot)
                 );
             }
             return entries;
@@ -208,11 +302,41 @@ public final class WorkbenchSynchronizer {
         }
     }
 
+    /**
+     * One worker classpath: live classes, then captured dependencies.
+     * {@code base/classes} is never an entry. Sync is the only writer of
+     * {@code classpath.txt}; a skip rebuilds this list instead of keeping a
+     * file another step replaced.
+     */
+    static List<String> workerClasspath(Path stateRoot, List<String> dependencies) {
+        Path live = PickleballLocalLayout.liveClasses(stateRoot);
+        List<String> entries = new ArrayList<>();
+        entries.add(live.toString());
+        if (dependencies != null) {
+            for (String dependency : dependencies) {
+                if (dependency == null || dependency.isBlank()) continue;
+                Path path = Path.of(dependency).toAbsolutePath().normalize();
+                if (path.equals(live)) continue;
+                entries.add(path.toString());
+            }
+        }
+        assertNoBaseClasspath(stateRoot, entries);
+        return entries;
+    }
+
+    private static void ensureWorkerClasspath(Path stateRoot, List<String> dependencies) {
+        writeLines(
+                stateRoot.resolve(PickleballLocalLayout.WORKER_CLASSPATH_FILE),
+                workerClasspath(stateRoot, dependencies)
+        );
+    }
+
     private WorkbenchManifest skip(
             WorkbenchManifest previous,
             WorkbenchSyncInputs inputs,
             Path stateRoot
     ) {
+        ensureWorkerClasspath(stateRoot, previous.dependencyClasspath());
         WorkbenchManifest updated = previous.withSkip(Instant.now().toString(), inputs);
         updated.write(stateRoot.resolve("manifest.json"));
         return updated;

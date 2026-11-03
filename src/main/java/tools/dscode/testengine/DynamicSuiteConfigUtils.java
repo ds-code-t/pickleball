@@ -1,7 +1,7 @@
 package tools.dscode.testengine;
 
-import java.util.ArrayList;
-import java.util.Arrays;
+import tools.dscode.common.resources.PathLists;
+
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -20,11 +20,11 @@ public final class DynamicSuiteConfigUtils {
     }
 
     public static List<String> getGluePaths() {
-        return splitCommaSeparated(getFirstNonBlank(PKB_GLUE, GLUE_PROPERTY_NAME));
+        return PathLists.split(getFirstNonBlank(PKB_GLUE, GLUE_PROPERTY_NAME));
     }
 
     public static List<String> getFeaturePaths() {
-        return splitCommaSeparated(getFirstNonBlank(PKB_FEATURES, FEATURES_PROPERTY_NAME));
+        return PathLists.split(getFirstNonBlank(PKB_FEATURES, FEATURES_PROPERTY_NAME));
     }
 
     public static String getTags() {
@@ -50,20 +50,5 @@ public final class DynamicSuiteConfigUtils {
             }
         }
         return null;
-    }
-
-    private static List<String> splitCommaSeparated(String value) {
-        if (value == null || value.isBlank()) {
-            return List.of();
-        }
-
-        List<String> out = new ArrayList<>();
-        for (String part : Arrays.asList(value.split(","))) {
-            String trimmed = part == null ? null : part.trim();
-            if (trimmed != null && !trimmed.isEmpty()) {
-                out.add(trimmed);
-            }
-        }
-        return List.copyOf(out);
     }
 }

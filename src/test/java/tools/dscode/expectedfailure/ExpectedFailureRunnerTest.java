@@ -143,6 +143,10 @@ class ExpectedFailureRunnerTest {
         assertNotNull(thrown, scenarioName);
         assertTrue(messageEquals(thrown, expectedMessage), () -> scenarioName + " failure was " + describe(thrown));
         assertEquals(soft, hasSoft(thrown), () -> scenarioName + " soft/hard mismatch: " + describe(thrown));
+        // 2.1.17 bug 4: report tools that show only the top-level message showed nothing.
+        assertNotNull(thrown.getMessage(), () -> scenarioName + " top-level message is null: " + describe(thrown));
+        assertTrue(thrown.getMessage().contains(expectedMessage),
+                () -> scenarioName + " top-level message lacks the failure text: " + describe(thrown));
     }
 
     private static ExpectedFailureSteps.Snapshot observation(String scenarioName) {

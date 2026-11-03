@@ -160,9 +160,13 @@ public record WorkbenchSyncInputs(
         }
     }
 
+    /**
+     * Live classes and the manifest are the snapshot. {@code classpath.txt} is
+     * rebuilt from that manifest on skip, so a missing or reordered file does
+     * not force another compile.
+     */
     static boolean snapshotReady(Path stateRoot) {
         return Files.isDirectory(stateRoot.resolve("live").resolve("classes"))
-                && Files.isRegularFile(stateRoot.resolve("classpath.txt"))
                 && Files.isRegularFile(stateRoot.resolve("manifest.json"));
     }
 

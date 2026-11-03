@@ -342,4 +342,22 @@ class ConsumerMavenTestRunnerTest {
         }
         return false;
     }
+
+    @Test
+    void offlineResolutionFailureTriggersOneOnlineRetryCommand() {
+        String surefire = "[ERROR] Cannot access central (https://repo.maven.apache.org/maven2) in offline mode and the artifact "
+                + "org.apache.maven.plugins:maven-surefire-plugin:jar:3.5.2 has not been downloaded from it before.";
+        assertTrue(ConsumerMavenTestRunner.offlineResolutionFailure(surefire));
+        assertTrue(ConsumerMavenTestRunner.offlineResolutionFailure("artifact x has not been downloaded from it before."));
+        assertFalse(ConsumerMavenTestRunner.offlineResolutionFailure("[ERROR] Tests run: 1, Failures: 1"));
+        assertFalse(ConsumerMavenTestRunner.offlineResolutionFailure(null));
+
+        List<String> maven = List.of("/p/mvnw", "-o", "-q", "test", "-Dpkb_tags=@one");
+        assertTrue(ConsumerMavenTestRunner.hasOfflineFlag(maven));
+        assertEquals(List.of("/p/mvnw", "-q", "test", "-Dpkb_tags=@one"), ConsumerMavenTestRunner.withoutOffline(maven));
+        List<String> gradle = List.of("/p/gradlew", "--offline", "test");
+        assertTrue(ConsumerMavenTestRunner.hasOfflineFlag(gradle));
+        assertEquals(List.of("/p/gradlew", "test"), ConsumerMavenTestRunner.withoutOffline(gradle));
+        assertFalse(ConsumerMavenTestRunner.hasOfflineFlag(List.of("/p/mvnw", "-q", "test")));
+    }
 }

@@ -30,6 +30,8 @@ Each stronger source overwrites the same key from weaker sources. The naming is 
 
 The fully resolved normal RunVars become the in-memory `default_profile`. If neither `pkb_profile` nor `pkb_runvars` is supplied, that normal configuration becomes the effective RunVar set and is serialized into `pkb_run_profile`.
 
+`pickleball_local2.properties` is a third property file. It overwrites `pickleball_local.properties`, which overwrites `pickleball.properties`. `ProjectPropertySources` is the only reader. A normal launch reads classpath resources only, as ISO-8859-1 (`Properties.load(InputStream)`), which is the pre-2.1.18 behavior. UTF-8 bytes for é (`C3 A9`) in a classpath file are not the character é. Project-root and `src/test/resources` copies are read only for a Workbench seed, dry-run, or protected-reference lookup, as UTF-8, and they overwrite the classpath value of the same key. Those same bytes in a Workbench project file are é. A bad `\u` escape throws instead of being skipped. A normal launch and Workbench `hint` / `resolve-runvars` both construct the runner and call `resolveShared`, so `globalTestDefaults()` and `globalTestProperties()` are in the preview when the consumer runner is visible. The dry-run prints the Workbench launch default `pkb_reportingmode=diagnostic` for a blank saved copy. That default is written into the copy once; a later prepare does not rewrite an unchanged copy. A Workbench launch then reads the saved workspace copy with `Workspace.loadForLaunch` and does not apply hooks or property files again. See [One resolution path](ai-run-configuration.md#one-resolution-path).
+
 ```java
 @Override
 public void globalTestDefaults() {
@@ -539,6 +541,8 @@ session-start progress elapsed=12000ms stage=compile
 The stage is the latest `progress stage=` line in the session log or in a worker `*.err.log` under the Workbench `logs` directory (`compile`, `classpath`, `worker-launch`, `anchor-parse`, `paused`). Before any marker the stage is `starting / Maven resolve or feature index`. A start that is healthy before the first interval prints no progress line.
 
 A session-start timeout names the current stage, the elapsed time, per-stage durations, the last 20 lines of the relevant log, and this hint: raise the limit with `-Dpkb_workbench_worker_start_timeout=N`, `PKB_WORKBENCH_WORKER_START_TIMEOUT`, or a `pkb_runvars` member `pkb_workbench_worker_start_timeout`. Stage enter times are written to `.pickleball/runs/<run-id>/session/startup-progress.json`. A worker startup timeout still names the elapsed time, the stage, and the last worker output.
+
+The warm JVM used by a classpath-cache hit stays up across separate CLI commands. `stop`, a session-start timeout, and a session that exits before it is healthy kill that JVM and its process tree. A one-shot CLI process is not an owner. Owner death applies only to a long-lived owner: the Workbench UI, the MCP host, or the session process. It also exits when it has been idle. Idle does not fire during a run. `pkb_workbench_warm_idle_timeout` uses the same four places as the worker start timeout: system property, `PKB_WORKBENCH_WARM_IDLE_TIMEOUT`, dotted `pkb_runvars.pkb_workbench_warm_idle_timeout`, and a compact `pkb_runvars` member. The default is 900 seconds. Blank, non-numeric, or non-positive stays 900. The number is read when the warm JVM starts.
 
 ## Repeat ceilings
 

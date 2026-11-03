@@ -53,7 +53,8 @@ final class SessionHealthWait {
     }
 
     /**
-     * Same order as the Workbench worker {@code startTimeout}:
+     * Same key order as the Workbench worker {@code startTimeout}.
+     * This duration is the outer health wait. The worker deadline is shorter.
      * system property, environment, dotted {@code pkb_runvars} property,
      * compact {@code pkb_runvars}, then the same two keys on {@code properties}.
      * Blank, non-numeric, or not greater than zero stays {@link #DEFAULT_TIMEOUT}.
@@ -176,7 +177,7 @@ final class SessionHealthWait {
         StageHit hit = latestStage(logCandidates(project, sessionLog));
         Path relevant = hit != null && hit.file != null ? hit.file : sessionLog;
         StringBuilder text = new StringBuilder();
-        text.append("Workbench session did not become healthy within ")
+        text.append("error: Workbench session did not become healthy within ")
                 .append(budget)
                 .append(" (elapsed=")
                 .append(shown)
@@ -185,6 +186,7 @@ final class SessionHealthWait {
                 .append(").")
                 .append(System.lineSeparator());
         text.append("stages: ").append(marks.durations(shown)).append(System.lineSeparator());
+        text.append("startup-timing: ").append(marks.durations(shown)).append(System.lineSeparator());
         text.append("last-log:").append(System.lineSeparator());
         List<String> lines = tailLines(relevant, TAIL_LINES);
         if (lines.isEmpty()) {
@@ -194,7 +196,7 @@ final class SessionHealthWait {
                 text.append(line).append(System.lineSeparator());
             }
         }
-        text.append("Raise the limit with -D")
+        text.append("fix: Raise the limit with -D")
                 .append(START_TIMEOUT_PROPERTY)
                 .append("=N, the environment variable ")
                 .append(START_TIMEOUT_ENV)

@@ -20,6 +20,7 @@ import com.fasterxml.jackson.dataformat.yaml.YAMLMapper;
 
 import tools.dscode.common.dataelements.DataQueryException;
 import tools.dscode.common.dataelements.StructuredDataConverter;
+import tools.dscode.common.resources.PathLists;
 import tools.dscode.common.resources.ResourceLocations;
 import tools.dscode.control.protocol.PickleballPaths;
 
@@ -120,6 +121,29 @@ public final class FileAndDataParsing {
                 resolveTemplates
         );
         return queryLoaded(resolved, split.queryPath(), split.boundarySegment());
+    }
+
+    /**
+     * First non-null document across a comma-separated data-root list.
+     * A value with no comma is the single root, unchanged.
+     */
+    public static JsonNode buildJsonFromDataRoots(String roots, String resourcePath) {
+        return buildJsonFromDataRoots(roots, resourcePath, true);
+    }
+
+    public static JsonNode buildJsonFromDataRoots(
+            String roots,
+            String resourcePath,
+            boolean resolveTemplates
+    ) {
+        if (roots == null || roots.indexOf(',') < 0) {
+            return buildJsonFromPathUnderRoot(roots, resourcePath, resolveTemplates);
+        }
+        for (String root : PathLists.split(roots)) {
+            JsonNode found = buildJsonFromPathUnderRoot(root, resourcePath, resolveTemplates);
+            if (found != null) return found;
+        }
+        return null;
     }
 
     public static JsonNode readDirectory(Path root, boolean resolveTemplates) {

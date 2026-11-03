@@ -1,8 +1,12 @@
 package tools.dscode.workbench;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import tools.dscode.control.protocol.ControlBridgeCallResult;
+import tools.dscode.control.protocol.ControlBridgeError;
 import tools.dscode.control.protocol.ControlBridgePageQueryResult;
 import tools.dscode.control.protocol.ExampleRowSelector;
+import tools.dscode.control.protocol.SessionDescriptor;
+import tools.dscode.control.protocol.SessionStepGate;
 import tools.dscode.control.protocol.WindowDriver;
 import tools.dscode.workbench.catalog.ConsumerFeatureCatalog;
 import tools.dscode.workbench.lease.WorkbenchCallContext;
@@ -51,6 +55,7 @@ public final class WorkbenchSessionActions {
             "stop",
             "show-run",
             "close-window",
+            "open-ui",
             "inspect-page",
             "find-element"
     );
@@ -74,6 +79,7 @@ public final class WorkbenchSessionActions {
     private final WorkbenchServices services;
     private volatile Window window;
     private volatile String selectedDiagnosticRun = "";
+    private static final ObjectMapper JSON = new ObjectMapper();
 
     public WorkbenchSessionActions(WorkbenchServices services) {
         this.services = Objects.requireNonNull(services, "services");
@@ -143,6 +149,7 @@ public final class WorkbenchSessionActions {
     }
 
     public Map<String, Object> pause() {
+        services.noteSessionState(SessionDescriptor.State.PAUSED);
         if (window != null) {
             show(Window::pause);
             return accepted("pause", "PAUSED");
@@ -152,6 +159,7 @@ public final class WorkbenchSessionActions {
     }
 
     public Map<String, Object> stopPlayback() {
+        services.noteSessionState(SessionDescriptor.State.PAUSED);
         if (window != null) {
             show(Window::stopPlayback);
             return accepted("stop", "STOPPED");
@@ -169,12 +177,15 @@ public final class WorkbenchSessionActions {
             throw new IllegalArgumentException("execute-step text must not be blank.");
         }
         ControlBridgeCallResult result = services.executeStep(text, "");
-        LinkedHashMap<String, Object> payload = new LinkedHashMap<>();
-        String status = result != null && "SUCCESS".equals(result.status()) ? "SUCCESS" : "FAILED";
-        payload.put("status", status);
-        payload.put("op", "execute-step");
-        payload.put("playback", status);
-        return payload;
+        if (result != null && "SUCCESS".equals(result.status())) {
+            LinkedHashMap<String, Object> payload = new LinkedHashMap<>();
+            payload.put("status", "SUCCESS");
+            payload.put("op", "execute-step");
+            payload.put("playback", "SUCCESS");
+            if (result.valueText() != null) payload.put("valueText", result.valueText());
+            return payload;
+        }
+        return bridgeFailure("execute-step", result);
     }
 
     public Map<String, Object> insertStep(String text) {
@@ -350,6 +361,7 @@ public final class WorkbenchSessionActions {
             case "stop" -> stopPlayback();
             case "show-run" -> showRun(first(args, "runId", "run"), args.get("agent"), Boolean.parseBoolean(args.get("claim")));
             case "close-window" -> closeWindow();
+            case "open-ui" -> openUi(first(args, "runId", "run"), args.get("agent"));
             case "inspect-page" -> pageQuery(null, null);
             case "find-element" -> pageQuery(args.get("category"), args.get("text"));
             default -> throw new IllegalArgumentException("Unknown session command: " + op);
@@ -360,6 +372,19 @@ public final class WorkbenchSessionActions {
         String phrase = args.get("stopAfter");
         if (phrase == null || phrase.isBlank()) return;
         services.player().stopAfter(phrase);
+    }
+
+    public Map<String, Object> openUi(String runId, String agentId) {
+        if (java.awt.GraphicsEnvironment.isHeadless()) {
+            return accepted("open-ui", "HEADLESS");
+        }
+        Thread thread = new Thread(
+                () -> tools.dscode.workbench.ui.WorkbenchUi.launch(services.projectRoot(), runId, agentId),
+                "pickleball-workbench-open-ui"
+        );
+        thread.setDaemon(true);
+        thread.start();
+        return accepted("open-ui", "OPENING");
     }
 
     public Map<String, Object> showRun(String runId, String agentId, boolean claim) {
@@ -421,6 +446,7 @@ public final class WorkbenchSessionActions {
     }
 
     private Map<String, Object> play(boolean fromHere, String stepId) {
+        services.noteSessionState(SessionDescriptor.State.RUNNING);
         if (window != null) {
             show(client -> {
                 if (fromHere) client.playFromHere(stepId);
@@ -445,14 +471,25 @@ public final class WorkbenchSessionActions {
             else services.playback().playFromStart();
             int executed = 0;
             int guard = Math.max(1, services.playback().playPlan().steps().size()) + 2;
+            String runId = services.sessionRunId();
             while (services.playback().running() && executed < guard) {
+                if (runId != null) {
+                    SessionDescriptor.State state = SessionStepGate.awaitAdvance(
+                            services.projectRoot(), runId, SessionStepGate.DEFAULT_WAIT
+                    );
+                    if (state == SessionDescriptor.State.PAUSED
+                            || state == SessionDescriptor.State.STOPPING
+                            || state == SessionDescriptor.State.STOPPED) {
+                        break;
+                    }
+                }
                 GherkinPlayPlan.Step step = services.playback().nextPlanStep().orElse(null);
                 if (step == null) break;
                 int before = services.playback().planIndex();
                 ControlBridgeCallResult result = services.executeStep(step.executeText(), "");
                 executed++;
                 if (result == null || !"SUCCESS".equals(result.status())) {
-                    LinkedHashMap<String, Object> failed = failed(op, result == null ? "no result" : result.status());
+                    Map<String, Object> failed = bridgeFailure(op, result);
                     failed.put("steps", executed);
                     return failed;
                 }
@@ -539,6 +576,52 @@ public final class WorkbenchSessionActions {
         payload.put("op", op);
         payload.put("playback", playback);
         return payload;
+    }
+
+    static LinkedHashMap<String, Object> bridgeFailure(String op, ControlBridgeCallResult result) {
+        LinkedHashMap<String, Object> payload = new LinkedHashMap<>();
+        payload.put("status", "FAILED");
+        payload.put("op", op);
+        payload.put("playback", "FAILED");
+        ControlBridgeError error = result == null ? null : result.error();
+        String code = error == null || error.type() == null || error.type().isBlank()
+                ? "FAILED"
+                : error.type();
+        String message = error == null || error.message() == null || error.message().isBlank()
+                ? (result == null || result.status() == null || result.status().isBlank() ? "no result" : result.status())
+                : error.message();
+        String cause = error == null || error.stackTrace() == null ? "" : error.stackTrace();
+        String valueText = result == null || result.valueText() == null ? "" : result.valueText();
+        payload.put("text", "error: " + message);
+        payload.put("message", message);
+        payload.put("valueText", valueText);
+        LinkedHashMap<String, Object> failure = new LinkedHashMap<>();
+        failure.put("code", code);
+        failure.put("message", message);
+        failure.put("cause", cause);
+        failure.put("valueText", valueText);
+        payload.put("failureJson", failure);
+        LinkedHashMap<String, Object> nested = new LinkedHashMap<>();
+        nested.put("type", code);
+        nested.put("message", message);
+        nested.put("stackTrace", cause);
+        payload.put("error", nested);
+        return payload;
+    }
+
+    public static String render(Map<String, Object> payload, boolean json) {
+        if (json) {
+            try {
+                return JSON.writeValueAsString(payload == null ? Map.of() : payload);
+            } catch (com.fasterxml.jackson.core.JsonProcessingException failure) {
+                throw new IllegalStateException("Could not write JSON.", failure);
+            }
+        }
+        Object text = payload == null ? null : payload.get("text");
+        if (text != null && !text.toString().isBlank()) return text.toString();
+        Object message = payload == null ? null : payload.get("message");
+        if (message != null && !message.toString().isBlank()) return "error: " + message;
+        return "";
     }
 
     private static LinkedHashMap<String, Object> failed(String op, String message) {

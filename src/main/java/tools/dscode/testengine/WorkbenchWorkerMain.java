@@ -1,6 +1,7 @@
 package tools.dscode.testengine;
 
 import io.cucumber.core.cli.Main;
+import tools.dscode.common.resources.PathLists;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -40,8 +41,8 @@ public final class WorkbenchWorkerMain {
 
     private static void addGlue(List<String> args, String glue) {
         if (glue == null || glue.isBlank()) return;
-        for (String value : glue.split(",")) {
-            addGlueIfMissing(args, value.trim());
+        for (String value : PathLists.split(glue)) {
+            addGlueIfMissing(args, value);
         }
     }
 

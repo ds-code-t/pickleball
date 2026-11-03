@@ -4,10 +4,14 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import tools.dscode.common.coordination.AgentCoordination;
 import tools.dscode.common.runtime.ProcessTrees;
+import tools.dscode.control.protocol.FailureRecord;
+import tools.dscode.control.protocol.OutputFormatter;
 import tools.dscode.control.protocol.PickleballLocalLayout;
 import tools.dscode.control.protocol.RunView;
+import tools.dscode.control.protocol.SecretRedactor;
 import tools.dscode.control.protocol.SleepGapMonitor;
 import tools.dscode.control.protocol.WindowDriver;
+import tools.dscode.control.protocol.Workspace;
 
 import java.io.IOException;
 import java.io.PrintStream;
@@ -15,11 +19,15 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Base64;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -118,31 +126,50 @@ public final class WorkbenchSessionCommands {
             err.println(failure.getMessage());
             return 2;
         }
+        SecretRedactor.noteAssignments(parsed.runVars());
+        noteWorkspaceSecrets(parsed);
+        PrintStream safeOut = OutputFormatter.wrap(out);
+        PrintStream safeErr = OutputFormatter.wrap(err);
         try {
             return switch (parsed.command()) {
-                case "isolate", "session-start" -> sessionStart(parsed, out, err, starter, http);
-                case "execute-step" -> executeStep(parsed, flags, out, err, http);
-                case "insert-step", "update-step" -> textCommand(parsed, flags, out, err, http);
-                case "open-scenario" -> openScenario(parsed, flags, out, err, http);
-                case "example" -> example(parsed, flags, out, err, http);
-                case "diagnostic-run" -> diagnosticRun(parsed, flags, out, err, http);
+                case "isolate", "session-start" -> sessionStart(parsed, flags, safeOut, safeErr, starter, http);
+                case "execute-step" -> executeStep(parsed, flags, safeOut, safeErr, http);
+                case "insert-step", "update-step" -> textCommand(parsed, flags, safeOut, safeErr, http);
+                case "open-scenario" -> openScenario(parsed, flags, safeOut, safeErr, http);
+                case "example" -> example(parsed, flags, safeOut, safeErr, http);
+                case "diagnostic-run" -> diagnosticRun(parsed, flags, safeOut, safeErr, http);
                 case "play", "from-here", "pause", "save", "refresh",
                      "session-sync", "worker-start", "worker-restart", "worker-stop" ->
-                        postCommand(parsed, flags, out, err, http);
-                case "status" -> status(parsed, flags, out, err, http);
-                case "events" -> events(parsed, out, err, http);
-                case "stop", "kill" -> stop(parsed, flags, out, err, http);
-                case "open-window" -> openWindow(parsed, out, err, http, uiStarter);
-                case "close-window" -> closeWindow(parsed, out, err, http);
-                case "show-run" -> showRun(parsed, out, err, http);
+                        postCommand(parsed, flags, safeOut, safeErr, http);
+                case "status" -> status(parsed, flags, safeOut, safeErr, http);
+                case "events" -> events(parsed, flags, safeOut, safeErr, http);
+                case "stop", "kill" -> stop(parsed, flags, safeOut, safeErr, http);
+                case "open-window" -> openWindow(parsed, safeOut, safeErr, http, uiStarter);
+                case "close-window" -> closeWindow(parsed, safeOut, safeErr, http);
+                case "show-run" -> showRun(parsed, safeOut, safeErr, http);
                 default -> {
-                    err.println("Unknown Workbench session command: " + parsed.command());
+                    safeErr.println("Unknown Workbench session command: " + parsed.command());
                     yield 2;
                 }
             };
         } catch (RuntimeException failure) {
-            err.println("Workbench " + parsed.command() + " failed: " + WorkbenchCliErrors.explain(failure));
+            safeErr.println("Workbench " + parsed.command() + " failed: " + WorkbenchCliErrors.explain(failure));
             return 1;
+        } finally {
+            SecretRedactor.clear();
+        }
+    }
+
+    private static void noteWorkspaceSecrets(WorkbenchCommandLine.Parsed parsed) {
+        if (parsed.project() == null) return;
+        String runId = parsed.coordination().runId();
+        if (runId == null || runId.isBlank()) return;
+        Path workspace = Workspace.directory(parsed.project(), runId);
+        if (!Workspace.exists(workspace)) return;
+        try {
+            SecretRedactor.noteAll(Workspace.readRunVars(workspace));
+        } catch (RuntimeException ignored) {
+            // The command's own read reports "Workbench <command> failed:".
         }
     }
 
@@ -248,7 +275,7 @@ public final class WorkbenchSessionCommands {
     ) {
         String runId = parsed.coordination().runId();
         if (runId == null || runId.isBlank()) {
-            err.println("Usage: " + parsed.command() + " --run-id=<id>");
+            err.print(WorkbenchCliHelp.usageError("missing --run-id", parsed.command()));
             return 2;
         }
         RunView.Loaded loaded;
@@ -280,6 +307,20 @@ public final class WorkbenchSessionCommands {
                     && !decision.state().driverAgent().equals(parsed.coordination().agentId())) {
                 out.println("A second agent does not become a second driver of the live session "
                         + decision.state().liveRunId() + ".");
+            }
+        }
+        boolean sharedOpened = false;
+        if (window.isEmpty() && openIfClosed) {
+            boolean shared = tryShareController(
+                    parsed.project(), runId, parsed.coordination().agentId(), http
+            );
+            if (shared) {
+                long sharedDeadline = System.nanoTime() + OPEN_WINDOW_HEALTH_TIMEOUT.toNanos();
+                while (System.nanoTime() < sharedDeadline && openWindow(parsed.project(), http).isEmpty()) {
+                    sleep(POLL);
+                }
+                window = openWindow(parsed.project(), http);
+                sharedOpened = window.isPresent();
             }
         }
         if (window.isEmpty() && openIfClosed) {
@@ -329,8 +370,46 @@ public final class WorkbenchSessionCommands {
                 : "";
         out.println("ACK WINDOW " + (openIfClosed ? "opened" : "shown")
                 + " run-id=" + loaded.runId()
-                + (decision != null && decision.driving() ? " driver=" + driver : " read-only"));
+                + (decision != null && decision.driving() ? " driver=" + driver : " read-only")
+                + (sharedOpened ? " controller=shared" : ""));
         return 0;
+    }
+
+    /**
+     * A healthy {@code cli-session} already is the controller. {@code open-ui}
+     * starts the window in that JVM. Any other answer falls back to {@code ui}.
+     */
+    static boolean sharesController(SessionState session) {
+        return session != null
+                && "cli-session".equals(session.mode())
+                && session.url() != null
+                && !session.url().isBlank()
+                && session.pid() > 0;
+    }
+
+    private static boolean tryShareController(Path project, String runId, String agentId, HttpClient http) {
+        Optional<SessionState> cli = readHealthyFile(sessionFile(project), project, http);
+        if (cli.isEmpty() || !sharesController(cli.get())) return false;
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("op", "open-ui");
+        if (runId != null && !runId.isBlank()) body.put("runId", runId);
+        if (agentId != null && !agentId.isBlank()) body.put("agent", agentId);
+        try {
+            JsonNode ack = postJson(http, cli.get(), "/commands", body);
+            String id = textOr(ack, "id", "");
+            if (id.isBlank()) return false;
+            for (int attempt = 0; attempt < 8; attempt++) {
+                JsonNode view = getJson(http, cli.get(), "/commands/" + id);
+                JsonNode result = view == null ? null : view.get("result");
+                if ("OPENING".equals(textOr(result, "playback", ""))) return true;
+                String status = textOr(view, "status", "");
+                if ("FAILED".equals(status) || "SUCCESS".equals(status)) return false;
+                sleep(Duration.ofMillis(50));
+            }
+        } catch (RuntimeException ignored) {
+            return false;
+        }
+        return false;
     }
 
     private static int closeWindow(
@@ -375,7 +454,8 @@ public final class WorkbenchSessionCommands {
 
     /**
      * The forked controller does not inherit launcher {@code -D} properties.
-     * Pass the timeout the health wait already resolved so the worker wait matches.
+     * Pass the outer timeout the health wait already resolved. The worker
+     * derives a strictly shorter inner deadline from that same setting.
      */
     static List<String> withResolvedStartTimeout(List<String> command) {
         if (command == null || command.isEmpty()) return List.of();
@@ -395,6 +475,7 @@ public final class WorkbenchSessionCommands {
 
     private static int sessionStart(
             WorkbenchCommandLine.Parsed parsed,
+            SessionFlags flags,
             PrintStream out,
             PrintStream err,
             DetachedStarter starter,
@@ -427,7 +508,7 @@ public final class WorkbenchSessionCommands {
         }
 
         Path logFile = run.sessionDirectory().resolve("session.log");
-        Path sessionFile = run.sessionStateFile();
+        Path sessionFile = requestedSessionFile(project, flags, run);
         Process process;
         try {
             process = starter.start(new SessionLaunch(
@@ -442,6 +523,7 @@ public final class WorkbenchSessionCommands {
                     parsed.runVars()
             ));
         } catch (IOException failure) {
+            WorkbenchSpeed.release(project);
             String reason = "Session start failed: " + WorkbenchCliErrors.explain(failure);
             finishReason(project, run.runId(), reason, out);
             throw new IllegalStateException(reason, failure);
@@ -472,7 +554,22 @@ public final class WorkbenchSessionCommands {
         if (outcome.kind() != SessionHealthWait.Kind.TIMED_OUT) {
             err.println("Workbench session process exited before becoming healthy. See " + logFile);
             finishReason(project, run.runId(), "Session start failed: the process exited before it was healthy.", out);
+            WorkbenchSpeed.release(project);
             return 1;
+        }
+        destroyTimedOutSession(process, sessionFile, project);
+        try {
+            AgentCoordination.appendLog(
+                    project,
+                    Instant.now(),
+                    run.agentId(),
+                    run.runId(),
+                    "startup-timing",
+                    "elapsed=" + outcome.elapsedMs() + "ms stage=" + outcome.stage(),
+                    run.recordFile()
+            );
+        } catch (IOException ignored) {
+            // The timeout text is already on stderr.
         }
         finishReason(
                 project,
@@ -493,12 +590,13 @@ public final class WorkbenchSessionCommands {
     ) {
         Integer refused = refusedDriver(parsed, err);
         if (refused != null) return refused;
-        SessionState state = requireSession(parsed, http);
         String text = flags.text;
+        if (flags.quoteWarning != null && !flags.quoteWarning.isBlank()) err.println(flags.quoteWarning);
         if (text == null || text.isBlank()) {
-            err.println("Usage: execute-step <gherkin> or execute-step --text=<gherkin> [--ack-only]");
+            err.print(WorkbenchCliHelp.usageError("missing gherkin", "execute-step"));
             return 2;
         }
+        SessionState state = requireSession(parsed, http);
         Map<String, Object> body = commandBody(parsed, flags);
         body.put("text", text);
         return postAndMaybeWait(parsed, state, flags, body, out, err, http);
@@ -512,7 +610,7 @@ public final class WorkbenchSessionCommands {
             HttpClient http
     ) {
         if (flags.text == null || flags.text.isBlank()) {
-            err.println("Usage: " + parsed.command() + " --text=<gherkin>");
+            err.print(WorkbenchCliHelp.usageError("missing gherkin", parsed.command()));
             return 2;
         }
         Integer refused = refusedDriver(parsed, err);
@@ -531,7 +629,7 @@ public final class WorkbenchSessionCommands {
         boolean featureBlank = flags.feature == null || flags.feature.isBlank();
         boolean nameBlank = parsed.name() == null || parsed.name().isBlank();
         if (featureBlank && nameBlank) {
-            err.println("Usage: open-scenario --feature=<path-or-name> --name=<scenario> [--example=<rows>]");
+            err.print(WorkbenchCliHelp.usageError("missing --feature and --name", "open-scenario"));
             return 2;
         }
         Integer refused = refusedDriver(parsed, err);
@@ -550,7 +648,7 @@ public final class WorkbenchSessionCommands {
         String selector = parsed.example();
         if (selector == null || selector.isBlank()) selector = flags.text;
         if (selector == null || selector.isBlank()) {
-            err.println("Usage: example --example=<rows>");
+            err.print(WorkbenchCliHelp.usageError("missing --example", "example"));
             return 2;
         }
         Integer refused = refusedDriver(parsed, err);
@@ -568,12 +666,26 @@ public final class WorkbenchSessionCommands {
             PrintStream err,
             HttpClient http
     ) {
-        if (flags.run == null || flags.run.isBlank()) {
-            err.println("Usage: diagnostic-run --run=<id>");
-            return 2;
-        }
+        String target = diagnosticTarget(parsed, flags, err);
+        if (target == null) return 2;
         SessionState state = requireSession(parsed, http);
-        return postAndMaybeWait(parsed, state, flags, commandBody(parsed, flags), out, err, http);
+        Map<String, Object> body = commandBody(parsed, flags);
+        body.put("run", target);
+        return postAndMaybeWait(parsed, state, flags, body, out, err, http);
+    }
+
+    private static String diagnosticTarget(
+            WorkbenchCommandLine.Parsed parsed,
+            SessionFlags flags,
+            PrintStream err
+    ) {
+        String run = flags.run;
+        String runId = parsed.coordination().runId();
+        if (run != null && !run.isBlank()) return run;
+        if (runId != null && !runId.isBlank()) return runId;
+        err.print(WorkbenchCliHelp.usageError("missing --run", "diagnostic-run"));
+        err.println("--run is the diagnostic pack. --run-id selects the live session and is the pack when --run is omitted.");
+        return null;
     }
 
     private static int postCommand(
@@ -617,7 +729,11 @@ public final class WorkbenchSessionCommands {
         JsonNode ack = postJson(http, state, "/commands", body);
         String id = textOr(ack, "id", "");
         String status = textOr(ack, "status", "QUEUED");
-        out.println("ACK " + id + " " + status);
+        if (flags.text == null || flags.text.isBlank()) {
+            out.println("ACK " + id + " " + status);
+        } else {
+            out.println("ACK " + id + " " + status + " " + flags.text);
+        }
         if (flags.ackOnly || !flags.wait) return 0;
         return waitForDone(parsed, http, state, flags, id, out, err);
     }
@@ -637,6 +753,14 @@ public final class WorkbenchSessionCommands {
         String id = flags.id;
         if (id == null || id.isBlank()) {
             SessionState session = state.get();
+            if (jsonRequested(parsed)) {
+                Map<String, Object> body = new LinkedHashMap<>();
+                body.put("pid", session.pid());
+                body.put("url", session.url());
+                body.put("mode", session.mode());
+                printJson(out, body);
+                return 0;
+            }
             out.println("SESSION pid=" + session.pid() + " url=" + session.url() + " mode=" + session.mode());
             printTiming(out, parsed, http, session);
             return 0;
@@ -644,6 +768,16 @@ public final class WorkbenchSessionCommands {
         try {
             JsonNode view = getJson(http, state.get(), "/commands/" + id);
             String status = textOr(view, "status", "");
+            if (jsonRequested(parsed)) {
+                Map<String, Object> body = new LinkedHashMap<>();
+                body.put("id", id);
+                body.put("status", status);
+                if (view.has("result") && !view.get("result").isNull()) {
+                    body.put("result", JSON.convertValue(view.get("result"), Object.class));
+                }
+                printJson(out, body);
+                return terminalExit(status);
+            }
             out.println(id + " " + status);
             if (view.has("result")) out.println(view.get("result").toString());
             printTiming(out, parsed, http, state.get());
@@ -657,6 +791,7 @@ public final class WorkbenchSessionCommands {
 
     private static int events(
             WorkbenchCommandLine.Parsed parsed,
+            SessionFlags flags,
             PrintStream out,
             PrintStream err,
             HttpClient http
@@ -664,7 +799,38 @@ public final class WorkbenchSessionCommands {
         SessionState state = requireSession(parsed, http);
         try {
             JsonNode events = postJson(http, state, "/tools/workbench_events", Map.of());
-            out.println(events.toString());
+            boolean hooks = flags != null && flags.hooks;
+            List<JsonNode> rows = eventRows(events);
+            List<JsonNode> kept = new ArrayList<>();
+            for (JsonNode event : rows) {
+                if (hooks || isStepOrPhrase(event)) kept.add(event);
+            }
+            int limit = parsed.coordination().limit() == null ? 20 : parsed.coordination().limit();
+            int offset = eventCursor(parsed);
+            if (offset > kept.size()) offset = kept.size();
+            int end = Math.min(kept.size(), offset + limit);
+            List<JsonNode> page = kept.subList(offset, end);
+            if (jsonRequested(parsed)) {
+                Map<String, Object> body = new LinkedHashMap<>();
+                body.put("events", page.stream().map(node -> JSON.convertValue(node, Object.class)).toList());
+                body.put("matched", kept.size());
+                body.put("limit", limit);
+                if (end < kept.size()) {
+                    body.put("nextCursor", Integer.toString(end));
+                    body.put("truncated", "...+" + (kept.size() - end) + " more, use cursor");
+                }
+                printJson(out, body);
+                return 0;
+            }
+            if (hooks) {
+                for (JsonNode event : page) out.println(event.toString());
+            } else {
+                for (JsonNode event : page) out.println(compactEvent(event));
+            }
+            if (end < kept.size()) {
+                out.println("...+" + (kept.size() - end) + " more, use cursor");
+                out.println("nextCursor=" + end);
+            }
             out.println(formatReport(timingOf(events, runStarted(parsed), Instant.now()), sleepGaps(http, state)));
             return 0;
         } catch (RuntimeException failure) {
@@ -682,6 +848,7 @@ public final class WorkbenchSessionCommands {
     ) {
         Integer refused = refusedDriver(parsed, err);
         if (refused != null) return refused;
+        WorkbenchSpeed.release(parsed.project());
         Optional<SessionState> state = resolveSession(parsed, http);
         if (state.isEmpty()) {
             out.println("ACK SESSION already-stopped");
@@ -726,6 +893,65 @@ public final class WorkbenchSessionCommands {
         out.println("ACK SESSION killed pid=" + session.pid());
         finishRequestedRun(parsed, out, "STOPPED");
         return 0;
+    }
+
+    private static boolean jsonRequested(WorkbenchCommandLine.Parsed parsed) {
+        String[] args = parsed == null ? null : parsed.forwarded();
+        if (args == null) return false;
+        for (String arg : args) {
+            if ("--json".equals(arg)) return true;
+        }
+        return false;
+    }
+
+    private static void printJson(PrintStream out, Object value) {
+        try {
+            out.println(JSON.writeValueAsString(value));
+        } catch (IOException failure) {
+            throw new IllegalStateException("Could not write JSON.", failure);
+        }
+    }
+
+    private static void destroyTimedOutSession(Process process, Path sessionFile, Path project) {
+        if (process != null) {
+            ProcessHandle handle;
+            List<ProcessHandle> descendants;
+            try {
+                handle = process.toHandle();
+            } catch (RuntimeException ignored) {
+                handle = null;
+            }
+            if (handle != null) {
+                try {
+                    descendants = handle.descendants().toList();
+                } catch (RuntimeException ignored) {
+                    descendants = List.of();
+                }
+            } else {
+                descendants = List.of();
+            }
+            try {
+                process.destroy();
+            } catch (RuntimeException ignored) {
+                // Already gone.
+            }
+            sleep(Duration.ofMillis(400));
+            for (int index = descendants.size() - 1; index >= 0; index--) {
+                try {
+                    descendants.get(index).destroyForcibly();
+                } catch (RuntimeException ignored) {
+                    // The child can exit between the snapshot and the kill.
+                }
+            }
+            try {
+                process.destroyForcibly();
+            } catch (RuntimeException ignored) {
+                // Already gone.
+            }
+            if (handle != null) ProcessTrees.killTree(handle);
+        }
+        deleteSessionFile(sessionFile);
+        WorkbenchSpeed.release(project);
     }
 
     private static void killTree(long pid) {
@@ -797,7 +1023,13 @@ public final class WorkbenchSessionCommands {
                 return timedOut(parsed, id, out, err, true);
             }
             out.println("DONE " + id + " " + status);
-            if (view.has("result")) out.println(view.get("result").toString());
+            if (view.has("result") && !view.get("result").isNull()) {
+                JsonNode resultNode = view.get("result");
+                String errorLine = textOr(resultNode, "text", "");
+                if (errorLine.startsWith("error:")) out.println(errorLine);
+                if ("SUCCESS".equals(status)) out.println(resultNode.toString());
+                else out.println(failureJson(flags.text, resultNode));
+            }
             return terminalExit(status);
         }
     }
@@ -881,7 +1113,194 @@ public final class WorkbenchSessionCommands {
                     .resolve("cli-session.json");
             return readHealthyFile(file, parsed.project(), http);
         }
+        List<SessionState> live = liveRunSessions(parsed.project(), http);
+        if (live.size() > 1) {
+            StringBuilder message = new StringBuilder("Several live sessions. Pass --run-id.");
+            for (SessionState state : live) {
+                message.append(System.lineSeparator()).append("run-id=").append(runIdOf(state));
+            }
+            throw new IllegalStateException(message.toString());
+        }
+        if (live.size() == 1) return Optional.of(live.getFirst());
         return readHealthy(parsed.project(), http);
+    }
+
+    private static List<SessionState> liveRunSessions(Path project, HttpClient http) {
+        Path runs = project.resolve(".pickleball").resolve("runs");
+        if (!Files.isDirectory(runs)) return List.of();
+        List<Path> children = new ArrayList<>();
+        try (DirectoryStream<Path> stream = Files.newDirectoryStream(runs)) {
+            for (Path child : stream) children.add(child);
+        } catch (IOException failure) {
+            return List.of();
+        }
+        children.sort(Comparator.comparing(path -> path.getFileName().toString()));
+        List<SessionState> live = new ArrayList<>();
+        for (Path child : children) {
+            if (!Files.isDirectory(child)) continue;
+            Path file = child.resolve("session").resolve("cli-session.json");
+            readHealthyFile(file, project, http).ifPresent(live::add);
+        }
+        return live;
+    }
+
+    private static String runIdOf(SessionState state) {
+        if (state == null || state.stateFile() == null) return "";
+        Path session = state.stateFile().getParent();
+        Path run = session == null ? null : session.getParent();
+        if (run == null || run.getFileName() == null) return "";
+        return run.getFileName().toString();
+    }
+
+    private static String failureJson(String received, JsonNode result) {
+        Map<String, Object> raw = new LinkedHashMap<>();
+        if (result != null && result.isObject()) {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> converted = JSON.convertValue(result, Map.class);
+            if (converted != null) raw.putAll(converted);
+        }
+        FailureRecord record = FailureRecord.fromWorker(raw);
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("text", received == null ? "" : received);
+        String phrase = record == null ? null : record.phrase();
+        if ((phrase == null || phrase.isBlank()) && received != null && !received.isBlank()) phrase = received;
+        String message = record == null ? null : record.message();
+        String stack = record == null ? null : record.stackHead();
+        if (phrase != null) body.put("phrase", phrase);
+        if (message != null) body.put("message", message);
+        if (stack != null) body.put("stackHead", stack);
+        copyFailureField(body, result, "code");
+        copyFailureField(body, result, "cause");
+        copyFailureField(body, result, "valueText");
+        JsonNode nestedFailure = result == null ? null : result.get("failureJson");
+        if (nestedFailure != null && nestedFailure.isObject()) {
+            copyFailureField(body, nestedFailure, "code");
+            copyFailureField(body, nestedFailure, "cause");
+            copyFailureField(body, nestedFailure, "valueText");
+            if (!body.containsKey("message")) copyFailureField(body, nestedFailure, "message");
+        }
+        try {
+            return JSON.writeValueAsString(body);
+        } catch (IOException failure) {
+            throw new IllegalStateException("Could not write JSON.", failure);
+        }
+    }
+
+    private static void copyFailureField(Map<String, Object> body, JsonNode node, String field) {
+        if (body == null || node == null || field == null || body.containsKey(field)) return;
+        JsonNode value = node.get(field);
+        if (value == null || value.isNull()) return;
+        String text = value.asText("");
+        if (text.isBlank()) return;
+        body.put(field, text);
+    }
+
+    private static List<JsonNode> eventRows(JsonNode events) {
+        JsonNode array = events;
+        if (events != null && events.isObject()) {
+            if (events.has("events") && events.get("events").isArray()) array = events.get("events");
+            else if (events.has("result") && events.get("result").isArray()) array = events.get("result");
+            else array = null;
+        }
+        if (array == null || !array.isArray()) return List.of();
+        List<JsonNode> rows = new ArrayList<>();
+        array.forEach(rows::add);
+        return rows;
+    }
+
+    private static boolean isStepOrPhrase(JsonNode event) {
+        if (event == null || !event.isObject()) return false;
+        if (present(event, "stepText") || present(event, "phraseText") || present(event, "phrase")) return true;
+        String hook = firstText(event, "hook", "type", "kind");
+        if (hook == null) return present(event, "text") && looksLikeStep(event.get("text").asText(""));
+        String upper = hook.toUpperCase(Locale.ROOT);
+        if (upper.contains("STEP") || upper.contains("PHRASE")) return true;
+        return "step".equalsIgnoreCase(hook) || "phrase".equalsIgnoreCase(hook);
+    }
+
+    private static boolean looksLikeStep(String text) {
+        String trimmed = text == null ? "" : text.strip();
+        return trimmed.startsWith("Given ") || trimmed.startsWith("When ") || trimmed.startsWith("Then ")
+                || trimmed.startsWith("And ") || trimmed.startsWith("But ");
+    }
+
+    private static boolean present(JsonNode event, String field) {
+        JsonNode value = event.get(field);
+        return value != null && !value.isNull() && !value.asText("").isBlank();
+    }
+
+    static String compactEvent(JsonNode event) {
+        String phrase = firstText(event, "phraseText", "phrase");
+        String step = firstText(event, "stepText", "step", "text");
+        String line;
+        if (phrase != null && (step == null || phrase.equals(step))) line = "phrase " + phrase;
+        else if (step != null) line = "step " + step;
+        else if (phrase != null) line = "phrase " + phrase;
+        else line = "step";
+        String outcome = eventOutcome(event);
+        if (outcome != null) line = line + " " + outcome;
+        String id = eventCommandId(event);
+        if (id != null) line = line + " id=" + id;
+        return line;
+    }
+
+    /** FailureRecord wins. A Java method signature is not an outcome. */
+    private static String eventOutcome(JsonNode event) {
+        if (event == null || !event.isObject()) return null;
+        try {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> body = JSON.convertValue(event, Map.class);
+            FailureRecord record = FailureRecord.fromWorker(body);
+            if (record != null && record.substantive()) return "FAILED";
+        } catch (RuntimeException ignored) {
+            // A field that is not a failure map is not an outcome.
+        }
+        String status = outcomeToken(firstText(event, "status", "outcome"));
+        if (status == null && event.has("result") && event.get("result").isObject()) {
+            status = outcomeToken(firstText(event.get("result"), "status", "outcome"));
+        }
+        if (status == null) status = outcomeToken(firstText(event, "signature"));
+        return status;
+    }
+
+    private static String outcomeToken(String raw) {
+        if (raw == null || raw.isBlank()) return null;
+        return switch (raw.strip().toUpperCase(Locale.ROOT)) {
+            case "SUCCESS", "PASSED", "OK" -> "PASSED";
+            case "FAILED", "ERROR", "FAILURE", "ERRORED" -> "FAILED";
+            default -> null;
+        };
+    }
+
+    /** Execute-step command id when the event has one, otherwise the event sequence. */
+    private static String eventCommandId(JsonNode event) {
+        String command = firstText(event, "commandId", "command-id", "command_id");
+        if (command != null) return command;
+        if (event == null) return null;
+        JsonNode sequence = event.get("sequence");
+        if (sequence == null || sequence.isNull()) return null;
+        String text = sequence.asText("").strip();
+        return text.isEmpty() ? null : text;
+    }
+
+    private static int eventCursor(WorkbenchCommandLine.Parsed parsed) {
+        String cursor = null;
+        String[] args = parsed == null ? null : parsed.forwarded();
+        if (args != null) {
+            for (int index = 0; index < args.length; index++) {
+                String token = args[index];
+                if (token == null) continue;
+                if (token.startsWith("--cursor=")) cursor = token.substring("--cursor=".length());
+                else if ("--cursor".equals(token) && index + 1 < args.length) cursor = args[index + 1];
+            }
+        }
+        if (cursor == null || cursor.isBlank()) return 0;
+        try {
+            int value = Integer.parseInt(cursor.trim());
+            return Math.max(0, value);
+        } catch (NumberFormatException failure) {
+            return 0;
+        }
     }
 
     static Optional<SessionState> readHealthy(Path project, HttpClient http) {
@@ -983,8 +1402,11 @@ public final class WorkbenchSessionCommands {
     }
 
     static String formatReport(Timing timing, List<SleepGapMonitor.Gap> gaps) {
-        return "elapsed-run-ms=" + timing.elapsedRunMs
-                + System.lineSeparator() + "elapsed-step-ms=" + timing.elapsedStepMs
+        String step = timing.stepRunning ? Long.toString(timing.elapsedStepMs) : "idle";
+        String status = timing.stepRunning ? "running" : "idle";
+        return "status=" + status
+                + System.lineSeparator() + "elapsed-run-ms=" + timing.elapsedRunMs
+                + System.lineSeparator() + "elapsed-step-ms=" + step
                 + System.lineSeparator() + formatSleepGaps(gaps);
     }
 
@@ -1023,10 +1445,12 @@ public final class WorkbenchSessionCommands {
     static final class Timing {
         final long elapsedRunMs;
         final long elapsedStepMs;
+        final boolean stepRunning;
 
-        Timing(long elapsedRunMs, long elapsedStepMs) {
+        Timing(long elapsedRunMs, long elapsedStepMs, boolean stepRunning) {
             this.elapsedRunMs = elapsedRunMs;
             this.elapsedStepMs = elapsedStepMs;
+            this.stepRunning = stepRunning;
         }
     }
 
@@ -1048,10 +1472,15 @@ public final class WorkbenchSessionCommands {
             if (mark.step && mark.at != null) stepAt = mark.at;
         }
         long stepMs = stepAt == null ? 0 : Math.max(0, Duration.between(stepAt, clock).toMillis());
-        return new Timing(runMs, stepMs);
+        boolean running = false;
+        for (Mark mark : marks) {
+            if (mark.opens) running = true;
+            if (mark.closes) running = false;
+        }
+        return new Timing(runMs, stepMs, running);
     }
 
-    private record Mark(Instant at, boolean step, String text) {
+    private record Mark(Instant at, boolean step, boolean opens, boolean closes, String text) {
     }
 
     private static List<Mark> eventMarks(JsonNode events) {
@@ -1070,8 +1499,11 @@ public final class WorkbenchSessionCommands {
             String hook = firstText(event, "hook", "type", "kind");
             boolean step = (stepText != null && !stepText.isBlank())
                     || (hook != null && hook.toUpperCase(Locale.ROOT).contains("STEP"));
+            String upper = hook == null ? "" : hook.toUpperCase(Locale.ROOT);
+            boolean closes = upper.contains("AFTER_STEP") || "EXECUTE_STEP".equals(upper);
+            boolean opens = !closes && (upper.contains("BEFORE_STEP") || "RUNNING".equals(upper));
             String text = ((stepText == null ? "" : stepText) + " " + (phrase == null ? "" : phrase)).trim();
-            marks.add(new Mark(at, step, text));
+            marks.add(new Mark(at, step, opens, closes, text));
         }
         return marks;
     }
@@ -1096,6 +1528,18 @@ public final class WorkbenchSessionCommands {
                 return null;
             }
         }
+    }
+
+    /**
+     * {@code --session-file} overrides the per-run state file. The same path is
+     * what the controller is told to write and what this process waits on.
+     */
+    private static Path requestedSessionFile(Path project, SessionFlags flags, AgentCoordination.Run run) {
+        if (flags == null || flags.sessionFile == null || flags.sessionFile.isBlank()) {
+            return run.sessionStateFile();
+        }
+        Path requested = Path.of(flags.sessionFile);
+        return (requested.isAbsolute() ? requested : project.resolve(requested)).normalize();
     }
 
     static Path sessionFile(Path project) {
@@ -1188,17 +1632,25 @@ public final class WorkbenchSessionCommands {
     }
 
     static final class SessionFlags {
+        /**
+         * Flags this parser recognizes beyond {@link WorkbenchCommandLine#MAJOR_FLAGS}.
+         * {@code --session-file} is the state file session launch forwards to the controller.
+         */
+        static final List<String> MAJOR_FLAGS = WorkbenchCliFlags.SESSION;
         final String text;
         final String id;
         final String feature;
         final String run;
         final String fromHere;
         final String stopAfter;
+        final String sessionFile;
         final boolean ackOnly;
         final boolean wait;
         final boolean force;
+        final boolean hooks;
         final Long stepTimeoutSeconds;
         final Long runTimeoutSeconds;
+        final String quoteWarning;
 
         private SessionFlags(
                 String text,
@@ -1207,11 +1659,14 @@ public final class WorkbenchSessionCommands {
                 String run,
                 String fromHere,
                 String stopAfter,
+                String sessionFile,
                 boolean ackOnly,
                 boolean wait,
                 boolean force,
+                boolean hooks,
                 Long stepTimeoutSeconds,
-                Long runTimeoutSeconds
+                Long runTimeoutSeconds,
+                String quoteWarning
         ) {
             this.text = text;
             this.id = id;
@@ -1219,11 +1674,14 @@ public final class WorkbenchSessionCommands {
             this.run = run;
             this.fromHere = fromHere;
             this.stopAfter = stopAfter;
+            this.sessionFile = sessionFile;
             this.ackOnly = ackOnly;
             this.wait = wait;
             this.force = force;
+            this.hooks = hooks;
             this.stepTimeoutSeconds = stepTimeoutSeconds;
             this.runTimeoutSeconds = runTimeoutSeconds;
+            this.quoteWarning = quoteWarning;
         }
 
         static SessionFlags parse(String[] args) {
@@ -1233,26 +1691,58 @@ public final class WorkbenchSessionCommands {
             String run = null;
             String fromHere = null;
             String stopAfter = null;
+            String sessionFile = null;
             boolean ackOnly = false;
             boolean wait = true;
             boolean force = false;
+            boolean hooks = false;
             Long stepTimeoutSeconds = null;
             Long runTimeoutSeconds = null;
+            String textFile = null;
+            String textB64 = null;
             String absorb = null;
             List<String> words = new ArrayList<>();
             if (args == null) {
-                return new SessionFlags(null, null, null, null, null, null, false, true, false, null, null);
+                return new SessionFlags(null, null, null, null, null, null, null, false, true, false, false, null, null, null);
             }
+            boolean textFromFlag = false;
             for (int index = 1; index < args.length; index++) {
                 String token = args[index];
                 if (token == null) continue;
                 if (token.startsWith("--text=")) {
                     text = token.substring("--text=".length());
+                    textFromFlag = true;
                     absorb = null;
                     continue;
                 }
                 if ("--text".equals(token) && index + 1 < args.length) {
                     text = args[++index];
+                    textFromFlag = true;
+                    absorb = null;
+                    continue;
+                }
+                if (token.startsWith("--text-file=")) {
+                    textFile = token.substring("--text-file=".length());
+                    absorb = null;
+                    continue;
+                }
+                if ("--text-file".equals(token) && index + 1 < args.length) {
+                    textFile = args[++index];
+                    absorb = null;
+                    continue;
+                }
+                if (token.startsWith("--text-b64=")) {
+                    textB64 = token.substring("--text-b64=".length());
+                    absorb = null;
+                    continue;
+                }
+                if ("--text-b64".equals(token) && index + 1 < args.length) {
+                    textB64 = args[++index];
+                    absorb = null;
+                    continue;
+                }
+                if ("--hooks".equals(token)) {
+                    hooks = true;
                     absorb = null;
                     continue;
                 }
@@ -1343,6 +1833,23 @@ public final class WorkbenchSessionCommands {
                     absorb = null;
                     continue;
                 }
+                if (token.startsWith("--session-file=")) {
+                    sessionFile = token.substring("--session-file=".length()).trim();
+                    if (sessionFile.isBlank()) {
+                        throw new IllegalArgumentException(WorkbenchCliHelp.usageError("--session-file needs a path", "--session-file"));
+                    }
+                    absorb = null;
+                    continue;
+                }
+                if ("--session-file".equals(token)) {
+                    String value = index + 1 < args.length ? args[++index] : null;
+                    if (value == null || value.isBlank()) {
+                        throw new IllegalArgumentException(WorkbenchCliHelp.usageError("--session-file needs a path", "--session-file"));
+                    }
+                    sessionFile = value.trim();
+                    absorb = null;
+                    continue;
+                }
                 if (token.startsWith("--tags=") || token.startsWith("--name=")) {
                     absorb = null;
                     continue;
@@ -1375,6 +1882,13 @@ public final class WorkbenchSessionCommands {
                 if (looksLikeProject(token)) continue;
                 words.add(token);
             }
+            if (textFile != null && !textFile.isBlank()) {
+                text = readTextFile(textFile);
+                textFromFlag = false;
+            } else if (textB64 != null && !textB64.isBlank()) {
+                text = decodeText(textB64);
+                textFromFlag = false;
+            }
             if (text == null && !words.isEmpty()) {
                 if ("status".equals(args[0]) && words.size() == 1) {
                     id = words.getFirst();
@@ -1383,20 +1897,71 @@ public final class WorkbenchSessionCommands {
                     if ("status".equals(args[0]) && id == null && words.size() == 1) id = words.getFirst();
                 }
             }
+            String warning = null;
+            if (textFromFlag && args.length > 0 && "execute-step".equals(args[0])) {
+                warning = quoteStripWarning(text, words);
+            }
             return new SessionFlags(
-                    text, id, feature, run, fromHere, stopAfter, ackOnly, wait, force,
-                    stepTimeoutSeconds, runTimeoutSeconds
+                    text, id, feature, run, fromHere, stopAfter, sessionFile, ackOnly, wait, force, hooks,
+                    stepTimeoutSeconds, runTimeoutSeconds, warning
             );
+        }
+
+        /**
+         * Non-fatal. Quoting through a shell or mvnw is not fixed; the warning
+         * points at {@code --text-b64} and {@code --text-file}.
+         */
+        static String quoteStripWarning(String text, List<String> leftover) {
+            if (text == null) return null;
+            int quotes = 0;
+            for (int index = 0; index < text.length(); index++) {
+                if (text.charAt(index) == '"') quotes++;
+            }
+            boolean unbalanced = quotes % 2 == 1;
+            boolean truncated = leftover != null && !leftover.isEmpty();
+            boolean stripped = !text.contains("\"")
+                    && text.matches("(?s).*\\b(?:the|a|an)\\s+\\S+\\s+(?:button|link|field|checkbox|element)\\b.*");
+            if (!unbalanced && !truncated && !stripped) return null;
+            return "WARNING: execute-step --text looks quote-stripped or truncated. "
+                    + "Pass the step with --text-b64 or --text-file. Quoting through mvnw is not fixed.";
+        }
+
+        private static String readTextFile(String path) {
+            try {
+                String text = Files.readString(Path.of(path), StandardCharsets.UTF_8);
+                text = text.replace("\r\n", "\n").replace('\r', '\n');
+                if (text.endsWith("\n")) text = text.substring(0, text.length() - 1);
+                return text;
+            } catch (IOException failure) {
+                throw new IllegalArgumentException(WorkbenchCliHelp.usageError(
+                        "--text-file could not be read: " + path, "--text-file"
+                ));
+            }
+        }
+
+        private static String decodeText(String encoded) {
+            try {
+                byte[] bytes = Base64.getMimeDecoder().decode(encoded.trim());
+                return new String(bytes, StandardCharsets.UTF_8);
+            } catch (IllegalArgumentException failure) {
+                throw new IllegalArgumentException(WorkbenchCliHelp.usageError(
+                        "--text-b64 is not base64", "--text-b64"
+                ));
+            }
         }
 
         private static Long positiveSeconds(String value, String label) {
             if (value == null || value.isBlank()) {
-                throw new IllegalArgumentException(label + " requires a positive number of seconds.");
+                throw new IllegalArgumentException(WorkbenchCliHelp.usageError(
+                        label + " requires a positive number of seconds", label
+                ));
             }
             try {
                 long seconds = Long.parseLong(value.trim());
                 if (seconds <= 0) {
-                    throw new IllegalArgumentException(label + " requires a positive number of seconds.");
+                    throw new IllegalArgumentException(WorkbenchCliHelp.usageError(
+                        label + " requires a positive number of seconds", label
+                ));
                 }
                 return seconds;
             } catch (NumberFormatException failure) {

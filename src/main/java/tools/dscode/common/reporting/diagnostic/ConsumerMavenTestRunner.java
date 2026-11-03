@@ -40,6 +40,14 @@ public final class ConsumerMavenTestRunner {
         return build(projectRoot, workspace, selection, featurePaths, "workbench-discover");
     }
 
+    public static List<String> compileCommand(Path projectRoot) {
+        List<String> command = new ArrayList<>(launchPrefix(wrapper(projectRoot)));
+        boolean mavenProject = Files.isRegularFile(projectRoot.toAbsolutePath().normalize().resolve("pom.xml"));
+        if (mavenProject) command.add("-q");
+        command.add(mavenProject ? "test-compile" : "testClasses");
+        return List.copyOf(command);
+    }
+
     public static List<String> confirmCommand(Path projectRoot, Path workspace, Map<String, String> selection) {
         return confirmCommand(projectRoot, workspace, selection, null);
     }
@@ -108,6 +116,26 @@ public final class ConsumerMavenTestRunner {
      * the local repository has the resolved plugins and dependencies. A fresh
      * checkout stays online. A normal {@code mvn test} does not call this.
      */
+    /** Build-tool output that means an offline launch failed only because a plugin or provider was never downloaded. */
+    public static boolean offlineResolutionFailure(String output) {
+        if (output == null) return false;
+        return output.contains("in offline mode") || output.contains("has not been downloaded from it before");
+    }
+
+    /** True when {@code command} carries the warm-launch offline flag ({@code -o} or {@code --offline}). */
+    public static boolean hasOfflineFlag(List<String> command) {
+        return command.contains("-o") || command.contains("--offline");
+    }
+
+    /** The same launch without the warm-launch offline flag. Every other argument is kept in order. */
+    public static List<String> withoutOffline(List<String> command) {
+        List<String> online = new ArrayList<>(command.size());
+        for (String argument : command) {
+            if (!argument.equals("-o") && !argument.equals("--offline")) online.add(argument);
+        }
+        return List.copyOf(online);
+    }
+
     static boolean offlineSafe(Path projectRoot) {
         Path project = projectRoot.toAbsolutePath().normalize();
         if (Files.isRegularFile(project.resolve("pom.xml"))) {
@@ -147,6 +175,16 @@ public final class ConsumerMavenTestRunner {
             err.println("Workbench could not run Maven test: " + failure.getMessage());
             return 1;
         }
+    }
+
+    /** Project wrapper script, or the wrapper jar when the script is absent. */
+    public static Path wrapperPath(Path projectRoot) {
+        return wrapper(projectRoot);
+    }
+
+    /** {@code java -jar} for a wrapper jar, otherwise the wrapper script. */
+    public static List<String> wrapperLaunchPrefix(Path launcher) {
+        return launchPrefix(launcher);
     }
 
     static Path wrapper(Path projectRoot) {

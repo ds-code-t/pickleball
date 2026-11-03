@@ -47,6 +47,25 @@ class WorkspaceTest {
     }
 
     @Test
+    void overlayConfigsKeepsEarlierFilesAndReplacesSameNames() throws Exception {
+        Path workspace = temp.resolve("overlay");
+        Path first = temp.resolve("first");
+        Path second = temp.resolve("second");
+        Files.createDirectories(first);
+        Files.createDirectories(second);
+        Files.writeString(first.resolve("kept.yaml"), "from: first\n");
+        Files.writeString(first.resolve("shared.yaml"), "from: first\n");
+        Files.writeString(second.resolve("shared.yaml"), "from: second\n");
+        Files.writeString(second.resolve("added.yaml"), "from: second\n");
+        Workspace.copyConfigs(first, workspace);
+        Workspace.overlayConfigs(second, workspace);
+        Path configs = Workspace.configsDirectory(workspace);
+        assertEquals("from: first\n", Files.readString(configs.resolve("kept.yaml")));
+        assertEquals("from: second\n", Files.readString(configs.resolve("shared.yaml")));
+        assertEquals("from: second\n", Files.readString(configs.resolve("added.yaml")));
+    }
+
+    @Test
     void atomicWriteLeavesNoPartialFileAndRoundTripsValues() throws Exception {
         Path workspace = temp.resolve("workspace");
         Map<String, String> values = context();
@@ -165,6 +184,19 @@ class WorkspaceTest {
         Workspace.writeFingerprint(record, "def");
         assertTrue(Files.readString(record).contains("\"workspaceFingerprint\" : \"def\""));
         assertFalse(Files.readString(record).contains("abc"));
+    }
+
+    @Test
+    void blankOldRunvarIsShownAsEmptyQuotes() throws Exception {
+        Path workspace = temp.resolve("workspace");
+        Map<String, String> values = context();
+        values.put("pkb_environment", "");
+        Workspace.writeRunVars(workspace, values);
+        StringBuilder warnings = new StringBuilder();
+        Workspace.applyLaunchEdits(workspace, new LinkedHashMap<>(), List.of("pkb_environment=QA"), warnings);
+        assertTrue(warnings.toString().contains("replaces \"\" with QA"), warnings.toString());
+        assertFalse(warnings.toString().contains("replaces _"), warnings.toString());
+        assertEquals("QA", Workspace.readRunVars(workspace).get("pkb_environment"));
     }
 
     private static Map<String, String> context() {

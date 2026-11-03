@@ -132,7 +132,21 @@ public final class DynamicSuiteBootstrap {
         return glue;
     }
 
+    /**
+     * The consumer runner in the preferred test-output root, or null when this
+     * JVM is not a consumer test process. Dry-run and a normal launch use the
+     * same class so hook defaults are not a second formula.
+     */
+    public static Class<? extends PickleballRunner> findConsumerRunnerOrNull() {
+        return findDynamicSuiteSubclassInPreferredTestRoots();
+    }
+
     private static volatile Class<? extends PickleballRunner> DISCOVERED_SUITE_CLASS;
+
+    /** True when {@code type} is the built-in suite used when no consumer runner is found. */
+    public static boolean isDefaultSuite(Class<?> type) {
+        return type == DefaultDynamicSuite.class;
+    }
 
     public static Class<? extends PickleballRunner> getDiscoveredSuiteClass() {
         return DISCOVERED_SUITE_CLASS;
@@ -343,13 +357,57 @@ public final class DynamicSuiteBootstrap {
         return s.endsWith("/target/test-classes/")
                 || s.endsWith("/build/classes/java/test/")
                 || s.endsWith("/build/classes/kotlin/test/")
-                || s.endsWith("/build/classes/test/");
+                || s.endsWith("/build/classes/test/")
+                || s.endsWith("/workbench/live/classes/");
+    }
+
+    /**
+     * {@code java.class.path} entries, plus the file URLs of the context class
+     * loader chain when {@code java.class.path} has no test output root. Under
+     * {@code mvn exec:java} the JVM class path is Maven's launcher, and the
+     * project's classes are only on the context class loader (2.1.17 bug 1).
+     * Normal runs, whose test output is on {@code java.class.path}, are unchanged.
+     */
+    public static List<String> effectiveClasspathEntries() {
+        return effectiveClasspathEntries(
+                System.getProperty("java.class.path", ""),
+                Thread.currentThread().getContextClassLoader());
+    }
+
+    static List<String> effectiveClasspathEntries(String javaClassPath, ClassLoader context) {
+        List<String> entries = new ArrayList<>();
+        for (String entry : (javaClassPath == null ? "" : javaClassPath).split(File.pathSeparator, -1)) {
+            if (!entry.isBlank()) entries.add(entry);
+        }
+        boolean hasTestRoot = entries.stream().anyMatch(entry -> {
+            try {
+                return isPreferredTestOutputRoot(Path.of(entry).toUri());
+            } catch (RuntimeException invalid) {
+                return false;
+            }
+        });
+        if (hasTestRoot) return entries;
+        List<String> extra = new ArrayList<>();
+        for (ClassLoader loader = context; loader != null; loader = loader.getParent()) {
+            if (!(loader instanceof java.net.URLClassLoader urls)) continue;
+            for (java.net.URL url : urls.getURLs()) {
+                if (!"file".equalsIgnoreCase(url.getProtocol())) continue;
+                try {
+                    String path = Path.of(url.toURI()).toString();
+                    if (!entries.contains(path) && !extra.contains(path)) extra.add(path);
+                } catch (Exception ignored) {
+                    // Skip URLs that are not plain file paths.
+                }
+            }
+        }
+        // Context-loader entries first so the project's test output is found before launcher jars.
+        extra.addAll(entries);
+        return extra.isEmpty() ? entries : extra;
     }
 
     private static List<URI> classpathRoots() {
-        String cp = System.getProperty("java.class.path", "");
-        String[] entries = cp.split(File.pathSeparator);
-        List<URI> roots = new ArrayList<>(entries.length);
+        List<String> entries = effectiveClasspathEntries();
+        List<URI> roots = new ArrayList<>(entries.size());
 
         for (String entry : entries) {
             if (entry.isBlank()) {

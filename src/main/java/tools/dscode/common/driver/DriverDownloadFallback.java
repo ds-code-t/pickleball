@@ -1615,8 +1615,10 @@ public final class DriverDownloadFallback {
         return out.toString();
     }
 
+    /** PowerShell single-quoted body. The quotes are added by the caller. Same escape as {@link tools.dscode.launcher.WorkbenchShellQuoting}. */
     private static String ps(String value) {
-        return value.replace("'", "''");
+        String quoted = tools.dscode.launcher.WorkbenchShellQuoting.powershellLiteral(value);
+        return quoted.substring(1, quoted.length() - 1);
     }
 
     private static boolean looksLikeUtf16Le(byte[] body) {

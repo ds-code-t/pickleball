@@ -35,7 +35,9 @@ public final class WorkbenchWorkerManager implements AutoCloseable {
     static final int LEASE_RENEW_SECONDS = 30;
     static final String INTERACTIVE_PAUSE_HOOK = "BEFORE_STEP";
     static final String INTERACTIVE_PAUSE_STEP = "---pickleball-workbench-anchor";
-    static final Duration START_TIMEOUT = Duration.ofSeconds(180);
+    static final Duration OUTER_START_TIMEOUT = Duration.ofSeconds(180);
+    /** Inner worker deadline. Strictly below {@link #OUTER_START_TIMEOUT}. */
+    static final Duration START_TIMEOUT = innerDeadline(OUTER_START_TIMEOUT);
     static final String START_TIMEOUT_PROPERTY = "pkb_workbench_worker_start_timeout";
     static final String START_TIMEOUT_ENV = "PKB_WORKBENCH_WORKER_START_TIMEOUT";
     static final String START_TIMEOUT_RUNVAR = "pkb_runvars.pkb_workbench_worker_start_timeout";
@@ -73,10 +75,12 @@ public final class WorkbenchWorkerManager implements AutoCloseable {
         Path stdout = stateRoot.resolve("logs").resolve("worker-" + sessionId + ".out.log");
         Path stderr = stateRoot.resolve("logs").resolve("worker-" + sessionId + ".err.log");
         createDirectories(sessionDirectory, stdout.getParent());
-        writeProgress(stderr, "compile");
+        long started = System.nanoTime();
+        StringBuilder timing = new StringBuilder();
+        markStage(stderr, "compile", started, timing);
         WorkbenchManifest manifest = WorkbenchManifest.read(projectRoot);
         List<String> classpath = WorkbenchSynchronizer.readWorkerClasspath(projectRoot);
-        writeProgress(stderr, "classpath");
+        markStage(stderr, "classpath", started, timing);
         writeAnchor(anchor);
 
         Map<String, String> properties = workerSystemProperties.isEmpty()
@@ -95,21 +99,22 @@ public final class WorkbenchWorkerManager implements AutoCloseable {
         builder.environment().put(ControlProtocol.PAUSE_FIRST_SCENARIO_ENV, "true");
 
         Process process = null;
-        long started = System.nanoTime();
         String stage = "worker-launch";
         try {
-            writeProgress(stderr, stage);
+            markStage(stderr, stage, started, timing);
             process = builder.start();
             WorkerSession session = awaitBridge(
                     process, sessionId, token, sessionDirectory, stdout, stderr, manifest, classpath,
-                    started
+                    started, timing
             );
             active = session;
             scheduleLeaseRenewal(session);
             return status();
         } catch (IOException failure) {
+            writeStartupTiming(stderr, timing.toString());
             throw new IllegalStateException("Could not start Workbench consumer worker.", failure);
         } catch (RuntimeException failure) {
+            writeStartupTiming(stderr, timing.toString());
             if (active != null) {
                 stop();
             } else if (process != null && process.isAlive()) {
@@ -244,6 +249,11 @@ public final class WorkbenchWorkerManager implements AutoCloseable {
     ) {
         List<String> command = new ArrayList<>();
         command.add(javaExecutable().toString());
+        command.add("-Dfile.encoding=UTF-8");
+        command.add("-Dstdout.encoding=UTF-8");
+        command.add("-Dstderr.encoding=UTF-8");
+        command.add("-Dsun.stdout.encoding=UTF-8");
+        command.add("-Dsun.stderr.encoding=UTF-8");
         command.add("-D" + ControlProtocol.WORKBENCH_TEST_OUTPUT_ROOT_PROPERTY
                 + "=" + manifest.liveOutputPath());
         systemProperties.entrySet().stream()
@@ -299,12 +309,14 @@ public final class WorkbenchWorkerManager implements AutoCloseable {
             Path stderr,
             WorkbenchManifest manifest,
             List<String> classpath,
-            long startedNanos
+            long startedNanos,
+            StringBuilder timing
     ) {
         String stage = "worker-launch";
         long deadline = startedNanos + startTimeout(workerSystemProperties).toNanos();
         while (System.nanoTime() < deadline) {
             if (!process.isAlive()) {
+                writeStartupTiming(stderr, timing == null ? "" : timing.toString());
                 throw startupFailure(
                         "Workbench worker exited before publishing its control bridge. exit="
                                 + process.exitValue(),
@@ -316,7 +328,7 @@ public final class WorkbenchWorkerManager implements AutoCloseable {
             if (descriptor != null) {
                 if (!"anchor-parse".equals(stage)) {
                     stage = "anchor-parse";
-                    writeProgress(stderr, stage);
+                    markStage(stderr, stage, startedNanos, timing);
                 }
                 ControlBridgeClient client;
                 try {
@@ -351,7 +363,8 @@ public final class WorkbenchWorkerManager implements AutoCloseable {
                             process, client, scenario, deadline, stdout, stderr, startedNanos, stage
                     );
                     stage = "paused";
-                    writeProgress(stderr, stage);
+                    markStage(stderr, stage, startedNanos, timing);
+                    writeStartupTiming(stderr, timing == null ? "" : timing.toString());
                     ScheduledExecutorService renewal = Executors.newSingleThreadScheduledExecutor(runnable -> {
                         Thread thread = new Thread(runnable, "pickleball-workbench-lease-" + sessionId);
                         thread.setDaemon(true);
@@ -365,10 +378,26 @@ public final class WorkbenchWorkerManager implements AutoCloseable {
             sleep(50);
         }
         process.destroy();
+        writeStartupTiming(stderr, timing == null ? "" : timing.toString());
         throw startupFailure(
                 "Timed out waiting for Workbench worker anchor to pause.",
                 startedNanos, stage, stdout, stderr
         );
+    }
+
+    /**
+     * Inner deadline for {@code outer}. At least 15s subtracts 10s (180s becomes
+     * 170s). A shorter outer subtracts one fifth, and at least 1ms, and the
+     * result stays strictly below the outer wait.
+     */
+    static Duration innerDeadline(Duration outer) {
+        long outerMs = outer == null || outer.isZero() || outer.isNegative()
+                ? OUTER_START_TIMEOUT.toMillis()
+                : outer.toMillis();
+        long subtract = outerMs >= 15_000L ? 10_000L : Math.max(1L, outerMs / 5L);
+        long inner = outerMs - subtract;
+        if (inner <= 0L || inner >= outerMs) inner = Math.max(1L, outerMs - 1L);
+        return Duration.ofMillis(inner);
     }
 
     static Duration startTimeout(Map<String, String> workerProperties) {
@@ -385,19 +414,56 @@ public final class WorkbenchWorkerManager implements AutoCloseable {
         try {
             long seconds = Long.parseLong(raw.trim());
             if (seconds <= 0) return START_TIMEOUT;
-            return Duration.ofSeconds(seconds);
+            return innerDeadline(Duration.ofSeconds(seconds));
         } catch (NumberFormatException failure) {
             return START_TIMEOUT;
         }
     }
 
+    static void markStage(Path log, String stage, long startedNanos, StringBuilder timing) {
+        long elapsed = Math.max(0L, (System.nanoTime() - startedNanos) / 1_000_000L);
+        writeProgress(log, stage);
+        String alias = aliasStage(stage);
+        if (alias == null) return;
+        writeTimedProgress(log, alias, elapsed);
+        if (timing == null) return;
+        if (!timing.isEmpty()) timing.append(' ');
+        timing.append(alias).append('=').append(elapsed).append("ms");
+    }
+
+    static String aliasStage(String stage) {
+        return switch (stage) {
+            case "compile" -> "maven";
+            case "classpath" -> "sync";
+            case "worker-launch" -> "jvm";
+            case "paused" -> "worker-ready";
+            default -> null;
+        };
+    }
+
     static void writeProgress(Path log, String stage) {
+        writeTimedProgress(log, stage, null);
+    }
+
+    static void writeTimedProgress(Path log, String stage, Long elapsedMs) {
         if (log == null || stage == null || stage.isBlank()) return;
+        StringBuilder line = new StringBuilder("progress stage=").append(stage);
+        if (elapsedMs != null) line.append(" elapsed=").append(elapsedMs).append("ms");
+        line.append(System.lineSeparator());
+        appendLogLine(log, line.toString());
+    }
+
+    static void writeStartupTiming(Path log, String summary) {
+        if (log == null || summary == null || summary.isBlank()) return;
+        appendLogLine(log, "startup-timing " + summary + System.lineSeparator());
+    }
+
+    private static void appendLogLine(Path log, String line) {
         try {
             if (log.getParent() != null) Files.createDirectories(log.getParent());
             Files.writeString(
                     log,
-                    "progress stage=" + stage + System.lineSeparator(),
+                    line,
                     StandardCharsets.UTF_8,
                     java.nio.file.StandardOpenOption.CREATE,
                     java.nio.file.StandardOpenOption.APPEND

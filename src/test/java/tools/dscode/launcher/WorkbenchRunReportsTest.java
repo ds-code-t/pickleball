@@ -1,5 +1,6 @@
 package tools.dscode.launcher;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -9,6 +10,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.net.URLEncoder;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
@@ -154,6 +156,91 @@ class WorkbenchRunReportsTest {
         );
         assertEquals(2, consoleSteps);
         assertTrue(consoleOut.toString(StandardCharsets.UTF_8).contains("summary status=PASSED scenarios=1 steps=2"));
+    }
+
+    @Test
+    void secondDiscoverCountsOnlyTheNewAttempt() throws Exception {
+        Path project = tempDir.resolve("rerun");
+        Files.createDirectories(project);
+        String runId = "run-rerun";
+        AgentCoordination.Run run = AgentCoordination.begin(
+                project,
+                AgentCoordination.Request.of(runId, "agent-r", null, null, null, null, "discover")
+        );
+        Path oldScenario = run.diagnosticDirectory().resolve(runId).resolve("scenarios").resolve("old");
+        Files.createDirectories(oldScenario);
+        Files.writeString(oldScenario.resolve("events.jsonl"), "{\"type\":\"scenario_start\"}\n");
+        Files.writeString(
+                run.diagnosticDirectory().resolve(runId).resolve("run-index.json"),
+                "{\"runId\":\"run-rerun\",\"outcome\":\"FAILED\",\"counts\":{\"total\":1,\"failed\":1},\"steps\":{\"executed\":4}}"
+        );
+        AgentCoordination.begin(
+                project,
+                AgentCoordination.Request.of(runId, "agent-r", null, null, null, null, "discover")
+        );
+        Path fresh = run.diagnosticDirectory().resolve(runId).resolve("scenarios").resolve("fresh");
+        Files.createDirectories(fresh);
+        Files.writeString(fresh.resolve("summary.json"), """
+                {"outcome":"PASSED","identity":{"scenarioName":"Fresh"},"steps":{"executed":1,"passed":1}}
+                """);
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        WorkbenchRunReports.publish(
+                project, runId, List.of(), "", "PASSED",
+                new PrintStream(out, true, StandardCharsets.UTF_8)
+        );
+        String text = out.toString(StandardCharsets.UTF_8);
+        assertTrue(text.contains("scenarios=1"), text);
+        assertFalse(text.contains("scenarios=2"), text);
+        assertTrue(text.contains("steps=1"), text);
+    }
+
+    @Test
+    void summaryLineCountsPassesAndNamesTheFailedScenario() throws Exception {
+        Path project = tempDir.resolve("counts");
+        String runId = "run-counts";
+        Path run = AgentCoordination.runDirectory(project, runId);
+        Path pass = run.resolve("diagnostic").resolve(runId).resolve("scenarios").resolve("ok");
+        Path fail = run.resolve("diagnostic").resolve(runId).resolve("scenarios").resolve("bad");
+        Files.createDirectories(pass);
+        Files.createDirectories(fail);
+        Files.writeString(pass.resolve("summary.json"), """
+                {"outcome":"PASSED","identity":{"scenarioName":"Ok case"},"steps":{"executed":1,"passed":1}}
+                """);
+        Files.writeString(fail.resolve("summary.json"), """
+                {"outcome":"FAILED","identity":{"scenarioName":"Bad case"},"steps":{"executed":1,"failed":1}}
+                """);
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        WorkbenchRunReports.publish(
+                project, runId, List.of(), "", "FAILED",
+                new PrintStream(out, true, StandardCharsets.UTF_8)
+        );
+        String text = out.toString(StandardCharsets.UTF_8);
+        assertTrue(text.contains("passed=1"), text);
+        assertTrue(text.contains("failed=1"), text);
+        assertTrue(text.contains("failedScenarios=[\"Bad case\"]"), text);
+        assertFalse(text.contains("failedScenariosMore"), text);
+    }
+
+    @Test
+    void summaryLineCapsTheFailedScenarioArray() throws Exception {
+        List<String> names = new ArrayList<>();
+        names.add("Case, \"quoted\"");
+        for (int index = 2; index <= 12; index++) names.add("Case " + index);
+        String line = WorkbenchRunReports.compact("FAILED", 12, 12, null, null, 0, 12, names);
+        int start = line.indexOf("failedScenarios=");
+        assertTrue(start >= 0, line);
+        start += "failedScenarios=".length();
+        int end = line.indexOf(']', start);
+        String array = line.substring(start, end + 1);
+        var parsed = new ObjectMapper().readTree(array);
+        assertTrue(parsed.isArray(), array);
+        assertEquals(10, parsed.size(), array);
+        assertEquals("Case, \"quoted\"", parsed.get(0).asText());
+        assertEquals("Case 10", parsed.get(9).asText());
+        assertTrue(line.contains("failedScenariosMore=2"), line);
+        assertTrue(line.contains("query errors"), line);
+        assertFalse(line.contains("Case 11"), line);
+        assertFalse(line.contains("Case 12"), line);
     }
 
     @Test

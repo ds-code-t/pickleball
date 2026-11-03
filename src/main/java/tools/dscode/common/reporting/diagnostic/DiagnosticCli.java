@@ -73,8 +73,15 @@ public final class DiagnosticCli {
     }
 
     private static int guidance(String[] args, PrintStream out) throws IOException {
-        requireLength(args, 1, 1, "guidance");
+        boolean detail = args.length == 2 && "--detail".equals(args[1]);
+        if (!detail) requireLength(args, 1, 1, "guidance [--detail]");
         try (InputStream input = guidanceResource(AGENT_GUIDE)) {
+            out.print(new String(input.readAllBytes(), StandardCharsets.UTF_8));
+        }
+        if (!detail) return 0;
+        String relative = "docs/workbench-agent-detail.md";
+        try (InputStream input = guidanceResource(relative)) {
+            out.println();
             out.print(new String(input.readAllBytes(), StandardCharsets.UTF_8));
         }
         return 0;
@@ -125,12 +132,10 @@ public final class DiagnosticCli {
             PrintStream out,
             boolean includeAmbient
     ) throws IOException {
-        LinkedHashMap<String, String> values = loadProjectPkbValues(project);
-        LinkedHashMap<String, String> jvm = new LinkedHashMap<>();
-        if (includeAmbient) {
-            PKB_props.copyJvmDryRunInputs(values, jvm, true, true);
+        PKB_props.ResolvedRunVars resolved = tools.dscode.testengine.PickleballRunner.previewLaunch(project, includeAmbient);
+        if (project == null && includeAmbient) {
+            project = Path.of("");
         }
-        PKB_props.ResolvedRunVars resolved = PKB_props.resolveRunVars(values, jvm);
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("sealed", resolved.sealed());
         body.put("runProfile", resolved.runProfile());
@@ -142,29 +147,6 @@ public final class DiagnosticCli {
         out.println(json().writeValueAsString(body));
         out.println("pkb_overriderunvars is deprecated for Workbench. A plain run that does not set pkb_workspace can still use -Dpkb_overriderunvars=<complete compact map>, never -Dpkb_run_profile=.");
         out.println();
-    }
-
-    private static LinkedHashMap<String, String> loadProjectPkbValues(Path project) {
-        LinkedHashMap<String, String> values = new LinkedHashMap<>();
-        loadPropertiesFile(values, project.resolve("src/test/resources/pickleball.properties"));
-        loadPropertiesFile(values, project.resolve("src/test/resources/pickleball_local.properties"));
-        return values;
-    }
-
-    private static void loadPropertiesFile(Map<String, String> values, Path file) {
-        if (!Files.isRegularFile(file)) {
-            return;
-        }
-        java.util.Properties props = new java.util.Properties();
-        try (InputStream in = Files.newInputStream(file)) {
-            props.load(in);
-        } catch (IOException ignored) {
-            return;
-        }
-        for (String key : props.stringPropertyNames()) {
-            if (key == null) continue;
-            values.put(key.toLowerCase(java.util.Locale.ROOT), props.getProperty(key));
-        }
     }
 
     @SuppressWarnings("unchecked")
@@ -298,7 +280,7 @@ public final class DiagnosticCli {
     private static void usage(PrintStream out) {
         out.println("Pickleball diagnostic utility");
         out.println("The consumer AI-agent entry is Pickleball Workbench (PickleballWorkbenchLauncher), not DiagnosticCli.");
-        out.println("  DiagnosticCli guidance");
+        out.println("  DiagnosticCli guidance [--detail]");
         out.println("  DiagnosticCli export-guidance [output-directory]");
         out.println("  DiagnosticCli discover-hint [project]");
         out.println("  DiagnosticCli resolve-runvars [project]");

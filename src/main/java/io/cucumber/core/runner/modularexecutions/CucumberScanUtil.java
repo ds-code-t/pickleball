@@ -11,6 +11,7 @@ import io.cucumber.core.runner.ScenarioStep;
 import io.cucumber.core.runner.StepExtension;
 import io.cucumber.core.runtime.FeaturePathFeatureSupplier;
 import org.intellij.lang.annotations.Language;
+import tools.dscode.common.resources.PathLists;
 import tools.dscode.control.protocol.PickleballPaths;
 import tools.dscode.testengine.DynamicSuiteConfigUtils;
 import tools.dscode.testengine.ExampleRowFilter;
@@ -328,9 +329,7 @@ public final class CucumberScanUtil {
             return List.of();
         }
 
-        return Arrays.stream(featurePathsProp.split(","))
-                .map(String::trim)
-                .filter(s -> !s.isEmpty())
+        return PathLists.split(featurePathsProp).stream()
                 .map(path -> toUriString(path, pickleballGrammar))
                 .collect(Collectors.toList());
     }

@@ -30,20 +30,22 @@ public final class WorkbenchLaunchTiming {
 
     public static void record(Path runFolder, String jvm, String stage, long elapsedMs, String detail) {
         String line = format(jvm, stage, elapsedMs, detail);
-        System.err.println(line);
+        if (echoStderr()) System.err.println(line);
         if (runFolder == null) return;
         Path file = runFolder.resolve(FILE_NAME);
-        try {
-            Files.createDirectories(runFolder);
-            Files.writeString(
-                    file,
-                    line + System.lineSeparator(),
-                    StandardCharsets.UTF_8,
-                    StandardOpenOption.CREATE,
-                    StandardOpenOption.APPEND
-            );
-        } catch (IOException ignored) {
-            // Timing must not fail the launch.
+        synchronized (WorkbenchLaunchTiming.class) {
+            try {
+                Files.createDirectories(runFolder);
+                Files.writeString(
+                        file,
+                        line + System.lineSeparator(),
+                        StandardCharsets.UTF_8,
+                        StandardOpenOption.CREATE,
+                        StandardOpenOption.APPEND
+                );
+            } catch (IOException ignored) {
+                // Timing must not fail the launch.
+            }
         }
     }
 
@@ -56,6 +58,22 @@ public final class WorkbenchLaunchTiming {
             line.append(' ').append(detail.trim());
         }
         return line.toString();
+    }
+
+    /**
+     * Stderr is quiet unless an agent asks. The file is always written.
+     * {@code -Dpkb_workbench_timing=true} wins over the environment variable.
+     */
+    static boolean echoStderr() {
+        String property = System.getProperty("pkb_workbench_timing");
+        if (property != null) return truthy(property);
+        return truthy(System.getenv("PKB_WORKBENCH_TIMING"));
+    }
+
+    private static boolean truthy(String value) {
+        if (value == null) return false;
+        String token = value.trim();
+        return "1".equals(token) || "true".equalsIgnoreCase(token) || "yes".equalsIgnoreCase(token);
     }
 
     private static Path runFolderFromProperties() {

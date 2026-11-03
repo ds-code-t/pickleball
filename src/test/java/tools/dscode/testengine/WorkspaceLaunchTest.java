@@ -11,6 +11,7 @@ import tools.dscode.testengine.fixtures.WorkspaceLaunchHooked;
 import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -101,6 +102,18 @@ class WorkspaceLaunchTest {
         assertEquals("from-project", runner.get("pkb_rp_api_key"));
         assertEquals("${protected:pkb_rp_api_key}", Workspace.readRunVars(workspace).get("pkb_rp_api_key"));
         assertFalse(WorkspaceLaunchHooked.hookRan);
+    }
+
+    @Test
+    void workbenchPurposeReachesTheRunnerAndIsNotStoredInTheWorkspace() throws Exception {
+        Path workspace = temp.resolve("workspace");
+        Workspace.writeRunVars(workspace, context());
+        System.setProperty(Workspace.PROPERTY, workspace.toString());
+        System.setProperty(PKB_props.PKB_RUN_PURPOSE, "workbench-discover");
+        WorkspaceLaunchHooked runner = new WorkspaceLaunchHooked();
+        assertEquals("workbench-discover", runner.get(PKB_props.PKB_RUN_PURPOSE));
+        assertFalse(Files.readString(Workspace.runvarsFile(workspace)).contains("pkb_run_purpose"));
+        assertFalse(Files.readString(Workspace.runvarsFile(workspace)).contains("workbench-discover"));
     }
 
     @Test

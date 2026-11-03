@@ -3,12 +3,19 @@ package tools.dscode.workbench.mcp;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.modelcontextprotocol.server.McpServerFeatures;
 import io.modelcontextprotocol.spec.McpSchema;
+import tools.dscode.control.protocol.AgentLog;
+import tools.dscode.control.protocol.OutputFormatter;
+import tools.dscode.control.protocol.SecretRedactor;
 import tools.dscode.control.protocol.ControlBridgeMappingSnapshot;
+import tools.dscode.control.protocol.DiagnosticQuery;
 import tools.dscode.workbench.WorkbenchServices;
 import tools.dscode.workbench.nav.WorkbenchGoLink;
 import tools.dscode.workbench.lease.WorkbenchCallContext;
 import tools.dscode.workbench.lease.WorkbenchLeaseHolder;
 
+import java.io.IOException;
+import java.nio.file.Path;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -17,6 +24,9 @@ import java.util.function.Function;
 
 /** MCP tool definitions that adapt the shared Workbench controller surface. */
 final class WorkbenchMcpTools {
+    private static final ThreadLocal<String> CURRENT_TOOL = new ThreadLocal<>();
+    private static final ThreadLocal<WorkbenchMcpTools> CURRENT = new ThreadLocal<>();
+
     private final WorkbenchServices services;
     private final ObjectMapper json;
     private final Map<String, ToolBinding> tools = new LinkedHashMap<>();
@@ -42,16 +52,30 @@ final class WorkbenchMcpTools {
     Object call(String name, Map<String, Object> arguments) {
         ToolBinding binding = tools.get(name);
         if (binding == null) {
-            throw new IllegalArgumentException("Unknown Workbench tool: " + name);
+            throw new IllegalArgumentException(
+                    "error: Unknown Workbench tool: " + name + ".\n"
+                            + "fix: Use tools/list. Do not invent workbench_* names.\n"
+            );
         }
-        return WorkbenchCallContext.callAs(
-                WorkbenchLeaseHolder.AGENT,
-                () -> binding.action.apply(arguments == null ? Map.of() : arguments)
-        );
+        String previous = CURRENT_TOOL.get();
+        WorkbenchMcpTools previousTools = CURRENT.get();
+        CURRENT_TOOL.set(name);
+        CURRENT.set(this);
+        try {
+            return WorkbenchCallContext.callAs(
+                    WorkbenchLeaseHolder.AGENT,
+                    () -> binding.action.apply(arguments == null ? Map.of() : arguments)
+            );
+        } finally {
+            if (previous == null) CURRENT_TOOL.remove();
+            else CURRENT_TOOL.set(previous);
+            if (previousTools == null) CURRENT.remove();
+            else CURRENT.set(previousTools);
+        }
     }
 
     private void register() {
-        add("workbench_sync", "Synchronize the selected consumer project. Skips Maven/Gradle when Java/build/dependencies are unchanged; resources-only refresh when only features/config/data changed. Live buffer edits do not require this.", schema(Map.of()),
+        add("workbench_sync", "Synchronize the consumer project. Skips a rebuild when Java, the build, and dependencies are unchanged.", schema(Map.of()),
                 args -> services.synchronize());
         add("workbench_sync_status", "Read the current Workbench synchronization manifest.", schema(Map.of()),
                 args -> services.synchronizationStatus());
@@ -96,7 +120,7 @@ final class WorkbenchMcpTools {
                 schema(Map.of()),
                 args -> services.requestSave());
 
-        add("workbench_execute_step", "Execute raw Gherkin in the paused live scenario. A FAILED result leaves the worker paused so you can inspect or retry; it is not an MCP error and does not stop the worker.",
+        add("workbench_execute_step", "Execute raw Gherkin in the paused live scenario. A FAILED result does not stop the worker and is not an MCP error.",
                 schema(Map.of(
                         "text", stringProperty("Gherkin step text."),
                         "argument", stringProperty("Optional DocString-style argument text.")
@@ -140,7 +164,7 @@ final class WorkbenchMcpTools {
                 args -> services.events(longValue(args, "afterSequence"), integer(args, "limit")));
         add("workbench_browser_page", "Read current browser page evidence.", schema(Map.of()),
                 args -> services.browserPage());
-        add("workbench_browser_screenshot", "Capture current browser screenshot evidence. Prefer workbench_browser_page or workbench_element_inspect unless the image itself is required.", schema(Map.of()),
+        add("workbench_browser_screenshot", "Capture the current browser screenshot. Prefer workbench_browser_page unless the image is required.", schema(Map.of()),
                 args -> services.browserScreenshot());
         add("workbench_element_inspect", "Inspect browser elements using Pickleball element vocabulary.",
                 schema(Map.of(
@@ -202,22 +226,91 @@ final class WorkbenchMcpTools {
                 args -> Map.of("removed", services.clearStepOverrides()));
 
         add("workbench_diagnostic_catalog",
-                "Read reports/diagnostic-runs/run-catalog.json as sparse JSON, including each run's pkb_run_profile when retained. Do not glob the diagnostic tree.",
+                "Deprecated alias of wb_runs. Compact JSON including each run's retained pkb_run_profile. Do not glob.",
                 schema(Map.of()),
-                args -> services.diagnosticCatalog());
+                args -> retrieval("runs", args));
         add("workbench_diagnostic_run",
-                "Read one run's run-index.json and clusters.json, including the retained pkb_run_profile. Does not return events, traces, or screenshots.",
+                "Deprecated alias of wb_get. One run record including the retained pkb_run_profile. No events or screenshots.",
                 schema(Map.of("runId", stringProperty("Diagnostic run directory name from the catalog.")), "runId"),
-                args -> services.diagnosticRun(text(args, "runId")));
+                args -> {
+                    text(args, "runId");
+                    Map<String, Object> copy = new LinkedHashMap<>(args);
+                    copy.putIfAbsent("kind", "run");
+                    return retrieval("get", copy);
+                });
         add("workbench_diagnostic_summary",
-                "Read one scenario summary.json, including the retained pkb_run_profile. Does not return events.jsonl, traces, or PNG bytes.",
+                "Deprecated alias of wb_get. One scenario summary including the retained pkb_run_profile. No events.jsonl.",
                 schema(Map.of(
                         "runId", stringProperty("Diagnostic run directory name from the catalog."),
                         "scenarioId", stringProperty("Scenario directory name under that run.")
                 ), "runId", "scenarioId"),
-                args -> services.diagnosticScenarioSummary(text(args, "runId"), text(args, "scenarioId")));
+                args -> {
+                    text(args, "runId");
+                    text(args, "scenarioId");
+                    Map<String, Object> copy = new LinkedHashMap<>(args);
+                    copy.putIfAbsent("kind", "scenario");
+                    return retrieval("get", copy);
+                });
+        add("wb_runs",
+                "List retained diagnostic runs as compact JSON. Default limit 20 plus cursor.",
+                schema(Map.of(
+                        "limit", integerProperty("Page size. Default 20, max 100."),
+                        "cursor", stringProperty("nextCursor from the previous page."),
+                        "fields", stringProperty("Comma-separated fields."),
+                        "status", stringProperty("Outcome filter such as FAILED.")
+                )),
+                args -> retrieval("runs", args));
+        add("wb_get",
+                "Get one diagnostic record by runId and kind. Ids and a relative where, not a file dump.",
+                schema(Map.of(
+                        "runId", stringProperty("Run id from wb_runs."),
+                        "kind", stringProperty("run, scenario, step, event, property, artifact, error, or log."),
+                        "scenarioId", stringProperty("Scenario id when kind is scenario, step, event, or artifact."),
+                        "id", stringProperty("Event seq, artifact id, or scenario id.")
+                ), "runId"),
+                args -> retrieval("get", args));
+        add("wb_query",
+                "Filter diagnostic records. Compact JSON, explicit fields, limit and cursor.",
+                schema(Map.of(
+                        "runId", stringProperty("Optional run id."),
+                        "scenarioId", stringProperty("Optional scenario id."),
+                        "kind", stringProperty("run, scenario, step, event, property, artifact, error, or log."),
+                        "text", stringProperty("Optional substring."),
+                        "status", stringProperty("Optional outcome or step status."),
+                        "fields", stringProperty("Comma-separated fields."),
+                        "limit", integerProperty("Page size. Default 20, max 100."),
+                        "cursor", stringProperty("nextCursor from the previous page.")
+                )),
+                args -> retrieval("query", args));
+        add("wb_search",
+                "Search event, error, scenario, and short-log text. Returns ids and where.",
+                schema(Map.of(
+                        "text", stringProperty("Substring to find."),
+                        "runId", stringProperty("Optional run id."),
+                        "kind", stringProperty("Optional kind filter."),
+                        "limit", integerProperty("Page size. Default 20, max 100."),
+                        "cursor", stringProperty("nextCursor from the previous page.")
+                ), "text"),
+                args -> retrieval("search", args));
+        add("wb_props",
+                "List retained run properties (runProfile and scalar configuration). Values are clipped.",
+                schema(Map.of(
+                        "runId", stringProperty("Run id from wb_runs."),
+                        "limit", integerProperty("Page size. Default 20, max 100."),
+                        "cursor", stringProperty("nextCursor from the previous page.")
+                ), "runId"),
+                args -> retrieval("props", args));
+        add("wb_errors",
+                "List failure records with a one-line stack head. Truncation says ...+N more, use cursor.",
+                schema(Map.of(
+                        "runId", stringProperty("Optional run id. Omit to scan the catalog."),
+                        "scenarioId", stringProperty("Optional scenario id."),
+                        "limit", integerProperty("Page size. Default 20, max 100."),
+                        "cursor", stringProperty("nextCursor from the previous page.")
+                )),
+                args -> retrieval("errors", args));
         add("workbench_investigation_emit",
-                "Write .pickleball/investigations/<id>/{investigation.json,report.html}. New handoffs always use that root path. A legacy v/<version>/investigations/<id> tree is still readable when the root path is absent. Returns the relative report.html path only. Does not copy the diagnostic pack or embed PNG bytes.",
+                "Write .pickleball/investigations/<id>/investigation.json and report.html. Returns the report path only.",
                 schema(Map.of(
                         "investigation", Map.of(
                                 "type", "object",
@@ -227,7 +320,7 @@ final class WorkbenchMcpTools {
                 ), "investigation"),
                 args -> services.emitInvestigation(investigationObject(args.get("investigation"))));
         add("workbench_go",
-                "Navigate Explorer, peek a retained-run file, or switch Report/Mapping/Terminal. UI attach plus a control lease are required to move the window. Headless: validate and echo the resolved target. Does not write files.",
+                "Navigate Explorer, Report, Mapping, or Terminal. Headless calls validate the target and do not write.",
                 schema(Map.of(
                         "link", Map.of(
                                 "type", "object",
@@ -253,6 +346,49 @@ final class WorkbenchMcpTools {
                 });
     }
 
+    private Object retrieval(String op, Map<String, Object> args) {
+        Map<String, Object> request = new LinkedHashMap<>();
+        request.put("op", op);
+        for (String key : List.of("runId", "scenarioId", "kind", "text", "fields", "cursor", "status", "id", "limit")) {
+            if (args != null && args.containsKey(key) && args.get(key) != null) request.put(key, args.get(key));
+        }
+        DiagnosticQuery.Outcome outcome = DiagnosticQuery.query(services.projectRoot(), request);
+        if (outcome.exit() != 0) throw new ToolFailure(outcome.body());
+        appendQueryLog(op, args);
+        return outcome.body();
+    }
+
+    /** Same columns as a successful launcher {@code query}: event {@code query}, purpose is the verb. */
+    private void appendQueryLog(String op, Map<String, Object> args) {
+        Path project = services.projectRoot();
+        if (project == null) return;
+        String run = null;
+        String agent = null;
+        if (args != null) {
+            Object value = args.get("runId");
+            if (value instanceof String text && !text.isBlank()) run = text;
+            else if (value != null && !String.valueOf(value).isBlank()) run = String.valueOf(value);
+            Object named = args.get("agentId");
+            if (named == null) named = args.get("agent");
+            if (named != null && !String.valueOf(named).isBlank()) agent = String.valueOf(named);
+        }
+        if (agent == null || agent.isBlank()) agent = AgentLog.recordedAgent(project, run);
+        try {
+            AgentLog.append(project, Instant.now(), agent == null || agent.isBlank() ? "-" : agent, run, "query", op, null);
+        } catch (IOException ignored) {
+            // The JSON answer is already computed. A short-log failure does not hide it.
+        }
+    }
+
+    static final class ToolFailure extends RuntimeException {
+        final Map<String, Object> body;
+
+        ToolFailure(Map<String, Object> body) {
+            super(String.valueOf(body.get("error")));
+            this.body = body;
+        }
+    }
+
     private void add(
             String name,
             String description,
@@ -276,6 +412,8 @@ final class WorkbenchMcpTools {
         try {
             Object value = call(name, arguments);
             return result(value, false);
+        } catch (ToolFailure failure) {
+            return result(failure.body, true);
         } catch (RuntimeException failure) {
             return result(Map.of(
                     "error", failure.getClass().getSimpleName(),
@@ -286,7 +424,8 @@ final class WorkbenchMcpTools {
 
     private McpSchema.CallToolResult result(Object value, boolean error) {
         try {
-            String text = json.writeValueAsString(value);
+            Object safe = OutputFormatter.redactValue(value);
+            String text = SecretRedactor.scrub(json.writeValueAsString(safe));
             return McpSchema.CallToolResult.builder()
                     .content(List.of(McpSchema.TextContent.builder(text).build()))
                     .isError(error)
@@ -324,9 +463,32 @@ final class WorkbenchMcpTools {
     private static String text(Map<String, Object> args, String name) {
         Object value = args.get(name);
         if (!(value instanceof String text) || text.isBlank()) {
-            throw new IllegalArgumentException(name + " must not be blank.");
+            throw new IllegalArgumentException(missingArgument(name, value));
         }
         return text;
+    }
+
+    private static String missingArgument(String name, Object value) {
+        String tool = CURRENT_TOOL.get();
+        String who = tool == null || tool.isBlank() ? "This tool" : tool;
+        String description = argumentDescription(tool, name);
+        String detail = description.isBlank() ? "" : " (" + description + ")";
+        String got = value == null ? "It was omitted." : "Got " + value.getClass().getSimpleName() + ".";
+        return "error: " + who + " requires " + name + detail + ". " + got
+                + "\nfix: Pass a non-blank string.";
+    }
+
+    private static String argumentDescription(String tool, String name) {
+        WorkbenchMcpTools current = CURRENT.get();
+        if (current == null || tool == null || name == null) return "";
+        ToolBinding binding = current.tools.get(tool);
+        if (binding == null) return "";
+        Object properties = binding.inputSchema.get("properties");
+        if (!(properties instanceof Map<?, ?> map)) return "";
+        Object property = map.get(name);
+        if (!(property instanceof Map<?, ?> spec)) return "";
+        Object description = spec.get("description");
+        return description == null ? "" : description.toString();
     }
 
     private static String optionalText(Map<String, Object> args, String name) {
@@ -352,21 +514,24 @@ final class WorkbenchMcpTools {
     @SuppressWarnings("unchecked")
     private Map<String, Object> investigationObject(Object value) {
         if (value == null) {
-            throw new IllegalArgumentException("investigation must be a JSON object.");
+            throw new IllegalArgumentException(
+                    "error: workbench_investigation_emit requires investigation.\n"
+                            + "fix: Pass a JSON object.\n"
+            );
         }
         Object parsed = value;
         if (parsed instanceof String text) {
             if (text.isBlank()) {
-                throw new IllegalArgumentException("investigation must be a JSON object.");
+                throw new IllegalArgumentException("error: investigation must be a JSON object.\nfix: Pass a JSON object.\n");
             }
             try {
                 parsed = json.readValue(text, LinkedHashMap.class);
             } catch (Exception failure) {
-                throw new IllegalArgumentException("investigation must be a JSON object.");
+                throw new IllegalArgumentException("error: investigation must be a JSON object.\nfix: Pass a JSON object.\n");
             }
         }
         if (!(parsed instanceof Map<?, ?>)) {
-            throw new IllegalArgumentException("investigation must be a JSON object.");
+            throw new IllegalArgumentException("error: investigation must be a JSON object.\nfix: Pass a JSON object.\n");
         }
         return json.convertValue(parsed, LinkedHashMap.class);
     }

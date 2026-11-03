@@ -12,9 +12,9 @@ import static tools.dscode.Values.saveScenarioObject;
 
 public final class ScenarioObjectSteps {
     static final String WINDOWS = "C:\\Users\\Dan She'll\\page";
-    static final List<Object> beforeTokens = new ArrayList<>();
-    static final List<Object> stepTokens = new ArrayList<>();
-    static final List<Object> afterTokens = new ArrayList<>();
+    static final List<Object> beforeTokens = java.util.Collections.synchronizedList(new ArrayList<>());
+    static final List<Object> stepTokens = java.util.Collections.synchronizedList(new ArrayList<>());
+    static final List<Object> afterTokens = java.util.Collections.synchronizedList(new ArrayList<>());
     static boolean leaked;
 
     private ScenarioObjectSteps() {

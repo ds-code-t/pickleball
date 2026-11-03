@@ -31,15 +31,94 @@
 @SET __MVNW_PSMODULEP_SAVE=%PSModulePath%
 @SET PSModulePath=
 @FOR /F "usebackq tokens=1* delims==" %%A IN (`powershell -noprofile "& {$scriptDir='%~dp0'; $script='%__MVNW_ARG0_NAME__%'; icm -ScriptBlock ([Scriptblock]::Create((Get-Content -Raw '%~f0'))) -NoNewScope}"`) DO @(
-  IF "%%A"=="MVN_CMD" (set __MVNW_CMD__=%%B) ELSE IF "%%B"=="" (echo %%A) ELSE (echo %%A=%%B)
+  IF "%%A"=="MVN_CMD" (set __MVNW_CMD__=%%B) ELSE IF "%%A"=="MAVEN_HOME" (set "MAVEN_HOME=%%B") ELSE IF "%%B"=="" (echo %%A) ELSE (echo %%A=%%B)
 )
 @SET PSModulePath=%__MVNW_PSMODULEP_SAVE%
 @SET __MVNW_PSMODULEP_SAVE=
 @SET __MVNW_ARG0_NAME__=
 @SET MVNW_USERNAME=
 @SET MVNW_PASSWORD=
-@IF NOT "%__MVNW_CMD__%"=="" ("%__MVNW_CMD__%" %*)
-@echo Cannot start maven from wrapper >&2 && exit /b 1
+@IF "%__MVNW_CMD__%"=="" goto pkbNoMaven
+@REM Apache mvn.cmd maps every JVM status greater than 0 to exit 1.
+@REM Launch the same classworlds JVM the Unix mvn script execs, and return that status.
+@call :pkbMaven %*
+@REM PowerShell starts this file through cmd.exe and does not use CALL.
+@REM A top-level "exit /b N" is then reported as 1 for every non-zero JVM
+@REM status (consumer retest of 111dea5). "exit N" ends that cmd.exe with N,
+@REM which PowerShell reads as $LASTEXITCODE. The subroutine still uses
+@REM "exit /b" so a nested CALL returns. Linux mvnw execs the JVM directly.
+@set "PKB_RC=%ERRORLEVEL%"
+@exit %PKB_RC%
+
+:pkbNoMaven
+@echo Cannot start maven from wrapper >&2
+@exit /b 1
+
+:pkbMaven
+@setlocal
+@if not "%JAVA_HOME%"=="" goto pkbJavaHome
+@for %%i in (java.exe) do @set "JAVACMD=%%~$PATH:i"
+@goto pkbCheckJava
+:pkbJavaHome
+@set "JAVACMD=%JAVA_HOME%\bin\java.exe"
+:pkbCheckJava
+@if exist "%JAVACMD%" goto pkbJavaOk
+@echo The JAVA_HOME environment variable is not defined correctly. >&2
+@endlocal & exit /b 1
+:pkbJavaOk
+@if not "%MAVEN_HOME%"=="" goto pkbHomeOk
+@set "PKB_MVN_CMD=%__MVNW_CMD__:/=\%"
+@for %%I in ("%PKB_MVN_CMD%") do @set "PKB_MVN_DIR=%%~dpI"
+@for %%I in ("%PKB_MVN_DIR%..") do @set "MAVEN_HOME=%%~fI"
+:pkbHomeOk
+@set "MAVEN_HOME=%MAVEN_HOME:/=\%"
+@set "CLASSWORLDS_JAR="
+@for %%i in ("%MAVEN_HOME%"\boot\plexus-classworlds-*) do @set "CLASSWORLDS_JAR=%%~i"
+@if exist "%CLASSWORLDS_JAR%" goto pkbCpOk
+@echo Cannot start maven from wrapper >&2
+@endlocal & exit /b 1
+:pkbCpOk
+@set "MAVEN_PROJECTBASEDIR=%CD%"
+@if not "%MAVEN_BASEDIR%"=="" set "MAVEN_PROJECTBASEDIR=%MAVEN_BASEDIR%"
+@if not exist "%MAVEN_PROJECTBASEDIR%\.mvn" call :pkbFindBase
+@if "_%MAVEN_PROJECTBASEDIR:~-1%"=="_\" set "MAVEN_PROJECTBASEDIR=%MAVEN_PROJECTBASEDIR%\"
+@set "JVM_CONFIG_MAVEN_PROPS="
+@if not exist "%MAVEN_PROJECTBASEDIR%\.mvn\jvm.config" goto pkbNoJvmConfig
+@setlocal EnableExtensions EnableDelayedExpansion
+@for /F "usebackq delims=" %%a in ("%MAVEN_PROJECTBASEDIR%\.mvn\jvm.config") do @set JVM_CONFIG_MAVEN_PROPS=!JVM_CONFIG_MAVEN_PROPS! %%a
+@endlocal & set "JVM_CONFIG_MAVEN_PROPS=%JVM_CONFIG_MAVEN_PROPS%"
+:pkbNoJvmConfig
+@set "MAVEN_CMD_LINE_ARGS=%*"
+@if not "%MAVEN_SKIP_RC%"=="" goto pkbSkipRcPre
+@if exist "%USERPROFILE%\mavenrc_pre.bat" call "%USERPROFILE%\mavenrc_pre.bat" %*
+@if exist "%USERPROFILE%\mavenrc_pre.cmd" call "%USERPROFILE%\mavenrc_pre.cmd" %*
+:pkbSkipRcPre
+@set "INTERNAL_MAVEN_OPTS="
+@"%JAVACMD%" --enable-native-access=ALL-UNNAMED -version >nul 2>&1
+@if ERRORLEVEL 1 goto pkbSkipNative
+@set "INTERNAL_MAVEN_OPTS=--enable-native-access=ALL-UNNAMED"
+:pkbSkipNative
+@"%JAVACMD%" %JVM_CONFIG_MAVEN_PROPS% %INTERNAL_MAVEN_OPTS% %MAVEN_OPTS% %MAVEN_DEBUG_OPTS% -classpath "%CLASSWORLDS_JAR%" "-Dclassworlds.conf=%MAVEN_HOME%\bin\m2.conf" "-Dmaven.home=%MAVEN_HOME%" "-Dlibrary.jansi.path=%MAVEN_HOME%\lib\jansi-native" "-Dmaven.multiModuleProjectDirectory=%MAVEN_PROJECTBASEDIR%" org.codehaus.plexus.classworlds.launcher.Launcher %MAVEN_ARGS% %*
+@set "PKB_EXIT=%ERRORLEVEL%"
+@if not "%MAVEN_SKIP_RC%"=="" goto pkbSkipRcPost
+@if exist "%USERPROFILE%\mavenrc_post.bat" call "%USERPROFILE%\mavenrc_post.bat"
+@if exist "%USERPROFILE%\mavenrc_post.cmd" call "%USERPROFILE%\mavenrc_post.cmd"
+:pkbSkipRcPost
+@endlocal & exit /b %PKB_EXIT%
+
+:pkbFindBase
+@set "WDIR=%CD%"
+:pkbBaseLoop
+@if exist "%WDIR%\.mvn" goto pkbBaseFound
+@for %%I in ("%WDIR%\..") do @set "NEXT=%%~fI"
+@if "%NEXT%"=="%WDIR%" goto pkbBaseMiss
+@set "WDIR=%NEXT%"
+@goto pkbBaseLoop
+:pkbBaseFound
+@set "MAVEN_PROJECTBASEDIR=%WDIR%"
+:pkbBaseMiss
+@exit /b 0
+
 @GOTO :EOF
 : end batch / begin powershell #>
 $ErrorActionPreference = "Stop"
@@ -94,6 +173,7 @@ $MAVEN_HOME = "$MAVEN_HOME_PARENT/$MAVEN_HOME_NAME"
 if (Test-Path -Path "$MAVEN_HOME" -PathType Container) {
   Write-Verbose "found existing MAVEN_HOME at $MAVEN_HOME"
   Write-Output "MVN_CMD=$MAVEN_HOME/bin/$MVN_CMD"
+  Write-Output "MAVEN_HOME=$MAVEN_HOME"
   exit $?
 }
 if (! $distributionUrlNameMain -or ($distributionUrlName -eq $distributionUrlNameMain)) {
@@ -169,3 +249,4 @@ try {
   catch { Write-Warning "Cannot remove $TMP_DOWNLOAD_DIR" }
 }
 Write-Output "MVN_CMD=$MAVEN_HOME/bin/$MVN_CMD"
+Write-Output "MAVEN_HOME=$MAVEN_HOME"

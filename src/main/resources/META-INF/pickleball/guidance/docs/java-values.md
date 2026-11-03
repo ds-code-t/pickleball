@@ -40,7 +40,7 @@ Every read has a `Class<T>` overload. It converts the stored value with Jackson.
 
 ## softFail
 
-`softFail(String message)` records a soft failure the way a soft assert is meant to finish the scenario. The calling step continues. The scenario fails when it ends. `RUN IF SCENARIO SOFT FAILED` sees the soft failure and runs. This does not change `SOFT ASSERT` or `SOFT FAIL SCENARIO`. There is no API to discard or absorb that failure. The Cucumber result stays failed, matching the workbook status. The JUnit failure is a `RuntimeException` whose cause is a `SoftRuntimeException`. That cause's message is the text you passed. It is not null.
+`softFail(String message)` records a soft failure the way a soft assert is meant to finish the scenario. The calling step continues. The scenario fails when it ends. `RUN IF SCENARIO SOFT FAILED` sees the soft failure and runs. This does not change `SOFT ASSERT` or `SOFT FAIL SCENARIO`. There is no API to discard or absorb that failure. The Cucumber result stays failed, matching the workbook status. The JUnit failure is a `RuntimeException` whose cause is a `SoftRuntimeException`. That cause's message is the text you passed. It is not null. The top-level throwable's message also contains that text, including when the step definition is a Java method that calls `softFail`.
 
 Outside a scenario, `softFail` throws `IllegalStateException`. A Cucumber `@Before` or `@After` is not a running scenario step, so `softFail` throws there too.
 
@@ -52,7 +52,7 @@ Outside a scenario, `softFail` throws `IllegalStateException`. A Cucumber `@Befo
 
 `throttle(String key, int seconds)` blocks until at least `seconds` have passed since the previous `throttle` call with the same key in this JVM. It returns how many milliseconds this call waited. The first call returns `0` and does not wait. `0` records the call and returns `0`. A blank key or a negative second count throws. Callers that ignore the result are unchanged. There is no Gherkin syntax.
 
-One key has one lock. The thread that holds it parks until the gap has elapsed. Another thread with the same key waits for the lock, then for whatever part of the gap is still left. Parallel scenarios share that gate. An interrupt sets the interrupt flag again and throws `IllegalStateException` with the message `throttle was interrupted.` The gate is not moved forward when the wait is interrupted.
+One key has one lock. The thread that holds it parks until the gap has elapsed. Another thread with the same key waits for the lock, then for whatever part of the gap is still left. The returned milliseconds count only that gap wait, not the time spent queued for the lock. Parallel scenarios share that gate. An interrupt sets the interrupt flag again and throws `IllegalStateException` with the message `throttle was interrupted.` The gate is not moved forward when the wait is interrupted.
 
 ## Hooks
 

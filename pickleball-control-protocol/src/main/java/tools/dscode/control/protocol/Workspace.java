@@ -12,6 +12,7 @@ import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -26,14 +27,16 @@ import java.util.stream.Stream;
 /**
  * One run's resolved configuration.
  *
- * <p>Layout: {@code .pickleball/runs/<runId>/workspace/runvars.properties} and
- * {@code workspace/configs}. Workbench, agents, and the test JVM all use this
- * class. There is no second reader or writer.</p>
+ * <p>Layout: {@code .pickleball/runs/<runId>/workspace/runvars.properties},
+ * {@code workspace/value-sources.properties}, and {@code workspace/configs}.
+ * Workbench, agents, and the test JVM all use this class. There is no second
+ * reader or writer.</p>
  */
 public final class Workspace {
     public static final String PROPERTY = "pkb_workspace";
     public static final String DIRECTORY = "workspace";
     public static final String RUNVARS_FILE = "runvars.properties";
+    public static final String VALUE_SOURCES_FILE = "value-sources.properties";
     public static final String CONFIGS_DIRECTORY = "configs";
     public static final String FINGERPRINT_FIELD = "workspaceFingerprint";
     public static final String CACHE_DIRECTORY = "resolve-cache";
@@ -132,7 +135,7 @@ public final class Workspace {
         Properties properties = new Properties();
         try (InputStream in = Files.newInputStream(file)) {
             properties.load(new java.io.InputStreamReader(in, StandardCharsets.UTF_8));
-        } catch (IOException failure) {
+        } catch (IOException | IllegalArgumentException failure) {
             throw new IllegalStateException("Could not read " + file + ": " + failure.getMessage(), failure);
         }
         Map<String, String> values = new LinkedHashMap<>();
@@ -146,17 +149,104 @@ public final class Workspace {
     /**
      * Writes runvars atomically. Sensitive values are stored as protected
      * references. {@code pkb_parallel=auto} is kept as {@code auto}.
+     * Keys in {@code keepLiteral} stay as the captured value. A sensitive key
+     * already stored as a literal stays a literal on later writes.
      */
     public static void writeRunVars(Path workspace, Map<String, String> runVars) {
-        Map<String, String> stored = protect(runVars);
+        writeRunVars(workspace, runVars, Set.of());
+    }
+
+    public static void writeRunVars(Path workspace, Map<String, String> runVars, Set<String> keepLiteral) {
+        Set<String> keep = new LinkedHashSet<>();
+        if (keepLiteral != null) {
+            for (String key : keepLiteral) {
+                if (key != null && !key.isBlank()) keep.add(normalizeKey(key));
+            }
+        }
+        Path file = runvarsFile(workspace);
+        if (Files.isRegularFile(file)) {
+            readRunVars(workspace).forEach((key, value) -> {
+                if (isSensitiveKey(key) && value != null && !value.isBlank() && protectedKey(value) == null) {
+                    keep.add(normalizeKey(key));
+                }
+            });
+        }
+        Map<String, String> stored = protect(runVars, keep);
         StringBuilder body = new StringBuilder();
         new TreeMap<>(stored).forEach((key, value) -> {
             body.append(escape(key)).append('=').append(escape(value == null ? "" : value)).append('\n');
         });
-        atomicWrite(runvarsFile(workspace), body.toString().getBytes(StandardCharsets.UTF_8));
+        atomicWrite(file, body.toString().getBytes(StandardCharsets.UTF_8));
+    }
+
+    public static Path valueSourcesFile(Path workspace) {
+        return workspace.resolve(VALUE_SOURCES_FILE);
+    }
+
+    /** Empty when this workspace was seeded before sources were recorded. */
+    public static Map<String, String> readValueSources(Path workspace) {
+        Map<String, String> sources = new LinkedHashMap<>();
+        if (workspace == null) return sources;
+        Path file = valueSourcesFile(workspace);
+        if (!Files.isRegularFile(file)) return sources;
+        Properties properties = new Properties();
+        try (InputStream in = Files.newInputStream(file)) {
+            properties.load(new java.io.InputStreamReader(in, StandardCharsets.UTF_8));
+        } catch (IOException | IllegalArgumentException failure) {
+            throw new IllegalStateException("Could not read " + file + ": " + failure.getMessage(), failure);
+        }
+        for (String key : properties.stringPropertyNames()) {
+            if (key == null || key.isBlank()) continue;
+            String source = properties.getProperty(key);
+            sources.put(normalizeKey(key), source == null ? "" : source);
+        }
+        return sources;
+    }
+
+    public static void writeValueSources(Path workspace, Map<String, String> sources) {
+        StringBuilder body = new StringBuilder();
+        Map<String, String> ordered = new TreeMap<>();
+        if (sources != null) {
+            sources.forEach((key, value) -> {
+                if (key == null || key.isBlank() || value == null || value.isBlank()) return;
+                ordered.put(normalizeKey(key), value.trim());
+            });
+        }
+        ordered.forEach((key, value) -> body.append(escape(key)).append('=').append(escape(value)).append('\n'));
+        atomicWrite(valueSourcesFile(workspace), body.toString().getBytes(StandardCharsets.UTF_8));
+    }
+
+    /** Records {@code source} for keys a later edit changed. Missing keys are added. */
+    public static void markValueSources(Path workspace, Iterable<String> keys, String source) {
+        if (workspace == null || keys == null || source == null || source.isBlank()) return;
+        Map<String, String> sources = new LinkedHashMap<>(readValueSources(workspace));
+        boolean changed = false;
+        for (String key : keys) {
+            if (key == null || key.isBlank()) continue;
+            sources.put(normalizeKey(key), source.trim());
+            changed = true;
+        }
+        if (changed) writeValueSources(workspace, sources);
+    }
+
+    public static void copyValueSources(Path from, Path to) {
+        if (from == null || to == null) return;
+        Path source = valueSourcesFile(from);
+        if (!Files.isRegularFile(source)) return;
+        try {
+            if (to.getParent() != null) Files.createDirectories(to);
+            Files.createDirectories(to);
+            Files.copy(source, valueSourcesFile(to), StandardCopyOption.REPLACE_EXISTING);
+        } catch (IOException failure) {
+            throw new IllegalStateException("Could not copy value sources into " + to + ": " + failure.getMessage(), failure);
+        }
     }
 
     public static Map<String, String> protect(Map<String, String> runVars) {
+        return protect(runVars, Set.of());
+    }
+
+    public static Map<String, String> protect(Map<String, String> runVars, Set<String> keepLiteral) {
         Map<String, String> stored = new LinkedHashMap<>();
         if (runVars == null) return stored;
         runVars.forEach((key, value) -> {
@@ -168,7 +258,8 @@ public final class Workspace {
                 return;
             }
             String text = value == null ? "" : value;
-            if (isSensitiveKey(normalized) && !text.isBlank() && protectedKey(text) == null) {
+            boolean keep = keepLiteral != null && keepLiteral.contains(normalized);
+            if (isSensitiveKey(normalized) && !text.isBlank() && protectedKey(text) == null && !keep) {
                 stored.put(normalized, protectedReference(normalized));
             } else {
                 stored.put(normalized, text);
@@ -198,10 +289,34 @@ public final class Workspace {
         }
     }
 
+    /**
+     * Launch read of a workspace copy. Selection keys may override the file for this
+     * process. Hooks, property files, and profiles are not applied again.
+     */
+    public static LinkedHashMap<String, String> loadForLaunch(Path workspace, Map<String, String> selectionOverrides) {
+        LinkedHashMap<String, String> loaded = new LinkedHashMap<>(readRunVars(workspace));
+        requireContext(loaded);
+        if (selectionOverrides == null) return loaded;
+        for (String key : SELECTION_KEYS) {
+            String override = selectionOverrides.get(key);
+            if (override != null && !override.isBlank()) loaded.put(key, override.trim());
+        }
+        return loaded;
+    }
+
     public static void copyConfigs(Path source, Path workspace) {
+        copyInto(source, workspace, true);
+    }
+
+    /** Copies files onto an existing configs directory. Does not delete it first. */
+    public static void overlayConfigs(Path source, Path workspace) {
+        copyInto(source, workspace, false);
+    }
+
+    private static void copyInto(Path source, Path workspace, boolean replace) {
         Path destination = configsDirectory(workspace);
         try {
-            if (Files.isDirectory(destination)) {
+            if (replace && Files.isDirectory(destination)) {
                 deleteTree(destination);
             }
             Files.createDirectories(destination);
@@ -235,6 +350,7 @@ public final class Workspace {
             throw new IllegalStateException("Workspace already exists at " + to + ". Use --reseed to replace it.");
         }
         writeRunVars(to, readRunVars(from));
+        copyValueSources(from, to);
         copyConfigs(configsDirectory(from), to);
     }
 
@@ -251,6 +367,12 @@ public final class Workspace {
             digest.update("runvars\n".getBytes(StandardCharsets.UTF_8));
             if (Files.isRegularFile(runvars)) {
                 digest.update(Files.readAllBytes(runvars));
+            }
+            digest.update(new byte[]{0});
+            Path sources = valueSourcesFile(workspace);
+            digest.update("sources\n".getBytes(StandardCharsets.UTF_8));
+            if (Files.isRegularFile(sources)) {
+                digest.update(Files.readAllBytes(sources));
             }
             digest.update(new byte[]{0});
             Path configs = configsDirectory(workspace);
@@ -363,7 +485,13 @@ public final class Workspace {
             if (!key.startsWith("pkb_")) key = "pkb_" + key;
             String existing = selection != null && selection.get(key) != null ? selection.get(key) : values.get(key);
             if (existing != null && !existing.equals(value)) {
-                appendWarning(warnings, "WARNING: --runvar " + key + " replaces " + existing + " with " + value);
+                appendWarning(warnings, "WARNING: --runvar " + key + " replaces "
+                        + OutputFormatter.shown(key, existing) + " with " + OutputFormatter.shown(key, value));
+                if (SecretRedactor.leaks(key, existing) || SecretRedactor.leaks(key, value)) {
+                    String sample = SecretRedactor.leaks(key, existing) ? existing : value;
+                    String fix = secretFix(projectContaining(workspace), Map.of(key, sample));
+                    if (fix != null) appendWarning(warnings, "fix: " + fix);
+                }
             }
             if (SELECTION_KEYS.contains(key)) {
                 if (selection != null) selection.put(key, value);
@@ -377,6 +505,11 @@ public final class Workspace {
             else values.remove(key);
         }
         if (!values.equals(original)) writeRunVars(workspace, values);
+    }
+
+    public static String shown(String value) {
+        if (value == null || value.isEmpty()) return "\"\"";
+        return value;
     }
 
     private static void appendWarning(Appendable warnings, String message) {
@@ -410,7 +543,9 @@ public final class Workspace {
         String field = "\"" + FINGERPRINT_FIELD + "\"";
         String assignment = field + " : \"" + fingerprint + "\"";
         try {
-            String text = Files.isRegularFile(recordFile) ? Files.readString(recordFile) : "{\n}\n";
+            String text = Files.isRegularFile(recordFile) ? Files.readString(recordFile) : "";
+            if (!text.isEmpty() && text.contains(assignment)) return;
+            if (text.isEmpty()) text = "{\n}\n";
             String updated;
             if (text.contains(field)) {
                 updated = text.replaceAll(
@@ -508,6 +643,95 @@ public final class Workspace {
         if (value == null || !value.startsWith(PROTECTED_PREFIX) || !value.endsWith(PROTECTED_SUFFIX)) return null;
         String key = value.substring(PROTECTED_PREFIX.length(), value.length() - PROTECTED_SUFFIX.length()).trim();
         return key.isEmpty() ? null : normalizeKey(key);
+    }
+
+    /**
+     * One source-aware secret fix for every leaked plain value in {@code values}.
+     * A key absent from the project property files names the runner hook.
+     * A key present in those files names the file. Null when nothing leaked.
+     */
+    public static String secretFix(Path project, Map<String, String> values) {
+        if (values == null || values.isEmpty()) return null;
+        java.util.LinkedHashSet<String> files = new java.util.LinkedHashSet<>();
+        boolean runner = false;
+        boolean any = false;
+        for (Map.Entry<String, String> entry : values.entrySet()) {
+            if (entry.getKey() == null) continue;
+            String key = normalizeKey(entry.getKey());
+            if (!SecretRedactor.leaks(key, entry.getValue())) continue;
+            any = true;
+            String source = projectFileSource(project, key);
+            if (source == null) runner = true;
+            else files.add(source);
+        }
+        if (!any) return null;
+        if (runner && files.isEmpty()) {
+            return SecretRedactor.fix("the runner hook (set by the runner and is not in project properties)");
+        }
+        if (!runner) return SecretRedactor.fix(String.join(", ", files));
+        return SecretRedactor.fix(
+                "the runner hook for keys that are not in a project property file, and "
+                        + String.join(", ", files) + " for keys that are"
+        );
+    }
+
+    /** UTF-8 project property values. Later files in the workbench scan overwrite earlier ones. */
+    public static Map<String, String> projectFileValues(Path project) {
+        return readProjectFiles(project).values;
+    }
+
+    /** Relative project-property path that supplied {@code key}, or null when the key is not in those files. */
+    public static String projectFileSource(Path project, String key) {
+        if (key == null || key.isBlank()) return null;
+        return readProjectFiles(project).sources.get(normalizeKey(key));
+    }
+
+    private record ProjectFiles(Map<String, String> values, Map<String, String> sources) {
+    }
+
+    private static ProjectFiles readProjectFiles(Path project) {
+        Map<String, String> values = new LinkedHashMap<>();
+        Map<String, String> sources = new LinkedHashMap<>();
+        if (project == null) return new ProjectFiles(values, sources);
+        Path root = project.toAbsolutePath().normalize();
+        for (Path file : List.of(
+                root.resolve("src/test/resources/pickleball_local2.properties"),
+                root.resolve("src/test/resources/pickleball_local.properties"),
+                root.resolve("src/test/resources/pickleball.properties"),
+                root.resolve("src/main/resources/pickleball_local2.properties"),
+                root.resolve("src/main/resources/pickleball_local.properties"),
+                root.resolve("src/main/resources/pickleball.properties"),
+                root.resolve("pickleball_local2.properties"),
+                root.resolve("pickleball_local.properties"),
+                root.resolve("pickleball.properties")
+        )) {
+            if (!Files.isRegularFile(file)) continue;
+            Properties properties = new Properties();
+            try (var reader = Files.newBufferedReader(file, StandardCharsets.UTF_8)) {
+                properties.load(reader);
+            } catch (IOException ignored) {
+                continue;
+            }
+            String relative = root.relativize(file).toString().replace('\\', '/');
+            for (String name : properties.stringPropertyNames()) {
+                String normalized = normalizeKey(name);
+                values.put(normalized, properties.getProperty(name));
+                sources.put(normalized, relative);
+            }
+        }
+        return new ProjectFiles(values, sources);
+    }
+
+    private static Path projectContaining(Path workspace) {
+        if (workspace == null) return Path.of("");
+        Path cursor = workspace.toAbsolutePath().normalize();
+        while (cursor != null) {
+            if (".pickleball".equals(String.valueOf(cursor.getFileName())) && cursor.getParent() != null) {
+                return cursor.getParent();
+            }
+            cursor = cursor.getParent();
+        }
+        return workspace;
     }
 
     public static String normalizeKey(String key) {
