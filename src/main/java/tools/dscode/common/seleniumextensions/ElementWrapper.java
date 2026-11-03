@@ -373,14 +373,6 @@ public class ElementWrapper implements WebElement, WrapsElement {
         });
     }
 
-    private JavascriptExecutor javascriptExecutor() {
-        if (driver instanceof JavascriptExecutor js) {
-            return js;
-        }
-        throw new IllegalArgumentException(
-                "WebDriver must implement JavascriptExecutor to use ElementWrapper");
-    }
-
     private static Object[] prependElement(WebElement currentElement, Object[] arguments) {
         Object[] additionalArguments = arguments == null ? new Object[0] : arguments;
         Object[] combinedArguments = new Object[additionalArguments.length + 1];
@@ -408,7 +400,6 @@ public class ElementWrapper implements WebElement, WrapsElement {
      */
     public Object executeScript(String script, Object... arguments) {
         Objects.requireNonNull(script, "script must not be null");
-        JavascriptExecutor js = javascriptExecutor();
         return executeWithStaleRetry(currentElement ->
                 tools.dscode.common.composite.ElementOperations.script(driver, script, prependElement(currentElement, arguments)));
     }
@@ -419,54 +410,32 @@ public class ElementWrapper implements WebElement, WrapsElement {
      */
     public Object executeAsyncScript(String script, Object... arguments) {
         Objects.requireNonNull(script, "script must not be null");
-        JavascriptExecutor js = javascriptExecutor();
         return executeWithStaleRetry(currentElement ->
                 tools.dscode.common.composite.ElementOperations.asyncScript(driver, script, prependElement(currentElement, arguments)));
     }
 
     @Override
     public void click() {
-        if (compositeAction()) {
-            executeVoidWithStaleRetry(current ->
-                    tools.dscode.common.composite.ElementOperations.click(driver, current));
-            return;
-        }
-        executeVoidWithStaleRetry(WebElement::click);
+        executeVoidWithStaleRetry(current ->
+                tools.dscode.common.composite.ElementOperations.click(driver, current));
     }
 
     @Override
     public void submit() {
-        if (compositeAction()) {
-            executeVoidWithStaleRetry(current ->
-                    tools.dscode.common.composite.ElementOperations.click(driver, current));
-            return;
-        }
-        executeVoidWithStaleRetry(WebElement::submit);
+        executeVoidWithStaleRetry(current ->
+                tools.dscode.common.composite.ElementOperations.submit(driver, current));
     }
 
     @Override
     public void sendKeys(CharSequence... keysToSend) {
-        if (compositeAction()) {
-            executeVoidWithStaleRetry(current ->
-                    tools.dscode.common.composite.ElementOperations.sendKeys(driver, current, keysToSend));
-            return;
-        }
-        executeVoidWithStaleRetry(currentElement -> currentElement.sendKeys(keysToSend));
+        executeVoidWithStaleRetry(current ->
+                tools.dscode.common.composite.ElementOperations.sendKeys(driver, current, keysToSend));
     }
 
     @Override
     public void clear() {
-        if (compositeAction()) {
-            executeVoidWithStaleRetry(current ->
-                    tools.dscode.common.composite.ElementOperations.sendKeys(driver, current, ""));
-            return;
-        }
-        executeVoidWithStaleRetry(WebElement::clear);
-    }
-
-    private boolean compositeAction() {
-        return element instanceof CompositeWebElement
-                || tools.dscode.common.composite.ElementOperations.primary();
+        executeVoidWithStaleRetry(current ->
+                tools.dscode.common.composite.ElementOperations.clear(driver, current));
     }
 
     @Override

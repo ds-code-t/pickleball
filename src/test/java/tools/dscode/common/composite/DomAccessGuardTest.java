@@ -26,10 +26,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class DomAccessGuardTest {
     static final Pattern RAW = Pattern.compile(
-            "(?<!ElementOperations)\\.(?:findElement|findElements|executeAsyncScript|executeScript|getDomAttribute|getDomProperty|getAttribute|getText|isDisplayed|isEnabled|isSelected|getTagName|getRect|getLocation|getSize|getCssValue|getShadowRoot)\\s*\\("
-                    + "|switchTo\\s*\\(\\s*\\)\\s*\\.\\s*frame\\s*\\("
+            "(?<!ElementOperations)\\.(?:findElement|findElements|executeAsyncScript|executeScript|getDomAttribute|getDomProperty|getAttribute|getText|isDisplayed|isEnabled|isSelected|getTagName|getRect|getLocation|getSize|getCssValue|getShadowRoot|getPageSource)\\s*\\("
+                    + "|switchTo\\s*\\(\\s*\\)\\s*\\.\\s*(?:frame|defaultContent|parentFrame|activeElement)\\s*\\("
                     + "|new\\s+Actions\\s*\\("
                     + "|new\\s+Select\\s*\\("
+                    + "|WebElement::(?:click|submit|sendKeys|clear)\\b"
+                    + "|(?<![A-Za-z0-9_])(?:el|raw|element|currentElement|webElement)\\.(?:click|sendKeys|clear|submit)\\s*\\("
+                    + "|\\(\\s*JavascriptExecutor\\s*\\)"
     );
 
     /** Files that may contain raw DOM calls. Everything else must stay clean. */
@@ -114,6 +117,27 @@ class DomAccessGuardTest {
         unknown.add(bad);
         unknown.removeAll(ALLOWED);
         assertFalse(unknown.isEmpty());
+    }
+
+    @Test
+    void interactionPatternsHitWebElementCallsAndIgnoreCollections() {
+        assertEquals(1, hitLines("void x(org.openqa.selenium.WebElement el){ el.click(); }").size());
+        assertEquals(1, hitLines("void x(org.openqa.selenium.WebElement el){ el.sendKeys(\"a\"); }").size());
+        assertEquals(1, hitLines("void x(org.openqa.selenium.WebElement el){ el.clear(); }").size());
+        assertEquals(1, hitLines("void x(org.openqa.selenium.WebElement el){ el.submit(); }").size());
+        assertEquals(1, hitLines("void x(){ run(org.openqa.selenium.WebElement::click); }").size());
+        assertEquals(1, hitLines("void x(org.openqa.selenium.WebElement currentElement){ currentElement.sendKeys(\"a\"); }").size());
+        assertEquals(1, hitLines("void x(org.openqa.selenium.WebDriver d){ d.getPageSource(); }").size());
+        assertEquals(1, hitLines("void x(org.openqa.selenium.WebDriver d){ d.switchTo().defaultContent(); }").size());
+        assertEquals(1, hitLines("void x(org.openqa.selenium.WebDriver d){ d.switchTo().parentFrame(); }").size());
+        assertEquals(1, hitLines("void x(org.openqa.selenium.WebDriver d){ d.switchTo().activeElement(); }").size());
+        assertEquals(1, hitLines("void x(org.openqa.selenium.WebDriver d){ Object j = (JavascriptExecutor) d; }").size());
+        assertEquals(0, hitLines("void x(java.util.List<String> values){ values.clear(); }").size());
+        assertEquals(0, hitLines("void x(java.util.Map<String, String> maps){ maps.clear(); }").size());
+        assertEquals(0, hitLines("void x(java.util.concurrent.ExecutorService pool){ pool.submit(() -> 1); }").size());
+        assertEquals(0, hitLines("void x(){ ElementOperations.click(driver, el); }").size());
+        assertEquals(0, hitLines("void x(){ ElementOperations.sendKeys(driver, el, \"a\"); }").size());
+        assertEquals(0, hitLines("void x(){ wrappedElements.clear(); }").size());
     }
 
     static TreeMap<String, List<String>> scan(Path root) throws IOException {

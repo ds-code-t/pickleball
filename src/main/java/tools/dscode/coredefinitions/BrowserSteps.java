@@ -3,7 +3,6 @@ package tools.dscode.coredefinitions;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.cucumber.java.en.Given;
 import org.openqa.selenium.Dimension;
-import org.openqa.selenium.JavascriptExecutor;
 import org.openqa.selenium.remote.LocalFileDetector;
 import org.openqa.selenium.remote.RemoteWebDriver;
 import tools.dscode.common.domoperations.SeleniumUtils;
@@ -21,10 +20,6 @@ import static tools.dscode.coredefinitions.ObjectRegistrationSteps.constructObje
 import static tools.dscode.coredefinitions.ObjectRegistrationSteps.getNewObjectFromParsingMap;
 
 public class BrowserSteps {
-
-    public static JavascriptExecutor getJavascriptExecutor() {
-        return (JavascriptExecutor) getCurrentDriver();
-    }
 
     public static void navigateWithBlocker(RemoteWebDriver driver, String url) {
         if (isTruthy(resolveFromVarsOrDefault("pkb_staggerParallelURLCalls", false))) {

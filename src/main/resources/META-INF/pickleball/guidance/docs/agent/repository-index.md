@@ -509,6 +509,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/common/reporting/diagnostic/DiscoverHintJvmLeakTest.java`
 - `src/test/java/tools/dscode/common/resources/PathListSemanticsTest.java`
 - `src/test/java/tools/dscode/common/seleniumextensions/ElementSnapshotParityTest.java`
+- `src/test/java/tools/dscode/common/seleniumextensions/ElementWrapperActionTest.java`
 - `src/test/java/tools/dscode/common/seleniumextensions/ElementWrapperRefreshTest.java`
 - `src/test/java/tools/dscode/common/seleniumextensions/ElementWrapperSnapshotTest.java`
 - `src/test/java/tools/dscode/common/seleniumextensions/SeleniumSnapshotProducerTest.java`

@@ -1,15 +1,12 @@
 package tools.dscode.common.domoperations;
 
 import org.openqa.selenium.By;
-import org.openqa.selenium.JavascriptExecutor;
 import org.openqa.selenium.Keys;
 import org.openqa.selenium.NoSuchElementException;
 import org.openqa.selenium.StaleElementReferenceException;
 import org.openqa.selenium.WebDriverException;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
-import org.openqa.selenium.interactions.Actions;
-import org.openqa.selenium.support.ui.Select;
 import tools.dscode.common.assertions.ValueWrapper;
 import tools.dscode.common.seleniumextensions.ElementWrapper;
 
@@ -110,7 +107,7 @@ public final class HumanInteractions {
                 return;
             }
             centerScroll(driver, el);
-            el.click();
+            tools.dscode.common.composite.ElementOperations.click(driver, el);
             return;
         }
 
@@ -142,7 +139,7 @@ public final class HumanInteractions {
         } catch (RuntimeException e) {
             try {
                 centerScroll(driver, el);
-                el.click();
+                tools.dscode.common.composite.ElementOperations.click(driver, el);
             } catch (RuntimeException e2) {
                 jsClick(driver, el);
             }
@@ -298,9 +295,9 @@ public final class HumanInteractions {
         }
         try {
             focus(driver, el);
-            el.sendKeys(Keys.chord(osControlKey(), "a"));
-            el.sendKeys(Keys.DELETE);
-            if (!s.isEmpty()) el.sendKeys(s);
+            tools.dscode.common.composite.ElementOperations.sendKeys(driver, el, Keys.chord(osControlKey(), "a"));
+            tools.dscode.common.composite.ElementOperations.sendKeys(driver, el, Keys.DELETE);
+            if (!s.isEmpty()) tools.dscode.common.composite.ElementOperations.sendKeys(driver, el, s);
         } catch (RuntimeException e) {
             jsSetValue(driver, el, s, true);
         }
@@ -314,8 +311,8 @@ public final class HumanInteractions {
             return;
         }
         focus(driver, el);
-        el.sendKeys(Keys.chord(osControlKey(), "a"));
-        el.sendKeys(Keys.DELETE);
+        tools.dscode.common.composite.ElementOperations.sendKeys(driver, el, Keys.chord(osControlKey(), "a"));
+        tools.dscode.common.composite.ElementOperations.sendKeys(driver, el, Keys.DELETE);
     }
 
     public static void typeText(WebDriver driver, WebElement el, CharSequence text) {
@@ -331,7 +328,7 @@ public final class HumanInteractions {
         }
         try {
             focus(driver, el);
-            if (!s.isEmpty()) el.sendKeys(s);
+            if (!s.isEmpty()) tools.dscode.common.composite.ElementOperations.sendKeys(driver, el, s);
         } catch (RuntimeException e) {
             jsAppendValue(driver, el, s);
         }
@@ -388,7 +385,7 @@ public final class HumanInteractions {
         }
         try {
             focus(driver, el);
-            el.sendKeys(Keys.ENTER);
+            tools.dscode.common.composite.ElementOperations.sendKeys(driver, el, Keys.ENTER);
         } catch (RuntimeException e) {
             jsDispatchKeyboard(driver, el, "Enter");
         }

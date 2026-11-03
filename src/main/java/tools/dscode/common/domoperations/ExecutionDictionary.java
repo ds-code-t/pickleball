@@ -1111,7 +1111,7 @@ public class ExecutionDictionary {
         return categories(categoryNames)
                 .flags(CategoryFlags.IFRAME)
                 .startingContext((category, value, op, driver, context) -> {
-                    driver.switchTo().defaultContent();
+                    tools.dscode.common.composite.ElementOperations.defaultContent(driver);
 
                     XPathy xpathy = resolveFinalXPath(category, value, op);
                     if (xpathy == null) return driver;
@@ -1143,7 +1143,7 @@ public class ExecutionDictionary {
         return categories(categoryNames)
                 .flags(CategoryFlags.SHADOW_HOST)
                 .startingContext((category, value, op, driver, context) -> {
-                    driver.switchTo().defaultContent();
+                    tools.dscode.common.composite.ElementOperations.defaultContent(driver);
 
                     XPathy xpathy = resolveFinalXPath(category, value, op);
                     if (xpathy == null) return driver;

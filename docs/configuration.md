@@ -434,7 +434,7 @@ Missing or blank `pkb_configpath` uses the classpath resource root `configs`. Pi
 | `pkb_gitsnapshot` | `metadata`, `diff`, `none` | diagnostic Git/source provenance |
 | `pkb_composite` | `auto`, `on`, `off` | element backend. `auto` (default) uses dom-composite 2.4.0 when the binary is found and otherwise Selenium for that run. `on` is the same and always prints the missing-binary `error:` / `fix:` line. `off` does not look for the binary |
 | `pkb_composite_bin` | path | `composite` executable. Checked before `COMPOSITE_BIN` |
-| `pkb_composite_log` | `off`, `all`, or `location,adapter,session,element,fallback` | CLI-first adapter log. Unset is off. One date-stamped file, 1 MiB cap |
+| `pkb_composite_log` | `off`, `all`, or `location,adapter,session,element,fallback,batch` | CLI-first adapter log. Unset is off. `batch` or `all` writes one TRACE line per describe and no per-element line: `TRACE batch mode=<composite, selenium-batch, or selenium-legacy> selector=<by> nodes=<count> durationMs=<n>`. One date-stamped file, 1 MiB cap |
 | `pkb_composite_log_dir` | directory | log directory. Default is the temp directory `pickleball-composite-logs` |
 
 ## Example row filter

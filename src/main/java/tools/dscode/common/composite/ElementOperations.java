@@ -72,7 +72,37 @@ public final class ElementOperations {
         if (primary()) {
             CompositeLog.errorFix("element", "click had no composite element", "Look the element up through ElementOperations so the hit stays on the adapter.");
         }
-        legacyClick(driver, raw);
+        raw.click();
+    }
+
+    /**
+     * Form submit. dom-composite 2.4.0 has click, type, and scroll, and no submit
+     * verb. A composite element therefore submits by click, the same mapping as
+     * {@link CompositeWebElement#submit()}. A Selenium element calls
+     * {@link WebElement#submit()}.
+     */
+    public static void submit(WebDriver driver, WebElement element) {
+        WebElement raw = unwrap(element);
+        if (raw instanceof CompositeWebElement composite) {
+            composite.submit();
+            return;
+        }
+        if (primary()) {
+            CompositeLog.errorFix("element", "submit had no composite element", "Look the element up through ElementOperations so the hit stays on the adapter.");
+        }
+        raw.submit();
+    }
+
+    public static void clear(WebDriver driver, WebElement element) {
+        WebElement raw = unwrap(element);
+        if (raw instanceof CompositeWebElement composite) {
+            composite.clear();
+            return;
+        }
+        if (primary()) {
+            CompositeLog.errorFix("element", "clear had no composite element", "Look the element up through ElementOperations so the hit stays on the adapter.");
+        }
+        raw.clear();
     }
 
     public static void sendKeys(WebDriver driver, WebElement element, CharSequence... keys) {
@@ -209,6 +239,11 @@ public final class ElementOperations {
         driver.switchTo().defaultContent();
     }
 
+    /** Full document HTML. There is no composite page-source verb, so this is the one Selenium call. */
+    public static String pageSource(WebDriver driver) {
+        return driver.getPageSource();
+    }
+
     public static String text(WebElement element) {
         return ElementReads.text(element);
     }
@@ -282,10 +317,6 @@ public final class ElementOperations {
             }
         }
         sel.selectByVisibleText(visibleText);
-    }
-
-    private static void legacyClick(WebDriver driver, WebElement element) {
-        new Actions(driver).moveToElement(element).click(element).perform();
     }
 
     private static WebElement unwrap(WebElement element) {

@@ -8,6 +8,7 @@ import io.cucumber.core.runner.StepExtension;
 import org.openqa.selenium.Dimension;
 import org.openqa.selenium.OutputType;
 import org.openqa.selenium.remote.RemoteWebDriver;
+import tools.dscode.common.composite.ElementOperations;
 import tools.dscode.common.control.ControlDecision;
 import tools.dscode.common.control.ControlEvent;
 import tools.dscode.common.control.ControlHook;
@@ -551,7 +552,7 @@ final class ControlBridgeCoordinator implements ControlHookHandler, AutoCloseabl
     private ControlBridgeBrowserPageResult browserPageOnScenarioThread(ScenarioLane lane) {
         RemoteWebDriver driver = BrowserSteps.getCurrentDriverIfPresent();
         if (driver == null) return browserPageUnavailable("The selected scenario has not created a browser.", lane.status(lanes.size()));
-        String source = Objects.toString(driver.getPageSource(), "");
+        String source = Objects.toString(ElementOperations.pageSource(driver), "");
         boolean truncated = source.length() > MAX_PAGE_SOURCE_CHARS;
         if (truncated) source = source.substring(0, MAX_PAGE_SOURCE_CHARS);
         Dimension size = driver.manage().window().getSize();

@@ -2,7 +2,6 @@ package tools.dscode.common.seleniumextensions;
 
 import com.xpathy.XPathy;
 import org.openqa.selenium.By;
-import org.openqa.selenium.JavascriptExecutor;
 import org.openqa.selenium.SearchContext;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebDriverException;
