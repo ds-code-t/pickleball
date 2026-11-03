@@ -44,12 +44,12 @@ class PrimaryPathAuditTest {
     void liveInspectRoutesThroughElementOperations() throws IOException {
         String source = Files.readString(Path.of(
                 "pickleball-control-api/src/main/java/tools/dscode/control/api/ElementControl.java"));
-        assertTrue(source.contains("ElementOperations.findElements"), source);
+        assertTrue(source.contains("ElementOperations.describe"), source);
         assertTrue(!source.contains("driver.findElement"), source);
         assertTrue(!source.contains("driver.findElements"), source);
         String pageQuery = Files.readString(Path.of(
                 "pickleball-control-api/src/main/java/tools/dscode/control/api/PageElementQuery.java"));
-        assertTrue(pageQuery.contains("ElementOperations.findElements"), pageQuery);
+        assertTrue(pageQuery.contains("ElementOperations.describe"), pageQuery);
         assertTrue(!pageQuery.contains("driver.findElement"), pageQuery);
         assertTrue(!pageQuery.contains("driver.findElements"), pageQuery);
     }

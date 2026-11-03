@@ -2,24 +2,26 @@ package tools.dscode.control.api;
 
 import org.openqa.selenium.By;
 import org.openqa.selenium.WebDriver;
-import org.openqa.selenium.WebElement;
 import tools.dscode.common.assertions.ValueWrapper;
 import tools.dscode.common.composite.ElementOperations;
+import tools.dscode.common.composite.ElementView;
 import tools.dscode.common.domoperations.ExecutionDictionary;
 import tools.dscode.common.treeparsing.DefinitionContext;
 
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 
 /**
- * Read-only live element counts. Builds an XPath with the execution dictionary,
- * then calls {@link ElementOperations#findElements} and {@code isDisplayed}.
- * It does not click, type, or add a wait. Composite is used when that runtime
- * is primary. The implicit wait is zeroed around the legacy driver call.
+ * Read-only live element counts. One {@link ElementOperations#describe} call
+ * returns tag, text, displayed, and attributes. Nothing is clicked or typed.
+ * Composite is used when that runtime is primary. The implicit wait is zeroed
+ * around the legacy driver call.
  */
 public final class PageElementQuery {
     private static final String INTERACTIVE_XPATH =
@@ -39,19 +41,13 @@ public final class PageElementQuery {
         if (category == null || category.isBlank()) {
             throw new IllegalArgumentException("Element category must not be blank.");
         }
-        ExecutionDictionary dictionary = DefinitionContext.getExecutionDictionary();
-        ValueWrapper value = text == null || text.isBlank() ? null : ValueWrapper.createValueWrapper(text);
-        ExecutionDictionary.CategoryResolution resolution =
-                dictionary.getFinalCategoryResolution(category.trim(), value, null);
-        String xpath = resolution.xpath() == null || resolution.xpath().getXpath() == null
-                ? ""
-                : resolution.xpath().getXpath();
+        String xpath = xpath(category.trim(), text);
         int raw = 0;
         int visible = 0;
         if (!xpath.isBlank()) {
-            for (WebElement element : findElements(driver, xpath)) {
+            for (ElementView view : describe(driver, xpath)) {
                 raw++;
-                if (displayed(element)) visible++;
+                if (view.displayed()) visible++;
             }
         }
         return new Hit(phrase(category.trim(), text), xpath, raw, visible);
@@ -61,19 +57,31 @@ public final class PageElementQuery {
         if (driver == null) {
             throw new IllegalStateException("The active scenario has not created a browser.");
         }
+        Map<String, int[]> counts = new LinkedHashMap<>();
+        Map<String, String> texts = new LinkedHashMap<>();
+        for (ElementView view : describe(driver, INTERACTIVE_XPATH)) {
+            String category = category(view);
+            String text = text(view);
+            if (category.isEmpty() || text.isEmpty()) continue;
+            String key = category + "\0" + text;
+            int[] count = counts.computeIfAbsent(key, ignored -> new int[2]);
+            count[0]++;
+            if (view.displayed()) count[1]++;
+            texts.putIfAbsent(key, text);
+        }
         List<Hit> hits = new ArrayList<>();
         Set<String> seen = new LinkedHashSet<>();
-        for (WebElement element : findElements(driver, INTERACTIVE_XPATH)) {
-            String category = category(element);
-            String text = text(element);
-            if (category.isEmpty() || text.isEmpty()) continue;
-            if (!seen.add(category + "\0" + text)) continue;
-            hits.add(find(driver, category, text));
+        for (Map.Entry<String, int[]> entry : counts.entrySet()) {
+            if (!seen.add(entry.getKey())) continue;
+            String category = entry.getKey().substring(0, entry.getKey().indexOf('\0'));
+            String text = texts.get(entry.getKey());
+            int[] count = entry.getValue();
+            hits.add(new Hit(phrase(category, text), xpath(category, text), count[0], count[1]));
         }
         return List.copyOf(hits);
     }
 
-    private static List<WebElement> findElements(WebDriver driver, String xpath) {
+    private static List<ElementView> describe(WebDriver driver, String xpath) {
         Duration previous = null;
         try {
             previous = driver.manage().timeouts().getImplicitWaitTimeout();
@@ -82,7 +90,7 @@ public final class PageElementQuery {
             previous = null;
         }
         try {
-            List<WebElement> found = ElementOperations.findElements(driver, By.xpath(xpath));
+            List<ElementView> found = ElementOperations.describe(driver, By.xpath(xpath));
             return found == null ? List.of() : found;
         } finally {
             if (previous != null) {
@@ -95,46 +103,28 @@ public final class PageElementQuery {
         }
     }
 
-    private static boolean displayed(WebElement element) {
-        try {
-            return element.isDisplayed();
-        } catch (RuntimeException ignored) {
-            return false;
-        }
+    private static String xpath(String category, String text) {
+        ExecutionDictionary dictionary = DefinitionContext.getExecutionDictionary();
+        ValueWrapper value = text == null || text.isBlank() ? null : ValueWrapper.createValueWrapper(text);
+        ExecutionDictionary.CategoryResolution resolution =
+                dictionary.getFinalCategoryResolution(category, value, null);
+        if (resolution.xpath() == null || resolution.xpath().getXpath() == null) return "";
+        return resolution.xpath().getXpath();
     }
 
-    private static String text(WebElement element) {
-        String value = safe(element::getText);
-        if (!value.isBlank()) return value.trim();
+    private static String text(ElementView view) {
+        if (!view.text().isBlank()) return view.text().trim();
         for (String name : List.of("aria-label", "placeholder", "name", "id", "value")) {
-            value = attribute(element, name);
+            String value = view.attribute(name);
             if (!value.isBlank()) return value.trim();
         }
+        if (!view.value().isBlank()) return view.value().trim();
         return "";
     }
 
-    private static String attribute(WebElement element, String name) {
-        try {
-            String value = element.getDomAttribute(name);
-            if (value == null || value.isBlank()) value = element.getAttribute(name);
-            return value == null ? "" : value;
-        } catch (RuntimeException ignored) {
-            return "";
-        }
-    }
-
-    private static String safe(java.util.function.Supplier<String> action) {
-        try {
-            String value = action.get();
-            return value == null ? "" : value;
-        } catch (RuntimeException ignored) {
-            return "";
-        }
-    }
-
-    private static String category(WebElement element) {
-        String tag = safe(element::getTagName).toLowerCase(Locale.ROOT);
-        String role = attribute(element, "role").toLowerCase(Locale.ROOT);
+    private static String category(ElementView view) {
+        String tag = view.tag().toLowerCase(Locale.ROOT);
+        String role = view.attribute("role").toLowerCase(Locale.ROOT);
         if ("a".equals(tag) || "link".equals(role)) return "Link";
         if ("textarea".equals(tag) || "input".equals(tag) || "textbox".equals(role)) return "Textbox";
         if ("select".equals(tag)) return "Dropdown";

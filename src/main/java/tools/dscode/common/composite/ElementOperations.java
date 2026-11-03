@@ -1,11 +1,16 @@
 package tools.dscode.common.composite;
 
 import org.openqa.selenium.By;
+import org.openqa.selenium.Dimension;
+import org.openqa.selenium.JavascriptExecutor;
 import org.openqa.selenium.NoSuchElementException;
+import org.openqa.selenium.Point;
+import org.openqa.selenium.Rectangle;
 import org.openqa.selenium.SearchContext;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.interactions.Actions;
+import org.openqa.selenium.support.ui.Select;
 import tools.dscode.common.seleniumextensions.ElementWrapper;
 
 import java.time.Duration;
@@ -148,6 +153,135 @@ public final class ElementOperations {
 
     public static JsonDesktop desktop(String verb, ElementPhrase phrase) {
         return new JsonDesktop(DomCompositeAdapter.get().desktop(verb, phrase));
+    }
+
+    /** One batched read. Composite copies the query payload. Selenium runs one script. */
+    public static List<ElementView> describe(WebDriver driver, By by) {
+        return ElementReads.describe(driver, by);
+    }
+
+    /** Describe elements already found. Composite hits do not take another round trip. */
+    public static List<ElementView> describe(WebDriver driver, List<WebElement> elements) {
+        return ElementReads.describe(driver, elements);
+    }
+
+    public static int batchCallsForTests() {
+        return ElementReads.BATCHES.get();
+    }
+
+    public static void resetBatchCallsForTests() {
+        ElementReads.BATCHES.set(0);
+    }
+
+    public static Actions actions(WebDriver driver) {
+        return new Actions(driver);
+    }
+
+    public static Object script(WebDriver driver, String source, Object... args) {
+        if (!(driver instanceof JavascriptExecutor javascript)) {
+            throw new IllegalArgumentException("error: this driver cannot run JavaScript. fix: use a browser driver.");
+        }
+        return javascript.executeScript(source, args == null ? new Object[0] : args);
+    }
+
+    /** ElementWrapper keeps stale retry. Every other element is one driver script. */
+    public static Object scriptOn(WebDriver driver, WebElement element, String source, Object... extra) {
+        if (element instanceof ElementWrapper wrapper) return wrapper.executeScript(source, extra);
+        Object[] more = extra == null ? new Object[0] : extra;
+        Object[] args = new Object[more.length + 1];
+        args[0] = unwrap(element);
+        System.arraycopy(more, 0, args, 1, more.length);
+        return script(driver, source, args);
+    }
+
+    public static Object asyncScript(WebDriver driver, String source, Object... args) {
+        if (!(driver instanceof JavascriptExecutor javascript)) {
+            throw new IllegalArgumentException("error: this driver cannot run JavaScript. fix: use a browser driver.");
+        }
+        return javascript.executeAsyncScript(source, args == null ? new Object[0] : args);
+    }
+
+    public static void enterFrame(WebDriver driver, int index) {
+        driver.switchTo().frame(index);
+    }
+
+    public static void defaultContent(WebDriver driver) {
+        driver.switchTo().defaultContent();
+    }
+
+    public static String text(WebElement element) {
+        return ElementReads.text(element);
+    }
+
+    public static String textContent(WebDriver driver, WebElement element) {
+        return ElementReads.textContent(driver, element);
+    }
+
+    public static String tag(WebElement element) {
+        return ElementReads.tag(element);
+    }
+
+    public static boolean displayed(WebElement element) {
+        return ElementReads.displayed(element);
+    }
+
+    public static boolean enabled(WebElement element) {
+        return ElementReads.enabled(element);
+    }
+
+    public static boolean selected(WebElement element) {
+        return ElementReads.selected(element);
+    }
+
+    public static String attribute(WebElement element, String name) {
+        return ElementReads.attribute(element, name);
+    }
+
+    public static String domAttribute(WebElement element, String name) {
+        return ElementReads.domAttribute(element, name);
+    }
+
+    public static String domProperty(WebElement element, String name) {
+        return ElementReads.domProperty(element, name);
+    }
+
+    public static String css(WebElement element, String property) {
+        return ElementReads.css(element, property);
+    }
+
+    public static Rectangle rect(WebElement element) {
+        return ElementReads.rect(element);
+    }
+
+    public static Point location(WebElement element) {
+        Rectangle bounds = rect(element);
+        return bounds == null ? new Point(0, 0) : bounds.getPoint();
+    }
+
+    public static Dimension size(WebElement element) {
+        Rectangle bounds = rect(element);
+        return bounds == null ? new Dimension(0, 0) : bounds.getDimension();
+    }
+
+    public static int optionCount(WebElement element) {
+        return new Select(unwrap(element)).getOptions().size();
+    }
+
+    public static void selectByIndex(WebElement element, int index) {
+        new Select(unwrap(element)).selectByIndex(index);
+    }
+
+    public static void selectMatching(WebElement select, WebElement option, String visibleText) {
+        Select sel = new Select(unwrap(select));
+        WebElement wanted = unwrap(option);
+        List<WebElement> options = sel.getOptions();
+        for (int i = 0; i < options.size(); i++) {
+            if (options.get(i).equals(wanted)) {
+                sel.selectByIndex(i);
+                return;
+            }
+        }
+        sel.selectByVisibleText(visibleText);
     }
 
     private static void legacyClick(WebDriver driver, WebElement element) {

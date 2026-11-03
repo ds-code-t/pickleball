@@ -204,6 +204,8 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/common/composite/DomCompositeAdapter.java`
 - `src/main/java/tools/dscode/common/composite/ElementOperations.java`
 - `src/main/java/tools/dscode/common/composite/ElementPhrase.java`
+- `src/main/java/tools/dscode/common/composite/ElementReads.java`
+- `src/main/java/tools/dscode/common/composite/ElementView.java`
 - `src/main/java/tools/dscode/common/composite/SelectorTranslator.java`
 - `src/main/java/tools/dscode/common/control/ControlDecision.java`
 - `src/main/java/tools/dscode/common/control/ControlEvent.java`
@@ -514,6 +516,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/common/composite/CompositeElements.java`
 - `src/test/java/tools/dscode/common/composite/CompositeLocationTest.java`
 - `src/test/java/tools/dscode/common/composite/DomAccessGuardTest.java`
+- `src/test/java/tools/dscode/common/composite/ElementBatchLogTest.java`
 - `src/test/java/tools/dscode/common/composite/PrimaryPathAuditTest.java`
 - `src/test/java/tools/dscode/common/composite/SelectorAndAdapterTest.java`
 - `src/test/java/tools/dscode/common/coordination/AgentCoordinationTest.java`

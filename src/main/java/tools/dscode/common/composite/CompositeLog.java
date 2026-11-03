@@ -58,6 +58,10 @@ public final class CompositeLog {
         line(entity, "INFO", message);
     }
 
+    public static void trace(String entity, String message) {
+        line(entity, "TRACE", message);
+    }
+
     public static void debug(String entity, String message) {
         line(entity, "DEBUG", message);
     }

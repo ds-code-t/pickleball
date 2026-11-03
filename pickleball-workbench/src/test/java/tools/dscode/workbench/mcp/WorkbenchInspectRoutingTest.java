@@ -94,10 +94,10 @@ class WorkbenchInspectRoutingTest {
         assertFalse(mcp.contains("WebDriver"), mcp);
         String worker = Files.readString(root.resolve(
                 "pickleball-control-api/src/main/java/tools/dscode/control/api/PageElementQuery.java"));
-        assertTrue(worker.contains("ElementOperations.findElements"), worker);
+        assertTrue(worker.contains("ElementOperations.describe"), worker);
         String inspect = Files.readString(root.resolve(
                 "pickleball-control-api/src/main/java/tools/dscode/control/api/ElementControl.java"));
-        assertTrue(inspect.contains("ElementOperations.findElements"), inspect);
+        assertTrue(inspect.contains("ElementOperations.describe"), inspect);
     }
 
     private static WorkbenchServices services(

@@ -2,7 +2,7 @@ package tools.dscode.control.protocol;
 
 import java.util.List;
 
-/** Read-only page query. Counts come from findElements and isDisplayed. Nothing is clicked. */
+/** Read-only page query. Counts come from one describe batch. Nothing is clicked. */
 public record ControlBridgePageQueryResult(
         String status,
         List<ControlBridgePageQueryHit> hits,

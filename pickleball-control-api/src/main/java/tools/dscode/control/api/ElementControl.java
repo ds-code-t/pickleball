@@ -1,24 +1,22 @@
 package tools.dscode.control.api;
 
 import org.openqa.selenium.By;
-import org.openqa.selenium.JavascriptExecutor;
-import org.openqa.selenium.Rectangle;
-import org.openqa.selenium.WebElement;
 import org.openqa.selenium.remote.RemoteWebDriver;
 import tools.dscode.common.assertions.ValueWrapper;
+import tools.dscode.common.composite.ElementOperations;
+import tools.dscode.common.composite.ElementView;
 import tools.dscode.common.domoperations.ExecutionDictionary;
 import tools.dscode.coredefinitions.BrowserSteps;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Objects;
 import java.util.TreeMap;
 
 import static tools.dscode.common.assertions.ValueWrapper.createValueWrapper;
-import static tools.dscode.common.domoperations.SeleniumUtils.safeDomAttributeOrProperty;
 import static tools.dscode.common.treeparsing.DefinitionContext.getExecutionDictionary;
 
 /** Read-only tooling access to the same execution dictionary used by normal Pickleball element syntax. */
@@ -62,18 +60,19 @@ public final class ElementControl {
             }
 
             String xpath = resolution.xpath().getXpath();
-            List<WebElement> matches = tools.dscode.common.composite.ElementOperations.findElements(driver, By.xpath(xpath));
+            List<ElementView> views = ElementOperations.describe(driver, By.xpath(xpath));
             int limit = boundedMax(maxElements);
-            List<ElementEvidence> evidence = java.util.stream.IntStream.range(0, Math.min(limit, matches.size()))
-                    .mapToObj(index -> evidence(driver, matches.get(index), index + 1))
-                    .toList();
+            List<ElementEvidence> evidence = new ArrayList<>();
+            for (int index = 0; index < Math.min(limit, views.size()); index++) {
+                evidence.add(evidence(views.get(index), index + 1));
+            }
             return ControlCallResult.success(new ElementInspection(
                     category.trim(),
                     text == null ? "" : text,
                     op == null ? "DEFAULT" : op.name(),
                     clip(xpath, MAX_TEXT_CHARS),
-                    matches.size(),
-                    matches.size() > evidence.size(),
+                    views.size(),
+                    views.size() > evidence.size(),
                     evidence
             ));
         } catch (Throwable failure) {
@@ -81,67 +80,40 @@ public final class ElementControl {
         }
     }
 
-    private static ElementEvidence evidence(
-            RemoteWebDriver driver,
-            WebElement element,
-            int index
-    ) {
-        Rectangle rect = element.getRect();
-        String outerHtml = Objects.toString(
-                safeDomAttributeOrProperty(element, "outerHTML"),
-                ""
-        );
+    private static ElementEvidence evidence(ElementView view, int index) {
+        String outerHtml = view.outerHtml() == null ? "" : view.outerHtml();
         boolean outerHtmlTruncated = outerHtml.length() > MAX_OUTER_HTML_CHARS;
         if (outerHtmlTruncated) {
             outerHtml = outerHtml.substring(0, MAX_OUTER_HTML_CHARS);
         }
-
+        String value = view.value();
+        if (value.isBlank()) value = view.attribute("value");
         return new ElementEvidence(
                 index,
-                safe(() -> element.getTagName()),
-                clip(safe(element::getText), MAX_TEXT_CHARS),
-                clip(Objects.toString(safeDomAttributeOrProperty(element, "value"), ""), MAX_TEXT_CHARS),
-                safeBoolean(element::isDisplayed),
-                safeBoolean(element::isEnabled),
-                safeBoolean(element::isSelected),
-                rect.getX(),
-                rect.getY(),
-                rect.getWidth(),
-                rect.getHeight(),
-                attributes(driver, element),
+                view.tag(),
+                clip(view.text(), MAX_TEXT_CHARS),
+                clip(value, MAX_TEXT_CHARS),
+                view.displayed(),
+                view.enabled(),
+                view.selected(),
+                view.x(),
+                view.y(),
+                view.width(),
+                view.height(),
+                attributes(view),
                 outerHtml,
                 outerHtmlTruncated
         );
     }
 
-    @SuppressWarnings("unchecked")
-    private static Map<String, String> attributes(RemoteWebDriver driver, WebElement element) {
-        if (element instanceof tools.dscode.common.composite.CompositeWebElement composite) {
-            return composite.attributes();
-        }
-        try {
-            JavascriptExecutor javascript = driver;
-            Object raw = javascript.executeScript(
-                    "const out={}; for (const a of arguments[0].attributes) out[a.name]=a.value; return out;",
-                    element
-            );
-            if (!(raw instanceof Map<?, ?> map)) {
-                return Map.of();
+    private static Map<String, String> attributes(ElementView view) {
+        TreeMap<String, String> sorted = new TreeMap<>();
+        view.attributes().forEach((key, value) -> {
+            if (key != null && sorted.size() < MAX_ATTRIBUTES) {
+                sorted.put(key, clip(value == null ? "" : value, MAX_ATTRIBUTE_VALUE_CHARS));
             }
-
-            TreeMap<String, String> sorted = new TreeMap<>();
-            map.forEach((key, value) -> {
-                if (key != null && sorted.size() < MAX_ATTRIBUTES) {
-                    sorted.put(
-                            String.valueOf(key),
-                            clip(Objects.toString(value, ""), MAX_ATTRIBUTE_VALUE_CHARS)
-                    );
-                }
-            });
-            return Collections.unmodifiableMap(new LinkedHashMap<>(sorted));
-        } catch (RuntimeException ignored) {
-            return Map.of();
-        }
+        });
+        return Collections.unmodifiableMap(new LinkedHashMap<>(sorted));
     }
 
     private static ExecutionDictionary.Op resolveOperation(String operation) {
@@ -168,31 +140,10 @@ public final class ElementControl {
         return value;
     }
 
-    private static boolean safeBoolean(BooleanSupplier action) {
-        try {
-            return action.getAsBoolean();
-        } catch (RuntimeException ignored) {
-            return false;
-        }
-    }
-
-    private static String safe(java.util.function.Supplier<String> action) {
-        try {
-            return Objects.toString(action.get(), "");
-        } catch (RuntimeException ignored) {
-            return "";
-        }
-    }
-
     private static String clip(String value, int maxChars) {
         if (value == null || value.length() <= maxChars) {
             return value == null ? "" : value;
         }
         return value.substring(0, maxChars) + "\n...[truncated]";
-    }
-
-    @FunctionalInterface
-    private interface BooleanSupplier {
-        boolean getAsBoolean();
     }
 }

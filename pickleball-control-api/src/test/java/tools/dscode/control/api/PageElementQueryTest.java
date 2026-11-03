@@ -4,18 +4,21 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.openqa.selenium.JavascriptExecutor;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 import tools.dscode.common.composite.CompositeBinaryLocator;
 import tools.dscode.common.composite.CompositeLog;
 import tools.dscode.common.composite.CompositeMode;
 import tools.dscode.common.composite.CompositeRuntime;
+import tools.dscode.common.composite.ElementOperations;
 import tools.dscode.control.protocol.DirectControlProvider;
 
 import java.lang.reflect.Proxy;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.PosixFilePermission;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -31,6 +34,7 @@ class PageElementQueryTest {
 
     @BeforeEach
     void isolate() {
+        ElementOperations.resetBatchCallsForTests();
         CompositeRuntime.use(temp.resolve("project"), Map.of(), new ClassLoader(null) {
         }, temp.resolve("home"));
     }
@@ -61,6 +65,7 @@ class PageElementQueryTest {
         assertFalse(hit.xpath().isBlank(), hit.xpath());
         assertEquals(0, clicks.get());
         assertTrue(finds.get() > 0);
+        assertEquals(1, ElementOperations.batchCallsForTests());
     }
 
     @Test
@@ -81,6 +86,65 @@ class PageElementQueryTest {
         assertEquals(1, hit.visibleCount());
         assertEquals(0, finds.get());
         assertTrue(CompositeRuntime.primary());
+        assertEquals(1, ElementOperations.batchCallsForTests());
+    }
+
+    @Test
+    void liveFindUsesOneScriptAndDoesNotReadEachElement() {
+        AtomicInteger scripts = new AtomicInteger();
+        WebDriver driver = scriptDriver(scripts);
+        PageElementQuery.Hit hit = PageElementQuery.find(driver, "Button", "Save");
+        assertEquals(1, hit.rawMatchCount());
+        assertEquals(1, hit.visibleCount());
+        assertEquals("the \"Save\" Button", hit.phrase());
+        assertEquals(1, scripts.get());
+        assertEquals(1, ElementOperations.batchCallsForTests());
+    }
+
+    @Test
+    void inspectGroupsTheInteractiveBatchWithoutASecondQuery() {
+        AtomicInteger scripts = new AtomicInteger();
+        WebDriver driver = scriptDriver(scripts);
+        List<PageElementQuery.Hit> hits = PageElementQuery.inspect(driver);
+        assertEquals(1, scripts.get());
+        assertEquals(1, ElementOperations.batchCallsForTests());
+        assertEquals(1, hits.size());
+        PageElementQuery.Hit hit = hits.get(0);
+        assertEquals(1, hit.rawMatchCount());
+        assertEquals(1, hit.visibleCount());
+        assertEquals("the \"Save\" Button", hit.phrase());
+        assertFalse(hit.xpath().isBlank(), hit.xpath());
+    }
+
+    private static WebDriver scriptDriver(AtomicInteger scripts) {
+        return (WebDriver) Proxy.newProxyInstance(
+                WebDriver.class.getClassLoader(),
+                new Class<?>[]{WebDriver.class, JavascriptExecutor.class},
+                (proxy, method, args) -> {
+                    if ("executeScript".equals(method.getName())) {
+                        scripts.incrementAndGet();
+                        Map<String, Object> row = new LinkedHashMap<>();
+                        row.put("tag", "button");
+                        row.put("text", "Save");
+                        row.put("displayed", true);
+                        row.put("enabled", true);
+                        row.put("selected", false);
+                        row.put("attributes", Map.of("id", "save"));
+                        row.put("value", "Save");
+                        row.put("outerHtml", "<button id=\"save\">Save</button>");
+                        row.put("x", 1);
+                        row.put("y", 2);
+                        row.put("width", 10);
+                        row.put("height", 8);
+                        return List.of(row);
+                    }
+                    if ("findElements".equals(method.getName()) || "findElement".equals(method.getName())
+                            || "executeAsyncScript".equals(method.getName())) {
+                        throw new AssertionError("page query must not call " + method.getName());
+                    }
+                    return defaultValue(method.getReturnType());
+                }
+        );
     }
 
     private static WebDriver driver(List<WebElement> elements, AtomicInteger finds) {
