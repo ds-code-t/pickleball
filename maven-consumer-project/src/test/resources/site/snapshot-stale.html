@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>Snapshot stale</title></head>
+<body>
+<div id="row">
+    <span id="sib-a">A</span>
+    <span id="sib-b">B</span>
+    <div id="sib-c">C</div>
+    <div id="live" data-testid="live">Before</div>
+</div>
+<button id="replace" type="button">Replace Live</button>
+<script>
+    document.getElementById("replace").addEventListener("click", function () {
+        var old = document.getElementById("live");
+        var neu = document.createElement("div");
+        neu.id = "live";
+        neu.setAttribute("data-testid", "live");
+        neu.appendChild(document.createTextNode("After"));
+        old.parentNode.replaceChild(neu, old);
+    });
+</script>
+</body>
+</html>

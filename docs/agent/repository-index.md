@@ -531,6 +531,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/common/reporting/diagnostic/DiscoverHintJvmLeakTest.java`
 - `src/test/java/tools/dscode/common/resources/PathListSemanticsTest.java`
 - `src/test/java/tools/dscode/common/seleniumextensions/ElementSnapshotParityTest.java`
+- `src/test/java/tools/dscode/common/seleniumextensions/ElementWrapperRefreshTest.java`
 - `src/test/java/tools/dscode/common/seleniumextensions/ElementWrapperSnapshotTest.java`
 - `src/test/java/tools/dscode/common/seleniumextensions/SeleniumSnapshotProducerTest.java`
 - `src/test/java/tools/dscode/common/seleniumextensions/SnapshotPages.java`
@@ -917,6 +918,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `maven-consumer-project/src/test/java/com/example/pickleball/DataReferenceSteps.java`
 - `maven-consumer-project/src/test/java/com/example/pickleball/DiagnosticValidationSteps.java`
 - `maven-consumer-project/src/test/java/com/example/pickleball/DynamicControlApiChecks.java`
+- `maven-consumer-project/src/test/java/com/example/pickleball/ElementSnapshotStaleSteps.java`
 - `maven-consumer-project/src/test/java/com/example/pickleball/InternalFrameworkTestSteps.java`
 - `maven-consumer-project/src/test/java/com/example/pickleball/LoadingContextChecks.java`
 - `maven-consumer-project/src/test/java/com/example/pickleball/LogAndAssertStepsChecks.java`
@@ -987,6 +989,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `maven-consumer-project/src/test/resources/features/dialogs.feature`
 - `maven-consumer-project/src/test/resources/features/dom-composite.feature`
 - `maven-consumer-project/src/test/resources/features/dynamic-steps.feature`
+- `maven-consumer-project/src/test/resources/features/element-snapshot-stale.feature`
 - `maven-consumer-project/src/test/resources/features/example-row-proof.feature`
 - `maven-consumer-project/src/test/resources/features/expression-plain-forms.feature`
 - `maven-consumer-project/src/test/resources/features/forms-dynamic-steps.feature`
@@ -1064,6 +1067,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `maven-consumer-project/src/test/resources/site/index.html`
 - `maven-consumer-project/src/test/resources/site/keyboard.html`
 - `maven-consumer-project/src/test/resources/site/loading.html`
+- `maven-consumer-project/src/test/resources/site/snapshot-stale.html`
 - `maven-consumer-project/src/test/resources/site/text-match.html`
 - `maven-consumer-project/src/test/resources/site/window-actions.html`
 - `maven-consumer-project/src/test/resources/site/window-child.html`
