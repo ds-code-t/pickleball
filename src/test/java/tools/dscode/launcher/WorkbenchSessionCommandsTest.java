@@ -1238,6 +1238,35 @@ class WorkbenchSessionCommandsTest {
     }
 
     @Test
+    void runningMarkBeforeAStepStaysIdleUnlessACommandIsInFlight() throws Exception {
+        String events = """
+                {"events":[
+                  {"timestamp":"2026-07-20T12:00:00Z","hook":"RUNNING"},
+                  {"timestamp":"2026-07-20T12:00:01Z","type":"RUNNING"}
+                ]}
+                """;
+        var idle = WorkbenchSessionCommands.timingOf(
+                new ObjectMapper().readTree(events),
+                null,
+                java.time.Instant.parse("2026-07-20T12:00:05Z"),
+                false
+        );
+        String idleReport = WorkbenchSessionCommands.formatReport(idle, List.of());
+        assertTrue(idleReport.contains("status=idle"), idleReport);
+        assertTrue(idleReport.contains("elapsed-step-ms=idle"), idleReport);
+
+        var inFlight = WorkbenchSessionCommands.timingOf(
+                new ObjectMapper().readTree(events),
+                null,
+                java.time.Instant.parse("2026-07-20T12:00:05Z"),
+                true
+        );
+        String running = WorkbenchSessionCommands.formatReport(inFlight, List.of());
+        assertTrue(running.contains("status=running"), running);
+        assertFalse(running.contains("elapsed-step-ms=idle"), running);
+    }
+
+    @Test
     @Timeout(value = 10, unit = TimeUnit.SECONDS)
     void statusIsIdleAfterTheStepHookClosesAndNotWhileBeforeStepIsOpen() throws Exception {
         Path sessionFile = project.resolve(".pickleball/runs/idle-step/session/cli-session.json");

@@ -831,7 +831,10 @@ public final class WorkbenchSessionCommands {
                 out.println("...+" + (kept.size() - end) + " more, use cursor");
                 out.println("nextCursor=" + end);
             }
-            out.println(formatReport(timingOf(events, runStarted(parsed), Instant.now()), sleepGaps(http, state)));
+            out.println(formatReport(
+                    timingOf(events, runStarted(parsed), Instant.now(), commandInFlight(http, state)),
+                    sleepGaps(http, state)
+            ));
             return 0;
         } catch (RuntimeException failure) {
             err.println("Workbench events failed: " + failure.getMessage());
@@ -1337,7 +1340,10 @@ public final class WorkbenchSessionCommands {
         } catch (RuntimeException ignored) {
             // Elapsed time still prints from the run record when the event feed is down.
         }
-        out.println(formatReport(timingOf(events, runStarted(parsed), Instant.now()), sleepGaps(http, state)));
+        out.println(formatReport(
+                timingOf(events, runStarted(parsed), Instant.now(), commandInFlight(http, state)),
+                sleepGaps(http, state)
+        ));
     }
 
     static String unhealthyMessage(Path project, String runId) {
@@ -1455,6 +1461,14 @@ public final class WorkbenchSessionCommands {
     }
 
     static Timing timingOf(JsonNode events, Instant runStarted, Instant now) {
+        return timingOf(events, runStarted, now, false);
+    }
+
+    /**
+     * A step is running only while a {@code BEFORE_STEP} is open or a session
+     * command is in flight. A bare {@code RUNNING} mark is not a step.
+     */
+    static Timing timingOf(JsonNode events, Instant runStarted, Instant now, boolean commandInFlight) {
         Instant clock = now == null ? Instant.now() : now;
         List<Mark> marks = eventMarks(events);
         Instant origin = runStarted;
@@ -1472,12 +1486,23 @@ public final class WorkbenchSessionCommands {
             if (mark.step && mark.at != null) stepAt = mark.at;
         }
         long stepMs = stepAt == null ? 0 : Math.max(0, Duration.between(stepAt, clock).toMillis());
-        boolean running = false;
+        boolean openStep = false;
         for (Mark mark : marks) {
-            if (mark.opens) running = true;
-            if (mark.closes) running = false;
+            if (mark.opens) openStep = true;
+            if (mark.closes) openStep = false;
         }
+        boolean running = openStep || commandInFlight;
         return new Timing(runMs, stepMs, running);
+    }
+
+    /** {@code /health} {@code running} is true only while a command is in flight. */
+    private static boolean commandInFlight(HttpClient http, SessionState state) {
+        try {
+            JsonNode health = getJson(http, state, "/health");
+            return health != null && health.path("running").asBoolean(false);
+        } catch (RuntimeException ignored) {
+            return false;
+        }
     }
 
     private record Mark(Instant at, boolean step, boolean opens, boolean closes, String text) {
@@ -1501,7 +1526,7 @@ public final class WorkbenchSessionCommands {
                     || (hook != null && hook.toUpperCase(Locale.ROOT).contains("STEP"));
             String upper = hook == null ? "" : hook.toUpperCase(Locale.ROOT);
             boolean closes = upper.contains("AFTER_STEP") || "EXECUTE_STEP".equals(upper);
-            boolean opens = !closes && (upper.contains("BEFORE_STEP") || "RUNNING".equals(upper));
+            boolean opens = !closes && upper.contains("BEFORE_STEP");
             String text = ((stepText == null ? "" : stepText) + " " + (phrase == null ? "" : phrase)).trim();
             marks.add(new Mark(at, step, opens, closes, text));
         }
