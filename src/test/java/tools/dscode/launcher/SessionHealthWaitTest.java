@@ -25,7 +25,7 @@ class SessionHealthWaitTest {
 
     @Test
     void timeoutMatchesTheWorkerStartResolutionOrder() {
-        assertEquals(Duration.ofSeconds(180), SessionHealthWait.DEFAULT_TIMEOUT);
+        assertEquals(Duration.ofSeconds(300), SessionHealthWait.DEFAULT_TIMEOUT);
         assertEquals(Duration.ofSeconds(12), SessionHealthWait.PROGRESS_EVERY);
         assertTrue(SessionHealthWait.PROGRESS_EVERY.compareTo(Duration.ofSeconds(10)) >= 0);
         assertTrue(SessionHealthWait.PROGRESS_EVERY.compareTo(Duration.ofSeconds(15)) <= 0);
@@ -59,10 +59,10 @@ class SessionHealthWaitTest {
                 key -> null,
                 key -> null
         ));
-        assertEquals(Duration.ofSeconds(180), SessionHealthWait.timeout(Map.of(property, "nope"), key -> null, key -> null));
-        assertEquals(Duration.ofSeconds(180), SessionHealthWait.timeout(Map.of(property, "0"), key -> null, key -> null));
-        assertEquals(Duration.ofSeconds(180), SessionHealthWait.timeout(Map.of(property, "-4"), key -> null, key -> null));
-        assertEquals(Duration.ofSeconds(180), SessionHealthWait.timeout(Map.of(), key -> " ", key -> " "));
+        assertEquals(Duration.ofSeconds(300), SessionHealthWait.timeout(Map.of(property, "nope"), key -> null, key -> null));
+        assertEquals(Duration.ofSeconds(300), SessionHealthWait.timeout(Map.of(property, "0"), key -> null, key -> null));
+        assertEquals(Duration.ofSeconds(300), SessionHealthWait.timeout(Map.of(property, "-4"), key -> null, key -> null));
+        assertEquals(Duration.ofSeconds(300), SessionHealthWait.timeout(Map.of(), key -> " ", key -> " "));
         assertEquals(Duration.ofSeconds(8), SessionHealthWait.timeout(
                 Map.of(),
                 key -> property.equals(key) ? " 8 " : null,
@@ -77,7 +77,7 @@ class SessionHealthWaitTest {
         String previousRunVars = System.getProperty("pkb_runvars");
         String previousDotted = System.getProperty(SessionHealthWait.START_TIMEOUT_RUNVAR);
         try {
-            assertEquals(Duration.ofSeconds(180), SessionHealthWait.timeout(Map.of()));
+            assertEquals(Duration.ofSeconds(300), SessionHealthWait.timeout(Map.of()));
             System.setProperty(property, "12");
             assertEquals(Duration.ofSeconds(12), SessionHealthWait.timeout(Map.of()));
             System.clearProperty(property);
@@ -93,7 +93,7 @@ class SessionHealthWaitTest {
                             "pkb_runvars", "pkb_workbench_worker_start_timeout=90"
                     ))
             );
-            assertEquals(Duration.ofSeconds(180), SessionHealthWait.timeout(Map.of(property, "nope")));
+            assertEquals(Duration.ofSeconds(300), SessionHealthWait.timeout(Map.of(property, "nope")));
         } finally {
             restore(property, previous);
             restore("pkb_runvars", previousRunVars);

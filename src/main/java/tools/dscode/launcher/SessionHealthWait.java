@@ -23,7 +23,7 @@ import java.util.regex.Pattern;
  * {@code open-window} does not use this type.
  */
 final class SessionHealthWait {
-    static final Duration DEFAULT_TIMEOUT = Duration.ofSeconds(180);
+    static final Duration DEFAULT_TIMEOUT = Duration.ofSeconds(300);
     static final Duration PROGRESS_EVERY = Duration.ofSeconds(12);
     static final String START_TIMEOUT_PROPERTY = "pkb_workbench_worker_start_timeout";
     static final String START_TIMEOUT_ENV = "PKB_WORKBENCH_WORKER_START_TIMEOUT";

@@ -19,7 +19,11 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 
 /**
@@ -111,7 +115,7 @@ public final class WorkbenchSpeed {
         }
         Path runFolder = AgentRun.folder(project, runId);
         boolean hit = cacheHit(project);
-        java.util.concurrent.atomic.AtomicReference<T> indexed = new java.util.concurrent.atomic.AtomicReference<>();
+        AtomicReference<T> indexed = new AtomicReference<>();
         List<StageScheduler.Task> tasks = new ArrayList<>();
         tasks.add(new StageScheduler.Task("index", () -> {
             indexed.set(index.call());
@@ -127,20 +131,61 @@ public final class WorkbenchSpeed {
         }));
         if (hit && seed != null) {
             tasks.add(new StageScheduler.Task("seed", () -> {
-                WorkspaceLaunch.warmClasspath(project, runFolder, err);
                 seed.call();
                 return "seed";
             }));
         }
-        StageScheduler.Outcome outcome = StageScheduler.run(tasks, true);
+        StageScheduler.Outcome outcome = StageScheduler.run(startTogether(tasks, runFolder), true);
         if (outcome.failed() || indexed.get() == null) {
             WorkbenchLaunchTiming.note(runFolder, "fallback", "parallel");
             return Optional.empty();
         }
-        if (!outcome.overlaps().isEmpty()) {
-            WorkbenchLaunchTiming.note(runFolder, "overlap", outcome.overlapDetail());
-        }
         return Optional.of(indexed.get());
+    }
+
+    /**
+     * Log index start and end, and log overlap when every stage has entered
+     * and none has done its work yet. The line is not written after compile.
+     */
+    private static List<StageScheduler.Task> startTogether(List<StageScheduler.Task> tasks, Path runFolder) {
+        int count = tasks.size();
+        if (count < 2) return tasks;
+        AtomicInteger arrived = new AtomicInteger();
+        CountDownLatch started = new CountDownLatch(count);
+        AtomicBoolean noted = new AtomicBoolean();
+        String detail = overlapNames(tasks);
+        List<StageScheduler.Task> gated = new ArrayList<>();
+        for (StageScheduler.Task task : tasks) {
+            boolean index = "index".equals(task.name());
+            gated.add(new StageScheduler.Task(task.name(), () -> {
+                boolean released = false;
+                if (index) WorkbenchLaunchTiming.note(runFolder, "index", "start");
+                try {
+                    if (arrived.incrementAndGet() == count && noted.compareAndSet(false, true)) {
+                        WorkbenchLaunchTiming.note(runFolder, "overlap", detail);
+                    }
+                    started.countDown();
+                    released = true;
+                    started.await();
+                    return task.body() == null ? "" : task.body().call();
+                } finally {
+                    if (!released) started.countDown();
+                    if (index) WorkbenchLaunchTiming.note(runFolder, "index", "end");
+                }
+            }));
+        }
+        return gated;
+    }
+
+    private static String overlapNames(List<StageScheduler.Task> tasks) {
+        StringBuilder detail = new StringBuilder();
+        for (int i = 0; i < tasks.size(); i++) {
+            for (int j = i + 1; j < tasks.size(); j++) {
+                if (!detail.isEmpty()) detail.append(',');
+                detail.append(tasks.get(i).name()).append('+').append(tasks.get(j).name());
+            }
+        }
+        return detail.toString();
     }
 
     /**
@@ -167,7 +212,7 @@ public final class WorkbenchSpeed {
     static boolean cacheHit(Path project) {
         if (project == null) return false;
         ClasspathCache.Hit hit = ClasspathCache.load(state(project), InputFingerprint.lockHash(project));
-        return hit.hit();
+        return hit.hit() && ClasspathCache.hasProjectOutput(project, hit.entries());
     }
 
     static void remember(Path project, List<String> entries) {

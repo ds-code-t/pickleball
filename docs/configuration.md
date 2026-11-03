@@ -521,7 +521,7 @@ Isolate selects one scenario. It does not force `pkb_parallel=1`.
 
 ## Workbench start timeout
 
-`pkb_workbench_worker_start_timeout` is Workbench only. A normal `mvn test` does not read it. The same value limits the consumer worker start and the `isolate` / `session-start` health wait. The default is 180 seconds. A blank, non-numeric, or non-positive value stays 180 seconds.
+`pkb_workbench_worker_start_timeout` is Workbench only. A normal `mvn test` does not read it. The same value limits the consumer worker start and the `isolate` / `session-start` health wait. The default is 300 seconds. A blank, non-numeric, or non-positive value stays 300 seconds.
 
 Resolution order, first match wins:
 
@@ -538,7 +538,7 @@ While `isolate` / `session-start` waits, stdout prints a progress line about eve
 session-start progress elapsed=12000ms stage=compile
 ```
 
-The stage is the latest `progress stage=` line in the session log or in a worker `*.err.log` under the Workbench `logs` directory (`compile`, `classpath`, `worker-launch`, `anchor-parse`, `paused`). Before any marker the stage is `starting / Maven resolve or feature index`. A start that is healthy before the first interval prints no progress line.
+The stage is the latest `progress stage=` line in the session log or in a worker `*.err.log` under the Workbench `logs` directory (`index`, `index-end`, `compile`, `classpath`, `worker-launch`, `anchor-parse`, `paused`). Before any marker the stage is `starting / Maven resolve or feature index`. The controller prints `index`, then `index-end`, then `compile` (a classpath-cache hit still uses that name and does not start Maven). A start that is healthy before the first interval prints no progress line.
 
 A session-start timeout names the current stage, the elapsed time, per-stage durations, the last 20 lines of the relevant log, and this hint: raise the limit with `-Dpkb_workbench_worker_start_timeout=N`, `PKB_WORKBENCH_WORKER_START_TIMEOUT`, or a `pkb_runvars` member `pkb_workbench_worker_start_timeout`. Stage enter times are written to `.pickleball/runs/<run-id>/session/startup-progress.json`. A worker startup timeout still names the elapsed time, the stage, and the last worker output.
 

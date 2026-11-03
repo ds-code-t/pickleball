@@ -55,6 +55,34 @@ public final class ClasspathCache {
         return new Hit(true, hash, entries);
     }
 
+    /**
+     * A discover cache isolate can reuse. A directory under {@code target/} or
+     * {@code build/} is the compiled output. A live-worker list is not.
+     */
+    public static boolean hasProjectOutput(Path project, List<String> entries) {
+        if (project == null || entries == null || entries.isEmpty()) return false;
+        Path root = project.toAbsolutePath().normalize();
+        Path target = root.resolve("target");
+        Path build = root.resolve("build");
+        for (String entry : entries) {
+            if (entry == null || entry.isBlank()) continue;
+            Path path;
+            try {
+                path = Path.of(entry.trim());
+            } catch (RuntimeException failure) {
+                continue;
+            }
+            if (!path.isAbsolute()) path = root.resolve(path);
+            try {
+                path = path.toAbsolutePath().normalize();
+            } catch (RuntimeException failure) {
+                continue;
+            }
+            if (Files.isDirectory(path) && (path.startsWith(target) || path.startsWith(build))) return true;
+        }
+        return false;
+    }
+
     public static void store(Path stateRoot, String hash, List<String> entries) throws IOException {
         if (stateRoot == null || hash == null || hash.isBlank() || entries == null || entries.isEmpty()) {
             throw new IllegalArgumentException("Classpath cache needs a hash and at least one entry.");

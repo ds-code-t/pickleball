@@ -202,7 +202,7 @@ public final class WorkbenchSynchronizer {
         String hash = InputFingerprint.lockHash(root);
         Path stateRoot = WorkbenchManifest.workbenchRoot(root);
         ClasspathCache.Hit hit = ClasspathCache.load(stateRoot, hash);
-        if (!hit.hit()) return null;
+        if (!hit.hit() || !ClasspathCache.hasProjectOutput(root, hit.entries())) return null;
         List<OutputPath> outputs = new ArrayList<>();
         List<String> dependencies = new ArrayList<>();
         for (String entry : hit.entries()) {
@@ -214,7 +214,7 @@ public final class WorkbenchSynchronizer {
                 dependencies.add(path.toString());
             }
         }
-        if (outputs.isEmpty() || dependencies.isEmpty()) return null;
+        if (outputs.isEmpty()) return null;
         Path staging = stateRoot.resolve(".sync-cache-" + UUID.randomUUID());
         createDirectories(staging);
         try {
@@ -251,12 +251,13 @@ public final class WorkbenchSynchronizer {
         String mode = System.getProperty("pkb_workbench_speed");
         if (mode == null) mode = System.getenv("PKB_WORKBENCH_SPEED");
         if (mode != null && "sequential".equalsIgnoreCase(mode.trim())) {
-            return new WorkbenchSynchronizer().sync(project);
+            return syncThenIndex(project);
         }
         java.util.concurrent.atomic.AtomicReference<WorkbenchManifest> manifest = new java.util.concurrent.atomic.AtomicReference<>();
         java.util.concurrent.atomic.AtomicReference<RuntimeException> failure = new java.util.concurrent.atomic.AtomicReference<>();
         tools.dscode.control.protocol.speed.StageScheduler.run(List.of(
                         new tools.dscode.control.protocol.speed.StageScheduler.Task("sync", () -> {
+                            progress("compile");
                             try {
                                 manifest.set(new WorkbenchSynchronizer().sync(project));
                                 return "sync";
@@ -266,16 +267,42 @@ public final class WorkbenchSynchronizer {
                             }
                         }),
                         new tools.dscode.control.protocol.speed.StageScheduler.Task("index", () -> {
-                            WorkbenchFeatureIndex.select(new WorkbenchFeatureIndex.Request(
-                                    project, List.of(), null, null, null, List.of(), false
-                            ));
-                            return "index";
+                            progress("index");
+                            try {
+                                indexCatalog(project);
+                                return "index";
+                            } finally {
+                                progress("index-end");
+                            }
                         })
                 ), true);
         if (failure.get() != null) throw failure.get();
         WorkbenchManifest done = manifest.get();
         if (done != null) return done;
         return new WorkbenchSynchronizer().sync(project);
+    }
+
+    private static WorkbenchManifest syncThenIndex(Path project) {
+        progress("index");
+        try {
+            indexCatalog(project);
+        } catch (RuntimeException ignored) {
+            // Index failure does not hide sync.
+        } finally {
+            progress("index-end");
+        }
+        progress("compile");
+        return new WorkbenchSynchronizer().sync(project);
+    }
+
+    private static void indexCatalog(Path project) {
+        WorkbenchFeatureIndex.select(new WorkbenchFeatureIndex.Request(
+                project, List.of(), null, null, null, List.of(), false
+        ));
+    }
+
+    private static void progress(String stage) {
+        System.err.println("progress stage=" + stage);
     }
 
     public static List<String> readWorkerClasspath(Path projectRoot) {

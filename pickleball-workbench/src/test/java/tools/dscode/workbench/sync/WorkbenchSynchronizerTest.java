@@ -3,7 +3,12 @@ package tools.dscode.workbench.sync;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import tools.dscode.control.protocol.speed.ClasspathCache;
+import tools.dscode.control.protocol.speed.InputFingerprint;
+
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -11,6 +16,7 @@ import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -527,6 +533,76 @@ class WorkbenchSynchronizerTest {
         assertEquals("kept", Files.readString(target.resolve("nested").resolve("a.txt")));
         assertFalse(Files.exists(target.resolve("locked.txt")));
         assertFalse(Files.exists(staged));
+    }
+
+    @Test
+    void isolateSyncReusesTheDiscoverClasspathAndDoesNotCompile() throws Exception {
+        Path project = consumerProject("with-jar");
+        Path classes = project.resolve("target/test-classes");
+        Path jar = tempDir.resolve("lib.jar");
+        Files.writeString(jar, "jar");
+        storeDiscoverCache(project, List.of(classes.toString(), jar.toString()));
+        assertEquals(0, syncWithoutMaven(project));
+        assertTrue(Files.isRegularFile(WorkbenchManifest.workbenchRoot(project)
+                .resolve("live/classes/Runner.class")));
+    }
+
+    @Test
+    void projectOutputAloneIsEnoughToSkipTheWrapper() throws Exception {
+        Path project = consumerProject("classes-only");
+        storeDiscoverCache(project, List.of(project.resolve("target/test-classes").toString()));
+        assertEquals(0, syncWithoutMaven(project));
+    }
+
+    @Test
+    void isolateStartupSplitsIndexFromCompile() throws Exception {
+        Path project = consumerProject("stages");
+        storeDiscoverCache(project, List.of(project.resolve("target/test-classes").toString()));
+        ByteArrayOutputStream err = new ByteArrayOutputStream();
+        PrintStream previous = System.err;
+        String mode = System.getProperty("pkb_workbench_speed");
+        System.setErr(new PrintStream(err, true, StandardCharsets.UTF_8));
+        System.setProperty("pkb_workbench_speed", "overlap");
+        try {
+            WorkbenchSynchronizer.syncOverlapped(project);
+        } finally {
+            System.setErr(previous);
+            if (mode == null) System.clearProperty("pkb_workbench_speed");
+            else System.setProperty("pkb_workbench_speed", mode);
+        }
+        String text = err.toString(StandardCharsets.UTF_8);
+        assertTrue(text.contains("progress stage=index" + System.lineSeparator()), text);
+        assertTrue(text.contains("progress stage=index-end"), text);
+        assertTrue(text.contains("progress stage=compile"), text);
+        assertTrue(text.indexOf("progress stage=index" + System.lineSeparator())
+                < text.indexOf("progress stage=index-end"), text);
+    }
+
+    private Path consumerProject(String name) throws IOException {
+        Path project = tempDir.resolve(name);
+        Files.createDirectories(project.resolve("target/test-classes"));
+        Files.writeString(project.resolve("target/test-classes/Runner.class"), "class");
+        Files.writeString(project.resolve("pom.xml"), "<project>" + name + "</project>\n");
+        Files.writeString(project.resolve("mvnw"), "#!/bin/sh\nexit 1\n");
+        return project;
+    }
+
+    private static void storeDiscoverCache(Path project, List<String> entries) throws IOException {
+        ClasspathCache.store(
+                WorkbenchManifest.workbenchRoot(project),
+                InputFingerprint.lockHash(project),
+                entries
+        );
+    }
+
+    private static int syncWithoutMaven(Path project) {
+        AtomicInteger maven = new AtomicInteger();
+        WorkbenchSynchronizer synchronizer = new WorkbenchSynchronizer((ignored, args, log) -> {
+            maven.incrementAndGet();
+            throw new IllegalStateException("maven started: " + args);
+        });
+        synchronizer.sync(project);
+        return maven.get();
     }
 
     private Path stagedTree(String contents) throws IOException {

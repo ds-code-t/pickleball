@@ -213,12 +213,12 @@ class WorkbenchWorkerManagerTest {
     }
 
     @Test
-    void workerStartTimeoutDefaultsToThreeMinutesAndHonorsOverrides() {
-        assertEquals(Duration.ofSeconds(170), WorkbenchWorkerManager.START_TIMEOUT);
-        assertTrue(WorkbenchWorkerManager.START_TIMEOUT.compareTo(Duration.ofSeconds(180)) < 0);
-        assertEquals(Duration.ofSeconds(170), WorkbenchWorkerManager.startTimeout(Map.of()));
+    void workerStartTimeoutStaysUnderTheOuterDefaultAndHonorsOverrides() {
+        assertEquals(Duration.ofSeconds(290), WorkbenchWorkerManager.START_TIMEOUT);
+        assertTrue(WorkbenchWorkerManager.START_TIMEOUT.compareTo(Duration.ofSeconds(300)) < 0);
+        assertEquals(Duration.ofSeconds(290), WorkbenchWorkerManager.startTimeout(Map.of()));
         assertEquals(
-                WorkbenchWorkerManager.innerDeadline(Duration.ofSeconds(180)),
+                WorkbenchWorkerManager.innerDeadline(Duration.ofSeconds(300)),
                 WorkbenchWorkerManager.START_TIMEOUT
         );
         String property = WorkbenchWorkerManager.START_TIMEOUT_PROPERTY;
@@ -252,7 +252,7 @@ class WorkbenchWorkerManagerTest {
                             "pkb_runvars", "pkb_workbench_worker_start_timeout=90"
                     ))
             );
-            assertEquals(Duration.ofSeconds(170), WorkbenchWorkerManager.startTimeout(Map.of(property, "nope")));
+            assertEquals(Duration.ofSeconds(290), WorkbenchWorkerManager.startTimeout(Map.of(property, "nope")));
         } finally {
             restore(property, previous);
             restore("pkb_runvars", previousRunVars);
