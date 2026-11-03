@@ -164,7 +164,7 @@ Usage: use-version --version=<safe-version>
 
 # help validate
 Usage: validate [--tags=<expr>] [--name=<regex>] [--run-id=<id>]
-Reports undefined steps, ambiguous glue, and unresolved RUN SCENARIO targets. Runs nothing.
+Reports undefined steps, ambiguous glue, and unresolved RUN SCENARIO targets. Outline rows are expanded. Core steps count as defined. A long suite prints progress and stops at a cap. Runs nothing.
 
 # help worker-restart
 Usage: worker-restart

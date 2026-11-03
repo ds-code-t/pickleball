@@ -4,6 +4,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import tools.dscode.control.protocol.WorkbenchFeatureIndex;
 
+import java.io.ByteArrayOutputStream;
+import java.io.PrintStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -52,5 +55,60 @@ class WorkbenchValidateTest {
         assertTrue(WorkbenchValidate.framework("TRACE: hello"));
         assertTrue(WorkbenchValidate.patternMatches("buy {string}", "buy \"milk\""));
         assertFalse(WorkbenchValidate.patternMatches("buy {string}", "missing step"));
+        assertEquals("the price is 2", WorkbenchValidate.expand("the price is <price>", List.of("price"), List.of("2")));
+    }
+
+    @Test
+    void outlineRowsAndCoreStepsAreDefined() throws Exception {
+        Path feature = project.resolve("src/test/resources/features/outline.feature");
+        Files.createDirectories(feature.getParent());
+        Files.writeString(feature, """
+                Feature: Outline
+                  Scenario Outline: Buy
+                    Given buy "<item>"
+                    Given the price is <price>
+                    Given non-blank: kept
+                    Given missing step
+                  Examples:
+                    | item | price |
+                    | milk | 2 |
+                """);
+        Path glue = project.resolve("src/test/java/ShopSteps.java");
+        Files.createDirectories(glue.getParent());
+        Files.writeString(glue, """
+                public class ShopSteps {
+                  @Given("buy {string}") void a(String item) {}
+                  @Given("the price is {int}") void b(int price) {}
+                }
+                """);
+        ByteArrayOutputStream stdout = new ByteArrayOutputStream();
+        int code = WorkbenchValidate.run(project, null, null, new PrintStream(stdout, true, StandardCharsets.UTF_8), new PrintStream(new ByteArrayOutputStream()));
+        String out = stdout.toString(StandardCharsets.UTF_8);
+        assertEquals(1, code, out);
+        assertTrue(out.contains("validate progress stage=glue"), out);
+        assertTrue(out.contains("capped=false"), out);
+        assertTrue(out.contains("undefined:"), out);
+        assertTrue(out.contains("missing step"), out);
+        assertFalse(out.lines().anyMatch(line -> line.startsWith("undefined:") && (line.contains("price") || line.contains("non-blank") || line.contains("buy"))), out);
+    }
+
+    @Test
+    void wholeSuitePrintsProgressAndStopsAtTheCap() throws Exception {
+        Path feature = project.resolve("src/test/resources/features/many.feature");
+        Files.createDirectories(feature.getParent());
+        StringBuilder body = new StringBuilder("Feature: Many\n  Scenario: Lots\n");
+        int steps = WorkbenchValidate.STEP_CAP + 25;
+        for (int i = 0; i < steps; i++) body.append("    Given missing ").append(i).append('\n');
+        Files.writeString(feature, body.toString());
+        ByteArrayOutputStream stdout = new ByteArrayOutputStream();
+        int code = WorkbenchValidate.run(project, null, null, new PrintStream(stdout, true, StandardCharsets.UTF_8), new PrintStream(new ByteArrayOutputStream()));
+        String out = stdout.toString(StandardCharsets.UTF_8);
+        assertEquals(1, code, out);
+        assertTrue(out.contains("validate progress stage=steps"), out);
+        assertTrue(out.contains("capped=true"), out);
+        assertTrue(out.contains("fix: narrow validate with --tags or --name"), out);
+        assertFalse(out.contains("missing " + (steps - 1)), out);
+        long undefined = out.lines().filter(line -> line.startsWith("undefined:")).count();
+        assertEquals(WorkbenchValidate.STEP_CAP, undefined, out);
     }
 }
