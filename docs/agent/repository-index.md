@@ -58,6 +58,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/maintainer/2.1.18-meta-analysis-2.md`
 - `docs/maintainer/2.1.18-meta-deep-dive.md`
 - `docs/maintainer/2.1.18-report-6-roadmap.md`
+- `docs/maintainer/2.1.18-report-7-roadmap.md`
 - `docs/maintainer/2.1.18-report4.md`
 - `docs/maintainer/2.1.18-report5.md`
 - `docs/maintainer/2.1.18-speed-build-prompt.md`
