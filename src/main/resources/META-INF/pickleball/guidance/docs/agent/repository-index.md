@@ -485,6 +485,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/common/assertions/MultilineAssertTest.java`
 - `src/test/java/tools/dscode/common/composite/CompositeElements.java`
 - `src/test/java/tools/dscode/common/composite/CompositeLocationTest.java`
+- `src/test/java/tools/dscode/common/composite/DomAccessGuardTest.java`
 - `src/test/java/tools/dscode/common/composite/PrimaryPathAuditTest.java`
 - `src/test/java/tools/dscode/common/composite/SelectorAndAdapterTest.java`
 - `src/test/java/tools/dscode/common/coordination/AgentCoordinationTest.java`

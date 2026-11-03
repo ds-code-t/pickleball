@@ -63,6 +63,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/maintainer/2.1.18-speed-roadmap.md`
 - `docs/maintainer/2.1.18-structural-fixes.md`
 - `docs/maintainer/2.1.18-unification.md`
+- `docs/maintainer/2.1.19-dom-access-roadmap.md`
 - `docs/maintainer/2.1.19-dom-composite-roadmap.md`
 - `docs/maintainer/2.1.19-element-snapshot-roadmap.md`
 - `docs/maintainer/consumer-sim-harness.md`
@@ -512,6 +513,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/common/assertions/MultilineAssertTest.java`
 - `src/test/java/tools/dscode/common/composite/CompositeElements.java`
 - `src/test/java/tools/dscode/common/composite/CompositeLocationTest.java`
+- `src/test/java/tools/dscode/common/composite/DomAccessGuardTest.java`
 - `src/test/java/tools/dscode/common/composite/PrimaryPathAuditTest.java`
 - `src/test/java/tools/dscode/common/composite/SelectorAndAdapterTest.java`
 - `src/test/java/tools/dscode/common/coordination/AgentCoordinationTest.java`
