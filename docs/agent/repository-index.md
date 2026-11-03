@@ -516,6 +516,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/common/composite/CompositeElements.java`
 - `src/test/java/tools/dscode/common/composite/CompositeLocationTest.java`
 - `src/test/java/tools/dscode/common/composite/DomAccessGuardTest.java`
+- `src/test/java/tools/dscode/common/composite/ElementBatchEdgeTest.java`
 - `src/test/java/tools/dscode/common/composite/ElementBatchLogTest.java`
 - `src/test/java/tools/dscode/common/composite/PrimaryPathAuditTest.java`
 - `src/test/java/tools/dscode/common/composite/SelectorAndAdapterTest.java`
@@ -616,6 +617,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/testengine/WorkspaceSeedTest.java`
 - `src/test/java/tools/dscode/untilpass/UntilPassBrowserSteps.java`
 - `src/test/java/tools/dscode/untilpass/UntilPassChromeLookupTest.java`
+- `src/test/resources/element-batch/edge.html`
 - `src/test/resources/element-snapshot/fixture.html`
 - `src/test/resources/expected-failure/release-216-expected-failure.feature`
 - `src/test/resources/guidance-golden/documented-help.txt`
@@ -922,6 +924,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `maven-consumer-project/src/test/java/com/example/pickleball/ControlRuntimeObserverChecks.java`
 - `maven-consumer-project/src/test/java/com/example/pickleball/DataReferenceSteps.java`
 - `maven-consumer-project/src/test/java/com/example/pickleball/DiagnosticValidationSteps.java`
+- `maven-consumer-project/src/test/java/com/example/pickleball/DomBatchCountSteps.java`
 - `maven-consumer-project/src/test/java/com/example/pickleball/DynamicControlApiChecks.java`
 - `maven-consumer-project/src/test/java/com/example/pickleball/ElementSnapshotStaleSteps.java`
 - `maven-consumer-project/src/test/java/com/example/pickleball/InternalFrameworkTestSteps.java`

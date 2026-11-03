@@ -50,3 +50,8 @@ Feature: Dom-composite adapter path and backward-compatible phrases
     * , click the "Keyboard Input" Textbox
     * , press "ENTER" in the "Keyboard Input" Textbox
     * , ensure "Last Key: Enter" Text is displayed
+
+  @all @regression @browser @local-site @dom-composite @batch-count
+  Scenario: Counting a visible button is one describe batch
+    * navigate to: URL.forms
+    * the visible "Submit Form" Button count is 1 from one batch

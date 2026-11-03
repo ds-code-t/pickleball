@@ -45,16 +45,17 @@ final class ElementReads {
               if (!el || el.nodeType !== 1) {
                 return {tag:'', text:'', displayed:false, enabled:false, selected:false, attributes:{}, value:'', outerHtml:'', x:0, y:0, width:0, height:0};
               }
-              var attrs = {};
+              var attrs = [];
               if (el.attributes) {
                 for (var i = 0; i < el.attributes.length; i++) {
                   var a = el.attributes[i];
-                  attrs[a.name] = a.value;
+                  attrs.push([String(a.name), a.value == null ? '' : String(a.value)]);
                 }
               }
               var rect = el.getBoundingClientRect();
               var tag = String(el.tagName || '').toLowerCase();
-              var text = el.innerText != null ? String(el.innerText) : String(el.textContent || '');
+              var text = el.textContent == null ? '' : String(el.textContent);
+              if (el.innerText != null && String(el.innerText).length > 0) text = String(el.innerText);
               var value = el.value == null ? '' : String(el.value);
               return {
                 tag: tag,
@@ -72,13 +73,20 @@ final class ElementReads {
               };
             }
             function pickleballDisplayed(el) {
-              if (!el || !el.isConnected) return false;
+              if (!el) return false;
+              if (el.isConnected === false) return false;
               for (var n = el; n && n.nodeType === 1; n = n.parentElement) {
-                var style = window.getComputedStyle(n);
+                var style = null;
+                try { style = window.getComputedStyle(n); } catch (ignore) { style = null; }
                 if (!style) break;
-                if (style.display === 'none' || style.visibility === 'hidden') return false;
+                var display = style.display;
+                var visibility = style.visibility;
+                if (display === 'none' || visibility === 'hidden') return false;
               }
-              return !!(el.offsetWidth || el.offsetHeight || (el.getClientRects && el.getClientRects().length));
+              var rect = el.getBoundingClientRect ? el.getBoundingClientRect() : null;
+              if (rect && ((rect.width || 0) > 0 || (rect.height || 0) > 0)) return true;
+              if (el.offsetWidth || el.offsetHeight) return true;
+              return !!(el.getClientRects && el.getClientRects().length);
             }
             """;
 
@@ -100,6 +108,9 @@ final class ElementReads {
                 views = scriptQuery((JavascriptExecutor) driver, by);
             } catch (RuntimeException failure) {
                 mode = "selenium-legacy";
+                String detail = failure.getClass().getSimpleName() + ":" + failure.getMessage();
+                if (detail.length() > 160) detail = detail.substring(0, 160);
+                selector = selector + " scriptError=" + detail.replace('\n', ' ');
                 views = fromElements(ElementOperations.findElements(driver, by));
             }
         } else {
@@ -237,7 +248,10 @@ final class ElementReads {
 
     private static List<ElementView> scriptQuery(JavascriptExecutor javascript, By by) {
         String[] locator = split(by);
-        Object raw = javascript.executeScript(DESCRIBE_FN + QUERY_JS, locator[0], locator[1]);
+        Object raw = javascript.executeScript(
+                DESCRIBE_FN + QUERY_JS,
+                locator[0] == null ? "" : locator[0],
+                locator[1] == null ? "" : locator[1]);
         return parse(raw);
     }
 
@@ -317,12 +331,22 @@ final class ElementReads {
     }
 
     private static Map<String, String> attributes(Object raw) {
-        if (!(raw instanceof Map<?, ?> map)) return Map.of();
         Map<String, String> copy = new LinkedHashMap<>();
-        map.forEach((key, value) -> {
-            if (key != null && value != null) copy.put(String.valueOf(key), String.valueOf(value));
-        });
-        return copy;
+        if (raw instanceof Map<?, ?> map) {
+            map.forEach((key, value) -> {
+                if (key != null && value != null) copy.put(String.valueOf(key), String.valueOf(value));
+            });
+            return copy.isEmpty() ? Map.of() : copy;
+        }
+        if (raw instanceof List<?> pairs) {
+            for (Object item : pairs) {
+                if (!(item instanceof List<?> pair) || pair.size() < 2) continue;
+                if (pair.get(0) == null || pair.get(1) == null) continue;
+                copy.put(String.valueOf(pair.get(0)), String.valueOf(pair.get(1)));
+            }
+            return copy.isEmpty() ? Map.of() : copy;
+        }
+        return Map.of();
     }
 
     private static String text(Object raw) {
