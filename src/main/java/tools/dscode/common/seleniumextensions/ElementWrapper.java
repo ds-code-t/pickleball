@@ -26,6 +26,27 @@ import static tools.dscode.common.treeparsing.parsedComponents.ElementMatch.ELEM
 import static tools.dscode.common.reporting.logging.LogForwarder.logTrace;
 import static tools.dscode.common.util.debug.DebugUtils.debugFlags;
 
+/**
+ * One live element and one {@link ElementSnapshot}.
+ *
+ * <p>The snapshot is taken once, when the wrapper is built. Reads
+ * ({@link #snapshot()}, {@link #getTagName()}, {@link #getIndex()},
+ * {@link #getSameTagIndex()}, {@link #getSnapshotValue(String)}, and the
+ * deprecated {@link #getAttributeSnapshot()}) do not take another snapshot.
+ * {@link #refreshSnapshot()} is the only refresh. {@link #takeSnapshot()}
+ * calls it. A {@link org.openqa.selenium.StaleElementReferenceException} or a
+ * dom-composite {@code StaleException} also calls it once, then retries the
+ * operation on the replacement element.
+ *
+ * <p>Refresh finds exactly one node by {@link ElementSnapshot#stableSelector()}.
+ * There is no second XPath and no overlap list. The node id is stable only
+ * until the element is re-rendered. Zero matches or many matches fail with
+ * {@code error:} and {@code fix:}. {@code siblingIndex} and {@code sameTagIndex}
+ * are real positions, not hard-coded zeroes.
+ *
+ * <p>{@code pkb_composite=off} uses the same record and the same script as
+ * composite mode. Selenium leaves {@code nodeId} and {@code bounds} null.
+ */
 public class ElementWrapper implements WebElement, WrapsElement {
 
     private static final String CENTER_SCROLL_SCRIPT =

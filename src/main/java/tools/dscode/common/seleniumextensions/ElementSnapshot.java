@@ -5,11 +5,15 @@ import java.util.Map;
 /**
  * Immutable description of one element, taken once.
  *
- * <p>Both the Selenium path and the dom-composite path produce this same record.
+ * <p>Both the Selenium path and the dom-composite path produce this same record
+ * from one shared script. Read it from {@code ElementWrapper.snapshot()}.
+ * Do not parse two XPaths, and do not treat {@code siblingIndex} or
+ * {@code sameTagIndex} as 0 unless this element really is the first sibling.
+ * Positions and {@code selectedValue} are real in both modes.
  * {@code nodeId} and {@code bounds} are present only for a composite hit.
- * Selenium leaves them null. Positions and {@code selectedValue} are real in
- * both modes. Nothing in this record is refreshed in place: a new record
- * replaces it when the wrapper refreshes.
+ * Selenium leaves them null. Nothing in this record is refreshed in place: a
+ * new record replaces it when the wrapper calls {@code refreshSnapshot()}.
+ * A node id is stable only until the element is re-rendered.
  *
  * <p>{@code value} is the DOM value property (or the value attribute when the
  * property is empty). {@code text} is the historical {@code textContent}
