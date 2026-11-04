@@ -250,6 +250,7 @@ class SessionHealthWaitTest {
         String json = Files.readString(progress);
         assertFalse(json.contains("prior-newest"), json);
         assertFalse(json.contains("prior-older"), json);
+        assertTrue(json.contains("index-end"), json);
         assertTrue(json.contains("jvm"), json);
     }
 

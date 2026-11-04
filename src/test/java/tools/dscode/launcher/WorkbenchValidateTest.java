@@ -291,6 +291,88 @@ class WorkbenchValidateTest {
         assertEquals("report7 bulk pattern 0 ", WorkbenchValidate.literalPrefix("^report7 bulk pattern 0 (\\d+)$"));
         assertEquals("buy ", WorkbenchValidate.literalPrefix("buy {string}"));
         assertEquals("report seven clash", WorkbenchValidate.literalPrefix("^report seven clash$"));
+        assertEquals("item", WorkbenchValidate.literalPrefix("^items? are shown$"));
+        assertEquals("colo", WorkbenchValidate.literalPrefix("^colou?r"));
+        assertEquals("cat", WorkbenchValidate.literalPrefix("^cats* are here$"));
+        assertEquals("", WorkbenchValidate.literalPrefix("^a|^b"));
+        assertEquals("probe item", WorkbenchValidate.literalPrefix("^probe items? are shown$"));
+    }
+
+    @Test
+    void repeatedI18nDependencyGlueAndStaleSource() throws Exception {
+        Path feature = project.resolve("src/test/resources/features/report8.feature");
+        Files.createDirectories(feature.getParent());
+        Files.writeString(feature, """
+                @report8
+                Feature: Report 8
+                  Scenario: Glue
+                    Given report eight first alias
+                    Given report eight second alias
+                    Given report eight french step
+                    Given report eight typed step
+                    Given report eight stale step
+                """);
+        Path glue = project.resolve("src/test/java/com/example/report8glue/Report8Typed.java");
+        Files.createDirectories(glue.getParent());
+        Files.writeString(glue, """
+                package com.example.report8glue;
+                import io.cucumber.java.en.Given;
+                import io.cucumber.java.fr.Et;
+                public final class Report8Typed {
+                  @Given("^report eight first alias$")
+                  @Given("^report eight second alias$")
+                  public void aliases() {}
+                  @Et("^report eight french step$")
+                  public void french() {}
+                }
+                """);
+        Path stale = project.resolve("src/test/java/com/example/report8glue/Report8Stale.java");
+        Files.writeString(stale, """
+                package com.example.report8glue;
+                import io.cucumber.java.en.Given;
+                final class Report8Stale {
+                  @Given("^report eight stale step$")
+                  public void stale() {}
+                }
+                """);
+        compileGlue(project);
+        Path markerRoot = project.resolve("marker-classes");
+        Path markerSource = project.resolve("marker-src/com/example/report8dep/Marker.java");
+        Files.createDirectories(markerSource.getParent());
+        Files.writeString(markerSource, """
+                package com.example.report8dep;
+                public class Marker { public Marker() {} }
+                """);
+        compileSources(List.of(markerSource), markerRoot, System.getProperty("java.class.path"));
+        Path external = project.resolve("external-src/com/example/report8glue/Report8External.java");
+        Files.createDirectories(external.getParent());
+        Files.writeString(external, """
+                package com.example.report8glue;
+                import com.example.report8dep.Marker;
+                import io.cucumber.java.en.Given;
+                public class Report8External extends Marker {
+                  @Given("^report eight typed step$")
+                  public void typed(String unused) {}
+                }
+                """);
+        compileSources(
+                List.of(external),
+                project.resolve("target/test-classes"),
+                markerRoot + java.io.File.pathSeparator + System.getProperty("java.class.path")
+        );
+        Path harness = project.resolve(".pickleball/harness-classpath.txt");
+        Files.createDirectories(harness.getParent());
+        Files.writeString(harness, markerRoot.toAbsolutePath().normalize().toString());
+        Files.setLastModifiedTime(stale, java.nio.file.attribute.FileTime.fromMillis(System.currentTimeMillis() + 120_000));
+        ByteArrayOutputStream stdout = new ByteArrayOutputStream();
+        int code = WorkbenchValidate.run(project, "@report8", null,
+                new PrintStream(stdout, true, StandardCharsets.UTF_8),
+                new PrintStream(new ByteArrayOutputStream()));
+        String out = stdout.toString(StandardCharsets.UTF_8);
+        assertEquals(0, code, out);
+        assertFalse(out.contains("undefined:"), out);
+        assertTrue(out.contains("compiled glue is older than its source:"), out);
+        assertTrue(out.contains("Report8Stale.java"), out);
     }
 
     private static void compileGlue(Path project) throws Exception {
@@ -310,6 +392,25 @@ class WorkbenchValidateTest {
                     files,
                     null,
                     List.of("-classpath", System.getProperty("java.class.path"), "-d", output.toString()),
+                    null,
+                    files.getJavaFileObjectsFromPaths(sources)
+            ).call();
+            assertTrue(compiled, errors.toString());
+        }
+    }
+
+    private static void compileSources(List<Path> sources, Path output, String classpath) throws Exception {
+        Files.createDirectories(output);
+        JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
+        assertTrue(compiler != null, "JDK compiler is required to compile glue fixtures");
+        StringWriter errors = new StringWriter();
+        var files = compiler.getStandardFileManager(null, null, StandardCharsets.UTF_8);
+        try (files) {
+            boolean compiled = compiler.getTask(
+                    errors,
+                    files,
+                    null,
+                    List.of("-classpath", classpath, "-d", output.toString()),
                     null,
                     files.getJavaFileObjectsFromPaths(sources)
             ).call();

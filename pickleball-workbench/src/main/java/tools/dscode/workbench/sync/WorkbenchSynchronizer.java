@@ -26,6 +26,7 @@ import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -57,6 +58,7 @@ public final class WorkbenchSynchronizer {
     public WorkbenchManifest sync(Path requestedProject) {
         WorkbenchManifest reused = trySkipUnchanged(requestedProject);
         if (reused != null) return reused;
+        progress("sync");
         try {
             WorkbenchManifest cached = syncFromClasspathCache(requestedProject);
             if (cached != null) return cached;
@@ -120,6 +122,7 @@ public final class WorkbenchSynchronizer {
         Path stagedLive = staging.resolve("live");
         Path stagedLiveClasses = stagedLive.resolve("classes");
         createDirectories(stagedBaseClasses, stagedLiveClasses);
+        progress("materialize");
 
         boolean copiedAnyOutput = false;
         for (OutputPath output : metadata.outputs()) {
@@ -145,7 +148,7 @@ public final class WorkbenchSynchronizer {
         WorkbenchSyncInputs stored = WorkbenchSyncInputs.capture(
                 project, metadata.sourceRoots(), dependencies
         );
-        String fingerprint = fingerprint(stagedBaseClasses, dependencies);
+        String fingerprint = fingerprint(stagedBaseClasses, dependencies, stateRoot.resolve("jar-hashes.v1"));
         Path finalBaseClasses = stateRoot.resolve("base").resolve("classes").toAbsolutePath().normalize();
         Path finalLiveClasses = PickleballLocalLayout.liveClasses(stateRoot);
         List<String> classpathEntries = workerClasspath(stateRoot, dependencies);
@@ -240,6 +243,7 @@ public final class WorkbenchSynchronizer {
             }
         }
         if (outputs.isEmpty()) return null;
+        progress("maven skipped=unchanged");
         Path staging = stateRoot.resolve(".sync-cache-" + UUID.randomUUID());
         createDirectories(staging);
         try {
@@ -414,6 +418,7 @@ public final class WorkbenchSynchronizer {
     }
 
     private SyncMetadata synchronizeMavenFull(WorkbenchProject project, Path staging, Path log) {
+        progress("maven");
         Path dependencyClasspath = staging.resolve("maven-classpath.txt");
         Path effectivePom = staging.resolve("effective-pom.xml");
         commandRunner.run(project, mavenFullArgs(project, dependencyClasspath, effectivePom), log);
@@ -745,47 +750,93 @@ public final class WorkbenchSynchronizer {
     }
 
     /**
-     * Names the cache-hit work that sits between {@code index-end} and {@code jvm}:
-     * every dependency jar is read and SHA-256'd. A later unchanged start does not.
+     * Jar identity is path, size, and mtime. A cached token is reused when those
+     * still match. The file bytes are not read, so a cold or edited start does
+     * not SHA-256 the dependency jars.
      */
-    private static void noteJarHash(List<String> dependencies) {
-        if (dependencies == null || dependencies.isEmpty()) return;
-        int jars = 0;
-        long bytes = 0L;
-        for (String dependency : dependencies) {
-            if (dependency == null || dependency.isBlank()) continue;
-            Path path = Path.of(dependency).toAbsolutePath().normalize();
-            if (!Files.isRegularFile(path)) continue;
-            jars++;
-            try {
-                bytes += Files.size(path);
-            } catch (IOException ignored) {
-                // The hash loop reports the failure if the file cannot be read.
-            }
-        }
-        if (jars == 0) return;
-        System.err.println("progress stage=jar-hash jars=" + jars + " bytes=" + bytes);
-    }
-
-    private static String fingerprint(Path classes, List<String> dependencies) {
+    private static String fingerprint(Path classes, List<String> dependencies, Path cacheFile) {
         try {
-            noteJarHash(dependencies);
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
             updateDirectoryDigest(digest, classes);
-            for (String dependency : dependencies) {
+            Map<String, String> cache = loadJarHashCache(cacheFile);
+            Map<String, String> next = new java.util.LinkedHashMap<>();
+            int jars = 0;
+            int reused = 0;
+            long bytes = 0L;
+            List<String> ordered = dependencies == null ? List.of() : dependencies;
+            for (String dependency : ordered) {
+                if (dependency == null || dependency.isBlank()) continue;
                 Path path = Path.of(dependency).toAbsolutePath().normalize();
                 digest.update(path.toString().getBytes(StandardCharsets.UTF_8));
                 digest.update((byte) 0);
-                if (Files.isRegularFile(path)) {
-                    updateFileDigest(digest, path);
-                } else if (Files.isDirectory(path)) {
-                    updateDirectoryDigest(digest, path);
+                if (!Files.isRegularFile(path)) {
+                    if (Files.isDirectory(path)) updateDirectoryDigest(digest, path);
+                    digest.update((byte) 0);
+                    continue;
                 }
+                long size = Files.size(path);
+                long modified = Files.getLastModifiedTime(path).toMillis();
+                jars++;
+                bytes += size;
+                String key = path + "\t" + size + "\t" + modified;
+                String token = cache.get(key);
+                if (token != null) reused++;
+                else token = jarToken(path, size, modified);
+                next.put(key, token);
+                digest.update(token.getBytes(StandardCharsets.UTF_8));
                 digest.update((byte) 0);
             }
+            saveJarHashCache(cacheFile, next);
+            System.err.println("progress stage=hash jars=" + jars
+                    + " reused=" + reused
+                    + " hashed=0 bytes=" + bytes);
             return HexFormat.of().formatHex(digest.digest());
         } catch (Exception failure) {
             throw new IllegalStateException("Could not fingerprint Workbench synchronization output.", failure);
+        }
+    }
+
+    private static String jarToken(Path path, long size, long modified) throws Exception {
+        MessageDigest digest = MessageDigest.getInstance("SHA-256");
+        digest.update(path.toString().getBytes(StandardCharsets.UTF_8));
+        digest.update((byte) 0);
+        digest.update(Long.toString(size).getBytes(StandardCharsets.UTF_8));
+        digest.update((byte) 0);
+        digest.update(Long.toString(modified).getBytes(StandardCharsets.UTF_8));
+        return HexFormat.of().formatHex(digest.digest());
+    }
+
+    private static Map<String, String> loadJarHashCache(Path cacheFile) {
+        Map<String, String> cache = new java.util.LinkedHashMap<>();
+        if (cacheFile == null || !Files.isRegularFile(cacheFile)) return cache;
+        try {
+            List<String> lines = Files.readAllLines(cacheFile, StandardCharsets.UTF_8);
+            if (lines.isEmpty() || !"v1".equals(lines.get(0).trim())) return cache;
+            for (int i = 1; i < lines.size(); i++) {
+                String line = lines.get(i);
+                int split = line.lastIndexOf('\t');
+                if (split <= 0) continue;
+                cache.put(line.substring(0, split), line.substring(split + 1));
+            }
+        } catch (IOException ignored) {
+            return new java.util.LinkedHashMap<>();
+        }
+        return cache;
+    }
+
+    private static void saveJarHashCache(Path cacheFile, Map<String, String> cache) throws IOException {
+        if (cacheFile == null) return;
+        Files.createDirectories(cacheFile.getParent());
+        StringBuilder body = new StringBuilder("v1\n");
+        for (Map.Entry<String, String> entry : cache.entrySet()) {
+            body.append(entry.getKey()).append('\t').append(entry.getValue()).append('\n');
+        }
+        Path temp = cacheFile.resolveSibling(cacheFile.getFileName() + ".tmp");
+        Files.writeString(temp, body.toString(), StandardCharsets.UTF_8);
+        try {
+            Files.move(temp, cacheFile, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+        } catch (java.nio.file.AtomicMoveNotSupportedException ignored) {
+            Files.move(temp, cacheFile, StandardCopyOption.REPLACE_EXISTING);
         }
     }
 

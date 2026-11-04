@@ -132,8 +132,18 @@ final class SessionHealthWait {
         long deadline = started + limit.toNanos();
         long nextProgress = started + every.toNanos();
         StageTimeline timeline = new StageTimeline();
+        Map<Path, Long> cursor = new java.util.LinkedHashMap<>();
+        if (baseline != null) cursor.putAll(baseline);
         while (System.nanoTime() < deadline) {
+            if (observeStages(project, sessionLog, cursor, timeline, elapsedMs(started))) {
+                writeTimeline(sessionLog, timeline);
+            }
             if (healthy != null && healthy.getAsBoolean()) {
+                // /health can flip true before the stderr pump writes the same burst.
+                sleep(Duration.ofMillis(50));
+                if (observeStages(project, sessionLog, cursor, timeline, elapsedMs(started))) {
+                    writeTimeline(sessionLog, timeline);
+                }
                 return new Outcome(Kind.HEALTHY, timeline.current(), elapsedMs(started));
             }
             if (alive != null && !alive.getAsBoolean()) {
@@ -141,10 +151,6 @@ final class SessionHealthWait {
                     return new Outcome(Kind.HEALTHY, timeline.current(), elapsedMs(started));
                 }
                 return new Outcome(Kind.DIED, timeline.current(), elapsedMs(started));
-            }
-            String stage = currentStage(project, sessionLog, baseline);
-            if (timeline.observe(stage, elapsedMs(started))) {
-                writeTimeline(sessionLog, timeline);
             }
             long now = System.nanoTime();
             if (now >= nextProgress) {
@@ -156,7 +162,9 @@ final class SessionHealthWait {
             if (System.nanoTime() >= deadline) break;
             sleep(pause);
         }
+        observeStages(project, sessionLog, cursor, timeline, elapsedMs(started));
         if (healthy != null && healthy.getAsBoolean()) {
+            writeTimeline(sessionLog, timeline);
             return new Outcome(Kind.HEALTHY, timeline.current(), elapsedMs(started));
         }
         if (timeline.isEmpty()) {
@@ -263,6 +271,54 @@ final class SessionHealthWait {
             // A missing logs directory still leaves the session log.
         }
         return files;
+    }
+
+    /**
+     * Every stage line appended since the last read, session log first.
+     * A poll that only kept the latest line dropped {@code index-end} when
+     * {@code jar-hash} or {@code jvm} was already in the same burst.
+     */
+    private static boolean observeStages(
+            Path project,
+            Path sessionLog,
+            Map<Path, Long> cursor,
+            StageTimeline timeline,
+            long elapsedMs
+    ) {
+        List<String> fresh = new ArrayList<>();
+        List<Path> files = new ArrayList<>();
+        if (sessionLog != null) files.add(sessionLog);
+        for (Path file : logCandidates(project, sessionLog)) {
+            if (file == null) continue;
+            if (sessionLog != null && sameFile(file, sessionLog)) continue;
+            files.add(file);
+        }
+        for (Path file : files) {
+            if (file == null || !Files.isRegularFile(file)) continue;
+            Path key = file.toAbsolutePath().normalize();
+            long size = fileSize(file);
+            long offset = cursor.getOrDefault(key, 0L);
+            if (size < offset) offset = 0L;
+            if (size > offset) {
+                Matcher matcher = STAGE_LINE.matcher(tailText(file, offset));
+                while (matcher.find()) fresh.add(matcher.group(1));
+            }
+            cursor.put(key, size);
+        }
+        if (fresh.isEmpty() && timeline.isEmpty()) fresh.add(GENERIC_STAGE);
+        boolean changed = false;
+        for (String stage : fresh) {
+            if (timeline.observe(stage, elapsedMs)) changed = true;
+        }
+        return changed;
+    }
+
+    private static boolean sameFile(Path left, Path right) {
+        try {
+            return left.toAbsolutePath().normalize().equals(right.toAbsolutePath().normalize());
+        } catch (RuntimeException failure) {
+            return false;
+        }
     }
 
     static StageHit latestStage(List<Path> files) {

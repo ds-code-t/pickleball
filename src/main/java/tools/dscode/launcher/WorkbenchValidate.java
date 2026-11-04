@@ -26,8 +26,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.Optional;
-import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
@@ -142,7 +140,7 @@ public final class WorkbenchValidate {
     }
 
     private static List<StepDef> glueFor(Path project, String runId, PrintStream out) {
-        if (runId == null || runId.isBlank()) return compiledGlue(project, null);
+        if (runId == null || runId.isBlank()) return compiledGlue(project, null, out);
         Path workspace = Workspace.directory(project, runId.trim()).toAbsolutePath().normalize();
         if (out != null) out.println("workspace=" + workspace);
         String packages = "";
@@ -150,7 +148,7 @@ public final class WorkbenchValidate {
             String stored = Workspace.readRunVars(workspace).get("pkb_glue");
             packages = stored == null ? "" : stored;
         }
-        return compiledGlue(project, packages);
+        return compiledGlue(project, packages, out);
     }
 
     private static List<Finding> scanTree(
@@ -406,29 +404,58 @@ public final class WorkbenchValidate {
         } catch (Throwable ignored) {
             return List.of();
         }
-        for (Method method : type.getDeclaredMethods()) {
-            for (Annotation annotation : method.getDeclaredAnnotations()) {
-                String name = annotation.annotationType().getName();
-                if (!name.startsWith("io.cucumber.java.en.")) continue;
-                try {
-                    Object value = annotation.annotationType().getMethod("value").invoke(annotation);
-                    if (value instanceof String pattern && !pattern.isBlank()) {
-                        patterns.add(new StepDef(className, method.getName(), pattern));
-                    }
-                } catch (ReflectiveOperationException ignored) {
-                    // An annotation without a string value is not a step pattern.
+        try {
+            for (Method method : type.getDeclaredMethods()) {
+                for (Annotation annotation : method.getDeclaredAnnotations()) {
+                    collectStep(patterns, className, method.getName(), annotation);
                 }
             }
+        } catch (Throwable ignored) {
+            // A parameter or superclass the loader cannot see drops this class.
+            return List.of();
         }
         return patterns;
     }
 
     /**
+     * Language step annotations live under {@code io.cucumber.java.<lang>}.
+     * Hooks on {@code io.cucumber.java} itself are not step patterns.
+     * A repeatable container ({@code @Given} twice) exposes the nested annotations.
+     */
+    private static void collectStep(List<StepDef> patterns, String className, String method, Annotation annotation) {
+        String name = annotation.annotationType().getName();
+        if (!isLanguageStepAnnotation(name)) return;
+        try {
+            Object value = annotation.annotationType().getMethod("value").invoke(annotation);
+            if (value instanceof String pattern && !pattern.isBlank()) {
+                patterns.add(new StepDef(className, method, pattern));
+                return;
+            }
+            if (value instanceof Object[] nested) {
+                for (Object item : nested) {
+                    if (item instanceof Annotation inner) collectStep(patterns, className, method, inner);
+                }
+            }
+        } catch (ReflectiveOperationException ignored) {
+            // An annotation without a string value is not a step pattern.
+        }
+    }
+
+    private static boolean isLanguageStepAnnotation(String name) {
+        String prefix = "io.cucumber.java.";
+        if (name == null || !name.startsWith(prefix)) return false;
+        String rest = name.substring(prefix.length());
+        return rest.indexOf('.') >= 0 || rest.indexOf('$') >= 0;
+    }
+
+    /**
      * Blank packages contribute no consumer definitions. A null package list is every
      * compiled test and main class. Subpackages are included. A commented-out
-     * annotation is not on the class file, so it is not a definition.
+     * annotation is not on the class file, so it is not a definition. The loader
+     * sees the resolved test classpath, so a superclass or parameter type that
+     * lives only in a dependency jar still loads.
      */
-    private static List<StepDef> compiledGlue(Path project, String packages) {
+    private static List<StepDef> compiledGlue(Path project, String packages, PrintStream out) {
         if (packages != null && packages.isBlank()) return List.of();
         List<String> prefixes = new ArrayList<>();
         if (packages != null) {
@@ -440,19 +467,15 @@ public final class WorkbenchValidate {
         }
         List<Path> roots = classRoots(project);
         List<URL> urls = new ArrayList<>();
-        for (Path root : roots) {
-            if (root == null || !Files.isDirectory(root)) continue;
-            try {
-                urls.add(root.toUri().toURL());
-            } catch (IOException ignored) {
-                // A root that cannot be opened contributes no classes.
-            }
-        }
+        Set<String> urlSeen = new LinkedHashSet<>();
+        for (Path root : roots) addUrl(urls, urlSeen, root);
+        for (Path entry : testClasspathEntries(project)) addUrl(urls, urlSeen, entry);
         if (urls.isEmpty()) return List.of();
         List<StepDef> defs = new ArrayList<>();
         Set<String> seen = new LinkedHashSet<>();
+        Set<String> warned = new LinkedHashSet<>();
         ClassLoader parent = WorkbenchValidate.class.getClassLoader();
-        try (URLClassLoader loader = new URLClassLoader(urls.toArray(URL[]::new), parent)) {
+        try (URLClassLoader loader = new GlueClassLoader(urls.toArray(URL[]::new), parent)) {
             for (Path root : roots) {
                 if (root == null || !Files.isDirectory(root)) continue;
                 try (Stream<Path> walk = Files.walk(root)) {
@@ -461,6 +484,7 @@ public final class WorkbenchValidate {
                         if (!relative.endsWith(".class") || relative.indexOf('$') >= 0) continue;
                         String className = relative.substring(0, relative.length() - ".class".length()).replace('/', '.');
                         if (!packageAllowed(className, prefixes) || !seen.add(className)) continue;
+                        warnIfStale(project, className, path, out, warned);
                         defs.addAll(annotationPatterns(className, loader));
                     }
                 } catch (IOException ignored) {
@@ -471,6 +495,99 @@ public final class WorkbenchValidate {
             return defs;
         }
         return defs;
+    }
+
+    private static void addUrl(List<URL> urls, Set<String> seen, Path path) {
+        if (path == null || !Files.exists(path) || !seen.add(path.toAbsolutePath().normalize().toString())) return;
+        try {
+            urls.add(path.toAbsolutePath().normalize().toUri().toURL());
+        } catch (IOException ignored) {
+            // A root that cannot be opened contributes no classes.
+        }
+    }
+
+    /**
+     * Parent-first, except when the parent can see the class file and still cannot
+     * link it. The validate JVM already has {@code target/test-classes} on its
+     * classpath, so a superclass that lives only in a resolved dependency jar
+     * fails there. Define that class here, where the jar is on the URL list.
+     */
+    private static final class GlueClassLoader extends URLClassLoader {
+        private GlueClassLoader(URL[] urls, ClassLoader parent) {
+            super(urls, parent);
+        }
+
+        @Override
+        protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
+            try {
+                return super.loadClass(name, resolve);
+            } catch (NoClassDefFoundError missing) {
+                synchronized (getClassLoadingLock(name)) {
+                    Class<?> local = findLoadedClass(name);
+                    if (local == null) {
+                        try {
+                            local = findClass(name);
+                        } catch (ClassNotFoundException notLocal) {
+                            throw missing;
+                        }
+                    }
+                    if (resolve) resolveClass(local);
+                    return local;
+                }
+            }
+        }
+    }
+
+    private static List<Path> testClasspathEntries(Path project) {
+        List<Path> entries = new ArrayList<>();
+        try {
+            Path state = tools.dscode.control.protocol.PickleballLocalLayout.workbenchStateRoot(project);
+            addClasspathFile(entries, tools.dscode.control.protocol.speed.ClasspathCache.file(state));
+            addClasspathFile(entries, state.resolve("classpath.txt"));
+        } catch (RuntimeException ignored) {
+            // A project without workbench state still validates its own class roots.
+        }
+        addClasspathFile(entries, project.resolve(".pickleball").resolve("harness-classpath.txt"));
+        return entries;
+    }
+
+    private static void addClasspathFile(List<Path> entries, Path file) {
+        if (file == null || !Files.isRegularFile(file)) return;
+        try {
+            for (String line : Files.readAllLines(file, StandardCharsets.UTF_8)) {
+                if (line == null || line.isBlank()) continue;
+                String[] parts = line.split(java.util.regex.Pattern.quote(java.io.File.pathSeparator));
+                for (String part : parts) {
+                    String trimmed = part.trim();
+                    if (trimmed.isEmpty()) continue;
+                    Path path = Path.of(trimmed);
+                    if (Files.exists(path)) entries.add(path.toAbsolutePath().normalize());
+                }
+            }
+        } catch (IOException ignored) {
+            // A classpath file that cannot be read is not a match.
+        }
+    }
+
+    private static void warnIfStale(Path project, String className, Path classFile, PrintStream out, Set<String> warned) {
+        if (out == null || project == null || className == null) return;
+        String relative = className.replace('.', '/') + ".java";
+        for (String root : List.of("src/test/java", "src/main/java")) {
+            Path source = project.resolve(root).resolve(relative);
+            if (!Files.isRegularFile(source)) continue;
+            try {
+                if (Files.getLastModifiedTime(source).toMillis() <= Files.getLastModifiedTime(classFile).toMillis()) {
+                    return;
+                }
+            } catch (IOException failure) {
+                return;
+            }
+            String shown = root + "/" + relative;
+            if (warned.add(shown)) {
+                out.println("WARN: compiled glue is older than its source: " + shown);
+            }
+            return;
+        }
     }
 
     private static List<Path> classRoots(Path project) {
@@ -493,6 +610,7 @@ public final class WorkbenchValidate {
     /** Literal text a step must start with. Empty means the pattern is always tested. */
     static String literalPrefix(String pattern) {
         if (pattern == null || pattern.isEmpty()) return "";
+        if (hasUnescapedAlternation(pattern)) return "";
         boolean anchored = pattern.charAt(0) == '^';
         boolean slashRegex = pattern.length() >= 2 && pattern.charAt(0) == '/' && pattern.charAt(pattern.length() - 1) == '/';
         if (!anchored && (slashRegex || pattern.charAt(pattern.length() - 1) == '$')) return "";
@@ -507,6 +625,10 @@ public final class WorkbenchValidate {
                         || escaped == 'w' || escaped == 'W') {
                     break;
                 }
+                if (index + 1 < pattern.length()) {
+                    char quantifier = pattern.charAt(index + 1);
+                    if (quantifier == '?' || quantifier == '*') break;
+                }
                 if (escaped == 'n') prefix.append('\n');
                 else if (escaped == 't') prefix.append('\t');
                 else if (escaped == 'r') prefix.append('\r');
@@ -514,11 +636,32 @@ public final class WorkbenchValidate {
                 index++;
                 continue;
             }
-            if ("()[]{}.*+?|^$".indexOf(current) >= 0) break;
+            if (current == '?' || current == '*') {
+                if (!prefix.isEmpty()) prefix.setLength(prefix.length() - 1);
+                break;
+            }
+            if ("()[]{}+|^$.".indexOf(current) >= 0) break;
             prefix.append(current);
             index++;
         }
         return prefix.toString();
+    }
+
+    private static boolean hasUnescapedAlternation(String pattern) {
+        boolean escaped = false;
+        for (int i = 0; i < pattern.length(); i++) {
+            char current = pattern.charAt(i);
+            if (escaped) {
+                escaped = false;
+                continue;
+            }
+            if (current == '\\') {
+                escaped = true;
+                continue;
+            }
+            if (current == '|') return true;
+        }
+        return false;
     }
 
     private static String describe(String text, List<StepDef> matches) {

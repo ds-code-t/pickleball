@@ -606,8 +606,11 @@ class WorkbenchSynchronizerTest {
                 jar.toString()
         ));
         String first = syncCaptured(project);
-        assertTrue(first.contains("progress stage=jar-hash"), first);
+        assertTrue(first.contains("progress stage=hash"), first);
         assertTrue(first.contains("jars=1"), first);
+        assertTrue(first.contains("hashed=0"), first);
+        assertTrue(first.contains("progress stage=materialize"), first);
+        assertTrue(first.contains("maven skipped=unchanged"), first);
         String second = syncCaptured(project);
         assertTrue(second.contains("progress stage=classpath-cache"), second);
         assertTrue(second.contains("hashed=false"), second);

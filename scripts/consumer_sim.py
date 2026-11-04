@@ -1264,6 +1264,12 @@ def _report8_fixback(timings: list[dict], results: list[dict]) -> None:
     ], 900)
     code, gap, observed, work = _report8_isolate(timings, "report8-after-discover")
     discover_ok = code == 0 and gap is not None and gap <= INDEX_JVM_BUDGET_MS and "index-end@" in observed
+    if not discover_ok:
+        with open("/tmp/report8-work.txt", "a", encoding="utf-8") as handle:
+            handle.write(f"\n== after-discover code={code} gap={gap} observed={observed}\n{work[-2000:]}\n")
+            progress = CONSUMER / ".pickleball" / "runs" / "report8-gap" / "session" / "startup-progress.json"
+            if progress.is_file():
+                handle.write(progress.read_text(encoding="utf-8", errors="replace")[:2000] + "\n")
     legs.append(("after-discover", code, gap, observed, work, discover_ok))
     failed = [name for name, _code, _gap, _observed, _work, ok in legs if not ok]
     detail = " ".join(
@@ -1445,24 +1451,31 @@ def _delete_workbench_manifests() -> None:
             path.unlink(missing_ok=True)
 
 
-def _session_new_text(run_id: str, snaps: dict[Path, int]) -> str:
+def _session_new_text(run_id: str, before: bytes | None) -> str:
+    """Text this start wrote to session.log.
+
+    A start truncates that file and writes it again. The new file can be longer
+    than the previous one, so a size watermark would keep only the tail and miss
+    the progress lines at the front. An unchanged file contributes nothing.
+    """
     path = CONSUMER / ".pickleball" / "runs" / run_id / "session" / "session.log"
     if not path.is_file():
         return ""
     data = path.read_bytes()
-    mark = snaps.get(path, 0)
-    chunk = data if len(data) < mark else data[mark:]
-    return chunk.decode("utf-8", errors="replace")
+    if before and data.startswith(before):
+        data = data[len(before):]
+    return data.decode("utf-8", errors="replace")
 
 
 def _report8_isolate(timings: list[dict], stage: str):
-    snaps = _log_snapshot()
+    log = CONSUMER / ".pickleball" / "runs" / "report8-gap" / "session" / "session.log"
+    before = log.read_bytes() if log.is_file() else b""
     started, _seconds = _report7_launch(timings, stage, [
         "isolate", "--run-id=report8-gap", "--tags=@report7-regex", "--agent=consumer-sim",
         "--runvar=pkb_browser=CHROME_HEADLESS",
     ], 600)
     gap, _between, observed = _index_jvm_gap("report8-gap")
-    work = _session_new_text("report8-gap", snaps)
+    work = _session_new_text("report8-gap", before)
     return started.returncode, gap, observed, work
 
 
@@ -1482,6 +1495,9 @@ def _report8_materialize(timings: list[dict], stage: str, delete_manifest: bool)
         and "hashed=0" in work
         and "maven skipped=unchanged" in work
     )
+    if not ok:
+        with open("/tmp/report8-work.txt", "a", encoding="utf-8") as handle:
+            handle.write(f"\n== {stage} code={code} gap={gap} observed={observed}\n{work[-2000:]}\n")
     return code, gap, observed, work, ok
 
 

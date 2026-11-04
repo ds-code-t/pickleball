@@ -517,7 +517,10 @@ public final class WorkbenchSessionCommands {
                 null,
                 false
         );
-        Optional<SessionState> existing = readHealthy(project, http);
+        Optional<SessionState> existing = readHealthyFile(
+                requestedSessionFile(project, flags, run), project, http
+        );
+        if (existing.isEmpty()) existing = readHealthy(project, http);
         if (existing.isPresent()) {
             SessionState state = existing.get();
             AgentCoordination.logStart(project, run, "isolate");
