@@ -40,7 +40,16 @@ public final class Workspace {
     public static final String CONFIGS_DIRECTORY = "configs";
     public static final String FINGERPRINT_FIELD = "workspaceFingerprint";
     public static final String CACHE_DIRECTORY = "resolve-cache";
+    /** Bumped when a cached workspace would no longer match a fresh capture. */
+    public static final String CACHE_FORMAT = "2";
     public static final String PARALLEL_AUTO = "auto";
+    /**
+     * Thrown when a launch has no run id and no Discover snapshot to borrow one from.
+     * Isolate and validate share this sentence.
+     */
+    public static final String NO_DISCOVER_SNAPSHOT =
+            "Workbench CLI isolate failed: no prior Discover snapshot. "
+                    + "Run Workbench discover first. Isolate will not silently re-resolve from project defaults.";
 
     public static final List<String> CONTEXT_KEYS = List.of(
             "pkb_glue",
@@ -113,6 +122,40 @@ public final class Workspace {
 
     public static Path directory(Path project, String runId) {
         return RunView.runDirectory(project, runId).resolve(DIRECTORY);
+    }
+
+    /**
+     * Workspace directory for {@code runId}. A blank id uses the shared Discover
+     * snapshot's run id. The directory is returned even when {@code runvars.properties}
+     * has not been written; callers that need the file use {@link #exists}.
+     */
+    public static Path forRunId(Path project, String runId) {
+        if (project == null) throw new IllegalArgumentException("A project is required.");
+        if (runId != null && !runId.isBlank()) {
+            return directory(project, runId.trim()).toAbsolutePath().normalize();
+        }
+        Path snapshot = PickleballLocalLayout.lastDiscoverSnapshot(project);
+        if (!Files.isRegularFile(snapshot)) {
+            throw new IllegalStateException(NO_DISCOVER_SNAPSHOT);
+        }
+        String fromSnapshot = snapshotRunId(snapshot);
+        if (fromSnapshot == null) {
+            throw new IllegalStateException("Discover snapshot has no run id, so there is no workspace to launch.");
+        }
+        return directory(project, fromSnapshot).toAbsolutePath().normalize();
+    }
+
+    private static final Pattern SNAPSHOT_RUN_ID = Pattern.compile("\"runId\"\\s*:\\s*\"([^\"]*)\"");
+
+    private static String snapshotRunId(Path snapshot) {
+        try {
+            Matcher matcher = SNAPSHOT_RUN_ID.matcher(Files.readString(snapshot, StandardCharsets.UTF_8));
+            if (!matcher.find()) return null;
+            String id = matcher.group(1).trim();
+            return id.isEmpty() ? null : id;
+        } catch (IOException failure) {
+            return null;
+        }
     }
 
     public static Path runvarsFile(Path workspace) {
@@ -349,9 +392,28 @@ public final class Workspace {
         if (exists(to)) {
             throw new IllegalStateException("Workspace already exists at " + to + ". Use --reseed to replace it.");
         }
-        writeRunVars(to, readRunVars(from));
+        Map<String, String> values = readRunVars(from);
+        writeRunVars(to, values, literalSensitiveKeys(values));
         copyValueSources(from, to);
         copyConfigs(configsDirectory(from), to);
+    }
+
+    /**
+     * Sensitive values already stored as literals. A copy keeps them.
+     * Re-protecting would turn a runner secret into {@code ${protected:key}}
+     * and drop the value a cache hit has to restore.
+     */
+    public static Set<String> literalSensitiveKeys(Map<String, String> values) {
+        Set<String> keep = new LinkedHashSet<>();
+        if (values == null) return keep;
+        values.forEach((key, value) -> {
+            if (key == null || key.isBlank()) return;
+            String normalized = normalizeKey(key);
+            if (isSensitiveKey(normalized) && value != null && !value.isBlank() && protectedKey(value) == null) {
+                keep.add(normalized);
+            }
+        });
+        return keep;
     }
 
     public static void replaceWorkspace(Path from, Path to) {
@@ -576,8 +638,25 @@ public final class Workspace {
             String classpathFingerprint,
             Map<String, String> inputs
     ) {
+        return cacheKey(propertyFiles, testClassesModifiedMillis, classpathFingerprint, inputs, cacheIdentity());
+    }
+
+    /** Format plus the running build. An older entry hashes to a different key. */
+    public static String cacheIdentity() {
+        return CACHE_FORMAT + "|" + PickleballVersion.running(Workspace.class);
+    }
+
+    public static String cacheKey(
+            Map<String, byte[]> propertyFiles,
+            long testClassesModifiedMillis,
+            String classpathFingerprint,
+            Map<String, String> inputs,
+            String format
+    ) {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            digest.update((format == null ? "" : format).getBytes(StandardCharsets.UTF_8));
+            digest.update(new byte[]{0});
             if (propertyFiles != null) {
                 new TreeMap<>(propertyFiles).forEach((name, bytes) -> {
                     digest.update(name.getBytes(StandardCharsets.UTF_8));

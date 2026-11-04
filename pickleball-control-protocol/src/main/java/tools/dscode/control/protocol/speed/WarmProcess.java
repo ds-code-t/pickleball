@@ -13,6 +13,8 @@ import java.util.Optional;
  */
 public final class WarmProcess {
     public static final String FILE_NAME = "warm-jvm.v1";
+    /** Pid kept after the handle file is deleted so stop can still kill the JVM. */
+    public static final String PID_FILE_NAME = "warm-jvm.pid";
     /** Pid of a long-lived owner (Workbench, MCP host, or session). A one-shot CLI does not write this. */
     public static final String OWNER_FILE_NAME = "warm-owner.v1";
     /** Idle before a warm JVM exits. Blank, non-numeric, or non-positive config stays here. */
@@ -38,6 +40,7 @@ public final class WarmProcess {
                 + handle.port() + "\n"
                 + (handle.watchHash() == null ? "" : handle.watchHash()) + "\n";
         Files.writeString(file(stateRoot), body, StandardCharsets.UTF_8);
+        Files.writeString(pidFile(stateRoot), Long.toString(handle.pid()) + "\n", StandardCharsets.UTF_8);
     }
 
     public static Optional<Handle> read(Path stateRoot) {
@@ -80,10 +83,40 @@ public final class WarmProcess {
      * Delete first so a replacement JVM can write a new handle while the old tree dies.
      */
     public static void release(Path stateRoot) {
-        Optional<Handle> handle = read(stateRoot);
+        long pid = read(stateRoot).map(Handle::pid).orElse(0L);
+        if (pid <= 0) pid = rememberedPid(stateRoot);
         delete(stateRoot);
         deleteOwner(stateRoot);
-        handle.ifPresent(found -> ProcessTree.kill(found.pid()));
+        if (pid > 0) ProcessTree.kill(pid);
+        deleteRememberedPid(stateRoot);
+    }
+
+    /** Pid from {@link #PID_FILE_NAME}, or zero. Survives deletion of the handle file. */
+    public static long rememberedPid(Path stateRoot) {
+        if (stateRoot == null) return 0L;
+        Path path = pidFile(stateRoot);
+        if (!Files.isRegularFile(path)) return 0L;
+        try {
+            String raw = Files.readString(path, StandardCharsets.UTF_8).trim();
+            if (raw.isEmpty()) return 0L;
+            long pid = Long.parseLong(raw);
+            return pid > 0 ? pid : 0L;
+        } catch (IOException | NumberFormatException failure) {
+            return 0L;
+        }
+    }
+
+    public static Path pidFile(Path stateRoot) {
+        return stateRoot.resolve(PID_FILE_NAME);
+    }
+
+    public static void deleteRememberedPid(Path stateRoot) {
+        if (stateRoot == null) return;
+        try {
+            Files.deleteIfExists(pidFile(stateRoot));
+        } catch (IOException ignored) {
+            // A leftover pid is ignored once the process is gone.
+        }
     }
 
     /**

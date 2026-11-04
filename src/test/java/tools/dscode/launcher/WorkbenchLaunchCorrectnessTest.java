@@ -74,7 +74,7 @@ class WorkbenchLaunchCorrectnessTest {
     }
 
     @Test
-    void quietDiscoverOmitsTheSummaryAndStillWritesTheConsole() throws Exception {
+    void quietDiscoverKeepsTheSummaryAndStillWritesTheConsole() throws Exception {
         writeFeature();
         ByteArrayOutputStream stdout = new ByteArrayOutputStream();
         int exit = WorkbenchAgentCommands.run(
@@ -89,7 +89,7 @@ class WorkbenchLaunchCorrectnessTest {
         assertEquals(0, exit);
         String out = stdout.toString(StandardCharsets.UTF_8);
         assertFalse(out.contains("# pkb-console"), out);
-        assertFalse(out.contains("summary status="), out);
+        assertTrue(out.contains("summary status="), out);
         assertFalse(out.contains("console="), out);
         String saved = Files.readString(AgentCoordination.runDirectory(temp, "run-quiet").resolve("console").resolve("The_one.txt"));
         assertTrue(saved.contains("worker-line"), saved);

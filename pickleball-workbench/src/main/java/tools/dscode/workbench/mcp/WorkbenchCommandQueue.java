@@ -122,6 +122,13 @@ final class WorkbenchCommandQueue implements AutoCloseable {
         silenced.set(true);
     }
 
+    boolean commandInFlight() {
+        for (Command command : commands.values()) {
+            if (RUNNING.equals(command.stored)) return true;
+        }
+        return false;
+    }
+
     boolean heartbeatFresh() {
         if (silenced.get()) {
             return System.nanoTime() - heartbeatNanos.get() < staleAfterNanos;

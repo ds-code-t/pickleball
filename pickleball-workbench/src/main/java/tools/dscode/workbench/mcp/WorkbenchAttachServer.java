@@ -234,6 +234,7 @@ public final class WorkbenchAttachServer implements AutoCloseable {
         body.put("url", url());
         body.put("pid", ProcessHandle.current().pid());
         body.put("mode", mode);
+        body.put("running", commands != null && commands.commandInFlight());
         body.put("sleepGaps", recorded);
         send(exchange, 200, body);
     }

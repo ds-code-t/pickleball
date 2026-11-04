@@ -349,7 +349,7 @@ final class WorkbenchMcpTools {
     private Object retrieval(String op, Map<String, Object> args) {
         Map<String, Object> request = new LinkedHashMap<>();
         request.put("op", op);
-        for (String key : List.of("runId", "scenarioId", "kind", "text", "fields", "cursor", "status", "id", "limit")) {
+        for (String key : List.of("runId", "scenarioId", "kind", "text", "fields", "cursor", "status", "id", "limit", "verbose")) {
             if (args != null && args.containsKey(key) && args.get(key) != null) request.put(key, args.get(key));
         }
         DiagnosticQuery.Outcome outcome = DiagnosticQuery.query(services.projectRoot(), request);

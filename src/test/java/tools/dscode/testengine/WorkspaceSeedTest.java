@@ -20,6 +20,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -224,6 +225,71 @@ class WorkspaceSeedTest {
     }
 
     @Test
+    void cacheHitKeepsTheSameRunnerSecretAndWarningAsTheMiss() throws Exception {
+        clearPkbSystemProperties();
+        System.setProperty(WorkspaceSeed.SEED_PROPERTY, "true");
+        HookSourceRunner runner = new HookSourceRunner();
+        clearRunner();
+        byte[] properties = "pkb_browser=firefox\n".getBytes(StandardCharsets.UTF_8);
+        WorkspaceSeed.Inputs inputs = new WorkspaceSeed.Inputs(
+                Map.of("pickleball.properties", properties), 10L, "classpath-secret", Map.of("pkb_environment", "qa"));
+
+        StringBuilder miss = new StringBuilder();
+        WorkspaceSeed.seed(temp, "run-miss", false, null, inputs, workspace -> {
+            WorkspaceSeed.writeCaptured(workspace, runner, false);
+        }, miss);
+        Map<String, String> missVars = Workspace.readRunVars(Workspace.directory(temp, "run-miss"));
+        assertEquals("runner-hook-secret-value", missVars.get("pkb_password"));
+        assertTrue(miss.toString().contains("pkb_password"), miss.toString());
+        assertTrue(miss.toString().contains("not in project properties"), miss.toString());
+        assertFalse(miss.toString().contains("runner-hook-secret-value"), miss.toString());
+        String key = Workspace.cacheKey(
+                Map.of("pickleball.properties", properties), 10L, "classpath-secret", Map.of("pkb_environment", "qa"));
+        assertEquals("runner-hook-secret-value", Workspace.readRunVars(Workspace.cacheDirectory(temp, key)).get("pkb_password"));
+
+        StringBuilder hit = new StringBuilder();
+        AtomicInteger captures = new AtomicInteger();
+        WorkspaceSeed.seed(temp, "run-hit", false, null, inputs, workspace -> captures.incrementAndGet(), hit);
+        assertEquals(0, captures.get());
+        assertEquals("runner-hook-secret-value", Workspace.readRunVars(Workspace.directory(temp, "run-hit")).get("pkb_password"));
+        assertEquals(sortedLines(miss), sortedLines(hit));
+    }
+
+    @Test
+    void oldResolveCacheFormatIsNotReused() {
+        byte[] properties = "pkb_browser=firefox\n".getBytes(StandardCharsets.UTF_8);
+        Map<String, String> resolution = Map.of("pkb_environment", "qa");
+        String legacy = Workspace.cacheKey(
+                Map.of("pickleball.properties", properties), 10L, "classpath-a", resolution, "1");
+        String current = Workspace.cacheKey(
+                Map.of("pickleball.properties", properties), 10L, "classpath-a", resolution);
+        assertFalse(legacy.equals(current));
+        assertTrue(Workspace.cacheIdentity().startsWith(Workspace.CACHE_FORMAT + "|"), Workspace.cacheIdentity());
+
+        Path poisoned = Workspace.directory(temp, "poison");
+        Map<String, String> values = context("firefox");
+        values.put("pkb_password", "${protected:pkb_password}");
+        Workspace.writeRunVars(poisoned, values);
+        Workspace.storeCache(temp, legacy, poisoned);
+
+        AtomicInteger captures = new AtomicInteger();
+        WorkspaceSeed.seed(temp, "run-new", false, null, new WorkspaceSeed.Inputs(
+                Map.of("pickleball.properties", properties), 10L, "classpath-a", resolution
+        ), workspace -> {
+            captures.incrementAndGet();
+            Map<String, String> fresh = context("firefox");
+            fresh.put("pkb_password", "runner-secret");
+            Workspace.writeRunVars(workspace, fresh, Set.of("pkb_password"));
+        });
+        assertEquals(1, captures.get());
+        assertEquals("runner-secret", Workspace.readRunVars(Workspace.directory(temp, "run-new")).get("pkb_password"));
+        assertTrue(Workspace.cacheHit(temp, legacy));
+        assertTrue(Workspace.cacheHit(temp, current));
+        assertEquals("runner-secret", Workspace.readRunVars(Workspace.cacheDirectory(temp, current)).get("pkb_password"));
+        assertEquals("${protected:pkb_password}", Workspace.readRunVars(Workspace.cacheDirectory(temp, legacy)).get("pkb_password"));
+    }
+
+    @Test
     void cacheHitsUntilAKeyInputChangesAndExistingWorkspaceIsNotOverwritten() {
         byte[] properties = "pkb_browser=firefox\n".getBytes(StandardCharsets.UTF_8);
         WorkspaceSeed.Inputs inputs = new WorkspaceSeed.Inputs(
@@ -353,6 +419,10 @@ class WorkspaceSeedTest {
         for (String key : System.getProperties().stringPropertyNames().toArray(String[]::new)) {
             if (key.regionMatches(true, 0, "pkb_", 0, 4)) System.clearProperty(key);
         }
+    }
+
+    private static List<String> sortedLines(CharSequence text) {
+        return text.toString().lines().map(String::strip).filter(line -> !line.isEmpty()).sorted().toList();
     }
 
     private static Map<String, String> context(String browser) {

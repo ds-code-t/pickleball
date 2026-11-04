@@ -49,6 +49,18 @@ public final class WorkspaceSeed {
             Inputs inputs,
             Consumer<Path> capture
     ) {
+        return seed(project, runId, reseed, fromRunId, inputs, capture, null);
+    }
+
+    public static Path seed(
+            Path project,
+            String runId,
+            boolean reseed,
+            String fromRunId,
+            Inputs inputs,
+            Consumer<Path> capture,
+            Appendable warnings
+    ) {
         Path workspace = Workspace.directory(project, runId);
         if (Workspace.exists(workspace) && !reseed) {
             return workspace;
@@ -57,6 +69,7 @@ public final class WorkspaceSeed {
             Path from = Workspace.directory(project, fromRunId);
             if (reseed && Workspace.exists(workspace)) Workspace.replaceWorkspace(from, workspace);
             else Workspace.copyWorkspace(from, workspace);
+            emitWarnings(warnings, applyCapturedSecrets(workspace));
             stampRecord(workspace);
             return workspace;
         }
@@ -69,6 +82,7 @@ public final class WorkspaceSeed {
         );
         if (!reseed && Workspace.cacheHit(project, key)) {
             Workspace.restoreCache(project, key, workspace);
+            emitWarnings(warnings, applyCapturedSecrets(workspace));
             stampRecord(workspace);
             return workspace;
         }
@@ -86,9 +100,40 @@ public final class WorkspaceSeed {
         if (!Workspace.exists(workspace)) {
             throw new IllegalStateException("Workspace seed did not write " + workspace);
         }
+        emitWarnings(warnings, applyCapturedSecrets(workspace));
         Workspace.storeCache(project, key, workspace);
         stampRecord(workspace);
         return workspace;
+    }
+
+    /**
+     * One post-step for a fresh capture and a resolve-cache hit.
+     * Runner secrets with no project property stay literals, and the warnings
+     * are the same list either way.
+     */
+    public static List<String> applyCapturedSecrets(Path workspace) {
+        Map<String, String> values = new LinkedHashMap<>(Workspace.readRunVars(workspace));
+        Set<String> keep = runnerComputedSecretKeys(values);
+        if (!keep.isEmpty()) Workspace.writeRunVars(workspace, values, keep);
+        return new ArrayList<>(new LinkedHashSet<>(
+                java.util.stream.Stream.concat(
+                        Workspace.literalSecretWarnings(Workspace.configsDirectory(workspace)).stream(),
+                        runnerComputedSecretWarnings(values).stream()
+                ).toList()
+        ));
+    }
+
+    private static void emitWarnings(Appendable warnings, List<String> notes) {
+        if (warnings == null || notes == null) return;
+        for (String note : notes) {
+            if (note == null || note.isBlank()) continue;
+            try {
+                warnings.append(note);
+                warnings.append(System.lineSeparator());
+            } catch (IOException failure) {
+                throw new IllegalStateException("Could not write seed warning", failure);
+            }
+        }
     }
 
     public static List<String> writeCaptured(Path workspace, PickleballRunner runner, boolean reseed) {
@@ -122,13 +167,7 @@ public final class WorkspaceSeed {
         Set<String> keep = runnerComputedSecretKeys(values);
         Workspace.writeRunVars(workspace, values, keep);
         writeSources(workspace, runner, values, browser);
-        List<String> warnings = new ArrayList<>(new java.util.LinkedHashSet<>(
-                java.util.stream.Stream.concat(
-                        Workspace.literalSecretWarnings(Workspace.configsDirectory(workspace)).stream(),
-                        runnerComputedSecretWarnings(values).stream()
-                ).toList()
-        ));
-        return warnings;
+        return applyCapturedSecrets(workspace);
     }
 
     /**
@@ -501,10 +540,8 @@ public final class WorkspaceSeed {
         try {
             seed(parsed.project(), parsed.runId(), parsed.reseed(), parsed.fromRunId(), null, workspace -> {
                 PickleballRunner runner = DynamicSuiteBootstrap.initializeFromRuntimeClasspath();
-                for (String warning : writeCaptured(workspace, runner, parsed.reseed())) {
-                    System.err.println(warning);
-                }
-            });
+                writeCaptured(workspace, runner, parsed.reseed());
+            }, System.err);
             System.out.println("workspace=" + Workspace.directory(parsed.project(), parsed.runId()));
             return 0;
         } catch (RuntimeException failure) {

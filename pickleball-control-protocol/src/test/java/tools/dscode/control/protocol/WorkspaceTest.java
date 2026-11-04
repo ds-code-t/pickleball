@@ -12,6 +12,7 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -174,6 +175,22 @@ class WorkspaceTest {
     }
 
     @Test
+    void copyKeepsALiteralRunnerSecret() throws Exception {
+        Path project = temp.resolve("project");
+        Path from = Workspace.directory(project, "run-1");
+        Map<String, String> values = context();
+        values.put("pkb_password", "runner-secret");
+        Workspace.writeRunVars(from, values, java.util.Set.of("pkb_password"));
+        String key = Workspace.cacheKey(Map.of(), 1L, "cp", Map.of());
+        Workspace.storeCache(project, key, from);
+        Path restored = Workspace.directory(project, "run-2");
+        Workspace.restoreCache(project, key, restored);
+        assertEquals("runner-secret", Workspace.readRunVars(restored).get("pkb_password"));
+        assertFalse(Files.readString(Workspace.runvarsFile(restored)).contains("${protected:pkb_password}"));
+        assertNotEquals(key, Workspace.cacheKey(Map.of(), 1L, "cp", Map.of(), "1"));
+    }
+
+    @Test
     void fingerprintIsWrittenOntoRecordJson() throws Exception {
         Path record = temp.resolve("record.json");
         Files.writeString(record, "{\n  \"runId\" : \"run-1\"\n}\n");
@@ -197,6 +214,20 @@ class WorkspaceTest {
         assertTrue(warnings.toString().contains("replaces \"\" with QA"), warnings.toString());
         assertFalse(warnings.toString().contains("replaces _"), warnings.toString());
         assertEquals("QA", Workspace.readRunVars(workspace).get("pkb_environment"));
+    }
+
+    @Test
+    void forRunIdUsesTheRequestedRunOrTheSnapshotRun() throws Exception {
+        Path requested = Workspace.forRunId(temp, "alpha");
+        assertEquals(Workspace.directory(temp, "alpha").toAbsolutePath().normalize(), requested);
+
+        IllegalStateException missing = assertThrows(IllegalStateException.class, () -> Workspace.forRunId(temp, " "));
+        assertTrue(missing.getMessage().contains("no prior Discover snapshot"), missing.getMessage());
+
+        Path snapshot = PickleballLocalLayout.lastDiscoverSnapshot(temp);
+        Files.createDirectories(snapshot.getParent());
+        Files.writeString(snapshot, "{\"runId\":\"beta\"}\n", StandardCharsets.UTF_8);
+        assertEquals(Workspace.directory(temp, "beta").toAbsolutePath().normalize(), Workspace.forRunId(temp, null));
     }
 
     private static Map<String, String> context() {

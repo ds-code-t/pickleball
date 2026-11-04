@@ -328,6 +328,17 @@ after adding, moving, or removing indexed source, test, documentation, or consum
 
 Do not use these files as substitutes for inspecting current source.
 
+## Verification lessons
+
+Unit tests and a single consumer_sim run are not enough to call a Workbench bug fixed. Report-6 was green that way and the Windows consumer still hit every report-7 bug.
+
+- Single-run fixtures hide workspace resolver bugs (latest == requested).
+- Expression-only glue hides regex matching bugs.
+- One-shot isolate hides restart regressions and progress-file state.
+- Idealized timing hides slow paths between stages.
+
+Future rounds must use multi-run ids, mixed glue (regex and Cucumber expressions, including a blank `pkb_glue`), repeated start/stop, and timing budgets in `scripts/consumer_sim.py` before claiming fixed. An item is done only when that consumer scenario passes. Unit tests alone never close it.
+
 ## Definition of done
 
 A functionality change is complete only when:

@@ -81,10 +81,11 @@ public record WorkbenchSyncInputs(
                 Path path = Path.of(dependency).toAbsolutePath().normalize();
                 digest.update(path.toString().getBytes(StandardCharsets.UTF_8));
                 digest.update((byte) 0);
-                if (Files.isRegularFile(path)) {
-                    updateFileDigest(digest, path);
-                } else if (Files.isDirectory(path)) {
-                    updateDirectoryDigest(digest, path);
+                if (Files.exists(path)) {
+                    long size = Files.isRegularFile(path) ? Files.size(path) : 0L;
+                    digest.update(Long.toString(size).getBytes(StandardCharsets.UTF_8));
+                    digest.update((byte) 0);
+                    digest.update(Long.toString(Files.getLastModifiedTime(path).toMillis()).getBytes(StandardCharsets.UTF_8));
                 } else {
                     digest.update("MISSING".getBytes(StandardCharsets.UTF_8));
                 }

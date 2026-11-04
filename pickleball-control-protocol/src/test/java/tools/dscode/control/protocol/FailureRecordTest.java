@@ -68,4 +68,57 @@ class FailureRecordTest {
         assertEquals("Failed to find PickleStepDefinitionMatch for step text: 'Then missing'", colonRecord.message());
         assertFalse(colonRecord.message().startsWith("Step:"));
     }
+
+    @Test
+    void stackHeadIsTheFirstFrameOutsideTheFrameworkAndCauseIsTheTopCausedBy() {
+        AssertionError cause = new AssertionError("expected <true> but was <false>");
+        cause.setStackTrace(new StackTraceElement[]{
+                new StackTraceElement("tools.dscode.StepExtension", "resolve", "StepExtension.java", 3),
+                new StackTraceElement("com.example.ShopSteps", "buy", "ShopSteps.java", 42)
+        });
+        RuntimeException wrapper = new RuntimeException("Step 'Then buy' failed", cause);
+        wrapper.setStackTrace(new StackTraceElement[]{
+                new StackTraceElement("io.cucumber.core.runner.PickleStepTestStep", "run", "PickleStepTestStep.java", 80)
+        });
+        FailureRecord record = FailureRecord.fromThrowable(wrapper, "Then buy");
+        assertEquals("expected <true> but was <false>", record.message());
+        assertEquals("at com.example.ShopSteps.buy(ShopSteps.java:42)", record.stackHead());
+        assertEquals("Caused by: java.lang.AssertionError: expected <true> but was <false>", record.cause());
+        assertFalse(record.toMap().containsKey("causeChain"));
+        assertEquals(record.cause(), record.toMap().get("cause"));
+        FailureRecord.verbose(true);
+        try {
+            assertTrue(record.toMap().containsKey("causeChain"));
+        } finally {
+            FailureRecord.verbose(false);
+        }
+
+        String stack = """
+                java.lang.RuntimeException: Step 'Then buy' failed
+                \tat io.cucumber.core.runner.PickleStepTestStep.run(PickleStepTestStep.java:80)
+                Caused by: java.lang.AssertionError: expected <true> but was <false>
+                \tat com.example.ShopSteps.buy(ShopSteps.java:42)
+                \tat tools.dscode.StepExtension.resolve(StepExtension.java:3)
+                """;
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("message", "expected <true> but was <false>");
+        body.put("stackTrace", stack);
+        body.put("cause", stack);
+        FailureRecord worker = FailureRecord.fromWorker(body);
+        assertEquals("at com.example.ShopSteps.buy(ShopSteps.java:42)", worker.stackHead());
+        assertEquals("Caused by: java.lang.AssertionError: expected <true> but was <false>", worker.cause());
+        assertFalse(worker.cause().contains("PickleStepTestStep"));
+        assertFalse(worker.cause().contains("\n"));
+    }
+
+    @Test
+    void unpackagedFrameIsNotTheStackHead() {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("message", "sqlite-token-alpha");
+        body.put("stack", "java.lang.AssertionError: sqlite-token-alpha\n\tat Hidden.frame(Hidden.java:4)");
+        FailureRecord record = FailureRecord.fromWorker(body);
+        assertEquals("java.lang.AssertionError: sqlite-token-alpha", record.stackHead());
+        assertFalse(record.stackHead().contains("Hidden.java"));
+        assertFalse(String.valueOf(record.toMap()).contains("Hidden.java"));
+    }
 }

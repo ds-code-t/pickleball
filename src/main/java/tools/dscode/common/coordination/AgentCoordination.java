@@ -14,6 +14,7 @@ import tools.dscode.testengine.PKB_props;
 import tools.dscode.testengine.PickleballRunner;
 
 import java.io.IOException;
+import java.io.PrintStream;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
@@ -67,12 +68,26 @@ public final class AgentCoordination {
     public static final long HISTORY_MAX_BYTES = 10L * 1024L * 1024L;
     public static final int PURPOSE_LIMIT = AgentLog.PURPOSE_LIMIT;
 
-    private static final ObjectMapper JSON = new ObjectMapper()
-            .enable(SerializationFeature.INDENT_OUTPUT);
     private static final DateTimeFormatter RUN_STAMP = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmssSSS'Z'")
             .withZone(ZoneOffset.UTC);
     private static final Pattern SAFE_ID = Pattern.compile("[A-Za-z0-9][A-Za-z0-9._-]{0,119}");
     private static final String ATTACHMENT_TEMP_PROPERTY = "dscode.logging.attachmentTempRoot";
+
+    /**
+     * Jackson is not in the thin {@code java -jar} launcher. Load it on the first
+     * json() call, not when this class initializes, so a launcher check can run first.
+     */
+    private static ObjectMapper json() {
+        return Json.MAPPER;
+    }
+
+    private static final class Json {
+        private static final ObjectMapper MAPPER = new ObjectMapper()
+                .enable(SerializationFeature.INDENT_OUTPUT);
+
+        private Json() {
+        }
+    }
 
     private static volatile Run current;
 
@@ -719,7 +734,7 @@ public final class AgentCoordination {
         List<String> runs = new ArrayList<>();
         if (Files.isRegularFile(file)) {
             try {
-                PresenceFile existing = JSON.readValue(file.toFile(), PresenceFile.class);
+                PresenceFile existing = json().readValue(file.toFile(), PresenceFile.class);
                 if (existing.runIds() != null) {
                     for (String id : existing.runIds()) {
                         if (id != null && !id.isBlank() && !runs.contains(id)) runs.add(id);
@@ -748,7 +763,7 @@ public final class AgentCoordination {
         List<Presence> rows = new ArrayList<>();
         for (Path file : noteFiles(dir)) {
             try {
-                PresenceFile body = JSON.readValue(file.toFile(), PresenceFile.class);
+                PresenceFile body = json().readValue(file.toFile(), PresenceFile.class);
                 String agent = body.agentId() == null || body.agentId().isBlank()
                         ? file.getFileName().toString().replaceFirst("\\.json$", "")
                         : body.agentId();
@@ -975,9 +990,55 @@ public final class AgentCoordination {
             if (name.equals(current) || running.contains(name)) continue;
             if (workbenchLive(child.resolve(PickleballLocalLayout.WORKBENCH_DIRECTORY))) continue;
             if (!versionExpired(child, clock)) continue;
-            if (deleteVersionTree(pickleball, child)) removed++;
+            if (deleteVersionTree(pickleball, child)) {
+                removed++;
+                appendHistory(project, "gc-versions removed v/" + name);
+            }
         }
         return new VersionSweep(removed);
+    }
+
+    /**
+     * Launch check. A usable {@code current.json} whose {@code v/<version>/} tree
+     * is gone is not silent. {@code gc-versions} records the command in
+     * {@code history.log}; anything else is just missing.
+     */
+    public static void warnMissingCurrentTree(Path project, PrintStream err) {
+        if (project == null || err == null) return;
+        Path pickleball = PickleballLocalLayout.root(project);
+        var current = PickleballLocalLayout.readCurrent(pickleball);
+        if (current.isEmpty() || !current.get().usable()) return;
+        String version = current.get().pickleballVersion();
+        if (!PickleballLocalLayout.isSafeVersion(version)) return;
+        Path root = PickleballLocalLayout.versionRoot(pickleball, version);
+        if (Files.isDirectory(root) && Files.isRegularFile(root.resolve(PickleballLocalLayout.AGENT_GUIDE))) return;
+        String deletedBy = deletionCommand(pickleball, version);
+        if (deletedBy == null) {
+            err.println("v/" + version + "/ is missing. run export-guidance");
+        } else {
+            err.println("v/" + version + "/ is missing. deleted by " + deletedBy + ". run export-guidance");
+        }
+    }
+
+    private static String deletionCommand(Path pickleball, String version) {
+        Path history = pickleball.resolve(HISTORY_FILE);
+        if (!Files.isRegularFile(history)) return null;
+        String needle = "removed v/" + version;
+        String found = null;
+        try {
+            for (String line : Files.readAllLines(history, StandardCharsets.UTF_8)) {
+                int at = line.indexOf(needle);
+                if (at < 0) continue;
+                String before = line.substring(0, at).strip();
+                if (before.endsWith("removed")) {
+                    before = before.substring(0, before.length() - "removed".length()).strip();
+                }
+                if (!before.isBlank()) found = before;
+            }
+        } catch (IOException ignored) {
+            return null;
+        }
+        return found;
     }
 
     public static List<String> mavenProperties(Run run) {
@@ -1020,7 +1081,7 @@ public final class AgentCoordination {
             try {
                 byte[] bytes = Files.readAllBytes(file);
                 if (take && !Files.deleteIfExists(file)) continue;
-                InboxFile body = JSON.readValue(bytes, InboxFile.class);
+                InboxFile body = json().readValue(bytes, InboxFile.class);
                 notes.add(new InboxNote(
                         file,
                         body.from() == null ? "" : body.from(),
@@ -1223,7 +1284,7 @@ public final class AgentCoordination {
     }
 
     private static RunRecord readRecord(Path file) throws IOException {
-        return JSON.readValue(file.toFile(), RunRecord.class);
+        return json().readValue(file.toFile(), RunRecord.class);
     }
 
     private static void writeRecord(Path file, RunRecord record) throws IOException {
@@ -1233,7 +1294,7 @@ public final class AgentCoordination {
     private static void writeJson(Path file, Object value) throws IOException {
         Files.createDirectories(file.getParent());
         Path temp = file.resolveSibling(file.getFileName() + ".tmp-" + UUID.randomUUID());
-        JSON.writeValue(temp.toFile(), value);
+        json().writeValue(temp.toFile(), value);
         try {
             Files.move(temp, file, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
         } catch (AtomicMoveNotSupportedException ignored) {
@@ -1348,7 +1409,7 @@ public final class AgentCoordination {
 
     private static boolean readablePresence(Path file) {
         try {
-            PresenceFile body = JSON.readValue(file.toFile(), PresenceFile.class);
+            PresenceFile body = json().readValue(file.toFile(), PresenceFile.class);
             return body.lastSeen() != null && !body.lastSeen().isBlank() && lastSeenInstant(body.lastSeen()) != null;
         } catch (Exception ignored) {
             return false;
@@ -1376,7 +1437,7 @@ public final class AgentCoordination {
     private static BoardPost readPost(Path file) {
         if (file == null || !Files.isRegularFile(file)) return null;
         try {
-            return toBoardPost(JSON.readValue(file.toFile(), PostFile.class), file);
+            return toBoardPost(json().readValue(file.toFile(), PostFile.class), file);
         } catch (IOException ignored) {
             return null;
         }
@@ -1578,7 +1639,7 @@ public final class AgentCoordination {
             }
         }
         try {
-            return signalFromIndex(JSON.readTree(index.toFile()), index);
+            return signalFromIndex(json().readTree(index.toFile()), index);
         } catch (IOException failure) {
             return null;
         }
@@ -1731,7 +1792,7 @@ public final class AgentCoordination {
                 if (RECORD_FILE.equals(fileName.toString())) continue;
                 try {
                     if (Files.size(path) > 2_000_000L) continue;
-                    if (jsonSignalsFailure(JSON.readTree(path.toFile()))) return true;
+                    if (jsonSignalsFailure(json().readTree(path.toFile()))) return true;
                 } catch (IOException ignored) {
                     // An unreadable pack is not a failure signal.
                 }
@@ -1829,7 +1890,7 @@ public final class AgentCoordination {
     private static boolean sessionFileLive(Path file) {
         if (!Files.isRegularFile(file)) return false;
         try {
-            JsonNode node = JSON.readTree(file.toFile());
+            JsonNode node = json().readTree(file.toFile());
             JsonNode pidNode = node.get("pid");
             if (pidNode == null || pidNode.isNull() || !pidNode.isNumber()) return false;
             long pid = pidNode.asLong(0L);

@@ -3,10 +3,15 @@ package tools.dscode.launcher;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import tools.dscode.control.protocol.PickleballLocalLayout;
+import tools.dscode.control.protocol.speed.ClasspathCache;
+import tools.dscode.control.protocol.speed.InputFingerprint;
 
+import java.io.ByteArrayOutputStream;
+import java.io.PrintStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -85,6 +90,51 @@ class WorkbenchLaunchTimingTest {
         Files.delete(session);
         List<String> seeded = WorkspaceLaunch.cachedClasspath(project);
         assertEquals(classes, Path.of(seeded.getFirst()).toAbsolutePath().normalize().toString());
+    }
+
+    @Test
+    void overlapIsLoggedWhenIndexAndCompileStartAndCompileRunsOnce() throws Exception {
+        Path project = tempDir.resolve("overlap");
+        Files.createDirectories(project.resolve("target/test-classes"));
+        Files.writeString(project.resolve("pom.xml"), "<project>one</project>\n");
+        Path classes = project.resolve("target/test-classes");
+        Path jar = project.resolve("lib.jar");
+        Files.writeString(jar, "jar");
+        ClasspathCache.store(
+                PickleballLocalLayout.workbenchStateRoot(project),
+                InputFingerprint.lockHash(project),
+                List.of(classes.toString(), jar.toString())
+        );
+        String previous = System.getProperty(WorkbenchSpeed.MODE_PROPERTY);
+        System.setProperty(WorkbenchSpeed.MODE_PROPERTY, "overlap");
+        AtomicBoolean seeded = new AtomicBoolean();
+        try {
+            WorkbenchSpeed.indexBesideClasspath(
+                    project,
+                    "speed",
+                    () -> "indexed",
+                    () -> {
+                        seeded.set(true);
+                        return null;
+                    },
+                    new PrintStream(new ByteArrayOutputStream())
+            );
+        } finally {
+            if (previous == null) System.clearProperty(WorkbenchSpeed.MODE_PROPERTY);
+            else System.setProperty(WorkbenchSpeed.MODE_PROPERTY, previous);
+        }
+        String text = Files.readString(project.resolve(".pickleball/runs/speed")
+                .resolve(WorkbenchLaunchTiming.FILE_NAME));
+        assertTrue(text.contains("stage=index") && text.contains(" start"), text);
+        assertTrue(text.contains("stage=index") && text.contains(" end"), text);
+        int overlap = text.indexOf("stage=overlap");
+        int compiled = text.indexOf("cache-hit");
+        assertTrue(overlap >= 0 && compiled > overlap, text);
+        assertTrue(text.contains("index+compile"), text);
+        assertTrue(seeded.get());
+        for (String line : text.split("\\R")) {
+            assertTrue(!(line.contains("stage=compile") && line.endsWith(" start")), line);
+        }
     }
 
     private static void assertFalsePrinted(String text) {

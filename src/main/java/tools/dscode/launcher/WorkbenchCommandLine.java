@@ -103,7 +103,9 @@ final class WorkbenchCommandLine {
             List<String> selects,
             Long stepTimeoutSeconds,
             Long runTimeoutSeconds,
-            boolean quiet
+            boolean quiet,
+            Integer maxSteps,
+            boolean allSteps
     ) {
         public Parsed {
             selects = selects == null ? List.of() : List.copyOf(selects);
@@ -145,14 +147,14 @@ final class WorkbenchCommandLine {
         args = sessionQueryArgs(normalizeFlags(args));
         Path cwd = Path.of("").toAbsolutePath().normalize();
         if (args == null || args.length == 0) {
-            return new Parsed("ui", cwd, null, null, null, null, null, new String[]{"ui", cwd.toString()}, Coordination.empty(), null, false, false, false, List.of(), List.of(), null, null, false);
+            return new Parsed("ui", cwd, null, null, null, null, null, new String[]{"ui", cwd.toString()}, Coordination.empty(), null, false, false, false, List.of(), List.of(), null, null, false, null, false);
         }
         String command = args[0];
         if ("export-guidance".equals(command) || "help".equals(command)) {
             Path output = "export-guidance".equals(command) && args.length >= 2 && !isFlag(args[1])
                     ? Path.of(args[1])
                     : Path.of(".pickleball");
-            return new Parsed(command, cwd, output, null, null, null, null, args.clone(), Coordination.empty(), null, false, false, false, List.of(), List.of(), null, null, false);
+            return new Parsed(command, cwd, output, null, null, null, null, args.clone(), Coordination.empty(), null, false, false, false, List.of(), List.of(), null, null, false, null, false);
         }
 
         String tags = null;
@@ -189,6 +191,8 @@ final class WorkbenchCommandLine {
         Long stepTimeoutSeconds = null;
         Long runTimeoutSeconds = null;
         boolean quiet = false;
+        Integer maxSteps = null;
+        boolean allSteps = false;
         String absorb = null;
         boolean tagsSplitOpen = false;
         List<String> splitTags = new ArrayList<>();
@@ -262,6 +266,19 @@ final class WorkbenchCommandLine {
             }
             if ("--quiet".equals(token)) {
                 quiet = true;
+                absorb = null;
+                continue;
+            }
+            if ("--all".equals(token)) {
+                allSteps = true;
+                absorb = null;
+                continue;
+            }
+            if (token.startsWith("--max-steps=") || "--max-steps".equals(token)) {
+                String value = token.startsWith("--max-steps=")
+                        ? token.substring("--max-steps=".length())
+                        : (index + 1 < args.length ? args[++index] : null);
+                maxSteps = parseMaxSteps(value);
                 absorb = null;
                 continue;
             }
@@ -582,12 +599,12 @@ final class WorkbenchCommandLine {
             forwarded.addAll(rest);
             return new Parsed(
                     command, project, null, tags, name, example, retention, forwarded.toArray(String[]::new),
-                    coordination, version, planOnly, refreshIndex, fullScan, runVars, selects, stepTimeoutSeconds, runTimeoutSeconds, quiet
+                    coordination, version, planOnly, refreshIndex, fullScan, runVars, selects, stepTimeoutSeconds, runTimeoutSeconds, quiet, maxSteps, allSteps
             );
         }
         return new Parsed(
                 command, project, null, tags, name, example, retention, args.clone(),
-                coordination, version, planOnly, refreshIndex, fullScan, runVars, selects, stepTimeoutSeconds, runTimeoutSeconds, quiet
+                coordination, version, planOnly, refreshIndex, fullScan, runVars, selects, stepTimeoutSeconds, runTimeoutSeconds, quiet, maxSteps, allSteps
         );
     }
 
@@ -666,6 +683,31 @@ final class WorkbenchCommandLine {
 
     private static IllegalArgumentException cliError(String error, String fix) {
         return new IllegalArgumentException(WorkbenchCliHelp.structured(error, fix));
+    }
+
+    private static Integer parseMaxSteps(String value) {
+        if (value == null || !value.trim().matches("[0-9]+")) {
+            throw cliError(
+                    "--max-steps needs a positive integer.",
+                    "Pass --max-steps=<n> or --all. See help validate."
+            );
+        }
+        int parsed;
+        try {
+            parsed = Integer.parseInt(value.trim());
+        } catch (NumberFormatException failure) {
+            throw cliError(
+                    "--max-steps needs a positive integer.",
+                    "Pass --max-steps=<n> or --all. See help validate."
+            );
+        }
+        if (parsed <= 0) {
+            throw cliError(
+                    "--max-steps needs a positive integer.",
+                    "Pass --max-steps=<n> or --all. See help validate."
+            );
+        }
+        return parsed;
     }
 
     private static Long parsePositiveSeconds(String value, String label) {

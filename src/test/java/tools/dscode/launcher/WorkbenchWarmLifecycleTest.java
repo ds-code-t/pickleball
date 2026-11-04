@@ -67,6 +67,41 @@ class WorkbenchWarmLifecycleTest {
         assertFalse(WorkbenchWarmMain.exitDue(ProcessHandle.current().pid(), true, 1, 0, now));
         assertTrue(WorkbenchWarmMain.exitDue(ProcessHandle.current().pid(), false, 5_000, now - 5_000, now));
         assertTrue(WorkbenchWarmMain.exitDue(1_000_000_001L, true, 1, now, now));
+        assertTrue(WorkbenchWarmMain.exitDue(0, true, 1, now, now, true));
+    }
+
+    @Test
+    @Timeout(value = 30, unit = TimeUnit.SECONDS)
+    void deletedStateFileExitsTheWarmJvm() throws Exception {
+        Path state = state();
+        Process warm = startWarm(state, ProcessHandle.current().pid(), 900);
+        try {
+            List<ProcessHandle> children = awaitTree(warm.pid());
+            assertTrue(Files.isRegularFile(WarmProcess.file(state)));
+            assertEquals(warm.pid(), WarmProcess.rememberedPid(state));
+            Files.delete(WarmProcess.file(state));
+            awaitDead(warm.pid(), children);
+        } finally {
+            warm.destroyForcibly();
+        }
+    }
+
+    @Test
+    @Timeout(value = 20, unit = TimeUnit.SECONDS)
+    void releaseKillsTheRememberedPidWhenTheHandleFileIsGone() throws Exception {
+        Path state = state();
+        Process hold = startHold(state);
+        try {
+            awaitAlive(hold.pid());
+            Files.writeString(WarmProcess.pidFile(state), hold.pid() + "\n");
+            assertFalse(Files.isRegularFile(WarmProcess.file(state)));
+            WarmProcess.release(state);
+            assertTrue(hold.waitFor(10, TimeUnit.SECONDS), "stop must kill the remembered pid");
+            assertFalse(WarmProcess.alive(hold.pid()));
+            assertFalse(Files.isRegularFile(WarmProcess.pidFile(state)));
+        } finally {
+            hold.destroyForcibly();
+        }
     }
 
     @Test

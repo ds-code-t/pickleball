@@ -590,7 +590,9 @@ public final class WorkbenchSessionActions {
         String message = error == null || error.message() == null || error.message().isBlank()
                 ? (result == null || result.status() == null || result.status().isBlank() ? "no result" : result.status())
                 : error.message();
-        String cause = error == null || error.stackTrace() == null ? "" : error.stackTrace();
+        String rawStack = error == null || error.stackTrace() == null ? "" : error.stackTrace();
+        String cause = tools.dscode.control.protocol.FailureRecord.displayCause(rawStack);
+        if (cause == null) cause = "";
         String valueText = result == null || result.valueText() == null ? "" : result.valueText();
         payload.put("text", "error: " + message);
         payload.put("message", message);
@@ -604,7 +606,7 @@ public final class WorkbenchSessionActions {
         LinkedHashMap<String, Object> nested = new LinkedHashMap<>();
         nested.put("type", code);
         nested.put("message", message);
-        nested.put("stackTrace", cause);
+        nested.put("stackTrace", rawStack);
         payload.put("error", nested);
         return payload;
     }

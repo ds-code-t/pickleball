@@ -16,7 +16,7 @@ final class WorkbenchCliHelp {
             Map.entry("discover", "Usage: discover [--tags=<expr>] [--name=<regex>] [--example=<rows>] [--select=<path:line>] [--plan] [--quiet] [--refresh] [--no-narrow|--full-scan] [--runvar=key=value] [--retention=all|failed|none] [--run-id=<id>] [--agent=<id>] [--run-timeout=<seconds>]"),
             Map.entry("confirm", "Usage: confirm [--tags=<expr>] [--name=<regex>] [--example=<rows>] [--select=<path:line>] [--quiet] [--runvar=key=value] [--run-id=<id>] [--agent=<id>] [--run-timeout=<seconds>]"),
             Map.entry("plan", "Usage: plan [--tags=<expr>] [--name=<regex>] [--example=<rows>] [--select=<path:line>] [--refresh] [--json]"),
-            Map.entry("validate", "Usage: validate [--tags=<expr>] [--name=<regex>] [--run-id=<id>]\nReports undefined steps, ambiguous glue, and unresolved RUN SCENARIO targets. Runs nothing."),
+            Map.entry("validate", "Usage: validate [--tags=<expr>] [--name=<regex>] [--run-id=<id>] [--max-steps=<n>] [--all]\nReports undefined steps, ambiguous glue, and unresolved RUN SCENARIO targets. Outline rows are expanded. Core steps count as defined. A long suite prints progress and stops at a step cap unless --max-steps or --all is set, and reports how many scenarios were skipped. Runs nothing."),
             Map.entry("hint", "Usage: hint [--json]"),
             Map.entry("discover-hint", "Usage: discover-hint [--json]"),
             Map.entry("resolve-runvars", "Usage: resolve-runvars [--json]"),

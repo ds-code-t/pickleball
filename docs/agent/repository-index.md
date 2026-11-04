@@ -57,6 +57,8 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/maintainer/2.1.18-locked-roadmap.md`
 - `docs/maintainer/2.1.18-meta-analysis-2.md`
 - `docs/maintainer/2.1.18-meta-deep-dive.md`
+- `docs/maintainer/2.1.18-report-6-roadmap.md`
+- `docs/maintainer/2.1.18-report-7-roadmap.md`
 - `docs/maintainer/2.1.18-report4.md`
 - `docs/maintainer/2.1.18-report5.md`
 - `docs/maintainer/2.1.18-speed-build-prompt.md`
@@ -384,6 +386,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/common/treeparsing/parsedComponents/phraseoperations/ElementMatcher.java`
 - `src/main/java/tools/dscode/common/treeparsing/parsedComponents/phraseoperations/ElementMatching.java`
 - `src/main/java/tools/dscode/common/treeparsing/parsedComponents/phraseoperations/OperationsInterface.java`
+- `src/main/java/tools/dscode/common/treeparsing/parsedComponents/phraseoperations/PhraseSyntax.java`
 - `src/main/java/tools/dscode/common/treeparsing/parsedComponents/phraseoperations/PlaceHolderMatch.java`
 - `src/main/java/tools/dscode/common/treeparsing/parsedComponents/ValueMatch.java`
 - `src/main/java/tools/dscode/common/treeparsing/ParsedLine.java`
@@ -454,6 +457,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/cucumberextended/utilities/StringUtilities.java`
 - `src/main/java/tools/dscode/internal/ValuesSupport.java`
 - `src/main/java/tools/dscode/launcher/PickleballWorkbenchLauncher.java`
+- `src/main/java/tools/dscode/launcher/QuietWarnings.java`
 - `src/main/java/tools/dscode/launcher/SessionHealthWait.java`
 - `src/main/java/tools/dscode/launcher/WorkbenchAgentCommands.java`
 - `src/main/java/tools/dscode/launcher/WorkbenchCliErrors.java`
@@ -543,6 +547,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/common/seleniumextensions/SeleniumSnapshotProducerTest.java`
 - `src/test/java/tools/dscode/common/seleniumextensions/SnapshotPages.java`
 - `src/test/java/tools/dscode/common/servicecalls/JdbcTypeMappingTest.java`
+- `src/test/java/tools/dscode/common/treeparsing/PhraseSyntaxTest.java`
 - `src/test/java/tools/dscode/common/treeparsing/preparsing/ConditionalBranchArgumentTest.java`
 - `src/test/java/tools/dscode/common/treeparsing/preparsing/LazyBranchResolutionTest.java`
 - `src/test/java/tools/dscode/common/treeparsing/WithinRewriteScopeTest.java`
@@ -577,6 +582,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/WorkbenchConsumerScenarioEndToEndTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchElementInspectTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchLaunchCorrectnessTest.java`
+- `src/test/java/tools/dscode/launcher/WorkbenchLaunchOutputContractTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchLaunchTimingTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchOneShotLaunchTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchPointerContractTest.java`

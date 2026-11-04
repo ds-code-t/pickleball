@@ -1190,6 +1190,27 @@ class WorkbenchSessionCommandsTest {
 
     @Test
     @Timeout(value = 10, unit = TimeUnit.SECONDS)
+    void executeStepFailureJsonUsesTheExternalFrameAndTheTopCause() throws Exception {
+        Path sessionFile = project.resolve(".pickleball/runs/fail-frame/session/cli-session.json");
+        try (FakeSession session = FakeSession.start(project, "cli-session", sessionFile)) {
+            session.commandGet = """
+                    {"id":"step-held","status":"FAILED","result":{"phrase":"buy","message":"expected <true> but was <false>","stackTrace":"java.lang.RuntimeException: Step 'Then buy' failed\\n\\tat io.cucumber.core.runner.PickleStepTestStep.run(PickleStepTestStep.java:80)\\nCaused by: java.lang.AssertionError: expected <true> but was <false>\\n\\tat com.example.ShopSteps.buy(ShopSteps.java:42)\\n\\tat tools.dscode.StepExtension.resolve(StepExtension.java:3)","cause":"java.lang.RuntimeException: Step 'Then buy' failed\\n\\tat io.cucumber.core.runner.PickleStepTestStep.run(PickleStepTestStep.java:80)\\nCaused by: java.lang.AssertionError: expected <true> but was <false>\\n\\tat com.example.ShopSteps.buy(ShopSteps.java:42)"}}
+                    """;
+            Output output = run(
+                    new String[]{"execute-step", project.toString(), "--text=Then buy"},
+                    launch -> {
+                        throw new AssertionError("execute-step must not start a session");
+                    }
+            );
+            assertEquals(1, output.exitCode, output.stderr + output.stdout);
+            assertTrue(output.stdout.contains("\"stackHead\":\"at com.example.ShopSteps.buy(ShopSteps.java:42)\""), output.stdout);
+            assertTrue(output.stdout.contains("\"cause\":\"Caused by: java.lang.AssertionError: expected <true> but was <false>\""), output.stdout);
+            assertFalse(output.stdout.contains("PickleStepTestStep"), output.stdout);
+        }
+    }
+
+    @Test
+    @Timeout(value = 10, unit = TimeUnit.SECONDS)
     void executeStepWarnsWhenTextLooksQuoteStrippedAndNamesTheSafeForms() throws Exception {
         WorkbenchSessionCommands.SessionFlags stripped = WorkbenchSessionCommands.SessionFlags.parse(new String[]{
                 "execute-step", "--text=Then the Save button is visible"
@@ -1207,6 +1228,12 @@ class WorkbenchSessionCommandsTest {
         });
         assertNotNull(split.quoteWarning);
         assertEquals("Then", split.text);
+        WorkbenchSessionCommands.SessionFlags star = WorkbenchSessionCommands.SessionFlags.parse(new String[]{
+                "execute-step", "--text=*, save E."
+        });
+        assertNotNull(star.quoteWarning);
+        assertTrue(star.quoteWarning.contains("--text-b64"), star.quoteWarning);
+        assertEquals("*, save E.", star.text);
 
         Path sessionFile = project.resolve(".pickleball/runs/quote-warn/session/cli-session.json");
         try (FakeSession session = FakeSession.start(project, "cli-session", sessionFile)) {
@@ -1235,6 +1262,35 @@ class WorkbenchSessionCommandsTest {
         assertTrue(report.contains("elapsed-step-ms=idle"), report);
         assertFalse(report.contains("elapsed-step-ms=0"), report);
         assertFalse(report.contains("status=running"), report);
+    }
+
+    @Test
+    void runningMarkBeforeAStepStaysIdleUnlessACommandIsInFlight() throws Exception {
+        String events = """
+                {"events":[
+                  {"timestamp":"2026-07-20T12:00:00Z","hook":"RUNNING"},
+                  {"timestamp":"2026-07-20T12:00:01Z","type":"RUNNING"}
+                ]}
+                """;
+        var idle = WorkbenchSessionCommands.timingOf(
+                new ObjectMapper().readTree(events),
+                null,
+                java.time.Instant.parse("2026-07-20T12:00:05Z"),
+                false
+        );
+        String idleReport = WorkbenchSessionCommands.formatReport(idle, List.of());
+        assertTrue(idleReport.contains("status=idle"), idleReport);
+        assertTrue(idleReport.contains("elapsed-step-ms=idle"), idleReport);
+
+        var inFlight = WorkbenchSessionCommands.timingOf(
+                new ObjectMapper().readTree(events),
+                null,
+                java.time.Instant.parse("2026-07-20T12:00:05Z"),
+                true
+        );
+        String running = WorkbenchSessionCommands.formatReport(inFlight, List.of());
+        assertTrue(running.contains("status=running"), running);
+        assertFalse(running.contains("elapsed-step-ms=idle"), running);
     }
 
     @Test
@@ -1283,8 +1339,8 @@ class WorkbenchSessionCommandsTest {
                     }
             );
             assertEquals(0, running.exitCode, running.stderr + running.stdout);
-            assertFalse(running.stdout.contains("elapsed-step-ms=idle"), running.stdout);
-            assertTrue(running.stdout.contains("elapsed-step-ms="), running.stdout);
+            assertTrue(running.stdout.contains("status=idle"), running.stdout);
+            assertTrue(running.stdout.contains("elapsed-step-ms=idle"), running.stdout);
         }
     }
 

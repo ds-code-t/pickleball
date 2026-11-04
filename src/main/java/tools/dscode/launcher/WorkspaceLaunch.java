@@ -20,6 +20,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
 /**
@@ -33,6 +34,8 @@ public final class WorkspaceLaunch {
      * Production leaves it null and captures the consumer runner.
      */
     public static volatile Consumer<Path> testCapture;
+
+    private static final ConcurrentHashMap<String, Object> COMPILE_LOCKS = new ConcurrentHashMap<>();
 
     private WorkspaceLaunch() {
     }
@@ -75,7 +78,8 @@ public final class WorkspaceLaunch {
                 false,
                 copy ? fromRunId : null,
                 null,
-                path -> capture(project, path, false, warnings)
+                path -> capture(project, path, false, warnings),
+                warnings
         );
         Map<String, String> selection = new LinkedHashMap<>();
         put(selection, PKB_props.PKB_TAGS, tags);
@@ -130,7 +134,7 @@ public final class WorkspaceLaunch {
         boolean fallback = DynamicSuiteBootstrap.isDefaultSuite(runner == null ? null : runner.getClass());
         if (fallback && buildProject(project)) {
             stage(workspace, "compile", "start");
-            boolean compiled = compileAndPublishClasspath(project, warnings);
+            boolean compiled = warmClasspath(project, workspace == null ? null : workspace.getParent(), warnings);
             stage(workspace, "compile", compiled ? "exit=0" : "exit=failed");
             if (compiled) {
                 forkSeed(project, workspace, reseed, cachedClasspath(project), warnings);
@@ -139,9 +143,7 @@ public final class WorkspaceLaunch {
         }
         String message = defaultSuiteWarning(runner == null ? null : runner.getClass());
         if (message != null) warn(warnings, message);
-        for (String warning : WorkspaceSeed.writeCaptured(workspace, runner, reseed)) {
-            warn(warnings, warning);
-        }
+        WorkspaceSeed.writeCaptured(workspace, runner, reseed);
     }
 
     private static boolean buildProject(Path project) {
@@ -203,11 +205,17 @@ public final class WorkspaceLaunch {
         if (testCapture != null) return true;
         if (project == null) return false;
         Path root = project.toAbsolutePath().normalize();
+        synchronized (COMPILE_LOCKS.computeIfAbsent(root.toString(), key -> new Object())) {
+            return warmClasspathLocked(root, runFolder, warnings);
+        }
+    }
+
+    private static boolean warmClasspathLocked(Path root, Path runFolder, Appendable warnings) {
         String hash = InputFingerprint.lockHash(root);
         Path state = PickleballLocalLayout.workbenchStateRoot(root);
         tools.dscode.control.protocol.speed.ClasspathCache.Hit hit =
                 tools.dscode.control.protocol.speed.ClasspathCache.load(state, hash);
-        if (hit.hit() && hasConsumerOutput(root, hit.entries())) {
+        if (hit.hit() && tools.dscode.control.protocol.speed.ClasspathCache.hasProjectOutput(root, hit.entries())) {
             try {
                 publishSeedClasspath(root, hit.entries());
                 WorkbenchLaunchTiming.note(runFolder, "compile", "cache-hit");
@@ -220,7 +228,8 @@ public final class WorkspaceLaunch {
         boolean compiled = compileAndPublishClasspath(root, warnings);
         WorkbenchLaunchTiming.note(runFolder, "compile", compiled ? "exit=0" : "exit=failed");
         if (compiled) {
-            WorkbenchSpeed.remember(root, cachedClasspath(root));
+            List<String> seed = readClasspathLines(state.resolve(PickleballLocalLayout.SEED_CLASSPATH_FILE));
+            WorkbenchSpeed.remember(root, seed.isEmpty() ? cachedClasspath(root) : seed);
         }
         return compiled;
     }
@@ -300,10 +309,6 @@ public final class WorkspaceLaunch {
                 );
             }
             stage(workspace, "seed-fork", "exit=0");
-            for (String line : output.split("\\R")) {
-                String trimmed = line.strip();
-                if (trimmed.startsWith("WARNING:") || trimmed.startsWith("WARN:")) warn(warnings, trimmed);
-            }
         } catch (InterruptedException interrupted) {
             Thread.currentThread().interrupt();
             stage(workspace, "seed-fork", "exit=failed");

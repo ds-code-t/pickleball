@@ -20,9 +20,7 @@ import java.util.Map;
  */
 public final class LastDiscoverSnapshot {
     private static final ObjectMapper JSON = new ObjectMapper();
-    public static final String MISSING_SNAPSHOT_MESSAGE =
-            "Workbench CLI isolate failed: no prior Discover snapshot. "
-                    + "Run Workbench discover first. Isolate will not silently re-resolve from project defaults.";
+    public static final String MISSING_SNAPSHOT_MESSAGE = Workspace.NO_DISCOVER_SNAPSHOT;
 
     private LastDiscoverSnapshot() {
     }
@@ -93,16 +91,47 @@ public final class LastDiscoverSnapshot {
             List<String> cliRunVars,
             PrintStream err
     ) {
-        Snapshot snapshot = require(projectRoot);
-        if (snapshot.runId() == null || snapshot.runId().isBlank()) {
-            throw new IllegalStateException(
-                    "Discover snapshot has no run id, so there is no workspace to launch.");
+        return workerSystemProperties(projectRoot, tags, name, example, cliRunVars, err, null);
+    }
+
+    /**
+     * A non-blank {@code runId} loads that run's workspace and puts the same id on
+     * {@code pkb_run_id}. A blank id still uses the shared Discover snapshot.
+     * The workspace file is required only when the caller named a run.
+     */
+    public static Map<String, String> workerSystemProperties(
+            Path projectRoot,
+            String tags,
+            String name,
+            String example,
+            List<String> cliRunVars,
+            PrintStream err,
+            String runId
+    ) {
+        String requested = runId == null ? "" : runId.trim();
+        Path workspace;
+        if (!requested.isBlank()) {
+            workspace = Workspace.forRunId(projectRoot, requested);
+            if (!Workspace.exists(workspace)) {
+                throw new IllegalStateException(
+                        "Workbench CLI isolate failed: no workspace for run id " + requested
+                                + " at " + workspace
+                                + ". Run workspace-seed or discover for that run id."
+                );
+            }
+        } else {
+            Snapshot snapshot = require(projectRoot);
+            if (snapshot.runId() == null || snapshot.runId().isBlank()) {
+                throw new IllegalStateException(
+                        "Discover snapshot has no run id, so there is no workspace to launch.");
+            }
+            workspace = Workspace.directory(projectRoot, snapshot.runId());
         }
-        Path workspace = Workspace.directory(projectRoot, snapshot.runId());
         Map<String, String> selection = new LinkedHashMap<>();
         putSelection(selection, "pkb_tags", tags);
         putSelection(selection, "pkb_name", name);
         putSelection(selection, "pkb_example", example);
+        if (!requested.isBlank()) selection.put("pkb_run_id", requested);
         Workspace.applyLaunchEdits(workspace, selection, cliRunVars, err);
         return Workspace.launchProperties(workspace, selection);
     }

@@ -1,5 +1,6 @@
 package tools.dscode.launcher;
 
+import tools.dscode.common.coordination.AgentCoordination;
 import tools.dscode.control.protocol.ControlProtocol;
 import tools.dscode.control.protocol.PickleballArtifactLocator;
 import tools.dscode.control.protocol.PickleballLocalLayout;
@@ -103,6 +104,7 @@ public final class PickleballWorkbenchLauncher {
 
         if (!WorkbenchCommandLine.isAgentCoreCommand(parsed.command())
                 || !"export-guidance".equals(parsed.command())) {
+            AgentCoordination.warnMissingCurrentTree(project, System.err);
             PickleballLocalStore.ensureQuietly(project);
         }
 
@@ -145,12 +147,10 @@ public final class PickleballWorkbenchLauncher {
      * That plugin can rewrite {@code System.exit} into an exception and Maven
      * then exits 1. {@code Runtime.halt} is not rewritten, so a rewritten or
      * ignored {@code System.exit} still ends the JVM with {@code code}.
-     * Apache {@code mvn.cmd} then maps every non-zero JVM status to 1. The
-     * project {@code mvnw.cmd} and Linux {@code mvnw} launch this same JVM and
-     * return {@code code}. They do not collapse a non-zero status to 1.
-     * Windows PowerShell does not {@code CALL} {@code mvnw.cmd}. A top-level
-     * {@code exit /b} is reported as 1, so the wrapper ends with {@code exit}
-     * and this code.
+     * Apache {@code mvn.cmd} and stock {@code mvnw.cmd} map every non-zero
+     * JVM status to 1. Linux {@code mvnw} returns {@code code}. A Windows
+     * script that needs the exact code matches {@code error:} or uses
+     * {@code java -cp}.
      */
     static void exitProcess(int code) {
         keepExitCode(code, System::exit, status -> Runtime.getRuntime().halt(status));

@@ -62,7 +62,7 @@ summary status=PASSED
 | `java -jar` | 2 |
 | `java -cp` | 2 |
 | `./mvnw` exec:java | 2 |
-| PowerShell `.\mvnw.cmd` | 2 |
+| PowerShell `.\mvnw.cmd` | 1 |
 | stock `mvn.cmd` | non-zero, not asserted as 2 |
 
 ## Query loop
