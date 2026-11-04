@@ -151,7 +151,7 @@ public final class WorkbenchSynchronizer {
         WorkbenchSyncInputs stored = WorkbenchSyncInputs.capture(
                 project, metadata.sourceRoots(), dependencies
         );
-        String fingerprint = fingerprint(stagedBaseClasses, dependencies, stateRoot.resolve("jar-hashes.v1"));
+        String fingerprint = fingerprint(stagedBaseClasses, dependencies, stateRoot.resolve("jar-hashes.v2"));
         Path finalBaseClasses = stateRoot.resolve("base").resolve("classes").toAbsolutePath().normalize();
         Path finalLiveClasses = PickleballLocalLayout.liveClasses(stateRoot);
         List<String> classpathEntries = workerClasspath(stateRoot, dependencies);
@@ -762,13 +762,14 @@ public final class WorkbenchSynchronizer {
     }
 
     /**
-     * Fast path: a jar token is path, size, mtime, and file identity, and the bytes
-     * are not read. A cached token is not trusted while its mtime is still within two
-     * seconds of now (git's racy timestamp), or when inode or ctime changed while size
-     * and mtime stayed the same. Those jars are hashed, and {@code hashed} is how many.
-     * Leaving the window keeps the token for that file state and refreshes the recorded
-     * time so later starts reuse it. On Windows, fileKey() and ctime are not available,
-     * so the key is effectively path, size, and mtime plus the 2 s rule.
+     * A jar token is path, size, mtime, and file identity. A jar first seen while
+     * its mtime is still within two seconds of now is recorded with a content hash,
+     * and that token stays with the jar. A later start inside the window reads the
+     * bytes again so a same-mtime rewrite still changes the fingerprint. Once the
+     * mtime is outside the window the same token is kept and the recorded time is
+     * refreshed, and {@code hashed} is how many jars were read. On Windows, fileKey()
+     * and ctime are not available, so the key is effectively path, size, and mtime
+     * plus the 2 s rule.
      */
     private static String fingerprint(Path classes, List<String> dependencies, Path cacheFile) {
         try {
@@ -805,15 +806,20 @@ public final class WorkbenchSynchronizer {
                 String token;
                 long recordedAt;
                 boolean outsideWindow = now - stat.mtimeMillis > RACY_WINDOW_MS;
+                boolean insideWindow = now - stat.mtimeMillis <= RACY_WINDOW_MS
+                        && now - stat.mtimeMillis >= -RACY_WINDOW_MS;
                 if (cached != null && (outsideWindow || !racy(stat, cached.recordedAt))) {
-                    // Same file state keeps its token. A stat token must not become a
-                    // content hash just because the entry was recorded inside the window.
                     token = cached.token;
                     recordedAt = outsideWindow ? now : cached.recordedAt;
                     reused++;
                 } else if (cached != null || statKeys.containsKey(statKey)) {
-                    token = contentToken(path);
+                    String content = contentToken(path);
+                    hashed++;
+                    token = cached != null && content.equals(cached.token) ? cached.token : content;
                     recordedAt = cached != null ? cached.recordedAt : now;
+                } else if (insideWindow) {
+                    token = contentToken(path);
+                    recordedAt = now;
                     hashed++;
                 } else {
                     token = statToken(exact);
