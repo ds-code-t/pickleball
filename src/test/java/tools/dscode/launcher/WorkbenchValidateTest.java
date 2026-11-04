@@ -296,6 +296,15 @@ class WorkbenchValidateTest {
         assertEquals("cat", WorkbenchValidate.literalPrefix("^cats* are here$"));
         assertEquals("", WorkbenchValidate.literalPrefix("^a|^b"));
         assertEquals("probe item", WorkbenchValidate.literalPrefix("^probe items? are shown$"));
+        assertEquals("trieq box", WorkbenchValidate.literalPrefix("^trieq boxe{0,1}s shown$"));
+        assertEquals("trieq a ", WorkbenchValidate.literalPrefix("trieq a cat/dog walks"));
+        assertEquals("trieq box", WorkbenchValidate.literalPrefix("trieq box(es) shown"));
+        assertEquals("", WorkbenchValidate.literalPrefix("^(?i)trieq shown$"));
+        assertEquals("item", WorkbenchValidate.literalPrefix("^item(s)? shown$"));
+        assertEquals("colou?r", WorkbenchValidate.literalPrefix("^colou\\?r$"));
+        assertEquals("cat/dog", WorkbenchValidate.literalPrefix("cat\\/dog"));
+        assertEquals("", WorkbenchValidate.literalPrefix("hello$"));
+        assertEquals("", WorkbenchValidate.literalPrefix("/a[0-9]/"));
     }
 
     @Test
@@ -373,6 +382,46 @@ class WorkbenchValidateTest {
         assertFalse(out.contains("undefined:"), out);
         assertTrue(out.contains("compiled glue is older than its source:"), out);
         assertTrue(out.contains("Report8Stale.java"), out);
+    }
+
+    @Test
+    void braceQuantifierAndSlashAlternationAreDefined() throws Exception {
+        Path feature = project.resolve("src/test/resources/features/trieq.feature");
+        Files.createDirectories(feature.getParent());
+        Files.writeString(feature, """
+                @trieq
+                Feature: Trie quantifiers
+                  Scenario: Matcher valid steps
+                    Given trieq boxs shown
+                    Given trieq a cat walks
+                    Given trieq a dog walks
+                    Given trieq box shown
+                    Given TRIEQ SHOWN
+                """);
+        Path glue = project.resolve("src/test/java/com/example/trieq/TrieqSteps.java");
+        Files.createDirectories(glue.getParent());
+        Files.writeString(glue, """
+                package com.example.trieq;
+                import io.cucumber.java.en.Given;
+                public final class TrieqSteps {
+                  @Given("^trieq boxe{0,1}s shown$")
+                  public void brace() {}
+                  @Given("trieq a cat/dog walks")
+                  public void slash() {}
+                  @Given("trieq box(es) shown")
+                  public void optionalText() {}
+                  @Given("^(?i)trieq shown$")
+                  public void insensitive() {}
+                }
+                """);
+        compileGlue(project);
+        ByteArrayOutputStream stdout = new ByteArrayOutputStream();
+        int code = WorkbenchValidate.run(project, "@trieq", null,
+                new PrintStream(stdout, true, StandardCharsets.UTF_8),
+                new PrintStream(new ByteArrayOutputStream()));
+        String out = stdout.toString(StandardCharsets.UTF_8);
+        assertEquals(0, code, out);
+        assertFalse(out.contains("undefined:"), out);
     }
 
     private static void compileGlue(Path project) throws Exception {

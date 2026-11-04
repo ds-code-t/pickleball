@@ -607,44 +607,28 @@ public final class WorkbenchValidate {
         return false;
     }
 
-    /** Literal text a step must start with. Empty means the pattern is always tested. */
+    /**
+     * Literal text a step must start with. Empty means the pattern is always tested.
+     * A brace quantifier, {@code ?}, {@code *}, or an alternation drops the quantified
+     * text. Anything this scan is not sure about is left out, so a matcher-valid step
+     * is never skipped.
+     */
     static String literalPrefix(String pattern) {
         if (pattern == null || pattern.isEmpty()) return "";
-        if (hasUnescapedAlternation(pattern)) return "";
-        boolean anchored = pattern.charAt(0) == '^';
-        boolean slashRegex = pattern.length() >= 2 && pattern.charAt(0) == '/' && pattern.charAt(pattern.length() - 1) == '/';
-        if (!anchored && (slashRegex || pattern.charAt(pattern.length() - 1) == '$')) return "";
-        int index = anchored ? 1 : 0;
-        StringBuilder prefix = new StringBuilder();
-        while (index < pattern.length()) {
-            char current = pattern.charAt(index);
-            if (current == '\\') {
-                if (index + 1 >= pattern.length()) break;
-                char escaped = pattern.charAt(++index);
-                if (escaped == 'd' || escaped == 'D' || escaped == 's' || escaped == 'S'
-                        || escaped == 'w' || escaped == 'W') {
-                    break;
-                }
-                if (index + 1 < pattern.length()) {
-                    char quantifier = pattern.charAt(index + 1);
-                    if (quantifier == '?' || quantifier == '*') break;
-                }
-                if (escaped == 'n') prefix.append('\n');
-                else if (escaped == 't') prefix.append('\t');
-                else if (escaped == 'r') prefix.append('\r');
-                else prefix.append(escaped);
-                index++;
-                continue;
-            }
-            if (current == '?' || current == '*') {
-                if (!prefix.isEmpty()) prefix.setLength(prefix.length() - 1);
-                break;
-            }
-            if ("()[]{}+|^$.".indexOf(current) >= 0) break;
-            prefix.append(current);
-            index++;
+        if (pattern.charAt(0) == '^') {
+            if (hasUnescapedAlternation(pattern)) return "";
+            return regexPrefix(pattern, 1);
         }
-        return prefix.toString();
+        if (isRegexPattern(pattern)) return "";
+        return cucumberPrefix(pattern);
+    }
+
+    /** Same split {@code ExpressionFactory} uses: {@code ^} or {@code $} or {@code /.../}. */
+    private static boolean isRegexPattern(String pattern) {
+        char first = pattern.charAt(0);
+        char last = pattern.charAt(pattern.length() - 1);
+        if (first == '^' || last == '$') return true;
+        return pattern.length() >= 2 && first == '/' && last == '/';
     }
 
     private static boolean hasUnescapedAlternation(String pattern) {
@@ -662,6 +646,89 @@ public final class WorkbenchValidate {
             if (current == '|') return true;
         }
         return false;
+    }
+
+    private static String regexPrefix(String pattern, int index) {
+        StringBuilder prefix = new StringBuilder();
+        while (index < pattern.length()) {
+            char current = pattern.charAt(index);
+            if (current == '\\') {
+                if (index + 1 >= pattern.length()) break;
+                char escaped = pattern.charAt(++index);
+                if (isRegexClassEscape(escaped)) break;
+                prefix.append(switch (escaped) {
+                    case 'n' -> '\n';
+                    case 't' -> '\t';
+                    case 'r' -> '\r';
+                    default -> escaped;
+                });
+                index++;
+                continue;
+            }
+            if (current == '|') return "";
+            if (current == '?' || current == '*') {
+                if (!prefix.isEmpty()) prefix.setLength(prefix.length() - 1);
+                break;
+            }
+            if (current == '{') {
+                if (isBraceQuantifier(pattern, index) && !prefix.isEmpty()) {
+                    prefix.setLength(prefix.length() - 1);
+                }
+                break;
+            }
+            if ("()[]+^$.".indexOf(current) >= 0) break;
+            prefix.append(current);
+            index++;
+        }
+        return prefix.toString();
+    }
+
+    private static String cucumberPrefix(String pattern) {
+        StringBuilder prefix = new StringBuilder();
+        int index = 0;
+        while (index < pattern.length()) {
+            char current = pattern.charAt(index);
+            if (current == '\\') {
+                if (index + 1 >= pattern.length()) break;
+                prefix.append(pattern.charAt(++index));
+                index++;
+                continue;
+            }
+            if (current == '/') {
+                while (!prefix.isEmpty() && !Character.isWhitespace(prefix.charAt(prefix.length() - 1))) {
+                    prefix.setLength(prefix.length() - 1);
+                }
+                break;
+            }
+            if (current == '(' || current == '{' || current == ')' || current == '}') break;
+            prefix.append(current);
+            index++;
+        }
+        return prefix.toString();
+    }
+
+    private static boolean isRegexClassEscape(char escaped) {
+        return escaped == 'd' || escaped == 'D' || escaped == 's' || escaped == 'S'
+                || escaped == 'w' || escaped == 'W' || escaped == 'b' || escaped == 'B'
+                || escaped == 'A' || escaped == 'z' || escaped == 'Z' || escaped == 'G';
+    }
+
+    /** {@code {n}}, {@code {n,}}, {@code {n,m}}, or {@code {,m}}. Not a Cucumber {@code {int}}. */
+    private static boolean isBraceQuantifier(String pattern, int open) {
+        int index = open + 1;
+        int length = pattern.length();
+        if (index >= length) return false;
+        boolean digits = false;
+        if (Character.isDigit(pattern.charAt(index))) {
+            digits = true;
+            while (index < length && Character.isDigit(pattern.charAt(index))) index++;
+        }
+        if (index < length && pattern.charAt(index) == ',') {
+            index++;
+            while (index < length && Character.isDigit(pattern.charAt(index))) index++;
+            return index < length && pattern.charAt(index) == '}' && (digits || index > open + 2);
+        }
+        return digits && index < length && pattern.charAt(index) == '}';
     }
 
     private static String describe(String text, List<StepDef> matches) {

@@ -762,6 +762,7 @@ public final class WorkbenchSynchronizer {
             Map<String, String> next = new java.util.LinkedHashMap<>();
             int jars = 0;
             int reused = 0;
+            int hashed = 0;
             long bytes = 0L;
             List<String> ordered = dependencies == null ? List.of() : dependencies;
             for (String dependency : ordered) {
@@ -789,7 +790,8 @@ public final class WorkbenchSynchronizer {
             saveJarHashCache(cacheFile, next);
             System.err.println("progress stage=hash jars=" + jars
                     + " reused=" + reused
-                    + " hashed=0 bytes=" + bytes);
+                    + " hashed=" + hashed
+                    + " bytes=" + bytes);
             return HexFormat.of().formatHex(digest.digest());
         } catch (Exception failure) {
             throw new IllegalStateException("Could not fingerprint Workbench synchronization output.", failure);

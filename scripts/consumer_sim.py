@@ -773,6 +773,15 @@ def _report7_cleanup() -> None:
     bulk_class = CONSUMER / "target/test-classes/com/example/report7glue/Report7Bulk.class"
     if bulk_class.is_file():
         bulk_class.unlink()
+    glue_dir = CONSUMER / "src/test/java/com/example/report7glue"
+    if glue_dir.is_dir():
+        shutil.rmtree(glue_dir, ignore_errors=True)
+    compiled_glue = CONSUMER / "target/test-classes/com/example/report7glue"
+    if compiled_glue.is_dir():
+        shutil.rmtree(compiled_glue, ignore_errors=True)
+    ambiguous = CONSUMER / "src/test/resources/features/report7-ambiguous.feature"
+    if ambiguous.is_file():
+        ambiguous.unlink()
     _restore_quiet_properties()
     for run_id in ("report7-a", "report7-b", "report7-c", "report7-quiet", "report7-quiet-warn", "report7-fail", "report8-gap"):
         try:
@@ -1222,6 +1231,24 @@ def _report8_fixback(timings: list[dict], results: list[dict]) -> None:
         not probes,
         "undefined: " + " | ".join(probes[:4]) if probes else "optional, star, and alternation matched",
     )
+    braces = undefined("trieq boxs shown")
+    _report7_note(
+        results, "8-prefix-brace",
+        not braces,
+        "undefined: " + " | ".join(braces[:2]) if braces else "brace quantifier matched trieq boxs shown",
+    )
+    slashes = undefined("trieq a cat walks") + undefined("trieq a dog walks")
+    _report7_note(
+        results, "8-prefix-alternation",
+        not slashes,
+        "undefined: " + " | ".join(slashes[:2]) if slashes else "cat and dog alternation matched",
+    )
+    audited = undefined("trieq box shown") + undefined("TRIEQ SHOWN")
+    _report7_note(
+        results, "8-prefix-audit",
+        not audited,
+        "undefined: " + " | ".join(audited[:2]) if audited else "optional text and (?i) matched",
+    )
 
     stale_java = CONSUMER / "src/test/java/com/example/report8glue/Report8Stale.java"
     future = time.time() + 120
@@ -1264,12 +1291,6 @@ def _report8_fixback(timings: list[dict], results: list[dict]) -> None:
     ], 900)
     code, gap, observed, work = _report8_isolate(timings, "report8-after-discover")
     discover_ok = code == 0 and gap is not None and gap <= INDEX_JVM_BUDGET_MS and "index-end@" in observed
-    if not discover_ok:
-        with open("/tmp/report8-work.txt", "a", encoding="utf-8") as handle:
-            handle.write(f"\n== after-discover code={code} gap={gap} observed={observed}\n{work[-2000:]}\n")
-            progress = CONSUMER / ".pickleball" / "runs" / "report8-gap" / "session" / "startup-progress.json"
-            if progress.is_file():
-                handle.write(progress.read_text(encoding="utf-8", errors="replace")[:2000] + "\n")
     legs.append(("after-discover", code, gap, observed, work, discover_ok))
     failed = [name for name, _code, _gap, _observed, _work, ok in legs if not ok]
     detail = " ".join(
@@ -1306,6 +1327,14 @@ def _write_report8_glue() -> None:
         "    public void cats() {}\n"
         "    @Given(\"^probe left$|^probe right$\")\n"
         "    public void either() {}\n"
+        "    @Given(\"^trieq boxe{0,1}s shown$\")\n"
+        "    public void brace() {}\n"
+        "    @Given(\"trieq a cat/dog walks\")\n"
+        "    public void slash() {}\n"
+        "    @Given(\"trieq box(es) shown\")\n"
+        "    public void optionalText() {}\n"
+        "    @Given(\"^(?i)trieq shown$\")\n"
+        "    public void insensitive() {}\n"
         "}\n",
         encoding="utf-8",
         newline="\n",
@@ -1342,6 +1371,11 @@ def _write_report8_glue() -> None:
         "    Given probe color ok\n"
         "    Given probe cat are here\n"
         "    Given probe right\n"
+        "    Given trieq boxs shown\n"
+        "    Given trieq a cat walks\n"
+        "    Given trieq a dog walks\n"
+        "    Given trieq box shown\n"
+        "    Given TRIEQ SHOWN\n"
         "    Given report eight stale step\n",
         encoding="utf-8",
         newline="\n",
@@ -1495,9 +1529,6 @@ def _report8_materialize(timings: list[dict], stage: str, delete_manifest: bool)
         and "hashed=0" in work
         and "maven skipped=unchanged" in work
     )
-    if not ok:
-        with open("/tmp/report8-work.txt", "a", encoding="utf-8") as handle:
-            handle.write(f"\n== {stage} code={code} gap={gap} observed={observed}\n{work[-2000:]}\n")
     return code, gap, observed, work, ok
 
 
