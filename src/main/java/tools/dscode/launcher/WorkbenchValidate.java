@@ -13,14 +13,19 @@ import java.lang.reflect.Method;
 import java.net.JarURLConnection;
 import java.net.URI;
 import java.net.URL;
+import java.net.URLClassLoader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Enumeration;
+import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -32,7 +37,9 @@ import java.util.stream.Stream;
 
 /**
  * Dry-run over the feature index and the same step expressions the runner
- * uses. It does not start a browser, Maven, or a worker. Undefined and
+ * uses. It does not start a browser, Maven, or a worker. Consumer glue is the
+ * definitions the runner would register from compiled classes, not source text.
+ * Undefined and
  * ambiguous steps and unresolved {@code RUN SCENARIO} targets are one line
  * each. Outline rows are expanded before that match. A long suite prints
  * progress and stops at {@link #STEP_CAP}.
@@ -45,14 +52,11 @@ public final class WorkbenchValidate {
             new ParameterTypeRegistry(Locale.ENGLISH)
     );
     private static final ConcurrentHashMap<String, Optional<Expression>> COMPILED = new ConcurrentHashMap<>();
-    private static volatile List<String> corePatterns;
+    private static volatile List<StepDef> corePatterns;
     private static final Pattern STEP = Pattern.compile(
             "^\\s*(?::+\\s*)?(?:Given|When|Then|And|But|\\*)\\s+(.*)$"
     );
     /** Head of a step annotation, including an optional {@code value =}. The pattern itself is read as Java string literals. */
-    private static final Pattern ANNOTATION_HEAD = Pattern.compile(
-            "@(?:Given|When|Then|And|But)\\s*\\(\\s*(?:value\\s*=\\s*)?"
-    );
     private static final Pattern RUN_TARGET = Pattern.compile(
             "^RUN SCENARIOS?\\s*:\\s*(.+)$"
     );
@@ -89,7 +93,7 @@ public final class WorkbenchValidate {
         }
         long started = System.nanoTime();
         if (out != null) out.println("validate progress stage=glue");
-        List<String> glue = glueFor(project, runId, out);
+        GlueIndex index = GlueIndex.of(glueFor(project, runId, out));
         WorkbenchFeatureIndex.Selection all = WorkbenchFeatureIndex.select(new WorkbenchFeatureIndex.Request(
                 project, List.of(), null, null, null, List.of(), false
         ));
@@ -106,13 +110,13 @@ public final class WorkbenchValidate {
             if (budget.capped) break;
             Path file = project.resolve(hit.relativePath().replace('/', java.io.File.separatorChar));
             addFindings(findings, scan(
-                    project, file, hit.startLine(), hit.endLine(), glue, all,
+                    project, file, hit.startLine(), hit.endLine(), index, all,
                     hit.headers(), hit.values(), budget, out
             ));
             budget.scenarios++;
         }
         if (selection.hits().isEmpty() && selection.fullScanFallback() && !budget.capped) {
-            addFindings(findings, scanTree(project, glue, all, budget, out));
+            addFindings(findings, scanTree(project, index, all, budget, out));
         }
         if (out != null) progress(out, budget);
         long elapsed = Math.max(0L, (System.nanoTime() - started) / 1_000_000L);
@@ -137,8 +141,8 @@ public final class WorkbenchValidate {
         return undefined + ambiguous + unresolved == 0 ? 0 : 1;
     }
 
-    private static List<String> glueFor(Path project, String runId, PrintStream out) {
-        if (runId == null || runId.isBlank()) return gluePatterns(project);
+    private static List<StepDef> glueFor(Path project, String runId, PrintStream out) {
+        if (runId == null || runId.isBlank()) return compiledGlue(project, null);
         Path workspace = Workspace.directory(project, runId.trim()).toAbsolutePath().normalize();
         if (out != null) out.println("workspace=" + workspace);
         String packages = "";
@@ -146,12 +150,12 @@ public final class WorkbenchValidate {
             String stored = Workspace.readRunVars(workspace).get("pkb_glue");
             packages = stored == null ? "" : stored;
         }
-        return gluePatternsForPackages(project, packages);
+        return compiledGlue(project, packages);
     }
 
     private static List<Finding> scanTree(
             Path project,
-            List<String> glue,
+            GlueIndex index,
             WorkbenchFeatureIndex.Selection selection,
             Budget budget,
             PrintStream progress
@@ -163,7 +167,7 @@ public final class WorkbenchValidate {
             walk.filter(path -> path.toString().endsWith(".feature")).forEach(file -> {
                 if (budget.capped) return;
                 addFindings(findings, scan(
-                        project, file, 1, Integer.MAX_VALUE, glue, selection,
+                        project, file, 1, Integer.MAX_VALUE, index, selection,
                         List.of(), List.of(), budget, progress
                 ));
             });
@@ -181,7 +185,11 @@ public final class WorkbenchValidate {
             List<String> glue,
             WorkbenchFeatureIndex.Selection selection
     ) {
-        return scan(project, file, start, end, glue, selection, List.of(), List.of(), null, null);
+        List<StepDef> defs = new ArrayList<>();
+        if (glue != null) {
+            for (String pattern : glue) defs.add(new StepDef("", "", pattern));
+        }
+        return scan(project, file, start, end, GlueIndex.of(defs), selection, List.of(), List.of(), null, null);
     }
 
     private static List<Finding> scan(
@@ -189,7 +197,7 @@ public final class WorkbenchValidate {
             Path file,
             int start,
             int end,
-            List<String> glue,
+            GlueIndex index,
             WorkbenchFeatureIndex.Selection selection,
             List<String> headers,
             List<String> values,
@@ -218,9 +226,9 @@ public final class WorkbenchValidate {
                 findings.addAll(runTarget(where, number, text, selection));
                 continue;
             }
-            int matches = countGlue(glue, text);
-            if (matches > 1) findings.add(new Finding("ambiguous", where + ":" + number, text));
-            else if (matches == 0) findings.add(new Finding("undefined", where + ":" + number, text));
+            List<StepDef> matches = index == null ? List.of() : index.matching(text);
+            if (matches.size() > 1) findings.add(new Finding("ambiguous", where + ":" + number, describe(text, matches)));
+            else if (matches.isEmpty()) findings.add(new Finding("undefined", where + ":" + number, text));
         }
         return findings;
     }
@@ -309,19 +317,6 @@ public final class WorkbenchValidate {
                 || head.startsWith("NAVIGATE TO:");
     }
 
-    private static int countGlue(List<String> glue, String text) {
-        int matches = 0;
-        if (glue != null) {
-            for (String pattern : glue) {
-                if (patternMatches(pattern, text)) matches++;
-            }
-        }
-        for (String pattern : corePatterns()) {
-            if (patternMatches(pattern, text)) matches++;
-        }
-        return matches;
-    }
-
     static boolean patternMatches(String cucumberPattern, String step) {
         Expression expression = compile(cucumberPattern);
         if (expression == null || step == null) return false;
@@ -346,8 +341,8 @@ public final class WorkbenchValidate {
         }
     }
 
-    private static List<String> corePatterns() {
-        List<String> cached = corePatterns;
+    private static List<StepDef> corePatterns() {
+        List<StepDef> cached = corePatterns;
         if (cached != null) return cached;
         synchronized (WorkbenchValidate.class) {
             if (corePatterns == null) corePatterns = List.copyOf(loadCorePatterns());
@@ -355,8 +350,8 @@ public final class WorkbenchValidate {
         }
     }
 
-    private static Set<String> loadCorePatterns() {
-        Set<String> patterns = new LinkedHashSet<>();
+    private static List<StepDef> loadCorePatterns() {
+        List<StepDef> patterns = new ArrayList<>();
         ClassLoader loader = WorkbenchValidate.class.getClassLoader();
         try {
             Enumeration<URL> resources = loader.getResources(CORE_PACKAGE.replace('.', '/'));
@@ -403,11 +398,11 @@ public final class WorkbenchValidate {
         return names;
     }
 
-    private static List<String> annotationPatterns(String className, ClassLoader loader) {
-        List<String> patterns = new ArrayList<>();
+    private static List<StepDef> annotationPatterns(String className, ClassLoader loader) {
+        List<StepDef> patterns = new ArrayList<>();
         Class<?> type;
         try {
-            type = Class.forName(className, true, loader);
+            type = Class.forName(className, false, loader);
         } catch (Throwable ignored) {
             return List.of();
         }
@@ -417,7 +412,9 @@ public final class WorkbenchValidate {
                 if (!name.startsWith("io.cucumber.java.en.")) continue;
                 try {
                     Object value = annotation.annotationType().getMethod("value").invoke(annotation);
-                    if (value instanceof String pattern && !pattern.isBlank()) patterns.add(pattern);
+                    if (value instanceof String pattern && !pattern.isBlank()) {
+                        patterns.add(new StepDef(className, method.getName(), pattern));
+                    }
                 } catch (ReflectiveOperationException ignored) {
                     // An annotation without a string value is not a step pattern.
                 }
@@ -426,116 +423,167 @@ public final class WorkbenchValidate {
         return patterns;
     }
 
-    private static List<String> gluePatterns(Path project) {
-        return readJavaGlue(List.of(project.resolve("src/test/java"), project.resolve("src/main/java")));
-    }
-
-    /** Blank or missing packages contribute no consumer patterns. Subpackages are included. */
-    private static List<String> gluePatternsForPackages(Path project, String packages) {
-        if (packages == null || packages.isBlank()) return List.of();
-        List<Path> roots = new ArrayList<>();
-        for (String raw : packages.split(",")) {
-            String pkg = raw.trim();
-            if (pkg.isEmpty()) continue;
-            Path relative = Path.of(pkg.replace('.', '/'));
-            roots.add(project.resolve("src/test/java").resolve(relative));
-            roots.add(project.resolve("src/main/java").resolve(relative));
+    /**
+     * Blank packages contribute no consumer definitions. A null package list is every
+     * compiled test and main class. Subpackages are included. A commented-out
+     * annotation is not on the class file, so it is not a definition.
+     */
+    private static List<StepDef> compiledGlue(Path project, String packages) {
+        if (packages != null && packages.isBlank()) return List.of();
+        List<String> prefixes = new ArrayList<>();
+        if (packages != null) {
+            for (String raw : packages.split(",")) {
+                String pkg = raw.trim();
+                if (!pkg.isEmpty()) prefixes.add(pkg);
+            }
+            if (prefixes.isEmpty()) return List.of();
         }
-        return readJavaGlue(roots);
-    }
-
-    private static List<String> readJavaGlue(List<Path> roots) {
-        List<String> patterns = new ArrayList<>();
+        List<Path> roots = classRoots(project);
+        List<URL> urls = new ArrayList<>();
         for (Path root : roots) {
             if (root == null || !Files.isDirectory(root)) continue;
-            try (Stream<Path> walk = Files.walk(root)) {
-                walk.filter(path -> path.toString().endsWith(".java")).forEach(file -> patterns.addAll(readGlue(file)));
+            try {
+                urls.add(root.toUri().toURL());
             } catch (IOException ignored) {
-                // Glue that cannot be read is not a match.
+                // A root that cannot be opened contributes no classes.
             }
         }
-        return patterns;
-    }
-
-    private static List<String> readGlue(Path file) {
-        List<String> patterns = new ArrayList<>();
-        try {
-            String text = Files.readString(file, StandardCharsets.UTF_8);
-            Matcher annotations = ANNOTATION_HEAD.matcher(text);
-            while (annotations.find()) {
-                String pattern = readAnnotationValue(text, annotations.end());
-                if (pattern != null && !pattern.isBlank()) patterns.add(pattern);
+        if (urls.isEmpty()) return List.of();
+        List<StepDef> defs = new ArrayList<>();
+        Set<String> seen = new LinkedHashSet<>();
+        ClassLoader parent = WorkbenchValidate.class.getClassLoader();
+        try (URLClassLoader loader = new URLClassLoader(urls.toArray(URL[]::new), parent)) {
+            for (Path root : roots) {
+                if (root == null || !Files.isDirectory(root)) continue;
+                try (Stream<Path> walk = Files.walk(root)) {
+                    for (Path path : walk.filter(file -> file.getFileName().toString().endsWith(".class")).toList()) {
+                        String relative = root.relativize(path).toString().replace('\\', '/');
+                        if (!relative.endsWith(".class") || relative.indexOf('$') >= 0) continue;
+                        String className = relative.substring(0, relative.length() - ".class".length()).replace('/', '.');
+                        if (!packageAllowed(className, prefixes) || !seen.add(className)) continue;
+                        defs.addAll(annotationPatterns(className, loader));
+                    }
+                } catch (IOException ignored) {
+                    // A class tree that cannot be read is not a match.
+                }
             }
         } catch (IOException ignored) {
-            return List.of();
+            return defs;
         }
-        return patterns;
+        return defs;
     }
 
-    /** Java string literals joined by {@code +}. A non-literal (a constant) skips the annotation. */
-    static String readAnnotationValue(String text, int index) {
-        if (text == null) return null;
-        StringBuilder joined = new StringBuilder();
-        boolean any = false;
-        int cursor = index;
-        while (cursor < text.length()) {
-            while (cursor < text.length() && Character.isWhitespace(text.charAt(cursor))) cursor++;
-            if (cursor >= text.length()) return null;
-            char current = text.charAt(cursor);
-            if (current == ')') return any ? joined.toString() : null;
-            if (current != '"' && current != '\'') return null;
-            JavaLiteral literal = readJavaLiteral(text, cursor);
-            if (literal == null) return null;
-            joined.append(literal.value);
-            any = true;
-            cursor = literal.end;
-            while (cursor < text.length() && Character.isWhitespace(text.charAt(cursor))) cursor++;
-            if (cursor < text.length() && text.charAt(cursor) == '+') {
-                cursor++;
-                continue;
-            }
-            if (cursor < text.length() && text.charAt(cursor) == ')') return joined.toString();
-            return null;
+    private static List<Path> classRoots(Path project) {
+        return List.of(
+                project.resolve("target/test-classes"),
+                project.resolve("target/classes"),
+                project.resolve("build/classes/java/test"),
+                project.resolve("build/classes/java/main")
+        );
+    }
+
+    private static boolean packageAllowed(String className, List<String> prefixes) {
+        if (prefixes == null || prefixes.isEmpty()) return true;
+        for (String prefix : prefixes) {
+            if (className.equals(prefix) || className.startsWith(prefix + ".")) return true;
         }
-        return null;
+        return false;
     }
 
-    private record JavaLiteral(String value, int end) {
-    }
-
-    private static JavaLiteral readJavaLiteral(String text, int start) {
-        char quote = text.charAt(start);
-        StringBuilder value = new StringBuilder();
-        for (int i = start + 1; i < text.length(); i++) {
-            char current = text.charAt(i);
+    /** Literal text a step must start with. Empty means the pattern is always tested. */
+    static String literalPrefix(String pattern) {
+        if (pattern == null || pattern.isEmpty()) return "";
+        boolean anchored = pattern.charAt(0) == '^';
+        boolean slashRegex = pattern.length() >= 2 && pattern.charAt(0) == '/' && pattern.charAt(pattern.length() - 1) == '/';
+        if (!anchored && (slashRegex || pattern.charAt(pattern.length() - 1) == '$')) return "";
+        int index = anchored ? 1 : 0;
+        StringBuilder prefix = new StringBuilder();
+        while (index < pattern.length()) {
+            char current = pattern.charAt(index);
             if (current == '\\') {
-                if (i + 1 >= text.length()) return null;
-                char escaped = text.charAt(++i);
-                switch (escaped) {
-                    case 'n' -> value.append('\n');
-                    case 't' -> value.append('\t');
-                    case 'r' -> value.append('\r');
-                    case 'b' -> value.append('\b');
-                    case 'f' -> value.append('\f');
-                    case '\\', '"', '\'' -> value.append(escaped);
-                    case 'u' -> {
-                        if (i + 4 >= text.length()) return null;
-                        try {
-                            value.append((char) Integer.parseInt(text.substring(i + 1, i + 5), 16));
-                        } catch (NumberFormatException failure) {
-                            return null;
-                        }
-                        i += 4;
-                    }
-                    default -> value.append(escaped);
+                if (index + 1 >= pattern.length()) break;
+                char escaped = pattern.charAt(++index);
+                if (escaped == 'd' || escaped == 'D' || escaped == 's' || escaped == 'S'
+                        || escaped == 'w' || escaped == 'W') {
+                    break;
                 }
+                if (escaped == 'n') prefix.append('\n');
+                else if (escaped == 't') prefix.append('\t');
+                else if (escaped == 'r') prefix.append('\r');
+                else prefix.append(escaped);
+                index++;
                 continue;
             }
-            if (current == quote) return new JavaLiteral(value.toString(), i + 1);
-            if (current == '\n' || current == '\r') return null;
-            value.append(current);
+            if ("()[]{}.*+?|^$".indexOf(current) >= 0) break;
+            prefix.append(current);
+            index++;
         }
-        return null;
+        return prefix.toString();
+    }
+
+    private static String describe(String text, List<StepDef> matches) {
+        StringBuilder line = new StringBuilder(text == null ? "" : text);
+        for (StepDef def : matches) {
+            line.append(" | ");
+            if (def.owner() != null && !def.owner().isBlank()) {
+                line.append(def.owner()).append('#').append(def.method()).append(' ');
+            }
+            line.append(def.pattern());
+        }
+        return line.toString();
+    }
+
+    private record StepDef(String owner, String method, String pattern) {
+    }
+
+    /** One literal-prefix trie. Patterns with no safe prefix stay in {@code always}. */
+    private static final class GlueIndex {
+        private final List<StepDef> always = new ArrayList<>();
+        private final Node root = new Node();
+
+        private static GlueIndex of(List<StepDef> consumer) {
+            GlueIndex index = new GlueIndex();
+            if (consumer != null) {
+                for (StepDef def : consumer) index.add(def);
+            }
+            for (StepDef def : corePatterns()) index.add(def);
+            return index;
+        }
+
+        private void add(StepDef def) {
+            if (def == null || def.pattern() == null || def.pattern().isBlank()) return;
+            String prefix = literalPrefix(def.pattern());
+            if (prefix.isEmpty()) {
+                always.add(def);
+                return;
+            }
+            Node node = root;
+            for (int i = 0; i < prefix.length(); i++) {
+                node = node.next.computeIfAbsent(prefix.charAt(i), ignored -> new Node());
+            }
+            node.here.add(def);
+        }
+
+        private List<StepDef> matching(String text) {
+            List<StepDef> candidates = new ArrayList<>(always);
+            Node node = root;
+            if (text != null) {
+                for (int i = 0; i < text.length() && node != null; i++) {
+                    node = node.next.get(text.charAt(i));
+                    if (node != null && !node.here.isEmpty()) candidates.addAll(node.here);
+                }
+            }
+            List<StepDef> matched = new ArrayList<>();
+            for (StepDef def : candidates) {
+                if (patternMatches(def.pattern(), text)) matched.add(def);
+            }
+            return matched;
+        }
+
+        private static final class Node {
+            private final Map<Character, Node> next = new HashMap<>();
+            private final List<StepDef> here = new ArrayList<>();
+        }
     }
 
     private static void addFindings(List<Finding> into, List<Finding> more) {

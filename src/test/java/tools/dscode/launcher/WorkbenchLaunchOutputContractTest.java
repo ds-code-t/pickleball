@@ -160,6 +160,25 @@ class WorkbenchLaunchOutputContractTest {
         assertEquals(1, capture.exit);
     }
 
+    @Test
+    void quietDropsSeedWarningsAndKeepsFix() {
+        ByteArrayOutputStream raw = new ByteArrayOutputStream();
+        PrintStream err = new PrintStream(raw, true, StandardCharsets.UTF_8);
+        PrintStream quiet = QuietWarnings.filtering(err);
+        quiet.append("WARN: literal secret in configs copy at a.yaml key token");
+        quiet.append(System.lineSeparator());
+        quiet.println("WARNING: --runvar pkb_browser replaces chrome with EDGE");
+        quiet.append("fix: secret redacted");
+        quiet.append(System.lineSeparator());
+        quiet.println("error: still here");
+        quiet.flush();
+        String text = raw.toString(StandardCharsets.UTF_8);
+        assertFalse(text.contains("WARN"), text);
+        assertFalse(text.contains("replaces"), text);
+        assertTrue(text.contains("fix: secret redacted"), text);
+        assertTrue(text.contains("error: still here"), text);
+    }
+
     /** Summary plus the console pointer. Pre-launch echoes are not the report. */
     private static String reportOf(String stdout) {
         StringBuilder report = new StringBuilder();

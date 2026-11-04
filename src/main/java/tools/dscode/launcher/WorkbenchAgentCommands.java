@@ -520,6 +520,7 @@ public final class WorkbenchAgentCommands {
                 request(parsed, "discover")
         );
         PrintStream report = parsed.quiet() ? null : out;
+        if (parsed.quiet() && err != null) err = QuietWarnings.filtering(err);
         try {
             launchNote(parsed.project(), run.runId(), "command", "discover");
             if (report != null) echoFilters(parsed, report);
@@ -635,6 +636,7 @@ public final class WorkbenchAgentCommands {
                 request(parsed, "confirm")
         );
         PrintStream report = parsed.quiet() ? null : out;
+        if (parsed.quiet() && err != null) err = QuietWarnings.filtering(err);
         try {
             launchNote(parsed.project(), run.runId(), "command", "confirm");
             if (report != null) echoFilters(parsed, report);

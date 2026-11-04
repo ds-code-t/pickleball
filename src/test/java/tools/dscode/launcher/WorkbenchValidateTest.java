@@ -4,11 +4,15 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import tools.dscode.control.protocol.WorkbenchFeatureIndex;
 
+import javax.tools.JavaCompiler;
+import javax.tools.ToolProvider;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
+import java.io.StringWriter;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -76,11 +80,13 @@ class WorkbenchValidateTest {
         Path glue = project.resolve("src/test/java/ShopSteps.java");
         Files.createDirectories(glue.getParent());
         Files.writeString(glue, """
+                import io.cucumber.java.en.Given;
                 public class ShopSteps {
                   @Given("buy {string}") void a(String item) {}
                   @Given("the price is {int}") void b(int price) {}
                 }
                 """);
+        compileGlue(project);
         ByteArrayOutputStream stdout = new ByteArrayOutputStream();
         int code = WorkbenchValidate.run(project, null, null, new PrintStream(stdout, true, StandardCharsets.UTF_8), new PrintStream(new ByteArrayOutputStream()));
         String out = stdout.toString(StandardCharsets.UTF_8);
@@ -125,7 +131,8 @@ class WorkbenchValidateTest {
         Path glue = project.resolve("src/test/java/com/example/DataSteps.java");
         Files.createDirectories(glue.getParent());
         String annotation = "@Given(\"^VERIFY DATA ADDRESS \\\"([^\\\"]+)\\\" HAS DATA TABLE WITH (\\\\d+) DATA ROWS$\")";
-        Files.writeString(glue, "package com.example;\npublic class DataSteps {\n  " + annotation + "\n  void rows(String address, int count) {}\n}\n");
+        Files.writeString(glue, "package com.example;\nimport io.cucumber.java.en.Given;\npublic class DataSteps {\n  " + annotation + "\n  void rows(String address, int count) {}\n}\n");
+        compileGlue(project);
         String source = Files.readString(glue);
         assertTrue(source.contains("(\\\\d+)"), source);
         ByteArrayOutputStream stdout = new ByteArrayOutputStream();
@@ -152,6 +159,7 @@ class WorkbenchValidateTest {
         String annotation = "@Given(\"^VERIFY DATA ADDRESS \\\"([^\\\"]+)\\\" HAS DATA TABLE WITH (\\\\d+) DATA ROWS$\")";
         Files.writeString(glue, """
                 package com.example.report7glue;
+                import io.cucumber.java.en.Given;
                 public class Report7Steps {
                   @Given("report seven cucumber {int}")
                   void cucumber(int count) {}
@@ -160,11 +168,13 @@ class WorkbenchValidateTest {
         Files.createDirectories(other.getParent());
         Files.writeString(other, """
                 package com.example.pickleball;
+                import io.cucumber.java.en.Given;
                 public class OtherSteps {
                   @Given("report seven cucumber {int}")
                   void cucumber(int count) {}
                 }
                 """);
+        compileGlue(project);
         tools.dscode.control.protocol.Workspace.writeRunVars(
                 tools.dscode.control.protocol.Workspace.directory(project, "run-a"),
                 java.util.Map.of("pkb_glue", "com.example.report7glue")
@@ -229,5 +239,81 @@ class WorkbenchValidateTest {
         assertTrue(all.contains("capped=false"), all);
         assertTrue(all.contains("skipped=0"), all);
         assertTrue(all.contains("later-2"), all);
+    }
+
+    @Test
+    void commentedAnnotationIsNotAmbiguousAndTheClashNamesEachDefinition() throws Exception {
+        Path feature = project.resolve("src/test/resources/features/report7-ambiguous.feature");
+        Files.createDirectories(feature.getParent());
+        Files.writeString(feature, """
+                @report7-ambiguous
+                Feature: Ambiguous
+                  Scenario: Active and clash
+                    Given report seven active
+                    Given report seven clash
+                """);
+        Path glue = project.resolve("src/test/java/com/example/report7glue/Report7Ambiguous.java");
+        Files.createDirectories(glue.getParent());
+        Files.writeString(glue, """
+                package com.example.report7glue;
+                import io.cucumber.java.en.And;
+                public final class Report7Ambiguous {
+                  @And("^report seven active$")
+                  public void active() {}
+                  @And("^report seven clash$")
+                  public void clashLeft() {}
+                }
+                class Report7Commented {
+                  // @And("^report seven active$")
+                  // public void commentedOut() {}
+                }
+                class Report7ClashOther {
+                  @And("^report seven clash$")
+                  public void clashRight() {}
+                }
+                """);
+        compileGlue(project);
+        ByteArrayOutputStream stdout = new ByteArrayOutputStream();
+        int code = WorkbenchValidate.run(project, "@report7-ambiguous", null,
+                new PrintStream(stdout, true, StandardCharsets.UTF_8),
+                new PrintStream(new ByteArrayOutputStream()));
+        String out = stdout.toString(StandardCharsets.UTF_8);
+        assertEquals(1, code, out);
+        assertTrue(out.contains("ambiguous=1"), out);
+        assertFalse(out.lines().anyMatch(line -> line.startsWith("ambiguous:") && line.contains("report seven active")), out);
+        assertFalse(out.contains("commentedOut"), out);
+        String clash = out.lines().filter(line -> line.startsWith("ambiguous:")).findFirst().orElse("");
+        assertTrue(clash.contains("Report7Ambiguous"), clash);
+        assertTrue(clash.contains("clashLeft"), clash);
+        assertTrue(clash.contains("Report7ClashOther"), clash);
+        assertTrue(clash.contains("clashRight"), clash);
+        assertTrue(clash.contains("^report seven clash$"), clash);
+        assertEquals("report7 bulk pattern 0 ", WorkbenchValidate.literalPrefix("^report7 bulk pattern 0 (\\d+)$"));
+        assertEquals("buy ", WorkbenchValidate.literalPrefix("buy {string}"));
+        assertEquals("report seven clash", WorkbenchValidate.literalPrefix("^report seven clash$"));
+    }
+
+    private static void compileGlue(Path project) throws Exception {
+        Path sourceRoot = project.resolve("src/test/java");
+        List<Path> sources = new ArrayList<>();
+        try (var walk = Files.walk(sourceRoot)) {
+            walk.filter(path -> path.toString().endsWith(".java")).forEach(sources::add);
+        }
+        Path output = Files.createDirectories(project.resolve("target/test-classes"));
+        JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
+        assertTrue(compiler != null, "JDK compiler is required to compile glue fixtures");
+        StringWriter errors = new StringWriter();
+        var files = compiler.getStandardFileManager(null, null, StandardCharsets.UTF_8);
+        try (files) {
+            boolean compiled = compiler.getTask(
+                    errors,
+                    files,
+                    null,
+                    List.of("-classpath", System.getProperty("java.class.path"), "-d", output.toString()),
+                    null,
+                    files.getJavaFileObjectsFromPaths(sources)
+            ).call();
+            assertTrue(compiled, errors.toString());
+        }
     }
 }
