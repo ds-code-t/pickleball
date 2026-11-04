@@ -751,6 +751,7 @@ def _report7_note(results: list[dict], item: str, ok: bool, detail: str) -> None
 
 def _report7_cleanup() -> None:
     _restore_classpath_caches()
+    _restore_report8_classpath()
     for relative in (
         "src/test/java/com/example/report7glue/Report7Steps.java",
         "src/test/java/com/example/report7glue/Report7Ambiguous.java",
@@ -760,6 +761,11 @@ def _report7_cleanup() -> None:
         "src/test/resources/features/report7-ambiguous.feature",
         "src/test/resources/features/report7-bulk.feature",
         "src/test/resources/configs/report7-quiet.yaml",
+        "src/test/java/com/example/report8glue/Report8Typed.java",
+        "src/test/java/com/example/report8glue/Report8Stale.java",
+        "src/test/java/com/example/report8glue/Report8Touch.java",
+        "src/test/resources/features/report8-glue.feature",
+        "src/test/resources/report8-touch.txt",
     ):
         path = CONSUMER / relative
         if path.is_file():
@@ -768,7 +774,7 @@ def _report7_cleanup() -> None:
     if bulk_class.is_file():
         bulk_class.unlink()
     _restore_quiet_properties()
-    for run_id in ("report7-a", "report7-b", "report7-c", "report7-quiet", "report7-quiet-warn", "report7-fail"):
+    for run_id in ("report7-a", "report7-b", "report7-c", "report7-quiet", "report7-quiet-warn", "report7-fail", "report8-gap"):
         try:
             launcher(["stop", "--run-id=" + run_id, "--force"], 30)
         except SystemExit:
@@ -1166,6 +1172,317 @@ def _report7_open_items(timings: list[dict], results: list[dict]) -> None:
         ("noisy: " + " | ".join(noisy[:6])) if noisy else _snippet(combined, "summary ", "fix:", "WARN", "WARNING"),
     )
     _restore_quiet_properties()
+    _report8_fixback(timings, results)
+
+
+def _report8_fixback(timings: list[dict], results: list[dict]) -> None:
+    """Report-8 gaps on ad3b4193. Cold and edited starts still hash every jar.
+    The prefix trie keeps a quantified character and a leading alternative.
+    """
+    _write_report8_glue()
+    _report7_compile(timings)
+    _compile_report8_external()
+    glue, _ = _report7_launch(timings, "report8-validate-glue", [
+        "validate", "--tags=@report8-glue",
+    ], 180)
+    glue_text = (glue.stdout or "") + "\n" + (glue.stderr or "")
+
+    def undefined(needle: str) -> list[str]:
+        return [
+            line for line in glue_text.splitlines()
+            if line.startswith("undefined:") and needle in line
+        ]
+
+    typed = undefined("report eight typed step")
+    _report7_note(
+        results, "8-glue-classpath",
+        not typed,
+        "dropped: " + " | ".join(typed[:2]) if typed else _snippet(glue_text, "report eight typed", "validate undefined="),
+    )
+    aliases = undefined("report eight first alias") + undefined("report eight second alias")
+    _report7_note(
+        results, "8-repeatable",
+        not aliases,
+        "dropped: " + " | ".join(aliases[:2]) if aliases else "both aliases registered",
+    )
+    french = undefined("report eight french step")
+    _report7_note(
+        results, "8-i18n-glue",
+        not french,
+        "dropped: " + " | ".join(french[:2]) if french else "french step registered",
+    )
+    probes = (
+        undefined("probe item are shown")
+        + undefined("probe color ok")
+        + undefined("probe cat are here")
+        + undefined("probe right")
+    )
+    _report7_note(
+        results, "8-prefix-quantifier",
+        not probes,
+        "undefined: " + " | ".join(probes[:4]) if probes else "optional, star, and alternation matched",
+    )
+
+    stale_java = CONSUMER / "src/test/java/com/example/report8glue/Report8Stale.java"
+    future = time.time() + 120
+    os.utime(stale_java, (future, future))
+    stale, _ = _report7_launch(timings, "report8-validate-stale", [
+        "validate", "--tags=@report8-glue",
+    ], 180)
+    stale_text = (stale.stdout or "") + "\n" + (stale.stderr or "")
+    stale_warn = [
+        line for line in stale_text.splitlines()
+        if "compiled glue is older than its source" in line and "Report8Stale.java" in line
+    ]
+    _report7_note(
+        results, "8-stale-glue",
+        bool(stale_warn) and not any(
+            line.startswith("undefined:") and "report eight stale step" in line
+            for line in stale_text.splitlines()
+        ),
+        stale_warn[0] if stale_warn else "no stale-glue warning",
+    )
+
+    _report7_launch(timings, "report8-stop-before", ["stop", "--run-id=report8-gap", "--force"], 60)
+    bulk = _inflate_consumer_classpath()
+    _report7_launch(timings, "report8-seed", [
+        "workspace-seed", "--run-id=report8-gap", "--reseed",
+    ], 180)
+    legs = []
+    legs.append(("cold",) + _report8_materialize(timings, "report8-cold", delete_manifest=True))
+    touch = CONSUMER / "src/test/java/com/example/report8glue/Report8Touch.java"
+    touch.write_text(touch.read_text(encoding="utf-8") + "// edited\n", encoding="utf-8", newline="\n")
+    _report7_compile(timings)
+    legs.append(("java-edit",) + _report8_materialize(timings, "report8-java-edit", delete_manifest=False))
+    resource = CONSUMER / "src/test/resources/report8-touch.txt"
+    resource.write_text(resource.read_text(encoding="utf-8") + "edited\n", encoding="utf-8", newline="\n")
+    legs.append(("resource-edit",) + _report8_materialize(timings, "report8-resource-edit", delete_manifest=False))
+    legs.append(("manifest-removed",) + _report8_materialize(timings, "report8-manifest-removed", delete_manifest=True))
+    _report7_launch(timings, "report8-discover", [
+        "discover", "--run-id=report8-gap", "--tags=@report7-regex",
+        "--runvar=pkb_browser=CHROME_HEADLESS", "--agent=consumer-sim",
+    ], 900)
+    code, gap, observed, work = _report8_isolate(timings, "report8-after-discover")
+    discover_ok = code == 0 and gap is not None and gap <= INDEX_JVM_BUDGET_MS and "index-end@" in observed
+    legs.append(("after-discover", code, gap, observed, work, discover_ok))
+    failed = [name for name, _code, _gap, _observed, _work, ok in legs if not ok]
+    detail = " ".join(
+        f"{name}=exit:{code},gap:{gap},index-end:{'index-end@' in observed}"
+        for name, code, gap, observed, _work, _ok in legs
+    )
+    _report7_note(
+        results, "8-restart-paths",
+        not failed,
+        f"failed={failed} budget_ms={INDEX_JVM_BUDGET_MS} jars={bulk['jars']} bytes={bulk['bytes']} {detail}",
+    )
+    _restore_classpath_caches()
+    _restore_report8_classpath()
+
+
+def _write_report8_glue() -> None:
+    root = CONSUMER / "src/test/java/com/example/report8glue"
+    root.mkdir(parents=True, exist_ok=True)
+    (root / "Report8Typed.java").write_text(
+        "package com.example.report8glue;\n"
+        "import io.cucumber.java.en.Given;\n"
+        "import io.cucumber.java.fr.Et;\n"
+        "public final class Report8Typed {\n"
+        "    @Given(\"^report eight first alias$\")\n"
+        "    @Given(\"^report eight second alias$\")\n"
+        "    public void aliases() {}\n"
+        "    @Et(\"^report eight french step$\")\n"
+        "    public void french() {}\n"
+        "    @Given(\"^probe items? are shown$\")\n"
+        "    public void items() {}\n"
+        "    @Given(\"^probe colou?r ok$\")\n"
+        "    public void colour() {}\n"
+        "    @Given(\"^probe cats* are here$\")\n"
+        "    public void cats() {}\n"
+        "    @Given(\"^probe left$|^probe right$\")\n"
+        "    public void either() {}\n"
+        "}\n",
+        encoding="utf-8",
+        newline="\n",
+    )
+    (root / "Report8Stale.java").write_text(
+        "package com.example.report8glue;\n"
+        "import io.cucumber.java.en.Given;\n"
+        "final class Report8Stale {\n"
+        "    @Given(\"^report eight stale step$\")\n"
+        "    public void stale() {}\n"
+        "}\n",
+        encoding="utf-8",
+        newline="\n",
+    )
+    (root / "Report8Touch.java").write_text(
+        "package com.example.report8glue;\n"
+        "public final class Report8Touch {\n"
+        "    public void marker() {}\n"
+        "}\n",
+        encoding="utf-8",
+        newline="\n",
+    )
+    feature = CONSUMER / "src/test/resources/features/report8-glue.feature"
+    feature.parent.mkdir(parents=True, exist_ok=True)
+    feature.write_text(
+        "@report8-glue\n"
+        "Feature: Report 8 glue\n"
+        "  Scenario: Definitions the runner registers\n"
+        "    Given report eight typed step\n"
+        "    Given report eight first alias\n"
+        "    Given report eight second alias\n"
+        "    Given report eight french step\n"
+        "    Given probe item are shown\n"
+        "    Given probe color ok\n"
+        "    Given probe cat are here\n"
+        "    Given probe right\n"
+        "    Given report eight stale step\n",
+        encoding="utf-8",
+        newline="\n",
+    )
+    resource = CONSUMER / "src/test/resources/report8-touch.txt"
+    resource.write_text("one\n", encoding="utf-8", newline="\n")
+
+
+def _compile_report8_external() -> None:
+    """A superclass that exists only on the resolved test classpath, not on the validate JVM."""
+    work = CONSUMER / ".pickleball" / "report8-parent"
+    if work.exists():
+        shutil.rmtree(work)
+    src = work / "src"
+    src.mkdir(parents=True)
+    (src / "Marker.java").write_text(
+        "package com.example.report8dep;\npublic class Marker { public Marker() {} }\n",
+        encoding="utf-8",
+        newline="\n",
+    )
+    marker_classes = work / "marker-classes"
+    marker_classes.mkdir()
+    java_bin = Path(java_executable())
+    javac = str(java_bin.with_name("javac.exe" if os.name == "nt" else "javac"))
+    jar_bin = str(java_bin.with_name("jar.exe" if os.name == "nt" else "jar"))
+    compiled = subprocess.run(
+        [javac, "-d", str(marker_classes), str(src / "Marker.java")],
+        cwd=CONSUMER, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+    )
+    if compiled.returncode != 0:
+        raise SystemExit("report8 marker compile failed\n" + compiled.stdout + compiled.stderr)
+    jar_path = work / "report8-parent.jar"
+    packed = subprocess.run(
+        [jar_bin, "--create", "--file", str(jar_path), "-C", str(marker_classes), "."],
+        cwd=CONSUMER, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+    )
+    if packed.returncode != 0:
+        raise SystemExit("report8 marker jar failed\n" + packed.stdout + packed.stderr)
+    glue = work / "Report8External.java"
+    glue.write_text(
+        "package com.example.report8glue;\n"
+        "import com.example.report8dep.Marker;\n"
+        "import io.cucumber.java.en.Given;\n"
+        "import org.openqa.selenium.WebDriver;\n"
+        "public class Report8External extends Marker {\n"
+        "    @Given(\"^report eight typed step$\")\n"
+        "    public void typed(WebDriver driver) {}\n"
+        "}\n",
+        encoding="utf-8",
+        newline="\n",
+    )
+    out = CONSUMER / "target" / "test-classes"
+    external = subprocess.run(
+        [javac, "-d", str(out), "-cp", str(jar_path) + os.pathsep + test_classpath(), str(glue)],
+        cwd=CONSUMER, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+    )
+    if external.returncode != 0:
+        raise SystemExit("report8 external compile failed\n" + external.stdout + external.stderr)
+    _append_resolved_jar(jar_path.resolve())
+
+
+_REPORT8_CACHE_BACKUP: list[tuple[Path, str]] = []
+
+
+def _append_resolved_jar(jar_path: Path) -> None:
+    global _REPORT8_CACHE_BACKUP
+    _REPORT8_CACHE_BACKUP = []
+    text_line = str(jar_path)
+    for cache in _classpath_caches():
+        original = cache.read_text(encoding="utf-8", errors="replace")
+        _REPORT8_CACHE_BACKUP.append((cache, original))
+        if text_line in original:
+            continue
+        body = original if original.endswith("\n") else original + "\n"
+        cache.write_text(body + text_line + "\n", encoding="utf-8")
+    harness = CONSUMER / ".pickleball" / "harness-classpath.txt"
+    if harness.is_file():
+        original = harness.read_text(encoding="utf-8", errors="replace")
+        _REPORT8_CACHE_BACKUP.append((harness, original))
+        stripped = original.strip()
+        if text_line not in stripped.split(os.pathsep):
+            harness.write_text(stripped + os.pathsep + text_line + "\n", encoding="utf-8")
+
+
+def _restore_report8_classpath() -> None:
+    global _REPORT8_CACHE_BACKUP
+    for path, original in _REPORT8_CACHE_BACKUP:
+        try:
+            path.write_text(original, encoding="utf-8")
+        except OSError:
+            pass
+    _REPORT8_CACHE_BACKUP = []
+    work = CONSUMER / ".pickleball" / "report8-parent"
+    if work.exists():
+        shutil.rmtree(work, ignore_errors=True)
+    external = CONSUMER / "target/test-classes/com/example/report8glue/Report8External.class"
+    if external.is_file():
+        external.unlink()
+
+
+def _delete_workbench_manifests() -> None:
+    root = CONSUMER / ".pickleball"
+    if not root.is_dir():
+        return
+    for path in root.rglob("manifest.json"):
+        if "workbench" in path.parts:
+            path.unlink(missing_ok=True)
+
+
+def _session_new_text(run_id: str, snaps: dict[Path, int]) -> str:
+    path = CONSUMER / ".pickleball" / "runs" / run_id / "session" / "session.log"
+    if not path.is_file():
+        return ""
+    data = path.read_bytes()
+    mark = snaps.get(path, 0)
+    chunk = data if len(data) < mark else data[mark:]
+    return chunk.decode("utf-8", errors="replace")
+
+
+def _report8_isolate(timings: list[dict], stage: str):
+    snaps = _log_snapshot()
+    started, _seconds = _report7_launch(timings, stage, [
+        "isolate", "--run-id=report8-gap", "--tags=@report7-regex", "--agent=consumer-sim",
+        "--runvar=pkb_browser=CHROME_HEADLESS",
+    ], 600)
+    gap, _between, observed = _index_jvm_gap("report8-gap")
+    work = _session_new_text("report8-gap", snaps)
+    return started.returncode, gap, observed, work
+
+
+def _report8_materialize(timings: list[dict], stage: str, delete_manifest: bool):
+    _report7_launch(timings, stage + "-stop", ["stop", "--run-id=report8-gap", "--force"], 60)
+    if delete_manifest:
+        _delete_workbench_manifests()
+    code, gap, observed, work = _report8_isolate(timings, stage)
+    ok = (
+        code == 0
+        and gap is not None
+        and gap <= INDEX_JVM_BUDGET_MS
+        and "index-end@" in observed
+        and "progress stage=sync" in work
+        and "progress stage=materialize" in work
+        and "progress stage=hash" in work
+        and "hashed=0" in work
+        and "maven skipped=unchanged" in work
+    )
+    return code, gap, observed, work, ok
 
 
 def _write_bulk_suite() -> None:
