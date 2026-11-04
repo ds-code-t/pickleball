@@ -18,6 +18,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -169,6 +170,78 @@ class WorkbenchSynchronizerTest {
         assertFalse(first.equals(second), firstErr[0] + "\n" + secondErr[0]);
         assertTrue(firstErr[0].contains("hashed=0"), firstErr[0]);
         assertTrue(secondErr[0].contains("hashed=1"), secondErr[0]);
+    }
+
+    @Test
+    void freshJarKeepsFingerprintAndStopsHashingAfterTheRacyWindow() throws Exception {
+        AtomicLong clock = new AtomicLong(1_700_000_000_000L);
+        WorkbenchSynchronizer.useClock(clock::get);
+        try {
+            Path projectRoot = tempDir.resolve("fresh-jar-consumer");
+            Path test = projectRoot.resolve("target/test-classes");
+            Files.createDirectories(test);
+            Files.writeString(test.resolve("runner.class"), "runner", StandardCharsets.UTF_8);
+            Path dependency = tempDir.resolve("fresh.jar");
+            Files.write(dependency, new byte[]{1, 2, 3});
+            Files.setLastModifiedTime(dependency, FileTime.fromMillis(clock.get()));
+
+            WorkbenchProject project = new WorkbenchProject(
+                    projectRoot.toAbsolutePath().normalize(),
+                    WorkbenchProject.Type.MAVEN,
+                    projectRoot.toAbsolutePath().normalize(),
+                    Path.of("mvn")
+            );
+            WorkbenchSynchronizer.SyncMetadata metadata = new WorkbenchSynchronizer.SyncMetadata(
+                    List.of(projectRoot.resolve("src/test/java")),
+                    List.of(new WorkbenchSynchronizer.OutputPath("TEST", test)),
+                    List.of(dependency.toString())
+            );
+            Path stateRoot = WorkbenchManifest.workbenchRoot(projectRoot);
+            String[] firstErr = new String[1];
+            String first = capture(firstErr, () -> WorkbenchSynchronizer.materialize(
+                    project, metadata, stateRoot.resolve(".sync-first"), stateRoot
+            ).fingerprint());
+            String tokenAtRecord = cachedJarToken(stateRoot);
+            clock.addAndGet(2_001L);
+            String[] secondErr = new String[1];
+            String second = capture(secondErr, () -> WorkbenchSynchronizer.materialize(
+                    project, metadata, stateRoot.resolve(".sync-second"), stateRoot
+            ).fingerprint());
+            clock.addAndGet(2_001L);
+            String[] thirdErr = new String[1];
+            String third = capture(thirdErr, () -> WorkbenchSynchronizer.materialize(
+                    project, metadata, stateRoot.resolve(".sync-third"), stateRoot
+            ).fingerprint());
+
+            assertEquals(first, second, firstErr[0] + "\n" + secondErr[0]);
+            assertEquals(second, third, secondErr[0] + "\n" + thirdErr[0]);
+            assertTrue(firstErr[0].contains("hashed=0"), firstErr[0]);
+            assertTrue(secondErr[0].contains("hashed=0"), secondErr[0]);
+            assertTrue(thirdErr[0].contains("hashed=0"), thirdErr[0]);
+            assertEquals(tokenAtRecord, cachedJarToken(stateRoot), thirdErr[0]);
+            assertTrue(cachedJarRecordedAt(stateRoot) - 1_700_000_000_000L > 2_000L, thirdErr[0]);
+        } finally {
+            WorkbenchSynchronizer.useClock(null);
+        }
+    }
+
+    private static String cachedJarToken(Path stateRoot) throws IOException {
+        String row = cachedJarRow(stateRoot);
+        int first = row.indexOf('\t');
+        int last = row.lastIndexOf('\t');
+        return row.substring(first + 1, last);
+    }
+
+    private static long cachedJarRecordedAt(Path stateRoot) throws IOException {
+        String row = cachedJarRow(stateRoot);
+        return Long.parseLong(row.substring(row.lastIndexOf('\t') + 1).trim());
+    }
+
+    private static String cachedJarRow(Path stateRoot) throws IOException {
+        List<String> lines = Files.readAllLines(stateRoot.resolve("jar-hashes.v1"), StandardCharsets.UTF_8);
+        assertEquals("v2", lines.get(0).trim());
+        assertEquals(2, lines.size(), lines.toString());
+        return lines.get(1);
     }
 
     private static String capture(String[] err, java.util.concurrent.Callable<String> call) throws Exception {

@@ -31,6 +31,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.LongSupplier;
 
 import tools.dscode.control.protocol.PickleballLocalLayout;
 import tools.dscode.control.protocol.WorkbenchFeatureIndex;
@@ -753,13 +754,21 @@ public final class WorkbenchSynchronizer {
 
     private static final long RACY_WINDOW_MS = 2_000L;
     private static final char KEY_SEP = '\u001f';
+    private static volatile LongSupplier nowMillis = System::currentTimeMillis;
+
+    /** Test hook. A null supplier restores the wall clock. */
+    static void useClock(LongSupplier clock) {
+        nowMillis = clock == null ? System::currentTimeMillis : clock;
+    }
 
     /**
      * Fast path: a jar token is path, size, mtime, and file identity, and the bytes
-     * are not read. A cached token is not trusted when its mtime is within two
-     * seconds of the time it was recorded (git's racy timestamp), or when inode or
-     * ctime changed while size and mtime stayed the same. Those jars are hashed,
-     * and {@code hashed} is how many.
+     * are not read. A cached token is not trusted while its mtime is still within two
+     * seconds of now (git's racy timestamp), or when inode or ctime changed while size
+     * and mtime stayed the same. Those jars are hashed, and {@code hashed} is how many.
+     * Leaving the window keeps the token for that file state and refreshes the recorded
+     * time so later starts reuse it. On Windows, fileKey() and ctime are not available,
+     * so the key is effectively path, size, and mtime plus the 2 s rule.
      */
     private static String fingerprint(Path classes, List<String> dependencies, Path cacheFile) {
         try {
@@ -776,7 +785,7 @@ public final class WorkbenchSynchronizer {
             int hashed = 0;
             long bytes = 0L;
             List<String> ordered = dependencies == null ? List.of() : dependencies;
-            long now = System.currentTimeMillis();
+            long now = nowMillis.getAsLong();
             for (String dependency : ordered) {
                 if (dependency == null || dependency.isBlank()) continue;
                 Path path = Path.of(dependency).toAbsolutePath().normalize();
@@ -795,9 +804,12 @@ public final class WorkbenchSynchronizer {
                 CachedJar cached = cache.get(exact);
                 String token;
                 long recordedAt;
-                if (cached != null && !racy(stat, cached.recordedAt)) {
+                boolean outsideWindow = now - stat.mtimeMillis > RACY_WINDOW_MS;
+                if (cached != null && (outsideWindow || !racy(stat, cached.recordedAt))) {
+                    // Same file state keeps its token. A stat token must not become a
+                    // content hash just because the entry was recorded inside the window.
                     token = cached.token;
-                    recordedAt = cached.recordedAt;
+                    recordedAt = outsideWindow ? now : cached.recordedAt;
                     reused++;
                 } else if (cached != null || statKeys.containsKey(statKey)) {
                     token = contentToken(path);
