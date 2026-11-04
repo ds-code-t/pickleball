@@ -39,9 +39,17 @@ PRIOR_NEWEST = "prior-newest"
 # window (about a second per GiB here). The skip path does not. 1500ms is above
 # the skip path (~200ms on Linux) and below that re-hash. Override with PKB_INDEX_JVM_BUDGET_MS.
 INDEX_JVM_BUDGET_MS = int(os.environ.get("PKB_INDEX_JVM_BUDGET_MS", "1500"))
-# Many real jars, large enough that hashing them blows the budget on a4c7ea6f.
 BULK_JARS = int(os.environ.get("PKB_BULK_JARS", "40"))
 BULK_MIB = int(os.environ.get("PKB_BULK_MIB", "64"))
+# Every back-to-back restart, not only the first, must stay inside the same gap.
+RESTARTS = int(os.environ.get("PKB_RESTARTS", "3"))
+# A generated --all suite. Sequential matching of this many regex defs exceeds the budget.
+# The shared matcher must finish under it and still print progress.
+BULK_PATTERNS = int(os.environ.get("PKB_BULK_PATTERNS", "2000"))
+BULK_STEPS = int(os.environ.get("PKB_BULK_STEPS", "8000"))
+VALIDATE_ALL_BUDGET_MS = int(os.environ.get("PKB_VALIDATE_ALL_BUDGET_MS", "1500"))
+_LOCAL_PROPS = CONSUMER / "src/test/resources/pickleball_local.properties"
+_LOCAL_PROPS_BACKUP: str | None = None
 
 BUDGETS = {
     "discover-uncompiled": 900,
@@ -745,13 +753,22 @@ def _report7_cleanup() -> None:
     _restore_classpath_caches()
     for relative in (
         "src/test/java/com/example/report7glue/Report7Steps.java",
+        "src/test/java/com/example/report7glue/Report7Ambiguous.java",
+        "src/test/java/com/example/report7glue/Report7Bulk.java",
         "src/test/resources/features/report7-regex.feature",
         "src/test/resources/features/report7-cap.feature",
+        "src/test/resources/features/report7-ambiguous.feature",
+        "src/test/resources/features/report7-bulk.feature",
+        "src/test/resources/configs/report7-quiet.yaml",
     ):
         path = CONSUMER / relative
         if path.is_file():
             path.unlink()
-    for run_id in ("report7-a", "report7-b", "report7-c", "report7-quiet", "report7-fail"):
+    bulk_class = CONSUMER / "target/test-classes/com/example/report7glue/Report7Bulk.class"
+    if bulk_class.is_file():
+        bulk_class.unlink()
+    _restore_quiet_properties()
+    for run_id in ("report7-a", "report7-b", "report7-c", "report7-quiet", "report7-quiet-warn", "report7-fail"):
         try:
             launcher(["stop", "--run-id=" + run_id, "--force"], 30)
         except SystemExit:
@@ -793,6 +810,37 @@ def _report7_files() -> None:
     lines.append("  Scenario: Later two")
     lines.append("    Given missing report7 later-2")
     cap.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
+    ambiguous = CONSUMER / "src/test/java/com/example/report7glue/Report7Ambiguous.java"
+    ambiguous.write_text(
+        "package com.example.report7glue;\n"
+        "import io.cucumber.java.en.And;\n"
+        "public final class Report7Ambiguous {\n"
+        "    @And(\"^report seven active$\")\n"
+        "    public void active() {}\n"
+        "    @And(\"^report seven clash$\")\n"
+        "    public void clashLeft() {}\n"
+        "}\n"
+        "class Report7Commented {\n"
+        "    // @And(\"^report seven active$\")\n"
+        "    // public void commentedOut() {}\n"
+        "}\n"
+        "class Report7ClashOther {\n"
+        "    @And(\"^report seven clash$\")\n"
+        "    public void clashRight() {}\n"
+        "}\n",
+        encoding="utf-8",
+        newline="\n",
+    )
+    clash = CONSUMER / "src/test/resources/features/report7-ambiguous.feature"
+    clash.write_text(
+        "@report7-ambiguous\n"
+        "Feature: Report 7 ambiguous glue\n"
+        "  Scenario: Active and clash\n"
+        "    Given report seven active\n"
+        "    Given report seven clash\n",
+        encoding="utf-8",
+        newline="\n",
+    )
 
 
 def _report7_compile(timings: list[dict]) -> None:
@@ -1012,6 +1060,184 @@ def _report7_body(timings: list[dict], results: list[dict]) -> None:
             f"restart_seconds={second_seconds} stages={observed}"
         ),
     )
+    _report7_open_items(timings, results)
+
+
+def _report7_open_items(timings: list[dict], results: list[dict]) -> None:
+    """Follow-up symptoms from the 6a7e660 retest. Items 2-5 fail on 1d4e2f6d."""
+    _report7_launch(timings, "report7-stop-before-restarts", ["stop", "--run-id=report7-a", "--force"], 60)
+    gaps: list[str] = []
+    restart_ok = True
+    for index in range(RESTARTS):
+        started, _ = _report7_launch(timings, f"report7-restart-{index}", [
+            "isolate", "--run-id=report7-a", "--tags=@report7-regex", "--agent=consumer-sim",
+            "--runvar=pkb_browser=CHROME_HEADLESS",
+        ], 600)
+        gap_ms, _between, observed = _index_jvm_gap("report7-a")
+        gaps.append(str(gap_ms))
+        if started.returncode != 0 or gap_ms is None or gap_ms > INDEX_JVM_BUDGET_MS:
+            restart_ok = False
+        _report7_launch(timings, f"report7-restart-stop-{index}", ["stop", "--run-id=report7-a", "--force"], 60)
+    _report7_note(
+        results, "1-every-restart",
+        restart_ok,
+        f"gaps_ms={','.join(gaps)} budget_ms={INDEX_JVM_BUDGET_MS} restarts={RESTARTS}",
+    )
+    _restore_classpath_caches()
+
+    commented, _ = _report7_launch(timings, "report7-validate-ambiguous", [
+        "validate", "--tags=@report7-ambiguous",
+    ], 180)
+    commented_text = (commented.stdout or "") + "\n" + (commented.stderr or "")
+    active_ambiguous = [
+        line for line in commented_text.splitlines()
+        if line.startswith("ambiguous:") and "report seven active" in line
+    ]
+    _report7_note(
+        results, "2-commented-glue",
+        not active_ambiguous,
+        "commented def counted: " + " | ".join(active_ambiguous[:2]) if active_ambiguous else "no ambiguous line for report seven active",
+    )
+    clash_lines = [
+        line for line in commented_text.splitlines()
+        if line.startswith("ambiguous:") and "report seven clash" in line
+    ]
+    clash = clash_lines[0] if clash_lines else ""
+    detail_ok = (
+        commented.returncode == 1
+        and "ambiguous=1" in commented_text
+        and "Report7Ambiguous" in clash
+        and "clashLeft" in clash
+        and "Report7ClashOther" in clash
+        and "clashRight" in clash
+        and "^report seven clash$" in clash
+        and "commentedOut" not in clash
+        and "commentedOut" not in commented_text
+    )
+    _report7_note(
+        results, "3-ambiguous-detail",
+        detail_ok,
+        clash if clash else _snippet(commented_text, "ambiguous", "validate undefined="),
+    )
+
+    _write_bulk_suite()
+    _report7_compile(timings)
+    bulk, _ = _report7_launch(timings, "report7-validate-bulk-all", [
+        "validate", "--tags=@report7-bulk", "--all",
+    ], 300)
+    bulk_text = (bulk.stdout or "") + "\n" + (bulk.stderr or "")
+    elapsed = _elapsed_ms(bulk_text)
+    progress = "validate progress stage=steps" in bulk_text and "steps=100" in bulk_text
+    budget_ok = (
+        progress
+        and "capped=false" in bulk_text
+        and elapsed is not None
+        and elapsed <= VALIDATE_ALL_BUDGET_MS
+    )
+    _report7_note(
+        results, "4-validate-all-budget",
+        budget_ok,
+        (
+            f"elapsedMs={elapsed} budget_ms={VALIDATE_ALL_BUDGET_MS} "
+            f"progress={progress} patterns={BULK_PATTERNS} steps={BULK_STEPS} "
+            + _snippet(bulk_text, "validate undefined=", "validate progress stage=steps")
+        ),
+    )
+    _delete_bulk_suite()
+
+    _plant_quiet_secrets()
+    quiet, _ = _report7_launch(timings, "report7-quiet-warnings", [
+        "discover", "--quiet", "--run-id=report7-quiet-warn", "--tags=@report7-quiet-missing",
+        "--runvar=pkb_browser=EDGE", "--runvar=pkb_api_token=replaced-token",
+        "--agent=consumer-sim",
+    ], 300)
+    combined = (quiet.stdout or "") + "\n" + (quiet.stderr or "")
+    noisy = [
+        line for line in combined.splitlines()
+        if line.startswith("WARN:") or line.startswith("WARNING:")
+        or "literal secret" in line or "replaces" in line
+    ]
+    kept = any(line.startswith("summary ") for line in combined.splitlines()) and any(
+        line.startswith("fix:") for line in combined.splitlines()
+    )
+    _report7_note(
+        results, "5-quiet-warnings",
+        kept and not noisy,
+        ("noisy: " + " | ".join(noisy[:6])) if noisy else _snippet(combined, "summary ", "fix:", "WARN", "WARNING"),
+    )
+    _restore_quiet_properties()
+
+
+def _write_bulk_suite() -> None:
+    glue = CONSUMER / "src/test/java/com/example/report7glue/Report7Bulk.java"
+    glue.parent.mkdir(parents=True, exist_ok=True)
+    lines = [
+        "package com.example.report7glue;",
+        "import io.cucumber.java.en.Given;",
+        "public final class Report7Bulk {",
+    ]
+    for index in range(BULK_PATTERNS):
+        lines.append(f"    @Given(\"^report7 bulk pattern {index} (\\\\d+)$\")")
+        lines.append(f"    public void bulk{index}(String ignored) {{}}")
+    lines.append("}")
+    glue.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
+    feature = CONSUMER / "src/test/resources/features/report7-bulk.feature"
+    feature.parent.mkdir(parents=True, exist_ok=True)
+    steps = ["@report7-bulk", "Feature: Report 7 bulk validate", "  Scenario: Generated"]
+    for index in range(BULK_STEPS):
+        pattern = index % BULK_PATTERNS
+        steps.append(f"    Given report7 bulk pattern {pattern} 1")
+    feature.write_text("\n".join(steps) + "\n", encoding="utf-8", newline="\n")
+
+
+def _delete_bulk_suite() -> None:
+    for relative in (
+        "src/test/java/com/example/report7glue/Report7Bulk.java",
+        "src/test/resources/features/report7-bulk.feature",
+        "target/test-classes/com/example/report7glue/Report7Bulk.class",
+    ):
+        path = CONSUMER / relative
+        if path.is_file():
+            path.unlink()
+
+
+def _elapsed_ms(text: str) -> int | None:
+    for line in text.splitlines():
+        if not line.startswith("validate ") or "elapsedMs=" not in line:
+            continue
+        for part in line.split():
+            if part.startswith("elapsedMs="):
+                try:
+                    return int(part.split("=", 1)[1])
+                except ValueError:
+                    return None
+    return None
+
+
+def _plant_quiet_secrets() -> None:
+    global _LOCAL_PROPS_BACKUP
+    yaml = CONSUMER / "src/test/resources/configs/report7-quiet.yaml"
+    yaml.parent.mkdir(parents=True, exist_ok=True)
+    yaml.write_text(
+        "db_password: hunter2\n"
+        "api_token: tok-1\n"
+        "oauth_secret: sec-1\n"
+        "session_cookie: cook-1\n",
+        encoding="utf-8",
+        newline="\n",
+    )
+    original = _LOCAL_PROPS.read_text(encoding="utf-8")
+    _LOCAL_PROPS_BACKUP = original
+    body = original if original.endswith("\n") else original + "\n"
+    _LOCAL_PROPS.write_text(body + "pkb_api_token=from-file\n", encoding="utf-8", newline="\n")
+
+
+def _restore_quiet_properties() -> None:
+    global _LOCAL_PROPS_BACKUP
+    if _LOCAL_PROPS_BACKUP is None:
+        return
+    _LOCAL_PROPS.write_text(_LOCAL_PROPS_BACKUP, encoding="utf-8")
+    _LOCAL_PROPS_BACKUP = None
 
 
 _CACHE_SNAPSHOTS: list[tuple[Path, str]] = []
