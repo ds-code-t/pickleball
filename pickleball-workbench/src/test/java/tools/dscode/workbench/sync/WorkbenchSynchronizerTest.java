@@ -13,6 +13,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.attribute.FileTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -130,6 +131,56 @@ class WorkbenchSynchronizerTest {
         ).fingerprint();
 
         assertFalse(first.equals(second));
+    }
+
+    @Test
+    void sameMtimeRewriteChangesFingerprintAndCountsTheHash() throws Exception {
+        Path projectRoot = tempDir.resolve("same-mtime-consumer");
+        Path test = projectRoot.resolve("target/test-classes");
+        Files.createDirectories(test);
+        Files.writeString(test.resolve("runner.class"), "runner", StandardCharsets.UTF_8);
+        Path dependency = tempDir.resolve("same-mtime.jar");
+        Files.write(dependency, new byte[]{1, 2, 3});
+        FileTime stamp = FileTime.fromMillis(System.currentTimeMillis() / 1000L * 1000L);
+        Files.setLastModifiedTime(dependency, stamp);
+
+        WorkbenchProject project = new WorkbenchProject(
+                projectRoot.toAbsolutePath().normalize(),
+                WorkbenchProject.Type.MAVEN,
+                projectRoot.toAbsolutePath().normalize(),
+                Path.of("mvn")
+        );
+        WorkbenchSynchronizer.SyncMetadata metadata = new WorkbenchSynchronizer.SyncMetadata(
+                List.of(projectRoot.resolve("src/test/java")),
+                List.of(new WorkbenchSynchronizer.OutputPath("TEST", test)),
+                List.of(dependency.toString())
+        );
+        Path stateRoot = WorkbenchManifest.workbenchRoot(projectRoot);
+        String[] firstErr = new String[1];
+        String first = capture(firstErr, () -> WorkbenchSynchronizer.materialize(
+                project, metadata, stateRoot.resolve(".sync-first"), stateRoot
+        ).fingerprint());
+        Files.write(dependency, new byte[]{4, 5, 6});
+        Files.setLastModifiedTime(dependency, stamp);
+        String[] secondErr = new String[1];
+        String second = capture(secondErr, () -> WorkbenchSynchronizer.materialize(
+                project, metadata, stateRoot.resolve(".sync-second"), stateRoot
+        ).fingerprint());
+        assertFalse(first.equals(second), firstErr[0] + "\n" + secondErr[0]);
+        assertTrue(firstErr[0].contains("hashed=0"), firstErr[0]);
+        assertTrue(secondErr[0].contains("hashed=1"), secondErr[0]);
+    }
+
+    private static String capture(String[] err, java.util.concurrent.Callable<String> call) throws Exception {
+        ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+        PrintStream previous = System.err;
+        System.setErr(new PrintStream(buffer, true, StandardCharsets.UTF_8));
+        try {
+            return call.call();
+        } finally {
+            System.setErr(previous);
+            err[0] = buffer.toString(StandardCharsets.UTF_8);
+        }
     }
 
     @Test

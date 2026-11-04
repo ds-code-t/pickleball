@@ -20,9 +20,11 @@ import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.nio.file.attribute.FileTime;
 import java.security.MessageDigest;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HexFormat;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -749,22 +751,32 @@ public final class WorkbenchSynchronizer {
         }
     }
 
+    private static final long RACY_WINDOW_MS = 2_000L;
+    private static final char KEY_SEP = '\u001f';
+
     /**
-     * Jar identity is path, size, and mtime. A cached token is reused when those
-     * still match. The file bytes are not read, so a cold or edited start does
-     * not SHA-256 the dependency jars.
+     * Fast path: a jar token is path, size, mtime, and file identity, and the bytes
+     * are not read. A cached token is not trusted when its mtime is within two
+     * seconds of the time it was recorded (git's racy timestamp), or when inode or
+     * ctime changed while size and mtime stayed the same. Those jars are hashed,
+     * and {@code hashed} is how many.
      */
     private static String fingerprint(Path classes, List<String> dependencies, Path cacheFile) {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
             updateDirectoryDigest(digest, classes);
-            Map<String, String> cache = loadJarHashCache(cacheFile);
-            Map<String, String> next = new java.util.LinkedHashMap<>();
+            Map<String, CachedJar> cache = loadJarHashCache(cacheFile);
+            Map<String, String> statKeys = new HashMap<>();
+            for (Map.Entry<String, CachedJar> entry : cache.entrySet()) {
+                statKeys.put(statKeyFromExact(entry.getKey()), entry.getKey());
+            }
+            Map<String, CachedJar> next = new java.util.LinkedHashMap<>();
             int jars = 0;
             int reused = 0;
             int hashed = 0;
             long bytes = 0L;
             List<String> ordered = dependencies == null ? List.of() : dependencies;
+            long now = System.currentTimeMillis();
             for (String dependency : ordered) {
                 if (dependency == null || dependency.isBlank()) continue;
                 Path path = Path.of(dependency).toAbsolutePath().normalize();
@@ -775,15 +787,27 @@ public final class WorkbenchSynchronizer {
                     digest.update((byte) 0);
                     continue;
                 }
-                long size = Files.size(path);
-                long modified = Files.getLastModifiedTime(path).toMillis();
+                JarStat stat = jarStat(path);
                 jars++;
-                bytes += size;
-                String key = path + "\t" + size + "\t" + modified;
-                String token = cache.get(key);
-                if (token != null) reused++;
-                else token = jarToken(path, size, modified);
-                next.put(key, token);
+                bytes += stat.size;
+                String exact = exactKey(path.toString(), stat);
+                String statKey = statKey(path.toString(), stat);
+                CachedJar cached = cache.get(exact);
+                String token;
+                long recordedAt;
+                if (cached != null && !racy(stat, cached.recordedAt)) {
+                    token = cached.token;
+                    recordedAt = cached.recordedAt;
+                    reused++;
+                } else if (cached != null || statKeys.containsKey(statKey)) {
+                    token = contentToken(path);
+                    recordedAt = cached != null ? cached.recordedAt : now;
+                    hashed++;
+                } else {
+                    token = statToken(exact);
+                    recordedAt = now;
+                }
+                next.put(exact, new CachedJar(token, recordedAt));
                 digest.update(token.getBytes(StandardCharsets.UTF_8));
                 digest.update((byte) 0);
             }
@@ -798,27 +822,100 @@ public final class WorkbenchSynchronizer {
         }
     }
 
-    private static String jarToken(Path path, long size, long modified) throws Exception {
+    private record JarStat(
+            long size,
+            long mtimeMillis,
+            int mtimeNano,
+            String fileKey,
+            long ctimeMillis,
+            int ctimeNano
+    ) {}
+
+    private record CachedJar(String token, long recordedAt) {}
+
+    private static JarStat jarStat(Path path) throws IOException {
+        BasicFileAttributes attrs = Files.readAttributes(path, BasicFileAttributes.class);
+        FileTime modified = attrs.lastModifiedTime();
+        Object key = attrs.fileKey();
+        long ctimeMillis = -1L;
+        int ctimeNano = -1;
+        try {
+            Object ctime = Files.getAttribute(path, "unix:ctime");
+            if (ctime instanceof FileTime time) {
+                ctimeMillis = time.toMillis();
+                ctimeNano = time.toInstant().getNano();
+            }
+        } catch (UnsupportedOperationException | IllegalArgumentException ignored) {
+            // No unix ctime on this provider. The racy-mtime rule still applies.
+        }
+        return new JarStat(
+                attrs.size(),
+                modified.toMillis(),
+                modified.toInstant().getNano(),
+                key == null ? "-" : sanitize(key.toString()),
+                ctimeMillis,
+                ctimeNano
+        );
+    }
+
+    /** Same path, size, and mtime as a token recorded inside the coarse clock window. */
+    private static boolean racy(JarStat stat, long recordedAt) {
+        long delta = recordedAt - stat.mtimeMillis;
+        return delta <= RACY_WINDOW_MS && delta >= -RACY_WINDOW_MS;
+    }
+
+    private static String exactKey(String path, JarStat stat) {
+        return statKey(path, stat) + KEY_SEP + stat.fileKey + KEY_SEP + stat.ctimeMillis + KEY_SEP + stat.ctimeNano;
+    }
+
+    private static String statKey(String path, JarStat stat) {
+        return sanitize(path) + KEY_SEP + stat.size + KEY_SEP + stat.mtimeMillis + KEY_SEP + stat.mtimeNano;
+    }
+
+    private static String statKeyFromExact(String exact) {
+        int seps = 0;
+        for (int i = 0; i < exact.length(); i++) {
+            if (exact.charAt(i) == KEY_SEP && ++seps == 4) return exact.substring(0, i);
+        }
+        return exact;
+    }
+
+    private static String sanitize(String value) {
+        return value.replace('\t', ' ').replace('\n', ' ').replace('\r', ' ').replace(KEY_SEP, ' ');
+    }
+
+    private static String statToken(String exactKey) throws Exception {
         MessageDigest digest = MessageDigest.getInstance("SHA-256");
-        digest.update(path.toString().getBytes(StandardCharsets.UTF_8));
+        digest.update("stat".getBytes(StandardCharsets.UTF_8));
         digest.update((byte) 0);
-        digest.update(Long.toString(size).getBytes(StandardCharsets.UTF_8));
-        digest.update((byte) 0);
-        digest.update(Long.toString(modified).getBytes(StandardCharsets.UTF_8));
+        digest.update(exactKey.getBytes(StandardCharsets.UTF_8));
         return HexFormat.of().formatHex(digest.digest());
     }
 
-    private static Map<String, String> loadJarHashCache(Path cacheFile) {
-        Map<String, String> cache = new java.util.LinkedHashMap<>();
+    private static String contentToken(Path path) throws Exception {
+        MessageDigest digest = MessageDigest.getInstance("SHA-256");
+        updateFileDigest(digest, path);
+        return HexFormat.of().formatHex(digest.digest());
+    }
+
+    private static Map<String, CachedJar> loadJarHashCache(Path cacheFile) {
+        Map<String, CachedJar> cache = new java.util.LinkedHashMap<>();
         if (cacheFile == null || !Files.isRegularFile(cacheFile)) return cache;
         try {
             List<String> lines = Files.readAllLines(cacheFile, StandardCharsets.UTF_8);
-            if (lines.isEmpty() || !"v1".equals(lines.get(0).trim())) return cache;
+            if (lines.isEmpty() || !"v2".equals(lines.get(0).trim())) return cache;
             for (int i = 1; i < lines.size(); i++) {
                 String line = lines.get(i);
-                int split = line.lastIndexOf('\t');
-                if (split <= 0) continue;
-                cache.put(line.substring(0, split), line.substring(split + 1));
+                int first = line.indexOf('\t');
+                int last = line.lastIndexOf('\t');
+                if (first <= 0 || last <= first) continue;
+                long recordedAt;
+                try {
+                    recordedAt = Long.parseLong(line.substring(last + 1).trim());
+                } catch (NumberFormatException ignored) {
+                    continue;
+                }
+                cache.put(line.substring(0, first), new CachedJar(line.substring(first + 1, last), recordedAt));
             }
         } catch (IOException ignored) {
             return new java.util.LinkedHashMap<>();
@@ -826,12 +923,14 @@ public final class WorkbenchSynchronizer {
         return cache;
     }
 
-    private static void saveJarHashCache(Path cacheFile, Map<String, String> cache) throws IOException {
+    private static void saveJarHashCache(Path cacheFile, Map<String, CachedJar> cache) throws IOException {
         if (cacheFile == null) return;
         Files.createDirectories(cacheFile.getParent());
-        StringBuilder body = new StringBuilder("v1\n");
-        for (Map.Entry<String, String> entry : cache.entrySet()) {
-            body.append(entry.getKey()).append('\t').append(entry.getValue()).append('\n');
+        StringBuilder body = new StringBuilder("v2\n");
+        for (Map.Entry<String, CachedJar> entry : cache.entrySet()) {
+            body.append(entry.getKey()).append('\t')
+                    .append(entry.getValue().token).append('\t')
+                    .append(entry.getValue().recordedAt).append('\n');
         }
         Path temp = cacheFile.resolveSibling(cacheFile.getFileName() + ".tmp");
         Files.writeString(temp, body.toString(), StandardCharsets.UTF_8);
