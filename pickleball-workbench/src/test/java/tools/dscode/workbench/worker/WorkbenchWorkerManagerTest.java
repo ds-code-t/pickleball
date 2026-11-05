@@ -287,6 +287,21 @@ class WorkbenchWorkerManagerTest {
     }
 
     @Test
+    void workerSpawnIsRecordedImmediatelyAfterTheProcessStarts() throws Exception {
+        Path log = tempDir.resolve("worker.err.log");
+        boolean windows = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).contains("win");
+        String executable = Path.of(System.getProperty("java.home"), "bin", windows ? "java.exe" : "java").toString();
+        ProcessBuilder builder = new ProcessBuilder(executable, "-version");
+        builder.redirectOutput(ProcessBuilder.Redirect.DISCARD);
+        builder.redirectError(ProcessBuilder.Redirect.DISCARD);
+        Process process = WorkbenchWorkerManager.startWorkerProcess(builder, log);
+        process.waitFor();
+        String text = Files.readString(log);
+        assertTrue(text.contains("progress stage=worker-spawn"), text);
+        assertTrue(text.indexOf("progress stage=worker-spawn") >= 0, text);
+    }
+
+    @Test
     void sessionStartWritesCompileProgressBeforeTheWorkerExists() throws IOException {
         Path project = tempDir.resolve("consumer");
         Files.createDirectories(project);

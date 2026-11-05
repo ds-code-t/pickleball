@@ -795,6 +795,7 @@ class WorkbenchSynchronizerTest {
         assertTrue(copyBase >= 0 && copyLive > copyBase && digest > copyLive && hash > digest, text);
         assertTrue(text.contains("progress stage=copy-base files=2 bytes=8 ms="), text);
         assertTrue(text.contains("progress stage=copy-live files=2 bytes=8 ms="), text);
+        assertLiveAccounted(text, 2);
         assertTrue(text.contains("progress stage=digest files=2 bytes=8 ms="), text);
         assertTrue(text.contains("progress stage=materialize"), text);
         Path baseFile = stateRoot.resolve("base/classes/main.txt");
@@ -844,11 +845,15 @@ class WorkbenchSynchronizerTest {
         String text = err[0];
         assertTrue(text.contains("progress stage=copy-base files=" + count), text);
         assertTrue(text.contains("progress stage=copy-live files=" + count), text);
+        assertLiveAccounted(text, count);
         assertTrue(text.contains("progress stage=digest files=" + count), text);
         assertTrue(elapsed < 60_000L, "materialize elapsed " + elapsed + "ms\n" + text);
         Path sample = stateRoot.resolve("base/classes/p0/C0.class");
         Path live = stateRoot.resolve("live/classes/p0/C0.class");
         if (canLink(tempDir)) assertTrue(Files.isSameFile(sample, live), text);
+        System.out.println("windows-shaped-small copy-live " + liveLine(text)
+                + " serialLinkMs=" + serialLinkMillis(test, count)
+                + " materializeWallMs=" + elapsed);
     }
 
     @Test
@@ -884,8 +889,105 @@ class WorkbenchSynchronizerTest {
         String text = err[0];
         assertTrue(text.contains("progress stage=copy-base files=" + count), text);
         assertTrue(text.contains("progress stage=copy-live files=" + count), text);
+        assertLiveAccounted(text, count);
         assertTrue(text.contains("progress stage=digest files=" + count), text);
         assertTrue(elapsed < 60_000L, "materialize elapsed " + elapsed + "ms\n" + text);
+        System.out.println("windows-shaped-consumer copy-live " + liveLine(text)
+                + " files=" + count
+                + " bytes=" + (long) count * body.length
+                + " materializeWallMs=" + elapsed);
+    }
+
+    @Test
+    void linkOrCopyFallsBackToACopyWhenTheDestinationAlreadyExists() throws Exception {
+        Path source = tempDir.resolve("src.bin");
+        Path destination = tempDir.resolve("dest.bin");
+        Files.writeString(source, "abc");
+        Files.writeString(destination, "old");
+        assertFalse(WorkbenchSynchronizer.linkOrCopy(source, destination));
+        assertEquals("abc", Files.readString(destination));
+        assertFalse(Files.isSameFile(source, destination));
+    }
+
+    @Test
+    void refusedLinksCopyEveryFileAndLeaveBaseAlone() throws Exception {
+        Path projectRoot = tempDir.resolve("refused-links");
+        Path test = projectRoot.resolve("target/test-classes");
+        Files.createDirectories(test.resolve("p"));
+        int count = 48;
+        for (int i = 0; i < count; i++) {
+            Files.writeString(test.resolve("p").resolve("C" + i + ".class"), "class-" + i);
+        }
+        WorkbenchProject project = new WorkbenchProject(
+                projectRoot.toAbsolutePath().normalize(),
+                WorkbenchProject.Type.MAVEN,
+                projectRoot.toAbsolutePath().normalize(),
+                Path.of("mvn")
+        );
+        Path stateRoot = WorkbenchManifest.workbenchRoot(projectRoot);
+        String[] err = new String[1];
+        boolean previous = WorkbenchSynchronizer.linksDisabledForTest;
+        WorkbenchSynchronizer.linksDisabledForTest = true;
+        try {
+            capture(err, () -> WorkbenchSynchronizer.materialize(
+                    project,
+                    new WorkbenchSynchronizer.SyncMetadata(
+                            List.of(projectRoot.resolve("src/test/java")),
+                            List.of(new WorkbenchSynchronizer.OutputPath("TEST", test)),
+                            List.of()
+                    ),
+                    stateRoot.resolve(".sync-refused"),
+                    stateRoot
+            ).fingerprint());
+        } finally {
+            WorkbenchSynchronizer.linksDisabledForTest = previous;
+        }
+        String text = err[0];
+        assertTrue(text.contains("progress stage=copy-live files=" + count), text);
+        assertTrue(text.contains("links=0 copies=" + count), text);
+        Path base = stateRoot.resolve("base/classes/p/C0.class");
+        Path live = stateRoot.resolve("live/classes/p/C0.class");
+        assertFalse(Files.isSameFile(test.resolve("p/C0.class"), base));
+        assertFalse(Files.isSameFile(base, live));
+        Files.writeString(live, "mutated");
+        assertEquals("class-0", Files.readString(base));
+        System.out.println("windows-shaped-fallback " + liveLine(text));
+    }
+
+    private static void assertLiveAccounted(String text, int files) {
+        java.util.regex.Matcher matcher = java.util.regex.Pattern.compile(
+                "progress stage=copy-live files=(\\d+) bytes=\\d+ ms=\\d+ links=(\\d+) copies=(\\d+)"
+        ).matcher(text);
+        assertTrue(matcher.find(), text);
+        assertEquals(files, Integer.parseInt(matcher.group(1)), text);
+        int links = Integer.parseInt(matcher.group(2));
+        int copies = Integer.parseInt(matcher.group(3));
+        assertEquals(files, links + copies, text);
+    }
+
+    private static String liveLine(String text) {
+        for (String line : text.split("\\R")) {
+            if (line.contains("progress stage=copy-live ")) return line.trim();
+        }
+        return "";
+    }
+
+    /** Serial linkOrCopy of the same tree, so a parallel copy-live can be compared on this host. */
+    private static long serialLinkMillis(Path source, int expected) throws IOException {
+        Path target = source.resolveSibling("serial-links");
+        Files.createDirectories(target);
+        long started = System.nanoTime();
+        int files = 0;
+        try (var paths = Files.walk(source)) {
+            for (Path file : paths.filter(Files::isRegularFile).toList()) {
+                Path destination = target.resolve(source.relativize(file).toString());
+                Files.createDirectories(destination.getParent());
+                WorkbenchSynchronizer.linkOrCopy(file, destination);
+                files++;
+            }
+        }
+        assertEquals(expected, files);
+        return Math.max(0L, (System.nanoTime() - started) / 1_000_000L);
     }
 
     private static boolean canLink(Path directory) {

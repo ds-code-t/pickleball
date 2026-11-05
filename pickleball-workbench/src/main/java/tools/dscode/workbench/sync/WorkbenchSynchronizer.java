@@ -990,7 +990,7 @@ public final class WorkbenchSynchronizer {
                 }
             }
         }
-        return new TreeStats(files, bytes, elapsedMs(started));
+        return new TreeStats(files, bytes, elapsedMs(started), 0, 0);
     }
 
     private static long updateFileDigest(MessageDigest digest, Path file) throws IOException {
@@ -1008,16 +1008,26 @@ public final class WorkbenchSynchronizer {
         return total;
     }
 
-    private record TreeStats(int files, long bytes, long millis) {
-        static final TreeStats EMPTY = new TreeStats(0, 0, 0);
+    private record TreeStats(int files, long bytes, long millis, int links, int copies) {
+        static final TreeStats EMPTY = new TreeStats(0, 0, 0, 0, 0);
 
         TreeStats plus(TreeStats other) {
             if (other == null) return this;
-            return new TreeStats(files + other.files, bytes + other.bytes, millis + other.millis);
+            return new TreeStats(
+                    files + other.files,
+                    bytes + other.bytes,
+                    millis + other.millis,
+                    links + other.links,
+                    copies + other.copies
+            );
         }
 
         String stage(String name) {
-            return name + " files=" + files + " bytes=" + bytes + " ms=" + millis;
+            String line = name + " files=" + files + " bytes=" + bytes + " ms=" + millis;
+            if ("copy-live".equals(name)) {
+                line += " links=" + links + " copies=" + copies;
+            }
+            return line;
         }
     }
 
@@ -1058,35 +1068,73 @@ public final class WorkbenchSynchronizer {
                     return FileVisitResult.CONTINUE;
                 }
             });
+            int links = 0;
+            int copies = 0;
             if (link) {
-                for (Path file : files) {
-                    Path destination = target.resolve(source.relativize(file).toString());
-                    Files.createDirectories(destination.getParent());
-                    linkOrCopy(file, destination);
-                }
+                int[] counted = linkFiles(source, target, files);
+                links = counted[0];
+                copies = counted[1];
             } else {
                 copyFiles(source, target, files);
             }
+            return new TreeStats(files.size(), bytes[0], elapsedMs(started), links, copies);
         } catch (IOException failure) {
             throw new IllegalStateException("Could not materialize Workbench output from " + source, failure);
         }
-        return new TreeStats(files.size(), bytes[0], elapsedMs(started));
+    }
+
+    /**
+     * Same pool as {@link #copyFiles}. Each file still prefers {@code Files.createLink}
+     * and falls back to a copy. The returned pair is hardlink successes, then copies.
+     */
+    private static int[] linkFiles(Path source, Path target, List<Path> files) throws IOException {
+        java.util.concurrent.atomic.AtomicInteger links = new java.util.concurrent.atomic.AtomicInteger();
+        java.util.concurrent.atomic.AtomicInteger copies = new java.util.concurrent.atomic.AtomicInteger();
+        java.util.concurrent.atomic.AtomicBoolean linksRefused = new java.util.concurrent.atomic.AtomicBoolean();
+        List<IoTask> tasks = new ArrayList<>();
+        for (Path file : files) {
+            tasks.add(() -> {
+                Path destination = target.resolve(source.relativize(file).toString());
+                Files.createDirectories(destination.getParent());
+                if (linkOrCopy(file, destination, linksRefused)) links.incrementAndGet();
+                else copies.incrementAndGet();
+            });
+        }
+        runParallel(tasks, source);
+        return new int[] {links.get(), copies.get()};
     }
 
     private static void copyFiles(Path source, Path target, List<Path> files) throws IOException {
-        if (files.isEmpty()) return;
-        int threads = Math.min(files.size(), Math.max(1, Runtime.getRuntime().availableProcessors()));
+        List<IoTask> tasks = new ArrayList<>();
+        for (Path file : files) {
+            tasks.add(() -> copyOne(source, target, file));
+        }
+        runParallel(tasks, source);
+    }
+
+    @FunctionalInterface
+    private interface IoTask {
+        void run() throws IOException;
+    }
+
+    /**
+     * One thread when there is nothing to fan out. Otherwise a fixed pool of
+     * {@code min(tasks, available processors)}, the same bound the copy path used.
+     */
+    private static void runParallel(List<IoTask> tasks, Path source) throws IOException {
+        if (tasks.isEmpty()) return;
+        int threads = Math.min(tasks.size(), Math.max(1, Runtime.getRuntime().availableProcessors()));
         if (threads == 1) {
-            for (Path file : files) copyOne(source, target, file);
+            for (IoTask task : tasks) task.run();
             return;
         }
         java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newFixedThreadPool(threads);
         try {
             List<java.util.concurrent.Future<?>> waiting = new ArrayList<>();
-            for (Path file : files) {
+            for (IoTask task : tasks) {
                 waiting.add(pool.submit(() -> {
                     try {
-                        copyOne(source, target, file);
+                        task.run();
                         return null;
                     } catch (IOException failure) {
                         throw new IllegalStateException(failure);
@@ -1113,17 +1161,49 @@ public final class WorkbenchSynchronizer {
     private static void copyOne(Path source, Path target, Path file) throws IOException {
         Path destination = target.resolve(source.relativize(file).toString());
         Files.createDirectories(destination.getParent());
-        Files.copy(file, destination, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.COPY_ATTRIBUTES);
+        copyFile(file, destination);
     }
 
-    private static void linkOrCopy(Path source, Path destination) throws IOException {
+    /**
+     * Test-only. When true, live materialize copies every file and does not call
+     * {@code Files.createLink}. Production leaves this false. The Windows-shaped
+     * repro sets it so {@code copies=} is the whole tree.
+     */
+    static volatile boolean linksDisabledForTest;
+
+    static boolean linkOrCopy(Path source, Path destination) throws IOException {
+        return linkOrCopy(source, destination, null);
+    }
+
+    /**
+     * Prefer a hardlink. A provider that cannot link ({@code UnsupportedOperationException}
+     * or {@code SecurityException}) copies this file and the rest of the tree.
+     * Any other link error copies this file only and later files still try a link.
+     */
+    static boolean linkOrCopy(
+            Path source,
+            Path destination,
+            java.util.concurrent.atomic.AtomicBoolean linksRefused
+    ) throws IOException {
+        if (linksDisabledForTest || (linksRefused != null && linksRefused.get())) {
+            copyFile(source, destination);
+            return false;
+        }
         try {
             Files.createLink(destination, source);
+            return true;
         } catch (UnsupportedOperationException | SecurityException unsupported) {
-            Files.copy(source, destination, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.COPY_ATTRIBUTES);
+            if (linksRefused != null) linksRefused.set(true);
+            copyFile(source, destination);
+            return false;
         } catch (IOException failure) {
-            Files.copy(source, destination, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.COPY_ATTRIBUTES);
+            copyFile(source, destination);
+            return false;
         }
+    }
+
+    private static void copyFile(Path source, Path destination) throws IOException {
+        Files.copy(source, destination, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.COPY_ATTRIBUTES);
     }
 
     private static final long[] REPLACE_BACKOFF_MS = {100L, 300L, 1000L};

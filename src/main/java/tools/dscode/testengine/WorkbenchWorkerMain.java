@@ -14,6 +14,7 @@ public final class WorkbenchWorkerMain {
     }
 
     public static void main(String[] args) {
+        reportStartupStages();
         PickleballRunner runner = DynamicSuiteBootstrap.initializeFromRuntimeClasspath();
         List<String> cucumberArgs = new ArrayList<>();
         if (args != null) {
@@ -33,6 +34,17 @@ public final class WorkbenchWorkerMain {
         // Always enter JVM shutdown so the consumer-side bridge shutdown hook runs,
         // including after a successful anchor completion.
         System.exit(exitCode);
+    }
+
+    /**
+     * Earliest worker marks. {@code jvm-main} is the first line of main.
+     * {@code classpath-scan} is the classpath and glue initialization that follows,
+     * before the control bridge binds. Both go to stderr, which the controller
+     * appends to the worker {@code *.err.log}.
+     */
+    static void reportStartupStages() {
+        System.err.println("progress stage=jvm-main");
+        System.err.println("progress stage=classpath-scan");
     }
 
     private static boolean hasGlueOption(List<String> args) {

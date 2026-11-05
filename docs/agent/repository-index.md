@@ -65,6 +65,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/maintainer/2.1.18-speed-roadmap.md`
 - `docs/maintainer/2.1.18-structural-fixes.md`
 - `docs/maintainer/2.1.18-unification.md`
+- `docs/maintainer/2.1.18-wb-first-start-timing-roadmap.md`
 - `docs/maintainer/2.1.18-wb-open-issues-roadmap.md`
 - `docs/maintainer/consumer-sim-harness.md`
 - `docs/maintainer/guidance-goldens.md`
@@ -572,6 +573,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/testengine/ProjectPropertySourcesTest.java`
 - `src/test/java/tools/dscode/testengine/RunVarLaunchParityTest.java`
 - `src/test/java/tools/dscode/testengine/RunVarMatrixParityTest.java`
+- `src/test/java/tools/dscode/testengine/WorkbenchWorkerMainTest.java`
 - `src/test/java/tools/dscode/testengine/WorkspaceDriverProbe.java`
 - `src/test/java/tools/dscode/testengine/WorkspaceLaunchEndToEndTest.java`
 - `src/test/java/tools/dscode/testengine/WorkspaceLaunchTest.java`
@@ -836,6 +838,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/discover/LastDiscoverSnapshotTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/lease/WorkbenchControlLeaseTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/mapping/MappingValueCodecTest.java`
+- `pickleball-workbench/src/test/java/tools/dscode/workbench/mcp/WorkbenchAttachServerProgressTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/mcp/WorkbenchAttachServerTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/mcp/WorkbenchCommandQueueTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/mcp/WorkbenchMcpRetrievalTest.java`
