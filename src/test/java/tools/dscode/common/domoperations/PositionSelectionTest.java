@@ -26,6 +26,16 @@ class PositionSelectionTest {
         assertEquals(List.of(), PositionSelection.apply(items, match("0", "")));
         assertEquals(items, PositionSelection.apply(items, match("", "every")));
         assertEquals(List.of("e"), PositionSelection.apply(items, match("last", "every")));
+        for (String[] spec : new String[][] {
+                {"last", ""}, {"3", ""}, {"2", "every"}, {"", "every"}, {"last", "every"}, {"1", ""}, {"9", ""}, {"0", ""}
+        }) {
+            ElementMatch sample = match(spec[0], spec[1]);
+            assertEquals(
+                    PositionSelection.apply(items, sample),
+                    slice(items, PositionSelection.enginePosition(sample)),
+                    spec[0] + "/" + spec[1]
+            );
+        }
     }
 
     @Test
@@ -53,6 +63,16 @@ class PositionSelectionTest {
             restore(CompositeLog.DIR_KEY, previousDir);
             CompositeRuntime.resetForTests();
         }
+    }
+
+    private static List<String> slice(List<String> items, PositionSelection.EnginePosition position) {
+        if (position == null) return items;
+        if (position.every() == null) {
+            int at = position.nth() < 0 ? items.size() - 1 : position.nth();
+            if (at < 0 || at >= items.size()) return List.of();
+            return List.of(items.get(at));
+        }
+        return PositionSelection.every(items, position.nth(), position.every());
     }
 
     private static ElementMatch match(String position, String selection) {

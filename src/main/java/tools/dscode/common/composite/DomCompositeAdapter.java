@@ -101,19 +101,102 @@ public final class DomCompositeAdapter {
      * Null pieces are omitted. The caller already checked the capability.
      */
     public List<WebElement> findScoped(By by, String within, String nesting, String filter) {
+        return findScoped(by, within, nesting, filter, null, false);
+    }
+
+    /**
+     * Same query, with {@code --nth} / {@code --every} after nesting.
+     * The caller already checked the capability and that no regex remains.
+     */
+    public List<WebElement> findScoped(
+            By by,
+            String within,
+            String nesting,
+            String filter,
+            tools.dscode.common.domoperations.PositionSelection.EnginePosition position
+    ) {
+        return findScoped(by, within, nesting, filter, position, false);
+    }
+
+    /**
+     * One query that returns the positioned count and no nodes.
+     * A binary without {@code count-only} counts the nodes in Java.
+     */
+    public int countQuery(
+            By by,
+            String within,
+            String nesting,
+            String filter,
+            tools.dscode.common.domoperations.PositionSelection.EnginePosition position
+    ) {
+        if (!queryFlag("count-only") || !positionReady(position)) {
+            CompositeLog.info("adapter", "position java");
+            return slice(findScoped(by, within, nesting, filter), position).size();
+        }
+        JsonNode json = queryScoped(by, within, nesting, filter, position, true);
+        int count = json == null ? 0 : json.path("count").asInt(0);
+        CompositeLog.info("adapter", "count " + count);
+        return count;
+    }
+
+    private List<WebElement> findScoped(
+            By by,
+            String within,
+            String nesting,
+            String filter,
+            tools.dscode.common.domoperations.PositionSelection.EnginePosition position,
+            boolean countOnly
+    ) {
+        JsonNode json = queryScoped(by, within, nesting, filter, position, countOnly);
+        if (countOnly) return List.of();
+        return hits(json, SelectorTranslator.fromBy(by));
+    }
+
+    private JsonNode queryScoped(
+            By by,
+            String within,
+            String nesting,
+            String filter,
+            tools.dscode.common.domoperations.PositionSelection.EnginePosition position,
+            boolean countOnly
+    ) {
         CompositeSelector selector = SelectorTranslator.fromBy(by);
         Map<String, Object> body = new LinkedHashMap<>(selector.body(list(frames), list(shadows)));
         if (within != null && !within.isBlank()) body.put("within", within);
         if (nesting != null && !nesting.isBlank()) body.put("nesting", nesting);
         if (filter != null && !filter.isBlank()) body.put("filter", filter);
+        if (position != null) {
+            body.put("nth", position.nth());
+            if (position.every() != null) body.put("every", position.every());
+        }
+        if (countOnly) body.put("count_only", true);
         record("query");
         if (within != null && !within.isBlank()) CompositeLog.info("adapter", "within " + within);
         if (nesting != null && !nesting.isBlank()) CompositeLog.info("adapter", "nesting " + nesting);
-        if (dryRun) return List.of();
+        if (position != null) CompositeLog.info("adapter", position.logLine());
+        if (dryRun) return null;
         Client open = CompositeRuntime.ensureClient();
         if (open == null) throw new IllegalStateException("composite client is not open");
         CompositeLog.debug("adapter", "find " + selector.describe());
-        return hits(open.query(body), selector);
+        return open.query(body);
+    }
+
+    private static boolean positionReady(
+            tools.dscode.common.domoperations.PositionSelection.EnginePosition position
+    ) {
+        DomCompositeAdapter adapter = get();
+        if (position == null) return true;
+        if (!adapter.queryFlag("nth")) return false;
+        return position.every() == null || adapter.queryFlag("every");
+    }
+
+    private static <T> List<T> slice(
+            List<T> items,
+            tools.dscode.common.domoperations.PositionSelection.EnginePosition position
+    ) {
+        if (position == null) return items == null ? List.of() : items;
+        if (position.every() == null) return PositionSelection.applyOrdinal(items, position.nth());
+        return PositionSelection.every(items, Math.max(0, position.nth()), position.every());
     }
 
     /**
@@ -160,9 +243,22 @@ public final class DomCompositeAdapter {
         if (open == null) {
             throw new IllegalStateException("composite client is not open");
         }
-        CompositeLog.debug("adapter", "find " + selector.describe());
-        JsonNode json = open.query(selector.body(list(frames), list(shadows)));
-        return hits(json, selector);
+        Integer ordinal = selector.ordinal();
+        boolean engineNth = ordinal != null && queryFlag("nth");
+        CompositeSelector used = engineNth
+                ? new CompositeSelector(
+                        selector.xpath(), selector.css(), selector.pipeline(), selector.source(), null, selector.phrase())
+                : selector;
+        Map<String, Object> body = new LinkedHashMap<>(used.body(list(frames), list(shadows)));
+        if (engineNth) {
+            body.put("nth", ordinal);
+            CompositeLog.info("adapter", "nth " + ordinal);
+        } else if (ordinal != null && CompositeRuntime.primary()) {
+            CompositeLog.info("adapter", "position java");
+        }
+        CompositeLog.debug("adapter", "find " + used.describe());
+        JsonNode json = open.query(body);
+        return hits(json, used);
     }
 
     /**

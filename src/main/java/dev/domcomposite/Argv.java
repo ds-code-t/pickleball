@@ -109,7 +109,15 @@ public final class Argv {
                     pushValues(argv, node, new String[][] {{"source", "source"}, {"node_id", "node-id"}, {"node_ids", "node-ids"}});
                 }
                 if ("query".equals(cmd)) {
-                    pushValues(argv, node, new String[][] {{"pierce", "pierce"}, {"poll_ms", "poll-ms"}, {"within", "within"}, {"nesting", "nesting"}});
+                    pushValues(argv, node, new String[][] {
+                        {"pierce", "pierce"},
+                        {"poll_ms", "poll-ms"},
+                        {"within", "within"},
+                        {"nesting", "nesting"},
+                        {"nth", "nth"},
+                        {"every", "every"}
+                    });
+                    pushBools(argv, node, new String[][] {{"count_only", "count-only"}});
                 }
                 if ("scroll".equals(cmd)) {
                     pushValues(argv, node, new String[][] {{"dx", "dx"}, {"dy", "dy"}});

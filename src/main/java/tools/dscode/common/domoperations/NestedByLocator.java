@@ -103,9 +103,32 @@ public final class NestedByLocator {
             mode = NestingMode.OUTERMOST_ONLY;
         }
 
-        List<WebElement>  returnList = findWithRetry(context, locator, Duration.ofSeconds(10), displayedElementsOnly, mode);
-        returnList = retainFullMatches(returnList, elementMatch);
-        return PositionSelection.apply(returnList, elementMatch);
+        List<WebElement> returnList;
+        PositionSelection.EnginePosition position = PositionSelection.enginePosition(elementMatch);
+        boolean regex = PositionSelection.regexBeforePosition(elementMatch);
+        Instant deadline = Instant.now().plus(Duration.ofSeconds(10));
+        StaleElementReferenceException last = null;
+        while (Instant.now().isBefore(deadline)) {
+            try {
+                Found found = findCollected(
+                        context, locator, displayedElementsOnly, mode, regex ? null : position);
+                if (found.positioned()) {
+                    logTrace("elements-find-out.size(): " + found.elements().size());
+                    return found.elements();
+                }
+                returnList = retainFullMatches(found.elements(), elementMatch);
+                if (position != null && tools.dscode.common.composite.ElementOperations.primary()) {
+                    CompositeLog.info("adapter", "position java");
+                }
+                return PositionSelection.apply(returnList, elementMatch);
+            } catch (StaleElementReferenceException e) {
+                last = e;
+                sleep(Duration.ofSeconds(3));
+            }
+        }
+        throw last != null
+                ? last
+                : new StaleElementReferenceException("Timed out retrying find due to stale elements");
     }
 
     public static List<WebElement> retainFullMatches(List<WebElement> found, ElementMatch elementMatch) {
@@ -195,25 +218,56 @@ public final class NestedByLocator {
             boolean displayedElementsOnly,
             NestingMode mode
     ) {
+        return findCollected(context, locator, displayedElementsOnly, mode, null).elements();
+    }
+
+    /**
+     * One query carries {@code --nesting} after {@code displayed}, then {@code --nth}.
+     * Position stays in Java when a regex still has to run, or the binary has no nth flag.
+     */
+    private record Found(List<WebElement> elements, boolean positioned) {
+    }
+
+    private static Found findCollected(
+            SearchContext context,
+            By locator,
+            boolean displayedElementsOnly,
+            NestingMode mode,
+            PositionSelection.EnginePosition position
+    ) {
         Objects.requireNonNull(context, "context");
         Objects.requireNonNull(locator, "locator");
         Objects.requireNonNull(mode, "mode");
 
-        List<WebElement> matches;
         if (engineNest(context, mode)) {
+            tools.dscode.common.composite.DomCompositeAdapter adapter =
+                    tools.dscode.common.composite.DomCompositeAdapter.get();
+            tools.dscode.common.domoperations.PositionSelection.EnginePosition send =
+                    canSend(adapter, position) ? position : null;
             String nesting = mode == NestingMode.OUTERMOST_ONLY ? "outermost" : "deepest";
             String within = null;
             if (context instanceof tools.dscode.common.composite.CompositeWebElement composite) {
                 within = composite.nodeId();
             }
             String filter = displayedElementsOnly ? "displayed" : null;
-            matches = tools.dscode.common.composite.DomCompositeAdapter.get()
-                    .findScoped(locator, within, nesting, filter);
+            List<WebElement> matches = adapter.findScoped(locator, within, nesting, filter, send);
             logTrace("elements-find-out.size(): " + matches.size());
-            return matches;
+            return new Found(matches, send != null);
         }
 
-        matches = tools.dscode.common.composite.ElementOperations.findElements(context, locator);
+        if (position != null && mode == NestingMode.NONE && !displayedElementsOnly && plainContext(context)) {
+            tools.dscode.common.composite.DomCompositeAdapter adapter =
+                    tools.dscode.common.composite.DomCompositeAdapter.get();
+            if (canSend(adapter, position)) {
+                String within = null;
+                if (context instanceof CompositeWebElement composite) within = composite.nodeId();
+                List<WebElement> matches = adapter.findScoped(locator, within, null, null, position);
+                logTrace("elements-find-out.size(): " + matches.size());
+                return new Found(matches, true);
+            }
+        }
+
+        List<WebElement> matches = tools.dscode.common.composite.ElementOperations.findElements(context, locator);
 
         if (displayedElementsOnly) {
             matches = filterDisplayed(context, matches);
@@ -222,20 +276,20 @@ public final class NestedByLocator {
         logTrace("elements-find-matches.size(): " + matches.size());
 
         if (mode == NestingMode.NONE || matches.size() <= 1) {
-            return matches;
+            return new Found(matches, false);
         }
 
         List<WebElement> batched = tryCompositeNestBatch(matches, mode);
         if (batched != null) {
             logTrace("elements-find-out.size(): " + batched.size());
-            return batched;
+            return new Found(batched, false);
         }
 
         // Main optimized path: do containment analysis once in the browser.
         List<WebElement> browserSide = tryBrowserSideNestingFilter(context, matches, mode);
         if (browserSide != null) {
             logTrace("elements-find-out.size(): " + browserSide.size());
-            return browserSide;
+            return new Found(browserSide, false);
         }
 
         // Safe fallback if no JavascriptExecutor can be obtained.
@@ -248,7 +302,26 @@ public final class NestedByLocator {
         };
 
         logTrace("elements-find-final-out.size(): " + out.size());
-        return out;
+        return new Found(out, false);
+    }
+
+    private static boolean canSend(
+            tools.dscode.common.composite.DomCompositeAdapter adapter,
+            tools.dscode.common.domoperations.PositionSelection.EnginePosition position
+    ) {
+        if (position == null || !adapter.queryFlag("nth")) return false;
+        return position.every() == null || adapter.queryFlag("every");
+    }
+
+    /** A driver or a composite node that can take {@code --within}. Not a raw Selenium element. */
+    private static boolean plainContext(SearchContext context) {
+        if (context == null || context instanceof WebDriver) return true;
+        if (context instanceof CompositeWebElement composite) {
+            return tools.dscode.common.composite.DomCompositeAdapter.get().queryFlag("within")
+                    && composite.nodeId() != null
+                    && !composite.nodeId().isBlank();
+        }
+        return false;
     }
 
     /**

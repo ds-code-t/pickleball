@@ -20,7 +20,7 @@ One call, one value per id. A single id, including `--node-id`, keeps `backend_n
 Two or more return `values`. The function is caller JavaScript. The engine does not interpret it.
 `capabilities.query_flags` lists `within` and `nesting`. `capabilities.eval_nodes` is present when several ids are accepted.
 
-## Next
+## Landed in 2.10.0
 
 `query --nth <n>`
 0-based index after displayed, nesting, and any caller filter. `-1` is the last match.
@@ -34,5 +34,6 @@ With `--nth <start>`, keep indexes `start, start+step, ...` (0-based). Without `
 After nth and every, return `count` and an empty `nodes` array. `count_only` is true.
 
 Order on one query: match, then filters (displayed), then nesting, then nth/every, then count-only.
-These flags are query only. `capabilities.query_flags` lists them when present.
-Log entity `query`, off unless named.
+These flags are query only. `capabilities.query_flags` lists `nth`, `every`, and `count-only` when present.
+Log entity `query`, off unless named. Lines: `nth <n> every <step>` (either side `-` when omitted) and `count-only`.
+

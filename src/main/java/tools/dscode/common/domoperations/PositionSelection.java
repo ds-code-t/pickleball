@@ -25,6 +25,45 @@ public final class PositionSelection {
     private PositionSelection() {
     }
 
+    /**
+     * Engine {@code --nth} / {@code --every}. {@code nth} is 0-based, {@code -1} is last.
+     * Null keeps the whole list. A regex filter still has to run in Java before this slice.
+     */
+    public record EnginePosition(int nth, Integer every) {
+        public String logLine() {
+            if (every == null) return "nth " + nth;
+            return "nth " + nth + " every " + every;
+        }
+    }
+
+    /** True when a {@code MATCHES} op must see the list before position. */
+    public static boolean regexBeforePosition(ElementMatch match) {
+        if (match == null || match.textOps == null) return false;
+        for (ElementMatch.TextOp textOp : match.textOps) {
+            if (textOp.op() == ExecutionDictionary.Op.MATCHES) return true;
+        }
+        return false;
+    }
+
+    /**
+     * The same choice as {@link #apply}, as engine flags.
+     * Null keeps every item. An index below 1 is an out-of-range nth.
+     */
+    public static EnginePosition enginePosition(ElementMatch match) {
+        if (match == null) return null;
+        String position = match.elementPosition == null ? "" : match.elementPosition.trim();
+        String selection = match.selectionType == null ? "" : match.selectionType.trim();
+        int index = index(position, match.elementIndex);
+        if (index == LAST) return new EnginePosition(LAST, null);
+        if (selection.isEmpty()) {
+            if (index < 1) return new EnginePosition(Integer.MAX_VALUE, null);
+            return new EnginePosition(index - 1, null);
+        }
+        if (index == 1) return null;
+        if (index < 1) return new EnginePosition(Integer.MAX_VALUE, null);
+        return new EnginePosition(index - 1, index);
+    }
+
     public static <T> List<T> apply(List<T> items, ElementMatch match) {
         long start = System.nanoTime();
         List<T> chosen = choose(items, match);
