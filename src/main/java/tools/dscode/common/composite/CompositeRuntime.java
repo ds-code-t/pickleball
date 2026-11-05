@@ -135,6 +135,17 @@ public final class CompositeRuntime {
         return client;
     }
 
+    /** True after {@link #attach} joined a CDP browser. A process-only session is not joined. */
+    public static boolean browserJoined() {
+        String joined = joinedCdp;
+        return joined != null && !joined.isBlank();
+    }
+
+    /** Test seam. Production join is {@link #attach}. */
+    public static void joinForTests(String cdp) {
+        joinedCdp = cdp == null || cdp.isBlank() ? null : cdp;
+    }
+
     /** Opens the thread session on demand. Returns null when this run is on Selenium. */
     public static Client ensureClient() {
         Client open = client();

@@ -8,6 +8,8 @@ import org.openqa.selenium.JavascriptExecutor;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.htmlunit.HtmlUnitDriver;
 import tools.dscode.common.composite.CompositeBinaryLocator;
+import tools.dscode.common.composite.CompositeLog;
+import tools.dscode.common.composite.CompositeRuntime;
 import tools.dscode.common.composite.CompositeWebElement;
 import tools.dscode.common.composite.ElementOperations;
 
@@ -18,6 +20,7 @@ import java.util.List;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -82,8 +85,12 @@ class ElementWrapperActionTest {
         Path log = temp.resolve("calls.log");
         Path binary = stub(temp.resolve("composite"), log);
         System.setProperty(CompositeBinaryLocator.BIN_KEY, binary.toString());
-        assertTrue(ElementOperations.primary());
-        List<WebElement> found = ElementOperations.findElements(driver, By.cssSelector("#save"));
+        CompositeRuntime.resetForTests();
+        assertTrue(ElementOperations.primary(), CompositeLog.lastFallbackForTests());
+        List<WebElement> page = ElementOperations.findElements(driver, By.cssSelector("#save"));
+        assertEquals(1, page.size());
+        assertFalse(page.get(0) instanceof CompositeWebElement);
+        List<WebElement> found = ElementOperations.findElements(null, By.cssSelector("#save"));
         CompositeWebElement hit = assertInstanceOf(CompositeWebElement.class, found.get(0));
         ElementWrapper wrapper = ElementWrapper.forResolvedElement(driver, hit);
         wrapper.click();

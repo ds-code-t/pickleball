@@ -148,6 +148,7 @@ class LeanWaitNestLiveTest {
     void nestBatchIsOneExtraQuery() throws Exception {
         Path log = temp.resolve("calls.log");
         pin(stub(temp.resolve("composite"), log, "ok", false));
+        CompositeRuntime.joinForTests("http://127.0.0.1:9222");
         driver = new HtmlUnitDriver(false);
         DomCompositeAdapter.get().resetCommandsForTests();
         ElementOperations.resetFindCallsForTests();

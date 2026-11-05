@@ -20,8 +20,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Single entry for element lookup and actions. Composite when the binary is
- * up. The Selenium calls in this class are the legacy path for a run that
- * does not have the binary.
+ * up and a browser session is joined. A primary binary that has not joined a
+ * browser uses the WebDriver's Selenium find. The other Selenium calls in
+ * this class are the legacy path for a run that does not have the binary.
  */
 public final class ElementOperations {
     private static final AtomicInteger FINDS = new AtomicInteger();
@@ -37,6 +38,10 @@ public final class ElementOperations {
     public static List<WebElement> findElements(SearchContext context, By by) {
         FINDS.incrementAndGet();
         if (by == null) return List.of();
+        if (unattachedDriver(context)) {
+            CompositeLog.info("element", "find selenium unattached");
+            return context.findElements(by);
+        }
         if (primary()) {
             CompositeLog.debug("element", "find " + by);
             if (context instanceof CompositeWebElement composite) return composite.findElements(by);
@@ -48,12 +53,17 @@ public final class ElementOperations {
     }
 
     public static WebElement findElement(SearchContext context, By by) {
-        if (!primary() || (context != null && !(context instanceof CompositeWebElement) && !(context instanceof WebDriver))) {
+        if (unattachedDriver(context) || !primary() || (context != null && !(context instanceof CompositeWebElement) && !(context instanceof WebDriver))) {
             return context.findElement(by);
         }
         List<WebElement> found = findElements(context, by);
         if (found.isEmpty()) throw new NoSuchElementException("No composite match for " + by);
         return found.get(0);
+    }
+
+    /** Primary, but this driver has no joined CDP session. CompositeWebElement stays on the adapter. */
+    private static boolean unattachedDriver(SearchContext context) {
+        return context instanceof WebDriver && primary() && !CompositeRuntime.browserJoined();
     }
 
     public static void enterFrame(WebDriver driver, WebElement frame) {

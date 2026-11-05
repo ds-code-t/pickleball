@@ -79,6 +79,7 @@ class PageElementQueryTest {
                 temp.resolve("home")
         );
         System.setProperty(CompositeLog.DIR_KEY, temp.resolve("logs").toString());
+        CompositeRuntime.joinForTests("http://127.0.0.1:9222");
         AtomicInteger finds = new AtomicInteger();
         WebDriver driver = driver(List.of(), finds);
         PageElementQuery.Hit hit = PageElementQuery.find(driver, "Button", "Save");

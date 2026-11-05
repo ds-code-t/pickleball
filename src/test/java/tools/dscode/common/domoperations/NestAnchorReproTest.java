@@ -15,9 +15,8 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Bug 3. A composite nest batch is skipped when any hit has no id or name.
- * Selenium still keeps the deepest node. Phase B makes the composite path
- * filter without anchors; this assertion records the skip until then.
+ * Bug 3. {@code tryCompositeNestBatch} returns null when any hit has no id or name.
+ * HtmlUnit has no CDP join. A primary binary must still keep the deepest Selenium node.
  */
 class NestAnchorReproTest {
     @Test
