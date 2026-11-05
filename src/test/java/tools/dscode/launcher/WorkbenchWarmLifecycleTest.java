@@ -227,6 +227,7 @@ class WorkbenchWarmLifecycleTest {
         Process warm = startWarm(state, ProcessHandle.current().pid(), 900);
         try {
             List<ProcessHandle> children = awaitTree(warm.pid());
+            WorkbenchSessionCommandsTest.seedWorkspace(project, "warm-died");
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             ByteArrayOutputStream err = new ByteArrayOutputStream();
             int code = WorkbenchSessionCommands.run(
@@ -254,6 +255,7 @@ class WorkbenchWarmLifecycleTest {
         Process warm = startWarm(state, ProcessHandle.current().pid(), 900);
         try {
             List<ProcessHandle> children = awaitTree(warm.pid());
+            WorkbenchSessionCommandsTest.seedWorkspace(project, "warm-timeout");
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             ByteArrayOutputStream err = new ByteArrayOutputStream();
             int code = WorkbenchSessionCommands.run(

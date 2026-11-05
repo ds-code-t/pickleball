@@ -413,6 +413,70 @@ final class SessionHealthWait {
         }
     }
 
+    static String lastFault(Path log, long offset) {
+        String text = textFrom(log, offset);
+        if (text.isBlank()) return null;
+        String best = null;
+        for (String raw : text.split("\\R")) {
+            String line = raw.strip();
+            if (line.isEmpty() || line.startsWith("at ")) continue;
+            if (line.contains("no workspace for run id")
+                    || line.startsWith("Caused by:")
+                    || line.startsWith("Workbench CLI isolate failed")
+                    || line.startsWith("Workbench CLI ")
+                    || line.contains("Exception")) {
+                best = line;
+            }
+        }
+        return best;
+    }
+
+    /** The cause, without the launcher prefix or the recovery sentence. */
+    static String faultError(String fault) {
+        if (fault == null || fault.isBlank()) return "session exited before becoming healthy";
+        String text = fault.strip();
+        String prefix = "Workbench CLI isolate failed: ";
+        if (text.startsWith(prefix)) text = text.substring(prefix.length());
+        int recovery = text.indexOf(". Run ");
+        if (recovery > 0 && text.contains("no workspace")) text = text.substring(0, recovery);
+        return text;
+    }
+
+    static String faultFix(String fault, Path logFile) {
+        if (fault != null && fault.contains("no workspace for run id")) {
+            return "Run workspace-seed or discover for that run id.";
+        }
+        return "See " + (logFile == null ? "session.log" : logFile);
+    }
+
+    private static String textFrom(Path file, long offset) {
+        if (file == null || !Files.isRegularFile(file)) return "";
+        try {
+            long size = Files.size(file);
+            long start = Math.max(0L, offset);
+            if (size <= start) return "";
+            int take = (int) Math.min(size - start, TAIL_BYTES);
+            long position = size - take;
+            if (position < start) {
+                position = start;
+                take = (int) (size - position);
+            }
+            byte[] buf = new byte[take];
+            try (var channel = Files.newByteChannel(file)) {
+                channel.position(position);
+                int read = 0;
+                while (read < take) {
+                    int n = channel.read(ByteBuffer.wrap(buf, read, take - read));
+                    if (n < 0) break;
+                    read += n;
+                }
+                return new String(buf, 0, read, StandardCharsets.UTF_8);
+            }
+        } catch (IOException failure) {
+            return "";
+        }
+    }
+
     private static long lastModified(Path file) {
         try {
             return Files.getLastModifiedTime(file).toMillis();

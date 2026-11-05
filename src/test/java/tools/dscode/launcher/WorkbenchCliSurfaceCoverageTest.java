@@ -113,6 +113,7 @@ class WorkbenchCliSurfaceCoverageTest {
 
     @Test
     void covers_command_isolate() throws Exception {
+        WorkbenchSessionCommandsTest.seedWorkspace(temp, "iso-1");
         AtomicReference<WorkbenchSessionCommands.SessionLaunch> launch = new AtomicReference<>();
         Capture capture = session(command -> {
             launch.set(command);
@@ -1243,6 +1244,7 @@ class WorkbenchCliSurfaceCoverageTest {
         assertTrue(List.of(parsed.forwarded()).contains("--session-file=" + sessionFile),
                 List.of(parsed.forwarded()).toString());
         assertEquals("sf-1", parsed.coordination().runId());
+        WorkbenchSessionCommandsTest.seedWorkspace(temp, "sf-1");
         AtomicReference<WorkbenchSessionCommands.SessionLaunch> launch = new AtomicReference<>();
         session(command -> {
             launch.set(command);

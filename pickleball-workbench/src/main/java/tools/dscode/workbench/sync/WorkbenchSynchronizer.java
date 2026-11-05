@@ -128,9 +128,10 @@ public final class WorkbenchSynchronizer {
         progress("materialize");
 
         boolean copiedAnyOutput = false;
+        TreeStats copiedBase = TreeStats.EMPTY;
         for (OutputPath output : metadata.outputs()) {
             if (Files.isDirectory(output.path())) {
-                copyTree(output.path(), stagedBaseClasses);
+                copiedBase = copiedBase.plus(copyTree(output.path(), stagedBaseClasses));
                 copiedAnyOutput = true;
             }
         }
@@ -139,8 +140,10 @@ public final class WorkbenchSynchronizer {
                     "Build completed but no compiled/resource output directories were found for " + project.root()
             );
         }
+        progress(copiedBase.stage("copy-base"));
 
-        copyTree(stagedBaseClasses, stagedLiveClasses);
+        TreeStats copiedLive = linkTree(stagedBaseClasses, stagedLiveClasses);
+        progress(copiedLive.stage("copy-live"));
         createDirectories(
                 stagedLive.resolve("candidate-source"),
                 stagedLive.resolve("generated-java"),
@@ -774,7 +777,8 @@ public final class WorkbenchSynchronizer {
     private static String fingerprint(Path classes, List<String> dependencies, Path cacheFile) {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            updateDirectoryDigest(digest, classes);
+            TreeStats classesDigest = updateDirectoryDigest(digest, classes, true);
+            progress(classesDigest.stage("digest"));
             Map<String, CachedJar> cache = loadJarHashCache(cacheFile);
             Map<String, String> statKeys = new HashMap<>();
             for (Map.Entry<String, CachedJar> entry : cache.entrySet()) {
@@ -793,7 +797,7 @@ public final class WorkbenchSynchronizer {
                 digest.update(path.toString().getBytes(StandardCharsets.UTF_8));
                 digest.update((byte) 0);
                 if (!Files.isRegularFile(path)) {
-                    if (Files.isDirectory(path)) updateDirectoryDigest(digest, path);
+                    if (Files.isDirectory(path)) updateDirectoryDigest(digest, path, false);
                     digest.update((byte) 0);
                     continue;
                 }
@@ -959,25 +963,66 @@ public final class WorkbenchSynchronizer {
         }
     }
 
-    private static void updateDirectoryDigest(MessageDigest digest, Path root) throws IOException {
-        try (var paths = Files.walk(root)) {
-            for (Path file : paths.filter(Files::isRegularFile).sorted().toList()) {
-                digest.update(root.relativize(file).toString().replace('\\', '/').getBytes(StandardCharsets.UTF_8));
-                digest.update((byte) 0);
-                updateFileDigest(digest, file);
-                digest.update((byte) 0);
+    /**
+     * Class files are keyed by relative path, size, and mtime. Bytes are not read.
+     * Jars keep the racy-window content hash. A directory dependency still hashes bytes.
+     */
+    private static TreeStats updateDirectoryDigest(MessageDigest digest, Path root, boolean metadataOnly) throws IOException {
+        int files = 0;
+        long bytes = 0L;
+        long started = System.nanoTime();
+        if (root != null && Files.exists(root)) {
+            try (var paths = Files.walk(root)) {
+                for (Path file : paths.filter(Files::isRegularFile).sorted().toList()) {
+                    digest.update(root.relativize(file).toString().replace('\\', '/').getBytes(StandardCharsets.UTF_8));
+                    digest.update((byte) 0);
+                    if (metadataOnly) {
+                        BasicFileAttributes attrs = Files.readAttributes(file, BasicFileAttributes.class);
+                        digest.update(Long.toString(attrs.size()).getBytes(StandardCharsets.UTF_8));
+                        digest.update((byte) 0);
+                        digest.update(Long.toString(attrs.lastModifiedTime().toMillis()).getBytes(StandardCharsets.UTF_8));
+                        bytes += attrs.size();
+                    } else {
+                        bytes += updateFileDigest(digest, file);
+                    }
+                    digest.update((byte) 0);
+                    files++;
+                }
             }
         }
+        return new TreeStats(files, bytes, elapsedMs(started));
     }
 
-    private static void updateFileDigest(MessageDigest digest, Path file) throws IOException {
+    private static long updateFileDigest(MessageDigest digest, Path file) throws IOException {
+        long total = 0L;
         try (var input = Files.newInputStream(file)) {
             byte[] buffer = new byte[64 * 1024];
             int read;
             while ((read = input.read(buffer)) >= 0) {
-                if (read > 0) digest.update(buffer, 0, read);
+                if (read > 0) {
+                    digest.update(buffer, 0, read);
+                    total += read;
+                }
             }
         }
+        return total;
+    }
+
+    private record TreeStats(int files, long bytes, long millis) {
+        static final TreeStats EMPTY = new TreeStats(0, 0, 0);
+
+        TreeStats plus(TreeStats other) {
+            if (other == null) return this;
+            return new TreeStats(files + other.files, bytes + other.bytes, millis + other.millis);
+        }
+
+        String stage(String name) {
+            return name + " files=" + files + " bytes=" + bytes + " ms=" + millis;
+        }
+    }
+
+    private static long elapsedMs(long startedNanos) {
+        return Math.max(0L, (System.nanoTime() - startedNanos) / 1_000_000L);
     }
 
     private static String implementationVersion() {
@@ -985,7 +1030,19 @@ public final class WorkbenchSynchronizer {
         return version == null || version.isBlank() ? "development" : version;
     }
 
-    private static void copyTree(Path source, Path target) {
+    private static TreeStats copyTree(Path source, Path target) {
+        return transferTree(source, target, false);
+    }
+
+    /** Hardlink each file onto {@code target}. A link that the filesystem refuses is a copy. */
+    private static TreeStats linkTree(Path source, Path target) {
+        return transferTree(source, target, true);
+    }
+
+    private static TreeStats transferTree(Path source, Path target, boolean link) {
+        long started = System.nanoTime();
+        List<Path> files = new ArrayList<>();
+        long[] bytes = {0L};
         try {
             Files.walkFileTree(source, new SimpleFileVisitor<>() {
                 @Override
@@ -995,15 +1052,77 @@ public final class WorkbenchSynchronizer {
                 }
 
                 @Override
-                public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
-                    Path destination = target.resolve(source.relativize(file).toString());
-                    Files.createDirectories(destination.getParent());
-                    Files.copy(file, destination, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.COPY_ATTRIBUTES);
+                public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
+                    files.add(file);
+                    bytes[0] += attrs.size();
                     return FileVisitResult.CONTINUE;
                 }
             });
+            if (link) {
+                for (Path file : files) {
+                    Path destination = target.resolve(source.relativize(file).toString());
+                    Files.createDirectories(destination.getParent());
+                    linkOrCopy(file, destination);
+                }
+            } else {
+                copyFiles(source, target, files);
+            }
         } catch (IOException failure) {
             throw new IllegalStateException("Could not materialize Workbench output from " + source, failure);
+        }
+        return new TreeStats(files.size(), bytes[0], elapsedMs(started));
+    }
+
+    private static void copyFiles(Path source, Path target, List<Path> files) throws IOException {
+        if (files.isEmpty()) return;
+        int threads = Math.min(files.size(), Math.max(1, Runtime.getRuntime().availableProcessors()));
+        if (threads == 1) {
+            for (Path file : files) copyOne(source, target, file);
+            return;
+        }
+        java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newFixedThreadPool(threads);
+        try {
+            List<java.util.concurrent.Future<?>> waiting = new ArrayList<>();
+            for (Path file : files) {
+                waiting.add(pool.submit(() -> {
+                    try {
+                        copyOne(source, target, file);
+                        return null;
+                    } catch (IOException failure) {
+                        throw new IllegalStateException(failure);
+                    }
+                }));
+            }
+            for (java.util.concurrent.Future<?> done : waiting) {
+                try {
+                    done.get();
+                } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                    throw new IOException("Interrupted while copying " + source, interrupted);
+                } catch (java.util.concurrent.ExecutionException failure) {
+                    Throwable cause = failure.getCause() == null ? failure : failure.getCause();
+                    if (cause instanceof IOException io) throw io;
+                    throw new IOException("Could not copy " + source, cause);
+                }
+            }
+        } finally {
+            pool.shutdownNow();
+        }
+    }
+
+    private static void copyOne(Path source, Path target, Path file) throws IOException {
+        Path destination = target.resolve(source.relativize(file).toString());
+        Files.createDirectories(destination.getParent());
+        Files.copy(file, destination, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.COPY_ATTRIBUTES);
+    }
+
+    private static void linkOrCopy(Path source, Path destination) throws IOException {
+        try {
+            Files.createLink(destination, source);
+        } catch (UnsupportedOperationException | SecurityException unsupported) {
+            Files.copy(source, destination, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.COPY_ATTRIBUTES);
+        } catch (IOException failure) {
+            Files.copy(source, destination, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.COPY_ATTRIBUTES);
         }
     }
 
