@@ -32,6 +32,8 @@ public final class DomCompositeAdapter {
     private volatile Client verbClient;
     private volatile Set<String> desktopVerbs;
     private volatile Set<String> actionVerbs;
+    private volatile Set<String> queryFlags;
+    private volatile boolean multiEvalPinned;
     private volatile Set<String> verbsForTests;
     private volatile boolean dryRun;
 
@@ -58,6 +60,8 @@ public final class DomCompositeAdapter {
         verbsForTests = null;
         dryRun = false;
         actionVerbs = null;
+        queryFlags = null;
+        multiEvalPinned = false;
         desktopVerbs = null;
         verbClient = null;
         recorded.clear();
@@ -76,6 +80,71 @@ public final class DomCompositeAdapter {
 
     public boolean actionListed(String verb) {
         return VerbPlan.listed(actionVerbs(), verb);
+    }
+
+    /** True when {@code capabilities.query_flags} lists {@code within}, {@code nesting}, or a later flag. */
+    public boolean queryFlag(String flag) {
+        if (flag == null || flag.isBlank()) return false;
+        return queryFlags().contains(flag.toLowerCase(Locale.ROOT));
+    }
+
+    /** True when {@code capabilities.eval_nodes} is present. One eval can take several node ids. */
+    public boolean multiEval() {
+        if (verbsForTests != null) return multiEvalPinned;
+        if (!CompositeRuntime.primary()) return false;
+        queryFlags();
+        return multiEvalPinned;
+    }
+
+    /**
+     * One query under {@code within}, with {@code nesting} after {@code filter}.
+     * Null pieces are omitted. The caller already checked the capability.
+     */
+    public List<WebElement> findScoped(By by, String within, String nesting, String filter) {
+        CompositeSelector selector = SelectorTranslator.fromBy(by);
+        Map<String, Object> body = new LinkedHashMap<>(selector.body(list(frames), list(shadows)));
+        if (within != null && !within.isBlank()) body.put("within", within);
+        if (nesting != null && !nesting.isBlank()) body.put("nesting", nesting);
+        if (filter != null && !filter.isBlank()) body.put("filter", filter);
+        record("query");
+        if (within != null && !within.isBlank()) CompositeLog.info("adapter", "within " + within);
+        if (nesting != null && !nesting.isBlank()) CompositeLog.info("adapter", "nesting " + nesting);
+        if (dryRun) return List.of();
+        Client open = CompositeRuntime.ensureClient();
+        if (open == null) throw new IllegalStateException("composite client is not open");
+        CompositeLog.debug("adapter", "find " + selector.describe());
+        return hits(open.query(body), selector);
+    }
+
+    /**
+     * One eval for every node. A binary without {@code eval_nodes} evaluates the first node only.
+     */
+    public JsonNode evalAll(List<CompositeWebElement> elements, String source) {
+        List<CompositeWebElement> present = new ArrayList<>();
+        if (elements != null) {
+            for (CompositeWebElement element : elements) {
+                if (element != null && element.nodeId() != null && !element.nodeId().isBlank()) present.add(element);
+            }
+        }
+        if (present.size() <= 1 || !multiEval()) {
+            CompositeLog.info("adapter", "eval fallback");
+            if (present.isEmpty()) return null;
+            return eval(present.getFirst(), source);
+        }
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("source", source == null ? "" : source);
+        StringBuilder ids = new StringBuilder();
+        for (CompositeWebElement element : present) {
+            if (!ids.isEmpty()) ids.append(',');
+            ids.append(element.nodeId());
+        }
+        body.put("node_ids", ids.toString());
+        record("eval");
+        CompositeLog.info("adapter", "eval nodes=" + present.size());
+        if (dryRun) return null;
+        Client open = CompositeRuntime.ensureClient();
+        if (open == null) throw new IllegalStateException("composite client is not open");
+        return open.eval(body);
     }
 
     public List<WebElement> find(By by) {
@@ -367,6 +436,32 @@ public final class DomCompositeAdapter {
         verbClient = open;
         desktopVerbs = null;
         actionVerbs = null;
+        queryFlags = null;
+        multiEvalPinned = false;
+    }
+
+    private Set<String> queryFlags() {
+        if (verbsForTests != null) return queryFlags == null ? Set.of() : queryFlags;
+        if (!CompositeRuntime.primary()) return Set.of();
+        Client open = CompositeRuntime.ensureClient();
+        if (open == null) return Set.of();
+        pinClient(open);
+        Set<String> cached = queryFlags;
+        if (cached != null) return cached;
+        Set<String> loaded = loadNamedVerbs(open, "query_flags", List.of());
+        queryFlags = loaded;
+        loadMultiEval(open);
+        return loaded;
+    }
+
+    private void loadMultiEval(Client open) {
+        try {
+            JsonNode caps = open.capabilities();
+            JsonNode node = caps == null ? null : caps.get("eval_nodes");
+            multiEvalPinned = node != null && !node.isNull() && !node.asText("").isBlank();
+        } catch (RuntimeException ignored) {
+            multiEvalPinned = false;
+        }
     }
 
     private static Set<String> loadNamedVerbs(Client open, String field, List<String> fallback) {

@@ -194,9 +194,14 @@ public final class CompositeWebElement implements WebElement {
     @Override
     public List<WebElement> findElements(By by) {
         if (by == null) return List.of();
+        DomCompositeAdapter adapter = DomCompositeAdapter.get();
+        if (adapter.queryFlag("within") && nodeId != null && !nodeId.isBlank()) {
+            return adapter.findScoped(by, nodeId, null, null);
+        }
+        CompositeLog.info("adapter", "within fallback");
         By scoped = scope(by);
         if (scoped == null) return List.of();
-        return DomCompositeAdapter.get().find(scoped);
+        return adapter.find(scoped);
     }
 
     @Override

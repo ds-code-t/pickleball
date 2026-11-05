@@ -305,6 +305,31 @@ public final class ElementSnapshotScript {
         return snapshot;
     }
 
+    /**
+     * One eval for every composite hit. Empty when the binary has no multi-node eval.
+     * Keys are node ids.
+     */
+    public static Map<String, ElementSnapshot> onEvalAll(List<CompositeWebElement> elements) {
+        JsonNode result = DomCompositeAdapter.get().evalAll(elements, EVAL_SOURCE);
+        JsonNode values = result == null ? null : result.get("values");
+        if (values == null || !values.isArray()) return Map.of();
+        Map<String, ElementSnapshot> shots = new LinkedHashMap<>();
+        Map<String, CompositeWebElement> byId = new LinkedHashMap<>();
+        for (CompositeWebElement element : elements) {
+            if (element != null && element.nodeId() != null) byId.put(element.nodeId(), element);
+        }
+        for (JsonNode row : values) {
+            String nodeId = row.path("node_id").asText("");
+            JsonNode value = row.get("value");
+            if (nodeId.isBlank() || value == null || !value.isObject()) continue;
+            CompositeWebElement element = byId.get(nodeId);
+            ElementSnapshot snapshot = toSnapshot(jsonMap(value), nodeId, bounds(element));
+            if (element != null) ElementStateCache.remember(element, snapshot.elementState());
+            shots.put(nodeId, snapshot);
+        }
+        return shots;
+    }
+
     private static Map<String, Object> jsonMap(JsonNode node) {
         return JSON.convertValue(node, new TypeReference<LinkedHashMap<String, Object>>() {});
     }

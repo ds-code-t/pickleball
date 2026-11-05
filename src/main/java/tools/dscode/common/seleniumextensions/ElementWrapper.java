@@ -103,7 +103,42 @@ public class ElementWrapper implements WebElement, WrapsElement {
             if (singleElement) break;
         }
         logTrace("getWrappedElements-elementWrappers: " + elementWrappers.size());
+        if (elementWrappers.size() > 1) prefetchComposite(elementWrappers);
         return elementWrappers;
+    }
+
+    /**
+     * One eval fills every composite snapshot in the list.
+     * A binary without multi-node eval leaves them lazy.
+     */
+    static void prefetchComposite(List<ElementWrapper> wrappers) {
+        if (wrappers == null || wrappers.size() < 2) return;
+        if (!tools.dscode.common.composite.DomCompositeAdapter.get().multiEval()) return;
+        List<tools.dscode.common.composite.CompositeWebElement> elements = new ArrayList<>();
+        List<ElementWrapper> pending = new ArrayList<>();
+        for (ElementWrapper wrapper : wrappers) {
+            if (wrapper.snapshotComplete || !(wrapper.element instanceof tools.dscode.common.composite.CompositeWebElement composite)) {
+                continue;
+            }
+            elements.add(composite);
+            pending.add(wrapper);
+        }
+        if (pending.size() < 2) return;
+        Map<String, ElementSnapshot> shots = ElementSnapshotScript.onEvalAll(elements);
+        if (shots.isEmpty()) return;
+        for (ElementWrapper wrapper : pending) {
+            tools.dscode.common.composite.CompositeWebElement composite =
+                    (tools.dscode.common.composite.CompositeWebElement) wrapper.element;
+            ElementSnapshot shot = shots.get(composite.nodeId());
+            if (shot != null) wrapper.installSnapshot(shot);
+        }
+    }
+
+    private void installSnapshot(ElementSnapshot shot) {
+        this.elementSnapshot = shot;
+        this.snapshotComplete = true;
+        this.elementReturnValue = null;
+        this.extraSnapshotValues.clear();
     }
 
     /** How many wrappers this JVM has built. All-contexts uses it to show only chosen hits are wrapped. */

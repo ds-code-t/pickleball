@@ -199,7 +199,21 @@ public final class NestedByLocator {
         Objects.requireNonNull(locator, "locator");
         Objects.requireNonNull(mode, "mode");
 
-        List<WebElement> matches = tools.dscode.common.composite.ElementOperations.findElements(context, locator);
+        List<WebElement> matches;
+        if (engineNest(context, mode)) {
+            String nesting = mode == NestingMode.OUTERMOST_ONLY ? "outermost" : "deepest";
+            String within = null;
+            if (context instanceof tools.dscode.common.composite.CompositeWebElement composite) {
+                within = composite.nodeId();
+            }
+            String filter = displayedElementsOnly ? "displayed" : null;
+            matches = tools.dscode.common.composite.DomCompositeAdapter.get()
+                    .findScoped(locator, within, nesting, filter);
+            logTrace("elements-find-out.size(): " + matches.size());
+            return matches;
+        }
+
+        matches = tools.dscode.common.composite.ElementOperations.findElements(context, locator);
 
         if (displayedElementsOnly) {
             matches = filterDisplayed(context, matches);
@@ -235,6 +249,29 @@ public final class NestedByLocator {
 
         logTrace("elements-find-final-out.size(): " + out.size());
         return out;
+    }
+
+    /**
+     * One query carries {@code --nesting} after {@code displayed}.
+     * An element context also needs {@code --within}. Otherwise the anchor walk stays.
+     */
+    private static boolean engineNest(SearchContext context, NestingMode mode) {
+        if (mode != NestingMode.DEEPEST_ONLY && mode != NestingMode.OUTERMOST_ONLY) return false;
+        tools.dscode.common.composite.DomCompositeAdapter adapter =
+                tools.dscode.common.composite.DomCompositeAdapter.get();
+        if (!tools.dscode.common.composite.ElementOperations.primary() || !adapter.queryFlag("nesting")) {
+            if (tools.dscode.common.composite.ElementOperations.primary()) {
+                CompositeLog.info("adapter", "nesting fallback");
+            }
+            return false;
+        }
+        if (context == null || context instanceof WebDriver) return true;
+        if (context instanceof CompositeWebElement composite) {
+            return adapter.queryFlag("within")
+                    && composite.nodeId() != null
+                    && !composite.nodeId().isBlank();
+        }
+        return false;
     }
 
     private static List<WebElement> filterDisplayed(SearchContext context, List<WebElement> matches) {

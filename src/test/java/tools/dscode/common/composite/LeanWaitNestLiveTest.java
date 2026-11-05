@@ -199,7 +199,8 @@ class LeanWaitNestLiveTest {
         System.setProperty(CompositeBinaryLocator.BIN_KEY, binary.toString());
         System.setProperty(CompositeLog.KEY, "adapter");
         System.setProperty(CompositeLog.DIR_KEY, temp.resolve("logs").toString());
-        assertTrue(ElementOperations.primary());
+        CompositeRuntime.resetForTests();
+        assertTrue(ElementOperations.primary(), String.valueOf(CompositeLog.lastFallbackForTests()));
     }
 
     private static List<String> ids(List<WebElement> elements) {
