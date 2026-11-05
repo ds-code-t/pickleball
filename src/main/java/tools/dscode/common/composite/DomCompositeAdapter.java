@@ -188,6 +188,23 @@ public final class DomCompositeAdapter {
         return true;
     }
 
+    /**
+     * One element-scoped {@code eval}. The source is caller JavaScript.
+     * {@code node_id} addresses the hit so the engine does not search again.
+     */
+    public JsonNode eval(CompositeWebElement element, String source) {
+        Map<String, Object> body = new LinkedHashMap<>(element.actionBody(list(frames), list(shadows)));
+        body.put("source", source == null ? "" : source);
+        String nodeId = element.nodeId();
+        if (nodeId != null && !nodeId.isBlank()) body.put("node_id", nodeId);
+        record("eval");
+        CompositeLog.info("adapter", "eval " + element.selector().describe());
+        if (dryRun) return null;
+        Client open = CompositeRuntime.ensureClient();
+        if (open == null) throw new IllegalStateException("composite client is not open");
+        return open.eval(body);
+    }
+
     public void keys(String text) {
         Client open = CompositeRuntime.ensureClient();
         if (open == null) throw new IllegalStateException("composite client is not open");

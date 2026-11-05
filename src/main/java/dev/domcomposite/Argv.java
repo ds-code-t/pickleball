@@ -85,7 +85,7 @@ public final class Argv {
         switch (cmd) {
             case "capture" -> pushBools(argv, node, new String[][] {{"mobile", "mobile"}});
             case "query", "resolve", "click", "type", "scroll", "submit", "key", "dblclick",
-                    "contextclick" -> {
+                    "contextclick", "eval" -> {
                 pushValues(argv, node, SELECTOR_FLAGS);
                 pushBools(argv, node, new String[][] {
                     {"strict", "strict"},
@@ -104,6 +104,9 @@ public final class Argv {
                 }
                 if ("key".equals(cmd)) {
                     pushValues(argv, node, new String[][] {{"key", "key"}});
+                }
+                if ("eval".equals(cmd)) {
+                    pushValues(argv, node, new String[][] {{"source", "source"}, {"node_id", "node-id"}});
                 }
                 if ("scroll".equals(cmd)) {
                     pushValues(argv, node, new String[][] {{"dx", "dx"}, {"dy", "dy"}});

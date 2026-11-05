@@ -1,8 +1,12 @@
 package tools.dscode.common.seleniumextensions;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.openqa.selenium.JavascriptExecutor;
 import org.openqa.selenium.WebDriver;
 import tools.dscode.common.composite.CompositeWebElement;
+import tools.dscode.common.composite.DomCompositeAdapter;
 import tools.dscode.common.composite.ElementStateCache;
 import tools.dscode.common.composite.ElementStateScript;
 
@@ -10,18 +14,19 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * One element-scoped script shared by the Selenium and composite producers.
  *
  * <p>The function reads tag, text, value, selected child, attributes, sibling
  * index, same-tag index, and a stable selector. Selenium runs it with the
- * live element as {@code arguments[0]}. Composite cannot: dom-composite 2.4.0
- * has no eval command, and {@link CompositeWebElement} is not a WebDriver
- * node. Composite runs the same function through the driver's
- * {@link JavascriptExecutor} after the script locates that one element from
- * {@link SnapshotLookup} candidates, including same-origin frames. That is one
- * script evaluation, not a page snapshot.
+ * live element as {@code arguments[0]}. When {@code capabilities.actions}
+ * lists {@code eval}, composite runs the same function with {@code this}
+ * bound to the stored node and does not call the WebDriver. When {@code eval}
+ * is absent, composite still runs the function through the driver's
+ * {@link JavascriptExecutor} after locating that one element from
+ * {@link SnapshotLookup} candidates, including same-origin frames.
  */
 public final class ElementSnapshotScript {
     /**
@@ -212,10 +217,37 @@ public final class ElementSnapshotScript {
             return shot;
             """;
 
+    /**
+     * Same function as {@link #ON_ELEMENT}, with {@code this} bound to the node.
+     * Sent to {@code composite eval}. Not a second description of the element.
+     */
+    public static final String EVAL_SOURCE = "function(){\n"
+            + FUNCTION
+            + ElementStateScript.FUNCTION
+            + """
+            var shot = pickleballSnapshot(this);
+            if (shot) shot.elementState = pickleballElementState(this);
+            return shot;
+            }
+            """;
+
+    private static final ObjectMapper JSON = new ObjectMapper();
+    private static final AtomicInteger SCRIPTS = new AtomicInteger();
+
     private ElementSnapshotScript() {
     }
 
+    /** WebDriver script evaluations. An eval snapshot does not increment this. */
+    public static int scriptCallsForTests() {
+        return SCRIPTS.get();
+    }
+
+    public static void resetScriptCallsForTests() {
+        SCRIPTS.set(0);
+    }
+
     public static ElementSnapshot onElement(WebDriver driver, org.openqa.selenium.WebElement element) {
+        SCRIPTS.incrementAndGet();
         Object raw = executor(driver).executeScript(ON_ELEMENT, element);
         if (raw == null) {
             throw new IllegalStateException(
@@ -228,8 +260,8 @@ public final class ElementSnapshotScript {
     }
 
     /**
-     * Composite path. One script call. Throws when no candidate matches exactly
-     * one live node. Does not invent positions.
+     * Composite path when {@code eval} is not listed. One script call. Throws when
+     * no candidate matches exactly one live node. Does not invent positions.
      */
     public static ElementSnapshot onComposite(WebDriver driver, CompositeWebElement element) {
         List<String> candidates = SnapshotLookup.candidates(element);
@@ -238,21 +270,43 @@ public final class ElementSnapshotScript {
                     "error: composite element has no selector the snapshot script can run. mode=composite"
                             + " nodeId=" + (element == null ? "" : element.nodeId())
                             + " tried=id,data-testid,data-test,data-user-id,name,text,selector"
-                            + " fix: dom-composite 2.4.0 has no element eval. Add an id or data-testid,"
+                            + " fix: capabilities.actions does not list eval. Add an id or data-testid,"
                             + " or a unique name, so the shared script can address the live node.");
         }
+        SCRIPTS.incrementAndGet();
         Object raw = executor(driver).executeScript(ON_CANDIDATES, candidates);
         if (raw == null) {
             throw new IllegalStateException(
                     "error: composite snapshot script found no unique live element. mode=composite"
                             + " nodeId=" + element.nodeId()
                             + " tried=" + String.join(" | ", candidates)
-                            + " fix: dom-composite 2.4.0 has no element eval, so Pickleball runs the shared"
+                            + " fix: capabilities.actions does not list eval, so Pickleball runs the shared"
                             + " script through the WebDriver. None of those selectors matched exactly one node.");
         }
         ElementSnapshot snapshot = toSnapshot(raw, element.nodeId(), bounds(element));
         ElementStateCache.remember(element, snapshot.elementState());
         return snapshot;
+    }
+
+    /**
+     * Composite path when {@code eval} is listed. One adapter command. No WebDriver script.
+     */
+    public static ElementSnapshot onEval(CompositeWebElement element) {
+        JsonNode result = DomCompositeAdapter.get().eval(element, EVAL_SOURCE);
+        JsonNode value = result == null ? null : result.get("value");
+        if (value == null || !value.isObject()) {
+            throw new IllegalStateException(
+                    "error: composite eval returned no snapshot. mode=composite"
+                            + " nodeId=" + (element == null ? "" : element.nodeId())
+                            + " fix: eval must return the snapshot object as value.");
+        }
+        ElementSnapshot snapshot = toSnapshot(jsonMap(value), element.nodeId(), bounds(element));
+        ElementStateCache.remember(element, snapshot.elementState());
+        return snapshot;
+    }
+
+    private static Map<String, Object> jsonMap(JsonNode node) {
+        return JSON.convertValue(node, new TypeReference<LinkedHashMap<String, Object>>() {});
     }
 
     static ElementSnapshot toSnapshot(Object raw, String nodeId, ElementSnapshot.Bounds bounds) {

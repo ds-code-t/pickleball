@@ -323,6 +323,10 @@ public final class Client implements AutoCloseable {
         return command("drag", bindLive(body, true));
     }
 
+    public JsonNode eval(Object body) {
+        return command("eval", bindLive(body, true));
+    }
+
     public JsonNode screenshot(Object body) {
         return command("screenshot", bindLive(body, false));
     }

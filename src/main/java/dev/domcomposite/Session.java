@@ -63,6 +63,10 @@ public final class Session implements AutoCloseable {
         return client.command("drag", client.forceSession(body, id));
     }
 
+    public JsonNode eval(Object body) {
+        return client.command("eval", client.forceSession(body, id));
+    }
+
     public JsonNode query(Object body) {
         return client.command("query", client.forceSession(body, id));
     }
