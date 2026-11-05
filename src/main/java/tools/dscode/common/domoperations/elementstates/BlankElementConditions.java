@@ -62,9 +62,22 @@ public final class BlankElementConditions {
         if (element == null) {
             return false;
         }
-        List<WebElement> matches =
-                tools.dscode.common.composite.ElementOperations.findElements(element, By.xpath("self::*[" + BLANK_PRED + "]"));
+        tools.dscode.common.composite.ElementState state =
+                tools.dscode.common.composite.ElementStateCache.recall(element);
+        if (state != null) {
+            return state.blank();
+        }
+        tools.dscode.common.composite.CompositeLog.trace(
+                "state", "snapshot miss fallback check=blank");
+        tools.dscode.common.composite.ElementOperations.noteStateFallbackForTests();
+        List<WebElement> matches = tools.dscode.common.composite.ElementOperations.findElements(
+                element, By.xpath(blankSelfXPath()));
         return !matches.isEmpty();
+    }
+
+    /** The {@code self::*} check {@link #isBlank} used to run as a second find. */
+    public static String blankSelfXPath() {
+        return "self::*[" + BLANK_PRED + "]";
     }
 
 }

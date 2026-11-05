@@ -116,18 +116,32 @@ public final class CollapsedExpandedConditions {
      * (That’s what you asked for.)
      */
     public static boolean isExpandedState(WebElement element) {
-        return matchesSelf(element, EXPANDED_STATE_PREDICATE);
+        return matchesSelf(element, "expanded", true);
     }
 
     public static boolean isCollapsedState(WebElement element) {
-        return !matchesSelf(element, EXPANDED_STATE_PREDICATE);
+        return !matchesSelf(element, "expanded", true);
     }
 
-    private static boolean matchesSelf(WebElement element, String predicate) {
+    /** The {@code self::*} check the expanded/collapsed readers used to run as a second find. */
+    public static String expandedSelfXPath() {
+        return "self::*[" + EXPANDED_STATE_PREDICATE + "]";
+    }
+
+    private static boolean matchesSelf(WebElement element, String check, boolean expanded) {
         if (element == null) {
             return false;
         }
-        List<WebElement> matches = tools.dscode.common.composite.ElementOperations.findElements(element, By.xpath("self::*[" + predicate + "]"));
+        tools.dscode.common.composite.ElementState state =
+                tools.dscode.common.composite.ElementStateCache.recall(element);
+        if (state != null) {
+            return expanded ? state.expanded() : !state.expanded();
+        }
+        tools.dscode.common.composite.CompositeLog.trace(
+                "state", "snapshot miss fallback check=" + check);
+        tools.dscode.common.composite.ElementOperations.noteStateFallbackForTests();
+        List<WebElement> matches = tools.dscode.common.composite.ElementOperations.findElements(
+                element, By.xpath(expandedSelfXPath()));
         return !matches.isEmpty();
     }
 }

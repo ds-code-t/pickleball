@@ -3,6 +3,8 @@ package tools.dscode.common.seleniumextensions;
 import org.openqa.selenium.JavascriptExecutor;
 import org.openqa.selenium.WebDriver;
 import tools.dscode.common.composite.CompositeWebElement;
+import tools.dscode.common.composite.ElementStateCache;
+import tools.dscode.common.composite.ElementStateScript;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -165,9 +167,13 @@ public final class ElementSnapshotScript {
             }
             """;
 
-    public static final String ON_ELEMENT = FUNCTION + "\nreturn pickleballSnapshot(arguments[0]);\n";
+    public static final String ON_ELEMENT = FUNCTION + ElementStateScript.FUNCTION + """
+            var shot = pickleballSnapshot(arguments[0]);
+            if (shot) shot.elementState = pickleballElementState(arguments[0]);
+            return shot;
+            """;
 
-    public static final String ON_CANDIDATES = FUNCTION + """
+    public static final String ON_CANDIDATES = FUNCTION + ElementStateScript.FUNCTION + """
             function pickleballResolve(doc, selectors) {
               if (!doc || !selectors) return null;
               var s;
@@ -200,7 +206,10 @@ public final class ElementSnapshotScript {
               }
               return null;
             }
-            return pickleballSnapshot(pickleballResolve(document, arguments[0]));
+            var live = pickleballResolve(document, arguments[0]);
+            var shot = pickleballSnapshot(live);
+            if (shot) shot.elementState = pickleballElementState(live);
+            return shot;
             """;
 
     private ElementSnapshotScript() {
@@ -213,7 +222,9 @@ public final class ElementSnapshotScript {
                     "error: element snapshot script returned nothing. mode=selenium"
                             + " fix: the element was detached before the script ran. Refresh once via its stable selector.");
         }
-        return toSnapshot(raw, null, null);
+        ElementSnapshot snapshot = toSnapshot(raw, null, null);
+        ElementStateCache.remember(element, snapshot.elementState());
+        return snapshot;
     }
 
     /**
@@ -239,7 +250,9 @@ public final class ElementSnapshotScript {
                             + " fix: dom-composite 2.4.0 has no element eval, so Pickleball runs the shared"
                             + " script through the WebDriver. None of those selectors matched exactly one node.");
         }
-        return toSnapshot(raw, element.nodeId(), bounds(element));
+        ElementSnapshot snapshot = toSnapshot(raw, element.nodeId(), bounds(element));
+        ElementStateCache.remember(element, snapshot.elementState());
+        return snapshot;
     }
 
     static ElementSnapshot toSnapshot(Object raw, String nodeId, ElementSnapshot.Bounds bounds) {
@@ -254,7 +267,8 @@ public final class ElementSnapshotScript {
                 bounds,
                 number(map.get("siblingIndex")),
                 number(map.get("sameTagIndex")),
-                text(map.get("stableSelector"))
+                text(map.get("stableSelector")),
+                ElementStateScript.parse(map.get("elementState"))
         );
     }
 

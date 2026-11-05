@@ -21,7 +21,9 @@ import java.util.Map;
  * otherwise innerText). {@code selectedValue} is the concatenated value of
  * direct children that carry the {@code selected} attribute, or null when
  * there are none. An empty string means those children exist and their value
- * is empty.
+ * is empty. {@code elementState} is the enabled, blank, required, expanded,
+ * and on predicates, taken in the same script. Null means the driver could
+ * not evaluate them, and a later check may fall back to one find.
  */
 public record ElementSnapshot(
         String nodeId,
@@ -33,7 +35,8 @@ public record ElementSnapshot(
         Bounds bounds,
         int siblingIndex,
         int sameTagIndex,
-        String stableSelector
+        String stableSelector,
+        tools.dscode.common.composite.ElementState elementState
 ) {
     /**
      * Border box in CSS pixels. Null on the Selenium path, which does not
@@ -53,7 +56,7 @@ public record ElementSnapshot(
     }
 
     public static ElementSnapshot empty() {
-        return new ElementSnapshot(null, "", "", "", null, Map.of(), null, 0, 0, "");
+        return new ElementSnapshot(null, "", "", "", null, Map.of(), null, 0, 0, "", null);
     }
 
     public String attribute(String name) {

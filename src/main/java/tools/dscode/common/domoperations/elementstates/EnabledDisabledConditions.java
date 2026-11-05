@@ -43,10 +43,25 @@ public final class EnabledDisabledConditions {
         if (element == null) {
             return false;
         }
+        tools.dscode.common.composite.ElementState state =
+                tools.dscode.common.composite.ElementStateCache.recall(element);
+        if (state != null) {
+            return state.disabled();
+        }
+        return fallback(element);
+    }
 
-        List<WebElement> matches =
-                tools.dscode.common.composite.ElementOperations.findElements(element, By.xpath("self::*[" + DISABLED_DESC_OR_SELF_PRED + "]"));
+    /** The {@code self::*} check {@link #isDisabled} used to run as a second find. */
+    public static String disabledSelfXPath() {
+        return "self::*[" + DISABLED_DESC_OR_SELF_PRED + "]";
+    }
 
+    private static boolean fallback(WebElement element) {
+        tools.dscode.common.composite.CompositeLog.trace(
+                "state", "snapshot miss fallback check=disabled");
+        tools.dscode.common.composite.ElementOperations.noteStateFallbackForTests();
+        List<WebElement> matches = tools.dscode.common.composite.ElementOperations.findElements(
+                element, By.xpath(disabledSelfXPath()));
         return !matches.isEmpty();
     }
 

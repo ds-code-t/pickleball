@@ -20,7 +20,8 @@ public record ElementView(
         int width,
         int height,
         String value,
-        String outerHtml
+        String outerHtml,
+        ElementState elementState
 ) {
     public ElementView {
         tag = tag == null ? "" : tag;

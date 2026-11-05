@@ -53,8 +53,22 @@ public final class RequiredInputConditions {
         if (element == null) {
             return false;
         }
-        List<WebElement> matches = tools.dscode.common.composite.ElementOperations.findElements(element, By.xpath("self::*[" + REQUIRED_DESC_OR_SELF_PRED + "]"));
+        tools.dscode.common.composite.ElementState state =
+                tools.dscode.common.composite.ElementStateCache.recall(element);
+        if (state != null) {
+            return state.required();
+        }
+        tools.dscode.common.composite.CompositeLog.trace(
+                "state", "snapshot miss fallback check=required");
+        tools.dscode.common.composite.ElementOperations.noteStateFallbackForTests();
+        List<WebElement> matches = tools.dscode.common.composite.ElementOperations.findElements(
+                element, By.xpath(requiredSelfXPath()));
         return !matches.isEmpty();
+    }
+
+    /** The {@code self::*} check {@link #isElementRequired} used to run as a second find. */
+    public static String requiredSelfXPath() {
+        return "self::*[" + REQUIRED_DESC_OR_SELF_PRED + "]";
     }
 
 }

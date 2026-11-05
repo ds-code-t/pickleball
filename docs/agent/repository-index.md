@@ -67,6 +67,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/maintainer/2.1.18-unification.md`
 - `docs/maintainer/2.1.19-dom-access-roadmap.md`
 - `docs/maintainer/2.1.19-dom-composite-roadmap.md`
+- `docs/maintainer/2.1.19-dom-efficiency-roadmap.md`
 - `docs/maintainer/2.1.19-element-snapshot-roadmap.md`
 - `docs/maintainer/consumer-sim-harness.md`
 - `docs/maintainer/guidance-goldens.md`
@@ -207,6 +208,9 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/common/composite/ElementOperations.java`
 - `src/main/java/tools/dscode/common/composite/ElementPhrase.java`
 - `src/main/java/tools/dscode/common/composite/ElementReads.java`
+- `src/main/java/tools/dscode/common/composite/ElementState.java`
+- `src/main/java/tools/dscode/common/composite/ElementStateCache.java`
+- `src/main/java/tools/dscode/common/composite/ElementStateScript.java`
 - `src/main/java/tools/dscode/common/composite/ElementView.java`
 - `src/main/java/tools/dscode/common/composite/SelectorTranslator.java`
 - `src/main/java/tools/dscode/common/control/ControlDecision.java`
@@ -541,6 +545,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/common/reporting/diagnostic/DiscoverHintJvmLeakTest.java`
 - `src/test/java/tools/dscode/common/resources/PathListSemanticsTest.java`
 - `src/test/java/tools/dscode/common/seleniumextensions/ElementSnapshotParityTest.java`
+- `src/test/java/tools/dscode/common/seleniumextensions/ElementStateRoundTripTest.java`
 - `src/test/java/tools/dscode/common/seleniumextensions/ElementWrapperActionTest.java`
 - `src/test/java/tools/dscode/common/seleniumextensions/ElementWrapperRefreshTest.java`
 - `src/test/java/tools/dscode/common/seleniumextensions/ElementWrapperSnapshotTest.java`
@@ -626,6 +631,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/untilpass/UntilPassChromeLookupTest.java`
 - `src/test/resources/element-batch/edge.html`
 - `src/test/resources/element-snapshot/fixture.html`
+- `src/test/resources/element-state/states.html`
 - `src/test/resources/expected-failure/release-216-expected-failure.feature`
 - `src/test/resources/guidance-golden/documented-help.txt`
 - `src/test/resources/launch-parity/observe.feature`

@@ -15,6 +15,7 @@ import tools.dscode.common.seleniumextensions.ElementWrapper;
 
 import java.time.Duration;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Single entry for element lookup and actions. Composite when the binary is
@@ -22,6 +23,9 @@ import java.util.List;
  * does not have the binary.
  */
 public final class ElementOperations {
+    private static final AtomicInteger FINDS = new AtomicInteger();
+    private static final AtomicInteger STATE_FALLBACKS = new AtomicInteger();
+
     private ElementOperations() {
     }
 
@@ -30,6 +34,7 @@ public final class ElementOperations {
     }
 
     public static List<WebElement> findElements(SearchContext context, By by) {
+        FINDS.incrementAndGet();
         if (by == null) return List.of();
         if (primary()) {
             CompositeLog.debug("element", "find " + by);
@@ -201,6 +206,29 @@ public final class ElementOperations {
 
     public static void resetBatchCallsForTests() {
         ElementReads.BATCHES.set(0);
+    }
+
+    /** Finds since the last {@link #resetFindCallsForTests()}. State checks should add zero. */
+    public static int findCallsForTests() {
+        return FINDS.get();
+    }
+
+    public static void resetFindCallsForTests() {
+        FINDS.set(0);
+    }
+
+    public static int stateFallbacksForTests() {
+        return STATE_FALLBACKS.get();
+    }
+
+    public static void resetStateMeasurementsForTests() {
+        FINDS.set(0);
+        STATE_FALLBACKS.set(0);
+        ElementStateCache.resetForTests();
+    }
+
+    public static void noteStateFallbackForTests() {
+        STATE_FALLBACKS.incrementAndGet();
     }
 
     public static Actions actions(WebDriver driver) {

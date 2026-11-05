@@ -32,12 +32,20 @@ final class ElementReads {
             } else if (css) {
               nodes = Array.prototype.slice.call(document.querySelectorAll(css));
             }
-            return nodes.map(pickleballDescribe);
+            return nodes.map(pickleballDescribeWithState);
             """;
 
     private static final String ELEMENTS_JS = """
             var nodes = arguments[0] || [];
-            return Array.prototype.map.call(nodes, pickleballDescribe);
+            return Array.prototype.map.call(nodes, pickleballDescribeWithState);
+            """;
+
+    private static final String WITH_STATE = ElementStateScript.FUNCTION + """
+            function pickleballDescribeWithState(el) {
+              var row = pickleballDescribe(el);
+              if (row) row.elementState = pickleballElementState(el);
+              return row;
+            }
             """;
 
     private static final String DESCRIBE_FN = """
@@ -133,7 +141,8 @@ final class ElementReads {
         } else if (driver instanceof JavascriptExecutor js) {
             try {
                 mode = "selenium-batch";
-                views = parse(js.executeScript(DESCRIBE_FN + ELEMENTS_JS, found));
+                views = parse(js.executeScript(DESCRIBE_FN + WITH_STATE + ELEMENTS_JS, found));
+                remember(found, views);
             } catch (RuntimeException failure) {
                 mode = "selenium-legacy";
                 views = fromElements(found);
@@ -161,7 +170,8 @@ final class ElementReads {
                 element.getSize().getWidth(),
                 element.getSize().getHeight(),
                 value == null ? "" : value,
-                outer == null ? "" : outer
+                outer == null ? "" : outer,
+                ElementStateCache.recall(element)
         );
     }
 
@@ -249,7 +259,7 @@ final class ElementReads {
     private static List<ElementView> scriptQuery(JavascriptExecutor javascript, By by) {
         String[] locator = split(by);
         Object raw = javascript.executeScript(
-                DESCRIBE_FN + QUERY_JS,
+                DESCRIBE_FN + WITH_STATE + QUERY_JS,
                 locator[0] == null ? "" : locator[0],
                 locator[1] == null ? "" : locator[1]);
         return parse(raw);
@@ -276,6 +286,7 @@ final class ElementReads {
             if (raw instanceof CompositeWebElement composite) views.add(fromComposite(composite));
             else views.add(fromSelenium(raw));
         }
+        remember(elements, views);
         return views;
     }
 
@@ -296,7 +307,8 @@ final class ElementReads {
                 rect == null ? 0 : rect.getWidth(),
                 rect == null ? 0 : rect.getHeight(),
                 value == null ? "" : value,
-                outer == null ? "" : outer
+                outer == null ? "" : outer,
+                ElementStateCache.recall(element)
         );
     }
 
@@ -324,10 +336,23 @@ final class ElementReads {
                     number(map.get("width")),
                     number(map.get("height")),
                     text(map.get("value")),
-                    text(map.get("outerHtml"))
+                    text(map.get("outerHtml")),
+                    ElementStateScript.parse(map.get("elementState"))
             ));
         }
         return views;
+    }
+
+    private static void remember(List<WebElement> elements, List<ElementView> views) {
+        if (elements == null || views == null) return;
+        int count = Math.min(elements.size(), views.size());
+        for (int i = 0; i < count; i++) {
+            ElementState state = views.get(i).elementState();
+            WebElement element = elements.get(i);
+            ElementStateCache.remember(element, state);
+            WebElement raw = unwrap(element);
+            if (raw != element) ElementStateCache.remember(raw, state);
+        }
     }
 
     private static Map<String, String> attributes(Object raw) {

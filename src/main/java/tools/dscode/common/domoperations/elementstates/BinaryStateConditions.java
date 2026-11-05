@@ -50,6 +50,14 @@ public final class BinaryStateConditions {
         if (element == null) {
             return false;
         }
+        tools.dscode.common.composite.ElementState state =
+                tools.dscode.common.composite.ElementStateCache.recall(element);
+        if (state != null) {
+            if (state.selectable()) {
+                return state.domSelected();
+            }
+            return state.attributeOn();
+        }
 
         // 1) Native Selenium-defined selection semantics
         //    - <input type="checkbox|radio">
@@ -59,10 +67,18 @@ public final class BinaryStateConditions {
         }
 
         // 2) Broader attribute/ARIA/data-attribute semantics (original behavior)
+        tools.dscode.common.composite.CompositeLog.trace(
+                "state", "snapshot miss fallback check=on");
+        tools.dscode.common.composite.ElementOperations.noteStateFallbackForTests();
         List<WebElement> matches =
-                tools.dscode.common.composite.ElementOperations.findElements(element, By.xpath("self::*[" + ON_DESC_OR_SELF_PRED + "]"));
+                tools.dscode.common.composite.ElementOperations.findElements(element, By.xpath(onSelfXPath()));
 
         return !matches.isEmpty();
+    }
+
+    /** The {@code self::*} check the attribute-on reader used to run as a second find. */
+    public static String onSelfXPath() {
+        return "self::*[" + ON_DESC_OR_SELF_PRED + "]";
     }
 
     /**
