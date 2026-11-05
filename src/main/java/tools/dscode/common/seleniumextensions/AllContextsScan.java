@@ -132,6 +132,9 @@ public final class AllContextsScan {
             try {
                 driver.manage().timeouts().implicitlyWait(Duration.ZERO);
                 startPath = capturePath();
+                if (applyComposite()) {
+                    return limit(matches);
+                }
                 searchDocument(driver, startPath == null ? List.of() : startPath, 0, false);
                 if (startPath != null) {
                     searched.add(key(startPath));
@@ -149,6 +152,49 @@ public final class AllContextsScan {
                 restoreBrowser(originalWindow, originalWait);
             }
             return limit(matches);
+        }
+
+        private boolean applyComposite() {
+            if (xpath == null || !tools.dscode.common.composite.ElementOperations.primary()) {
+                return false;
+            }
+            com.fasterxml.jackson.databind.JsonNode report;
+            try {
+                report = tools.dscode.common.composite.DomCompositeAdapter.get().queryAllContexts(xpath);
+            } catch (RuntimeException ignored) {
+                return false;
+            }
+            List<AllContextsPlan.FrameStep> steps = null;
+            if (startPath != null) {
+                steps = new ArrayList<>();
+                for (FrameRef ref : startPath) {
+                    steps.add(new AllContextsPlan.FrameStep(ref.id, ref.name, ref.index));
+                }
+            }
+            AllContextsPlan.Result plan = AllContextsPlan.classify(report, steps);
+            if (plan == null) {
+                return false;
+            }
+            if (plan.depthExceeded()) {
+                warnDepth();
+            }
+            if (plan.frameCapped()) {
+                warnFrames();
+            }
+            int live = 0;
+            for (AllContextsPlan.Hit hit : plan.hits()) {
+                if (hit.foreign()) {
+                    matches.add(ElementWrapper.foreignPresence(elementMatch));
+                } else {
+                    matches.add(new ElementWrapper(
+                            tools.dscode.common.composite.CompositeWebElement.fromQuery(xpath, hit.node(), live),
+                            elementMatch,
+                            matches.size() + 1
+                    ));
+                    live++;
+                }
+            }
+            return true;
         }
 
         private void searchDocument(SearchContext context, List<FrameRef> path, int depth, boolean foreign) {

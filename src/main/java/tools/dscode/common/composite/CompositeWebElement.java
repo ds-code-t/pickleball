@@ -34,6 +34,11 @@ public final class CompositeWebElement implements WebElement {
     private final int width;
     private final int height;
 
+    /** One node from an all-contexts query. The id is the frame and backend id. */
+    public static WebElement fromQuery(String xpath, JsonNode node, int index) {
+        return new CompositeWebElement(new CompositeSelector(xpath, null, null, "dom", null, null), node, index);
+    }
+
     CompositeWebElement(CompositeSelector selector, JsonNode node, int index) {
         this.selector = selector;
         JsonNode value = node == null ? null : node;

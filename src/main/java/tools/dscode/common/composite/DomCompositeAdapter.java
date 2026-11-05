@@ -95,6 +95,33 @@ public final class DomCompositeAdapter {
         return hits(json, selector);
     }
 
+    /**
+     * One all-frames query with open-shadow pierce.
+     * A null result means the caller keeps the Java walk (composite off, dry-run, or a binary that rejects pierce).
+     */
+    public JsonNode queryAllContexts(String xpath) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("xpath", xpath == null ? "" : xpath);
+        body.put("mode", "composite");
+        body.put("all_frames", true);
+        body.put("pierce", "open");
+        record("query");
+        CompositeLog.info("adapter", "scan all-contexts");
+        if (dryRun) {
+            return null;
+        }
+        Client open = CompositeRuntime.ensureClient();
+        if (open == null) {
+            return null;
+        }
+        try {
+            return open.query(body);
+        } catch (RuntimeException ignored) {
+            CompositeLog.info("adapter", "scan fallback");
+            return null;
+        }
+    }
+
     public void click(CompositeWebElement element) {
         if (desktopSource(element)) {
             desktopAct("click", element);

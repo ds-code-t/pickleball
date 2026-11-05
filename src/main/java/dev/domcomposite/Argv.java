@@ -108,6 +108,9 @@ public final class Argv {
                 if ("eval".equals(cmd)) {
                     pushValues(argv, node, new String[][] {{"source", "source"}, {"node_id", "node-id"}});
                 }
+                if ("query".equals(cmd)) {
+                    pushValues(argv, node, new String[][] {{"pierce", "pierce"}});
+                }
                 if ("scroll".equals(cmd)) {
                     pushValues(argv, node, new String[][] {{"dx", "dx"}, {"dy", "dy"}});
                 }

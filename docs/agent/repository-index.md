@@ -356,6 +356,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/common/resources/PathLists.java`
 - `src/main/java/tools/dscode/common/resources/ResourceLocations.java`
 - `src/main/java/tools/dscode/common/runtime/ProcessTrees.java`
+- `src/main/java/tools/dscode/common/seleniumextensions/AllContextsPlan.java`
 - `src/main/java/tools/dscode/common/seleniumextensions/AllContextsScan.java`
 - `src/main/java/tools/dscode/common/seleniumextensions/CompositeSnapshotProducer.java`
 - `src/main/java/tools/dscode/common/seleniumextensions/ContextWrapper.java`
@@ -523,6 +524,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/common/assertions/MultilineAssertFeatureTest.java`
 - `src/test/java/tools/dscode/common/assertions/MultilineAssertTest.java`
 - `src/test/java/tools/dscode/common/composite/ActionVerbPlanTest.java`
+- `src/test/java/tools/dscode/common/composite/AllContextsPlanTest.java`
 - `src/test/java/tools/dscode/common/composite/CompositeElements.java`
 - `src/test/java/tools/dscode/common/composite/CompositeLocationTest.java`
 - `src/test/java/tools/dscode/common/composite/DomAccessGuardTest.java`
