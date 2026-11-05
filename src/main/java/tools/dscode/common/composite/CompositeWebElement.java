@@ -287,6 +287,11 @@ public final class CompositeWebElement implements WebElement {
         return By.xpath(anchor + "/" + xp);
     }
 
+    /** XPath that finds this node again. Null when the node has no id or name anchor. */
+    public String anchor() {
+        return xpathAnchor();
+    }
+
     private String xpathAnchor() {
         String id = attributes.get("id");
         if (usableToken(id)) return "//*[@id='" + id + "']";

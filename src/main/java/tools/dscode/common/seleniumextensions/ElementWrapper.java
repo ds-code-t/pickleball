@@ -167,6 +167,12 @@ public class ElementWrapper implements WebElement, WrapsElement {
      */
     public void refreshSnapshot() {
         rejectIfForeignContext();
+        if (element instanceof CompositeWebElement composite
+                && tools.dscode.common.composite.ElementOperations.primary()
+                && tools.dscode.common.composite.DomCompositeAdapter.get().live(composite)) {
+            assignSnapshot(element, "refresh");
+            return;
+        }
         String selector = snapshot().stableSelector();
         String refreshMode = mode();
         String nodeId = snapshot().nodeId();

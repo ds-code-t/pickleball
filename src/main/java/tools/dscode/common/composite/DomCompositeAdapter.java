@@ -232,6 +232,54 @@ public final class DomCompositeAdapter {
         return open.eval(body);
     }
 
+    /**
+     * One live wait for this node. The poll is 150 ms, matching {@code LeanWaits}.
+     * False when the binary rejects the wait flags, so the caller keeps its own loop.
+     * A timeout is a Selenium {@code TimeoutException}.
+     */
+    public boolean waitOn(CompositeWebElement element, String rules, long timeoutMs) {
+        Map<String, Object> body = new LinkedHashMap<>(element.actionBody(list(frames), list(shadows)));
+        body.put("wait_for", rules == null ? "visible" : rules);
+        body.put("timeout_ms", Math.max(0, timeoutMs));
+        body.put("poll_ms", 150);
+        body.put("stability_ms", 0);
+        record("query");
+        CompositeLog.info("adapter", "wait " + rules + " poll=150");
+        if (dryRun) return true;
+        Client open = CompositeRuntime.ensureClient();
+        if (open == null) return false;
+        try {
+            open.query(body);
+            return true;
+        } catch (RuntimeException ex) {
+            String message = ex.getMessage() == null ? "" : ex.getMessage().toLowerCase(Locale.ROOT);
+            if (message.contains("unexpected") || message.contains("unrecognized") || message.contains("poll-ms") || message.contains("poll_ms")) {
+                CompositeLog.info("adapter", "wait fallback");
+                return false;
+            }
+            if (message.contains("timeout") || message.contains("timed out")) {
+                throw new org.openqa.selenium.TimeoutException(ex.getMessage());
+            }
+            throw ex;
+        }
+    }
+
+    /**
+     * True when {@code eval} says the node is still connected. False when the verb is absent or the call fails.
+     */
+    public boolean live(CompositeWebElement element) {
+        if (!actionListed("eval")) return false;
+        CompositeLog.info("adapter", "live " + element.nodeId());
+        try {
+            JsonNode result = eval(element, "function(){ return !!(this && this.isConnected); }");
+            if (dryRun) return true;
+            JsonNode value = result == null ? null : result.get("value");
+            return value != null && value.asBoolean(false);
+        } catch (RuntimeException ignored) {
+            return false;
+        }
+    }
+
     public void keys(String text) {
         Client open = CompositeRuntime.ensureClient();
         if (open == null) throw new IllegalStateException("composite client is not open");

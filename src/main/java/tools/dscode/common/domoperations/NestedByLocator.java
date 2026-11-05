@@ -7,6 +7,7 @@ import org.openqa.selenium.StaleElementReferenceException;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.WrapsDriver;
+import tools.dscode.common.composite.CompositeLog;
 import tools.dscode.common.composite.CompositeWebElement;
 import tools.dscode.common.composite.ElementView;
 import tools.dscode.common.dataoperations.TextOp;
@@ -227,6 +228,12 @@ public final class NestedByLocator {
             return matches;
         }
 
+        List<WebElement> batched = tryCompositeNestBatch(matches, mode);
+        if (batched != null) {
+            logTrace("elements-find-out.size(): " + batched.size());
+            return batched;
+        }
+
         // Main optimized path: do containment analysis once in the browser.
         List<WebElement> browserSide = tryBrowserSideNestingFilter(context, matches, mode);
         if (browserSide != null) {
@@ -256,6 +263,45 @@ public final class NestedByLocator {
             if (views.get(i).displayed()) displayed.add(matches.get(i));
         }
         return displayed;
+    }
+
+    /**
+     * One xpath union for composite hits that have an id or name anchor.
+     * Null keeps the per-node ancestor walk.
+     * Deepest drops containers. Outermost drops contained nodes.
+     * An empty remainder keeps the original list.
+     */
+    private static List<WebElement> tryCompositeNestBatch(List<WebElement> matches, NestingMode mode) {
+        if (!compositeHits(matches)) return null;
+        if (mode != NestingMode.DEEPEST_ONLY && mode != NestingMode.OUTERMOST_ONLY) return null;
+        String axis = mode == NestingMode.DEEPEST_ONLY ? "/ancestor::*" : "/descendant::*";
+        StringBuilder union = new StringBuilder();
+        for (WebElement el : matches) {
+            if (!(el instanceof CompositeWebElement composite)) return null;
+            String anchor = composite.anchor();
+            if (anchor == null) return null;
+            if (!union.isEmpty()) union.append(" | ");
+            union.append(anchor).append(axis);
+        }
+        CompositeLog.info("adapter", "nest batch");
+        List<WebElement> related;
+        try {
+            related = tools.dscode.common.composite.ElementOperations.findElements(null, By.xpath(union.toString()));
+        } catch (RuntimeException ignored) {
+            return null;
+        }
+        Set<String> relatedIds = new HashSet<>();
+        for (WebElement el : related) {
+            if (el instanceof CompositeWebElement composite && composite.nodeId() != null) {
+                relatedIds.add(composite.nodeId());
+            }
+        }
+        List<WebElement> out = new ArrayList<>();
+        for (WebElement el : matches) {
+            CompositeWebElement composite = (CompositeWebElement) el;
+            if (!relatedIds.contains(composite.nodeId())) out.add(el);
+        }
+        return out.isEmpty() ? List.copyOf(matches) : out;
     }
 
     /**

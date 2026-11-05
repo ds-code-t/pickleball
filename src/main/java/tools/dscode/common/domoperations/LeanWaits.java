@@ -151,6 +151,9 @@ public final class LeanWaits {
             WebElement element,
             Duration timeout
     ) {
+        if (compositeWait(element, "visible", timeout)) {
+            return element;
+        }
         FluentWait<WebDriver> wait = new FluentWait<>(driver)
                 .withTimeout(timeout)
                 .pollingEvery(Duration.ofMillis(150))
@@ -172,6 +175,9 @@ public final class LeanWaits {
             WebElement element,
             Duration timeout
     ) {
+        if (compositeWait(element, "attached", timeout)) {
+            return element;
+        }
         FluentWait<WebDriver> wait = new FluentWait<>(driver)
                 .withTimeout(timeout)
                 .pollingEvery(Duration.ofMillis(150))
@@ -184,6 +190,17 @@ public final class LeanWaits {
             Boolean connected = (Boolean) tools.dscode.common.composite.ElementOperations.script(d, IS_CONNECTED_JS, element);
             return Boolean.TRUE.equals(connected) ? element : null;
         });
+    }
+
+    /**
+     * One composite query wait. False keeps the 150 ms FluentWait.
+     * A timeout from the engine is not caught here.
+     */
+    private static boolean compositeWait(WebElement element, String rules, Duration timeout) {
+        if (!(element instanceof tools.dscode.common.composite.CompositeWebElement composite)) return false;
+        if (!tools.dscode.common.composite.ElementOperations.primary()) return false;
+        long millis = timeout == null ? 0 : Math.max(0, timeout.toMillis());
+        return tools.dscode.common.composite.DomCompositeAdapter.get().waitOn(composite, rules, millis);
     }
 
 
