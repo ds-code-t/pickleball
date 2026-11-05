@@ -150,8 +150,7 @@ public final class HumanInteractions {
         rejectForeignContext(el);
         Objects.requireNonNull(el, "element must not be null");
         if (tools.dscode.common.composite.ElementOperations.primary()) {
-            tools.dscode.common.composite.ElementOperations.click(driver, el);
-            tools.dscode.common.composite.ElementOperations.click(driver, el);
+            tools.dscode.common.composite.ElementOperations.doubleClick(driver, el);
             return;
         }
         try {
@@ -175,7 +174,7 @@ public final class HumanInteractions {
         rejectForeignContext(el);
         Objects.requireNonNull(el, "element must not be null");
         if (tools.dscode.common.composite.ElementOperations.primary()) {
-            tools.dscode.common.composite.ElementOperations.click(driver, el);
+            tools.dscode.common.composite.ElementOperations.contextClick(driver, el);
             return;
         }
         try {

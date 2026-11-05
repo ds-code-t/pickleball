@@ -11,6 +11,7 @@ import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.interactions.Actions;
 import org.openqa.selenium.support.ui.Select;
+import tools.dscode.common.domoperations.KeyParser;
 import tools.dscode.common.seleniumextensions.ElementWrapper;
 
 import java.time.Duration;
@@ -81,10 +82,8 @@ public final class ElementOperations {
     }
 
     /**
-     * Form submit. dom-composite 2.4.0 has click, type, and scroll, and no submit
-     * verb. A composite element therefore submits by click, the same mapping as
-     * {@link CompositeWebElement#submit()}. A Selenium element calls
-     * {@link WebElement#submit()}.
+     * Form submit. A composite element uses {@code submit} when {@code capabilities.actions}
+     * lists it, and click otherwise. A Selenium element calls {@link WebElement#submit()}.
      */
     public static void submit(WebDriver driver, WebElement element) {
         WebElement raw = unwrap(element);
@@ -125,6 +124,46 @@ public final class ElementOperations {
             return;
         }
         raw.sendKeys(keys);
+    }
+
+    public static void doubleClick(WebDriver driver, WebElement element) {
+        WebElement raw = unwrap(element);
+        if (raw instanceof CompositeWebElement composite) {
+            DomCompositeAdapter.get().doubleClick(composite);
+            return;
+        }
+        click(driver, element);
+        click(driver, element);
+    }
+
+    public static void contextClick(WebDriver driver, WebElement element) {
+        WebElement raw = unwrap(element);
+        if (raw instanceof CompositeWebElement composite) {
+            DomCompositeAdapter.get().contextClick(composite);
+            return;
+        }
+        click(driver, element);
+    }
+
+    /**
+     * Sends composite {@code key} chords to a composite element.
+     * False when this run is not on composite, the hit is not a composite element,
+     * the expression is not a chord the verb can represent, or {@code key} is not listed.
+     * A true result means every chord was one {@code key} command and the caller must not also use Actions.
+     */
+    public static boolean pressKeys(WebDriver driver, WebElement element, String input) {
+        DomCompositeAdapter adapter = DomCompositeAdapter.get();
+        if (!primary() && !adapter.dryRun()) return false;
+        WebElement raw = unwrap(element);
+        if (!(raw instanceof CompositeWebElement composite)) return false;
+        if (composite.selector() != null && "desktop".equalsIgnoreCase(composite.selector().source())) return false;
+        List<String> chords = KeyParser.compositeChords(input);
+        if (chords == null || chords.isEmpty()) return false;
+        if (!adapter.actionListed("key")) return false;
+        for (String chord : chords) {
+            if (!adapter.key(composite, chord)) return false;
+        }
+        return true;
     }
 
     public static void hover(WebDriver driver, WebElement element) {

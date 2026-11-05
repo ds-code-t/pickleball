@@ -43,6 +43,26 @@ public final class Session implements AutoCloseable {
         return client.command("scroll", client.forceSession(body, id));
     }
 
+    public JsonNode submit(Object body) {
+        return client.command("submit", client.forceSession(body, id));
+    }
+
+    public JsonNode key(Object body) {
+        return client.command("key", client.forceSession(body, id));
+    }
+
+    public JsonNode dblclick(Object body) {
+        return client.command("dblclick", client.forceSession(body, id));
+    }
+
+    public JsonNode contextclick(Object body) {
+        return client.command("contextclick", client.forceSession(body, id));
+    }
+
+    public JsonNode drag(Object body) {
+        return client.command("drag", client.forceSession(body, id));
+    }
+
     public JsonNode query(Object body) {
         return client.command("query", client.forceSession(body, id));
     }

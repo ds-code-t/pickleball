@@ -13,6 +13,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /** The only composite call path for find, click, type, hover, scroll, keys, and desktop. */
 public final class DomCompositeAdapter {
@@ -24,14 +26,55 @@ public final class DomCompositeAdapter {
     private static final DomCompositeAdapter INSTANCE = new DomCompositeAdapter();
     private final ThreadLocal<ArrayDeque<String>> frames = ThreadLocal.withInitial(ArrayDeque::new);
     private final ThreadLocal<ArrayDeque<String>> shadows = ThreadLocal.withInitial(ArrayDeque::new);
+    private final List<String> recorded = new CopyOnWriteArrayList<>();
+    private final AtomicInteger commands = new AtomicInteger();
     private volatile Client verbClient;
     private volatile Set<String> desktopVerbs;
+    private volatile Set<String> actionVerbs;
+    private volatile Set<String> verbsForTests;
+    private volatile boolean dryRun;
 
     private DomCompositeAdapter() {
     }
 
     public static DomCompositeAdapter get() {
         return INSTANCE;
+    }
+
+    /** Record commands and skip the binary. {@code actions} is the capability set under test. */
+    public void dryRunForTests(Set<String> actions) {
+        verbsForTests = actions == null ? Set.of() : Set.copyOf(actions);
+        dryRun = true;
+        recorded.clear();
+        commands.set(0);
+    }
+
+    public boolean dryRun() {
+        return dryRun;
+    }
+
+    public void resetDryRunForTests() {
+        verbsForTests = null;
+        dryRun = false;
+        actionVerbs = null;
+        desktopVerbs = null;
+        verbClient = null;
+        recorded.clear();
+        commands.set(0);
+    }
+
+    /** Action commands since the last reset, in order. One entry is one round trip. */
+    public List<String> commandsForTests() {
+        return List.copyOf(recorded);
+    }
+
+    public void resetCommandsForTests() {
+        recorded.clear();
+        commands.set(0);
+    }
+
+    public boolean actionListed(String verb) {
+        return VerbPlan.listed(actionVerbs(), verb);
     }
 
     public List<WebElement> find(By by) {
@@ -81,11 +124,68 @@ public final class DomCompositeAdapter {
         act("scroll", element, Map.of("dx", dx, "dy", dy));
     }
 
+    public void submit(CompositeWebElement element) {
+        if (desktopSource(element) || !VerbPlan.listed(actionVerbs(), "submit")) {
+            CompositeLog.info("adapter", "verb submit fallback");
+            click(element);
+            return;
+        }
+        CompositeLog.info("adapter", "verb submit real");
+        act("submit", element, Map.of());
+    }
+
+    public void doubleClick(CompositeWebElement element) {
+        if (desktopSource(element) || !VerbPlan.listed(actionVerbs(), "dblclick")) {
+            CompositeLog.info("adapter", "verb dblclick fallback");
+            click(element);
+            click(element);
+            return;
+        }
+        CompositeLog.info("adapter", "verb dblclick real");
+        act("dblclick", element, Map.of());
+    }
+
+    public void contextClick(CompositeWebElement element) {
+        if (desktopSource(element) || !VerbPlan.listed(actionVerbs(), "contextclick")) {
+            CompositeLog.info("adapter", "verb contextclick fallback");
+            click(element);
+            return;
+        }
+        CompositeLog.info("adapter", "verb contextclick real");
+        act("contextclick", element, Map.of());
+    }
+
     public void drag(CompositeWebElement source, CompositeWebElement target, int xOffset, int yOffset) {
-        CompositeLog.info("adapter", "drag " + source.selector().describe());
-        click(source);
-        scroll(source, xOffset, yOffset == 0 && target != null ? target.rectHeight() : yOffset);
-        if (target != null) click(target);
+        boolean real = !desktopSource(source)
+                && VerbPlan.drag(actionVerbs(), target != null, xOffset, yOffset).equals(List.of("drag"));
+        if (!real) {
+            CompositeLog.info("adapter", "verb drag fallback");
+            click(source);
+            scroll(source, xOffset, yOffset == 0 && target != null ? target.rectHeight() : yOffset);
+            if (target != null) click(target);
+            return;
+        }
+        CompositeLog.info("adapter", "verb drag real");
+        Client open = clientOrDry();
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("source", source.actionBody(list(frames), list(shadows)));
+        body.put("target", target.actionBody(list(frames), list(shadows)));
+        record("drag");
+        if (dryRun) return;
+        open.drag(body);
+    }
+
+    /**
+     * One composite {@code key} chord. False when the verb is absent or this hit is a desktop node.
+     * The engine focuses the node, so the caller does not click first.
+     */
+    public boolean key(CompositeWebElement element, String chord) {
+        if (chord == null || chord.isBlank() || desktopSource(element) || !VerbPlan.listed(actionVerbs(), "key")) {
+            return false;
+        }
+        CompositeLog.info("adapter", "verb key real");
+        act("key", element, Map.of("key", chord));
+        return true;
     }
 
     public void keys(String text) {
@@ -149,19 +249,38 @@ public final class DomCompositeAdapter {
     private Set<String> desktopVerbs() {
         Client open = CompositeRuntime.ensureClient();
         if (open == null) return Set.copyOf(DESKTOP_VERBS_2_4_0);
+        pinClient(open);
         Set<String> cached = desktopVerbs;
-        if (open == verbClient && cached != null) return cached;
-        Set<String> loaded = loadDesktopVerbs(open);
-        verbClient = open;
+        if (cached != null) return cached;
+        Set<String> loaded = loadNamedVerbs(open, "desktop", DESKTOP_VERBS_2_4_0);
         desktopVerbs = loaded;
         return loaded;
     }
 
-    private static Set<String> loadDesktopVerbs(Client open) {
+    private Set<String> actionVerbs() {
+        if (verbsForTests != null) return verbsForTests;
+        Client open = CompositeRuntime.ensureClient();
+        if (open == null) return Set.copyOf(VerbPlan.ACTIONS_2_4_0);
+        pinClient(open);
+        Set<String> cached = actionVerbs;
+        if (cached != null) return cached;
+        Set<String> loaded = loadNamedVerbs(open, "actions", VerbPlan.ACTIONS_2_4_0);
+        actionVerbs = loaded;
+        return loaded;
+    }
+
+    private void pinClient(Client open) {
+        if (open == verbClient) return;
+        verbClient = open;
+        desktopVerbs = null;
+        actionVerbs = null;
+    }
+
+    private static Set<String> loadNamedVerbs(Client open, String field, List<String> fallback) {
         try {
             JsonNode caps = open.capabilities();
-            JsonNode list = caps == null ? null : caps.get("desktop");
-            if (list == null || !list.isArray()) return Set.copyOf(DESKTOP_VERBS_2_4_0);
+            JsonNode list = caps == null ? null : caps.get(field);
+            if (list == null || !list.isArray()) return Set.copyOf(fallback);
             Set<String> verbs = new LinkedHashSet<>();
             for (JsonNode item : list) {
                 String name = item.asText("").trim().toLowerCase(Locale.ROOT);
@@ -169,7 +288,7 @@ public final class DomCompositeAdapter {
             }
             return Set.copyOf(verbs);
         } catch (RuntimeException ignored) {
-            return Set.copyOf(DESKTOP_VERBS_2_4_0);
+            return Set.copyOf(fallback);
         }
     }
 
@@ -202,18 +321,36 @@ public final class DomCompositeAdapter {
     }
 
     private void act(String command, CompositeWebElement element, Map<String, Object> extra) {
-        Client open = CompositeRuntime.ensureClient();
-        if (open == null) throw new IllegalStateException("composite client is not open");
         Map<String, Object> body = new LinkedHashMap<>(element.actionBody(list(frames), list(shadows)));
         body.putAll(extra);
+        record(command);
         CompositeLog.info("adapter", command + " " + element.selector().describe());
+        if (dryRun) return;
+        Client open = CompositeRuntime.ensureClient();
+        if (open == null) throw new IllegalStateException("composite client is not open");
         switch (command) {
             case "click" -> open.click(body);
             case "type" -> open.type(body);
             case "scroll" -> open.scroll(body);
+            case "submit" -> open.submit(body);
+            case "key" -> open.key(body);
+            case "dblclick" -> open.dblclick(body);
+            case "contextclick" -> open.contextclick(body);
             case "query" -> open.query(body);
             default -> open.command(command, body);
         }
+    }
+
+    private Client clientOrDry() {
+        if (dryRun) return null;
+        Client open = CompositeRuntime.ensureClient();
+        if (open == null) throw new IllegalStateException("composite client is not open");
+        return open;
+    }
+
+    private void record(String command) {
+        commands.incrementAndGet();
+        recorded.add(command);
     }
 
     private List<WebElement> hits(JsonNode json, CompositeSelector selector) {

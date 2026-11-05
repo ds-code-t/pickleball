@@ -122,7 +122,7 @@ public final class CompositeWebElement implements WebElement {
 
     @Override
     public void submit() {
-        click();
+        DomCompositeAdapter.get().submit(this);
     }
 
     @Override

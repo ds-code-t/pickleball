@@ -24,7 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * ElementWrapper has one call per action. Composite on uses the adapter.
  * Composite off uses the Selenium element through ElementOperations.
- * Composite submit is click: 2.4.0 has no submit verb.
+ * Composite submit is click when capabilities.actions has no submit verb.
  */
 class ElementWrapperActionTest {
     @TempDir

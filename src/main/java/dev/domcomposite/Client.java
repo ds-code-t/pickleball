@@ -303,6 +303,26 @@ public final class Client implements AutoCloseable {
         return command("scroll", bindLive(body, true));
     }
 
+    public JsonNode submit(Object body) {
+        return command("submit", bindLive(body, true));
+    }
+
+    public JsonNode key(Object body) {
+        return command("key", bindLive(body, true));
+    }
+
+    public JsonNode dblclick(Object body) {
+        return command("dblclick", bindLive(body, true));
+    }
+
+    public JsonNode contextclick(Object body) {
+        return command("contextclick", bindLive(body, true));
+    }
+
+    public JsonNode drag(Object body) {
+        return command("drag", bindLive(body, true));
+    }
+
     public JsonNode screenshot(Object body) {
         return command("screenshot", bindLive(body, false));
     }

@@ -112,6 +112,7 @@ public final class CompositeRuntime {
         joinedCdp = null;
         override = null;
         CompositeLog.resetForTests();
+        DomCompositeAdapter.get().resetDryRunForTests();
     }
 
     public static boolean primary() {

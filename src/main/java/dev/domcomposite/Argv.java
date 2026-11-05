@@ -84,7 +84,8 @@ public final class Argv {
         }
         switch (cmd) {
             case "capture" -> pushBools(argv, node, new String[][] {{"mobile", "mobile"}});
-            case "query", "resolve", "click", "type", "scroll" -> {
+            case "query", "resolve", "click", "type", "scroll", "submit", "key", "dblclick",
+                    "contextclick" -> {
                 pushValues(argv, node, SELECTOR_FLAGS);
                 pushBools(argv, node, new String[][] {
                     {"strict", "strict"},
@@ -96,11 +97,30 @@ public final class Argv {
                 });
                 if ("type".equals(cmd)) {
                     pushValues(argv, node, new String[][] {{"text", "text"}});
-                    pushBools(argv, node, new String[][] {{"submit", "submit"}});
+                    pushBools(argv, node, new String[][] {
+                        {"submit", "submit"},
+                        {"append", "append"},
+                    });
+                }
+                if ("key".equals(cmd)) {
+                    pushValues(argv, node, new String[][] {{"key", "key"}});
                 }
                 if ("scroll".equals(cmd)) {
                     pushValues(argv, node, new String[][] {{"dx", "dx"}, {"dy", "dy"}});
                 }
+            }
+            case "drag" -> {
+                pushValues(argv, node, new String[][] {
+                    {"session", "session"},
+                    {"cdp", "cdp"},
+                    {"timeout_ms", "timeout-ms"},
+                    {"stability_ms", "stability-ms"},
+                    {"wait_for", "wait-for"},
+                    {"session_dir", "session-dir"},
+                });
+                pushBools(argv, node, new String[][] {{"auto_wait", "auto-wait"}});
+                pushLocator(argv, node, "source", "source");
+                pushLocator(argv, node, "target", "target");
             }
             case "recommend" -> {
                 pushValues(argv, node, new String[][] {
@@ -182,7 +202,9 @@ public final class Argv {
                     {"scroll", "scroll"},
                     {"perform", "perform"},
                     {"promote_visual", "promote-visual"},
+                    {"append", "append"},
                 });
+                pushValues(argv, node, new String[][] {{"text", "text"}, {"key", "key"}});
             }
             case "screenshot" -> pushValues(argv, node, new String[][] {
                 {"out", "out"},
@@ -254,6 +276,20 @@ public final class Argv {
         String hyphen = key.replace('_', '-');
         if (!hyphen.equals(key)) return body.get(hyphen);
         return null;
+    }
+
+    private static void pushLocator(List<String> argv, JsonNode body, String key, String flag) {
+        JsonNode value = field(body, key);
+        if (value == null || value.isNull()) return;
+        if (value.isObject()) {
+            argv.add("--" + flag);
+            argv.add(value.toString());
+            return;
+        }
+        String text = scalar(value);
+        if (text == null) return;
+        argv.add("--" + flag);
+        argv.add(text);
     }
 
     private static void pushValues(List<String> argv, JsonNode body, String[][] flags) {

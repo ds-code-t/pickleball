@@ -110,8 +110,9 @@ public final class KeyParser {
                 }
                 return;
             }
-            // composite 2.4.0 can insert text and click. It has no keydown verb, so
-            // named keys and chords use the same Actions parser after a composite focus.
+            if (tools.dscode.common.composite.ElementOperations.pressKeys(driver, element, input)) return;
+            // No key verb, or a chord the verb cannot represent (two non-modifiers).
+            // Focus, then the same Actions parser the Selenium path uses.
             tools.dscode.common.composite.ElementOperations.click(driver, element);
             Actions actions = tools.dscode.common.composite.ElementOperations.actions(driver);
             parseInto(actions, input);
@@ -332,6 +333,136 @@ public final class KeyParser {
         }
 
         throw new IllegalArgumentException("Unknown key: " + token);
+    }
+
+    /**
+     * Chords the composite {@code key} verb can send, or null when the expression
+     * needs WebDriver Actions. {@code ENTER} is {@code [ENTER]}. {@code CONTROL[A]}
+     * and {@code CONTROL+A} are {@code [CONTROL+A]}. {@code SHIFT+TAB} is
+     * {@code [SHIFT+TAB]}. {@code ENTER TAB} is {@code [ENTER, TAB]}. {@code A+B}
+     * and {@code CONTROL[A+B]} are null: a chord has one non-modifier.
+     * Each returned chord is one {@code key} command. The engine focuses the target on every command.
+     */
+    public static List<String> compositeChords(String input) {
+        if (input == null) return null;
+        int[] pos = {0};
+        List<String> out = new ArrayList<>();
+        if (!chordSequence(input, pos, List.of(), out, false)) return null;
+        skipSpaces(input, pos);
+        if (pos[0] < input.length()) return null;
+        return List.copyOf(out);
+    }
+
+    private static boolean chordSequence(String input, int[] pos, List<String> held, List<String> out, boolean sub) {
+        while (pos[0] < input.length()) {
+            skipSpaces(input, pos);
+            if (pos[0] >= input.length()) break;
+            if (input.charAt(pos[0]) == ']') return sub;
+            if (!chordTerm(input, pos, held, out)) return false;
+        }
+        return true;
+    }
+
+    private static boolean chordTerm(String input, int[] pos, List<String> held, List<String> out) {
+        skipSpaces(input, pos);
+        List<String> group = new ArrayList<>();
+        if (!chordGroup(input, pos, group)) return false;
+        skipSpaces(input, pos);
+        if (pos[0] < input.length() && input.charAt(pos[0]) == '[') {
+            pos[0]++;
+            List<String> next = new ArrayList<>(held);
+            for (String key : group) {
+                if (!isModifier(key)) return false;
+                next.add(key);
+            }
+            if (!chordSequence(input, pos, next, out, true)) return false;
+            skipSpaces(input, pos);
+            if (pos[0] >= input.length() || input.charAt(pos[0]) != ']') return false;
+            pos[0]++;
+            return true;
+        }
+        String chord = chordOf(held, group);
+        if (chord == null) return false;
+        out.add(chord);
+        return true;
+    }
+
+    private static boolean chordGroup(String input, int[] pos, List<String> out) {
+        String first = chordToken(input, pos);
+        if (first == null) return false;
+        out.add(first);
+        while (true) {
+            skipSpaces(input, pos);
+            if (pos[0] < input.length() && input.charAt(pos[0]) == '+') {
+                pos[0]++;
+                String next = chordToken(input, pos);
+                if (next == null) return false;
+                out.add(next);
+                continue;
+            }
+            break;
+        }
+        return true;
+    }
+
+    private static String chordToken(String input, int[] pos) {
+        skipSpaces(input, pos);
+        if (pos[0] >= input.length()) return null;
+        char mark = input.charAt(pos[0]);
+        if (mark == '+' || mark == '[' || mark == ']') return null;
+        String token = parseToken(input, pos);
+        if (token.isEmpty()) return null;
+        return compositeToken(token);
+    }
+
+    private static String chordOf(List<String> held, List<String> group) {
+        List<String> mods = new ArrayList<>(held);
+        String main = null;
+        for (String key : group) {
+            if (isModifier(key) && main == null) {
+                mods.add(key);
+                continue;
+            }
+            if (main != null) return null;
+            main = key;
+        }
+        if (main == null) {
+            if (mods.isEmpty()) return null;
+            main = mods.remove(mods.size() - 1);
+        }
+        if (mods.isEmpty()) return main;
+        return String.join("+", mods) + "+" + main;
+    }
+
+    private static boolean isModifier(String key) {
+        return "CONTROL".equals(key) || "SHIFT".equals(key) || "ALT".equals(key) || "META".equals(key);
+    }
+
+    /** Composite key name, or null when this token is not one composite key. */
+    private static String compositeToken(String raw) {
+        String name = raw.toUpperCase(Locale.ROOT);
+        return switch (name) {
+            case "ENTER", "RETURN" -> "ENTER";
+            case "TAB" -> "TAB";
+            case "ESCAPE", "ESC" -> "ESCAPE";
+            case "UP", "ARROW_UP", "ARROWUP" -> "ARROWUP";
+            case "DOWN", "ARROW_DOWN", "ARROWDOWN" -> "ARROWDOWN";
+            case "LEFT", "ARROW_LEFT", "ARROWLEFT" -> "ARROWLEFT";
+            case "RIGHT", "ARROW_RIGHT", "ARROWRIGHT" -> "ARROWRIGHT";
+            case "BACK_SPACE", "BACKSPACE" -> "BACKSPACE";
+            case "DELETE" -> "DELETE";
+            case "HOME" -> "HOME";
+            case "END" -> "END";
+            case "PAGE_UP", "PAGEUP" -> "PAGEUP";
+            case "PAGE_DOWN", "PAGEDOWN" -> "PAGEDOWN";
+            case "SPACE" -> "SPACE";
+            case "CONTROL", "CTRL", "LEFT_CONTROL" -> "CONTROL";
+            case "SHIFT", "LEFT_SHIFT" -> "SHIFT";
+            case "ALT", "LEFT_ALT" -> "ALT";
+            case "META", "COMMAND", "WIN", "LEFT_META" -> "META";
+            case "F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "F11", "F12" -> name;
+            default -> name.length() == 1 && Character.isLetterOrDigit(name.charAt(0)) ? name : null;
+        };
     }
 
     /** Letters and digits the composite type verb can insert.
