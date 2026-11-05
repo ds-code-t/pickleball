@@ -129,11 +129,11 @@ The binary is found at runtime by `CompositeBinaryLocator`, the same order the p
 
 Element operations join an already-attached session when the driver publishes a CDP address. That join uses `Client.openSession` with `cdp` and `i_accept_local_attach`. It does not launch a second browser and it does not replace `pkb_direct_control_provider`.
 
-Logging is off unless `pkb_composite_log` is `all` or a comma list of `location`, `adapter`, `session`, `element`, `fallback`, `batch`. `batch` writes one `TRACE batch mode=<composite|selenium-batch|selenium-legacy> selector=<by> nodes=<count> durationMs=<n>` line per describe and no per-element line. Lines go to the CLI and to `composite-YYYY-MM-DD.log` under `pkb_composite_log_dir` (default the temp directory `pickleball-composite-logs`). One file is capped at 1 MiB.
+Logging is off unless `pkb_composite_log` is `all` or a comma list of `location`, `adapter`, `session`, `element`, `fallback`, `batch`, `state`. `batch` writes one `TRACE batch mode=<composite|selenium-batch|selenium-legacy> selector=<by> nodes=<count> durationMs=<n>` line per describe and no per-element line. `state` writes one `TRACE state snapshot miss fallback` line only when a state check has no snapshot. `adapter` writes the verb, snapshot, scan, wait, nest, and live lines. Lines go to the CLI and to `composite-YYYY-MM-DD.log` under `pkb_composite_log_dir` (default the temp directory `pickleball-composite-logs`). One file is capped at 1 MiB.
 
 ## Desktop click, type, and native classifiers
 
-composite 2.4.0 desktop verbs are only `list`, `attach`, `walk`, `query`, `resolve`, and `close`. Browser actions are `click`, `type`, and `scroll`. There is no `desktop click` and no `desktop type`. A desktop click or type in Pickleball fails immediately. The CLI always prints `error:` and `fix:`. It is not a silent no-op, and it is not hidden when logging is off.
+composite 2.4.0 desktop verbs are only `list`, `attach`, `walk`, `query`, `resolve`, and `close`. Browser actions on that binary are `click`, `type`, and `scroll`. That binary has no `desktop click` and no `desktop type`. A desktop click or type then fails immediately. The CLI always prints `error:` and `fix:`. It is not a silent no-op, and it is not hidden when logging is off. dom-composite 2.8.0 lists `click` and `type` on `capabilities.desktop`. Pickleball already forwards those. The native classifier jars are still not in this repo.
 
 The `fix:` names the missing verb. Expected upstream verbs are `desktop click` and `desktop type`. When a later binary's `capabilities.desktop` array lists `click` or `type`, `DomCompositeAdapter` forwards that verb. No Pickleball change is required for the drop-in.
 
