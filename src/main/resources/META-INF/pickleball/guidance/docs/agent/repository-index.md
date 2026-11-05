@@ -246,6 +246,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/common/domoperations/KeyParser.java`
 - `src/main/java/tools/dscode/common/domoperations/LeanWaits.java`
 - `src/main/java/tools/dscode/common/domoperations/NestedByLocator.java`
+- `src/main/java/tools/dscode/common/domoperations/PositionSelection.java`
 - `src/main/java/tools/dscode/common/domoperations/SeleniumUtils.java`
 - `src/main/java/tools/dscode/common/domoperations/TableColumnByHeaderXPath.java`
 - `src/main/java/tools/dscode/common/driver/DriverConstruction.java`
@@ -496,10 +497,13 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/common/composite/AllContextsPlanTest.java`
 - `src/test/java/tools/dscode/common/composite/CompositeElements.java`
 - `src/test/java/tools/dscode/common/composite/CompositeLocationTest.java`
+- `src/test/java/tools/dscode/common/composite/ContextAnchorReproTest.java`
+- `src/test/java/tools/dscode/common/composite/ContextNestGateTest.java`
 - `src/test/java/tools/dscode/common/composite/DomAccessGuardTest.java`
 - `src/test/java/tools/dscode/common/composite/ElementBatchEdgeTest.java`
 - `src/test/java/tools/dscode/common/composite/ElementBatchLogTest.java`
 - `src/test/java/tools/dscode/common/composite/ElementSnapshotEvalTest.java`
+- `src/test/java/tools/dscode/common/composite/EnginePositionGateTest.java`
 - `src/test/java/tools/dscode/common/composite/LeanWaitNestLiveTest.java`
 - `src/test/java/tools/dscode/common/composite/PrimaryPathAuditTest.java`
 - `src/test/java/tools/dscode/common/composite/SelectorAndAdapterTest.java`
@@ -508,6 +512,8 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/common/coordination/RunConfigIsolationTest.java`
 - `src/test/java/tools/dscode/common/dataelements/NamespaceXmlTest.java`
 - `src/test/java/tools/dscode/common/domoperations/LoadingCategoryDefinitionTest.java`
+- `src/test/java/tools/dscode/common/domoperations/NestAnchorReproTest.java`
+- `src/test/java/tools/dscode/common/domoperations/PositionSelectionTest.java`
 - `src/test/java/tools/dscode/common/driver/DriverDownloadFallbackTest.java`
 - `src/test/java/tools/dscode/common/mappings/ParsingMapGreaterThanMaskTest.java`
 - `src/test/java/tools/dscode/common/mappings/queries/DocumentAndReservedFieldReadTest.java`
@@ -519,6 +525,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/common/reporting/diagnostic/DiagnosticSecretRedactionTest.java`
 - `src/test/java/tools/dscode/common/reporting/diagnostic/DiscoverHintJvmLeakTest.java`
 - `src/test/java/tools/dscode/common/resources/PathListSemanticsTest.java`
+- `src/test/java/tools/dscode/common/seleniumextensions/AllContextsPositionTest.java`
 - `src/test/java/tools/dscode/common/seleniumextensions/ElementSnapshotParityTest.java`
 - `src/test/java/tools/dscode/common/seleniumextensions/ElementStateRoundTripTest.java`
 - `src/test/java/tools/dscode/common/seleniumextensions/ElementWrapperActionTest.java`
@@ -611,6 +618,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/resources/guidance-golden/documented-help.txt`
 - `src/test/resources/launch-parity/observe.feature`
 - `src/test/resources/multiline-assert/multiline-assert.feature`
+- `src/test/resources/position/ordinals.html`
 - `src/test/resources/scenario-object/scenario-object.feature`
 - `src/test/resources/until-pass/literal-until-with-browser.feature`
 - `src/test/resources/until-pass/literal-until.feature`
