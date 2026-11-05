@@ -15,11 +15,14 @@ import java.util.concurrent.atomic.AtomicBoolean;
 /**
  * CLI-first log for the dom-composite adapter. Off unless
  * {@code pkb_composite_log} names an entity ({@code location}, {@code adapter},
- * {@code session}, {@code element}, {@code fallback}, {@code batch}, {@code state})
+ * {@code session}, {@code element}, {@code fallback}, {@code batch}, {@code state},
+ * {@code position})
  * or {@code all}.
  * {@code batch} writes one TRACE line per describe:
  * {@code TRACE batch mode=<composite|selenium-batch|selenium-legacy> selector=<by> nodes=<count> durationMs=<n>}.
- * There is no per-element line. Files are date-stamped and capped. The fallback line is recorded once per run.
+ * There is no per-element line. {@code position} writes
+ * {@code TRACE position apply size=<n> position=<p> selection=<s> kept=<k> durationMs=<ms>}
+ * and {@code TRACE position ordinal}. Files are date-stamped and capped. The fallback line is recorded once per run.
  */
 public final class CompositeLog {
     public static final String KEY = "pkb_composite_log";

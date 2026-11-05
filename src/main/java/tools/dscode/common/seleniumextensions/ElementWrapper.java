@@ -11,6 +11,7 @@ import tools.dscode.common.assertions.ValueWrapper;
 
 import java.time.Duration;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static tools.dscode.common.assertions.ValueWrapper.createValueWrapper;
 import static tools.dscode.common.domoperations.LeanWaits.safeWaitForElementReady;
@@ -29,8 +30,11 @@ import static tools.dscode.common.util.debug.DebugUtils.debugFlags;
 /**
  * One live element and one {@link ElementSnapshot}.
  *
- * <p>The snapshot is taken once, when the wrapper is built. Reads
- * ({@link #snapshot()}, {@link #getTagName()}, {@link #getIndex()},
+ * <p>The snapshot is taken once. A Selenium element is snapshotted when the
+ * wrapper is built. A composite hit keeps tag, text, attributes, and bounds
+ * from the query and evaluates {@code selectedValue}, {@code siblingIndex},
+ * {@code sameTagIndex}, and {@code stableSelector} on the first read.
+ * Reads ({@link #snapshot()}, {@link #getTagName()}, {@link #getIndex()},
  * {@link #getSameTagIndex()}, {@link #getSnapshotValue(String)}, and the
  * deprecated {@link #getAttributeSnapshot()}) do not take another snapshot.
  * {@link #refreshSnapshot()} is the only refresh. {@link #takeSnapshot()}
@@ -64,6 +68,9 @@ public class ElementWrapper implements WebElement, WrapsElement {
     public final ElementMatch elementMatch;
     public final Integer matchIndex;
     public final boolean foreignContext;
+    private boolean snapshotComplete;
+
+    private static final AtomicInteger WRAPS = new AtomicInteger();
 
     private static final Set<String> DOM_PROPERTY_FALLBACK_KEYS = Set.of(
             "innerHTML",
@@ -99,8 +106,17 @@ public class ElementWrapper implements WebElement, WrapsElement {
         return elementWrappers;
     }
 
-    ElementWrapper(WebElement element, ElementMatch elementMatch, Integer matchIndex) {
-        this(elementMatch.parentPhrase.getDriver(), element, elementMatch, matchIndex);
+    /** How many wrappers this JVM has built. All-contexts uses it to show only chosen hits are wrapped. */
+    public static int wrapsForTests() {
+        return WRAPS.get();
+    }
+
+    public static void resetWrapsForTests() {
+        WRAPS.set(0);
+    }
+
+    static ElementWrapper adopt(WebDriver driver, WebElement element, ElementMatch elementMatch, int matchIndex) {
+        return new ElementWrapper(driver, element, elementMatch, matchIndex);
     }
 
     /**
@@ -113,14 +129,24 @@ public class ElementWrapper implements WebElement, WrapsElement {
         return new ElementWrapper(driver, element, ElementMatch.resolved("Text"), 1);
     }
 
+    ElementWrapper(WebElement element, ElementMatch elementMatch, Integer matchIndex) {
+        this(elementMatch.parentPhrase.getDriver(), element, elementMatch, matchIndex);
+    }
+
     private ElementWrapper(WebDriver driver, WebElement element, ElementMatch elementMatch, Integer matchIndex) {
+        WRAPS.incrementAndGet();
         this.driver = Objects.requireNonNull(driver, "driver");
         this.matchIndex = matchIndex;
         this.elementMatch = elementMatch;
         this.foreignContext = false;
         this.element = Objects.requireNonNull(element, "element must not be null");
-
-        assignSnapshot(this.element, "create");
+        if (element instanceof CompositeWebElement composite) {
+            this.elementSnapshot = partialSnapshot(composite);
+            this.snapshotComplete = false;
+            tools.dscode.common.composite.CompositeLog.trace("adapter", "snapshot deferred " + composite.nodeId());
+        } else {
+            assignSnapshot(this.element, "create");
+        }
     }
 
     /**
@@ -128,16 +154,22 @@ public class ElementWrapper implements WebElement, WrapsElement {
      * is not a live element.
      */
     public static ElementWrapper foreignPresence(ElementMatch elementMatch) {
-        return new ElementWrapper(elementMatch);
+        return foreignPresence(elementMatch.parentPhrase.getDriver(), elementMatch);
     }
 
-    private ElementWrapper(ElementMatch elementMatch) {
-        this.driver = elementMatch.parentPhrase.getDriver();
+    static ElementWrapper foreignPresence(WebDriver driver, ElementMatch elementMatch) {
+        return new ElementWrapper(driver, elementMatch);
+    }
+
+    private ElementWrapper(WebDriver driver, ElementMatch elementMatch) {
+        WRAPS.incrementAndGet();
+        this.driver = driver;
         this.matchIndex = 0;
         this.elementMatch = elementMatch;
         this.foreignContext = true;
         this.element = null;
         this.elementSnapshot = ElementSnapshot.empty();
+        this.snapshotComplete = true;
     }
 
     public static String foreignContextMessage(String category) {
@@ -173,9 +205,13 @@ public class ElementWrapper implements WebElement, WrapsElement {
             assignSnapshot(element, "refresh");
             return;
         }
-        String selector = snapshot().stableSelector();
+        String selector = known().stableSelector();
+        if ((selector == null || selector.isBlank()) && !snapshotComplete) {
+            completeSnapshot("refresh");
+            selector = known().stableSelector();
+        }
         String refreshMode = mode();
-        String nodeId = snapshot().nodeId();
+        String nodeId = known().nodeId();
         if (selector == null || selector.isBlank()) {
             throw new IllegalStateException(refreshError(
                     refreshMode, selector, nodeId, "stableSelector was empty"));
@@ -239,11 +275,61 @@ public class ElementWrapper implements WebElement, WrapsElement {
      * after construction. Reads do not take a new snapshot.
      */
     public ElementSnapshot snapshot() {
+        completeSnapshot("read");
+        return known();
+    }
+
+    private ElementSnapshot known() {
         return elementSnapshot == null ? ElementSnapshot.empty() : elementSnapshot;
+    }
+
+    private void completeSnapshot(String event) {
+        if (snapshotComplete) {
+            return;
+        }
+        if (element instanceof CompositeWebElement) {
+            assignSnapshot(element, event);
+            return;
+        }
+        snapshotComplete = true;
+    }
+
+    /**
+     * Tag, text, attributes, and bounds from the query hit. Positions and the
+     * stable selector stay unset until {@link #completeSnapshot(String)}.
+     * An id that is a CSS identifier is a provisional selector so a refresh
+     * can run before that eval.
+     */
+    private static ElementSnapshot partialSnapshot(CompositeWebElement composite) {
+        String id = tools.dscode.common.composite.ElementOperations.attribute(composite, "id");
+        String stable = cssIdent(id) ? "#" + id : "";
+        String value = tools.dscode.common.composite.ElementOperations.attribute(composite, "value");
+        org.openqa.selenium.Rectangle rect = tools.dscode.common.composite.ElementOperations.rect(composite);
+        ElementSnapshot.Bounds bounds = rect == null
+                ? null
+                : new ElementSnapshot.Bounds(rect.x, rect.y, rect.width, rect.height);
+        return new ElementSnapshot(
+                composite.nodeId(),
+                tools.dscode.common.composite.ElementOperations.tag(composite),
+                tools.dscode.common.composite.ElementOperations.text(composite),
+                value == null ? "" : value,
+                null,
+                composite.attributes(),
+                bounds,
+                0,
+                0,
+                stable,
+                null
+        );
+    }
+
+    private static boolean cssIdent(String value) {
+        return value != null && value.matches("[A-Za-z_][-A-Za-z0-9_]*");
     }
 
     private void assignSnapshot(WebElement snapshotElement, String event) {
         this.elementSnapshot = SnapshotProducers.capture(driver, snapshotElement, event);
+        this.snapshotComplete = true;
         this.elementReturnValue = null;
         this.extraSnapshotValues.clear();
         if (debugFlags.contains("elementsnapshot")) {
@@ -446,6 +532,7 @@ public class ElementWrapper implements WebElement, WrapsElement {
 
     @Override
     public String getDomProperty(String name) {
+        if (!snapshotComplete && known().hasAttribute(name)) return known().attribute(name);
         if ("value".equals(name)) return snapshot().value();
         if (snapshot().hasAttribute(name)) return snapshot().attribute(name);
         return executeWithStaleRetry(currentElement ->
@@ -454,14 +541,16 @@ public class ElementWrapper implements WebElement, WrapsElement {
 
     @Override
     public String getDomAttribute(String name) {
-        if (snapshot().hasAttribute(name)) return snapshot().attribute(name);
+        if (known().hasAttribute(name)) return known().attribute(name);
+        if (!snapshotComplete && snapshot().hasAttribute(name)) return snapshot().attribute(name);
         return executeWithStaleRetry(currentElement ->
                 tools.dscode.common.composite.ElementOperations.domAttribute(currentElement, name));
     }
 
     @Override
     public String getAttribute(String name) {
-        if (snapshot().hasAttribute(name)) return snapshot().attribute(name);
+        if (known().hasAttribute(name)) return known().attribute(name);
+        if (!snapshotComplete && snapshot().hasAttribute(name)) return snapshot().attribute(name);
         return executeWithStaleRetry(currentElement ->
                 tools.dscode.common.composite.ElementOperations.attribute(currentElement, name));
     }
@@ -664,7 +753,8 @@ public class ElementWrapper implements WebElement, WrapsElement {
 
     public String getSnapshotAttribute(String name) {
         if (name == null) return null;
-        if (snapshot().hasAttribute(name)) return snapshot().attribute(name);
+        if (known().hasAttribute(name)) return known().attribute(name);
+        if (!snapshotComplete && snapshot().hasAttribute(name)) return snapshot().attribute(name);
         return extraSnapshotValues.get("attributes." + name);
     }
 
@@ -690,35 +780,49 @@ public class ElementWrapper implements WebElement, WrapsElement {
 
     public String getSnapshotValue(String key) {
         if (key == null) return null;
-        ElementSnapshot shot = snapshot();
-        switch (key) {
-            case "tagName":
-            case "tag":
-                return shot.tag();
-            case "textContent":
-            case "text":
-                return shot.text();
-            case "childValue":
-            case "selectedValue":
-                return shot.selectedValue();
-            case "siblingIndex":
-                return Integer.toString(shot.siblingIndex());
-            case "sameTagIndex":
-                return Integer.toString(shot.sameTagIndex());
-            case "stableSelector":
-                return shot.stableSelector();
-            case "nodeId":
-                return shot.nodeId();
-            default:
-                break;
+        if (cheap(key)) {
+            return cheapValue(key);
         }
-        if (extraSnapshotValues.containsKey(key)) return extraSnapshotValues.get(key);
-        if (shot.hasAttribute(key)) return shot.attribute(key);
-        return extraSnapshotValues.get("attributes." + key);
+        ElementSnapshot shot = snapshot();
+        return switch (key) {
+            case "tagName", "tag" -> shot.tag();
+            case "textContent", "text" -> shot.text();
+            case "childValue", "selectedValue" -> shot.selectedValue();
+            case "siblingIndex" -> Integer.toString(shot.siblingIndex());
+            case "sameTagIndex" -> Integer.toString(shot.sameTagIndex());
+            case "stableSelector" -> shot.stableSelector();
+            case "nodeId" -> shot.nodeId();
+            default -> {
+                if (extraSnapshotValues.containsKey(key)) yield extraSnapshotValues.get(key);
+                if (shot.hasAttribute(key)) yield shot.attribute(key);
+                yield extraSnapshotValues.get("attributes." + key);
+            }
+        };
+    }
+
+    private boolean cheap(String key) {
+        if (snapshotComplete) return false;
+        return switch (key) {
+            case "tagName", "tag", "textContent", "text", "nodeId" -> true;
+            default -> known().hasAttribute(key);
+        };
+    }
+
+    private String cheapValue(String key) {
+        ElementSnapshot shot = known();
+        return switch (key) {
+            case "tagName", "tag" -> shot.tag();
+            case "textContent", "text" -> shot.text();
+            case "nodeId" -> shot.nodeId();
+            default -> shot.attribute(key);
+        };
     }
 
     @Override
     public String getTagName() {
+        if (!snapshotComplete && element instanceof CompositeWebElement) {
+            return known().tag();
+        }
         return snapshot().tag();
     }
 

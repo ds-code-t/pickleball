@@ -6,6 +6,7 @@ import org.openqa.selenium.SearchContext;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebDriverException;
 import org.openqa.selenium.WebElement;
+import tools.dscode.common.domoperations.PositionSelection;
 import tools.dscode.common.treeparsing.parsedComponents.ElementMatch;
 
 import java.time.Duration;
@@ -93,6 +94,13 @@ public final class AllContextsScan {
         if (driver == null) {
             return List.of();
         }
+        return find(driver, elementMatch);
+    }
+
+    static List<ElementWrapper> find(WebDriver driver, ElementMatch elementMatch) {
+        if (driver == null || elementMatch == null) {
+            return List.of();
+        }
         return new Scan(driver, elementMatch).run();
     }
 
@@ -100,7 +108,7 @@ public final class AllContextsScan {
         private final WebDriver driver;
         private final ElementMatch elementMatch;
         private final String xpath;
-        private final List<ElementWrapper> matches = new ArrayList<>();
+        private final List<Hit> collected = new ArrayList<>();
         private final Set<String> searched = new HashSet<>();
         private final Set<String> foreignNoted = new HashSet<>();
         private List<FrameRef> startPath;
@@ -133,7 +141,7 @@ public final class AllContextsScan {
                 driver.manage().timeouts().implicitlyWait(Duration.ZERO);
                 startPath = capturePath();
                 if (applyComposite()) {
-                    return limit(matches);
+                    return finish();
                 }
                 searchDocument(driver, startPath == null ? List.of() : startPath, 0, false);
                 if (startPath != null) {
@@ -151,7 +159,7 @@ public final class AllContextsScan {
             } finally {
                 restoreBrowser(originalWindow, originalWait);
             }
-            return limit(matches);
+            return finish();
         }
 
         private boolean applyComposite() {
@@ -184,12 +192,10 @@ public final class AllContextsScan {
             int live = 0;
             for (AllContextsPlan.Hit hit : plan.hits()) {
                 if (hit.foreign()) {
-                    matches.add(ElementWrapper.foreignPresence(elementMatch));
+                    collected.add(Hit.otherFrame());
                 } else {
-                    matches.add(new ElementWrapper(
-                            tools.dscode.common.composite.CompositeWebElement.fromQuery(xpath, hit.node(), live),
-                            elementMatch,
-                            matches.size() + 1
+                    collected.add(Hit.live(
+                            tools.dscode.common.composite.CompositeWebElement.fromQuery(xpath, hit.node(), live)
                     ));
                     live++;
                 }
@@ -227,10 +233,10 @@ public final class AllContextsScan {
                     }
                     if (foreign) {
                         if (foreignNoted.add(key(path))) {
-                            matches.add(ElementWrapper.foreignPresence(elementMatch));
+                            collected.add(Hit.otherFrame());
                         }
                     } else {
-                        matches.add(new ElementWrapper(element, elementMatch, matches.size() + 1));
+                        collected.add(Hit.live(element));
                     }
                 } catch (WebDriverException ignored) {
                     // stale, detached, or cross-origin
@@ -473,7 +479,8 @@ public final class AllContextsScan {
                         context instanceof WebDriver ? null : context
                 );
                 return castElements(raw);
-            } catch (WebDriverException ignored) {
+            } catch (WebDriverException | NullPointerException ignored) {
+                // HtmlUnit rejects a null script argument. No shadow hosts still leaves the light-DOM matches.
                 return List.of();
             }
         }
@@ -507,18 +514,28 @@ public final class AllContextsScan {
             }
         }
 
-        private List<ElementWrapper> limit(List<ElementWrapper> found) {
-            if (found.isEmpty()) {
-                return found;
+        private List<ElementWrapper> finish() {
+            List<Hit> chosen = PositionSelection.apply(collected, elementMatch);
+            List<ElementWrapper> wrapped = new ArrayList<>(chosen.size());
+            int index = 0;
+            for (Hit hit : chosen) {
+                if (hit.foreign()) {
+                    wrapped.add(ElementWrapper.foreignPresence(driver, elementMatch));
+                } else {
+                    wrapped.add(ElementWrapper.adopt(driver, hit.element(), elementMatch, ++index));
+                }
             }
-            String position = elementMatch.elementPosition == null ? "" : elementMatch.elementPosition;
-            if ("last".equalsIgnoreCase(position)) {
-                return List.of(found.getLast());
-            }
-            if (elementMatch.selectionType == null || elementMatch.selectionType.isBlank()) {
-                return List.of(found.getFirst());
-            }
-            return found;
+            return wrapped;
+        }
+    }
+
+    private record Hit(WebElement element, boolean foreign) {
+        static Hit live(WebElement element) {
+            return new Hit(element, false);
+        }
+
+        static Hit otherFrame() {
+            return new Hit(null, true);
         }
     }
 

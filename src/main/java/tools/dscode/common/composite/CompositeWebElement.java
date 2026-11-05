@@ -271,7 +271,7 @@ public final class CompositeWebElement implements WebElement {
         }
     }
 
-    private By scope(By by) {
+    By scope(By by) {
         String raw = by.toString();
         String prefix = "By.xpath: ";
         if (!raw.startsWith(prefix)) return null;

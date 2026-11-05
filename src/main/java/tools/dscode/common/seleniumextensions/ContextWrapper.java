@@ -8,6 +8,7 @@ import org.openqa.selenium.StaleElementReferenceException;
 import org.openqa.selenium.WebElement;
 import tools.dscode.common.domoperations.ExecutionDictionary;
 import tools.dscode.common.domoperations.NestedByLocator;
+import tools.dscode.common.domoperations.PositionSelection;
 import tools.dscode.common.treeparsing.parsedComponents.ElementMatch;
 import tools.dscode.common.treeparsing.parsedComponents.PhraseData;
 
@@ -45,7 +46,7 @@ public class ContextWrapper {
         }
         List<WebElement> candidates = findAll(searchContext, elementTerminalXPath, elementMatch);
         List<WebElement> related = applySpatial(searchContext, candidates);
-        return selectByPosition(related, elementMatch);
+        return PositionSelection.apply(related, elementMatch);
     }
 
 
@@ -257,33 +258,6 @@ public class ContextWrapper {
             case "right of" -> candidateLeft >= anchorRight - 1 && verticalOverlap;
             default -> false;
         };
-    }
-
-    private static List<WebElement> selectByPosition(List<WebElement> elements, ElementMatch elementMatch) {
-        if (elements.isEmpty()) {
-            return new ArrayList<>();
-        }
-        if (elementMatch.elementPosition.equalsIgnoreCase("last")) {
-            return new ArrayList<>(List.of(elements.getLast()));
-        }
-        if (elementMatch.selectionType.isEmpty()) {
-            if (elementMatch.elementIndex > elements.size()) {
-                return new ArrayList<>();
-            }
-            return new ArrayList<>(List.of(elements.get(elementMatch.elementIndex - 1)));
-        }
-        if (elementMatch.elementIndex == 1) {
-            return elements;
-        }
-        return sampleEvery(elements, elementMatch.elementIndex - 1, elementMatch.elementIndex);
-    }
-
-    private static ArrayList<WebElement> sampleEvery(List<WebElement> list, int startIndex, int step) {
-        ArrayList<WebElement> out = new ArrayList<>();
-        for (int i = startIndex; i < list.size(); i += step) {
-            out.add(list.get(i));
-        }
-        return out;
     }
 
     private static NestingMode nestingMode(ElementMatch elementMatch) {

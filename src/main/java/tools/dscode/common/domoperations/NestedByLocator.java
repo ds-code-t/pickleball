@@ -105,22 +105,7 @@ public final class NestedByLocator {
 
         List<WebElement>  returnList = findWithRetry(context, locator, Duration.ofSeconds(10), displayedElementsOnly, mode);
         returnList = retainFullMatches(returnList, elementMatch);
-        if (returnList.isEmpty()) {
-            return new ArrayList<>();
-        }
-
-        if(elementMatch.elementPosition.equalsIgnoreCase("last"))
-            return new ArrayList<>(List.of(returnList.getLast()));
-
-        if(elementMatch.selectionType.isEmpty()) {
-            if(elementMatch.elementIndex  > returnList.size())
-                return new ArrayList<>();
-            return new ArrayList<>(List.of(returnList.get(elementMatch.elementIndex-1)));
-        }
-        if(elementMatch.elementIndex ==1)
-            return returnList;
-
-        return sampleEvery(returnList, elementMatch.elementIndex-1, elementMatch.elementIndex);
+        return PositionSelection.apply(returnList, elementMatch);
     }
 
     public static List<WebElement> retainFullMatches(List<WebElement> found, ElementMatch elementMatch) {
@@ -172,9 +157,7 @@ public final class NestedByLocator {
     }
 
     public static <T> ArrayList<T> sampleEvery(List<T> list, int startIndex, int step) {
-        ArrayList<T> out = new ArrayList<>();
-        for (int i = startIndex; i < list.size(); i += step) out.add(list.get(i));
-        return out;
+        return PositionSelection.every(list, startIndex, step);
     }
 
     public static List<WebElement> findWithRetry(
@@ -271,7 +254,7 @@ public final class NestedByLocator {
      * Deepest drops containers. Outermost drops contained nodes.
      * An empty remainder keeps the original list.
      */
-    private static List<WebElement> tryCompositeNestBatch(List<WebElement> matches, NestingMode mode) {
+    static List<WebElement> tryCompositeNestBatch(List<WebElement> matches, NestingMode mode) {
         if (!compositeHits(matches)) return null;
         if (mode != NestingMode.DEEPEST_ONLY && mode != NestingMode.OUTERMOST_ONLY) return null;
         String axis = mode == NestingMode.DEEPEST_ONLY ? "/ancestor::*" : "/descendant::*";

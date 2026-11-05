@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import dev.domcomposite.Client;
 import org.openqa.selenium.By;
 import org.openqa.selenium.WebElement;
+import tools.dscode.common.domoperations.PositionSelection;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -445,7 +446,7 @@ public final class DomCompositeAdapter {
         recorded.add(command);
     }
 
-    private List<WebElement> hits(JsonNode json, CompositeSelector selector) {
+    List<WebElement> hits(JsonNode json, CompositeSelector selector) {
         JsonNode list = array(json, "composite");
         if (list == null) list = array(json, "nodes");
         if (list == null) list = array(json, "matches");
@@ -456,11 +457,7 @@ public final class DomCompositeAdapter {
                 hits.add(new CompositeWebElement(selector, node, index++));
             }
         }
-        Integer ordinal = selector.ordinal();
-        if (ordinal == null || hits.isEmpty()) return hits;
-        int at = ordinal < 0 ? hits.size() - 1 : ordinal;
-        if (at < 0 || at >= hits.size()) return List.of();
-        return List.of(hits.get(at));
+        return PositionSelection.applyOrdinal(hits, selector.ordinal());
     }
 
     private static JsonNode array(JsonNode json, String name) {
