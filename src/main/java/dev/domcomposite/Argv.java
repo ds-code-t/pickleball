@@ -117,7 +117,7 @@ public final class Argv {
                         {"nth", "nth"},
                         {"every", "every"}
                     });
-                    pushBools(argv, node, new String[][] {{"count_only", "count-only"}});
+                    pushBools(argv, node, new String[][] {{"count_only", "count-only"}, {"geometry", "geometry"}});
                 }
                 if ("scroll".equals(cmd)) {
                     pushValues(argv, node, new String[][] {{"dx", "dx"}, {"dy", "dy"}});

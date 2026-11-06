@@ -73,6 +73,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/maintainer/2.1.19-dom-composite-roadmap.md`
 - `docs/maintainer/2.1.19-dom-efficiency-roadmap.md`
 - `docs/maintainer/2.1.19-element-snapshot-roadmap.md`
+- `docs/maintainer/2.1.19-mapping-geometry-roadmap.md`
 - `docs/maintainer/consumer-sim-harness.md`
 - `docs/maintainer/guidance-goldens.md`
 - `docs/maintainer/pointer-eval-harness.md`
@@ -540,6 +541,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/common/composite/ElementBatchLogTest.java`
 - `src/test/java/tools/dscode/common/composite/ElementSnapshotEvalTest.java`
 - `src/test/java/tools/dscode/common/composite/EnginePositionGateTest.java`
+- `src/test/java/tools/dscode/common/composite/GeometryViewTest.java`
 - `src/test/java/tools/dscode/common/composite/LeanWaitNestLiveTest.java`
 - `src/test/java/tools/dscode/common/composite/PrimaryPathAuditTest.java`
 - `src/test/java/tools/dscode/common/composite/SelectorAndAdapterTest.java`

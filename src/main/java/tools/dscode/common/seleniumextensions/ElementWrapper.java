@@ -354,7 +354,8 @@ public class ElementWrapper implements WebElement, WrapsElement {
                 0,
                 0,
                 stable,
-                null
+                null,
+                composite.geometry()
         );
     }
 

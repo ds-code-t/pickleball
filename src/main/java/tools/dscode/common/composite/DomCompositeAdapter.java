@@ -174,6 +174,7 @@ public final class DomCompositeAdapter {
         if (within != null && !within.isBlank()) CompositeLog.info("adapter", "within " + within);
         if (nesting != null && !nesting.isBlank()) CompositeLog.info("adapter", "nesting " + nesting);
         if (position != null) CompositeLog.info("adapter", position.logLine());
+        attachGeometry(body);
         if (dryRun) return null;
         Client open = CompositeRuntime.ensureClient();
         if (open == null) throw new IllegalStateException("composite client is not open");
@@ -256,6 +257,7 @@ public final class DomCompositeAdapter {
         } else if (ordinal != null && CompositeRuntime.primary()) {
             CompositeLog.info("adapter", "position java");
         }
+        attachGeometry(body);
         CompositeLog.debug("adapter", "find " + used.describe());
         JsonNode json = open.query(body);
         return hits(json, used);
@@ -271,6 +273,7 @@ public final class DomCompositeAdapter {
         body.put("mode", "composite");
         body.put("all_frames", true);
         body.put("pierce", "open");
+        attachGeometry(body);
         record("query");
         CompositeLog.info("adapter", "scan all-contexts");
         if (dryRun) {
@@ -502,6 +505,24 @@ public final class DomCompositeAdapter {
                 + "`, this adapter forwards it. No Pickleball change is required.";
         CompositeLog.always(error, fix);
         throw new IllegalStateException("error: " + error);
+    }
+
+    /**
+     * Ask for the five-space geometry view when {@code capabilities.query_flags}
+     * lists {@code geometry}. A binary that does not list it keeps the AABB.
+     */
+    private void attachGeometry(Map<String, Object> body) {
+        if (queryFlag("geometry")) {
+            body.put("geometry", true);
+            CompositeLog.trace("geometry", "request");
+            CompositeLog.info("geometry", "real");
+            CompositeLog.info("adapter", "geometry real");
+            return;
+        }
+        if (CompositeRuntime.primary()) {
+            CompositeLog.info("geometry", "fallback");
+            CompositeLog.info("adapter", "geometry fallback");
+        }
     }
 
     private Set<String> desktopVerbs() {

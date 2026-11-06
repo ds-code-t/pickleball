@@ -283,7 +283,7 @@ public final class ElementSnapshotScript {
                             + " fix: capabilities.actions does not list eval, so Pickleball runs the shared"
                             + " script through the WebDriver. None of those selectors matched exactly one node.");
         }
-        ElementSnapshot snapshot = toSnapshot(raw, element.nodeId(), bounds(element));
+        ElementSnapshot snapshot = toSnapshot(raw, element.nodeId(), bounds(element), element.geometry());
         ElementStateCache.remember(element, snapshot.elementState());
         return snapshot;
     }
@@ -300,7 +300,7 @@ public final class ElementSnapshotScript {
                             + " nodeId=" + (element == null ? "" : element.nodeId())
                             + " fix: eval must return the snapshot object as value.");
         }
-        ElementSnapshot snapshot = toSnapshot(jsonMap(value), element.nodeId(), bounds(element));
+        ElementSnapshot snapshot = toSnapshot(jsonMap(value), element.nodeId(), bounds(element), element.geometry());
         ElementStateCache.remember(element, snapshot.elementState());
         return snapshot;
     }
@@ -323,7 +323,7 @@ public final class ElementSnapshotScript {
             JsonNode value = row.get("value");
             if (nodeId.isBlank() || value == null || !value.isObject()) continue;
             CompositeWebElement element = byId.get(nodeId);
-            ElementSnapshot snapshot = toSnapshot(jsonMap(value), nodeId, bounds(element));
+            ElementSnapshot snapshot = toSnapshot(jsonMap(value), nodeId, bounds(element), geometry(element));
             if (element != null) ElementStateCache.remember(element, snapshot.elementState());
             shots.put(nodeId, snapshot);
         }
@@ -335,6 +335,15 @@ public final class ElementSnapshotScript {
     }
 
     static ElementSnapshot toSnapshot(Object raw, String nodeId, ElementSnapshot.Bounds bounds) {
+        return toSnapshot(raw, nodeId, bounds, null);
+    }
+
+    static ElementSnapshot toSnapshot(
+            Object raw,
+            String nodeId,
+            ElementSnapshot.Bounds bounds,
+            ElementSnapshot.Geometry geometry
+    ) {
         Map<String, Object> map = castMap(raw);
         return new ElementSnapshot(
                 blankToNull(nodeId),
@@ -347,8 +356,13 @@ public final class ElementSnapshotScript {
                 number(map.get("siblingIndex")),
                 number(map.get("sameTagIndex")),
                 text(map.get("stableSelector")),
-                ElementStateScript.parse(map.get("elementState"))
+                ElementStateScript.parse(map.get("elementState")),
+                geometry
         );
+    }
+
+    private static ElementSnapshot.Geometry geometry(CompositeWebElement element) {
+        return element == null ? null : element.geometry();
     }
 
     private static ElementSnapshot.Bounds bounds(CompositeWebElement element) {

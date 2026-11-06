@@ -171,7 +171,8 @@ final class ElementReads {
                 element.getSize().getHeight(),
                 value == null ? "" : value,
                 outer == null ? "" : outer,
-                ElementStateCache.recall(element)
+                ElementStateCache.recall(element),
+                element.geometry()
         );
     }
 

@@ -16,8 +16,12 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * CLI-first log for the dom-composite adapter. Off unless
  * {@code pkb_composite_log} names an entity ({@code location}, {@code adapter},
  * {@code session}, {@code element}, {@code fallback}, {@code batch}, {@code state},
- * {@code position})
+ * {@code position}, {@code geometry})
  * or {@code all}.
+ * {@code geometry} writes {@code TRACE geometry request} when a query asks for
+ * the five-space view, and {@code INFO geometry real} or {@code INFO geometry fallback}.
+ * {@code adapter} writes the same choice as {@code INFO adapter geometry real}
+ * or {@code INFO adapter geometry fallback}.
  * {@code batch} writes one TRACE line per describe:
  * {@code TRACE batch mode=<composite|selenium-batch|selenium-legacy> selector=<by> nodes=<count> durationMs=<n>}.
  * There is no per-element line. {@code position} writes

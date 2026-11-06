@@ -4,9 +4,10 @@ import java.util.Map;
 
 /**
  * One element's read-only description from a single batched lookup.
- * Composite mode copies the query payload. Selenium mode comes from one script,
- * or from the legacy property reads inside {@link ElementReads} when the driver
- * cannot run that script.
+ * Composite mode copies the query payload, including {@code geometry} when the
+ * hit carried it. Selenium mode comes from one script, or from the legacy
+ * property reads inside {@link ElementReads} when the driver cannot run that
+ * script. Selenium leaves {@code geometry} null.
  */
 public record ElementView(
         String tag,
@@ -21,8 +22,28 @@ public record ElementView(
         int height,
         String value,
         String outerHtml,
-        ElementState elementState
+        ElementState elementState,
+        tools.dscode.common.seleniumextensions.ElementSnapshot.Geometry geometry
 ) {
+    /** Selenium and a bounds-only composite hit leave geometry null. */
+    public ElementView(
+            String tag,
+            String text,
+            boolean displayed,
+            boolean enabled,
+            boolean selected,
+            Map<String, String> attributes,
+            int x,
+            int y,
+            int width,
+            int height,
+            String value,
+            String outerHtml,
+            ElementState elementState
+    ) {
+        this(tag, text, displayed, enabled, selected, attributes, x, y, width, height, value, outerHtml, elementState, null);
+    }
+
     public ElementView {
         tag = tag == null ? "" : tag;
         text = text == null ? "" : text;

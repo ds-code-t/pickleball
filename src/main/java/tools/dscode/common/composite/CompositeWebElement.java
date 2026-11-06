@@ -11,6 +11,8 @@ import org.openqa.selenium.SearchContext;
 import org.openqa.selenium.WebDriverException;
 import org.openqa.selenium.WebElement;
 
+import tools.dscode.common.seleniumextensions.ElementSnapshot;
+
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -33,6 +35,7 @@ public final class CompositeWebElement implements WebElement {
     private final int y;
     private final int width;
     private final int height;
+    private final ElementSnapshot.Geometry geometry;
 
     /** One node from an all-contexts query. The id is the frame and backend id. */
     public static WebElement fromQuery(String xpath, JsonNode node, int index) {
@@ -62,6 +65,7 @@ public final class CompositeWebElement implements WebElement {
         this.y = bounds == null ? 0 : bounds.path("y").asInt(0);
         this.width = bounds == null ? 0 : bounds.path("width").asInt(0);
         this.height = bounds == null ? 0 : bounds.path("height").asInt(0);
+        this.geometry = ElementSnapshot.Geometry.parse(value == null ? null : value.get("geometry"));
     }
 
     public String nodeTag() {
@@ -82,6 +86,11 @@ public final class CompositeWebElement implements WebElement {
 
     public Map<String, String> attributes() {
         return attributes;
+    }
+
+    /** Five-space view from the query payload. Null when the hit had no geometry object. */
+    public ElementSnapshot.Geometry geometry() {
+        return geometry;
     }
 
     int rectHeight() {

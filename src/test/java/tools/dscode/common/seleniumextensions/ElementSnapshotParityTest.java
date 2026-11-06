@@ -102,8 +102,31 @@ class ElementSnapshotParityTest {
         assertEquals(selenium.stableSelector(), composite.stableSelector(), id);
         assertNull(selenium.nodeId(), id);
         assertNull(selenium.bounds(), id);
+        assertNull(selenium.geometry(), id);
         assertEquals("main:42", composite.nodeId(), id);
         assertNotNull(composite.bounds(), id);
+        assertNull(composite.geometry(), id);
+    }
+
+    @Test
+    void compositeHitWithGeometryCopiesSpacesAndSeleniumDoesNotInventThem() {
+        ElementSnapshot selenium = SeleniumSnapshotProducer.INSTANCE.snapshot(driver, SnapshotPages.byId(driver, "target"));
+        CompositeWebElement hit = CompositeElements.withGeometry("target", selenium.tag(), "STALE-CACHED", 8, 9, 10, 11);
+        ElementSnapshot composite = CompositeSnapshotProducer.INSTANCE.snapshot(driver, hit);
+        assertNull(selenium.geometry());
+        assertNull(selenium.bounds());
+        assertNotNull(composite.geometry());
+        assertTrue(composite.geometry().matches(composite.bounds()));
+        assertEquals(8, composite.bounds().x());
+        assertEquals(4, composite.geometry().documentCssPx().corners().size());
+        assertEquals(6.0, composite.geometry().visualViewportRelative().x());
+        assertEquals("viewport", composite.geometry().nearestScrollport().kind());
+        assertFalse(composite.geometry().closedShadow());
+        assertTrue(composite.geometry().closedShadowLimit().contains("retargets"));
+        var described = tools.dscode.common.composite.ElementOperations.describe(null, java.util.List.of(hit));
+        assertEquals(1, described.size());
+        assertNotNull(described.get(0).geometry());
+        assertTrue(described.get(0).geometry().matches(new ElementSnapshot.Bounds(8, 9, 10, 11)));
     }
 
     /** Only a binary checked into this repo. Never a machine-local composite. */

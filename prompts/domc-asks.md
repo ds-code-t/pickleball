@@ -37,3 +37,30 @@ Order on one query: match, then filters (displayed), then nesting, then nth/ever
 These flags are query only. `capabilities.query_flags` lists `nth`, `every`, and `count-only` when present.
 Log entity `query`, off unless named. Lines: `nth <n> every <step>` (either side `-` when omitted) and `count-only`.
 
+## Landed in 2.11.0
+
+`query --geometry`
+One `geometry` object on each hit in `nodes` and `composite` that has a stored border quad.
+Five spaces: `document_css_px`, `visual_viewport_relative`, `layout_viewport_relative`,
+`nearest_scrollport_relative`, `frame_document_relative`. Each space has `kind` (`quad`, or
+`aabb` when the stored source is `cdp_snapshot_bounds`), four `corners`, and the axis-aligned
+`x`, `y`, `width`, `height`. `bounds` is unchanged. Omitted, the field is absent. A node with
+no quad omits the field. `--count-only` still returns no nodes.
+
+`nearest_scrollport` names the element scrollport (`overflow` `auto`, `scroll`, or `overlay`;
+not `html` or `body`) or the frame viewport. Phase 1 origin is that scrollport's border-box
+corner, or the frame scroll mapped through the frame transform.
+
+`closed_shadow` is true when the node sits in a closed shadow root. `closed_shadow_limit`
+states that page-script hit-testing retargets to the host. The corners are CDP or stored quads.
+The engine does not call `elementFromPoint` to defeat that limit.
+
+A live query enriches the matched nodes and their ancestors inside that one command.
+`capabilities.query_flags` lists `geometry`. HTTP and the Java, JavaScript, and Python bindings
+forward the bool on `query` only. They do not compute boxes.
+
+Log entity `geometry`, off unless named. A `query` line `geometry` is written when the flag is set.
+Trace: `id=<frame>:<backend> kind=<quad|aabb> closed_shadow=<bool>`.
+Info: `query nodes=<n> missing=<n>`, `query count-only`, or `query nodes=0`.
+
+
