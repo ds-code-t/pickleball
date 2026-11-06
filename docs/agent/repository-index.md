@@ -65,6 +65,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/maintainer/2.1.18-speed-roadmap.md`
 - `docs/maintainer/2.1.18-structural-fixes.md`
 - `docs/maintainer/2.1.18-unification.md`
+- `docs/maintainer/2.1.18-wb-first-start-timing-p2-roadmap.md`
 - `docs/maintainer/2.1.18-wb-first-start-timing-roadmap.md`
 - `docs/maintainer/2.1.18-wb-open-issues-roadmap.md`
 - `docs/maintainer/consumer-sim-harness.md`
