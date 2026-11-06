@@ -71,6 +71,7 @@ public record EngineQuery(
         if (text == null || text.isBlank()) return null;
         EngineQuery built = of(text);
         if (exposure != null && !exposure.isBlank()) built = built.exposure(exposure);
+        else built = built.exposure("human");
         if (limit != null) built = built.limit(limit);
         if (Boolean.TRUE.equals(explain)) built = built.explain(true);
         if (Boolean.TRUE.equals(promoteVisual)) built = built.promoteVisual(true);

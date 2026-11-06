@@ -183,6 +183,27 @@ class WorkbenchElementInspectTest {
                     """, pageText);
             assertTrue(session.lastPost().contains("\"op\":\"inspect-page\""), session.lastPost());
             assertFalse(session.lastPost().contains("category"), session.lastPost());
+            assertFalse(session.lastPost().contains("exposure"), session.lastPost());
+
+            session.completeWith("{\"id\":\"cmd-3\",\"status\":\"SUCCESS\",\"result\":{\"status\":\"SUCCESS\",\"source\":\"live-session\",\"hits\":[]}}");
+            int queried = WorkbenchAgentCommands.run(
+                    new String[]{"find-element", tempDir.toString(), "--query=css=#save"},
+                    new java.io.PrintStream(new java.io.ByteArrayOutputStream(), true, StandardCharsets.UTF_8),
+                    new java.io.PrintStream(new java.io.ByteArrayOutputStream(), true, StandardCharsets.UTF_8)
+            );
+            assertEquals(0, queried);
+            assertTrue(session.lastPost().contains("\"query\":\"css=#save\""), session.lastPost());
+            assertTrue(session.lastPost().contains("\"exposure\":\"human\""), session.lastPost());
+
+            session.completeWith("{\"id\":\"cmd-4\",\"status\":\"SUCCESS\",\"result\":{\"status\":\"SUCCESS\",\"source\":\"live-session\",\"hits\":[]}}");
+            int lower = WorkbenchAgentCommands.run(
+                    new String[]{"find-element", tempDir.toString(), "--query=css=#save", "--exposure=lower"},
+                    new java.io.PrintStream(new java.io.ByteArrayOutputStream(), true, StandardCharsets.UTF_8),
+                    new java.io.PrintStream(new java.io.ByteArrayOutputStream(), true, StandardCharsets.UTF_8)
+            );
+            assertEquals(0, lower);
+            assertTrue(session.lastPost().contains("\"exposure\":\"lower\""), session.lastPost());
+            assertFalse(session.lastPost().contains("\"exposure\":\"human\""), session.lastPost());
         }
     }
 

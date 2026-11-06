@@ -1667,9 +1667,11 @@ public final class WorkbenchAgentCommands {
             body.put("op", op);
             if (category != null && !category.isBlank()) body.put("category", category);
             if (text != null && !text.isBlank()) body.put("text", text);
-            if (query != null && !query.isBlank()) body.put("query", query);
-            String exposure = flag(parsed, "--exposure");
-            if (exposure != null && !exposure.isBlank()) body.put("exposure", exposure);
+            if (query != null && !query.isBlank()) {
+                body.put("query", query);
+                String exposure = flag(parsed, "--exposure");
+                body.put("exposure", exposure == null || exposure.isBlank() ? "human" : exposure);
+            }
             Integer limit = parsed.coordination().limit();
             if (query != null && !query.isBlank() && limit != null) body.put("limit", limit);
             if (hasFlag(parsed, "--explain")) body.put("explain", true);

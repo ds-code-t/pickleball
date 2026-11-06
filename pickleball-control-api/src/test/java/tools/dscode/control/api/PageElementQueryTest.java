@@ -5,6 +5,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.openqa.selenium.JavascriptExecutor;
+import org.openqa.selenium.NoSuchElementException;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 import tools.dscode.common.composite.CompositeBinaryLocator;
@@ -12,6 +13,7 @@ import tools.dscode.common.composite.CompositeLog;
 import tools.dscode.common.composite.CompositeMode;
 import tools.dscode.common.composite.CompositeRuntime;
 import tools.dscode.common.composite.ElementOperations;
+import tools.dscode.common.composite.ElementView;
 import tools.dscode.common.composite.EngineQuery;
 import tools.dscode.control.protocol.DirectControlProvider;
 
@@ -156,6 +158,34 @@ class PageElementQueryTest {
         assertTrue(forwarded.contains("--limit"), forwarded);
         assertTrue(forwarded.contains("2"), forwarded);
         assertEquals(1, ElementOperations.batchCallsForTests());
+        assertEquals("human", EngineQuery.controller("css=#save", null, null, null, null).exposure());
+        assertEquals("lower", EngineQuery.controller("css=#save", "lower", null, null, null).exposure());
+        assertEquals(null, EngineQuery.controller(" ", null, null, null, null));
+    }
+
+    @Test
+    void humanActRefusesAndLowerActKeepsTheSentence() throws Exception {
+        Path binary = stub(temp.resolve("composite"));
+        CompositeRuntime.use(
+                temp.resolve("project"),
+                Map.of(DirectControlProvider.BIN_ENV, binary.toString()),
+                new ClassLoader(null) {
+                },
+                temp.resolve("home")
+        );
+        CompositeRuntime.joinForTests("http://127.0.0.1:9222");
+        assertThrows(
+                NoSuchElementException.class,
+                () -> ElementOperations.act(EngineQuery.of("css=#ghost"), "click", null)
+        );
+        ElementView acted = ElementOperations.act(EngineQuery.of("css=#ghost").exposure("lower"), "click", null);
+        assertEquals("main:9", acted.handle());
+        assertTrue(acted.humanSentence().contains("opacity:0"), acted.humanSentence());
+        assertTrue(acted.humanCodes().contains("human_could_not_click"));
+        assertTrue(acted.humanCodes().contains("off_visual_viewport"));
+        String forwarded = Files.readString(temp.resolve("composite.requests"));
+        assertTrue(forwarded.contains("\"human\""), forwarded);
+        assertTrue(forwarded.contains("\"lower\""), forwarded);
     }
 
     @Test
@@ -290,6 +320,25 @@ class PageElementQueryTest {
                                 "sentence": "scrolled out of the visual viewport"
                             }
                         }]}
+                    elif "click" in argv or "type" in argv:
+                        exposure = ""
+                        if "--exposure" in argv:
+                            exposure = argv[argv.index("--exposure") + 1]
+                        if exposure == "human":
+                            body = {"ok": True}
+                        else:
+                            body = {"ok": True, "node": {
+                                "id": "main:9",
+                                "handle": "main:9",
+                                "text": "hidden",
+                                "role": "button",
+                                "bounds": {"x": 1, "y": 900, "width": 10, "height": 8},
+                                "states": ["hidden"],
+                                "human_limits": {
+                                    "codes": ["human_could_not_see", "human_could_not_click", "off_visual_viewport", "opacity_zero"],
+                                    "sentence": "a person could not have seen or clicked it because it is scrolled out of the visual viewport and has opacity:0"
+                                }
+                            }}
                     else:
                         body = {"ok": True}
                     sys.stdout.write(json.dumps({

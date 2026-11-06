@@ -421,12 +421,14 @@ public final class WorkbenchSessionActions {
         String category = args.get("category");
         String text = args.get("text");
         String query = blank(args.get("query"));
+        String exposure = blank(args.get("exposure"));
+        if (query != null && exposure == null) exposure = "human";
         try {
             ControlBridgePageQueryResult result = services.pageQuery(
                     category,
                     text,
                     query,
-                    blank(args.get("exposure")),
+                    exposure,
                     whole(args.get("limit")),
                     truth(args.get("explain")),
                     truth(args.get("promoteVisual"))

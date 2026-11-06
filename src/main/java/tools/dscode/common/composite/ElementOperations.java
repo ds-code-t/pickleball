@@ -272,7 +272,8 @@ public final class ElementOperations {
         if (!CompositeRuntime.primary()) {
             throw new IllegalStateException("engine action needs the composite runtime");
         }
-        return DomCompositeAdapter.get().act(query, verb, typed);
+        EngineQuery used = query.exposure() == null ? query.exposure("human") : query;
+        return DomCompositeAdapter.get().act(used, verb, typed);
     }
 
     /** Describe elements already found. Composite hits do not take another round trip. */

@@ -48,7 +48,11 @@ class WorkbenchInspectRoutingTest {
         assertEquals("find-element:Button:Save", seen.get());
         Map<String, Object> queried = actions.dispatch("find-element", Map.of("query", "css=#save", "exposure", "lower"));
         assertEquals("SUCCESS", queried.get("status"));
-        assertEquals("query:css=#save", seen.get());
+        assertEquals("query:css=#save:lower", seen.get());
+        actions.dispatch("find-element", Map.of("query", "css=#save"));
+        assertEquals("query:css=#save:human", seen.get());
+        actions.dispatch("find-element", Map.of("category", "Button", "text", "Save"));
+        assertEquals("find-element:Button:Save", seen.get());
     }
 
     @Test
@@ -64,7 +68,11 @@ class WorkbenchInspectRoutingTest {
         assertEquals("SUCCESS", inspection.status());
         assertEquals("element-inspect:Button:Save", seen.get());
         tools.call("workbench_element_inspect", Map.of("query", "xpath=//button"));
-        assertEquals("query:xpath=//button", seen.get());
+        assertEquals("query:xpath=//button:human", seen.get());
+        tools.call("workbench_element_inspect", Map.of("query", "xpath=//button", "exposure", "lower"));
+        assertEquals("query:xpath=//button:lower", seen.get());
+        tools.call("workbench_element_inspect", Map.of("category", "Link", "text", "Login"));
+        assertEquals("element-inspect:Link:Login", seen.get());
     }
 
     @Test
@@ -118,18 +126,20 @@ class WorkbenchInspectRoutingTest {
                         String category = args == null || args.length < 1 || args[0] == null ? "" : args[0].toString();
                         String text = args == null || args.length < 2 || args[1] == null ? "" : args[1].toString();
                         String query = args != null && args.length > 2 && args[2] != null ? args[2].toString() : "";
+                        String exposure = args != null && args.length > 3 && args[3] != null ? args[3].toString() : "";
                         seen.set(query.isBlank()
                                 ? (category.isBlank() ? "inspect-page" : "find-element:" + category + ":" + text)
-                                : "query:" + query);
+                                : "query:" + query + ":" + exposure);
                         return page;
                     }
                     if ("elementInspect".equals(method.getName())) {
                         String category = args == null || args[0] == null ? "" : args[0].toString();
                         String text = args == null || args.length < 2 || args[1] == null ? "" : args[1].toString();
                         String query = args != null && args.length > 4 && args[4] != null ? args[4].toString() : "";
+                        String exposure = args != null && args.length > 5 && args[5] != null ? args[5].toString() : "";
                         seen.set(query.isBlank()
                                 ? "element-inspect:" + category + ":" + text
-                                : "query:" + query);
+                                : "query:" + query + ":" + exposure);
                         return inspection;
                     }
                     if (method.getReturnType() == boolean.class) return false;
