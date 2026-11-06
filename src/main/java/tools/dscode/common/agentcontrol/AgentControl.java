@@ -261,7 +261,8 @@ public final class AgentControl {
                 "overlay",
                 integerOrNull(args.get("x")),
                 integerOrNull(args.get("y")),
-                args.get("geometry")
+                args.get("geometry"),
+                AgentStore.root(project, runId)
         );
         placed.put("ok", true);
         return new Result(0, placed);
@@ -286,7 +287,8 @@ public final class AgentControl {
                 "html",
                 integerOrNull(args.get("x")),
                 integerOrNull(args.get("y")),
-                args.get("geometry")
+                args.get("geometry"),
+                AgentStore.root(project, runId)
         );
         placed.put("ok", true);
         return new Result(0, placed);
@@ -294,7 +296,7 @@ public final class AgentControl {
 
     private static Result remove(Path project, String runId, Map<String, String> args, String kind) throws Exception {
         String id = present(args.get("id")) ? args.get("id") : args.get("handle");
-        Map<String, Object> removed = PageSurfaces.remove(explicitPage(project, args), id);
+        Map<String, Object> removed = PageSurfaces.remove(explicitPage(project, args), id, AgentStore.root(project, runId));
         removed.put("ok", true);
         removed.put("kind", kind);
         return new Result(0, removed);

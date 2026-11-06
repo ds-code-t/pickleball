@@ -132,6 +132,19 @@ class AgentLiveFixTest {
         assertFalse(encoded.toLowerCase().contains("javascript"), encoded);
         String doubled = PageSurfaces.neutralize("<img &#111;nerror=\"alert(1)\">");
         assertFalse(doubled.toLowerCase().contains("onerror"), doubled);
+        String slash = PageSurfaces.neutralize("<img src=x /onerror=alert(1)>");
+        assertFalse(slash.toLowerCase().contains("onerror"), slash);
+        assertFalse(slash.toLowerCase().contains("alert"), slash);
+        assertTrue(slash.toLowerCase().contains("<img"), slash);
+        String spaced = PageSurfaces.neutralize("<a href=\"java&#9;script:alert(1)\">go</a>");
+        assertFalse(spaced.toLowerCase().contains("javascript"), spaced);
+        assertFalse(spaced.toLowerCase().contains("alert"), spaced);
+        assertTrue(spaced.contains(">go</a>"), spaced);
+        String kept = PageSurfaces.neutralize("<section><p class=\"note\">Hello <b>there</b></p><a href=\"https://example.test/a\">go</a></section>");
+        assertTrue(kept.contains("<section>"), kept);
+        assertTrue(kept.contains("class=\"note\""), kept);
+        assertTrue(kept.contains("<b>there</b>"), kept);
+        assertTrue(kept.contains("https://example.test/a"), kept);
     }
 
     @Test
@@ -143,6 +156,11 @@ class AgentLiveFixTest {
         assertEquals(placed.get("sha256"), removed.get("sha256"));
         assertFalse(String.valueOf(removed.get("sha256")).isBlank());
         assertFalse(String.valueOf(removed.get("summary")).isBlank());
+        PageSurfaces.clearPlacementMemory();
+        Map<String, Object> again = PageSurfaces.remove(page, String.valueOf(placed.get("id")));
+        assertEquals(placed.get("sha256"), again.get("sha256"));
+        assertEquals(removed.get("summary"), again.get("summary"));
+        assertTrue(Files.isRegularFile(temp.resolve("page.html.place.json")));
     }
 
     @Test

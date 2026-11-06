@@ -341,6 +341,10 @@ final class PageSurfaces {
     }
 
     static Map<String, Object> place(Path page, String op, String handle, String where, String rawHtml, String kind, Integer x, Integer y, String geometryJson) throws IOException {
+        return place(page, op, handle, where, rawHtml, kind, x, y, geometryJson, null);
+    }
+
+    static Map<String, Object> place(Path page, String op, String handle, String where, String rawHtml, String kind, Integer x, Integer y, String geometryJson, Path ledger) throws IOException {
         String id = "pkb-" + IDS.incrementAndGet();
         String sentence = "overlay".equals(kind) ? OVERLAY_SENTENCE : HTML_SENTENCE;
         boolean stripped = rawHtml != null && !rawHtml.equals(neutralize(rawHtml));
@@ -397,7 +401,7 @@ final class PageSurfaces {
         }
         String summary = html.length() > 80 ? html.substring(0, 80) : html;
         String digest = sha(html);
-        rememberPlacement(id, digest, summary);
+        rememberPlacement(page, ledger, id, digest, summary);
         CompositeLog.info("html".equals(kind) ? "html" : "overlay", op + " id=" + id + " sha=" + digest + " summary=" + summary);
         Map<String, Object> body = labeled(
                 "overlay".equals(kind) ? List.of("agent_injected", "overlay") : List.of("agent_injected"),
@@ -419,8 +423,12 @@ final class PageSurfaces {
     }
 
     static Map<String, Object> remove(Path page, String id) throws IOException {
+        return remove(page, id, null);
+    }
+
+    static Map<String, Object> remove(Path page, String id, Path ledger) throws IOException {
         if (id == null || id.isBlank()) throw new IllegalArgumentException("missing id");
-        Placement placement = placement(id);
+        Placement placement = placement(page, ledger, id);
         if (page != null && Files.isRegularFile(page)) {
             String undo = undo(page, id);
             String html = read(page);
@@ -758,34 +766,162 @@ final class PageSurfaces {
     }
 
     static String neutralize(String html) {
-        if (html == null) return "";
-        String stripped = html.replaceAll("(?is)<script\\b[^>]*>.*?</script>", "");
-        stripped = stripped.replaceAll("(?is)<script\\b[^>]*/\\s*>", "");
-        StringBuilder out = new StringBuilder();
+        if (html == null || html.isEmpty()) return html == null ? "" : html;
+        StringBuilder out = new StringBuilder(html.length());
         int index = 0;
-        while (index < stripped.length()) {
-            int start = stripped.indexOf('<', index);
+        while (index < html.length()) {
+            int start = html.indexOf('<', index);
             if (start < 0) {
-                out.append(stripped.substring(index));
+                out.append(html.substring(index));
                 break;
             }
-            out.append(stripped, index, start);
-            int end = tagEnd(stripped, start);
+            out.append(html, index, start);
+            if (scriptOpen(html, start)) {
+                int close = indexOfIgnoreCase(html, "</script", start + 1);
+                if (close < 0) break;
+                int end = tagEnd(html, close);
+                index = end < 0 ? html.length() : end + 1;
+                continue;
+            }
+            int end = tagEnd(html, start);
             if (end < 0) {
-                out.append(stripped.substring(start));
+                out.append(html.substring(start));
                 break;
             }
-            String tag = stripped.substring(start, end + 1);
-            if (!tag.matches("(?is)</?\\s*script\\b.*")) {
-                String decoded = decodeEntities(decodeEntities(tag));
-                decoded = decoded.replaceAll("(?i)\\ssrcdoc\\s*=\\s*(\"(?:\\\\.|[^\"])*\"|'(?:\\\\.|[^'])*'|[^\\s>]+)", "");
-                decoded = decoded.replaceAll("(?i)\\son[a-z][a-z0-9_-]*\\s*=\\s*(\"(?:\\\\.|[^\"])*\"|'(?:\\\\.|[^'])*'|[^\\s>]+)", "");
-                decoded = decoded.replaceAll("(?i)javascript\\s*:", "");
-                out.append(decoded);
-            }
+            String tag = html.substring(start, end + 1);
+            if (!scriptTag(tag)) out.append(sanitizeTag(tag));
             index = end + 1;
         }
         return out.toString();
+    }
+
+    private static boolean scriptOpen(String html, int start) {
+        int index = start + 1;
+        while (index < html.length() && Character.isWhitespace(html.charAt(index))) index++;
+        return index + 6 <= html.length()
+                && html.regionMatches(true, index, "script", 0, 6)
+                && (index + 6 == html.length() || !isNameChar(html.charAt(index + 6)));
+    }
+
+    private static boolean scriptTag(String tag) {
+        return scriptOpen(tag, 0);
+    }
+
+    private static int indexOfIgnoreCase(String html, String token, int from) {
+        int last = html.length() - token.length();
+        for (int index = Math.max(0, from); index <= last; index++) {
+            if (html.regionMatches(true, index, token, 0, token.length())) return index;
+        }
+        return -1;
+    }
+
+    private static String sanitizeTag(String tag) {
+        if (tag.length() < 2 || tag.charAt(1) == '!' || tag.charAt(1) == '?') return tag;
+        int index = 1;
+        if (tag.charAt(index) == '/') return tag;
+        while (index < tag.length() && Character.isWhitespace(tag.charAt(index))) index++;
+        int nameStart = index;
+        while (index < tag.length() && isNameChar(tag.charAt(index))) index++;
+        if (nameStart == index) return tag;
+        StringBuilder rebuilt = new StringBuilder();
+        rebuilt.append('<').append(tag, nameStart, index);
+        while (index < tag.length()) {
+            char current = tag.charAt(index);
+            if (current == '>') break;
+            if (Character.isWhitespace(current) || current == '/') {
+                index++;
+                continue;
+            }
+            int attrStart = index;
+            while (index < tag.length() && isAttrChar(tag.charAt(index))) index++;
+            if (index == attrStart) {
+                index++;
+                continue;
+            }
+            String rawName = tag.substring(attrStart, index);
+            String rawValue = null;
+            while (index < tag.length() && Character.isWhitespace(tag.charAt(index))) index++;
+            if (index < tag.length() && tag.charAt(index) == '=') {
+                index++;
+                while (index < tag.length() && Character.isWhitespace(tag.charAt(index))) index++;
+                if (index < tag.length() && (tag.charAt(index) == '"' || tag.charAt(index) == '\'')) {
+                    char quote = tag.charAt(index++);
+                    int valueStart = index;
+                    while (index < tag.length() && tag.charAt(index) != quote) index++;
+                    rawValue = tag.substring(valueStart, index);
+                    if (index < tag.length()) index++;
+                } else {
+                    int valueStart = index;
+                    while (index < tag.length() && isUnquotedValueChar(tag.charAt(index))) index++;
+                    rawValue = tag.substring(valueStart, index);
+                }
+            }
+            String decodedName = decodeUntilStable(rawName).toLowerCase(Locale.ROOT);
+            String decodedValue = rawValue == null ? null : decodeUntilStable(rawValue);
+            if (dropAttribute(decodedName, decodedValue)) continue;
+            rebuilt.append(' ').append(decodedName);
+            if (decodedValue != null) rebuilt.append("=\"").append(escapeAttr(decodedValue)).append('"');
+        }
+        if (tag.endsWith("/>")) rebuilt.append(" />");
+        else rebuilt.append('>');
+        return rebuilt.toString();
+    }
+
+    private static boolean isNameChar(char current) {
+        return Character.isLetterOrDigit(current) || current == ':' || current == '-' || current == '_';
+    }
+
+    private static boolean isAttrChar(char current) {
+        return current != '=' && current != '>' && current != '/' && current != '"' && current != '\'' && !Character.isWhitespace(current);
+    }
+
+    private static boolean isUnquotedValueChar(char current) {
+        return !Character.isWhitespace(current) && current != '>' && current != '/' && current != '"' && current != '\'';
+    }
+
+    private static boolean dropAttribute(String name, String value) {
+        if (name.isBlank()) return true;
+        if ("srcdoc".equals(name)) return true;
+        if (name.length() > 2 && name.startsWith("on") && Character.isLetter(name.charAt(2))) return true;
+        return urlAttribute(name) && javascriptUrl(value);
+    }
+
+    private static boolean urlAttribute(String name) {
+        return switch (name) {
+            case "href", "src", "action", "formaction", "poster", "cite", "background", "dynsrc", "lowsrc", "data", "xlink:href" -> true;
+            default -> false;
+        };
+    }
+
+    private static boolean javascriptUrl(String value) {
+        if (value == null) return false;
+        String compact = value.replaceAll("\\s+", "").toLowerCase(Locale.ROOT);
+        return compact.startsWith("javascript:");
+    }
+
+    private static String decodeUntilStable(String value) {
+        String current = value == null ? "" : value;
+        for (int pass = 0; pass < 6; pass++) {
+            String decoded = decodeEntities(current);
+            if (decoded.equals(current)) return current;
+            current = decoded;
+        }
+        return current;
+    }
+
+    private static String escapeAttr(String value) {
+        StringBuilder escaped = new StringBuilder(value.length());
+        for (int index = 0; index < value.length(); index++) {
+            char current = value.charAt(index);
+            switch (current) {
+                case '&' -> escaped.append('&').append("amp;");
+                case '"' -> escaped.append('&').append("quot;");
+                case '<' -> escaped.append('&').append("lt;");
+                case '>' -> escaped.append('&').append("gt;");
+                default -> escaped.append(current);
+            }
+        }
+        return escaped.toString();
     }
 
     private static int tagEnd(String html, int start) {
@@ -1023,12 +1159,49 @@ final class PageSurfaces {
 
     private static final Map<String, Placement> PLACED = new LinkedHashMap<>();
 
-    private static void rememberPlacement(String id, String sha, String summary) {
-        PLACED.put(id, new Placement(sha, summary));
+    static void clearPlacementMemory() {
+        PLACED.clear();
     }
 
-    private static Placement placement(String id) {
-        return PLACED.get(id);
+    private static void rememberPlacement(Path page, Path ledger, String id, String sha, String summary) throws IOException {
+        PLACED.put(id, new Placement(sha, summary));
+        writePlacement(page == null ? null : placeFile(page), id, sha, summary);
+        writePlacement(ledger == null ? null : ledger.resolve("placements.json"), id, sha, summary);
+    }
+
+    private static Placement placement(Path page, Path ledger, String id) throws IOException {
+        Placement memory = PLACED.get(id);
+        if (memory != null) return memory;
+        Placement fromPage = readPlacement(page == null ? null : placeFile(page), id);
+        if (fromPage != null) return fromPage;
+        return readPlacement(ledger == null ? null : ledger.resolve("placements.json"), id);
+    }
+
+    private static Path placeFile(Path page) {
+        return page.resolveSibling(page.getFileName() + ".place.json");
+    }
+
+    private static void writePlacement(Path file, String id, String sha, String summary) throws IOException {
+        if (file == null) return;
+        ObjectNode root = readObject(file);
+        ObjectNode row = root.putObject(id);
+        row.put("sha256", sha);
+        row.put("summary", summary);
+        if (file.getParent() != null) Files.createDirectories(file.getParent());
+        AgentStore.JSON.writeValue(file.toFile(), root);
+    }
+
+    private static Placement readPlacement(Path file, String id) throws IOException {
+        if (file == null || !Files.isRegularFile(file)) return null;
+        JsonNode row = AgentStore.JSON.readTree(file.toFile()).path(id);
+        if (!row.isObject()) return null;
+        return new Placement(row.path("sha256").asText(""), row.path("summary").asText(""));
+    }
+
+    private static ObjectNode readObject(Path file) throws IOException {
+        if (file == null || !Files.isRegularFile(file)) return AgentStore.JSON.createObjectNode();
+        JsonNode node = AgentStore.JSON.readTree(file.toFile());
+        return node instanceof ObjectNode object ? object : AgentStore.JSON.createObjectNode();
     }
 
     private static Map<String, Object> labeled(List<String> codes, String sentence) {
