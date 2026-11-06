@@ -71,7 +71,7 @@ class GeometryViewTest {
     void oneQueryReturnsSpacesWhenTheFlagIsListed() throws Exception {
         temp = Files.createTempDirectory("pkb-geometry");
         Path log = temp.resolve("calls.log");
-        pin(stub(temp.resolve("composite"), log, true, false));
+        pin(stub(temp.resolve("composite"), log, true, false, false));
         CompositeRuntime.joinForTests("http://127.0.0.1:9222");
         HtmlUnitDriver driver = new HtmlUnitDriver(false);
         try {
@@ -109,7 +109,7 @@ class GeometryViewTest {
     void missingFlagKeepsTheAabbAndDoesNotAsk() throws Exception {
         temp = Files.createTempDirectory("pkb-geometry-off");
         Path log = temp.resolve("calls.log");
-        pin(stub(temp.resolve("composite"), log, false, false));
+        pin(stub(temp.resolve("composite"), log, false, false, false));
         CompositeRuntime.joinForTests("http://127.0.0.1:9222");
         HtmlUnitDriver driver = new HtmlUnitDriver(false);
         try {
@@ -134,7 +134,7 @@ class GeometryViewTest {
     void scrollableRegionExposesClientAndContentInOneQuery() throws Exception {
         temp = Files.createTempDirectory("pkb-scrollport");
         Path log = temp.resolve("calls.log");
-        pin(stub(temp.resolve("composite"), log, true, true));
+        pin(stub(temp.resolve("composite"), log, true, true, false));
         CompositeRuntime.joinForTests("http://127.0.0.1:9222");
         HtmlUnitDriver driver = new HtmlUnitDriver(false);
         try {
@@ -196,6 +196,71 @@ class GeometryViewTest {
         assertEquals(100, hit.getLocation().getX());
     }
 
+    @Test
+    void collapsedControlDoesNotInventARevealedBox() {
+        ObjectNode node = JsonNodeFactory.instance.objectNode();
+        node.put("id", "main:4");
+        node.put("node_name", "DETAILS");
+        ObjectNode bounds = node.putObject("bounds");
+        bounds.put("x", 10);
+        bounds.put("y", 10);
+        bounds.put("width", 100);
+        bounds.put("height", 24);
+        ObjectNode geometry = node.putObject("geometry");
+        ObjectNode document = geometry.putObject("document_css_px");
+        document.put("kind", "quad");
+        document.put("x", 10);
+        document.put("y", 10);
+        document.put("width", 100);
+        document.put("height", 24);
+        geometry.put("expanded", false);
+        geometry.put("expanded_source", "details");
+        ObjectNode sample = geometry.putArray("corners").addObject();
+        sample.put("box", "border");
+        sample.put("index", 0);
+        sample.put("x", 11);
+        sample.put("y", 11);
+        sample.putNull("hit");
+        sample.put("reason", "closed_shadow_hit");
+        CompositeWebElement hit = new CompositeWebElement(
+                new CompositeSelector(null, "details", null, "web", null, "details"), node, 0);
+        assertEquals(false, hit.geometry().expanded());
+        assertEquals("details", hit.geometry().expandedSource());
+        assertNull(hit.geometry().revealed());
+        assertEquals(1, hit.geometry().corners().size());
+        assertNull(hit.geometry().corners().get(0).hit());
+        assertEquals("closed_shadow_hit", hit.geometry().corners().get(0).reason());
+        assertEquals(10, hit.getLocation().getX());
+    }
+
+    @Test
+    void openControlExposesRevealedCornersInOneQuery() throws Exception {
+        temp = Files.createTempDirectory("pkb-revealed");
+        Path log = temp.resolve("calls.log");
+        pin(stub(temp.resolve("composite"), log, true, false, true));
+        CompositeRuntime.joinForTests("http://127.0.0.1:9222");
+        HtmlUnitDriver driver = new HtmlUnitDriver(false);
+        try {
+            List<WebElement> found = ElementOperations.findElements(driver, By.cssSelector("#go"));
+            assertEquals(1, found.size());
+            CompositeWebElement hit = (CompositeWebElement) found.get(0);
+            assertEquals(true, hit.geometry().expanded());
+            assertNotNull(hit.geometry().revealed());
+            assertEquals(4.0, hit.geometry().revealed().documentCssPx().x());
+            assertEquals(40.0, hit.geometry().revealed().documentCssPx().width());
+            assertEquals(18.0, hit.geometry().revealed().documentCssPx().height());
+            assertEquals(true, hit.geometry().corners().get(0).hit());
+            String calls = Files.readString(log);
+            assertEquals(1, queries(calls), calls);
+            assertTrue(calls.contains("--geometry"), calls);
+            String trace = Files.readString(CompositeLog.file());
+            assertTrue(trace.contains("INFO geometry expanded revealed"), trace);
+            assertTrue(trace.contains("INFO geometry corners 1hit/0miss"), trace);
+        } finally {
+            driver.quit();
+        }
+    }
+
     private void pin(Path binary) {
         System.setProperty(CompositeBinaryLocator.BIN_KEY, binary.toString());
         System.setProperty(CompositeLog.KEY, "geometry,adapter");
@@ -208,7 +273,7 @@ class GeometryViewTest {
         return calls.lines().filter(line -> line.startsWith("query ")).count();
     }
 
-    private static Path stub(Path path, Path log, boolean geometry, boolean scrollport) throws Exception {
+    private static Path stub(Path path, Path log, boolean geometry, boolean scrollport, boolean open) throws Exception {
         String flags = geometry
                 ? "[\"within\", \"nesting\", \"nth\", \"every\", \"count-only\", \"geometry\"]"
                 : "[\"within\", \"nesting\", \"nth\", \"every\", \"count-only\"]";
@@ -218,6 +283,7 @@ class GeometryViewTest {
                 log = %s
                 flags = %s
                 scrollport = %s
+                opened = %s
                 def note(argv):
                     with open(log, "a", encoding="utf-8") as handle:
                         handle.write(" ".join(argv) + "\\n")
@@ -252,6 +318,13 @@ class GeometryViewTest {
                                 "client": {"document_css_px": space(108, 104, 180, 140)},
                                 "content": {"document_css_px": space(78, 54, 400, 800)}
                             }
+                        if opened:
+                            row["geometry"]["expanded"] = True
+                            row["geometry"]["expanded_source"] = "aria-expanded"
+                            row["geometry"]["revealed"] = {"document_css_px": space(4, 30, 40, 18)}
+                            row["geometry"]["corners"] = [{
+                                "box": "border", "index": 0, "x": 5.0, "y": 7.0, "hit": True, "reason": None
+                            }]
                     return row
                 for line in sys.stdin:
                     line = line.strip()
@@ -277,7 +350,7 @@ class GeometryViewTest {
                         "stderr": ""
                     }) + "\\n")
                     sys.stdout.flush()
-                """.formatted(quote(log.toString()), flags, scrollport ? "True" : "False");
+                """.formatted(quote(log.toString()), flags, scrollport ? "True" : "False", open ? "True" : "False");
         Files.createDirectories(path.getParent());
         Files.writeString(path, script);
         Files.setPosixFilePermissions(path, Set.of(

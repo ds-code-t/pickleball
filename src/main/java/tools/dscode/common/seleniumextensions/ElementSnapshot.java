@@ -92,6 +92,18 @@ public record ElementSnapshot(
     }
 
     /**
+     * One corner sample of a mapped box. {@code hit} is null when the sample
+     * cannot be known. {@code reason} is then {@code closed_shadow_hit},
+     * {@code cross_origin}, or {@code no_hit_grid}. A null hit is not a hit.
+     */
+    public record CornerHit(String box, int index, double x, double y, Boolean hit, String reason) {
+        public CornerHit {
+            box = box == null ? "" : box;
+            reason = reason == null ? "" : reason;
+        }
+    }
+
+    /**
      * Client box of a scrollport, plus the scrollable content box when that
      * size was stored. Content is null when the engine did not have it.
      * Neither box is invented.
@@ -105,7 +117,10 @@ public record ElementSnapshot(
      * hit-testing retargets to the host. These corners are the CDP or stored
      * quads. They are not a page-JS {@code elementFromPoint} result.
      * {@code scrollport} is set only when this element is a scrollport and the
-     * payload included a client box.
+     * payload included a client box. {@code expanded} is set only for a control.
+     * {@code revealed} is set only when that control is open and a region was stored.
+     * A collapsed control does not grow a predicted box. {@code corners} samples
+     * the boxes that were mapped. An empty list means the payload had none.
      */
     public record Geometry(
             Space documentCssPx,
@@ -116,10 +131,16 @@ public record ElementSnapshot(
             boolean closedShadow,
             String closedShadowLimit,
             NearestScrollport nearestScrollport,
-            ScrollBoxes scrollport
+            ScrollBoxes scrollport,
+            Boolean expanded,
+            String expandedSource,
+            Spaces revealed,
+            List<CornerHit> corners
     ) {
         public Geometry {
             closedShadowLimit = closedShadowLimit == null ? "" : closedShadowLimit;
+            expandedSource = expandedSource == null ? "" : expandedSource;
+            corners = corners == null || corners.isEmpty() ? List.of() : List.copyOf(corners);
         }
 
         /** True when the document space's axis-aligned box is the same integer AABB as {@code bounds}. */
@@ -143,7 +164,11 @@ public record ElementSnapshot(
                     node.path("closed_shadow").asBoolean(false),
                     node.path("closed_shadow_limit").asText(""),
                     port(node.get("nearest_scrollport")),
-                    scrollBoxes(node.get("scrollport"))
+                    scrollBoxes(node.get("scrollport")),
+                    boolOrNull(node.get("expanded")),
+                    node.path("expanded_source").asText(""),
+                    node.has("revealed") ? spaces(node.get("revealed")) : null,
+                    cornerHits(node.get("corners"))
             );
         }
 
@@ -193,6 +218,30 @@ public record ElementSnapshot(
                     node.path("id").asText(""),
                     node.path("origin").asText("")
             );
+        }
+
+        private static Boolean boolOrNull(JsonNode node) {
+            if (node == null || node.isNull() || !node.isBoolean()) return null;
+            return node.asBoolean();
+        }
+
+        private static List<CornerHit> cornerHits(JsonNode node) {
+            if (node == null || !node.isArray()) return List.of();
+            List<CornerHit> hits = new ArrayList<>();
+            for (JsonNode corner : node) {
+                if (corner == null || !corner.isObject()) continue;
+                JsonNode hit = corner.get("hit");
+                JsonNode reason = corner.get("reason");
+                hits.add(new CornerHit(
+                        corner.path("box").asText(""),
+                        corner.path("index").asInt(0),
+                        corner.path("x").asDouble(),
+                        corner.path("y").asDouble(),
+                        hit != null && hit.isBoolean() ? hit.asBoolean() : null,
+                        reason == null || reason.isNull() ? "" : reason.asText("")
+                ));
+            }
+            return hits;
         }
     }
 

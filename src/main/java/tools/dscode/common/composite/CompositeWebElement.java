@@ -70,6 +70,20 @@ public final class CompositeWebElement implements WebElement {
             boolean content = this.geometry.scrollport().content() != null;
             CompositeLog.info("geometry", content ? "scrollport client+content" : "scrollport client");
         }
+        if (this.geometry != null && this.geometry.expanded() != null) {
+            CompositeLog.info(
+                    "geometry",
+                    (this.geometry.expanded() ? "expanded" : "collapsed")
+                            + (this.geometry.revealed() != null ? " revealed" : "")
+            );
+        }
+        if (this.geometry != null) {
+            long hits = this.geometry.corners().stream().filter(corner -> Boolean.TRUE.equals(corner.hit())).count();
+            long misses = this.geometry.corners().stream().filter(corner -> Boolean.FALSE.equals(corner.hit())).count();
+            if (hits + misses > 0) {
+                CompositeLog.info("geometry", "corners " + hits + "hit/" + misses + "miss");
+            }
+        }
     }
 
     public String nodeTag() {

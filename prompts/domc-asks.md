@@ -83,4 +83,23 @@ The live probe writes `scroll_left`, `scroll_top`, `client_left`, `client_top`,
 Log entity `geometry`. Info, when a box is present: `id=<frame>:<backend> scrollport=client`
 or `scrollport=client+content`.
 
+## Landed in 2.11.2
+
+Same `query --geometry` object. `expanded` and `expanded_source` are present when the hit is a control:
+`aria-expanded`, an accessibility `expanded` property (`ax`), or a `details` / `summary` pair (`details`).
+Other nodes omit both.
+
+`revealed` is that region in the same five spaces, and only when the control is open and a stored quad exists.
+`aria-controls` names the element. An open `details` uses element children other than `summary`.
+A collapsed control does not get a predicted box. A missing quad omits `revealed`.
+
+`corners` samples one CSS pixel in from each corner of the border box, and of `scrollport.client`,
+`scrollport.content`, and `revealed` when those boxes are present. `hit` is true when the `hit_grid`
+cell's top node is this node or a descendant, false when the cell names something else, and null when
+the sample is not known. `reason` is then `closed_shadow_hit`, `cross_origin`, or `no_hit_grid`.
+A null hit is not a hit. The engine does not call page-script `elementFromPoint`.
+
+Log entity `geometry`. Info, when the node is a control or a corner sample is known:
+`id=<frame>:<backend> expanded=<true|false|none> revealed=<yes|no> corners=<n>hit/<n>miss/<n>unknown`.
+
 

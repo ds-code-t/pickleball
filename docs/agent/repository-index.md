@@ -73,6 +73,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/maintainer/2.1.19-dom-composite-roadmap.md`
 - `docs/maintainer/2.1.19-dom-efficiency-roadmap.md`
 - `docs/maintainer/2.1.19-element-snapshot-roadmap.md`
+- `docs/maintainer/2.1.19-find-interface-roadmap.md`
 - `docs/maintainer/2.1.19-mapping-geometry-roadmap.md`
 - `docs/maintainer/consumer-sim-harness.md`
 - `docs/maintainer/guidance-goldens.md`
