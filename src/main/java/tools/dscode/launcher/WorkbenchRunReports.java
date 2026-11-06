@@ -10,6 +10,7 @@ import tools.dscode.control.protocol.WorkbenchFeatureIndex;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.PrintStream;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -41,6 +42,11 @@ public final class WorkbenchRunReports {
     private static final Pattern STEP_SUMMARY = Pattern.compile("(?m)^(\\d+)\\s+Steps?\\b");
     /** Inline summary names. The rest are failedScenariosMore plus query errors. */
     static final int FAILED_SCENARIOS_INLINE_CAP = 10;
+    /**
+     * Worker stdout is routing and wrapper noise. Both launch modes keep it in the
+     * console files. Turning this on still strips {@link WorkbenchConsoleTap#MARKER}.
+     */
+    static final boolean REPLAY_WORKER_STDOUT = false;
 
     private WorkbenchRunReports() {
     }
@@ -116,6 +122,52 @@ public final class WorkbenchRunReports {
         if (more > 0) {
             line.append(" failedScenariosMore=").append(more).append(" query errors");
         }
+    }
+
+    /**
+     * Drops {@code # pkb-console} lines. Other lines stay, in order.
+     * This is the only rule that decides whether a worker line may be shown.
+     */
+    public static String filterConsoleMarkers(String captured) {
+        if (captured == null || captured.isEmpty()) return "";
+        StringBuilder kept = new StringBuilder();
+        String[] lines = captured.split("\\R", -1);
+        int limit = lines.length;
+        if (limit > 0 && lines[limit - 1].isEmpty()) limit--;
+        for (int i = 0; i < limit; i++) {
+            if (lines[i].contains(WorkbenchConsoleTap.MARKER)) continue;
+            kept.append(lines[i]).append('\n');
+        }
+        return kept.toString();
+    }
+
+    /**
+     * The one agent-facing launch report for direct/warm and the wrapper.
+     * The summary is always printed. Quiet drops every other report line.
+     * A launch fault (no usable test result) prints {@code error:} / {@code fix:}.
+     * An ordinary {@code FAILED} does not.
+     */
+    public static void presentLaunch(
+            PrintStream out,
+            PrintStream err,
+            String capturedWorker,
+            boolean quiet,
+            String summary,
+            String consolePointer,
+            String launchFaultCause,
+            String launchFaultFix
+    ) {
+        if (err != null && launchFaultCause != null && !launchFaultCause.isBlank()) {
+            err.print(WorkbenchCliHelp.structured(
+                    launchFaultCause,
+                    launchFaultFix == null ? "" : launchFaultFix
+            ));
+        }
+        if (out == null) return;
+        String worker = filterConsoleMarkers(capturedWorker);
+        if (REPLAY_WORKER_STDOUT && !quiet && !worker.isBlank()) out.print(worker);
+        if (summary != null && !summary.isBlank()) out.println(summary.strip());
+        if (!quiet && consolePointer != null && !consolePointer.isBlank()) out.println(consolePointer);
     }
 
     /**
@@ -215,7 +267,7 @@ public final class WorkbenchRunReports {
                 int[] counted = passFail(bodies);
                 passed = counted[0];
                 failed = counted[1];
-                failedNames = failedScenarioNames(bodies);
+                failedNames = failedScenarioNames(project, bodies);
             }
             out.println(compact(status, scenarios, steps, environment, browser, passed, failed, failedNames));
         }
@@ -234,15 +286,83 @@ public final class WorkbenchRunReports {
         return new int[]{passed, failed};
     }
 
-    private static List<String> failedScenarioNames(List<Map<String, Object>> bodies) {
+    private static List<String> failedScenarioNames(Path project, List<Map<String, Object>> bodies) {
         List<String> names = new ArrayList<>();
         if (bodies == null) return names;
         for (Map<String, Object> body : bodies) {
             if (!isFailedStatus(scenarioStatus(body))) continue;
             String name = text(body.get("scenario"));
-            if (!name.isBlank()) names.add(name);
+            if (!name.isBlank()) names.add(scenarioLabel(project, name, body));
         }
         return names;
+    }
+
+    /** Name, then project-relative {@code path:line} and {@code example <line>} when the identity recorded them. */
+    private static String scenarioLabel(Path project, String name, Map<String, Object> body) {
+        String uri = projectRelative(project, text(body.get("featureUri")));
+        Long line = positiveLine(body.get("scenarioLine"));
+        Long example = positiveLine(body.get("exampleLine"));
+        StringBuilder label = new StringBuilder(name);
+        if (!uri.isBlank()) {
+            label.append(' ').append(uri);
+            if (line != null) label.append(':').append(line);
+        }
+        if (example != null) label.append(" example ").append(example);
+        return label.toString();
+    }
+
+    /** Display only. Does not change {@code ScenarioIdentity.canonicalSourceUri}. */
+    static String projectRelative(Path project, String raw) {
+        if (raw == null || raw.isBlank()) return "";
+        String text = raw.trim();
+        try {
+            if (text.regionMatches(true, 0, "file:", 0, 5)) {
+                return relativize(project, Path.of(URI.create(text)));
+            }
+        } catch (RuntimeException ignored) {
+            // A broken file URI falls through to the raw text with the scheme removed below.
+        }
+        if (text.regionMatches(true, 0, "classpath:", 0, 10)) {
+            String rest = text.substring("classpath:".length()).replace('\\', '/');
+            while (rest.startsWith("/")) rest = rest.substring(1);
+            if (rest.startsWith("src/")) return rest;
+            return "src/test/resources/" + rest;
+        }
+        String slashed = text.replace('\\', '/');
+        try {
+            Path path = Path.of(text);
+            if (path.isAbsolute()) return relativize(project, path);
+        } catch (RuntimeException ignored) {
+            return slashed;
+        }
+        return slashed;
+    }
+
+    private static String relativize(Path project, Path path) {
+        Path absolute = path.toAbsolutePath().normalize();
+        String shown = absolute.toString().replace('\\', '/');
+        if (project == null) return shown;
+        Path base = project.toAbsolutePath().normalize();
+        if (absolute.startsWith(base)) {
+            return base.relativize(absolute).toString().replace('\\', '/');
+        }
+        return shown;
+    }
+
+    private static Long positiveLine(Object value) {
+        if (value == null) return null;
+        long parsed;
+        if (value instanceof Number number) parsed = number.longValue();
+        else {
+            String raw = String.valueOf(value).trim();
+            if (raw.isEmpty()) return null;
+            try {
+                parsed = Long.parseLong(raw);
+            } catch (NumberFormatException failure) {
+                return null;
+            }
+        }
+        return parsed > 0 ? parsed : null;
     }
 
     private static String scenarioStatus(Map<String, Object> body) {
@@ -482,12 +602,14 @@ public final class WorkbenchRunReports {
         List<Map<String, Object>> events = readJsonLines(scenarioDir.resolve("events.jsonl"));
         String scenario = "";
         String status = "";
+        Object identity = null;
         List<Map<String, Object>> steps = new ArrayList<>();
         List<Map<String, Object>> failures = new ArrayList<>();
         for (Map<String, Object> event : events) {
             String type = text(event.get("type"));
             if ("scenario_start".equals(type)) {
-                scenario = identityName(event.get("identity"));
+                identity = event.get("identity");
+                scenario = identityName(identity);
             } else if ("scenario_end".equals(type) && status.isBlank()) {
                 status = text(event.get("outcome"));
             } else if ("step".equals(type)) {
@@ -506,6 +628,7 @@ public final class WorkbenchRunReports {
         body.put("status", status);
         body.put("steps", steps);
         body.put("failures", failures);
+        copyScenarioLocation(body, identity);
         if (thin) fillFromCoreSummary(scenarioDir, body);
         Path workbench = scenarioDir.resolve("workbench");
         Files.createDirectories(workbench);
@@ -579,6 +702,7 @@ public final class WorkbenchRunReports {
             if (text(body.get("scenario")).isBlank()) {
                 body.put("scenario", scenarioNameFrom(coreBody));
             }
+            copyScenarioLocation(body, coreBody.get("identity"));
             if (text(body.get("status")).isBlank()) {
                 String outcome = firstText(coreBody, "outcome", "status");
                 if (!outcome.isBlank()) body.put("status", outcome);
@@ -606,6 +730,22 @@ public final class WorkbenchRunReports {
             if (!name.isBlank()) return name;
         }
         return firstText(coreBody, "scenario", "scenarioName", "name");
+    }
+
+    private static void copyScenarioLocation(Map<String, Object> body, Object identity) {
+        if (!(identity instanceof Map<?, ?> map)) return;
+        if (text(body.get("featureUri")).isBlank()) {
+            String uri = firstText(map, "featureUri", "uri");
+            if (!uri.isBlank()) body.put("featureUri", uri.replace('\\', '/'));
+        }
+        if (positiveLine(body.get("scenarioLine")) == null) {
+            Long line = positiveLine(map.get("scenarioLine"));
+            if (line != null) body.put("scenarioLine", line);
+        }
+        if (positiveLine(body.get("exampleLine")) == null) {
+            Long line = positiveLine(map.get("exampleLine"));
+            if (line != null) body.put("exampleLine", line);
+        }
     }
 
     private static Map<String, Object> readJsonObject(Path file) {

@@ -47,6 +47,7 @@ public final class WorkbenchAttachServer implements AutoCloseable {
     private final WorkbenchSessionActions actions;
     private final ExecutorService executor;
     private final AtomicBoolean closed = new AtomicBoolean();
+    private final AtomicBoolean workerReadyMarked = new AtomicBoolean();
     private final SleepGapMonitor sleepGaps = new SleepGapMonitor();
 
     private WorkbenchAttachServer(
@@ -234,8 +235,21 @@ public final class WorkbenchAttachServer implements AutoCloseable {
         body.put("url", url());
         body.put("pid", ProcessHandle.current().pid());
         body.put("mode", mode);
+        body.put("running", commands != null && commands.commandInFlight());
         body.put("sleepGaps", recorded);
+        markWorkerReady(mode, workerReadyMarked);
         send(exchange, 200, body);
+    }
+
+    /**
+     * First successful CLI-session {@code /health}. Printed on the controller
+     * stderr, which the session launch appends to {@code session.log}.
+     * A second call, and UI attach, do not print again.
+     */
+    static void markWorkerReady(String mode, AtomicBoolean marked) {
+        if (!CLI_SESSION_MODE.equals(mode) || marked == null) return;
+        if (!marked.compareAndSet(false, true)) return;
+        System.err.println("progress stage=worker-ready");
     }
 
     private void lease(HttpExchange exchange) throws IOException {

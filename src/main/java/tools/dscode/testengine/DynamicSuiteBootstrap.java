@@ -101,6 +101,15 @@ public final class DynamicSuiteBootstrap {
 
             debug("Scanning preferred test classpath root for glue fallback: " + root);
 
+            if (Files.isDirectory(path)) {
+                try {
+                    packages.addAll(PreferredRootScanner.stepPackages(path));
+                    continue;
+                } catch (IOException failure) {
+                    debug("Header glue scan failed, loading classes: " + failure.getMessage());
+                }
+            }
+
             List<Class<?>> found = ReflectionSupport.findAllClassesInClasspathRoot(
                     root,
                     c -> true,
@@ -278,6 +287,28 @@ public final class DynamicSuiteBootstrap {
 
         debug("Scanning preferred test classpath root: " + root);
 
+        if (Files.isDirectory(path)) {
+            try {
+                List<String> names = PreferredRootScanner.concreteRunnerNames(path);
+                if (names.size() > 1) {
+                    throw new IllegalStateException(
+                            "Expected exactly one concrete subclass of " + PickleballRunner.class.getName()
+                                    + " in classpath root " + root + " but found "
+                                    + PreferredRootScanner.dotted(names)
+                    );
+                }
+                if (names.isEmpty()) return null;
+                Class<?> loaded = PreferredRootScanner.loadNamed(names.get(0));
+                if (loaded == null || !isCandidate(loaded)) return null;
+                debug("Accepted classpath candidate: " + loaded.getName());
+                return loaded;
+            } catch (IllegalStateException multiple) {
+                throw multiple;
+            } catch (IOException failure) {
+                debug("Header runner scan failed, loading classes: " + failure.getMessage());
+            }
+        }
+
         List<Class<?>> found = ReflectionSupport.findAllClassesInClasspathRoot(
                 root,
                 DynamicSuiteBootstrap::isCandidate,
@@ -310,7 +341,7 @@ public final class DynamicSuiteBootstrap {
                 && !Modifier.isAbstract(c.getModifiers());
     }
 
-    private static boolean isStepPackage(String packageName) {
+    static boolean isStepPackage(String packageName) {
         if (packageName == null || packageName.isBlank()) {
             return false;
         }

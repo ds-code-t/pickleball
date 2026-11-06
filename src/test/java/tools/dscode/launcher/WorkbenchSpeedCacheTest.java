@@ -42,6 +42,21 @@ class WorkbenchSpeedCacheTest {
     }
 
     @Test
+    void liveWorkerListIsNotADiscoverCacheHit() throws Exception {
+        Files.writeString(project.resolve("pom.xml"), "<project>live</project>\n");
+        Path live = PickleballLocalLayout.workbenchStateRoot(project).resolve("live/classes");
+        Files.createDirectories(live);
+        Path jar = project.resolve("lib.jar");
+        Files.writeString(jar, "jar");
+        ClasspathCache.store(
+                PickleballLocalLayout.workbenchStateRoot(project),
+                InputFingerprint.lockHash(project),
+                List.of(live.toString(), jar.toString())
+        );
+        assertFalse(WorkbenchSpeed.cacheHit(project));
+    }
+
+    @Test
     void sequentialModeIsTheFreshJvmFallback() {
         String previous = System.getProperty(WorkbenchSpeed.MODE_PROPERTY);
         try {

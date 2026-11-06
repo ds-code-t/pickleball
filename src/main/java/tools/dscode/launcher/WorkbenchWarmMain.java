@@ -87,9 +87,22 @@ public final class WorkbenchWarmMain {
 
     /**
      * Parent death exits even during a run. Idle does not.
+     * A missing state file exits even during a run.
      * {@code parentPid} of zero is not watched.
      */
     static boolean exitDue(long parent, boolean running, long idleLimitNanos, long usedAt, long now) {
+        return exitDue(parent, running, idleLimitNanos, usedAt, now, false);
+    }
+
+    static boolean exitDue(
+            long parent,
+            boolean running,
+            long idleLimitNanos,
+            long usedAt,
+            long now,
+            boolean stateMissing
+    ) {
+        if (stateMissing) return true;
         if (parent > 0 && !WarmProcess.alive(parent)) return true;
         if (running || idleLimitNanos <= 0) return false;
         return now - usedAt >= idleLimitNanos;
@@ -103,9 +116,12 @@ public final class WorkbenchWarmMain {
                 Thread.currentThread().interrupt();
                 return;
             }
-            long filed = WarmProcess.readOwner(state);
-            if (filed > 0) parentPid = filed;
-            if (exitDue(parentPid, busy, idleNanos, lastUsedNanos, System.nanoTime())) shutdown(state);
+            boolean missing = !Files.isRegularFile(WarmProcess.file(state));
+            if (!missing) {
+                long filed = WarmProcess.readOwner(state);
+                if (filed > 0) parentPid = filed;
+            }
+            if (exitDue(parentPid, busy, idleNanos, lastUsedNanos, System.nanoTime(), missing)) shutdown(state);
         }
     }
 
@@ -117,6 +133,7 @@ public final class WorkbenchWarmMain {
             // A child can exit between the snapshot and the kill.
         }
         WarmProcess.delete(state);
+        WarmProcess.deleteRememberedPid(state);
         System.exit(0);
     }
 

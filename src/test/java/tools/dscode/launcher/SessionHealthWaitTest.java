@@ -5,12 +5,14 @@ import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
 import java.time.Duration;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -25,7 +27,7 @@ class SessionHealthWaitTest {
 
     @Test
     void timeoutMatchesTheWorkerStartResolutionOrder() {
-        assertEquals(Duration.ofSeconds(180), SessionHealthWait.DEFAULT_TIMEOUT);
+        assertEquals(Duration.ofSeconds(300), SessionHealthWait.DEFAULT_TIMEOUT);
         assertEquals(Duration.ofSeconds(12), SessionHealthWait.PROGRESS_EVERY);
         assertTrue(SessionHealthWait.PROGRESS_EVERY.compareTo(Duration.ofSeconds(10)) >= 0);
         assertTrue(SessionHealthWait.PROGRESS_EVERY.compareTo(Duration.ofSeconds(15)) <= 0);
@@ -59,10 +61,10 @@ class SessionHealthWaitTest {
                 key -> null,
                 key -> null
         ));
-        assertEquals(Duration.ofSeconds(180), SessionHealthWait.timeout(Map.of(property, "nope"), key -> null, key -> null));
-        assertEquals(Duration.ofSeconds(180), SessionHealthWait.timeout(Map.of(property, "0"), key -> null, key -> null));
-        assertEquals(Duration.ofSeconds(180), SessionHealthWait.timeout(Map.of(property, "-4"), key -> null, key -> null));
-        assertEquals(Duration.ofSeconds(180), SessionHealthWait.timeout(Map.of(), key -> " ", key -> " "));
+        assertEquals(Duration.ofSeconds(300), SessionHealthWait.timeout(Map.of(property, "nope"), key -> null, key -> null));
+        assertEquals(Duration.ofSeconds(300), SessionHealthWait.timeout(Map.of(property, "0"), key -> null, key -> null));
+        assertEquals(Duration.ofSeconds(300), SessionHealthWait.timeout(Map.of(property, "-4"), key -> null, key -> null));
+        assertEquals(Duration.ofSeconds(300), SessionHealthWait.timeout(Map.of(), key -> " ", key -> " "));
         assertEquals(Duration.ofSeconds(8), SessionHealthWait.timeout(
                 Map.of(),
                 key -> property.equals(key) ? " 8 " : null,
@@ -77,7 +79,7 @@ class SessionHealthWaitTest {
         String previousRunVars = System.getProperty("pkb_runvars");
         String previousDotted = System.getProperty(SessionHealthWait.START_TIMEOUT_RUNVAR);
         try {
-            assertEquals(Duration.ofSeconds(180), SessionHealthWait.timeout(Map.of()));
+            assertEquals(Duration.ofSeconds(300), SessionHealthWait.timeout(Map.of()));
             System.setProperty(property, "12");
             assertEquals(Duration.ofSeconds(12), SessionHealthWait.timeout(Map.of()));
             System.clearProperty(property);
@@ -93,7 +95,7 @@ class SessionHealthWaitTest {
                             "pkb_runvars", "pkb_workbench_worker_start_timeout=90"
                     ))
             );
-            assertEquals(Duration.ofSeconds(180), SessionHealthWait.timeout(Map.of(property, "nope")));
+            assertEquals(Duration.ofSeconds(300), SessionHealthWait.timeout(Map.of(property, "nope")));
         } finally {
             restore(property, previous);
             restore("pkb_runvars", previousRunVars);
@@ -210,6 +212,52 @@ class SessionHealthWaitTest {
 
     @Test
     @Timeout(value = 5, unit = TimeUnit.SECONDS)
+    void aNewWaitDropsAStageLeftInAnOlderLogTheNewestLogAndTheProgressFile() throws Exception {
+        Path session = project.resolve("session").resolve("session.log");
+        Files.createDirectories(session.getParent());
+        Files.writeString(session, "progress stage=prior-newest\n");
+        Path logs = project.resolve(".pickleball").resolve("workbench").resolve("logs");
+        Files.createDirectories(logs);
+        Path older = logs.resolve("worker-older.err.log");
+        Path newest = logs.resolve("worker-newest.err.log");
+        Files.writeString(older, "progress stage=prior-older\n");
+        Files.writeString(newest, "progress stage=prior-newest\n");
+        Files.setLastModifiedTime(older, FileTime.fromMillis(1_000L));
+        Files.setLastModifiedTime(newest, FileTime.fromMillis(System.currentTimeMillis() + 86_400_000L));
+        Path progress = session.getParent().resolve(SessionHealthWait.PROGRESS_FILE);
+        Files.writeString(progress, "{\"stages\":[{\"stage\":\"prior-newest\",\"enteredElapsedMs\":0}]}");
+        assertEquals("prior-newest", SessionHealthWait.currentStage(project, session));
+
+        Files.writeString(session, "");
+        Files.deleteIfExists(progress);
+        Map<Path, Long> baseline = SessionHealthWait.baselineSizes(project, session);
+        assertFalse("prior-newest".equals(SessionHealthWait.currentStage(project, session, baseline)));
+        assertFalse("prior-older".equals(SessionHealthWait.currentStage(project, session, baseline)));
+        Files.writeString(session, "progress stage=index-end\nprogress stage=jvm\n");
+
+        long started = System.nanoTime();
+        SessionHealthWait.Outcome outcome = SessionHealthWait.waitFor(
+                () -> System.nanoTime() - started > Duration.ofMillis(40).toNanos(),
+                () -> true,
+                project,
+                session,
+                new PrintStream(new ByteArrayOutputStream(), true, StandardCharsets.UTF_8),
+                new PrintStream(new ByteArrayOutputStream(), true, StandardCharsets.UTF_8),
+                Duration.ofSeconds(2),
+                Duration.ofMillis(15),
+                Duration.ofMillis(5),
+                baseline
+        );
+        assertEquals(SessionHealthWait.Kind.HEALTHY, outcome.kind());
+        String json = Files.readString(progress);
+        assertFalse(json.contains("prior-newest"), json);
+        assertFalse(json.contains("prior-older"), json);
+        assertTrue(json.contains("index-end"), json);
+        assertTrue(json.contains("jvm"), json);
+    }
+
+    @Test
+    @Timeout(value = 5, unit = TimeUnit.SECONDS)
     void timeoutWithoutAMarkerUsesTheGenericStage() {
         Path log = project.resolve("session.log");
         ByteArrayOutputStream stderr = new ByteArrayOutputStream();
@@ -269,6 +317,64 @@ class SessionHealthWaitTest {
         );
         assertEquals(SessionHealthWait.Kind.HEALTHY, outcome.kind());
         assertEquals("", stdout.toString(StandardCharsets.UTF_8));
+    }
+
+    @Test
+    void postDigestStagesAreObservedFromTheSessionLogAndWorkerStderr() throws Exception {
+        Path session = project.resolve("session.log");
+        Path logs = project.resolve(".pickleball").resolve("workbench").resolve("logs");
+        Files.createDirectories(logs);
+        Path worker = logs.resolve("worker-timing.err.log");
+        Files.writeString(session, String.join("\n",
+                "progress stage=digest files=5259 bytes=193000000 ms=3200 links=0 copies=0",
+                "progress stage=hash jars=1 reused=1 hashed=0 bytes=10",
+                ""
+        ));
+        Files.writeString(worker, String.join("\n",
+                "progress stage=worker-launch",
+                "progress stage=jvm elapsed=1ms",
+                "progress stage=worker-spawn",
+                "progress stage=jvm-main",
+                "progress stage=classpath-scan",
+                "progress stage=anchor-parse",
+                "progress stage=paused",
+                "progress stage=worker-ready elapsed=40ms",
+                ""
+        ));
+        ByteArrayOutputStream stdout = new ByteArrayOutputStream();
+        SessionHealthWait.Outcome outcome = SessionHealthWait.waitFor(
+                () -> {
+                    try {
+                        Files.writeString(session, "progress stage=worker-ready\n",
+                                java.nio.file.StandardOpenOption.APPEND);
+                    } catch (IOException failure) {
+                        throw new IllegalStateException(failure);
+                    }
+                    return true;
+                },
+                () -> true,
+                project,
+                session,
+                new PrintStream(stdout, true, StandardCharsets.UTF_8),
+                new PrintStream(new ByteArrayOutputStream(), true, StandardCharsets.UTF_8),
+                Duration.ofSeconds(5),
+                Duration.ofSeconds(30),
+                Duration.ofMillis(5)
+        );
+        assertEquals(SessionHealthWait.Kind.HEALTHY, outcome.kind());
+        String progress = Files.readString(session.getParent().resolve(SessionHealthWait.PROGRESS_FILE));
+        for (String stage : List.of(
+                "digest", "hash", "worker-launch", "jvm", "worker-spawn",
+                "jvm-main", "classpath-scan", "anchor-parse", "paused", "worker-ready"
+        )) {
+            assertTrue(progress.contains("\"stage\":\"" + stage + "\""), progress);
+        }
+        int spawn = progress.indexOf("\"stage\":\"worker-spawn\"");
+        int jvmMain = progress.indexOf("\"stage\":\"jvm-main\"");
+        int scan = progress.indexOf("\"stage\":\"classpath-scan\"");
+        int ready = progress.indexOf("\"stage\":\"worker-ready\"");
+        assertTrue(spawn >= 0 && jvmMain > spawn && scan > jvmMain && ready > scan, progress);
+        System.out.println("windows-shaped-stages " + progress);
     }
 
     private static void restore(String key, String previous) {

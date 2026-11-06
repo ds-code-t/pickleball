@@ -113,6 +113,7 @@ class WorkbenchCliSurfaceCoverageTest {
 
     @Test
     void covers_command_isolate() throws Exception {
+        WorkbenchSessionCommandsTest.seedWorkspace(temp, "iso-1");
         AtomicReference<WorkbenchSessionCommands.SessionLaunch> launch = new AtomicReference<>();
         Capture capture = session(command -> {
             launch.set(command);
@@ -735,6 +736,56 @@ class WorkbenchCliSurfaceCoverageTest {
     }
 
     @Test
+    void covers_flag_max_steps() throws Exception {
+        WorkbenchCommandLine.Parsed parsed = parse("validate", "--max-steps=4", "--tags=@cap");
+        assertEquals(4, parsed.maxSteps());
+        assertFalse(parsed.allSteps());
+        writeCapFeature();
+        Capture capped = agent("validate", temp.toString(), "--tags=@cap", "--max-steps=1");
+        assertEquals(1, capped.code, capped.out + capped.err);
+        assertTrue(capped.out.contains("capped=true"), capped.out);
+        assertTrue(capped.out.contains("skipped=2"), capped.out);
+        assertFalse(capped.out.contains("later-2"), capped.out);
+        Capture rejected = agent("validate", temp.toString(), "--max-steps=0");
+        assertEquals(2, rejected.code, rejected.out + rejected.err);
+        assertTrue(rejected.err.contains("error:"), rejected.err);
+        assertTrue(rejected.err.contains("fix:"), rejected.err);
+        Capture help = agent("help", "validate");
+        assertTrue(help.out.contains("--max-steps"), help.out);
+        assertTrue(help.out.contains("--all"), help.out);
+    }
+
+    @Test
+    void covers_flag_all() throws Exception {
+        WorkbenchCommandLine.Parsed parsed = parse("validate", "--all", "--max-steps=1", "--tags=@cap");
+        assertTrue(parsed.allSteps());
+        assertEquals(1, parsed.maxSteps());
+        writeCapFeature();
+        Capture all = agent("validate", temp.toString(), "--tags=@cap", "--all", "--max-steps=1");
+        assertEquals(1, all.code, all.out + all.err);
+        assertTrue(all.out.contains("capped=false"), all.out);
+        assertTrue(all.out.contains("skipped=0"), all.out);
+        assertTrue(all.out.contains("later-2"), all.out);
+    }
+
+    private void writeCapFeature() throws IOException {
+        Path feature = temp.resolve("src/test/resources/features/cap.feature");
+        Files.createDirectories(feature.getParent());
+        Files.writeString(feature, """
+                @cap
+                Feature: Cap
+                  Scenario: Lots
+                    Given missing one
+                    Given missing two
+                    Given missing three
+                  Scenario: Later one
+                    Given missing later-1
+                  Scenario: Later two
+                    Given missing later-2
+                """);
+    }
+
+    @Test
     void covers_flag_refresh() throws Exception {
         assertTrue(parse("plan", "--refresh").refreshIndex());
         writeFeature("@smoke", "Find term");
@@ -1193,6 +1244,7 @@ class WorkbenchCliSurfaceCoverageTest {
         assertTrue(List.of(parsed.forwarded()).contains("--session-file=" + sessionFile),
                 List.of(parsed.forwarded()).toString());
         assertEquals("sf-1", parsed.coordination().runId());
+        WorkbenchSessionCommandsTest.seedWorkspace(temp, "sf-1");
         AtomicReference<WorkbenchSessionCommands.SessionLaunch> launch = new AtomicReference<>();
         session(command -> {
             launch.set(command);

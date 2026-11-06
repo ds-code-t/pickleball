@@ -18,6 +18,21 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class WorkbenchCommandLineTest {
     @Test
+    void validateRejectsQuietWhileDiscoverAndConfirmKeepIt() {
+        IllegalArgumentException rejected = assertThrows(
+                IllegalArgumentException.class,
+                () -> WorkbenchCommandLine.parse(new String[]{"validate", "--quiet", "--tags=@smoke"})
+        );
+        assertTrue(rejected.getMessage().contains("error: validate does not use --quiet"), rejected.getMessage());
+        assertTrue(rejected.getMessage().contains("fix:"), rejected.getMessage());
+        assertTrue(rejected.getMessage().contains("help validate"), rejected.getMessage());
+        assertTrue(WorkbenchCommandLine.parse(new String[]{"discover", "--quiet", "--tags=@smoke"}).quiet());
+        assertTrue(WorkbenchCommandLine.parse(new String[]{"confirm", "--quiet"}).quiet());
+        assertTrue(WorkbenchCommandLine.parse(new String[]{"validate", "--tags=@smoke", "--all", "--max-steps=4"}).allSteps());
+        assertTrue(WorkbenchCliHelp.usage("validate").contains("--quiet"));
+    }
+
+    @Test
     void parseRetentionEqualsForm() {
         WorkbenchCommandLine.Parsed parsed = WorkbenchCommandLine.parse(
                 new String[]{"discover", "--retention=all"}

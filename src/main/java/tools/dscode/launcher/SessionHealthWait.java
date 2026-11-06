@@ -23,7 +23,7 @@ import java.util.regex.Pattern;
  * {@code open-window} does not use this type.
  */
 final class SessionHealthWait {
-    static final Duration DEFAULT_TIMEOUT = Duration.ofSeconds(180);
+    static final Duration DEFAULT_TIMEOUT = Duration.ofSeconds(300);
     static final Duration PROGRESS_EVERY = Duration.ofSeconds(12);
     static final String START_TIMEOUT_PROPERTY = "pkb_workbench_worker_start_timeout";
     static final String START_TIMEOUT_ENV = "PKB_WORKBENCH_WORKER_START_TIMEOUT";
@@ -102,6 +102,27 @@ final class SessionHealthWait {
             Duration progressEvery,
             Duration poll
     ) {
+        return waitFor(healthy, alive, project, sessionLog, out, err, timeout, progressEvery, poll, null);
+    }
+
+    /**
+     * {@code baseline} is the size of each log at session start. Only bytes appended
+     * after that count, so a previous session's last stage is not this start's first mark.
+     * A file that did not exist yet, or that shrank, is read in full. A null baseline
+     * keeps the previous whole-file read.
+     */
+    static Outcome waitFor(
+            BooleanSupplier healthy,
+            BooleanSupplier alive,
+            Path project,
+            Path sessionLog,
+            PrintStream out,
+            PrintStream err,
+            Duration timeout,
+            Duration progressEvery,
+            Duration poll,
+            Map<Path, Long> baseline
+    ) {
         Duration limit = timeout == null || timeout.isZero() || timeout.isNegative() ? DEFAULT_TIMEOUT : timeout;
         Duration every = progressEvery == null || progressEvery.isZero() || progressEvery.isNegative()
                 ? PROGRESS_EVERY
@@ -111,8 +132,18 @@ final class SessionHealthWait {
         long deadline = started + limit.toNanos();
         long nextProgress = started + every.toNanos();
         StageTimeline timeline = new StageTimeline();
+        Map<Path, Long> cursor = new java.util.LinkedHashMap<>();
+        if (baseline != null) cursor.putAll(baseline);
         while (System.nanoTime() < deadline) {
+            if (observeStages(project, sessionLog, cursor, timeline, elapsedMs(started))) {
+                writeTimeline(sessionLog, timeline);
+            }
             if (healthy != null && healthy.getAsBoolean()) {
+                // /health can flip true before the stderr pump writes the same burst.
+                sleep(Duration.ofMillis(50));
+                if (observeStages(project, sessionLog, cursor, timeline, elapsedMs(started))) {
+                    writeTimeline(sessionLog, timeline);
+                }
                 return new Outcome(Kind.HEALTHY, timeline.current(), elapsedMs(started));
             }
             if (alive != null && !alive.getAsBoolean()) {
@@ -120,10 +151,6 @@ final class SessionHealthWait {
                     return new Outcome(Kind.HEALTHY, timeline.current(), elapsedMs(started));
                 }
                 return new Outcome(Kind.DIED, timeline.current(), elapsedMs(started));
-            }
-            String stage = currentStage(project, sessionLog);
-            if (timeline.observe(stage, elapsedMs(started))) {
-                writeTimeline(sessionLog, timeline);
             }
             long now = System.nanoTime();
             if (now >= nextProgress) {
@@ -135,11 +162,13 @@ final class SessionHealthWait {
             if (System.nanoTime() >= deadline) break;
             sleep(pause);
         }
+        observeStages(project, sessionLog, cursor, timeline, elapsedMs(started));
         if (healthy != null && healthy.getAsBoolean()) {
+            writeTimeline(sessionLog, timeline);
             return new Outcome(Kind.HEALTHY, timeline.current(), elapsedMs(started));
         }
         if (timeline.isEmpty()) {
-            timeline.observe(currentStage(project, sessionLog), elapsedMs(started));
+            timeline.observe(currentStage(project, sessionLog, baseline), elapsedMs(started));
         }
         long elapsed = elapsedMs(started);
         writeTimeline(sessionLog, timeline);
@@ -155,8 +184,21 @@ final class SessionHealthWait {
         return "session-start progress elapsed=" + millis + "ms stage=" + where;
     }
 
+    static Map<Path, Long> baselineSizes(Path project, Path sessionLog) {
+        Map<Path, Long> sizes = new java.util.LinkedHashMap<>();
+        for (Path file : logCandidates(project, sessionLog)) {
+            if (file == null) continue;
+            sizes.put(file.toAbsolutePath().normalize(), fileSize(file));
+        }
+        return sizes;
+    }
+
     static String currentStage(Path project, Path sessionLog) {
-        StageHit hit = latestStage(logCandidates(project, sessionLog));
+        return currentStage(project, sessionLog, null);
+    }
+
+    static String currentStage(Path project, Path sessionLog, Map<Path, Long> baseline) {
+        StageHit hit = latestStage(logCandidates(project, sessionLog), baseline);
         return hit == null ? GENERIC_STAGE : hit.stage;
     }
 
@@ -231,12 +273,64 @@ final class SessionHealthWait {
         return files;
     }
 
+    /**
+     * Every stage line appended since the last read, session log first.
+     * A poll that only kept the latest line dropped {@code index-end} when
+     * {@code jar-hash} or {@code jvm} was already in the same burst.
+     */
+    private static boolean observeStages(
+            Path project,
+            Path sessionLog,
+            Map<Path, Long> cursor,
+            StageTimeline timeline,
+            long elapsedMs
+    ) {
+        List<String> fresh = new ArrayList<>();
+        List<Path> files = new ArrayList<>();
+        if (sessionLog != null) files.add(sessionLog);
+        for (Path file : logCandidates(project, sessionLog)) {
+            if (file == null) continue;
+            if (sessionLog != null && sameFile(file, sessionLog)) continue;
+            files.add(file);
+        }
+        for (Path file : files) {
+            if (file == null || !Files.isRegularFile(file)) continue;
+            Path key = file.toAbsolutePath().normalize();
+            long size = fileSize(file);
+            long offset = cursor.getOrDefault(key, 0L);
+            if (size < offset) offset = 0L;
+            if (size > offset) {
+                Matcher matcher = STAGE_LINE.matcher(tailText(file, offset));
+                while (matcher.find()) fresh.add(matcher.group(1));
+            }
+            cursor.put(key, size);
+        }
+        if (fresh.isEmpty() && timeline.isEmpty()) fresh.add(GENERIC_STAGE);
+        boolean changed = false;
+        for (String stage : fresh) {
+            if (timeline.observe(stage, elapsedMs)) changed = true;
+        }
+        return changed;
+    }
+
+    private static boolean sameFile(Path left, Path right) {
+        try {
+            return left.toAbsolutePath().normalize().equals(right.toAbsolutePath().normalize());
+        } catch (RuntimeException failure) {
+            return false;
+        }
+    }
+
     static StageHit latestStage(List<Path> files) {
+        return latestStage(files, null);
+    }
+
+    static StageHit latestStage(List<Path> files, Map<Path, Long> baseline) {
         if (files == null || files.isEmpty()) return null;
         StageHit best = null;
         for (Path file : files) {
             if (file == null || !Files.isRegularFile(file)) continue;
-            String stage = lastStage(file);
+            String stage = lastStage(file, startOffset(file, baseline));
             if (stage == null) continue;
             long modified = lastModified(file);
             if (best == null || modified > best.modifiedMillis
@@ -245,6 +339,24 @@ final class SessionHealthWait {
             }
         }
         return best;
+    }
+
+    private static long startOffset(Path file, Map<Path, Long> baseline) {
+        if (baseline == null || file == null) return 0L;
+        Path key = file.toAbsolutePath().normalize();
+        if (!baseline.containsKey(key)) return 0L;
+        long mark = baseline.get(key);
+        long size = fileSize(file);
+        if (size < mark) return 0L;
+        return mark;
+    }
+
+    private static long fileSize(Path file) {
+        try {
+            return Files.isRegularFile(file) ? Files.size(file) : 0L;
+        } catch (IOException failure) {
+            return 0L;
+        }
     }
 
     static List<String> tailLines(Path file, int max) {
@@ -260,7 +372,11 @@ final class SessionHealthWait {
     }
 
     private static String lastStage(Path file) {
-        String text = tailText(file);
+        return lastStage(file, 0L);
+    }
+
+    private static String lastStage(Path file, long offset) {
+        String text = tailText(file, offset);
         if (text.isEmpty()) return null;
         Matcher matcher = STAGE_LINE.matcher(text);
         String stage = null;
@@ -269,14 +385,85 @@ final class SessionHealthWait {
     }
 
     private static String tailText(Path file) {
+        return tailText(file, 0L);
+    }
+
+    private static String tailText(Path file, long offset) {
         if (file == null || !Files.isRegularFile(file)) return "";
         try {
             long size = Files.size(file);
-            if (size <= 0) return "";
-            int take = (int) Math.min(size, TAIL_BYTES);
+            long start = Math.max(0L, offset);
+            if (size <= start) return "";
+            long available = size - start;
+            int take = (int) Math.min(available, TAIL_BYTES);
+            long position = size - take;
             byte[] buf = new byte[take];
             try (var channel = Files.newByteChannel(file)) {
-                channel.position(size - take);
+                channel.position(position);
+                int read = 0;
+                while (read < take) {
+                    int n = channel.read(ByteBuffer.wrap(buf, read, take - read));
+                    if (n < 0) break;
+                    read += n;
+                }
+                return new String(buf, 0, read, StandardCharsets.UTF_8);
+            }
+        } catch (IOException failure) {
+            return "";
+        }
+    }
+
+    static String lastFault(Path log, long offset) {
+        String text = textFrom(log, offset);
+        if (text.isBlank()) return null;
+        String best = null;
+        for (String raw : text.split("\\R")) {
+            String line = raw.strip();
+            if (line.isEmpty() || line.startsWith("at ")) continue;
+            if (line.contains("no workspace for run id")
+                    || line.startsWith("Caused by:")
+                    || line.startsWith("Workbench CLI isolate failed")
+                    || line.startsWith("Workbench CLI ")
+                    || line.contains("Exception")) {
+                best = line;
+            }
+        }
+        return best;
+    }
+
+    /** The cause, without the launcher prefix or the recovery sentence. */
+    static String faultError(String fault) {
+        if (fault == null || fault.isBlank()) return "session exited before becoming healthy";
+        String text = fault.strip();
+        String prefix = "Workbench CLI isolate failed: ";
+        if (text.startsWith(prefix)) text = text.substring(prefix.length());
+        int recovery = text.indexOf(". Run ");
+        if (recovery > 0 && text.contains("no workspace")) text = text.substring(0, recovery);
+        return text;
+    }
+
+    static String faultFix(String fault, Path logFile) {
+        if (fault != null && fault.contains("no workspace for run id")) {
+            return "Run workspace-seed or discover for that run id.";
+        }
+        return "See " + (logFile == null ? "session.log" : logFile);
+    }
+
+    private static String textFrom(Path file, long offset) {
+        if (file == null || !Files.isRegularFile(file)) return "";
+        try {
+            long size = Files.size(file);
+            long start = Math.max(0L, offset);
+            if (size <= start) return "";
+            int take = (int) Math.min(size - start, TAIL_BYTES);
+            long position = size - take;
+            if (position < start) {
+                position = start;
+                take = (int) (size - position);
+            }
+            byte[] buf = new byte[take];
+            try (var channel = Files.newByteChannel(file)) {
+                channel.position(position);
                 int read = 0;
                 while (read < take) {
                     int n = channel.read(ByteBuffer.wrap(buf, read, take - read));

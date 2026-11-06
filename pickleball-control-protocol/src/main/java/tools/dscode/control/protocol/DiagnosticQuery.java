@@ -40,7 +40,7 @@ public final class DiagnosticQuery {
     private static final Set<String> FIELDS = Set.of(
             "kind", "id", "seq", "runId", "scenarioId", "name", "outcome", "completion",
             "purpose", "scenarioCount", "failed", "where", "type", "status", "text",
-            "message", "stackHead", "key", "value", "source", "artifact"
+            "message", "stackHead", "cause", "causeChain", "key", "value", "source", "artifact"
     );
 
     private static final ThreadLocal<List<String>> DECODE_WARNINGS = ThreadLocal.withInitial(ArrayList::new);
@@ -148,6 +148,7 @@ public final class DiagnosticQuery {
             else if (Files.isDirectory(sharedDir)) DECODE_SCOPE.set(sharedDir);
         }
         try {
+        FailureRecord.verbose(flag(request, "verbose"));
         boolean capped = false;
         List<Map<String, Object>> matched = null;
         String where = null;
@@ -195,6 +196,7 @@ public final class DiagnosticQuery {
         return new Outcome(body, json, 0);
         } finally {
             DECODE_SCOPE.remove();
+            FailureRecord.verbose(false);
         }
     }
 
@@ -812,6 +814,12 @@ public final class DiagnosticQuery {
         if (error || (failure != null && failure.substantive())) {
             if (failureMessage != null && !failureMessage.isBlank()) item.put("message", clip(failureMessage));
             if (failureHead != null && !failureHead.isBlank()) item.put("stackHead", clip(failureHead));
+            if (failure != null && failure.cause() != null && !failure.cause().isBlank()) {
+                item.put("cause", clip(failure.cause()));
+            }
+            if (FailureRecord.verbose() && failure != null && !failure.causeChain().isEmpty()) {
+                item.put("causeChain", failure.causeChain());
+            }
         }
         item.put("where", where);
         return item;
@@ -836,34 +844,13 @@ public final class DiagnosticQuery {
 
     private static String stackHead(Object body) {
         if (!(body instanceof Map<?, ?> map)) return null;
-        Object stack = map.get("stack");
-        if (stack == null) stack = map.get("stackTrace");
-        if (stack == null && map.get("exception") instanceof Map<?, ?> exception) {
-            stack = exception.get("stackTrace");
-            if (stack == null) stack = exception.get("stack");
-            if (stack == null) stack = exception.get("message");
+        Map<String, Object> typed = new LinkedHashMap<>();
+        for (Map.Entry<?, ?> entry : map.entrySet()) {
+            if (entry.getKey() != null) typed.put(String.valueOf(entry.getKey()), entry.getValue());
         }
-        if (stack == null && map.get("failures") instanceof List<?> failures && !failures.isEmpty()) {
-            Object first = failures.getFirst();
-            if (first instanceof Map<?, ?> failure) {
-                stack = failure.get("stackTrace");
-                if (stack == null) stack = failure.get("stack");
-                if (stack == null) {
-                    String klass = str(failure.get("class"));
-                    String message = str(failure.get("message"));
-                    if (klass != null && message != null) stack = klass + ": " + message;
-                    else stack = firstNonBlank(message, klass);
-                }
-            }
-        }
-        if (stack instanceof List<?> lines && !lines.isEmpty()) stack = lines.getFirst();
-        if (stack == null) return null;
-        String text = String.valueOf(stack);
-        int newline = text.indexOf('\n');
-        if (newline >= 0) text = text.substring(0, newline);
-        text = text.strip();
-        if (text.isEmpty()) return null;
-        return clip(text);
+        FailureRecord record = FailureRecord.fromWorker(typed);
+        if (record == null || record.stackHead() == null || record.stackHead().isBlank()) return null;
+        return clip(record.stackHead());
     }
 
     private static Map<String, Object> summaryError(String runId, ScenarioRef scenario) throws IOException {
@@ -1035,38 +1022,68 @@ public final class DiagnosticQuery {
     }
 
     private static Scan logs(Path project, String runId) throws IOException {
-        List<Map<String, Object>> items = new ArrayList<>();
-        boolean capped = false;
-        Path file = project.resolve(".pickleball").resolve("agent-log");
-        if (Files.isRegularFile(file)) {
-            List<String> lines = readLinesReplacing(file, project);
-            capped = lines.size() > SCAN_LINES;
-            int start = capped ? lines.size() - SCAN_LINES : 0;
-            for (int index = start; index < lines.size(); index++) {
-                String line = lines.get(index);
-                if (line.isBlank()) continue;
-                String[] parts = line.split("\t", 6);
-                String text = parts.length >= 5 ? parts[4] : line;
-                String loggedRun = parts.length >= 3 ? parts[2] : null;
-                if (runId != null && loggedRun != null && !"-".equals(loggedRun) && !runId.equals(loggedRun)) continue;
-                Map<String, Object> item = new LinkedHashMap<>();
-                item.put("kind", "log");
-                item.put("id", Integer.toString(index + 1));
-                item.put("seq", index + 1);
-                item.put("source", "agent-log");
-                item.put("runId", "-".equals(loggedRun) ? null : loggedRun);
-                item.put("text", clip(text));
-                item.put("where", ".pickleball/agent-log");
-                items.add(item);
-            }
-        }
-        capped = appendWorkerLogs(project, items) || capped;
+        AgentLog agent = readAgentLog(project, runId);
+        List<Map<String, Object>> items = agent.items;
+        boolean capped = appendWorkerLogs(project, runId, items) || agent.capped;
         return new Scan(items, capped);
     }
 
+    /**
+     * Unscoped: the whole agent-log over {@link #SCAN_LINES} is capped.
+     * Scoped: only lines for that run count, and only those lines are kept.
+     */
+    private static AgentLog readAgentLog(Path project, String runId) throws IOException {
+        List<Map<String, Object>> items = new ArrayList<>();
+        Path file = project.resolve(".pickleball").resolve("agent-log");
+        if (!Files.isRegularFile(file)) return new AgentLog(items, false);
+        List<String> lines = readLinesReplacing(file, project);
+        boolean scoped = runId != null && !runId.isBlank();
+        if (!scoped) {
+            boolean capped = lines.size() > SCAN_LINES;
+            int start = capped ? lines.size() - SCAN_LINES : 0;
+            for (int index = start; index < lines.size(); index++) {
+                if (lines.get(index).isBlank()) continue;
+                items.add(agentItem(lines.get(index), index));
+            }
+            return new AgentLog(items, capped);
+        }
+        List<Integer> matched = new ArrayList<>();
+        for (int index = 0; index < lines.size(); index++) {
+            String line = lines.get(index);
+            if (line.isBlank() || !agentLineForRun(line, runId)) continue;
+            matched.add(index);
+        }
+        boolean capped = matched.size() > SCAN_LINES;
+        int start = capped ? matched.size() - SCAN_LINES : 0;
+        for (int cursor = start; cursor < matched.size(); cursor++) {
+            int index = matched.get(cursor);
+            items.add(agentItem(lines.get(index), index));
+        }
+        return new AgentLog(items, capped);
+    }
+
+    private static boolean agentLineForRun(String line, String runId) {
+        String[] parts = line.split("\t", 6);
+        String loggedRun = parts.length >= 3 ? parts[2] : null;
+        return loggedRun == null || "-".equals(loggedRun) || runId.equals(loggedRun);
+    }
+
+    private static Map<String, Object> agentItem(String line, int index) {
+        String[] parts = line.split("\t", 6);
+        String text = parts.length >= 5 ? parts[4] : line;
+        String loggedRun = parts.length >= 3 ? parts[2] : null;
+        return logItem(index + 1, "agent-log", "-".equals(loggedRun) ? null : loggedRun, text, ".pickleball/agent-log");
+    }
+
+    private record AgentLog(List<Map<String, Object>> items, boolean capped) {
+    }
+
     /** Last lines of worker stdout/stderr so agents can query them with the short log. */
-    private static boolean appendWorkerLogs(Path project, List<Map<String, Object>> items) throws IOException {
-        Path root = project.resolve(".pickleball");
+    private static boolean appendWorkerLogs(Path project, String runId, List<Map<String, Object>> items) throws IOException {
+        boolean scoped = runId != null && !runId.isBlank();
+        Path root = scoped
+                ? project.resolve(".pickleball").resolve("runs").resolve(runId)
+                : project.resolve(".pickleball");
         if (!Files.isDirectory(root)) return false;
         boolean capped = false;
         try (var walk = Files.walk(root, 6)) {
@@ -1162,6 +1179,17 @@ public final class DiagnosticQuery {
     private static boolean safeId(String id) {
         if (id == null || id.isBlank()) return false;
         return !id.contains("..") && !id.contains("/") && !id.contains("\\") && !id.contains("\0");
+    }
+
+    private static boolean flag(Map<String, ?> request, String key) {
+        if (request == null || key == null) return false;
+        Object value = request.get(key);
+        if (value instanceof Boolean enabled) return enabled;
+        if (value instanceof String text) {
+            String trimmed = text.strip();
+            return "true".equalsIgnoreCase(trimmed) || "1".equals(trimmed);
+        }
+        return false;
     }
 
     private static String slug(String name, int sequence) {
@@ -1329,26 +1357,9 @@ public final class DiagnosticQuery {
     }
 
     private static Scan tailLines(Path project, String runId) throws IOException {
-        List<Map<String, Object>> items = new ArrayList<>();
-        boolean capped = false;
-        Path agent = project.resolve(".pickleball").resolve("agent-log");
-        if (Files.isRegularFile(agent)) {
-            List<String> lines = readLinesReplacing(agent, project);
-            int start = 0;
-            if (lines.size() > SCAN_LINES) {
-                start = lines.size() - SCAN_LINES;
-                capped = true;
-            }
-            for (int index = start; index < lines.size(); index++) {
-                String line = lines.get(index);
-                if (line.isBlank()) continue;
-                String[] parts = line.split("\t", 6);
-                String loggedRun = parts.length >= 3 ? parts[2] : null;
-                if (runId != null && loggedRun != null && !"-".equals(loggedRun) && !runId.equals(loggedRun)) continue;
-                items.add(logItem(index + 1, "agent-log", "-".equals(loggedRun) ? null : loggedRun,
-                        parts.length >= 5 ? parts[4] : line, ".pickleball/agent-log"));
-            }
-        }
+        AgentLog agent = readAgentLog(project, runId);
+        List<Map<String, Object>> items = new ArrayList<>(agent.items);
+        boolean capped = agent.capped;
         List<Path> files = new ArrayList<>();
         Path runDir = project.resolve(".pickleball").resolve("runs").resolve(runId);
         if (Files.isDirectory(runDir)) {

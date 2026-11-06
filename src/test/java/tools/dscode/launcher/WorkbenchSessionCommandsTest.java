@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import tools.dscode.common.coordination.AgentCoordination;
 import tools.dscode.control.protocol.PickleballLocalLayout;
+import tools.dscode.control.protocol.Workspace;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -163,6 +164,7 @@ class WorkbenchSessionCommandsTest {
     @Test
     @Timeout(value = 10, unit = TimeUnit.SECONDS)
     void sessionStartLogsStartOnlyAfterTheSessionIsUp() throws Exception {
+        seedWorkspace(project, "up-run");
         AtomicReference<FakeSession> started = new AtomicReference<>();
         AtomicReference<Process> child = new AtomicReference<>();
         try {
@@ -191,6 +193,7 @@ class WorkbenchSessionCommandsTest {
     @Test
     @Timeout(value = 10, unit = TimeUnit.SECONDS)
     void sessionStartDoesNotLogStartWhenTheProcessDies() throws Exception {
+        seedWorkspace(project, "dead-run");
         Process dead = exitedProcess();
         Output output = run(
                 new String[]{"session-start", project.toString(), "--run-id=dead-run", "--agent=agent-dead"},
@@ -210,6 +213,7 @@ class WorkbenchSessionCommandsTest {
         AtomicReference<Process> child = new AtomicReference<>();
         try {
             System.setProperty(property, "1");
+            seedWorkspace(project, "slow-run");
             Output output = run(
                     new String[]{"session-start", project.toString(), "--run-id=slow-run", "--agent=agent-slow"},
                     launch -> {
@@ -264,6 +268,7 @@ class WorkbenchSessionCommandsTest {
         AtomicReference<Path> sessionFile = new AtomicReference<>();
         try {
             System.setProperty(property, "1");
+            seedWorkspace(project, "orphan-run");
             Output output = run(
                     new String[]{"session-start", project.toString(), "--run-id=orphan-run", "--agent=agent-orphan"},
                     launch -> {
@@ -309,6 +314,7 @@ class WorkbenchSessionCommandsTest {
         try {
             System.setProperty(property, "1");
             SessionHealthWait.progressEveryOverride = Duration.ofMillis(20);
+            seedWorkspace(project, "progress-run");
             Output output = run(
                     new String[]{"session-start", project.toString(), "--run-id=progress-run"},
                     launch -> {
@@ -805,6 +811,8 @@ class WorkbenchSessionCommandsTest {
         List<FakeSession> sessions = new ArrayList<>();
         List<Process> children = new ArrayList<>();
         try {
+            seedWorkspace(project, "run-0");
+            seedWorkspace(project, "run-1");
             for (int index = 0; index < 2; index++) {
                 Output output = run(
                         new String[]{"isolate", project.toString(), "--run-id=run-" + index, "--agent=agent-" + index},
@@ -1099,6 +1107,91 @@ class WorkbenchSessionCommandsTest {
         return new Output(exit, stdout.toString(StandardCharsets.UTF_8), stderr.toString(StandardCharsets.UTF_8));
     }
 
+    static void seedWorkspace(Path project, String runId) throws IOException {
+        Path workspace = Workspace.directory(project, runId);
+        Files.createDirectories(workspace);
+        Files.writeString(workspace.resolve(Workspace.RUNVARS_FILE), "pkb_browser=CHROME_HEADLESS\n");
+    }
+
+    @Test
+    @Timeout(value = 10, unit = TimeUnit.SECONDS)
+    void isolateWithoutAWorkspaceFailsBeforeSpawn() {
+        AtomicBoolean started = new AtomicBoolean();
+        Output output = run(
+                new String[]{"isolate", project.toString(), "--run-id=missing-ws"},
+                launch -> {
+                    started.set(true);
+                    return exitedProcess();
+                }
+        );
+        assertEquals(1, output.exitCode, output.stderr + output.stdout);
+        assertFalse(started.get());
+        assertTrue(output.stderr.contains("error: no workspace for run id missing-ws"), output.stderr);
+        assertTrue(output.stderr.contains("fix: Run workspace-seed or discover for that run id."), output.stderr);
+        assertFalse(output.stderr.contains("exited before becoming healthy"), output.stderr);
+    }
+
+    @Test
+    @Timeout(value = 10, unit = TimeUnit.SECONDS)
+    void isolateSurfacesTheChildLogErrorWithoutOpeningTheFile() throws Exception {
+        seedWorkspace(project, "logged-ws");
+        Output output = run(
+                new String[]{"session-start", project.toString(), "--run-id=logged-ws"},
+                launch -> {
+                    Files.writeString(
+                            launch.logFile(),
+                            "Workbench CLI isolate failed: no workspace for run id logged-ws at "
+                                    + launch.project() + ". Run workspace-seed or discover for that run id.\n"
+                    );
+                    return exitedProcess();
+                }
+        );
+        assertEquals(1, output.exitCode, output.stderr + output.stdout);
+        assertTrue(output.stderr.contains("error: no workspace for run id logged-ws"), output.stderr);
+        assertTrue(output.stderr.contains("fix: Run workspace-seed or discover for that run id."), output.stderr);
+        assertFalse(output.stderr.contains("exited before becoming healthy"), output.stderr);
+    }
+
+    @Test
+    @Timeout(value = 10, unit = TimeUnit.SECONDS)
+    void secondIsolateKeepsTheFirstSessionLog() throws Exception {
+        seedWorkspace(project, "keep-1");
+        Output first = run(
+                new String[]{"isolate", project.toString(), "--run-id=keep-1"},
+                launch -> {
+                    Files.writeString(
+                            launch.logFile(),
+                            "FIRST-START-EVIDENCE\nprogress stage=copy-base files=1 bytes=2 ms=3\n"
+                    );
+                    return exitedProcess();
+                }
+        );
+        assertEquals(1, first.exitCode, first.stderr + first.stdout);
+        Path session = AgentCoordination.runDirectory(project, "keep-1").resolve("session");
+        assertTrue(Files.readString(session.resolve("session.log")).contains("FIRST-START-EVIDENCE"));
+        Output second = run(
+                new String[]{"isolate", project.toString(), "--run-id=keep-1"},
+                launch -> {
+                    Files.writeString(launch.logFile(), "SECOND-START\n");
+                    return exitedProcess();
+                }
+        );
+        assertEquals(1, second.exitCode, second.stderr + second.stdout);
+        String archived = Files.readString(session.resolve("attempts").resolve("1").resolve("session.log"));
+        assertTrue(archived.contains("FIRST-START-EVIDENCE"), archived);
+        assertFalse(archived.contains("SECOND-START"), archived);
+        String current = Files.readString(session.resolve("session.log"));
+        assertTrue(current.contains("SECOND-START"), current);
+        assertFalse(current.contains("FIRST-START-EVIDENCE"), current);
+        Path archivedProgress = session.resolve("attempts").resolve("1").resolve(SessionHealthWait.PROGRESS_FILE);
+        if (Files.isRegularFile(session.resolve(SessionHealthWait.PROGRESS_FILE))) {
+            assertFalse(Files.readString(session.resolve(SessionHealthWait.PROGRESS_FILE)).contains("FIRST-START-EVIDENCE"));
+        }
+        if (Files.isRegularFile(archivedProgress)) {
+            assertTrue(Files.readString(archivedProgress).contains("copy-base"), Files.readString(archivedProgress));
+        }
+    }
+
     private record Output(int exitCode, String stdout, String stderr) {
     }
 
@@ -1190,6 +1283,27 @@ class WorkbenchSessionCommandsTest {
 
     @Test
     @Timeout(value = 10, unit = TimeUnit.SECONDS)
+    void executeStepFailureJsonUsesTheExternalFrameAndTheTopCause() throws Exception {
+        Path sessionFile = project.resolve(".pickleball/runs/fail-frame/session/cli-session.json");
+        try (FakeSession session = FakeSession.start(project, "cli-session", sessionFile)) {
+            session.commandGet = """
+                    {"id":"step-held","status":"FAILED","result":{"phrase":"buy","message":"expected <true> but was <false>","stackTrace":"java.lang.RuntimeException: Step 'Then buy' failed\\n\\tat io.cucumber.core.runner.PickleStepTestStep.run(PickleStepTestStep.java:80)\\nCaused by: java.lang.AssertionError: expected <true> but was <false>\\n\\tat com.example.ShopSteps.buy(ShopSteps.java:42)\\n\\tat tools.dscode.StepExtension.resolve(StepExtension.java:3)","cause":"java.lang.RuntimeException: Step 'Then buy' failed\\n\\tat io.cucumber.core.runner.PickleStepTestStep.run(PickleStepTestStep.java:80)\\nCaused by: java.lang.AssertionError: expected <true> but was <false>\\n\\tat com.example.ShopSteps.buy(ShopSteps.java:42)"}}
+                    """;
+            Output output = run(
+                    new String[]{"execute-step", project.toString(), "--text=Then buy"},
+                    launch -> {
+                        throw new AssertionError("execute-step must not start a session");
+                    }
+            );
+            assertEquals(1, output.exitCode, output.stderr + output.stdout);
+            assertTrue(output.stdout.contains("\"stackHead\":\"at com.example.ShopSteps.buy(ShopSteps.java:42)\""), output.stdout);
+            assertTrue(output.stdout.contains("\"cause\":\"Caused by: java.lang.AssertionError: expected <true> but was <false>\""), output.stdout);
+            assertFalse(output.stdout.contains("PickleStepTestStep"), output.stdout);
+        }
+    }
+
+    @Test
+    @Timeout(value = 10, unit = TimeUnit.SECONDS)
     void executeStepWarnsWhenTextLooksQuoteStrippedAndNamesTheSafeForms() throws Exception {
         WorkbenchSessionCommands.SessionFlags stripped = WorkbenchSessionCommands.SessionFlags.parse(new String[]{
                 "execute-step", "--text=Then the Save button is visible"
@@ -1207,6 +1321,12 @@ class WorkbenchSessionCommandsTest {
         });
         assertNotNull(split.quoteWarning);
         assertEquals("Then", split.text);
+        WorkbenchSessionCommands.SessionFlags star = WorkbenchSessionCommands.SessionFlags.parse(new String[]{
+                "execute-step", "--text=*, save E."
+        });
+        assertNotNull(star.quoteWarning);
+        assertTrue(star.quoteWarning.contains("--text-b64"), star.quoteWarning);
+        assertEquals("*, save E.", star.text);
 
         Path sessionFile = project.resolve(".pickleball/runs/quote-warn/session/cli-session.json");
         try (FakeSession session = FakeSession.start(project, "cli-session", sessionFile)) {
@@ -1235,6 +1355,35 @@ class WorkbenchSessionCommandsTest {
         assertTrue(report.contains("elapsed-step-ms=idle"), report);
         assertFalse(report.contains("elapsed-step-ms=0"), report);
         assertFalse(report.contains("status=running"), report);
+    }
+
+    @Test
+    void runningMarkBeforeAStepStaysIdleUnlessACommandIsInFlight() throws Exception {
+        String events = """
+                {"events":[
+                  {"timestamp":"2026-07-20T12:00:00Z","hook":"RUNNING"},
+                  {"timestamp":"2026-07-20T12:00:01Z","type":"RUNNING"}
+                ]}
+                """;
+        var idle = WorkbenchSessionCommands.timingOf(
+                new ObjectMapper().readTree(events),
+                null,
+                java.time.Instant.parse("2026-07-20T12:00:05Z"),
+                false
+        );
+        String idleReport = WorkbenchSessionCommands.formatReport(idle, List.of());
+        assertTrue(idleReport.contains("status=idle"), idleReport);
+        assertTrue(idleReport.contains("elapsed-step-ms=idle"), idleReport);
+
+        var inFlight = WorkbenchSessionCommands.timingOf(
+                new ObjectMapper().readTree(events),
+                null,
+                java.time.Instant.parse("2026-07-20T12:00:05Z"),
+                true
+        );
+        String running = WorkbenchSessionCommands.formatReport(inFlight, List.of());
+        assertTrue(running.contains("status=running"), running);
+        assertFalse(running.contains("elapsed-step-ms=idle"), running);
     }
 
     @Test
@@ -1283,8 +1432,8 @@ class WorkbenchSessionCommandsTest {
                     }
             );
             assertEquals(0, running.exitCode, running.stderr + running.stdout);
-            assertFalse(running.stdout.contains("elapsed-step-ms=idle"), running.stdout);
-            assertTrue(running.stdout.contains("elapsed-step-ms="), running.stdout);
+            assertTrue(running.stdout.contains("status=idle"), running.stdout);
+            assertTrue(running.stdout.contains("elapsed-step-ms=idle"), running.stdout);
         }
     }
 
@@ -1299,9 +1448,14 @@ class WorkbenchSessionCommandsTest {
         return new ProcessBuilder("sleep", "30").start();
     }
 
-    private static Process exitedProcess() throws IOException, InterruptedException {
+    private static Process exitedProcess() throws IOException {
         Process process = new ProcessBuilder("true").start();
-        process.waitFor(2, TimeUnit.SECONDS);
+        try {
+            process.waitFor(2, TimeUnit.SECONDS);
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            throw new IOException("Interrupted while waiting for the exited process.", interrupted);
+        }
         return process;
     }
 

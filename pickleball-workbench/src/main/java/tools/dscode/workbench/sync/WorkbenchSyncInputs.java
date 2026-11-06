@@ -81,10 +81,11 @@ public record WorkbenchSyncInputs(
                 Path path = Path.of(dependency).toAbsolutePath().normalize();
                 digest.update(path.toString().getBytes(StandardCharsets.UTF_8));
                 digest.update((byte) 0);
-                if (Files.isRegularFile(path)) {
-                    updateFileDigest(digest, path);
-                } else if (Files.isDirectory(path)) {
-                    updateDirectoryDigest(digest, path);
+                if (Files.exists(path)) {
+                    long size = Files.isRegularFile(path) ? Files.size(path) : 0L;
+                    digest.update(Long.toString(size).getBytes(StandardCharsets.UTF_8));
+                    digest.update((byte) 0);
+                    digest.update(Long.toString(Files.getLastModifiedTime(path).toMillis()).getBytes(StandardCharsets.UTF_8));
                 } else {
                     digest.update("MISSING".getBytes(StandardCharsets.UTF_8));
                 }
@@ -151,13 +152,29 @@ public record WorkbenchSyncInputs(
 
     static long countClassFiles(Path root) {
         if (root == null || !Files.isDirectory(root)) return 0;
-        try (Stream<Path> paths = Files.walk(root)) {
+        Path start = followDirectoryLink(root);
+        try (Stream<Path> paths = Files.walk(start)) {
             return paths.filter(Files::isRegularFile)
                     .filter(path -> path.getFileName().toString().endsWith(".class"))
                     .count();
         } catch (IOException ignored) {
             return 0;
         }
+    }
+
+    /**
+     * {@code Files.walk} does not enter a directory symlink. Live classes may be
+     * one relative link at {@code live/classes}, so count the target tree.
+     */
+    private static Path followDirectoryLink(Path root) {
+        try {
+            if (Files.isSymbolicLink(root)) {
+                return root.toRealPath();
+            }
+        } catch (IOException ignored) {
+            return root;
+        }
+        return root;
     }
 
     /**

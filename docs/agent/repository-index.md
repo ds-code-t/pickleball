@@ -57,12 +57,17 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/maintainer/2.1.18-locked-roadmap.md`
 - `docs/maintainer/2.1.18-meta-analysis-2.md`
 - `docs/maintainer/2.1.18-meta-deep-dive.md`
+- `docs/maintainer/2.1.18-report-6-roadmap.md`
+- `docs/maintainer/2.1.18-report-7-roadmap.md`
 - `docs/maintainer/2.1.18-report4.md`
 - `docs/maintainer/2.1.18-report5.md`
 - `docs/maintainer/2.1.18-speed-build-prompt.md`
 - `docs/maintainer/2.1.18-speed-roadmap.md`
 - `docs/maintainer/2.1.18-structural-fixes.md`
 - `docs/maintainer/2.1.18-unification.md`
+- `docs/maintainer/2.1.18-wb-first-start-timing-p2-roadmap.md`
+- `docs/maintainer/2.1.18-wb-first-start-timing-roadmap.md`
+- `docs/maintainer/2.1.18-wb-open-issues-roadmap.md`
 - `docs/maintainer/consumer-sim-harness.md`
 - `docs/maintainer/guidance-goldens.md`
 - `docs/maintainer/pointer-eval-harness.md`
@@ -351,6 +356,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/common/treeparsing/parsedComponents/phraseoperations/ElementMatcher.java`
 - `src/main/java/tools/dscode/common/treeparsing/parsedComponents/phraseoperations/ElementMatching.java`
 - `src/main/java/tools/dscode/common/treeparsing/parsedComponents/phraseoperations/OperationsInterface.java`
+- `src/main/java/tools/dscode/common/treeparsing/parsedComponents/phraseoperations/PhraseSyntax.java`
 - `src/main/java/tools/dscode/common/treeparsing/parsedComponents/phraseoperations/PlaceHolderMatch.java`
 - `src/main/java/tools/dscode/common/treeparsing/parsedComponents/ValueMatch.java`
 - `src/main/java/tools/dscode/common/treeparsing/ParsedLine.java`
@@ -421,6 +427,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/cucumberextended/utilities/StringUtilities.java`
 - `src/main/java/tools/dscode/internal/ValuesSupport.java`
 - `src/main/java/tools/dscode/launcher/PickleballWorkbenchLauncher.java`
+- `src/main/java/tools/dscode/launcher/QuietWarnings.java`
 - `src/main/java/tools/dscode/launcher/SessionHealthWait.java`
 - `src/main/java/tools/dscode/launcher/WorkbenchAgentCommands.java`
 - `src/main/java/tools/dscode/launcher/WorkbenchCliErrors.java`
@@ -459,6 +466,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/testengine/PickleballRunner.java`
 - `src/main/java/tools/dscode/testengine/PKB_props.java`
 - `src/main/java/tools/dscode/testengine/PkbPropertyValueNormalizer.java`
+- `src/main/java/tools/dscode/testengine/PreferredRootScanner.java`
 - `src/main/java/tools/dscode/testengine/ProjectPropertySources.java`
 - `src/main/java/tools/dscode/testengine/SensitiveConfiguration.java`
 - `src/main/java/tools/dscode/testengine/WorkbenchWorkerMain.java`
@@ -496,6 +504,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/common/reporting/diagnostic/DiscoverHintJvmLeakTest.java`
 - `src/test/java/tools/dscode/common/resources/PathListSemanticsTest.java`
 - `src/test/java/tools/dscode/common/servicecalls/JdbcTypeMappingTest.java`
+- `src/test/java/tools/dscode/common/treeparsing/PhraseSyntaxTest.java`
 - `src/test/java/tools/dscode/common/treeparsing/preparsing/ConditionalBranchArgumentTest.java`
 - `src/test/java/tools/dscode/common/treeparsing/preparsing/LazyBranchResolutionTest.java`
 - `src/test/java/tools/dscode/common/treeparsing/WithinRewriteScopeTest.java`
@@ -530,6 +539,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/WorkbenchConsumerScenarioEndToEndTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchElementInspectTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchLaunchCorrectnessTest.java`
+- `src/test/java/tools/dscode/launcher/WorkbenchLaunchOutputContractTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchLaunchTimingTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchOneShotLaunchTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchPointerContractTest.java`
@@ -562,9 +572,11 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/testengine/parity/LaunchSeedMain.java`
 - `src/test/java/tools/dscode/testengine/Phase7SeedMain.java`
 - `src/test/java/tools/dscode/testengine/PlainResolutionGoldenTest.java`
+- `src/test/java/tools/dscode/testengine/PreferredRootScannerTest.java`
 - `src/test/java/tools/dscode/testengine/ProjectPropertySourcesTest.java`
 - `src/test/java/tools/dscode/testengine/RunVarLaunchParityTest.java`
 - `src/test/java/tools/dscode/testengine/RunVarMatrixParityTest.java`
+- `src/test/java/tools/dscode/testengine/WorkbenchWorkerMainTest.java`
 - `src/test/java/tools/dscode/testengine/WorkspaceDriverProbe.java`
 - `src/test/java/tools/dscode/testengine/WorkspaceLaunchEndToEndTest.java`
 - `src/test/java/tools/dscode/testengine/WorkspaceLaunchTest.java`
@@ -829,6 +841,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/discover/LastDiscoverSnapshotTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/lease/WorkbenchControlLeaseTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/mapping/MappingValueCodecTest.java`
+- `pickleball-workbench/src/test/java/tools/dscode/workbench/mcp/WorkbenchAttachServerProgressTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/mcp/WorkbenchAttachServerTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/mcp/WorkbenchCommandQueueTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/mcp/WorkbenchMcpRetrievalTest.java`

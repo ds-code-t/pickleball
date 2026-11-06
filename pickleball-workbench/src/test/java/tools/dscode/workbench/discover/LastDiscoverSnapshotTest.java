@@ -74,6 +74,28 @@ class LastDiscoverSnapshotTest {
     }
 
     @Test
+    void requestedRunIdLoadsThatWorkspaceRatherThanTheLatestSnapshot() throws Exception {
+        Path file = LastDiscoverSnapshot.file(tempDir);
+        Files.createDirectories(file.getParent());
+        Files.writeString(file, """
+                {"runId":"run-b","runProfile":"pkb_browser=CHROME_HEADLESS","runVars":{"pkb_browser":"CHROME_HEADLESS"}}
+                """);
+        Path requested = Workspace.directory(tempDir, "run-a");
+        Path latest = Workspace.directory(tempDir, "run-b");
+        Workspace.writeRunVars(requested, Map.of("pkb_glue", "com.example.a", "pkb_browser", "CHROME_HEADLESS"));
+        Workspace.writeRunVars(latest, Map.of("pkb_glue", "com.example.b", "pkb_browser", "CHROME_HEADLESS"));
+
+        Map<String, String> properties = LastDiscoverSnapshot.workerSystemProperties(
+                tempDir, "@tags", null, null, null, null, "run-a"
+        );
+
+        assertEquals(requested.toAbsolutePath().normalize().toString(), properties.get("pkb_workspace"));
+        assertEquals("run-a", properties.get("pkb_run_id"));
+        assertEquals("@tags", properties.get("pkb_tags"));
+        assertFalse(properties.get("pkb_workspace").contains("run-b"), properties.toString());
+    }
+
+    @Test
     void isolateRunVarOverridesEnvironmentAndWarnsOnConflict() throws Exception {
         Path file = LastDiscoverSnapshot.file(tempDir);
         Files.createDirectories(file.getParent());

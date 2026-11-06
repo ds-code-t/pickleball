@@ -35,7 +35,7 @@ public final class WorkbenchWorkerManager implements AutoCloseable {
     static final int LEASE_RENEW_SECONDS = 30;
     static final String INTERACTIVE_PAUSE_HOOK = "BEFORE_STEP";
     static final String INTERACTIVE_PAUSE_STEP = "---pickleball-workbench-anchor";
-    static final Duration OUTER_START_TIMEOUT = Duration.ofSeconds(180);
+    static final Duration OUTER_START_TIMEOUT = Duration.ofSeconds(300);
     /** Inner worker deadline. Strictly below {@link #OUTER_START_TIMEOUT}. */
     static final Duration START_TIMEOUT = innerDeadline(OUTER_START_TIMEOUT);
     static final String START_TIMEOUT_PROPERTY = "pkb_workbench_worker_start_timeout";
@@ -102,7 +102,7 @@ public final class WorkbenchWorkerManager implements AutoCloseable {
         String stage = "worker-launch";
         try {
             markStage(stderr, stage, started, timing);
-            process = builder.start();
+            process = startWorkerProcess(builder, stderr);
             WorkerSession session = awaitBridge(
                     process, sessionId, token, sessionDirectory, stdout, stderr, manifest, classpath,
                     started, timing
@@ -268,6 +268,16 @@ public final class WorkbenchWorkerManager implements AutoCloseable {
         return List.copyOf(command);
     }
 
+    /**
+     * Starts the consumer worker and immediately records {@code worker-spawn}
+     * on the worker stderr log that {@code SessionHealthWait} tails.
+     */
+    static Process startWorkerProcess(ProcessBuilder builder, Path stderr) throws IOException {
+        Process process = builder.start();
+        writeProgress(stderr, "worker-spawn");
+        return process;
+    }
+
     /** Runs the resolve-only main when a launch names a workspace that is not on disk yet. */
     static void ensureSeed(Path project, List<String> classpath, Map<String, String> properties) {
         if (properties == null) return;
@@ -386,8 +396,8 @@ public final class WorkbenchWorkerManager implements AutoCloseable {
     }
 
     /**
-     * Inner deadline for {@code outer}. At least 15s subtracts 10s (180s becomes
-     * 170s). A shorter outer subtracts one fifth, and at least 1ms, and the
+     * Inner deadline for {@code outer}. At least 15s subtracts 10s (300s becomes
+     * 290s). A shorter outer subtracts one fifth, and at least 1ms, and the
      * result stays strictly below the outer wait.
      */
     static Duration innerDeadline(Duration outer) {

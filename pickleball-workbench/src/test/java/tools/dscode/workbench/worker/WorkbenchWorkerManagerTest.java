@@ -213,12 +213,12 @@ class WorkbenchWorkerManagerTest {
     }
 
     @Test
-    void workerStartTimeoutDefaultsToThreeMinutesAndHonorsOverrides() {
-        assertEquals(Duration.ofSeconds(170), WorkbenchWorkerManager.START_TIMEOUT);
-        assertTrue(WorkbenchWorkerManager.START_TIMEOUT.compareTo(Duration.ofSeconds(180)) < 0);
-        assertEquals(Duration.ofSeconds(170), WorkbenchWorkerManager.startTimeout(Map.of()));
+    void workerStartTimeoutStaysUnderTheOuterDefaultAndHonorsOverrides() {
+        assertEquals(Duration.ofSeconds(290), WorkbenchWorkerManager.START_TIMEOUT);
+        assertTrue(WorkbenchWorkerManager.START_TIMEOUT.compareTo(Duration.ofSeconds(300)) < 0);
+        assertEquals(Duration.ofSeconds(290), WorkbenchWorkerManager.startTimeout(Map.of()));
         assertEquals(
-                WorkbenchWorkerManager.innerDeadline(Duration.ofSeconds(180)),
+                WorkbenchWorkerManager.innerDeadline(Duration.ofSeconds(300)),
                 WorkbenchWorkerManager.START_TIMEOUT
         );
         String property = WorkbenchWorkerManager.START_TIMEOUT_PROPERTY;
@@ -252,7 +252,7 @@ class WorkbenchWorkerManagerTest {
                             "pkb_runvars", "pkb_workbench_worker_start_timeout=90"
                     ))
             );
-            assertEquals(Duration.ofSeconds(170), WorkbenchWorkerManager.startTimeout(Map.of(property, "nope")));
+            assertEquals(Duration.ofSeconds(290), WorkbenchWorkerManager.startTimeout(Map.of(property, "nope")));
         } finally {
             restore(property, previous);
             restore("pkb_runvars", previousRunVars);
@@ -284,6 +284,21 @@ class WorkbenchWorkerManagerTest {
         assertTrue(marked.contains("progress stage=maven elapsed="), marked);
         assertTrue(timing.toString().startsWith("maven="), timing.toString());
         assertTrue(timing.toString().endsWith("ms"), timing.toString());
+    }
+
+    @Test
+    void workerSpawnIsRecordedImmediatelyAfterTheProcessStarts() throws Exception {
+        Path log = tempDir.resolve("worker.err.log");
+        boolean windows = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).contains("win");
+        String executable = Path.of(System.getProperty("java.home"), "bin", windows ? "java.exe" : "java").toString();
+        ProcessBuilder builder = new ProcessBuilder(executable, "-version");
+        builder.redirectOutput(ProcessBuilder.Redirect.DISCARD);
+        builder.redirectError(ProcessBuilder.Redirect.DISCARD);
+        Process process = WorkbenchWorkerManager.startWorkerProcess(builder, log);
+        process.waitFor();
+        String text = Files.readString(log);
+        assertTrue(text.contains("progress stage=worker-spawn"), text);
+        assertTrue(text.indexOf("progress stage=worker-spawn") >= 0, text);
     }
 
     @Test

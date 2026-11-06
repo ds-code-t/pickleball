@@ -146,6 +146,28 @@ class WorkbenchSessionActionsTest {
     }
 
     @Test
+    void bridgeFailureCauseIsTheTopCausedByNotTheStack() {
+        String stack = """
+                java.lang.RuntimeException: Step 'Then buy' failed
+                \tat io.cucumber.core.runner.PickleStepTestStep.run(PickleStepTestStep.java:80)
+                Caused by: java.lang.AssertionError: expected true
+                \tat com.example.ShopSteps.buy(ShopSteps.java:42)
+                """;
+        ControlBridgeCallResult failed = new ControlBridgeCallResult(
+                "FAILED",
+                "string",
+                "seen-value",
+                new ControlBridgeError("ASSERTION", "expected true", stack),
+                null
+        );
+        Map<String, Object> step = WorkbenchSessionActions.bridgeFailure("execute-step", failed);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> failure = (Map<String, Object>) step.get("failureJson");
+        assertEquals("Caused by: java.lang.AssertionError: expected true", failure.get("cause"));
+        assertFalse(String.valueOf(failure.get("cause")).contains("PickleStepTestStep"));
+    }
+
+    @Test
     void windowReceivesEverySessionCommand() throws Exception {
         Path feature = project.resolve("src/test/resources/features/shop.feature");
         Files.createDirectories(feature.getParent());

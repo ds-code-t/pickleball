@@ -20,9 +20,11 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -452,6 +454,64 @@ public final class WorkbenchSessionCommands {
         return null;
     }
 
+    private static void truncateSessionLog(Path logFile) {
+        if (logFile == null) return;
+        try {
+            Path parent = logFile.getParent();
+            if (parent != null) Files.createDirectories(parent);
+            rotateSessionEvidence(logFile);
+            Files.writeString(
+                    logFile,
+                    "",
+                    StandardCharsets.UTF_8,
+                    java.nio.file.StandardOpenOption.CREATE,
+                    java.nio.file.StandardOpenOption.TRUNCATE_EXISTING,
+                    java.nio.file.StandardOpenOption.WRITE
+            );
+            Path progress = parent == null ? null : parent.resolve(SessionHealthWait.PROGRESS_FILE);
+            if (progress != null) Files.deleteIfExists(progress);
+        } catch (IOException failure) {
+            throw new IllegalStateException("Could not truncate " + logFile, failure);
+        }
+    }
+
+    /**
+     * Keeps the previous isolate's session log and startup progress.
+     * The pair moves to {@code <session>/attempts/<n>/} before this start truncates them.
+     * {@code n} is {@link AgentCoordination#nextAttempt}, the same count discover uses
+     * for {@code <run>/attempts/<n>/diagnostic}.
+     */
+    static void rotateSessionEvidence(Path logFile) throws IOException {
+        if (logFile == null) return;
+        Path parent = logFile.getParent();
+        if (parent == null) return;
+        Path progress = parent.resolve(SessionHealthWait.PROGRESS_FILE);
+        boolean log = Files.isRegularFile(logFile) && Files.size(logFile) > 0;
+        boolean progressFile = Files.isRegularFile(progress);
+        if (!log && !progressFile) return;
+        Path attempts = parent.resolve("attempts");
+        Path dest = attempts.resolve(Integer.toString(AgentCoordination.nextAttempt(attempts)));
+        Files.createDirectories(dest);
+        if (log) moveEvidence(logFile, dest.resolve(logFile.getFileName().toString()));
+        if (progressFile && Files.isRegularFile(progress)) {
+            moveEvidence(progress, dest.resolve(SessionHealthWait.PROGRESS_FILE));
+        }
+    }
+
+    private static void moveEvidence(Path source, Path dest) throws IOException {
+        try {
+            Files.move(source, dest, StandardCopyOption.ATOMIC_MOVE);
+        } catch (AtomicMoveNotSupportedException failure) {
+            Files.move(source, dest);
+        }
+    }
+
+    private static long loggedBytes(Map<Path, Long> baseline, Path logFile) {
+        if (baseline == null || logFile == null) return 0L;
+        Long size = baseline.get(logFile.toAbsolutePath().normalize());
+        return size == null ? 0L : size;
+    }
+
     /**
      * The forked controller does not inherit launcher {@code -D} properties.
      * Pass the outer timeout the health wait already resolved. The worker
@@ -497,7 +557,10 @@ public final class WorkbenchSessionCommands {
                 null,
                 false
         );
-        Optional<SessionState> existing = readHealthy(project, http);
+        Optional<SessionState> existing = readHealthyFile(
+                requestedSessionFile(project, flags, run), project, http
+        );
+        if (existing.isEmpty()) existing = readHealthy(project, http);
         if (existing.isPresent()) {
             SessionState state = existing.get();
             AgentCoordination.logStart(project, run, "isolate");
@@ -507,7 +570,20 @@ public final class WorkbenchSessionCommands {
             return 0;
         }
 
+        String requestedRun = parsed.coordination().runId();
+        if (requestedRun != null && !requestedRun.isBlank()
+                && !Workspace.exists(Workspace.directory(project, requestedRun.trim()))) {
+            String error = "no workspace for run id " + requestedRun.trim();
+            String fix = "Run workspace-seed or discover for that run id.";
+            if (err != null) err.print(WorkbenchCliHelp.structured(error, fix));
+            finishReason(project, run.runId(), "Session start failed: " + error, out);
+            WorkbenchSpeed.release(project);
+            return 1;
+        }
+
         Path logFile = run.sessionDirectory().resolve("session.log");
+        truncateSessionLog(logFile);
+        Map<Path, Long> logBaseline = SessionHealthWait.baselineSizes(project, logFile);
         Path sessionFile = requestedSessionFile(project, flags, run);
         Process process;
         try {
@@ -543,7 +619,8 @@ public final class WorkbenchSessionCommands {
                 err,
                 SessionHealthWait.timeout(Map.of()),
                 SessionHealthWait.progressEvery(),
-                POLL
+                POLL,
+                logBaseline
         );
         if (outcome.kind() == SessionHealthWait.Kind.HEALTHY && found[0] != null) {
             SessionState state = found[0];
@@ -552,7 +629,15 @@ public final class WorkbenchSessionCommands {
             return 0;
         }
         if (outcome.kind() != SessionHealthWait.Kind.TIMED_OUT) {
-            err.println("Workbench session process exited before becoming healthy. See " + logFile);
+            String fault = SessionHealthWait.lastFault(logFile, loggedBytes(logBaseline, logFile));
+            if (fault != null && err != null) {
+                err.print(WorkbenchCliHelp.structured(
+                        SessionHealthWait.faultError(fault),
+                        SessionHealthWait.faultFix(fault, logFile)
+                ));
+            } else if (err != null) {
+                err.println("Workbench session process exited before becoming healthy. See " + logFile);
+            }
             finishReason(project, run.runId(), "Session start failed: the process exited before it was healthy.", out);
             WorkbenchSpeed.release(project);
             return 1;
@@ -831,7 +916,10 @@ public final class WorkbenchSessionCommands {
                 out.println("...+" + (kept.size() - end) + " more, use cursor");
                 out.println("nextCursor=" + end);
             }
-            out.println(formatReport(timingOf(events, runStarted(parsed), Instant.now()), sleepGaps(http, state)));
+            out.println(formatReport(
+                    timingOf(events, runStarted(parsed), Instant.now(), commandInFlight(http, state)),
+                    sleepGaps(http, state)
+            ));
             return 0;
         } catch (RuntimeException failure) {
             err.println("Workbench events failed: " + failure.getMessage());
@@ -1169,6 +1257,7 @@ public final class WorkbenchSessionCommands {
         if (phrase != null) body.put("phrase", phrase);
         if (message != null) body.put("message", message);
         if (stack != null) body.put("stackHead", stack);
+        if (record != null && record.cause() != null) body.put("cause", record.cause());
         copyFailureField(body, result, "code");
         copyFailureField(body, result, "cause");
         copyFailureField(body, result, "valueText");
@@ -1178,6 +1267,11 @@ public final class WorkbenchSessionCommands {
             copyFailureField(body, nestedFailure, "cause");
             copyFailureField(body, nestedFailure, "valueText");
             if (!body.containsKey("message")) copyFailureField(body, nestedFailure, "message");
+        }
+        Object copiedCause = body.get("cause");
+        if (copiedCause instanceof String causeText) {
+            String shortened = FailureRecord.displayCause(causeText);
+            if (shortened != null) body.put("cause", shortened);
         }
         try {
             return JSON.writeValueAsString(body);
@@ -1337,7 +1431,10 @@ public final class WorkbenchSessionCommands {
         } catch (RuntimeException ignored) {
             // Elapsed time still prints from the run record when the event feed is down.
         }
-        out.println(formatReport(timingOf(events, runStarted(parsed), Instant.now()), sleepGaps(http, state)));
+        out.println(formatReport(
+                timingOf(events, runStarted(parsed), Instant.now(), commandInFlight(http, state)),
+                sleepGaps(http, state)
+        ));
     }
 
     static String unhealthyMessage(Path project, String runId) {
@@ -1455,6 +1552,14 @@ public final class WorkbenchSessionCommands {
     }
 
     static Timing timingOf(JsonNode events, Instant runStarted, Instant now) {
+        return timingOf(events, runStarted, now, false);
+    }
+
+    /**
+     * A step is running only while a session command is in flight.
+     * An open {@code BEFORE_STEP} with nothing queued is idle: isolate parks there.
+     */
+    static Timing timingOf(JsonNode events, Instant runStarted, Instant now, boolean commandInFlight) {
         Instant clock = now == null ? Instant.now() : now;
         List<Mark> marks = eventMarks(events);
         Instant origin = runStarted;
@@ -1472,12 +1577,18 @@ public final class WorkbenchSessionCommands {
             if (mark.step && mark.at != null) stepAt = mark.at;
         }
         long stepMs = stepAt == null ? 0 : Math.max(0, Duration.between(stepAt, clock).toMillis());
-        boolean running = false;
-        for (Mark mark : marks) {
-            if (mark.opens) running = true;
-            if (mark.closes) running = false;
-        }
+        boolean running = commandInFlight;
         return new Timing(runMs, stepMs, running);
+    }
+
+    /** {@code /health} {@code running} is true only while a command is in flight. */
+    private static boolean commandInFlight(HttpClient http, SessionState state) {
+        try {
+            JsonNode health = getJson(http, state, "/health");
+            return health != null && health.path("running").asBoolean(false);
+        } catch (RuntimeException ignored) {
+            return false;
+        }
     }
 
     private record Mark(Instant at, boolean step, boolean opens, boolean closes, String text) {
@@ -1501,7 +1612,7 @@ public final class WorkbenchSessionCommands {
                     || (hook != null && hook.toUpperCase(Locale.ROOT).contains("STEP"));
             String upper = hook == null ? "" : hook.toUpperCase(Locale.ROOT);
             boolean closes = upper.contains("AFTER_STEP") || "EXECUTE_STEP".equals(upper);
-            boolean opens = !closes && (upper.contains("BEFORE_STEP") || "RUNNING".equals(upper));
+            boolean opens = !closes && upper.contains("BEFORE_STEP");
             String text = ((stepText == null ? "" : stepText) + " " + (phrase == null ? "" : phrase)).trim();
             marks.add(new Mark(at, step, opens, closes, text));
         }
@@ -1919,9 +2030,8 @@ public final class WorkbenchSessionCommands {
             }
             boolean unbalanced = quotes % 2 == 1;
             boolean truncated = leftover != null && !leftover.isEmpty();
-            boolean stripped = !text.contains("\"")
-                    && text.matches("(?s).*\\b(?:the|a|an)\\s+\\S+\\s+(?:button|link|field|checkbox|element)\\b.*");
-            if (!unbalanced && !truncated && !stripped) return null;
+            boolean unquoted = quotes == 0;
+            if (!unbalanced && !truncated && !unquoted) return null;
             return "WARNING: execute-step --text looks quote-stripped or truncated. "
                     + "Pass the step with --text-b64 or --text-file. Quoting through mvnw is not fixed.";
         }
