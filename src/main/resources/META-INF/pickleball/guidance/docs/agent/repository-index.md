@@ -436,6 +436,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/testengine/PickleballRunner.java`
 - `src/main/java/tools/dscode/testengine/PKB_props.java`
 - `src/main/java/tools/dscode/testengine/PkbPropertyValueNormalizer.java`
+- `src/main/java/tools/dscode/testengine/PreferredRootScanner.java`
 - `src/main/java/tools/dscode/testengine/ProjectPropertySources.java`
 - `src/main/java/tools/dscode/testengine/SensitiveConfiguration.java`
 - `src/main/java/tools/dscode/testengine/WorkbenchWorkerMain.java`
@@ -541,6 +542,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/testengine/parity/LaunchSeedMain.java`
 - `src/test/java/tools/dscode/testengine/Phase7SeedMain.java`
 - `src/test/java/tools/dscode/testengine/PlainResolutionGoldenTest.java`
+- `src/test/java/tools/dscode/testengine/PreferredRootScannerTest.java`
 - `src/test/java/tools/dscode/testengine/ProjectPropertySourcesTest.java`
 - `src/test/java/tools/dscode/testengine/RunVarLaunchParityTest.java`
 - `src/test/java/tools/dscode/testengine/RunVarMatrixParityTest.java`
