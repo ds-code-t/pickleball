@@ -63,4 +63,24 @@ Log entity `geometry`, off unless named. A `query` line `geometry` is written wh
 Trace: `id=<frame>:<backend> kind=<quad|aabb> closed_shadow=<bool>`.
 Info: `query nodes=<n> missing=<n>`, `query count-only`, or `query nodes=0`.
 
+## Landed in 2.11.1
+
+Same `query --geometry` object. On a hit that is itself an element scrollport
+(`overflow` `auto`, `scroll`, or `overlay`; not `html` or `body`), and only when
+`styles.extra_json` stored `client_width` and `client_height`, the object also has
+`scrollport.client` in the same five spaces. `scrollport.content` is present only when
+`scroll_width` and `scroll_height` were stored. Neither box is invented from the border quad.
+Derived boxes are `kind` `aabb`.
+
+`nearest_scrollport.origin` is `client-box` when that client size is stored, otherwise
+`border-box`. Relative corners subtract the client origin. A descendant does not receive a
+`scrollport` object unless that descendant is itself a scrollport.
+
+The live probe writes `scroll_left`, `scroll_top`, `client_left`, `client_top`,
+`client_width`, `client_height`, `scroll_width`, and `scroll_height` into the existing
+`extra_json` column. A capture that never wrote those keys omits the content box.
+
+Log entity `geometry`. Info, when a box is present: `id=<frame>:<backend> scrollport=client`
+or `scrollport=client+content`.
+
 

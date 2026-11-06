@@ -66,6 +66,10 @@ public final class CompositeWebElement implements WebElement {
         this.width = bounds == null ? 0 : bounds.path("width").asInt(0);
         this.height = bounds == null ? 0 : bounds.path("height").asInt(0);
         this.geometry = ElementSnapshot.Geometry.parse(value == null ? null : value.get("geometry"));
+        if (this.geometry != null && this.geometry.scrollport() != null) {
+            boolean content = this.geometry.scrollport().content() != null;
+            CompositeLog.info("geometry", content ? "scrollport client+content" : "scrollport client");
+        }
     }
 
     public String nodeTag() {

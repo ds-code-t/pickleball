@@ -71,7 +71,7 @@ class GeometryViewTest {
     void oneQueryReturnsSpacesWhenTheFlagIsListed() throws Exception {
         temp = Files.createTempDirectory("pkb-geometry");
         Path log = temp.resolve("calls.log");
-        pin(stub(temp.resolve("composite"), log, true));
+        pin(stub(temp.resolve("composite"), log, true, false));
         CompositeRuntime.joinForTests("http://127.0.0.1:9222");
         HtmlUnitDriver driver = new HtmlUnitDriver(false);
         try {
@@ -109,7 +109,7 @@ class GeometryViewTest {
     void missingFlagKeepsTheAabbAndDoesNotAsk() throws Exception {
         temp = Files.createTempDirectory("pkb-geometry-off");
         Path log = temp.resolve("calls.log");
-        pin(stub(temp.resolve("composite"), log, false));
+        pin(stub(temp.resolve("composite"), log, false, false));
         CompositeRuntime.joinForTests("http://127.0.0.1:9222");
         HtmlUnitDriver driver = new HtmlUnitDriver(false);
         try {
@@ -130,6 +130,72 @@ class GeometryViewTest {
         }
     }
 
+    @Test
+    void scrollableRegionExposesClientAndContentInOneQuery() throws Exception {
+        temp = Files.createTempDirectory("pkb-scrollport");
+        Path log = temp.resolve("calls.log");
+        pin(stub(temp.resolve("composite"), log, true, true));
+        CompositeRuntime.joinForTests("http://127.0.0.1:9222");
+        HtmlUnitDriver driver = new HtmlUnitDriver(false);
+        try {
+            List<WebElement> found = ElementOperations.findElements(driver, By.cssSelector("#go"));
+            assertEquals(1, found.size());
+            CompositeWebElement hit = (CompositeWebElement) found.get(0);
+            assertNotNull(hit.geometry());
+            assertNotNull(hit.geometry().scrollport());
+            ElementSnapshot.Spaces client = hit.geometry().scrollport().client();
+            ElementSnapshot.Spaces content = hit.geometry().scrollport().content();
+            assertNotNull(client);
+            assertNotNull(content);
+            assertEquals(108.0, client.documentCssPx().x());
+            assertEquals(180.0, client.documentCssPx().width());
+            assertEquals(78.0, content.documentCssPx().x());
+            assertEquals(400.0, content.documentCssPx().width());
+            assertEquals(800.0, content.documentCssPx().height());
+            assertEquals("client-box", hit.geometry().nearestScrollport().origin());
+            String calls = Files.readString(log);
+            assertEquals(1, queries(calls), calls);
+            assertTrue(calls.contains("--geometry"), calls);
+            String trace = Files.readString(CompositeLog.file());
+            assertTrue(trace.contains("INFO geometry scrollport client+content"), trace);
+        } finally {
+            driver.quit();
+        }
+    }
+
+    @Test
+    void clientBoxWithoutContentSizeDoesNotInventContent() {
+        ObjectNode node = JsonNodeFactory.instance.objectNode();
+        node.put("id", "main:9");
+        node.put("node_name", "DIV");
+        ObjectNode bounds = node.putObject("bounds");
+        bounds.put("x", 100);
+        bounds.put("y", 40);
+        bounds.put("width", 200);
+        bounds.put("height", 150);
+        ObjectNode geometry = node.putObject("geometry");
+        ObjectNode document = geometry.putObject("document_css_px");
+        document.put("kind", "quad");
+        document.put("x", 100);
+        document.put("y", 40);
+        document.put("width", 200);
+        document.put("height", 150);
+        ObjectNode scrollport = geometry.putObject("scrollport");
+        ObjectNode client = scrollport.putObject("client");
+        ObjectNode clientDoc = client.putObject("document_css_px");
+        clientDoc.put("kind", "aabb");
+        clientDoc.put("x", 100);
+        clientDoc.put("y", 40);
+        clientDoc.put("width", 180);
+        clientDoc.put("height", 140);
+        CompositeWebElement hit = new CompositeWebElement(
+                new CompositeSelector(null, "#pane", null, "web", null, "#pane"), node, 0);
+        assertNotNull(hit.geometry().scrollport());
+        assertEquals(180.0, hit.geometry().scrollport().client().documentCssPx().width());
+        assertNull(hit.geometry().scrollport().content());
+        assertEquals(100, hit.getLocation().getX());
+    }
+
     private void pin(Path binary) {
         System.setProperty(CompositeBinaryLocator.BIN_KEY, binary.toString());
         System.setProperty(CompositeLog.KEY, "geometry,adapter");
@@ -142,7 +208,7 @@ class GeometryViewTest {
         return calls.lines().filter(line -> line.startsWith("query ")).count();
     }
 
-    private static Path stub(Path path, Path log, boolean geometry) throws Exception {
+    private static Path stub(Path path, Path log, boolean geometry, boolean scrollport) throws Exception {
         String flags = geometry
                 ? "[\"within\", \"nesting\", \"nth\", \"every\", \"count-only\", \"geometry\"]"
                 : "[\"within\", \"nesting\", \"nth\", \"every\", \"count-only\"]";
@@ -151,6 +217,7 @@ class GeometryViewTest {
                 import json, sys
                 log = %s
                 flags = %s
+                scrollport = %s
                 def note(argv):
                     with open(log, "a", encoding="utf-8") as handle:
                         handle.write(" ".join(argv) + "\\n")
@@ -179,6 +246,12 @@ class GeometryViewTest {
                             "frame_document_relative": space(12, 20, 20, 16),
                             "nearest_scrollport": {"kind": "viewport", "id": "main", "origin": "frame-scroll"}
                         }
+                        if scrollport:
+                            row["geometry"]["nearest_scrollport"]["origin"] = "client-box"
+                            row["geometry"]["scrollport"] = {
+                                "client": {"document_css_px": space(108, 104, 180, 140)},
+                                "content": {"document_css_px": space(78, 54, 400, 800)}
+                            }
                     return row
                 for line in sys.stdin:
                     line = line.strip()
@@ -204,7 +277,7 @@ class GeometryViewTest {
                         "stderr": ""
                     }) + "\\n")
                     sys.stdout.flush()
-                """.formatted(quote(log.toString()), flags);
+                """.formatted(quote(log.toString()), flags, scrollport ? "True" : "False");
         Files.createDirectories(path.getParent());
         Files.writeString(path, script);
         Files.setPosixFilePermissions(path, Set.of(

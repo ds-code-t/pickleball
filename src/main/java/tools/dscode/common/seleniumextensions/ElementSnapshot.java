@@ -81,11 +81,31 @@ public record ElementSnapshot(
         }
     }
 
+    /** One box expressed in the same five spaces as the border box. */
+    public record Spaces(
+            Space documentCssPx,
+            Space visualViewportRelative,
+            Space layoutViewportRelative,
+            Space nearestScrollportRelative,
+            Space frameDocumentRelative
+    ) {
+    }
+
+    /**
+     * Client box of a scrollport, plus the scrollable content box when that
+     * size was stored. Content is null when the engine did not have it.
+     * Neither box is invented.
+     */
+    public record ScrollBoxes(Spaces client, Spaces content) {
+    }
+
     /**
      * The five spaces for one mapped box. Absent (null) on Selenium and when
      * the binary does not list {@code geometry}. Closed-shadow page script
      * hit-testing retargets to the host. These corners are the CDP or stored
      * quads. They are not a page-JS {@code elementFromPoint} result.
+     * {@code scrollport} is set only when this element is a scrollport and the
+     * payload included a client box.
      */
     public record Geometry(
             Space documentCssPx,
@@ -95,7 +115,8 @@ public record ElementSnapshot(
             Space frameDocumentRelative,
             boolean closedShadow,
             String closedShadowLimit,
-            NearestScrollport nearestScrollport
+            NearestScrollport nearestScrollport,
+            ScrollBoxes scrollport
     ) {
         public Geometry {
             closedShadowLimit = closedShadowLimit == null ? "" : closedShadowLimit;
@@ -121,7 +142,26 @@ public record ElementSnapshot(
                     space(node.get("frame_document_relative")),
                     node.path("closed_shadow").asBoolean(false),
                     node.path("closed_shadow_limit").asText(""),
-                    port(node.get("nearest_scrollport"))
+                    port(node.get("nearest_scrollport")),
+                    scrollBoxes(node.get("scrollport"))
+            );
+        }
+
+        private static ScrollBoxes scrollBoxes(JsonNode node) {
+            if (node == null || !node.isObject() || !node.has("client")) return null;
+            Spaces client = spaces(node.get("client"));
+            if (client == null) return null;
+            return new ScrollBoxes(client, node.has("content") ? spaces(node.get("content")) : null);
+        }
+
+        private static Spaces spaces(JsonNode node) {
+            if (node == null || !node.isObject() || !node.has("document_css_px")) return null;
+            return new Spaces(
+                    space(node.get("document_css_px")),
+                    space(node.get("visual_viewport_relative")),
+                    space(node.get("layout_viewport_relative")),
+                    space(node.get("nearest_scrollport_relative")),
+                    space(node.get("frame_document_relative"))
             );
         }
 
