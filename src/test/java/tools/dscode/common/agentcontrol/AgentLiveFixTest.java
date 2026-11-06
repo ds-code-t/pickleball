@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.openqa.selenium.JavascriptExecutor;
 import org.openqa.selenium.WebDriver;
 
 import java.io.IOException;
@@ -14,6 +15,9 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Function;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -171,6 +175,107 @@ class AgentLiveFixTest {
         Files.writeString(temp.resolve(".pickleball/runs/chat/agent/chat/durable.jsonl"), stored, StandardCharsets.UTF_8);
         ChatLog.Message next = ChatLog.send(temp, "chat", "durable", "human", "ada", "after");
         assertEquals("41", next.id());
+    }
+
+    @Test
+    void focusedDriverWinsOverTheFirstManagedSuccess() throws Exception {
+        AtomicInteger firstCalls = new AtomicInteger();
+        WebDriver first = scriptDriver("tab-a", spec -> {
+            firstCalls.incrementAndGet();
+            return Map.of("ok", true, "x", 1, "y", 1);
+        }, false);
+        WebDriver second = scriptDriver("tab-b", spec -> Map.of("ok", true, "x", 9, "y", 8), false);
+        PageSurfaces.manage(first, "chrome-headed-quiet", true);
+        PageSurfaces.manage(second, "edge-headed-quiet", true);
+        PageSurfaces.focus(second);
+        Map<String, Object> placed = PageSurfaces.place(null, "append", null, null, "<b>live</b>", "html", null, null, null);
+        assertEquals(0, firstCalls.get());
+        assertEquals(9, placed.get("x"));
+        assertEquals(8, placed.get("y"));
+    }
+
+    @Test
+    void rankedHandleUsesFrameIdentityInsteadOfScanningDrivers() throws Exception {
+        AtomicInteger wrong = new AtomicInteger();
+        WebDriver first = scriptDriver("tab-a", spec -> {
+            wrong.incrementAndGet();
+            return Map.of("ok", true, "x", 1, "y", 1);
+        }, false);
+        WebDriver second = scriptDriver("tab-b", spec -> Map.of("ok", true, "x", 4, "y", 5), false);
+        PageSurfaces.manage(first, "chrome-headed-quiet", true);
+        PageSurfaces.manage(second, "edge-headed-quiet", true);
+        PageSurfaces.focus(first);
+        assertThrows(IllegalStateException.class, () ->
+                PageSurfaces.place(null, "append", "frame-missing:15", null, "<i>n</i>", "html", null, null, null));
+        assertEquals(0, wrong.get());
+        PageSurfaces.bindFrame(second, "tab-b", "frame-b");
+        Map<String, Object> placed = PageSurfaces.place(null, "append", "frame-b:15", null, "<i>n</i>", "html", null, null, null);
+        assertEquals(0, wrong.get());
+        assertEquals(4, placed.get("x"));
+    }
+
+    @Test
+    void removalDoesNotStopAtTheFirstDriverThatDidNotHoldTheSurface() throws Exception {
+        WebDriver first = scriptDriver("tab-a", spec -> Map.of("ok", true, "removed", 0), false);
+        AtomicInteger hits = new AtomicInteger();
+        WebDriver second = scriptDriver("tab-b", spec -> {
+            hits.incrementAndGet();
+            return Map.of("ok", true, "removed", 1);
+        }, false);
+        PageSurfaces.manage(first, "chrome-headed-quiet", true);
+        PageSurfaces.manage(second, "edge-headed-quiet", true);
+        Map<String, Object> removed = PageSurfaces.remove(null, "pkb-9");
+        assertEquals(true, removed.get("removed"));
+        assertEquals(1, hits.get());
+    }
+
+    @Test
+    void closeDoesNotReportSuccessWhenQuitFails() {
+        WebDriver bad = scriptDriver("tab-a", spec -> Map.of("ok", true), true);
+        PageSurfaces.manage(bad, "chrome-headed-quiet", true);
+        String handle = "window:" + PageSurfaces.managed().get(0).id();
+        assertThrows(IllegalStateException.class, () -> WindowRegistry.close(temp, "run", handle));
+        assertEquals(1, PageSurfaces.managed().size());
+    }
+
+    private static WebDriver scriptDriver(
+            String handle,
+            Function<Map<?, ?>, Map<String, Object>> script,
+            boolean quitFails
+    ) {
+        AtomicReference<WebDriver> self = new AtomicReference<>();
+        Object switcher = Proxy.newProxyInstance(
+                WebDriver.class.getClassLoader(),
+                new Class<?>[]{WebDriver.TargetLocator.class},
+                (proxy, method, args) -> {
+                    if ("window".equals(method.getName())) return self.get();
+                    return defaultValue(method.getReturnType());
+                }
+        );
+        WebDriver driver = (WebDriver) Proxy.newProxyInstance(
+                WebDriver.class.getClassLoader(),
+                new Class<?>[]{WebDriver.class, JavascriptExecutor.class},
+                (proxy, method, args) -> switch (method.getName()) {
+                    case "getWindowHandles" -> Set.of(handle);
+                    case "getWindowHandle" -> handle;
+                    case "getTitle" -> "title";
+                    case "getCurrentUrl" -> "https://example.test";
+                    case "quit" -> {
+                        if (quitFails) throw new RuntimeException("quit failed");
+                        yield null;
+                    }
+                    case "switchTo" -> switcher;
+                    case "executeScript" -> {
+                        Object spec = args != null && args.length > 1 ? args[1] : Map.of();
+                        Map<?, ?> body = spec instanceof Map<?, ?> map ? map : Map.of();
+                        yield script.apply(body);
+                    }
+                    case "toString" -> handle;
+                    default -> defaultValue(method.getReturnType());
+                }
+        );
+        self.set(driver);
+        return driver;
     }
 
     private static WebDriver driver(String handle) {

@@ -37,6 +37,11 @@ final class PageSurfaces {
     private static final CopyOnWriteArrayList<Path> PAGES = new CopyOnWriteArrayList<>();
     private static final CopyOnWriteArrayList<Managed> MANAGED = new CopyOnWriteArrayList<>();
     private static volatile WebDriver driver;
+    private static volatile String focusedTab;
+    private static final Map<String, FrameOwner> FRAMES = new java.util.concurrent.ConcurrentHashMap<>();
+
+    private record FrameOwner(String browserId, WebDriver driver, String tab) {
+    }
 
     private static final String LIVE_HELPER = """
             var spec = arguments[0];
@@ -108,21 +113,26 @@ final class PageSurfaces {
                   if (id && ids.indexOf(id) < 0) ids.push(id);
                 });
               } else if (spec.id) ids.push(spec.id);
+              var removed = 0;
               ids.forEach(function(id) {
                 var undo = window.__pkbUndo[id];
-                document.querySelectorAll('[data-pkb-id="' + CSS.escape(id) + '"]').forEach(function(el) {
+                var nodes = document.querySelectorAll('[data-pkb-id="' + CSS.escape(id) + '"]');
+                if (!nodes.length) return;
+                nodes.forEach(function(el) {
                   if (undo) {
                     var tpl = document.createElement('template');
                     tpl.innerHTML = undo;
                     el.replaceWith(tpl.content);
                     delete window.__pkbUndo[id];
                   } else el.remove();
+                  removed++;
                 });
               });
               if (op === 'cleanup') document.querySelectorAll('[data-pkb-style]').forEach(restoreStyle);
-              return {ok:true};
+              if (op === 'remove' && removed === 0) return {ok:false, error:'unknown id'};
+              return {ok:true, removed:removed};
             }
-            if ((op === 'replace' || op === 'insert') && spec.handle && !node()) {
+            if (spec.handle && !node()) {
               return {ok:false, error:'unknown handle'};
             }
             var host = document.createElement('div');
@@ -194,6 +204,17 @@ final class PageSurfaces {
 
     static void focus(WebDriver webDriver) {
         driver = webDriver;
+        focusedTab = currentHandle(webDriver);
+    }
+
+    /** Ranked frame identity belongs to one browser and one tab. Not a scan. */
+    static void bindFrame(WebDriver webDriver, String tab, String frameId) {
+        if (webDriver == null || frameId == null || frameId.isBlank()) return;
+        String browserId = "";
+        for (Managed managed : MANAGED) {
+            if (managed.driver == webDriver) browserId = managed.id;
+        }
+        FRAMES.put(frameId, new FrameOwner(browserId, webDriver, tab == null ? "" : tab));
     }
 
     static void detach(WebDriver webDriver) {
@@ -230,6 +251,8 @@ final class PageSurfaces {
     static void clearDriver() {
         MANAGED.clear();
         driver = null;
+        focusedTab = null;
+        FRAMES.clear();
     }
 
     static String presetCss(String preset, String explicit) {
@@ -539,18 +562,56 @@ final class PageSurfaces {
     }
 
     private static LiveResult runLive(String op, String handle, String where, String css, String html, String kind, String sentence, String id, boolean measure, Integer x, Integer y) {
-        if (MANAGED.isEmpty()) return new LiveResult(false, "no live browser", null, null);
-        LiveResult last = new LiveResult(false, "no live browser", null, null);
+        if (MANAGED.isEmpty()) return new LiveResult(false, "no live browser", null, null, 0);
+        if ("remove".equals(op) || "cleanup".equals(op)) {
+            return runAcrossTabs(op, handle, where, css, html, kind, sentence, id, measure, x, y);
+        }
+        WebDriver target = resolveDriver(handle);
+        if (handle != null && !handle.isBlank() && HandleRef.parse(handle).frameId != null && target == null) {
+            return new LiveResult(false, "unknown handle", null, null, 0);
+        }
+        if (target == null) target = driver;
+        if (target == null) return new LiveResult(false, "no live browser", null, null, 0);
+        return runLive(target, op, handle, where, css, html, kind, sentence, id, measure, x, y);
+    }
+
+    private static LiveResult runAcrossTabs(String op, String handle, String where, String css, String html, String kind, String sentence, String id, boolean measure, Integer x, Integer y) {
+        LiveResult last = new LiveResult(false, "unknown id", null, null, 0);
         for (Managed managed : MANAGED) {
-            last = runLive(managed.driver, op, handle, where, css, html, kind, sentence, id, measure, x, y);
-            if (last.ok()) return last;
+            List<String> tabs = tabsOf(managed.driver);
+            if (tabs.isEmpty()) tabs = List.of("");
+            for (String tab : tabs) {
+                activate(managed.driver, tab);
+                LiveResult live = runLive(managed.driver, op, handle, where, css, html, kind, sentence, id, measure, x, y);
+                if ("remove".equals(op)) {
+                    if (live.removed() > 0) return live;
+                    last = live;
+                    continue;
+                }
+                if (live.ok()) return live;
+                last = live;
+            }
         }
         return last;
     }
 
+    private static WebDriver resolveDriver(String handle) {
+        HandleRef ref = HandleRef.parse(handle);
+        if (ref.frameId != null) {
+            FrameOwner owner = FRAMES.get(ref.frameId);
+            if (owner == null) return null;
+            activate(owner.driver, owner.tab);
+            driver = owner.driver;
+            focusedTab = owner.tab;
+            return owner.driver;
+        }
+        if (driver != null) activate(driver, focusedTab);
+        return driver;
+    }
+
     private static LiveResult runLive(WebDriver current, String op, String handle, String where, String css, String html, String kind, String sentence, String id, boolean measure, Integer x, Integer y) {
         if (!(current instanceof JavascriptExecutor executor)) {
-            return new LiveResult(false, "no live browser", null, null);
+            return new LiveResult(false, "no live browser", null, null, 0);
         }
         HandleRef ref = HandleRef.parse(handle);
         Map<String, Object> spec = new LinkedHashMap<>();
@@ -570,14 +631,18 @@ final class PageSurfaces {
             Object value = executor.executeScript(LIVE_HELPER, spec);
             if (value instanceof Map<?, ?> map && Boolean.FALSE.equals(map.get("ok"))) {
                 Object error = map.get("error");
-                return new LiveResult(false, error == null ? "live helper failed" : String.valueOf(error), null, null);
+                return new LiveResult(false, error == null ? "live helper failed" : String.valueOf(error), null, null, 0);
             }
             Integer liveX = value instanceof Map<?, ?> map && map.get("x") instanceof Number number ? number.intValue() : null;
             Integer liveY = value instanceof Map<?, ?> map && map.get("y") instanceof Number number ? number.intValue() : null;
-            return new LiveResult(true, null, liveX, liveY);
+            int removed = value instanceof Map<?, ?> map && map.get("removed") instanceof Number number ? number.intValue() : 0;
+            if ("remove".equals(op) && removed <= 0) {
+                return new LiveResult(false, "unknown id", null, null, 0);
+            }
+            return new LiveResult(true, null, liveX, liveY, removed);
         } catch (RuntimeException failure) {
             CompositeLog.info("html", "live helper failed " + failure.getMessage());
-            return new LiveResult(false, failure.getMessage(), null, null);
+            return new LiveResult(false, failure.getMessage(), null, null, 0);
         }
     }
 
@@ -870,7 +935,36 @@ final class PageSurfaces {
         return value == null ? "" : value;
     }
 
-    private record LiveResult(boolean ok, String error, Integer x, Integer y) {
+    private record LiveResult(boolean ok, String error, Integer x, Integer y, int removed) {
+    }
+
+    private static List<String> tabsOf(WebDriver web) {
+        try {
+            if (web.getWindowHandles() == null) return List.of();
+            return new ArrayList<>(web.getWindowHandles());
+        } catch (RuntimeException failure) {
+            return List.of();
+        }
+    }
+
+    private static void activate(WebDriver web, String tab) {
+        if (web == null || tab == null || tab.isBlank()) return;
+        try {
+            String current = web.getWindowHandle();
+            if (tab.equals(current)) return;
+            web.switchTo().window(tab);
+        } catch (RuntimeException failure) {
+            CompositeLog.info("window", "activate failed " + tab + " " + failure.getMessage());
+        }
+    }
+
+    private static String currentHandle(WebDriver web) {
+        if (web == null) return null;
+        try {
+            return web.getWindowHandle();
+        } catch (RuntimeException failure) {
+            return null;
+        }
     }
 
     /** Ranked find-interface id: {@code frameId:backendNodeId}, same as {@code DomCompositeAdapter.matchNode}. */

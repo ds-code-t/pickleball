@@ -95,6 +95,7 @@ final class WindowRegistry {
                 managed.driver().quit();
             } catch (RuntimeException failure) {
                 CompositeLog.info("window", "close failed " + handle + " " + failure.getMessage());
+                throw new IllegalStateException("close failed: " + handle, failure);
             }
             PageSurfaces.detach(managed.driver());
             CompositeLog.info("window", "close " + handle);
