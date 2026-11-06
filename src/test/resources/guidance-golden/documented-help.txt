@@ -43,7 +43,7 @@ Usage: execute-step <gherkin> | execute-step --text=<gherkin> | --text-file=<pat
 Usage: export-guidance [output-directory]
 
 # help find-element
-Usage: find-element --category=<Button> [--text=<label>] [--html=<file>]
+Usage: find-element (--category=<Button> [--text=<label>] | --query=<selector>) [--exposure=human|lower] [--limit=<n>] [--explain] [--promote-visual] [--html=<file>]
 
 # help finish
 Usage: finish --run-id=<id> [--learned=<one line>] [--status=PASSED|FAILED|EMPTY|TIMEOUT|STOPPED]
