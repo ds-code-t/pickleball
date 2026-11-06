@@ -1,6 +1,7 @@
 package tools.dscode.common.composite;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import dev.domcomposite.Client;
 import org.openqa.selenium.By;
 import org.openqa.selenium.WebElement;
@@ -241,6 +242,7 @@ public final class DomCompositeAdapter {
     public List<WebElement> findEngine(EngineQuery query) {
         JsonNode json = queryEngine(query);
         if (json == null) return List.of();
+        logExplain(json);
         List<WebElement> found = hits(json, new CompositeSelector(null, null, query.text(), "dom", null, query.text()));
         for (WebElement element : found) {
             if (element instanceof CompositeWebElement hit && hit.visualOnly()) {
@@ -318,6 +320,7 @@ public final class DomCompositeAdapter {
         if (node == null || node.isNull()) {
             throw new org.openqa.selenium.NoSuchElementException("no match for " + used.text());
         }
+        node = actionLabel(json, node);
         CompositeWebElement element = new CompositeWebElement(
                 new CompositeSelector(null, null, used.text(), "dom", null, used.text()),
                 node,
@@ -829,17 +832,74 @@ public final class DomCompositeAdapter {
     }
 
     List<WebElement> hits(JsonNode json, CompositeSelector selector) {
-        JsonNode list = array(json, "composite");
-        if (list == null) list = array(json, "nodes");
+        JsonNode composite = array(json, "composite");
+        JsonNode nodes = array(json, "nodes");
+        JsonNode list = composite != null ? composite : nodes;
         if (list == null) list = array(json, "matches");
         List<WebElement> hits = new ArrayList<>();
         if (list != null) {
             int index = 0;
             for (JsonNode node : list) {
-                hits.add(new CompositeWebElement(selector, node, index++));
+                JsonNode used = composite != null && nodes != null
+                        ? overlayFindFields(node, matchNode(node, nodes, index))
+                        : node;
+                hits.add(new CompositeWebElement(selector, used, index++));
             }
         }
         return PositionSelection.applyOrdinal(hits, selector.ordinal());
+    }
+
+    /**
+     * The engine writes rank, score, and human_limits on legacy {@code nodes}.
+     * The composite row is the same hit and often omits them. Copy the missing
+     * fields. Do not invent a value the node row does not have.
+     */
+    private static JsonNode overlayFindFields(JsonNode composite, JsonNode node) {
+        if (!(composite instanceof ObjectNode) || node == null || !node.isObject()) return composite;
+        ObjectNode copy = ((ObjectNode) composite).deepCopy();
+        copyMissing(copy, node, "handle");
+        copyMissing(copy, node, "rank");
+        copyMissing(copy, node, "score");
+        copyMissing(copy, node, "human_limits");
+        copyMissing(copy, node, "geometry");
+        return copy;
+    }
+
+    /** Click and type put the prefixed sentence on the action, not only on the node. */
+    private static JsonNode actionLabel(JsonNode json, JsonNode node) {
+        JsonNode labeled = json.get("human_limits");
+        if (!(node instanceof ObjectNode) || labeled == null || !labeled.isObject()) return node;
+        ObjectNode copy = ((ObjectNode) node).deepCopy();
+        copy.set("human_limits", labeled);
+        return copy;
+    }
+
+    private static void copyMissing(ObjectNode onto, JsonNode from, String field) {
+        JsonNode present = onto.get(field);
+        if (present != null && !present.isNull()) return;
+        JsonNode value = from.get(field);
+        if (value != null && !value.isNull()) onto.set(field, value);
+    }
+
+    private static JsonNode matchNode(JsonNode composite, JsonNode nodes, int index) {
+        String id = composite == null ? "" : composite.path("id").asText("");
+        if (!id.isBlank()) {
+            for (JsonNode node : nodes) {
+                String handle = node.path("handle").asText("");
+                String built = node.path("frame_id").asText("") + ":" + node.path("backend_node_id").asText("");
+                if (id.equals(handle) || id.equals(built)) return node;
+            }
+        }
+        return index < nodes.size() ? nodes.get(index) : null;
+    }
+
+    private static void logExplain(JsonNode json) {
+        JsonNode explain = json.get("explain");
+        if (explain == null || !explain.isArray()) return;
+        for (JsonNode trace : explain) {
+            String why = trace.path("why").asText("");
+            if (!why.isBlank()) CompositeLog.info("query", "why " + why);
+        }
     }
 
     private static JsonNode array(JsonNode json, String name) {

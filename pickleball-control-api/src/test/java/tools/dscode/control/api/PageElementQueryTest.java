@@ -183,6 +183,7 @@ class PageElementQueryTest {
         );
         ElementView acted = ElementOperations.act(EngineQuery.of("css=#ghost").exposure("lower"), "click", null);
         assertEquals("main:9", acted.handle());
+        assertTrue(acted.humanSentence().startsWith("acted on node main:9;"), acted.humanSentence());
         assertTrue(acted.humanSentence().contains("opacity:0"), acted.humanSentence());
         assertTrue(acted.humanCodes().contains("human_could_not_click"));
         assertTrue(acted.humanCodes().contains("off_visual_viewport"));
@@ -448,6 +449,7 @@ class PageElementQueryTest {
                                         "sentence": "a person could not follow this hit because it is a visual match with no DOM node"
                                     }
                                 }]
+                            body = {"ok": True, "composite": nodes}
                         elif selector == "css=a":
                             nodes = [
                                 {
@@ -475,15 +477,24 @@ class PageElementQueryTest {
                                     "score": 0.4
                                 }
                             ]
+                            body = {"ok": True, "composite": nodes}
                         else:
-                            nodes = [{
+                            composite = [{
                                 "id": "main:7",
-                                "handle": "main:7",
                                 "text": selector or "Save",
                                 "role": "button",
+                                "source": "Dom",
                                 "bounds": {"x": 1, "y": 2, "width": 10, "height": 8},
                                 "attributes": {"id": "save"},
                                 "states": ["enabled"],
+                                "score": 0.5
+                            }]
+                            nodes = [{
+                                "frame_id": "main",
+                                "backend_node_id": 7,
+                                "node_name": "BUTTON",
+                                "text": selector or "Save",
+                                "handle": "main:7",
                                 "rank": 0,
                                 "score": 0.5,
                                 "human_limits": {
@@ -491,7 +502,7 @@ class PageElementQueryTest {
                                     "sentence": "scrolled out of the visual viewport"
                                 }
                             }]
-                        body = {"ok": True, "composite": nodes}
+                            body = {"ok": True, "composite": composite, "nodes": nodes, "explain": [{"why": "css matched 1"}]}
                     elif "click" in argv or "type" in argv:
                         selector = ""
                         if "--selector" in argv:
@@ -503,6 +514,11 @@ class PageElementQueryTest {
                             body = {"ok": True}
                         else:
                             handle = selector if ":" in selector else "main:9"
+                            sentence = "a person could not have seen or clicked it because it is scrolled out of the visual viewport and has opacity:0"
+                            limits = {
+                                "codes": ["human_could_not_see", "human_could_not_click", "off_visual_viewport", "opacity_zero"],
+                                "sentence": sentence
+                            }
                             body = {"ok": True, "node": {
                                 "id": handle,
                                 "handle": handle,
@@ -510,11 +526,13 @@ class PageElementQueryTest {
                                 "role": "button",
                                 "bounds": {"x": 1, "y": 900, "width": 10, "height": 8},
                                 "states": ["hidden"] if exposure == "lower" else ["enabled"],
-                                "human_limits": {
-                                    "codes": ["human_could_not_see", "human_could_not_click", "off_visual_viewport", "opacity_zero"],
-                                    "sentence": "a person could not have seen or clicked it because it is scrolled out of the visual viewport and has opacity:0"
-                                } if exposure == "lower" else None
+                                "human_limits": limits if exposure == "lower" else None
                             }}
+                            if exposure == "lower":
+                                body["human_limits"] = {
+                                    "codes": limits["codes"],
+                                    "sentence": "acted on node " + handle + "; " + sentence
+                                }
                     else:
                         body = {"ok": True}
                     sys.stdout.write(json.dumps({
