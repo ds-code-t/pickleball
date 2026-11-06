@@ -384,14 +384,32 @@ public final class WorkbenchController implements WorkbenchServices {
 
     @Override
     public ControlBridgeElementInspectionResult elementInspect(
-            String category, String text, String operation, Integer maxElements
+            String category,
+            String text,
+            String operation,
+            Integer maxElements,
+            String query,
+            String exposure,
+            Integer limit,
+            Boolean explain,
+            Boolean promoteVisual
     ) {
-        return live.elementInspect(category, text, operation, maxElements);
+        return live.elementInspect(
+                category, text, operation, maxElements, query, exposure, limit, explain, promoteVisual
+        );
     }
 
     @Override
-    public ControlBridgePageQueryResult pageQuery(String category, String text) {
-        return live.pageQuery(category, text);
+    public ControlBridgePageQueryResult pageQuery(
+            String category,
+            String text,
+            String query,
+            String exposure,
+            Integer limit,
+            Boolean explain,
+            Boolean promoteVisual
+    ) {
+        return live.pageQuery(category, text, query, exposure, limit, explain, promoteVisual);
     }
 
     @Override

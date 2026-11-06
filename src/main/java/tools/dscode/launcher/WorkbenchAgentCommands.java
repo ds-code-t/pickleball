@@ -1570,6 +1570,11 @@ public final class WorkbenchAgentCommands {
         if (html == null && flag(parsed, "--html") != null) return 2;
         if (html != null) {
             out.println("source=offline-html");
+            String query = flag(parsed, "--query");
+            if (query != null && !query.isBlank()) {
+                out.println("query=" + query);
+                out.println("note=offline html does not run the engine query");
+            }
             for (WorkbenchElementInspect.Hit hit : WorkbenchElementInspect.dump(html)) {
                 printHit(out, hit.phrase(), hit.xpath(), hit.rawMatchCount(), hit.visibleCount());
             }
@@ -1580,8 +1585,20 @@ public final class WorkbenchAgentCommands {
 
     private static int findElement(WorkbenchCommandLine.Parsed parsed, PrintStream out, PrintStream err) {
         String category = flag(parsed, "--category");
-        if (category == null || category.isBlank()) {
-            err.print(WorkbenchCliHelp.usageError("missing --category", "find-element"));
+        String query = flag(parsed, "--query");
+        boolean engine = query != null && !query.isBlank();
+        if ((category == null || category.isBlank()) && !engine) {
+            err.print(WorkbenchCliHelp.usageError("missing --category or --query", "find-element"));
+            return 2;
+        }
+        String exposure = flag(parsed, "--exposure");
+        if (exposure != null && !exposure.equalsIgnoreCase("human") && !exposure.equalsIgnoreCase("lower")) {
+            err.print(WorkbenchCliHelp.usageError("exposure is human or lower", "find-element"));
+            return 2;
+        }
+        Integer limit = parsed.coordination().limit();
+        if (engine && limit != null && limit < 1) {
+            err.print(WorkbenchCliHelp.usageError("limit is below 1", "find-element"));
             return 2;
         }
         String htmlFlag = flag(parsed, "--html");
@@ -1590,9 +1607,16 @@ public final class WorkbenchAgentCommands {
             String html = readHtml(parsed, err);
             if (html == null) return 2;
             out.println("source=offline-html");
-            WorkbenchElementInspect.Hit hit = WorkbenchElementInspect.find(category, label, html);
-            printHit(out, hit.phrase(), hit.xpath(), hit.rawMatchCount(), hit.visibleCount());
-            return hit.xpath().isBlank() ? 1 : 0;
+            if (engine) {
+                out.println("query=" + query);
+                out.println("note=offline html does not run the engine query");
+            }
+            if (category != null && !category.isBlank()) {
+                WorkbenchElementInspect.Hit hit = WorkbenchElementInspect.find(category, label, html);
+                printHit(out, hit.phrase(), hit.xpath(), hit.rawMatchCount(), hit.visibleCount());
+                return hit.xpath().isBlank() && !engine ? 1 : 0;
+            }
+            return 0;
         }
         return liveQuery(parsed, category, label, out, err);
     }
@@ -1633,12 +1657,23 @@ public final class WorkbenchAgentCommands {
             return 2;
         }
         String op = category == null || category.isBlank() ? "inspect-page" : "find-element";
+        String query = flag(parsed, "--query");
+        if (query != null && !query.isBlank() && "find-element".equals(commandOf(parsed))) {
+            op = "find-element";
+        }
         try {
             WorkbenchSessionCommands.SessionState state = session.get();
             Map<String, Object> body = new LinkedHashMap<>();
             body.put("op", op);
             if (category != null && !category.isBlank()) body.put("category", category);
             if (text != null && !text.isBlank()) body.put("text", text);
+            if (query != null && !query.isBlank()) body.put("query", query);
+            String exposure = flag(parsed, "--exposure");
+            if (exposure != null && !exposure.isBlank()) body.put("exposure", exposure);
+            Integer limit = parsed.coordination().limit();
+            if (query != null && !query.isBlank() && limit != null) body.put("limit", limit);
+            if (hasFlag(parsed, "--explain")) body.put("explain", true);
+            if (hasFlag(parsed, "--promote-visual")) body.put("promoteVisual", true);
             JsonNode ack = postSession(http, state, "/commands", body);
             String id = ack.path("id").asText("");
             JsonNode view = ack;
@@ -1681,6 +1716,21 @@ public final class WorkbenchAgentCommands {
                             hit.path("rawMatchCount").asInt(0),
                             hit.path("visibleCount").asInt(0)
                     );
+                    String forwarded = hit.path("query").asText("");
+                    if (!forwarded.isBlank()) out.println("query=" + forwarded);
+                    String shownExposure = hit.path("exposure").asText("");
+                    if (!shownExposure.isBlank()) out.println("exposure=" + shownExposure);
+                    JsonNode nodes = hit.get("nodes");
+                    if (nodes != null && nodes.isArray()) {
+                        for (JsonNode node : nodes) {
+                            out.println("node handle=" + node.path("handle").asText("")
+                                    + " rank=" + node.path("rank").asText("")
+                                    + " text=" + node.path("text").asText(""));
+                            String sentence = node.path("humanSentence").asText("");
+                            if (!sentence.isBlank()) out.println("human=" + sentence);
+                            if (node.path("visualOnly").asBoolean(false)) out.println("visualOnly=true");
+                        }
+                    }
                 }
             }
             return 0;
@@ -1771,6 +1821,20 @@ public final class WorkbenchAgentCommands {
             if (name.equals(token) && index + 1 < args.length) return args[index + 1];
         }
         return null;
+    }
+
+    private static boolean hasFlag(WorkbenchCommandLine.Parsed parsed, String name) {
+        String[] args = parsed.forwarded();
+        if (args == null) return false;
+        for (String token : args) {
+            if (token == null) continue;
+            if (name.equals(token) || token.startsWith(name + "=")) return true;
+        }
+        return false;
+    }
+
+    private static String commandOf(WorkbenchCommandLine.Parsed parsed) {
+        return parsed.command() == null ? "" : parsed.command();
     }
 
     private static void printEmpty(

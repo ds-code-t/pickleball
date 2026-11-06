@@ -422,6 +422,11 @@ class WorkbenchCliSurfaceCoverageTest {
         Capture usage = agent("find-element", temp.toString());
         assertEquals(2, usage.code);
         assertTrue(usage.err.contains("--category"));
+        Capture queried = agent("find-element", temp.toString(), "--query=css=#save", "--html=" + html);
+        assertEquals(0, queried.code, queried.err);
+        assertTrue(queried.out.contains("source=offline-html"));
+        assertTrue(queried.out.contains("query=css=#save"), queried.out);
+        assertTrue(queried.out.contains("does not run the engine query"), queried.out);
     }
 
     @Test
@@ -1326,6 +1331,39 @@ class WorkbenchCliSurfaceCoverageTest {
         Capture capture = agent("find-element", "--category=Link", "--text=Login", "--html=" + html, temp.toString());
         assertEquals(0, capture.code, capture.err);
         assertTrue(capture.out.contains("Login"), capture.out);
+    }
+
+    @Test
+    void covers_flag_query() throws Exception {
+        Path html = writePage();
+        Capture capture = agent("find-element", temp.toString(), "--query=css=#save", "--html=" + html);
+        assertEquals(0, capture.code, capture.err);
+        assertTrue(capture.out.contains("query=css=#save"), capture.out);
+        assertTrue(capture.out.contains("does not run the engine query"), capture.out);
+    }
+
+    @Test
+    void covers_flag_exposure() {
+        Capture bad = agent("find-element", temp.toString(), "--query=css=#save", "--exposure=source");
+        assertEquals(2, bad.code);
+        assertTrue(bad.err.contains("human or lower"), bad.err);
+        Capture live = agent("find-element", temp.toString(), "--query=css=#save", "--exposure=lower");
+        assertEquals(2, live.code);
+        assertTrue(live.err.contains("start a session first"), live.err);
+    }
+
+    @Test
+    void covers_flag_explain() {
+        Capture capture = agent("inspect-page", temp.toString(), "--query=css=button", "--explain");
+        assertEquals(2, capture.code);
+        assertTrue(capture.err.contains("start a session first"), capture.err);
+    }
+
+    @Test
+    void covers_flag_promote_visual() {
+        Capture capture = agent("find-element", temp.toString(), "--query=image=button.png", "--promote-visual");
+        assertEquals(2, capture.code);
+        assertTrue(capture.err.contains("start a session first"), capture.err);
     }
 
     @Test

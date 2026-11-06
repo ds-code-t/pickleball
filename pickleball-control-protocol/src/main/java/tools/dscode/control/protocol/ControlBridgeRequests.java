@@ -35,14 +35,39 @@ public final class ControlBridgeRequests {
             String text,
             String operation,
             Integer maxElements,
-            Integer timeoutSeconds
-    ) { }
+            Integer timeoutSeconds,
+            String query,
+            String exposure,
+            Integer limit,
+            Boolean explain,
+            Boolean promoteVisual
+    ) {
+        public ElementInspectionRequest(
+                String scenarioId,
+                String category,
+                String text,
+                String operation,
+                Integer maxElements,
+                Integer timeoutSeconds
+        ) {
+            this(scenarioId, category, text, operation, maxElements, timeoutSeconds, null, null, null, null, null);
+        }
+    }
     public record PageQueryRequest(
             String scenarioId,
             String category,
             String text,
-            Integer timeoutSeconds
-    ) { }
+            Integer timeoutSeconds,
+            String query,
+            String exposure,
+            Integer limit,
+            Boolean explain,
+            Boolean promoteVisual
+    ) {
+        public PageQueryRequest(String scenarioId, String category, String text, Integer timeoutSeconds) {
+            this(scenarioId, category, text, timeoutSeconds, null, null, null, null, null);
+        }
+    }
     public record ServiceCallRequest(String scenarioId, String selector, Integer timeoutSeconds) { }
     public record BreakpointAddRequest(
             String scenarioId,

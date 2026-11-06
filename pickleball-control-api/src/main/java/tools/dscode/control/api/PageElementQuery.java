@@ -3,8 +3,10 @@ package tools.dscode.control.api;
 import org.openqa.selenium.By;
 import org.openqa.selenium.WebDriver;
 import tools.dscode.common.assertions.ValueWrapper;
+import tools.dscode.common.composite.CompositeLog;
 import tools.dscode.common.composite.ElementOperations;
 import tools.dscode.common.composite.ElementView;
+import tools.dscode.common.composite.EngineQuery;
 import tools.dscode.common.domoperations.ExecutionDictionary;
 import tools.dscode.common.treeparsing.DefinitionContext;
 
@@ -31,7 +33,17 @@ public final class PageElementQuery {
     private PageElementQuery() {
     }
 
-    public record Hit(String phrase, String xpath, int rawMatchCount, int visibleCount) {
+    public record Hit(
+            String phrase,
+            String xpath,
+            int rawMatchCount,
+            int visibleCount,
+            String query,
+            List<ElementView> nodes
+    ) {
+        public Hit(String phrase, String xpath, int rawMatchCount, int visibleCount) {
+            this(phrase, xpath, rawMatchCount, visibleCount, "", List.of());
+        }
     }
 
     public static Hit find(WebDriver driver, String category, String text) {
@@ -51,6 +63,22 @@ public final class PageElementQuery {
             }
         }
         return new Hit(phrase(category.trim(), text), xpath, raw, visible);
+    }
+
+    /** One engine query on the same describe path. Category+text stays {@link #find(WebDriver, String, String)}. */
+    public static Hit find(WebDriver driver, EngineQuery query) {
+        if (driver == null) {
+            throw new IllegalStateException("The active scenario has not created a browser.");
+        }
+        if (query == null || query.text().isBlank()) {
+            throw new IllegalArgumentException("engine query must not be blank");
+        }
+        List<ElementView> nodes = describe(driver, query);
+        int visible = 0;
+        for (ElementView view : nodes) {
+            if (view.displayed()) visible++;
+        }
+        return new Hit("engine", query.text(), nodes.size(), visible, query.text(), List.copyOf(nodes));
     }
 
     public static List<Hit> inspect(WebDriver driver) {
@@ -82,6 +110,15 @@ public final class PageElementQuery {
     }
 
     private static List<ElementView> describe(WebDriver driver, String xpath) {
+        return describe(driver, xpath, null);
+    }
+
+    private static List<ElementView> describe(WebDriver driver, EngineQuery query) {
+        CompositeLog.info("query", "engine " + query.text());
+        return describe(driver, "", query);
+    }
+
+    private static List<ElementView> describe(WebDriver driver, String xpath, EngineQuery query) {
         Duration previous = null;
         try {
             previous = driver.manage().timeouts().getImplicitWaitTimeout();
@@ -90,7 +127,9 @@ public final class PageElementQuery {
             previous = null;
         }
         try {
-            List<ElementView> found = ElementOperations.describe(driver, By.xpath(xpath));
+            List<ElementView> found = query == null
+                    ? ElementOperations.describe(driver, By.xpath(xpath))
+                    : ElementOperations.describe(driver, query);
             return found == null ? List.of() : found;
         } finally {
             if (previous != null) {

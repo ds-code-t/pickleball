@@ -153,15 +153,42 @@ public final class WorkbenchLiveSession implements AutoCloseable {
     public ControlBridgeElementInspectionResult elementInspect(
             String category, String text, String operation, Integer maxElements
     ) {
+        return elementInspect(category, text, operation, maxElements, null, null, null, null, null);
+    }
+
+    public ControlBridgeElementInspectionResult elementInspect(
+            String category,
+            String text,
+            String operation,
+            Integer maxElements,
+            String query,
+            String exposure,
+            Integer limit,
+            Boolean explain,
+            Boolean promoteVisual
+    ) {
         return call(binding -> binding.client().elementInspect(
                 binding.scenarioId(), category, text, operation, maxElements,
-                COMMAND_TIMEOUT_SECONDS
+                COMMAND_TIMEOUT_SECONDS, query, exposure, limit, explain, promoteVisual
         ));
     }
 
     public ControlBridgePageQueryResult pageQuery(String category, String text) {
+        return pageQuery(category, text, null, null, null, null, null);
+    }
+
+    public ControlBridgePageQueryResult pageQuery(
+            String category,
+            String text,
+            String query,
+            String exposure,
+            Integer limit,
+            Boolean explain,
+            Boolean promoteVisual
+    ) {
         return call(binding -> binding.client().pageQuery(
-                binding.scenarioId(), category, text, COMMAND_TIMEOUT_SECONDS
+                binding.scenarioId(), category, text, COMMAND_TIMEOUT_SECONDS,
+                query, exposure, limit, explain, promoteVisual
         ));
     }
 

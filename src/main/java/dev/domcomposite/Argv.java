@@ -41,6 +41,7 @@ public final class Argv {
         {"preset", "preset"},
         {"force_hover", "force-hover"},
         {"force_focus", "force-focus"},
+        {"exposure", "exposure"},
     };
 
     private Argv() {}
@@ -116,7 +117,8 @@ public final class Argv {
                         {"nesting", "nesting"},
                         {"nth", "nth"},
                         {"every", "every"},
-                        {"point", "point"}
+                        {"point", "point"},
+                        {"limit", "limit"}
                     });
                     pushBools(argv, node, new String[][] {{"count_only", "count-only"}, {"geometry", "geometry"}});
                 }

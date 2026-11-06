@@ -3,6 +3,7 @@ package tools.dscode.workbench;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import tools.dscode.control.protocol.ControlBridgeCallResult;
 import tools.dscode.control.protocol.ControlBridgeError;
+import tools.dscode.control.protocol.ControlBridgeElementEvidence;
 import tools.dscode.control.protocol.ControlBridgePageQueryResult;
 import tools.dscode.control.protocol.ExampleRowSelector;
 import tools.dscode.control.protocol.SessionDescriptor;
@@ -362,8 +363,8 @@ public final class WorkbenchSessionActions {
             case "show-run" -> showRun(first(args, "runId", "run"), args.get("agent"), Boolean.parseBoolean(args.get("claim")));
             case "close-window" -> closeWindow();
             case "open-ui" -> openUi(first(args, "runId", "run"), args.get("agent"));
-            case "inspect-page" -> pageQuery(null, null);
-            case "find-element" -> pageQuery(args.get("category"), args.get("text"));
+            case "inspect-page" -> pageQuery("inspect-page", args);
+            case "find-element" -> pageQuery("find-element", args);
             default -> throw new IllegalArgumentException("Unknown session command: " + op);
         };
     }
@@ -416,10 +417,20 @@ public final class WorkbenchSessionActions {
         return payload;
     }
 
-    private Map<String, Object> pageQuery(String category, String text) {
-        String op = category == null || category.isBlank() ? "inspect-page" : "find-element";
+    private Map<String, Object> pageQuery(String op, Map<String, String> args) {
+        String category = args.get("category");
+        String text = args.get("text");
+        String query = blank(args.get("query"));
         try {
-            ControlBridgePageQueryResult result = services.pageQuery(category, text);
+            ControlBridgePageQueryResult result = services.pageQuery(
+                    category,
+                    text,
+                    query,
+                    blank(args.get("exposure")),
+                    whole(args.get("limit")),
+                    truth(args.get("explain")),
+                    truth(args.get("promoteVisual"))
+            );
             if (result == null || !"SUCCESS".equals(result.status())) {
                 String message = result == null || result.error() == null
                         ? "Page query failed."
@@ -433,6 +444,9 @@ public final class WorkbenchSessionActions {
                 row.put("xpath", hit.xpath());
                 row.put("rawMatchCount", hit.rawMatchCount());
                 row.put("visibleCount", hit.visibleCount());
+                if (hit.query() != null && !hit.query().isBlank()) row.put("query", hit.query());
+                if (hit.exposure() != null && !hit.exposure().isBlank()) row.put("exposure", hit.exposure());
+                if (hit.nodes() != null && !hit.nodes().isEmpty()) row.put("nodes", nodes(hit.nodes()));
                 hits.add(row);
             }
             LinkedHashMap<String, Object> payload = accepted(op, "READ");
@@ -443,6 +457,42 @@ public final class WorkbenchSessionActions {
         } catch (RuntimeException failure) {
             return failed(op, failure.getMessage() == null ? failure.toString() : failure.getMessage());
         }
+    }
+
+    private static List<Map<String, Object>> nodes(List<ControlBridgeElementEvidence> evidence) {
+        List<Map<String, Object>> rows = new ArrayList<>();
+        for (ControlBridgeElementEvidence node : evidence) {
+            LinkedHashMap<String, Object> row = new LinkedHashMap<>();
+            row.put("handle", node.handle());
+            row.put("text", node.text());
+            row.put("rank", node.rank());
+            row.put("score", node.score());
+            row.put("humanCodes", node.humanCodes());
+            row.put("humanSentence", node.humanSentence());
+            row.put("visualOnly", node.visualOnly());
+            rows.add(row);
+        }
+        return rows;
+    }
+
+    private static String blank(String value) {
+        return value == null || value.isBlank() ? null : value;
+    }
+
+    private static Integer whole(String value) {
+        if (value == null || value.isBlank()) return null;
+        try {
+            return Integer.valueOf(value.trim());
+        } catch (NumberFormatException failure) {
+            throw new IllegalArgumentException("limit is below 1");
+        }
+    }
+
+    private static Boolean truth(String value) {
+        if (value == null || value.isBlank()) return null;
+        if ("true".equalsIgnoreCase(value) || "1".equals(value)) return Boolean.TRUE;
+        if ("false".equalsIgnoreCase(value) || "0".equals(value)) return Boolean.FALSE;
+        return null;
     }
 
     private Map<String, Object> play(boolean fromHere, String stepId) {

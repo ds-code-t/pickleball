@@ -42,7 +42,7 @@ final class WorkbenchCliHelp {
             Map.entry("session-release", "Usage: session release <sessionId> [--json]"),
             Map.entry("query", "Usage: query <runs|get|query|search|props|errors|tail> [--run-id=<id>] [--scenario=<id>] [--kind=run|scenario|step|event|property|artifact|error|log] [--text=<words>] [--status=<outcome>] [--fields=<a,b>] [--limit=<n>] [--cursor=<token>] [--id=<id>]"),
             Map.entry("use-version", "Usage: use-version --version=<safe-version>"),
-            Map.entry("find-element", "Usage: find-element --category=<Button> [--text=<label>] [--html=<file>]"),
+            Map.entry("find-element", "Usage: find-element (--category=<Button> [--text=<label>] | --query=<selector>) [--exposure=human|lower] [--limit=<n>] [--explain] [--promote-visual] [--html=<file>]"),
             Map.entry("presence", "Usage: presence --touch --agent=<id> [--run-id=<id>] | presence --list | presence --sweep"),
             Map.entry("post", "Usage: post --write --to=<agent-id|all> --text=<one line> [--run-id=<id>] [--ttl=1h] | post --renew --id=<id> [--ttl=1h]"),
             Map.entry("history", "Usage: history --append --text=<one line>"),

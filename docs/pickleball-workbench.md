@@ -541,7 +541,7 @@ workbench_service_call
 
 Prefer `workbench_browser_page` and `workbench_element_inspect` over `workbench_browser_screenshot` unless the image itself is required. Screenshot bytes are expensive in agent context.
 
-Live `inspect-page`, `find-element`, and `workbench_element_inspect` join the session descriptor's CDP address. `inspect-page` and `find-element` call `PageElementQuery`, and each of those calls `ElementOperations.describe` once. `workbench_element_inspect` calls `ElementControl`, which uses that same one-batch `describe`. Counts, text, and evidence come from the returned rows. The CLI, the MCP tool, and the GUI session command do not look up elements themselves. Offline `--html` inspect does not start a browser and still uses the dictionary XPath (`source=offline-html`).
+Live `inspect-page`, `find-element`, and `workbench_element_inspect` join the session descriptor's CDP address. `inspect-page` and `find-element` call `PageElementQuery`, and each of those calls `ElementOperations.describe` once. `workbench_element_inspect` calls `ElementControl`, which uses that same one-batch `describe`. A `--query` (CLI) or `query` (MCP) value is the engine selector string and is forwarded as-is. Category+text still builds the dictionary XPath. Counts, text, and evidence come from the returned rows. The CLI, the MCP tool, and the GUI session command do not look up elements themselves. Offline `--html` inspect does not start a browser. It stays `source=offline-html` and does not run the engine query.
 
 Semantic breakpoints:
 

@@ -218,6 +218,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/common/composite/ElementStateCache.java`
 - `src/main/java/tools/dscode/common/composite/ElementStateScript.java`
 - `src/main/java/tools/dscode/common/composite/ElementView.java`
+- `src/main/java/tools/dscode/common/composite/EngineQuery.java`
 - `src/main/java/tools/dscode/common/composite/SelectorTranslator.java`
 - `src/main/java/tools/dscode/common/composite/VerbPlan.java`
 - `src/main/java/tools/dscode/common/control/ControlDecision.java`

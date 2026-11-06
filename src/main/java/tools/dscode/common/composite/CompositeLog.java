@@ -16,8 +16,11 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * CLI-first log for the dom-composite adapter. Off unless
  * {@code pkb_composite_log} names an entity ({@code location}, {@code adapter},
  * {@code session}, {@code element}, {@code fallback}, {@code batch}, {@code state},
- * {@code position}, {@code geometry})
+ * {@code position}, {@code geometry}, {@code query}, {@code exposure})
  * or {@code all}.
+ * {@code query} writes {@code INFO query category} for dictionary XPath and
+ * {@code INFO query engine} plus {@code TRACE query forward selector=} for an
+ * engine pipeline or expression. {@code exposure} writes the lower-level act.
  * {@code geometry} writes {@code TRACE geometry request} when a query asks for
  * the five-space view, and {@code INFO geometry real} or {@code INFO geometry fallback}.
  * {@code adapter} writes the same choice as {@code INFO adapter geometry real}

@@ -222,11 +222,31 @@ public final class ControlBridgeClient {
             Integer maxElements,
             Integer timeoutSeconds
     ) {
+        return elementInspect(
+                scenarioId, category, text, operation, maxElements, timeoutSeconds,
+                null, null, null, null, null
+        );
+    }
+
+    public ControlBridgeElementInspectionResult elementInspect(
+            String scenarioId,
+            String category,
+            String text,
+            String operation,
+            Integer maxElements,
+            Integer timeoutSeconds,
+            String query,
+            String exposure,
+            Integer limit,
+            Boolean explain,
+            Boolean promoteVisual
+    ) {
         int timeout = commandTimeout(timeoutSeconds);
         return request(
                 "POST", "/v1/browser/elements",
                 new ElementInspectionRequest(
-                        scenarioId, category, text, operation, maxElements, timeoutSeconds
+                        scenarioId, category, text, operation, maxElements, timeoutSeconds,
+                        query, exposure, limit, explain, promoteVisual
                 ),
                 ControlBridgeElementInspectionResult.class, commandDuration(timeout)
         );
@@ -238,10 +258,27 @@ public final class ControlBridgeClient {
             String text,
             Integer timeoutSeconds
     ) {
+        return pageQuery(scenarioId, category, text, timeoutSeconds, null, null, null, null, null);
+    }
+
+    public ControlBridgePageQueryResult pageQuery(
+            String scenarioId,
+            String category,
+            String text,
+            Integer timeoutSeconds,
+            String query,
+            String exposure,
+            Integer limit,
+            Boolean explain,
+            Boolean promoteVisual
+    ) {
         int timeout = commandTimeout(timeoutSeconds);
         return request(
                 "POST", "/v1/browser/query",
-                new PageQueryRequest(scenarioId, category, text, timeoutSeconds),
+                new PageQueryRequest(
+                        scenarioId, category, text, timeoutSeconds,
+                        query, exposure, limit, explain, promoteVisual
+                ),
                 ControlBridgePageQueryResult.class, commandDuration(timeout)
         );
     }

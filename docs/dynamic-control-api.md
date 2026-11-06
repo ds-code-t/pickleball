@@ -73,7 +73,7 @@ The bridge retains bounded immutable semantic hook metadata rather than arbitrar
 
 ## Browser and service investigation
 
-`ElementControl.inspect(...)` resolves through the active Pickleball `ExecutionDictionary`. It uses Pickleball element vocabulary rather than introducing raw CSS/XPath as a controller language. Inspection requires an existing scenario-owned browser and returns `UNAVAILABLE` rather than creating one.
+`ElementControl.inspect(...)` resolves a Pickleball category through the active `ExecutionDictionary`, or forwards one engine query string when `query` is set. That string is the composite selector: `css=`, `xpath=`, `text=`, `image=`, `near=`, `below=`, `above=`, `left-of=`, `right-of=`, `>>` stages, and AND/OR/NOT. Workbench, MCP, and the control bridge only forward it. There is no second locator language. Gherkin stays phrase sugar via `SelectorTranslator`. Inspection requires an existing scenario-owned browser and returns `UNAVAILABLE` rather than creating one. A binary that does not list `exposure` or `limit` omits that flag and does not invent a result. Offline HTML is a labelled source read and does not run the engine query.
 
 `ServiceCallControl.execute(selector)` runs the same reusable service-call component selected by normal `CALL:` semantics. Existing Pickleball discovery, Mapping, request/configuration processing, REST/SOAP execution, response mapping, and failure behavior remain authoritative.
 

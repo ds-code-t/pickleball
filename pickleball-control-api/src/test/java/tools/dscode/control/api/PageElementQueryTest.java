@@ -12,6 +12,7 @@ import tools.dscode.common.composite.CompositeLog;
 import tools.dscode.common.composite.CompositeMode;
 import tools.dscode.common.composite.CompositeRuntime;
 import tools.dscode.common.composite.ElementOperations;
+import tools.dscode.common.composite.EngineQuery;
 import tools.dscode.control.protocol.DirectControlProvider;
 
 import java.lang.reflect.Proxy;
@@ -26,6 +27,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class PageElementQueryTest {
@@ -117,6 +119,62 @@ class PageElementQueryTest {
         assertFalse(hit.xpath().isBlank(), hit.xpath());
     }
 
+    @Test
+    void engineQueryForwardsTheSelectorAndKeepsCategoryCounts() throws Exception {
+        Path binary = stub(temp.resolve("composite"));
+        CompositeRuntime.use(
+                temp.resolve("project"),
+                Map.of(DirectControlProvider.BIN_ENV, binary.toString()),
+                new ClassLoader(null) {
+                },
+                temp.resolve("home")
+        );
+        System.setProperty(CompositeLog.KEY, "query");
+        System.setProperty(CompositeLog.DIR_KEY, temp.resolve("logs").toString());
+        CompositeRuntime.joinForTests("http://127.0.0.1:9222");
+        AtomicInteger finds = new AtomicInteger();
+        WebDriver driver = driver(List.of(), finds);
+        PageElementQuery.Hit hit = PageElementQuery.find(
+                driver,
+                EngineQuery.of("css=#save").exposure("lower").limit(2).explain(true)
+        );
+        assertEquals(0, finds.get());
+        assertEquals("engine", hit.phrase());
+        assertEquals("css=#save", hit.query());
+        assertEquals(1, hit.rawMatchCount());
+        assertEquals(1, hit.nodes().size());
+        assertEquals("main:7", hit.nodes().get(0).handle());
+        assertEquals(0, hit.nodes().get(0).rank());
+        assertTrue(hit.nodes().get(0).humanCodes().contains("off_visual_viewport"));
+        assertTrue(hit.nodes().get(0).humanSentence().contains("visual viewport"));
+        String forwarded = Files.readString(temp.resolve("composite.requests"));
+        assertTrue(forwarded.contains("--selector"), forwarded);
+        assertTrue(forwarded.contains("css=#save"), forwarded);
+        assertTrue(forwarded.contains("--exposure"), forwarded);
+        assertTrue(forwarded.contains("lower"), forwarded);
+        assertTrue(forwarded.contains("--explain"), forwarded);
+        assertTrue(forwarded.contains("--limit"), forwarded);
+        assertTrue(forwarded.contains("2"), forwarded);
+        assertEquals(1, ElementOperations.batchCallsForTests());
+    }
+
+    @Test
+    void singleCssStageFallsBackToSeleniumAndAPipelineDoesNot() {
+        AtomicInteger finds = new AtomicInteger();
+        List<WebElement> elements = List.of(element(true, new AtomicInteger()), element(false, new AtomicInteger()));
+        WebDriver driver = driver(elements, finds);
+        PageElementQuery.Hit hit = PageElementQuery.find(driver, EngineQuery.of("css=#save"));
+        assertEquals(2, hit.rawMatchCount());
+        assertEquals(1, hit.visibleCount());
+        assertTrue(finds.get() > 0);
+        WebDriver empty = driver(List.of(), new AtomicInteger());
+        IllegalStateException failure = assertThrows(
+                IllegalStateException.class,
+                () -> PageElementQuery.find(empty, EngineQuery.of("css=#a >> css=#b"))
+        );
+        assertTrue(failure.getMessage().contains("composite runtime"), failure.getMessage());
+    }
+
     private static WebDriver scriptDriver(AtomicInteger scripts) {
         return (WebDriver) Proxy.newProxyInstance(
                 WebDriver.class.getClassLoader(),
@@ -194,25 +252,43 @@ class PageElementQueryTest {
     private static Path stub(Path path) throws Exception {
         String script = """
                 #!/usr/bin/env python3
-                import json, sys
+                import json, sys, os
+                log = os.path.splitext(sys.argv[0])[0] + ".requests"
                 for line in sys.stdin:
                     line = line.strip()
                     if not line:
                         continue
                     req = json.loads(line)
                     argv = req.get("argv") or []
+                    with open(log, "a", encoding="utf-8") as handle:
+                        handle.write(json.dumps(argv) + "\\n")
                     if "version" in argv:
                         body = {"version": "2.4.0"}
                     elif "create" in argv:
                         body = {"ok": True, "id": "sess-1", "launched": False}
+                    elif "capabilities" in argv:
+                        body = {"ok": True, "query_flags": [
+                            "within", "nesting", "nth", "every", "count-only",
+                            "geometry", "point", "exposure", "limit"
+                        ]}
                     elif "query" in argv:
+                        selector = ""
+                        if "--selector" in argv:
+                            selector = argv[argv.index("--selector") + 1]
                         body = {"ok": True, "composite": [{
-                            "id": "main:1",
-                            "text": "Save",
+                            "id": "main:7",
+                            "handle": "main:7",
+                            "text": selector or "Save",
                             "role": "button",
                             "bounds": {"x": 1, "y": 2, "width": 10, "height": 8},
                             "attributes": {"id": "save"},
-                            "states": ["enabled"]
+                            "states": ["enabled"],
+                            "rank": 0,
+                            "score": 0.5,
+                            "human_limits": {
+                                "codes": ["off_visual_viewport"],
+                                "sentence": "scrolled out of the visual viewport"
+                            }
                         }]}
                     else:
                         body = {"ok": True}

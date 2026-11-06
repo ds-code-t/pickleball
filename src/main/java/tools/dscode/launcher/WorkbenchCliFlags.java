@@ -22,7 +22,8 @@ final class WorkbenchCliFlags {
     static final List<String> AGENT = List.of(
             "--json", "--expect", "--config", "--reseed", "--from-run",
             "--html", "--category", "--status",
-            "--kind", "--scenario", "--cursor", "--fields"
+            "--kind", "--scenario", "--cursor", "--fields",
+            "--query", "--exposure", "--explain", "--promote-visual"
     );
 
     static final List<String> SESSION = List.of(

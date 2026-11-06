@@ -158,10 +158,36 @@ public interface WorkbenchServices extends AutoCloseable {
     ControlBridgeBrowserScreenshotResult browserScreenshot();
 
     ControlBridgeElementInspectionResult elementInspect(
-            String category, String text, String operation, Integer maxElements
+            String category,
+            String text,
+            String operation,
+            Integer maxElements,
+            String query,
+            String exposure,
+            Integer limit,
+            Boolean explain,
+            Boolean promoteVisual
     );
 
-    ControlBridgePageQueryResult pageQuery(String category, String text);
+    default ControlBridgeElementInspectionResult elementInspect(
+            String category, String text, String operation, Integer maxElements
+    ) {
+        return elementInspect(category, text, operation, maxElements, null, null, null, null, null);
+    }
+
+    ControlBridgePageQueryResult pageQuery(
+            String category,
+            String text,
+            String query,
+            String exposure,
+            Integer limit,
+            Boolean explain,
+            Boolean promoteVisual
+    );
+
+    default ControlBridgePageQueryResult pageQuery(String category, String text) {
+        return pageQuery(category, text, null, null, null, null, null);
+    }
 
     ControlBridgeServiceCallResult serviceCall(String selector);
 

@@ -232,6 +232,89 @@ public final class DomCompositeAdapter {
         return open.eval(body);
     }
 
+    /**
+     * Forward one engine query object. {@code selector} is the pipeline or
+     * expression. Exposure and limit are sent only when capabilities list them.
+     */
+    public List<WebElement> findEngine(EngineQuery query) {
+        JsonNode json = queryEngine(query);
+        if (json == null) return List.of();
+        return hits(json, new CompositeSelector(null, null, query.text(), "dom", null, query.text()));
+    }
+
+    public JsonNode queryEngine(EngineQuery query) {
+        if (query == null || query.text().isBlank()) {
+            throw new IllegalArgumentException("engine query must not be blank");
+        }
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("selector", query.text());
+        body.put("mode", "composite");
+        if (query.exposure() != null) {
+            if (queryFlag("exposure")) {
+                body.put("exposure", query.exposure());
+                CompositeLog.info("query", "exposure " + query.exposure());
+            } else {
+                CompositeLog.info("query", "exposure fallback");
+            }
+        }
+        if (query.limit() != null) {
+            if (queryFlag("limit")) {
+                body.put("limit", query.limit());
+                CompositeLog.info("query", "limit " + query.limit());
+            } else {
+                CompositeLog.info("query", "limit fallback");
+            }
+        }
+        if (query.explain()) body.put("explain", true);
+        if (query.promoteVisual()) body.put("promote_visual", true);
+        attachGeometry(body);
+        CompositeLog.info("query", "engine " + query.text());
+        CompositeLog.trace("query", "forward selector=" + query.text());
+        record("query");
+        if (dryRun) return null;
+        Client open = CompositeRuntime.ensureClient();
+        if (open == null) throw new IllegalStateException("composite client is not open");
+        return open.query(body);
+    }
+
+    /** One click or type. Human exposure is whatever the query already carries. */
+    public ElementView act(EngineQuery query, String verb, String typed) {
+        EngineQuery used = query.interact() ? query : query.interact(true);
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("selector", used.text());
+        body.put("mode", "composite");
+        if (used.exposure() != null && queryFlag("exposure")) {
+            body.put("exposure", used.exposure());
+        }
+        if (used.explain()) body.put("explain", true);
+        String action = verb == null ? "click" : verb.trim().toLowerCase(java.util.Locale.ROOT);
+        CompositeLog.info("query", "act " + action + " " + used.text());
+        if ("lower".equals(used.exposure())) {
+            CompositeLog.info("exposure", "act lower " + used.text());
+        }
+        if (dryRun) return null;
+        Client open = CompositeRuntime.ensureClient();
+        if (open == null) throw new IllegalStateException("composite client is not open");
+        JsonNode json = "type".equals(action)
+                ? open.type(withText(body, typed))
+                : open.click(body);
+        JsonNode node = json == null ? null : json.get("node");
+        if (node == null || node.isNull()) {
+            throw new org.openqa.selenium.NoSuchElementException("no match for " + used.text());
+        }
+        CompositeWebElement element = new CompositeWebElement(
+                new CompositeSelector(null, null, used.text(), "dom", null, used.text()),
+                node,
+                0
+        );
+        return ElementReads.fromComposite(element);
+    }
+
+    private static Map<String, Object> withText(Map<String, Object> body, String typed) {
+        body.put("text", typed == null ? "" : typed);
+        return body;
+    }
+
     public List<WebElement> find(By by) {
         return find(SelectorTranslator.fromBy(by));
     }

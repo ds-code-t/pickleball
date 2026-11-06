@@ -165,7 +165,7 @@ The dictionary still owns the XPath for a built-in or custom category. `ElementO
 
 The same translator covers an OS desktop element. Set the phrase source to desktop. A template image becomes `image=template=<path>`. OCR text becomes `image=ocr~="<text>"`. The pipeline starts with `source=desktop`. Query, OCR, and template matching go through that one adapter. Desktop click and type do not, until `capabilities.desktop` lists the verb. They fail with `error:` / `fix:` naming the missing `desktop click` or `desktop type` verb when it is absent. Browser `submit`, `dblclick`, `contextclick`, `drag`, and `key` follow `capabilities.actions` the same way.
 
-Live Workbench `inspect-page` and `find-element` post to the worker. The worker calls `PageElementQuery`, which calls `ElementOperations.describe` once. `workbench_element_inspect` calls `ElementControl`, which calls that same `describe`. Counts and evidence are the batch rows, not a second per-element read. Offline HTML inspect stays on the dictionary XPath (`source=offline-html`). There is no second locator implementation in the GUI or the CLI.
+Live Workbench `inspect-page` and `find-element` post to the worker. The worker calls `PageElementQuery`, which calls `ElementOperations.describe` once. `workbench_element_inspect` calls `ElementControl`, which calls that same `describe`. A controller `query` string is the engine selector (`css=`, `xpath=`, `text=`, `image=`, relatives, `>>`, AND/OR/NOT) on that same call. Counts and evidence are the batch rows, not a second per-element read. Offline HTML inspect stays `source=offline-html` and does not run the engine query. There is no second locator implementation in the GUI or the CLI.
 
 ## When to add a category
 

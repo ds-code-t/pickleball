@@ -137,7 +137,11 @@
     "--kind",
     "--scenario",
     "--cursor",
-    "--fields"
+    "--fields",
+    "--query",
+    "--exposure",
+    "--explain",
+    "--promote-visual"
   ],
   "exitCodes": [
     {

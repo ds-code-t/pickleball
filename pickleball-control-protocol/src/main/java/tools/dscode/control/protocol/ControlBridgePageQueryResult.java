@@ -17,7 +17,19 @@ public record ControlBridgePageQueryResult(
             String phrase,
             String xpath,
             int rawMatchCount,
-            int visibleCount
+            int visibleCount,
+            String query,
+            String exposure,
+            List<ControlBridgeElementEvidence> nodes
     ) {
+        public ControlBridgePageQueryHit {
+            nodes = nodes == null ? List.of() : List.copyOf(nodes);
+            query = query == null ? "" : query;
+            exposure = exposure == null ? "" : exposure;
+        }
+
+        public ControlBridgePageQueryHit(String phrase, String xpath, int rawMatchCount, int visibleCount) {
+            this(phrase, xpath, rawMatchCount, visibleCount, "", "", List.of());
+        }
     }
 }

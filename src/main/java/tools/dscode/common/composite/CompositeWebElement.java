@@ -36,6 +36,12 @@ public final class CompositeWebElement implements WebElement {
     private final int width;
     private final int height;
     private final ElementSnapshot.Geometry geometry;
+    private final String handle;
+    private final Integer rank;
+    private final Double score;
+    private final java.util.List<String> humanCodes;
+    private final String humanSentence;
+    private final boolean visualOnly;
 
     /** One node from an all-contexts query. The id is the frame and backend id. */
     public static WebElement fromQuery(String xpath, JsonNode node, int index) {
@@ -66,6 +72,27 @@ public final class CompositeWebElement implements WebElement {
         this.width = bounds == null ? 0 : bounds.path("width").asInt(0);
         this.height = bounds == null ? 0 : bounds.path("height").asInt(0);
         this.geometry = ElementSnapshot.Geometry.parse(value == null ? null : value.get("geometry"));
+        this.handle = first(text(value, "handle", ""), this.nodeId);
+        this.rank = value != null && value.has("rank") && value.get("rank").canConvertToInt()
+                ? value.get("rank").asInt()
+                : null;
+        this.score = value != null && value.has("score") && value.get("score").isNumber()
+                ? value.get("score").asDouble()
+                : null;
+        JsonNode limits = value == null ? null : value.get("human_limits");
+        java.util.ArrayList<String> codes = new java.util.ArrayList<>();
+        if (limits != null && limits.path("codes").isArray()) {
+            for (JsonNode code : limits.path("codes")) {
+                String name = code.asText("");
+                if (!name.isBlank()) codes.add(name);
+            }
+        }
+        this.humanCodes = java.util.List.copyOf(codes);
+        this.humanSentence = limits == null ? "" : limits.path("sentence").asText("");
+        String source = text(value, "source", "");
+        this.visualOnly = "visual".equalsIgnoreCase(source)
+                || "desktop".equalsIgnoreCase(source)
+                || codes.contains("source_only");
         if (this.geometry != null && this.geometry.scrollport() != null) {
             boolean content = this.geometry.scrollport().content() != null;
             CompositeLog.info("geometry", content ? "scrollport client+content" : "scrollport client");
@@ -109,6 +136,30 @@ public final class CompositeWebElement implements WebElement {
     /** Five-space view from the query payload. Null when the hit had no geometry object. */
     public ElementSnapshot.Geometry geometry() {
         return geometry;
+    }
+
+    public String handle() {
+        return handle == null ? "" : handle;
+    }
+
+    public Integer rank() {
+        return rank;
+    }
+
+    public Double score() {
+        return score;
+    }
+
+    public java.util.List<String> humanCodes() {
+        return humanCodes == null ? java.util.List.of() : humanCodes;
+    }
+
+    public String humanSentence() {
+        return humanSentence == null ? "" : humanSentence;
+    }
+
+    public boolean visualOnly() {
+        return visualOnly;
     }
 
     int rectHeight() {

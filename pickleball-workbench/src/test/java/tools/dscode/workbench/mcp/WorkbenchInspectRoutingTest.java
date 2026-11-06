@@ -46,6 +46,9 @@ class WorkbenchInspectRoutingTest {
         assertEquals("SUCCESS", found.get("status"));
         assertEquals("live-session", found.get("source"));
         assertEquals("find-element:Button:Save", seen.get());
+        Map<String, Object> queried = actions.dispatch("find-element", Map.of("query", "css=#save", "exposure", "lower"));
+        assertEquals("SUCCESS", queried.get("status"));
+        assertEquals("query:css=#save", seen.get());
     }
 
     @Test
@@ -60,6 +63,8 @@ class WorkbenchInspectRoutingTest {
         ControlBridgeElementInspectionResult inspection = assertInstanceOf(ControlBridgeElementInspectionResult.class, called);
         assertEquals("SUCCESS", inspection.status());
         assertEquals("element-inspect:Button:Save", seen.get());
+        tools.call("workbench_element_inspect", Map.of("query", "xpath=//button"));
+        assertEquals("query:xpath=//button", seen.get());
     }
 
     @Test
@@ -112,13 +117,19 @@ class WorkbenchInspectRoutingTest {
                     if ("pageQuery".equals(method.getName())) {
                         String category = args == null || args.length < 1 || args[0] == null ? "" : args[0].toString();
                         String text = args == null || args.length < 2 || args[1] == null ? "" : args[1].toString();
-                        seen.set(category.isBlank() ? "inspect-page" : "find-element:" + category + ":" + text);
+                        String query = args != null && args.length > 2 && args[2] != null ? args[2].toString() : "";
+                        seen.set(query.isBlank()
+                                ? (category.isBlank() ? "inspect-page" : "find-element:" + category + ":" + text)
+                                : "query:" + query);
                         return page;
                     }
                     if ("elementInspect".equals(method.getName())) {
                         String category = args == null || args[0] == null ? "" : args[0].toString();
                         String text = args == null || args.length < 2 || args[1] == null ? "" : args[1].toString();
-                        seen.set("element-inspect:" + category + ":" + text);
+                        String query = args != null && args.length > 4 && args[4] != null ? args[4].toString() : "";
+                        seen.set(query.isBlank()
+                                ? "element-inspect:" + category + ":" + text
+                                : "query:" + query);
                         return inspection;
                     }
                     if (method.getReturnType() == boolean.class) return false;

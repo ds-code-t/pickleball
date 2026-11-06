@@ -6,6 +6,10 @@ A live Workbench session can publish a descriptor so an external tool can attach
 
 A normal `mvn test` or `gradlew test` does not write a descriptor. An unset or blank `pkb_direct_control_provider` does nothing: no provider process, no extra log line, no change to that run.
 
+## Find
+
+Workbench, MCP, and the control bridge forward one engine query string through `ElementOperations` → `DomCompositeAdapter`. The string is the composite selector (`css=`, `xpath=`, `text=`, `image=`, `near=`, `below=`, `above=`, `left-of=`, `right-of=`, `>>`, AND/OR/NOT). Category+text still uses the execution dictionary. Gherkin phrases, including `after` and `before` as document order, are unchanged. Offline `--html` is a labelled source read and does not pretend to run that query.
+
 ## Descriptor
 
 Schema `session-descriptor.v1`. `contractVersion` is `"1"`. Later versions add fields or are negotiated. They do not change the meaning of a field that already exists.

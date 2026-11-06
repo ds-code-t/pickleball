@@ -166,18 +166,28 @@ final class WorkbenchMcpTools {
                 args -> services.browserPage());
         add("workbench_browser_screenshot", "Capture the current browser screenshot. Prefer workbench_browser_page unless the image is required.", schema(Map.of()),
                 args -> services.browserScreenshot());
-        add("workbench_element_inspect", "Inspect browser elements using Pickleball element vocabulary.",
+        add("workbench_element_inspect", "Inspect with a Pickleball category or one engine query (css=, xpath=, text=, image=, near=, below=, above=, left-of=, right-of=, >> stages, AND/OR/NOT).",
                 schema(Map.of(
-                        "category", stringProperty("Optional Pickleball element category."),
-                        "text", stringProperty("Optional visible/context text."),
+                        "category", stringProperty("Optional Pickleball element category. Omit when query is set."),
+                        "text", stringProperty("Optional visible/context text for a category."),
                         "operation", stringProperty("Optional inspection operation."),
-                        "maxElements", integerProperty("Optional maximum result count.")
+                        "maxElements", integerProperty("Optional maximum result count."),
+                        "query", stringProperty("Engine pipeline or expression. The same string the composite CLI takes as --selector."),
+                        "exposure", stringProperty("Optional human or lower. Omitted does not change the engine filter. Not session-sticky."),
+                        "limit", integerProperty("Optional maximum nodes, at least 1."),
+                        "explain", booleanProperty("Ask the engine for why-matched."),
+                        "promoteVisual", booleanProperty("Bind an image match to a node when the engine can.")
                 )),
                 args -> services.elementInspect(
                         optionalText(args, "category"),
                         optionalText(args, "text"),
                         optionalText(args, "operation"),
-                        integer(args, "maxElements")
+                        integer(args, "maxElements"),
+                        optionalText(args, "query"),
+                        optionalText(args, "exposure"),
+                        integer(args, "limit"),
+                        args.containsKey("explain") ? bool(args, "explain", false) : null,
+                        args.containsKey("promoteVisual") ? bool(args, "promoteVisual", false) : null
                 ));
         add("workbench_service_call", "Execute an existing Pickleball service-call selector and return evidence.",
                 schema(Map.of("selector", stringProperty("Existing service-call selector, for example %health-full-url.")), "selector"),

@@ -118,4 +118,19 @@ Query only. `capabilities.query_flags` lists `point`.
 
 Log entity `query`, line `point <x>,<y>`, off unless named. The geometry trace names `chain=<n>`.
 
+## Landed in 2.12.0
+
+On branch `geometry-2.11.0` (not main). General-purpose. No Pickleball knowledge.
+
+`query --exposure human|lower`
+Omitted, the query is unchanged. `human` keeps nodes a person could see (displayed, non-zero size, intersecting the visual viewport, not clipped or occluded, not `aria-hidden` or `pointer-events: none` for a click). `lower` keeps every match and labels each one. Codes include `human_could_not_see`, `human_could_not_click`, `human_could_not_follow`, `off_visual_viewport`, `display_none`, `visibility_hidden`, `opacity_zero`, `aria_hidden`, `zero_size`, `clipped`, `occluded`, `pointer_events_none`, and `source_only`, plus a short sentence. Click and type take the same flag. `human` refuses a node the person could not click. `lower` still acts and the action sentence starts `acted on node <handle>;`.
+
+`query --limit <n>`
+Keep the first `n` matches after the other filters. `n` below 1 is invalid. When `exposure`, `limit`, or `--explain` is set, each node gains `handle` (`frame:backend`) and `rank`.
+
+Visual relatives `above`, `left-of`, `right-of` (aliases `left` and `right`). `near` and `below` stay, and rank by visual center distance rather than tree order. The space is the nearest element scrollport when the reference lives in one, the visual viewport when exposure is `human`, otherwise document CSS pixels. Ties break by paint order, then preorder. A node with no border quad is skipped. No invented boxes.
+
+`capabilities.query_flags` lists `exposure` and `limit`. `capabilities.engines` lists `above`, `left-of`, and `right-of`. Log entity `query` for the limit line, entity `exposure` for the label line, entity `geometry` for `rel space=<name>`.
+
+
 

@@ -3,8 +3,10 @@ package tools.dscode.control.api;
 import org.openqa.selenium.By;
 import org.openqa.selenium.remote.RemoteWebDriver;
 import tools.dscode.common.assertions.ValueWrapper;
+import tools.dscode.common.composite.CompositeLog;
 import tools.dscode.common.composite.ElementOperations;
 import tools.dscode.common.composite.ElementView;
+import tools.dscode.common.composite.EngineQuery;
 import tools.dscode.common.domoperations.ExecutionDictionary;
 import tools.dscode.coredefinitions.BrowserSteps;
 
@@ -37,6 +39,19 @@ public final class ElementControl {
             String operation,
             Integer maxElements
     ) {
+        return inspect(category, text, operation, maxElements, null);
+    }
+
+    public static ControlCallResult<ElementInspection> inspect(
+            String category,
+            String text,
+            String operation,
+            Integer maxElements,
+            EngineQuery query
+    ) {
+        if (query != null && !query.text().isBlank()) {
+            return inspectEngine(query, maxElements);
+        }
         if (category == null || category.isBlank()) {
             return ControlCallResult.unavailable("Element category must not be blank.");
         }
@@ -60,6 +75,7 @@ public final class ElementControl {
             }
 
             String xpath = resolution.xpath().getXpath();
+            CompositeLog.info("query", "category " + category.trim());
             List<ElementView> views = ElementOperations.describe(driver, By.xpath(xpath));
             int limit = boundedMax(maxElements);
             List<ElementEvidence> evidence = new ArrayList<>();
@@ -80,7 +96,7 @@ public final class ElementControl {
         }
     }
 
-    private static ElementEvidence evidence(ElementView view, int index) {
+    public static ElementEvidence evidence(ElementView view, int index) {
         String outerHtml = view.outerHtml() == null ? "" : view.outerHtml();
         boolean outerHtmlTruncated = outerHtml.length() > MAX_OUTER_HTML_CHARS;
         if (outerHtmlTruncated) {
@@ -102,8 +118,42 @@ public final class ElementControl {
                 view.height(),
                 attributes(view),
                 outerHtml,
-                outerHtmlTruncated
+                outerHtmlTruncated,
+                view.handle(),
+                view.rank(),
+                view.score(),
+                view.humanCodes(),
+                view.humanSentence(),
+                view.visualOnly()
         );
+    }
+
+    private static ControlCallResult<ElementInspection> inspectEngine(EngineQuery query, Integer maxElements) {
+        RemoteWebDriver driver = BrowserSteps.getCurrentDriverIfPresent();
+        if (driver == null) {
+            return ControlCallResult.unavailable("The active scenario has not created a browser.");
+        }
+        try {
+            int limit = boundedMax(maxElements);
+            EngineQuery used = query.limit() == null ? query.limit(limit) : query;
+            List<ElementView> views = ElementOperations.describe(driver, used);
+            List<ElementEvidence> evidence = new ArrayList<>();
+            for (int index = 0; index < Math.min(limit, views.size()); index++) {
+                evidence.add(evidence(views.get(index), index + 1));
+            }
+            return ControlCallResult.success(new ElementInspection(
+                    "",
+                    "",
+                    "ENGINE",
+                    used.text(),
+                    views.size(),
+                    views.size() > evidence.size(),
+                    evidence,
+                    used.text()
+            ));
+        } catch (Throwable failure) {
+            return ControlCallResult.failed(failure);
+        }
     }
 
     private static Map<String, String> attributes(ElementView view) {

@@ -49,7 +49,8 @@ final class WorkbenchCommandLine {
     private static final Set<String> TRAILING_VALUE_FLAGS = Set.of(
             "--text-file", "--text-b64", "--session-file", "--feature", "--run", "--from-here",
             "--stop-after", "--cursor", "--fields", "--config", "--from-run", "--expect",
-            "--category", "--status", "--kind", "--scenario", "--html"
+            "--category", "--status", "--kind", "--scenario", "--html",
+            "--query", "--exposure"
     );
 
     private WorkbenchCommandLine() {

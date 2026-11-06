@@ -172,7 +172,13 @@ final class ElementReads {
                 value == null ? "" : value,
                 outer == null ? "" : outer,
                 ElementStateCache.recall(element),
-                element.geometry()
+                element.geometry(),
+                element.handle(),
+                element.rank(),
+                element.score(),
+                element.humanCodes(),
+                element.humanSentence(),
+                element.visualOnly()
         );
     }
 

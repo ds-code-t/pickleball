@@ -244,6 +244,37 @@ public final class ElementOperations {
         return ElementReads.describe(driver, by);
     }
 
+    /**
+     * One engine query. Composite forwards the selector string. Selenium runs a
+     * single css= or xpath= stage. A richer query with composite off fails closed.
+     */
+    public static List<ElementView> describe(WebDriver driver, EngineQuery query) {
+        if (query == null || query.text().isBlank()) return List.of();
+        if (CompositeRuntime.primary()) {
+            List<WebElement> found = DomCompositeAdapter.get().findEngine(query);
+            return ElementReads.describe(driver, found);
+        }
+        By fallback = query.seleniumFallback();
+        if (fallback == null) {
+            throw new IllegalStateException(
+                    "engine query needs the composite runtime: " + query.text()
+            );
+        }
+        CompositeLog.info("query", "selenium fallback " + query.text());
+        return describe(driver, fallback);
+    }
+
+    /** Click or type through the same query object. Composite only. */
+    public static ElementView act(EngineQuery query, String verb, String typed) {
+        if (query == null || query.text().isBlank()) {
+            throw new IllegalArgumentException("engine query must not be blank");
+        }
+        if (!CompositeRuntime.primary()) {
+            throw new IllegalStateException("engine action needs the composite runtime");
+        }
+        return DomCompositeAdapter.get().act(query, verb, typed);
+    }
+
     /** Describe elements already found. Composite hits do not take another round trip. */
     public static List<ElementView> describe(WebDriver driver, List<WebElement> elements) {
         return ElementReads.describe(driver, elements);

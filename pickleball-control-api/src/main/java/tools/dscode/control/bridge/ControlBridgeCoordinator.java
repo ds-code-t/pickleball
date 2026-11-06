@@ -9,6 +9,8 @@ import org.openqa.selenium.Dimension;
 import org.openqa.selenium.OutputType;
 import org.openqa.selenium.remote.RemoteWebDriver;
 import tools.dscode.common.composite.ElementOperations;
+import tools.dscode.common.composite.ElementView;
+import tools.dscode.common.composite.EngineQuery;
 import tools.dscode.common.control.ControlDecision;
 import tools.dscode.common.control.ControlEvent;
 import tools.dscode.common.control.ControlHook;
@@ -411,12 +413,32 @@ final class ControlBridgeCoordinator implements ControlHookHandler, AutoCloseabl
             Integer maxElements,
             Integer timeoutSeconds
     ) {
+        return inspectElements(
+                scenarioId, category, text, operation, maxElements, timeoutSeconds,
+                null, null, null, null, null
+        );
+    }
+
+    ControlBridgeElementInspectionResult inspectElements(
+            String scenarioId,
+            String category,
+            String text,
+            String operation,
+            Integer maxElements,
+            Integer timeoutSeconds,
+            String query,
+            String exposure,
+            Integer limit,
+            Boolean explain,
+            Boolean promoteVisual
+    ) {
         ScenarioLane lane = selectedLane(normalizeScenarioId(scenarioId));
         if (lane == null) return elementUnavailable(scenarioCommandUnavailableMessage(scenarioId, "Element inspection"));
+        EngineQuery engine = engineQuery(query, exposure, limit, explain, promoteVisual);
         return submit(
                 lane,
                 commandTimeout(timeoutSeconds),
-                () -> elementResult(ElementControl.inspect(category, text, operation, maxElements), lane),
+                () -> elementResult(ElementControl.inspect(category, text, operation, maxElements, engine), lane),
                 (type, message) -> elementFailed(type, message, lane.status(lanes.size())),
                 message -> elementUnavailable(message, lane.status(lanes.size()))
         );
@@ -428,14 +450,29 @@ final class ControlBridgeCoordinator implements ControlHookHandler, AutoCloseabl
             String text,
             Integer timeoutSeconds
     ) {
+        return queryPage(scenarioId, category, text, timeoutSeconds, null, null, null, null, null);
+    }
+
+    ControlBridgePageQueryResult queryPage(
+            String scenarioId,
+            String category,
+            String text,
+            Integer timeoutSeconds,
+            String query,
+            String exposure,
+            Integer limit,
+            Boolean explain,
+            Boolean promoteVisual
+    ) {
         ScenarioLane lane = selectedLane(normalizeScenarioId(scenarioId));
         if (lane == null) {
             return pageQueryUnavailable(scenarioCommandUnavailableMessage(scenarioId, "Page query"));
         }
+        EngineQuery engine = engineQuery(query, exposure, limit, explain, promoteVisual);
         return submit(
                 lane,
                 commandTimeout(timeoutSeconds),
-                () -> pageQueryOnScenarioThread(category, text, lane),
+                () -> pageQueryOnScenarioThread(category, text, engine, lane),
                 (type, message) -> pageQueryFailed(type, message, lane.status(lanes.size())),
                 message -> pageQueryUnavailable(message, lane.status(lanes.size()))
         );
@@ -444,6 +481,7 @@ final class ControlBridgeCoordinator implements ControlHookHandler, AutoCloseabl
     private ControlBridgePageQueryResult pageQueryOnScenarioThread(
             String category,
             String text,
+            EngineQuery query,
             ScenarioLane lane
     ) {
         try {
@@ -454,14 +492,15 @@ final class ControlBridgeCoordinator implements ControlHookHandler, AutoCloseabl
                         lane.status(lanes.size())
                 );
             }
-            List<PageElementQuery.Hit> hits = category == null || category.isBlank()
+            List<PageElementQuery.Hit> hits = query != null
+                    ? List.of(PageElementQuery.find(driver, query))
+                    : category == null || category.isBlank()
                     ? PageElementQuery.inspect(driver)
                     : List.of(PageElementQuery.find(driver, category, text));
+            String shown = query == null || query.exposure() == null ? "" : query.exposure();
             return new ControlBridgePageQueryResult(
                     "SUCCESS",
-                    hits.stream().map(hit -> new ControlBridgePageQueryResult.ControlBridgePageQueryHit(
-                            hit.phrase(), hit.xpath(), hit.rawMatchCount(), hit.visibleCount()
-                    )).toList(),
+                    hits.stream().map(hit -> protocolHit(hit, shown)).toList(),
                     null,
                     lane.status(lanes.size())
             );
@@ -860,8 +899,39 @@ final class ControlBridgeCoordinator implements ControlHookHandler, AutoCloseabl
                         ? List.of()
                         : inspection.elements().stream()
                                 .map(ControlBridgeCoordinator::protocolElementEvidence)
-                                .toList()
+                                .toList(),
+                inspection.query()
         );
+    }
+
+    private static ControlBridgePageQueryResult.ControlBridgePageQueryHit protocolHit(
+            PageElementQuery.Hit hit,
+            String exposure
+    ) {
+        List<ControlBridgeElementEvidence> nodes = new java.util.ArrayList<>();
+        int index = 1;
+        for (ElementView view : hit.nodes()) {
+            nodes.add(protocolElementEvidence(ElementControl.evidence(view, index++)));
+        }
+        return new ControlBridgePageQueryResult.ControlBridgePageQueryHit(
+                hit.phrase(),
+                hit.xpath(),
+                hit.rawMatchCount(),
+                hit.visibleCount(),
+                hit.query(),
+                exposure,
+                nodes
+        );
+    }
+
+    private static EngineQuery engineQuery(
+            String query,
+            String exposure,
+            Integer limit,
+            Boolean explain,
+            Boolean promoteVisual
+    ) {
+        return EngineQuery.controller(query, exposure, limit, explain, promoteVisual);
     }
 
     private static ControlBridgeElementEvidence protocolElementEvidence(ElementEvidence evidence) {
@@ -879,7 +949,13 @@ final class ControlBridgeCoordinator implements ControlHookHandler, AutoCloseabl
                 evidence.height(),
                 evidence.attributes(),
                 evidence.outerHtml(),
-                evidence.outerHtmlTruncated()
+                evidence.outerHtmlTruncated(),
+                evidence.handle(),
+                evidence.rank(),
+                evidence.score(),
+                evidence.humanCodes(),
+                evidence.humanSentence(),
+                evidence.visualOnly()
         );
     }
 
