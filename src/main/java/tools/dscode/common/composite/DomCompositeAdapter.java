@@ -241,7 +241,13 @@ public final class DomCompositeAdapter {
     public List<WebElement> findEngine(EngineQuery query) {
         JsonNode json = queryEngine(query);
         if (json == null) return List.of();
-        return hits(json, new CompositeSelector(null, null, query.text(), "dom", null, query.text()));
+        List<WebElement> found = hits(json, new CompositeSelector(null, null, query.text(), "dom", null, query.text()));
+        for (WebElement element : found) {
+            if (element instanceof CompositeWebElement hit && hit.visualOnly()) {
+                CompositeLog.info("query", "visual-only " + hit.handle());
+            }
+        }
+        return found;
     }
 
     public JsonNode queryEngine(EngineQuery query) {
@@ -268,8 +274,14 @@ public final class DomCompositeAdapter {
                 CompositeLog.info("query", "limit fallback");
             }
         }
-        if (query.explain()) body.put("explain", true);
-        if (query.promoteVisual()) body.put("promote_visual", true);
+        if (query.explain()) {
+            body.put("explain", true);
+            CompositeLog.info("query", "explain");
+        }
+        if (query.promoteVisual()) {
+            body.put("promote_visual", true);
+            CompositeLog.info("query", "promote visual");
+        }
         attachGeometry(body);
         CompositeLog.info("query", "engine " + query.text());
         CompositeLog.trace("query", "forward selector=" + query.text());

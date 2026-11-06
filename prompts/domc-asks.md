@@ -128,6 +128,8 @@ Omitted, the query is unchanged. `human` keeps nodes a person could see (display
 `query --limit <n>`
 Keep the first `n` matches after the other filters. `n` below 1 is invalid. When `exposure`, `limit`, or `--explain` is set, each node gains `handle` (`frame:backend`) and `rank`.
 
+A selector that is exactly that handle, or a unique bare positive backend id, returns the node and does not walk CSS. Click and type use the same query, so a follow-up act on the handle does not re-walk. CSS, pipelines, and expressions are unchanged. A missing handle is `not_found`. Log entity `query` writes `handle <id>`, off unless named.
+
 Visual relatives `above`, `left-of`, `right-of` (aliases `left` and `right`). `near` and `below` stay, and rank by visual center distance rather than tree order. The space is the nearest element scrollport when the reference lives in one, the visual viewport when exposure is `human`, otherwise document CSS pixels. Ties break by paint order, then preorder. A node with no border quad is skipped. No invented boxes.
 
 `capabilities.query_flags` lists `exposure` and `limit`. `capabilities.engines` lists `above`, `left-of`, and `right-of`. Log entity `query` for the limit line, entity `exposure` for the label line, entity `geometry` for `rel space=<name>`.

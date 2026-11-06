@@ -257,6 +257,60 @@ class PageElementQueryTest {
         assertFalse(forwarded.contains("left-of"), forwarded);
     }
 
+    @Test
+    void imagePromoteBindsANodeAndAVisualHitStaysLabeled() throws Exception {
+        Path binary = stub(temp.resolve("composite"), true);
+        CompositeRuntime.use(
+                temp.resolve("project"),
+                Map.of(DirectControlProvider.BIN_ENV, binary.toString()),
+                new ClassLoader(null) {
+                },
+                temp.resolve("home")
+        );
+        CompositeRuntime.joinForTests("http://127.0.0.1:9222");
+        WebDriver driver = driver(List.of(), new AtomicInteger());
+        PageElementQuery.Hit visual = PageElementQuery.find(driver, EngineQuery.of("image=logo"));
+        assertTrue(visual.nodes().get(0).visualOnly());
+        assertTrue(visual.nodes().get(0).humanCodes().contains("source_only"));
+        PageElementQuery.Hit bound = PageElementQuery.find(
+                driver, EngineQuery.of("image=logo").promoteVisual(true));
+        assertFalse(bound.nodes().get(0).visualOnly());
+        assertEquals("main:4", bound.nodes().get(0).handle());
+        String forwarded = Files.readString(temp.resolve("composite.requests"));
+        assertTrue(forwarded.contains("image=logo"), forwarded);
+        assertTrue(forwarded.contains("--promote-visual"), forwarded);
+    }
+
+    @Test
+    void fastSurfingBatchReturnsHandlesForOneFollowUpAct() throws Exception {
+        Path binary = stub(temp.resolve("composite"), true);
+        CompositeRuntime.use(
+                temp.resolve("project"),
+                Map.of(DirectControlProvider.BIN_ENV, binary.toString()),
+                new ClassLoader(null) {
+                },
+                temp.resolve("home")
+        );
+        CompositeRuntime.joinForTests("http://127.0.0.1:9222");
+        WebDriver driver = driver(List.of(), new AtomicInteger());
+        PageElementQuery.Hit batch = PageElementQuery.find(
+                driver, EngineQuery.of("css=a").limit(2).explain(true));
+        assertEquals(2, batch.nodes().size());
+        assertEquals(0, batch.nodes().get(0).rank());
+        assertEquals(0.9, batch.nodes().get(0).score(), 0.0001);
+        assertEquals(1, batch.nodes().get(1).rank());
+        assertEquals("main:7", batch.nodes().get(0).handle());
+        assertEquals("main:8", batch.nodes().get(1).handle());
+        ElementView acted = ElementOperations.act(EngineQuery.of(batch.nodes().get(0).handle()), "click", null);
+        assertEquals("main:7", acted.handle());
+        assertFalse(acted.visualOnly());
+        String forwarded = Files.readString(temp.resolve("composite.requests"));
+        assertTrue(forwarded.contains("\"css=a\""), forwarded);
+        assertTrue(forwarded.contains("--explain"), forwarded);
+        assertTrue(forwarded.contains("--limit"), forwarded);
+        assertTrue(forwarded.contains("\"main:7\""), forwarded);
+    }
+
     private static WebDriver scriptDriver(AtomicInteger scripts) {
         return (WebDriver) Proxy.newProxyInstance(
                 WebDriver.class.getClassLoader(),
@@ -364,39 +418,102 @@ class PageElementQueryTest {
                         selector = ""
                         if "--selector" in argv:
                             selector = argv[argv.index("--selector") + 1]
-                        body = {"ok": True, "composite": [{
-                            "id": "main:7",
-                            "handle": "main:7",
-                            "text": selector or "Save",
-                            "role": "button",
-                            "bounds": {"x": 1, "y": 2, "width": 10, "height": 8},
-                            "attributes": {"id": "save"},
-                            "states": ["enabled"],
-                            "rank": 0,
-                            "score": 0.5,
-                            "human_limits": {
-                                "codes": ["off_visual_viewport"],
-                                "sentence": "scrolled out of the visual viewport"
-                            }
-                        }]}
+                        promote = "--promote-visual" in argv
+                        if selector.startswith("image="):
+                            if promote:
+                                nodes = [{
+                                    "id": "main:4",
+                                    "handle": "main:4",
+                                    "text": "logo",
+                                    "role": "img",
+                                    "source": "cdp",
+                                    "bounds": {"x": 1, "y": 2, "width": 10, "height": 8},
+                                    "attributes": {"id": "logo"},
+                                    "states": ["enabled"],
+                                    "rank": 0,
+                                    "score": 0.8
+                                }]
+                            else:
+                                nodes = [{
+                                    "id": "visual:1",
+                                    "text": "logo",
+                                    "role": "image",
+                                    "source": "visual",
+                                    "bounds": {"x": 1, "y": 2, "width": 10, "height": 8},
+                                    "states": ["enabled"],
+                                    "rank": 0,
+                                    "score": 0.8,
+                                    "human_limits": {
+                                        "codes": ["source_only", "human_could_not_follow"],
+                                        "sentence": "a person could not follow this hit because it is a visual match with no DOM node"
+                                    }
+                                }]
+                        elif selector == "css=a":
+                            nodes = [
+                                {
+                                    "id": "main:7",
+                                    "handle": "main:7",
+                                    "text": "Docs",
+                                    "role": "link",
+                                    "source": "cdp",
+                                    "bounds": {"x": 1, "y": 2, "width": 10, "height": 8},
+                                    "attributes": {"id": "docs"},
+                                    "states": ["enabled"],
+                                    "rank": 0,
+                                    "score": 0.9
+                                },
+                                {
+                                    "id": "main:8",
+                                    "handle": "main:8",
+                                    "text": "Api",
+                                    "role": "link",
+                                    "source": "cdp",
+                                    "bounds": {"x": 20, "y": 2, "width": 10, "height": 8},
+                                    "attributes": {"id": "api"},
+                                    "states": ["enabled"],
+                                    "rank": 1,
+                                    "score": 0.4
+                                }
+                            ]
+                        else:
+                            nodes = [{
+                                "id": "main:7",
+                                "handle": "main:7",
+                                "text": selector or "Save",
+                                "role": "button",
+                                "bounds": {"x": 1, "y": 2, "width": 10, "height": 8},
+                                "attributes": {"id": "save"},
+                                "states": ["enabled"],
+                                "rank": 0,
+                                "score": 0.5,
+                                "human_limits": {
+                                    "codes": ["off_visual_viewport"],
+                                    "sentence": "scrolled out of the visual viewport"
+                                }
+                            }]
+                        body = {"ok": True, "composite": nodes}
                     elif "click" in argv or "type" in argv:
+                        selector = ""
+                        if "--selector" in argv:
+                            selector = argv[argv.index("--selector") + 1]
                         exposure = ""
                         if "--exposure" in argv:
                             exposure = argv[argv.index("--exposure") + 1]
-                        if exposure == "human":
+                        if exposure == "human" and ":" not in selector:
                             body = {"ok": True}
                         else:
+                            handle = selector if ":" in selector else "main:9"
                             body = {"ok": True, "node": {
-                                "id": "main:9",
-                                "handle": "main:9",
-                                "text": "hidden",
+                                "id": handle,
+                                "handle": handle,
+                                "text": "hidden" if exposure == "lower" else "Docs",
                                 "role": "button",
                                 "bounds": {"x": 1, "y": 900, "width": 10, "height": 8},
-                                "states": ["hidden"],
+                                "states": ["hidden"] if exposure == "lower" else ["enabled"],
                                 "human_limits": {
                                     "codes": ["human_could_not_see", "human_could_not_click", "off_visual_viewport", "opacity_zero"],
                                     "sentence": "a person could not have seen or clicked it because it is scrolled out of the visual viewport and has opacity:0"
-                                }
+                                } if exposure == "lower" else None
                             }}
                     else:
                         body = {"ok": True}
