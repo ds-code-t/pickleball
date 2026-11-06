@@ -6,6 +6,7 @@ import tools.dscode.control.protocol.RunView;
 import tools.dscode.control.protocol.SessionDescriptor;
 import tools.dscode.control.protocol.SessionDescriptorWriter;
 import tools.dscode.control.protocol.SessionStepGate;
+import tools.dscode.workbench.ui.WorkbenchNativeOverlay;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -98,6 +99,7 @@ final class LiveSessionPublication {
     }
 
     void closing() {
+        WorkbenchNativeOverlay.remove(null);
         if (provider != null) {
             provider.detach();
             provider = null;

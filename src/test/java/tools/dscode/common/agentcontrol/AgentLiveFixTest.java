@@ -12,6 +12,8 @@ import java.lang.reflect.Proxy;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -238,6 +240,74 @@ class AgentLiveFixTest {
         assertEquals(1, PageSurfaces.managed().size());
     }
 
+    @Test
+    void overlayUsesRememberedGeometryWhenCallerOmitsCoordinates() throws Exception {
+        AtomicInteger calls = new AtomicInteger();
+        WebDriver live = scriptDriver("tab-a", spec -> {
+            calls.incrementAndGet();
+            return Map.of("ok", true, "x", spec.get("x"), "y", spec.get("y"));
+        }, false);
+        PageSurfaces.manage(live, "chrome-headed-quiet", true);
+        PageSurfaces.focus(live);
+        PageSurfaces.rememberGeometry("main:7", 30, 44);
+        Map<String, Object> placed = PageSurfaces.place(null, "append", "main:7", null, "<b>here</b>", "overlay", null, null, null);
+        assertEquals(30, placed.get("x"));
+        assertEquals(44, placed.get("y"));
+        assertEquals("visual-viewport-relative", placed.get("placement"));
+        assertTrue(calls.get() > 0);
+        calls.set(0);
+        assertThrows(IllegalArgumentException.class, () ->
+                PageSurfaces.place(null, "append", "gone:2", null, "<b>nope</b>", "overlay", 12, 40, null));
+        assertEquals(0, calls.get());
+    }
+
+    @Test
+    void cdpHighlightDoesNotNeedADomMutationAndCleanupHidesIt() throws Exception {
+        List<String> commands = new ArrayList<>();
+        List<Map<String, Object>> configs = new ArrayList<>();
+        AtomicInteger domHighlights = new AtomicInteger();
+        WebDriver live = cdpDriver("tab-a", (method, params) -> {
+            commands.add(method);
+            if ("Overlay.highlightNode".equals(method) && params.get("highlightConfig") instanceof Map<?, ?> config) {
+                configs.add(cast(config));
+            }
+            return Map.of();
+        }, spec -> {
+            if ("highlight".equals(String.valueOf(spec.get("op"))) || "unhighlight".equals(String.valueOf(spec.get("op")))) {
+                domHighlights.incrementAndGet();
+                return Map.of("ok", false, "error", "unknown handle");
+            }
+            return Map.of("ok", true, "removed", 1);
+        });
+        PageSurfaces.manage(live, "chrome-headed-quiet", true);
+        PageSurfaces.bindFrame(live, "tab-a", "frame-a");
+        Map<String, Object> painted = PageSurfaces.highlight(null, "frame-a:9", "outline-red", "outline-color:#112233;", null, null, null, null);
+        assertEquals("Overlay.highlightNode", painted.get("cdp"));
+        assertEquals(0, domHighlights.get());
+        assertTrue(commands.contains("Overlay.highlightNode"));
+        assertEquals(0d, ((Map<?, ?>) configs.get(0).get("contentColor")).get("a"));
+        assertEquals(17, ((Map<?, ?>) configs.get(0).get("borderColor")).get("r"));
+        PageSurfaces.unhighlight(null, "frame-a:9");
+        assertEquals(0, domHighlights.get());
+        assertTrue(commands.contains("Overlay.hideHighlight"));
+        PageSurfaces.cleanup(null);
+        assertTrue(commands.stream().filter("Overlay.hideHighlight"::equals).count() >= 2);
+    }
+
+    @Test
+    void overlayInputIsPolledFromEveryTab() throws Exception {
+        AtomicReference<String> current = new AtomicReference<>("tab-1");
+        WebDriver live = tabDriver(current, new LinkedHashSet<>(List.of("tab-1", "tab-2")), spec -> {
+            if ("tab-2".equals(current.get())) return List.of(Map.of("type", "click", "id", "pkb-2"));
+            return List.of();
+        });
+        PageSurfaces.manage(live, "chrome-headed-quiet", false);
+        List<Map<String, Object>> events = PageSurfaces.pollInput(temp, "inputs");
+        assertEquals(1, events.size());
+        assertEquals("click", events.get(0).get("type"));
+        assertEquals("pkb-2", events.get(0).get("id"));
+    }
+
     private static WebDriver scriptDriver(
             String handle,
             Function<Map<?, ?>, Map<String, Object>> script,
@@ -265,17 +335,93 @@ class AgentLiveFixTest {
                         yield null;
                     }
                     case "switchTo" -> switcher;
-                    case "executeScript" -> {
-                        Object spec = args != null && args.length > 1 ? args[1] : Map.of();
-                        Map<?, ?> body = spec instanceof Map<?, ?> map ? map : Map.of();
-                        yield script.apply(body);
-                    }
+                    case "executeScript" -> script.apply(scriptSpec(args));
                     case "toString" -> handle;
                     default -> defaultValue(method.getReturnType());
                 }
         );
         self.set(driver);
         return driver;
+    }
+
+    private interface CdpProbe {
+        Object executeCdpCommand(String method, Map<String, Object> params);
+    }
+
+    private static WebDriver cdpDriver(
+            String handle,
+            java.util.function.BiFunction<String, Map<String, Object>, Object> cdp,
+            Function<Map<?, ?>, Map<String, Object>> script
+    ) {
+        AtomicReference<WebDriver> self = new AtomicReference<>();
+        Object switcher = Proxy.newProxyInstance(
+                WebDriver.class.getClassLoader(),
+                new Class<?>[]{WebDriver.TargetLocator.class},
+                (proxy, method, args) -> "window".equals(method.getName()) ? self.get() : defaultValue(method.getReturnType())
+        );
+        WebDriver driver = (WebDriver) Proxy.newProxyInstance(
+                WebDriver.class.getClassLoader(),
+                new Class<?>[]{WebDriver.class, JavascriptExecutor.class, CdpProbe.class},
+                (proxy, method, args) -> switch (method.getName()) {
+                    case "getWindowHandles" -> Set.of(handle);
+                    case "getWindowHandle" -> handle;
+                    case "switchTo" -> switcher;
+                    case "executeScript" -> script.apply(scriptSpec(args));
+                    case "executeCdpCommand" -> {
+                        @SuppressWarnings("unchecked")
+                        Map<String, Object> params = args[1] instanceof Map<?, ?> map ? cast(map) : Map.of();
+                        yield cdp.apply(String.valueOf(args[0]), params);
+                    }
+                    default -> defaultValue(method.getReturnType());
+                }
+        );
+        self.set(driver);
+        return driver;
+    }
+
+    private static WebDriver tabDriver(
+            AtomicReference<String> current,
+            LinkedHashSet<String> tabs,
+            Function<Map<?, ?>, Object> script
+    ) {
+        AtomicReference<WebDriver> self = new AtomicReference<>();
+        Object switcher = Proxy.newProxyInstance(
+                WebDriver.class.getClassLoader(),
+                new Class<?>[]{WebDriver.TargetLocator.class},
+                (proxy, method, args) -> {
+                    if ("window".equals(method.getName()) && args != null && args.length > 0) {
+                        current.set(String.valueOf(args[0]));
+                        return self.get();
+                    }
+                    return defaultValue(method.getReturnType());
+                }
+        );
+        WebDriver driver = (WebDriver) Proxy.newProxyInstance(
+                WebDriver.class.getClassLoader(),
+                new Class<?>[]{WebDriver.class, JavascriptExecutor.class},
+                (proxy, method, args) -> switch (method.getName()) {
+                    case "getWindowHandles" -> tabs;
+                    case "getWindowHandle" -> current.get();
+                    case "switchTo" -> switcher;
+                    case "executeScript" -> script.apply(Map.of());
+                    default -> defaultValue(method.getReturnType());
+                }
+        );
+        self.set(driver);
+        return driver;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> scriptSpec(Object[] args) {
+        Object spec = args != null && args.length > 1 ? args[1] : Map.of();
+        if (spec instanceof Object[] packed) spec = packed.length == 0 ? Map.of() : packed[0];
+        if (spec instanceof Map<?, ?> map) return cast(map);
+        return Map.of();
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> cast(Map<?, ?> map) {
+        return (Map<String, Object>) map;
     }
 
     private static WebDriver driver(String handle) {

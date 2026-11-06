@@ -93,6 +93,16 @@ public final class CompositeWebElement implements WebElement {
         this.visualOnly = "visual".equalsIgnoreCase(source)
                 || "desktop".equalsIgnoreCase(source)
                 || codes.contains("source_only");
+        if (this.geometry != null
+                && this.geometry.visualViewportRelative() != null
+                && this.handle != null
+                && !this.handle.isBlank()) {
+            tools.dscode.common.agentcontrol.AgentControl.rememberGeometry(
+                    this.handle,
+                    this.geometry.visualViewportRelative().x(),
+                    this.geometry.visualViewportRelative().y()
+            );
+        }
         if (this.geometry != null && this.geometry.scrollport() != null) {
             boolean content = this.geometry.scrollport().content() != null;
             CompositeLog.info("geometry", content ? "scrollport client+content" : "scrollport client");

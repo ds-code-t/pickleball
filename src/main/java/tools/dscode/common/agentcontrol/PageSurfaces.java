@@ -39,6 +39,8 @@ final class PageSurfaces {
     private static volatile WebDriver driver;
     private static volatile String focusedTab;
     private static final Map<String, FrameOwner> FRAMES = new java.util.concurrent.ConcurrentHashMap<>();
+    private static final Map<String, int[]> GEOMETRY = new java.util.concurrent.ConcurrentHashMap<>();
+    private static final java.util.Set<String> CDP_HIGHLIGHTS = java.util.concurrent.ConcurrentHashMap.newKeySet();
 
     private record FrameOwner(String browserId, WebDriver driver, String tab) {
     }
@@ -141,11 +143,6 @@ final class PageSurfaces {
             var anchor = node();
             var left = spec.x;
             var top = spec.y;
-            if (spec.measure && anchor) {
-              var box = anchor.getBoundingClientRect();
-              left = box.left;
-              top = box.top;
-            }
             if (spec.kind === 'overlay') {
               if (left === undefined || left === null || top === undefined || top === null) {
                 return {ok:false, error:'overlay needs a visual-viewport box'};
@@ -217,6 +214,16 @@ final class PageSurfaces {
         FRAMES.put(frameId, new FrameOwner(browserId, webDriver, tab == null ? "" : tab));
     }
 
+    /** Geometry view for a resolved handle. Visual-viewport x/y, not a page rect. */
+    public static void rememberGeometry(String handle, double x, double y) {
+        if (handle == null || handle.isBlank()) return;
+        GEOMETRY.put(handle, new int[]{(int) Math.round(x), (int) Math.round(y)});
+        HandleRef ref = HandleRef.parse(handle);
+        if (ref.frameId != null && driver != null && !FRAMES.containsKey(ref.frameId)) {
+            bindFrame(driver, currentHandle(driver), ref.frameId);
+        }
+    }
+
     static void detach(WebDriver webDriver) {
         MANAGED.removeIf(managed -> managed.driver == webDriver);
         if (driver == webDriver) {
@@ -253,6 +260,8 @@ final class PageSurfaces {
         driver = null;
         focusedTab = null;
         FRAMES.clear();
+        GEOMETRY.clear();
+        CDP_HIGHLIGHTS.clear();
     }
 
     static String presetCss(String preset, String explicit) {
@@ -287,8 +296,11 @@ final class PageSurfaces {
             if (updated == null) throw new IllegalArgumentException("unknown handle: " + handle);
             write(page, updated);
         }
-        boolean cdp = tryHighlightNode(handle);
-        LiveResult live = runLive("highlight", handle, null, css, null, "style", STYLE_SENTENCE, "");
+        boolean cdp = tryHighlightNode(handle, preset, style);
+        LiveResult live = new LiveResult(false, null, null, null, 0);
+        if (!cdp) {
+            live = runLive("highlight", handle, null, css, null, "style", STYLE_SENTENCE, "");
+        }
         if (liveOnly && !cdp && !live.ok()) {
             throw new IllegalStateException(live.error() == null ? "highlight did not resolve " + handle : live.error());
         }
@@ -307,12 +319,17 @@ final class PageSurfaces {
         } else if (page != null) {
             throw new IllegalArgumentException("unknown handle: " + handle);
         }
-        hideHighlight();
-        LiveResult live = runLive("unhighlight", handle, null, null, null, "style", STYLE_SENTENCE, "");
+        hideHighlight(handle);
+        boolean cdpOnly = handle != null && CDP_HIGHLIGHTS.remove(handle);
+        if (handle == null || handle.isBlank()) CDP_HIGHLIGHTS.clear();
+        LiveResult live = new LiveResult(true, null, null, null, 0);
+        if (!cdpOnly) {
+            live = runLive("unhighlight", handle, null, null, null, "style", STYLE_SENTENCE, "");
+        }
         if (page == null && managed().isEmpty()) {
             throw new IllegalStateException("no live browser; unhighlight was not applied");
         }
-        if (page == null && !live.ok()) {
+        if (page == null && !cdpOnly && !live.ok()) {
             throw new IllegalStateException(live.error() == null ? "unhighlight did not resolve " + handle : live.error());
         }
         CompositeLog.info("highlight", "reverse handle=" + text(handle));
@@ -329,11 +346,21 @@ final class PageSurfaces {
         boolean stripped = rawHtml != null && !rawHtml.equals(neutralize(rawHtml));
         String html = labelElements(neutralize(rawHtml), kind, sentence);
         int[] point = visualPoint(geometryJson, x, y);
-        boolean measure = "overlay".equals(kind) && handle != null && !handle.isBlank();
-        if ("overlay".equals(kind) && point == null && !measure && page != null) {
+        if ("overlay".equals(kind) && (geometryJson == null || geometryJson.isBlank())) {
+            int[] looked = lookupGeometry(handle);
+            if (looked != null) point = looked;
+        }
+        boolean liveOnly = page == null;
+        if (liveOnly && managed().isEmpty()) {
+            throw new IllegalStateException("no live browser; " + kind + " was not applied");
+        }
+        if ("overlay".equals(kind) && liveOnly && handle != null && !handle.isBlank() && !resolved(handle)) {
+            throw new IllegalArgumentException("unknown handle: " + handle);
+        }
+        if ("overlay".equals(kind) && point == null && page != null) {
             throw new IllegalArgumentException("overlay needs a visual-viewport box or x and y");
         }
-        if ("overlay".equals(kind) && point == null && page == null && !measure) {
+        if ("overlay".equals(kind) && point == null && page == null) {
             throw new IllegalArgumentException("overlay needs a target or a visual-viewport box");
         }
         int left = point == null ? 0 : point[0];
@@ -345,10 +372,7 @@ final class PageSurfaces {
                 + kind + "\" data-pkb-sentence=\"" + sentence + "\""
                 + (css.isBlank() ? "" : " style=\"" + css + "\"")
                 + ">" + html + "</div><!--pkb-end:" + id + "-->";
-        boolean liveOnly = page == null;
-        if (liveOnly && managed().isEmpty()) {
-            throw new IllegalStateException("no live browser; " + kind + " was not applied");
-        }
+        boolean measure = false;
         String undo = null;
         if (page != null) {
             String document = read(page);
@@ -389,7 +413,7 @@ final class PageSurfaces {
         body.put("x", live.x() != null ? live.x() : (point == null ? null : left));
         body.put("y", live.y() != null ? live.y() : (point == null ? null : top));
         if ("overlay".equals(kind)) {
-            body.put("placement", measure || geometryJson != null ? "visual-viewport-relative" : "caller");
+            body.put("placement", geometryJson != null || lookupGeometry(handle) != null ? "visual-viewport-relative" : "caller");
         }
         return body;
     }
@@ -476,6 +500,8 @@ final class PageSurfaces {
     }
 
     static void cleanupManaged() {
+        hideHighlight(null);
+        CDP_HIGHLIGHTS.clear();
         for (Managed managed : List.copyOf(MANAGED)) {
             WebDriver web = managed.driver;
             try {
@@ -499,62 +525,147 @@ final class PageSurfaces {
 
     private static void drainLiveInputs(Path project, String runId) throws IOException {
         for (Managed managed : MANAGED) {
-            if (!(managed.driver instanceof JavascriptExecutor executor)) continue;
-            Object value;
-            try {
-                value = executor.executeScript("""
-                        var events = window.__pkbEvents || [];
-                        window.__pkbEvents = [];
-                        return events;
-                        """);
-            } catch (RuntimeException failure) {
-                continue;
+            if (!(managed.driver instanceof JavascriptExecutor)) continue;
+            String current = currentHandle(managed.driver);
+            List<String> tabs = tabsOf(managed.driver);
+            if (tabs.isEmpty()) tabs = List.of("");
+            for (String tab : tabs) {
+                activate(managed.driver, tab);
+                drainTab(project, runId, managed.driver);
             }
-            if (!(value instanceof List<?> list)) continue;
-            for (Object item : list) {
-                if (item instanceof Map<?, ?> map) {
-                    Map<String, String> event = new LinkedHashMap<>();
-                    map.forEach((key, raw) -> {
-                        if (key != null && raw != null) event.put(String.valueOf(key), String.valueOf(raw));
-                    });
-                    recordInput(project, runId, event);
-                }
+            activate(managed.driver, current);
+        }
+    }
+
+    private static void drainTab(Path project, String runId, WebDriver web) throws IOException {
+        if (!(web instanceof JavascriptExecutor executor)) return;
+        Object value;
+        try {
+            value = executor.executeScript("""
+                    var events = window.__pkbEvents || [];
+                    window.__pkbEvents = [];
+                    return events;
+                    """);
+        } catch (RuntimeException failure) {
+            return;
+        }
+        if (!(value instanceof List<?> list)) return;
+        for (Object item : list) {
+            if (item instanceof Map<?, ?> map) {
+                Map<String, String> event = new LinkedHashMap<>();
+                map.forEach((key, raw) -> {
+                    if (key != null && raw != null) event.put(String.valueOf(key), String.valueOf(raw));
+                });
+                recordInput(project, runId, event);
             }
         }
     }
 
-    private static boolean tryHighlightNode(String handle) {
+    private static boolean tryHighlightNode(String handle, String preset, String style) {
         HandleRef ref = HandleRef.parse(handle);
         if (ref.backend == null) return false;
-        for (Managed managed : MANAGED) {
-            if (!(managed.driver instanceof ChromiumDriver chromium)) continue;
-            try {
-                chromium.executeCdpCommand("Overlay.enable", Map.of());
-                Map<String, Object> highlight = new LinkedHashMap<>();
-                highlight.put("backendNodeId", ref.backend);
-                highlight.put("highlightConfig", Map.of(
-                        "showInfo", true,
-                        "contentColor", Map.of("r", 255, "g", 243, "b", 160, "a", 0.45),
-                        "borderColor", Map.of("r", 210, "g", 34, "b", 34, "a", 1)
-                ));
-                chromium.executeCdpCommand("Overlay.highlightNode", highlight);
-                return true;
-            } catch (RuntimeException failure) {
-                CompositeLog.info("highlight", "Overlay.highlightNode failed " + failure.getMessage());
-            }
+        WebDriver target = resolveDriver(handle);
+        if (target == null || !cdpCapable(target)) return false;
+        try {
+            cdp(target, "Overlay.enable", Map.of());
+            Map<String, Object> highlight = new LinkedHashMap<>();
+            highlight.put("backendNodeId", ref.backend);
+            highlight.put("highlightConfig", highlightConfig(preset, style));
+            cdp(target, "Overlay.highlightNode", highlight);
+            if (handle != null) CDP_HIGHLIGHTS.add(handle);
+            return true;
+        } catch (RuntimeException failure) {
+            CompositeLog.info("highlight", "Overlay.highlightNode failed " + failure.getMessage());
+            return false;
         }
-        return false;
     }
 
-    private static void hideHighlight() {
-        for (Managed managed : MANAGED) {
-            if (!(managed.driver instanceof ChromiumDriver chromium)) continue;
-            try {
-                chromium.executeCdpCommand("Overlay.hideHighlight", Map.of());
-            } catch (RuntimeException failure) {
-                CompositeLog.info("highlight", "Overlay.hideHighlight failed " + failure.getMessage());
-            }
+    private static void hideHighlight(String handle) {
+        if (handle != null && !handle.isBlank()) {
+            WebDriver target = resolveDriver(handle);
+            if (target != null && hideOn(target)) return;
         }
+        for (Managed managed : MANAGED) hideOn(managed.driver);
+    }
+
+    private static boolean hideOn(WebDriver web) {
+        if (!cdpCapable(web)) return false;
+        try {
+            cdp(web, "Overlay.hideHighlight", Map.of());
+            return true;
+        } catch (RuntimeException failure) {
+            CompositeLog.info("highlight", "Overlay.hideHighlight failed " + failure.getMessage());
+            return false;
+        }
+    }
+
+    private static boolean cdpCapable(WebDriver web) {
+        if (web == null) return false;
+        if (web instanceof ChromiumDriver) return true;
+        try {
+            web.getClass().getMethod("executeCdpCommand", String.class, Map.class);
+            return true;
+        } catch (NoSuchMethodException failure) {
+            return false;
+        }
+    }
+
+    private static void cdp(WebDriver web, String method, Map<String, Object> params) {
+        try {
+            web.getClass().getMethod("executeCdpCommand", String.class, Map.class).invoke(web, method, params);
+        } catch (java.lang.reflect.InvocationTargetException failure) {
+            Throwable cause = failure.getCause() == null ? failure : failure.getCause();
+            if (cause instanceof RuntimeException runtime) throw runtime;
+            throw new IllegalStateException(cause);
+        } catch (ReflectiveOperationException failure) {
+            throw new IllegalStateException(failure);
+        }
+    }
+
+    private static Map<String, Object> highlightConfig(String preset, String style) {
+        double[] content = {255, 243, 160, 0.45};
+        double[] border = {230, 194, 0, 1};
+        String key = preset == null ? "" : preset.trim().toLowerCase(Locale.ROOT);
+        if ("outline-red".equals(key)) {
+            content = new double[]{210, 34, 34, 0};
+            border = new double[]{210, 34, 34, 1};
+        }
+        double[] parsed = cssColor(style);
+        if (parsed != null) border = parsed;
+        Map<String, Object> config = new LinkedHashMap<>();
+        config.put("showInfo", true);
+        config.put("contentColor", rgba(content));
+        config.put("borderColor", rgba(border));
+        return config;
+    }
+
+    private static double[] cssColor(String style) {
+        if (style == null) return null;
+        java.util.regex.Matcher matcher = Pattern.compile("#([0-9a-fA-F]{6})").matcher(style);
+        if (!matcher.find()) return null;
+        int rgb = Integer.parseInt(matcher.group(1), 16);
+        return new double[]{(rgb >> 16) & 255, (rgb >> 8) & 255, rgb & 255, 1};
+    }
+
+    private static Map<String, Object> rgba(double[] color) {
+        Map<String, Object> map = new LinkedHashMap<>();
+        map.put("r", (int) color[0]);
+        map.put("g", (int) color[1]);
+        map.put("b", (int) color[2]);
+        map.put("a", color[3]);
+        return map;
+    }
+
+    private static int[] lookupGeometry(String handle) {
+        if (handle == null || handle.isBlank()) return null;
+        return GEOMETRY.get(handle);
+    }
+
+    private static boolean resolved(String handle) {
+        if (handle == null || handle.isBlank()) return false;
+        if (GEOMETRY.containsKey(handle)) return true;
+        HandleRef ref = HandleRef.parse(handle);
+        return ref.frameId != null && FRAMES.containsKey(ref.frameId);
     }
 
     private static LiveResult runLive(String op, String handle, String where, String css, String html, String kind, String sentence, String id) {

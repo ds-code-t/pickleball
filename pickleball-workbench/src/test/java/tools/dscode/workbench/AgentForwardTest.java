@@ -2,6 +2,8 @@ package tools.dscode.workbench;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import tools.dscode.workbench.player.LivePlaybackCoordinator;
+import tools.dscode.workbench.player.LiveScenarioPlayer;
 import tools.dscode.workbench.ui.AgentChatPanel;
 import tools.dscode.workbench.ui.WorkbenchNativeOverlay;
 
@@ -102,6 +104,30 @@ class AgentForwardTest {
         assertFalse(WorkbenchNativeOverlay.removedForTests().isEmpty());
         WorkbenchNativeOverlay.resetForTests();
         actions.dispatch("close-window", Map.of());
+        assertTrue(WorkbenchNativeOverlay.removedForTests().contains("*"));
+    }
+
+    @Test
+    void scenarioCompletionRemovesTheNativeOverlay(@TempDir Path temp) {
+        LivePlaybackCoordinator playback = new LivePlaybackCoordinator(new LiveScenarioPlayer(List.of(
+                "Feature: Empty",
+                "",
+                "Scenario: Nothing to run"
+        )));
+        WorkbenchServices services = fake((method, values) -> {
+            if ("projectRoot".equals(method)) return temp;
+            if ("playback".equals(method)) return playback;
+            return null;
+        });
+        WorkbenchSessionActions actions = new WorkbenchSessionActions(services);
+        WorkbenchNativeOverlay.resetForTests();
+        Map<String, Object> placed = new LinkedHashMap<>();
+        placed.put("id", "pkb-9");
+        placed.put("guidance", "look");
+        placed.put("sentence", "agent-injected overlay; a person did not author this UI");
+        WorkbenchNativeOverlay.place(placed);
+        Map<String, Object> finished = actions.dispatch("play", Map.of());
+        assertEquals("FINISHED", finished.get("playback"));
         assertTrue(WorkbenchNativeOverlay.removedForTests().contains("*"));
     }
 

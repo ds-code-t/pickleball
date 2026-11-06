@@ -27,6 +27,11 @@ public final class AgentControl {
         AgentDriverHooks.quit();
     }
 
+    /** Geometry already resolved for a ranked handle. Overlay placement looks this up. */
+    public static void rememberGeometry(String handle, double x, double y) {
+        PageSurfaces.rememberGeometry(handle, x, y);
+    }
+
     public static Result execute(
             Path project,
             String runId,

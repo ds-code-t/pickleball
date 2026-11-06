@@ -179,6 +179,7 @@ public final class WorkbenchSessionActions {
     }
 
     public Map<String, Object> stopPlayback() {
+        WorkbenchNativeOverlay.remove(null);
         services.noteSessionState(SessionDescriptor.State.PAUSED);
         if (window != null) {
             show(Window::stopPlayback);
@@ -569,20 +570,26 @@ public final class WorkbenchSessionActions {
                     if (state == SessionDescriptor.State.PAUSED
                             || state == SessionDescriptor.State.STOPPING
                             || state == SessionDescriptor.State.STOPPED) {
+                        if (state != SessionDescriptor.State.PAUSED) WorkbenchNativeOverlay.remove(null);
                         break;
                     }
                 }
                 GherkinPlayPlan.Step step = services.playback().nextPlanStep().orElse(null);
-                if (step == null) break;
+                if (step == null) {
+                    WorkbenchNativeOverlay.remove(null);
+                    break;
+                }
                 int before = services.playback().planIndex();
                 ControlBridgeCallResult result = services.executeStep(step.executeText(), "");
                 executed++;
                 if (result == null || !"SUCCESS".equals(result.status())) {
+                    WorkbenchNativeOverlay.remove(null);
                     Map<String, Object> failed = bridgeFailure(op, result);
                     failed.put("steps", executed);
                     return failed;
                 }
                 if (services.playback().running() && services.playback().planIndex() == before) {
+                    WorkbenchNativeOverlay.remove(null);
                     LinkedHashMap<String, Object> failed = failed(op, "playback did not advance");
                     failed.put("steps", executed);
                     return failed;
@@ -590,8 +597,10 @@ public final class WorkbenchSessionActions {
             }
             LinkedHashMap<String, Object> payload = accepted(op, "FINISHED");
             payload.put("steps", executed);
+            WorkbenchNativeOverlay.remove(null);
             return payload;
         } catch (RuntimeException failure) {
+            WorkbenchNativeOverlay.remove(null);
             return failed(op, failure.getMessage() == null ? failure.toString() : failure.getMessage());
         }
     }
