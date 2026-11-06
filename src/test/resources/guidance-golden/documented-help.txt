@@ -135,7 +135,7 @@ Templates: chrome-headed-verbose, chrome-headed-quiet, chrome-headless-verbose, 
 Usage: note --text=<one line> [--agent=<id>] [--run-id=<id>]
 
 # help observe
-Usage: observe [--type=<Network|console|log>] [--url=<substring>] [--since=<epoch-ms>] [--until=<epoch-ms>] [--limit=<n>] [--events=<file>] [--cdp=<url>] [--session=<id>] [--run-id=<id>]
+Usage: observe [--type=<Network|console|log>] [--url=<substring>] [--since=<epoch-ms>] [--until=<epoch-ms>] [--limit=<n>] [--wait-ms=<n>] [--events=<file>] [--cdp=<url>] [--session=<id>] [--run-id=<id>]
 
 # help open-scenario
 Usage: open-scenario --feature=<path-or-name> --name=<scenario> [--example=<rows>]

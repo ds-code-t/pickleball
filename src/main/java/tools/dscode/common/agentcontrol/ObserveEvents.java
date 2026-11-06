@@ -90,12 +90,23 @@ public final class ObserveEvents {
         put(argv, "--since", args.get("since"));
         put(argv, "--until", args.get("until"));
         put(argv, "--limit", args.get("limit"));
+        String wait = args.get("wait-ms");
+        if (wait == null || wait.isBlank()) wait = args.get("waitMs");
+        put(argv, "--wait-ms", wait);
         JsonNode node;
         try {
             node = client.call(argv);
         } catch (RuntimeException failure) {
             throw new IOException("observe failed: " + failure.getMessage(), failure);
         }
+        return requireBuffer(node);
+    }
+
+    /**
+     * A failed engine observe is not zero events. An {@code ok} buffer with no
+     * rows is empty traffic.
+     */
+    static List<Event> requireBuffer(JsonNode node) throws IOException {
         if (node != null && node.path("ok").isBoolean() && !node.path("ok").asBoolean()) {
             String error = node.path("error").asText("engine rejected observe");
             throw new IOException("observe failed: " + error);

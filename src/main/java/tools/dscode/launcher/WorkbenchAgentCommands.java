@@ -1834,6 +1834,7 @@ public final class WorkbenchAgentCommands {
         copyFlag(args, parsed, "events");
         copyFlag(args, parsed, "cdp");
         copyFlag(args, parsed, "session");
+        copyFlag(args, parsed, "wait-ms");
         copyFlag(args, parsed, "preset");
         copyFlag(args, parsed, "style");
         copyFlag(args, parsed, "handle");

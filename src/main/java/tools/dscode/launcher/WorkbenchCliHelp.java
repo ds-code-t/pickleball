@@ -51,7 +51,7 @@ final class WorkbenchCliHelp {
             Map.entry("show-run", "Usage: show-run --run-id=<id>"),
             Map.entry("open-window", "Usage: open-window --run-id=<id>"),
             Map.entry("inbox", "Usage: inbox --write --to=<agent-id|any> --text=<one line> [--from=<agent-id>] [--run-id=<id>] | inbox --list|--take --agent=<id>"),
-            Map.entry("observe", "Usage: observe [--type=<Network|console|log>] [--url=<substring>] [--since=<epoch-ms>] [--until=<epoch-ms>] [--limit=<n>] [--events=<file>] [--cdp=<url>] [--session=<id>] [--run-id=<id>]"),
+            Map.entry("observe", "Usage: observe [--type=<Network|console|log>] [--url=<substring>] [--since=<epoch-ms>] [--until=<epoch-ms>] [--limit=<n>] [--wait-ms=<n>] [--events=<file>] [--cdp=<url>] [--session=<id>] [--run-id=<id>]"),
             Map.entry("launch", "Usage: launch --template=<name> [--arg=<chrome-arg>] [--start] [--run-id=<id>]\nTemplates: chrome-headed-verbose, chrome-headed-quiet, chrome-headless-verbose, chrome-headless-quiet, edge-headed-quiet, edge-headless-quiet, chrome-headed-logs, chromium-headed-quiet. Args are added to the existing pkb_browser / Selenium Manager launch. Chromium uses that Chrome launcher. --start calls DriverConstruction."),
             Map.entry("windows", "Usage: windows [--switch=<handle>] [--close=<handle>] [--run-id=<id>]"),
             Map.entry("tabs", "Usage: tabs [--switch=<handle>] [--close=<handle>] [--run-id=<id>]"),

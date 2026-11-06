@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.openqa.selenium.WebDriver;
 
+import java.io.IOException;
 import java.lang.reflect.Proxy;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -16,6 +17,7 @@ import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Live-behavior gaps the file-fixture command tests did not prove. */
@@ -135,6 +137,19 @@ class AgentLiveFixTest {
         assertEquals(placed.get("sha256"), removed.get("sha256"));
         assertFalse(String.valueOf(removed.get("sha256")).isBlank());
         assertFalse(String.valueOf(removed.get("summary")).isBlank());
+    }
+
+    @Test
+    void drainFailureIsNotEmptyTraffic() throws Exception {
+        IOException failed = assertThrows(IOException.class, () -> ObserveEvents.requireBuffer(
+                AgentStore.JSON.readTree("{\"ok\":false,\"error\":\"observe drain failed: websocket closed\"}")
+        ));
+        assertTrue(failed.getMessage().contains("websocket closed"), failed.getMessage());
+        assertTrue(failed.getMessage().contains("observe failed"), failed.getMessage());
+        List<ObserveEvents.Event> empty = ObserveEvents.requireBuffer(
+                AgentStore.JSON.readTree("{\"ok\":true,\"source\":\"cdp-session\",\"count\":0,\"events\":[]}")
+        );
+        assertTrue(empty.isEmpty());
     }
 
     @Test
