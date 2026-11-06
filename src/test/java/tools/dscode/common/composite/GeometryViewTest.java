@@ -1,5 +1,6 @@
 package tools.dscode.common.composite;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import dev.domcomposite.Argv;
@@ -61,17 +62,20 @@ class GeometryViewTest {
         ObjectNode body = JsonNodeFactory.instance.objectNode();
         body.put("css", "#go");
         body.put("geometry", true);
+        body.put("point", "4,5");
         List<String> query = Argv.from("query", body);
         assertTrue(query.contains("--geometry"), query.toString());
+        assertTrue(query.contains("--point"), query.toString());
         List<String> resolve = Argv.from("resolve", body);
         assertFalse(resolve.contains("--geometry"), resolve.toString());
+        assertFalse(resolve.contains("--point"), resolve.toString());
     }
 
     @Test
     void oneQueryReturnsSpacesWhenTheFlagIsListed() throws Exception {
         temp = Files.createTempDirectory("pkb-geometry");
         Path log = temp.resolve("calls.log");
-        pin(stub(temp.resolve("composite"), log, true, false, false));
+        pin(stub(temp.resolve("composite"), log, true, false, false, false));
         CompositeRuntime.joinForTests("http://127.0.0.1:9222");
         HtmlUnitDriver driver = new HtmlUnitDriver(false);
         try {
@@ -109,7 +113,7 @@ class GeometryViewTest {
     void missingFlagKeepsTheAabbAndDoesNotAsk() throws Exception {
         temp = Files.createTempDirectory("pkb-geometry-off");
         Path log = temp.resolve("calls.log");
-        pin(stub(temp.resolve("composite"), log, false, false, false));
+        pin(stub(temp.resolve("composite"), log, false, false, false, false));
         CompositeRuntime.joinForTests("http://127.0.0.1:9222");
         HtmlUnitDriver driver = new HtmlUnitDriver(false);
         try {
@@ -134,7 +138,7 @@ class GeometryViewTest {
     void scrollableRegionExposesClientAndContentInOneQuery() throws Exception {
         temp = Files.createTempDirectory("pkb-scrollport");
         Path log = temp.resolve("calls.log");
-        pin(stub(temp.resolve("composite"), log, true, true, false));
+        pin(stub(temp.resolve("composite"), log, true, true, false, false));
         CompositeRuntime.joinForTests("http://127.0.0.1:9222");
         HtmlUnitDriver driver = new HtmlUnitDriver(false);
         try {
@@ -237,7 +241,7 @@ class GeometryViewTest {
     void openControlExposesRevealedCornersInOneQuery() throws Exception {
         temp = Files.createTempDirectory("pkb-revealed");
         Path log = temp.resolve("calls.log");
-        pin(stub(temp.resolve("composite"), log, true, false, true));
+        pin(stub(temp.resolve("composite"), log, true, false, true, false));
         CompositeRuntime.joinForTests("http://127.0.0.1:9222");
         HtmlUnitDriver driver = new HtmlUnitDriver(false);
         try {
@@ -261,6 +265,66 @@ class GeometryViewTest {
         }
     }
 
+    @Test
+    void scrollChainComesFromTheHitAndDoesNotQueryAgain() throws Exception {
+        ObjectNode node = JsonNodeFactory.instance.objectNode();
+        node.put("id", "main:3");
+        node.put("node_name", "SPAN");
+        ObjectNode geometry = node.putObject("geometry");
+        ObjectNode document = geometry.putObject("document_css_px");
+        document.put("kind", "quad");
+        document.put("x", 1);
+        document.put("y", 2);
+        document.put("width", 3);
+        document.put("height", 4);
+        geometry.putArray("scroll_chain").addObject()
+                .put("kind", "element").put("id", "main:2").put("origin", "client-box");
+        geometry.withArray("scroll_chain").addObject()
+                .put("kind", "viewport").put("id", "main").put("origin", "frame-scroll");
+        CompositeWebElement hit = new CompositeWebElement(
+                new CompositeSelector(null, "#go", null, "web", null, "#go"), node, 0);
+        temp = Files.createTempDirectory("pkb-chain");
+        System.setProperty(CompositeLog.KEY, "geometry");
+        System.setProperty(CompositeLog.DIR_KEY, temp.resolve("logs").toString());
+        DomCompositeAdapter.get().resetCommandsForTests();
+        List<ElementSnapshot.ScrollLink> chain = DomCompositeAdapter.get().scrollChain(hit);
+        assertEquals(2, chain.size());
+        assertEquals("element", chain.get(0).kind());
+        assertEquals("main:2", chain.get(0).id());
+        assertEquals("viewport", chain.get(1).kind());
+        assertEquals(0, DomCompositeAdapter.get().commandsForTests().size());
+        String trace = Files.readString(CompositeLog.file());
+        assertTrue(trace.contains("INFO geometry scroll-chain 2"), trace);
+    }
+
+    @Test
+    void hitAtIsOnePointQueryWhenListedAndAbsentOtherwise() throws Exception {
+        temp = Files.createTempDirectory("pkb-point-off");
+        Path off = temp.resolve("calls-off.log");
+        pin(stub(temp.resolve("composite-off"), off, true, false, false, false));
+        CompositeRuntime.joinForTests("http://127.0.0.1:9222");
+        assertNull(DomCompositeAdapter.get().hitAt(55, 34));
+        assertEquals(0, queries(Files.readString(off)));
+        assertTrue(Files.readString(CompositeLog.file()).contains("INFO geometry point fallback"));
+
+        Path log = temp.resolve("calls.log");
+        pin(stub(temp.resolve("composite"), log, true, false, false, true));
+        CompositeRuntime.joinForTests("http://127.0.0.1:9222");
+        DomCompositeAdapter.get().resetCommandsForTests();
+        JsonNode hit = DomCompositeAdapter.get().hitAt(55, 34);
+        assertNotNull(hit);
+        assertEquals(1, hit.path("count").asInt());
+        String calls = Files.readString(log);
+        assertEquals(1, queries(calls), calls);
+        assertTrue(calls.contains("--point"), calls);
+        assertTrue(calls.contains("55,34") || calls.contains("55.0,34.0"), calls);
+        assertTrue(
+                Files.readString(CompositeLog.file()).lines()
+                        .anyMatch(line -> line.contains("INFO geometry point") && !line.contains("fallback")),
+                calls
+        );
+    }
+
     private void pin(Path binary) {
         System.setProperty(CompositeBinaryLocator.BIN_KEY, binary.toString());
         System.setProperty(CompositeLog.KEY, "geometry,adapter");
@@ -273,10 +337,10 @@ class GeometryViewTest {
         return calls.lines().filter(line -> line.startsWith("query ")).count();
     }
 
-    private static Path stub(Path path, Path log, boolean geometry, boolean scrollport, boolean open) throws Exception {
+    private static Path stub(Path path, Path log, boolean geometry, boolean scrollport, boolean open, boolean point) throws Exception {
         String flags = geometry
-                ? "[\"within\", \"nesting\", \"nth\", \"every\", \"count-only\", \"geometry\"]"
-                : "[\"within\", \"nesting\", \"nth\", \"every\", \"count-only\"]";
+                ? "[\"within\", \"nesting\", \"nth\", \"every\", \"count-only\", \"geometry\"" + (point ? ", \"point\"" : "") + "]"
+                : "[\"within\", \"nesting\", \"nth\", \"every\", \"count-only\"" + (point ? ", \"point\"" : "") + "]";
         String script = """
                 #!/usr/bin/env python3
                 import json, sys

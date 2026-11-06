@@ -91,6 +91,15 @@ public record ElementSnapshot(
     ) {
     }
 
+    /** One scrollport in the chain. Innermost element first. The frame viewport is last. */
+    public record ScrollLink(String kind, String id, String origin) {
+        public ScrollLink {
+            kind = kind == null ? "" : kind;
+            id = id == null ? "" : id;
+            origin = origin == null ? "" : origin;
+        }
+    }
+
     /**
      * One corner sample of a mapped box. {@code hit} is null when the sample
      * cannot be known. {@code reason} is then {@code closed_shadow_hit},
@@ -121,6 +130,8 @@ public record ElementSnapshot(
      * {@code revealed} is set only when that control is open and a region was stored.
      * A collapsed control does not grow a predicted box. {@code corners} samples
      * the boxes that were mapped. An empty list means the payload had none.
+     * {@code scrollChain} is the ancestor scrollports, innermost first, then the
+     * frame viewport. Empty when the payload omitted it. Deltas stay on resolve.
      */
     public record Geometry(
             Space documentCssPx,
@@ -135,12 +146,14 @@ public record ElementSnapshot(
             Boolean expanded,
             String expandedSource,
             Spaces revealed,
-            List<CornerHit> corners
+            List<CornerHit> corners,
+            List<ScrollLink> scrollChain
     ) {
         public Geometry {
             closedShadowLimit = closedShadowLimit == null ? "" : closedShadowLimit;
             expandedSource = expandedSource == null ? "" : expandedSource;
             corners = corners == null || corners.isEmpty() ? List.of() : List.copyOf(corners);
+            scrollChain = scrollChain == null || scrollChain.isEmpty() ? List.of() : List.copyOf(scrollChain);
         }
 
         /** True when the document space's axis-aligned box is the same integer AABB as {@code bounds}. */
@@ -168,7 +181,8 @@ public record ElementSnapshot(
                     boolOrNull(node.get("expanded")),
                     node.path("expanded_source").asText(""),
                     node.has("revealed") ? spaces(node.get("revealed")) : null,
-                    cornerHits(node.get("corners"))
+                    cornerHits(node.get("corners")),
+                    scrollChain(node.get("scroll_chain"))
             );
         }
 
@@ -242,6 +256,20 @@ public record ElementSnapshot(
                 ));
             }
             return hits;
+        }
+
+        private static List<ScrollLink> scrollChain(JsonNode node) {
+            if (node == null || !node.isArray()) return List.of();
+            List<ScrollLink> links = new ArrayList<>();
+            for (JsonNode link : node) {
+                if (link == null || !link.isObject()) continue;
+                links.add(new ScrollLink(
+                        link.path("kind").asText(""),
+                        link.path("id").asText(""),
+                        link.path("origin").asText("")
+                ));
+            }
+            return links;
         }
     }
 

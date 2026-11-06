@@ -5,6 +5,7 @@ import dev.domcomposite.Client;
 import org.openqa.selenium.By;
 import org.openqa.selenium.WebElement;
 import tools.dscode.common.domoperations.PositionSelection;
+import tools.dscode.common.seleniumextensions.ElementSnapshot;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -318,6 +319,40 @@ public final class DomCompositeAdapter {
 
     public void scroll(CompositeWebElement element, int dx, int dy) {
         act("scroll", element, Map.of("dx", dx, "dy", dy));
+    }
+
+    /**
+     * The scroll chain already on the hit. Empty when geometry did not carry one.
+     * Does not call {@code resolve --scroll} and does not start a second query.
+     */
+    public List<ElementSnapshot.ScrollLink> scrollChain(CompositeWebElement element) {
+        if (element == null || element.geometry() == null || element.geometry().scrollChain().isEmpty()) {
+            CompositeLog.info("geometry", "scroll-chain fallback");
+            return List.of();
+        }
+        CompositeLog.info("geometry", "scroll-chain " + element.geometry().scrollChain().size());
+        return element.geometry().scrollChain();
+    }
+
+    /**
+     * One query for the topmost node at a document CSS point. Null when
+     * {@code point} is not listed. Does not invent a node.
+     */
+    public JsonNode hitAt(double x, double y) {
+        if (!queryFlag("point")) {
+            CompositeLog.info("geometry", "point fallback");
+            return null;
+        }
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("point", x + "," + y);
+        body.put("mode", "composite");
+        attachGeometry(body);
+        record("query");
+        CompositeLog.info("geometry", "point");
+        if (dryRun) return null;
+        Client open = CompositeRuntime.ensureClient();
+        if (open == null) return null;
+        return open.query(body);
     }
 
     public void submit(CompositeWebElement element) {

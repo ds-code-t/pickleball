@@ -102,4 +102,20 @@ A null hit is not a hit. The engine does not call page-script `elementFromPoint`
 Log entity `geometry`. Info, when the node is a control or a corner sample is known:
 `id=<frame>:<backend> expanded=<true|false|none> revealed=<yes|no> corners=<n>hit/<n>miss/<n>unknown`.
 
+## Landed in 2.11.3
+
+Same `query --geometry` object. `scroll_chain` is ancestor element scrollports, innermost first,
+then the frame viewport. Each entry is `kind`, `id`, and `origin` (`client-box`, `border-box`,
+or `frame-scroll`). Scroll deltas stay on `resolve --scroll`. Query does not call it.
+
+All five spaces are on the object when a quad exists. `frame_document_relative` is the inverse
+frame transform. Layout and visual spaces subtract the manifest viewport.
+
+`query --point x,y`
+Keeps the topmost match that contains that document point. A `hit_grid` cell wins. Otherwise the
+deepest stored border box wins. With no selector, every element is considered. A miss is count 0.
+Query only. `capabilities.query_flags` lists `point`.
+
+Log entity `query`, line `point <x>,<y>`, off unless named. The geometry trace names `chain=<n>`.
+
 

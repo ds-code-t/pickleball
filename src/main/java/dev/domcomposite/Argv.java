@@ -115,7 +115,8 @@ public final class Argv {
                         {"within", "within"},
                         {"nesting", "nesting"},
                         {"nth", "nth"},
-                        {"every", "every"}
+                        {"every", "every"},
+                        {"point", "point"}
                     });
                     pushBools(argv, node, new String[][] {{"count_only", "count-only"}, {"geometry", "geometry"}});
                 }
