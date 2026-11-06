@@ -294,6 +294,25 @@ public final class ControlBridgeClient {
         );
     }
 
+    public AgentCommandResult agentCommand(
+            String op,
+            java.util.Map<String, String> args,
+            String project,
+            String runId,
+            String agentId
+    ) {
+        return agentCommand(new AgentCommandRequest(op, args, project, runId, agentId, java.util.List.of()));
+    }
+
+    public AgentCommandResult agentCommand(AgentCommandRequest request) {
+        return request(
+                "POST", "/v1/agent/command",
+                request,
+                AgentCommandResult.class,
+                Duration.ofSeconds(60)
+        );
+    }
+
     public List<ControlBridgeBreakpoint> breakpoints() {
         return List.of(request(
                 "GET", "/v1/breakpoints", null, ControlBridgeBreakpoint[].class, READ_TIMEOUT

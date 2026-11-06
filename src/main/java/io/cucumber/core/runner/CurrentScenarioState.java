@@ -366,6 +366,7 @@ public class CurrentScenarioState extends ScenarioMapping {
     }
 
     public void scenarioRunCleanUp() {
+        tools.dscode.common.agentcontrol.AgentDriverHooks.quit();
         runConfiguredObjectCleanups();
         quitUnmanagedWebDrivers();
     }

@@ -25,6 +25,12 @@ final class WorkbenchCommandLine {
             "presence", "post", "history", "gc-runs", "gc-versions", "use-version",
             "inspect-page", "find-element", "query",
             "session-list", "session-info", "session-hold", "session-release",
+            "observe", "launch", "windows", "tabs",
+            "chat-send", "chat-history", "chat-poll",
+            "highlight", "unhighlight",
+            "overlay", "overlay-poll", "overlay-remove",
+            "html-write", "html-replace", "html-insert", "html-remove", "html-cleanup",
+            "capture-scenario",
             "help"
     );
     static final Set<String> SESSION_CLIENT_COMMANDS = Set.of(

@@ -75,6 +75,9 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/maintainer/2.1.19-element-snapshot-roadmap.md`
 - `docs/maintainer/2.1.19-find-interface-roadmap.md`
 - `docs/maintainer/2.1.19-mapping-geometry-roadmap.md`
+- `docs/maintainer/2.1.19-workbench-expansion-brainstorm.md`
+- `docs/maintainer/2.1.19-workbench-expansion-ideas.md`
+- `docs/maintainer/2.1.19-workbench-expansion-roadmap.md`
 - `docs/maintainer/consumer-sim-harness.md`
 - `docs/maintainer/guidance-goldens.md`
 - `docs/maintainer/pointer-eval-harness.md`
@@ -186,6 +189,16 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/io/cucumber/core/stepexpression/DocStringBuilder.java`
 - `src/main/java/io/cucumber/java/en/ReturnStep.java`
 - `src/main/java/io/cucumber/messages/types/InlinePickleArgument.java`
+- `src/main/java/tools/dscode/common/agentcontrol/AgentControl.java`
+- `src/main/java/tools/dscode/common/agentcontrol/AgentDriverHooks.java`
+- `src/main/java/tools/dscode/common/agentcontrol/AgentLaunch.java`
+- `src/main/java/tools/dscode/common/agentcontrol/AgentStore.java`
+- `src/main/java/tools/dscode/common/agentcontrol/ChatLog.java`
+- `src/main/java/tools/dscode/common/agentcontrol/LaunchTemplates.java`
+- `src/main/java/tools/dscode/common/agentcontrol/ObserveEvents.java`
+- `src/main/java/tools/dscode/common/agentcontrol/PageSurfaces.java`
+- `src/main/java/tools/dscode/common/agentcontrol/ScenarioCapture.java`
+- `src/main/java/tools/dscode/common/agentcontrol/WindowRegistry.java`
 - `src/main/java/tools/dscode/common/annotations/DefinitionFlag.java`
 - `src/main/java/tools/dscode/common/annotations/DefinitionFlags.java`
 - `src/main/java/tools/dscode/common/annotations/IgnoreDefinition.java`
@@ -593,6 +606,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/expectedfailure/ExpectedFailureRunnerTest.java`
 - `src/test/java/tools/dscode/expectedfailure/ExpectedFailureSteps.java`
 - `src/test/java/tools/dscode/GuidancePackagingTest.java`
+- `src/test/java/tools/dscode/launcher/AgentExpansionTest.java`
 - `src/test/java/tools/dscode/launcher/GuidanceCommandGoldenTest.java`
 - `src/test/java/tools/dscode/launcher/PickleballWorkbenchLauncherTest.java`
 - `src/test/java/tools/dscode/launcher/Release218RecommendationsTest.java`
@@ -874,6 +888,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/sync/WorkbenchSyncPlanner.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/terminal/WorkerLogBuffer.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/terminal/WorkerLogFiles.java`
+- `pickleball-workbench/src/main/java/tools/dscode/workbench/ui/AgentChatPanel.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/ui/ConfigTabModel.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/ui/FeaturePickerPanel.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/ui/LongWork.java`
@@ -885,6 +900,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/ui/web/WebViewPanel.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/ui/web/WorkbenchWebJson.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/ui/WorkbenchFrame.java`
+- `pickleball-workbench/src/main/java/tools/dscode/workbench/ui/WorkbenchNativeOverlay.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/ui/WorkbenchTheme.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/ui/WorkbenchUi.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/ui/WorkbenchUiController.java`
@@ -905,6 +921,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-workbench/src/main/resources/tools/dscode/workbench/ui/web/mapping-editor.html`
 - `pickleball-workbench/src/main/resources/tools/dscode/workbench/ui/web/mapping-editor.js`
 - `pickleball-workbench/src/main/resources/tools/dscode/workbench/ui/web/workbench-web.css`
+- `pickleball-workbench/src/test/java/tools/dscode/workbench/AgentForwardTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/bridge/ControlBridgeClientTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/catalog/ConsumerFeatureCatalogTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/catalog/JavaGlueIndexTest.java`

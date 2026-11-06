@@ -224,6 +224,19 @@ public interface WorkbenchServices extends AutoCloseable {
 
     Object go(Map<String, ?> link);
 
+    /**
+     * Forwards one agent command to the worker bridge. The default is unavailable
+     * so a proxy that does not implement the method still returns a sentence.
+     */
+    default Map<String, Object> agentCommand(String op, Map<String, String> args) {
+        Map<String, Object> body = new java.util.LinkedHashMap<>();
+        body.put("op", op == null ? "" : op);
+        body.put("status", "UNAVAILABLE");
+        body.put("sentence", "Agent command is forwarded to the worker control bridge.");
+        if (args != null) body.put("args", args);
+        return body;
+    }
+
     @Override
     void close();
 }

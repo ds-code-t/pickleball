@@ -585,6 +585,7 @@ final class WorkbenchFrame extends JFrame {
         rightTabs.addTab("Terminal", terminal);
         rightTabs.addTab("Explorer", diagnosticsPanel());
         rightTabs.addTab("Report", reportPanel());
+        rightTabs.addTab("Chat", new AgentChatPanel(actions));
         diagnosticTailTimer.setRepeats(true);
         rightTabs.addChangeListener(event -> {
             String title = rightTabs.getTitleAt(rightTabs.getSelectedIndex());

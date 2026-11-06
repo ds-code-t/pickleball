@@ -89,7 +89,8 @@ class WorkbenchMcpServerTest {
             "wb_props",
             "wb_errors",
             "workbench_investigation_emit",
-            "workbench_go"
+            "workbench_go",
+            "workbench_agent_command"
     );
 
     @TempDir

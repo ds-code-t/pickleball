@@ -11,9 +11,22 @@ session: isolate session-start execute-step status events stop kill open-scenari
 coordination: short-log note inbox finish presence post history gc-runs gc-versions use-version export-guidance
 descriptors: session list | session info <sessionId> [--json] | session hold <sessionId> | session release <sessionId>
 page: inspect-page find-element
+agent: observe launch windows tabs chat-send chat-history chat-poll highlight unhighlight overlay overlay-poll overlay-remove html-write html-replace html-insert html-remove html-cleanup capture-scenario
 retrieval: query runs | query get | query query | query search | query props | query errors | query tail
 controller: sync worker-check live-check ui mcp session
-all: close-window confirm diagnostic-run discover discover-hint events example execute-step export-guidance find-element finish from-here gc-runs gc-versions help hint history inbox insert-step inspect-page isolate kill live-check mcp note open-scenario open-window pause plan play post presence query refresh resolve-runvars save session session-hold session-info session-list session-release session-start session-sync short-log show-run status stop sync ui update-step use-version validate worker-check worker-restart worker-start worker-stop workspace-edit workspace-seed workspace-show
+all: capture-scenario chat-history chat-poll chat-send close-window confirm diagnostic-run discover discover-hint events example execute-step export-guidance find-element finish from-here gc-runs gc-versions help highlight hint history html-cleanup html-insert html-remove html-replace html-write inbox insert-step inspect-page isolate kill launch live-check mcp note observe open-scenario open-window overlay overlay-poll overlay-remove pause plan play post presence query refresh resolve-runvars save session session-hold session-info session-list session-release session-start session-sync short-log show-run status stop sync tabs ui unhighlight update-step use-version validate windows worker-check worker-restart worker-start worker-stop workspace-edit workspace-seed workspace-show
+
+# help capture-scenario
+Usage: capture-scenario [--url=<substring>] [--since=<epoch-ms>] [--until=<epoch-ms>] [--events=<file>] [--out=<feature>] [--run-id=<id>]
+
+# help chat-history
+Usage: chat-history [--channel=<name>] [--limit=<n>] [--run-id=<id>]
+
+# help chat-poll
+Usage: chat-poll [--channel=<name>] [--id=<after>] [--run-id=<id>]
+
+# help chat-send
+Usage: chat-send --text=<message> [--source=agent|human|system] [--channel=<name>] [--agent=<id>] [--run-id=<id>]
 
 # help close-window
 Usage: close-window
@@ -70,15 +83,34 @@ session: isolate session-start execute-step status events stop kill open-scenari
 coordination: short-log note inbox finish presence post history gc-runs gc-versions use-version export-guidance
 descriptors: session list | session info <sessionId> [--json] | session hold <sessionId> | session release <sessionId>
 page: inspect-page find-element
+agent: observe launch windows tabs chat-send chat-history chat-poll highlight unhighlight overlay overlay-poll overlay-remove html-write html-replace html-insert html-remove html-cleanup capture-scenario
 retrieval: query runs | query get | query query | query search | query props | query errors | query tail
 controller: sync worker-check live-check ui mcp session
-all: close-window confirm diagnostic-run discover discover-hint events example execute-step export-guidance find-element finish from-here gc-runs gc-versions help hint history inbox insert-step inspect-page isolate kill live-check mcp note open-scenario open-window pause plan play post presence query refresh resolve-runvars save session session-hold session-info session-list session-release session-start session-sync short-log show-run status stop sync ui update-step use-version validate worker-check worker-restart worker-start worker-stop workspace-edit workspace-seed workspace-show
+all: capture-scenario chat-history chat-poll chat-send close-window confirm diagnostic-run discover discover-hint events example execute-step export-guidance find-element finish from-here gc-runs gc-versions help highlight hint history html-cleanup html-insert html-remove html-replace html-write inbox insert-step inspect-page isolate kill launch live-check mcp note observe open-scenario open-window overlay overlay-poll overlay-remove pause plan play post presence query refresh resolve-runvars save session session-hold session-info session-list session-release session-start session-sync short-log show-run status stop sync tabs ui unhighlight update-step use-version validate windows worker-check worker-restart worker-start worker-stop workspace-edit workspace-seed workspace-show
+
+# help highlight
+Usage: highlight --handle=<id> (--preset=yellow|outline-red) [--style=<css>] [--html=<page>] [--x=<px>] [--y=<px>] [--width=<px>] [--height=<px>]
 
 # help hint
 Usage: hint [--json]
 
 # help history
 Usage: history --append --text=<one line>
+
+# help html-cleanup
+Usage: html-cleanup [--html=<page>]
+
+# help html-insert
+Usage: html-insert --handle=<id> --text=<html> [--where=before|after] [--html=<page>]
+
+# help html-remove
+Usage: html-remove --id=<id> [--html=<page>]
+
+# help html-replace
+Usage: html-replace --handle=<id> --text=<html> [--html=<page>]
+
+# help html-write
+Usage: html-write --text=<html> [--html=<page>]
 
 # help inbox
 Usage: inbox --write --to=<agent-id|any> --text=<one line> [--from=<agent-id>] [--run-id=<id>] | inbox --list|--take --agent=<id>
@@ -95,14 +127,30 @@ Usage: isolate [--tags=<expr>] [--name=<regex>] [--example=<rows>] [--runvar=key
 # help kill
 Usage: kill
 
+# help launch
+Usage: launch --template=<name> [--arg=<chrome-arg>] [--start] [--run-id=<id>]
+Templates: chrome-headed-verbose, chrome-headed-quiet, chrome-headless-verbose, chrome-headless-quiet, edge-headed-quiet, edge-headless-quiet, chrome-headed-logs. Args are added to the existing pkb_browser / Selenium Manager launch. --start calls DriverConstruction.
+
 # help note
 Usage: note --text=<one line> [--agent=<id>] [--run-id=<id>]
+
+# help observe
+Usage: observe [--type=<Network|console|log>] [--url=<substring>] [--since=<epoch-ms>] [--until=<epoch-ms>] [--limit=<n>] [--events=<file>] [--cdp=<url>] [--session=<id>] [--run-id=<id>]
 
 # help open-scenario
 Usage: open-scenario --feature=<path-or-name> --name=<scenario> [--example=<rows>]
 
 # help open-window
 Usage: open-window --run-id=<id>
+
+# help overlay
+Usage: overlay --text=<html> [--x=<px>] [--y=<px>] [--handle=<id>] [--html=<page>]
+
+# help overlay-poll
+Usage: overlay-poll [--run-id=<id>]
+
+# help overlay-remove
+Usage: overlay-remove --id=<id> [--html=<page>]
 
 # help pause
 Usage: pause
@@ -156,6 +204,12 @@ Usage: stop [--force] [--run-id=<id>]
 # help sync
 Usage: sync
 
+# help tabs
+Usage: tabs [--switch=<handle>] [--close=<handle>] [--run-id=<id>]
+
+# help unhighlight
+Usage: unhighlight [--handle=<id>] [--html=<page>]
+
 # help update-step
 Usage: update-step --text=<gherkin>
 
@@ -165,6 +219,9 @@ Usage: use-version --version=<safe-version>
 # help validate
 Usage: validate [--tags=<expr>] [--name=<regex>] [--run-id=<id>] [--max-steps=<n>] [--all]
 Reports undefined steps, ambiguous glue, and unresolved RUN SCENARIO targets. Outline rows are expanded. Core steps count as defined. A long suite prints progress and stops at a step cap unless --max-steps or --all is set, and reports how many scenarios were skipped. Runs nothing. A flag this command does not use, including --quiet, is rejected with error: and fix:.
+
+# help windows
+Usage: windows [--switch=<handle>] [--close=<handle>] [--run-id=<id>]
 
 # help worker-restart
 Usage: worker-restart

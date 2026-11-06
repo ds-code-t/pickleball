@@ -359,6 +359,28 @@ final class WorkbenchMcpTools {
                     }
                     return services.go(Map.of());
                 });
+        add("workbench_agent_command",
+                "Forward one agent command (observe, launch, chat, highlight, overlay, html, capture) to the shared controller.",
+                schema(Map.of(
+                        "op", stringProperty("Agent command name."),
+                        "args", Map.of(
+                                "type", "object",
+                                "description", "Flag map forwarded unchanged.",
+                                "additionalProperties", true
+                        )
+                ), "op"),
+                arguments -> {
+                    String op = text(arguments, "op");
+                    Map<String, String> forwarded = new LinkedHashMap<>();
+                    Object raw = arguments.get("args");
+                    if (raw instanceof Map<?, ?> map) {
+                        map.forEach((key, value) -> {
+                            if (key != null && value != null) forwarded.put(String.valueOf(key), String.valueOf(value));
+                        });
+                    }
+                    Object value = services.agentCommand(op, forwarded);
+                    return value == null ? Map.of("status", "UNAVAILABLE", "op", op) : value;
+                });
     }
 
     private Object retrieval(String op, Map<String, Object> args) {

@@ -192,6 +192,31 @@ public final class WorkbenchLiveSession implements AutoCloseable {
         ));
     }
 
+    public Map<String, Object> agentCommand(Path project, String op, Map<String, String> args) {
+        Map<String, String> values = args == null ? Map.of() : args;
+        return call(binding -> {
+            var result = binding.client().agentCommand(
+                    op,
+                    values,
+                    project == null ? projectRoot.toString() : project.toString(),
+                    first(values, "runId", "run"),
+                    first(values, "agent", "agentId")
+            );
+            if (result == null || result.body() == null) {
+                return Map.of("op", op == null ? "" : op, "status", "UNAVAILABLE");
+            }
+            return result.body();
+        });
+    }
+
+    private static String first(Map<String, String> values, String... keys) {
+        for (String key : keys) {
+            String value = values.get(key);
+            if (value != null && !value.isBlank()) return value;
+        }
+        return null;
+    }
+
     public ControlBridgeServiceCallResult serviceCall(String selector) {
         return call(binding -> binding.client().serviceCall(
                 binding.scenarioId(), selector, COMMAND_TIMEOUT_SECONDS

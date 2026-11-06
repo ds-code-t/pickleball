@@ -521,6 +521,20 @@ public final class WorkbenchController implements WorkbenchServices {
     }
 
     @Override
+    public Map<String, Object> agentCommand(String op, Map<String, String> args) {
+        try {
+            return live.agentCommand(projectRoot, op, args);
+        } catch (RuntimeException failure) {
+            Map<String, Object> body = new java.util.LinkedHashMap<>();
+            body.put("op", op == null ? "" : op);
+            body.put("status", "UNAVAILABLE");
+            body.put("error", failure.getMessage() == null ? failure.getClass().getSimpleName() : failure.getMessage());
+            body.put("sentence", "Agent command is forwarded to the worker control bridge.");
+            return body;
+        }
+    }
+
+    @Override
     public void close() {
         lease.detachUi();
         live.close();

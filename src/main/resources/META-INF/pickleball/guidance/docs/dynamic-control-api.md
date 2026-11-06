@@ -92,3 +92,24 @@ Worker-side compilation requires `javax.tools.JavaCompiler`. Workbench sends a J
 ## Architecture boundary
 
 The control API and bridge intentionally remain independent of MCP, Spring, GUI frameworks, generic project IDE behavior, and build orchestration. Pickleball owns live execution semantics. Workbench is the external controller/adaptation layer and its artifact contains no Pickleball core, behavioral control API, Cucumber, Selenium, or service runtime. The only shared code is the dependency-neutral wire protocol.
+
+## Agent browser control
+
+`POST /v1/agent/command` forwards one agent command to `AgentControl`. The CLI calls that same class directly. Workbench, MCP `workbench_agent_command`, and the bridge do not keep a second implementation. The worker capability is `agent_command`. No active scenario is required.
+
+Commands: `observe`, `launch`, `windows`, `tabs`, `chat-send`, `chat-history`, `chat-poll`, `highlight`, `unhighlight`, `overlay`, `overlay-poll`, `overlay-remove`, `html-write`, `html-replace`, `html-insert`, `html-remove`, `html-cleanup`, `capture-scenario`.
+
+`observe` reads events the engine CDP Session already buffered (`Network.*`, `Runtime.consoleAPICalled`, `Log.entryAdded`). Filters are type, URL substring, time window, and limit. `--events` is a recorded snapshot of that same shape. There is no second buffer.
+
+`launch --template` selects `pkb_browser` and Chromium args for the existing Selenium Manager / fallback-driver path. `--arg` is additive. `--start` calls `DriverConstruction`. Templates include `chrome-headed-verbose`, `chrome-headed-quiet`, `chrome-headless-verbose`, `chrome-headless-quiet`, `edge-headed-quiet`, `edge-headless-quiet`, and `chrome-headed-logs`. `windows` and `tabs` list, switch, and close those handles.
+
+Chat is stored under `.pickleball/runs/<run-id>/agent/chat/<channel>.jsonl` (or `.pickleball/agent` when no run id is set). Sources are `agent`, `human`, and `system`. The Chat tab only forwards `chat-send`, `chat-history`, and `chat-poll`.
+
+`highlight --preset=yellow|outline-red` paints a find-interface handle and prefers CDP `Overlay.highlightRect` when a Chromium driver is already open. The result is labeled `style_modified` plus a sentence. `unhighlight` reverses it. No agent JavaScript is evaluated.
+
+`overlay` injects a visual-viewport-relative surface. Clicks and form changes are polled with `overlay-poll` and also written to the `overlay` chat channel. `html-write`, `html-replace`, and `html-insert` accept an HTML snippet. Script elements, `on*` attributes, and `javascript:` URLs are stripped. That is not a tag allowlist. Every injected node carries `data-pkb-agent=agent_injected` and a sentence. Agents still see those nodes. `html-remove` and `html-cleanup` reverse them. Scenario end and bridge close do the same.
+
+Agent loop for service calls: observe the buffer, filter by URL or time, then `capture-scenario`. The file is existing service-call component syntax (`MAP "REQUEST"`, `EXECUTE SERVICE CALL`, Examples). No new Gherkin phrase.
+
+Logs use `pkb_composite_log` entities `observe`, `launch`, `window`, `chat`, `highlight`, `overlay`, `html`, and `capture`. They are off unless named, date-stamped, and size-capped.
+

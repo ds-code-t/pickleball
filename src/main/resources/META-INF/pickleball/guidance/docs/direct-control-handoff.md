@@ -168,3 +168,6 @@ composite --session-dir <compositeSessionDir> serve --stdio
 Pass `compositeSessionId` on the later tool call. Close with `session close` only when you are the owner of that registry entry. If Pickleball started the provider, Pickleball closes it when the live session stops. Do not close it out from under a step that is still using it. Hold the session first.
 
 Pickleball writes the descriptor, the CLI, the hold, and the provider key. dom-composite stays a general tool and does not grow a Pickleball-only flag.
+
+Agent browser commands (`observe`, `launch`, windows and tabs, chat, highlight, overlay, HTML write, `capture-scenario`) are the Workbench CLI. They do not add a Pickleball flag to the engine. `observe` reads the CDP Session buffer the engine already keeps. `capture-scenario` writes existing service-call Gherkin. Join the descriptor session before a live `observe` against that browser.
+

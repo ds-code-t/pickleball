@@ -219,6 +219,22 @@ final class ControlBridgeRuntime implements AutoCloseable {
             ServiceCallRequest request = readRequired(exchange, ServiceCallRequest.class);
             return coordinator.executeServiceCall(request.scenarioId(), request.selector(), request.timeoutSeconds());
         }));
+        server.createContext("/v1/agent/command", exchange -> handle(exchange, "POST", () -> {
+            AgentCommandRequest request = readRequired(exchange, AgentCommandRequest.class);
+            Path project = request.project() == null || request.project().isBlank()
+                    ? Path.of("").toAbsolutePath()
+                    : Path.of(request.project());
+            tools.dscode.common.agentcontrol.AgentControl.Result result =
+                    tools.dscode.common.agentcontrol.AgentControl.execute(
+                            project,
+                            request.runId(),
+                            request.op(),
+                            request.args(),
+                            request.extraArgs(),
+                            request.agentId()
+                    );
+            return new AgentCommandResult(result.exit(), result.body());
+        }));
         server.createContext("/v1/breakpoints", exchange -> handle(exchange, "GET", coordinator::breakpoints));
         server.createContext("/v1/breakpoints/add", exchange -> handle(exchange, "POST", () -> {
             BreakpointAddRequest request = readRequired(exchange, BreakpointAddRequest.class);
@@ -442,6 +458,11 @@ final class ControlBridgeRuntime implements AutoCloseable {
         eventRecorder.close();
         server.stop(0);
         executor.shutdownNow();
+        try {
+            tools.dscode.common.agentcontrol.AgentControl.cleanup();
+        } catch (RuntimeException ignored) {
+            // Bridge shutdown still removes the descriptor.
+        }
         try { Files.deleteIfExists(descriptorFile); } catch (IOException ignored) { }
     }
 

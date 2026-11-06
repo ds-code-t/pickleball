@@ -15,6 +15,7 @@ import tools.dscode.workbench.lease.WorkbenchLeaseHolder;
 import tools.dscode.workbench.player.GherkinPlayPlan;
 import tools.dscode.workbench.player.LiveScenarioPlayer;
 import tools.dscode.workbench.player.WorkbenchSaveResult;
+import tools.dscode.workbench.ui.WorkbenchNativeOverlay;
 import tools.dscode.workbench.worker.WorkbenchWorkerStatus;
 
 import javax.swing.SwingUtilities;
@@ -58,7 +59,25 @@ public final class WorkbenchSessionActions {
             "close-window",
             "open-ui",
             "inspect-page",
-            "find-element"
+            "find-element",
+            "observe",
+            "launch",
+            "windows",
+            "tabs",
+            "chat-send",
+            "chat-history",
+            "chat-poll",
+            "highlight",
+            "unhighlight",
+            "overlay",
+            "overlay-poll",
+            "overlay-remove",
+            "html-write",
+            "html-replace",
+            "html-insert",
+            "html-remove",
+            "html-cleanup",
+            "capture-scenario"
     );
 
     private static final Set<String> DRIVING = Set.of(
@@ -365,6 +384,12 @@ public final class WorkbenchSessionActions {
             case "open-ui" -> openUi(first(args, "runId", "run"), args.get("agent"));
             case "inspect-page" -> pageQuery("inspect-page", args);
             case "find-element" -> pageQuery("find-element", args);
+            case "observe", "launch", "windows", "tabs",
+                 "chat-send", "chat-history", "chat-poll",
+                 "highlight", "unhighlight",
+                 "overlay", "overlay-poll", "overlay-remove",
+                 "html-write", "html-replace", "html-insert", "html-remove", "html-cleanup",
+                 "capture-scenario" -> forwardAgent(op, args);
             default -> throw new IllegalArgumentException("Unknown session command: " + op);
         };
     }
@@ -415,6 +440,16 @@ public final class WorkbenchSessionActions {
         LinkedHashMap<String, Object> payload = accepted("close-window", "CLOSED");
         payload.put("startedTest", false);
         return payload;
+    }
+
+    private Map<String, Object> forwardAgent(String op, Map<String, String> args) {
+        Map<String, Object> result = services.agentCommand(op, args);
+        if (result == null) return failed(op, "Agent command was not forwarded.");
+        if ("overlay".equals(op)) WorkbenchNativeOverlay.place(result);
+        if ("overlay-remove".equals(op) || "html-remove".equals(op) || "html-cleanup".equals(op)) {
+            WorkbenchNativeOverlay.remove(result.get("id"));
+        }
+        return result;
     }
 
     private Map<String, Object> pageQuery(String op, Map<String, String> args) {

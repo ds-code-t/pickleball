@@ -1,5 +1,8 @@
 package tools.dscode.control.protocol;
 
+import java.util.List;
+import java.util.Map;
+
 /** Request DTOs for the local versioned controller/worker transport. */
 public final class ControlBridgeRequests {
     private ControlBridgeRequests() {
@@ -69,6 +72,14 @@ public final class ControlBridgeRequests {
         }
     }
     public record ServiceCallRequest(String scenarioId, String selector, Integer timeoutSeconds) { }
+    public record AgentCommandRequest(
+            String op,
+            Map<String, String> args,
+            String project,
+            String runId,
+            String agentId,
+            List<String> extraArgs
+    ) { }
     public record BreakpointAddRequest(
             String scenarioId,
             String hook,

@@ -5,6 +5,7 @@ import io.cucumber.java.en.Given;
 import org.openqa.selenium.Dimension;
 import org.openqa.selenium.remote.LocalFileDetector;
 import org.openqa.selenium.remote.RemoteWebDriver;
+import tools.dscode.common.agentcontrol.AgentDriverHooks;
 import tools.dscode.common.domoperations.SeleniumUtils;
 import tools.dscode.common.driver.DriverConstruction;
 import tools.dscode.parallelutilities.Stagger;
@@ -178,7 +179,11 @@ public class BrowserSteps {
     @Given(ObjectRegistrationSteps.objAction + "QUIT_LOCAL_DRIVER$")
     public Object quitLocalDriver(Object value) {
         RemoteWebDriver driver = (RemoteWebDriver) value;
-        driver.quit();
+        try {
+            AgentDriverHooks.quit();
+        } finally {
+            driver.quit();
+        }
         return value;
     }
 }

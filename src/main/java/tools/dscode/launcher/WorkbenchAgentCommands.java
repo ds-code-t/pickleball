@@ -2,6 +2,7 @@ package tools.dscode.launcher;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.dscode.common.agentcontrol.AgentControl;
 import tools.dscode.common.coordination.AgentCoordination;
 import tools.dscode.common.reporting.diagnostic.ConsumerMavenTestRunner;
 import tools.dscode.common.reporting.diagnostic.LastDiscoverSnapshot;
@@ -127,6 +128,12 @@ public final class WorkbenchAgentCommands {
                 case "session-info" -> sessionInfo(parsed, safeOut, safeErr);
                 case "session-hold" -> sessionHold(parsed, safeOut, safeErr, true);
                 case "session-release" -> sessionHold(parsed, safeOut, safeErr, false);
+                case "observe", "launch", "windows", "tabs",
+                     "chat-send", "chat-history", "chat-poll",
+                     "highlight", "unhighlight",
+                     "overlay", "overlay-poll", "overlay-remove",
+                     "html-write", "html-replace", "html-insert", "html-remove", "html-cleanup",
+                     "capture-scenario" -> agentControl(parsed, safeOut, safeErr);
                 case "help" -> help(args, safeOut, safeErr);
                 default -> {
                     safeErr.print(WorkbenchCliHelp.unknown(parsed.command()));
@@ -1811,6 +1818,79 @@ public final class WorkbenchAgentCommands {
             err.println("Workbench inspect failed: " + WorkbenchCliErrors.explain(failure));
             return null;
         }
+    }
+
+    private static int agentControl(
+            WorkbenchCommandLine.Parsed parsed,
+            PrintStream out,
+            PrintStream err
+    ) {
+        Map<String, String> args = new LinkedHashMap<>();
+        copyFlag(args, parsed, "template");
+        copyFlag(args, parsed, "type");
+        copyFlag(args, parsed, "url");
+        copyFlag(args, parsed, "since");
+        copyFlag(args, parsed, "until");
+        copyFlag(args, parsed, "events");
+        copyFlag(args, parsed, "cdp");
+        copyFlag(args, parsed, "session");
+        copyFlag(args, parsed, "preset");
+        copyFlag(args, parsed, "style");
+        copyFlag(args, parsed, "handle");
+        copyFlag(args, parsed, "channel");
+        copyFlag(args, parsed, "source");
+        copyFlag(args, parsed, "out");
+        copyFlag(args, parsed, "where");
+        copyFlag(args, parsed, "x");
+        copyFlag(args, parsed, "y");
+        copyFlag(args, parsed, "width");
+        copyFlag(args, parsed, "height");
+        copyFlag(args, parsed, "switch");
+        copyFlag(args, parsed, "close");
+        copyFlag(args, parsed, "html");
+        copyFlag(args, parsed, "page");
+        copyFlag(args, parsed, "after");
+        if (parsed.coordination().text() != null) args.put("text", parsed.coordination().text());
+        if (parsed.coordination().limit() != null) args.put("limit", parsed.coordination().limit().toString());
+        if (parsed.coordination().id() != null) args.put("id", parsed.coordination().id());
+        if (hasFlag(parsed, "--start")) args.put("start", "true");
+        List<String> extra = new ArrayList<>();
+        String[] forwarded = parsed.forwarded();
+        if (forwarded != null) {
+            for (int index = 0; index < forwarded.length; index++) {
+                String token = forwarded[index];
+                if (token == null) continue;
+                if (token.startsWith("--arg=")) extra.add(token.substring("--arg=".length()));
+                else if ("--arg".equals(token) && index + 1 < forwarded.length) extra.add(forwarded[++index]);
+            }
+        }
+        AgentControl.Result result = AgentControl.execute(
+                parsed.project(),
+                parsed.coordination().runId(),
+                parsed.command(),
+                args,
+                extra,
+                parsed.coordination().agentId()
+        );
+        try {
+            out.println(JSON.writeValueAsString(result.body()));
+        } catch (java.io.IOException failure) {
+            err.println(failure.getMessage());
+            return 1;
+        }
+        if (result.exit() != 0) {
+            Object error = result.body().get("error");
+            err.print(WorkbenchCliHelp.usageError(
+                    error == null ? "agent command failed" : String.valueOf(error),
+                    parsed.command()
+            ));
+        }
+        return result.exit();
+    }
+
+    private static void copyFlag(Map<String, String> args, WorkbenchCommandLine.Parsed parsed, String name) {
+        String value = flag(parsed, "--" + name);
+        if (value != null && !value.isBlank()) args.put(name, value);
     }
 
     private static String flag(WorkbenchCommandLine.Parsed parsed, String name) {

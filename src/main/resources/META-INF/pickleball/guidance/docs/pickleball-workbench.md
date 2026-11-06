@@ -583,9 +583,13 @@ One navigation tool (do not add generic IDE / git / process MCP tools):
 
 ```text
 workbench_go
+workbench_agent_command
 ```
 
 `workbench_go(link)` accepts `to` (`explorer` | `editor` | `mapping` | `report` | `terminal`), `runId`, `eventSeq`, `nodeId`, `path`, `line`, `column`, `kind` (`feature` | `component` | `step` | `call` | `data` | `java`), `mapReference`, `key`, `investigationId`, `section`, and `label`. The same fields parse from `wb://explorer?run=&seq=&node=`. UI attach plus a control lease are required to move the window. Headless: validate and echo the resolved target. `label` may feed `workbench_set_current_action`. The tool does not write files. Report clicks, explorer Open, and MCP share one Java resolver.
+
+`workbench_agent_command` forwards `op` plus an `args` map to the same agent commands the CLI runs (`observe`, `launch`, `windows`, `tabs`, chat, highlight, overlay, html, `capture-scenario`). The Chat tab only forwards `chat-send`, `chat-history`, and `chat-poll`. A native overlay, when the window is not headless, uses that same result map. In-page HTML is the agent path and is labeled `agent_injected`.
+
 
 `workbench_step_override_compile` sends the Java source template to the consumer worker. The source must contain `{{CLASS_NAME}}`; worker-side Pickleball remains responsible for compilation, generated classloaders, matching, replacement, captures, and execution.
 

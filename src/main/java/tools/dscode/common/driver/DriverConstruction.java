@@ -13,6 +13,8 @@ import org.openqa.selenium.chromium.ChromiumOptions;
 import org.openqa.selenium.edge.EdgeDriver;
 import org.openqa.selenium.edge.EdgeDriverService;
 import org.openqa.selenium.edge.EdgeOptions;
+import tools.dscode.common.agentcontrol.AgentDriverHooks;
+import tools.dscode.common.agentcontrol.AgentLaunch;
 import tools.dscode.common.composite.CompositeRuntime;
 import org.openqa.selenium.remote.RemoteWebDriver;
 import org.openqa.selenium.remote.http.ClientConfig;
@@ -130,6 +132,7 @@ public final class DriverConstruction {
             ObjectNode fullConfiguration
     ) throws Exception {
         ClientConfig clientConfig = buildClientConfig(getObject(driverConfig, "connection"));
+        AgentLaunch.apply(browserName, driverConfig);
 
         return switch (browserName) {
             case "chrome", "edge" -> launchLocalChromium(browserName, driverConfig, fullConfiguration, clientConfig);
@@ -305,6 +308,7 @@ public final class DriverConstruction {
 
     /** Locates dom-composite when a browser session starts. A missing binary does not fail the driver. */
     private static RemoteWebDriver ready(RemoteWebDriver driver) {
+        AgentDriverHooks.ready(driver);
         CompositeRuntime.attach(driver);
         return driver;
     }

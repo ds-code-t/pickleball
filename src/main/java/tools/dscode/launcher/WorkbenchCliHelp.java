@@ -50,7 +50,25 @@ final class WorkbenchCliHelp {
             Map.entry("update-step", "Usage: update-step --text=<gherkin>"),
             Map.entry("show-run", "Usage: show-run --run-id=<id>"),
             Map.entry("open-window", "Usage: open-window --run-id=<id>"),
-            Map.entry("inbox", "Usage: inbox --write --to=<agent-id|any> --text=<one line> [--from=<agent-id>] [--run-id=<id>] | inbox --list|--take --agent=<id>")
+            Map.entry("inbox", "Usage: inbox --write --to=<agent-id|any> --text=<one line> [--from=<agent-id>] [--run-id=<id>] | inbox --list|--take --agent=<id>"),
+            Map.entry("observe", "Usage: observe [--type=<Network|console|log>] [--url=<substring>] [--since=<epoch-ms>] [--until=<epoch-ms>] [--limit=<n>] [--events=<file>] [--cdp=<url>] [--session=<id>] [--run-id=<id>]"),
+            Map.entry("launch", "Usage: launch --template=<name> [--arg=<chrome-arg>] [--start] [--run-id=<id>]\nTemplates: chrome-headed-verbose, chrome-headed-quiet, chrome-headless-verbose, chrome-headless-quiet, edge-headed-quiet, edge-headless-quiet, chrome-headed-logs. Args are added to the existing pkb_browser / Selenium Manager launch. --start calls DriverConstruction."),
+            Map.entry("windows", "Usage: windows [--switch=<handle>] [--close=<handle>] [--run-id=<id>]"),
+            Map.entry("tabs", "Usage: tabs [--switch=<handle>] [--close=<handle>] [--run-id=<id>]"),
+            Map.entry("chat-send", "Usage: chat-send --text=<message> [--source=agent|human|system] [--channel=<name>] [--agent=<id>] [--run-id=<id>]"),
+            Map.entry("chat-history", "Usage: chat-history [--channel=<name>] [--limit=<n>] [--run-id=<id>]"),
+            Map.entry("chat-poll", "Usage: chat-poll [--channel=<name>] [--id=<after>] [--run-id=<id>]"),
+            Map.entry("highlight", "Usage: highlight --handle=<id> (--preset=yellow|outline-red) [--style=<css>] [--html=<page>] [--x=<px>] [--y=<px>] [--width=<px>] [--height=<px>]"),
+            Map.entry("unhighlight", "Usage: unhighlight [--handle=<id>] [--html=<page>]"),
+            Map.entry("overlay", "Usage: overlay --text=<html> [--x=<px>] [--y=<px>] [--handle=<id>] [--html=<page>]"),
+            Map.entry("overlay-poll", "Usage: overlay-poll [--run-id=<id>]"),
+            Map.entry("overlay-remove", "Usage: overlay-remove --id=<id> [--html=<page>]"),
+            Map.entry("html-write", "Usage: html-write --text=<html> [--html=<page>]"),
+            Map.entry("html-replace", "Usage: html-replace --handle=<id> --text=<html> [--html=<page>]"),
+            Map.entry("html-insert", "Usage: html-insert --handle=<id> --text=<html> [--where=before|after] [--html=<page>]"),
+            Map.entry("html-remove", "Usage: html-remove --id=<id> [--html=<page>]"),
+            Map.entry("html-cleanup", "Usage: html-cleanup [--html=<page>]"),
+            Map.entry("capture-scenario", "Usage: capture-scenario [--url=<substring>] [--since=<epoch-ms>] [--until=<epoch-ms>] [--events=<file>] [--out=<feature>] [--run-id=<id>]")
     );
 
     private static final Map<String, String> FLAGS = Map.ofEntries(
@@ -127,6 +145,7 @@ final class WorkbenchCliHelp {
         text.append("coordination: short-log note inbox finish presence post history gc-runs gc-versions use-version export-guidance\n");
         text.append("descriptors: session list | session info <sessionId> [--json] | session hold <sessionId> | session release <sessionId>\n");
         text.append("page: inspect-page find-element\n");
+        text.append("agent: observe launch windows tabs chat-send chat-history chat-poll highlight unhighlight overlay overlay-poll overlay-remove html-write html-replace html-insert html-remove html-cleanup capture-scenario\n");
         text.append("retrieval: query runs | query get | query query | query search | query props | query errors | query tail\n");
         text.append("controller: sync worker-check live-check ui mcp session\n");
         text.append("all:");

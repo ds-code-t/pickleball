@@ -85,7 +85,7 @@ public final class ControlProtocol {
             "status", "scenarios", "events", "pause", "resume", "execute_step", "resolve_step",
             "mapping_get", "mapping_put", "mapping_resolve", "mapping_snapshot", "mapping_restore",
             "browser_page", "browser_screenshot", "element_inspect", "page_query", "service_call", "breakpoints",
-            "step_overrides", "step_override_compile"
+            "step_overrides", "step_override_compile", "agent_command"
     );
 
     public static final List<String> CONTROLLER_REQUIRED_CAPABILITIES = WORKER_CAPABILITIES;
