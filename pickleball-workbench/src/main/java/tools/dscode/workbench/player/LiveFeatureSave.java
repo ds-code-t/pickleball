@@ -8,6 +8,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
+import tools.dscode.workbench.sync.WorkbenchSynchronizer;
+
 /**
  * Writes the live editor buffer to the originating {@code .feature} file.
  * Demo buffers have no save path. Picker load never writes.
@@ -43,6 +45,7 @@ public final class LiveFeatureSave {
         Path file = preview.featurePath();
         ScenarioOrigin origin = playback.origin();
         try {
+            WorkbenchSynchronizer.detachContainingLiveClasses(file);
             String newline = detectNewline(file);
             Files.writeString(file, join(preview.liveScenarioLines(), newline), StandardCharsets.UTF_8);
             return WorkbenchSaveResult.written(file, origin.scenarioName());

@@ -797,18 +797,29 @@ class WorkbenchSynchronizerTest {
         assertTrue(text.contains("progress stage=copy-live files=2 bytes=8 ms="), text);
         assertLiveAccounted(text, 2);
         assertTrue(text.contains("progress stage=digest files=2 bytes=8 ms="), text);
-        assertTrue(text.contains("progress stage=materialize"), text);
+        Path liveDir = stateRoot.resolve("live/classes");
         Path baseFile = stateRoot.resolve("base/classes/main.txt");
         Path liveFile = stateRoot.resolve("live/classes/main.txt");
         assertFalse(Files.isSameFile(main.resolve("main.txt"), baseFile), "base/classes must be a copy, not a link into target");
-        try {
-            Path probe = tempDir.resolve("link-probe");
-            Files.writeString(probe, "x");
-            Files.createLink(tempDir.resolve("link-dest"), probe);
-            assertTrue(Files.isSameFile(baseFile, liveFile), "live/classes should hardlink base");
+        if (Files.isSymbolicLink(liveDir)) {
+            assertEquals(Path.of("..", "base", "classes"), Files.readSymbolicLink(liveDir));
+            assertTrue(Files.isSameFile(baseFile, liveFile), "directory link shares the base file until detach");
+            assertTrue(WorkbenchSynchronizer.detachLinkedLiveClasses(liveDir));
+            assertFalse(Files.isSymbolicLink(liveDir));
+            Files.writeString(liveFile, "live-edit");
             assertEquals("main", Files.readString(baseFile));
-        } catch (UnsupportedOperationException | IOException unsupported) {
-            assertFalse(Files.isSameFile(baseFile, liveFile));
+            assertEquals("live-edit", Files.readString(liveFile));
+            System.out.println("windows-shaped-dirlink " + liveLine(text) + " symlink=true");
+        } else {
+            System.out.println("windows-shaped-dirlink " + liveLine(text) + " symlink=false");
+            try {
+                Path probe = tempDir.resolve("link-probe");
+                Files.writeString(probe, "x");
+                Files.createLink(tempDir.resolve("link-dest"), probe);
+                assertTrue(Files.isSameFile(baseFile, liveFile), "live/classes should hardlink base");
+            } catch (UnsupportedOperationException | IOException unsupported) {
+                assertFalse(Files.isSameFile(baseFile, liveFile));
+            }
         }
     }
 
