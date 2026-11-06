@@ -375,7 +375,7 @@ final class WorkbenchMcpTools {
                     Object raw = arguments.get("args");
                     if (raw instanceof Map<?, ?> map) {
                         map.forEach((key, value) -> {
-                            if (key != null && value != null) forwarded.put(String.valueOf(key), String.valueOf(value));
+                            if (key != null && value != null) forwarded.put(String.valueOf(key), forwardValue(value));
                         });
                     }
                     Object value = services.agentCommand(op, forwarded);
@@ -495,6 +495,19 @@ final class WorkbenchMcpTools {
 
     private static Map<String, Object> objectProperty(String description) {
         return Map.of("type", "object", "description", description);
+    }
+
+    private static String forwardValue(Object value) {
+        if (value instanceof List<?> list) {
+            StringBuilder joined = new StringBuilder();
+            for (Object item : list) {
+                if (item == null) continue;
+                if (!joined.isEmpty()) joined.append('\n');
+                joined.append(item);
+            }
+            return joined.toString();
+        }
+        return String.valueOf(value);
     }
 
     private static String text(Map<String, Object> args, String name) {

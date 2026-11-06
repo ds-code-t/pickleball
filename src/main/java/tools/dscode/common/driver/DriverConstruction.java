@@ -132,12 +132,19 @@ public final class DriverConstruction {
             ObjectNode fullConfiguration
     ) throws Exception {
         ClientConfig clientConfig = buildClientConfig(getObject(driverConfig, "connection"));
-        AgentLaunch.apply(browserName, driverConfig);
+        AgentLaunch.apply(browserName, driverConfig, projectOf(fullConfiguration));
 
         return switch (browserName) {
             case "chrome", "edge" -> launchLocalChromium(browserName, driverConfig, fullConfiguration, clientConfig);
             default -> throw new RuntimeException("Unsupported local browser: " + browserName);
         };
+    }
+
+    /** The launch file written for this project, not the process working directory. */
+    private static Path projectOf(ObjectNode fullConfiguration) {
+        String raw = fullConfiguration == null ? "" : fullConfiguration.path("project").asText("");
+        if (raw == null || raw.isBlank()) return Path.of("").toAbsolutePath();
+        return Path.of(raw);
     }
 
     private static RemoteWebDriver launchLocalChromium(

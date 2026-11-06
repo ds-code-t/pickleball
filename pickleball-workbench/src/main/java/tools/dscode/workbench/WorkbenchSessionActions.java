@@ -299,6 +299,7 @@ public final class WorkbenchSessionActions {
     }
 
     public Map<String, Object> workerStop() {
+        WorkbenchNativeOverlay.remove(null);
         if (window != null) {
             show(client -> {
                 client.stopPlayback();
@@ -433,6 +434,7 @@ public final class WorkbenchSessionActions {
     }
 
     public Map<String, Object> closeWindow() {
+        WorkbenchNativeOverlay.remove(null);
         WindowDriver.closeWindow(services.projectRoot());
         if (window != null) {
             show(Window::closeWindow);

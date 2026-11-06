@@ -1,19 +1,20 @@
 package tools.dscode.common.agentcontrol;
 
-import com.fasterxml.jackson.databind.JsonNode;
+import org.openqa.selenium.NoSuchWindowException;
 import org.openqa.selenium.WebDriver;
 import tools.dscode.common.browseroperations.WindowSwitch;
 import tools.dscode.common.composite.CompositeLog;
 
-import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-/** Window and tab handles. Live drivers use {@link WindowSwitch}; otherwise the registry. */
+/**
+ * Live browser instances are windows. Selenium handles inside one instance are tabs.
+ * Nothing here invents {@code window-1} or {@code tab-2} when no driver is open.
+ */
 final class WindowRegistry {
     private WindowRegistry() {
     }
@@ -21,124 +22,115 @@ final class WindowRegistry {
     record Handle(String handle, String kind, String template, String title, String url, boolean open) {
     }
 
-    static List<Handle> list(Path project, String runId) throws IOException {
-        List<Handle> stored = read(project, runId);
-        WebDriver driver = PageSurfaces.driver();
-        if (driver == null) return stored;
+    static List<Handle> list(Path project, String runId) {
         List<Handle> live = new ArrayList<>();
-        try {
-            for (String handle : driver.getWindowHandles()) {
-                live.add(new Handle(handle, "window", "", "", "", true));
+        for (PageSurfaces.Managed managed : PageSurfaces.managed()) {
+            List<String> tabs = new ArrayList<>();
+            try {
+                if (managed.driver().getWindowHandles() != null) {
+                    tabs.addAll(managed.driver().getWindowHandles());
+                }
+            } catch (RuntimeException failure) {
+                CompositeLog.info("window", "list failed " + managed.id() + " " + failure.getMessage());
             }
-        } catch (RuntimeException failure) {
-            return stored;
+            live.addAll(classify(managed.id(), managed.template(), tabs));
         }
-        return live.isEmpty() ? stored : live;
+        return live;
     }
 
-    static Handle open(Path project, String runId, String template, String kind) throws IOException {
-        List<Handle> all = new ArrayList<>(read(project, runId));
-        String handle = kind + "-" + (all.size() + 1);
-        Handle created = new Handle(handle, kind, template == null ? "" : template, "", "", true);
-        all.add(created);
-        write(project, runId, all);
-        CompositeLog.info("window", "open " + kind + " " + handle + " template=" + template);
-        return created;
+    /**
+     * One window row for the browser instance, then one tab row per Selenium handle.
+     * Selenium handles are not windows.
+     */
+    static List<Handle> classify(String browserId, String template, List<String> seleniumHandles) {
+        String id = browserId == null || browserId.isBlank() ? "browser" : browserId;
+        String useTemplate = template == null ? "" : template;
+        List<Handle> rows = new ArrayList<>();
+        rows.add(new Handle("window:" + id, "window", useTemplate, "", "", true));
+        if (seleniumHandles != null) {
+            for (String handle : seleniumHandles) {
+                if (handle == null || handle.isBlank()) continue;
+                rows.add(new Handle(handle, "tab", useTemplate, "", "", true));
+            }
+        }
+        return rows;
     }
 
-    static Handle switchTo(Path project, String runId, String handle) throws IOException {
+    static Handle switchTo(Path project, String runId, String handle) {
         if (handle == null || handle.isBlank()) {
             throw new IllegalArgumentException("missing handle");
         }
-        WebDriver driver = PageSurfaces.driver();
-        if (driver != null) {
-            WindowSwitch.switchToHandleOrThrow(driver, handle);
+        if (handle.startsWith("window:")) {
+            PageSurfaces.Managed managed = findBrowser(handle);
+            if (managed == null) throw new IllegalArgumentException("unknown handle: " + handle);
+            PageSurfaces.focus(managed.driver());
             CompositeLog.info("window", "switch " + handle);
-            return new Handle(handle, "window", "", safeTitle(driver), safeUrl(driver), true);
+            return new Handle(handle, "window", managed.template(), safeTitle(managed.driver()), safeUrl(managed.driver()), true);
         }
-        Handle found = require(read(project, runId), handle);
-        CompositeLog.info("window", "switch " + handle);
-        return found;
-    }
-
-    static Handle close(Path project, String runId, String handle) throws IOException {
-        if (handle == null || handle.isBlank()) {
-            throw new IllegalArgumentException("missing handle");
-        }
-        WebDriver driver = PageSurfaces.driver();
-        if (driver != null && driver.getWindowHandles().contains(handle)) {
-            String current = driver.getWindowHandle();
-            driver.switchTo().window(handle);
-            driver.close();
-            if (!current.equals(handle) && driver.getWindowHandles().contains(current)) {
-                driver.switchTo().window(current);
-            } else if (!driver.getWindowHandles().isEmpty()) {
-                driver.switchTo().window(driver.getWindowHandles().iterator().next());
+        for (PageSurfaces.Managed managed : PageSurfaces.managed()) {
+            try {
+                if (managed.driver().getWindowHandles() != null && managed.driver().getWindowHandles().contains(handle)) {
+                    WindowSwitch.switchToHandleOrThrow(managed.driver(), handle);
+                    PageSurfaces.focus(managed.driver());
+                    CompositeLog.info("window", "switch " + handle);
+                    return new Handle(handle, "tab", managed.template(), safeTitle(managed.driver()), safeUrl(managed.driver()), true);
+                }
+            } catch (NoSuchWindowException failure) {
+                throw new IllegalArgumentException("unknown handle: " + handle);
+            } catch (RuntimeException failure) {
+                CompositeLog.info("window", "switch failed " + handle + " " + failure.getMessage());
             }
-            CompositeLog.info("window", "close " + handle);
-            return new Handle(handle, "window", "", "", "", false);
-        }
-        List<Handle> all = new ArrayList<>();
-        Handle closed = null;
-        for (Handle item : read(project, runId)) {
-            if (item.handle().equals(handle)) {
-                closed = new Handle(item.handle(), item.kind(), item.template(), item.title(), item.url(), false);
-                all.add(closed);
-            } else {
-                all.add(item);
-            }
-        }
-        if (closed == null) throw new IllegalArgumentException("unknown handle: " + handle);
-        write(project, runId, all);
-        CompositeLog.info("window", "close " + handle);
-        return closed;
-    }
-
-    private static Handle require(List<Handle> all, String handle) {
-        for (Handle item : all) {
-            if (item.handle().equals(handle) && item.open()) return item;
         }
         throw new IllegalArgumentException("unknown handle: " + handle);
     }
 
-    private static List<Handle> read(Path project, String runId) throws IOException {
-        Path file = file(project, runId);
-        if (!Files.isRegularFile(file)) return List.of();
-        JsonNode root = AgentStore.JSON.readTree(file.toFile());
-        List<Handle> all = new ArrayList<>();
-        if (!root.isArray()) return all;
-        for (JsonNode node : root) {
-            all.add(new Handle(
-                    node.path("handle").asText(""),
-                    node.path("kind").asText("window"),
-                    node.path("template").asText(""),
-                    node.path("title").asText(""),
-                    node.path("url").asText(""),
-                    node.path("open").asBoolean(true)
-            ));
+    static Handle close(Path project, String runId, String handle) {
+        if (handle == null || handle.isBlank()) {
+            throw new IllegalArgumentException("missing handle");
         }
-        return all;
+        if (handle.startsWith("window:")) {
+            PageSurfaces.Managed managed = findBrowser(handle);
+            if (managed == null) throw new IllegalArgumentException("unknown handle: " + handle);
+            try {
+                managed.driver().quit();
+            } catch (RuntimeException failure) {
+                CompositeLog.info("window", "close failed " + handle + " " + failure.getMessage());
+            }
+            PageSurfaces.detach(managed.driver());
+            CompositeLog.info("window", "close " + handle);
+            return new Handle(handle, "window", managed.template(), "", "", false);
+        }
+        for (PageSurfaces.Managed managed : PageSurfaces.managed()) {
+            try {
+                if (managed.driver().getWindowHandles() == null || !managed.driver().getWindowHandles().contains(handle)) {
+                    continue;
+                }
+                String current = safeCurrent(managed.driver());
+                managed.driver().switchTo().window(handle);
+                managed.driver().close();
+                java.util.Set<String> left = managed.driver().getWindowHandles();
+                if (left == null || left.isEmpty()) {
+                    PageSurfaces.detach(managed.driver());
+                } else if (current != null && left.contains(current) && !current.equals(handle)) {
+                    managed.driver().switchTo().window(current);
+                } else {
+                    managed.driver().switchTo().window(left.iterator().next());
+                }
+                CompositeLog.info("window", "close " + handle);
+                return new Handle(handle, "tab", managed.template(), "", "", false);
+            } catch (RuntimeException failure) {
+                CompositeLog.info("window", "close failed " + handle + " " + failure.getMessage());
+            }
+        }
+        throw new IllegalArgumentException("unknown handle: " + handle);
     }
 
-    private static void write(Path project, String runId, List<Handle> all) throws IOException {
-        Path file = file(project, runId);
-        AgentStore.ensure(file.getParent());
-        List<Map<String, Object>> rows = new ArrayList<>();
-        for (Handle item : all) {
-            Map<String, Object> row = new LinkedHashMap<>();
-            row.put("handle", item.handle());
-            row.put("kind", item.kind());
-            row.put("template", item.template());
-            row.put("title", item.title());
-            row.put("url", item.url());
-            row.put("open", item.open());
-            rows.add(row);
+    private static PageSurfaces.Managed findBrowser(String handle) {
+        String id = handle.substring("window:".length());
+        for (PageSurfaces.Managed managed : PageSurfaces.managed()) {
+            if (managed.id().equals(id)) return managed;
         }
-        AgentStore.JSON.writeValue(file.toFile(), rows);
-    }
-
-    private static Path file(Path project, String runId) {
-        return AgentStore.root(project, runId).resolve("windows.json");
+        return null;
     }
 
     static Map<String, Object> toMap(Handle handle) {
@@ -150,6 +142,14 @@ final class WindowRegistry {
         map.put("url", handle.url());
         map.put("open", handle.open());
         return map;
+    }
+
+    private static String safeCurrent(WebDriver driver) {
+        try {
+            return driver.getWindowHandle();
+        } catch (RuntimeException failure) {
+            return null;
+        }
     }
 
     private static String safeTitle(WebDriver driver) {

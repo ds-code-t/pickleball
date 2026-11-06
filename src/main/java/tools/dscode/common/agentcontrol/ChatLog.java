@@ -10,12 +10,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicLong;
 
-/** Per-run chat channels. One JSON line per message. */
+/** Per-run chat channels. One JSON line per message. Ids continue from the stored log. */
 final class ChatLog {
-    private static final AtomicLong IDS = new AtomicLong(1);
-
     private ChatLog() {
     }
 
@@ -26,21 +23,26 @@ final class ChatLog {
         String useChannel = channel == null || channel.isBlank() ? "run" : channel;
         String useSource = normalizeSource(source);
         if (text == null || text.isBlank()) throw new IllegalArgumentException("missing text");
-        Message message = new Message(
-                Long.toString(IDS.incrementAndGet()),
-                AgentStore.now(),
-                useSource,
-                agent == null ? "" : agent,
-                useChannel,
-                text
-        );
-        AgentStore.appendCapped(file(project, runId, useChannel), AgentStore.JSON.writeValueAsString(message));
-        CompositeLog.info("chat", "send source=" + useSource + " channel=" + useChannel + " agent=" + message.agent());
-        return message;
+        synchronized (ChatLog.class) {
+            long next = maxId(project, runId, useChannel) + 1;
+            Message message = new Message(
+                    Long.toString(next),
+                    AgentStore.now(),
+                    useSource,
+                    agent == null ? "" : agent,
+                    useChannel,
+                    text
+            );
+            AgentStore.appendCapped(file(project, runId, useChannel), AgentStore.JSON.writeValueAsString(message));
+            CompositeLog.info("chat", "send source=" + useSource + " channel=" + useChannel + " agent=" + message.agent() + " id=" + message.id());
+            return message;
+        }
     }
 
     static List<Message> history(Path project, String runId, String channel, int limit) throws IOException {
-        List<Message> all = read(project, runId, channel == null || channel.isBlank() ? "run" : channel);
+        String useChannel = channel == null || channel.isBlank() ? "run" : channel;
+        List<Message> all = read(project, runId, useChannel);
+        CompositeLog.info("chat", "receive channel=" + useChannel + " count=" + all.size());
         if (limit > 0 && all.size() > limit) return List.copyOf(all.subList(all.size() - limit, all.size()));
         return all;
     }
@@ -59,7 +61,7 @@ final class ChatLog {
 
     private static List<Message> read(Path project, String runId, String channel) throws IOException {
         List<Message> messages = new ArrayList<>();
-        for (String line : AgentStore.readLines(file(project, runId, channel))) {
+        for (String line : AgentStore.readGroup(file(project, runId, channel))) {
             JsonNode node = AgentStore.JSON.readTree(line);
             messages.add(new Message(
                     node.path("id").asText(""),
@@ -69,10 +71,17 @@ final class ChatLog {
                     node.path("channel").asText(channel),
                     node.path("text").asText("")
             ));
-            long id = longOrZero(node.path("id").asText(""));
-            IDS.accumulateAndGet(id, Math::max);
         }
         return messages;
+    }
+
+    private static long maxId(Path project, String runId, String channel) throws IOException {
+        long max = 0L;
+        for (String line : AgentStore.readGroup(file(project, runId, channel))) {
+            JsonNode node = AgentStore.JSON.readTree(line);
+            max = Math.max(max, longOrZero(node.path("id").asText("")));
+        }
+        return max;
     }
 
     private static long longOrZero(String value) {

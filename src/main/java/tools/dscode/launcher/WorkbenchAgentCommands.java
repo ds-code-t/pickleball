@@ -1845,6 +1845,7 @@ public final class WorkbenchAgentCommands {
         copyFlag(args, parsed, "y");
         copyFlag(args, parsed, "width");
         copyFlag(args, parsed, "height");
+        copyFlag(args, parsed, "geometry");
         copyFlag(args, parsed, "switch");
         copyFlag(args, parsed, "close");
         copyFlag(args, parsed, "html");

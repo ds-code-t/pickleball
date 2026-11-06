@@ -17,8 +17,9 @@ import java.util.Map;
 
 /**
  * Reads CDP events the engine Session already buffered. A missing binary
- * returns an empty read with a sentence. {@code --events} is a recorded
- * snapshot of that same shape, used by tests and capture.
+ * or a binary that cannot observe is a failure, not an empty buffer.
+ * {@code --events} is a recorded snapshot of that same shape, used by tests
+ * and capture. An empty snapshot after a successful read is empty traffic.
  */
 public final class ObserveEvents {
     private ObserveEvents() {
@@ -49,18 +50,29 @@ public final class ObserveEvents {
             events.addAll(fromEngine(args));
         }
         List<Event> filtered = filter(events, args);
-        CompositeLog.info("observe", "filter type=" + text(args.get("type"))
-                + " url=" + text(args.get("url"))
-                + " count=" + filtered.size());
+        if (filtered.isEmpty()) {
+            CompositeLog.info("observe", "empty type=" + text(args.get("type"))
+                    + " url=" + text(args.get("url"))
+                    + " count=0");
+        } else {
+            CompositeLog.info("observe", "filter type=" + text(args.get("type"))
+                    + " url=" + text(args.get("url"))
+                    + " count=" + filtered.size());
+        }
         Path out = AgentStore.root(project, runId).resolve("observe.json");
         AgentStore.ensure(out.getParent());
         AgentStore.JSON.writeValue(out.toFile(), filtered.stream().map(ObserveEvents::toMap).toList());
         return filtered;
     }
 
-    static List<Event> fromEngine(Map<String, String> args) {
+    static List<Event> fromEngine(Map<String, String> args) throws IOException {
         Client client = CompositeRuntime.client();
-        if (client == null) return List.of();
+        if (client == null) {
+            throw new IOException("observe failed: no engine CDP Session is attached");
+        }
+        if (!engineCanObserve(client)) {
+            throw new IOException("observe failed: this engine binary does not expose the CDP Session buffer");
+        }
         List<String> argv = new ArrayList<>();
         argv.add("observe");
         String cdp = args.get("cdp");
@@ -78,13 +90,37 @@ public final class ObserveEvents {
         put(argv, "--since", args.get("since"));
         put(argv, "--until", args.get("until"));
         put(argv, "--limit", args.get("limit"));
+        JsonNode node;
         try {
-            JsonNode node = client.call(argv);
-            return parse(node.toString());
-        } catch (RuntimeException | java.io.IOException failure) {
-            CompositeLog.info("observe", "engine unavailable " + failure.getMessage());
-            return List.of();
+            node = client.call(argv);
+        } catch (RuntimeException failure) {
+            throw new IOException("observe failed: " + failure.getMessage(), failure);
         }
+        if (node != null && node.path("ok").isBoolean() && !node.path("ok").asBoolean()) {
+            String error = node.path("error").asText("engine rejected observe");
+            throw new IOException("observe failed: " + error);
+        }
+        if (node == null || (!node.isArray() && !node.has("events"))) {
+            throw new IOException("observe failed: engine returned no event buffer");
+        }
+        return parse(node.toString());
+    }
+
+    private static boolean engineCanObserve(Client client) throws IOException {
+        JsonNode caps;
+        try {
+            caps = client.capabilities();
+        } catch (RuntimeException failure) {
+            throw new IOException("observe failed: " + failure.getMessage(), failure);
+        }
+        JsonNode commands = caps == null ? null : caps.get("commands");
+        if (commands == null || !commands.isArray()) {
+            throw new IOException("observe failed: engine capabilities do not list commands");
+        }
+        for (JsonNode command : commands) {
+            if ("observe".equals(command.asText())) return true;
+        }
+        return false;
     }
 
     private static void put(List<String> argv, String flag, String value) {

@@ -42,6 +42,7 @@ public final class LaunchTemplates {
         add("edge-headed-quiet", "edge", "EDGE", false, false, false);
         add("edge-headless-quiet", "edge", "EDGE", true, false, false);
         add("chrome-headed-logs", "chrome", "CHROME", false, true, true);
+        add("chromium-headed-quiet", "chrome", "CHROME", false, false, false);
     }
 
     private LaunchTemplates() {
@@ -76,7 +77,9 @@ public final class LaunchTemplates {
                 if (extra != null && !extra.isBlank() && !args.contains(extra)) args.add(extra);
             }
         }
-        String sentence = template.browser() + " via pkb_browser=" + template.pkbBrowser()
+        String sentence = "chromium-headed-quiet".equals(template.name())
+                ? "Chromium via the existing Chrome launcher. DriverDownloadFallback already searches chromium and chromium-browser. Not a second launcher."
+                : template.browser() + " via pkb_browser=" + template.pkbBrowser()
                 + (template.headless() ? " headless" : " headed")
                 + (template.logs() ? " with logs" : template.verbose() ? " verbose" : " quiet")
                 + ". Existing Selenium Manager and fallback drivers start it.";

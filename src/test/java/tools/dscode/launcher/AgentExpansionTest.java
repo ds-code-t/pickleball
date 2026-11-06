@@ -2,6 +2,7 @@ package tools.dscode.launcher;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import tools.dscode.common.composite.CompositeRuntime;
 import tools.dscode.common.agentcontrol.LaunchTemplates;
 import tools.dscode.common.agentcontrol.ObserveEvents;
 import tools.dscode.common.agentcontrol.ScenarioCapture;
@@ -16,6 +17,7 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Targeted coverage for the 2.1.19 agent commands. Each method is a real CLI call. */
@@ -48,6 +50,23 @@ class AgentExpansionTest {
     }
 
     @Test
+    void observe_failure_is_not_an_empty_buffer() throws Exception {
+        CompositeRuntime.use(temp, Map.of(), AgentExpansionTest.class.getClassLoader(), temp);
+        try {
+            Capture capture = agent("observe", temp.toString(), "--run-id=obs");
+            assertNotEquals(0, capture.code, capture.out + capture.err);
+            assertFalse(capture.out.contains("\"source\":\"cdp-session\""), capture.out);
+            assertTrue(capture.err.contains("observe failed") || capture.out.contains("observe failed"), capture.out + capture.err);
+            Capture captured = agent("capture-scenario", temp.toString(), "--run-id=obs2");
+            assertNotEquals(0, captured.code, captured.out + captured.err);
+            assertFalse(Files.exists(temp.resolve(".pickleball/runs/obs2/agent/captured-service-calls.feature")));
+            assertFalse(captured.out.contains("No Network.requestWillBeSent"), captured.out);
+        } finally {
+            CompositeRuntime.resetForTests();
+        }
+    }
+
+    @Test
     void covers_command_launch() throws Exception {
         Capture capture = agent(
                 "launch", temp.toString(), "--run-id=run-1",
@@ -61,13 +80,16 @@ class AgentExpansionTest {
         assertTrue(Files.isRegularFile(temp.resolve(".pickleball/agent-launch.json")));
         Capture windows = agent("windows", temp.toString(), "--run-id=run-1");
         assertEquals(0, windows.code, windows.err);
-        assertTrue(windows.out.contains("window-1"), windows.out);
+        assertFalse(windows.out.contains("window-1"), windows.out);
+        assertTrue(windows.out.contains("\"count\":0"), windows.out);
         Capture unknown = agent("launch", temp.toString(), "--template=not-a-browser");
         assertEquals(2, unknown.code);
         assertTrue(unknown.err.contains("error:"), unknown.err);
         assertTrue(unknown.err.contains("fix:"), unknown.err);
-        assertEquals(7, LaunchTemplates.names().size());
+        assertEquals(8, LaunchTemplates.names().size());
         assertTrue(LaunchTemplates.names().contains("chrome-headed-logs"));
+        assertTrue(LaunchTemplates.names().contains("chromium-headed-quiet"));
+        assertTrue(LaunchTemplates.resolve("chromium-headed-quiet", List.of()).sentence().contains("Not a second launcher"));
         assertTrue(LaunchTemplates.resolve("edge-headless-quiet", List.of("--disable-gpu")).args().contains("--headless=new"));
     }
 
@@ -76,13 +98,13 @@ class AgentExpansionTest {
         assertEquals(0, agent("launch", temp.toString(), "--run-id=w", "--template=edge-headed-quiet").code);
         Capture listed = agent("windows", temp.toString(), "--run-id=w");
         assertEquals(0, listed.code, listed.err);
-        assertTrue(listed.out.contains("\"kind\":\"window\""), listed.out);
+        assertFalse(listed.out.contains("window-1"), listed.out);
+        assertTrue(listed.out.contains("\"count\":0"), listed.out);
         Capture switched = agent("windows", temp.toString(), "--run-id=w", "--switch=window-1");
-        assertEquals(0, switched.code, switched.err);
-        assertTrue(switched.out.contains("window-1"), switched.out);
+        assertEquals(2, switched.code);
+        assertTrue(switched.err.contains("unknown handle"), switched.err);
         Capture closed = agent("windows", temp.toString(), "--run-id=w", "--close=window-1");
-        assertEquals(0, closed.code, closed.err);
-        assertTrue(closed.out.contains("\"open\":false") || closed.out.contains("Closed"), closed.out);
+        assertEquals(2, closed.code);
         Capture missing = agent("windows", temp.toString(), "--run-id=w", "--switch=missing");
         assertEquals(2, missing.code);
         assertTrue(missing.err.contains("error:"), missing.err);
@@ -93,10 +115,11 @@ class AgentExpansionTest {
         assertEquals(0, agent("launch", temp.toString(), "--run-id=t", "--template=chrome-headless-verbose").code);
         Capture listed = agent("tabs", temp.toString(), "--run-id=t");
         assertEquals(0, listed.code, listed.err);
-        assertTrue(listed.out.contains("tab-2") || listed.out.contains("\"kind\":\"tab\""), listed.out);
+        assertFalse(listed.out.contains("tab-2"), listed.out);
+        assertTrue(listed.out.contains("\"count\":0"), listed.out);
         Capture closed = agent("tabs", temp.toString(), "--run-id=t", "--close=tab-2");
-        assertEquals(0, closed.code, closed.err);
-        assertTrue(closed.out.contains("tab-2"), closed.out);
+        assertEquals(2, closed.code);
+        assertTrue(closed.err.contains("unknown handle"), closed.err);
     }
 
     @Test
@@ -143,6 +166,9 @@ class AgentExpansionTest {
         String html = Files.readString(page);
         assertTrue(html.contains("data-pkb-style=\"style_modified\""), html);
         assertTrue(html.contains("background-color:#fff3a0"), html);
+        Capture missing = agent("highlight", temp.toString(), "--handle=main:4", "--preset=yellow");
+        assertNotEquals(0, missing.code);
+        assertTrue(missing.out.contains("no live browser") || missing.err.contains("no live browser"), missing.out + missing.err);
         Capture bad = agent("highlight", temp.toString(), "--handle=save", "--preset=blue", "--html=" + page);
         assertEquals(2, bad.code);
         assertTrue(bad.err.contains("error:"), bad.err);
@@ -170,7 +196,7 @@ class AgentExpansionTest {
         assertTrue(placed.out.contains("agent_injected"), placed.out);
         assertTrue(placed.out.contains("overlay"), placed.out);
         assertTrue(placed.out.contains("a person did not author this UI"), placed.out);
-        assertTrue(placed.out.contains("visual-viewport-relative"), placed.out);
+        assertTrue(placed.out.contains("\"placement\":\"caller\""), placed.out);
         String html = Files.readString(page);
         assertTrue(html.contains("data-pkb-agent=\"agent_injected\""), html);
         assertTrue(html.contains("click here"), html);
@@ -188,7 +214,7 @@ class AgentExpansionTest {
     @Test
     void covers_command_overlay_remove() throws Exception {
         Path page = page();
-        Capture placed = agent("overlay", temp.toString(), "--html=" + page, "--text=click here");
+        Capture placed = agent("overlay", temp.toString(), "--html=" + page, "--text=click here", "--x=8", "--y=8");
         assertEquals(0, placed.code, placed.err);
         String id = placed.out.replaceAll("(?s).*\"id\":\"([^\"]+)\".*", "$1");
         Capture removed = agent("overlay-remove", temp.toString(), "--html=" + page, "--id=" + id);

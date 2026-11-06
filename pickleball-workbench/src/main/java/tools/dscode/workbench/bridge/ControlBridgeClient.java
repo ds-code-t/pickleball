@@ -301,7 +301,7 @@ public final class ControlBridgeClient {
             String runId,
             String agentId
     ) {
-        return agentCommand(new AgentCommandRequest(op, args, project, runId, agentId, java.util.List.of()));
+        return agentCommand(new AgentCommandRequest(op, args, project, runId, agentId, launchExtra(args)));
     }
 
     public AgentCommandResult agentCommand(AgentCommandRequest request) {
@@ -311,6 +311,36 @@ public final class ControlBridgeClient {
                 AgentCommandResult.class,
                 Duration.ofSeconds(60)
         );
+    }
+
+    /** Repeated launch {@code --arg} values travel as {@code extraArgs}, not only inside the string map. */
+    static List<String> launchExtra(java.util.Map<String, String> args) {
+        List<String> extra = new ArrayList<>();
+        if (args == null) return extra;
+        extra.addAll(splitLaunch(args.get("arg")));
+        extra.addAll(splitLaunch(args.get("extraArgs")));
+        return extra;
+    }
+
+    private static List<String> splitLaunch(String raw) {
+        if (raw == null || raw.isBlank()) return List.of();
+        String trimmed = raw.trim();
+        List<String> parsed = new ArrayList<>();
+        if (trimmed.startsWith("[")) {
+            try {
+                for (var node : new ObjectMapper().readTree(trimmed)) {
+                    String text = node.asText("");
+                    if (!text.isBlank()) parsed.add(text);
+                }
+                if (!parsed.isEmpty()) return parsed;
+            } catch (Exception ignored) {
+                parsed.clear();
+            }
+        }
+        for (String line : trimmed.split("\\R")) {
+            if (!line.isBlank()) parsed.add(line.trim());
+        }
+        return parsed;
     }
 
     public List<ControlBridgeBreakpoint> breakpoints() {
