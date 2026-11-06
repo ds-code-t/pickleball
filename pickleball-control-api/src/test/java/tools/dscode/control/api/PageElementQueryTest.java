@@ -12,9 +12,11 @@ import tools.dscode.common.composite.CompositeBinaryLocator;
 import tools.dscode.common.composite.CompositeLog;
 import tools.dscode.common.composite.CompositeMode;
 import tools.dscode.common.composite.CompositeRuntime;
+import tools.dscode.common.composite.ElementPhrase;
 import tools.dscode.common.composite.ElementOperations;
 import tools.dscode.common.composite.ElementView;
 import tools.dscode.common.composite.EngineQuery;
+import tools.dscode.common.composite.SelectorTranslator;
 import tools.dscode.control.protocol.DirectControlProvider;
 
 import java.lang.reflect.Proxy;
@@ -29,6 +31,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -205,6 +208,55 @@ class PageElementQueryTest {
         assertTrue(failure.getMessage().contains("composite runtime"), failure.getMessage());
     }
 
+    @Test
+    void visualRelativeForwardsTheSelectorAndLeavesGeometryNull() throws Exception {
+        Path binary = stub(temp.resolve("composite"), true);
+        CompositeRuntime.use(
+                temp.resolve("project"),
+                Map.of(DirectControlProvider.BIN_ENV, binary.toString()),
+                new ClassLoader(null) {
+                },
+                temp.resolve("home")
+        );
+        CompositeRuntime.joinForTests("http://127.0.0.1:9222");
+        WebDriver driver = driver(List.of(), new AtomicInteger());
+        String selector = "css=#a >> left-of=#b";
+        PageElementQuery.Hit hit = PageElementQuery.find(driver, EngineQuery.of(selector));
+        assertEquals(selector, hit.query());
+        assertEquals(1, hit.nodes().size());
+        assertNull(hit.nodes().get(0).geometry());
+        String forwarded = Files.readString(temp.resolve("composite.requests"));
+        assertTrue(forwarded.contains(selector), forwarded);
+        assertEquals("left-of", EngineQuery.visualRelative(selector));
+        assertEquals("above", EngineQuery.visualRelative("css=#a AND above=#b"));
+        assertEquals(null, EngineQuery.visualRelative("css=#save"));
+        assertEquals(null, EngineQuery.visualRelative("text=left=foo"));
+        assertTrue(SelectorTranslator.phrase(
+                ElementPhrase.of("Button", "Save").context("after", "Billing", "Section")
+        ).pipeline().contains("below=1"));
+    }
+
+    @Test
+    void visualRelativeWithoutGeometryDoesNotInventABox() throws Exception {
+        Path binary = stub(temp.resolve("composite-old"), false);
+        CompositeRuntime.use(
+                temp.resolve("project"),
+                Map.of(DirectControlProvider.BIN_ENV, binary.toString()),
+                new ClassLoader(null) {
+                },
+                temp.resolve("home")
+        );
+        CompositeRuntime.joinForTests("http://127.0.0.1:9222");
+        WebDriver driver = driver(List.of(), new AtomicInteger());
+        IllegalStateException failure = assertThrows(
+                IllegalStateException.class,
+                () -> PageElementQuery.find(driver, EngineQuery.of("css=#a >> left-of=#b"))
+        );
+        assertTrue(failure.getMessage().contains("no boxes were invented"), failure.getMessage());
+        String forwarded = Files.readString(temp.resolve("composite-old.requests"));
+        assertFalse(forwarded.contains("left-of"), forwarded);
+    }
+
     private static WebDriver scriptDriver(AtomicInteger scripts) {
         return (WebDriver) Proxy.newProxyInstance(
                 WebDriver.class.getClassLoader(),
@@ -280,6 +332,16 @@ class PageElementQueryTest {
     }
 
     private static Path stub(Path path) throws Exception {
+        return stub(path, true);
+    }
+
+    private static Path stub(Path path, boolean geometry) throws Exception {
+        String flags = geometry
+                ? "\"within\", \"nesting\", \"nth\", \"every\", \"count-only\", \"geometry\", \"point\", \"exposure\", \"limit\""
+                : "\"within\", \"nesting\", \"nth\", \"every\", \"count-only\", \"point\", \"exposure\", \"limit\"";
+        String engines = geometry
+                ? "\"css\", \"xpath\", \"text\", \"near\", \"below\", \"above\", \"left-of\", \"right-of\""
+                : "\"css\", \"xpath\", \"text\"";
         String script = """
                 #!/usr/bin/env python3
                 import json, sys, os
@@ -297,10 +359,7 @@ class PageElementQueryTest {
                     elif "create" in argv:
                         body = {"ok": True, "id": "sess-1", "launched": False}
                     elif "capabilities" in argv:
-                        body = {"ok": True, "query_flags": [
-                            "within", "nesting", "nth", "every", "count-only",
-                            "geometry", "point", "exposure", "limit"
-                        ]}
+                        body = {"ok": True, "query_flags": [__FLAGS__], "engines": [__ENGINES__]}
                     elif "query" in argv:
                         selector = ""
                         if "--selector" in argv:
@@ -348,7 +407,7 @@ class PageElementQueryTest {
                         "stderr": ""
                     }) + "\\n")
                     sys.stdout.flush()
-                """;
+                """.replace("__FLAGS__", flags).replace("__ENGINES__", engines);
         Files.createDirectories(path.getParent());
         Files.writeString(path, script);
         Files.setPosixFilePermissions(path, Set.of(

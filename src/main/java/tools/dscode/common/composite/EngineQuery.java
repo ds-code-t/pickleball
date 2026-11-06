@@ -89,4 +89,32 @@ public record EngineQuery(
         if (!text.isEmpty() && !text.contains("=")) return By.cssSelector(text);
         return null;
     }
+
+    /**
+     * The first visual-relative engine in this selector, or null.
+     * Gherkin after/before are document order and do not use this.
+     */
+    public static String visualRelative(String selector) {
+        if (selector == null || selector.isBlank()) return null;
+        for (String chunk : selector.split("(?i)>>|\\bAND\\b|\\bOR\\b|\\bNOT\\b")) {
+            String trimmed = chunk.trim();
+            while (trimmed.startsWith("(")) trimmed = trimmed.substring(1).trim();
+            int eq = trimmed.indexOf('=');
+            if (eq <= 0) continue;
+            String name = trimmed.substring(0, eq).trim().toLowerCase(Locale.ROOT);
+            if (VISUAL_RELATIVES.contains(name)) return name;
+        }
+        return null;
+    }
+
+    /** Capability name for a visual relative. {@code left} and {@code right} are aliases. */
+    public static String canonicalRelative(String name) {
+        if ("left".equals(name)) return "left-of";
+        if ("right".equals(name)) return "right-of";
+        return name;
+    }
+
+    private static final java.util.Set<String> VISUAL_RELATIVES = java.util.Set.of(
+            "near", "below", "above", "left-of", "right-of", "left", "right"
+    );
 }

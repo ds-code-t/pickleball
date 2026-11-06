@@ -34,6 +34,7 @@ public final class DomCompositeAdapter {
     private volatile Set<String> desktopVerbs;
     private volatile Set<String> actionVerbs;
     private volatile Set<String> queryFlags;
+    private volatile Set<String> engines;
     private volatile boolean multiEvalPinned;
     private volatile Set<String> verbsForTests;
     private volatile boolean dryRun;
@@ -62,6 +63,7 @@ public final class DomCompositeAdapter {
         dryRun = false;
         actionVerbs = null;
         queryFlags = null;
+        engines = null;
         multiEvalPinned = false;
         desktopVerbs = null;
         verbClient = null;
@@ -246,6 +248,7 @@ public final class DomCompositeAdapter {
         if (query == null || query.text().isBlank()) {
             throw new IllegalArgumentException("engine query must not be blank");
         }
+        requireVisual(query.text());
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("selector", query.text());
         body.put("mode", "composite");
@@ -280,6 +283,7 @@ public final class DomCompositeAdapter {
     /** One click or type. Human exposure is whatever the query already carries. */
     public ElementView act(EngineQuery query, String verb, String typed) {
         EngineQuery used = query.interact() ? query : query.interact(true);
+        requireVisual(used.text());
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("selector", used.text());
         body.put("mode", "composite");
@@ -626,6 +630,41 @@ public final class DomCompositeAdapter {
     }
 
     /**
+     * Visual relatives use the engine geometry view. A binary that lacks the
+     * flag or the engine name does not get a box invented here.
+     */
+    private void requireVisual(String selector) {
+        String relative = EngineQuery.visualRelative(selector);
+        if (relative == null) return;
+        String canonical = EngineQuery.canonicalRelative(relative);
+        boolean ready = queryFlag("geometry") && (engineListed(canonical) || engineListed(relative));
+        if (!ready) {
+            CompositeLog.info("geometry", "rel fallback " + relative);
+            throw new IllegalStateException(
+                    "visual relative " + relative + " needs the geometry view; no boxes were invented");
+        }
+        CompositeLog.info("geometry", "rel forward " + relative);
+    }
+
+    private boolean engineListed(String name) {
+        if (name == null || name.isBlank()) return false;
+        return engines().contains(name.toLowerCase(Locale.ROOT));
+    }
+
+    private Set<String> engines() {
+        if (verbsForTests != null) return engines == null ? Set.of() : engines;
+        if (!CompositeRuntime.primary()) return Set.of();
+        Client open = CompositeRuntime.ensureClient();
+        if (open == null) return Set.of();
+        pinClient(open);
+        Set<String> cached = engines;
+        if (cached != null) return cached;
+        Set<String> loaded = loadNamedVerbs(open, "engines", List.of());
+        engines = loaded;
+        return loaded;
+    }
+
+    /**
      * Ask for the five-space geometry view when {@code capabilities.query_flags}
      * lists {@code geometry}. A binary that does not list it keeps the AABB.
      */
@@ -672,6 +711,7 @@ public final class DomCompositeAdapter {
         desktopVerbs = null;
         actionVerbs = null;
         queryFlags = null;
+        engines = null;
         multiEvalPinned = false;
     }
 
