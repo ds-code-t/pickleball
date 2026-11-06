@@ -3,8 +3,11 @@ package tools.dscode.testengine;
 import io.cucumber.core.cli.Main;
 import tools.dscode.common.resources.PathLists;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 /** Thin consumer-worker entrypoint used by the separate Pickleball Workbench controller. */
 public final class WorkbenchWorkerMain {
@@ -14,6 +17,9 @@ public final class WorkbenchWorkerMain {
     }
 
     public static void main(String[] args) {
+        System.err.println("progress stage=jvm-main");
+        awaitLiveReady();
+        System.err.println("progress stage=classpath-scan");
         PickleballRunner runner = DynamicSuiteBootstrap.initializeFromRuntimeClasspath();
         List<String> cucumberArgs = new ArrayList<>();
         if (args != null) {
@@ -33,6 +39,54 @@ public final class WorkbenchWorkerMain {
         // Always enter JVM shutdown so the consumer-side bridge shutdown hook runs,
         // including after a successful anchor completion.
         System.exit(exitCode);
+    }
+
+    static final String LIVE_READY_ENV = "PKB_WORKBENCH_LIVE_READY";
+
+    /**
+     * Earliest worker marks. {@code jvm-main} is the first line of main.
+     * {@code classpath-scan} is the classpath and glue initialization that follows,
+     * before the control bridge binds. Both go to stderr, which the controller
+     * appends to the worker {@code *.err.log}.
+     */
+    static void reportStartupStages() {
+        System.err.println("progress stage=jvm-main");
+        System.err.println("progress stage=classpath-scan");
+    }
+
+    /**
+     * Overlapped cold start sets {@code PKB_WORKBENCH_LIVE_READY} to a file the
+     * controller writes after live classes are installed. Absent means the tree
+     * is already in place and main continues.
+     */
+    static void awaitLiveReady() {
+        String raw = System.getenv(LIVE_READY_ENV);
+        if (raw == null || raw.isBlank()) return;
+        Path ready = Path.of(raw);
+        String result = pollLiveReady(ready, ready.resolveSibling("live.failed"));
+        if ("aborted".equals(result)) {
+            System.err.println("progress stage=live-ready-aborted");
+            System.exit(2);
+        }
+        if ("timeout".equals(result)) {
+            System.err.println("progress stage=live-ready-timeout");
+        }
+    }
+
+    static String pollLiveReady(Path ready, Path failed) {
+        if (ready == null) return "ready";
+        long deadline = System.nanoTime() + TimeUnit.MINUTES.toNanos(4);
+        while (!Files.isRegularFile(ready)) {
+            if (failed != null && Files.isRegularFile(failed)) return "aborted";
+            if (System.nanoTime() >= deadline) return "timeout";
+            try {
+                Thread.sleep(20L);
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+                return "interrupted";
+            }
+        }
+        return "ready";
     }
 
     private static boolean hasGlueOption(List<String> args) {

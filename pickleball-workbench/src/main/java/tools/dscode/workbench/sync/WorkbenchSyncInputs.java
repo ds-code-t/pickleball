@@ -152,13 +152,29 @@ public record WorkbenchSyncInputs(
 
     static long countClassFiles(Path root) {
         if (root == null || !Files.isDirectory(root)) return 0;
-        try (Stream<Path> paths = Files.walk(root)) {
+        Path start = followDirectoryLink(root);
+        try (Stream<Path> paths = Files.walk(start)) {
             return paths.filter(Files::isRegularFile)
                     .filter(path -> path.getFileName().toString().endsWith(".class"))
                     .count();
         } catch (IOException ignored) {
             return 0;
         }
+    }
+
+    /**
+     * {@code Files.walk} does not enter a directory symlink. Live classes may be
+     * one relative link at {@code live/classes}, so count the target tree.
+     */
+    private static Path followDirectoryLink(Path root) {
+        try {
+            if (Files.isSymbolicLink(root)) {
+                return root.toRealPath();
+            }
+        } catch (IOException ignored) {
+            return root;
+        }
+        return root;
     }
 
     /**

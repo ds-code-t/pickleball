@@ -193,6 +193,7 @@ final class WorkbenchCommandLine {
         boolean quiet = false;
         Integer maxSteps = null;
         boolean allSteps = false;
+        java.util.LinkedHashSet<String> seenFlags = new java.util.LinkedHashSet<>();
         String absorb = null;
         boolean tagsSplitOpen = false;
         List<String> splitTags = new ArrayList<>();
@@ -201,6 +202,7 @@ final class WorkbenchCommandLine {
         for (int index = 1; index < args.length; index++) {
             String token = args[index];
             if (token == null) continue;
+            noteFlag(seenFlags, token);
             if (tagsSplitOpen && isFlag(token) && !isTagsValueFlag(token)) {
                 tagsSplitOpen = false;
                 rejectSplitTags(tags, splitTags);
@@ -570,6 +572,7 @@ final class WorkbenchCommandLine {
             tags = readTagsFile(project, tagsFile);
         }
         validateFilters(tags, name);
+        rejectUnusedFlags(command, seenFlags);
         Coordination coordination = new Coordination(
                 runId, agentId, group, sequence, who, why, learned, text,
                 inboxTo, inboxFrom, inboxWrite, inboxList, inboxTake,
@@ -606,6 +609,29 @@ final class WorkbenchCommandLine {
                 command, project, null, tags, name, example, retention, args.clone(),
                 coordination, version, planOnly, refreshIndex, fullScan, runVars, selects, stepTimeoutSeconds, runTimeoutSeconds, quiet, maxSteps, allSteps
         );
+    }
+
+    private static void noteFlag(java.util.Set<String> seen, String token) {
+        if (seen == null || token == null || !token.startsWith("--")) return;
+        int equals = token.indexOf('=');
+        seen.add(equals < 0 ? token : token.substring(0, equals));
+    }
+
+    /**
+     * A command listed in {@link WorkbenchCliFlags#USED_BY} rejects every other flag.
+     * Discover and confirm are not listed, so {@code --quiet} still applies there.
+     */
+    private static void rejectUnusedFlags(String command, java.util.Set<String> seen) {
+        List<String> allowed = WorkbenchCliFlags.USED_BY.get(command);
+        if (allowed == null || seen == null || seen.isEmpty()) return;
+        for (String flag : seen) {
+            if (!allowed.contains(flag)) {
+                throw cliError(
+                        command + " does not use " + flag,
+                        "Drop " + flag + ". See help " + command + "."
+                );
+            }
+        }
     }
 
     /**

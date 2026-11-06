@@ -102,7 +102,7 @@ public final class WorkbenchWorkerManager implements AutoCloseable {
         String stage = "worker-launch";
         try {
             markStage(stderr, stage, started, timing);
-            process = builder.start();
+            process = startWorkerProcess(builder, stderr);
             WorkerSession session = awaitBridge(
                     process, sessionId, token, sessionDirectory, stdout, stderr, manifest, classpath,
                     started, timing
@@ -266,6 +266,16 @@ public final class WorkbenchWorkerManager implements AutoCloseable {
         command.add("@pickleball-workbench-anchor");
         command.add(anchorFeature.toAbsolutePath().normalize().toUri().toString());
         return List.copyOf(command);
+    }
+
+    /**
+     * Starts the consumer worker and immediately records {@code worker-spawn}
+     * on the worker stderr log that {@code SessionHealthWait} tails.
+     */
+    static Process startWorkerProcess(ProcessBuilder builder, Path stderr) throws IOException {
+        Process process = builder.start();
+        writeProgress(stderr, "worker-spawn");
+        return process;
     }
 
     /** Runs the resolve-only main when a launch names a workspace that is not on disk yet. */

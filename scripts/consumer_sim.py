@@ -57,6 +57,11 @@ BUDGETS = {
     "workspace-seed": 180,
     "discover-compiled": 900,
     "validate": 30,
+    "validate-quiet": 30,
+    "discover-quiet": 120,
+    "isolate-no-workspace": 60,
+    "stop-before-rotate": 60,
+    "isolate-again": 600,
     "isolate": 600,
     "execute-step-b64": 180,
     "execute-step-file": 180,
@@ -150,10 +155,43 @@ def main() -> int:
         assert_in(validated, "validate undefined=0")
         assert_not_in(validated, "summary status=")
         assert_validate_warm(validated.stdout)
+        rejected = run_stage(timings, "validate-quiet", [
+            "validate", "--quiet", "--tags=" + TAGS,
+        ], allow_exit={2})
+        assert_in(rejected, "error:")
+        assert_in(rejected, "does not use --quiet")
+        assert_in(rejected, "fix:")
+        assert_not_in(rejected, "validate undefined=")
+        quiet_discover = run_stage(timings, "discover-quiet", [
+            "discover", "--quiet", "--plan", "--run-id=" + RUN, "--tags=" + TAGS,
+        ], allow_exit={0, 1})
+        assert_not_in(quiet_discover, "does not use --quiet")
+        missing = run_stage(timings, "isolate-no-workspace", [
+            "isolate", "--run-id=sim-missing-workspace", "--agent=consumer-sim",
+        ], allow_exit={1})
+        assert_in(missing, "error: no workspace for run id sim-missing-workspace")
+        assert_in(missing, "fix: Run workspace-seed or discover for that run id.")
+        assert_not_in(missing, "exited before becoming healthy")
         run_stage(timings, "isolate", [
             "isolate", "--run-id=" + RUN, "--tags=" + TAGS, "--name=" + NAME,
             "--runvar=pkb_browser=CHROME_HEADLESS", "--agent=consumer-sim",
         ], allow_exit={0})
+        assert_first_start_timing(RUN)
+        log_path = CONSUMER / ".pickleball" / "runs" / RUN / "session" / "session.log"
+        before = log_path.read_bytes() if log_path.is_file() else b""
+        run_stage(timings, "stop-before-rotate", ["stop", "--run-id=" + RUN, "--force"], allow_exit={0, 1})
+        run_stage(timings, "isolate-again", [
+            "isolate", "--run-id=" + RUN, "--tags=" + TAGS, "--name=" + NAME,
+            "--runvar=pkb_browser=CHROME_HEADLESS", "--agent=consumer-sim",
+        ], allow_exit={0})
+        archived = CONSUMER / ".pickleball" / "runs" / RUN / "session" / "attempts" / "1" / "session.log"
+        assert_true(archived.is_file(), "first session.log was not kept at " + str(archived))
+        if before:
+            kept = archived.read_bytes()
+            assert_true(
+                kept == before or kept.startswith(before),
+                "rotated session.log does not keep the first start",
+            )
         b64 = base64.b64encode(STEP.encode("utf-8")).decode("ascii")
         stepped = run_stage(timings, "execute-step-b64", [
             "execute-step", "--run-id=" + RUN, "--text-b64=" + b64,
@@ -711,6 +749,30 @@ def assert_not_in(result: subprocess.CompletedProcess, needle: str) -> None:
 def assert_true(condition: bool, message: str) -> None:
     if not condition:
         raise SystemExit("consumer-sim: " + message)
+
+
+def assert_first_start_timing(run_id: str) -> None:
+    """Fresh-cache isolate prints link counts and the post-digest stages.
+
+    copy-live is on the session log. worker-spawn, jvm-main, and classpath-scan
+    are on the worker stderr log. worker-ready is on the session log when
+    /health first succeeds, and also as the paused alias on the worker log.
+    """
+    chunks = []
+    session = CONSUMER / ".pickleball" / "runs" / run_id / "session" / "session.log"
+    if session.is_file():
+        chunks.append(session.read_text(encoding="utf-8", errors="replace"))
+    root = CONSUMER / ".pickleball"
+    if root.is_dir():
+        for log in root.glob("**/logs/worker-*.err.log"):
+            chunks.append(log.read_text(encoding="utf-8", errors="replace"))
+    text = "\n".join(chunks)
+    assert_true("progress stage=copy-live " in text and "links=" in text and "copies=" in text,
+                "copy-live did not record links= and copies=")
+    for stage in ("worker-spawn", "jvm-main", "classpath-scan", "worker-ready"):
+        assert_true(f"progress stage={stage}" in text, "missing progress stage=" + stage)
+    print("consumer-sim first-start stages present "
+          + " ".join(line.strip() for line in text.splitlines() if "progress stage=copy-live " in line))
 
 
 def fail(stage: str, result: subprocess.CompletedProcess, message: str) -> None:
@@ -1525,6 +1587,9 @@ def _report8_materialize(timings: list[dict], stage: str, delete_manifest: bool)
         and "index-end@" in observed
         and "progress stage=sync" in work
         and "progress stage=materialize" in work
+        and "progress stage=copy-base" in work
+        and "progress stage=copy-live" in work
+        and "progress stage=digest" in work
         and "progress stage=hash" in work
         and "hashed=0" in work
         and "maven skipped=unchanged" in work

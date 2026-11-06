@@ -20,9 +20,11 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -457,6 +459,7 @@ public final class WorkbenchSessionCommands {
         try {
             Path parent = logFile.getParent();
             if (parent != null) Files.createDirectories(parent);
+            rotateSessionEvidence(logFile);
             Files.writeString(
                     logFile,
                     "",
@@ -470,6 +473,43 @@ public final class WorkbenchSessionCommands {
         } catch (IOException failure) {
             throw new IllegalStateException("Could not truncate " + logFile, failure);
         }
+    }
+
+    /**
+     * Keeps the previous isolate's session log and startup progress.
+     * The pair moves to {@code <session>/attempts/<n>/} before this start truncates them.
+     * {@code n} is {@link AgentCoordination#nextAttempt}, the same count discover uses
+     * for {@code <run>/attempts/<n>/diagnostic}.
+     */
+    static void rotateSessionEvidence(Path logFile) throws IOException {
+        if (logFile == null) return;
+        Path parent = logFile.getParent();
+        if (parent == null) return;
+        Path progress = parent.resolve(SessionHealthWait.PROGRESS_FILE);
+        boolean log = Files.isRegularFile(logFile) && Files.size(logFile) > 0;
+        boolean progressFile = Files.isRegularFile(progress);
+        if (!log && !progressFile) return;
+        Path attempts = parent.resolve("attempts");
+        Path dest = attempts.resolve(Integer.toString(AgentCoordination.nextAttempt(attempts)));
+        Files.createDirectories(dest);
+        if (log) moveEvidence(logFile, dest.resolve(logFile.getFileName().toString()));
+        if (progressFile && Files.isRegularFile(progress)) {
+            moveEvidence(progress, dest.resolve(SessionHealthWait.PROGRESS_FILE));
+        }
+    }
+
+    private static void moveEvidence(Path source, Path dest) throws IOException {
+        try {
+            Files.move(source, dest, StandardCopyOption.ATOMIC_MOVE);
+        } catch (AtomicMoveNotSupportedException failure) {
+            Files.move(source, dest);
+        }
+    }
+
+    private static long loggedBytes(Map<Path, Long> baseline, Path logFile) {
+        if (baseline == null || logFile == null) return 0L;
+        Long size = baseline.get(logFile.toAbsolutePath().normalize());
+        return size == null ? 0L : size;
     }
 
     /**
@@ -530,6 +570,17 @@ public final class WorkbenchSessionCommands {
             return 0;
         }
 
+        String requestedRun = parsed.coordination().runId();
+        if (requestedRun != null && !requestedRun.isBlank()
+                && !Workspace.exists(Workspace.directory(project, requestedRun.trim()))) {
+            String error = "no workspace for run id " + requestedRun.trim();
+            String fix = "Run workspace-seed or discover for that run id.";
+            if (err != null) err.print(WorkbenchCliHelp.structured(error, fix));
+            finishReason(project, run.runId(), "Session start failed: " + error, out);
+            WorkbenchSpeed.release(project);
+            return 1;
+        }
+
         Path logFile = run.sessionDirectory().resolve("session.log");
         truncateSessionLog(logFile);
         Map<Path, Long> logBaseline = SessionHealthWait.baselineSizes(project, logFile);
@@ -578,7 +629,15 @@ public final class WorkbenchSessionCommands {
             return 0;
         }
         if (outcome.kind() != SessionHealthWait.Kind.TIMED_OUT) {
-            err.println("Workbench session process exited before becoming healthy. See " + logFile);
+            String fault = SessionHealthWait.lastFault(logFile, loggedBytes(logBaseline, logFile));
+            if (fault != null && err != null) {
+                err.print(WorkbenchCliHelp.structured(
+                        SessionHealthWait.faultError(fault),
+                        SessionHealthWait.faultFix(fault, logFile)
+                ));
+            } else if (err != null) {
+                err.println("Workbench session process exited before becoming healthy. See " + logFile);
+            }
             finishReason(project, run.runId(), "Session start failed: the process exited before it was healthy.", out);
             WorkbenchSpeed.release(project);
             return 1;

@@ -1127,19 +1127,7 @@ public final class AgentCoordination {
         Path diagnostic = data.resolve("diagnostic");
         if (!Files.isDirectory(diagnostic) || !attemptEvidence(diagnostic)) return;
         Path attempts = data.resolve("attempts");
-        int next = 1;
-        if (Files.isDirectory(attempts)) {
-            try (var children = Files.list(attempts)) {
-                for (Path child : children.toList()) {
-                    String name = child.getFileName() == null ? "" : child.getFileName().toString();
-                    try {
-                        next = Math.max(next, Integer.parseInt(name) + 1);
-                    } catch (NumberFormatException ignored) {
-                        // A non-numeric sibling is not an attempt number.
-                    }
-                }
-            }
-        }
+        int next = nextAttempt(attempts);
         Path dest = attempts.resolve(Integer.toString(next)).resolve("diagnostic");
         Files.createDirectories(dest.getParent());
         try {
@@ -1147,6 +1135,27 @@ public final class AgentCoordination {
         } catch (AtomicMoveNotSupportedException failure) {
             Files.move(diagnostic, dest);
         }
+    }
+
+    /**
+     * Next attempt directory under {@code attempts}. The first is {@code 1}.
+     * A non-numeric sibling is ignored. Discover's diagnostic archive and an
+     * isolate's session log use this same count. Each caller has its own directory.
+     */
+    public static int nextAttempt(Path attempts) throws IOException {
+        int next = 1;
+        if (attempts == null || !Files.isDirectory(attempts)) return next;
+        try (var children = Files.list(attempts)) {
+            for (Path child : children.toList()) {
+                String name = child.getFileName() == null ? "" : child.getFileName().toString();
+                try {
+                    next = Math.max(next, Integer.parseInt(name) + 1);
+                } catch (NumberFormatException ignored) {
+                    // A non-numeric sibling is not an attempt number.
+                }
+            }
+        }
+        return next;
     }
 
     private static boolean attemptEvidence(Path diagnostic) throws IOException {

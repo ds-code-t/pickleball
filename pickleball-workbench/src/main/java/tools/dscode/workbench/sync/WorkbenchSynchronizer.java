@@ -30,7 +30,9 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.Locale;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import java.util.function.LongSupplier;
 
 import tools.dscode.control.protocol.PickleballLocalLayout;
@@ -124,13 +126,13 @@ public final class WorkbenchSynchronizer {
         Path stagedBaseClasses = stagedBase.resolve("classes");
         Path stagedLive = staging.resolve("live");
         Path stagedLiveClasses = stagedLive.resolve("classes");
-        createDirectories(stagedBaseClasses, stagedLiveClasses);
+        createDirectories(stagedBaseClasses, stagedLive);
         progress("materialize");
-
         boolean copiedAnyOutput = false;
+        TreeStats copiedBase = TreeStats.EMPTY;
         for (OutputPath output : metadata.outputs()) {
             if (Files.isDirectory(output.path())) {
-                copyTree(output.path(), stagedBaseClasses);
+                copiedBase = copiedBase.plus(copyTree(output.path(), stagedBaseClasses));
                 copiedAnyOutput = true;
             }
         }
@@ -139,20 +141,35 @@ public final class WorkbenchSynchronizer {
                     "Build completed but no compiled/resource output directories were found for " + project.root()
             );
         }
+        progress(copiedBase.stage("copy-base"));
 
-        copyTree(stagedBaseClasses, stagedLiveClasses);
+        Path finalBase = stateRoot.resolve("base");
+        Path finalBaseClasses = finalBase.resolve("classes").toAbsolutePath().normalize();
+        java.util.concurrent.atomic.AtomicBoolean baseInstalled = new java.util.concurrent.atomic.AtomicBoolean();
+        TreeStats copiedLive = linkLiveClasses(
+                stagedBase, stagedBaseClasses, stagedLiveClasses, finalBase, finalBaseClasses, baseInstalled
+        );
+        progress(copiedLive.stage("copy-live"));
         createDirectories(
                 stagedLive.resolve("candidate-source"),
                 stagedLive.resolve("generated-java"),
                 stagedLive.resolve("generated-classes")
         );
+        createDirectories(stateRoot, stateRoot.resolve("sessions"), stateRoot.resolve("evidence"), stateRoot.resolve("logs"));
+        if (!baseInstalled.get()) {
+            replaceDirectory(stagedBase, finalBase);
+        }
+        replaceDirectory(stagedLive, stateRoot.resolve("live"));
 
         List<String> dependencies = distinctExisting(metadata.dependencies());
         WorkbenchSyncInputs stored = WorkbenchSyncInputs.capture(
                 project, metadata.sourceRoots(), dependencies
         );
-        String fingerprint = fingerprint(stagedBaseClasses, dependencies, stateRoot.resolve("jar-hashes.v2"));
-        Path finalBaseClasses = stateRoot.resolve("base").resolve("classes").toAbsolutePath().normalize();
+        String fingerprint = fingerprint(
+                finalBaseClasses,
+                dependencies,
+                stateRoot.resolve("jar-hashes.v2")
+        );
         Path finalLiveClasses = PickleballLocalLayout.liveClasses(stateRoot);
         List<String> classpathEntries = workerClasspath(stateRoot, dependencies);
 
@@ -191,10 +208,6 @@ public final class WorkbenchSynchronizer {
         Path stagedClasspath = staging.resolve(PickleballLocalLayout.WORKER_CLASSPATH_FILE);
         manifest.write(stagedManifest);
         writeLines(stagedClasspath, classpathEntries);
-
-        createDirectories(stateRoot, stateRoot.resolve("sessions"), stateRoot.resolve("evidence"), stateRoot.resolve("logs"));
-        replaceDirectory(stagedBase, stateRoot.resolve("base"));
-        replaceDirectory(stagedLive, stateRoot.resolve("live"));
         replaceFile(stagedManifest, stateRoot.resolve("manifest.json"));
         replaceFile(stagedClasspath, stateRoot.resolve(PickleballLocalLayout.WORKER_CLASSPATH_FILE));
         return manifest;
@@ -774,7 +787,8 @@ public final class WorkbenchSynchronizer {
     private static String fingerprint(Path classes, List<String> dependencies, Path cacheFile) {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            updateDirectoryDigest(digest, classes);
+            TreeStats classesDigest = updateDirectoryDigest(digest, classes, true);
+            progress(classesDigest.stage("digest"));
             Map<String, CachedJar> cache = loadJarHashCache(cacheFile);
             Map<String, String> statKeys = new HashMap<>();
             for (Map.Entry<String, CachedJar> entry : cache.entrySet()) {
@@ -793,7 +807,7 @@ public final class WorkbenchSynchronizer {
                 digest.update(path.toString().getBytes(StandardCharsets.UTF_8));
                 digest.update((byte) 0);
                 if (!Files.isRegularFile(path)) {
-                    if (Files.isDirectory(path)) updateDirectoryDigest(digest, path);
+                    if (Files.isDirectory(path)) updateDirectoryDigest(digest, path, false);
                     digest.update((byte) 0);
                     continue;
                 }
@@ -959,25 +973,76 @@ public final class WorkbenchSynchronizer {
         }
     }
 
-    private static void updateDirectoryDigest(MessageDigest digest, Path root) throws IOException {
-        try (var paths = Files.walk(root)) {
-            for (Path file : paths.filter(Files::isRegularFile).sorted().toList()) {
-                digest.update(root.relativize(file).toString().replace('\\', '/').getBytes(StandardCharsets.UTF_8));
-                digest.update((byte) 0);
-                updateFileDigest(digest, file);
-                digest.update((byte) 0);
+    /**
+     * Class files are keyed by relative path, size, and mtime. Bytes are not read.
+     * Jars keep the racy-window content hash. A directory dependency still hashes bytes.
+     */
+    private static TreeStats updateDirectoryDigest(MessageDigest digest, Path root, boolean metadataOnly) throws IOException {
+        int files = 0;
+        long bytes = 0L;
+        long started = System.nanoTime();
+        if (root != null && Files.exists(root)) {
+            try (var paths = Files.walk(root)) {
+                for (Path file : paths.filter(Files::isRegularFile).sorted().toList()) {
+                    digest.update(root.relativize(file).toString().replace('\\', '/').getBytes(StandardCharsets.UTF_8));
+                    digest.update((byte) 0);
+                    if (metadataOnly) {
+                        BasicFileAttributes attrs = Files.readAttributes(file, BasicFileAttributes.class);
+                        digest.update(Long.toString(attrs.size()).getBytes(StandardCharsets.UTF_8));
+                        digest.update((byte) 0);
+                        digest.update(Long.toString(attrs.lastModifiedTime().toMillis()).getBytes(StandardCharsets.UTF_8));
+                        bytes += attrs.size();
+                    } else {
+                        bytes += updateFileDigest(digest, file);
+                    }
+                    digest.update((byte) 0);
+                    files++;
+                }
             }
         }
+        return new TreeStats(files, bytes, elapsedMs(started), 0, 0);
     }
 
-    private static void updateFileDigest(MessageDigest digest, Path file) throws IOException {
+    private static long updateFileDigest(MessageDigest digest, Path file) throws IOException {
+        long total = 0L;
         try (var input = Files.newInputStream(file)) {
             byte[] buffer = new byte[64 * 1024];
             int read;
             while ((read = input.read(buffer)) >= 0) {
-                if (read > 0) digest.update(buffer, 0, read);
+                if (read > 0) {
+                    digest.update(buffer, 0, read);
+                    total += read;
+                }
             }
         }
+        return total;
+    }
+
+    private record TreeStats(int files, long bytes, long millis, int links, int copies) {
+        static final TreeStats EMPTY = new TreeStats(0, 0, 0, 0, 0);
+
+        TreeStats plus(TreeStats other) {
+            if (other == null) return this;
+            return new TreeStats(
+                    files + other.files,
+                    bytes + other.bytes,
+                    millis + other.millis,
+                    links + other.links,
+                    copies + other.copies
+            );
+        }
+
+        String stage(String name) {
+            String line = name + " files=" + files + " bytes=" + bytes + " ms=" + millis;
+            if ("copy-live".equals(name)) {
+                line += " links=" + links + " copies=" + copies;
+            }
+            return line;
+        }
+    }
+
+    private static long elapsedMs(long startedNanos) {
+        return Math.max(0L, (System.nanoTime() - startedNanos) / 1_000_000L);
     }
 
     private static String implementationVersion() {
@@ -985,7 +1050,182 @@ public final class WorkbenchSynchronizer {
         return version == null || version.isBlank() ? "development" : version;
     }
 
-    private static void copyTree(Path source, Path target) {
+    private static TreeStats copyTree(Path source, Path target) {
+        return transferTree(source, target, false);
+    }
+
+    /** Hardlink each file onto {@code target}. A link that the filesystem refuses is a copy. */
+    private static TreeStats linkTree(Path source, Path target) {
+        return transferTree(source, target, true);
+    }
+
+    /**
+     * One directory link from live classes to the staged base when the filesystem
+     * allows it. A relative symlink stays valid after the staged tree is installed.
+     * Windows falls back to a junction aimed at the final base, then to the
+     * per-file link-or-copy path.
+     */
+    private static TreeStats linkLiveClasses(
+            Path stagedBase,
+            Path stagedBaseClasses,
+            Path stagedLiveClasses,
+            Path finalBase,
+            Path finalBaseClasses,
+            java.util.concurrent.atomic.AtomicBoolean baseInstalled
+    ) {
+        long started = System.nanoTime();
+        if (!linksDisabledForTest) {
+            Path parent = stagedLiveClasses.getParent();
+            Path relative = null;
+            if (parent != null) {
+                try {
+                    relative = parent.toAbsolutePath().normalize()
+                            .relativize(stagedBaseClasses.toAbsolutePath().normalize());
+                } catch (IllegalArgumentException differentRoots) {
+                    relative = null;
+                }
+            }
+            if (relative != null && !relative.isAbsolute() && tryDirectorySymlink(stagedLiveClasses, relative)) {
+                return directoryLinkStats(stagedBaseClasses, started);
+            }
+            if (isWindows()) {
+                replaceDirectory(stagedBase, finalBase);
+                baseInstalled.set(true);
+                if (tryJunction(stagedLiveClasses, finalBaseClasses)) {
+                    return directoryLinkStats(finalBaseClasses, started);
+                }
+            }
+        }
+        createDirectories(stagedLiveClasses);
+        Path source = Files.isDirectory(stagedBaseClasses) ? stagedBaseClasses : finalBaseClasses;
+        return transferTree(source, stagedLiveClasses, true);
+    }
+
+    private static TreeStats directoryLinkStats(Path source, long startedNanos) throws IllegalStateException {
+        int files = 0;
+        long bytes = 0L;
+        try (var walk = Files.walk(source)) {
+            for (Path file : walk.filter(Files::isRegularFile).toList()) {
+                files++;
+                bytes += Files.size(file);
+            }
+        } catch (IOException failure) {
+            throw new IllegalStateException("Could not describe linked Workbench output " + source, failure);
+        }
+        return new TreeStats(files, bytes, elapsedMs(startedNanos), files, 0);
+    }
+
+    private static boolean tryDirectorySymlink(Path link, Path relativeTarget) {
+        try {
+            if (Files.exists(link) || Files.isSymbolicLink(link)) {
+                Files.deleteIfExists(link);
+            }
+            Files.createSymbolicLink(link, relativeTarget);
+            return Files.isSymbolicLink(link);
+        } catch (IOException | UnsupportedOperationException | SecurityException unsupported) {
+            try {
+                if (Files.isSymbolicLink(link)) Files.deleteIfExists(link);
+            } catch (IOException ignored) {
+                // The per-file path creates the directory itself.
+            }
+            return false;
+        }
+    }
+
+    private static boolean tryJunction(Path link, Path absoluteTarget) {
+        if (!isWindows() || absoluteTarget == null || !Files.isDirectory(absoluteTarget)) return false;
+        try {
+            if (Files.exists(link) || Files.isSymbolicLink(link)) Files.deleteIfExists(link);
+            Process process = new ProcessBuilder(
+                    "cmd.exe", "/d", "/c", "mklink", "/J",
+                    link.toAbsolutePath().normalize().toString(),
+                    absoluteTarget.toAbsolutePath().normalize().toString()
+            ).redirectOutput(ProcessBuilder.Redirect.DISCARD)
+                    .redirectError(ProcessBuilder.Redirect.DISCARD)
+                    .start();
+            if (!process.waitFor(5, TimeUnit.SECONDS)) {
+                process.destroyForcibly();
+                return false;
+            }
+            return process.exitValue() == 0 && Files.isDirectory(link);
+        } catch (IOException failure) {
+            return false;
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            return false;
+        }
+    }
+
+    private static boolean isWindows() {
+        return System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win");
+    }
+
+    /**
+     * A directory link shares {@code base/classes}. Replace it with a private
+     * copy before a live write so the owned snapshot does not change.
+     */
+    static boolean detachLinkedLiveClasses(Path liveClasses) {
+        if (!isDirectoryLink(liveClasses)) return false;
+        Path real;
+        try {
+            real = liveClasses.toRealPath();
+        } catch (IOException failure) {
+            throw new IllegalStateException("Could not read linked live classes " + liveClasses, failure);
+        }
+        Path parent = liveClasses.getParent();
+        if (parent == null) return false;
+        Path temp = parent.resolve("classes.detach-" + UUID.randomUUID());
+        try {
+            copyTree(real, temp);
+            Files.deleteIfExists(liveClasses);
+            Files.move(temp, liveClasses);
+            return true;
+        } catch (IOException failure) {
+            deleteQuietly(temp);
+            throw new IllegalStateException("Could not detach linked live classes " + liveClasses, failure);
+        } catch (RuntimeException failure) {
+            deleteQuietly(temp);
+            throw failure;
+        }
+    }
+
+    /**
+     * When {@code file} sits under a linked {@code live/classes}, detach that
+     * directory before the write. A path outside that link is unchanged.
+     */
+    public static void detachContainingLiveClasses(Path file) {
+        Path cursor = file == null ? null : file.toAbsolutePath().normalize();
+        while (cursor != null) {
+            Path name = cursor.getFileName();
+            Path parent = cursor.getParent();
+            if (name != null
+                    && "classes".equals(name.toString())
+                    && parent != null
+                    && parent.getFileName() != null
+                    && "live".equals(parent.getFileName().toString())
+                    && isDirectoryLink(cursor)) {
+                detachLinkedLiveClasses(cursor);
+                return;
+            }
+            cursor = parent;
+        }
+    }
+
+    private static boolean isDirectoryLink(Path path) {
+        if (path == null || !Files.exists(path, java.nio.file.LinkOption.NOFOLLOW_LINKS)) return false;
+        if (Files.isSymbolicLink(path)) return true;
+        if (!isWindows() || !Files.isDirectory(path)) return false;
+        try {
+            return !path.toAbsolutePath().normalize().equals(path.toRealPath());
+        } catch (IOException failure) {
+            return false;
+        }
+    }
+
+    private static TreeStats transferTree(Path source, Path target, boolean link) {
+        long started = System.nanoTime();
+        List<Path> files = new ArrayList<>();
+        long[] bytes = {0L};
         try {
             Files.walkFileTree(source, new SimpleFileVisitor<>() {
                 @Override
@@ -995,16 +1235,148 @@ public final class WorkbenchSynchronizer {
                 }
 
                 @Override
-                public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
-                    Path destination = target.resolve(source.relativize(file).toString());
-                    Files.createDirectories(destination.getParent());
-                    Files.copy(file, destination, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.COPY_ATTRIBUTES);
+                public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
+                    files.add(file);
+                    bytes[0] += attrs.size();
                     return FileVisitResult.CONTINUE;
                 }
             });
+            int links = 0;
+            int copies = 0;
+            if (link) {
+                int[] counted = linkFiles(source, target, files);
+                links = counted[0];
+                copies = counted[1];
+            } else {
+                copyFiles(source, target, files);
+            }
+            return new TreeStats(files.size(), bytes[0], elapsedMs(started), links, copies);
         } catch (IOException failure) {
             throw new IllegalStateException("Could not materialize Workbench output from " + source, failure);
         }
+    }
+
+    /**
+     * Same pool as {@link #copyFiles}. Each file still prefers {@code Files.createLink}
+     * and falls back to a copy. The returned pair is hardlink successes, then copies.
+     */
+    private static int[] linkFiles(Path source, Path target, List<Path> files) throws IOException {
+        java.util.concurrent.atomic.AtomicInteger links = new java.util.concurrent.atomic.AtomicInteger();
+        java.util.concurrent.atomic.AtomicInteger copies = new java.util.concurrent.atomic.AtomicInteger();
+        java.util.concurrent.atomic.AtomicBoolean linksRefused = new java.util.concurrent.atomic.AtomicBoolean();
+        List<IoTask> tasks = new ArrayList<>();
+        for (Path file : files) {
+            tasks.add(() -> {
+                Path destination = target.resolve(source.relativize(file).toString());
+                Files.createDirectories(destination.getParent());
+                if (linkOrCopy(file, destination, linksRefused)) links.incrementAndGet();
+                else copies.incrementAndGet();
+            });
+        }
+        runParallel(tasks, source);
+        return new int[] {links.get(), copies.get()};
+    }
+
+    private static void copyFiles(Path source, Path target, List<Path> files) throws IOException {
+        List<IoTask> tasks = new ArrayList<>();
+        for (Path file : files) {
+            tasks.add(() -> copyOne(source, target, file));
+        }
+        runParallel(tasks, source);
+    }
+
+    @FunctionalInterface
+    private interface IoTask {
+        void run() throws IOException;
+    }
+
+    /**
+     * One thread when there is nothing to fan out. Otherwise a fixed pool of
+     * {@code min(tasks, available processors)}, the same bound the copy path used.
+     */
+    private static void runParallel(List<IoTask> tasks, Path source) throws IOException {
+        if (tasks.isEmpty()) return;
+        int threads = Math.min(tasks.size(), Math.max(1, Runtime.getRuntime().availableProcessors()));
+        if (threads == 1) {
+            for (IoTask task : tasks) task.run();
+            return;
+        }
+        java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newFixedThreadPool(threads);
+        try {
+            List<java.util.concurrent.Future<?>> waiting = new ArrayList<>();
+            for (IoTask task : tasks) {
+                waiting.add(pool.submit(() -> {
+                    try {
+                        task.run();
+                        return null;
+                    } catch (IOException failure) {
+                        throw new IllegalStateException(failure);
+                    }
+                }));
+            }
+            for (java.util.concurrent.Future<?> done : waiting) {
+                try {
+                    done.get();
+                } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                    throw new IOException("Interrupted while copying " + source, interrupted);
+                } catch (java.util.concurrent.ExecutionException failure) {
+                    Throwable cause = failure.getCause() == null ? failure : failure.getCause();
+                    if (cause instanceof IOException io) throw io;
+                    throw new IOException("Could not copy " + source, cause);
+                }
+            }
+        } finally {
+            pool.shutdownNow();
+        }
+    }
+
+    private static void copyOne(Path source, Path target, Path file) throws IOException {
+        Path destination = target.resolve(source.relativize(file).toString());
+        Files.createDirectories(destination.getParent());
+        copyFile(file, destination);
+    }
+
+    /**
+     * Test-only. When true, live materialize copies every file and does not call
+     * {@code Files.createLink}. Production leaves this false. The Windows-shaped
+     * repro sets it so {@code copies=} is the whole tree.
+     */
+    static volatile boolean linksDisabledForTest;
+
+    static boolean linkOrCopy(Path source, Path destination) throws IOException {
+        return linkOrCopy(source, destination, null);
+    }
+
+    /**
+     * Prefer a hardlink. A provider that cannot link ({@code UnsupportedOperationException}
+     * or {@code SecurityException}) copies this file and the rest of the tree.
+     * Any other link error copies this file only and later files still try a link.
+     */
+    static boolean linkOrCopy(
+            Path source,
+            Path destination,
+            java.util.concurrent.atomic.AtomicBoolean linksRefused
+    ) throws IOException {
+        if (linksDisabledForTest || (linksRefused != null && linksRefused.get())) {
+            copyFile(source, destination);
+            return false;
+        }
+        try {
+            Files.createLink(destination, source);
+            return true;
+        } catch (UnsupportedOperationException | SecurityException unsupported) {
+            if (linksRefused != null) linksRefused.set(true);
+            copyFile(source, destination);
+            return false;
+        } catch (IOException failure) {
+            copyFile(source, destination);
+            return false;
+        }
+    }
+
+    private static void copyFile(Path source, Path destination) throws IOException {
+        Files.copy(source, destination, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.COPY_ATTRIBUTES);
     }
 
     private static final long[] REPLACE_BACKOFF_MS = {100L, 300L, 1000L};
@@ -1150,6 +1522,12 @@ public final class WorkbenchSynchronizer {
         Files.walkFileTree(source, new SimpleFileVisitor<>() {
             @Override
             public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
+                if (!dir.equals(source) && Files.isSymbolicLink(dir)) {
+                    Path destination = target.resolve(source.relativize(dir).toString());
+                    if (destination.getParent() != null) Files.createDirectories(destination.getParent());
+                    Files.copy(dir, destination, StandardCopyOption.REPLACE_EXISTING, java.nio.file.LinkOption.NOFOLLOW_LINKS);
+                    return FileVisitResult.SKIP_SUBTREE;
+                }
                 Files.createDirectories(target.resolve(source.relativize(dir).toString()));
                 return FileVisitResult.CONTINUE;
             }
@@ -1158,7 +1536,11 @@ public final class WorkbenchSynchronizer {
             public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
                 Path destination = target.resolve(source.relativize(file).toString());
                 if (destination.getParent() != null) Files.createDirectories(destination.getParent());
-                Files.copy(file, destination, StandardCopyOption.REPLACE_EXISTING);
+                if (Files.isSymbolicLink(file)) {
+                    Files.copy(file, destination, StandardCopyOption.REPLACE_EXISTING, java.nio.file.LinkOption.NOFOLLOW_LINKS);
+                } else {
+                    Files.copy(file, destination, StandardCopyOption.REPLACE_EXISTING);
+                }
                 return FileVisitResult.CONTINUE;
             }
         });
@@ -1183,6 +1565,15 @@ public final class WorkbenchSynchronizer {
     private static void deleteTreeOnce(Path root) throws IOException {
         if (root == null || !Files.exists(root)) return;
         Files.walkFileTree(root, new SimpleFileVisitor<>() {
+            @Override
+            public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
+                if (Files.isSymbolicLink(dir)) {
+                    Files.deleteIfExists(dir);
+                    return FileVisitResult.SKIP_SUBTREE;
+                }
+                return FileVisitResult.CONTINUE;
+            }
+
             @Override
             public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
                 Files.deleteIfExists(file);
