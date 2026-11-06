@@ -9,9 +9,13 @@ import org.openqa.selenium.WebDriver;
 
 import java.io.IOException;
 import java.lang.reflect.Proxy;
+import java.nio.channels.FileChannel;
+import java.nio.channels.FileLock;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
+import java.util.concurrent.TimeUnit;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -195,6 +199,37 @@ class AgentLiveFixTest {
         Files.writeString(temp.resolve(".pickleball/runs/chat/agent/chat/durable.jsonl"), stored, StandardCharsets.UTF_8);
         ChatLog.Message next = ChatLog.send(temp, "chat", "durable", "human", "ada", "after");
         assertEquals("41", next.id());
+    }
+
+    @Test
+    void chatAppendWaitsForAnExclusiveLockHeldByAnotherProcess() throws Exception {
+        Path lock = temp.resolve(".pickleball/runs/lock/agent/chat/run.jsonl.lock");
+        Files.createDirectories(lock.getParent());
+        try (FileChannel channel = FileChannel.open(lock, StandardOpenOption.CREATE, StandardOpenOption.WRITE)) {
+            FileLock held = channel.lock();
+            Process child = new ProcessBuilder(
+                    Path.of(System.getProperty("java.home"), "bin", "java").toString(),
+                    "-cp",
+                    System.getProperty("java.class.path"),
+                    "tools.dscode.common.agentcontrol.ChatLockChild",
+                    temp.toString(),
+                    "lock"
+            ).redirectErrorStream(true).start();
+            try {
+                Thread.sleep(500);
+                assertTrue(child.isAlive(), "chat send must wait while another process holds the lock");
+                held.release();
+                boolean finished = child.waitFor(15, TimeUnit.SECONDS);
+                String output = new String(child.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+                assertTrue(finished, output);
+                assertEquals(0, child.exitValue(), output);
+                assertTrue(output.contains("id=1"), output);
+            } finally {
+                if (child.isAlive()) child.destroyForcibly();
+            }
+        }
+        ChatLog.Message second = ChatLog.send(temp, "lock", "run", "human", "ada", "parent");
+        assertEquals("2", second.id());
     }
 
     @Test

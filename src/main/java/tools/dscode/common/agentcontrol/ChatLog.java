@@ -4,7 +4,10 @@ import com.fasterxml.jackson.databind.JsonNode;
 import tools.dscode.common.composite.CompositeLog;
 
 import java.io.IOException;
+import java.nio.channels.FileChannel;
+import java.nio.channels.FileLock;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -24,18 +27,24 @@ final class ChatLog {
         String useSource = normalizeSource(source);
         if (text == null || text.isBlank()) throw new IllegalArgumentException("missing text");
         synchronized (ChatLog.class) {
-            long next = maxId(project, runId, useChannel) + 1;
-            Message message = new Message(
-                    Long.toString(next),
-                    AgentStore.now(),
-                    useSource,
-                    agent == null ? "" : agent,
-                    useChannel,
-                    text
-            );
-            AgentStore.appendCapped(file(project, runId, useChannel), AgentStore.JSON.writeValueAsString(message));
-            CompositeLog.info("chat", "send source=" + useSource + " channel=" + useChannel + " agent=" + message.agent() + " id=" + message.id());
-            return message;
+            Path chat = file(project, runId, useChannel);
+            Path lockFile = chat.resolveSibling(chat.getFileName() + ".lock");
+            AgentStore.ensure(lockFile.getParent());
+            try (FileChannel locked = FileChannel.open(lockFile, StandardOpenOption.CREATE, StandardOpenOption.WRITE);
+                 FileLock ignored = locked.lock()) {
+                long next = maxId(project, runId, useChannel) + 1;
+                Message message = new Message(
+                        Long.toString(next),
+                        AgentStore.now(),
+                        useSource,
+                        agent == null ? "" : agent,
+                        useChannel,
+                        text
+                );
+                AgentStore.appendCapped(chat, AgentStore.JSON.writeValueAsString(message));
+                CompositeLog.info("chat", "send source=" + useSource + " channel=" + useChannel + " agent=" + message.agent() + " id=" + message.id());
+                return message;
+            }
         }
     }
 
