@@ -1181,6 +1181,31 @@ class AgentLiveFixTest {
     }
 
     @Test
+    void surfaceIdFollowsTheDestinationPageNotTheFocusedPage() throws Exception {
+        AtomicInteger focusedCalls = new AtomicInteger();
+        AtomicReference<String> destinationId = new AtomicReference<>();
+        WebDriver focused = scriptDriver("tab-a", spec -> {
+            focusedCalls.incrementAndGet();
+            return Map.of("ok", true);
+        }, false);
+        WebDriver destination = scriptDriver("tab-b", spec -> {
+            destinationId.set(String.valueOf(spec.get("id")));
+            return Map.of("ok", true);
+        }, false);
+        PageSurfaces.manage(focused, "chrome-headed-quiet", true);
+        PageSurfaces.manage(destination, "edge-headed-quiet", true);
+        PageSurfaces.focus(destination);
+        Map<String, Object> seeded = PageSurfaces.place(null, "append", null, null, "<b>seed</b>", "html", null, null, null, temp.resolve("run-b"));
+        assertEquals("pkb-1", seeded.get("id"));
+        PageSurfaces.focus(focused);
+        PageSurfaces.bindHandle(destination, "tab-b", "frame-b:15");
+        Map<String, Object> placed = PageSurfaces.place(null, "append", "frame-b:15", null, "<b>again</b>", "html", null, null, null, temp.resolve("run-a"));
+        assertEquals("pkb-2", placed.get("id"));
+        assertEquals("pkb-2", destinationId.get());
+        assertEquals(0, focusedCalls.get());
+    }
+
+    @Test
     void scenarioRunCleanUpItselfRemovesNativeSurfaces() throws Exception {
         AtomicInteger hits = new AtomicInteger();
         tools.dscode.control.protocol.AgentSurfaceEnd.register(hits::incrementAndGet);

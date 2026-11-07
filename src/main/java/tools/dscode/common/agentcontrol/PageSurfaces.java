@@ -449,7 +449,6 @@ final class PageSurfaces {
     }
 
     static Map<String, Object> place(Path page, String op, String handle, String where, String rawHtml, String kind, Integer x, Integer y, String geometryJson, Path ledger) throws IOException {
-        String id = allocateId(idStore(page, ledger));
         String sentence = "overlay".equals(kind) ? OVERLAY_SENTENCE : HTML_SENTENCE;
         boolean stripped = rawHtml != null && !rawHtml.equals(neutralize(rawHtml));
         String html = labelElements(neutralize(rawHtml), kind, sentence);
@@ -471,6 +470,14 @@ final class PageSurfaces {
         if ("overlay".equals(kind) && point == null && page == null) {
             throw new IllegalArgumentException("overlay needs a target or a visual-viewport box");
         }
+        WebDriver destination = driver;
+        String destinationTab = focusedTab == null ? "" : focusedTab;
+        if (liveOnly) {
+            Selected selected = selectDestination(handle);
+            destination = selected.driver();
+            destinationTab = selected.tab();
+        }
+        String id = allocateId(idStore(page, ledger, destination, destinationTab));
         int left = point == null ? 0 : point[0];
         int top = point == null ? 0 : point[1];
         String css = "overlay".equals(kind) && point != null
@@ -1882,10 +1889,38 @@ final class PageSurfaces {
 
     private static final Map<String, Path> LIVE_IDS = new java.util.concurrent.ConcurrentHashMap<>();
 
+    private record Selected(WebDriver driver, String tab) {
+    }
+
+    /** Choose the page the handle names before an id is taken from that page's counter. Does not enter the frame. */
+    private static Selected selectDestination(String handle) {
+        if (handle != null && !handle.isBlank()) {
+            HandleRef ref = HandleRef.parse(handle);
+            if (ref.frameId != null || ref.browserId != null) {
+                FrameOwner owner = frameOwner(ref);
+                if (owner == null || !browserStillManaged(owner)) {
+                    throw new IllegalStateException("unknown handle");
+                }
+                String tab = owner.tab == null || owner.tab.isBlank() ? text(currentHandle(owner.driver)) : owner.tab;
+                return new Selected(owner.driver, tab);
+            }
+        }
+        String tab = focusedTab == null ? "" : focusedTab;
+        if (tab.isBlank()) {
+            String current = currentHandle(driver);
+            tab = current == null ? "" : current;
+        }
+        return new Selected(driver, tab);
+    }
+
     private static Path idStore(Path page, Path ledger) {
+        return idStore(page, ledger, driver, focusedTab == null ? "" : focusedTab);
+    }
+
+    private static Path idStore(Path page, Path ledger, WebDriver web, String tab) {
         if (page != null) return placeFile(page);
         if (!MANAGED.isEmpty()) {
-            String key = livePageKey();
+            String key = livePageKey(web, tab);
             return LIVE_IDS.computeIfAbsent(key, ignored -> {
                 String hash = sha(key);
                 if (hash.length() > 16) hash = hash.substring(0, 16);
@@ -1898,16 +1933,19 @@ final class PageSurfaces {
     }
 
     private static String livePageKey() {
-        WebDriver web = driver;
-        String tab = focusedTab == null ? "" : focusedTab;
+        return livePageKey(driver, focusedTab == null ? "" : focusedTab);
+    }
+
+    private static String livePageKey(WebDriver web, String tab) {
+        String useTab = tab == null ? "" : tab;
         if (web instanceof RemoteWebDriver remote) {
             String address = debuggerAddress(remote);
             if (!address.isEmpty()) {
                 String target = pageTarget(web);
-                return address + "|" + (target == null ? "" : target) + "|" + tab;
+                return address + "|" + (target == null ? "" : target) + "|" + useTab;
             }
         }
-        return "local|" + System.identityHashCode(web) + "|" + tab;
+        return "local|" + System.identityHashCode(web) + "|" + useTab;
     }
 
     private static String allocateId(Path file) throws IOException {

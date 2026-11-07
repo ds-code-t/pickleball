@@ -639,6 +639,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/resources/multiline-assert/multiline-assert.feature`
 - `src/test/resources/position/ordinals.html`
 - `src/test/resources/scenario-object/scenario-object.feature`
+- `src/test/resources/tools/dscode/common/agentcontrol/context-dom.js`
 - `src/test/resources/tools/dscode/common/agentcontrol/live-helper-dom.js`
 - `src/test/resources/until-pass/literal-until-with-browser.feature`
 - `src/test/resources/until-pass/literal-until.feature`
