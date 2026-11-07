@@ -507,6 +507,8 @@ class AgentLiveFixTest {
             if ("DOM.getFrameOwner".equals(method)) return Map.of("backendNodeId", 7);
             if ("DOM.resolveNode".equals(method)) return Map.of("object", Map.of("objectId", "obj-frame"));
             if ("Runtime.callFunctionOn".equals(method)) {
+                String function = String.valueOf(params.get("functionDeclaration"));
+                if (function.contains("removeAttribute")) return Map.of("result", Map.of("value", true));
                 return Map.of("result", Map.of("value", "{\"name\":\"child\",\"changedName\":false,\"previousBridge\":null}"));
             }
             if ("Overlay.hideHighlight".equals(method)) hidden.add(current.get());
@@ -598,6 +600,7 @@ class AgentLiveFixTest {
             if ("Runtime.callFunctionOn".equals(method)) {
                 String function = String.valueOf(params.get("functionDeclaration"));
                 functions.add(function);
+                if (function.contains("removeAttribute")) return Map.of("result", Map.of("value", true));
                 if (function.contains("changedName")) {
                     return Map.of("result", Map.of("value", "{\"name\":\"child\",\"changedName\":false,\"previousBridge\":null}"));
                 }
@@ -926,6 +929,8 @@ class AgentLiveFixTest {
             if ("DOM.resolveNode".equals(method)) return Map.of("object", Map.of("objectId", "obj-1"));
             if ("Runtime.callFunctionOn".equals(method)) {
                 functions.add(String.valueOf(params.get("functionDeclaration")));
+                String function = String.valueOf(params.get("functionDeclaration"));
+                if (function.contains("removeAttribute")) return Map.of("result", Map.of("value", true));
                 return Map.of("result", Map.of("value", "{\"name\":\"temp\",\"changedName\":true,\"previousBridge\":null}"));
             }
             return Map.of();
@@ -1073,6 +1078,7 @@ class AgentLiveFixTest {
             if ("DOM.resolveNode".equals(method)) return Map.of("object", Map.of("objectId", "obj-9"));
             if ("Runtime.callFunctionOn".equals(method)) {
                 String function = String.valueOf(params.get("functionDeclaration"));
+                if (function.contains("removeAttribute")) return Map.of("result", Map.of("value", true));
                 if (function.contains("changedName")) {
                     return Map.of("result", Map.of("value", "{\"name\":\"child\",\"changedName\":false,\"previousBridge\":null}"));
                 }
@@ -1139,6 +1145,163 @@ class AgentLiveFixTest {
         debug.setBoolean(state, true);
         io.cucumber.core.runner.CurrentScenarioState.class.getMethod("scenarioRunCleanUp").invoke(state);
         assertTrue(hits.get() >= 1);
+    }
+
+    @Test
+    void queryOriginFollowsTheThreadSessionNotTheGlobalJoinPointer() throws Exception {
+        Path binary = stdioBinary(temp.resolve("origin-composite"), temp.resolve("origin.log"));
+        try {
+            CompositeRuntime.use(temp, Map.of("COMPOSITE_BIN", binary.toString(), "pkb_composite", "on"),
+                    getClass().getClassLoader(), temp);
+            RemoteWebDriver first = remote("http://127.0.0.1:9222");
+            RemoteWebDriver second = remote("http://127.0.0.1:9333");
+            PageSurfaces.manage(first, "chrome-headed-quiet", true);
+            PageSurfaces.manage(second, "edge-headed-quiet", true);
+            CompositeRuntime.attach(first);
+            String firstId = CompositeRuntime.focusedSessionId();
+            CompositeRuntime.attach(second);
+            CompositeRuntime.client().focusSession(firstId);
+            CompositeRuntime.joinForTests("http://127.0.0.1:9333");
+            assertTrue(String.valueOf(CompositeRuntime.joinedForTests()).contains("9333"));
+            assertEquals(first, PageSurfaces.ownerForQuery());
+            assertTrue(String.valueOf(CompositeRuntime.focusedCdp()).contains("9222"), CompositeRuntime.focusedCdp());
+        } finally {
+            CompositeRuntime.resetForTests();
+        }
+    }
+
+    @Test
+    void failedPageSessionDoesNotClaimTheGlobalJoinPointer() throws Exception {
+        Path binary = stdioBinary(temp.resolve("fail-composite"), temp.resolve("fail.log"), true);
+        try {
+            CompositeRuntime.use(temp, Map.of("COMPOSITE_BIN", binary.toString(), "pkb_composite", "on"),
+                    getClass().getClassLoader(), temp);
+            PagedDriver browser = new PagedDriver("http://127.0.0.1:9222", Map.of("tab-a", "AAA", "tab-b", "BBB"));
+            PageSurfaces.manage(browser, "chrome-headed-quiet", true);
+            CompositeRuntime.attach(browser);
+            String joined = CompositeRuntime.joinedForTests();
+            assertTrue(joined != null && joined.contains("9222") && !joined.contains("devtools/page"), joined);
+            WindowRegistry.switchTo(temp, "run", "tab-b");
+            String after = String.valueOf(CompositeRuntime.joinedForTests());
+            assertFalse(after.contains("BBB") || after.contains("devtools/page"), after);
+            assertTrue(after.contains("9222"), after);
+            assertEquals(CompositeRuntime.focusedSessionId(), CompositeRuntime.client().currentSession().id());
+        } finally {
+            CompositeRuntime.resetForTests();
+        }
+    }
+
+    @Test
+    void rankedHandleStoresBrowserAndTabWithoutVisualGeometry() throws Exception {
+        WebDriver owner = scriptDriver("tab-b", spec -> Map.of("ok", true), false);
+        PageSurfaces.manage(owner, "edge-headed-quiet", true);
+        com.fasterxml.jackson.databind.JsonNode node = new ObjectMapper().readTree("""
+                {"handle":"frame-b:15","frame_id":"frame-b","backend_node_id":15}
+                """);
+        tools.dscode.common.composite.CompositeWebElement.fromQuery("//b", node, 0, owner, "tab-b");
+        PageSurfaces.HandleRef ref = PageSurfaces.HandleRef.parse("frame-b:15");
+        assertEquals("frame-b", ref.frameId());
+        assertEquals(15, ref.backend());
+        assertEquals("tab-b", ref.tab());
+        assertFalse(ref.browserId() == null || ref.browserId().isBlank(), ref.toString());
+    }
+
+    @Test
+    void closingATabFocusesTheSurvivingEngineSession() {
+        AtomicReference<String> current = new AtomicReference<>("tab-1");
+        LinkedHashSet<String> tabs = new LinkedHashSet<>(List.of("tab-1", "tab-2"));
+        WebDriver live = closingTabs(current, tabs);
+        PageSurfaces.manage(live, "chrome-headed-quiet", true);
+        PageSurfaces.focus(live);
+        assertEquals("tab-1", PageSurfaces.focusedTabOf(live));
+        WindowRegistry.close(temp, "run", "tab-1");
+        assertEquals("tab-2", current.get());
+        assertEquals("tab-2", PageSurfaces.focusedTabOf(live));
+    }
+
+    @Test
+    void frameMarkAndRestoreKeepAnOriginallyEmptyNameAndBridge() throws Exception {
+        Path dir = Files.createTempDirectory("pkb-frame-restore");
+        Path script = dir.resolve("frame.js");
+        Files.writeString(script, """
+                const fs = require('fs');
+                const input = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+                function Element() {
+                  this.nodeType = 1;
+                  this.tagName = 'IFRAME';
+                  this.attrs = {};
+                }
+                Element.prototype.hasAttribute = function(n) { return Object.prototype.hasOwnProperty.call(this.attrs, n); };
+                Element.prototype.getAttribute = function(n) { return this.hasAttribute(n) ? this.attrs[n] : null; };
+                Element.prototype.setAttribute = function(n, v) { this.attrs[n] = String(v); };
+                Element.prototype.removeAttribute = function(n) { delete this.attrs[n]; };
+                const frame = new Element();
+                frame.setAttribute('name', '');
+                frame.setAttribute('data-pkb-bridge', '');
+                const mark = eval('(' + input.mark + ')');
+                const restore = eval('(' + input.restore + ')');
+                const marked = JSON.parse(mark.call(frame, 'temp-name'));
+                const restored = restore.call(frame, marked);
+                const dropped = new Element();
+                dropped.setAttribute('id', 'kept');
+                const markedDrop = JSON.parse(mark.call(dropped, 'temp-name'));
+                restore.call(dropped, markedDrop);
+                const broken = restore.call(frame, null);
+                fs.writeFileSync(process.argv[3], JSON.stringify({
+                  marked,
+                  restored,
+                  name: frame.getAttribute('name'),
+                  hadName: frame.hasAttribute('name'),
+                  bridge: frame.getAttribute('data-pkb-bridge'),
+                  hadBridge: frame.hasAttribute('data-pkb-bridge'),
+                  droppedName: dropped.hasAttribute('name'),
+                  broken
+                }));
+                """);
+        Path in = dir.resolve("in.json");
+        Path out = dir.resolve("out.json");
+        new ObjectMapper().writeValue(in.toFile(), Map.of(
+                "mark", PageSurfaces.frameMarkSource(),
+                "restore", PageSurfaces.frameRestoreSource()
+        ));
+        Process process = new ProcessBuilder("node", script.toString(), in.toString(), out.toString()).redirectErrorStream(true).start();
+        boolean finished = process.waitFor(20, TimeUnit.SECONDS);
+        String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+        assertTrue(finished && process.exitValue() == 0 && Files.isRegularFile(out), output);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> parsed = new ObjectMapper().readValue(out.toFile(), Map.class);
+        assertEquals(Boolean.TRUE, parsed.get("restored"));
+        assertEquals(Boolean.TRUE, parsed.get("hadName"));
+        assertEquals("", parsed.get("name"));
+        assertEquals(Boolean.TRUE, parsed.get("hadBridge"));
+        assertEquals("", parsed.get("bridge"));
+        assertEquals(Boolean.FALSE, parsed.get("droppedName"));
+        assertEquals(Boolean.FALSE, parsed.get("broken"));
+    }
+
+    @Test
+    void frameRestoreFailureFailsTheCommand() {
+        WebDriver live = cdpDriver("tab-a", (method, params) -> {
+            if ("Page.getFrameTree".equals(method)) {
+                return Map.of("frameTree", Map.of(
+                        "frame", Map.of("id", "main"),
+                        "childFrames", List.of(Map.of("frame", Map.of("id", "child-1")))
+                ));
+            }
+            if ("DOM.getFrameOwner".equals(method)) return Map.of("backendNodeId", 42);
+            if ("DOM.resolveNode".equals(method)) return Map.of("object", Map.of("objectId", "obj-1"));
+            if ("Runtime.callFunctionOn".equals(method)) {
+                String function = String.valueOf(params.get("functionDeclaration"));
+                if (function.contains("removeAttribute")) return Map.of("result", Map.of("value", false));
+                return Map.of("result", Map.of("value", "{\"name\":\"temp\",\"changedName\":true,\"previousBridge\":null}"));
+            }
+            return Map.of();
+        }, spec -> Map.of("ok", true));
+        PageSurfaces.manage(live, "chrome-headed-quiet", true);
+        PageSurfaces.bindFrame(live, "tab-a", "child-1");
+        IllegalStateException failure = assertThrows(IllegalStateException.class, () ->
+                PageSurfaces.place(null, "replace", "child-1:15", null, "<b>x</b>", "html", null, null, null));
+        assertTrue(failure.getMessage().toLowerCase().contains("frame"), failure.getMessage());
     }
 
     private static final AtomicBoolean THROW_FRAME = new AtomicBoolean(false);
@@ -1267,6 +1430,80 @@ class AgentLiveFixTest {
 
     private static final AtomicReference<String> LAST_SCRIPT = new AtomicReference<>();
     private static String lastHelperHtml = "";
+
+    private static Path stdioBinary(Path binary, Path log) throws IOException {
+        return stdioBinary(binary, log, false);
+    }
+
+    private static Path stdioBinary(Path binary, Path log, boolean rejectPageTargets) throws IOException {
+        Files.writeString(binary, """
+                #!/usr/bin/env python3
+                import json, sys
+                log = open(%s, "a", encoding="utf-8")
+                reject_pages = %s
+                for line in sys.stdin:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    req = json.loads(line)
+                    argv = req.get("argv") or []
+                    log.write(json.dumps(argv) + "\\n")
+                    log.flush()
+                    def flag(name):
+                        if name in argv:
+                            index = argv.index(name)
+                            if index + 1 < len(argv):
+                                return argv[index + 1]
+                        return ""
+                    exit_code = 0
+                    if "version" in argv:
+                        body = {"version": "2.4.0"}
+                    elif len(argv) >= 2 and argv[0] == "session" and argv[1] == "create":
+                        cdp = flag("--cdp")
+                        if reject_pages and "/devtools/page/" in cdp:
+                            exit_code = 1
+                            body = {"ok": False, "error": "page session refused"}
+                        else:
+                            body = {"ok": True, "id": flag("--id"), "cdp": cdp, "launched": False}
+                    else:
+                        body = {"ok": True}
+                    sys.stdout.write(json.dumps({
+                        "id": req.get("id"),
+                        "exit": exit_code,
+                        "stdout": json.dumps(body),
+                        "stderr": ""
+                    }) + "\\n")
+                    sys.stdout.flush()
+                """.formatted(new ObjectMapper().writeValueAsString(log.toString()), rejectPageTargets ? "True" : "False"));
+        Files.setPosixFilePermissions(binary, Set.of(
+                PosixFilePermission.OWNER_READ,
+                PosixFilePermission.OWNER_WRITE,
+                PosixFilePermission.OWNER_EXECUTE
+        ));
+        return binary;
+    }
+
+    private static WebDriver closingTabs(AtomicReference<String> current, LinkedHashSet<String> tabs) {
+        AtomicReference<WebDriver> self = new AtomicReference<>();
+        Object switcher = locator(self, current);
+        WebDriver driver = (WebDriver) Proxy.newProxyInstance(
+                WebDriver.class.getClassLoader(),
+                new Class<?>[]{WebDriver.class, JavascriptExecutor.class},
+                (proxy, method, args) -> switch (method.getName()) {
+                    case "getWindowHandles" -> new LinkedHashSet<>(tabs);
+                    case "getWindowHandle" -> current.get();
+                    case "switchTo" -> switcher;
+                    case "close" -> {
+                        tabs.remove(current.get());
+                        yield null;
+                    }
+                    case "executeScript" -> Map.of("ok", true);
+                    default -> defaultValue(method.getReturnType());
+                }
+        );
+        self.set(driver);
+        return driver;
+    }
 
     private static Process chatChild(Path project, String run) throws IOException {
         return new ProcessBuilder(

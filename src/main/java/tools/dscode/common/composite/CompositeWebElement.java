@@ -102,6 +102,9 @@ public final class CompositeWebElement implements WebElement {
         this.visualOnly = "visual".equalsIgnoreCase(source)
                 || "desktop".equalsIgnoreCase(source)
                 || codes.contains("source_only");
+        if (this.handle != null && !this.handle.isBlank() && owner != null) {
+            tools.dscode.common.agentcontrol.AgentControl.bindHandle(this.handle, owner, tab);
+        }
         if (this.geometry != null
                 && this.geometry.visualViewportRelative() != null
                 && this.handle != null

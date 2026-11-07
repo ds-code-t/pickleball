@@ -44,11 +44,19 @@ final class PageSurfaces {
     private static final CopyOnWriteArrayList<Managed> MANAGED = new CopyOnWriteArrayList<>();
     private static volatile WebDriver driver;
     private static volatile String focusedTab;
-    private static final Map<String, FrameOwner> FRAMES = new java.util.concurrent.ConcurrentHashMap<>();
+    private static final CopyOnWriteArrayList<FrameOwner> FRAME_LIST = new CopyOnWriteArrayList<>();
+    private static final java.util.concurrent.ConcurrentHashMap<String, HandleOwner> HANDLE_OWNERS = new java.util.concurrent.ConcurrentHashMap<>();
+    private static final ThreadLocal<Focus> THREAD_FOCUS = new ThreadLocal<>();
     private static final Map<String, int[]> GEOMETRY = new java.util.concurrent.ConcurrentHashMap<>();
     private static final java.util.Set<String> CDP_HIGHLIGHTS = java.util.concurrent.ConcurrentHashMap.newKeySet();
 
-    private record FrameOwner(String browserId, WebDriver driver, String tab) {
+    private record Focus(WebDriver driver, String tab) {
+    }
+
+    private record HandleOwner(String browserId, String tab, WebDriver driver) {
+    }
+
+    private record FrameOwner(String browserId, WebDriver driver, String tab, String frameId) {
     }
 
     private static final String LIVE_HELPER = """
@@ -201,10 +209,10 @@ final class PageSurfaces {
      * The caller restores both after switchTo().frame(name).
      */
     static final String FRAME_MARK =
-            "function(token){ if (!this || this.nodeType !== 1) return ''; var tag = String(this.tagName || '').toLowerCase(); if (tag !== 'iframe' && tag !== 'frame') return ''; var previousName = this.getAttribute('name'); var name = previousName || this.getAttribute('id') || ''; var changedName = false; if (!name) { this.setAttribute('name', token); name = token; changedName = true; } var previousBridge = this.getAttribute('data-pkb-bridge'); this.setAttribute('data-pkb-bridge', token); return JSON.stringify({name:name, changedName:changedName, previousBridge:previousBridge}); }";
+            "function(token){ if (!this || this.nodeType !== 1) return ''; var tag = String(this.tagName || '').toLowerCase(); if (tag !== 'iframe' && tag !== 'frame') return ''; var hadName = this.hasAttribute('name'); var previousName = hadName ? this.getAttribute('name') : null; var id = this.hasAttribute('id') ? this.getAttribute('id') : ''; var name = previousName; var changedName = false; if (name == null || name === '') { if (id) name = id; else { this.setAttribute('name', token); name = token; changedName = true; } } var hadBridge = this.hasAttribute('data-pkb-bridge'); var previousBridge = hadBridge ? this.getAttribute('data-pkb-bridge') : null; this.setAttribute('data-pkb-bridge', token); return JSON.stringify({name:name, changedName:changedName, hadName:hadName, previousName:previousName, hadBridge:hadBridge, previousBridge:previousBridge}); }";
 
     static final String FRAME_RESTORE =
-            "function(spec){ if (!this || this.nodeType !== 1 || !spec) return false; if (spec.changedName) this.removeAttribute('name'); if (spec.previousBridge == null || spec.previousBridge === '') this.removeAttribute('data-pkb-bridge'); else this.setAttribute('data-pkb-bridge', spec.previousBridge); return true; }";
+            "function(spec){ if (!this || this.nodeType !== 1 || !spec) return false; if (spec.changedName) { if (spec.hadName) this.setAttribute('name', spec.previousName == null ? '' : String(spec.previousName)); else this.removeAttribute('name'); } if (spec.hadBridge) this.setAttribute('data-pkb-bridge', spec.previousBridge == null ? '' : String(spec.previousBridge)); else this.removeAttribute('data-pkb-bridge'); return true; }";
 
     private PageSurfaces() {
     }
@@ -228,22 +236,31 @@ final class PageSurfaces {
     static void focus(WebDriver webDriver) {
         driver = webDriver;
         focusedTab = currentHandle(webDriver);
+        THREAD_FOCUS.set(new Focus(webDriver, focusedTab));
         CompositeRuntime.focusPage(webDriver, pageTarget(webDriver));
     }
 
     /** Ranked frame identity belongs to one browser and one tab. Not a scan. */
     static void bindFrame(WebDriver webDriver, String tab, String frameId) {
         if (webDriver == null || frameId == null || frameId.isBlank()) return;
-        String browserId = "";
-        for (Managed managed : MANAGED) {
-            if (managed.driver == webDriver) browserId = managed.id;
-        }
-        FRAMES.putIfAbsent(frameId, new FrameOwner(browserId, webDriver, tab == null ? "" : tab));
+        String browserId = browserId(webDriver);
+        String useTab = tab == null || tab.isBlank() ? "" : tab;
+        FRAME_LIST.removeIf(existing -> existing.driver == webDriver && useTab.equals(existing.tab) && frameId.equals(existing.frameId));
+        FRAME_LIST.add(new FrameOwner(browserId, webDriver, useTab, frameId));
+    }
+
+    /** The ranked handle carries browser and tab even when the hit has no visual box. */
+    static void bindHandle(WebDriver webDriver, String tab, String handle) {
+        if (webDriver == null || handle == null || handle.isBlank()) return;
+        String useTab = tab == null || tab.isBlank() ? text(currentHandle(webDriver)) : tab;
+        HANDLE_OWNERS.put(handle, new HandleOwner(browserId(webDriver), useTab, webDriver));
+        HandleRef ref = parseHandle(handle);
+        if (ref.frameId != null) bindFrame(webDriver, useTab, ref.frameId);
     }
 
     /** Geometry view for a resolved handle. Visual-viewport x/y, not a page rect. */
     public static void rememberGeometry(String handle, double x, double y) {
-        rememberGeometry(handle, x, y, null, null);
+        rememberGeometry(handle, x, y, driver, focusedTabOf(driver));
     }
 
     /**
@@ -253,17 +270,22 @@ final class PageSurfaces {
     public static void rememberGeometry(String handle, double x, double y, WebDriver owner, String tab) {
         if (handle == null || handle.isBlank()) return;
         GEOMETRY.put(handle, new int[]{(int) Math.round(x), (int) Math.round(y)});
-        HandleRef ref = HandleRef.parse(handle);
-        if (ref.frameId != null && owner != null && !FRAMES.containsKey(ref.frameId)) {
-            bindFrame(owner, tab == null || tab.isBlank() ? currentHandle(owner) : tab, ref.frameId);
-        }
+        if (owner != null) bindHandle(owner, tab, handle);
     }
 
-    /** Driver whose debugger address owns the focused engine session. No global-driver fallback. */
+    /** Driver whose debugger address owns this thread's engine session. No global-driver fallback. */
     static WebDriver ownerForQuery() {
         String cdp = CompositeRuntime.focusedCdp();
         if (cdp == null || cdp.isBlank()) return null;
         String key = dev.domcomposite.Client.cdpKey(cdp);
+        Focus focus = THREAD_FOCUS.get();
+        if (focus != null && focus.driver instanceof RemoteWebDriver remote) {
+            String address = debuggerAddress(remote);
+            if (!address.isEmpty()) {
+                String browserKey = dev.domcomposite.Client.cdpKey(address);
+                if (browserKey.equals(key) || key.startsWith(browserKey + "/")) return focus.driver;
+            }
+        }
         for (Managed managed : MANAGED) {
             if (!(managed.driver instanceof RemoteWebDriver remote)) continue;
             String address = debuggerAddress(remote);
@@ -275,6 +297,8 @@ final class PageSurfaces {
     }
 
     static String focusedTabOf(WebDriver web) {
+        Focus focus = THREAD_FOCUS.get();
+        if (focus != null && focus.driver == web && focus.tab != null && !focus.tab.isBlank()) return focus.tab;
         if (web != null && web == driver && focusedTab != null && !focusedTab.isBlank()) return focusedTab;
         return currentHandle(web);
     }
@@ -314,7 +338,9 @@ final class PageSurfaces {
         MANAGED.clear();
         driver = null;
         focusedTab = null;
-        FRAMES.clear();
+        THREAD_FOCUS.remove();
+        FRAME_LIST.clear();
+        HANDLE_OWNERS.clear();
         GEOMETRY.clear();
         CDP_HIGHLIGHTS.clear();
         HIGHLIGHT_SITES.clear();
@@ -938,8 +964,8 @@ final class PageSurfaces {
     private static boolean resolved(String handle) {
         if (handle == null || handle.isBlank()) return false;
         if (GEOMETRY.containsKey(handle)) return true;
-        HandleRef ref = HandleRef.parse(handle);
-        return ref.frameId != null && FRAMES.containsKey(ref.frameId);
+        HandleRef ref = parseHandle(handle);
+        return ref.frameId != null && frameOwner(HandleRef.parse(handle)) != null;
     }
 
     private static LiveResult runLive(String op, String handle, String where, String css, String html, String kind, String sentence, String id) {
@@ -1017,36 +1043,56 @@ final class PageSurfaces {
     private static WebDriver resolveDriver(String handle) {
         ENTRY_FAILURE.remove();
         HandleRef ref = HandleRef.parse(handle);
-        if (ref.frameId != null) {
-            FrameOwner owner = FRAMES.get(ref.frameId);
-            if (owner != null) {
-                if (!browserStillManaged(owner)) {
-                    ENTRY_FAILURE.set("unknown handle");
-                    return null;
-                }
-                if (!activate(owner.driver, owner.tab)) {
-                    ENTRY_FAILURE.set("tab switch failed");
-                    return null;
-                }
-                if (!enterFrame(owner.driver, ref.frameId)) {
-                    ENTRY_FAILURE.set("frame entry failed");
-                    return null;
-                }
-                driver = owner.driver;
-                focusedTab = owner.tab;
-                CompositeRuntime.focusPage(owner.driver, pageTarget(owner.driver));
-                return owner.driver;
-            }
-            if (!GEOMETRY.containsKey(handle)) {
+        if (ref.frameId != null || ref.browserId != null) {
+            FrameOwner owner = frameOwner(ref);
+            if (owner == null) {
                 ENTRY_FAILURE.set("unknown handle");
                 return null;
             }
+            if (!browserStillManaged(owner)) {
+                ENTRY_FAILURE.set("unknown handle");
+                return null;
+            }
+            if (!activate(owner.driver, owner.tab)) {
+                ENTRY_FAILURE.set("tab switch failed");
+                return null;
+            }
+            if (ref.frameId != null && !enterFrame(owner.driver, ref.frameId)) {
+                ENTRY_FAILURE.set("frame entry failed");
+                return null;
+            }
+            driver = owner.driver;
+            focusedTab = owner.tab;
+            THREAD_FOCUS.set(new Focus(owner.driver, owner.tab));
+            CompositeRuntime.focusPage(owner.driver, pageTarget(owner.driver));
+            return owner.driver;
         }
         if (driver != null && focusedTab != null && !focusedTab.isBlank() && !activate(driver, focusedTab)) {
             ENTRY_FAILURE.set("tab switch failed");
             return null;
         }
         return driver;
+    }
+
+    private static FrameOwner frameOwner(HandleRef ref) {
+        if (ref == null) return null;
+        HandleOwner bound = ref.raw == null ? null : HANDLE_OWNERS.get(ref.raw);
+        if (bound != null) return new FrameOwner(bound.browserId, bound.driver, bound.tab, ref.frameId);
+        if (ref.frameId == null) return null;
+        for (FrameOwner owner : FRAME_LIST) {
+            if (ref.frameId.equals(owner.frameId)) return owner;
+        }
+        return null;
+    }
+
+    private static String browserId(WebDriver webDriver) {
+        for (Managed managed : MANAGED) {
+            if (managed.driver == webDriver) return managed.id;
+        }
+        if (webDriver instanceof RemoteWebDriver remote && remote.getSessionId() != null) {
+            return remote.getSessionId().toString();
+        }
+        return "";
     }
 
     private static boolean browserStillManaged(FrameOwner owner) {
@@ -1059,10 +1105,19 @@ final class PageSurfaces {
         return false;
     }
 
-    /** @return false when the ranked frame could not be entered. A driver without CDP is already on its document. */
+    /** @return false when the ranked frame was not entered. A driver without CDP does not pretend it entered. */
     private static boolean enterFrame(WebDriver web, String frameId) {
         if (web == null || frameId == null || frameId.isBlank()) return false;
-        if (!cdpCapable(web)) return true;
+        if (!cdpCapable(web)) {
+            try {
+                web.switchTo().defaultContent();
+                web.switchTo().frame(frameId);
+                return true;
+            } catch (RuntimeException failure) {
+                CompositeLog.info("window", "frame enter failed " + frameId + " " + failure.getMessage());
+                return false;
+            }
+        }
         try {
             web.switchTo().defaultContent();
             List<String> chain = frameChain(web, frameId);
@@ -1086,10 +1141,15 @@ final class PageSurfaces {
                     web.switchTo().frame(mutation.name);
                 } catch (RuntimeException failure) {
                     CompositeLog.info("window", "frame switch failed " + id + " " + failure.getMessage());
-                    restoreFrame(web, mutation);
+                    if (!restoreFrame(web, mutation)) {
+                        CompositeLog.info("window", "frame bridge restore failed " + id);
+                    }
                     return false;
                 }
-                restoreFrame(web, mutation);
+                if (!restoreFrame(web, mutation)) {
+                    CompositeLog.info("window", "frame bridge restore failed " + id);
+                    return false;
+                }
             }
             return true;
         } catch (RuntimeException failure) {
@@ -1132,7 +1192,15 @@ final class PageSurfaces {
         return null;
     }
 
-    private record FrameMutation(String objectId, String name, boolean changedName, String previousBridge) {}
+    private record FrameMutation(
+            String objectId,
+            String name,
+            boolean changedName,
+            boolean hadName,
+            String previousName,
+            boolean hadBridge,
+            String previousBridge
+    ) {}
 
     private static FrameMutation frameSwitchName(WebDriver web, int backend) {
         try {
@@ -1152,27 +1220,46 @@ final class PageSurfaces {
             if (name.isBlank()) return null;
             JsonNode previous = node.get("previousBridge");
             String previousBridge = previous == null || previous.isNull() ? null : previous.asText("");
-            return new FrameMutation(objectId, name, node.path("changedName").asBoolean(false), previousBridge);
+            JsonNode previousName = node.get("previousName");
+            return new FrameMutation(
+                    objectId,
+                    name,
+                    node.path("changedName").asBoolean(false),
+                    node.path("hadName").asBoolean(false),
+                    previousName == null || previousName.isNull() ? null : previousName.asText(""),
+                    node.path("hadBridge").asBoolean(false),
+                    previousBridge
+            );
         } catch (RuntimeException | IOException failure) {
             CompositeLog.info("window", "frame owner bridge failed " + failure.getMessage());
             return null;
         }
     }
 
-    private static void restoreFrame(WebDriver web, FrameMutation mutation) {
-        if (web == null || mutation == null || mutation.objectId == null || mutation.objectId.isBlank()) return;
+    /** @return false when the temporary name or bridge was not put back. Callers must fail the command. */
+    private static boolean restoreFrame(WebDriver web, FrameMutation mutation) {
+        if (web == null || mutation == null || mutation.objectId == null || mutation.objectId.isBlank()) return false;
         try {
             Map<String, Object> spec = new LinkedHashMap<>();
             spec.put("changedName", mutation.changedName);
+            spec.put("hadName", mutation.hadName);
+            spec.put("previousName", mutation.previousName);
+            spec.put("hadBridge", mutation.hadBridge);
             spec.put("previousBridge", mutation.previousBridge);
             Map<String, Object> call = new LinkedHashMap<>();
             call.put("objectId", mutation.objectId);
             call.put("functionDeclaration", FRAME_RESTORE);
             call.put("arguments", List.of(Map.of("value", spec)));
             call.put("returnByValue", true);
-            cdp(web, "Runtime.callFunctionOn", call);
+            Object returned = cdp(web, "Runtime.callFunctionOn", call);
+            if (!"true".equals(textValue(returned))) {
+                CompositeLog.info("window", "frame bridge restore failed");
+                return false;
+            }
+            return true;
         } catch (RuntimeException failure) {
             CompositeLog.info("window", "frame bridge restore failed " + failure.getMessage());
+            return false;
         }
     }
 
@@ -1867,6 +1954,7 @@ final class PageSurfaces {
             if (!tab.equals(current)) web.switchTo().window(tab);
             focusedTab = tab;
             driver = web;
+            THREAD_FOCUS.set(new Focus(web, tab));
             CompositeRuntime.focusPage(web, pageTarget(web));
             return true;
         } catch (RuntimeException failure) {
@@ -1903,20 +1991,27 @@ final class PageSurfaces {
         }
     }
 
-    /** Ranked find-interface id: {@code frameId:backendNodeId}, same as {@code DomCompositeAdapter.matchNode}. */
-    record HandleRef(String raw, String frameId, Integer backend) {
+    /** Ranked find-interface id: {@code frameId:backendNodeId}, plus the browser and tab bound to that hit. */
+    record HandleRef(String raw, String frameId, Integer backend, String browserId, String tab) {
         static HandleRef parse(String handle) {
-            if (handle == null || handle.isBlank()) return new HandleRef("", null, null);
-            int colon = handle.lastIndexOf(':');
-            if (colon > 0 && colon < handle.length() - 1) {
-                try {
-                    int backend = Integer.parseInt(handle.substring(colon + 1));
-                    return new HandleRef(handle, handle.substring(0, colon), backend);
-                } catch (NumberFormatException ignored) {
-                    return new HandleRef(handle, null, null);
-                }
-            }
-            return new HandleRef(handle, null, null);
+            HandleRef parsed = parseHandle(handle);
+            HandleOwner owner = parsed.raw == null || parsed.raw.isBlank() ? null : HANDLE_OWNERS.get(parsed.raw);
+            if (owner == null) return parsed;
+            return new HandleRef(parsed.raw, parsed.frameId, parsed.backend, owner.browserId, owner.tab);
         }
+    }
+
+    private static HandleRef parseHandle(String handle) {
+        if (handle == null || handle.isBlank()) return new HandleRef("", null, null, null, null);
+        int colon = handle.lastIndexOf(':');
+        if (colon > 0 && colon < handle.length() - 1) {
+            try {
+                int backend = Integer.parseInt(handle.substring(colon + 1));
+                return new HandleRef(handle, handle.substring(0, colon), backend, null, null);
+            } catch (NumberFormatException ignored) {
+                return new HandleRef(handle, null, null, null, null);
+            }
+        }
+        return new HandleRef(handle, null, null, null, null);
     }
 }

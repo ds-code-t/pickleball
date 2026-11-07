@@ -110,13 +110,18 @@ final class WindowRegistry {
                 managed.driver().switchTo().window(handle);
                 managed.driver().close();
                 java.util.Set<String> left = managed.driver().getWindowHandles();
+                String survivor;
                 if (left == null || left.isEmpty()) {
                     PageSurfaces.detach(managed.driver());
+                    CompositeLog.info("window", "close " + handle);
+                    return new Handle(handle, "tab", managed.template(), "", "", false);
                 } else if (current != null && left.contains(current) && !current.equals(handle)) {
-                    managed.driver().switchTo().window(current);
+                    survivor = current;
                 } else {
-                    managed.driver().switchTo().window(left.iterator().next());
+                    survivor = left.iterator().next();
                 }
+                managed.driver().switchTo().window(survivor);
+                PageSurfaces.focus(managed.driver());
                 CompositeLog.info("window", "close " + handle);
                 return new Handle(handle, "tab", managed.template(), "", "", false);
             } catch (RuntimeException failure) {

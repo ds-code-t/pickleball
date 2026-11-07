@@ -141,8 +141,16 @@ public final class CompositeRuntime {
         return client;
     }
 
-    /** DevTools endpoint of the browser this thread's engine session is focused on. */
+    /** DevTools endpoint of the session this thread will actually query, not another thread's focus. */
     public static String focusedCdp() {
+        Client open = client;
+        if (open != null) {
+            Session session = open.currentSession();
+            if (session != null && !session.isClosed()) {
+                String cdp = session.cdp();
+                if (cdp != null && !cdp.isBlank()) return cdp;
+            }
+        }
         return joinedCdp;
     }
 
@@ -172,26 +180,35 @@ public final class CompositeRuntime {
         String normalized = pageTarget == null || pageTarget.isBlank()
                 ? browser
                 : Client.withTarget(browser, pageTarget);
-        joinedCdp = normalized;
+        String previous = joinedCdp;
         String key = Client.cdpKey(normalized);
         String id = SESSIONS_BY_CDP.get(key);
         Client open = client;
         if (open != null && id != null) {
             open.focusSession(id);
+            joinedCdp = normalized;
             return;
         }
         if (pageTarget != null && !pageTarget.isBlank()) {
-            openSession(normalized, key);
+            if (!openSession(normalized, key)) joinedCdp = previous;
             return;
         }
         String browserId = SESSIONS_BY_CDP.get(Client.cdpKey(browser));
-        if (open != null && browserId != null) open.focusSession(browserId);
+        if (open != null && browserId != null) {
+            open.focusSession(browserId);
+            joinedCdp = browser;
+        }
     }
 
     /** True after {@link #attach} joined a CDP browser. A process-only session is not joined. */
     public static boolean browserJoined() {
         String joined = joinedCdp;
         return joined != null && !joined.isBlank();
+    }
+
+    /** Test seam. The global join pointer, which must not name a session that failed to open. */
+    public static String joinedForTests() {
+        return joinedCdp;
     }
 
     /** Test seam. Production join is {@link #attach}. */
@@ -252,9 +269,10 @@ public final class CompositeRuntime {
         }
     }
 
-    private static void openSession(String normalized, String key) {
+    /** @return false when the page session did not open. Does not leave {@code joinedCdp} on that target. */
+    private static boolean openSession(String normalized, String key) {
         Client open = client;
-        if (open == null || normalized == null || normalized.isBlank()) return;
+        if (open == null || normalized == null || normalized.isBlank()) return false;
         try {
             Map<String, Object> config = new LinkedHashMap<>();
             config.put("cdp", normalized);
@@ -264,12 +282,14 @@ public final class CompositeRuntime {
             SESSIONS_BY_CDP.put(key, session.id());
             joinedCdp = normalized;
             CompositeLog.info("session", "joined " + normalized + " id=" + session.id());
+            return true;
         } catch (RuntimeException failure) {
             CompositeLog.errorFix(
                     "session",
                     "dom-composite could not join the page session: " + failure.getMessage(),
                     "Leave pkb_composite=auto so this run stays on Selenium, or fix COMPOSITE_BIN."
             );
+            return false;
         }
     }
 

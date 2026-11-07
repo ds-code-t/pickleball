@@ -140,7 +140,8 @@ public final class AllContextsScan {
             try {
                 driver.manage().timeouts().implicitlyWait(Duration.ZERO);
                 startPath = capturePath();
-                if (applyComposite()) {
+                String originTab = safeHandle();
+                if (applyComposite(originTab)) {
                     return finish();
                 }
                 searchDocument(driver, startPath == null ? List.of() : startPath, 0, false);
@@ -162,7 +163,7 @@ public final class AllContextsScan {
             return finish();
         }
 
-        private boolean applyComposite() {
+        private boolean applyComposite(String originTab) {
             if (xpath == null || !tools.dscode.common.composite.ElementOperations.primary()) {
                 return false;
             }
@@ -196,7 +197,7 @@ public final class AllContextsScan {
                 } else {
                     collected.add(Hit.live(
                             tools.dscode.common.composite.CompositeWebElement.fromQuery(
-                                    xpath, hit.node(), live, driver, safeHandle())
+                                    xpath, hit.node(), live, driver, originTab)
                     ));
                     live++;
                 }

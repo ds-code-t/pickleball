@@ -30,12 +30,17 @@ public final class AgentControl {
 
     /** Geometry already resolved for a ranked handle. Overlay placement looks this up. */
     public static void rememberGeometry(String handle, double x, double y) {
-        PageSurfaces.rememberGeometry(handle, x, y, null, null);
+        PageSurfaces.rememberGeometry(handle, x, y);
     }
 
     /** Query-time owner. Not inferred again from global focus when the box is stored. */
     public static void rememberGeometry(String handle, double x, double y, WebDriver owner, String tab) {
         PageSurfaces.rememberGeometry(handle, x, y, owner, tab);
+    }
+
+    /** Binds browser and tab onto the handle itself, including hits with no visual geometry. */
+    public static void bindHandle(String handle, WebDriver owner, String tab) {
+        PageSurfaces.bindHandle(owner, tab, handle);
     }
 
     public static WebDriver queryOwner() {
