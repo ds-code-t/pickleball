@@ -1,7 +1,9 @@
 package tools.dscode.common.composite;
 
 import dev.domcomposite.Client;
+import dev.domcomposite.Session;
 import org.openqa.selenium.Capabilities;
+import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.remote.RemoteWebDriver;
 
 import java.nio.file.Path;
@@ -10,6 +12,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 import tools.dscode.control.protocol.DirectControlProvider;
 
 /**
@@ -25,6 +28,7 @@ public final class CompositeRuntime {
     private static volatile Client client;
     private static volatile String joinedCdp;
     private static volatile Sources override;
+    private static final Map<String, String> SESSIONS_BY_CDP = new ConcurrentHashMap<>();
 
     private CompositeRuntime() {
     }
@@ -95,6 +99,7 @@ public final class CompositeRuntime {
         closeClient();
         decision = null;
         joinedCdp = null;
+        SESSIONS_BY_CDP.clear();
         override = new Sources(
                 project == null ? Path.of("").toAbsolutePath() : project,
                 env,
@@ -110,6 +115,7 @@ public final class CompositeRuntime {
         closeClient();
         decision = null;
         joinedCdp = null;
+        SESSIONS_BY_CDP.clear();
         override = null;
         CompositeLog.resetForTests();
         DomCompositeAdapter.get().resetDryRunForTests();
@@ -133,6 +139,32 @@ public final class CompositeRuntime {
         Decision now = current();
         if (!now.primary) return null;
         return client;
+    }
+
+    /** DevTools endpoint of the browser this thread's engine session is focused on. */
+    public static String focusedCdp() {
+        return joinedCdp;
+    }
+
+    /** Session id query and observe use when the caller does not pass one. */
+    public static String focusedSessionId() {
+        Client open = client;
+        if (open == null) return null;
+        Session session = open.currentSession();
+        return session == null ? null : session.id();
+    }
+
+    /** Window and tab focus follow the driver's engine session, not the first join. */
+    public static void focusDriver(WebDriver driver) {
+        if (!(driver instanceof RemoteWebDriver remote)) return;
+        String cdp = cdp(remote.getCapabilities());
+        if (cdp == null) return;
+        String normalized = DirectControlProvider.withScheme(cdp);
+        joinedCdp = normalized;
+        String id = SESSIONS_BY_CDP.get(Client.cdpKey(normalized));
+        if (id == null) id = SESSIONS_BY_CDP.get(normalized);
+        Client open = client;
+        if (open != null && id != null) open.focusSession(id);
     }
 
     /** True after {@link #attach} joined a CDP browser. A process-only session is not joined. */
@@ -162,27 +194,40 @@ public final class CompositeRuntime {
         return open;
     }
 
-    /** Opens a client when the binary is present. Does not throw. */
+    /** Opens a client when the binary is present. Does not throw. A second browser keeps its own session. */
     public static void attach(RemoteWebDriver driver) {
         try {
             Decision now = current();
             if (!now.primary) return;
-            String cdp = driver == null ? null : cdp(driver.getCapabilities());
-            if (cdp == null || cdp.equals(joinedCdp)) return;
+            String raw = driver == null ? null : cdp(driver.getCapabilities());
+            if (raw == null) return;
+            String normalized = DirectControlProvider.withScheme(raw);
+            String key = Client.cdpKey(normalized);
+            String known = SESSIONS_BY_CDP.get(key);
+            if (known != null) {
+                joinedCdp = normalized;
+                if (client != null) client.focusSession(known);
+                return;
+            }
+            if (client != null && client.currentSession() != null && normalized.equals(joinedCdp)) {
+                SESSIONS_BY_CDP.put(key, client.currentSession().id());
+                return;
+            }
             Map<String, Object> config = new LinkedHashMap<>();
-            config.put("cdp", DirectControlProvider.withScheme(cdp));
+            config.put("cdp", normalized);
             config.put("i_accept_local_attach", true);
             config.put("process", true);
-            client.openSession(config);
-            joinedCdp = cdp;
-            CompositeLog.info("session", "joined " + cdp);
+            Session session = client.openSession(config);
+            SESSIONS_BY_CDP.put(key, session.id());
+            joinedCdp = normalized;
+            CompositeLog.info("session", "joined " + normalized + " id=" + session.id());
         } catch (RuntimeException failure) {
             CompositeLog.errorFix(
                     "session",
                     "dom-composite could not join the browser session: " + failure.getMessage(),
                     "Leave pkb_composite=auto so this run stays on Selenium, or fix COMPOSITE_BIN."
             );
-            forceLegacy();
+            if (SESSIONS_BY_CDP.isEmpty()) forceLegacy();
         }
     }
 

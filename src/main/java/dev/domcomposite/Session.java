@@ -22,6 +22,11 @@ public final class Session implements AutoCloseable {
         return id;
     }
 
+    /** DevTools endpoint recorded by {@code session create}, or empty. */
+    public String cdp() {
+        return record == null ? "" : record.path("cdp").asText("");
+    }
+
     /** The JSON object returned by {@code session create}. */
     public JsonNode record() {
         return record;

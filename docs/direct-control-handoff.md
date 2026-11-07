@@ -169,5 +169,5 @@ Pass `compositeSessionId` on the later tool call. Close with `session close` onl
 
 Pickleball writes the descriptor, the CLI, the hold, and the provider key. dom-composite stays a general tool and does not grow a Pickleball-only flag.
 
-Agent browser commands (`observe`, `launch`, windows and tabs, chat, highlight, overlay, HTML write, `capture-scenario`) are the Workbench CLI. They do not add a Pickleball flag to the engine. `observe` reads the CDP Session buffer the engine already keeps. `capture-scenario` writes existing service-call Gherkin. Join the descriptor session before a live `observe` against that browser.
+Agent browser commands (`observe`, `launch`, windows and tabs, chat, highlight, overlay, HTML write, `capture-scenario`) are the Workbench CLI. They do not add a Pickleball flag to the engine. `observe` reads the same CDP Session query and settle use, not a second capture socket. `capture-scenario` writes existing service-call Gherkin. Join the descriptor session before a live `observe` against that browser. Focusing another managed browser selects that browser's engine session.
 

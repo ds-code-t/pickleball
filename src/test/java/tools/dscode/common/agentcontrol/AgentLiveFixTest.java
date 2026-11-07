@@ -4,8 +4,20 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.openqa.selenium.JavascriptExecutor;
+import org.openqa.selenium.MutableCapabilities;
 import org.openqa.selenium.WebDriver;
+import org.openqa.selenium.remote.RemoteWebDriver;
+import org.openqa.selenium.remote.Response;
+import tools.dscode.common.composite.CompositeRuntime;
+
+import java.io.BufferedReader;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.util.LinkedHashMap;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
 
 import java.io.IOException;
 import java.lang.reflect.Proxy;
@@ -15,6 +27,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.nio.file.attribute.PosixFilePermission;
 import java.util.concurrent.TimeUnit;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -216,12 +229,14 @@ class AgentLiveFixTest {
                     "lock"
             ).redirectErrorStream(true).start();
             try {
-                Thread.sleep(500);
+                BlockingQueue<String> lines = pump(child);
+                String ready = lines.poll(15, TimeUnit.SECONDS);
+                assertEquals("ready", ready);
                 assertTrue(child.isAlive(), "chat send must wait while another process holds the lock");
                 held.release();
                 boolean finished = child.waitFor(15, TimeUnit.SECONDS);
-                String output = new String(child.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-                assertTrue(finished, output);
+                String output = String.join("\n", drain(lines));
+                assertTrue(finished, ready + "\n" + output);
                 assertEquals(0, child.exitValue(), output);
                 assertTrue(output.contains("id=1"), output);
             } finally {
@@ -361,6 +376,346 @@ class AgentLiveFixTest {
         assertEquals("pkb-2", events.get(0).get("id"));
     }
 
+    @Test
+    void sanitizerDropsC0JavascriptAndActiveHtmlButKeepsUnquotedUrls() {
+        String control = PageSurfaces.neutralize("<a href=\"&#1;javascript:alert(1)\">go</a>");
+        assertFalse(control.toLowerCase().contains("javascript"), control);
+        assertFalse(control.toLowerCase().contains("alert"), control);
+        assertTrue(control.contains(">go</a>"), control);
+        String hex = PageSurfaces.neutralize("<a href=\"&#x1;javascript:alert(1)\">go</a>");
+        assertFalse(hex.toLowerCase().contains("javascript"), hex);
+        String frame = PageSurfaces.neutralize("<iframe src=\"data:text/html,%3Cscript%3Ealert(1)%3C/script%3E\"></iframe>");
+        assertFalse(frame.toLowerCase().contains("script"), frame);
+        assertFalse(frame.toLowerCase().contains("data:text/html"), frame);
+        assertTrue(frame.toLowerCase().contains("<iframe"), frame);
+        String url = PageSurfaces.neutralize("<a href=https://example.test/a>go</a>");
+        assertTrue(url.contains("https://example.test/a"), url);
+        assertFalse(url.contains("href=\"https:\""), url);
+        String kept = PageSurfaces.neutralize("<section><p class=\"note\">Hello <b>there</b></p></section>");
+        assertTrue(kept.contains("<section>"), kept);
+        assertTrue(kept.contains("<b>there</b>"), kept);
+    }
+
+    @Test
+    void geometryBindsTheQueryOwnerNotWhicheverBrowserIsFocusedLater() throws Exception {
+        AtomicInteger wrong = new AtomicInteger();
+        WebDriver first = scriptDriver("tab-a", spec -> {
+            wrong.incrementAndGet();
+            return Map.of("ok", true, "x", 1, "y", 1);
+        }, false);
+        WebDriver second = scriptDriver("tab-b", spec -> Map.of("ok", true, "x", spec.get("x"), "y", spec.get("y")), false);
+        PageSurfaces.manage(first, "chrome-headed-quiet", true);
+        PageSurfaces.manage(second, "edge-headed-quiet", true);
+        PageSurfaces.focus(first);
+        PageSurfaces.rememberGeometry("frame-b:15", 12, 18, second, "tab-b");
+        PageSurfaces.focus(first);
+        Map<String, Object> placed = PageSurfaces.place(null, "append", "frame-b:15", null, "<b>here</b>", "overlay", null, null, null);
+        assertEquals(0, wrong.get());
+        assertEquals(12, placed.get("x"));
+        assertEquals(18, placed.get("y"));
+    }
+
+    @Test
+    void explicitStylesFollowTheRequestOrSayTheyFellBack() throws Exception {
+        List<Map<String, Object>> configs = new ArrayList<>();
+        WebDriver live = cdpDriver("tab-a", (method, params) -> {
+            if ("Overlay.highlightNode".equals(method) && params.get("highlightConfig") instanceof Map<?, ?> config) {
+                configs.add(cast(config));
+            }
+            return Map.of();
+        }, spec -> Map.of("ok", true));
+        PageSurfaces.manage(live, "chrome-headed-quiet", true);
+        PageSurfaces.bindFrame(live, "tab-a", "frame-a");
+        Map<String, Object> painted = PageSurfaces.highlight(
+                null, "frame-a:4", "yellow", "background-color:#abc; border: 2px solid tomato; border-color: rgb(1, 2, 3);", null, null, null, null);
+        assertEquals("Overlay.highlightNode", painted.get("cdp"));
+        assertFalse(painted.containsKey("styleNote"));
+        assertEquals(170, ((Map<?, ?>) configs.get(0).get("contentColor")).get("r"));
+        assertEquals(187, ((Map<?, ?>) configs.get(0).get("contentColor")).get("g"));
+        assertEquals(204, ((Map<?, ?>) configs.get(0).get("contentColor")).get("b"));
+        assertEquals(1, ((Number) ((Map<?, ?>) configs.get(0).get("borderColor")).get("r")).intValue());
+        assertEquals(2, ((Number) ((Map<?, ?>) configs.get(0).get("borderColor")).get("g")).intValue());
+        assertEquals(3, ((Number) ((Map<?, ?>) configs.get(0).get("borderColor")).get("b")).intValue());
+        PageSurfaces.clearDriver();
+        AtomicReference<String> css = new AtomicReference<>();
+        WebDriver dom = scriptDriver("tab-a", spec -> {
+            css.set(String.valueOf(spec.get("css")));
+            return Map.of("ok", true);
+        }, false);
+        PageSurfaces.manage(dom, "chrome-headed-quiet", true);
+        Map<String, Object> fallback = PageSurfaces.highlight(null, "save", "yellow", "transform: rotate(1deg);", null, null, null, null);
+        assertEquals("style", fallback.get("cdp"));
+        assertTrue(String.valueOf(fallback.get("styleNote")).contains("reversible DOM"), String.valueOf(fallback));
+        assertTrue(css.get().contains("transform"), css.get());
+    }
+
+    @Test
+    void unhighlightFailsWhenHideHighlightFails() throws Exception {
+        AtomicInteger dom = new AtomicInteger();
+        WebDriver live = cdpDriver("tab-a", (method, params) -> {
+            if ("Overlay.hideHighlight".equals(method)) throw new IllegalStateException("hide failed");
+            return Map.of();
+        }, spec -> {
+            dom.incrementAndGet();
+            return Map.of("ok", false, "error", "dom should not run");
+        });
+        PageSurfaces.manage(live, "chrome-headed-quiet", true);
+        PageSurfaces.bindFrame(live, "tab-a", "frame-a");
+        Map<String, Object> painted = PageSurfaces.highlight(null, "frame-a:9", "yellow", null, null, null, null, null);
+        assertEquals("Overlay.highlightNode", painted.get("cdp"));
+        IllegalStateException failure = assertThrows(IllegalStateException.class, () -> PageSurfaces.unhighlight(null, "frame-a:9"));
+        assertTrue(failure.getMessage().contains("hideHighlight"), failure.getMessage());
+        assertEquals(0, dom.get());
+        assertThrows(IllegalStateException.class, () -> PageSurfaces.cleanup(null));
+    }
+
+    @Test
+    void hideHighlightVisitsEveryTabThatHadAHighlight() throws Exception {
+        AtomicReference<String> current = new AtomicReference<>("tab-1");
+        List<String> hidden = new ArrayList<>();
+        WebDriver live = tabsCdp(current, new LinkedHashSet<>(List.of("tab-1", "tab-2")), (method, params) -> {
+            if ("Overlay.hideHighlight".equals(method)) hidden.add(current.get());
+            return Map.of();
+        }, spec -> Map.of("ok", true, "removed", 1));
+        PageSurfaces.manage(live, "chrome-headed-quiet", true);
+        PageSurfaces.bindFrame(live, "tab-1", "a");
+        PageSurfaces.highlight(null, "a:1", "yellow", null, null, null, null, null);
+        PageSurfaces.bindFrame(live, "tab-2", "b");
+        PageSurfaces.highlight(null, "b:2", "outline-red", null, null, null, null, null);
+        hidden.clear();
+        PageSurfaces.cleanup(null);
+        assertTrue(hidden.contains("tab-1"), hidden.toString());
+        assertTrue(hidden.contains("tab-2"), hidden.toString());
+    }
+
+    @Test
+    void liveHelperFindsABridgedNodeWithoutAPickledBackendAttribute() throws Exception {
+        Map<String, Object> highlight = runLiveHelper(Map.of(
+                "op", "highlight",
+                "bridge", "tok",
+                "handle", "child-1:15",
+                "backend", 15,
+                "css", "outline:1px solid red",
+                "sentence", "agent style"
+        ));
+        assertEquals(Boolean.TRUE, highlight.get("ok"));
+        assertTrue(lastHelperHtml.contains("data-pkb-style"), lastHelperHtml);
+        assertFalse(lastHelperHtml.contains("data-backend-node-id"), lastHelperHtml);
+        Map<String, Object> replaced = runLiveHelper(Map.of(
+                "op", "replace",
+                "bridge", "tok",
+                "handle", "child-1:15",
+                "backend", 15,
+                "html", "<b>bridged</b>",
+                "kind", "html",
+                "id", "pkb-9",
+                "sentence", "sentence",
+                "where", "after"
+        ));
+        assertEquals(Boolean.TRUE, replaced.get("ok"));
+        assertTrue(lastHelperHtml.contains("bridged"), lastHelperHtml);
+        assertTrue(lastHelperHtml.contains("data-pkb-agent"), lastHelperHtml);
+        assertFalse(lastHelperHtml.contains("ordinary"), lastHelperHtml);
+        assertFalse(lastHelperHtml.contains("data-backend-node-id"), lastHelperHtml);
+        Map<String, Object> inserted = runLiveHelper(Map.of(
+                "op", "insert",
+                "bridge", "tok",
+                "handle", "child-1:15",
+                "backend", 15,
+                "html", "<i>before</i>",
+                "kind", "html",
+                "id", "pkb-8",
+                "sentence", "sentence",
+                "where", "before"
+        ));
+        assertEquals(Boolean.TRUE, inserted.get("ok"));
+        assertTrue(lastHelperHtml.contains("before"), lastHelperHtml);
+        assertTrue(lastHelperHtml.contains("ordinary"), lastHelperHtml);
+        Map<String, Object> overlay = runLiveHelper(Map.of(
+                "op", "append",
+                "bridge", "tok",
+                "handle", "child-1:15",
+                "backend", 15,
+                "html", "<b>over</b>",
+                "kind", "overlay",
+                "id", "pkb-3",
+                "sentence", "sentence",
+                "x", 8,
+                "y", 9
+        ));
+        assertEquals(Boolean.TRUE, overlay.get("ok"));
+        assertEquals(8, ((Number) overlay.get("x")).intValue());
+        assertTrue(lastHelperHtml.contains("over"), lastHelperHtml);
+    }
+
+    @Test
+    void pageHelperBridgesAnOrdinaryNodeAndRunsTheRealHelper() throws Exception {
+        List<String> functions = new ArrayList<>();
+        WebDriver live = cdpDriver("tab-a", (method, params) -> {
+            if ("Page.getFrameTree".equals(method)) {
+                return Map.of("frameTree", Map.of(
+                        "frame", Map.of("id", "main"),
+                        "childFrames", List.of(Map.of("frame", Map.of("id", "child-1")))
+                ));
+            }
+            if ("DOM.getFrameOwner".equals(method)) return Map.of("backendNodeId", 42);
+            if ("DOM.resolveNode".equals(method)) return Map.of("object", Map.of("objectId", "obj-9"));
+            if ("Runtime.callFunctionOn".equals(method)) {
+                functions.add(String.valueOf(params.get("functionDeclaration")));
+                return Map.of("result", Map.of("value", true));
+            }
+            return Map.of();
+        }, spec -> {
+            try {
+                return runLiveHelper(cast(spec));
+            } catch (Exception failure) {
+                throw new IllegalStateException(failure);
+            }
+        });
+        PageSurfaces.manage(live, "chrome-headed-quiet", true);
+        PageSurfaces.bindFrame(live, "tab-a", "child-1");
+        Map<String, Object> placed = PageSurfaces.place(null, "replace", "child-1:15", null, "<b>bridged</b>", "html", null, null, null);
+        assertEquals(PageSurfaces.liveHelperSource(), LAST_SCRIPT.get());
+        assertTrue(functions.stream().anyMatch(fn -> fn.contains("data-pkb-bridge") && fn.contains("function(token)")), functions.toString());
+        assertTrue(functions.stream().noneMatch(fn -> fn.contains("bridged")), functions.toString());
+        assertTrue(lastHelperHtml.contains("bridged"), lastHelperHtml);
+        assertFalse(lastHelperHtml.contains("ordinary"), lastHelperHtml);
+        assertFalse(lastHelperHtml.contains("data-backend-node-id"), lastHelperHtml);
+        assertFalse(String.valueOf(placed.get("id")).isBlank());
+    }
+
+    @Test
+    void twoProcessesAllocateDistinctSurfaceIdsUnderThePlacementLock() throws Exception {
+        Path file = temp.resolve("ledger/placements.json");
+        Process first = surfaceChild(file);
+        Process second = surfaceChild(file);
+        try {
+            BlockingQueue<String> one = pump(first);
+            BlockingQueue<String> two = pump(second);
+            assertEquals("ready", one.poll(15, TimeUnit.SECONDS));
+            assertEquals("ready", two.poll(15, TimeUnit.SECONDS));
+            assertTrue(first.waitFor(15, TimeUnit.SECONDS));
+            assertTrue(second.waitFor(15, TimeUnit.SECONDS));
+            String output = String.join("\n", drain(one)) + "\n" + String.join("\n", drain(two));
+            assertEquals(0, first.exitValue(), output);
+            assertEquals(0, second.exitValue(), output);
+            assertTrue(output.contains("id=pkb-1"), output);
+            assertTrue(output.contains("id=pkb-2"), output);
+            String stored = Files.readString(file);
+            assertTrue(stored.contains("\"pkb-1\""), stored);
+            assertTrue(stored.contains("\"pkb-2\""), stored);
+            assertTrue(stored.contains("summary-pkb-1"), stored);
+            assertTrue(stored.contains("summary-pkb-2"), stored);
+        } finally {
+            if (first.isAlive()) first.destroyForcibly();
+            if (second.isAlive()) second.destroyForcibly();
+        }
+    }
+
+    @Test
+    void twoChatWritersReceiveDistinctIdsAfterReady() throws Exception {
+        Process first = chatChild(temp, "writers");
+        Process second = chatChild(temp, "writers");
+        try {
+            BlockingQueue<String> one = pump(first);
+            BlockingQueue<String> two = pump(second);
+            assertEquals("ready", one.poll(15, TimeUnit.SECONDS));
+            assertEquals("ready", two.poll(15, TimeUnit.SECONDS));
+            assertTrue(first.waitFor(15, TimeUnit.SECONDS));
+            assertTrue(second.waitFor(15, TimeUnit.SECONDS));
+            String output = String.join("\n", drain(one)) + "\n" + String.join("\n", drain(two));
+            assertEquals(0, first.exitValue(), output);
+            assertEquals(0, second.exitValue(), output);
+            assertTrue(output.contains("id=1"), output);
+            int firstId = output.indexOf("id=1");
+            int secondId = output.indexOf("id=2");
+            assertTrue(firstId >= 0 && secondId >= 0, output);
+            assertTrue(output.indexOf("id=1", firstId + 4) < 0, output);
+        } finally {
+            if (first.isAlive()) first.destroyForcibly();
+            if (second.isAlive()) second.destroyForcibly();
+        }
+    }
+
+    @Test
+    void scenarioCleanupRunsRegisteredSurfaceHooks() {
+        AtomicInteger hits = new AtomicInteger();
+        io.cucumber.core.runner.CurrentScenarioState.finishAgentSurfaces();
+        tools.dscode.control.protocol.AgentSurfaceEnd.register(hits::incrementAndGet);
+        io.cucumber.core.runner.CurrentScenarioState.finishAgentSurfaces();
+        assertTrue(hits.get() >= 1);
+    }
+
+    @Test
+    void aSecondBrowserKeepsItsOwnEngineSession() throws Exception {
+        Path binary = temp.resolve("composite");
+        Path log = temp.resolve("stdio.log");
+        Files.writeString(binary, """
+                #!/usr/bin/env python3
+                import json, sys
+                log = open(%s, "a", encoding="utf-8")
+                for line in sys.stdin:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    req = json.loads(line)
+                    argv = req.get("argv") or []
+                    log.write(json.dumps(argv) + "\\n")
+                    log.flush()
+                    def flag(name):
+                        if name in argv:
+                            index = argv.index(name)
+                            if index + 1 < len(argv):
+                                return argv[index + 1]
+                        return ""
+                    if "version" in argv:
+                        body = {"version": "2.4.0"}
+                    elif len(argv) >= 2 and argv[0] == "session" and argv[1] == "create":
+                        body = {"ok": True, "id": flag("--id"), "cdp": flag("--cdp"), "launched": False}
+                    else:
+                        body = {"ok": True}
+                    sys.stdout.write(json.dumps({
+                        "id": req.get("id"),
+                        "exit": 0,
+                        "stdout": json.dumps(body),
+                        "stderr": ""
+                    }) + "\\n")
+                    sys.stdout.flush()
+                """.formatted(new ObjectMapper().writeValueAsString(log.toString())));
+        Files.setPosixFilePermissions(binary, Set.of(
+                PosixFilePermission.OWNER_READ,
+                PosixFilePermission.OWNER_WRITE,
+                PosixFilePermission.OWNER_EXECUTE
+        ));
+        try {
+            CompositeRuntime.use(temp, Map.of("COMPOSITE_BIN", binary.toString(), "pkb_composite", "on"),
+                    getClass().getClassLoader(), temp);
+            assertTrue(CompositeRuntime.primary(), String.valueOf(CompositeRuntime.current()));
+            RemoteWebDriver first = remote("http://127.0.0.1:9222");
+            RemoteWebDriver second = remote("http://127.0.0.1:9333");
+            CompositeRuntime.attach(first);
+            String firstId = CompositeRuntime.focusedSessionId();
+            CompositeRuntime.attach(second);
+            String secondId = CompositeRuntime.focusedSessionId();
+            assertTrue(firstId != null && !firstId.isBlank(), firstId);
+            assertTrue(secondId != null && !secondId.isBlank(), secondId);
+            assertFalse(firstId.equals(secondId), firstId + " / " + secondId);
+            CompositeRuntime.focusDriver(first);
+            assertEquals(firstId, CompositeRuntime.focusedSessionId());
+            assertTrue(String.valueOf(CompositeRuntime.focusedCdp()).contains("9222"), CompositeRuntime.focusedCdp());
+            CompositeRuntime.focusDriver(second);
+            assertEquals(secondId, CompositeRuntime.focusedSessionId());
+            dev.domcomposite.Session again = CompositeRuntime.client().openSession(Map.of("cdp", "http://127.0.0.1:9222"));
+            assertEquals(firstId, again.id());
+            String trace = Files.readString(log);
+            int creates = 0;
+            for (String line : trace.split("\n")) if (line.contains("session") && line.contains("create")) creates++;
+            assertEquals(2, creates, trace);
+        } finally {
+            CompositeRuntime.resetForTests();
+        }
+    }
+
     private static WebDriver scriptDriver(
             String handle,
             Function<Map<?, ?>, Map<String, Object>> script,
@@ -419,7 +774,10 @@ class AgentLiveFixTest {
                     case "getWindowHandles" -> Set.of(handle);
                     case "getWindowHandle" -> handle;
                     case "switchTo" -> switcher;
-                    case "executeScript" -> script.apply(scriptSpec(args));
+                    case "executeScript" -> {
+                        if (args != null && args.length > 0) LAST_SCRIPT.set(String.valueOf(args[0]));
+                        yield script.apply(scriptSpec(args));
+                    }
                     case "executeCdpCommand" -> {
                         @SuppressWarnings("unchecked")
                         Map<String, Object> params = args[1] instanceof Map<?, ?> map ? cast(map) : Map.of();
@@ -462,6 +820,145 @@ class AgentLiveFixTest {
         );
         self.set(driver);
         return driver;
+    }
+
+    private static WebDriver tabsCdp(
+            AtomicReference<String> current,
+            LinkedHashSet<String> tabs,
+            java.util.function.BiFunction<String, Map<String, Object>, Object> cdp,
+            Function<Map<?, ?>, Map<String, Object>> script
+    ) {
+        AtomicReference<WebDriver> self = new AtomicReference<>();
+        Object switcher = Proxy.newProxyInstance(
+                WebDriver.class.getClassLoader(),
+                new Class<?>[]{WebDriver.TargetLocator.class},
+                (proxy, method, args) -> {
+                    if ("window".equals(method.getName()) && args != null && args.length > 0) {
+                        current.set(String.valueOf(args[0]));
+                        return self.get();
+                    }
+                    return defaultValue(method.getReturnType());
+                }
+        );
+        WebDriver driver = (WebDriver) Proxy.newProxyInstance(
+                WebDriver.class.getClassLoader(),
+                new Class<?>[]{WebDriver.class, JavascriptExecutor.class, CdpProbe.class},
+                (proxy, method, args) -> switch (method.getName()) {
+                    case "getWindowHandles" -> tabs;
+                    case "getWindowHandle" -> current.get();
+                    case "switchTo" -> switcher;
+                    case "executeScript" -> script.apply(scriptSpec(args));
+                    case "executeCdpCommand" -> {
+                        @SuppressWarnings("unchecked")
+                        Map<String, Object> params = args[1] instanceof Map<?, ?> map ? cast(map) : Map.of();
+                        yield cdp.apply(String.valueOf(args[0]), params);
+                    }
+                    default -> defaultValue(method.getReturnType());
+                }
+        );
+        self.set(driver);
+        return driver;
+    }
+
+    private static final AtomicReference<String> LAST_SCRIPT = new AtomicReference<>();
+    private static String lastHelperHtml = "";
+
+    private static Process chatChild(Path project, String run) throws IOException {
+        return new ProcessBuilder(
+                Path.of(System.getProperty("java.home"), "bin", "java").toString(),
+                "-cp",
+                System.getProperty("java.class.path"),
+                "tools.dscode.common.agentcontrol.ChatLockChild",
+                project.toString(),
+                run
+        ).redirectErrorStream(true).start();
+    }
+
+    private static Process surfaceChild(Path file) throws IOException {
+        return new ProcessBuilder(
+                Path.of(System.getProperty("java.home"), "bin", "java").toString(),
+                "-cp",
+                System.getProperty("java.class.path"),
+                "tools.dscode.common.agentcontrol.SurfaceIdChild",
+                file.toString()
+        ).redirectErrorStream(true).start();
+    }
+
+    private static BlockingQueue<String> pump(Process child) {
+        BlockingQueue<String> lines = new LinkedBlockingQueue<>();
+        Thread thread = new Thread(() -> {
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(child.getInputStream(), StandardCharsets.UTF_8))) {
+                String line;
+                while ((line = reader.readLine()) != null) lines.add(line);
+            } catch (IOException ignored) {
+                // The caller reports a missing ready line.
+            }
+        }, "child-stdout");
+        thread.setDaemon(true);
+        thread.start();
+        return lines;
+    }
+
+    private static List<String> drain(BlockingQueue<String> lines) throws InterruptedException {
+        List<String> all = new ArrayList<>();
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2);
+        while (System.nanoTime() < deadline) {
+            String line = lines.poll(100, TimeUnit.MILLISECONDS);
+            if (line == null) {
+                if (!all.isEmpty()) break;
+                continue;
+            }
+            all.add(line);
+        }
+        lines.drainTo(all);
+        return all;
+    }
+
+    private static Map<String, Object> runLiveHelper(Map<String, Object> spec) throws Exception {
+        Path dir = Files.createTempDirectory("pkb-live-helper");
+        Path in = dir.resolve("in.json");
+        Path out = dir.resolve("out.json");
+        String harness;
+        try (InputStream stream = AgentLiveFixTest.class.getResourceAsStream("live-helper-dom.js")) {
+            if (stream == null) throw new IOException("missing live-helper-dom.js");
+            harness = new String(stream.readAllBytes(), StandardCharsets.UTF_8);
+        }
+        Path script = dir.resolve("dom.js");
+        Files.writeString(script, harness);
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("script", PageSurfaces.liveHelperSource());
+        body.put("spec", spec);
+        new ObjectMapper().writeValue(in.toFile(), body);
+        Process process = new ProcessBuilder("node", script.toString(), in.toString(), out.toString())
+                .redirectErrorStream(true)
+                .start();
+        boolean finished = process.waitFor(20, TimeUnit.SECONDS);
+        String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+        if (!finished || process.exitValue() != 0 || !Files.isRegularFile(out)) {
+            throw new AssertionError("live helper did not run: " + output);
+        }
+        @SuppressWarnings("unchecked")
+        Map<String, Object> parsed = new ObjectMapper().readValue(out.toFile(), Map.class);
+        lastHelperHtml = String.valueOf(parsed.get("html"));
+        Object result = parsed.get("result");
+        if (!(result instanceof Map<?, ?> map)) throw new AssertionError("helper result was not a map: " + parsed + " html=" + lastHelperHtml);
+        return cast(map);
+    }
+
+    private static RemoteWebDriver remote(String cdp) {
+        MutableCapabilities caps = new MutableCapabilities();
+        caps.setCapability("browserName", "chrome");
+        caps.setCapability("se:cdp", cdp);
+        return new RemoteWebDriver(command -> {
+            Response response = new Response();
+            response.setState("success");
+            response.setSessionId("s" + Integer.toHexString(cdp.hashCode()));
+            Map<String, Object> returned = new LinkedHashMap<>();
+            returned.put("browserName", "chrome");
+            returned.put("se:cdp", cdp);
+            response.setValue(returned);
+            return response;
+        }, caps);
     }
 
     @SuppressWarnings("unchecked")

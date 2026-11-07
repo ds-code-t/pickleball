@@ -14,7 +14,16 @@ public final class WorkbenchNativeOverlay {
     private static final Map<String, JWindow> WINDOWS = new LinkedHashMap<>();
     private static final List<String> REMOVED = new ArrayList<>();
 
+    static {
+        tools.dscode.control.protocol.AgentSurfaceEnd.register(() -> remove(null));
+    }
+
     private WorkbenchNativeOverlay() {
+    }
+
+    /** GUI playback pause, stop, and natural completion. */
+    public static void onPlaybackFinished() {
+        remove(null);
     }
 
     /** Guidance text plus the provenance sentence. Headless callers can read this without a window. */

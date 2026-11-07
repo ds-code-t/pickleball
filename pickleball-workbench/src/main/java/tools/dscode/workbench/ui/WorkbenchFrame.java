@@ -1671,6 +1671,7 @@ final class WorkbenchFrame extends JFrame {
     private void commandPause() {
         if (blocked()) return;
         player.pause();
+        WorkbenchNativeOverlay.onPlaybackFinished();
         updatePlayerView(playbackBusy
                 ? "Pause requested; the current step will finish first."
                 : "Scenario playback paused.");
@@ -1679,6 +1680,7 @@ final class WorkbenchFrame extends JFrame {
     private void commandStopPlayback() {
         if (blocked()) return;
         player.stop();
+        WorkbenchNativeOverlay.onPlaybackFinished();
         pendingFreshRun = false;
         pendingFreshRunStepId = null;
         pendingIsolatedStep = null;
@@ -1871,6 +1873,7 @@ final class WorkbenchFrame extends JFrame {
                     );
                     if (runPendingFreshRun()) return;
                     if (player.state() != LiveScenarioPlayer.State.RUNNING) {
+                        WorkbenchNativeOverlay.onPlaybackFinished();
                         refreshMappingCatalog();
                     }
                     if (!runPendingIsolatedStep()) {
@@ -1885,6 +1888,7 @@ final class WorkbenchFrame extends JFrame {
                     syncScenarioView();
                     showLine(planned.sourceLineId());
                     updatePlayerView("Step execution failed. Scenario playback paused.");
+                    WorkbenchNativeOverlay.onPlaybackFinished();
                     showFailure("Could not execute live step", failure);
                     if (!runPendingFreshRun()) runPendingIsolatedStep();
                 }

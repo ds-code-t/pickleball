@@ -97,10 +97,14 @@ public final class CompositeWebElement implements WebElement {
                 && this.geometry.visualViewportRelative() != null
                 && this.handle != null
                 && !this.handle.isBlank()) {
+            org.openqa.selenium.WebDriver origin = tools.dscode.common.agentcontrol.AgentControl.queryOwner();
+            String tab = tools.dscode.common.agentcontrol.AgentControl.queryTab(origin);
             tools.dscode.common.agentcontrol.AgentControl.rememberGeometry(
                     this.handle,
                     this.geometry.visualViewportRelative().x(),
-                    this.geometry.visualViewportRelative().y()
+                    this.geometry.visualViewportRelative().y(),
+                    origin,
+                    tab
             );
         }
         if (this.geometry != null && this.geometry.scrollport() != null) {

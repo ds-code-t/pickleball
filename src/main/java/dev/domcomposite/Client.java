@@ -14,6 +14,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
@@ -201,11 +202,19 @@ public final class Client implements AutoCloseable {
     public Session openSession(Object config) {
         synchronized (lock) {
             if (closed) throw new IllegalStateException("client is closed");
+            ObjectNode body = asObject(config);
+            String requested = cdpKey(textOf(body.get("cdp")));
             Session existing = threadSession.get();
             if (existing != null && !existing.isClosed()) {
-                throw InvalidException.local("this thread already has session " + existing.id());
+                if (requested.isEmpty()) {
+                    throw InvalidException.local("this thread already has session " + existing.id());
+                }
+                Session match = ownedByCdp(requested);
+                if (match != null) {
+                    threadSession.set(match);
+                    return match;
+                }
             }
-            ObjectNode body = asObject(config);
             if (!Argv.hasText(body, "id")) body.put("id", freshId());
             JsonNode processFlag = body.get("process");
             if (processFlag == null || processFlag.isNull()) body.put("process", true);
@@ -217,6 +226,43 @@ public final class Client implements AutoCloseable {
             threadSession.set(session);
             return session;
         }
+    }
+
+    /**
+     * Point this thread at a session it already owns. Window focus uses this
+     * so query and observe follow the focused browser instead of the first one.
+     */
+    public void focusSession(String id) {
+        synchronized (lock) {
+            if (id == null || id.isBlank()) return;
+            Session session = owned.get(id);
+            if (session == null || session.isClosed()) return;
+            threadSession.set(session);
+        }
+    }
+
+    private Session ownedByCdp(String requested) {
+        for (Session session : owned.values()) {
+            if (session == null || session.isClosed()) continue;
+            String have = cdpKey(session.cdp());
+            if (!have.isEmpty() && have.equals(requested)) return session;
+        }
+        return null;
+    }
+
+    public static String cdpKey(String cdp) {
+        if (cdp == null) return "";
+        String value = cdp.trim();
+        int scheme = value.indexOf("://");
+        if (scheme >= 0) value = value.substring(scheme + 3);
+        int slash = value.indexOf('/');
+        if (slash >= 0) value = value.substring(0, slash);
+        return value.toLowerCase(Locale.ROOT);
+    }
+
+    private static String textOf(JsonNode node) {
+        if (node == null || node.isNull()) return "";
+        return node.asText("");
     }
 
     /** The session {@link #openSession} bound to the calling thread, or null. */

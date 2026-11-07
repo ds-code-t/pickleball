@@ -1,6 +1,7 @@
 package tools.dscode.common.agentcontrol;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.remote.RemoteWebDriver;
 import tools.dscode.common.composite.CompositeLog;
 import tools.dscode.common.composite.CompositeRuntime;
@@ -29,7 +30,20 @@ public final class AgentControl {
 
     /** Geometry already resolved for a ranked handle. Overlay placement looks this up. */
     public static void rememberGeometry(String handle, double x, double y) {
-        PageSurfaces.rememberGeometry(handle, x, y);
+        PageSurfaces.rememberGeometry(handle, x, y, null, null);
+    }
+
+    /** Query-time owner. Not inferred again from global focus when the box is stored. */
+    public static void rememberGeometry(String handle, double x, double y, WebDriver owner, String tab) {
+        PageSurfaces.rememberGeometry(handle, x, y, owner, tab);
+    }
+
+    public static WebDriver queryOwner() {
+        return PageSurfaces.ownerForQuery();
+    }
+
+    public static String queryTab(WebDriver owner) {
+        return PageSurfaces.focusedTabOf(owner);
     }
 
     public static Result execute(

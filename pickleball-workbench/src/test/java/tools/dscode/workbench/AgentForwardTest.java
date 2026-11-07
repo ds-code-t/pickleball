@@ -8,6 +8,8 @@ import tools.dscode.workbench.ui.AgentChatPanel;
 import tools.dscode.workbench.ui.WorkbenchNativeOverlay;
 
 import java.lang.reflect.Proxy;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -129,6 +131,33 @@ class AgentForwardTest {
         Map<String, Object> finished = actions.dispatch("play", Map.of());
         assertEquals("FINISHED", finished.get("playback"));
         assertTrue(WorkbenchNativeOverlay.removedForTests().contains("*"));
+    }
+
+    @Test
+    void guiPlaybackAndScenarioCleanupRemoveTheNativeOverlay() throws Exception {
+        WorkbenchNativeOverlay.resetForTests();
+        WorkbenchNativeOverlay.onPlaybackFinished();
+        assertEquals(List.of("*"), WorkbenchNativeOverlay.removedForTests());
+        WorkbenchNativeOverlay.resetForTests();
+        tools.dscode.control.protocol.AgentSurfaceEnd.complete();
+        assertTrue(WorkbenchNativeOverlay.removedForTests().contains("*"));
+        Path frame = Path.of("pickleball-workbench/src/main/java/tools/dscode/workbench/ui/WorkbenchFrame.java");
+        if (!Files.isRegularFile(frame)) {
+            frame = Path.of("src/main/java/tools/dscode/workbench/ui/WorkbenchFrame.java");
+        }
+        String source = Files.readString(frame, StandardCharsets.UTF_8);
+        int calls = 0;
+        int from = 0;
+        String needle = "WorkbenchNativeOverlay.onPlaybackFinished()";
+        while (true) {
+            int at = source.indexOf(needle, from);
+            if (at < 0) break;
+            calls++;
+            from = at + needle.length();
+        }
+        assertTrue(calls >= 4, "GUI pause, stop, and completion must remove the native overlay, saw " + calls);
+        assertTrue(source.contains("commandPause"));
+        assertTrue(source.contains("commandStopPlayback"));
     }
 
     private static WorkbenchServices fake(Invocation invocation) {

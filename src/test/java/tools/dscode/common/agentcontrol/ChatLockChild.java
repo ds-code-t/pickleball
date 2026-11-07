@@ -10,6 +10,8 @@ public final class ChatLockChild {
     }
 
     public static void main(String[] args) {
+        System.out.println("ready");
+        System.out.flush();
         AgentControl.Result result = AgentControl.execute(
                 Path.of(args[0]),
                 args[1],
@@ -19,6 +21,7 @@ public final class ChatLockChild {
                 "child"
         );
         System.out.println("exit=" + result.exit());
+        System.out.println("id=" + result.body().get("id"));
         System.out.println(result.body());
         System.exit(result.exit());
     }

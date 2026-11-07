@@ -81,6 +81,9 @@ public final class ObserveEvents {
             argv.add(cdp);
         }
         String session = args.get("session");
+        if ((session == null || session.isBlank()) && (cdp == null || cdp.isBlank())) {
+            session = CompositeRuntime.focusedSessionId();
+        }
         if (session != null && !session.isBlank()) {
             argv.add("--session");
             argv.add(session);

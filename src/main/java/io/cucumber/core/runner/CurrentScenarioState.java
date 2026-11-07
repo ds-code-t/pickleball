@@ -366,9 +366,15 @@ public class CurrentScenarioState extends ScenarioMapping {
     }
 
     public void scenarioRunCleanUp() {
-        tools.dscode.common.agentcontrol.AgentDriverHooks.quit();
+        finishAgentSurfaces();
         runConfiguredObjectCleanups();
         quitUnmanagedWebDrivers();
+    }
+
+    /** In-page agent surfaces plus any native-overlay hook the Workbench registered. */
+    public static void finishAgentSurfaces() {
+        tools.dscode.common.agentcontrol.AgentDriverHooks.quit();
+        tools.dscode.control.protocol.AgentSurfaceEnd.complete();
     }
 
     /**
