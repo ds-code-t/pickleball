@@ -2,10 +2,8 @@ package tools.dscode.common.agentcontrol;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import org.openqa.selenium.By;
 import org.openqa.selenium.JavascriptExecutor;
 import org.openqa.selenium.WebDriver;
-import org.openqa.selenium.WebElement;
 import org.openqa.selenium.chromium.ChromiumDriver;
 import org.openqa.selenium.remote.RemoteWebDriver;
 import tools.dscode.common.composite.CompositeLog;
@@ -935,11 +933,10 @@ final class PageSurfaces {
                 Object owner = cdp(web, "DOM.getFrameOwner", Map.of("frameId", id));
                 Integer backend = backendOf(owner);
                 if (backend == null) continue;
-                String token = bridgeBackend(web, backend);
-                if (token == null) continue;
+                String name = frameSwitchName(web, backend);
+                if (name == null || name.isBlank()) continue;
                 try {
-                    WebElement frame = web.findElement(By.cssSelector("[data-pkb-bridge=\"" + token + "\"]"));
-                    web.switchTo().frame(frame);
+                    web.switchTo().frame(name);
                 } catch (RuntimeException failure) {
                     CompositeLog.info("window", "frame switch failed " + id + " " + failure.getMessage());
                 }
@@ -981,6 +978,34 @@ final class PageSurfaces {
         Object raw = map.get("backendNodeId");
         if (raw instanceof Number number) return number.intValue();
         return null;
+    }
+
+    private static String frameSwitchName(WebDriver web, int backend) {
+        try {
+            Object resolved = cdp(web, "DOM.resolveNode", Map.of("backendNodeId", backend));
+            String objectId = objectId(resolved);
+            if (objectId == null || objectId.isBlank()) return null;
+            String token = "b" + Integer.toUnsignedString(IDS.incrementAndGet(), 36);
+            Map<String, Object> call = new LinkedHashMap<>();
+            call.put("objectId", objectId);
+            call.put("functionDeclaration",
+                    "function(token){ if (!this || this.nodeType !== 1) return ''; var tag = String(this.tagName || '').toLowerCase(); if (tag !== 'iframe' && tag !== 'frame') return ''; var name = this.getAttribute('name') || this.getAttribute('id') || ''; if (!name) { this.setAttribute('name', token); name = token; } this.setAttribute('data-pkb-bridge', token); return name; }");
+            call.put("arguments", List.of(Map.of("value", token)));
+            call.put("returnByValue", true);
+            return textValue(cdp(web, "Runtime.callFunctionOn", call));
+        } catch (RuntimeException failure) {
+            CompositeLog.info("window", "frame owner bridge failed " + failure.getMessage());
+            return null;
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private static String textValue(Object value) {
+        if (!(value instanceof Map<?, ?> map)) return "";
+        Object result = map.get("result");
+        if (!(result instanceof Map<?, ?> body)) return "";
+        Object text = body.get("value");
+        return text == null ? "" : String.valueOf(text);
     }
 
     private static String bridgeBackend(WebDriver web, int backend) {

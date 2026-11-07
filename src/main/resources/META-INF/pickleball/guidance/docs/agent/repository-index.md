@@ -504,6 +504,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/io/cucumber/core/runtime/FeaturePathLoadCacheTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/AgentLiveFixTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/ChatLockChild.java`
+- `src/test/java/tools/dscode/common/agentcontrol/SurfaceIdChild.java`
 - `src/test/java/tools/dscode/common/assertions/AssertionClauseSplitterTest.java`
 - `src/test/java/tools/dscode/common/assertions/MultilineAssertFeatureTest.java`
 - `src/test/java/tools/dscode/common/assertions/MultilineAssertTest.java`
@@ -638,6 +639,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/resources/multiline-assert/multiline-assert.feature`
 - `src/test/resources/position/ordinals.html`
 - `src/test/resources/scenario-object/scenario-object.feature`
+- `src/test/resources/tools/dscode/common/agentcontrol/live-helper-dom.js`
 - `src/test/resources/until-pass/literal-until-with-browser.feature`
 - `src/test/resources/until-pass/literal-until.feature`
 - `src/test/resources/workbench-help-golden.txt`
@@ -718,6 +720,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 
 - `pickleball-control-protocol/build.gradle`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/AgentLog.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/AgentSurfaceEnd.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/ControlBridgeBoundedJsonEvidence.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/ControlBridgeBreakpoint.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/ControlBridgeBrowserPage.java`
