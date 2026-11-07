@@ -424,7 +424,11 @@ final class PageSurfaces {
         if (handle == null || handle.isBlank()) CDP_HIGHLIGHTS.clear();
         LiveResult live = new LiveResult(true, null, null, null, 0);
         if (!cdpOnly) {
-            live = runLive("unhighlight", handle, null, null, null, "style", STYLE_SENTENCE, "");
+            if (handle == null || handle.isBlank()) {
+                live = runAcrossTabs("unhighlight", handle, null, null, null, "style", STYLE_SENTENCE, "", false, null, null);
+            } else {
+                live = runLive("unhighlight", handle, null, null, null, "style", STYLE_SENTENCE, "");
+            }
         }
         if (page == null && managed().isEmpty()) {
             throw new IllegalStateException("no live browser; unhighlight was not applied");
@@ -598,13 +602,19 @@ final class PageSurfaces {
 
     static void cleanupAll() {
         cleanupManaged();
+        RuntimeException first = null;
         for (Path page : PAGES) {
             try {
                 if (Files.isRegularFile(page)) cleanup(page);
-            } catch (IOException | RuntimeException ignored) {
-                // Session end must not hide the original shutdown error.
+            } catch (IOException failure) {
+                CompositeLog.info("html", "cleanup failed " + failure.getMessage());
+                if (first == null) first = new IllegalStateException("cleanup failed", failure);
+            } catch (RuntimeException failure) {
+                CompositeLog.info("html", "cleanup failed " + failure.getMessage());
+                if (first == null) first = failure;
             }
         }
+        if (first != null) throw first;
     }
 
     static void cleanupManaged() {
@@ -622,6 +632,7 @@ final class PageSurfaces {
                     if (!handle.isBlank() && !activate(web, handle)) {
                         throw new IllegalStateException("tab switch failed");
                     }
+                    if (!resetTop(web)) throw new IllegalStateException("top document reset failed");
                     LiveResult live = runLive(web, "cleanup", null, null, null, null, "html", HTML_SENTENCE, "", false, null, null);
                     if (!live.ok()) {
                         throw new IllegalStateException(live.error() == null ? "cleanup failed" : live.error());
@@ -659,13 +670,16 @@ final class PageSurfaces {
                 if (!tab.isBlank() && !activate(managed.driver, tab)) {
                     throw new IllegalStateException("tab switch failed");
                 }
+                if (!resetTop(managed.driver)) throw new IllegalStateException("top document reset failed");
                 drainTab(project, runId, managed.driver);
                 for (String frame : framesFor(managed.driver, tab)) {
                     if (!enterFrame(managed.driver, frame)) throw new IllegalStateException("frame entry failed");
                     drainTab(project, runId, managed.driver);
                 }
             }
-            if (current != null) activate(managed.driver, current);
+            if (current != null && !current.isBlank() && !activate(managed.driver, current)) {
+                throw new IllegalStateException("tab restore failed");
+            }
         }
     }
 
@@ -682,7 +696,10 @@ final class PageSurfaces {
             CompositeLog.info("overlay", "input poll failed " + failure.getMessage());
             throw failure;
         }
-        if (!(value instanceof List<?> list)) return;
+        if (!(value instanceof List<?> list)) {
+            CompositeLog.info("overlay", "input poll did not return events");
+            throw new IllegalStateException("input poll did not return events");
+        }
         for (Object item : list) {
             if (item instanceof Map<?, ?> map) {
                 Map<String, String> event = new LinkedHashMap<>();
@@ -755,7 +772,54 @@ final class PageSurfaces {
             if (!wanted.isBlank() && !wanted.equals(site.tab)) continue;
             frames.add(site.frameId);
         }
+        for (FrameOwner owner : FRAME_LIST) {
+            if (owner.driver != web || owner.frameId == null || owner.frameId.isBlank()) continue;
+            if (!wanted.isBlank() && !wanted.equals(owner.tab)) continue;
+            frames.add(owner.frameId);
+        }
+        addLiveChildFrames(web, frames);
         return new ArrayList<>(frames);
+    }
+
+    private static void addLiveChildFrames(WebDriver web, java.util.Set<String> frames) {
+        if (!cdpCapable(web)) return;
+        Object tree;
+        try {
+            tree = cdp(web, "Page.getFrameTree", Map.of());
+        } catch (RuntimeException failure) {
+            CompositeLog.info("window", "frame enumeration failed " + failure.getMessage());
+            throw new IllegalStateException("frame enumeration failed", failure);
+        }
+        if (!(tree instanceof Map<?, ?> root)) {
+            throw new IllegalStateException("frame enumeration failed");
+        }
+        collectChildFrameIds(root.get("frameTree"), frames, true);
+    }
+
+    private static void collectChildFrameIds(Object node, java.util.Set<String> frames, boolean root) {
+        if (!(node instanceof Map<?, ?> map)) return;
+        if (!root) {
+            Object frame = map.get("frame");
+            String id = frame instanceof Map<?, ?> frameMap && frameMap.get("id") != null
+                    ? String.valueOf(frameMap.get("id")).trim()
+                    : "";
+            if (!id.isBlank() && !"null".equals(id)) frames.add(id);
+        }
+        Object children = map.get("childFrames");
+        if (children instanceof List<?> list) {
+            for (Object child : list) collectChildFrameIds(child, frames, false);
+        }
+    }
+
+    private static boolean resetTop(WebDriver web) {
+        if (web == null) return false;
+        try {
+            web.switchTo().defaultContent();
+            return true;
+        } catch (RuntimeException failure) {
+            CompositeLog.info("window", "top document reset failed " + failure.getMessage());
+            return false;
+        }
     }
 
     private static void rememberHighlight(WebDriver web, String handle) {
@@ -795,7 +859,10 @@ final class PageSurfaces {
                 continue;
             }
             worst = worse(worst, hideOn(site.driver));
-            if (previous != null && !previous.equals(site.tab)) activate(site.driver, previous);
+            if (previous != null && !previous.isBlank() && !previous.equals(site.tab) && !activate(site.driver, previous)) {
+                CompositeLog.info("window", "hide tab restore failed " + previous);
+                worst = Hide.FAILED;
+            }
         }
         if (worst != Hide.FAILED) {
             if (handle == null || handle.isBlank()) HIGHLIGHT_SITES.clear();
@@ -1003,18 +1070,35 @@ final class PageSurfaces {
             for (String tab : tabs) {
                 if (!tab.isBlank() && !activate(managed.driver, tab)) {
                     last = new LiveResult(false, "tab switch failed", null, null, 0);
-                    if ("cleanup".equals(op)) return last;
-                    continue;
+                    return last;
+                }
+                if (!resetTop(managed.driver)) {
+                    return new LiveResult(false, "top document reset failed", null, null, 0);
                 }
                 LiveResult live = runLive(managed.driver, op, handle, where, css, html, kind, sentence, id, measure, x, y);
+                List<String> frames;
+                try {
+                    frames = framesFor(managed.driver, tab);
+                } catch (RuntimeException failure) {
+                    return new LiveResult(false, failure.getMessage() == null ? "frame enumeration failed" : failure.getMessage(), null, null, 0);
+                }
                 if ("remove".equals(op)) {
                     if (live.removed() > 0) return live;
                     if (!live.ok() && live.error() != null && !"unknown id".equals(live.error())) return live;
-                    last = live;
+                    for (String frame : frames) {
+                        if (!enterFrame(managed.driver, frame)) {
+                            return new LiveResult(false, "frame entry failed", null, null, 0);
+                        }
+                        LiveResult framed = runLive(managed.driver, op, handle, where, css, html, kind, sentence, id, measure, x, y);
+                        if (framed.removed() > 0) return framed;
+                        if (!framed.ok() && framed.error() != null && !"unknown id".equals(framed.error())) return framed;
+                        last = framed;
+                    }
+                    last = live.removed() > 0 ? live : last;
                     continue;
                 }
                 if (!live.ok()) return live;
-                for (String frame : framesFor(managed.driver, tab)) {
+                for (String frame : frames) {
                     if (!enterFrame(managed.driver, frame)) {
                         return new LiveResult(false, "frame entry failed", null, null, 0);
                     }
@@ -1022,7 +1106,7 @@ final class PageSurfaces {
                     if (!framed.ok()) return framed;
                 }
                 last = live;
-                if (!"cleanup".equals(op)) return live;
+                if (!"cleanup".equals(op) && !"unhighlight".equals(op)) return live;
             }
         }
         return last;
@@ -1032,8 +1116,12 @@ final class PageSurfaces {
         if (site.tab != null && !site.tab.isBlank() && !activate(site.driver, site.tab)) {
             return new LiveResult(false, "tab switch failed", null, null, 0);
         }
-        if (site.frameId != null && !site.frameId.isBlank() && cdpCapable(site.driver) && !enterFrame(site.driver, site.frameId)) {
-            return new LiveResult(false, "frame entry failed", null, null, 0);
+        if (site.frameId != null && !site.frameId.isBlank()) {
+            if (!enterFrame(site.driver, site.frameId)) {
+                return new LiveResult(false, "frame entry failed", null, null, 0);
+            }
+        } else if (!resetTop(site.driver)) {
+            return new LiveResult(false, "top document reset failed", null, null, 0);
         }
         return runLive(site.driver, op, handle, where, css, html, kind, sentence, id, measure, x, y);
     }
@@ -1324,13 +1412,16 @@ final class PageSurfaces {
         if (y != null) spec.put("y", y);
         try {
             Object value = executor.executeScript(LIVE_HELPER, spec);
-            if (value instanceof Map<?, ?> map && Boolean.FALSE.equals(map.get("ok"))) {
-                Object error = map.get("error");
-                return new LiveResult(false, error == null ? "live helper failed" : String.valueOf(error), null, null, 0);
+            if (!(value instanceof Map<?, ?> map) || !Boolean.TRUE.equals(map.get("ok"))) {
+                String error = value instanceof Map<?, ?> failed && failed.get("error") != null
+                        ? String.valueOf(failed.get("error"))
+                        : "helper did not confirm " + op;
+                CompositeLog.info("html", "live helper failed " + error);
+                return new LiveResult(false, error, null, null, 0);
             }
-            Integer liveX = value instanceof Map<?, ?> map && map.get("x") instanceof Number number ? number.intValue() : null;
-            Integer liveY = value instanceof Map<?, ?> map && map.get("y") instanceof Number number ? number.intValue() : null;
-            int removed = value instanceof Map<?, ?> map && map.get("removed") instanceof Number number ? number.intValue() : 0;
+            Integer liveX = map.get("x") instanceof Number number ? number.intValue() : null;
+            Integer liveY = map.get("y") instanceof Number numberY ? numberY.intValue() : null;
+            int removed = map.get("removed") instanceof Number removedNumber ? removedNumber.intValue() : 0;
             if ("remove".equals(op) && removed <= 0) {
                 return new LiveResult(false, "unknown id", null, null, 0);
             }
@@ -1943,7 +2034,8 @@ final class PageSurfaces {
             if (web.getWindowHandles() == null) return List.of();
             return new ArrayList<>(web.getWindowHandles());
         } catch (RuntimeException failure) {
-            return List.of();
+            CompositeLog.info("window", "tab enumeration failed " + failure.getMessage());
+            throw new IllegalStateException("tab enumeration failed", failure);
         }
     }
 

@@ -26,12 +26,14 @@ public final class AgentDriverHooks {
     }
 
     public static void quit() {
+        RuntimeException cleanupFailure = null;
         try {
             PageSurfaces.cleanupAll();
-        } catch (RuntimeException ignored) {
-            // Scenario end must still release agent-owned drivers.
+        } catch (RuntimeException failure) {
+            cleanupFailure = failure;
         }
         PageSurfaces.quitOwned();
         PageSurfaces.clearDriver();
+        if (cleanupFailure != null) throw cleanupFailure;
     }
 }

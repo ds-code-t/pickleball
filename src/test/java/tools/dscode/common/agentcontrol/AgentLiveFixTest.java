@@ -1066,43 +1066,93 @@ class AgentLiveFixTest {
 
     @Test
     void childFrameSurfacesStayRemovableAndPollable() throws Exception {
-        AtomicReference<String> saw = new AtomicReference<>("");
-        WebDriver live = cdpDriver("tab-a", (method, params) -> {
-            if ("Page.getFrameTree".equals(method)) {
-                return Map.of("frameTree", Map.of(
-                        "frame", Map.of("id", "main"),
-                        "childFrames", List.of(Map.of("frame", Map.of("id", "child-1")))
-                ));
-            }
-            if ("DOM.getFrameOwner".equals(method)) return Map.of("backendNodeId", 42);
-            if ("DOM.resolveNode".equals(method)) return Map.of("object", Map.of("objectId", "obj-9"));
-            if ("Runtime.callFunctionOn".equals(method)) {
-                String function = String.valueOf(params.get("functionDeclaration"));
-                if (function.contains("removeAttribute")) return Map.of("result", Map.of("value", true));
-                if (function.contains("changedName")) {
-                    return Map.of("result", Map.of("value", "{\"name\":\"child\",\"changedName\":false,\"previousBridge\":null}"));
-                }
-                return Map.of("result", Map.of("value", true));
-            }
-            return Map.of();
-        }, spec -> {
-            String op = String.valueOf(spec.get("op"));
-            saw.set(op + ":" + String.join(",", FRAME_SWITCHES));
-            if ("remove".equals(op) || "cleanup".equals(op)) return Map.of("ok", true, "removed", 1);
-            if ("highlight".equals(op)) return Map.of("ok", true);
-            return Map.of("ok", true, "x", 1, "y", 1);
-        });
+        Path dir = Files.createTempDirectory("pkb-context");
+        Path state = dir.resolve("state.json");
+        Path script = dir.resolve("context-dom.js");
+        try (InputStream stream = AgentLiveFixTest.class.getResourceAsStream("context-dom.js")) {
+            if (stream == null) throw new IOException("missing context-dom.js");
+            Files.write(script, stream.readAllBytes());
+        }
+        ObjectMapper json = new ObjectMapper();
+        Map<String, Object> child = new LinkedHashMap<>();
+        child.put("html", "<b data-pkb-id=\"pkb-1\" data-pkb-agent=\"agent_injected\" data-pkb-kind=\"html\" data-pkb-sentence=\"s\">inside</b>");
+        child.put("undo", Map.of());
+        child.put("events", List.of(Map.of("type", "click", "id", "pkb-1", "text", "inside")));
+        child.put("bound", true);
+        writeContext(json, state, "child-1", child, Map.of("html", "", "undo", Map.of(), "events", List.of(), "bound", false), Map.of("name", "kid"));
+        WebDriver live = contextDriver(script, state);
         PageSurfaces.manage(live, "chrome-headed-quiet", true);
         PageSurfaces.bindFrame(live, "tab-a", "child-1");
-        FRAME_SWITCHES.clear();
-        Map<String, Object> placed = PageSurfaces.place(null, "append", "child-1:15", null, "<b>inside</b>", "html", null, null, null);
-        assertFalse(FRAME_SWITCHES.isEmpty(), "place did not enter the child frame");
-        FRAME_SWITCHES.clear();
-        PageSurfaces.remove(null, String.valueOf(placed.get("id")));
-        assertFalse(FRAME_SWITCHES.isEmpty(), "remove did not enter the child frame " + saw.get());
-        FRAME_SWITCHES.clear();
-        PageSurfaces.pollInput(temp, "frames");
-        assertFalse(FRAME_SWITCHES.isEmpty(), "poll did not enter the child frame");
+        Map<String, Object> removed = PageSurfaces.remove(null, "pkb-1");
+        assertEquals(true, removed.get("removed"));
+        Map<String, Object> afterRemove = json.readValue(state.toFile(), Map.class);
+        String childHtml = documentHtml(afterRemove, "child-1");
+        assertFalse(childHtml.contains("pkb-1"), childHtml);
+        assertFalse(childHtml.contains("inside"), childHtml);
+        List<?> trace = (List<?>) afterRemove.get("trace");
+        assertFalse(trace.isEmpty(), String.valueOf(trace));
+        assertTrue(String.valueOf(trace.get(0)).startsWith("top:"), String.valueOf(trace));
+        assertTrue(trace.stream().anyMatch(row -> String.valueOf(row).startsWith("child-1:")), String.valueOf(trace));
+
+        child.put("events", List.of(Map.of("type", "click", "id", "pkb-1", "text", "inside")));
+        writeContext(json, state, "child-1", child, Map.of("html", "", "undo", Map.of(), "events", List.of(), "bound", false), Map.of("name", "kid"));
+        List<Map<String, Object>> events = PageSurfaces.pollInput(temp, "frames");
+        assertEquals(1, events.size());
+        assertEquals("click", events.get(0).get("type"));
+        Map<String, Object> afterPoll = json.readValue(state.toFile(), Map.class);
+        List<?> pollTrace = (List<?>) afterPoll.get("trace");
+        assertTrue(String.valueOf(pollTrace.get(0)).startsWith("top:"), String.valueOf(pollTrace));
+        assertTrue(pollTrace.stream().anyMatch(row -> String.valueOf(row).startsWith("child-1:drain")), String.valueOf(pollTrace));
+
+        Map<String, Object> styled = new LinkedHashMap<>();
+        styled.put("html", "<b data-pkb-style=\"style_modified\" data-pkb-original-style=\"\" data-pkb-css=\"border:9px dashed #abc\" style=\"border:9px dashed #abc\">x</b>");
+        styled.put("undo", Map.of());
+        styled.put("events", List.of());
+        styled.put("bound", false);
+        writeContext(json, state, "child-1", styled, Map.of("html", "", "undo", Map.of(), "events", List.of(), "bound", false), Map.of("name", "kid"));
+        PageSurfaces.unhighlight(null, null);
+        String cleared = documentHtml(json.readValue(state.toFile(), Map.class), "child-1");
+        assertFalse(cleared.contains("data-pkb-style"), cleared);
+        assertFalse(cleared.contains("dashed"), cleared);
+    }
+
+    @Test
+    void quitPropagatesCleanupFailureAfterReleasingTheDriver() {
+        WebDriver live = scriptDriver("tab-a", spec -> Map.of("ok", false, "error", "helper broke"), false);
+        PageSurfaces.manage(live, "chrome-headed-quiet", true);
+        IllegalStateException failure = assertThrows(IllegalStateException.class, AgentDriverHooks::quit);
+        assertTrue(failure.getMessage().contains("helper broke"), failure.getMessage());
+        assertTrue(PageSurfaces.managed().isEmpty());
+    }
+
+    @Test
+    void helperThatDoesNotConfirmIsNotSuccess() {
+        WebDriver live = scriptDriver("tab-a", spec -> {
+            return null;
+        }, false);
+        PageSurfaces.manage(live, "chrome-headed-quiet", true);
+        PageSurfaces.focus(live);
+        IllegalStateException failure = assertThrows(IllegalStateException.class, () ->
+                PageSurfaces.highlight(null, "save", "yellow", null, null, null, null, null));
+        assertTrue(failure.getMessage().contains("confirm") || failure.getMessage().contains("highlight"), failure.getMessage());
+    }
+
+    @Test
+    void tabEnumerationFailureFailsCleanup() {
+        WebDriver live = (WebDriver) Proxy.newProxyInstance(
+                WebDriver.class.getClassLoader(),
+                new Class<?>[]{WebDriver.class, JavascriptExecutor.class},
+                (proxy, method, args) -> switch (method.getName()) {
+                    case "getWindowHandles" -> { throw new IllegalStateException("handles unavailable"); }
+                    case "getWindowHandle" -> "tab-a";
+                    case "switchTo" -> proxy;
+                    case "executeScript" -> Map.of("ok", true, "removed", 1);
+                    default -> defaultValue(method.getReturnType());
+                }
+        );
+        PageSurfaces.manage(live, "chrome-headed-quiet", true);
+        IllegalStateException failure = assertThrows(IllegalStateException.class, () -> PageSurfaces.cleanup(null));
+        assertTrue(failure.getMessage().contains("tab enumeration"), failure.getMessage());
     }
 
     @Test
@@ -1554,6 +1604,141 @@ class AgentLiveFixTest {
         }
         lines.drainTo(all);
         return all;
+    }
+
+    private static void writeContext(
+            ObjectMapper json,
+            Path state,
+            String context,
+            Map<String, Object> child,
+            Map<String, Object> top,
+            Map<String, Object> iframe
+    ) throws IOException {
+        Map<String, Object> docs = new LinkedHashMap<>();
+        docs.put("top", top);
+        docs.put("child-1", child);
+        Map<String, Object> world = new LinkedHashMap<>();
+        world.put("context", context);
+        world.put("docs", docs);
+        world.put("iframe", iframe);
+        world.put("trace", new ArrayList<>());
+        json.writeValue(state.toFile(), world);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static String documentHtml(Map<String, Object> world, String name) {
+        Object docs = world.get("docs");
+        if (!(docs instanceof Map<?, ?> map)) return "";
+        Object doc = map.get(name);
+        if (!(doc instanceof Map<?, ?> body)) return "";
+        return String.valueOf(body.get("html"));
+    }
+
+    private static void setContext(Path state, String context) {
+        try {
+            ObjectMapper json = new ObjectMapper();
+            @SuppressWarnings("unchecked")
+            Map<String, Object> world = json.readValue(state.toFile(), Map.class);
+            world.put("context", context);
+            json.writeValue(state.toFile(), world);
+        } catch (IOException failure) {
+            throw new IllegalStateException(failure);
+        }
+    }
+
+    private static Object runContext(Path script, Path state, Map<String, Object> input) {
+        try {
+            Path in = Files.createTempFile("pkb-ctx-in", ".json");
+            Path out = Files.createTempFile("pkb-ctx-out", ".json");
+            new ObjectMapper().writeValue(in.toFile(), input);
+            Process process = new ProcessBuilder("node", script.toString(), in.toString(), state.toString(), out.toString())
+                    .redirectErrorStream(true)
+                    .start();
+            boolean finished = process.waitFor(20, TimeUnit.SECONDS);
+            String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+            if (!finished || process.exitValue() != 0 || !Files.isRegularFile(out)) {
+                throw new IllegalStateException(output);
+            }
+            @SuppressWarnings("unchecked")
+            Map<String, Object> parsed = new ObjectMapper().readValue(out.toFile(), Map.class);
+            return parsed.get("result");
+        } catch (RuntimeException failure) {
+            throw failure;
+        } catch (Exception failure) {
+            throw new IllegalStateException(failure);
+        }
+    }
+
+    private static WebDriver contextDriver(Path script, Path state) {
+        AtomicReference<WebDriver> self = new AtomicReference<>();
+        Object switcher = Proxy.newProxyInstance(
+                WebDriver.class.getClassLoader(),
+                new Class<?>[]{WebDriver.TargetLocator.class},
+                (proxy, method, args) -> {
+                    String name = method.getName();
+                    if ("defaultContent".equals(name) || "parentFrame".equals(name)) {
+                        setContext(state, "top");
+                        return self.get();
+                    }
+                    if ("frame".equals(name)) {
+                        setContext(state, "child-1");
+                        return self.get();
+                    }
+                    if ("window".equals(name)) return self.get();
+                    return defaultValue(method.getReturnType());
+                }
+        );
+        WebDriver driver = (WebDriver) Proxy.newProxyInstance(
+                WebDriver.class.getClassLoader(),
+                new Class<?>[]{WebDriver.class, JavascriptExecutor.class, CdpProbe.class},
+                (proxy, method, args) -> switch (method.getName()) {
+                    case "getWindowHandles" -> Set.of("tab-a");
+                    case "getWindowHandle" -> "tab-a";
+                    case "switchTo" -> switcher;
+                    case "executeScript" -> {
+                        String source = args == null || args.length == 0 ? "" : String.valueOf(args[0]);
+                        Map<String, Object> input = new LinkedHashMap<>();
+                        input.put("script", source);
+                        if (source.contains("window.__pkbEvents = []")) input.put("mode", "drain");
+                        else {
+                            input.put("mode", "helper");
+                            input.put("spec", scriptSpec(args));
+                        }
+                        Object result = runContext(script, state, input);
+                        if (result instanceof Map<?, ?> map) yield cast(map);
+                        yield result;
+                    }
+                    case "executeCdpCommand" -> {
+                        String command = String.valueOf(args[0]);
+                        @SuppressWarnings("unchecked")
+                        Map<String, Object> params = args[1] instanceof Map<?, ?> map ? cast(map) : Map.of();
+                        if ("Page.getFrameTree".equals(command)) {
+                            yield Map.of("frameTree", Map.of(
+                                    "frame", Map.of("id", "main"),
+                                    "childFrames", List.of(Map.of("frame", Map.of("id", "child-1")))
+                            ));
+                        }
+                        if ("DOM.getFrameOwner".equals(command)) yield Map.of("backendNodeId", 42);
+                        if ("DOM.resolveNode".equals(command)) yield Map.of("object", Map.of("objectId", "obj-frame"));
+                        if ("Runtime.callFunctionOn".equals(command)) {
+                            Object arg = null;
+                            if (params.get("arguments") instanceof List<?> list && !list.isEmpty() && list.get(0) instanceof Map<?, ?> raw) {
+                                arg = raw.get("value");
+                            }
+                            Map<String, Object> input = new LinkedHashMap<>();
+                            input.put("mode", "call");
+                            input.put("script", String.valueOf(params.get("functionDeclaration")));
+                            input.put("arg", arg);
+                            Object value = runContext(script, state, input);
+                            yield Map.of("result", Map.of("value", value == null ? false : value));
+                        }
+                        yield Map.of();
+                    }
+                    default -> defaultValue(method.getReturnType());
+                }
+        );
+        self.set(driver);
+        return driver;
     }
 
     private static Map<String, Object> runLiveHelper(Map<String, Object> spec) throws Exception {
