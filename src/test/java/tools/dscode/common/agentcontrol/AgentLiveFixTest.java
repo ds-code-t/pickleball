@@ -1046,22 +1046,63 @@ class AgentLiveFixTest {
 
     @Test
     void borderShorthandAndTextColorUseDomFallback() throws Exception {
-        AtomicReference<String> css = new AtomicReference<>();
+        Path dir = Files.createTempDirectory("pkb-style");
+        Path state = dir.resolve("state.json");
+        Path script = dir.resolve("context-dom.js");
+        try (InputStream stream = AgentLiveFixTest.class.getResourceAsStream("context-dom.js")) {
+            if (stream == null) throw new IOException("missing context-dom.js");
+            Files.write(script, stream.readAllBytes());
+        }
+        ObjectMapper json = new ObjectMapper();
+        Map<String, Object> top = new LinkedHashMap<>();
+        top.put("html", "<b id=\"save\" style=\"color:blue\">save</b>");
+        top.put("undo", Map.of());
+        top.put("events", List.of());
+        top.put("bound", false);
+        writeContext(json, state, "top", Map.of("html", "", "undo", Map.of(), "events", List.of(), "bound", false), top, Map.of());
+        WebDriver raw = contextDriver(script, state);
         List<String> commands = new ArrayList<>();
-        WebDriver live = scriptDriver("tab-a", spec -> {
-            css.set(String.valueOf(spec.get("css")));
-            return Map.of("ok", true);
-        }, false);
+        WebDriver live = (WebDriver) Proxy.newProxyInstance(
+                WebDriver.class.getClassLoader(),
+                new Class<?>[]{WebDriver.class, JavascriptExecutor.class, CdpProbe.class},
+                (proxy, method, args) -> {
+                    if ("executeCdpCommand".equals(method.getName()) && args != null && args.length > 0) {
+                        commands.add(String.valueOf(args[0]));
+                    }
+                    try {
+                        return method.invoke(raw, args);
+                    } catch (java.lang.reflect.InvocationTargetException failure) {
+                        Throwable cause = failure.getCause() == null ? failure : failure.getCause();
+                        if (cause instanceof RuntimeException runtime) throw runtime;
+                        if (cause instanceof Error error) throw error;
+                        throw new IllegalStateException(cause);
+                    }
+                }
+        );
         PageSurfaces.manage(live, "chrome-headed-quiet", true);
+        PageSurfaces.focus(live);
         Map<String, Object> border = PageSurfaces.highlight(null, "save", "yellow", "border:9px dashed #abc", null, null, null, null);
         assertEquals("style", border.get("cdp"));
         assertTrue(String.valueOf(border.get("styleNote")).toLowerCase().contains("reversible dom"), String.valueOf(border));
-        assertTrue(css.get().contains("9px") && css.get().contains("dashed") && css.get().contains("#abc"), css.get());
-        assertFalse(commands.contains("Overlay.highlightNode"));
+        String painted = documentHtml(json.readValue(state.toFile(), Map.class), "top");
+        assertTrue(painted.contains("9px") && painted.contains("dashed") && painted.contains("#abc"), painted);
+        assertTrue(painted.contains("data-pkb-original-style=\"color:blue\""), painted);
+        assertFalse(commands.contains("Overlay.highlightNode"), commands.toString());
         Map<String, Object> color = PageSurfaces.highlight(null, "save", "yellow", "color:#112233", null, null, null, null);
         assertEquals("style", color.get("cdp"));
         assertTrue(String.valueOf(color.get("styleNote")).toLowerCase().contains("reversible dom"), String.valueOf(color));
-        assertTrue(css.get().contains("color:#112233") || css.get().contains("color: #112233"), css.get());
+        String recolored = documentHtml(json.readValue(state.toFile(), Map.class), "top");
+        assertTrue(recolored.contains("color:#112233"), recolored);
+        assertTrue(recolored.contains("data-pkb-original-style=\"color:blue\""), recolored);
+        assertFalse(commands.contains("Overlay.highlightNode"), commands.toString());
+        PageSurfaces.unhighlight(null, "save");
+        String restored = documentHtml(json.readValue(state.toFile(), Map.class), "top");
+        assertTrue(restored.contains("style=\"color:blue\""), restored);
+        assertFalse(restored.contains("data-pkb-style"), restored);
+        assertFalse(restored.contains("#112233"), restored);
+        assertFalse(restored.contains("dashed"), restored);
+        assertTrue(commands.contains("Overlay.hideHighlight"), commands.toString());
+        assertFalse(commands.contains("Overlay.highlightNode"), commands.toString());
     }
 
     @Test
