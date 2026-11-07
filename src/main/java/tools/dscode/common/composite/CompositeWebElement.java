@@ -45,10 +45,19 @@ public final class CompositeWebElement implements WebElement {
 
     /** One node from an all-contexts query. The id is the frame and backend id. */
     public static WebElement fromQuery(String xpath, JsonNode node, int index) {
-        return new CompositeWebElement(new CompositeSelector(xpath, null, null, "dom", null, null), node, index);
+        return fromQuery(xpath, node, index, null, null);
+    }
+
+    /** Query dispatch passes the browser and tab that produced this hit. Ownership is not re-read from global focus. */
+    public static WebElement fromQuery(String xpath, JsonNode node, int index, org.openqa.selenium.WebDriver owner, String tab) {
+        return new CompositeWebElement(new CompositeSelector(xpath, null, null, "dom", null, null), node, index, owner, tab);
     }
 
     CompositeWebElement(CompositeSelector selector, JsonNode node, int index) {
+        this(selector, node, index, null, null);
+    }
+
+    CompositeWebElement(CompositeSelector selector, JsonNode node, int index, org.openqa.selenium.WebDriver owner, String tab) {
         this.selector = selector;
         JsonNode value = node == null ? null : node;
         this.nodeId = first(
@@ -97,13 +106,11 @@ public final class CompositeWebElement implements WebElement {
                 && this.geometry.visualViewportRelative() != null
                 && this.handle != null
                 && !this.handle.isBlank()) {
-            org.openqa.selenium.WebDriver origin = tools.dscode.common.agentcontrol.AgentControl.queryOwner();
-            String tab = tools.dscode.common.agentcontrol.AgentControl.queryTab(origin);
             tools.dscode.common.agentcontrol.AgentControl.rememberGeometry(
                     this.handle,
                     this.geometry.visualViewportRelative().x(),
                     this.geometry.visualViewportRelative().y(),
-                    origin,
+                    owner,
                     tab
             );
         }

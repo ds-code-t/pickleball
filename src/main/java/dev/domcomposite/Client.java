@@ -256,8 +256,50 @@ public final class Client implements AutoCloseable {
         int scheme = value.indexOf("://");
         if (scheme >= 0) value = value.substring(scheme + 3);
         int slash = value.indexOf('/');
-        if (slash >= 0) value = value.substring(0, slash);
-        return value.toLowerCase(Locale.ROOT);
+        String hostport = slash >= 0 ? value.substring(0, slash) : value;
+        String path = slash >= 0 ? value.substring(slash) : "";
+        int query = path.indexOf('?');
+        if (query >= 0) path = path.substring(0, query);
+        return hostport.toLowerCase(Locale.ROOT) + pageTargetSuffix(path);
+    }
+
+    /** Browser endpoint plus one page target. A bare target id is `/devtools/page/<id>`. */
+    public static String withTarget(String browserCdp, String target) {
+        if (browserCdp == null || browserCdp.isBlank()) return target == null ? "" : target.trim();
+        if (target == null || target.isBlank()) return browserCdp.trim();
+        String trimmed = target.trim();
+        if (trimmed.contains("://")) return trimmed;
+        if (trimmed.contains("/devtools/page/")) {
+            String base = browserCdp.trim();
+            int scheme = base.indexOf("://");
+            String prefix = scheme >= 0 ? base.substring(0, scheme + 3) : "http://";
+            String rest = scheme >= 0 ? base.substring(scheme + 3) : base;
+            int slash = rest.indexOf('/');
+            String hostport = slash >= 0 ? rest.substring(0, slash) : rest;
+            String suffix = pageTargetSuffix(trimmed.startsWith("/") ? trimmed : "/" + trimmed);
+            return prefix + hostport + suffix;
+        }
+        String base = browserCdp.trim();
+        int scheme = base.indexOf("://");
+        String prefix = scheme >= 0 ? base.substring(0, scheme + 3) : "http://";
+        String rest = scheme >= 0 ? base.substring(scheme + 3) : base;
+        int slash = rest.indexOf('/');
+        String hostport = slash >= 0 ? rest.substring(0, slash) : rest;
+        return prefix + hostport + "/devtools/page/" + trimmed;
+    }
+
+    static String pageTargetSuffix(String path) {
+        if (path == null || path.isBlank()) return "";
+        String marker = "/devtools/page/";
+        int at = path.indexOf(marker);
+        if (at < 0) return "";
+        String id = path.substring(at + marker.length());
+        int cut = id.indexOf('/');
+        if (cut >= 0) id = id.substring(0, cut);
+        int query = id.indexOf('?');
+        if (query >= 0) id = id.substring(0, query);
+        if (id.isBlank()) return "";
+        return marker + id;
     }
 
     private static String textOf(JsonNode node) {

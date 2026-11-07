@@ -34,12 +34,14 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -51,6 +53,10 @@ class AgentLiveFixTest {
     @AfterEach
     void releaseDrivers() {
         PageSurfaces.clearDriver();
+        CompositeRuntime.resetForTests();
+        THROW_FRAME.set(false);
+        BLOCK_WINDOW.set(false);
+        FRAME_SWITCHES.clear();
     }
 
     @Test
@@ -335,6 +341,9 @@ class AgentLiveFixTest {
         List<Map<String, Object>> configs = new ArrayList<>();
         AtomicInteger domHighlights = new AtomicInteger();
         WebDriver live = cdpDriver("tab-a", (method, params) -> {
+            if ("Page.getFrameTree".equals(method)) {
+                return Map.of("frameTree", Map.of("frame", Map.of("id", "frame-a")));
+            }
             commands.add(method);
             if ("Overlay.highlightNode".equals(method) && params.get("highlightConfig") instanceof Map<?, ?> config) {
                 configs.add(cast(config));
@@ -394,6 +403,15 @@ class AgentLiveFixTest {
         String kept = PageSurfaces.neutralize("<section><p class=\"note\">Hello <b>there</b></p></section>");
         assertTrue(kept.contains("<section>"), kept);
         assertTrue(kept.contains("<b>there</b>"), kept);
+        String xhtml = PageSurfaces.neutralize("<iframe src=\"data:application/xhtml+xml,%3Cscript%3Ealert(1)%3C/script%3E\"></iframe>");
+        assertFalse(xhtml.toLowerCase().contains("xhtml"), xhtml);
+        assertFalse(xhtml.toLowerCase().contains("script"), xhtml);
+        assertTrue(xhtml.toLowerCase().contains("<iframe"), xhtml);
+        String svg = PageSurfaces.neutralize("<object data=\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' onload='alert(1)'%3E%3C/svg%3E\"></object>");
+        assertFalse(svg.toLowerCase().contains("svg"), svg);
+        assertFalse(svg.toLowerCase().contains("onload"), svg);
+        assertFalse(svg.toLowerCase().contains("alert"), svg);
+        assertTrue(svg.toLowerCase().contains("<object"), svg);
     }
 
     @Test
@@ -419,6 +437,9 @@ class AgentLiveFixTest {
     void explicitStylesFollowTheRequestOrSayTheyFellBack() throws Exception {
         List<Map<String, Object>> configs = new ArrayList<>();
         WebDriver live = cdpDriver("tab-a", (method, params) -> {
+            if ("Page.getFrameTree".equals(method)) {
+                return Map.of("frameTree", Map.of("frame", Map.of("id", "frame-a")));
+            }
             if ("Overlay.highlightNode".equals(method) && params.get("highlightConfig") instanceof Map<?, ?> config) {
                 configs.add(cast(config));
             }
@@ -427,7 +448,7 @@ class AgentLiveFixTest {
         PageSurfaces.manage(live, "chrome-headed-quiet", true);
         PageSurfaces.bindFrame(live, "tab-a", "frame-a");
         Map<String, Object> painted = PageSurfaces.highlight(
-                null, "frame-a:4", "yellow", "background-color:#abc; border: 2px solid tomato; border-color: rgb(1, 2, 3);", null, null, null, null);
+                null, "frame-a:4", "yellow", "background-color:#abc; border-color: rgb(1, 2, 3);", null, null, null, null);
         assertEquals("Overlay.highlightNode", painted.get("cdp"));
         assertFalse(painted.containsKey("styleNote"));
         assertEquals(170, ((Map<?, ?>) configs.get(0).get("contentColor")).get("r"));
@@ -453,6 +474,9 @@ class AgentLiveFixTest {
     void unhighlightFailsWhenHideHighlightFails() throws Exception {
         AtomicInteger dom = new AtomicInteger();
         WebDriver live = cdpDriver("tab-a", (method, params) -> {
+            if ("Page.getFrameTree".equals(method)) {
+                return Map.of("frameTree", Map.of("frame", Map.of("id", "frame-a")));
+            }
             if ("Overlay.hideHighlight".equals(method)) throw new IllegalStateException("hide failed");
             return Map.of();
         }, spec -> {
@@ -474,6 +498,17 @@ class AgentLiveFixTest {
         AtomicReference<String> current = new AtomicReference<>("tab-1");
         List<String> hidden = new ArrayList<>();
         WebDriver live = tabsCdp(current, new LinkedHashSet<>(List.of("tab-1", "tab-2")), (method, params) -> {
+            if ("Page.getFrameTree".equals(method)) {
+                return Map.of("frameTree", Map.of(
+                        "frame", Map.of("id", "a"),
+                        "childFrames", List.of(Map.of("frame", Map.of("id", "b")))
+                ));
+            }
+            if ("DOM.getFrameOwner".equals(method)) return Map.of("backendNodeId", 7);
+            if ("DOM.resolveNode".equals(method)) return Map.of("object", Map.of("objectId", "obj-frame"));
+            if ("Runtime.callFunctionOn".equals(method)) {
+                return Map.of("result", Map.of("value", "{\"name\":\"child\",\"changedName\":false,\"previousBridge\":null}"));
+            }
             if ("Overlay.hideHighlight".equals(method)) hidden.add(current.get());
             return Map.of();
         }, spec -> Map.of("ok", true, "removed", 1));
@@ -561,7 +596,11 @@ class AgentLiveFixTest {
             if ("DOM.getFrameOwner".equals(method)) return Map.of("backendNodeId", 42);
             if ("DOM.resolveNode".equals(method)) return Map.of("object", Map.of("objectId", "obj-9"));
             if ("Runtime.callFunctionOn".equals(method)) {
-                functions.add(String.valueOf(params.get("functionDeclaration")));
+                String function = String.valueOf(params.get("functionDeclaration"));
+                functions.add(function);
+                if (function.contains("changedName")) {
+                    return Map.of("result", Map.of("value", "{\"name\":\"child\",\"changedName\":false,\"previousBridge\":null}"));
+                }
                 return Map.of("result", Map.of("value", true));
             }
             return Map.of();
@@ -716,6 +755,396 @@ class AgentLiveFixTest {
         }
     }
 
+    @Test
+    void queryOwnershipSticksToTheDispatchDriver() throws Exception {
+        AtomicInteger wrong = new AtomicInteger();
+        WebDriver first = scriptDriver("tab-a", spec -> {
+            wrong.incrementAndGet();
+            return Map.of("ok", true);
+        }, false);
+        WebDriver second = scriptDriver("tab-b", spec -> Map.of("ok", true, "x", spec.get("x"), "y", spec.get("y")), false);
+        PageSurfaces.manage(first, "chrome-headed-quiet", true);
+        PageSurfaces.manage(second, "edge-headed-quiet", true);
+        PageSurfaces.focus(first);
+        com.fasterxml.jackson.databind.JsonNode node = new ObjectMapper().readTree("""
+                {"handle":"frame-b:15","frame_id":"frame-b","backend_node_id":15,
+                 "geometry":{"document_css_px":{"x":1,"y":2,"width":3,"height":4},
+                 "visual_viewport_relative":{"x":12,"y":18,"width":3,"height":4}}}
+                """);
+        tools.dscode.common.composite.CompositeWebElement.fromQuery("//b", node, 0, second, "tab-b");
+        PageSurfaces.focus(first);
+        Map<String, Object> placed = PageSurfaces.place(null, "append", "frame-b:15", null, "<b>here</b>", "overlay", null, null, null);
+        assertEquals(0, wrong.get());
+        assertEquals(12, placed.get("x"));
+        assertEquals(18, placed.get("y"));
+    }
+
+    @Test
+    void ordinaryNodeIsResolvedByThePredefinedBridgeFunction() throws Exception {
+        Path dir = Files.createTempDirectory("pkb-bridge");
+        Path script = dir.resolve("bridge.js");
+        Files.writeString(script, """
+                const fs = require('fs');
+                const input = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+                function Element(name) {
+                  this.nodeType = 1;
+                  this.nodeName = String(name).toUpperCase();
+                  this.tagName = this.nodeName;
+                  this.attrs = {};
+                  this.style = {};
+                  this.children = [];
+                  this.parent = null;
+                }
+                Element.prototype.setAttribute = function(n, v) { this.attrs[n] = String(v); };
+                Element.prototype.getAttribute = function(n) { return Object.prototype.hasOwnProperty.call(this.attrs, n) ? this.attrs[n] : null; };
+                Element.prototype.removeAttribute = function(n) { delete this.attrs[n]; };
+                Element.prototype.hasAttribute = function(n) { return Object.prototype.hasOwnProperty.call(this.attrs, n); };
+                Element.prototype.appendChild = function(c) { c.parent = this; this.children.push(c); return c; };
+                Element.prototype.insertBefore = function(node, ref) {
+                  node.parent = this;
+                  const at = ref ? this.children.indexOf(ref) : -1;
+                  if (at < 0) this.children.push(node);
+                  else this.children.splice(at, 0, node);
+                  return node;
+                };
+                Element.prototype.remove = function() {
+                  if (!this.parent) return;
+                  const at = this.parent.children.indexOf(this);
+                  if (at >= 0) this.parent.children.splice(at, 1);
+                };
+                Element.prototype.querySelectorAll = function() { return this.children.filter(c => c && c.nodeType === 1); };
+                Element.prototype.replaceWith = function(node) {
+                  const kids = node.children ? node.children.slice() : [node];
+                  const parent = this.parent;
+                  const at = parent.children.indexOf(this);
+                  parent.children.splice(at, 1, ...kids);
+                  kids.forEach(k => k.parent = parent);
+                };
+                Object.defineProperty(Element.prototype, 'parentNode', { get() { return this.parent; } });
+                Object.defineProperty(Element.prototype, 'nextSibling', {
+                  get() {
+                    if (!this.parent) return null;
+                    const kids = this.parent.children;
+                    const at = kids.indexOf(this);
+                    return at >= 0 && at + 1 < kids.length ? kids[at + 1] : null;
+                  }
+                });
+                Object.defineProperty(Element.prototype, 'outerHTML', {
+                  get() {
+                    const inner = this.children.map(c => c.outerHTML || c.text || '').join('');
+                    return '<' + this.nodeName.toLowerCase() + '>' + inner + '</' + this.nodeName.toLowerCase() + '>';
+                  }
+                });
+                Object.defineProperty(Element.prototype, 'innerHTML', {
+                  get() { return this.children.map(c => c.outerHTML || c.text || '').join(''); },
+                  set(html) { this.children = [{ text: html, outerHTML: html }]; }
+                });
+                function cssEscape(v) { return String(v).replace(/["\\\\]/g, '\\\\$&'); }
+                const CSS = { escape: cssEscape };
+                const body = new Element('body');
+                const ordinary = new Element('button');
+                ordinary.setAttribute('id', 'save');
+                body.appendChild(ordinary);
+                const pickled = new Element('span');
+                pickled.setAttribute('data-backend-node-id', '15');
+                body.appendChild(pickled);
+                const document = {
+                  nodeType: 9,
+                  body,
+                  documentElement: body,
+                  createElement(tag) { return new Element(tag); },
+                  getElementById(id) { return [ordinary, pickled].find(el => el.getAttribute('id') === String(id)) || null; },
+                  querySelector(selector) {
+                    const bridge = /data-pkb-bridge="([^"]+)"/.exec(selector);
+                    const backend = /data-backend-node-id="([^"]+)"/.exec(selector);
+                    const all = [ordinary, pickled, ...body.children];
+                    if (bridge) return all.find(el => el.getAttribute && el.getAttribute('data-pkb-bridge') === bridge[1]) || null;
+                    if (backend) return all.find(el => el.getAttribute && el.getAttribute('data-backend-node-id') === backend[1]) || null;
+                    return null;
+                  },
+                  querySelectorAll() { return []; },
+                  addEventListener() {}
+                };
+                globalThis.document = document;
+                globalThis.window = { document };
+                globalThis.CSS = CSS;
+                const bridge = eval('(' + input.bridge + ')');
+                const helper = new Function('payload', input.helper.replace('arguments[0]', 'payload'));
+                const before = helper({ op: 'highlight', handle: 'child-1:15', backend: 15, css: 'outline:1px solid red', sentence: 'agent style' });
+                if (before.ok !== false) throw new Error('pickled backend attribute was used: ' + JSON.stringify(before));
+                if (ordinary.getAttribute('data-pkb-bridge') || ordinary.getAttribute('data-backend-node-id')) {
+                  throw new Error('ordinary node was mutated before the bridge function');
+                }
+                const token = 'tok-live';
+                function run(spec) {
+                  if (bridge.call(ordinary, token) !== true) throw new Error('bridge function did not mark the node');
+                  if (ordinary.getAttribute('data-backend-node-id')) throw new Error('bridge invented a backend attribute');
+                  return helper(spec);
+                }
+                const highlight = run({ op: 'highlight', bridge: token, handle: 'child-1:15', backend: 15, css: 'outline:1px solid red', sentence: 'agent style' });
+                const replaced = run({ op: 'replace', bridge: token, handle: 'child-1:15', backend: 15, html: '<b>bridged</b>', kind: 'html', id: 'pkb-9', sentence: 'sentence' });
+                const inserted = run({ op: 'insert', bridge: token, handle: 'child-1:15', backend: 15, html: '<i>before</i>', kind: 'html', id: 'pkb-8', sentence: 'sentence', where: 'before' });
+                const overlay = run({ op: 'append', bridge: token, handle: 'child-1:15', backend: 15, html: '<b>over</b>', kind: 'overlay', id: 'pkb-3', sentence: 'sentence', x: 8, y: 9 });
+                fs.writeFileSync(process.argv[3], JSON.stringify({ highlight, replaced, inserted, overlay, html: body.innerHTML }));
+                """);
+        Path in = dir.resolve("in.json");
+        Path out = dir.resolve("out.json");
+        new ObjectMapper().writeValue(in.toFile(), Map.of(
+                "bridge", PageSurfaces.bridgeMarkSource(),
+                "helper", PageSurfaces.liveHelperSource()
+        ));
+        Process process = new ProcessBuilder("node", script.toString(), in.toString(), out.toString()).redirectErrorStream(true).start();
+        boolean finished = process.waitFor(20, TimeUnit.SECONDS);
+        String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+        assertTrue(finished && process.exitValue() == 0 && Files.isRegularFile(out), output);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> parsed = new ObjectMapper().readValue(out.toFile(), Map.class);
+        assertEquals(Boolean.TRUE, ((Map<?, ?>) parsed.get("highlight")).get("ok"));
+        assertEquals(Boolean.TRUE, ((Map<?, ?>) parsed.get("replaced")).get("ok"));
+        assertEquals(Boolean.TRUE, ((Map<?, ?>) parsed.get("inserted")).get("ok"));
+        assertEquals(Boolean.TRUE, ((Map<?, ?>) parsed.get("overlay")).get("ok"));
+        assertEquals(8, ((Number) ((Map<?, ?>) parsed.get("overlay")).get("x")).intValue());
+        String html = String.valueOf(parsed.get("html"));
+        assertTrue(html.contains("bridged"), html);
+        assertTrue(html.contains("before"), html);
+        assertTrue(html.contains("over"), html);
+        assertFalse(html.contains("data-backend-node-id=\"15\"") && html.contains("data-pkb-style") && html.indexOf("data-pkb-style") < html.indexOf("button"), html);
+    }
+
+    @Test
+    void failedFrameEntryFailsAndRestoresTheTemporaryName() throws Exception {
+        List<String> functions = new ArrayList<>();
+        THROW_FRAME.set(true);
+        WebDriver live = cdpDriver("tab-a", (method, params) -> {
+            if ("Page.getFrameTree".equals(method)) {
+                return Map.of("frameTree", Map.of(
+                        "frame", Map.of("id", "main"),
+                        "childFrames", List.of(Map.of("frame", Map.of("id", "child-1")))
+                ));
+            }
+            if ("DOM.getFrameOwner".equals(method)) return Map.of("backendNodeId", 42);
+            if ("DOM.resolveNode".equals(method)) return Map.of("object", Map.of("objectId", "obj-1"));
+            if ("Runtime.callFunctionOn".equals(method)) {
+                functions.add(String.valueOf(params.get("functionDeclaration")));
+                return Map.of("result", Map.of("value", "{\"name\":\"temp\",\"changedName\":true,\"previousBridge\":null}"));
+            }
+            return Map.of();
+        }, spec -> Map.of("ok", true));
+        PageSurfaces.manage(live, "chrome-headed-quiet", true);
+        PageSurfaces.bindFrame(live, "tab-a", "child-1");
+        IllegalStateException failure = assertThrows(IllegalStateException.class, () ->
+                PageSurfaces.place(null, "replace", "child-1:15", null, "<b>x</b>", "html", null, null, null));
+        assertTrue(failure.getMessage().toLowerCase().contains("frame") || failure.getMessage().contains("unknown"), failure.getMessage());
+        assertTrue(functions.stream().anyMatch(fn -> fn.contains("changedName") && fn.contains("setAttribute")), functions.toString());
+        assertTrue(functions.stream().anyMatch(fn -> fn.contains("removeAttribute")), functions.toString());
+        assertFalse(FRAME_SWITCHES.isEmpty(), FRAME_SWITCHES.toString());
+    }
+
+    @Test
+    void twoTabsOnOneBrowserKeepIndependentEngineSessions() throws Exception {
+        Path binary = temp.resolve("composite-tabs");
+        Path log = temp.resolve("tabs.log");
+        Files.writeString(binary, """
+                #!/usr/bin/env python3
+                import json, sys
+                log = open(%s, "a", encoding="utf-8")
+                for line in sys.stdin:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    req = json.loads(line)
+                    argv = req.get("argv") or []
+                    log.write(json.dumps(argv) + "\\n")
+                    log.flush()
+                    def flag(name):
+                        if name in argv:
+                            index = argv.index(name)
+                            if index + 1 < len(argv):
+                                return argv[index + 1]
+                        return ""
+                    if "version" in argv:
+                        body = {"version": "2.4.0"}
+                    elif len(argv) >= 2 and argv[0] == "session" and argv[1] == "create":
+                        body = {"ok": True, "id": flag("--id"), "cdp": flag("--cdp"), "launched": False}
+                    else:
+                        body = {"ok": True}
+                    sys.stdout.write(json.dumps({
+                        "id": req.get("id"),
+                        "exit": 0,
+                        "stdout": json.dumps(body),
+                        "stderr": ""
+                    }) + "\\n")
+                    sys.stdout.flush()
+                """.formatted(new ObjectMapper().writeValueAsString(log.toString())));
+        Files.setPosixFilePermissions(binary, Set.of(
+                PosixFilePermission.OWNER_READ,
+                PosixFilePermission.OWNER_WRITE,
+                PosixFilePermission.OWNER_EXECUTE
+        ));
+        try {
+            assertNotEquals(
+                    dev.domcomposite.Client.cdpKey("ws://127.0.0.1:9222/devtools/page/AAA"),
+                    dev.domcomposite.Client.cdpKey("ws://127.0.0.1:9222/devtools/page/BBB")
+            );
+            assertTrue(dev.domcomposite.Client.cdpKey("http://127.0.0.1:9222/devtools/page/AAA").contains("AAA"));
+            CompositeRuntime.use(temp, Map.of("COMPOSITE_BIN", binary.toString(), "pkb_composite", "on"),
+                    getClass().getClassLoader(), temp);
+            assertTrue(CompositeRuntime.primary(), String.valueOf(CompositeRuntime.current()));
+            PagedDriver browser = new PagedDriver("http://127.0.0.1:9222", Map.of("tab-a", "AAA", "tab-b", "BBB"));
+            PageSurfaces.manage(browser, "chrome-headed-quiet", true);
+            WindowRegistry.switchTo(temp, "run", "tab-a");
+            String first = CompositeRuntime.focusedSessionId();
+            WindowRegistry.switchTo(temp, "run", "tab-b");
+            String second = CompositeRuntime.focusedSessionId();
+            assertTrue(first != null && second != null && !first.equals(second), first + " / " + second);
+            WindowRegistry.switchTo(temp, "run", "tab-a");
+            assertEquals(first, CompositeRuntime.focusedSessionId());
+            PagedDriver other = new PagedDriver("http://127.0.0.1:9333", Map.of("only", "CCC"));
+            PageSurfaces.manage(other, "edge-headed-quiet", true);
+            WindowRegistry.switchTo(temp, "run", "only");
+            String third = CompositeRuntime.focusedSessionId();
+            assertFalse(first.equals(third) || second.equals(third), third);
+            String trace = Files.readString(log);
+            assertTrue(trace.contains("/devtools/page/AAA"), trace);
+            assertTrue(trace.contains("/devtools/page/BBB"), trace);
+            assertTrue(trace.contains("/devtools/page/CCC") || trace.contains("9333"), trace);
+            int creates = 0;
+            for (String line : trace.split("\n")) if (line.contains("session") && line.contains("create")) creates++;
+            assertTrue(creates >= 3, trace);
+        } finally {
+            CompositeRuntime.resetForTests();
+        }
+    }
+
+    @Test
+    void hideFailsWhenTheHighlightedTabCannotBeSelected() throws Exception {
+        AtomicReference<String> current = new AtomicReference<>("tab-1");
+        List<String> hidden = new ArrayList<>();
+        WebDriver live = tabsCdp(current, new LinkedHashSet<>(List.of("tab-1", "tab-2")), (method, params) -> {
+            if ("Page.getFrameTree".equals(method)) {
+                return Map.of("frameTree", Map.of("frame", Map.of("id", "a")));
+            }
+            if ("Overlay.hideHighlight".equals(method)) hidden.add(current.get());
+            if ("Overlay.highlightNode".equals(method)) return Map.of();
+            return Map.of();
+        }, spec -> Map.of("ok", true, "removed", 1));
+        PageSurfaces.manage(live, "chrome-headed-quiet", true);
+        PageSurfaces.bindFrame(live, "tab-1", "a");
+        PageSurfaces.highlight(null, "a:1", "yellow", null, null, null, null, null);
+        current.set("tab-2");
+        BLOCK_WINDOW.set(true);
+        hidden.clear();
+        IllegalStateException failure = assertThrows(IllegalStateException.class, () -> PageSurfaces.unhighlight(null, "a:1"));
+        assertTrue(failure.getMessage().contains("hideHighlight"), failure.getMessage());
+        assertFalse(hidden.contains("tab-2"), hidden.toString());
+    }
+
+    @Test
+    void borderShorthandAndTextColorUseDomFallback() throws Exception {
+        AtomicReference<String> css = new AtomicReference<>();
+        List<String> commands = new ArrayList<>();
+        WebDriver live = scriptDriver("tab-a", spec -> {
+            css.set(String.valueOf(spec.get("css")));
+            return Map.of("ok", true);
+        }, false);
+        PageSurfaces.manage(live, "chrome-headed-quiet", true);
+        Map<String, Object> border = PageSurfaces.highlight(null, "save", "yellow", "border:9px dashed #abc", null, null, null, null);
+        assertEquals("style", border.get("cdp"));
+        assertTrue(String.valueOf(border.get("styleNote")).toLowerCase().contains("reversible dom"), String.valueOf(border));
+        assertTrue(css.get().contains("9px") && css.get().contains("dashed") && css.get().contains("#abc"), css.get());
+        assertFalse(commands.contains("Overlay.highlightNode"));
+        Map<String, Object> color = PageSurfaces.highlight(null, "save", "yellow", "color:#112233", null, null, null, null);
+        assertEquals("style", color.get("cdp"));
+        assertTrue(String.valueOf(color.get("styleNote")).toLowerCase().contains("reversible dom"), String.valueOf(color));
+        assertTrue(css.get().contains("color:#112233") || css.get().contains("color: #112233"), css.get());
+    }
+
+    @Test
+    void childFrameSurfacesStayRemovableAndPollable() throws Exception {
+        AtomicReference<String> saw = new AtomicReference<>("");
+        WebDriver live = cdpDriver("tab-a", (method, params) -> {
+            if ("Page.getFrameTree".equals(method)) {
+                return Map.of("frameTree", Map.of(
+                        "frame", Map.of("id", "main"),
+                        "childFrames", List.of(Map.of("frame", Map.of("id", "child-1")))
+                ));
+            }
+            if ("DOM.getFrameOwner".equals(method)) return Map.of("backendNodeId", 42);
+            if ("DOM.resolveNode".equals(method)) return Map.of("object", Map.of("objectId", "obj-9"));
+            if ("Runtime.callFunctionOn".equals(method)) {
+                String function = String.valueOf(params.get("functionDeclaration"));
+                if (function.contains("changedName")) {
+                    return Map.of("result", Map.of("value", "{\"name\":\"child\",\"changedName\":false,\"previousBridge\":null}"));
+                }
+                return Map.of("result", Map.of("value", true));
+            }
+            return Map.of();
+        }, spec -> {
+            String op = String.valueOf(spec.get("op"));
+            saw.set(op + ":" + String.join(",", FRAME_SWITCHES));
+            if ("remove".equals(op) || "cleanup".equals(op)) return Map.of("ok", true, "removed", 1);
+            if ("highlight".equals(op)) return Map.of("ok", true);
+            return Map.of("ok", true, "x", 1, "y", 1);
+        });
+        PageSurfaces.manage(live, "chrome-headed-quiet", true);
+        PageSurfaces.bindFrame(live, "tab-a", "child-1");
+        FRAME_SWITCHES.clear();
+        Map<String, Object> placed = PageSurfaces.place(null, "append", "child-1:15", null, "<b>inside</b>", "html", null, null, null);
+        assertFalse(FRAME_SWITCHES.isEmpty(), "place did not enter the child frame");
+        FRAME_SWITCHES.clear();
+        PageSurfaces.remove(null, String.valueOf(placed.get("id")));
+        assertFalse(FRAME_SWITCHES.isEmpty(), "remove did not enter the child frame " + saw.get());
+        FRAME_SWITCHES.clear();
+        PageSurfaces.pollInput(temp, "frames");
+        assertFalse(FRAME_SWITCHES.isEmpty(), "poll did not enter the child frame");
+    }
+
+    @Test
+    void cleanupPropagatesHelperFailure() {
+        WebDriver live = scriptDriver("tab-a", spec -> Map.of("ok", false, "error", "helper broke"), false);
+        PageSurfaces.manage(live, "chrome-headed-quiet", true);
+        IllegalStateException failure = assertThrows(IllegalStateException.class, () -> PageSurfaces.cleanup(null));
+        assertTrue(failure.getMessage().contains("helper broke"), failure.getMessage());
+    }
+
+    @Test
+    void livePageIdsDoNotCollideAcrossRunLedgersOrRestartAtAUsedId() throws Exception {
+        WebDriver live = scriptDriver("tab-a", spec -> Map.of("ok", true), false);
+        PageSurfaces.manage(live, "chrome-headed-quiet", true);
+        PageSurfaces.focus(live);
+        Map<String, Object> first = PageSurfaces.place(null, "append", null, null, "<b>a</b>", "html", null, null, null, temp.resolve("run-a"));
+        Map<String, Object> second = PageSurfaces.place(null, "append", null, null, "<b>b</b>", "html", null, null, null, temp.resolve("run-b"));
+        assertEquals("pkb-1", first.get("id"));
+        assertEquals("pkb-2", second.get("id"));
+        Path aged = temp.resolve("aged/placements.json");
+        Files.createDirectories(aged.getParent());
+        Files.writeString(aged, "{\"pkb-1\":{\"sha256\":\"abc\",\"summary\":\"old\"}}");
+        assertEquals("pkb-2", PageSurfaces.allocateSurfaceId(aged));
+        String stored = Files.readString(aged);
+        assertTrue(stored.contains("\"next\":3") || stored.contains("\"next\": 3"), stored);
+    }
+
+    @Test
+    void scenarioRunCleanUpItselfRemovesNativeSurfaces() throws Exception {
+        AtomicInteger hits = new AtomicInteger();
+        tools.dscode.control.protocol.AgentSurfaceEnd.register(hits::incrementAndGet);
+        Class<?> unsafeType = Class.forName("sun.misc.Unsafe");
+        java.lang.reflect.Field field = unsafeType.getDeclaredField("theUnsafe");
+        field.setAccessible(true);
+        Object unsafe = field.get(null);
+        Object state = unsafeType.getMethod("allocateInstance", Class.class)
+                .invoke(unsafe, io.cucumber.core.runner.CurrentScenarioState.class);
+        java.lang.reflect.Field debug = io.cucumber.core.runner.CurrentScenarioState.class.getDeclaredField("debugBrowser");
+        debug.setAccessible(true);
+        debug.setBoolean(state, true);
+        io.cucumber.core.runner.CurrentScenarioState.class.getMethod("scenarioRunCleanUp").invoke(state);
+        assertTrue(hits.get() >= 1);
+    }
+
+    private static final AtomicBoolean THROW_FRAME = new AtomicBoolean(false);
+    private static final AtomicBoolean BLOCK_WINDOW = new AtomicBoolean(false);
+    private static final List<String> FRAME_SWITCHES = new ArrayList<>();
+
     private static WebDriver scriptDriver(
             String handle,
             Function<Map<?, ?>, Map<String, Object>> script,
@@ -762,11 +1191,7 @@ class AgentLiveFixTest {
             Function<Map<?, ?>, Map<String, Object>> script
     ) {
         AtomicReference<WebDriver> self = new AtomicReference<>();
-        Object switcher = Proxy.newProxyInstance(
-                WebDriver.class.getClassLoader(),
-                new Class<?>[]{WebDriver.TargetLocator.class},
-                (proxy, method, args) -> "window".equals(method.getName()) ? self.get() : defaultValue(method.getReturnType())
-        );
+        Object switcher = locator(self, null);
         WebDriver driver = (WebDriver) Proxy.newProxyInstance(
                 WebDriver.class.getClassLoader(),
                 new Class<?>[]{WebDriver.class, JavascriptExecutor.class, CdpProbe.class},
@@ -796,17 +1221,7 @@ class AgentLiveFixTest {
             Function<Map<?, ?>, Object> script
     ) {
         AtomicReference<WebDriver> self = new AtomicReference<>();
-        Object switcher = Proxy.newProxyInstance(
-                WebDriver.class.getClassLoader(),
-                new Class<?>[]{WebDriver.TargetLocator.class},
-                (proxy, method, args) -> {
-                    if ("window".equals(method.getName()) && args != null && args.length > 0) {
-                        current.set(String.valueOf(args[0]));
-                        return self.get();
-                    }
-                    return defaultValue(method.getReturnType());
-                }
-        );
+        Object switcher = locator(self, current);
         WebDriver driver = (WebDriver) Proxy.newProxyInstance(
                 WebDriver.class.getClassLoader(),
                 new Class<?>[]{WebDriver.class, JavascriptExecutor.class},
@@ -829,17 +1244,7 @@ class AgentLiveFixTest {
             Function<Map<?, ?>, Map<String, Object>> script
     ) {
         AtomicReference<WebDriver> self = new AtomicReference<>();
-        Object switcher = Proxy.newProxyInstance(
-                WebDriver.class.getClassLoader(),
-                new Class<?>[]{WebDriver.TargetLocator.class},
-                (proxy, method, args) -> {
-                    if ("window".equals(method.getName()) && args != null && args.length > 0) {
-                        current.set(String.valueOf(args[0]));
-                        return self.get();
-                    }
-                    return defaultValue(method.getReturnType());
-                }
-        );
+        Object switcher = locator(self, current);
         WebDriver driver = (WebDriver) Proxy.newProxyInstance(
                 WebDriver.class.getClassLoader(),
                 new Class<?>[]{WebDriver.class, JavascriptExecutor.class, CdpProbe.class},
@@ -943,6 +1348,110 @@ class AgentLiveFixTest {
         Object result = parsed.get("result");
         if (!(result instanceof Map<?, ?> map)) throw new AssertionError("helper result was not a map: " + parsed + " html=" + lastHelperHtml);
         return cast(map);
+    }
+
+    private static Object locator(AtomicReference<WebDriver> self, AtomicReference<String> current) {
+        return Proxy.newProxyInstance(
+                WebDriver.class.getClassLoader(),
+                new Class<?>[]{WebDriver.TargetLocator.class},
+                (proxy, method, args) -> {
+                    String name = method.getName();
+                    if ("defaultContent".equals(name) || "parentFrame".equals(name)) return self.get();
+                    if ("frame".equals(name)) {
+                        String frame = args == null || args.length == 0 || args[0] == null ? "" : String.valueOf(args[0]);
+                        FRAME_SWITCHES.add(frame);
+                        if (THROW_FRAME.get()) throw new IllegalStateException("frame switch failed");
+                        return self.get();
+                    }
+                    if ("window".equals(name) && args != null && args.length > 0) {
+                        if (BLOCK_WINDOW.get()) throw new IllegalStateException("tab switch failed");
+                        if (current != null) current.set(String.valueOf(args[0]));
+                        return self.get();
+                    }
+                    return defaultValue(method.getReturnType());
+                }
+        );
+    }
+
+    /** Remote driver whose CDP target id follows the selected window, not the host:port. */
+    private static final class PagedDriver extends RemoteWebDriver {
+        private final Map<String, String> targets;
+        private String current;
+
+        PagedDriver(String cdp, Map<String, String> targets) {
+            super(command -> {
+                Response response = new Response();
+                response.setState("success");
+                response.setSessionId("s" + Integer.toHexString(cdp.hashCode()));
+                Map<String, Object> returned = new LinkedHashMap<>();
+                returned.put("browserName", "chrome");
+                returned.put("se:cdp", cdp);
+                response.setValue(returned);
+                return response;
+            }, caps(cdp));
+            this.targets = new LinkedHashMap<>(targets);
+            this.current = targets.keySet().iterator().next();
+        }
+
+        private static MutableCapabilities caps(String cdp) {
+            MutableCapabilities capabilities = new MutableCapabilities();
+            capabilities.setCapability("browserName", "chrome");
+            capabilities.setCapability("se:cdp", cdp);
+            return capabilities;
+        }
+
+        @Override
+        public Set<String> getWindowHandles() {
+            return new LinkedHashSet<>(targets.keySet());
+        }
+
+        @Override
+        public String getWindowHandle() {
+            return current;
+        }
+
+        @Override
+        public String getTitle() {
+            return "title";
+        }
+
+        @Override
+        public String getCurrentUrl() {
+            return "https://example.test/" + current;
+        }
+
+        @Override
+        public TargetLocator switchTo() {
+            PagedDriver self = this;
+            return (TargetLocator) Proxy.newProxyInstance(
+                    WebDriver.class.getClassLoader(),
+                    new Class<?>[]{WebDriver.TargetLocator.class},
+                    (proxy, method, args) -> {
+                        if ("window".equals(method.getName()) && args != null && args.length > 0) {
+                            String handle = String.valueOf(args[0]);
+                            if (!targets.containsKey(handle)) {
+                                throw new org.openqa.selenium.NoSuchWindowException(handle);
+                            }
+                            current = handle;
+                            return self;
+                        }
+                        if ("defaultContent".equals(method.getName()) || "parentFrame".equals(method.getName()) || "frame".equals(method.getName())) {
+                            return self;
+                        }
+                        return defaultValue(method.getReturnType());
+                    }
+            );
+        }
+
+        public Map<String, Object> executeCdpCommand(String commandName, Map<String, Object> parameters) {
+            if ("Target.getTargetInfo".equals(commandName)) {
+                Map<String, Object> info = new LinkedHashMap<>();
+                info.put("targetId", targets.getOrDefault(current, ""));
+                info.put("type", "page");
+                return Map.of("targetInfo", info);
+            }
+            return Map.of();
+        }
     }
 
     private static RemoteWebDriver remote(String cdp) {

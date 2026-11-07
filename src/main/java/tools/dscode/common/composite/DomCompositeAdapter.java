@@ -151,9 +151,11 @@ public final class DomCompositeAdapter {
             tools.dscode.common.domoperations.PositionSelection.EnginePosition position,
             boolean countOnly
     ) {
+        org.openqa.selenium.WebDriver owner = dispatchOwner();
+        String tab = tools.dscode.common.agentcontrol.AgentControl.queryTab(owner);
         JsonNode json = queryScoped(by, within, nesting, filter, position, countOnly);
         if (countOnly) return List.of();
-        return hits(json, SelectorTranslator.fromBy(by));
+        return hits(json, SelectorTranslator.fromBy(by), owner, tab);
     }
 
     private JsonNode queryScoped(
@@ -240,10 +242,12 @@ public final class DomCompositeAdapter {
      * expression. Exposure and limit are sent only when capabilities list them.
      */
     public List<WebElement> findEngine(EngineQuery query) {
+        org.openqa.selenium.WebDriver owner = dispatchOwner();
+        String tab = tools.dscode.common.agentcontrol.AgentControl.queryTab(owner);
         JsonNode json = queryEngine(query);
         if (json == null) return List.of();
         logExplain(json);
-        List<WebElement> found = hits(json, new CompositeSelector(null, null, query.text(), "dom", null, query.text()));
+        List<WebElement> found = hits(json, new CompositeSelector(null, null, query.text(), "dom", null, query.text()), owner, tab);
         for (WebElement element : found) {
             if (element instanceof CompositeWebElement hit && hit.visualOnly()) {
                 CompositeLog.info("query", "visual-only " + hit.handle());
@@ -310,6 +314,8 @@ public final class DomCompositeAdapter {
         if ("lower".equals(used.exposure())) {
             CompositeLog.info("exposure", "act lower " + used.text());
         }
+        org.openqa.selenium.WebDriver owner = dispatchOwner();
+        String tab = tools.dscode.common.agentcontrol.AgentControl.queryTab(owner);
         if (dryRun) return null;
         Client open = CompositeRuntime.ensureClient();
         if (open == null) throw new IllegalStateException("composite client is not open");
@@ -324,7 +330,9 @@ public final class DomCompositeAdapter {
         CompositeWebElement element = new CompositeWebElement(
                 new CompositeSelector(null, null, used.text(), "dom", null, used.text()),
                 node,
-                0
+                0,
+                owner,
+                tab
         );
         return ElementReads.fromComposite(element);
     }
@@ -362,8 +370,10 @@ public final class DomCompositeAdapter {
         }
         attachGeometry(body);
         CompositeLog.debug("adapter", "find " + used.describe());
+        org.openqa.selenium.WebDriver owner = dispatchOwner();
+        String tab = tools.dscode.common.agentcontrol.AgentControl.queryTab(owner);
         JsonNode json = open.query(body);
-        return hits(json, used);
+        return hits(json, used, owner, tab);
     }
 
     /**
@@ -832,6 +842,19 @@ public final class DomCompositeAdapter {
     }
 
     List<WebElement> hits(JsonNode json, CompositeSelector selector) {
+        org.openqa.selenium.WebDriver owner = dispatchOwner();
+        return hits(json, selector, owner, dispatchTab(owner));
+    }
+
+    private static org.openqa.selenium.WebDriver dispatchOwner() {
+        return tools.dscode.common.agentcontrol.AgentControl.queryOwner();
+    }
+
+    private static String dispatchTab(org.openqa.selenium.WebDriver owner) {
+        return tools.dscode.common.agentcontrol.AgentControl.queryTab(owner);
+    }
+
+    List<WebElement> hits(JsonNode json, CompositeSelector selector, org.openqa.selenium.WebDriver owner, String tab) {
         JsonNode composite = array(json, "composite");
         JsonNode nodes = array(json, "nodes");
         JsonNode list = composite != null ? composite : nodes;
@@ -843,7 +866,7 @@ public final class DomCompositeAdapter {
                 JsonNode used = composite != null && nodes != null
                         ? overlayFindFields(node, matchNode(node, nodes, index))
                         : node;
-                hits.add(new CompositeWebElement(selector, used, index++));
+                hits.add(new CompositeWebElement(selector, used, index++, owner, tab));
             }
         }
         return PositionSelection.applyOrdinal(hits, selector.ordinal());

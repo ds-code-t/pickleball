@@ -156,15 +156,36 @@ public final class CompositeRuntime {
 
     /** Window and tab focus follow the driver's engine session, not the first join. */
     public static void focusDriver(WebDriver driver) {
+        focusPage(driver, null);
+    }
+
+    /**
+     * Select the engine Session for this browser, or for one page target when
+     * {@code pageTarget} is a CDP target id or a devtools page URL. Two tabs on
+     * one host:port keep two sessions. A null target keeps the browser session.
+     */
+    public static void focusPage(WebDriver driver, String pageTarget) {
         if (!(driver instanceof RemoteWebDriver remote)) return;
-        String cdp = cdp(remote.getCapabilities());
-        if (cdp == null) return;
-        String normalized = DirectControlProvider.withScheme(cdp);
+        String raw = cdp(remote.getCapabilities());
+        if (raw == null) return;
+        String browser = DirectControlProvider.withScheme(raw);
+        String normalized = pageTarget == null || pageTarget.isBlank()
+                ? browser
+                : Client.withTarget(browser, pageTarget);
         joinedCdp = normalized;
-        String id = SESSIONS_BY_CDP.get(Client.cdpKey(normalized));
-        if (id == null) id = SESSIONS_BY_CDP.get(normalized);
+        String key = Client.cdpKey(normalized);
+        String id = SESSIONS_BY_CDP.get(key);
         Client open = client;
-        if (open != null && id != null) open.focusSession(id);
+        if (open != null && id != null) {
+            open.focusSession(id);
+            return;
+        }
+        if (pageTarget != null && !pageTarget.isBlank()) {
+            openSession(normalized, key);
+            return;
+        }
+        String browserId = SESSIONS_BY_CDP.get(Client.cdpKey(browser));
+        if (open != null && browserId != null) open.focusSession(browserId);
     }
 
     /** True after {@link #attach} joined a CDP browser. A process-only session is not joined. */
@@ -228,6 +249,27 @@ public final class CompositeRuntime {
                     "Leave pkb_composite=auto so this run stays on Selenium, or fix COMPOSITE_BIN."
             );
             if (SESSIONS_BY_CDP.isEmpty()) forceLegacy();
+        }
+    }
+
+    private static void openSession(String normalized, String key) {
+        Client open = client;
+        if (open == null || normalized == null || normalized.isBlank()) return;
+        try {
+            Map<String, Object> config = new LinkedHashMap<>();
+            config.put("cdp", normalized);
+            config.put("i_accept_local_attach", true);
+            config.put("process", true);
+            Session session = open.openSession(config);
+            SESSIONS_BY_CDP.put(key, session.id());
+            joinedCdp = normalized;
+            CompositeLog.info("session", "joined " + normalized + " id=" + session.id());
+        } catch (RuntimeException failure) {
+            CompositeLog.errorFix(
+                    "session",
+                    "dom-composite could not join the page session: " + failure.getMessage(),
+                    "Leave pkb_composite=auto so this run stays on Selenium, or fix COMPOSITE_BIN."
+            );
         }
     }
 

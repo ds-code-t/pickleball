@@ -195,12 +195,21 @@ public final class AllContextsScan {
                     collected.add(Hit.otherFrame());
                 } else {
                     collected.add(Hit.live(
-                            tools.dscode.common.composite.CompositeWebElement.fromQuery(xpath, hit.node(), live)
+                            tools.dscode.common.composite.CompositeWebElement.fromQuery(
+                                    xpath, hit.node(), live, driver, safeHandle())
                     ));
                     live++;
                 }
             }
             return true;
+        }
+
+        private String safeHandle() {
+            try {
+                return driver.getWindowHandle();
+            } catch (RuntimeException failure) {
+                return null;
+            }
         }
 
         private void searchDocument(SearchContext context, List<FrameRef> path, int depth, boolean foreign) {

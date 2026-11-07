@@ -54,11 +54,17 @@ final class PageSurfaces {
     private static final String LIVE_HELPER = """
             var spec = arguments[0];
             var op = spec.op;
+            var resolved = null;
             function node() {
+              if (resolved) return resolved;
               var handle = spec.handle || '';
               if (spec.bridge) {
                 var bridged = document.querySelector('[data-pkb-bridge="' + CSS.escape(String(spec.bridge)) + '"]');
-                if (bridged) return bridged;
+                if (bridged) {
+                  bridged.removeAttribute('data-pkb-bridge');
+                  resolved = bridged;
+                  return bridged;
+                }
               }
               if (!handle) return null;
               var direct = document.getElementById(handle);
@@ -66,10 +72,6 @@ final class PageSurfaces {
               var marked = document.querySelector('[data-pkb-handle="' + CSS.escape(handle) + '"]')
                 || document.querySelector('[data-pkb-id="' + CSS.escape(handle) + '"]');
               if (marked) return marked;
-              if (spec.backend !== undefined && spec.backend !== null && String(spec.backend) !== '') {
-                var owned = document.querySelector('[data-backend-node-id="' + CSS.escape(String(spec.backend)) + '"]');
-                if (owned) return owned;
-              }
               return null;
             }
             function mark(el, kind, sentence) {
@@ -190,6 +192,20 @@ final class PageSurfaces {
             return {ok:true, id:spec.id, x:left, y:top};
             """;
 
+    /** Predefined DOM.resolveNode stamp. Not agent script. Removed by the helper after lookup. */
+    static final String BRIDGE_MARK =
+            "function(token){ if (!this || this.nodeType !== 1) return false; this.setAttribute('data-pkb-bridge', token); return true; }";
+
+    /**
+     * Names an iframe only when it has neither name nor id, and stamps a bridge token.
+     * The caller restores both after switchTo().frame(name).
+     */
+    static final String FRAME_MARK =
+            "function(token){ if (!this || this.nodeType !== 1) return ''; var tag = String(this.tagName || '').toLowerCase(); if (tag !== 'iframe' && tag !== 'frame') return ''; var previousName = this.getAttribute('name'); var name = previousName || this.getAttribute('id') || ''; var changedName = false; if (!name) { this.setAttribute('name', token); name = token; changedName = true; } var previousBridge = this.getAttribute('data-pkb-bridge'); this.setAttribute('data-pkb-bridge', token); return JSON.stringify({name:name, changedName:changedName, previousBridge:previousBridge}); }";
+
+    static final String FRAME_RESTORE =
+            "function(spec){ if (!this || this.nodeType !== 1 || !spec) return false; if (spec.changedName) this.removeAttribute('name'); if (spec.previousBridge == null || spec.previousBridge === '') this.removeAttribute('data-pkb-bridge'); else this.setAttribute('data-pkb-bridge', spec.previousBridge); return true; }";
+
     private PageSurfaces() {
     }
 
@@ -212,7 +228,7 @@ final class PageSurfaces {
     static void focus(WebDriver webDriver) {
         driver = webDriver;
         focusedTab = currentHandle(webDriver);
-        CompositeRuntime.focusDriver(webDriver);
+        CompositeRuntime.focusPage(webDriver, pageTarget(webDriver));
     }
 
     /** Ranked frame identity belongs to one browser and one tab. Not a scan. */
@@ -222,7 +238,7 @@ final class PageSurfaces {
         for (Managed managed : MANAGED) {
             if (managed.driver == webDriver) browserId = managed.id;
         }
-        FRAMES.put(frameId, new FrameOwner(browserId, webDriver, tab == null ? "" : tab));
+        FRAMES.putIfAbsent(frameId, new FrameOwner(browserId, webDriver, tab == null ? "" : tab));
     }
 
     /** Geometry view for a resolved handle. Visual-viewport x/y, not a page rect. */
@@ -243,20 +259,19 @@ final class PageSurfaces {
         }
     }
 
-    /** Driver that matches the focused engine session, else the focused Selenium driver. */
+    /** Driver whose debugger address owns the focused engine session. No global-driver fallback. */
     static WebDriver ownerForQuery() {
         String cdp = CompositeRuntime.focusedCdp();
-        if (cdp != null && !cdp.isBlank()) {
-            String key = dev.domcomposite.Client.cdpKey(cdp);
-            for (Managed managed : MANAGED) {
-                if (!(managed.driver instanceof RemoteWebDriver remote)) continue;
-                String address = debuggerAddress(remote);
-                if (!address.isEmpty() && dev.domcomposite.Client.cdpKey(address).equals(key)) {
-                    return managed.driver;
-                }
-            }
+        if (cdp == null || cdp.isBlank()) return null;
+        String key = dev.domcomposite.Client.cdpKey(cdp);
+        for (Managed managed : MANAGED) {
+            if (!(managed.driver instanceof RemoteWebDriver remote)) continue;
+            String address = debuggerAddress(remote);
+            if (address.isEmpty()) continue;
+            String browserKey = dev.domcomposite.Client.cdpKey(address);
+            if (browserKey.equals(key) || key.startsWith(browserKey + "/")) return managed.driver;
         }
-        return driver;
+        return null;
     }
 
     static String focusedTabOf(WebDriver web) {
@@ -303,6 +318,18 @@ final class PageSurfaces {
         GEOMETRY.clear();
         CDP_HIGHLIGHTS.clear();
         HIGHLIGHT_SITES.clear();
+        SURFACE_SITES.clear();
+        for (Path file : LIVE_IDS.values()) {
+            try {
+                if (file.getParent() != null) {
+                    if (Files.isRegularFile(file)) Files.deleteIfExists(file);
+                    Files.deleteIfExists(file.resolveSibling(file.getFileName() + ".lock"));
+                }
+            } catch (IOException ignored) {
+                // The next test allocates against a fresh key.
+            }
+        }
+        LIVE_IDS.clear();
     }
 
     static String presetCss(String preset, String explicit) {
@@ -559,18 +586,34 @@ final class PageSurfaces {
             throw new IllegalStateException("Overlay.hideHighlight failed");
         }
         CDP_HIGHLIGHTS.clear();
+        RuntimeException first = null;
         for (Managed managed : List.copyOf(MANAGED)) {
             WebDriver web = managed.driver;
             try {
-                List<String> handles = new ArrayList<>(web.getWindowHandles());
+                List<String> handles = new ArrayList<>(tabsOf(web));
+                if (handles.isEmpty()) handles = new ArrayList<>(List.of(""));
                 for (String handle : handles) {
-                    web.switchTo().window(handle);
-                    runLive(web, "cleanup", null, null, null, null, "html", HTML_SENTENCE, "", false, null, null);
+                    if (!handle.isBlank() && !activate(web, handle)) {
+                        throw new IllegalStateException("tab switch failed");
+                    }
+                    LiveResult live = runLive(web, "cleanup", null, null, null, null, "html", HTML_SENTENCE, "", false, null, null);
+                    if (!live.ok()) {
+                        throw new IllegalStateException(live.error() == null ? "cleanup failed" : live.error());
+                    }
+                    for (String frame : framesFor(web, handle)) {
+                        if (!enterFrame(web, frame)) throw new IllegalStateException("frame entry failed");
+                        LiveResult framed = runLive(web, "cleanup", null, null, null, null, "html", HTML_SENTENCE, "", false, null, null);
+                        if (!framed.ok()) {
+                            throw new IllegalStateException(framed.error() == null ? "cleanup failed" : framed.error());
+                        }
+                    }
                 }
             } catch (RuntimeException failure) {
-                CompositeLog.info("html", "cleanup skipped driver " + managed.id + " " + failure.getMessage());
+                CompositeLog.info("html", "cleanup failed driver " + managed.id + " " + failure.getMessage());
+                if (first == null) first = failure;
             }
         }
+        if (first != null) throw first;
     }
 
     static int[] visualPoint(String geometryJson, Integer x, Integer y) {
@@ -587,10 +630,16 @@ final class PageSurfaces {
             List<String> tabs = tabsOf(managed.driver);
             if (tabs.isEmpty()) tabs = List.of("");
             for (String tab : tabs) {
-                activate(managed.driver, tab);
+                if (!tab.isBlank() && !activate(managed.driver, tab)) {
+                    throw new IllegalStateException("tab switch failed");
+                }
                 drainTab(project, runId, managed.driver);
+                for (String frame : framesFor(managed.driver, tab)) {
+                    if (!enterFrame(managed.driver, frame)) throw new IllegalStateException("frame entry failed");
+                    drainTab(project, runId, managed.driver);
+                }
             }
-            activate(managed.driver, current);
+            if (current != null) activate(managed.driver, current);
         }
     }
 
@@ -604,7 +653,8 @@ final class PageSurfaces {
                     return events;
                     """);
         } catch (RuntimeException failure) {
-            return;
+            CompositeLog.info("overlay", "input poll failed " + failure.getMessage());
+            throw failure;
         }
         if (!(value instanceof List<?> list)) return;
         for (Object item : list) {
@@ -649,6 +699,39 @@ final class PageSurfaces {
 
     private static final CopyOnWriteArrayList<HighlightSite> HIGHLIGHT_SITES = new CopyOnWriteArrayList<>();
 
+    private record SurfaceSite(String id, WebDriver driver, String tab, String frameId) {}
+
+    private static final CopyOnWriteArrayList<SurfaceSite> SURFACE_SITES = new CopyOnWriteArrayList<>();
+
+    private static void rememberSurface(WebDriver web, String id, String handle) {
+        if (web == null) return;
+        HandleRef ref = HandleRef.parse(handle);
+        String frame = ref.frameId;
+        String tab = currentHandle(web);
+        if ((id == null || id.isBlank()) && (frame == null || frame.isBlank())) return;
+        SURFACE_SITES.add(new SurfaceSite(id == null ? "" : id, web, tab == null ? "" : tab, frame));
+    }
+
+    private static List<SurfaceSite> sitesFor(String id) {
+        if (id == null || id.isBlank()) return List.of();
+        List<SurfaceSite> sites = new ArrayList<>();
+        for (SurfaceSite site : SURFACE_SITES) {
+            if (id.equals(site.id)) sites.add(site);
+        }
+        return sites;
+    }
+
+    private static List<String> framesFor(WebDriver web, String tab) {
+        java.util.LinkedHashSet<String> frames = new java.util.LinkedHashSet<>();
+        String wanted = tab == null ? "" : tab;
+        for (SurfaceSite site : SURFACE_SITES) {
+            if (site.driver != web || site.frameId == null || site.frameId.isBlank()) continue;
+            if (!wanted.isBlank() && !wanted.equals(site.tab)) continue;
+            frames.add(site.frameId);
+        }
+        return new ArrayList<>(frames);
+    }
+
     private static void rememberHighlight(WebDriver web, String handle) {
         if (web == null) return;
         String tab = currentHandle(web);
@@ -680,7 +763,11 @@ final class PageSurfaces {
             String key = System.identityHashCode(site.driver) + "|" + site.tab;
             if (!seen.add(key)) continue;
             String previous = currentHandle(site.driver);
-            activate(site.driver, site.tab);
+            if (!site.tab.isBlank() && !activate(site.driver, site.tab)) {
+                CompositeLog.info("window", "hide tab switch failed " + site.tab);
+                worst = Hide.FAILED;
+                continue;
+            }
             worst = worse(worst, hideOn(site.driver));
             if (previous != null && !previous.equals(site.tab)) activate(site.driver, previous);
         }
@@ -766,16 +853,19 @@ final class PageSurfaces {
             }
             String name = part.substring(0, colon).trim().toLowerCase(Locale.ROOT);
             String value = part.substring(colon + 1).trim();
-            double[] color = cssColor(value);
             switch (name) {
-                case "background", "background-color" -> {
+                case "background", "background-color", "border-color", "outline-color" -> {
+                    double[] color = cssColor(value);
                     if (color == null) unsupported = true;
+                    else if (name.startsWith("border") || name.startsWith("outline")) border = opaque(color);
                     else content = color;
                 }
-                case "border", "border-color", "outline", "outline-color", "color" -> {
+                case "border", "outline" -> {
+                    double[] color = cssColor(value);
                     if (color == null) unsupported = true;
                     else border = opaque(color);
                 }
+                case "color" -> unsupported = true;
                 default -> unsupported = true;
             }
         }
@@ -805,29 +895,23 @@ final class PageSurfaces {
 
     private static double[] cssColor(String style) {
         if (style == null || style.isBlank()) return null;
-        String lower = style.trim().toLowerCase(Locale.ROOT);
+        String trimmed = style.trim();
+        String lower = trimmed.toLowerCase(Locale.ROOT);
         double[] named = NAMED_COLORS.get(lower);
         if (named != null) return named.clone();
-        java.util.regex.Matcher hex = Pattern.compile("#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})\\b").matcher(style);
-        if (hex.find()) {
-            String raw = hex.group(1);
-            if (raw.length() == 3) {
-                raw = "" + raw.charAt(0) + raw.charAt(0) + raw.charAt(1) + raw.charAt(1) + raw.charAt(2) + raw.charAt(2);
-            }
+        if (lower.matches("#[0-9a-f]{6}")) {
+            int rgb = Integer.parseInt(lower.substring(1), 16);
+            return new double[]{(rgb >> 16) & 255, (rgb >> 8) & 255, rgb & 255, 1};
+        }
+        if (lower.matches("#[0-9a-f]{3}")) {
+            String raw = "" + lower.charAt(1) + lower.charAt(1) + lower.charAt(2) + lower.charAt(2) + lower.charAt(3) + lower.charAt(3);
             int rgb = Integer.parseInt(raw, 16);
             return new double[]{(rgb >> 16) & 255, (rgb >> 8) & 255, rgb & 255, 1};
         }
         java.util.regex.Matcher rgb = Pattern.compile(
                 "rgba?\\(\\s*(\\d{1,3})\\s*,\\s*(\\d{1,3})\\s*,\\s*(\\d{1,3})(?:\\s*,\\s*([0-9]*\\.?[0-9]+))?\\s*\\)"
         ).matcher(lower);
-        if (!rgb.find()) {
-            for (String token : lower.split("[^a-z]+")) {
-                if (token.isEmpty()) continue;
-                double[] namedToken = NAMED_COLORS.get(token);
-                if (namedToken != null) return namedToken.clone();
-            }
-            return null;
-        }
+        if (!rgb.matches()) return null;
         double alpha = rgb.group(4) == null ? 1 : Double.parseDouble(rgb.group(4));
         return new double[]{
                 Integer.parseInt(rgb.group(1)),
@@ -869,7 +953,8 @@ final class PageSurfaces {
         }
         WebDriver target = resolveDriver(handle);
         if (handle != null && !handle.isBlank() && HandleRef.parse(handle).frameId != null && target == null) {
-            return new LiveResult(false, "unknown handle", null, null, 0);
+            String why = ENTRY_FAILURE.get();
+            return new LiveResult(false, why == null || why.isBlank() ? "unknown handle" : why, null, null, 0);
         }
         if (target == null) target = driver;
         if (target == null) return new LiveResult(false, "no live browser", null, null, 0);
@@ -878,40 +963,89 @@ final class PageSurfaces {
 
     private static LiveResult runAcrossTabs(String op, String handle, String where, String css, String html, String kind, String sentence, String id, boolean measure, Integer x, Integer y) {
         LiveResult last = new LiveResult(false, "unknown id", null, null, 0);
+        if ("remove".equals(op)) {
+            for (SurfaceSite site : sitesFor(id)) {
+                LiveResult live = runAtSite(site, op, handle, where, css, html, kind, sentence, id, measure, x, y);
+                if (live.removed() > 0) return live;
+                if (!live.ok() && live.error() != null && !"unknown id".equals(live.error())) return live;
+                last = live;
+            }
+        }
         for (Managed managed : MANAGED) {
             List<String> tabs = tabsOf(managed.driver);
             if (tabs.isEmpty()) tabs = List.of("");
             for (String tab : tabs) {
-                activate(managed.driver, tab);
+                if (!tab.isBlank() && !activate(managed.driver, tab)) {
+                    last = new LiveResult(false, "tab switch failed", null, null, 0);
+                    if ("cleanup".equals(op)) return last;
+                    continue;
+                }
                 LiveResult live = runLive(managed.driver, op, handle, where, css, html, kind, sentence, id, measure, x, y);
                 if ("remove".equals(op)) {
                     if (live.removed() > 0) return live;
+                    if (!live.ok() && live.error() != null && !"unknown id".equals(live.error())) return live;
                     last = live;
                     continue;
                 }
-                if (live.ok()) return live;
+                if (!live.ok()) return live;
+                for (String frame : framesFor(managed.driver, tab)) {
+                    if (!enterFrame(managed.driver, frame)) {
+                        return new LiveResult(false, "frame entry failed", null, null, 0);
+                    }
+                    LiveResult framed = runLive(managed.driver, op, handle, where, css, html, kind, sentence, id, measure, x, y);
+                    if (!framed.ok()) return framed;
+                }
                 last = live;
+                if (!"cleanup".equals(op)) return live;
             }
         }
         return last;
     }
 
+    private static LiveResult runAtSite(SurfaceSite site, String op, String handle, String where, String css, String html, String kind, String sentence, String id, boolean measure, Integer x, Integer y) {
+        if (site.tab != null && !site.tab.isBlank() && !activate(site.driver, site.tab)) {
+            return new LiveResult(false, "tab switch failed", null, null, 0);
+        }
+        if (site.frameId != null && !site.frameId.isBlank() && cdpCapable(site.driver) && !enterFrame(site.driver, site.frameId)) {
+            return new LiveResult(false, "frame entry failed", null, null, 0);
+        }
+        return runLive(site.driver, op, handle, where, css, html, kind, sentence, id, measure, x, y);
+    }
+
+    private static final ThreadLocal<String> ENTRY_FAILURE = new ThreadLocal<>();
+
     private static WebDriver resolveDriver(String handle) {
+        ENTRY_FAILURE.remove();
         HandleRef ref = HandleRef.parse(handle);
         if (ref.frameId != null) {
             FrameOwner owner = FRAMES.get(ref.frameId);
             if (owner != null) {
-                if (!browserStillManaged(owner)) return null;
-                activate(owner.driver, owner.tab);
-                enterFrame(owner.driver, ref.frameId);
+                if (!browserStillManaged(owner)) {
+                    ENTRY_FAILURE.set("unknown handle");
+                    return null;
+                }
+                if (!activate(owner.driver, owner.tab)) {
+                    ENTRY_FAILURE.set("tab switch failed");
+                    return null;
+                }
+                if (!enterFrame(owner.driver, ref.frameId)) {
+                    ENTRY_FAILURE.set("frame entry failed");
+                    return null;
+                }
                 driver = owner.driver;
                 focusedTab = owner.tab;
-                CompositeRuntime.focusDriver(owner.driver);
+                CompositeRuntime.focusPage(owner.driver, pageTarget(owner.driver));
                 return owner.driver;
             }
-            if (!GEOMETRY.containsKey(handle)) return null;
+            if (!GEOMETRY.containsKey(handle)) {
+                ENTRY_FAILURE.set("unknown handle");
+                return null;
+            }
         }
-        if (driver != null) activate(driver, focusedTab);
+        if (driver != null && focusedTab != null && !focusedTab.isBlank() && !activate(driver, focusedTab)) {
+            ENTRY_FAILURE.set("tab switch failed");
+            return null;
+        }
         return driver;
     }
 
@@ -925,33 +1059,51 @@ final class PageSurfaces {
         return false;
     }
 
-    private static void enterFrame(WebDriver web, String frameId) {
-        if (web == null || frameId == null || frameId.isBlank() || !cdpCapable(web)) return;
+    /** @return false when the ranked frame could not be entered. A driver without CDP is already on its document. */
+    private static boolean enterFrame(WebDriver web, String frameId) {
+        if (web == null || frameId == null || frameId.isBlank()) return false;
+        if (!cdpCapable(web)) return true;
         try {
             web.switchTo().defaultContent();
-            for (String id : frameChain(web, frameId)) {
+            List<String> chain = frameChain(web, frameId);
+            if (chain == null) {
+                CompositeLog.info("window", "frame enter failed " + frameId + " frame is not in the tree");
+                return false;
+            }
+            for (String id : chain) {
                 Object owner = cdp(web, "DOM.getFrameOwner", Map.of("frameId", id));
                 Integer backend = backendOf(owner);
-                if (backend == null) continue;
-                String name = frameSwitchName(web, backend);
-                if (name == null || name.isBlank()) continue;
+                if (backend == null) {
+                    CompositeLog.info("window", "frame enter failed " + id + " missing frame owner");
+                    return false;
+                }
+                FrameMutation mutation = frameSwitchName(web, backend);
+                if (mutation == null || mutation.name == null || mutation.name.isBlank()) {
+                    CompositeLog.info("window", "frame enter failed " + id + " no frame name");
+                    return false;
+                }
                 try {
-                    web.switchTo().frame(name);
+                    web.switchTo().frame(mutation.name);
                 } catch (RuntimeException failure) {
                     CompositeLog.info("window", "frame switch failed " + id + " " + failure.getMessage());
+                    restoreFrame(web, mutation);
+                    return false;
                 }
+                restoreFrame(web, mutation);
             }
+            return true;
         } catch (RuntimeException failure) {
             CompositeLog.info("window", "frame enter failed " + frameId + " " + failure.getMessage());
+            return false;
         }
     }
 
     @SuppressWarnings("unchecked")
     private static List<String> frameChain(WebDriver web, String frameId) {
         Object tree = cdp(web, "Page.getFrameTree", Map.of());
-        if (!(tree instanceof Map<?, ?> root)) return List.of();
+        if (!(tree instanceof Map<?, ?> root)) return null;
         List<String> chain = new ArrayList<>();
-        if (!collectFrame(root.get("frameTree"), frameId, chain)) return List.of();
+        if (!collectFrame(root.get("frameTree"), frameId, chain)) return null;
         if (!chain.isEmpty()) chain.remove(0);
         return chain;
     }
@@ -980,7 +1132,9 @@ final class PageSurfaces {
         return null;
     }
 
-    private static String frameSwitchName(WebDriver web, int backend) {
+    private record FrameMutation(String objectId, String name, boolean changedName, String previousBridge) {}
+
+    private static FrameMutation frameSwitchName(WebDriver web, int backend) {
         try {
             Object resolved = cdp(web, "DOM.resolveNode", Map.of("backendNodeId", backend));
             String objectId = objectId(resolved);
@@ -988,14 +1142,37 @@ final class PageSurfaces {
             String token = "b" + Integer.toUnsignedString(IDS.incrementAndGet(), 36);
             Map<String, Object> call = new LinkedHashMap<>();
             call.put("objectId", objectId);
-            call.put("functionDeclaration",
-                    "function(token){ if (!this || this.nodeType !== 1) return ''; var tag = String(this.tagName || '').toLowerCase(); if (tag !== 'iframe' && tag !== 'frame') return ''; var name = this.getAttribute('name') || this.getAttribute('id') || ''; if (!name) { this.setAttribute('name', token); name = token; } this.setAttribute('data-pkb-bridge', token); return name; }");
+            call.put("functionDeclaration", FRAME_MARK);
             call.put("arguments", List.of(Map.of("value", token)));
             call.put("returnByValue", true);
-            return textValue(cdp(web, "Runtime.callFunctionOn", call));
-        } catch (RuntimeException failure) {
+            String raw = textValue(cdp(web, "Runtime.callFunctionOn", call));
+            if (raw == null || raw.isBlank() || !raw.trim().startsWith("{")) return null;
+            JsonNode node = AgentStore.JSON.readTree(raw);
+            String name = node.path("name").asText("");
+            if (name.isBlank()) return null;
+            JsonNode previous = node.get("previousBridge");
+            String previousBridge = previous == null || previous.isNull() ? null : previous.asText("");
+            return new FrameMutation(objectId, name, node.path("changedName").asBoolean(false), previousBridge);
+        } catch (RuntimeException | IOException failure) {
             CompositeLog.info("window", "frame owner bridge failed " + failure.getMessage());
             return null;
+        }
+    }
+
+    private static void restoreFrame(WebDriver web, FrameMutation mutation) {
+        if (web == null || mutation == null || mutation.objectId == null || mutation.objectId.isBlank()) return;
+        try {
+            Map<String, Object> spec = new LinkedHashMap<>();
+            spec.put("changedName", mutation.changedName);
+            spec.put("previousBridge", mutation.previousBridge);
+            Map<String, Object> call = new LinkedHashMap<>();
+            call.put("objectId", mutation.objectId);
+            call.put("functionDeclaration", FRAME_RESTORE);
+            call.put("arguments", List.of(Map.of("value", spec)));
+            call.put("returnByValue", true);
+            cdp(web, "Runtime.callFunctionOn", call);
+        } catch (RuntimeException failure) {
+            CompositeLog.info("window", "frame bridge restore failed " + failure.getMessage());
         }
     }
 
@@ -1016,8 +1193,7 @@ final class PageSurfaces {
             String token = "b" + Integer.toUnsignedString(IDS.incrementAndGet(), 36);
             Map<String, Object> call = new LinkedHashMap<>();
             call.put("objectId", objectId);
-            call.put("functionDeclaration",
-                    "function(token){ if (!this || this.nodeType !== 1) return false; this.setAttribute('data-pkb-bridge', token); return true; }");
+            call.put("functionDeclaration", BRIDGE_MARK);
             call.put("arguments", List.of(Map.of("value", token)));
             call.put("returnByValue", true);
             cdp(web, "Runtime.callFunctionOn", call);
@@ -1071,6 +1247,7 @@ final class PageSurfaces {
             if ("remove".equals(op) && removed <= 0) {
                 return new LiveResult(false, "unknown id", null, null, 0);
             }
+            rememberSurface(current, id, handle);
             return new LiveResult(true, null, liveX, liveY, removed);
         } catch (RuntimeException failure) {
             CompositeLog.info("html", "live helper failed " + failure.getMessage());
@@ -1217,10 +1394,20 @@ final class PageSurfaces {
         return stripUrlControls(value).toLowerCase(Locale.ROOT).startsWith("javascript:");
     }
 
-    /** data:text/html documents run script. Drop the URL. Other data: payloads stay. */
+    /** data: documents that the browser will parse as an active nested document. Other data: payloads stay. */
     private static boolean activeHtmlDocument(String value) {
         if (value == null) return false;
-        return stripUrlControls(value).toLowerCase(Locale.ROOT).startsWith("data:text/html");
+        String stripped = stripUrlControls(value).toLowerCase(Locale.ROOT);
+        if (!stripped.startsWith("data:")) return false;
+        String rest = stripped.substring("data:".length());
+        int comma = rest.indexOf(',');
+        String meta = comma < 0 ? rest : rest.substring(0, comma);
+        int semi = meta.indexOf(';');
+        String mime = (semi < 0 ? meta : meta.substring(0, semi)).trim();
+        return switch (mime) {
+            case "text/html", "application/xhtml+xml", "image/svg+xml", "text/xml", "application/xml" -> true;
+            default -> false;
+        };
     }
 
     private static String stripUrlControls(String value) {
@@ -1515,25 +1702,65 @@ final class PageSurfaces {
         return page.resolveSibling(page.getFileName() + ".place.json");
     }
 
+    private static final Map<String, Path> LIVE_IDS = new java.util.concurrent.ConcurrentHashMap<>();
+
     private static Path idStore(Path page, Path ledger) {
-        if (ledger != null) return ledger.resolve("placements.json");
         if (page != null) return placeFile(page);
+        if (!MANAGED.isEmpty()) {
+            String key = livePageKey();
+            return LIVE_IDS.computeIfAbsent(key, ignored -> {
+                String hash = sha(key);
+                if (hash.length() > 16) hash = hash.substring(0, 16);
+                return Path.of(System.getProperty("java.io.tmpdir", "."), "pkb-surface-ids", hash, "placements.json");
+            });
+        }
+        if (ledger != null) return ledger.resolve("placements.json");
         String home = System.getProperty("user.home", ".");
         return Path.of(home, ".pickleball", "agent-surfaces", "placements.json");
+    }
+
+    private static String livePageKey() {
+        WebDriver web = driver;
+        String tab = focusedTab == null ? "" : focusedTab;
+        if (web instanceof RemoteWebDriver remote) {
+            String address = debuggerAddress(remote);
+            if (!address.isEmpty()) {
+                String target = pageTarget(web);
+                return address + "|" + (target == null ? "" : target) + "|" + tab;
+            }
+        }
+        return "local|" + System.identityHashCode(web) + "|" + tab;
     }
 
     private static String allocateId(Path file) throws IOException {
         String[] id = new String[1];
         withSurfaceLock(file, () -> {
             ObjectNode root = readObject(file);
-            int next = root.path("next").asInt(1);
-            if (next < 1) next = 1;
+            int next = nextSurfaceId(root);
             id[0] = "pkb-" + next;
             root.put("next", next + 1);
             if (file.getParent() != null) Files.createDirectories(file.getParent());
             AgentStore.JSON.writeValue(file.toFile(), root);
         });
         return id[0];
+    }
+
+    private static int nextSurfaceId(ObjectNode root) {
+        int used = 0;
+        var names = root.fieldNames();
+        while (names.hasNext()) {
+            String name = names.next();
+            if (!name.startsWith("pkb-")) continue;
+            try {
+                used = Math.max(used, Integer.parseInt(name.substring(4)));
+            } catch (NumberFormatException ignored) {
+                // Placement metadata that is not a surface id.
+            }
+        }
+        int next = root.has("next") ? root.path("next").asInt(1) : used + 1;
+        if (next <= used) next = used + 1;
+        if (next < 1) next = 1;
+        return next;
     }
 
     private interface SurfaceIo {
@@ -1567,6 +1794,18 @@ final class PageSurfaces {
 
     static String liveHelperSource() {
         return LIVE_HELPER;
+    }
+
+    static String bridgeMarkSource() {
+        return BRIDGE_MARK;
+    }
+
+    static String frameMarkSource() {
+        return FRAME_MARK;
+    }
+
+    static String frameRestoreSource() {
+        return FRAME_RESTORE;
     }
 
     private static void writePlacement(Path file, String id, String sha, String summary) throws IOException {
@@ -1621,14 +1860,37 @@ final class PageSurfaces {
         }
     }
 
-    private static void activate(WebDriver web, String tab) {
-        if (web == null || tab == null || tab.isBlank()) return;
+    private static boolean activate(WebDriver web, String tab) {
+        if (web == null || tab == null || tab.isBlank()) return true;
         try {
             String current = web.getWindowHandle();
-            if (tab.equals(current)) return;
-            web.switchTo().window(tab);
+            if (!tab.equals(current)) web.switchTo().window(tab);
+            focusedTab = tab;
+            driver = web;
+            CompositeRuntime.focusPage(web, pageTarget(web));
+            return true;
         } catch (RuntimeException failure) {
             CompositeLog.info("window", "activate failed " + tab + " " + failure.getMessage());
+            return false;
+        }
+    }
+
+    static String pageTarget(WebDriver web) {
+        if (!cdpCapable(web)) return null;
+        try {
+            Object info = cdp(web, "Target.getTargetInfo", Map.of());
+            if (!(info instanceof Map<?, ?> map)) return null;
+            Object body = map.get("targetInfo") instanceof Map<?, ?> nested ? nested : map;
+            if (!(body instanceof Map<?, ?> target)) return null;
+            Object type = target.get("type");
+            if (type != null && !"page".equals(String.valueOf(type))) return null;
+            Object id = target.get("targetId");
+            if (id == null) id = target.get("id");
+            if (id == null) return null;
+            String text = String.valueOf(id).trim();
+            return text.isEmpty() ? null : text;
+        } catch (RuntimeException failure) {
+            return null;
         }
     }
 
