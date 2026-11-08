@@ -1295,6 +1295,7 @@ class AgentLiveFixTest {
             CompositeRuntime.use(temp, Map.of("COMPOSITE_BIN", binary.toString(), "pkb_composite", "on"),
                     getClass().getClassLoader(), temp);
             PagedDriver browser = new PagedDriver("http://127.0.0.1:9222", Map.of("tab-a", "AAA", "tab-b", "BBB"));
+            browser.switchTo().window("tab-a");
             PageSurfaces.manage(browser, "chrome-headed-quiet", true);
             CompositeRuntime.attach(browser);
             String joined = CompositeRuntime.joinedForTests();
