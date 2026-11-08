@@ -1608,6 +1608,28 @@ class AgentLiveFixTest {
     }
 
     @Test
+    void unknownCurrentDiscoveryDoesNotLeaveSeleniumOnTheDestination() throws Exception {
+        List<String> seen = new ArrayList<>();
+        PagedDriver browser = new PagedDriver("http://127.0.0.1:9222", Map.of("tab-a", "AAA", "tab-b", "BBB"), seen);
+        PageSurfaces.manage(browser, "chrome-headed-quiet", true);
+        browser.switchTo().window("tab-a");
+        PageSurfaces.focus(browser);
+        assertEquals("tab-a", PageSurfaces.focusedTabOf(browser));
+        PageSurfaces.bindHandle(browser, "tab-b", "BBB:15");
+        browser.blindCurrentHandleOnce();
+        browser.suppressTargetOn("tab-b");
+        IllegalStateException failure = assertThrows(IllegalStateException.class, () ->
+                PageSurfaces.place(null, "append", "BBB:15", null, "<b>again</b>", "html", null, null, null, temp.resolve("run-a")));
+        assertTrue(failure.getMessage().contains("destination page target is unknown"), failure.getMessage());
+        assertEquals("tab-a", browser.getWindowHandle());
+        assertEquals("tab-a", PageSurfaces.focusedTabOf(browser));
+        assertNull(PageSurfaces.rememberedTargetForTests(browser, "tab-b"));
+        assertFalse(browser.document("tab-a").contains("data-pkb-id"), browser.document("tab-a"));
+        assertFalse(browser.document("tab-b").contains("data-pkb-id"), browser.document("tab-b"));
+        assertFalse(seen.stream().anyMatch(row -> row.contains("pkb-")), seen.toString());
+    }
+
+    @Test
     void blankPageTargetReusesRememberedDestinationTarget() throws Exception {
         PagedDriver browser = new PagedDriver("http://127.0.0.1:9222", Map.of("tab-a", "AAA", "tab-b", "BBB"));
         PageSurfaces.manage(browser, "chrome-headed-quiet", true);
@@ -2510,6 +2532,11 @@ class AgentLiveFixTest {
         void blindCurrentHandleOnceAndIgnoreNextSwitch() {
             blindGets = 1;
             ignoredSwitches = 1;
+        }
+
+        /** The next handle read fails. Later reads and window switches still move. */
+        void blindCurrentHandleOnce() {
+            blindGets = 1;
         }
 
         void suppressTargetInfo(boolean suppress) {

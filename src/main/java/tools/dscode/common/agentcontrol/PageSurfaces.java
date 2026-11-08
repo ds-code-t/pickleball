@@ -1979,6 +1979,8 @@ final class PageSurfaces {
      * An unknown current window is not that tab. Switch and confirm, reuse a target
      * already remembered for this tab, or fail the allocation. Never store the active
      * window's target under a different tab, and never allocate against a blank target.
+     * A discovery switch restores the thread's focused tab for this driver when the
+     * current handle was unknown, so Selenium is not left on the destination.
      */
     private static String destinationPageTarget(WebDriver web, String tab) {
         String wanted = tab == null ? "" : tab;
@@ -1988,12 +1990,23 @@ final class PageSurfaces {
                 CompositeLog.info("html", "destination page target is unknown");
                 throw new IllegalStateException("destination page target is unknown");
             }
-            return targetAfterSwitch(web, wanted, null);
+            return targetAfterSwitch(web, wanted, focusedTabToRestore(web));
         }
         if (wanted.isBlank() || wanted.equals(current)) {
             return confirmedOrRemembered(web, wanted.isBlank() ? current : wanted);
         }
         return targetAfterSwitch(web, wanted, current);
+    }
+
+    /**
+     * Tab this thread already focused on {@code web}. Not a guessed window handle.
+     * A discovery switch uses it to put Selenium back when the current handle was unknown.
+     */
+    private static String focusedTabToRestore(WebDriver web) {
+        Focus focus = THREAD_FOCUS.get();
+        if (focus != null && focus.driver == web && focus.tab != null && !focus.tab.isBlank()) return focus.tab;
+        if (web != null && web == driver && focusedTab != null && !focusedTab.isBlank()) return focusedTab;
+        return null;
     }
 
     /** The selected window is already {@code label}. A blank read is not a new page identity. */
@@ -2014,7 +2027,8 @@ final class PageSurfaces {
 
     /**
      * Select {@code wanted} and read its target only after the selected handle is
-     * confirmed to be that tab. {@code previous} is restored when it was known.
+     * confirmed to be that tab. {@code previous} is restored when it was known,
+     * including the thread's focused tab when the current handle could not be read.
      */
     private static String targetAfterSwitch(WebDriver web, String wanted, String previous) {
         String known = rememberedPageTarget(web, wanted);
