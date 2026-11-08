@@ -63,15 +63,27 @@ final class WindowRegistry {
         if (handle.startsWith("window:")) {
             PageSurfaces.Managed managed = findBrowser(handle);
             if (managed == null) throw new IllegalArgumentException("unknown handle: " + handle);
-            PageSurfaces.focus(managed.driver());
+            if (!PageSurfaces.focus(managed.driver())) {
+                CompositeLog.info("window", "page session failed " + handle);
+            }
             CompositeLog.info("window", "switch " + handle);
             return new Handle(handle, "window", managed.template(), safeTitle(managed.driver()), safeUrl(managed.driver()), true);
         }
         for (PageSurfaces.Managed managed : PageSurfaces.managed()) {
             try {
                 if (managed.driver().getWindowHandles() != null && managed.driver().getWindowHandles().contains(handle)) {
+                    String previous = safeCurrent(managed.driver());
                     WindowSwitch.switchToHandleOrThrow(managed.driver(), handle);
-                    PageSurfaces.focus(managed.driver());
+                    if (!PageSurfaces.focus(managed.driver())) {
+                        if (previous != null && !previous.equals(handle)) {
+                            try {
+                                managed.driver().switchTo().window(previous);
+                            } catch (RuntimeException failure) {
+                                CompositeLog.info("window", "tab restore failed " + previous + " " + failure.getMessage());
+                            }
+                        }
+                        CompositeLog.info("window", "page session failed " + handle);
+                    }
                     CompositeLog.info("window", "switch " + handle);
                     return new Handle(handle, "tab", managed.template(), safeTitle(managed.driver()), safeUrl(managed.driver()), true);
                 }
@@ -121,7 +133,9 @@ final class WindowRegistry {
                     survivor = left.iterator().next();
                 }
                 managed.driver().switchTo().window(survivor);
-                PageSurfaces.focus(managed.driver());
+                if (!PageSurfaces.focus(managed.driver())) {
+                    CompositeLog.info("window", "page session failed " + survivor);
+                }
                 CompositeLog.info("window", "close " + handle);
                 return new Handle(handle, "tab", managed.template(), "", "", false);
             } catch (RuntimeException failure) {

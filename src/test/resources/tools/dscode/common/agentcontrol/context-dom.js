@@ -255,12 +255,20 @@ function iframeElement() {
 let result;
 try {
   if (input.mode === "call") {
-    const frame = iframeElement();
+    const onNode = input.on === "node";
+    const target = onNode
+      ? (document.getElementById(state.nodeId || "save") || document.querySelector("b") || document.body)
+      : iframeElement();
     const fn = eval("(" + input.script + ")");
-    const value = fn.call(frame, input.arg);
-    const attrs = {};
-    Object.keys(frame.attributes).forEach((name) => { attrs[name] = frame.attributes[name]; });
-    state.iframe = attrs;
+    const value = fn.call(target, input.arg);
+    if (onNode) {
+      docState.html = body.innerHTML;
+      state.docs[context] = docState;
+    } else {
+      const attrs = {};
+      Object.keys(target.attributes).forEach((name) => { attrs[name] = target.attributes[name]; });
+      state.iframe = attrs;
+    }
     result = value;
   } else {
     const source = String(input.script || "").replace(/\barguments\b/g, "scriptArgs");

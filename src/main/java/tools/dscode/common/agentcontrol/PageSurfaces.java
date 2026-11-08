@@ -233,11 +233,16 @@ final class PageSurfaces {
         driver = webDriver;
     }
 
-    static void focus(WebDriver webDriver) {
+    static boolean focus(WebDriver webDriver) {
+        String tab = currentHandle(webDriver);
+        if (!CompositeRuntime.focusPage(webDriver, pageTarget(webDriver))) {
+            CompositeLog.info("window", "page session failed " + text(tab));
+            return false;
+        }
         driver = webDriver;
-        focusedTab = currentHandle(webDriver);
+        focusedTab = tab;
         THREAD_FOCUS.set(new Focus(webDriver, focusedTab));
-        CompositeRuntime.focusPage(webDriver, pageTarget(webDriver));
+        return true;
     }
 
     /** Ranked frame identity belongs to one browser and one tab. Not a scan. */
@@ -356,6 +361,7 @@ final class PageSurfaces {
             }
         }
         LIVE_IDS.clear();
+        PAGE_TARGETS.clear();
     }
 
     static String presetCss(String preset, String explicit) {
@@ -634,7 +640,7 @@ final class PageSurfaces {
             WebDriver web = managed.driver;
             try {
                 List<String> handles = new ArrayList<>(tabsOf(web));
-                if (handles.isEmpty()) handles = new ArrayList<>(List.of(""));
+                if (handles.isEmpty()) throw new IllegalStateException("tab enumeration failed");
                 for (String handle : handles) {
                     if (!handle.isBlank() && !activate(web, handle)) {
                         throw new IllegalStateException("tab switch failed");
@@ -672,7 +678,7 @@ final class PageSurfaces {
             if (!(managed.driver instanceof JavascriptExecutor)) continue;
             String current = currentHandle(managed.driver);
             List<String> tabs = tabsOf(managed.driver);
-            if (tabs.isEmpty()) tabs = List.of("");
+            if (tabs.isEmpty()) throw new IllegalStateException("tab enumeration failed");
             for (String tab : tabs) {
                 if (!tab.isBlank() && !activate(managed.driver, tab)) {
                     throw new IllegalStateException("tab switch failed");
@@ -798,13 +804,21 @@ final class PageSurfaces {
             throw new IllegalStateException("frame enumeration failed", failure);
         }
         if (!(tree instanceof Map<?, ?> root)) {
+            CompositeLog.info("window", "frame enumeration failed");
+            throw new IllegalStateException("frame enumeration failed");
+        }
+        if (!(root.get("frameTree") instanceof Map<?, ?>)) {
+            CompositeLog.info("window", "frame enumeration failed");
             throw new IllegalStateException("frame enumeration failed");
         }
         collectChildFrameIds(root.get("frameTree"), frames, true);
     }
 
     private static void collectChildFrameIds(Object node, java.util.Set<String> frames, boolean root) {
-        if (!(node instanceof Map<?, ?> map)) return;
+        if (!(node instanceof Map<?, ?> map)) {
+            CompositeLog.info("window", "frame enumeration failed");
+            throw new IllegalStateException("frame enumeration failed");
+        }
         if (!root) {
             Object frame = map.get("frame");
             String id = frame instanceof Map<?, ?> frameMap && frameMap.get("id") != null
@@ -815,6 +829,9 @@ final class PageSurfaces {
         Object children = map.get("childFrames");
         if (children instanceof List<?> list) {
             for (Object child : list) collectChildFrameIds(child, frames, false);
+        } else if (children != null) {
+            CompositeLog.info("window", "frame enumeration failed");
+            throw new IllegalStateException("frame enumeration failed");
         }
     }
 
@@ -850,7 +867,7 @@ final class PageSurfaces {
         } else {
             for (Managed managed : MANAGED) {
                 List<String> tabs = tabsOf(managed.driver);
-                if (tabs.isEmpty()) tabs = List.of("");
+                if (tabs.isEmpty()) throw new IllegalStateException("tab enumeration failed");
                 for (String tab : tabs) sites.add(new HighlightSite("", managed.driver, tab));
             }
         }
@@ -1073,7 +1090,9 @@ final class PageSurfaces {
         }
         for (Managed managed : MANAGED) {
             List<String> tabs = tabsOf(managed.driver);
-            if (tabs.isEmpty()) tabs = List.of("");
+            if (tabs.isEmpty()) {
+                return new LiveResult(false, "tab enumeration failed", null, null, 0);
+            }
             for (String tab : tabs) {
                 if (!tab.isBlank() && !activate(managed.driver, tab)) {
                     last = new LiveResult(false, "tab switch failed", null, null, 0);
@@ -1888,6 +1907,7 @@ final class PageSurfaces {
     }
 
     private static final Map<String, Path> LIVE_IDS = new java.util.concurrent.ConcurrentHashMap<>();
+    private static final Map<String, String> PAGE_TARGETS = new java.util.concurrent.ConcurrentHashMap<>();
 
     private record Selected(WebDriver driver, String tab) {
     }
@@ -1941,11 +1961,68 @@ final class PageSurfaces {
         if (web instanceof RemoteWebDriver remote) {
             String address = debuggerAddress(remote);
             if (!address.isEmpty()) {
-                String target = pageTarget(web);
+                String target = destinationPageTarget(web, useTab);
                 return address + "|" + (target == null ? "" : target) + "|" + useTab;
             }
         }
         return "local|" + System.identityHashCode(web) + "|" + useTab;
+    }
+
+    /**
+     * Page target of {@code tab} itself. {@code Target.getTargetInfo} with no target
+     * id is the active window, so a different Selenium handle must be selected first.
+     */
+    private static String destinationPageTarget(WebDriver web, String tab) {
+        String wanted = tab == null ? "" : tab;
+        String current = currentHandle(web);
+        if (wanted.isBlank() || current == null || wanted.equals(current)) {
+            String target = pageTarget(web);
+            rememberPageTarget(web, wanted.isBlank() ? current : wanted, target);
+            return target;
+        }
+        String known = rememberedPageTarget(web, wanted);
+        String previous = current;
+        try {
+            web.switchTo().window(wanted);
+            String target = pageTarget(web);
+            if (target == null || target.isBlank()) {
+                if (known != null) return known;
+                CompositeLog.info("html", "destination page target is unknown " + wanted);
+                throw new IllegalStateException("destination page target is unknown");
+            }
+            rememberPageTarget(web, wanted, target);
+            return target;
+        } catch (RuntimeException failure) {
+            if (known != null && (failure.getMessage() == null || !failure.getMessage().contains("destination page target"))) {
+                CompositeLog.info("window", "destination tab switch failed " + wanted + " " + failure.getMessage());
+                return known;
+            }
+            if (failure instanceof IllegalStateException && failure.getMessage() != null
+                    && failure.getMessage().contains("destination page target")) {
+                throw failure;
+            }
+            CompositeLog.info("window", "destination tab switch failed " + wanted + " " + failure.getMessage());
+            throw new IllegalStateException("destination page target is unknown", failure);
+        } finally {
+            String now = currentHandle(web);
+            if (previous != null && now != null && !previous.equals(now)) {
+                try {
+                    web.switchTo().window(previous);
+                } catch (RuntimeException failure) {
+                    CompositeLog.info("window", "tab restore failed " + previous + " " + failure.getMessage());
+                }
+            }
+        }
+    }
+
+    private static void rememberPageTarget(WebDriver web, String tab, String target) {
+        if (web == null || tab == null || tab.isBlank() || target == null || target.isBlank()) return;
+        PAGE_TARGETS.put(System.identityHashCode(web) + "|" + tab, target);
+    }
+
+    private static String rememberedPageTarget(WebDriver web, String tab) {
+        if (web == null || tab == null || tab.isBlank()) return null;
+        return PAGE_TARGETS.get(System.identityHashCode(web) + "|" + tab);
     }
 
     private static String allocateId(Path file) throws IOException {
@@ -2068,29 +2145,63 @@ final class PageSurfaces {
     }
 
     private static List<String> tabsOf(WebDriver web) {
+        java.util.Set<String> handles;
         try {
-            if (web.getWindowHandles() == null) return List.of();
-            return new ArrayList<>(web.getWindowHandles());
+            handles = web.getWindowHandles();
         } catch (RuntimeException failure) {
             CompositeLog.info("window", "tab enumeration failed " + failure.getMessage());
             throw new IllegalStateException("tab enumeration failed", failure);
         }
+        if (handles == null) {
+            CompositeLog.info("window", "tab enumeration failed");
+            throw new IllegalStateException("tab enumeration failed");
+        }
+        return new ArrayList<>(handles);
     }
 
-    private static boolean activate(WebDriver web, String tab) {
+    static boolean activate(WebDriver web, String tab) {
         if (web == null || tab == null || tab.isBlank()) return true;
+        Focus priorFocus = THREAD_FOCUS.get();
+        WebDriver priorDriver = driver;
+        String priorTab = focusedTab;
+        String priorWindow = null;
         try {
-            String current = web.getWindowHandle();
-            if (!tab.equals(current)) web.switchTo().window(tab);
+            priorWindow = web.getWindowHandle();
+        } catch (RuntimeException ignored) {
+            priorWindow = null;
+        }
+        try {
+            if (priorWindow == null || !tab.equals(priorWindow)) web.switchTo().window(tab);
+            if (!CompositeRuntime.focusPage(web, pageTarget(web))) {
+                CompositeLog.info("window", "page session failed " + tab);
+                restoreActivation(web, priorWindow, priorFocus, priorDriver, priorTab);
+                return false;
+            }
             focusedTab = tab;
             driver = web;
             THREAD_FOCUS.set(new Focus(web, tab));
-            CompositeRuntime.focusPage(web, pageTarget(web));
+            String target = pageTarget(web);
+            rememberPageTarget(web, tab, target);
             return true;
         } catch (RuntimeException failure) {
             CompositeLog.info("window", "activate failed " + tab + " " + failure.getMessage());
+            restoreActivation(web, priorWindow, priorFocus, priorDriver, priorTab);
             return false;
         }
+    }
+
+    private static void restoreActivation(WebDriver web, String priorWindow, Focus priorFocus, WebDriver priorDriver, String priorTab) {
+        if (web != null && priorWindow != null && !priorWindow.isBlank()) {
+            try {
+                if (!priorWindow.equals(web.getWindowHandle())) web.switchTo().window(priorWindow);
+            } catch (RuntimeException failure) {
+                CompositeLog.info("window", "tab restore failed " + priorWindow + " " + failure.getMessage());
+            }
+        }
+        driver = priorDriver;
+        focusedTab = priorTab;
+        if (priorFocus == null) THREAD_FOCUS.remove();
+        else THREAD_FOCUS.set(priorFocus);
     }
 
     static String pageTarget(WebDriver web) {

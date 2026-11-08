@@ -366,15 +366,37 @@ public class CurrentScenarioState extends ScenarioMapping {
     }
 
     public void scenarioRunCleanUp() {
-        finishAgentSurfaces();
-        runConfiguredObjectCleanups();
-        quitUnmanagedWebDrivers();
+        RuntimeException failure = null;
+        try {
+            finishAgentSurfaces();
+        } catch (RuntimeException thrown) {
+            failure = thrown;
+        } finally {
+            try {
+                runConfiguredObjectCleanups();
+            } catch (RuntimeException thrown) {
+                if (failure == null) failure = thrown;
+            }
+            try {
+                quitUnmanagedWebDrivers();
+            } catch (RuntimeException thrown) {
+                if (failure == null) failure = thrown;
+            }
+        }
+        if (failure != null) throw failure;
     }
 
     /** In-page agent surfaces plus any native-overlay hook the Workbench registered. */
     public static void finishAgentSurfaces() {
-        tools.dscode.common.agentcontrol.AgentDriverHooks.quit();
-        tools.dscode.control.protocol.AgentSurfaceEnd.complete();
+        RuntimeException failure = null;
+        try {
+            tools.dscode.common.agentcontrol.AgentDriverHooks.quit();
+        } catch (RuntimeException thrown) {
+            failure = thrown;
+        } finally {
+            tools.dscode.control.protocol.AgentSurfaceEnd.complete();
+        }
+        if (failure != null) throw failure;
     }
 
     /**

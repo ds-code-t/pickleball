@@ -27,6 +27,8 @@ public final class CompositeRuntime {
     private static volatile Decision decision;
     private static volatile Client client;
     private static volatile String joinedCdp;
+    /** Join pointer owned by the calling thread. Another thread's {@link #joinedCdp} is not a session. */
+    private static final ThreadLocal<String> THREAD_JOINED = new ThreadLocal<>();
     private static volatile Sources override;
     private static final Map<String, String> SESSIONS_BY_CDP = new ConcurrentHashMap<>();
 
@@ -99,6 +101,7 @@ public final class CompositeRuntime {
         closeClient();
         decision = null;
         joinedCdp = null;
+        THREAD_JOINED.remove();
         SESSIONS_BY_CDP.clear();
         override = new Sources(
                 project == null ? Path.of("").toAbsolutePath() : project,
@@ -115,6 +118,7 @@ public final class CompositeRuntime {
         closeClient();
         decision = null;
         joinedCdp = null;
+        THREAD_JOINED.remove();
         SESSIONS_BY_CDP.clear();
         override = null;
         CompositeLog.resetForTests();
@@ -151,7 +155,7 @@ public final class CompositeRuntime {
                 if (cdp != null && !cdp.isBlank()) return cdp;
             }
         }
-        return joinedCdp;
+        return THREAD_JOINED.get();
     }
 
     /** Session id query and observe use when the caller does not pass one. */
@@ -171,33 +175,44 @@ public final class CompositeRuntime {
      * Select the engine Session for this browser, or for one page target when
      * {@code pageTarget} is a CDP target id or a devtools page URL. Two tabs on
      * one host:port keep two sessions. A null target keeps the browser session.
+     *
+     * @return false when a page session was requested and did not open. The
+     * destination tab is not this thread's session in that case.
      */
-    public static void focusPage(WebDriver driver, String pageTarget) {
-        if (!(driver instanceof RemoteWebDriver remote)) return;
+    public static boolean focusPage(WebDriver driver, String pageTarget) {
+        if (!(driver instanceof RemoteWebDriver remote)) return true;
         String raw = cdp(remote.getCapabilities());
-        if (raw == null) return;
+        if (raw == null) return true;
         String browser = DirectControlProvider.withScheme(raw);
         String normalized = pageTarget == null || pageTarget.isBlank()
                 ? browser
                 : Client.withTarget(browser, pageTarget);
-        String previous = joinedCdp;
+        String previousGlobal = joinedCdp;
+        String previousThread = THREAD_JOINED.get();
         String key = Client.cdpKey(normalized);
         String id = SESSIONS_BY_CDP.get(key);
         Client open = client;
         if (open != null && id != null) {
             open.focusSession(id);
-            joinedCdp = normalized;
-            return;
+            rememberJoined(normalized);
+            return true;
         }
         if (pageTarget != null && !pageTarget.isBlank()) {
-            if (!openSession(normalized, key)) joinedCdp = previous;
-            return;
+            if (open == null) return true;
+            if (!openSession(normalized, key)) {
+                joinedCdp = previousGlobal;
+                if (previousThread == null || previousThread.isBlank()) THREAD_JOINED.remove();
+                else THREAD_JOINED.set(previousThread);
+                return false;
+            }
+            return true;
         }
         String browserId = SESSIONS_BY_CDP.get(Client.cdpKey(browser));
         if (open != null && browserId != null) {
             open.focusSession(browserId);
-            joinedCdp = browser;
+            rememberJoined(browser);
         }
+        return true;
     }
 
     /** True after {@link #attach} joined a CDP browser. A process-only session is not joined. */
@@ -213,7 +228,7 @@ public final class CompositeRuntime {
 
     /** Test seam. Production join is {@link #attach}. */
     public static void joinForTests(String cdp) {
-        joinedCdp = cdp == null || cdp.isBlank() ? null : cdp;
+        rememberJoined(cdp);
     }
 
     /** Opens the thread session on demand. Returns null when this run is on Selenium. */
@@ -221,12 +236,16 @@ public final class CompositeRuntime {
         Client open = client();
         if (open == null) return null;
         if (open.currentSession() != null) return open;
+        String own = THREAD_JOINED.get();
+        // A blank join on this thread must not copy another thread's endpoint.
+        // With no join anywhere, a process-only session is still this thread's.
+        if ((own == null || own.isBlank()) && joinedCdp != null && !joinedCdp.isBlank()) return open;
         Map<String, Object> config = new LinkedHashMap<>();
-        if (joinedCdp != null) {
-            config.put("cdp", joinedCdp);
+        config.put("process", true);
+        if (own != null && !own.isBlank()) {
+            config.put("cdp", own);
             config.put("i_accept_local_attach", true);
         }
-        config.put("process", true);
         open.openSession(config);
         CompositeLog.info("session", "opened " + open.currentSession().id());
         return open;
@@ -243,12 +262,13 @@ public final class CompositeRuntime {
             String key = Client.cdpKey(normalized);
             String known = SESSIONS_BY_CDP.get(key);
             if (known != null) {
-                joinedCdp = normalized;
+                rememberJoined(normalized);
                 if (client != null) client.focusSession(known);
                 return;
             }
             if (client != null && client.currentSession() != null && normalized.equals(joinedCdp)) {
                 SESSIONS_BY_CDP.put(key, client.currentSession().id());
+                rememberJoined(normalized);
                 return;
             }
             Map<String, Object> config = new LinkedHashMap<>();
@@ -257,7 +277,7 @@ public final class CompositeRuntime {
             config.put("process", true);
             Session session = client.openSession(config);
             SESSIONS_BY_CDP.put(key, session.id());
-            joinedCdp = normalized;
+            rememberJoined(normalized);
             CompositeLog.info("session", "joined " + normalized + " id=" + session.id());
         } catch (RuntimeException failure) {
             CompositeLog.errorFix(
@@ -280,7 +300,7 @@ public final class CompositeRuntime {
             config.put("process", true);
             Session session = open.openSession(config);
             SESSIONS_BY_CDP.put(key, session.id());
-            joinedCdp = normalized;
+            rememberJoined(normalized);
             CompositeLog.info("session", "joined " + normalized + " id=" + session.id());
             return true;
         } catch (RuntimeException failure) {
@@ -343,6 +363,12 @@ public final class CompositeRuntime {
                 // The test stub may already have exited.
             }
         }
+    }
+
+    private static void rememberJoined(String cdp) {
+        joinedCdp = cdp == null || cdp.isBlank() ? null : cdp;
+        if (joinedCdp == null) THREAD_JOINED.remove();
+        else THREAD_JOINED.set(joinedCdp);
     }
 
     private static void forceLegacy() {
