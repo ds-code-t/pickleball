@@ -1438,6 +1438,59 @@ class AgentLiveFixTest {
         assertEquals(List.of("tab-b:pkb-1", "tab-b:pkb-2"), seen.stream().filter(row -> row.contains("pkb-")).toList());
         assertTrue(seen.stream().anyMatch(row -> row.equals("tab-b:Target.getTargetInfo")), seen.toString());
         assertEquals(1, seen.stream().filter(row -> row.equals("tab-b:pkb-1")).count());
+        String tabB = browser.document("tab-b");
+        assertEquals(2, count(tabB, "<div "));
+        assertEquals(1, count(tabB, ">seed<"));
+        assertEquals(1, count(tabB, ">again<"));
+        assertEquals(2, count(tabB, "data-pkb-id=\"pkb-1\""));
+        assertEquals(2, count(tabB, "data-pkb-id=\"pkb-2\""));
+        assertFalse(browser.document("tab-a").contains("data-pkb-id"), browser.document("tab-a"));
+        assertEquals("BBB", PageSurfaces.rememberedTargetForTests(browser, "tab-b"));
+    }
+
+    @Test
+    void unknownCurrentTabDoesNotBorrowTheActivePageTarget() throws Exception {
+        List<String> seen = new ArrayList<>();
+        PagedDriver browser = new PagedDriver("http://127.0.0.1:9222", Map.of("tab-a", "AAA", "tab-b", "BBB"), seen);
+        PageSurfaces.manage(browser, "chrome-headed-quiet", true);
+        browser.switchTo().window("tab-b");
+        PageSurfaces.focus(browser);
+        Map<String, Object> seeded = PageSurfaces.place(null, "append", null, null, "<b>seed</b>", "html", null, null, null, temp.resolve("run-b"));
+        assertEquals("pkb-1", seeded.get("id"));
+        assertEquals("BBB", PageSurfaces.rememberedTargetForTests(browser, "tab-b"));
+        browser.switchTo().window("tab-a");
+        PageSurfaces.focus(browser);
+        PageSurfaces.bindHandle(browser, "tab-b", "BBB:15");
+        browser.blindCurrentHandleOnceAndIgnoreNextSwitch();
+        Map<String, Object> placed = PageSurfaces.place(null, "append", "BBB:15", null, "<b>again</b>", "html", null, null, null, temp.resolve("run-a"));
+        assertEquals("pkb-2", placed.get("id"));
+        assertEquals("BBB", PageSurfaces.rememberedTargetForTests(browser, "tab-b"));
+        assertNotEquals("AAA", PageSurfaces.rememberedTargetForTests(browser, "tab-b"));
+        String tabB = browser.document("tab-b");
+        assertEquals(2, count(tabB, "data-pkb-id=\"pkb-1\""));
+        assertEquals(2, count(tabB, "data-pkb-id=\"pkb-2\""));
+        assertEquals(1, count(tabB, ">again<"));
+        assertFalse(browser.document("tab-a").contains("pkb-1"), browser.document("tab-a"));
+        assertFalse(seen.stream().anyMatch(row -> row.equals("tab-a:pkb-1") || row.equals("tab-a:pkb-2")), seen.toString());
+    }
+
+    @Test
+    void blankPageTargetReusesRememberedDestinationTarget() throws Exception {
+        PagedDriver browser = new PagedDriver("http://127.0.0.1:9222", Map.of("tab-a", "AAA", "tab-b", "BBB"));
+        PageSurfaces.manage(browser, "chrome-headed-quiet", true);
+        browser.switchTo().window("tab-b");
+        PageSurfaces.focus(browser);
+        Map<String, Object> seeded = PageSurfaces.place(null, "append", null, null, "<b>seed</b>", "html", null, null, null, temp.resolve("run-b"));
+        assertEquals("pkb-1", seeded.get("id"));
+        assertEquals("BBB", PageSurfaces.rememberedTargetForTests(browser, "tab-b"));
+        browser.suppressTargetInfo(true);
+        Map<String, Object> placed = PageSurfaces.place(null, "append", null, null, "<b>again</b>", "html", null, null, null, temp.resolve("run-a"));
+        assertEquals("pkb-2", placed.get("id"));
+        assertEquals("BBB", PageSurfaces.rememberedTargetForTests(browser, "tab-b"));
+        String tabB = browser.document("tab-b");
+        assertEquals(2, count(tabB, "data-pkb-id=\"pkb-1\""));
+        assertEquals(2, count(tabB, "data-pkb-id=\"pkb-2\""));
+        assertFalse(browser.document("tab-a").contains("data-pkb-id"), browser.document("tab-a"));
     }
 
     @Test
@@ -2256,8 +2309,13 @@ class AgentLiveFixTest {
     /** Remote driver whose CDP target id follows the selected window, not the host:port. */
     private static final class PagedDriver extends RemoteWebDriver {
         private final Map<String, String> targets;
+        private final Map<String, String> documents = new LinkedHashMap<>();
         private final List<String> seen;
         private String current;
+        private int blindGets;
+        private int ignoredSwitches;
+        private boolean suppressTarget;
+        private Path harness;
 
         PagedDriver(String cdp, Map<String, String> targets) {
             this(cdp, targets, null);
@@ -2277,6 +2335,7 @@ class AgentLiveFixTest {
             this.targets = new LinkedHashMap<>(targets);
             this.seen = seen;
             this.current = targets.keySet().iterator().next();
+            for (String tab : targets.keySet()) documents.put(tab, "<b id=\"anchor\">anchor</b>");
         }
 
         private static MutableCapabilities caps(String cdp) {
@@ -2286,6 +2345,20 @@ class AgentLiveFixTest {
             return capabilities;
         }
 
+        /** The next handle read fails, and the next window switch does not leave the current tab. */
+        void blindCurrentHandleOnceAndIgnoreNextSwitch() {
+            blindGets = 1;
+            ignoredSwitches = 1;
+        }
+
+        void suppressTargetInfo(boolean suppress) {
+            suppressTarget = suppress;
+        }
+
+        String document(String tab) {
+            return documents.getOrDefault(tab, "");
+        }
+
         @Override
         public Set<String> getWindowHandles() {
             return new LinkedHashSet<>(targets.keySet());
@@ -2293,7 +2366,17 @@ class AgentLiveFixTest {
 
         @Override
         public String getWindowHandle() {
+            if (blindGets > 0) {
+                blindGets--;
+                throw new org.openqa.selenium.NoSuchWindowException("current tab is unknown");
+            }
             return current;
+        }
+
+        @Override
+        public void close() {
+            targets.remove(current);
+            documents.remove(current);
         }
 
         @Override
@@ -2318,6 +2401,10 @@ class AgentLiveFixTest {
                             if (!targets.containsKey(handle)) {
                                 throw new org.openqa.selenium.NoSuchWindowException(handle);
                             }
+                            if (ignoredSwitches > 0) {
+                                ignoredSwitches--;
+                                return self;
+                            }
                             current = handle;
                             return self;
                         }
@@ -2332,6 +2419,7 @@ class AgentLiveFixTest {
         public Map<String, Object> executeCdpCommand(String commandName, Map<String, Object> parameters) {
             if (seen != null) seen.add(current + ":" + commandName);
             if ("Target.getTargetInfo".equals(commandName)) {
+                if (suppressTarget) return Map.of();
                 Map<String, Object> info = new LinkedHashMap<>();
                 info.put("targetId", targets.getOrDefault(current, ""));
                 info.put("type", "page");
@@ -2340,17 +2428,75 @@ class AgentLiveFixTest {
             if ("Page.getFrameTree".equals(commandName)) {
                 return Map.of("frameTree", Map.of("frame", Map.of("id", targets.getOrDefault(current, "main"))));
             }
+            if ("DOM.resolveNode".equals(commandName)) {
+                return Map.of("object", Map.of("objectId", "node-" + current));
+            }
+            if ("Runtime.callFunctionOn".equals(commandName)) {
+                Object arg = null;
+                Object arguments = parameters == null ? null : parameters.get("arguments");
+                if (arguments instanceof List<?> list && !list.isEmpty() && list.get(0) instanceof Map<?, ?> raw) {
+                    arg = raw.get("value");
+                }
+                String function = parameters == null ? "" : String.valueOf(parameters.get("functionDeclaration"));
+                Map<String, Object> ran = runDom("call", function, null, arg);
+                documents.put(current, String.valueOf(ran.get("html")));
+                Object value = ran.get("result");
+                return Map.of("result", Map.of("value", value == null ? false : value));
+            }
             return Map.of();
         }
 
         @Override
         public Object executeScript(String script, Object... args) {
-            String id = "";
-            if (args != null && args.length > 0 && args[0] instanceof Map<?, ?> map && map.get("id") != null) {
-                id = String.valueOf(map.get("id"));
-            }
+            Object raw = args != null && args.length > 0 ? args[0] : Map.of();
+            Map<String, Object> spec = raw instanceof Map<?, ?> map ? cast(map) : Map.of();
+            String id = spec.get("id") == null ? "" : String.valueOf(spec.get("id"));
             if (seen != null) seen.add(current + ":" + id);
-            return Map.of("ok", true);
+            Map<String, Object> ran = runDom("helper", script, spec, null);
+            documents.put(current, String.valueOf(ran.get("html")));
+            Object result = ran.get("result");
+            if (result instanceof Map<?, ?> map) return cast(map);
+            return result;
+        }
+
+        private Map<String, Object> runDom(String mode, String script, Map<String, Object> spec, Object arg) {
+            try {
+                ensureHarness();
+                Path in = Files.createTempFile("pkb-paged-in", ".json");
+                Path out = Files.createTempFile("pkb-paged-out", ".json");
+                Map<String, Object> body = new LinkedHashMap<>();
+                body.put("mode", mode);
+                body.put("script", script == null ? "" : script);
+                body.put("html", documents.getOrDefault(current, ""));
+                if (spec != null) body.put("spec", spec);
+                if (arg != null) body.put("arg", arg);
+                new ObjectMapper().writeValue(in.toFile(), body);
+                Process process = new ProcessBuilder("node", harness.toString(), in.toString(), out.toString())
+                        .redirectErrorStream(true)
+                        .start();
+                boolean finished = process.waitFor(20, TimeUnit.SECONDS);
+                String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+                if (!finished || process.exitValue() != 0 || !Files.isRegularFile(out)) {
+                    throw new IllegalStateException("tab dom did not run: " + output);
+                }
+                @SuppressWarnings("unchecked")
+                Map<String, Object> parsed = new ObjectMapper().readValue(out.toFile(), Map.class);
+                return parsed;
+            } catch (RuntimeException failure) {
+                throw failure;
+            } catch (Exception failure) {
+                throw new IllegalStateException(failure);
+            }
+        }
+
+        private void ensureHarness() throws IOException {
+            if (harness != null) return;
+            Path dir = Files.createTempDirectory("pkb-paged-dom");
+            harness = dir.resolve("dom.js");
+            try (InputStream stream = AgentLiveFixTest.class.getResourceAsStream("persistent-tab-dom.js")) {
+                if (stream == null) throw new IOException("missing persistent-tab-dom.js");
+                Files.write(harness, stream.readAllBytes());
+            }
         }
     }
 

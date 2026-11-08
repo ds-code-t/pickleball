@@ -1971,19 +1971,59 @@ final class PageSurfaces {
     /**
      * Page target of {@code tab} itself. {@code Target.getTargetInfo} with no target
      * id is the active window, so a different Selenium handle must be selected first.
+     * An unknown current window is not that tab. Switch and confirm, reuse a target
+     * already remembered for this tab, or fail the allocation. Never store the active
+     * window's target under a different tab, and never allocate against a blank target.
      */
     private static String destinationPageTarget(WebDriver web, String tab) {
         String wanted = tab == null ? "" : tab;
         String current = currentHandle(web);
-        if (wanted.isBlank() || current == null || wanted.equals(current)) {
-            String target = pageTarget(web);
-            rememberPageTarget(web, wanted.isBlank() ? current : wanted, target);
-            return target;
+        if (current == null) {
+            if (wanted.isBlank()) {
+                CompositeLog.info("html", "destination page target is unknown");
+                throw new IllegalStateException("destination page target is unknown");
+            }
+            return targetAfterSwitch(web, wanted, null);
         }
+        if (wanted.isBlank() || wanted.equals(current)) {
+            return confirmedOrRemembered(web, wanted.isBlank() ? current : wanted);
+        }
+        return targetAfterSwitch(web, wanted, current);
+    }
+
+    /** The selected window is already {@code label}. A blank read is not a new page identity. */
+    private static String confirmedOrRemembered(WebDriver web, String label) {
+        String target = pageTarget(web);
+        if (target == null || target.isBlank()) {
+            String known = rememberedPageTarget(web, label);
+            if (known != null) {
+                CompositeLog.info("html", "destination page target reused " + label);
+                return known;
+            }
+            CompositeLog.info("html", "destination page target is unknown " + label);
+            throw new IllegalStateException("destination page target is unknown");
+        }
+        rememberPageTarget(web, label, target);
+        return target;
+    }
+
+    /**
+     * Select {@code wanted} and read its target only after the selected handle is
+     * confirmed to be that tab. {@code previous} is restored when it was known.
+     */
+    private static String targetAfterSwitch(WebDriver web, String wanted, String previous) {
         String known = rememberedPageTarget(web, wanted);
-        String previous = current;
         try {
             web.switchTo().window(wanted);
+            String now = currentHandle(web);
+            if (now == null || !wanted.equals(now)) {
+                if (known != null) {
+                    CompositeLog.info("window", "destination tab was not confirmed " + wanted);
+                    return known;
+                }
+                CompositeLog.info("html", "destination page target is unknown " + wanted);
+                throw new IllegalStateException("destination page target is unknown");
+            }
             String target = pageTarget(web);
             if (target == null || target.isBlank()) {
                 if (known != null) return known;
@@ -1993,13 +2033,13 @@ final class PageSurfaces {
             rememberPageTarget(web, wanted, target);
             return target;
         } catch (RuntimeException failure) {
-            if (known != null && (failure.getMessage() == null || !failure.getMessage().contains("destination page target"))) {
-                CompositeLog.info("window", "destination tab switch failed " + wanted + " " + failure.getMessage());
-                return known;
-            }
             if (failure instanceof IllegalStateException && failure.getMessage() != null
                     && failure.getMessage().contains("destination page target")) {
                 throw failure;
+            }
+            if (known != null) {
+                CompositeLog.info("window", "destination tab switch failed " + wanted + " " + failure.getMessage());
+                return known;
             }
             CompositeLog.info("window", "destination tab switch failed " + wanted + " " + failure.getMessage());
             throw new IllegalStateException("destination page target is unknown", failure);
@@ -2013,6 +2053,10 @@ final class PageSurfaces {
                 }
             }
         }
+    }
+
+    static String rememberedTargetForTests(WebDriver web, String tab) {
+        return rememberedPageTarget(web, tab);
     }
 
     private static void rememberPageTarget(WebDriver web, String tab, String target) {
