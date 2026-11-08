@@ -198,12 +198,12 @@ class LiveChromeCdpTest {
         return null;
     }
 
-    /** Engine binary built from observe-buffers, not a Python stub. Absent on machines that did not build it. */
+    /** Engine binary built from observe-buffers. Not under /tmp: JUnit temp projects treat /tmp/dom-composite as a sibling checkout. */
     private static Path compositeBinary() {
         String env = System.getenv("PKB_LIVE_COMPOSITE");
         Path[] candidates = {
                 env == null || env.isBlank() ? null : Path.of(env.trim()),
-                Path.of("/tmp/dom-composite/target/debug/composite")
+                Path.of("/opt/pkb-composite/composite")
         };
         for (Path candidate : candidates) {
             if (candidate != null && Files.isRegularFile(candidate) && Files.isExecutable(candidate)) {
