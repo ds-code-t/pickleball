@@ -181,7 +181,7 @@ public final class CompositeRuntime {
      */
     public static boolean focusPage(WebDriver driver, String pageTarget) {
         if (!(driver instanceof RemoteWebDriver remote)) return true;
-        String raw = cdp(remote.getCapabilities());
+        String raw = cdpAddress(remote.getCapabilities());
         if (raw == null) return true;
         String browser = DirectControlProvider.withScheme(raw);
         String normalized = pageTarget == null || pageTarget.isBlank()
@@ -256,7 +256,7 @@ public final class CompositeRuntime {
         try {
             Decision now = current();
             if (!now.primary) return;
-            String raw = driver == null ? null : cdp(driver.getCapabilities());
+            String raw = driver == null ? null : cdpAddress(driver.getCapabilities());
             if (raw == null) return;
             String normalized = DirectControlProvider.withScheme(raw);
             String key = Client.cdpKey(normalized);
@@ -375,8 +375,15 @@ public final class CompositeRuntime {
         decision = Decision.legacy("join");
     }
 
-    /** Same fields as {@code DebuggerAddress}. Core cannot depend on the control-api module. */
-    private static String cdp(Capabilities capabilities) {
+    /**
+     * Debugger address already published on the driver. {@code se:cdp} wins.
+     * Otherwise the Chromium {@code debuggerAddress} on {@code goog:chromeOptions}
+     * or {@code ms:edgeOptions}: the map that matches {@code browserName}
+     * (edge vs chrome) is read first, then the other. Null when none of those
+     * fields is present. {@link #attach} and {@link #focusPage} use this read.
+     * A null page target passed to {@link #focusPage} is still browser-level focus.
+     */
+    public static String cdpAddress(Capabilities capabilities) {
         if (capabilities == null) return null;
         String devtools = text(capabilities.getCapability("se:cdp"));
         if (devtools != null) return devtools;

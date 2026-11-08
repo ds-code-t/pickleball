@@ -1394,6 +1394,43 @@ class AgentLiveFixTest {
     }
 
     @Test
+    void debuggerAddressOnlyActivateDoesNotClaimATabWhosePageTargetIsMissing() throws Exception {
+        Path binary = stdioBinary(temp.resolve("address-only-composite"), temp.resolve("address-only.log"));
+        try {
+            CompositeRuntime.use(temp, Map.of("COMPOSITE_BIN", binary.toString(), "pkb_composite", "on"),
+                    getClass().getClassLoader(), temp);
+            PagedDriver browser = new PagedDriver("127.0.0.1:9222", Map.of("tab-a", "AAA", "tab-b", "BBB"), true);
+            assertNull(browser.getCapabilities().getCapability("se:cdp"));
+            Object options = browser.getCapabilities().getCapability("goog:chromeOptions");
+            assertTrue(options instanceof Map<?, ?> map
+                    && "127.0.0.1:9222".equals(String.valueOf(map.get("debuggerAddress"))), String.valueOf(options));
+            PageSurfaces.manage(browser, "chrome-headed-quiet", true);
+            CompositeRuntime.attach(browser);
+            WindowRegistry.switchTo(temp, "run", "tab-a");
+            String sessionA = CompositeRuntime.focusedSessionId();
+            browser.suppressTargetOn("tab-b");
+            assertFalse(PageSurfaces.activate(browser, "tab-b"));
+            assertEquals("tab-a", browser.getWindowHandle());
+            assertEquals("tab-a", PageSurfaces.focusedTabOf(browser));
+            assertEquals(sessionA, CompositeRuntime.focusedSessionId());
+            assertTrue(String.valueOf(CompositeRuntime.focusedCdp()).contains("AAA"), CompositeRuntime.focusedCdp());
+            assertFalse(String.valueOf(CompositeRuntime.focusedCdp()).contains("BBB"), CompositeRuntime.focusedCdp());
+            assertNull(PageSurfaces.rememberedTargetForTests(browser, "tab-b"));
+            browser.suppressTargetOn(null);
+            WindowRegistry.switchTo(temp, "run", "tab-b");
+            assertEquals("BBB", PageSurfaces.rememberedTargetForTests(browser, "tab-b"));
+            WindowRegistry.switchTo(temp, "run", "tab-a");
+            browser.suppressTargetOn("tab-b");
+            assertTrue(PageSurfaces.activate(browser, "tab-b"));
+            assertEquals("tab-b", browser.getWindowHandle());
+            assertEquals("tab-b", PageSurfaces.focusedTabOf(browser));
+            assertTrue(String.valueOf(CompositeRuntime.focusedCdp()).contains("BBB"), CompositeRuntime.focusedCdp());
+        } finally {
+            CompositeRuntime.resetForTests();
+        }
+    }
+
+    @Test
     void closeDoesNotLeaveTheClosedTabsSessionFocused() throws Exception {
         Path binary = stdioBinary(temp.resolve("close-survivor-composite"), temp.resolve("close-survivor.log"), "AAA");
         try {
@@ -2415,31 +2452,58 @@ class AgentLiveFixTest {
         private Path harness;
 
         PagedDriver(String cdp, Map<String, String> targets) {
-            this(cdp, targets, null);
+            this(cdp, targets, null, false);
         }
 
         PagedDriver(String cdp, Map<String, String> targets, List<String> seen) {
+            this(cdp, targets, seen, false);
+        }
+
+        /** Publishes {@code goog:chromeOptions.debuggerAddress} and not {@code se:cdp}. */
+        PagedDriver(String cdp, Map<String, String> targets, boolean debuggerAddressOnly) {
+            this(cdp, targets, null, debuggerAddressOnly);
+        }
+
+        private PagedDriver(String cdp, Map<String, String> targets, List<String> seen, boolean debuggerAddressOnly) {
             super(command -> {
                 Response response = new Response();
                 response.setState("success");
                 response.setSessionId("s" + Integer.toHexString(cdp.hashCode()));
-                Map<String, Object> returned = new LinkedHashMap<>();
-                returned.put("browserName", "chrome");
-                returned.put("se:cdp", cdp);
-                response.setValue(returned);
+                response.setValue(returnedCaps(cdp, debuggerAddressOnly));
                 return response;
-            }, caps(cdp));
+            }, caps(cdp, debuggerAddressOnly));
             this.targets = new LinkedHashMap<>(targets);
             this.seen = seen;
             this.current = targets.keySet().iterator().next();
             for (String tab : targets.keySet()) documents.put(tab, "<b id=\"anchor\">anchor</b>");
         }
 
-        private static MutableCapabilities caps(String cdp) {
+        private static MutableCapabilities caps(String cdp, boolean debuggerAddressOnly) {
             MutableCapabilities capabilities = new MutableCapabilities();
             capabilities.setCapability("browserName", "chrome");
-            capabilities.setCapability("se:cdp", cdp);
+            if (debuggerAddressOnly) {
+                capabilities.setCapability("goog:chromeOptions", chromeDebugger(cdp));
+            } else {
+                capabilities.setCapability("se:cdp", cdp);
+            }
             return capabilities;
+        }
+
+        private static Map<String, Object> returnedCaps(String cdp, boolean debuggerAddressOnly) {
+            Map<String, Object> returned = new LinkedHashMap<>();
+            returned.put("browserName", "chrome");
+            if (debuggerAddressOnly) {
+                returned.put("goog:chromeOptions", chromeDebugger(cdp));
+            } else {
+                returned.put("se:cdp", cdp);
+            }
+            return returned;
+        }
+
+        private static Map<String, Object> chromeDebugger(String address) {
+            Map<String, Object> options = new LinkedHashMap<>();
+            options.put("debuggerAddress", address);
+            return options;
         }
 
         /** The next handle read fails, and the next window switch does not leave the current tab. */

@@ -2118,12 +2118,14 @@ final class PageSurfaces {
         }
     }
 
+    /**
+     * {@link CompositeRuntime#cdpAddress}: {@code se:cdp}, then Chromium
+     * {@code debuggerAddress}. Empty when the driver published neither.
+     */
     private static String debuggerAddress(RemoteWebDriver remote) {
-        if (remote == null || remote.getCapabilities() == null) return "";
-        Object direct = remote.getCapabilities().getCapability("se:cdp");
-        if (direct == null) return "";
-        String text = direct.toString().trim();
-        return text.isEmpty() ? "" : text;
+        if (remote == null) return "";
+        String address = CompositeRuntime.cdpAddress(remote.getCapabilities());
+        return address == null ? "" : address;
     }
 
     static String allocateSurfaceId(Path file) throws IOException {
@@ -2258,7 +2260,11 @@ final class PageSurfaces {
         else THREAD_FOCUS.set(priorFocus);
     }
 
-    /** A remote debugger address can hold a browser session that is not the requested tab. */
+    /**
+     * A published debugger address ({@code se:cdp} or Chromium {@code debuggerAddress}
+     * on {@code goog:chromeOptions} / {@code ms:edgeOptions}) can hold a browser
+     * session that is not the requested tab.
+     */
     private static boolean remotePage(WebDriver web) {
         return web instanceof RemoteWebDriver remote && !debuggerAddress(remote).isEmpty();
     }
