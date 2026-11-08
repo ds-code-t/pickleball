@@ -42,6 +42,7 @@ import java.util.function.Function;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -1298,7 +1299,10 @@ class AgentLiveFixTest {
             CompositeRuntime.attach(browser);
             String joined = CompositeRuntime.joinedForTests();
             assertTrue(joined != null && joined.contains("9222") && !joined.contains("devtools/page"), joined);
-            WindowRegistry.switchTo(temp, "run", "tab-b");
+            IllegalStateException refused = assertThrows(IllegalStateException.class,
+                    () -> WindowRegistry.switchTo(temp, "run", "tab-b"));
+            assertTrue(refused.getMessage().contains("page session failed"), refused.getMessage());
+            assertEquals("tab-a", browser.getWindowHandle());
             String after = String.valueOf(CompositeRuntime.joinedForTests());
             assertFalse(after.contains("BBB") || after.contains("devtools/page"), after);
             assertTrue(after.contains("9222"), after);
@@ -1321,6 +1325,98 @@ class AgentLiveFixTest {
         assertEquals(15, ref.backend());
         assertEquals("tab-b", ref.tab());
         assertFalse(ref.browserId() == null || ref.browserId().isBlank(), ref.toString());
+    }
+
+    @Test
+    void publicSwitchDoesNotReportSuccessWhenThePageSessionFails() throws Exception {
+        Path binary = stdioBinary(temp.resolve("public-switch-composite"), temp.resolve("public-switch.log"), "BBB");
+        try {
+            CompositeRuntime.use(temp, Map.of("COMPOSITE_BIN", binary.toString(), "pkb_composite", "on"),
+                    getClass().getClassLoader(), temp);
+            PagedDriver browser = new PagedDriver("http://127.0.0.1:9222", Map.of("tab-a", "AAA", "tab-b", "BBB"));
+            PageSurfaces.manage(browser, "chrome-headed-quiet", true);
+            CompositeRuntime.attach(browser);
+            WindowRegistry.Handle selected = WindowRegistry.switchTo(temp, "run", "tab-a");
+            assertTrue(selected.open());
+            assertEquals("tab", selected.kind());
+            assertEquals("tab-a", selected.handle());
+            IllegalStateException failure = assertThrows(IllegalStateException.class,
+                    () -> WindowRegistry.switchTo(temp, "run", "tab-b"));
+            assertTrue(failure.getMessage().contains("page session failed"), failure.getMessage());
+            assertEquals("tab-a", browser.getWindowHandle());
+            assertEquals("tab-a", PageSurfaces.focusedTabOf(browser));
+            assertTrue(String.valueOf(CompositeRuntime.focusedCdp()).contains("AAA"), CompositeRuntime.focusedCdp());
+            assertFalse(String.valueOf(CompositeRuntime.joinedForTests()).contains("BBB"), CompositeRuntime.joinedForTests());
+            PagedDriver blind = new PagedDriver("http://127.0.0.1:9444", Map.of("only", "CCC"));
+            blind.suppressTargetInfo(true);
+            PageSurfaces.manage(blind, "edge-headed-quiet", true);
+            String window = "window:" + PageSurfaces.managed().get(1).id();
+            IllegalStateException windowFailure = assertThrows(IllegalStateException.class,
+                    () -> WindowRegistry.switchTo(temp, "run", window));
+            assertTrue(windowFailure.getMessage().contains("page session failed"), windowFailure.getMessage());
+            assertNull(PageSurfaces.rememberedTargetForTests(blind, "only"));
+        } finally {
+            CompositeRuntime.resetForTests();
+        }
+    }
+
+    @Test
+    void activateDoesNotClaimATabWhosePageTargetIsMissing() throws Exception {
+        Path binary = stdioBinary(temp.resolve("missing-target-composite"), temp.resolve("missing-target.log"));
+        try {
+            CompositeRuntime.use(temp, Map.of("COMPOSITE_BIN", binary.toString(), "pkb_composite", "on"),
+                    getClass().getClassLoader(), temp);
+            PagedDriver browser = new PagedDriver("http://127.0.0.1:9222", Map.of("tab-a", "AAA", "tab-b", "BBB"));
+            PageSurfaces.manage(browser, "chrome-headed-quiet", true);
+            CompositeRuntime.attach(browser);
+            WindowRegistry.switchTo(temp, "run", "tab-a");
+            String sessionA = CompositeRuntime.focusedSessionId();
+            browser.suppressTargetOn("tab-b");
+            assertFalse(PageSurfaces.activate(browser, "tab-b"));
+            assertEquals("tab-a", browser.getWindowHandle());
+            assertEquals("tab-a", PageSurfaces.focusedTabOf(browser));
+            assertEquals(sessionA, CompositeRuntime.focusedSessionId());
+            assertTrue(String.valueOf(CompositeRuntime.focusedCdp()).contains("AAA"), CompositeRuntime.focusedCdp());
+            assertFalse(String.valueOf(CompositeRuntime.focusedCdp()).contains("BBB"), CompositeRuntime.focusedCdp());
+            assertNull(PageSurfaces.rememberedTargetForTests(browser, "tab-b"));
+            browser.suppressTargetOn(null);
+            WindowRegistry.switchTo(temp, "run", "tab-b");
+            assertEquals("BBB", PageSurfaces.rememberedTargetForTests(browser, "tab-b"));
+            WindowRegistry.switchTo(temp, "run", "tab-a");
+            browser.suppressTargetOn("tab-b");
+            assertTrue(PageSurfaces.activate(browser, "tab-b"));
+            assertEquals("tab-b", browser.getWindowHandle());
+            assertEquals("tab-b", PageSurfaces.focusedTabOf(browser));
+            assertTrue(String.valueOf(CompositeRuntime.focusedCdp()).contains("BBB"), CompositeRuntime.focusedCdp());
+        } finally {
+            CompositeRuntime.resetForTests();
+        }
+    }
+
+    @Test
+    void closeDoesNotLeaveTheClosedTabsSessionFocused() throws Exception {
+        Path binary = stdioBinary(temp.resolve("close-survivor-composite"), temp.resolve("close-survivor.log"), "AAA");
+        try {
+            CompositeRuntime.use(temp, Map.of("COMPOSITE_BIN", binary.toString(), "pkb_composite", "on"),
+                    getClass().getClassLoader(), temp);
+            PagedDriver browser = new PagedDriver("http://127.0.0.1:9222", Map.of("tab-a", "AAA", "tab-b", "BBB"));
+            PageSurfaces.manage(browser, "chrome-headed-quiet", true);
+            CompositeRuntime.attach(browser);
+            WindowRegistry.switchTo(temp, "run", "tab-b");
+            assertTrue(String.valueOf(CompositeRuntime.focusedCdp()).contains("BBB"), CompositeRuntime.focusedCdp());
+            IllegalStateException failure = assertThrows(IllegalStateException.class,
+                    () -> WindowRegistry.close(temp, "run", "tab-b"));
+            assertTrue(failure.getMessage().contains("page session failed"), failure.getMessage());
+            assertEquals("tab-a", browser.getWindowHandle());
+            assertFalse(browser.getWindowHandles().contains("tab-b"));
+            assertNotEquals("tab-b", PageSurfaces.focusedTabOf(browser));
+            String cdp = String.valueOf(CompositeRuntime.focusedCdp());
+            assertFalse(cdp.contains("BBB"), cdp);
+            assertFalse(cdp.contains("/devtools/page/"), cdp);
+            assertEquals(1, PageSurfaces.managed().size());
+        } finally {
+            CompositeRuntime.resetForTests();
+        }
     }
 
     @Test
@@ -2315,6 +2411,7 @@ class AgentLiveFixTest {
         private int blindGets;
         private int ignoredSwitches;
         private boolean suppressTarget;
+        private String suppressTab;
         private Path harness;
 
         PagedDriver(String cdp, Map<String, String> targets) {
@@ -2353,6 +2450,10 @@ class AgentLiveFixTest {
 
         void suppressTargetInfo(boolean suppress) {
             suppressTarget = suppress;
+        }
+
+        void suppressTargetOn(String tab) {
+            suppressTab = tab;
         }
 
         String document(String tab) {
@@ -2419,7 +2520,7 @@ class AgentLiveFixTest {
         public Map<String, Object> executeCdpCommand(String commandName, Map<String, Object> parameters) {
             if (seen != null) seen.add(current + ":" + commandName);
             if ("Target.getTargetInfo".equals(commandName)) {
-                if (suppressTarget) return Map.of();
+                if (suppressTarget || (suppressTab != null && suppressTab.equals(current))) return Map.of();
                 Map<String, Object> info = new LinkedHashMap<>();
                 info.put("targetId", targets.getOrDefault(current, ""));
                 info.put("type", "page");

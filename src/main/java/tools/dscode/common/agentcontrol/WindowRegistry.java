@@ -65,6 +65,7 @@ final class WindowRegistry {
             if (managed == null) throw new IllegalArgumentException("unknown handle: " + handle);
             if (!PageSurfaces.focus(managed.driver())) {
                 CompositeLog.info("window", "page session failed " + handle);
+                throw new IllegalStateException("page session failed: " + handle);
             }
             CompositeLog.info("window", "switch " + handle);
             return new Handle(handle, "window", managed.template(), safeTitle(managed.driver()), safeUrl(managed.driver()), true);
@@ -83,6 +84,7 @@ final class WindowRegistry {
                             }
                         }
                         CompositeLog.info("window", "page session failed " + handle);
+                        throw new IllegalStateException("page session failed: " + handle);
                     }
                     CompositeLog.info("window", "switch " + handle);
                     return new Handle(handle, "tab", managed.template(), safeTitle(managed.driver()), safeUrl(managed.driver()), true);
@@ -90,6 +92,10 @@ final class WindowRegistry {
             } catch (NoSuchWindowException failure) {
                 throw new IllegalArgumentException("unknown handle: " + handle);
             } catch (RuntimeException failure) {
+                if (failure instanceof IllegalStateException && failure.getMessage() != null
+                        && failure.getMessage().contains("page session failed")) {
+                    throw failure;
+                }
                 CompositeLog.info("window", "switch failed " + handle + " " + failure.getMessage());
             }
         }
@@ -135,11 +141,17 @@ final class WindowRegistry {
                 managed.driver().switchTo().window(survivor);
                 if (!PageSurfaces.focus(managed.driver())) {
                     CompositeLog.info("window", "page session failed " + survivor);
+                    PageSurfaces.releaseClosedTab(managed.driver(), handle);
+                    throw new IllegalStateException("page session failed: " + survivor);
                 }
                 CompositeLog.info("window", "close " + handle);
                 return new Handle(handle, "tab", managed.template(), "", "", false);
             } catch (RuntimeException failure) {
                 CompositeLog.info("window", "close failed " + handle + " " + failure.getMessage());
+                if (failure instanceof IllegalStateException && failure.getMessage() != null
+                        && failure.getMessage().contains("page session failed")) {
+                    throw failure;
+                }
             }
         }
         throw new IllegalArgumentException("unknown handle: " + handle);

@@ -235,13 +235,19 @@ final class PageSurfaces {
 
     static boolean focus(WebDriver webDriver) {
         String tab = currentHandle(webDriver);
-        if (!CompositeRuntime.focusPage(webDriver, pageTarget(webDriver))) {
+        String target = targetForSelectedTab(webDriver, tab);
+        if (remotePage(webDriver) && (target == null || target.isBlank())) {
+            CompositeLog.info("window", "page target unknown " + text(tab));
+            return false;
+        }
+        if (!CompositeRuntime.focusPage(webDriver, target)) {
             CompositeLog.info("window", "page session failed " + text(tab));
             return false;
         }
         driver = webDriver;
         focusedTab = tab;
         THREAD_FOCUS.set(new Focus(webDriver, focusedTab));
+        rememberPageTarget(webDriver, tab, target);
         return true;
     }
 
@@ -1178,7 +1184,6 @@ final class PageSurfaces {
             driver = owner.driver;
             focusedTab = owner.tab;
             THREAD_FOCUS.set(new Focus(owner.driver, owner.tab));
-            CompositeRuntime.focusPage(owner.driver, pageTarget(owner.driver));
             return owner.driver;
         }
         if (driver != null && focusedTab != null && !focusedTab.isBlank() && !activate(driver, focusedTab)) {
@@ -2216,7 +2221,13 @@ final class PageSurfaces {
         }
         try {
             if (priorWindow == null || !tab.equals(priorWindow)) web.switchTo().window(tab);
-            if (!CompositeRuntime.focusPage(web, pageTarget(web))) {
+            String target = targetForSelectedTab(web, tab);
+            if (remotePage(web) && (target == null || target.isBlank())) {
+                CompositeLog.info("window", "page target unknown " + tab);
+                restoreActivation(web, priorWindow, priorFocus, priorDriver, priorTab);
+                return false;
+            }
+            if (!CompositeRuntime.focusPage(web, target)) {
                 CompositeLog.info("window", "page session failed " + tab);
                 restoreActivation(web, priorWindow, priorFocus, priorDriver, priorTab);
                 return false;
@@ -2224,7 +2235,6 @@ final class PageSurfaces {
             focusedTab = tab;
             driver = web;
             THREAD_FOCUS.set(new Focus(web, tab));
-            String target = pageTarget(web);
             rememberPageTarget(web, tab, target);
             return true;
         } catch (RuntimeException failure) {
@@ -2246,6 +2256,36 @@ final class PageSurfaces {
         focusedTab = priorTab;
         if (priorFocus == null) THREAD_FOCUS.remove();
         else THREAD_FOCUS.set(priorFocus);
+    }
+
+    /** A remote debugger address can hold a browser session that is not the requested tab. */
+    private static boolean remotePage(WebDriver web) {
+        return web instanceof RemoteWebDriver remote && !debuggerAddress(remote).isEmpty();
+    }
+
+    /**
+     * Target of {@code tab} only when Selenium is on that tab, or a target already
+     * confirmed for it. Null on a remote page means the caller must fail. It is not
+     * permission to focus the browser session under this tab's name.
+     */
+    private static String targetForSelectedTab(WebDriver web, String tab) {
+        if (!remotePage(web)) return pageTarget(web);
+        if (tab == null || tab.isBlank()) return null;
+        String current = currentHandle(web);
+        if (tab.equals(current)) {
+            String live = pageTarget(web);
+            if (live != null && !live.isBlank()) return live;
+        }
+        return rememberedPageTarget(web, tab);
+    }
+
+    /** The closed tab's engine session must not stay current when the survivor could not be focused. */
+    static void releaseClosedTab(WebDriver web, String closed) {
+        Focus focus = THREAD_FOCUS.get();
+        if (focus != null && focus.driver == web && closed != null && closed.equals(focus.tab)) THREAD_FOCUS.remove();
+        if (web == driver && closed != null && closed.equals(focusedTab)) focusedTab = null;
+        if (remotePage(web)) CompositeRuntime.focusPage(web, null);
+        CompositeLog.info("window", "closed tab session released " + text(closed));
     }
 
     static String pageTarget(WebDriver web) {
