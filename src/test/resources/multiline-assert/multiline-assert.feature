@@ -5,7 +5,7 @@ Feature: Multi-line ASSERT
     * CLEAR SAVED VALUES
     * MAP "Probe" OBJECT VALUE TO SCENARIO MAP
       """json
-      {"ml":"line one\nline two","pattern":"(?s)line one\nline two","jdbcPattern":"(?s).*no_such_table_x.*Position: 15"}
+      {"ml":"line one\nline two","pattern":"(?s)line one\nline two","jdbcPattern":"(?s).*no_such_table_x.*Position: 15","banner":"Please select one customer for each individual and submit.\n"}
       """
     * MAP "Q" OBJECT VALUE TO SCENARIO MAP
       """json
@@ -28,6 +28,7 @@ Feature: Multi-line ASSERT
     * ASSERT: <Q.RESPONSE.errorCrlf> contains "no_such_table_x"
     * ASSERT: "<Q.RESPONSE.errorCrlf>" contains "Position: 15"
     * ASSERT: "hello   world" equals "hello world"
+    * ASSERT: "<Probe.banner>" equals "Please select one customer for each individual and submit."
     * ASSERT: "C:\Users\Dan She'll\page.html" contains "She'll"
     * ASSERT: "C:/Program Files/Pickleball/body.json" contains "Program Files"
     * CLEAR SAVED VALUES

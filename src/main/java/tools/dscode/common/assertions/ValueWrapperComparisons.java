@@ -17,8 +17,9 @@ import static tools.dscode.common.reporting.logging.LogForwarder.logToDefaultLev
  * <p>
  * Rules:
  * - String comparisons normally use asNormalizedText()
- * - If either raw value contains a line break, both sides keep that text:
- *   CR/LF becomes LF and spaces are not collapsed
+ * - A line break that is only leading or trailing whitespace stays on that path
+ * - If either raw value still contains a line break, both sides keep that text:
+ *   CR/LF becomes LF, the ends are stripped, and internal spaces are not collapsed
  * - If either arg is SINGLE_QUOTED → case-insensitive comparison
  * - If either arg is BACK_TICKED → use getValue().toString() for BOTH sides
  * - Numeric comparisons use asBigDecimal()
@@ -124,21 +125,28 @@ public final class ValueWrapperComparisons {
         return hasLineBreak(a) || hasLineBreak(b);
     }
 
+    /**
+     * Leading and trailing whitespace, including a trailing CR/LF, does not
+     * make a value multi-line. That is the 2.1.16 equality path.
+     */
     private static boolean hasLineBreak(ValueWrapper value) {
         String text = rawText(value);
-        return text != null && (text.indexOf('\n') >= 0 || text.indexOf('\r') >= 0);
+        if (text == null) return false;
+        String body = text.strip();
+        return body.indexOf('\n') >= 0 || body.indexOf('\r') >= 0;
     }
 
     /**
      * A line break stays a line break. CRLF and a lone CR are the same break as LF.
-     * Spaces are not collapsed; that remains the single-line rule.
+     * Ends are stripped so a trailing newline does not change equality.
+     * Internal spaces are not collapsed; that remains the single-line rule.
      */
     private static String comparisonText(ValueWrapper value) {
         String text = rawText(value);
         if (text == null) {
             return null;
         }
-        return text.replace("\r\n", "\n").replace('\r', '\n');
+        return text.replace("\r\n", "\n").replace('\r', '\n').strip();
     }
 
     private static boolean hasMargin(ValueWrapper margin) {
