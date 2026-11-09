@@ -1,5 +1,9 @@
 # Release notes
 
+## 2.2.0
+
+_No changes yet._
+
 ## 2.1.19
 
 - dom-composite 2.4.0 is the element entry point when its binary is on the run. `DomCompositeAdapter` is the only path for find, click, type, hover, scroll, keys, wait, inspect, and desktop query. Existing Gherkin phrases, quote types, and context words (`in`, `from`, `for`, `after`, `before`) are unchanged. Dictionary XPath and CSS pass through. Other phrases become one composite pipeline.
