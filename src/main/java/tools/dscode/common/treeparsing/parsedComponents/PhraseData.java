@@ -515,6 +515,9 @@ public abstract class PhraseData extends PassedData {
             }
             operation = assertionOperation;
         }
+        if (operation == null) {
+            throw unknownWord();
+        }
         if (operation instanceof AssertionOperations && assertionChain != null) {
             assertionChain.executeAssertionChain();
             if(parsedLine.isBlockConditionalStep && assertionChain.chainStatus)
@@ -536,6 +539,20 @@ public abstract class PhraseData extends PassedData {
     }
 
     /**
+     * {@code displays} is not a comparison word. Say so instead of dereferencing a null operation.
+     */
+    private IllegalArgumentException unknownWord() {
+        String phrase = text == null ? "" : text.trim();
+        if (phrase.isEmpty() && resolvedText != null) phrase = resolvedText.trim();
+        return new IllegalArgumentException(
+                "syntax error: no comparison or action word was found in '" + phrase + "'. "
+                        + "displays is not a comparison word. "
+                        + "Valid text checks include equals, contains, starts with, and ends with. "
+                        + "displayed means visibility."
+        );
+    }
+
+    /**
      * Body of a resolved conditional, without a leading {@code if} or {@code else if}.
      */
     private String resolvedConditionalBody() {
@@ -549,6 +566,9 @@ public abstract class PhraseData extends PassedData {
     public void runUntilOperation() {
         OperationsInterface operation = actionOperation != null ? actionOperation : assertionOperation;
         settleBeforeBrowserAction(operation);
+        if (operation == null) {
+            throw unknownWord();
+        }
         operation.execute(this);
         if (result.failed()) {
             throw new RuntimeException("operation '" + operation + "' failed", result.error());
