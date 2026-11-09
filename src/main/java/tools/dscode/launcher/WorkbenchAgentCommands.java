@@ -743,19 +743,12 @@ public final class WorkbenchAgentCommands {
         if (direct.kind() == WorkbenchSpeed.DirectKind.TIMED_OUT) {
             return new Bounded(direct.exit(), true);
         }
-        if (direct.kind() == WorkbenchSpeed.DirectKind.INTERRUPTED) {
-            launchNote(parsed.project(), run.runId(), "maven-done", "direct interrupted");
+        if (direct.acknowledged()) {
+            String detail = direct.kind() == WorkbenchSpeed.DirectKind.INTERRUPTED
+                    ? "direct interrupted"
+                    : "direct exit=" + direct.exit();
+            launchNote(parsed.project(), run.runId(), "maven-done", detail);
             return new Bounded(direct.exit(), false);
-        }
-        boolean trusted = direct.kind() == WorkbenchSpeed.DirectKind.COMPLETED
-                && (direct.exit() == 0
-                || AgentCoordination.findRunIndex(parsed.project(), run.runId()) != null);
-        if (trusted) {
-            launchNote(parsed.project(), run.runId(), "maven-done", "direct exit=" + direct.exit());
-            return new Bounded(direct.exit(), false);
-        }
-        if (direct.kind() == WorkbenchSpeed.DirectKind.COMPLETED) {
-            launchNote(parsed.project(), run.runId(), "fallback", "fresh-jvm");
         }
         launchNote(parsed.project(), run.runId(), "maven-start", "");
         Bounded mavenResult = runWithOnlineFallback(
