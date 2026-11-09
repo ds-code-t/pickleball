@@ -722,8 +722,9 @@ public final class WorkbenchAgentCommands {
 
     /**
      * Warm path first. A run the warm JVM has accepted is never started again,
-     * including a timeout or a dropped connection. A miss before acknowledgement
-     * still uses the wrapper.
+     * including a timeout or a dropped connection. A busy rejection is also
+     * final: that selection is not started on a fresh JVM. A miss before
+     * acknowledgement still uses the wrapper.
      */
     private static Bounded directOrFallback(
             WorkbenchCommandLine.Parsed parsed,
@@ -743,10 +744,12 @@ public final class WorkbenchAgentCommands {
         if (direct.kind() == WorkbenchSpeed.DirectKind.TIMED_OUT) {
             return new Bounded(direct.exit(), true);
         }
-        if (direct.acknowledged()) {
-            String detail = direct.kind() == WorkbenchSpeed.DirectKind.INTERRUPTED
-                    ? "direct interrupted"
-                    : "direct exit=" + direct.exit();
+        if (direct.preventFallback()) {
+            String detail = switch (direct.kind()) {
+                case INTERRUPTED -> "direct interrupted";
+                case REJECTED -> "direct rejected";
+                default -> "direct exit=" + direct.exit();
+            };
             launchNote(parsed.project(), run.runId(), "maven-done", detail);
             return new Bounded(direct.exit(), false);
         }

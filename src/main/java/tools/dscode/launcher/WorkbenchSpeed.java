@@ -52,7 +52,9 @@ public final class WorkbenchSpeed {
         /** STARTED, then the connection dropped. Not a fresh JVM. */
         INTERRUPTED,
         /** STARTED, then {@code --run-timeout} expired. Not a fresh JVM. */
-        TIMED_OUT
+        TIMED_OUT,
+        /** EXIT 2 without STARTED. The warm JVM was busy and did not start this selection. */
+        REJECTED
     }
 
     record DirectAttempt(DirectKind kind, int exit) {
@@ -76,8 +78,17 @@ public final class WorkbenchSpeed {
             return new DirectAttempt(DirectKind.TIMED_OUT, 1);
         }
 
+        static DirectAttempt rejected() {
+            return new DirectAttempt(DirectKind.REJECTED, 2);
+        }
+
         boolean acknowledged() {
             return kind == DirectKind.COMPLETED || kind == DirectKind.INTERRUPTED || kind == DirectKind.TIMED_OUT;
+        }
+
+        /** A busy rejection also must not start a second JVM. */
+        boolean preventFallback() {
+            return acknowledged() || kind == DirectKind.REJECTED;
         }
     }
 
@@ -267,6 +278,7 @@ public final class WorkbenchSpeed {
             case COMPLETED -> WorkbenchLaunchTiming.note(folder, "direct", "run elapsedMs=" + elapsedMs);
             case TIMED_OUT -> WorkbenchLaunchTiming.note(folder, "direct", "timeout elapsedMs=" + elapsedMs);
             case INTERRUPTED -> WorkbenchLaunchTiming.note(folder, "direct", "interrupted elapsedMs=" + elapsedMs);
+            case REJECTED -> WorkbenchLaunchTiming.note(folder, "direct", "rejected elapsedMs=" + elapsedMs);
             case MISSED -> WorkbenchLaunchTiming.note(folder, "fallback", "fresh-jvm");
             case SKIPPED -> {
             }
@@ -359,6 +371,12 @@ public final class WorkbenchSpeed {
                 return DirectAttempt.missed();
             }
             if (!"STARTED".equals(status.trim())) {
+                // EXIT 2 without STARTED means the warm JVM is busy. Leave it up
+                // and do not start a second execution beside the in-flight run.
+                if ("EXIT 2".equals(status.trim())) {
+                    noteRejected(err);
+                    return DirectAttempt.rejected();
+                }
                 // A clean EXIT without STARTED is a rejection. Leave the JVM up.
                 if (!status.startsWith("EXIT ")) releaseQuietly(releaseState);
                 return DirectAttempt.missed();
@@ -407,6 +425,12 @@ public final class WorkbenchSpeed {
         if (err == null) return;
         err.println("error: warm run was accepted and then the connection dropped");
         err.println("fix: this selection was not started again.");
+    }
+
+    private static void noteRejected(PrintStream err) {
+        if (err == null) return;
+        err.println("error: warm JVM rejected the run because it is already busy");
+        err.println("fix: wait for the in-flight selection to finish. This selection was not started again.");
     }
 
     private static void releaseQuietly(Path state) {

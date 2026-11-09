@@ -30,10 +30,11 @@ import java.util.concurrent.atomic.AtomicBoolean;
  */
 public final class WorkbenchWarmMain {
     private static final AtomicBoolean EXITING = new AtomicBoolean();
+    private static final AtomicBoolean BUSY = new AtomicBoolean();
     private static volatile long parentPid;
-    private static volatile boolean busy;
     private static volatile long lastUsedNanos = System.nanoTime();
     private static volatile long idleNanos = TimeUnit.SECONDS.toNanos(WarmProcess.DEFAULT_IDLE_SECONDS);
+    private static volatile Runnable afterStarted;
 
     private WorkbenchWarmMain() {
     }
@@ -73,8 +74,8 @@ public final class WorkbenchWarmMain {
             watchThread.setDaemon(true);
             watchThread.start();
             while (!EXITING.get()) {
-                try (Socket socket = server.accept()) {
-                    serve(socket);
+                try {
+                    acceptOne(server);
                 } catch (Exception failure) {
                     if (EXITING.get()) break;
                     System.err.println("warm JVM request failed: " + failure.getMessage());
@@ -121,7 +122,7 @@ public final class WorkbenchWarmMain {
                 long filed = WarmProcess.readOwner(state);
                 if (filed > 0) parentPid = filed;
             }
-            if (exitDue(parentPid, busy, idleNanos, lastUsedNanos, System.nanoTime(), missing)) shutdown(state);
+            if (exitDue(parentPid, BUSY.get(), idleNanos, lastUsedNanos, System.nanoTime(), missing)) shutdown(state);
         }
     }
 
@@ -135,6 +136,26 @@ public final class WorkbenchWarmMain {
         WarmProcess.delete(state);
         WarmProcess.deleteRememberedPid(state);
         System.exit(0);
+    }
+
+    /**
+     * Accept without blocking the next connection on a long RUN.
+     * A second RUN can then receive EXIT 2 instead of sitting in the backlog
+     * until the handshake timeout kills this JVM.
+     */
+    static void acceptOne(ServerSocket server) throws java.io.IOException {
+        Socket socket = server.accept();
+        Thread worker = new Thread(() -> {
+            try (Socket ignored = socket) {
+                serve(socket);
+            } catch (Exception failure) {
+                if (!EXITING.get()) {
+                    System.err.println("warm JVM request failed: " + failure.getMessage());
+                }
+            }
+        }, "pickleball-warm-serve");
+        worker.setDaemon(true);
+        worker.start();
     }
 
     static void serve(Socket socket) throws Exception {
@@ -158,7 +179,7 @@ public final class WorkbenchWarmMain {
         while ((line = reader.readLine()) != null && !".".equals(line)) dashD.add(line);
         String projectLine = reader.readLine();
         adoptParent(reader.readLine());
-        if (busy) {
+        if (!BUSY.compareAndSet(false, true)) {
             writer.println("EXIT 2");
             writer.println("END");
             return;
@@ -168,12 +189,14 @@ public final class WorkbenchWarmMain {
         PrintStream tee = new PrintStream(captured, true, StandardCharsets.UTF_8);
         PrintStream out = System.out;
         PrintStream err = System.err;
-        int exit;
-        ClassLoader loader = newLoader();
+        int exit = 1;
+        ClassLoader loader = null;
         ClassLoader previous = Thread.currentThread().getContextClassLoader();
-        busy = true;
         try {
+            loader = newLoader();
             writer.println("STARTED");
+            Runnable hook = afterStarted;
+            if (hook != null) hook.run();
             System.setOut(tee);
             System.setErr(tee);
             Thread.currentThread().setContextClassLoader(loader);
@@ -184,7 +207,7 @@ public final class WorkbenchWarmMain {
             tee.println("error: warm run failed: " + failure.getMessage());
             tee.println("fix: the wrapper path still runs this command.");
         } finally {
-            busy = false;
+            BUSY.set(false);
             lastUsedNanos = System.nanoTime();
             Thread.currentThread().setContextClassLoader(previous);
             System.setOut(out);
@@ -201,7 +224,12 @@ public final class WorkbenchWarmMain {
 
     /** Tests mark an in-flight run so a second {@code RUN} is rejected. */
     static void setBusy(boolean value) {
-        busy = value;
+        BUSY.set(value);
+    }
+
+    /** Tests hold the worker after STARTED so a second accept can run. */
+    static void setAfterStarted(Runnable hook) {
+        afterStarted = hook;
     }
 
     private static void adoptParent(String line) {

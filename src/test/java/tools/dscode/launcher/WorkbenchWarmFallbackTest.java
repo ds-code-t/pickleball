@@ -18,6 +18,8 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -105,6 +107,79 @@ class WorkbenchWarmFallbackTest {
     }
 
     @Test
+    void exit2WithoutStartedIsARejectionNotAFallback() throws Exception {
+        Attempt attempt = talk(temp.resolve("reject"), Mode.EXIT_2, 0, 400, null);
+        assertEquals(WorkbenchSpeed.DirectKind.REJECTED, attempt.result.kind());
+        assertEquals(2, attempt.result.exit());
+        assertTrue(attempt.result.preventFallback());
+        assertFalse(attempt.result.acknowledged());
+        assertFalse(attempt.timing.contains("stage=fallback"), attempt.timing);
+        assertFalse(attempt.timing.contains("fresh-jvm"), attempt.timing);
+        assertTrue(attempt.timing.contains("rejected"), attempt.timing);
+        assertTrue(attempt.err.toString(StandardCharsets.UTF_8).contains("already busy"), attempt.err.toString());
+        assertTrue(Files.isRegularFile(attempt.handle), "a busy rejection must not kill the warm JVM");
+    }
+
+    @Test
+    void secondRunDuringAnInFlightServeDoesNotReleaseOrFallBack() throws Exception {
+        CountDownLatch started = new CountDownLatch(1);
+        CountDownLatch hold = new CountDownLatch(1);
+        WorkbenchWarmMain.setAfterStarted(() -> {
+            started.countDown();
+            try {
+                if (!hold.await(10, TimeUnit.SECONDS)) {
+                    throw new IllegalStateException("hold timed out");
+                }
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+                throw new IllegalStateException(interrupted);
+            }
+        });
+        Path project = temp.resolve("inflight");
+        Files.createDirectories(project);
+        Path state = project.resolve("state");
+        Files.createDirectories(state);
+        try (ServerSocket server = new ServerSocket(0, 50, InetAddress.getLoopbackAddress())) {
+            Process ended = new ProcessBuilder("true").start();
+            ended.waitFor();
+            WarmProcess.write(state, new WarmProcess.Handle(ended.pid(), server.getLocalPort(), "watch"));
+            Thread loop = new Thread(() -> {
+                try {
+                    WorkbenchWarmMain.acceptOne(server);
+                    WorkbenchWarmMain.acceptOne(server);
+                } catch (Exception ignored) {
+                    // The client assertions are the result.
+                }
+            }, "warm-accept-two");
+            loop.setDaemon(true);
+            loop.start();
+            Thread first = new Thread(() -> {
+                try {
+                    talkTo(project, "warm-first", server.getLocalPort(), 5_000, null, state);
+                } catch (Exception ignored) {
+                    // Held until the test releases afterStarted.
+                }
+            }, "warm-first-client");
+            first.setDaemon(true);
+            first.start();
+            assertTrue(started.await(5, TimeUnit.SECONDS), "first RUN should reach STARTED");
+            Attempt second = talkTo(project, "warm-second", server.getLocalPort(), 800, null, state);
+            assertEquals(WorkbenchSpeed.DirectKind.REJECTED, second.result.kind(), second.err.toString());
+            assertTrue(second.result.preventFallback());
+            assertFalse(second.timing.contains("stage=fallback"), second.timing);
+            assertFalse(second.timing.contains("fresh-jvm"), second.timing);
+            assertTrue(Files.isRegularFile(WarmProcess.file(state)),
+                    "a handshake against a busy accept must not kill the in-flight run");
+            hold.countDown();
+            first.join(5_000);
+            loop.join(2_000);
+        } finally {
+            WorkbenchWarmMain.setAfterStarted(null);
+            WorkbenchWarmMain.setBusy(false);
+        }
+    }
+
+    @Test
     void secondRunWhileBusyIsRejected() throws Exception {
         WorkbenchWarmMain.setBusy(true);
         try (ServerSocket server = new ServerSocket(0, 1, InetAddress.getLoopbackAddress())) {
@@ -142,6 +217,38 @@ class WorkbenchWarmFallbackTest {
         } finally {
             WorkbenchWarmMain.setBusy(false);
         }
+    }
+
+    private static Attempt talkTo(
+            Path project,
+            String runId,
+            int port,
+            int handshakeMillis,
+            Long runTimeoutMillis,
+            Path state
+    ) throws Exception {
+        List<String> command = List.of("-Dpkb_run_id=" + runId);
+        ByteArrayOutputStream outBytes = new ByteArrayOutputStream();
+        ByteArrayOutputStream errBytes = new ByteArrayOutputStream();
+        WorkbenchSpeed.DirectAttempt result = WorkbenchSpeed.record(
+                project,
+                command,
+                WorkbenchSpeed.exchange(
+                        port,
+                        command,
+                        project,
+                        0L,
+                        new PrintStream(outBytes, true, StandardCharsets.UTF_8),
+                        new PrintStream(errBytes, true, StandardCharsets.UTF_8),
+                        handshakeMillis,
+                        runTimeoutMillis,
+                        state
+                ),
+                0L
+        );
+        Path timing = project.resolve(".pickleball").resolve("runs").resolve(runId).resolve("launch-timing.txt");
+        String text = Files.isRegularFile(timing) ? Files.readString(timing) : "";
+        return new Attempt(result, text, outBytes, errBytes, WarmProcess.file(state));
     }
 
     private static Attempt talk(Path project, Mode mode, int delayMillis, int handshakeMillis, Long runTimeoutMillis) throws Exception {
@@ -208,6 +315,11 @@ class WorkbenchWarmFallbackTest {
             reader.readLine();
             PrintWriter writer = new PrintWriter(
                     new OutputStreamWriter(socket.getOutputStream(), StandardCharsets.UTF_8), true);
+            if (mode == Mode.EXIT_2) {
+                writer.println("EXIT 2");
+                writer.println("END");
+                return;
+            }
             if (mode == Mode.DELAYED_EXIT) {
                 Thread.sleep(delayMillis);
                 writer.println("EXIT 0");
@@ -232,7 +344,8 @@ class WorkbenchWarmFallbackTest {
         DELAYED_EXIT,
         STARTED_THEN_EXIT,
         STARTED_THEN_DROP,
-        CLOSED
+        CLOSED,
+        EXIT_2
     }
 
     private record Attempt(
