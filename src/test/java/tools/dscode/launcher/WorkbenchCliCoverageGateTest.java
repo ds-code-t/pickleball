@@ -31,7 +31,7 @@ class WorkbenchCliCoverageGateTest {
     @Test
     void inventoryMatchesTheParserSets() throws IOException {
         JsonNode root = JSON.readTree(inventoryFile().toFile());
-        assertEquals("2.1.18", root.path("version").asText());
+        assertEquals("2.1.19", root.path("version").asText());
         assertEquals(sorted(WorkbenchCommandLine.FORWARDED_COMMANDS), array(root, "commands", "forwarded"));
         assertEquals(sorted(WorkbenchCommandLine.AGENT_CORE_COMMANDS), array(root, "commands", "agentCore"));
         assertEquals(sorted(WorkbenchCommandLine.SESSION_CLIENT_COMMANDS), array(root, "commands", "sessionClient"));

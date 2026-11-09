@@ -22,7 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Real {@code mvnw} in {@code maven-consumer-project}. Not a shell stub.
- * Requires {@code tools.dscode:pickleball:2.1.18} in the local Maven repository.
+ * Requires {@code tools.dscode:pickleball:2.1.19} in the local Maven repository.
  */
 class WorkbenchConsumerScenarioEndToEndTest {
     private static final Path PROJECT = Path.of("maven-consumer-project").toAbsolutePath().normalize();
@@ -127,9 +127,9 @@ class WorkbenchConsumerScenarioEndToEndTest {
 
     private static void assertPublished() {
         Path published = Path.of(System.getProperty("user.home"),
-                ".m2", "repository", "tools", "dscode", "pickleball", "2.1.18", "pickleball-2.1.18.jar");
+                ".m2", "repository", "tools", "dscode", "pickleball", "2.1.19", "pickleball-2.1.19.jar");
         assertTrue(Files.isRegularFile(published),
-                "publishToMavenLocal tools.dscode:pickleball:2.1.18 before this test: " + published);
+                "publishToMavenLocal tools.dscode:pickleball:2.1.19 before this test: " + published);
         assertTrue(Files.isRegularFile(PROJECT.resolve("mvnw")));
     }
 
@@ -185,7 +185,7 @@ class WorkbenchConsumerScenarioEndToEndTest {
 
     private static Run launchJar(String... args) throws Exception {
         Path published = Path.of(System.getProperty("user.home"),
-                ".m2", "repository", "tools", "dscode", "pickleball", "2.1.18", "pickleball-2.1.18.jar");
+                ".m2", "repository", "tools", "dscode", "pickleball", "2.1.19", "pickleball-2.1.19.jar");
         String java = Path.of(System.getProperty("java.home"), "bin", "java").toString();
         List<String> command = new ArrayList<>();
         command.add(java);
