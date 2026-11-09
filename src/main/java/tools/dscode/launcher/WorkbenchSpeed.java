@@ -13,6 +13,7 @@ import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.net.InetAddress;
 import java.net.Socket;
+import java.net.SocketTimeoutException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -28,8 +29,9 @@ import java.util.function.Function;
 
 /**
  * One speed path for discover, confirm, and isolate. Cache hit skips Maven
- * resolve. A live warm JVM is reused until the watch hash changes. Any miss,
- * daemon error, or parallel failure falls back to the sequential wrapper path.
+ * resolve. A live warm JVM is reused until the watch hash changes. A miss
+ * before the warm JVM acknowledges the run falls back to the sequential
+ * wrapper path. An acknowledged run is never started a second time.
  */
 public final class WorkbenchSpeed {
     public static final String MODE_PROPERTY = "pkb_workbench_speed";
@@ -37,6 +39,47 @@ public final class WorkbenchSpeed {
     public static final String IDLE_PROPERTY = "pkb_workbench_warm_idle_timeout";
     public static final String IDLE_ENV = "PKB_WORKBENCH_WARM_IDLE_TIMEOUT";
     public static final String IDLE_RUNVAR = "pkb_runvars.pkb_workbench_warm_idle_timeout";
+    /** Connect, send RUN, and read STARTED. Same order of magnitude as {@code startDaemon}. */
+    static final int HANDSHAKE_TIMEOUT_MILLIS = 20_000;
+
+    enum DirectKind {
+        /** Direct launch was not attempted. The caller uses the wrapper. */
+        SKIPPED,
+        /** The warm JVM never acknowledged the run. The caller may start a fresh JVM. */
+        MISSED,
+        /** STARTED, then EXIT. */
+        COMPLETED,
+        /** STARTED, then the connection dropped. Not a fresh JVM. */
+        INTERRUPTED,
+        /** STARTED, then {@code --run-timeout} expired. Not a fresh JVM. */
+        TIMED_OUT
+    }
+
+    record DirectAttempt(DirectKind kind, int exit) {
+        static DirectAttempt skipped() {
+            return new DirectAttempt(DirectKind.SKIPPED, 0);
+        }
+
+        static DirectAttempt missed() {
+            return new DirectAttempt(DirectKind.MISSED, 0);
+        }
+
+        static DirectAttempt completed(int exit) {
+            return new DirectAttempt(DirectKind.COMPLETED, exit);
+        }
+
+        static DirectAttempt interrupted() {
+            return new DirectAttempt(DirectKind.INTERRUPTED, 1);
+        }
+
+        static DirectAttempt timedOut() {
+            return new DirectAttempt(DirectKind.TIMED_OUT, 1);
+        }
+
+        boolean acknowledged() {
+            return kind == DirectKind.COMPLETED || kind == DirectKind.INTERRUPTED || kind == DirectKind.TIMED_OUT;
+        }
+    }
 
     private static final ThreadLocal<Boolean> DIRECT = ThreadLocal.withInitial(() -> Boolean.FALSE);
 
@@ -190,23 +233,45 @@ public final class WorkbenchSpeed {
 
     /**
      * Runs the launch on the warm JVM when the classpath cache hits.
-     * Empty means the caller must use the wrapper.
+     * {@link DirectKind#SKIPPED} and {@link DirectKind#MISSED} mean the caller
+     * must use the wrapper. An acknowledged run must not be started again.
      */
-    static Optional<Integer> tryDirect(Path project, List<String> command, PrintStream out, PrintStream err) {
-        if (!directEnabled() || project == null || !cacheHit(project)) return Optional.empty();
+    static DirectAttempt tryDirect(
+            Path project,
+            List<String> command,
+            PrintStream out,
+            PrintStream err,
+            Long runTimeoutSeconds
+    ) {
+        if (!directEnabled() || project == null || !cacheHit(project)) return DirectAttempt.skipped();
         long started = System.nanoTime();
+        DirectAttempt warm;
         try {
-            Optional<Integer> warm = warmRun(project, command, out, err);
-            long elapsed = (System.nanoTime() - started) / 1_000_000L;
-            if (warm.isPresent()) {
-                WorkbenchLaunchTiming.note(AgentRun.folder(project, runIdOf(command)), "direct", "run elapsedMs=" + elapsed);
-                return warm;
-            }
+            warm = warmRun(project, command, out, err, runTimeoutSeconds);
         } catch (RuntimeException failure) {
             if (err != null) err.println("Workbench warm JVM missed: " + failure.getMessage());
+            warm = DirectAttempt.missed();
         }
-        WorkbenchLaunchTiming.note(AgentRun.folder(project, runIdOf(command)), "fallback", "fresh-jvm");
-        return Optional.empty();
+        long elapsed = Math.max(0L, (System.nanoTime() - started) / 1_000_000L);
+        return record(project, command, warm, elapsed);
+    }
+
+    /**
+     * Same decision {@link #tryDirect} records. A stub server calls this with
+     * {@link #exchange} so a short handshake timeout can prove the fallback.
+     */
+    static DirectAttempt record(Path project, List<String> command, DirectAttempt attempt, long elapsedMs) {
+        if (attempt == null) attempt = DirectAttempt.missed();
+        Path folder = AgentRun.folder(project, runIdOf(command));
+        switch (attempt.kind()) {
+            case COMPLETED -> WorkbenchLaunchTiming.note(folder, "direct", "run elapsedMs=" + elapsedMs);
+            case TIMED_OUT -> WorkbenchLaunchTiming.note(folder, "direct", "timeout elapsedMs=" + elapsedMs);
+            case INTERRUPTED -> WorkbenchLaunchTiming.note(folder, "direct", "interrupted elapsedMs=" + elapsedMs);
+            case MISSED -> WorkbenchLaunchTiming.note(folder, "fallback", "fresh-jvm");
+            case SKIPPED -> {
+            }
+        }
+        return attempt;
     }
 
     static boolean cacheHit(Path project) {
@@ -224,40 +289,129 @@ public final class WorkbenchSpeed {
         }
     }
 
-    private static Optional<Integer> warmRun(Path project, List<String> command, PrintStream out, PrintStream err) {
+    private static DirectAttempt warmRun(
+            Path project,
+            List<String> command,
+            PrintStream out,
+            PrintStream err,
+            Long runTimeoutSeconds
+    ) {
         String watch = InputFingerprint.watchHash(project);
         Path state = state(project);
         Optional<WarmProcess.Handle> reusable = WarmProcess.reusable(state, watch);
         if (reusable.isEmpty()) {
             stopStale(state);
-            if (!startDaemon(project, state, watch)) return Optional.empty();
+            if (!startDaemon(project, state, watch)) return DirectAttempt.missed();
             reusable = WarmProcess.reusable(state, watch);
         }
-        if (reusable.isEmpty()) return Optional.empty();
+        if (reusable.isEmpty()) return DirectAttempt.missed();
         WarmProcess.Handle handle = reusable.get();
-        try (Socket socket = new Socket(InetAddress.getLoopbackAddress(), handle.port())) {
-            socket.setSoTimeout((int) TimeUnit.MINUTES.toMillis(10));
+        Long runTimeoutMillis = null;
+        if (runTimeoutSeconds != null && runTimeoutSeconds > 0) {
+            try {
+                runTimeoutMillis = Math.multiplyExact(runTimeoutSeconds, 1000L);
+            } catch (ArithmeticException overflow) {
+                runTimeoutMillis = (long) Integer.MAX_VALUE;
+            }
+        }
+        return exchange(
+                handle.port(),
+                command,
+                project,
+                WarmProcess.liveOwner(state),
+                out,
+                err,
+                HANDSHAKE_TIMEOUT_MILLIS,
+                runTimeoutMillis,
+                state
+        );
+    }
+
+    /**
+     * One RUN on an already-open warm port. {@code releaseState} is killed only
+     * when the run was never acknowledged. A handshake timeout is not proof
+     * that a long run failed.
+     */
+    static DirectAttempt exchange(
+            int port,
+            List<String> command,
+            Path project,
+            long ownerPid,
+            PrintStream out,
+            PrintStream err,
+            int handshakeTimeoutMillis,
+            Long runTimeoutMillis,
+            Path releaseState
+    ) {
+        boolean acknowledged = false;
+        try (Socket socket = new Socket(InetAddress.getLoopbackAddress(), port)) {
+            socket.setSoTimeout(handshakeTimeoutMillis);
             PrintWriter writer = new PrintWriter(new OutputStreamWriter(socket.getOutputStream(), StandardCharsets.UTF_8), true);
             writer.println("RUN");
             for (String token : WorkbenchDirectRun.dashD(command)) writer.println(token);
             writer.println(".");
-            writer.println(project.toAbsolutePath().normalize());
-            writer.println(Long.toString(WarmProcess.liveOwner(state)));
+            writer.println(project == null ? "" : project.toAbsolutePath().normalize());
+            writer.println(Long.toString(ownerPid));
             BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8));
             String status = reader.readLine();
-            if (status == null || !status.startsWith("EXIT ")) return Optional.empty();
-            int exit = Integer.parseInt(status.substring("EXIT ".length()).trim());
+            if (status == null) {
+                releaseQuietly(releaseState);
+                return DirectAttempt.missed();
+            }
+            if (!"STARTED".equals(status.trim())) {
+                // A clean EXIT without STARTED is a rejection. Leave the JVM up.
+                if (!status.startsWith("EXIT ")) releaseQuietly(releaseState);
+                return DirectAttempt.missed();
+            }
+            acknowledged = true;
+            if (runTimeoutMillis != null && runTimeoutMillis > 0) {
+                long capped = Math.min(runTimeoutMillis, Integer.MAX_VALUE);
+                socket.setSoTimeout((int) capped);
+            } else {
+                socket.setSoTimeout(0);
+            }
+            String exitLine = reader.readLine();
+            if (exitLine == null || !exitLine.startsWith("EXIT ")) {
+                noteInterrupted(err);
+                return DirectAttempt.interrupted();
+            }
+            int exit = Integer.parseInt(exitLine.substring("EXIT ".length()).trim());
             StringBuilder captured = new StringBuilder();
             String line;
             while ((line = reader.readLine()) != null && !"END".equals(line)) {
                 captured.append(line).append(System.lineSeparator());
             }
             if (out != null && captured.length() > 0) out.print(captured);
-            return Optional.of(exit);
+            return DirectAttempt.completed(exit);
+        } catch (SocketTimeoutException timeout) {
+            if (acknowledged) {
+                if (err != null) {
+                    err.println("error: warm run timed out after the warm JVM accepted it");
+                    err.println("fix: raise --run-timeout. This selection was not started again.");
+                }
+                return DirectAttempt.timedOut();
+            }
+            releaseQuietly(releaseState);
+            return DirectAttempt.missed();
         } catch (Exception failure) {
-            WarmProcess.release(state);
-            return Optional.empty();
+            if (acknowledged) {
+                noteInterrupted(err);
+                return DirectAttempt.interrupted();
+            }
+            releaseQuietly(releaseState);
+            return DirectAttempt.missed();
         }
+    }
+
+    private static void noteInterrupted(PrintStream err) {
+        if (err == null) return;
+        err.println("error: warm run was accepted and then the connection dropped");
+        err.println("fix: this selection was not started again.");
+    }
+
+    private static void releaseQuietly(Path state) {
+        if (state == null) return;
+        WarmProcess.release(state);
     }
 
     private static void stopStale(Path state) {

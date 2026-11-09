@@ -137,7 +137,7 @@ public final class WorkbenchWarmMain {
         System.exit(0);
     }
 
-    private static void serve(Socket socket) throws Exception {
+    static void serve(Socket socket) throws Exception {
         socket.setSoTimeout(180_000);
         BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8));
         PrintWriter writer = new PrintWriter(new OutputStreamWriter(socket.getOutputStream(), StandardCharsets.UTF_8), true);
@@ -158,6 +158,11 @@ public final class WorkbenchWarmMain {
         while ((line = reader.readLine()) != null && !".".equals(line)) dashD.add(line);
         String projectLine = reader.readLine();
         adoptParent(reader.readLine());
+        if (busy) {
+            writer.println("EXIT 2");
+            writer.println("END");
+            return;
+        }
         Path project = projectLine == null || projectLine.isBlank() ? Path.of("") : Path.of(projectLine);
         ByteArrayOutputStream captured = new ByteArrayOutputStream();
         PrintStream tee = new PrintStream(captured, true, StandardCharsets.UTF_8);
@@ -168,6 +173,7 @@ public final class WorkbenchWarmMain {
         ClassLoader previous = Thread.currentThread().getContextClassLoader();
         busy = true;
         try {
+            writer.println("STARTED");
             System.setOut(tee);
             System.setErr(tee);
             Thread.currentThread().setContextClassLoader(loader);
@@ -191,6 +197,11 @@ public final class WorkbenchWarmMain {
             writer.println(capturedLine);
         }
         writer.println("END");
+    }
+
+    /** Tests mark an in-flight run so a second {@code RUN} is rejected. */
+    static void setBusy(boolean value) {
+        busy = value;
     }
 
     private static void adoptParent(String line) {
