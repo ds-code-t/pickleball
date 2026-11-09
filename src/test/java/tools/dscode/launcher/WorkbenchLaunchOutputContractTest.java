@@ -302,6 +302,7 @@ class WorkbenchLaunchOutputContractTest {
                 writeFailedIndex(Path.of(project), runId);
             }
             PrintWriter writer = new PrintWriter(new OutputStreamWriter(socket.getOutputStream(), StandardCharsets.UTF_8), true);
+            writer.println("STARTED");
             writer.println("EXIT 1");
             writer.println(MARKER_LINE);
             writer.println("plain-worker-line");
