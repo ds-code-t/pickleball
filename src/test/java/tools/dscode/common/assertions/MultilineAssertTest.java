@@ -100,6 +100,36 @@ class MultilineAssertTest {
     }
 
     @Test
+    void trailingLineBreakOnASingleLineValueMatches216() {
+        ValueWrapper actual = createValueWrapper(
+                "\"Please select one customer for each individual and submit.\n\"");
+        ValueWrapper expected = createValueWrapper(
+                "\"Please select one customer for each individual and submit.\"");
+        assertTrue(ValueWrapperComparisons.equals(actual, expected));
+        assertTrue(ValueWrapperComparisons.equals(
+                createValueWrapper("\"submit.\r\n\""),
+                createValueWrapper("\"submit.\"")));
+        assertTrue(ValueWrapperComparisons.endsWith(
+                createValueWrapper("\"foo.\n\""),
+                createValueWrapper("\"foo.\"")));
+        assertTrue(ValueWrapperComparisons.equals(
+                createValueWrapper("\"line one\nline two\n\""),
+                createValueWrapper("\"line one\nline two\"")));
+        assertFalse(ValueWrapperComparisons.equals(
+                createValueWrapper("\"line one\nline two\""),
+                createValueWrapper("\"line one line two\"")));
+        assertFalse(ValueWrapperComparisons.equals(
+                createValueWrapper("\"line one\nline  two\""),
+                createValueWrapper("\"line one\nline two\"")));
+        assertFalse(ValueWrapperComparisons.equals(
+                createValueWrapper("`foo.\n`"),
+                createValueWrapper("`foo.`")));
+        assertFalse(ValueWrapperComparisons.equals(
+                createValueWrapper("`foo.\n`"),
+                createValueWrapper("\"foo.\"")));
+    }
+
+    @Test
     void quoteParserKeepsANewlineInsideOneSpan() {
         QuoteParser parsed = new QuoteParser("\"" + LINES + "\" contains \"line two\"");
         assertTrue(parsed.values().stream().anyMatch(value -> value.contains("\n") && value.contains("line two")),

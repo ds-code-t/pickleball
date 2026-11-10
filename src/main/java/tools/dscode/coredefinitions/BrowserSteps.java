@@ -66,29 +66,29 @@ public class BrowserSteps {
         return webDriver;
     }
 
-    @Given(ObjectRegistrationSteps.objCreation + "CREATE_DRIVER$")
+    @Given("(?i)^\u207A_OCCREATE_DRIVER$")
     public RemoteWebDriver createDriver(ObjectNode configuration) throws Exception {
         return DriverConstruction.createDriver(configuration);
     }
 
-    @Given(ObjectRegistrationSteps.objCreation + "CREATE_LOCAL_DRIVER$")
+    @Given("(?i)^\u207A_OCCREATE_LOCAL_DRIVER$")
     public RemoteWebDriver createLocalDriver(ObjectNode configuration) throws Exception {
         return DriverConstruction.createLocalDriver(configuration);
     }
 
-    @Given(ObjectRegistrationSteps.objCreation + "CREATE_REMOTE_DRIVER$")
+    @Given("(?i)^\u207A_OCCREATE_REMOTE_DRIVER$")
     public RemoteWebDriver createRemoteDriver(ObjectNode configuration) throws Exception {
         return DriverConstruction.createRemoteDriver(configuration);
     }
 
-    @Given(ObjectRegistrationSteps.objAction + "NAVIGATE: (.*)$")
+    @Given("(?i)^\u207A_AENAVIGATE: (.*)$")
     public Object navigate(String address, Object value) {
         RemoteWebDriver driver = (RemoteWebDriver) value;
         navigateWithBlocker(driver, address);
         return value;
     }
 
-    @Given(ObjectRegistrationSteps.objAction + "MAXIMIZE$")
+    @Given("(?i)^\u207A_AEMAXIMIZE$")
     public Object maximize(Object value) {
         RemoteWebDriver driver = (RemoteWebDriver) value;
         try {
@@ -99,7 +99,7 @@ public class BrowserSteps {
         return value;
     }
 
-    @Given(ObjectRegistrationSteps.objAction + "MINIMIZE$")
+    @Given("(?i)^\u207A_AEMINIMIZE$")
     public Object minimize(Object value) {
         RemoteWebDriver driver = (RemoteWebDriver) value;
         try {
@@ -110,77 +110,77 @@ public class BrowserSteps {
         return value;
     }
 
-    @Given(ObjectRegistrationSteps.objAction + "FULLSCREEN$")
+    @Given("(?i)^\u207A_AEFULLSCREEN$")
     public Object fullscreen(Object value) {
         RemoteWebDriver driver = (RemoteWebDriver) value;
         driver.manage().window().fullscreen();
         return value;
     }
 
-    @Given(ObjectRegistrationSteps.objAction + "CLEAR_COOKIES$")
+    @Given("(?i)^\u207A_AECLEAR_COOKIES$")
     public Object clearCookies(Object value) {
         RemoteWebDriver driver = (RemoteWebDriver) value;
         driver.manage().deleteAllCookies();
         return value;
     }
 
-    @Given(ObjectRegistrationSteps.objAction + "IMPLICIT_WAIT: (\\d+)$")
+    @Given("(?i)^\u207A_AEIMPLICIT_WAIT: (\\d+)$")
     public Object implicitWait(long millis, Object value) {
         RemoteWebDriver driver = (RemoteWebDriver) value;
         driver.manage().timeouts().implicitlyWait(Duration.ofMillis(millis));
         return value;
     }
 
-    @Given(ObjectRegistrationSteps.objAction + "PAGE_LOAD_TIMEOUT: (\\d+)$")
+    @Given("(?i)^\u207A_AEPAGE_LOAD_TIMEOUT: (\\d+)$")
     public Object pageLoadTimeout(long millis, Object value) {
         RemoteWebDriver driver = (RemoteWebDriver) value;
         driver.manage().timeouts().pageLoadTimeout(Duration.ofMillis(millis));
         return value;
     }
 
-    @Given(ObjectRegistrationSteps.objAction + "SCRIPT_TIMEOUT: (\\d+)$")
+    @Given("(?i)^\u207A_AESCRIPT_TIMEOUT: (\\d+)$")
     public Object scriptTimeout(long millis, Object value) {
         RemoteWebDriver driver = (RemoteWebDriver) value;
         driver.manage().timeouts().scriptTimeout(Duration.ofMillis(millis));
         return value;
     }
 
-    @Given(ObjectRegistrationSteps.objAction + "ENABLE_LOCAL_FILE_DETECTOR$")
+    @Given("(?i)^\u207A_AEENABLE_LOCAL_FILE_DETECTOR$")
     public Object enableLocalFileDetector(Object value) {
         RemoteWebDriver driver = (RemoteWebDriver) value;
         driver.setFileDetector(new LocalFileDetector());
         return value;
     }
 
-    @Given(ObjectRegistrationSteps.objAction + "SET_WINDOW_SIZE: (\\d+)x(\\d+)$")
+    @Given("(?i)^\u207A_AESET_WINDOW_SIZE: (\\d+)x(\\d+)$")
     public Object setWindowSize(int width, int height, Object value) {
         RemoteWebDriver driver = (RemoteWebDriver) value;
         driver.manage().window().setSize(new Dimension(width, height));
         return value;
     }
 
-    @Given(ObjectRegistrationSteps.objAction + "REFRESH$")
+    @Given("(?i)^\u207A_AEREFRESH$")
     public Object refresh(Object value) {
         RemoteWebDriver driver = (RemoteWebDriver) value;
         driver.navigate().refresh();
         return value;
     }
 
-    @Given(ObjectRegistrationSteps.objAction + "BACK$")
+    @Given("(?i)^\u207A_AEBACK$")
     public Object back(Object value) {
         RemoteWebDriver driver = (RemoteWebDriver) value;
         driver.navigate().back();
         return value;
     }
 
-    @Given(ObjectRegistrationSteps.objAction + "FORWARD$")
+    @Given("(?i)^\u207A_AEFORWARD$")
     public Object forward(Object value) {
         RemoteWebDriver driver = (RemoteWebDriver) value;
         driver.navigate().forward();
         return value;
     }
 
-    @Given(ObjectRegistrationSteps.objAction + "QUIT_LOCAL_DRIVER$")
+    @Given("(?i)^\u207A_AEQUIT_LOCAL_DRIVER$")
     public Object quitLocalDriver(Object value) {
         RemoteWebDriver driver = (RemoteWebDriver) value;
         driver.quit();

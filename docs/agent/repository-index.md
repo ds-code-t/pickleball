@@ -50,6 +50,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/java-values.md`
 - `docs/key-parser-dsl.md`
 - `docs/log-and-assert-steps.md`
+- `docs/maintainer/2.1.18-consumer-issues-2026-11-09.md`
 - `docs/maintainer/2.1.18-consumer-report-2.md`
 - `docs/maintainer/2.1.18-consumer-report-fixes.md`
 - `docs/maintainer/2.1.18-locked-build-prompt.md`
@@ -68,6 +69,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/maintainer/2.1.18-wb-first-start-timing-p2-roadmap.md`
 - `docs/maintainer/2.1.18-wb-first-start-timing-roadmap.md`
 - `docs/maintainer/2.1.18-wb-open-issues-roadmap.md`
+- `docs/maintainer/2.1.19-issuefix-roadmap.md`
 - `docs/maintainer/consumer-sim-harness.md`
 - `docs/maintainer/guidance-goldens.md`
 - `docs/maintainer/pointer-eval-harness.md`
@@ -551,6 +553,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/WorkbenchStructuredErrorTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchTagFallbackTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchValidateTest.java`
+- `src/test/java/tools/dscode/launcher/WorkbenchWarmFallbackTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchWarmLifecycleTest.java`
 - `src/test/java/tools/dscode/launcher/WorkspaceLaunchForkTest.java`
 - `src/test/java/tools/dscode/parallelutilities/ParallelCountEstimatorTest.java`

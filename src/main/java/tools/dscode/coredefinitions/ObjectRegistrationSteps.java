@@ -50,7 +50,7 @@ public class ObjectRegistrationSteps {
         return removeScenarioObjectByKey(pathKey);
     }
 
-    @Given(objRegistration + "(.+)$")
+    @Given("(?i)^\u207A_OR(.+)$")
     public static Object constructObjectFromParsingMap(String pathKey) {
         if (pathKey == null || pathKey.isBlank()) {
             throw new IllegalArgumentException("Object construction path cannot be null or blank");

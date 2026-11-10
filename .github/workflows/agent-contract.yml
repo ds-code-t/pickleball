@@ -5,7 +5,7 @@ on:
   push:
     branches:
       - master
-      - 2.1.18
+      - 2.1.19
   workflow_dispatch:
 
 permissions:

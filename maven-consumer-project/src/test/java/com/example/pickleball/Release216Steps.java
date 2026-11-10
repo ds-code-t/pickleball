@@ -124,7 +124,7 @@ public final class Release216Steps {
         EXPECTED_CLEANUP.set(token);
     }
 
-    @Given(ObjectRegistrationSteps.objAction + "MARK_RELEASE_216: (.+)$")
+    @Given("(?i)^\u207A_AEMARK_RELEASE_216: (.+)$")
     public static void markRelease216(String token, Object registered) {
         if (!(registered instanceof Marker marker) || !token.equals(marker.token)) {
             throw new AssertionError("Registered-object cleanup did not receive the scenario object.");

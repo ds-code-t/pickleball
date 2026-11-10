@@ -9,6 +9,8 @@ import tools.dscode.common.treeparsing.parsedComponents.phraseoperations.PlaceHo
 import tools.dscode.common.treeparsing.preparsing.LineData;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -30,6 +32,33 @@ class PhraseSyntaxTest {
                 () -> save.actionOperation.execute(save)
         );
         assertEquals("syntax error: missing value", stripped.getMessage());
+    }
+
+    @Test
+    void displaysIsASyntaxErrorNotANullOperation() {
+        LineData line = new SaveLine("the Cell displays \"hello\"");
+        Phrase cell = new Phrase("the Cell displays \"hello\"", '.', line, null, false);
+        assertNull(cell.actionOperation);
+        assertNull(cell.assertionOperation);
+
+        IllegalArgumentException operation = assertThrows(IllegalArgumentException.class, cell::runOperation);
+        assertClear(operation);
+
+        IllegalArgumentException until = assertThrows(IllegalArgumentException.class, cell::runUntilOperation);
+        assertClear(until);
+    }
+
+    private static void assertClear(IllegalArgumentException error) {
+        String message = error.getMessage();
+        assertTrue(message.contains("displays"), message);
+        assertTrue(message.contains("no comparison or action word"), message);
+        assertTrue(message.contains("equals"), message);
+        assertTrue(message.contains("contains"), message);
+        assertTrue(message.contains("starts with"), message);
+        assertTrue(message.contains("ends with"), message);
+        assertTrue(message.contains("displayed"), message);
+        assertFalse(message.contains("\"operation\" is null"), message);
+        assertTrue(error instanceof IllegalArgumentException);
     }
 
     private static final class SaveLine extends LineData {

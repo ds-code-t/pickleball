@@ -46,7 +46,7 @@ public final class ExpectedFailureSteps {
         snapshot.expectedCleanup = token;
     }
 
-    @Given(ObjectRegistrationSteps.objAction + "MARK_EXPECTED_FAILURE: (.+)$")
+    @Given("(?i)^\u207A_AEMARK_EXPECTED_FAILURE: (.+)$")
     public static void markExpectedFailure(String token, Object registered) {
         if (!(registered instanceof Marker marker) || !token.equals(marker.token)) {
             throw new AssertionError("Registered-object cleanup did not receive the scenario object.");

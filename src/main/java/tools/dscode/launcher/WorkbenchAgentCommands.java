@@ -551,21 +551,9 @@ public final class WorkbenchAgentCommands {
             ByteArrayOutputStream capturedErr = new ByteArrayOutputStream();
             PrintStream captureOut = new PrintStream(capturedOut, true, StandardCharsets.UTF_8);
             PrintStream captureErr = new PrintStream(capturedErr, true, StandardCharsets.UTF_8);
-            java.util.Optional<Integer> direct = WorkbenchSpeed.tryDirect(
-                    parsed.project(), command, captureOut, captureErr
+            Bounded mavenResult = directOrFallback(
+                    parsed, run, command, out, err, capturedOut, capturedErr, captureOut, captureErr, maven
             );
-            boolean trustedDirect = direct.isPresent() && (direct.get() == 0
-                    || AgentCoordination.findRunIndex(parsed.project(), run.runId()) != null);
-            Bounded mavenResult;
-            if (trustedDirect) {
-                mavenResult = new Bounded(direct.get(), false);
-                launchNote(parsed.project(), run.runId(), "maven-done", "direct exit=" + direct.get());
-            } else {
-                if (direct.isPresent()) launchNote(parsed.project(), run.runId(), "fallback", "fresh-jvm");
-                launchNote(parsed.project(), run.runId(), "maven-start", "");
-                mavenResult = runWithOnlineFallback(parsed, run.runId(), command, out, err, capturedOut, capturedErr, maven);
-                launchNote(parsed.project(), run.runId(), "maven-done", "exit=" + mavenResult.exit() + " timedOut=" + mavenResult.timedOut());
-            }
             if (mavenResult.timedOut()) {
                 publishQuietly(parsed, run, selection, capturedOut, capturedErr, "TIMEOUT", environment, browser, out, err, null);
                 return timeoutExit(parsed, run, out, err);
@@ -694,21 +682,9 @@ public final class WorkbenchAgentCommands {
             ByteArrayOutputStream capturedErr = new ByteArrayOutputStream();
             PrintStream captureOut = new PrintStream(capturedOut, true, StandardCharsets.UTF_8);
             PrintStream captureErr = new PrintStream(capturedErr, true, StandardCharsets.UTF_8);
-            java.util.Optional<Integer> direct = WorkbenchSpeed.tryDirect(
-                    parsed.project(), command, captureOut, captureErr
+            Bounded mavenResult = directOrFallback(
+                    parsed, run, command, out, err, capturedOut, capturedErr, captureOut, captureErr, maven
             );
-            boolean trustedDirect = direct.isPresent() && (direct.get() == 0
-                    || AgentCoordination.findRunIndex(parsed.project(), run.runId()) != null);
-            Bounded mavenResult;
-            if (trustedDirect) {
-                mavenResult = new Bounded(direct.get(), false);
-                launchNote(parsed.project(), run.runId(), "maven-done", "direct exit=" + direct.get());
-            } else {
-                if (direct.isPresent()) launchNote(parsed.project(), run.runId(), "fallback", "fresh-jvm");
-                launchNote(parsed.project(), run.runId(), "maven-start", "");
-                mavenResult = runWithOnlineFallback(parsed, run.runId(), command, out, err, capturedOut, capturedErr, maven);
-                launchNote(parsed.project(), run.runId(), "maven-done", "exit=" + mavenResult.exit() + " timedOut=" + mavenResult.timedOut());
-            }
             if (mavenResult.timedOut()) {
                 publishQuietly(parsed, run, selection, capturedOut, capturedErr, "TIMEOUT", environment, browser, out, err, null);
                 return timeoutExit(parsed, run, out, err);
@@ -742,6 +718,52 @@ public final class WorkbenchAgentCommands {
     }
 
     private record Bounded(int exit, boolean timedOut) {
+    }
+
+    /**
+     * Warm path first. A run the warm JVM has accepted is never started again,
+     * including a timeout or a dropped connection. A busy rejection is also
+     * final: that selection is not started on a fresh JVM. A miss before
+     * acknowledgement still uses the wrapper.
+     */
+    private static Bounded directOrFallback(
+            WorkbenchCommandLine.Parsed parsed,
+            AgentCoordination.Run run,
+            List<String> command,
+            PrintStream out,
+            PrintStream err,
+            ByteArrayOutputStream capturedOut,
+            ByteArrayOutputStream capturedErr,
+            PrintStream captureOut,
+            PrintStream captureErr,
+            MavenRunner maven
+    ) {
+        WorkbenchSpeed.DirectAttempt direct = WorkbenchSpeed.tryDirect(
+                parsed.project(), command, captureOut, captureErr, parsed.runTimeoutSeconds()
+        );
+        if (direct.kind() == WorkbenchSpeed.DirectKind.TIMED_OUT) {
+            return new Bounded(direct.exit(), true);
+        }
+        if (direct.preventFallback()) {
+            String detail = switch (direct.kind()) {
+                case INTERRUPTED -> "direct interrupted";
+                case REJECTED -> "direct rejected";
+                default -> "direct exit=" + direct.exit();
+            };
+            launchNote(parsed.project(), run.runId(), "maven-done", detail);
+            return new Bounded(direct.exit(), false);
+        }
+        launchNote(parsed.project(), run.runId(), "maven-start", "");
+        Bounded mavenResult = runWithOnlineFallback(
+                parsed, run.runId(), command, out, err, capturedOut, capturedErr, maven
+        );
+        launchNote(
+                parsed.project(),
+                run.runId(),
+                "maven-done",
+                "exit=" + mavenResult.exit() + " timedOut=" + mavenResult.timedOut()
+        );
+        return mavenResult;
     }
 
     /**
