@@ -131,7 +131,7 @@ public class GeneralSteps extends CoreSteps {
     }
 
 
-    @Given("^" + SCENARIO_STEP + "\\s*(?:.*)$")
+    @Given("^\uFEFF\u200B\u00A0\u200C\uFEFFSCENARIO: \\s*(?:.*)$")
     public static void scenarioStep() {
 
     }
@@ -148,7 +148,7 @@ public class GeneralSteps extends CoreSteps {
 
 
     @DefinitionFlags(DefinitionFlag.RUN_METHOD_DIRECTLY)
-    @Given(ROOT_STEP)
+    @Given("\uFEFF\u200B\u00A0\u200C\uFEFF-ROOT-STEP-")
     public static void rootStep() throws Exception {
         getCurrentScenarioState().startScenarioRun();
     }
@@ -231,11 +231,11 @@ public class GeneralSteps extends CoreSteps {
         return primary;
     }
 
-    @Given("^" + INFO_STEP + "(.*)$")
+    @Given("^\uFEFF\u200B\u00A0\u200CINFO: (.*)$")
     public static void infoStep(String message) {
         logInfo(message);
     }
-    @Given("^" + HARD_ERROR_STEP + "(.*)$")
+    @Given("^\uFEFF\u200B\u00A0\u200CFAIL ERROR: (.*)$")
     public static void hardFailStep(String message) {
         Throwable throwable = removeRegisteredThrowable(message);
 
@@ -254,7 +254,7 @@ public class GeneralSteps extends CoreSteps {
         throw new RuntimeException(throwable.getMessage(), throwable);
     }
 
-    @Given("^" + SOFT_ERROR_STEP + "(.*)$")
+    @Given("^\uFEFF\u200B\u00A0\u200CERROR: (.*)$")
     public static void softFailStep(String message) {
         Throwable throwable = removeRegisteredThrowable(message);
 
@@ -291,7 +291,7 @@ public class GeneralSteps extends CoreSteps {
 
 
     @DefinitionFlags(_DEBUG_LOGGING)
-    @Given(NEXT_SIBLING_STEP)
+    @Given("\u207ANXT")
     public static void NEXT_SIBLING_STEP() {
 
     }

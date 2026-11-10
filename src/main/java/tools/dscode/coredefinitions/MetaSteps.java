@@ -11,14 +11,14 @@ public class MetaSteps  extends CoreSteps {
 
     public static final String RUN_SCENARIO = "\u207A RUN SCENARIO:";
 
-    @Given("^" + RUN_SCENARIO + "(.*)$")
+    @Given("^\u207A RUN SCENARIO:(.*)$")
     public static void runScenario(String scenarioName) {
 
         // place Holder
     }
 
 
-    @Given("^" + defaultMatchFlag + "(.*)$")
+    @Given("^\u207A-DEFAULT_DEFINITION_(.*)$")
     public static void matchDefault(String text) {
 
     }
