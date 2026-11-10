@@ -49,7 +49,7 @@ public class ModularScenarios extends CoreSteps {
     static final String DEFAULT_COMPONENT_PATH = "src/test/resources/component";
     static final String RUN_TYPE_PATTERN =
             "SCENARIOS?|COMPONENT SCENARIOS?|COMPONENTS?|SERVICE CALLS?|SERVICES?|CALLS?";
-    @Given("^RUN\\s*(?:\"([^\"]+)\"\\s+)?(?:(" + RUN_TYPE_PATTERN + "))?(?::(.*))?$")
+    @Given("^RUN\\s*(?:\"([^\"]+)\"\\s+)?(?:(SCENARIOS?|COMPONENT SCENARIOS?|COMPONENTS?|SERVICE CALLS?|SERVICES?|CALLS?))?(?::(.*))?$")
     public static void runScenarios(
             String inlineRunKey,
             String runTypeText,

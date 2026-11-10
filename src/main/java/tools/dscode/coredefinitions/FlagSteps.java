@@ -16,42 +16,42 @@ public class FlagSteps  extends CoreSteps {
 
 
 
-    @Given("^" + ALWAYS_RUN + "(?: AND IGNORE FAILURES|\\s*:.*)?$")
+    @Given("^ALWAYS RUN(?: AND IGNORE FAILURES|\\s*:.*)?$")
     public static void flagStep_AlwaysRun() {
 
     }
 
-    @Given("^" + RUN_IF_SCENARIO_PASSING + "(?:(?: AND SCENARIO FINISHED)?(?: AND IGNORE FAILURES)?|\\s*:.*)$")
+    @Given("^RUN IF SCENARIO PASSING(?:(?: AND SCENARIO FINISHED)?(?: AND IGNORE FAILURES)?|\\s*:.*)$")
     public static void flagStep_RunIfPassed() {
 
     }
 
-    @Given("^" + RUN_IF_SCENARIO_FAILED + "(?:\\s*:.*)?$")
+    @Given("^RUN IF SCENARIO FAILED(?:\\s*:.*)?$")
     public static void flagStep_RunOnFail() {
 
     }
 
-    @Given("^" + RUN_IF_SCENARIO_HARD_FAILED + "(?:\\s*:.*)?$")
+    @Given("^RUN IF SCENARIO HARD FAILED(?:\\s*:.*)?$")
     public static void flagStep_RunOnHardFail() {
 
     }
 
-    @Given("^" + RUN_IF_SCENARIO_SOFT_FAILED + "(?:\\s*:.*)?$")
+    @Given("^RUN IF SCENARIO SOFT FAILED(?:\\s*:.*)?$")
     public static void flagStep_RunOnSoftFail() {
 
     }
 
-    @Given(IGNORE_FAILURES)
+    @Given("IGNORE FAILURES")
     public static void flagStep_IgnoreFailures() {
 
     }
 
-    @Given(LOG_FAILURES_BUT_CONTINUE_SCENARIO)
+    @Given("LOG FAILURES BUT CONTINUE SCENARIO")
     public static void flagStep_LogFailuresButContinue() {
 
     }
 
-    @Given(RUN_IF_SCENARIO_FINISHED)
+    @Given("RUN IF SCENARIO FINISHED")
     public static void flagStep_RunIfFinished() {
 
     }
