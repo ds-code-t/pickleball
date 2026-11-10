@@ -599,6 +599,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/WorkbenchStructuredErrorTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchTagFallbackTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchValidateTest.java`
+- `src/test/java/tools/dscode/launcher/WorkbenchWarmFallbackTest.java`
 - `src/test/java/tools/dscode/launcher/WorkbenchWarmLifecycleTest.java`
 - `src/test/java/tools/dscode/launcher/WorkspaceLaunchForkTest.java`
 - `src/test/java/tools/dscode/parallelutilities/ParallelCountEstimatorTest.java`
