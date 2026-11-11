@@ -55,6 +55,7 @@ final class DaltonPanel extends JPanel {
         north.add(button("Hydrate", "dalton hydrate", () -> run(DaltonBrowser.hydrate(false), false)));
         north.add(button("Extract", "dalton extract", () -> run(DaltonBrowser.extract(false), false)));
         north.add(button("Conflicts", "dalton conflicts", () -> run(DaltonBrowser.conflicts(), true)));
+        north.add(button("Run", "dalton run", () -> run(DaltonBrowser.run(false), false)));
         north.add(view);
         north.add(new JLabel("Feature"));
         north.add(featurePath);

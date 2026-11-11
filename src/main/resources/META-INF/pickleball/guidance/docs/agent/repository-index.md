@@ -459,7 +459,9 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/dalton/DaltonLog.java`
 - `src/main/java/tools/dscode/dalton/DaltonPaths.java`
 - `src/main/java/tools/dscode/dalton/DaltonQuery.java`
+- `src/main/java/tools/dscode/dalton/DaltonRun.java`
 - `src/main/java/tools/dscode/dalton/DaltonRuntime.java`
+- `src/main/java/tools/dscode/dalton/DaltonRunWorker.java`
 - `src/main/java/tools/dscode/dalton/DaltonSources.java`
 - `src/main/java/tools/dscode/internal/ValuesSupport.java`
 - `src/main/java/tools/dscode/launcher/PickleballWorkbenchLauncher.java`
@@ -600,6 +602,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/dalton/DaltonParseTest.java`
 - `src/test/java/tools/dscode/dalton/DaltonQueryTest.java`
 - `src/test/java/tools/dscode/dalton/DaltonRunProbe.java`
+- `src/test/java/tools/dscode/dalton/DaltonRunTest.java`
 - `src/test/java/tools/dscode/dalton/DaltonScenarioHarness.java`
 - `src/test/java/tools/dscode/expectedfailure/ExpectedFailureRunnerTest.java`
 - `src/test/java/tools/dscode/expectedfailure/ExpectedFailureSteps.java`
@@ -1174,6 +1177,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `scripts/FeatureScanTiming.java`
 - `scripts/refresh_agent_index.py`
 - `scripts/sync_consumer_guidance.py`
+- `scripts/time_dalton_run.py`
 - `scripts/time_feature_scan.py`
 - `scripts/verify_agent_contract.py`
 

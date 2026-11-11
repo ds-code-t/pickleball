@@ -460,6 +460,42 @@ tasks.register('daltonHistory', JavaExec) {
     if (project.hasProperty('daltonMaxBytes')) args += ['--max-bytes=' + project.property('daltonMaxBytes')]
 }
 
+tasks.register('daltonRun', JavaExec) {
+    group = 'dalton'
+    description = 'Forward to the Dalton CLI run command. sqlite-jdbc is on this task classpath only and is not published.'
+    classpath = sourceSets.main.runtimeClasspath + configurations.detachedConfiguration(
+            dependencies.create('org.xerial:sqlite-jdbc:3.47.2.0')
+    )
+    mainClass = 'tools.dscode.dalton.DaltonCli'
+    args = ['dalton', 'run']
+    if (project.hasProperty('daltonTags')) args += ['--tags=' + project.property('daltonTags')]
+    if (project.hasProperty('daltonName')) args += ['--name=' + project.property('daltonName')]
+    if (project.hasProperty('daltonGlue')) args += ['--glue=' + project.property('daltonGlue')]
+    if (project.hasProperty('daltonDryRun')) args += ['--dry-run']
+    doFirst {
+        if (project.hasProperty('daltonDryRun')) return
+        def dir = file('.pickleball/dalton')
+        dir.mkdirs()
+        def joined = sourceSets.test.runtimeClasspath.asPath
+        if (joined.contains(' ')) joined = '"' + joined + '"'
+        new File(dir, 'classpath.cache').text = joined + '\n'
+    }
+}
+
+tasks.register('daltonRunClasspath') {
+    group = 'dalton'
+    description = 'Write the test runtime classpath used by warm dalton run. Does not publish sqlite-jdbc.'
+    def out = layout.buildDirectory.file('dalton-run-classpath.txt')
+    outputs.file(out)
+    doLast {
+        def joined = sourceSets.test.runtimeClasspath.asPath
+        if (joined.contains(' ')) joined = '"' + joined + '"'
+        def destination = out.get().asFile
+        destination.parentFile.mkdirs()
+        destination.text = joined + '\n'
+    }
+}
+
 tasks.register('verifySqliteNotPublished') {
     group = 'verification'
     description = 'sqlite-jdbc stays off the published POM and the consumer shadow JAR.'

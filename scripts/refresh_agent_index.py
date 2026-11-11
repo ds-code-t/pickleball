@@ -118,6 +118,7 @@ GROUPS: tuple[tuple[str, tuple[str, ...]], ...] = (
         "scripts/refresh_agent_index.py",
         "scripts/sync_consumer_guidance.py",
         "scripts/time_feature_scan.py",
+        "scripts/time_dalton_run.py",
         "scripts/FeatureScanTiming.java",
     )),
 )

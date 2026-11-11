@@ -84,5 +84,10 @@ class DaltonBrowserTest {
         assertEquals(
                 "database present  files=2  scenarios=1  conflicts=0  skipped=1",
                 DaltonBrowser.labels("{\"database\":\"present\",\"files\":2,\"scenarios\":1,\"conflicts\":0,\"skipped\":1}").get(0));
+
+        List<String> warm = DaltonCliForwarder.command(jar, project, DaltonBrowser.run(true));
+        assertEquals("run", warm.get(4));
+        assertEquals("--dry-run", warm.get(5));
+        assertTrue(warm.get(6).startsWith("--project="), warm.toString());
     }
 }

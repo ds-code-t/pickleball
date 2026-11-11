@@ -76,6 +76,10 @@ public final class DaltonBrowser {
         return force ? List.of("extract", "--force") : List.of("extract");
     }
 
+    public static List<String> run(boolean dryRun) {
+        return dryRun ? List.of("run", "--dry-run") : List.of("run");
+    }
+
     public static List<String> featureShow(String path) {
         return List.of("features", "show", path, "--json");
     }
