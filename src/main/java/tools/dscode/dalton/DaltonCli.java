@@ -105,7 +105,7 @@ public final class DaltonCli {
                 entity export writes a changed entity back to its file. It is extract limited to dalton-entities/. It refuses when the file and the database both changed. --force overwrites the file from the stored bytes.
                 extract copies stored file bytes back to disk and does not reformat them. hydrate-out is the same command. An unedited row is left untouched. A deleted file is not recreated unless that row was edited or --force is set.
                 history stores a run summary in the database. It does not change diagnostic reports or pkb_reportretention. --from copies outcome and counts from a run-index.json file. retain drops runs older than --days and then the oldest runs until the note, scenario, and message bytes fit --max-bytes.
-                sqlite-jdbc is required only when a command opens the database. It is not published in the Pickleball POM.
+                sqlite-jdbc is required only when a command opens the database. It is not published in the Pickleball POM. When Dalton is enabled and that driver is missing, status, hydrate, extract, and the auto-hydrate hook fail with: Dalton is enabled but org.xerial:sqlite-jdbc is not on the classpath. Add it as testRuntimeOnly / test scope or use the Gradle dalton* tasks. They do not fall back to the files. Gradle dalton* tasks put the driver on their own classpath.
                 feature put writes that .feature text into the database. It sets db_edited, leaves last_synced_hash, and replaces the stored scenarios, steps, tags, docstrings, and data tables in the same transaction. Bad Gherkin is rejected and the previous rows stay. The file is not changed until dalton extract. Use --file for multiline text. dalton scenario put and dalton step put are rejected. A database row whose content hash moved while db_edited is still 0 is an untracked DB edit. hydrate reports it and will not overwrite it unless --force is set.
                 entity put uses that same write, so the entity file row and the entity table stay together.
                 files, features, scenarios, steps, and conflicts are read-only. They do not create a database. --json prints one stable JSON object. Text mode prints labels. conflicts lists an untracked database edit and a row edited on both sides.
@@ -118,6 +118,17 @@ public final class DaltonCli {
         String shown = DaltonPaths.display(project, db);
         boolean present = Files.isRegularFile(db);
         boolean driver = DaltonDatabase.driverPresent();
+        if (!driver && DaltonConfig.enabled(project)) {
+            DaltonLog.log(project, "status", "files", "missing-driver " + shown);
+            if (json) {
+                out.println("{\"database\":\"" + (present ? "present" : "missing") + "\",\"path\":\""
+                        + jsonEscape(shown) + "\",\"driver\":false,\"error\":\""
+                        + jsonEscape(DaltonDatabase.MISSING_DRIVER) + "\"}");
+            } else {
+                out.println(DaltonDatabase.MISSING_DRIVER);
+            }
+            return 1;
+        }
         DaltonLog.log(project, "status", "files", present ? "present " + shown : "missing " + shown);
         List<DaltonSources.Skip> skipped = discoverySkips(project);
         if (!present) {

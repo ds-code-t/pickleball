@@ -59,7 +59,7 @@ public final class DaltonHydrator {
             return new Result(sources.size(), 0, 0, 0, true, List.of(), List.of(), ignored);
         }
         if (!DaltonDatabase.driverPresent()) {
-            throw new SQLException("sqlite-jdbc is not on the classpath");
+            throw new SQLException(DaltonDatabase.MISSING_DRIVER);
         }
         String now = Instant.now().toString();
         try (DaltonDatabase database = DaltonDatabase.open(project)) {

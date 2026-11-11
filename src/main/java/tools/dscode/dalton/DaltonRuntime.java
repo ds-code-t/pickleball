@@ -14,6 +14,9 @@ public final class DaltonRuntime {
 
     public static synchronized void beforeFeatureLoad() {
         if (!DaltonConfig.enabled()) return;
+        if (!DaltonDatabase.driverPresent()) {
+            throw new IllegalStateException(DaltonDatabase.MISSING_DRIVER);
+        }
         if (attempted) return;
         attempted = true;
         try {

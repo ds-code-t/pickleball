@@ -15,6 +15,8 @@ import java.sql.Statement;
  */
 public final class DaltonDatabase implements AutoCloseable {
     public static final int SCHEMA_VERSION = 4;
+    public static final String MISSING_DRIVER =
+            "Dalton is enabled but org.xerial:sqlite-jdbc is not on the classpath. Add it as testRuntimeOnly / test scope or use the Gradle dalton* tasks.";
     static final String DRIVER = "org.sqlite.JDBC";
 
     private final Connection connection;
@@ -36,7 +38,7 @@ public final class DaltonDatabase implements AutoCloseable {
 
     public static DaltonDatabase open(Path project) throws SQLException {
         if (!driverPresent()) {
-            throw new SQLException("sqlite-jdbc is not on the classpath");
+            throw new SQLException(MISSING_DRIVER);
         }
         Path db = DaltonPaths.database(project);
         try {
