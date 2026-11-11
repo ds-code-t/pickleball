@@ -629,6 +629,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/coredefinitions/RunTypeAliasTest.java`
 - `src/test/java/tools/dscode/coredefinitions/XmlTableCellFeatureTest.java`
 - `src/test/java/tools/dscode/coredefinitions/XmlTableCellTest.java`
+- `src/test/java/tools/dscode/dalton/DaltonEdgeTest.java`
 - `src/test/java/tools/dscode/dalton/DaltonEntityTest.java`
 - `src/test/java/tools/dscode/dalton/DaltonExtractTest.java`
 - `src/test/java/tools/dscode/dalton/DaltonFoundationTest.java`

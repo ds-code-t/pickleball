@@ -2,7 +2,7 @@
 
 ## 3.0.0
 
-In progress. Dalton is an opt-in hydrated working copy. Git files stay the source of truth. The database is `.pickleball/dalton/dalton.db`, gitignored, and never required for a fresh clone or CI. With Dalton off, feature loading, configuration, and execution are unchanged.
+Dalton is an opt-in hydrated working copy. Git files stay the source of truth. The database is `.pickleball/dalton/dalton.db`, gitignored, and never required for a fresh clone or CI. With Dalton off, feature loading, configuration, and execution are unchanged. A normal `mvn test` or `gradlew test` does not open that database.
 
 - `dalton status` reports a missing database and does not create one.
 - `dalton hydrate --dry-run` writes nothing. Gradle `daltonStatus` and the Workbench MCP tool `dalton` only forward to that CLI.
