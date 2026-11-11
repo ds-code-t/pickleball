@@ -36,6 +36,7 @@ Dalton is an opt-in hydrated working copy. Git files stay the source of truth. T
 - Phase 8 runs `DynamicControl.executeStep` with no Cucumber scenario on the thread. A live or paused scenario still uses the existing detached step. The control bridge does this only when no scenario lane is active.
 - Phase 9 keeps existing Cucumber and JUnit suites on the adapter. `pkb_engine=native` (else `PKB_ENGINE`, else `engine.properties` `mode=native`) selects the native engine. The default remains `cucumber`.
 - Phase 10 runs steps written during a step. They are not feature files. The step result records `source=runtime`.
+- Phase 11 compares a feature on the Cucumber adapter and the native engine. Plain glue matches. One `ASSERT` step matches. Browser and dynamic-step suites are not switched over. The default engine remains `cucumber`.
 
 ## 2.2.0
 

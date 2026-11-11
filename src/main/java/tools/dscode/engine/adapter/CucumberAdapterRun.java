@@ -9,6 +9,7 @@ import io.cucumber.plugin.event.EventPublisher;
 import io.cucumber.plugin.event.PickleStepTestStep;
 import io.cucumber.plugin.event.TestCaseFinished;
 import io.cucumber.plugin.event.TestCaseStarted;
+import io.cucumber.plugin.event.TestStep;
 import io.cucumber.plugin.event.TestStepFinished;
 import tools.dscode.engine.model.RunResult;
 import tools.dscode.engine.model.ScenarioResult;
@@ -21,45 +22,100 @@ import java.util.List;
 
 /** Runs one feature through Cucumber. Used only by the adapter and the parity harness. */
 public final class CucumberAdapterRun {
+    private static final StringBuilder RECORD = new StringBuilder();
+
     private CucumberAdapterRun() {
     }
 
     public static RunResult run(Path featureFile, String gluePackage) {
-        List<Case> cases = new ArrayList<>();
-        Runtime runtime = Runtime.builder()
-                .withRuntimeOptions(new RuntimeOptionsBuilder()
-                        .addFeature(FeatureWithLines.parse(featureFile.toAbsolutePath().toString()))
-                        .addGlue(GluePath.parse(gluePackage))
-                        .setNoSummary()
-                        .build())
-                .withAdditionalPlugins(new EventListener() {
-                    @Override
-                    public void setEventPublisher(EventPublisher publisher) {
+        synchronized (RECORD) {
+            RECORD.setLength(0);
+            Runtime runtime = Runtime.builder()
+                    .withRuntimeOptions(new RuntimeOptionsBuilder()
+                            .addFeature(FeatureWithLines.parse(featureFile.toAbsolutePath().toString()))
+                            .addGlue(GluePath.parse(gluePackage))
+                            .setNoSummary()
+                            .build())
+                    .withAdditionalPlugins((EventListener) publisher -> {
                         publisher.registerHandlerFor(TestCaseStarted.class, event ->
-                                cases.add(new Case(event.getTestCase().getName())));
+                                append("CASE\t" + escape(event.getTestCase().getName())));
                         publisher.registerHandlerFor(TestStepFinished.class, event -> {
-                            if (!(event.getTestStep() instanceof PickleStepTestStep step) || cases.isEmpty()) return;
-                            cases.getLast().steps.add(new StepResult(
-                                    map(event.getResult().getStatus().name()),
-                                    "",
-                                    step.getStepText(),
-                                    "",
-                                    event.getResult().getDuration() == null ? 0 : event.getResult().getDuration().toMillis(),
-                                    ""
-                            ));
+                            String text = stepText(event.getTestStep());
+                            if (text == null) return;
+                            append("STEP\t" + event.getResult().getStatus().name() + "\t" + escape(text));
                         });
-                        publisher.registerHandlerFor(TestCaseFinished.class, event -> {
-                            if (!cases.isEmpty()) cases.getLast().status = map(event.getResult().getStatus().name());
-                        });
-                    }
-                })
-                .build();
-        runtime.run();
-        List<ScenarioResult> scenarios = new ArrayList<>();
-        for (Case one : cases) {
-            scenarios.add(new ScenarioResult(one.status, one.name, one.steps, ""));
+                        publisher.registerHandlerFor(TestCaseFinished.class, event ->
+                                append("END\t" + event.getResult().getStatus().name()));
+                    })
+                    .build();
+            runtime.run();
+            return parse(RECORD.toString());
         }
+    }
+
+    private static void append(String line) {
+        RECORD.append(line).append('\n');
+    }
+
+    private static RunResult parse(String record) {
+        List<ScenarioResult> scenarios = new ArrayList<>();
+        String name = "";
+        Status status = Status.PASSED;
+        List<StepResult> steps = new ArrayList<>();
+        boolean open = false;
+        for (String line : record.split("\n", -1)) {
+            if (line.isEmpty()) continue;
+            int tab = line.indexOf('\t');
+            String kind = tab < 0 ? line : line.substring(0, tab);
+            String rest = tab < 0 ? "" : line.substring(tab + 1);
+            if ("CASE".equals(kind)) {
+                if (open) scenarios.add(new ScenarioResult(status, name, steps, ""));
+                name = unescape(rest);
+                status = Status.PASSED;
+                steps = new ArrayList<>();
+                open = true;
+            } else if ("STEP".equals(kind) && open) {
+                int split = rest.indexOf('\t');
+                String stepStatus = split < 0 ? rest : rest.substring(0, split);
+                String text = split < 0 ? "" : unescape(rest.substring(split + 1));
+                steps.add(new StepResult(map(stepStatus), "", text, "", 0, ""));
+            } else if ("END".equals(kind) && open) {
+                status = map(rest);
+                scenarios.add(new ScenarioResult(status, name, steps, ""));
+                open = false;
+                steps = new ArrayList<>();
+            }
+        }
+        if (open) scenarios.add(new ScenarioResult(status, name, steps, ""));
         return RunResult.of(scenarios);
+    }
+
+    private static String escape(String value) {
+        return value == null ? "" : value.replace("\\", "\\\\").replace("\n", "\\n").replace("\t", "\\t");
+    }
+
+    private static String unescape(String value) {
+        StringBuilder out = new StringBuilder();
+        for (int index = 0; index < value.length(); index++) {
+            char one = value.charAt(index);
+            if (one == '\\' && index + 1 < value.length()) {
+                char next = value.charAt(++index);
+                out.append(next == 'n' ? '\n' : next == 't' ? '\t' : next);
+            } else {
+                out.append(one);
+            }
+        }
+        return out.toString();
+    }
+
+    private static String stepText(TestStep step) {
+        if (step instanceof PickleStepTestStep pickle) return pickle.getStepText();
+        try {
+            Object value = step.getClass().getMethod("getStepText").invoke(step);
+            return value == null ? null : value.toString();
+        } catch (ReflectiveOperationException failure) {
+            return null;
+        }
     }
 
     private static Status map(String name) {
@@ -67,16 +123,6 @@ public final class CucumberAdapterRun {
             return Status.valueOf(name);
         } catch (IllegalArgumentException failure) {
             return Status.FAILED;
-        }
-    }
-
-    private static final class Case {
-        private final String name;
-        private Status status = Status.PASSED;
-        private final List<StepResult> steps = new ArrayList<>();
-
-        private Case(String name) {
-            this.name = name == null ? "" : name;
         }
     }
 }
