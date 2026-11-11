@@ -109,6 +109,7 @@ public final class DaltonCli {
                 feature put writes that .feature text into the database. It sets db_edited, leaves last_synced_hash, and replaces the stored scenarios, steps, tags, docstrings, and data tables in the same transaction. Bad Gherkin is rejected and the previous rows stay. The file is not changed until dalton extract. Use --file for multiline text. dalton scenario put and dalton step put are rejected. A database row whose content hash moved while db_edited is still 0 is an untracked DB edit. hydrate reports it and will not overwrite it unless --force is set.
                 entity put uses that same write, so the entity file row and the entity table stay together.
                 files, features, scenarios, steps, and conflicts are read-only. They do not create a database. --json prints one stable JSON object. Text mode prints labels. conflicts lists an untracked database edit and a row edited on both sides.
+                Discovery reads include, exclude, max-file-size (default 1048576), and binary-policy (default skip) from dalton.properties. System properties pkb_dalton_include, pkb_dalton_exclude, pkb_dalton_max_file_size, and pkb_dalton_binary_policy win over that file. An empty include keeps the fixed directories. Exclude is added to the defaults, which already skip .git, target, build, .pickleball, and common binary extensions. A file over the size limit, or a binary by extension or by a null byte or a high control-byte ratio, is ignored. dalton status prints skipped and up to five sample lines and does not create a database. Hydrate prints ignored= for those files. --path still applies the limits. --path --force is the only bypass. hash-only is not implemented. Set pkb_dalton_log=discover to log each reason.
                 """;
     }
 
@@ -118,18 +119,22 @@ public final class DaltonCli {
         boolean present = Files.isRegularFile(db);
         boolean driver = DaltonDatabase.driverPresent();
         DaltonLog.log(project, "status", "files", present ? "present " + shown : "missing " + shown);
+        List<DaltonSources.Skip> skipped = discoverySkips(project);
         if (!present) {
             if (json) {
-                out.println("{\"database\":\"missing\",\"path\":\"" + shown + "\",\"driver\":" + driver + ",\"files\":0}");
+                out.println("{\"database\":\"missing\",\"path\":\"" + jsonEscape(shown) + "\",\"driver\":" + driver
+                        + ",\"files\":0" + skipJson(skipped));
             } else {
                 out.println("Dalton database missing: " + shown);
                 if (!driver) out.println("sqlite-jdbc is not on the classpath");
+                printSkips(out, skipped);
             }
             return 0;
         }
         if (!driver) {
             out.println("Dalton database missing: " + shown);
             out.println("sqlite-jdbc is not on the classpath");
+            printSkips(out, skipped);
             return 1;
         }
         try (DaltonDatabase database = DaltonDatabase.open(project)) {
@@ -140,10 +145,10 @@ public final class DaltonCli {
             int runs = count(database, "SELECT COUNT(*) FROM runs");
             int conflicts = DaltonQuery.conflicts(project, database.connection()).size();
             if (json) {
-                out.println("{\"database\":\"present\",\"path\":\"" + shown + "\",\"schemaVersion\":"
+                out.println("{\"database\":\"present\",\"path\":\"" + jsonEscape(shown) + "\",\"schemaVersion\":"
                         + version + ",\"files\":" + files + ",\"scenarios\":" + scenarios
                         + ",\"entities\":" + entities + ",\"runs\":" + runs
-                        + ",\"conflicts\":" + conflicts + ",\"driver\":true}");
+                        + ",\"conflicts\":" + conflicts + ",\"driver\":true" + skipJson(skipped));
             } else {
                 out.println("Dalton schema " + version);
                 out.println("files " + files);
@@ -151,6 +156,7 @@ public final class DaltonCli {
                 out.println("entities " + entities);
                 out.println("runs " + runs);
                 out.println("conflicts " + conflicts);
+                printSkips(out, skipped);
                 out.println("database " + shown);
             }
             return 0;
@@ -158,6 +164,42 @@ public final class DaltonCli {
             out.println("error: " + failure.getMessage());
             return 1;
         }
+    }
+
+    private static List<DaltonSources.Skip> discoverySkips(Path project) {
+        try {
+            return DaltonSources.scan(project, List.of(), false).skipped();
+        } catch (Exception failure) {
+            return List.of();
+        }
+    }
+
+    private static void printSkips(PrintStream out, List<DaltonSources.Skip> skipped) {
+        out.println("skipped " + skipped.size());
+        int limit = Math.min(5, skipped.size());
+        for (int index = 0; index < limit; index++) {
+            DaltonSources.Skip skip = skipped.get(index);
+            out.println("sample " + skip.path() + " " + skip.reason());
+        }
+    }
+
+    private static String skipJson(List<DaltonSources.Skip> skipped) {
+        StringBuilder json = new StringBuilder();
+        json.append(",\"skipped\":").append(skipped.size()).append(",\"skipSamples\":[");
+        int limit = Math.min(5, skipped.size());
+        for (int index = 0; index < limit; index++) {
+            if (index > 0) json.append(',');
+            DaltonSources.Skip skip = skipped.get(index);
+            json.append("{\"path\":\"").append(jsonEscape(skip.path()))
+                    .append("\",\"reason\":\"").append(jsonEscape(skip.reason())).append("\"}");
+        }
+        json.append("]}");
+        return json.toString();
+    }
+
+    private static String jsonEscape(String value) {
+        if (value == null) return "";
+        return value.replace("\\", "\\\\").replace("\"", "\\\"").replace("\r", "\\r").replace("\n", "\\n");
     }
 
     private static int hydrate(Path project, List<String> tokens, PrintStream out, PrintStream err) {

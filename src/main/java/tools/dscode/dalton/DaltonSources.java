@@ -43,22 +43,99 @@ public final class DaltonSources {
     public record Found(String path, Path file, String sourceType) {
     }
 
+    public record Skip(String path, String reason) {
+    }
+
+    public record Scan(List<Found> found, List<Skip> skipped) {
+        public Scan {
+            found = found == null ? List.of() : List.copyOf(found);
+            skipped = skipped == null ? List.of() : List.copyOf(skipped);
+        }
+    }
+
     public static List<Found> scan(Path project, List<String> only) throws IOException {
+        return scan(project, only, false).found();
+    }
+
+    /**
+     * {@code bypassLimits} is only for {@code --path --force}. A full hydrate
+     * still applies size, binary, and exclude rules.
+     */
+    public static Scan scan(Path project, List<String> only, boolean bypassLimits) throws IOException {
         Path root = project.toAbsolutePath().normalize();
+        DaltonDiscovery discovery = DaltonDiscovery.load(root);
         Set<String> seen = new LinkedHashSet<>();
         List<Found> found = new ArrayList<>();
         if (only == null || only.isEmpty()) {
-            for (String relative : DEFAULT_DIRECTORIES) addTree(root, relative, seen, found);
-            for (String relative : DEFAULT_FILES) addFile(root, relative, seen, found);
-            return List.copyOf(found);
+            if (discovery.defaultIncludes()) {
+                for (String relative : DEFAULT_DIRECTORIES) addTree(root, relative, seen, found);
+                for (String relative : DEFAULT_FILES) addFile(root, relative, seen, found);
+            } else {
+                addIncluded(root, discovery.includes(), seen, found);
+            }
+        } else {
+            for (String raw : only) {
+                String relative = DaltonPaths.normalizeRelative(raw);
+                Path file = root.resolve(relative);
+                if (Files.isDirectory(file)) addTree(root, relative, seen, found);
+                else addFile(root, relative, seen, found);
+            }
         }
-        for (String raw : only) {
-            String relative = DaltonPaths.normalizeRelative(raw);
-            Path file = root.resolve(relative);
-            if (Files.isDirectory(file)) addTree(root, relative, seen, found);
-            else addFile(root, relative, seen, found);
+        if (bypassLimits) return new Scan(found, List.of());
+        List<Found> kept = new ArrayList<>();
+        List<Skip> skipped = new ArrayList<>();
+        for (Found source : found) {
+            String reason = discovery.skipReason(source.path(), source.file());
+            if (reason == null) kept.add(source);
+            else {
+                skipped.add(new Skip(source.path(), reason));
+                DaltonLog.log(root, "discover", source.path(), reason);
+            }
         }
-        return List.copyOf(found);
+        return new Scan(kept, skipped);
+    }
+
+    private static void addIncluded(Path root, List<String> globs, Set<String> seen, List<Found> found) throws IOException {
+        for (String glob : globs) {
+            String prefix = staticPrefix(glob);
+            Path start = prefix.isEmpty() ? root : root.resolve(prefix);
+            if (Files.isRegularFile(start)) {
+                addFile(root, prefix, seen, found);
+                continue;
+            }
+            if (!Files.isDirectory(start)) continue;
+            try (Stream<Path> walk = Files.walk(start)) {
+                for (Path file : walk.filter(Files::isRegularFile).sorted().toList()) {
+                    if (descentSkipped(root, file)) continue;
+                    String relative = DaltonPaths.normalizeRelative(root.relativize(file.toAbsolutePath().normalize()).toString());
+                    if (!DaltonDiscovery.glob(glob, relative)) continue;
+                    add(root, file, seen, found);
+                }
+            }
+        }
+    }
+
+    private static String staticPrefix(String glob) {
+        int star = glob.indexOf('*');
+        int question = glob.indexOf('?');
+        int cut = star < 0 ? question : (question < 0 ? star : Math.min(star, question));
+        String prefix = cut < 0 ? glob : glob.substring(0, cut);
+        int slash = prefix.lastIndexOf('/');
+        if (cut >= 0 && slash >= 0) return prefix.substring(0, slash);
+        if (cut >= 0) return "";
+        return prefix;
+    }
+
+    private static boolean descentSkipped(Path root, Path file) {
+        Path relative = root.relativize(file.toAbsolutePath().normalize());
+        for (Path part : relative) {
+            String name = part.toString();
+            if (".git".equals(name) || "target".equals(name) || "build".equals(name)
+                    || ".pickleball".equals(name) || "node_modules".equals(name) || ".gradle".equals(name)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public static String sourceType(String relativePath) {

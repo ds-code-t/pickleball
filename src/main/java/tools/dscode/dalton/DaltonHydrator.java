@@ -33,7 +33,8 @@ public final class DaltonHydrator {
             int conflicts,
             boolean dryRun,
             List<String> conflictPaths,
-            List<String> notices
+            List<String> notices,
+            int ignored
     ) {
         public Result {
             conflictPaths = conflictPaths == null ? List.of() : List.copyOf(conflictPaths);
@@ -43,15 +44,19 @@ public final class DaltonHydrator {
         public String line() {
             String prefix = dryRun ? "dry-run" : "hydrated";
             return prefix + " inserted=" + inserted + " updated=" + updated
-                    + " skipped=" + skipped + " conflicts=" + conflicts;
+                    + " skipped=" + skipped + " conflicts=" + conflicts
+                    + " ignored=" + ignored;
         }
     }
 
     public static Result hydrate(Path project, Options options) throws IOException, SQLException {
-        List<DaltonSources.Found> sources = DaltonSources.scan(project, options.paths());
+        boolean bypassLimits = options.force() && !options.paths().isEmpty();
+        DaltonSources.Scan scan = DaltonSources.scan(project, options.paths(), bypassLimits);
+        List<DaltonSources.Found> sources = scan.found();
+        int ignored = scan.skipped().size();
         boolean present = Files.isRegularFile(DaltonPaths.database(project));
         if (options.dryRun() && !present) {
-            return new Result(sources.size(), 0, 0, 0, true, List.of(), List.of());
+            return new Result(sources.size(), 0, 0, 0, true, List.of(), List.of(), ignored);
         }
         if (!DaltonDatabase.driverPresent()) {
             throw new SQLException("sqlite-jdbc is not on the classpath");
@@ -130,8 +135,9 @@ public final class DaltonHydrator {
                 connection.setAutoCommit(true);
             }
             DaltonLog.log(project, "hydrate", "files",
-                    (options.dryRun() ? "dry-run " : "") + "inserted=" + inserted + " updated=" + updated);
-            return new Result(inserted, updated, skipped, conflicts.size(), options.dryRun(), conflicts, notices);
+                    (options.dryRun() ? "dry-run " : "") + "inserted=" + inserted + " updated=" + updated
+                            + " ignored=" + ignored);
+            return new Result(inserted, updated, skipped, conflicts.size(), options.dryRun(), conflicts, notices, ignored);
         }
     }
 
