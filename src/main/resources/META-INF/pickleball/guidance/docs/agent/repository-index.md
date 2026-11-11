@@ -465,6 +465,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/dalton/DaltonRunWorker.java`
 - `src/main/java/tools/dscode/dalton/DaltonSecrets.java`
 - `src/main/java/tools/dscode/dalton/DaltonSources.java`
+- `src/main/java/tools/dscode/engine/context/ExecutionContext.java`
 - `src/main/java/tools/dscode/engine/convert/CucumberModelConverter.java`
 - `src/main/java/tools/dscode/engine/EngineLog.java`
 - `src/main/java/tools/dscode/engine/match/AmbiguousMatchException.java`
@@ -626,6 +627,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/dalton/DaltonRunTest.java`
 - `src/test/java/tools/dscode/dalton/DaltonScenarioHarness.java`
 - `src/test/java/tools/dscode/dalton/DaltonSecretsTest.java`
+- `src/test/java/tools/dscode/engine/context/ExecutionContextTest.java`
 - `src/test/java/tools/dscode/engine/convert/CucumberModelConverterTest.java`
 - `src/test/java/tools/dscode/engine/match/StepRegistryTest.java`
 - `src/test/java/tools/dscode/expectedfailure/ExpectedFailureRunnerTest.java`

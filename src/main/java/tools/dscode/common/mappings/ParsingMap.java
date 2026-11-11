@@ -30,6 +30,7 @@ import tools.dscode.common.dataelements.StructuredDataConverter;
 import tools.dscode.common.mappings.queries.Tokenized;
 import tools.dscode.common.treeparsing.parsedComponents.DataElementMatch;
 import tools.dscode.common.treeparsing.parsedComponents.ElementMatch;
+import tools.dscode.engine.context.ExecutionContext;
 import tools.dscode.common.treeparsing.parsedComponents.PhraseData;
 
 import tools.dscode.common.resources.PathLists;
@@ -636,6 +637,10 @@ public class ParsingMap extends MappingProcessor {
         CurrentScenarioState currentScenarioState =
                 getCurrentScenarioState();
         if (currentScenarioState == null) {
+            ExecutionContext context = ExecutionContext.current();
+            if (context != null && context.parsingMap() != null) {
+                return context.parsingMap();
+            }
             return getGlobalsParsingmap();
         }
         if (currentScenarioState.currentPhrase != null) {

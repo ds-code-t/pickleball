@@ -155,6 +155,19 @@ public class CurrentScenarioState extends ScenarioMapping {
         featureName = getFeatureName(pickle);
     }
 
+    /**
+     * Native engine only. Cucumber runs keep using {@link #CurrentScenarioState(TestCase)}.
+     * {@code testCase} and {@code pickle} stay null; callers must tolerate that.
+     */
+    public CurrentScenarioState(String scenarioName, String featureName) {
+        LOCAL.set(new ConcurrentHashMap<>());
+        this.testCase = null;
+        this.pickle = null;
+        this.scenarioName = scenarioName == null ? "" : scenarioName;
+        this.scenarioNameAndLine = this.scenarioName;
+        this.featureName = featureName == null ? "" : featureName;
+    }
+
 
     public static CachingGlue getGlue() {
         if (getCurrentScenarioState() == null) return null;

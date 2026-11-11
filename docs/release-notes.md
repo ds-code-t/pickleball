@@ -28,6 +28,7 @@ Dalton is an opt-in hydrated working copy. Git files stay the source of truth. T
 
 - Phase 1 adds a Pickleball-owned model (`EngineFeature`, `EngineScenario`, `EngineStep`, `Table`, `DocText`, `Status`) and converters to Cucumber messages, pickles, data tables, and doc strings. Nothing in a Cucumber run changes.
 - Phase 2 matches steps with a Pickleball registry that reads the existing step annotations and uses the same Cucumber expression and regex rules. Step text and annotations do not change. Matching does not run the step.
+- Phase 3 adds an explicit execution context. Existing Cucumber runs keep the same scenario state. The context is used only when no Cucumber scenario is on the thread.
 
 ## 2.2.0
 
