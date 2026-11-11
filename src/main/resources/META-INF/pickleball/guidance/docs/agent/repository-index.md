@@ -171,6 +171,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/common/assertions/AssertionChain.java`
 - `src/main/java/tools/dscode/common/assertions/AssertionClauseSplitter.java`
 - `src/main/java/tools/dscode/common/assertions/ConditionRepeater.java`
+- `src/main/java/tools/dscode/common/assertions/NeutralAssertions.java`
 - `src/main/java/tools/dscode/common/assertions/ValueWrapper.java`
 - `src/main/java/tools/dscode/common/assertions/ValueWrapperCompareReducer.java`
 - `src/main/java/tools/dscode/common/assertions/ValueWrapperComparisons.java`
@@ -244,6 +245,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/common/dataelements/TerminalResult.java`
 - `src/main/java/tools/dscode/common/dataoperations/DataComparisons.java`
 - `src/main/java/tools/dscode/common/dataoperations/DataQueries.java`
+- `src/main/java/tools/dscode/common/dataoperations/NeutralRows.java`
 - `src/main/java/tools/dscode/common/dataoperations/TableQueries.java`
 - `src/main/java/tools/dscode/common/dataoperations/TextOp.java`
 - `src/main/java/tools/dscode/common/dataoperations/TextPredicateMatcher.java`
@@ -629,6 +631,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/dalton/DaltonSecretsTest.java`
 - `src/test/java/tools/dscode/engine/context/ExecutionContextTest.java`
 - `src/test/java/tools/dscode/engine/convert/CucumberModelConverterTest.java`
+- `src/test/java/tools/dscode/engine/convert/NeutralDataTest.java`
 - `src/test/java/tools/dscode/engine/match/StepRegistryTest.java`
 - `src/test/java/tools/dscode/expectedfailure/ExpectedFailureRunnerTest.java`
 - `src/test/java/tools/dscode/expectedfailure/ExpectedFailureSteps.java`

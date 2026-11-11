@@ -30,7 +30,10 @@ import tools.dscode.common.dataelements.StructuredDataConverter;
 import tools.dscode.common.mappings.queries.Tokenized;
 import tools.dscode.common.treeparsing.parsedComponents.DataElementMatch;
 import tools.dscode.common.treeparsing.parsedComponents.ElementMatch;
+import tools.dscode.common.dataoperations.NeutralRows;
 import tools.dscode.engine.context.ExecutionContext;
+import tools.dscode.engine.model.DocText;
+import tools.dscode.engine.model.Table;
 import tools.dscode.common.treeparsing.parsedComponents.PhraseData;
 
 import tools.dscode.common.resources.PathLists;
@@ -617,6 +620,12 @@ public class ParsingMap extends MappingProcessor {
     }
 
     private static Object toJsonData(Object data) {
+        if (data instanceof Table table) {
+            return NeutralRows.toJson(table);
+        }
+        if (data instanceof DocText doc) {
+            return NeutralRows.text(doc);
+        }
         if (data instanceof DataTable dataTable) {
             return dataTableToJsonNode(dataTable);
         }

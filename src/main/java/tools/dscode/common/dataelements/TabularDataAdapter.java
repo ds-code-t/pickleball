@@ -7,6 +7,9 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.cucumber.core.runner.util.TableUtils;
 import io.cucumber.datatable.DataTable;
+import tools.dscode.common.dataoperations.NeutralRows;
+import tools.dscode.engine.model.DocText;
+import tools.dscode.engine.model.Table;
 
 import java.lang.reflect.Array;
 import java.util.ArrayList;
@@ -29,6 +32,12 @@ public final class TabularDataAdapter {
         if (source instanceof TabularMatrix matrix) {
             return matrix.copy();
         }
+        if (source instanceof Table table) {
+            return fromNeutralRows(table.rows());
+        }
+        if (source instanceof DocText doc) {
+            return TabularMatrix.fromRows(List.of(List.of(NeutralRows.text(doc))));
+        }
         if (source instanceof DataTable dataTable) {
             return fromDataTable(dataTable);
         }
@@ -45,6 +54,16 @@ public final class TabularDataAdapter {
             return fromCollection(arrayValues(source));
         }
         return TabularMatrix.fromRows(List.of(List.of(normalizeCell(source))));
+    }
+
+    private static TabularMatrix fromNeutralRows(List<List<String>> rows) {
+        List<List<Object>> copied = new ArrayList<>();
+        if (rows != null) {
+            for (List<String> row : rows) {
+                copied.add(new ArrayList<>(row == null ? List.of() : row));
+            }
+        }
+        return TabularMatrix.fromRows(copied);
     }
 
     private static TabularMatrix fromDataTable(DataTable dataTable) {
