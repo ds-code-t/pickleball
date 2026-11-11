@@ -5,6 +5,7 @@ import io.cucumber.core.gherkin.Pickle;
 import io.cucumber.core.gherkin.Step;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import tools.dscode.common.mappings.MappingProcessor;
 import tools.dscode.dalton.DaltonConfig;
 import tools.dscode.dalton.DaltonDatabase;
 import tools.dscode.dalton.DaltonFeatureSource;
@@ -12,12 +13,14 @@ import tools.dscode.dalton.DaltonFiles;
 import tools.dscode.dalton.DaltonHashes;
 import tools.dscode.dalton.DaltonPaths;
 import tools.dscode.dalton.DaltonRuntime;
+import tools.dscode.dalton.DaltonScenarioHarness;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Properties;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -107,6 +110,102 @@ class DaltonExecuteFromDbTest {
             DaltonRuntime.reset();
             FeaturePathLoadCache.clear();
         }
+    }
+
+    @Test
+    void executedScenariosUseDatabaseBytesAndADatabaseEditChangesTheRun() throws Exception {
+        Path features = project.resolve("features");
+        Files.createDirectories(features);
+        String feature = """
+                Feature: Dalton sample
+                  @dalton-db
+                  Scenario: Pay Ada
+                    * INFO: amount is 10
+                    * dalton probe records amount is 10
+                    * ASSERT: "10" equals "10"
+
+                  @dalton-db
+                  Scenario Outline: Pay <who>
+                    * INFO: amount is <amount>
+                    * dalton probe records amount is <amount>
+                    * ASSERT: "ok" equals "ok"
+                    Examples:
+                      | who | amount |
+                      | Lin | 4      |
+                      | Nia | 7      |
+                """;
+        Path file = features.resolve("sample.feature");
+        Files.writeString(file, feature);
+        Properties before = new Properties();
+        before.putAll(System.getProperties());
+        try {
+            System.setProperty("pkb_dalton", "false");
+            System.setProperty("pkb_dalton_project", project.toString());
+            DaltonRuntime.reset();
+            DaltonScenarioHarness.Outcome fromFile = runSample();
+            assertPassed(fromFile, "Pay Ada", "amount is 10");
+            assertTrue(fromFile.reached().containsAll(List.of("amount is 4", "amount is 7")), fromFile.report());
+            assertFalse(Files.exists(DaltonPaths.database(project)));
+
+            System.setProperty("pkb_dalton", "true");
+            DaltonRuntime.reset();
+            DaltonScenarioHarness.Outcome fromDb = runSample();
+            assertPassed(fromDb, "Pay Ada", "amount is 10");
+            assertTrue(Files.isRegularFile(DaltonPaths.database(project)));
+            assertEquals(feature, Files.readString(file));
+
+            String rewritten = feature
+                    .replace("Scenario: Pay Ada", "Scenario: Pay from database")
+                    .replace("INFO: amount is 10", "INFO: amount is 99")
+                    .replace("dalton probe records amount is 10", "dalton probe records amount is 99");
+            byte[] raw = rewritten.getBytes(StandardCharsets.UTF_8);
+            try (DaltonDatabase database = DaltonDatabase.open(project)) {
+                DaltonFiles.Row row = DaltonFiles.find(database.connection(), "features/sample.feature");
+                assertArrayEquals(feature.getBytes(StandardCharsets.UTF_8), row.raw());
+                DaltonFiles.upsert(database.connection(), new DaltonFiles.Row(
+                        row.path(),
+                        DaltonHashes.sha256(raw),
+                        raw,
+                        row.mtime(),
+                        row.sourceType(),
+                        row.lastHydratedAt(),
+                        row.lastSyncedHash(),
+                        true
+                ));
+            }
+            DaltonScenarioHarness.Outcome edited = runSample();
+            assertPassed(edited, "Pay from database", "amount is 99");
+            assertTrue(edited.reached().stream().noneMatch(value -> value.contains("amount is 10")), edited.report());
+            assertTrue(edited.tests().stream().noneMatch(row -> row.contains("Pay Ada")), edited.report());
+            assertEquals(feature, Files.readString(file));
+
+            System.setProperty("pkb_dalton", "false");
+            DaltonScenarioHarness.Outcome backToFile = runSample();
+            assertPassed(backToFile, "Pay Ada", "amount is 10");
+            assertTrue(backToFile.tests().stream().noneMatch(row -> row.contains("Pay from database")), backToFile.report());
+            assertEquals(feature, Files.readString(file));
+        } finally {
+            System.setProperties(before);
+            DaltonRuntime.reset();
+            FeaturePathLoadCache.clear();
+            MappingProcessor.resetCommonMaps();
+            DaltonScenarioHarness.release();
+        }
+    }
+
+    private DaltonScenarioHarness.Outcome runSample() {
+        return DaltonScenarioHarness.execute(
+                project.resolve("features"),
+                "tools.dscode.coredefinitions,tools.dscode.dalton",
+                "@dalton-db"
+        );
+    }
+
+    private static void assertPassed(DaltonScenarioHarness.Outcome outcome, String scenario, String step) {
+        assertTrue(outcome.tests().stream().anyMatch(row -> row.startsWith("SUCCESSFUL") && row.contains(scenario)), outcome.report());
+        assertTrue(outcome.tests().stream().allMatch(row -> row.startsWith("SUCCESSFUL")), outcome.report());
+        assertTrue(outcome.events().stream().anyMatch(row -> row.equals("scenario PASSED " + scenario)), outcome.report());
+        assertTrue(outcome.reached().contains(step), outcome.report());
     }
 
     private List<Feature> load() {

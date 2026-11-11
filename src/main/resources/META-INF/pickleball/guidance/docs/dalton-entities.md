@@ -36,6 +36,8 @@ The only new reference is:
 
 `field` is optional. Dots walk nested JSON. `<entity:Account#ada.name>` is the string `Ada`. `<entity:Account#ada>` is the payload JSON. This does not change `<config:...>`, `<file:...>`, `<data:...>`, or any other existing reference.
 
+A scenario step receives that resolved field only when Dalton is on. With Dalton off, the step receives the reference text unchanged. A secret field stays the reference. `<entity:Account#ada.password>` reaches the step as `<password:qaDb>`, not as a password.
+
 With Dalton on, a missing database row is read from `dalton-entities/<Type>/<id>.entity` when that file is present. Resolution does not create a database.
 
 ## CLI

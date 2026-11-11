@@ -85,6 +85,7 @@ public final class FeaturePathLoadCache {
         if (bypass || resource == null) {
             return original.get();
         }
+        tools.dscode.dalton.DaltonRuntime.beforeFeatureLoad();
         java.net.URI uri = resource.getUri();
         byte[] fromDb = tools.dscode.dalton.DaltonFeatureSource.bytesFor(uri);
         ClassLoader loader = Thread.currentThread().getContextClassLoader();

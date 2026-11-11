@@ -1,8 +1,10 @@
 package tools.dscode.dalton;
 
 /**
- * Auto-hydrate hook used by feature loading. When Dalton is off this returns
- * without opening a database, so the file-only path stays the file-only path.
+ * Auto-hydrate hook used by feature loading. {@code FeaturePathLoadCache}
+ * calls this from the CLI feature supplier and from the JUnit feature parser.
+ * When Dalton is off this returns without opening a database, so the file-only
+ * path stays the file-only path.
  */
 public final class DaltonRuntime {
     private static volatile boolean attempted;
@@ -10,7 +12,7 @@ public final class DaltonRuntime {
     private DaltonRuntime() {
     }
 
-    public static void beforeFeatureLoad() {
+    public static synchronized void beforeFeatureLoad() {
         if (!DaltonConfig.enabled()) return;
         if (attempted) return;
         attempted = true;
@@ -23,7 +25,7 @@ public final class DaltonRuntime {
     }
 
     /** Tests only. */
-    public static void reset() {
+    public static synchronized void reset() {
         attempted = false;
     }
 }

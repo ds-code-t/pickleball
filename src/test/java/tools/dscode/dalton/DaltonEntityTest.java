@@ -10,6 +10,8 @@ import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
+import java.util.Properties;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -146,6 +148,66 @@ class DaltonEntityTest {
             if (previousProject == null) System.clearProperty("pkb_dalton_project");
             else System.setProperty("pkb_dalton_project", previousProject);
         }
+    }
+
+    @Test
+    void entityReferenceInAScenarioReachesTheStepOnlyWhenDaltonIsOn() throws Exception {
+        Path features = project.resolve("features");
+        Path entity = project.resolve("dalton-entities/Account/ada.entity");
+        Files.createDirectories(features);
+        Files.createDirectories(entity.getParent());
+        Files.write(entity, DaltonEntities.canonicalFile("Account", "ada", 1, CANONICAL));
+        Files.writeString(features.resolve("account.feature"), """
+                Feature: Dalton entity reference
+                  @dalton-entity
+                  Scenario: Account fields reach the step
+                    * INFO: account <entity:Account#ada.name>
+                    * dalton probe records <entity:Account#ada.name>
+                    * dalton probe records <entity:Account#ada.password>
+                """);
+        Properties before = new Properties();
+        before.putAll(System.getProperties());
+        MappingProcessor.resetCommonMaps();
+        try {
+            System.setProperty("pkb_dalton", "false");
+            System.setProperty("pkb_dalton_project", project.toString());
+            DaltonRuntime.reset();
+            DaltonScenarioHarness.Outcome off = runEntity();
+            assertTrue(off.tests().stream().allMatch(row -> row.startsWith("SUCCESSFUL")), off.report());
+            assertEquals(List.of("<entity:Account#ada.name>", "<entity:Account#ada.password>"), off.reached(), off.report());
+            assertTrue(off.events().stream().anyMatch(row -> row.equals("scenario PASSED Account fields reach the step")), off.report());
+            assertFalse(Files.exists(DaltonPaths.database(project)));
+
+            System.setProperty("pkb_dalton", "true");
+            DaltonRuntime.reset();
+            DaltonScenarioHarness.Outcome on = runEntity();
+            assertTrue(on.tests().stream().allMatch(row -> row.startsWith("SUCCESSFUL")), on.report());
+            assertEquals(List.of("Ada", "<password:qaDb>"), on.reached(), on.report());
+            assertTrue(on.reached().stream().noneMatch(value -> value.contains("hunter2")), on.report());
+            assertTrue(on.events().stream().anyMatch(row -> row.equals("scenario PASSED Account fields reach the step")), on.report());
+            if (Files.isRegularFile(DaltonPaths.database(project))) {
+                DaltonEntities.Entity stored = DaltonEntities.get(project, "Account", "ada");
+                assertEquals(CANONICAL, stored.payloadJson());
+                assertTrue(stored.secretRefs().contains("<password:qaDb>"), stored.secretRefs());
+                assertFalse(stored.payloadJson().contains("hunter2"));
+            }
+            String onDisk = Files.readString(entity);
+            assertTrue(onDisk.contains("<password:qaDb>"), onDisk);
+            assertFalse(onDisk.contains("hunter2"));
+        } finally {
+            System.setProperties(before);
+            DaltonRuntime.reset();
+            MappingProcessor.resetCommonMaps();
+            DaltonScenarioHarness.release();
+        }
+    }
+
+    private DaltonScenarioHarness.Outcome runEntity() {
+        return DaltonScenarioHarness.execute(
+                project.resolve("features"),
+                "tools.dscode.coredefinitions,tools.dscode.dalton",
+                "@dalton-entity"
+        );
     }
 
     private DaltonFiles.Row row() throws Exception {
