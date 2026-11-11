@@ -9,6 +9,7 @@ import tools.dscode.control.protocol.SecretRedactor;
 import tools.dscode.control.protocol.ControlBridgeMappingSnapshot;
 import tools.dscode.control.protocol.DiagnosticQuery;
 import tools.dscode.workbench.WorkbenchServices;
+import tools.dscode.workbench.dalton.DaltonCliForwarder;
 import tools.dscode.workbench.nav.WorkbenchGoLink;
 import tools.dscode.workbench.lease.WorkbenchCallContext;
 import tools.dscode.workbench.lease.WorkbenchLeaseHolder;
@@ -381,6 +382,37 @@ final class WorkbenchMcpTools {
                     Object value = services.agentCommand(op, forwarded);
                     return value == null ? Map.of("status", "UNAVAILABLE", "op", op) : value;
                 });
+        add("dalton",
+                "Forward arguments to the pickleball dalton CLI. Does not implement Dalton inside Workbench.",
+                schema(Map.of(
+                        "args", Map.of(
+                                "type", "array",
+                                "description", "Arguments after dalton. Example: [\"status\"] or [\"hydrate\", \"--dry-run\"].",
+                                "items", Map.of("type", "string")
+                        )
+                ), "args"),
+                arguments -> forwardDalton(arguments.get("args")));
+    }
+
+    private Object forwardDalton(Object rawArgs) {
+        List<String> args = new ArrayList<>();
+        if (rawArgs instanceof List<?> list) {
+            for (Object item : list) {
+                if (item != null && !String.valueOf(item).isBlank()) args.add(String.valueOf(item));
+            }
+        } else if (rawArgs != null) {
+            throw new IllegalArgumentException("error: dalton requires args as a list of strings.\nfix: Pass {\"args\":[\"status\"]}.");
+        }
+        if (args.isEmpty()) {
+            throw new IllegalArgumentException("error: dalton requires args.\nfix: Pass {\"args\":[\"status\"]}.");
+        }
+        DaltonCliForwarder.Result result = DaltonCliForwarder.run(services.projectRoot(), args);
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("exit", result.exit());
+        body.put("out", result.out());
+        body.put("err", result.err());
+        body.put("forwarded", args);
+        return body;
     }
 
     private Object retrieval(String op, Map<String, Object> args) {

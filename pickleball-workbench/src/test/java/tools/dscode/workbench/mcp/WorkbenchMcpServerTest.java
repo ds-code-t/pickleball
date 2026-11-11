@@ -90,7 +90,8 @@ class WorkbenchMcpServerTest {
             "wb_errors",
             "workbench_investigation_emit",
             "workbench_go",
-            "workbench_agent_command"
+            "workbench_agent_command",
+            "dalton"
     );
 
     @TempDir

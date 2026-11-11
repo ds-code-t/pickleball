@@ -105,6 +105,15 @@ When implementation, tests, examples, and documentation disagree:
 - `maven-consumer-project/src/test/resources/site` — local browser/service test site
 - `maven-consumer-project/src/test/java` — runner, local server, support code, and internal framework checks compiled against the locally published dependency
 
+## Dalton (3.0.0)
+
+Dalton is opt-in. With no `pkb_dalton` setting and no Dalton config file, consumer projects stay on the file-only path. The locked design is `docs/maintainer/3.0.0-dalton-design.md`. The implementation plan is `docs/roadmaps/3.0.0-dalton-roadmap.md`.
+
+- Git files are the source of truth. The working copy is `.pickleball/dalton/dalton.db` (gitignored, including the explicit `.pickleball/dalton/` entry). A fresh clone has no database and must still run.
+- CLI: `dalton status` and `dalton hydrate --dry-run`. Gradle `daltonStatus`, the Workbench action `DaltonCliForwarder`, and MCP `dalton` only forward to that CLI.
+- `sqlite-jdbc` is not a published dependency. Tests and the Gradle forwarder put it on their own classpath. The consumer shadow JAR must not ship it.
+- Do not store cleartext secrets in Dalton. Entities hold secret references only, using the existing secrets and config approach.
+
 ## Public contracts
 
 Treat these as consumer-visible contracts unless source evidence clearly shows otherwise:

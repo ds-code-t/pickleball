@@ -44,6 +44,9 @@ bin/
 ### Pickleball generated local state ###
 .pickleball/
 
+### Dalton hydrated working copy (explicit; parent .pickleball/ is already ignored) ###
+.pickleball/dalton/
+
 ### Temporary agent and migration work ###
 .agent-work/
 .agent-bootstrap-backup-*/

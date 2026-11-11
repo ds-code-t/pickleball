@@ -80,6 +80,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/maintainer/2.1.19-workbench-expansion-brainstorm.md`
 - `docs/maintainer/2.1.19-workbench-expansion-ideas.md`
 - `docs/maintainer/2.1.19-workbench-expansion-roadmap.md`
+- `docs/maintainer/3.0.0-dalton-design.md`
 - `docs/maintainer/consumer-sim-harness.md`
 - `docs/maintainer/guidance-goldens.md`
 - `docs/maintainer/pointer-eval-harness.md`
@@ -98,6 +99,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/roadmaps/2.1.18-direct-control-handoff.md`
 - `docs/roadmaps/2.1.18-workbench-coverage-findings.md`
 - `docs/roadmaps/2.1.18-workbench-full-coverage.md`
+- `docs/roadmaps/3.0.0-dalton-roadmap.md`
 - `docs/service-call-scenarios.md`
 - `docs/step-overrides.md`
 - `docs/workbench-agent-detail.md`
@@ -484,6 +486,11 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/coredefinitions/TableSteps.java`
 - `src/main/java/tools/dscode/coredefinitions/UtilitySteps.java`
 - `src/main/java/tools/dscode/cucumberextended/utilities/StringUtilities.java`
+- `src/main/java/tools/dscode/dalton/DaltonCli.java`
+- `src/main/java/tools/dscode/dalton/DaltonDatabase.java`
+- `src/main/java/tools/dscode/dalton/DaltonHashes.java`
+- `src/main/java/tools/dscode/dalton/DaltonLog.java`
+- `src/main/java/tools/dscode/dalton/DaltonPaths.java`
 - `src/main/java/tools/dscode/internal/ValuesSupport.java`
 - `src/main/java/tools/dscode/launcher/PickleballWorkbenchLauncher.java`
 - `src/main/java/tools/dscode/launcher/QuietWarnings.java`
@@ -609,10 +616,12 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/coredefinitions/RunTypeAliasTest.java`
 - `src/test/java/tools/dscode/coredefinitions/XmlTableCellFeatureTest.java`
 - `src/test/java/tools/dscode/coredefinitions/XmlTableCellTest.java`
+- `src/test/java/tools/dscode/dalton/DaltonFoundationTest.java`
 - `src/test/java/tools/dscode/expectedfailure/ExpectedFailureRunnerTest.java`
 - `src/test/java/tools/dscode/expectedfailure/ExpectedFailureSteps.java`
 - `src/test/java/tools/dscode/GuidancePackagingTest.java`
 - `src/test/java/tools/dscode/launcher/AgentExpansionTest.java`
+- `src/test/java/tools/dscode/launcher/DaltonCliLaunchTest.java`
 - `src/test/java/tools/dscode/launcher/GuidanceCommandGoldenTest.java`
 - `src/test/java/tools/dscode/launcher/PickleballWorkbenchLauncherTest.java`
 - `src/test/java/tools/dscode/launcher/Release218RecommendationsTest.java`
@@ -859,6 +868,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/catalog/JavaGlueIndex.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/catalog/LaunchSelection.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/catalog/ScenarioFilter.java`
+- `pickleball-workbench/src/main/java/tools/dscode/workbench/dalton/DaltonCliForwarder.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/diagnostics/DiagnosticEvidenceNavigator.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/discover/LastDiscoverSnapshot.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/lease/WorkbenchCallContext.java`
@@ -938,6 +948,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/catalog/JavaGlueIndexTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/catalog/LaunchSelectionTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/catalog/ScenarioFilterTest.java`
+- `pickleball-workbench/src/test/java/tools/dscode/workbench/dalton/DaltonCliForwarderTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/diagnostics/DiagnosticEvidenceNavigatorTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/diagnostics/InvestigationHandoffTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/discover/LastDiscoverSnapshotTest.java`

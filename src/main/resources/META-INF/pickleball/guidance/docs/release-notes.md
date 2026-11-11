@@ -1,5 +1,13 @@
 # Release notes
 
+## 3.0.0
+
+In progress. Dalton is an opt-in hydrated working copy. Git files stay the source of truth. The database is `.pickleball/dalton/dalton.db`, gitignored, and never required for a fresh clone or CI. With Dalton off, feature loading, configuration, and execution are unchanged.
+
+- `dalton status` reports a missing database and does not create one.
+- `dalton hydrate --dry-run` writes nothing. Gradle `daltonStatus` and the Workbench MCP tool `dalton` only forward to that CLI.
+- `sqlite-jdbc` is still not in the published POM or the consumer shadow JAR. A command that opens the database needs the driver on that classpath.
+
 ## 2.2.0
 
 _No changes yet._

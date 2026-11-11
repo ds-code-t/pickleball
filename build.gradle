@@ -7,7 +7,7 @@ plugins {
 }
 
 group = 'tools.dscode'
-version = '2.2.0'
+version = '3.0.0'
 
 repositories {
     mavenCentral()
@@ -381,6 +381,16 @@ tasks.shadowJar {
 
     exclude 'META-INF/*.SF', 'META-INF/*.RSA', 'META-INF/*.DSA'
     zip64 = true
+}
+
+tasks.register('daltonStatus', JavaExec) {
+    group = 'dalton'
+    description = 'Forward to the Dalton CLI status command. sqlite-jdbc is on this task classpath only and is not published.'
+    classpath = sourceSets.main.runtimeClasspath + configurations.detachedConfiguration(
+            dependencies.create('org.xerial:sqlite-jdbc:3.47.2.0')
+    )
+    mainClass = 'tools.dscode.dalton.DaltonCli'
+    args = ['dalton', 'status']
 }
 
 tasks.register('verifySqliteNotPublished') {

@@ -1,6 +1,6 @@
 # Direct-control handoff
 
-Contract version 1 (`session-descriptor.v1`). Pickleball 2.2.0.
+Contract version 1 (`session-descriptor.v1`). Pickleball 3.0.0.
 
 A live Workbench session can publish a descriptor so an external tool can attach to the browser Pickleball already owns. dom-composite 2.4.0 is the optional tool. Pickleball stays the owner of the browser process and the WebDriver. The external tool only attaches, acts, and detaches.
 
