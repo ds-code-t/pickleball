@@ -334,6 +334,92 @@ class DaltonRunTest {
         }
     }
 
+    @Test
+    @Timeout(value = 300, unit = TimeUnit.SECONDS)
+    void glueChangeCompilesOnceAndRestartsTheWorker() throws Exception {
+        Path features = project.resolve("features");
+        Files.createDirectories(features);
+        Files.createDirectories(project.resolve("build/classes/java/test"));
+        Files.createDirectories(project.resolve("src/test/java"));
+        Files.writeString(features.resolve("glue.feature"), """
+                Feature: Dalton glue
+                  @dalton-glue
+                  Scenario: Glue Ada
+                    * INFO: amount is 2
+                    * ASSERT: "2" equals "2"
+                """);
+        Files.writeString(project.resolve("pom.xml"), "<project></project>\n");
+        Path mvnw = project.resolve("mvnw");
+        Files.writeString(mvnw, """
+                #!/bin/sh
+                dir=$(CDPATH= cd -- "$(dirname "$0")" && pwd)
+                printf 'compile\\n' >> "$dir/.pickleball/dalton/compile.log"
+                exit 0
+                """);
+        Files.writeString(project.resolve("mvnw.cmd"), """
+                @echo off
+                echo compile>> "%~dp0.pickleball\\dalton\\compile.log"
+                exit /b 0
+                """);
+        if (!System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).contains("win")) {
+            Files.setPosixFilePermissions(mvnw, PosixFilePermissions.fromString("rwxr-xr-x"));
+        }
+        Path java = project.resolve("src/test/java/Sample.java");
+        Files.writeString(java, "class Sample { int x; }\n");
+        Files.createDirectories(project.resolve(".pickleball/dalton"));
+        Files.writeString(project.resolve(".pickleball/dalton/glue.fingerprint"), DaltonRun.glueFingerprint(project));
+        String classpath = System.getProperty("pkb_dalton_run_classpath");
+        String log = System.getProperty("pkb_dalton_log");
+        try {
+            System.setProperty("pkb_dalton_run_classpath", System.getProperty("java.class.path"));
+            System.setProperty("pkb_dalton_log", "run");
+            List<String> selection = List.of(
+                    "-Dpkb_tags=@dalton-glue",
+                    "-Dpkb_glue=tools.dscode.coredefinitions",
+                    "-Dpkb_features=wd-file:" + features.toAbsolutePath().normalize().toString().replace('\\', '/'),
+                    "-Dpkb_loglevel=error",
+                    "-Dpkb_parallel=1",
+                    "-Dcucumber.execution.parallel.enabled=false"
+            );
+            DaltonRun.Outcome first = DaltonRun.execute(project, selection, false);
+            assertEquals(0, first.exit(), workerLog(first));
+            assertFalse(first.reused(), workerLog(first));
+            assertTrue(scenarioLines(first.out()).contains("scenario PASSED Glue Ada"), first.out());
+            long oldPid = warmPid();
+            assertFalse(Files.isRegularFile(project.resolve(".pickleball/dalton/compile.log")));
+
+            Files.writeString(java, "class Sample { int x; int y; }\n");
+            DaltonRun.Outcome restarted = DaltonRun.execute(project, selection, false);
+            assertEquals(0, restarted.exit(), workerLog(restarted));
+            assertFalse(restarted.reused(), workerLog(restarted));
+            assertEquals(List.of("compile"), Files.readAllLines(project.resolve(".pickleball/dalton/compile.log")));
+            assertTrue(scenarioLines(restarted.out()).contains("scenario PASSED Glue Ada"), restarted.out());
+            assertTrue(gone(oldPid), "old worker " + oldPid + " still alive");
+            long newPid = warmPid();
+            assertNotEquals(oldPid, newPid);
+
+            DaltonRun.Outcome reused = DaltonRun.execute(project, selection, false);
+            assertEquals(0, reused.exit(), workerLog(reused));
+            assertTrue(reused.reused(), workerLog(reused));
+            assertEquals(newPid, warmPid());
+            assertEquals(List.of("compile"), Files.readAllLines(project.resolve(".pickleball/dalton/compile.log")));
+            assertTrue(scenarioLines(reused.out()).contains("scenario PASSED Glue Ada"), reused.out());
+        } finally {
+            DaltonRun.stop(project);
+            restore("pkb_dalton_run_classpath", classpath);
+            restore("pkb_dalton_log", log);
+        }
+    }
+
+    private static boolean gone(long pid) throws InterruptedException {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+        while (System.nanoTime() < deadline) {
+            if (ProcessHandle.of(pid).map(handle -> !handle.isAlive()).orElse(true)) return true;
+            Thread.sleep(50);
+        }
+        return ProcessHandle.of(pid).map(handle -> !handle.isAlive()).orElse(true);
+    }
+
     private static String coldShell() {
         return """
                 #!/bin/bash
