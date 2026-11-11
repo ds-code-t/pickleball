@@ -92,6 +92,9 @@ public final class DynamicControl {
     }
 
     public static ControlCallResult<Object> executeStep(String text, String argument) {
+        if (GlobalState.getCurrentScenarioState() == null) {
+            return NativeDynamicSteps.execute(text, argument);
+        }
         ControlCallResult<StepExtension> created = createStep(text, argument);
         if (!created.successful()) {
             return new ControlCallResult<>(created.status(), null, created.error());
@@ -112,6 +115,9 @@ public final class DynamicControl {
             String argument,
             MappingContext mappingContext
     ) {
+        if (GlobalState.getCurrentScenarioState() == null) {
+            return NativeDynamicSteps.execute(text, argument);
+        }
         ControlCallResult<StepExtension> created = createStep(text, argument);
         if (!created.successful()) {
             return new ControlCallResult<>(created.status(), null, created.error());
@@ -135,7 +141,7 @@ public final class DynamicControl {
 
         CurrentScenarioState state = GlobalState.getCurrentScenarioState();
         if (state == null) {
-            return ControlCallResult.unavailable("Dynamic execution requires an active Pickleball test context.");
+            return NativeDynamicSteps.execute(step.getUnmodifiedText(), "");
         }
 
         Phrase previousPhrase = state.currentPhrase;

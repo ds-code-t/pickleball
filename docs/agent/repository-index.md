@@ -808,6 +808,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-control-api/src/main/java/tools/dscode/control/api/MappingControl.java`
 - `pickleball-control-api/src/main/java/tools/dscode/control/api/MappingScope.java`
 - `pickleball-control-api/src/main/java/tools/dscode/control/api/MappingSnapshot.java`
+- `pickleball-control-api/src/main/java/tools/dscode/control/api/NativeDynamicSteps.java`
 - `pickleball-control-api/src/main/java/tools/dscode/control/api/NodeMapSnapshot.java`
 - `pickleball-control-api/src/main/java/tools/dscode/control/api/OverrideScope.java`
 - `pickleball-control-api/src/main/java/tools/dscode/control/api/PageElementQuery.java`
@@ -843,9 +844,11 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-control-api/src/main/java/tools/dscode/control/bridge/ControlBridgeValueResult.java`
 - `pickleball-control-api/src/main/java/tools/dscode/control/bridge/DebuggerAddress.java`
 - `pickleball-control-api/src/test/java/com/example/glue/SampleGlue.java`
+- `pickleball-control-api/src/test/java/tools/dscode/control/api/DynamicControlNoScenarioTest.java`
 - `pickleball-control-api/src/test/java/tools/dscode/control/api/PageElementQueryTest.java`
 - `pickleball-control-api/src/test/java/tools/dscode/control/api/StepMapSeedsTest.java`
 - `pickleball-control-api/src/test/java/tools/dscode/control/bridge/ControlBridgeEventRecorderTest.java`
+- `pickleball-control-api/src/test/java/tools/dscode/control/bridge/ControlBridgeNativeStepTest.java`
 - `pickleball-control-api/src/test/java/tools/dscode/control/bridge/ControlBridgeStepResolverTest.java`
 - `pickleball-control-api/src/test/java/tools/dscode/control/bridge/DebuggerAddressTest.java`
 

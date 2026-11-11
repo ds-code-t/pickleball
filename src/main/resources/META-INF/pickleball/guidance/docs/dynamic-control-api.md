@@ -14,7 +14,7 @@ Installing Pickleball with no control handler and never invoking the bundled con
 
 `MappingControl` provides retry-friendly access to the live `ParsingMap` / `NodeMap` structures, caller-defined Mapping contexts, scoped overrides, snapshots, and resolution explanation. Live mutations are deliberate and are not automatically rolled back.
 
-The control API returns `SUCCESS`, `FAILED`, or `UNAVAILABLE` for exploratory operations. Calls without a required live Pickleball context return `UNAVAILABLE`.
+The control API returns `SUCCESS`, `FAILED`, or `UNAVAILABLE` for exploratory operations. Calls without a required live Pickleball context return `UNAVAILABLE`. `DynamicControl.executeStep` does not require that context. With no Cucumber scenario on the thread it runs the step on the native engine. Glue is `NativeDynamicSteps.useGlue` or the `pkb_engine_glue` class list. A live or paused scenario keeps the existing detached execution, including the failure restore. The control bridge uses that native call only when no scenario lane is active. A live lane is unchanged. Step creation, mapping interception, browser evidence, and service calls still return `UNAVAILABLE` without a live scenario.
 
 ## Semantic hooks
 

@@ -254,6 +254,18 @@ final class ControlBridgeCoordinator implements ControlHookHandler, AutoCloseabl
         if (text == null || text.isBlank()) {
             return unavailable("Dynamic step text must not be blank.");
         }
+        if (lanes.isEmpty() && normalizeScenarioId(scenarioId) == null) {
+            ControlCallResult<Object> nativeResult = DynamicControl.executeStep(text, argument == null ? "" : argument);
+            Object value = nativeResult.value();
+            var error = nativeResult.error();
+            return new ControlBridgeCallResult(
+                    nativeResult.status().name(),
+                    value == null ? null : value.getClass().getName(),
+                    value == null ? null : clipped(Objects.toString(value)),
+                    error == null ? null : bridgeError(error.type(), error.message(), error.stackTrace()),
+                    status()
+            );
+        }
         ScenarioLane lane = selectedLane(normalizeScenarioId(scenarioId));
         if (lane == null) {
             return unavailableForScenarioCommand(scenarioId, "Dynamic execution");

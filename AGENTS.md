@@ -384,3 +384,5 @@ Phase 5 parses Gherkin with the gherkin library, then converts. `EncodingRewrite
 Phase 6 resolves scenarios from any `ScenarioSource` by tags, name, feature name, example rows, step text, order, and limit. The rules match `CucumberScanUtil` and `ExampleRowFilter`. Memory text and Dalton rows use that same lookup.
 
 Phase 7 runs scenarios and single steps through `PickleballEngine.run` and `runStep`. Sources are in-memory Gherkin, a runtime step list with nothing on disk, a file, or a Dalton row. `engine help`, `engine run`, and `engine step` are the CLI. The launcher, `dalton run --engine`, Gradle `engineRun`, Workbench `EngineCliForwarder`, and MCP `engine` only forward to that CLI and do not run steps themselves. `pkb_engine_log=run` logs the run. A Cucumber suite is unchanged.
+
+Phase 8 runs `DynamicControl.executeStep` when no Cucumber scenario is on the thread. The live and paused path is unchanged. The control bridge uses that native call only when it has no scenario lane. `pkb_engine_glue` names glue classes for that call.
