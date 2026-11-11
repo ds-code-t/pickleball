@@ -74,4 +74,8 @@ The consumer project's [feature files](../maven-consumer-project/src/test/resour
 
 Cucumber CLI `--tags` / `--name` / `--glue` projection can overlay ordinary and named-profile runs. Direct `pkb_runvars` and sealed `pkb_overriderunvars` skip that projection so the controlled or sealed RunVar set is not mutated. Supply tag/name/glue inside the compact or expanded control instead.
 
+## Native engine CLI
+
+`engine run` and `engine step` run ordinary glue from text, a step list, a file, or a Dalton row. They do not start Cucumber. Gradle `engineRun`, Workbench, and MCP `engine` only forward to that CLI. A normal Cucumber or JUnit run is unchanged.
+
 [Documentation home](README.md) · [Next: Dynamic Steps](dynamic-steps.md)

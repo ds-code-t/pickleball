@@ -469,7 +469,9 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/dalton/DaltonSources.java`
 - `src/main/java/tools/dscode/engine/context/ExecutionContext.java`
 - `src/main/java/tools/dscode/engine/convert/CucumberModelConverter.java`
+- `src/main/java/tools/dscode/engine/EngineCli.java`
 - `src/main/java/tools/dscode/engine/EngineLog.java`
+- `src/main/java/tools/dscode/engine/EngineOptions.java`
 - `src/main/java/tools/dscode/engine/match/AmbiguousMatchException.java`
 - `src/main/java/tools/dscode/engine/match/GlueStep.java`
 - `src/main/java/tools/dscode/engine/match/StepKind.java`
@@ -489,6 +491,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/engine/model/Table.java`
 - `src/main/java/tools/dscode/engine/parse/EncodingRewrite.java`
 - `src/main/java/tools/dscode/engine/parse/GherkinEngineParser.java`
+- `src/main/java/tools/dscode/engine/PickleballEngine.java`
 - `src/main/java/tools/dscode/engine/resolve/ScenarioResolver.java`
 - `src/main/java/tools/dscode/engine/source/DaltonScenarioSource.java`
 - `src/main/java/tools/dscode/engine/source/FileScenarioSource.java`
@@ -642,12 +645,14 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/engine/convert/NeutralDataTest.java`
 - `src/test/java/tools/dscode/engine/match/StepRegistryTest.java`
 - `src/test/java/tools/dscode/engine/parse/GherkinEngineParserTest.java`
+- `src/test/java/tools/dscode/engine/PickleballEngineTest.java`
 - `src/test/java/tools/dscode/engine/resolve/ScenarioResolverTest.java`
 - `src/test/java/tools/dscode/expectedfailure/ExpectedFailureRunnerTest.java`
 - `src/test/java/tools/dscode/expectedfailure/ExpectedFailureSteps.java`
 - `src/test/java/tools/dscode/GuidancePackagingTest.java`
 - `src/test/java/tools/dscode/launcher/AgentExpansionTest.java`
 - `src/test/java/tools/dscode/launcher/DaltonCliLaunchTest.java`
+- `src/test/java/tools/dscode/launcher/EngineCliLaunchTest.java`
 - `src/test/java/tools/dscode/launcher/GuidanceCommandGoldenTest.java`
 - `src/test/java/tools/dscode/launcher/PickleballWorkbenchLauncherTest.java`
 - `src/test/java/tools/dscode/launcher/Release218RecommendationsTest.java`
@@ -898,6 +903,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/dalton/DaltonCliForwarder.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/diagnostics/DiagnosticEvidenceNavigator.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/discover/LastDiscoverSnapshot.java`
+- `pickleball-workbench/src/main/java/tools/dscode/workbench/engine/EngineCliForwarder.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/lease/WorkbenchCallContext.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/lease/WorkbenchControlLease.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/lease/WorkbenchControlLeaseSnapshot.java`
@@ -981,6 +987,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/diagnostics/DiagnosticEvidenceNavigatorTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/diagnostics/InvestigationHandoffTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/discover/LastDiscoverSnapshotTest.java`
+- `pickleball-workbench/src/test/java/tools/dscode/workbench/engine/EngineCliForwarderTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/lease/WorkbenchControlLeaseTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/mapping/MappingValueCodecTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/mcp/WorkbenchAttachServerProgressTest.java`

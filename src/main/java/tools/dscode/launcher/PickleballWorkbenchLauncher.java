@@ -54,6 +54,11 @@ public final class PickleballWorkbenchLauncher {
     }
 
     public static void main(String[] args) {
+        int engine = dispatchEngineIfAny(args, System.out, System.err);
+        if (engine >= 0) {
+            if (engine != 0) exitProcess(engine);
+            return;
+        }
         int dalton = dispatchDaltonIfAny(args, System.out, System.err);
         if (dalton >= 0) {
             if (dalton != 0) exitProcess(dalton);
@@ -65,6 +70,15 @@ public final class PickleballWorkbenchLauncher {
             return;
         }
         dispatch(args);
+    }
+
+    /**
+     * The native engine is a core CLI, not a Workbench verb. Returns {@code -1}
+     * when {@code args} are not an {@code engine} invocation.
+     */
+    static int dispatchEngineIfAny(String[] args, PrintStream out, PrintStream err) {
+        if (!tools.dscode.engine.EngineCli.handles(args)) return -1;
+        return tools.dscode.engine.EngineCli.execute(args, out, err);
     }
 
     /**

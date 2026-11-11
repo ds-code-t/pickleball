@@ -10,6 +10,7 @@ import tools.dscode.control.protocol.ControlBridgeMappingSnapshot;
 import tools.dscode.control.protocol.DiagnosticQuery;
 import tools.dscode.workbench.WorkbenchServices;
 import tools.dscode.workbench.dalton.DaltonCliForwarder;
+import tools.dscode.workbench.engine.EngineCliForwarder;
 import tools.dscode.workbench.nav.WorkbenchGoLink;
 import tools.dscode.workbench.lease.WorkbenchCallContext;
 import tools.dscode.workbench.lease.WorkbenchLeaseHolder;
@@ -392,6 +393,16 @@ final class WorkbenchMcpTools {
                         )
                 ), "args"),
                 arguments -> forwardDalton(arguments.get("args")));
+        add("engine",
+                "Forward arguments to the pickleball engine CLI. Does not run steps inside Workbench.",
+                schema(Map.of(
+                        "args", Map.of(
+                                "type", "array",
+                                "description", "Arguments after engine. Example: [\"help\"], [\"run\", \"--text=Feature: F\\\\n  Scenario: S\\\\n    Given hello\"], or [\"step\", \"--text=hello\"].",
+                                "items", Map.of("type", "string")
+                        )
+                ), "args"),
+                arguments -> forwardEngine(arguments.get("args")));
     }
 
     private Object forwardDalton(Object rawArgs) {
@@ -407,6 +418,27 @@ final class WorkbenchMcpTools {
             throw new IllegalArgumentException("error: dalton requires args.\nfix: Pass {\"args\":[\"status\"]}.");
         }
         DaltonCliForwarder.Result result = DaltonCliForwarder.run(services.projectRoot(), args);
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("exit", result.exit());
+        body.put("out", result.out());
+        body.put("err", result.err());
+        body.put("forwarded", args);
+        return body;
+    }
+
+    private Object forwardEngine(Object rawArgs) {
+        List<String> args = new ArrayList<>();
+        if (rawArgs instanceof List<?> list) {
+            for (Object item : list) {
+                if (item != null && !String.valueOf(item).isBlank()) args.add(String.valueOf(item));
+            }
+        } else if (rawArgs != null) {
+            throw new IllegalArgumentException("error: engine requires args as a list of strings.\nfix: Pass {\"args\":[\"help\"]}.");
+        }
+        if (args.isEmpty()) {
+            throw new IllegalArgumentException("error: engine requires args.\nfix: Pass {\"args\":[\"help\"]}.");
+        }
+        EngineCliForwarder.Result result = EngineCliForwarder.run(services.projectRoot(), args);
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("exit", result.exit());
         body.put("out", result.out());

@@ -95,7 +95,7 @@ public final class DaltonCli {
                 Usage: dalton scenarios list [--feature=<relative-path>] [--project=<dir>] [--json]
                 Usage: dalton steps list [--feature=<relative-path>] [--scenario=<ord-or-name>] [--project=<dir>] [--json]
                 Usage: dalton conflicts [--project=<dir>] [--json]
-                Usage: dalton run [--project=<dir>] [--dry-run] [--tags=<expr>] [--name=<text>] [--glue=<packages>]
+                Usage: dalton run [--project=<dir>] [--dry-run] [--tags=<expr>] [--name=<text>] [--glue=<packages>] [--engine]
                 Files stay the source of truth. The database is .pickleball/dalton/dalton.db and is gitignored.
                 status and hydrate --dry-run do not create a database when it is missing.
                 hydrate copies features, configs, calls, components, resource maps, templates, and dalton-entities/*.entity files.
@@ -112,11 +112,22 @@ public final class DaltonCli {
                 entity put uses that same write, so the entity file row and the entity table stay together.
                 files, features, scenarios, steps, and conflicts are read-only. They do not create a database. --json prints one stable JSON object. Text mode prints labels. conflicts lists an untracked database edit and a row edited on both sides.
                 Discovery reads include, exclude, max-file-size (default 1048576), and binary-policy (default skip) from dalton.properties. System properties pkb_dalton_include, pkb_dalton_exclude, pkb_dalton_max_file_size, and pkb_dalton_binary_policy win over that file. An empty include keeps the fixed directories. Exclude is added to the defaults, which already skip .git, target, build, .pickleball, and common binary extensions. A file over the size limit, or a binary by extension or by a null byte or a high control-byte ratio, is ignored. dalton status prints skipped and up to five sample lines and does not create a database. Hydrate prints ignored= for those files. --path still applies the limits. --path --force is the only bypass. hash-only is not implemented. Set pkb_dalton_log=discover to log each reason.
-                dalton run executes from the database on a warm JVM. It sets pkb_dalton=true and uses the pickleball-test-engine, the same engine as a normal run. --tags, --name, and --glue become pkb_tags, pkb_name, and pkb_glue. It prints one line per scenario (`scenario PASSED|FAILED <name>`) and one line per step (`step PASSED|FAILED <text>`). Java glue is fingerprinted by path, size, and modification time. A change compiles once with mvnw test-compile or gradlew testClasses, then restarts the worker. The classpath is pkb_dalton_run_classpath or the Workbench classpath.cache. --dry-run prints the plan and writes nothing. Full Gradle or Maven remains the CI build. Set pkb_dalton_log=run to log the worker.
+                dalton run executes from the database on a warm JVM. It sets pkb_dalton=true and uses the pickleball-test-engine, the same engine as a normal run. --tags, --name, and --glue become pkb_tags, pkb_name, and pkb_glue. It prints one line per scenario (`scenario PASSED|FAILED <name>`) and one line per step (`step PASSED|FAILED <text>`). Java glue is fingerprinted by path, size, and modification time. A change compiles once with mvnw test-compile or gradlew testClasses, then restarts the worker. The classpath is pkb_dalton_run_classpath or the Workbench classpath.cache. --dry-run prints the plan and writes nothing. Full Gradle or Maven remains the CI build. Set pkb_dalton_log=run to log the worker. --engine forwards the same selection to the native engine CLI and does not start the Cucumber runner.
                 """;
     }
 
     private static int runCommand(Path project, List<String> tokens, PrintStream out, PrintStream err) {
+        if (has(tokens, "--engine")) {
+            List<String> forwarded = new ArrayList<>();
+            forwarded.add("engine");
+            forwarded.add("run");
+            forwarded.add("--dalton");
+            forwarded.add("--project=" + project.toAbsolutePath().normalize());
+            copyOption(tokens, forwarded, "--name");
+            copyOption(tokens, forwarded, "--glue");
+            copyOption(tokens, forwarded, "--feature");
+            return tools.dscode.engine.EngineCli.execute(forwarded.toArray(String[]::new), out, err);
+        }
         boolean dry = has(tokens, "--dry-run");
         List<String> extra = DaltonRun.selection(
                 option(tokens, "--tags="),
@@ -137,6 +148,13 @@ public final class DaltonCli {
             err.println("error: " + (failure.getMessage() == null ? failure.getClass().getSimpleName() : failure.getMessage()));
             err.println("fix: compile the project once, then dalton run --dry-run");
             return 1;
+        }
+    }
+
+    private static void copyOption(List<String> tokens, List<String> forwarded, String name) {
+        String prefix = name + "=";
+        for (String token : tokens) {
+            if (token.startsWith(prefix)) forwarded.add(token);
         }
     }
 

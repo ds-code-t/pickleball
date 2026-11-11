@@ -383,6 +383,23 @@ tasks.shadowJar {
     zip64 = true
 }
 
+tasks.register('engineRun', JavaExec) {
+    group = 'engine'
+    description = 'Forward to the engine CLI. sqlite-jdbc is on this task classpath only and is not published.'
+    classpath = sourceSets.main.runtimeClasspath + configurations.detachedConfiguration(
+            dependencies.create('org.xerial:sqlite-jdbc:3.47.2.0')
+    )
+    mainClass = 'tools.dscode.engine.EngineCli'
+    args = ['engine', 'run']
+    if (project.hasProperty('engineText')) args += ['--text=' + project.property('engineText')]
+    if (project.hasProperty('engineFile')) args += ['--file=' + project.property('engineFile')]
+    if (project.hasProperty('engineSteps')) args += ['--steps=' + project.property('engineSteps')]
+    if (project.hasProperty('engineGlue')) args += ['--glue=' + project.property('engineGlue')]
+    if (project.hasProperty('engineName')) args += ['--name=' + project.property('engineName')]
+    if (project.hasProperty('engineDalton')) args += ['--dalton']
+    if (project.hasProperty('engineFeature')) args += ['--feature=' + project.property('engineFeature')]
+}
+
 tasks.register('daltonStatus', JavaExec) {
     group = 'dalton'
     description = 'Forward to the Dalton CLI status command. sqlite-jdbc is on this task classpath only and is not published.'

@@ -382,3 +382,5 @@ Phase 4 uses `Table` and `DocText` in mappings, data elements, data operations, 
 Phase 5 parses Gherkin with the gherkin library, then converts. `EncodingRewrite` repeats the encoding line swap. `GherkinEngineParser.expand` keeps placeholders, marks background steps, and applies Scenario Tags. Sources are files, Dalton rows, in-memory text, and a step list with no file.
 
 Phase 6 resolves scenarios from any `ScenarioSource` by tags, name, feature name, example rows, step text, order, and limit. The rules match `CucumberScanUtil` and `ExampleRowFilter`. Memory text and Dalton rows use that same lookup.
+
+Phase 7 runs scenarios and single steps through `PickleballEngine.run` and `runStep`. Sources are in-memory Gherkin, a runtime step list with nothing on disk, a file, or a Dalton row. `engine help`, `engine run`, and `engine step` are the CLI. The launcher, `dalton run --engine`, Gradle `engineRun`, Workbench `EngineCliForwarder`, and MCP `engine` only forward to that CLI and do not run steps themselves. `pkb_engine_log=run` logs the run. A Cucumber suite is unchanged.
