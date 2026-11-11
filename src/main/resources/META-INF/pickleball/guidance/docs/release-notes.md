@@ -24,6 +24,8 @@ Dalton is an opt-in hydrated working copy. Git files stay the source of truth. T
 
 **Round 2:** Adds a real DB edit path (`dalton feature put` with Gherkin validation, re-projection, and `db_edited` flags), CLI query surface for GUI, discovery include/exclude/size/binary config, loud failure when sqlite-jdbc is missing for consumers, Workbench GUI browse/edit (CLI-only), a warm `dalton run` fast path, and `secret-fields=` for extra secret names. The database is not encrypted. File watcher is out of scope.
 
+**Round 3 (in progress):** Pickleball gets its own execution engine so scenarios and steps can come from files, the Dalton database, in-memory text, or steps written at runtime. Cucumber becomes an optional adapter with identical results. Gherkin syntax and step annotations do not change.
+
 ## 2.2.0
 
 _No changes yet._

@@ -82,6 +82,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/maintainer/2.1.19-workbench-expansion-ideas.md`
 - `docs/maintainer/2.1.19-workbench-expansion-roadmap.md`
 - `docs/maintainer/3.0.0-dalton-design.md`
+- `docs/maintainer/3.0.0-engine-design.md`
 - `docs/maintainer/consumer-sim-harness.md`
 - `docs/maintainer/guidance-goldens.md`
 - `docs/maintainer/pointer-eval-harness.md`
@@ -102,6 +103,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/roadmaps/2.1.18-workbench-full-coverage.md`
 - `docs/roadmaps/3.0.0-dalton-roadmap.md`
 - `docs/roadmaps/3.0.0-dalton-round2-roadmap.md`
+- `docs/roadmaps/3.0.0-decouple-round3-roadmap.md`
 - `docs/service-call-scenarios.md`
 - `docs/step-overrides.md`
 - `docs/workbench-agent-detail.md`
