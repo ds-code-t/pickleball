@@ -12,6 +12,7 @@ import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
@@ -271,6 +272,119 @@ class DaltonRunTest {
 
     private static long countPrefix(List<String> lines, String prefix) {
         return lines.stream().filter(line -> line.startsWith(prefix)).count();
+    }
+
+    @Test
+    @Timeout(value = 300, unit = TimeUnit.SECONDS)
+    void timingScriptMeasuresAFixtureAndReusesTheWorker() throws Exception {
+        Path features = project.resolve("features");
+        Files.createDirectories(features);
+        Files.writeString(features.resolve("time.feature"), """
+                Feature: Dalton time
+                  @dalton-time
+                  Scenario: Time Ada
+                    * INFO: amount is 1
+                    * ASSERT: "1" equals "1"
+                """);
+        Files.writeString(project.resolve("build.gradle"), "// timing fixture\n");
+        Path gradlew = project.resolve("gradlew");
+        Files.writeString(gradlew, coldShell());
+        Files.writeString(project.resolve("gradlew.bat"), coldBat());
+        if (!System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).contains("win")) {
+            Files.setPosixFilePermissions(gradlew, PosixFilePermissions.fromString("rwxr-xr-x"));
+        }
+        Files.createDirectories(project.resolve(".pickleball/dalton"));
+        Files.writeString(project.resolve(".pickleball/dalton/glue.fingerprint"), DaltonRun.glueFingerprint(project));
+        Path classpathFile = Path.of("build", "dalton-run-classpath.txt");
+        Files.createDirectories(classpathFile.getParent());
+        String previous = Files.isRegularFile(classpathFile) ? Files.readString(classpathFile) : null;
+        String classpath = System.getProperty("java.class.path");
+        if (classpath.indexOf(' ') >= 0) classpath = "\"" + classpath + "\"";
+        Files.writeString(classpathFile, classpath + "\n");
+        String featureDir = features.toAbsolutePath().normalize().toString().replace('\\', '/');
+        try {
+            Process process = new ProcessBuilder(
+                    "python3",
+                    "scripts/time_dalton_run.py",
+                    "--project",
+                    project.toString(),
+                    "--tags=@dalton-time",
+                    "--glue=tools.dscode.coredefinitions",
+                    "--define=pkb_features=wd-file:" + featureDir,
+                    "--define=pkb_loglevel=error",
+                    "--define=pkb_parallel=1",
+                    "--define=cucumber.execution.parallel.enabled=false"
+            ).directory(Path.of("").toAbsolutePath().toFile()).redirectErrorStream(true).start();
+            String text = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+            assertEquals(0, process.waitFor(), text);
+            assertTrue(text.contains("coldMs="), text);
+            assertTrue(text.contains("coldExit=0"), text);
+            assertTrue(text.contains("warm1Ms="), text);
+            assertTrue(text.contains("warm1Exit=0"), text);
+            assertTrue(text.contains("warm1Reused=false"), text);
+            assertTrue(text.contains("warm2Ms="), text);
+            assertTrue(text.contains("warm2Exit=0"), text);
+            assertTrue(text.contains("warm2Reused=true"), text);
+            assertTrue(text.contains("results match"), text);
+            assertTrue(ProcessHandle.of(warmPid()).isPresent(), text);
+        } finally {
+            DaltonRun.stop(project);
+            if (previous == null) Files.deleteIfExists(classpathFile);
+            else Files.writeString(classpathFile, previous);
+        }
+    }
+
+    private static String coldShell() {
+        return """
+                #!/bin/bash
+                cd "$(dirname "$0")" || exit 2
+                dalton="$PWD/.pickleball/dalton"
+                trace="$dalton/cold-outcomes.txt"
+                rm -f "$trace"
+                if [[ -n "${JAVA_HOME:-}" && -x "$JAVA_HOME/bin/java" ]]; then
+                  JAVA="$JAVA_HOME/bin/java"
+                else
+                  JAVA=java
+                fi
+                args=()
+                for token in "$@"; do
+                  if [[ "$token" == -D* ]]; then
+                    args+=("$token")
+                  fi
+                done
+                args+=("-Dpkb_dalton=true")
+                args+=("-Dpkb_dalton_run_trace=true")
+                args+=("-Dpkb_dalton_run_trace_file=$trace")
+                "$JAVA" -cp "@$dalton/classpath.cache" tools.dscode.launcher.WorkbenchDirectRun "${args[@]}"
+                code=$?
+                if [[ -f "$trace" ]]; then
+                  cat "$trace"
+                fi
+                exit "$code"
+                """;
+    }
+
+    private static String coldBat() {
+        return """
+                @echo off
+                setlocal EnableExtensions
+                cd /d "%~dp0"
+                set "DALTON=%CD%\\.pickleball\\dalton"
+                set "TRACE=%DALTON%\\cold-outcomes.txt"
+                if exist "%TRACE%" del /q "%TRACE%"
+                set "EXTRA="
+                :collect
+                if "%~1"=="" goto launch
+                echo %~1| findstr /b /c:"-D" >nul && set "EXTRA=%EXTRA% %~1"
+                shift
+                goto collect
+                :launch
+                if defined JAVA_HOME (set "JAVA=%JAVA_HOME%\\bin\\java.exe") else (set "JAVA=java")
+                "%JAVA%" -cp "@%DALTON%\\classpath.cache" tools.dscode.launcher.WorkbenchDirectRun %EXTRA% -Dpkb_dalton=true -Dpkb_dalton_run_trace=true "-Dpkb_dalton_run_trace_file=%TRACE%"
+                set CODE=%ERRORLEVEL%
+                if exist "%TRACE%" type "%TRACE%"
+                exit /b %CODE%
+                """;
     }
 
     @Test
