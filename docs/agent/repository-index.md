@@ -101,6 +101,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/roadmaps/2.1.18-workbench-coverage-findings.md`
 - `docs/roadmaps/2.1.18-workbench-full-coverage.md`
 - `docs/roadmaps/3.0.0-dalton-roadmap.md`
+- `docs/roadmaps/3.0.0-dalton-round2-roadmap.md`
 - `docs/service-call-scenarios.md`
 - `docs/step-overrides.md`
 - `docs/workbench-agent-detail.md`

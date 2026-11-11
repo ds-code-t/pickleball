@@ -12,6 +12,8 @@ Dalton is an opt-in hydrated working copy. Git files stay the source of truth. T
 - `dalton extract` (alias `hydrate-out`) writes stored file bytes back to disk and does not reformat them. An unedited row stays as the original file. Both sides changed prints `conflict: <path>` and exits 1 unless `--force` is set. Gradle `daltonExtract` only forwards to that CLI.
 - `dalton history` stores run summaries beside diagnostic reports. It does not change `reports/diagnostic-runs` or `pkb_reportretention`. `retain` is date-stamped and size-capped. Gradle `daltonHistory`, Workbench, and MCP only forward to the CLI. Logging stays off unless `pkb_dalton_log` names the capability.
 
+**Round 2 (in progress on branch 3.0.0):** Adds a real DB edit path (`dalton feature put` with Gherkin validation, re-projection, and `db_edited` flags), CLI query surface for GUI, discovery include/exclude/size/binary config, loud failure when sqlite-jdbc is missing for consumers, Workbench GUI browse/edit (CLI-only), and a warm `dalton run` fast path. File watcher is out of scope.
+
 ## 2.2.0
 
 _No changes yet._
