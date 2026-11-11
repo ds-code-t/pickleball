@@ -27,6 +27,7 @@ Dalton is an opt-in hydrated working copy. Git files stay the source of truth. T
 **Round 3 (in progress):** Pickleball gets its own execution engine so scenarios and steps can come from files, the Dalton database, in-memory text, or steps written at runtime. Cucumber becomes an optional adapter with identical results. Gherkin syntax and step annotations do not change.
 
 - Phase 1 adds a Pickleball-owned model (`EngineFeature`, `EngineScenario`, `EngineStep`, `Table`, `DocText`, `Status`) and converters to Cucumber messages, pickles, data tables, and doc strings. Nothing in a Cucumber run changes.
+- Phase 2 matches steps with a Pickleball registry that reads the existing step annotations and uses the same Cucumber expression and regex rules. Step text and annotations do not change. Matching does not run the step.
 
 ## 2.2.0
 

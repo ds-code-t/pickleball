@@ -372,3 +372,6 @@ A functionality change is complete only when:
 ## Native engine (3.0.0 Round 3)
 
 Phase 1 adds Pickleball-owned model types in `tools.dscode.engine.model` (`EngineStep`, `EngineScenario`, `EngineFeature`, `Table`, `DocText`, `Status`, `RunResult`) and `CucumberModelConverter` at the adapter edge. Existing Cucumber execution is unchanged. The locked design remains `docs/maintainer/3.0.0-engine-design.md`.
+
+Phase 2 adds `StepRegistry`. It reads the same `@Given` / `@When` / `@Then` / `@And` / `@But` and other `io.cucumber.java` step annotations, leaves those values as single string literals, and matches with Cucumber's `ExpressionFactory` (regex and Cucumber expressions, parameter types, DataTable / DocString parameters, step overrides, and ambiguity). Dispatch kinds for dynamic, block-conditional, RUN, and service-call steps are stubs and do not execute the step. `pkb_engine_log=match` or `registry` writes `.pickleball/engine/engine.log`.
+

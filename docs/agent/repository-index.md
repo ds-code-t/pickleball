@@ -513,6 +513,12 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/dalton/DaltonSecrets.java`
 - `src/main/java/tools/dscode/dalton/DaltonSources.java`
 - `src/main/java/tools/dscode/engine/convert/CucumberModelConverter.java`
+- `src/main/java/tools/dscode/engine/EngineLog.java`
+- `src/main/java/tools/dscode/engine/match/AmbiguousMatchException.java`
+- `src/main/java/tools/dscode/engine/match/GlueStep.java`
+- `src/main/java/tools/dscode/engine/match/StepKind.java`
+- `src/main/java/tools/dscode/engine/match/StepMatch.java`
+- `src/main/java/tools/dscode/engine/match/StepRegistry.java`
 - `src/main/java/tools/dscode/engine/model/DocText.java`
 - `src/main/java/tools/dscode/engine/model/EngineFeature.java`
 - `src/main/java/tools/dscode/engine/model/EngineScenario.java`
@@ -668,6 +674,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/dalton/DaltonScenarioHarness.java`
 - `src/test/java/tools/dscode/dalton/DaltonSecretsTest.java`
 - `src/test/java/tools/dscode/engine/convert/CucumberModelConverterTest.java`
+- `src/test/java/tools/dscode/engine/match/StepRegistryTest.java`
 - `src/test/java/tools/dscode/expectedfailure/ExpectedFailureRunnerTest.java`
 - `src/test/java/tools/dscode/expectedfailure/ExpectedFailureSteps.java`
 - `src/test/java/tools/dscode/GuidancePackagingTest.java`
