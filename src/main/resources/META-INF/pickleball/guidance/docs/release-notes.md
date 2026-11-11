@@ -35,6 +35,7 @@ Dalton is an opt-in hydrated working copy. Git files stay the source of truth. T
 - Phase 7 runs a scenario or one step from text, a step list, a file, or a Dalton database row. Cucumber is not required. `engine run` and `engine step` are the CLI. Gradle `engineRun`, Workbench, MCP `engine`, and `dalton run --engine` only forward to that CLI. A normal Cucumber run is unchanged.
 - Phase 8 runs `DynamicControl.executeStep` with no Cucumber scenario on the thread. A live or paused scenario still uses the existing detached step. The control bridge does this only when no scenario lane is active.
 - Phase 9 keeps existing Cucumber and JUnit suites on the adapter. `pkb_engine=native` (else `PKB_ENGINE`, else `engine.properties` `mode=native`) selects the native engine. The default remains `cucumber`.
+- Phase 10 runs steps written during a step. They are not feature files. The step result records `source=runtime`.
 
 ## 2.2.0
 

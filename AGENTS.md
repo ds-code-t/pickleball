@@ -388,3 +388,5 @@ Phase 7 runs scenarios and single steps through `PickleballEngine.run` and `runS
 Phase 8 runs `DynamicControl.executeStep` when no Cucumber scenario is on the thread. The live and paused path is unchanged. The control bridge uses that native call only when it has no scenario lane. `pkb_engine_glue` names glue classes for that call.
 
 Phase 9 adds `EngineConfig`. `pkb_engine`, then `PKB_ENGINE`, then `engine.properties` `mode=` choose `native` or `cucumber`. The default is `cucumber`. Existing JUnit suites stay on the Cucumber adapter unless that toggle is `native`. `CucumberAdapterRun` and `DualRun` compare one feature on both paths.
+
+Phase 10 inserts steps written during a step (`ExecutionContext.writeSteps`) into the running scenario. They run next, with nothing on disk. The result records `source=runtime`, the same way a file step records its text. `pkb_engine_log=run` logs those lines under the `runtime` entity.

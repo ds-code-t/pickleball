@@ -493,6 +493,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/engine/model/StepResult.java`
 - `src/main/java/tools/dscode/engine/model/Table.java`
 - `src/main/java/tools/dscode/engine/parity/DualRun.java`
+- `src/main/java/tools/dscode/engine/parity/ParityHarness.java`
 - `src/main/java/tools/dscode/engine/parse/EncodingRewrite.java`
 - `src/main/java/tools/dscode/engine/parse/GherkinEngineParser.java`
 - `src/main/java/tools/dscode/engine/PickleballEngine.java`
@@ -651,6 +652,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/engine/match/StepRegistryTest.java`
 - `src/test/java/tools/dscode/engine/parity/DualRunSetupTest.java`
 - `src/test/java/tools/dscode/engine/parity/EchoParityGlue.java`
+- `src/test/java/tools/dscode/engine/parity/ParityHarnessTest.java`
 - `src/test/java/tools/dscode/engine/parse/GherkinEngineParserTest.java`
 - `src/test/java/tools/dscode/engine/PickleballEngineTest.java`
 - `src/test/java/tools/dscode/engine/resolve/ScenarioResolverTest.java`

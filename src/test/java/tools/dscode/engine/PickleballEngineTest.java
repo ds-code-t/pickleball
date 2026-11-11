@@ -4,6 +4,8 @@ import io.cucumber.java.en.Given;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import tools.dscode.dalton.DaltonHydrator;
+import tools.dscode.engine.context.ExecutionContext;
+import tools.dscode.engine.model.EngineStep;
 import tools.dscode.engine.model.RunResult;
 import tools.dscode.engine.model.Status;
 import tools.dscode.engine.source.DaltonScenarioSource;
@@ -69,5 +71,28 @@ class PickleballEngineTest {
         assertEquals(0, code, stderr.toString(StandardCharsets.UTF_8));
         assertTrue(out.contains("scenario PASSED Hi"));
         assertTrue(out.contains("step PASSED native engine echo \"hi\""));
+    }
+
+    public static class WriteGlue {
+        @Given("native engine write next {string}")
+        public void write(String value) {
+            ExecutionContext.current().writeSteps(List.of(
+                    EngineStep.of("Given ", "native engine echo \"" + value + "\"").withMetadata("source", "runtime")
+            ));
+        }
+    }
+
+    @Test
+    void runtimeWrittenStepRunsNextAndIsRecorded() {
+        String feature = """
+                Feature: Write
+                  Scenario: Mid
+                    Given native engine write next "hi"
+                """;
+        RunResult result = PickleballEngine.run(feature, EngineOptions.of(EchoGlue.class, WriteGlue.class));
+        assertEquals(Status.PASSED, result.status());
+        assertEquals(2, result.scenarios().getFirst().steps().size());
+        assertEquals("hi", result.scenarios().getFirst().steps().get(1).returned());
+        assertTrue(result.scenarios().getFirst().steps().get(1).message().contains("source=runtime"));
     }
 }

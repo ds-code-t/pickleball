@@ -109,7 +109,17 @@ public final class PickleballEngine {
                 results.add(result);
                 context.popStep();
                 List<EngineStep> written = context.drainWritten();
-                if (!written.isEmpty()) queue.addAll(index + 1, written);
+                if (!written.isEmpty()) {
+                    List<EngineStep> stamped = new ArrayList<>();
+                    for (EngineStep extra : written) {
+                        EngineStep marked = extra.metadata().containsKey("source")
+                                ? extra
+                                : extra.withMetadata("source", "runtime");
+                        stamped.add(marked);
+                        EngineLog.log(options.project(), "run", "runtime", marked.text());
+                    }
+                    queue.addAll(index + 1, stamped);
+                }
                 context.scope().put("returned", result.returned());
                 if (result.status() == Status.FAILED && !options.continueOnFailure()) break;
             }
@@ -214,7 +224,13 @@ public final class PickleballEngine {
 
     private static StepResult finish(Status status, EngineStep step, String message, String returned, long started) {
         long millis = Math.max(0, (System.nanoTime() - started) / 1_000_000L);
-        return new StepResult(status, step.keyword(), step.text(), message == null ? "" : message, millis, returned);
+        String noted = message == null ? "" : message;
+        String source = step.metadata().get("source");
+        if (source != null && !source.isBlank()) {
+            String mark = "source=" + source;
+            noted = noted.isBlank() ? mark : noted + " " + mark;
+        }
+        return new StepResult(status, step.keyword(), step.text(), noted, millis, returned);
     }
 
     static String describe(StepKind kind) {
