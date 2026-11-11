@@ -151,7 +151,7 @@ public final class DaltonHydrator {
             String now
     ) throws java.sql.SQLException {
         if (DaltonEntities.isRecord(source.path(), source.sourceType())) {
-            DaltonEntities.parseRecord(raw);
+            DaltonEntities.parseRecord(project, raw);
         }
         DaltonFiles.upsert(connection, new DaltonFiles.Row(
                 source.path(), hash, raw, mtime, source.sourceType(), now, hash, false));

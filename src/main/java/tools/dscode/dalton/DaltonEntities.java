@@ -30,8 +30,6 @@ public final class DaltonEntities {
     private static final Pattern ID = Pattern.compile("[A-Za-z0-9][A-Za-z0-9_-]*");
     private static final Pattern REFERENCE = Pattern.compile(
             "entity:([A-Za-z][A-Za-z0-9_-]*)#([A-Za-z0-9][A-Za-z0-9_-]*)(?:\\.([A-Za-z_][A-Za-z0-9_-]*(?:\\.[A-Za-z_][A-Za-z0-9_-]*)*))?");
-    private static final Pattern SECRET_KEY = Pattern.compile(
-            "(?i)password|passwd|secret|token|api[-_]?key|credential|private[-_]?key");
 
     private DaltonEntities() {
     }
@@ -69,6 +67,10 @@ public final class DaltonEntities {
 
     /** Parses a {@code .entity} file. Rejects cleartext secret fields. */
     public static Entity parseRecord(byte[] raw) {
+        return parseRecord(DaltonConfig.project(), raw);
+    }
+
+    public static Entity parseRecord(Path project, byte[] raw) {
         if (raw == null) {
             throw new IllegalArgumentException("entity file is empty");
         }
@@ -101,14 +103,14 @@ public final class DaltonEntities {
         if (payload == null) {
             throw new IllegalArgumentException("entity payload is missing");
         }
-        Prepared prepared = preparePayload(payload);
+        Prepared prepared = preparePayload(project, payload);
         String path = relativePath(type, id);
         byte[] canonical = canonicalFile(type, id, version, prepared.payload());
         return new Entity(type, id, version, prepared.payload(), prepared.secretRefs(), path, DaltonHashes.sha256(canonical));
     }
 
     public static void store(Connection connection, Path project, String path, byte[] raw) throws SQLException {
-        Entity entity = parseRecord(raw);
+        Entity entity = parseRecord(project, raw);
         if (!entity.sourceFile().equals(path)) {
             throw new IllegalArgumentException(
                     "entity path " + path + " does not match " + entity.sourceFile());
@@ -118,7 +120,7 @@ public final class DaltonEntities {
     }
 
     public static void storeIfMissing(Connection connection, Path project, String path, byte[] raw) throws SQLException {
-        Entity parsed = parseRecord(raw);
+        Entity parsed = parseRecord(project, raw);
         if (find(connection, parsed.type(), parsed.id()) != null) return;
         store(connection, project, path, raw);
     }
@@ -126,7 +128,7 @@ public final class DaltonEntities {
     public static Entity put(Path project, String type, String id, Integer version, String payloadJson) throws SQLException {
         requireType(type);
         requireId(id);
-        Prepared prepared = preparePayload(payloadJson);
+        Prepared prepared = preparePayload(project, payloadJson);
         String path = relativePath(type, id);
         String now = Instant.now().toString();
         try (DaltonDatabase database = DaltonDatabase.open(project)) {
@@ -266,7 +268,7 @@ public final class DaltonEntities {
         }
         Path file = project.resolve(relativePath(type, id));
         if (!Files.isRegularFile(file)) return null;
-        return parseRecord(Files.readAllBytes(file));
+        return parseRecord(project, Files.readAllBytes(file));
     }
 
     private static Object fieldValue(String payload, String field) throws IOException {
@@ -333,7 +335,7 @@ public final class DaltonEntities {
     private record Prepared(String payload, String secretRefs) {
     }
 
-    private static Prepared preparePayload(String payloadJson) {
+    private static Prepared preparePayload(Path project, String payloadJson) {
         if (payloadJson == null || payloadJson.isBlank()) {
             throw new IllegalArgumentException("entity payload is missing");
         }
@@ -347,35 +349,40 @@ public final class DaltonEntities {
             throw new IllegalArgumentException("entity payload must be a JSON object");
         }
         List<String> refs = new ArrayList<>();
-        rejectSecrets(node, refs);
+        List<String> warnings = new ArrayList<>();
+        rejectSecrets(project, node, refs, warnings);
+        for (String field : warnings) {
+            String message = DaltonSecrets.warning(field);
+            DaltonLog.log(project, "entity", field, message);
+            System.err.println(message);
+        }
         Collections.sort(refs);
         return new Prepared(canonical(node), refs.isEmpty() ? "[]" : jsonArray(refs));
     }
 
-    private static void rejectSecrets(JsonNode node, List<String> refs) {
+    private static void rejectSecrets(Path project, JsonNode node, List<String> refs, List<String> warnings) {
         if (node == null) return;
         if (node.isObject()) {
             node.fields().forEachRemaining(entry -> {
-                if (SECRET_KEY.matcher(entry.getKey()).matches()) {
-                    if (!isSecretReference(entry.getValue())) {
+                if (DaltonSecrets.secretName(project, entry.getKey())) {
+                    if (!DaltonSecrets.reference(entry.getValue() == null || !entry.getValue().isTextual()
+                            ? null
+                            : entry.getValue().textValue())) {
                         throw new IllegalArgumentException(
                                 "entity field " + entry.getKey() + " must be a secret reference, not cleartext");
                     }
                     refs.add(entry.getValue().textValue().trim());
                 } else {
-                    rejectSecrets(entry.getValue(), refs);
+                    if (entry.getValue() != null && entry.getValue().isTextual()
+                            && DaltonSecrets.highEntropy(entry.getValue().textValue())) {
+                        warnings.add(entry.getKey());
+                    }
+                    rejectSecrets(project, entry.getValue(), refs, warnings);
                 }
             });
         } else if (node.isArray()) {
-            for (JsonNode child : node) rejectSecrets(child, refs);
+            for (JsonNode child : node) rejectSecrets(project, child, refs, warnings);
         }
-    }
-
-    private static boolean isSecretReference(JsonNode node) {
-        if (node == null || !node.isTextual()) return false;
-        String value = node.textValue().trim();
-        if (value.startsWith("~MASK")) return true;
-        return value.startsWith("<") && value.endsWith(">") && value.length() > 2;
     }
 
     private static String jsonArray(List<String> values) {

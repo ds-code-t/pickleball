@@ -71,7 +71,7 @@ public final class DaltonContent {
     ) throws SQLException {
         String normalized = DaltonPaths.normalizeRelative(path);
         byte[] body = raw == null ? new byte[0] : raw;
-        validate(normalized, sourceType, body);
+        validate(project, normalized, sourceType, body);
         DaltonFiles.Row existing = DaltonFiles.find(connection, normalized);
         String synced = existing == null || existing.lastSyncedHash() == null ? "" : existing.lastSyncedHash();
         String hydratedAt = now == null ? Instant.now().toString() : now;
@@ -93,14 +93,14 @@ public final class DaltonContent {
         return row;
     }
 
-    private static void validate(String path, String sourceType, byte[] raw) {
+    private static void validate(Path project, String path, String sourceType, byte[] raw) {
         if (DaltonGherkin.isGherkin(path, sourceType) || path.toLowerCase(java.util.Locale.ROOT).endsWith(".feature")) {
             if (DaltonGherkin.parse(raw) == null) {
                 throw new IllegalArgumentException("Gherkin is not valid: " + path);
             }
         }
         if (DaltonEntities.isRecord(path, sourceType)) {
-            DaltonEntities.parseRecord(raw);
+            DaltonEntities.parseRecord(project, raw);
         }
     }
 

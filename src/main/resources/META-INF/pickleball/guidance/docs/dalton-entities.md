@@ -24,7 +24,7 @@ payload: {"name":"Ada","password":"<password:qaDb>"}
 
 Commit the files you want Git to remember. Ignore a type directory in `.gitignore` when that type must stay local. Dalton does not choose for you. The database `.pickleball/dalton/dalton.db` is always gitignored.
 
-`dalton hydrate` reads these files. Unchanged bytes are skipped. A secret field (`password`, `passwd`, `secret`, `token`, `api_key`, `api-key`, `apikey`, `credential`, `private_key`, `private-key`) whose value is not a `<...>` reference or a `~MASK;` value is rejected and is not copied into the database.
+`dalton hydrate` reads these files. Unchanged bytes are skipped. A secret field (`password`, `passwd`, `secret`, `token`, `api_key`, `api-key`, `apikey`, `credential`, `private_key`, `private-key`, plus any name in `secret-fields=`) whose value is not a `<...>` reference or a `~MASK;` value is rejected and is not copied into the database. `pkb_dalton_secret_fields` wins over the file. The database is not encrypted. A value of 32 or more characters with no spaces on a field that is not in that list prints `warn: high-entropy value on <field>` and is stored. The warning does not print the value.
 
 ## Reference
 

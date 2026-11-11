@@ -462,6 +462,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/dalton/DaltonRun.java`
 - `src/main/java/tools/dscode/dalton/DaltonRuntime.java`
 - `src/main/java/tools/dscode/dalton/DaltonRunWorker.java`
+- `src/main/java/tools/dscode/dalton/DaltonSecrets.java`
 - `src/main/java/tools/dscode/dalton/DaltonSources.java`
 - `src/main/java/tools/dscode/internal/ValuesSupport.java`
 - `src/main/java/tools/dscode/launcher/PickleballWorkbenchLauncher.java`
@@ -604,6 +605,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/dalton/DaltonRunProbe.java`
 - `src/test/java/tools/dscode/dalton/DaltonRunTest.java`
 - `src/test/java/tools/dscode/dalton/DaltonScenarioHarness.java`
+- `src/test/java/tools/dscode/dalton/DaltonSecretsTest.java`
 - `src/test/java/tools/dscode/expectedfailure/ExpectedFailureRunnerTest.java`
 - `src/test/java/tools/dscode/expectedfailure/ExpectedFailureSteps.java`
 - `src/test/java/tools/dscode/GuidancePackagingTest.java`

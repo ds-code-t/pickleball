@@ -103,7 +103,7 @@ public final class DaltonCli {
                 Unchanged content hashes are skipped. --force rewrites the database rows from files.
                 Auto-hydrate on a run happens only when pkb_dalton=true or dalton.properties sets enabled=true.
                 With that flag on, feature loading reads those database bytes. A path that is not in the database stays on the file. With the flag off, loading does not open the database.
-                Entity files are dalton-entities/<Type>/<id>.entity. The reference is <entity:Type#id.field>. Secret fields must be references such as <password:name> or ~MASK;, never cleartext.
+                Entity files are dalton-entities/<Type>/<id>.entity. The reference is <entity:Type#id.field>. Secret fields must be references such as <password:name> or ~MASK;, never cleartext. secret-fields= in dalton.properties, or pkb_dalton_secret_fields, adds names to that list. A long spaceless value on another field warns and is stored. The database is not encrypted.
                 entity export writes a changed entity back to its file. It is extract limited to dalton-entities/. It refuses when the file and the database both changed. --force overwrites the file from the stored bytes.
                 extract copies stored file bytes back to disk and does not reformat them. hydrate-out is the same command. An unedited row is left untouched. A deleted file is not recreated unless that row was edited or --force is set.
                 history stores a run summary in the database. It does not change diagnostic reports or pkb_reportretention. --from copies outcome and counts from a run-index.json file. retain drops runs older than --days and then the oldest runs until the note, scenario, and message bytes fit --max-bytes.

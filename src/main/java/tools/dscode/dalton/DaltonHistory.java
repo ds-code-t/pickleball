@@ -15,7 +15,6 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
@@ -28,8 +27,6 @@ public final class DaltonHistory {
     public static final int DEFAULT_MAX_BYTES = 1_048_576;
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final Pattern RUN_ID = Pattern.compile("[A-Za-z0-9][A-Za-z0-9._-]{0,127}");
-    private static final Pattern SECRET_ASSIGNMENT = Pattern.compile(
-            "(?i)\\b(password|passwd|secret|token|api[-_]?key|credential|private[-_]?key)\\b\\s*[:=]\\s*(\\S+)");
 
     private DaltonHistory() {
     }
@@ -69,8 +66,8 @@ public final class DaltonHistory {
     }
 
     public static Run record(Path project, Draft draft) throws SQLException {
-        rejectSecrets(draft.note());
-        rejectSecrets(draft.message());
+        DaltonSecrets.rejectAssignment(project, draft.note());
+        DaltonSecrets.rejectAssignment(project, draft.message());
         String id = requireId(draft.id());
         String started = stamp(draft.startedAt());
         String status = blank(draft.status()) ? "recorded" : draft.status().trim();
@@ -313,17 +310,6 @@ public final class DaltonHistory {
             throw new IllegalArgumentException("history run id must match [A-Za-z0-9][A-Za-z0-9._-]*");
         }
         return id;
-    }
-
-    private static void rejectSecrets(String value) {
-        if (value == null || value.isBlank()) return;
-        Matcher matcher = SECRET_ASSIGNMENT.matcher(value);
-        while (matcher.find()) {
-            String secret = matcher.group(2);
-            boolean reference = secret.startsWith("<") && secret.endsWith(">");
-            if (reference || secret.startsWith("~MASK")) continue;
-            throw new IllegalArgumentException("history holds secret references only, not cleartext");
-        }
     }
 
     private static String text(JsonNode node, String field) {

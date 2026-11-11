@@ -136,6 +136,9 @@ class DaltonHistoryTest {
         assertTrue(gradle.contains("tasks.register('daltonHydrate'"), gradle);
         assertTrue(gradle.contains("tasks.register('daltonExtract'"), gradle);
         assertTrue(gradle.contains("tasks.register('daltonHistory'"), gradle);
+        assertTrue(gradle.contains("tasks.register('daltonFeature'"), gradle);
+        assertTrue(gradle.contains("tasks.register('daltonQuery'"), gradle);
+        assertTrue(gradle.contains("tasks.register('daltonRun'"), gradle);
         int forwards = 0;
         int cursor = 0;
         String needle = "mainClass = 'tools.dscode.dalton.DaltonCli'";
@@ -145,11 +148,13 @@ class DaltonHistoryTest {
             forwards++;
             cursor += needle.length();
         }
-        assertEquals(4, forwards, gradle);
+        assertEquals(7, forwards, gradle);
         assertTrue(gradle.contains("args = ['dalton', 'status']"), gradle);
         assertTrue(gradle.contains("args = ['dalton', 'hydrate']"), gradle);
         assertTrue(gradle.contains("args = ['dalton', 'extract']"), gradle);
         assertTrue(gradle.contains("args = ['dalton', 'history']"), gradle);
+        assertTrue(gradle.contains("args = ['dalton', 'feature']"), gradle);
+        assertTrue(gradle.contains("args = ['dalton', 'run']"), gradle);
     }
 
     private static void restore(String key, String value) {
