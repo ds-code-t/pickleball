@@ -54,7 +54,11 @@ public final class DaltonCli {
                 case "history" -> history(project, tokens, stdout, stderr);
                 case "entity" -> entity(project, tokens, stdout, stderr);
                 case "feature" -> feature(project, tokens, stdout, stderr);
-                case "scenario", "scenarios", "step", "steps" -> structured(command, tokens, stderr);
+                case "files" -> files(project, tokens, json(tokens), stdout, stderr);
+                case "features" -> features(project, tokens, json(tokens), stdout, stderr);
+                case "scenario", "scenarios" -> scenarios(project, tokens, json(tokens), stdout, stderr);
+                case "step", "steps" -> steps(project, tokens, json(tokens), stdout, stderr);
+                case "conflicts" -> conflicts(project, json(tokens), stdout, stderr);
                 default -> {
                     stderr.println("error: Unknown Dalton command: " + command);
                     stderr.println("fix: dalton help");
@@ -83,6 +87,13 @@ public final class DaltonCli {
                 Usage: dalton entity remove <type> <id> [--force] [--project=<dir>]
                 Usage: dalton entity export [--force] [--project=<dir>]
                 Usage: dalton feature put <relative-path> [--text=<gherkin>] [--file=<path>] [--project=<dir>]
+                Usage: dalton files list [--project=<dir>] [--json]
+                Usage: dalton files show <relative-path> [--project=<dir>] [--json]
+                Usage: dalton features list [--project=<dir>] [--json]
+                Usage: dalton features show <relative-path> [--project=<dir>] [--json]
+                Usage: dalton scenarios list [--feature=<relative-path>] [--project=<dir>] [--json]
+                Usage: dalton steps list [--feature=<relative-path>] [--scenario=<ord-or-name>] [--project=<dir>] [--json]
+                Usage: dalton conflicts [--project=<dir>] [--json]
                 Files stay the source of truth. The database is .pickleball/dalton/dalton.db and is gitignored.
                 status and hydrate --dry-run do not create a database when it is missing.
                 hydrate copies features, configs, calls, components, resource maps, templates, and dalton-entities/*.entity files.
@@ -97,6 +108,7 @@ public final class DaltonCli {
                 sqlite-jdbc is required only when a command opens the database. It is not published in the Pickleball POM.
                 feature put writes that .feature text into the database. It sets db_edited, leaves last_synced_hash, and replaces the stored scenarios, steps, tags, docstrings, and data tables in the same transaction. Bad Gherkin is rejected and the previous rows stay. The file is not changed until dalton extract. Use --file for multiline text. dalton scenario put and dalton step put are rejected. A database row whose content hash moved while db_edited is still 0 is an untracked DB edit. hydrate reports it and will not overwrite it unless --force is set.
                 entity put uses that same write, so the entity file row and the entity table stay together.
+                files, features, scenarios, steps, and conflicts are read-only. They do not create a database. --json prints one stable JSON object. Text mode prints labels. conflicts lists an untracked database edit and a row edited on both sides.
                 """;
     }
 
@@ -126,16 +138,19 @@ public final class DaltonCli {
             int scenarios = count(database, "SELECT COUNT(*) FROM scenarios");
             int entities = count(database, "SELECT COUNT(*) FROM entities");
             int runs = count(database, "SELECT COUNT(*) FROM runs");
+            int conflicts = DaltonQuery.conflicts(project, database.connection()).size();
             if (json) {
                 out.println("{\"database\":\"present\",\"path\":\"" + shown + "\",\"schemaVersion\":"
                         + version + ",\"files\":" + files + ",\"scenarios\":" + scenarios
-                        + ",\"entities\":" + entities + ",\"runs\":" + runs + ",\"driver\":true}");
+                        + ",\"entities\":" + entities + ",\"runs\":" + runs
+                        + ",\"conflicts\":" + conflicts + ",\"driver\":true}");
             } else {
                 out.println("Dalton schema " + version);
                 out.println("files " + files);
                 out.println("scenarios " + scenarios);
                 out.println("entities " + entities);
                 out.println("runs " + runs);
+                out.println("conflicts " + conflicts);
                 out.println("database " + shown);
             }
             return 0;
@@ -188,6 +203,195 @@ public final class DaltonCli {
         }
     }
 
+    private static int files(Path project, List<String> tokens, boolean json, PrintStream out, PrintStream err) {
+        String action = action(tokens);
+        try {
+            if (action.isEmpty() || "list".equals(action)) {
+                List<DaltonQuery.FileSummary> files = DaltonQuery.files(project);
+                DaltonLog.log(project, "query", "files", "list " + files.size());
+                if (json) out.println(DaltonQuery.filesJson(files));
+                else {
+                    out.println("files " + files.size());
+                    for (DaltonQuery.FileSummary file : files) {
+                        out.println(file.path() + "  " + file.sourceType()
+                                + "  edited=" + (file.edited() ? "yes" : "no")
+                                + "  bytes=" + file.bytes());
+                    }
+                }
+                return 0;
+            }
+            if ("show".equals(action)) {
+                String path = arg(tokens, 2, "files show needs a relative path");
+                DaltonQuery.FileDetail detail = DaltonQuery.file(project, path);
+                if (detail == null) {
+                    err.println("error: file not found: " + DaltonPaths.normalizeRelative(path));
+                    err.println("fix: dalton files list");
+                    return 1;
+                }
+                DaltonLog.log(project, "query", detail.summary().path(), "show");
+                if (json) out.println(DaltonQuery.fileJson(detail));
+                else printFile(out, detail);
+                return 0;
+            }
+            err.println("error: Unknown Dalton files command: " + action);
+            err.println("fix: dalton files list");
+            return 2;
+        } catch (Exception failure) {
+            err.println("error: " + failure.getMessage());
+            err.println("fix: dalton files list");
+            return 1;
+        }
+    }
+
+    private static int features(Path project, List<String> tokens, boolean json, PrintStream out, PrintStream err) {
+        String action = action(tokens);
+        try {
+            if (action.isEmpty() || "list".equals(action)) {
+                List<DaltonQuery.FeatureSummary> features = DaltonQuery.features(project);
+                DaltonLog.log(project, "query", "features", "list " + features.size());
+                if (json) out.println(DaltonQuery.featuresJson(features));
+                else {
+                    out.println("features " + features.size());
+                    for (DaltonQuery.FeatureSummary feature : features) {
+                        out.println(feature.path() + "  " + feature.name() + "  scenarios=" + feature.scenarios());
+                    }
+                }
+                return 0;
+            }
+            if ("show".equals(action)) {
+                String path = arg(tokens, 2, "features show needs a relative path");
+                DaltonQuery.FeatureSummary feature = DaltonQuery.feature(project, path);
+                if (feature == null) {
+                    err.println("error: feature not found: " + DaltonPaths.normalizeRelative(path));
+                    err.println("fix: dalton features list");
+                    return 1;
+                }
+                DaltonQuery.FileDetail detail = DaltonQuery.file(project, feature.path());
+                String text = detail == null || detail.text() == null ? "" : detail.text();
+                List<DaltonQuery.ScenarioRow> scenarios = DaltonQuery.scenarios(project, feature.path());
+                DaltonLog.log(project, "query", feature.path(), "feature show");
+                if (json) out.println(DaltonQuery.featureJson(feature, text, scenarios));
+                else {
+                    out.println("path " + feature.path());
+                    out.println("name " + feature.name());
+                    out.println("language " + feature.language());
+                    out.println("tags " + feature.tags());
+                    out.println("scenarios " + feature.scenarios());
+                    for (DaltonQuery.ScenarioRow scenario : scenarios) {
+                        out.println("scenario " + scenario.ord() + " " + scenario.keyword() + " " + scenario.name());
+                    }
+                    out.println("text");
+                    out.print(text);
+                    if (!text.endsWith("\n")) out.println();
+                }
+                return 0;
+            }
+            err.println("error: Unknown Dalton features command: " + action);
+            err.println("fix: dalton features list");
+            return 2;
+        } catch (Exception failure) {
+            err.println("error: " + failure.getMessage());
+            err.println("fix: dalton features list");
+            return 1;
+        }
+    }
+
+    private static int scenarios(Path project, List<String> tokens, boolean json, PrintStream out, PrintStream err) {
+        String action = action(tokens);
+        if ("put".equals(action) || "update".equals(action) || "edit".equals(action) || "set".equals(action)) {
+            return rejectStructured(err);
+        }
+        if (!action.isEmpty() && !"list".equals(action)) {
+            err.println("error: Unknown Dalton scenarios command: " + action);
+            err.println("fix: dalton scenarios list");
+            return 2;
+        }
+        try {
+            List<DaltonQuery.ScenarioRow> scenarios = DaltonQuery.scenarios(project, option(tokens, "--feature="));
+            DaltonLog.log(project, "query", "scenarios", "list " + scenarios.size());
+            if (json) out.println(DaltonQuery.scenariosJson(scenarios));
+            else {
+                out.println("scenarios " + scenarios.size());
+                for (DaltonQuery.ScenarioRow scenario : scenarios) {
+                    out.println(scenario.path() + "  " + scenario.ord() + "  " + scenario.keyword() + "  " + scenario.name());
+                }
+            }
+            return 0;
+        } catch (Exception failure) {
+            err.println("error: " + failure.getMessage());
+            err.println("fix: dalton scenarios list");
+            return 1;
+        }
+    }
+
+    private static int steps(Path project, List<String> tokens, boolean json, PrintStream out, PrintStream err) {
+        String action = action(tokens);
+        if ("put".equals(action) || "update".equals(action) || "edit".equals(action) || "set".equals(action)) {
+            return rejectStructured(err);
+        }
+        if (!action.isEmpty() && !"list".equals(action)) {
+            err.println("error: Unknown Dalton steps command: " + action);
+            err.println("fix: dalton steps list");
+            return 2;
+        }
+        try {
+            List<DaltonQuery.StepRow> steps = DaltonQuery.steps(
+                    project, option(tokens, "--feature="), option(tokens, "--scenario="));
+            DaltonLog.log(project, "query", "steps", "list " + steps.size());
+            if (json) out.println(DaltonQuery.stepsJson(steps));
+            else {
+                out.println("steps " + steps.size());
+                for (DaltonQuery.StepRow step : steps) {
+                    out.println(step.path() + "  " + step.scenario() + "  " + step.ord() + "  " + step.keyword() + "  " + step.text());
+                }
+            }
+            return 0;
+        } catch (Exception failure) {
+            err.println("error: " + failure.getMessage());
+            err.println("fix: dalton steps list");
+            return 1;
+        }
+    }
+
+    private static int conflicts(Path project, boolean json, PrintStream out, PrintStream err) {
+        try {
+            List<DaltonQuery.Conflict> conflicts = DaltonQuery.conflicts(project);
+            DaltonLog.log(project, "query", "conflicts", "list " + conflicts.size());
+            if (json) out.println(DaltonQuery.conflictsJson(conflicts));
+            else {
+                out.println("conflicts " + conflicts.size());
+                for (DaltonQuery.Conflict conflict : conflicts) out.println(conflict.message());
+            }
+            return conflicts.isEmpty() ? 0 : 1;
+        } catch (Exception failure) {
+            err.println("error: " + failure.getMessage());
+            err.println("fix: dalton conflicts");
+            return 1;
+        }
+    }
+
+    private static void printFile(PrintStream out, DaltonQuery.FileDetail detail) {
+        DaltonQuery.FileSummary file = detail.summary();
+        out.println("path " + file.path());
+        out.println("sourceType " + file.sourceType());
+        out.println("edited " + (file.edited() ? "yes" : "no"));
+        out.println("bytes " + file.bytes());
+        out.println("contentHash " + file.contentHash());
+        out.println("lastSyncedHash " + file.lastSyncedHash());
+        if (detail.text() != null) {
+            out.println("text");
+            out.print(detail.text());
+            if (!detail.text().endsWith("\n")) out.println();
+        } else {
+            out.println("binary yes");
+        }
+    }
+
+    private static String action(List<String> tokens) {
+        if (tokens.size() < 2 || tokens.get(1).startsWith("--")) return "";
+        return tokens.get(1);
+    }
+
     private static int feature(Path project, List<String> tokens, PrintStream out, PrintStream err) {
         String action = tokens.size() < 2 || tokens.get(1).startsWith("--") ? "" : tokens.get(1);
         if ("scenario".equals(action) || "step".equals(action) || "scenarios".equals(action) || "steps".equals(action)) {
@@ -212,16 +416,6 @@ public final class DaltonCli {
             err.println("fix: dalton feature put <relative-path> --file=<path>");
             return 1;
         }
-    }
-
-    private static int structured(String command, List<String> tokens, PrintStream err) {
-        String action = tokens.size() < 2 || tokens.get(1).startsWith("--") ? "" : tokens.get(1);
-        if (action.isEmpty() || "put".equals(action) || "update".equals(action) || "edit".equals(action) || "set".equals(action)) {
-            return rejectStructured(err);
-        }
-        err.println("error: Unknown Dalton command: " + command + " " + action);
-        err.println("fix: dalton help");
-        return 2;
     }
 
     private static int rejectStructured(PrintStream err) {

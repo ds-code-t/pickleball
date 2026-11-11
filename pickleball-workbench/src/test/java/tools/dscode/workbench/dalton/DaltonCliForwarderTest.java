@@ -43,6 +43,10 @@ class DaltonCliForwarderTest {
         assertEquals("features/pay.feature", feature.get(6));
         assertEquals("--file=pay.feature", feature.get(7));
         assertTrue(feature.get(8).startsWith("--project="), feature.toString());
+        List<String> query = DaltonCliForwarder.command(jar, project, List.of("files", "list", "--json"));
+        assertEquals("files", query.get(4));
+        assertEquals("list", query.get(5));
+        assertEquals("--json", query.get(6));
     }
 
     @Test
