@@ -380,3 +380,5 @@ Phase 3 adds `ExecutionContext` (scenario, step stack, map scopes, phase, failur
 Phase 4 uses `Table` and `DocText` in mappings, data elements, data operations, and assertions (`NeutralRows`, `TabularDataAdapter`, `NeutralAssertions`). Conversion to Cucumber `DataTable` and `DocString` stays in `CucumberModelConverter`.
 
 Phase 5 parses Gherkin with the gherkin library, then converts. `EncodingRewrite` repeats the encoding line swap. `GherkinEngineParser.expand` keeps placeholders, marks background steps, and applies Scenario Tags. Sources are files, Dalton rows, in-memory text, and a step list with no file.
+
+Phase 6 resolves scenarios from any `ScenarioSource` by tags, name, feature name, example rows, step text, order, and limit. The rules match `CucumberScanUtil` and `ExampleRowFilter`. Memory text and Dalton rows use that same lookup.

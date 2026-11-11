@@ -52,13 +52,13 @@ public final class GherkinEngineParser {
     public static EngineFeature expand(EngineFeature feature) {
         if (feature == null) return EngineFeature.of("", List.of());
         List<EngineScenario> expanded = new ArrayList<>();
-        int overall = 0;
         for (EngineScenario scenario : feature.scenarios()) {
             if (!hasRows(scenario)) {
                 expanded.add(withBackground(feature, scenario, Map.of()));
                 continue;
             }
             int tableIndex = 0;
+            int overall = 0;
             for (ExampleTable table : scenario.examples()) {
                 tableIndex++;
                 int rowIndex = 0;

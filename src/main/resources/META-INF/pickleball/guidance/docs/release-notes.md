@@ -31,6 +31,7 @@ Dalton is an opt-in hydrated working copy. Git files stay the source of truth. T
 - Phase 3 adds an explicit execution context. Existing Cucumber runs keep the same scenario state. The context is used only when no Cucumber scenario is on the thread.
 - Phase 4 uses Pickleball tables and doc text inside mappings and data operations. Cucumber data tables and doc strings stay at the converter edge. Existing steps that take a Cucumber data table still do.
 - Phase 5 parses scenarios from a file, a Dalton row, in-memory text, or a list of steps. The Cucumber runner is not required to read them.
+- Phase 6 finds scenarios by tags, name, feature name, example rows, and step text from files, memory, or Dalton. The Cucumber scan rules stay the same.
 
 ## 2.2.0
 
