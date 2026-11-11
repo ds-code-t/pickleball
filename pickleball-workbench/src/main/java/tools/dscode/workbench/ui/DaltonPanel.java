@@ -26,7 +26,13 @@ import java.util.function.Supplier;
  * Dalton browse and edit tab. Every button shells out through {@link DaltonCliForwarder}.
  */
 final class DaltonPanel extends JPanel {
+    @FunctionalInterface
+    interface Forwarder {
+        DaltonCliForwarder.Result run(Path root, List<String> args);
+    }
+
     private final Supplier<Path> project;
+    private final Forwarder forwarder;
     private final JComboBox<String> view = new JComboBox<>(new String[] {
             "Files", "Features", "Scenarios", "Steps", "Entities", "History"
     });
@@ -46,8 +52,13 @@ final class DaltonPanel extends JPanel {
     private final JButton saveEntity = WorkbenchTheme.flatButton("Save entity", "dalton entity put of the editor text");
 
     DaltonPanel(Supplier<Path> project) {
+        this(project, DaltonCliForwarder::run);
+    }
+
+    DaltonPanel(Supplier<Path> project, Forwarder forwarder) {
         super(new BorderLayout(8, 8));
         this.project = project;
+        this.forwarder = forwarder;
         editor.setLineWrap(false);
         conflicts.setEditable(false);
         JPanel north = new JPanel(new FlowLayout(FlowLayout.LEFT));
@@ -158,7 +169,7 @@ final class DaltonPanel extends JPanel {
         new SwingWorker<DaltonCliForwarder.Result, Void>() {
             @Override
             protected DaltonCliForwarder.Result doInBackground() {
-                return DaltonCliForwarder.run(root, args);
+                return forwarder.run(root, args);
             }
 
             @Override

@@ -970,6 +970,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/sync/WorkbenchSyncPlannerTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/terminal/WorkerLogBufferTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/ui/ConfigTabModelTest.java`
+- `pickleball-workbench/src/test/java/tools/dscode/workbench/ui/DaltonPanelTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/ui/LongWorkTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/ui/RunVarOverridePanelTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/ui/web/WorkbenchWebResourceTest.java`
