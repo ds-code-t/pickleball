@@ -387,7 +387,7 @@ final class WorkbenchMcpTools {
                 schema(Map.of(
                         "args", Map.of(
                                 "type", "array",
-                                "description", "Arguments after dalton. Example: [\"status\"] or [\"hydrate\", \"--dry-run\"].",
+                                "description", "Arguments after dalton. Example: [\"status\"], [\"hydrate\", \"--dry-run\"], or [\"extract\"].",
                                 "items", Map.of("type", "string")
                         )
                 ), "args"),

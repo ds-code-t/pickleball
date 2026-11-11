@@ -133,3 +133,5 @@ When a consumer agent needs project configuration data, read the version-matched
 With `pkb_dalton=true` (or `enabled=true` in `dalton.properties`), feature loading uses the hydrated `.feature` bytes. The query rows (scenarios, steps, tags, docstrings, and data tables) are not a second Gherkin dialect. Execution still hands the stored bytes to Cucumber. With Dalton off, that load does not open the database.
 
 `<entity:Type#id.field>` is also opt-in and only when Dalton is on. It does not change `<config:...>`, `<file:...>`, or `<data:...>`. Entity files and the no-cleartext rule are in [Dalton entities](dalton-entities.md).
+
+`dalton extract` copies stored bytes back to those files and does not reformat them. It leaves a file that only changed on disk. It refuses with `conflict: <path>` when the file and the database both changed, unless `--force` is set.

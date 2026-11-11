@@ -225,64 +225,11 @@ public final class DaltonEntities {
     }
 
     public static ExportResult export(Path project, boolean force) throws SQLException, IOException {
-        if (!Files.isRegularFile(DaltonPaths.database(project))) {
-            return new ExportResult(0, 0, 0, List.of());
-        }
-        List<Entity> entities = list(project);
-        int written = 0;
-        int skipped = 0;
-        List<String> conflicts = new ArrayList<>();
-        String now = Instant.now().toString();
-        try (DaltonDatabase database = DaltonDatabase.open(project)) {
-            Connection connection = database.connection();
-            connection.setAutoCommit(false);
-            try {
-                for (Entity entity : entities) {
-                    byte[] canonical = canonicalFile(entity.type(), entity.id(), entity.version(), entity.payloadJson());
-                    Path disk = project.resolve(entity.sourceFile());
-                    DaltonFiles.Row file = DaltonFiles.find(connection, entity.sourceFile());
-                    byte[] existing = Files.isRegularFile(disk) ? Files.readAllBytes(disk) : null;
-                    String diskHash = existing == null ? null : DaltonHashes.sha256(existing);
-                    String synced = file == null ? "" : file.lastSyncedHash();
-                    boolean fileMoved = diskHash != null && synced != null && !synced.isBlank() && !diskHash.equals(synced);
-                    boolean edited = file != null && file.edited();
-                    if (fileMoved && edited && !force) {
-                        conflicts.add(entity.sourceFile());
-                        continue;
-                    }
-                    if (!edited && existing != null && !force) {
-                        skipped++;
-                        continue;
-                    }
-                    if (!edited && existing == null && !force) {
-                        skipped++;
-                        continue;
-                    }
-                    Files.createDirectories(disk.getParent());
-                    Files.write(disk, canonical);
-                    String hash = DaltonHashes.sha256(canonical);
-                    DaltonFiles.upsert(connection, new DaltonFiles.Row(
-                            entity.sourceFile(), hash, canonical, Files.getLastModifiedTime(disk).toMillis(),
-                            "entity", now, hash, false));
-                    try (PreparedStatement statement = connection.prepareStatement(
-                            "UPDATE entities SET content_hash = ? WHERE entity_type = ? AND entity_id = ?")) {
-                        statement.setString(1, hash);
-                        statement.setString(2, entity.type());
-                        statement.setString(3, entity.id());
-                        statement.executeUpdate();
-                    }
-                    written++;
-                }
-                connection.commit();
-            } catch (SQLException | RuntimeException failure) {
-                connection.rollback();
-                throw failure;
-            } finally {
-                connection.setAutoCommit(true);
-            }
-        }
-        DaltonLog.log(project, "entity", "files", "export written=" + written + " conflicts=" + conflicts.size());
-        return new ExportResult(written, skipped, conflicts.size(), conflicts);
+        DaltonExtractor.Result result = DaltonExtractor.extract(
+                project, new DaltonExtractor.Options(List.of("dalton-entities"), force));
+        DaltonLog.log(project, "entity", "files",
+                "export written=" + result.written() + " conflicts=" + result.conflicts());
+        return new ExportResult(result.written(), result.skipped(), result.conflicts(), result.conflictPaths());
     }
 
     /**

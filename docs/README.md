@@ -25,7 +25,7 @@ When these docs are materialized from the Maven dependency with Workbench `expor
 - [Registered objects](object-registration.md) — constructor, post-actions, and scenario-end cleanup.
 - [Data values and Data Elements](data-values-and-elements.md) — native values, Jackson container preservation, Data Elements, and explicit conversions.
 - [Configuration files and resource mapping](config-files-and-resource-mapping.md) — load shared config/resources, use `pkb_configpath`, prefer `<config:...>`, and retain legacy `<configs...>` compatibility.
-- [Dalton entities](dalton-entities.md) — opt-in `<entity:Type#id.field>` references. Secret fields are references only. Files under `dalton-entities/` stay the Git source of truth.
+- [Dalton entities](dalton-entities.md) — opt-in `<entity:Type#id.field>` references. Secret fields are references only. Files under `dalton-entities/` stay the Git source of truth. `dalton extract` copies stored bytes back without reformatting.
 - [Component scenarios](component-scenarios.md) — invoke reusable scenario-sized flows.
 - [Service-call scenarios](service-call-scenarios.md) — locate and execute reusable REST/SOAP service-call scenarios.
 - [Date and time utilities](date-time-utilities.md) — create, adjust, format, and compare temporal values.

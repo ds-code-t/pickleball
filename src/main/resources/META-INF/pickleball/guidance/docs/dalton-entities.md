@@ -52,6 +52,6 @@ dalton entity export
 dalton entity export --force
 ```
 
-`dalton entity export` writes a database edit back to the `.entity` file. If the file was not edited in the database, the original bytes stay, including comments. If both the file and the database changed since the last sync, export prints `conflict: <path>` and does not overwrite. `--force` overwrites the file from the database. The written form is `type`, `id`, `version`, and a compact payload with sorted keys.
+`dalton entity export` is `dalton extract` limited to `dalton-entities/`. It writes the stored file bytes. Those bytes stay the original file, comments included, until `dalton entity put`. A put stores the canonical form (`type`, `id`, `version`, and a compact payload with sorted keys) and export writes that. If the file was not edited in the database, the original bytes stay. If both the file and the database changed since the last sync, export prints `conflict: <path>` and does not overwrite. `--force` overwrites the file from the stored bytes. A deleted unedited file is not recreated.
 
 `dalton entity put` updates the database only. Export is what changes the file.

@@ -50,6 +50,7 @@ public final class DaltonCli {
                 }
                 case "status" -> status(project, json(tokens), stdout);
                 case "hydrate" -> hydrate(project, tokens, stdout, stderr);
+                case "extract", "hydrate-out" -> extract(project, tokens, stdout, stderr);
                 case "entity" -> entity(project, tokens, stdout, stderr);
                 default -> {
                     stderr.println("error: Unknown Dalton command: " + command);
@@ -68,6 +69,7 @@ public final class DaltonCli {
         return """
                 Usage: dalton status [--project=<dir>] [--json]
                 Usage: dalton hydrate [--project=<dir>] [--path=<relative>] [--force] [--dry-run]
+                Usage: dalton extract [--project=<dir>] [--path=<relative>] [--force]
                 Usage: dalton entity list [--project=<dir>]
                 Usage: dalton entity get <type> <id> [--project=<dir>]
                 Usage: dalton entity put <type> <id> [--version=N] [--payload=<json>] [--payload-file=<path>] [--project=<dir>]
@@ -81,7 +83,8 @@ public final class DaltonCli {
                 Auto-hydrate on a run happens only when pkb_dalton=true or dalton.properties sets enabled=true.
                 With that flag on, feature loading reads those database bytes. A path that is not in the database stays on the file. With the flag off, loading does not open the database.
                 Entity files are dalton-entities/<Type>/<id>.entity. The reference is <entity:Type#id.field>. Secret fields must be references such as <password:name> or ~MASK;, never cleartext.
-                entity export writes a changed entity back to its file. It refuses when the file and the database both changed. --force overwrites the file.
+                entity export writes a changed entity back to its file. It is extract limited to dalton-entities/. It refuses when the file and the database both changed. --force overwrites the file from the stored bytes.
+                extract copies stored file bytes back to disk and does not reformat them. hydrate-out is the same command. An unedited row is left untouched. A deleted file is not recreated unless that row was edited or --force is set.
                 sqlite-jdbc is required only when a command opens the database. It is not published in the Pickleball POM.
                 """;
     }
@@ -147,6 +150,26 @@ public final class DaltonCli {
         } catch (Exception failure) {
             err.println("error: " + failure.getMessage());
             err.println("fix: dalton hydrate --dry-run");
+            return 1;
+        }
+    }
+
+    private static int extract(Path project, List<String> tokens, PrintStream out, PrintStream err) {
+        List<String> paths = new ArrayList<>();
+        for (String token : tokens) {
+            if (token.startsWith("--path=")) paths.add(token.substring("--path=".length()));
+        }
+        boolean force = has(tokens, "--force");
+        try {
+            DaltonExtractor.Result result = DaltonExtractor.extract(project, new DaltonExtractor.Options(paths, force));
+            out.println(result.line());
+            for (String conflict : result.conflictPaths()) err.println("conflict: " + conflict);
+            boolean present = Files.isRegularFile(DaltonPaths.database(project));
+            out.println("database " + (present ? "present" : "missing"));
+            return result.conflicts() > 0 ? 1 : 0;
+        } catch (Exception failure) {
+            err.println("error: " + failure.getMessage());
+            err.println("fix: dalton extract");
             return 1;
         }
     }
