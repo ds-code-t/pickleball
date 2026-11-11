@@ -30,6 +30,7 @@ Dalton is an opt-in hydrated working copy. Git files stay the source of truth. T
 - Phase 2 matches steps with a Pickleball registry that reads the existing step annotations and uses the same Cucumber expression and regex rules. Step text and annotations do not change. Matching does not run the step.
 - Phase 3 adds an explicit execution context. Existing Cucumber runs keep the same scenario state. The context is used only when no Cucumber scenario is on the thread.
 - Phase 4 uses Pickleball tables and doc text inside mappings and data operations. Cucumber data tables and doc strings stay at the converter edge. Existing steps that take a Cucumber data table still do.
+- Phase 5 parses scenarios from a file, a Dalton row, in-memory text, or a list of steps. The Cucumber runner is not required to read them.
 
 ## 2.2.0
 

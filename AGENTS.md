@@ -378,3 +378,5 @@ Phase 2 adds `StepRegistry`. It reads the same `@Given` / `@When` / `@Then` / `@
 Phase 3 adds `ExecutionContext` (scenario, step stack, map scopes, phase, failures, timing, and browser/service resources). `GlobalState.getCurrentScenarioState` still returns the Cucumber thread local when one is set. It uses the context's legacy scenario only when that thread local is empty. `ParsingMap.getRunningParsingMap` uses the context map only in that same case. A Cucumber run does not change.
 
 Phase 4 uses `Table` and `DocText` in mappings, data elements, data operations, and assertions (`NeutralRows`, `TabularDataAdapter`, `NeutralAssertions`). Conversion to Cucumber `DataTable` and `DocString` stays in `CucumberModelConverter`.
+
+Phase 5 parses Gherkin with the gherkin library, then converts. `EncodingRewrite` repeats the encoding line swap. `GherkinEngineParser.expand` keeps placeholders, marks background steps, and applies Scenario Tags. Sources are files, Dalton rows, in-memory text, and a step list with no file.
