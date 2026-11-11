@@ -53,6 +53,8 @@ public final class DaltonCli {
                 case "extract", "hydrate-out" -> extract(project, tokens, stdout, stderr);
                 case "history" -> history(project, tokens, stdout, stderr);
                 case "entity" -> entity(project, tokens, stdout, stderr);
+                case "feature" -> feature(project, tokens, stdout, stderr);
+                case "scenario", "scenarios", "step", "steps" -> structured(command, tokens, stderr);
                 default -> {
                     stderr.println("error: Unknown Dalton command: " + command);
                     stderr.println("fix: dalton help");
@@ -80,6 +82,7 @@ public final class DaltonCli {
                 Usage: dalton entity put <type> <id> [--version=N] [--payload=<json>] [--payload-file=<path>] [--project=<dir>]
                 Usage: dalton entity remove <type> <id> [--force] [--project=<dir>]
                 Usage: dalton entity export [--force] [--project=<dir>]
+                Usage: dalton feature put <relative-path> [--text=<gherkin>] [--file=<path>] [--project=<dir>]
                 Files stay the source of truth. The database is .pickleball/dalton/dalton.db and is gitignored.
                 status and hydrate --dry-run do not create a database when it is missing.
                 hydrate copies features, configs, calls, components, resource maps, templates, and dalton-entities/*.entity files.
@@ -92,6 +95,8 @@ public final class DaltonCli {
                 extract copies stored file bytes back to disk and does not reformat them. hydrate-out is the same command. An unedited row is left untouched. A deleted file is not recreated unless that row was edited or --force is set.
                 history stores a run summary in the database. It does not change diagnostic reports or pkb_reportretention. --from copies outcome and counts from a run-index.json file. retain drops runs older than --days and then the oldest runs until the note, scenario, and message bytes fit --max-bytes.
                 sqlite-jdbc is required only when a command opens the database. It is not published in the Pickleball POM.
+                feature put writes that .feature text into the database. It sets db_edited, leaves last_synced_hash, and replaces the stored scenarios, steps, tags, docstrings, and data tables in the same transaction. Bad Gherkin is rejected and the previous rows stay. The file is not changed until dalton extract. Use --file for multiline text. dalton scenario put and dalton step put are rejected. A database row whose content hash moved while db_edited is still 0 is an untracked DB edit. hydrate reports it and will not overwrite it unless --force is set.
+                entity put uses that same write, so the entity file row and the entity table stay together.
                 """;
     }
 
@@ -151,6 +156,7 @@ public final class DaltonCli {
             DaltonHydrator.Result result = DaltonHydrator.hydrate(
                     project, new DaltonHydrator.Options(paths, force, dryRun));
             out.println(result.line());
+            for (String notice : result.notices()) err.println(notice);
             for (String conflict : result.conflictPaths()) err.println("conflict: " + conflict);
             boolean present = Files.isRegularFile(DaltonPaths.database(project));
             out.println("database " + (present ? "present" : "missing"));
@@ -180,6 +186,66 @@ public final class DaltonCli {
             err.println("fix: dalton extract");
             return 1;
         }
+    }
+
+    private static int feature(Path project, List<String> tokens, PrintStream out, PrintStream err) {
+        String action = tokens.size() < 2 || tokens.get(1).startsWith("--") ? "" : tokens.get(1);
+        if ("scenario".equals(action) || "step".equals(action) || "scenarios".equals(action) || "steps".equals(action)) {
+            return rejectStructured(err);
+        }
+        if (!"put".equals(action)) {
+            err.println("error: Unknown Dalton feature command: " + (action.isEmpty() ? "feature" : action));
+            err.println("fix: dalton feature put <relative-path> --file=<path>");
+            return 2;
+        }
+        try {
+            String path = arg(tokens, 2, "feature put needs a relative path");
+            if (!path.toLowerCase(java.util.Locale.ROOT).endsWith(".feature")) {
+                throw new IllegalArgumentException("feature put needs a .feature path: " + path);
+            }
+            byte[] raw = featureBytes(project, tokens);
+            DaltonFiles.Row row = DaltonContent.put(project, path, raw);
+            out.println("feature " + row.path() + " edited=1 bytes=" + row.raw().length);
+            return 0;
+        } catch (Exception failure) {
+            err.println("error: " + failure.getMessage());
+            err.println("fix: dalton feature put <relative-path> --file=<path>");
+            return 1;
+        }
+    }
+
+    private static int structured(String command, List<String> tokens, PrintStream err) {
+        String action = tokens.size() < 2 || tokens.get(1).startsWith("--") ? "" : tokens.get(1);
+        if (action.isEmpty() || "put".equals(action) || "update".equals(action) || "edit".equals(action) || "set".equals(action)) {
+            return rejectStructured(err);
+        }
+        err.println("error: Unknown Dalton command: " + command + " " + action);
+        err.println("fix: dalton help");
+        return 2;
+    }
+
+    private static int rejectStructured(PrintStream err) {
+        err.println("error: " + DaltonContent.STRUCTURED_EDIT);
+        err.println("fix: dalton feature put <relative-path> --file=<path>");
+        return 1;
+    }
+
+    private static byte[] featureBytes(Path project, List<String> tokens) throws java.io.IOException {
+        String text = option(tokens, "--text=");
+        String file = option(tokens, "--file=");
+        if (text != null && file != null) {
+            throw new IllegalArgumentException("feature put accepts --text or --file, not both");
+        }
+        if (file != null) {
+            Path path = Path.of(file);
+            if (!path.isAbsolute()) path = project.resolve(file);
+            if (!Files.isRegularFile(path)) {
+                throw new IllegalArgumentException("feature file not found: " + file);
+            }
+            return Files.readAllBytes(path);
+        }
+        if (text != null) return text.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        throw new IllegalArgumentException("feature put needs --text or --file");
     }
 
     private static int history(Path project, List<String> tokens, PrintStream out, PrintStream err) {

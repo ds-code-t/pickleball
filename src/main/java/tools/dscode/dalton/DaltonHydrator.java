@@ -26,9 +26,18 @@ public final class DaltonHydrator {
         }
     }
 
-    public record Result(int inserted, int updated, int skipped, int conflicts, boolean dryRun, List<String> conflictPaths) {
+    public record Result(
+            int inserted,
+            int updated,
+            int skipped,
+            int conflicts,
+            boolean dryRun,
+            List<String> conflictPaths,
+            List<String> notices
+    ) {
         public Result {
             conflictPaths = conflictPaths == null ? List.of() : List.copyOf(conflictPaths);
+            notices = notices == null ? List.of() : List.copyOf(notices);
         }
 
         public String line() {
@@ -42,7 +51,7 @@ public final class DaltonHydrator {
         List<DaltonSources.Found> sources = DaltonSources.scan(project, options.paths());
         boolean present = Files.isRegularFile(DaltonPaths.database(project));
         if (options.dryRun() && !present) {
-            return new Result(sources.size(), 0, 0, 0, true, List.of());
+            return new Result(sources.size(), 0, 0, 0, true, List.of(), List.of());
         }
         if (!DaltonDatabase.driverPresent()) {
             throw new SQLException("sqlite-jdbc is not on the classpath");
@@ -55,6 +64,7 @@ public final class DaltonHydrator {
             int updated = 0;
             int skipped = 0;
             List<String> conflicts = new ArrayList<>();
+            List<String> notices = new ArrayList<>();
             connection.setAutoCommit(false);
             try {
                 for (DaltonSources.Found source : sources) {
@@ -69,10 +79,22 @@ public final class DaltonHydrator {
                         }
                         continue;
                     }
+                    if (DaltonContent.untracked(row) && !options.force()) {
+                        conflicts.add(source.path());
+                        notices.add(DaltonContent.untrackedMessage(source.path()));
+                        DaltonLog.log(project, "hydrate", source.path(), DaltonContent.untrackedMessage(source.path()));
+                        continue;
+                    }
                     boolean same = hash.equals(row.contentHash());
                     boolean fileMoved = row.lastSyncedHash() != null && !hash.equals(row.lastSyncedHash());
                     if (row.edited() && fileMoved && !options.force()) {
                         conflicts.add(source.path());
+                        continue;
+                    }
+                    // A flagged edit whose file is still the last sync is the working copy.
+                    // Hydrate must not replace it with the older file.
+                    if (row.edited() && !fileMoved && !options.force()) {
+                        skipped++;
                         continue;
                     }
                     if (same && !options.force()) {
@@ -109,7 +131,7 @@ public final class DaltonHydrator {
             }
             DaltonLog.log(project, "hydrate", "files",
                     (options.dryRun() ? "dry-run " : "") + "inserted=" + inserted + " updated=" + updated);
-            return new Result(inserted, updated, skipped, conflicts.size(), options.dryRun(), conflicts);
+            return new Result(inserted, updated, skipped, conflicts.size(), options.dryRun(), conflicts, notices);
         }
     }
 

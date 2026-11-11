@@ -36,6 +36,13 @@ class DaltonCliForwarderTest {
         List<String> extract = DaltonCliForwarder.command(jar, project, List.of("extract", "--force"));
         assertEquals("extract", extract.get(4));
         assertEquals("--force", extract.get(5));
+        List<String> feature = DaltonCliForwarder.command(
+                jar, project, List.of("feature", "put", "features/pay.feature", "--file=pay.feature"));
+        assertEquals("feature", feature.get(4));
+        assertEquals("put", feature.get(5));
+        assertEquals("features/pay.feature", feature.get(6));
+        assertEquals("--file=pay.feature", feature.get(7));
+        assertTrue(feature.get(8).startsWith("--project="), feature.toString());
     }
 
     @Test

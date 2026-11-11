@@ -417,6 +417,20 @@ tasks.register('daltonExtract', JavaExec) {
     if (project.hasProperty('daltonForce')) args += ['--force']
 }
 
+tasks.register('daltonFeature', JavaExec) {
+    group = 'dalton'
+    description = 'Forward to the Dalton CLI feature command. sqlite-jdbc is on this task classpath only and is not published.'
+    classpath = sourceSets.main.runtimeClasspath + configurations.detachedConfiguration(
+            dependencies.create('org.xerial:sqlite-jdbc:3.47.2.0')
+    )
+    mainClass = 'tools.dscode.dalton.DaltonCli'
+    args = ['dalton', 'feature']
+    args += [project.hasProperty('daltonFeature') ? project.property('daltonFeature') : 'put']
+    if (project.hasProperty('daltonPath')) args += [project.property('daltonPath')]
+    if (project.hasProperty('daltonText')) args += ['--text=' + project.property('daltonText')]
+    if (project.hasProperty('daltonFile')) args += ['--file=' + project.property('daltonFile')]
+}
+
 tasks.register('daltonHistory', JavaExec) {
     group = 'dalton'
     description = 'Forward to the Dalton CLI history command. sqlite-jdbc is on this task classpath only and is not published.'

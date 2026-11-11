@@ -445,6 +445,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/cucumberextended/utilities/StringUtilities.java`
 - `src/main/java/tools/dscode/dalton/DaltonCli.java`
 - `src/main/java/tools/dscode/dalton/DaltonConfig.java`
+- `src/main/java/tools/dscode/dalton/DaltonContent.java`
 - `src/main/java/tools/dscode/dalton/DaltonDatabase.java`
 - `src/main/java/tools/dscode/dalton/DaltonEntities.java`
 - `src/main/java/tools/dscode/dalton/DaltonExtractor.java`
@@ -586,6 +587,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/coredefinitions/XmlTableCellFeatureTest.java`
 - `src/test/java/tools/dscode/coredefinitions/XmlTableCellTest.java`
 - `src/test/java/tools/dscode/dalton/DaltonEdgeTest.java`
+- `src/test/java/tools/dscode/dalton/DaltonEditTest.java`
 - `src/test/java/tools/dscode/dalton/DaltonEntityTest.java`
 - `src/test/java/tools/dscode/dalton/DaltonExtractTest.java`
 - `src/test/java/tools/dscode/dalton/DaltonFoundationTest.java`

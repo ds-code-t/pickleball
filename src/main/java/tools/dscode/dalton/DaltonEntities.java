@@ -137,15 +137,9 @@ public final class DaltonEntities {
                 throw new IllegalArgumentException("entity version must be 1 or greater");
             }
             byte[] canonical = canonicalFile(type, id, useVersion, prepared.payload());
-            Entity entity = new Entity(
-                    type, id, useVersion, prepared.payload(), prepared.secretRefs(), path, DaltonHashes.sha256(canonical));
             connection.setAutoCommit(false);
             try {
-                upsert(connection, entity, now);
-                DaltonFiles.Row file = DaltonFiles.find(connection, path);
-                String synced = file == null ? "" : file.lastSyncedHash();
-                DaltonFiles.upsert(connection, new DaltonFiles.Row(
-                        path, entity.contentHash(), canonical, System.currentTimeMillis(), "entity", now, synced, true));
+                DaltonContent.write(connection, project, path, "entity", canonical, now);
                 connection.commit();
             } catch (SQLException | RuntimeException failure) {
                 connection.rollback();
@@ -153,6 +147,7 @@ public final class DaltonEntities {
             } finally {
                 connection.setAutoCommit(true);
             }
+            Entity entity = find(connection, type, id);
             DaltonLog.log(project, "entity", type + "#" + id, "put version=" + useVersion);
             return entity;
         }
