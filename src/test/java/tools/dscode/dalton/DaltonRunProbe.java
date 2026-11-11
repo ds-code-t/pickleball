@@ -26,7 +26,9 @@ public final class DaltonRunProbe implements ConcurrentEventListener {
 
     @Given("^dalton probe records (.*)$")
     public void records(String value) {
-        REACHED.add(value == null ? "" : value);
+        String kept = value == null ? "" : value;
+        REACHED.add(kept);
+        DaltonRunTrace.append("reached " + kept);
     }
 
     @Override

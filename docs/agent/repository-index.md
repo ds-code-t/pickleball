@@ -506,6 +506,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/dalton/DaltonQuery.java`
 - `src/main/java/tools/dscode/dalton/DaltonRun.java`
 - `src/main/java/tools/dscode/dalton/DaltonRuntime.java`
+- `src/main/java/tools/dscode/dalton/DaltonRunTrace.java`
 - `src/main/java/tools/dscode/dalton/DaltonRunWorker.java`
 - `src/main/java/tools/dscode/dalton/DaltonSecrets.java`
 - `src/main/java/tools/dscode/dalton/DaltonSources.java`

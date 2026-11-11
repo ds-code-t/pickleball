@@ -20,6 +20,8 @@ import java.util.List;
  * {@link WorkbenchDirectRun}. A glue fingerprint change replaces the process.
  */
 public final class DaltonRunWorker {
+    private static volatile Path outcomeFile;
+
     private DaltonRunWorker() {
     }
 
@@ -32,6 +34,7 @@ public final class DaltonRunWorker {
         }
         Path state = Path.of(args[0]);
         Files.createDirectories(state);
+        outcomeFile = state.resolve("run-outcomes.txt");
         String fingerprint = Files.readString(state.resolve(DaltonRun.FINGERPRINT), StandardCharsets.UTF_8).trim();
         try (ServerSocket server = new ServerSocket(0, 20, InetAddress.getLoopbackAddress())) {
             Files.writeString(state.resolve(DaltonRun.WARM),
@@ -67,8 +70,19 @@ public final class DaltonRunWorker {
         String line;
         while ((line = reader.readLine()) != null && !".".equals(line)) properties.add(line);
         String project = reader.readLine();
+        Path trace = outcomeFile;
+        if (trace != null) {
+            Files.deleteIfExists(trace);
+            properties.add("-D" + DaltonRunTrace.ENABLED + "=true");
+            properties.add("-D" + DaltonRunTrace.FILE + "=" + trace.toAbsolutePath().normalize());
+        }
         int exit = WorkbenchDirectRun.run(project == null ? Path.of("") : Path.of(project), properties);
         writer.println("EXIT " + exit);
+        if (trace != null && Files.isRegularFile(trace)) {
+            for (String outcome : Files.readAllLines(trace, StandardCharsets.UTF_8)) {
+                if (!outcome.isBlank()) writer.println(outcome);
+            }
+        }
         writer.println("END");
         return false;
     }

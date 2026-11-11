@@ -7,6 +7,8 @@ import org.junit.platform.launcher.core.LauncherDiscoveryRequestBuilder;
 import org.junit.platform.launcher.core.LauncherFactory;
 import org.junit.platform.launcher.listeners.SummaryGeneratingListener;
 import tools.dscode.common.reporting.diagnostic.ConsumerMavenTestRunner;
+import tools.dscode.dalton.DaltonConfig;
+import tools.dscode.dalton.DaltonRunTrace;
 import tools.dscode.testengine.DynamicSuiteEngine;
 
 import java.nio.file.Files;
@@ -38,10 +40,15 @@ public final class WorkbenchDirectRun {
             tests = root.resolve("build").resolve("classes").resolve("java").resolve("test");
         }
         try {
-            LauncherDiscoveryRequest request = LauncherDiscoveryRequestBuilder.request()
+            LauncherDiscoveryRequestBuilder requestBuilder = LauncherDiscoveryRequestBuilder.request()
                     .selectors(DiscoverySelectors.selectDirectory(tests.toString()))
-                    .filters(EngineFilter.includeEngines(DynamicSuiteEngine.ENGINE_ID))
-                    .build();
+                    .filters(EngineFilter.includeEngines(DynamicSuiteEngine.ENGINE_ID));
+            if (DaltonConfig.truthy(System.getProperty(DaltonRunTrace.ENABLED))) {
+                requestBuilder.configurationParameter(
+                        io.cucumber.core.options.Constants.PLUGIN_PROPERTY_NAME,
+                        DaltonRunTrace.class.getName());
+            }
+            LauncherDiscoveryRequest request = requestBuilder.build();
             SummaryGeneratingListener summary = new SummaryGeneratingListener();
             LauncherFactory.create().execute(request, summary);
             long found = summary.getSummary().getTestsFoundCount();

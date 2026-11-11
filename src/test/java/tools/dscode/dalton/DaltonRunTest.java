@@ -1,8 +1,10 @@
 package tools.dscode.dalton;
 
+import io.cucumber.core.runtime.FeaturePathLoadCache;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
+import tools.dscode.common.mappings.MappingProcessor;
 import tools.dscode.common.reporting.diagnostic.ConsumerMavenTestRunner;
 
 import java.io.ByteArrayOutputStream;
@@ -10,7 +12,9 @@ import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -117,6 +121,160 @@ class DaltonRunTest {
     }
 
     @Test
+    @Timeout(value = 300, unit = TimeUnit.SECONDS)
+    void warmRunExecutesDatabaseBytesAndMatchesTheNormalEngine() throws Exception {
+        Path features = project.resolve("features");
+        Files.createDirectories(features);
+        Files.createDirectories(project.resolve("build/classes/java/test"));
+        String feature = """
+                Feature: Dalton warm sample
+                  @dalton-warm
+                  Scenario: Pay Ada
+                    * INFO: amount is 10
+                    * dalton probe records amount is 10
+                    * ASSERT: "10" equals "10"
+
+                  @dalton-warm
+                  Scenario: Pay Lin
+                    * dalton probe records amount is 4
+                    * ASSERT: "10" equals "11"
+                """;
+        Path file = features.resolve("sample.feature");
+        Files.writeString(file, feature);
+        Files.createDirectories(project.resolve(".pickleball/dalton"));
+        Files.writeString(project.resolve(".pickleball/dalton/glue.fingerprint"), DaltonRun.glueFingerprint(project));
+        Capture hydrated = cli("dalton", "hydrate", "--project=" + project);
+        assertEquals(0, hydrated.code, hydrated.err);
+
+        String classpath = System.getProperty("pkb_dalton_run_classpath");
+        String log = System.getProperty("pkb_dalton_log");
+        try {
+            System.setProperty("pkb_dalton_run_classpath", System.getProperty("java.class.path"));
+            System.setProperty("pkb_dalton_log", "run");
+            List<String> selection = warmSelection(features);
+            DaltonRun.Outcome warm = DaltonRun.execute(project, selection, false);
+            List<String> warmLines = scenarioLines(warm.out());
+            assertEquals(1, warm.exit(), workerLog(warm));
+            assertFalse(warm.reused(), workerLog(warm));
+            assertEquals(signature(List.of(
+                    "scenario PASSED Pay Ada",
+                    "scenario FAILED Pay Lin",
+                    "reached amount is 10",
+                    "reached amount is 4"
+            ), warmLines), warmLines, warm.out());
+            assertEquals(2, countPrefix(warmLines, "scenario "));
+            assertTrue(countPrefix(warmLines, "step ") >= 1, warmLines.toString());
+            assertTrue(warmLines.stream().anyMatch(row -> row.startsWith("step FAILED ") && row.contains("ASSERT:")), warmLines.toString());
+            long pid = warmPid();
+
+            assertEquals(warmLines, normalEngine(features), warmLines.toString());
+
+            String edited = feature
+                    .replace("Scenario: Pay Ada", "Scenario: Pay from database")
+                    .replace("INFO: amount is 10", "INFO: amount is 99")
+                    .replace("dalton probe records amount is 10", "dalton probe records amount is 99")
+                    .replace("ASSERT: \"10\" equals \"11\"", "ASSERT: \"10\" equals \"10\"");
+            Path payload = project.resolve("edited.feature");
+            Files.writeString(payload, edited);
+            Capture put = cli("dalton", "feature", "put", "features/sample.feature",
+                    "--file=" + payload.toAbsolutePath(), "--project=" + project);
+            assertEquals(0, put.code, put.err);
+            assertEquals(feature, Files.readString(file));
+
+            DaltonRun.Outcome again = DaltonRun.execute(project, selection, false);
+            List<String> editedLines = scenarioLines(again.out());
+            assertEquals(0, again.exit(), workerLog(again));
+            assertTrue(again.reused(), workerLog(again));
+            assertEquals(pid, warmPid());
+            assertEquals(signature(List.of(
+                    "scenario PASSED Pay from database",
+                    "scenario PASSED Pay Lin",
+                    "reached amount is 99",
+                    "reached amount is 4"
+            ), editedLines), editedLines, again.out());
+            assertTrue(editedLines.stream().noneMatch(row -> row.contains("Pay Ada") || row.contains("FAILED")), editedLines.toString());
+            assertEquals(feature, Files.readString(file));
+            assertEquals(editedLines, normalEngine(features), editedLines.toString());
+        } finally {
+            DaltonRun.stop(project);
+            restore("pkb_dalton_run_classpath", classpath);
+            restore("pkb_dalton_log", log);
+            DaltonRuntime.reset();
+            FeaturePathLoadCache.clear();
+            MappingProcessor.resetCommonMaps();
+            DaltonScenarioHarness.release();
+        }
+    }
+
+    private List<String> normalEngine(Path features) {
+        Properties snapshot = new Properties();
+        snapshot.putAll(System.getProperties());
+        try {
+            System.setProperty("pkb_dalton", "true");
+            System.setProperty("pkb_dalton_project", project.toString());
+            DaltonRuntime.reset();
+            DaltonScenarioHarness.Outcome outcome = DaltonScenarioHarness.execute(
+                    features,
+                    "tools.dscode.coredefinitions,tools.dscode.dalton",
+                    "@dalton-warm"
+            );
+            List<String> combined = new ArrayList<>(outcome.events());
+            for (String reached : outcome.reached()) combined.add("reached " + reached);
+            return scenarioLines(combined);
+        } finally {
+            System.setProperties(snapshot);
+            DaltonRuntime.reset();
+            FeaturePathLoadCache.clear();
+            MappingProcessor.resetCommonMaps();
+            DaltonScenarioHarness.release();
+        }
+    }
+
+    private List<String> warmSelection(Path features) {
+        return List.of(
+                "-Dpkb_tags=@dalton-warm",
+                "-Dpkb_glue=tools.dscode.coredefinitions,tools.dscode.dalton",
+                "-Dpkb_features=wd-file:" + features.toAbsolutePath().normalize(),
+                "-Dpkb_loglevel=error",
+                "-Dpkb_parallel=1",
+                "-Dcucumber.execution.parallel.enabled=false"
+        );
+    }
+
+    private static List<String> scenarioLines(String text) {
+        return scenarioLines(text == null ? List.of() : List.of(text.split("\\R")));
+    }
+
+    private static List<String> scenarioLines(List<String> lines) {
+        List<String> kept = new ArrayList<>();
+        if (lines == null) return kept;
+        for (String line : lines) {
+            if (line == null) continue;
+            String trimmed = line.trim();
+            if (trimmed.startsWith("scenario ") || trimmed.startsWith("step ") || trimmed.startsWith("reached ")) {
+                kept.add(trimmed);
+            }
+        }
+        kept.sort(null);
+        return kept;
+    }
+
+    /** Expected names and reached steps must be present. Extra engine step lines stay. */
+    private static List<String> signature(List<String> required, List<String> actual) {
+        List<String> missing = new ArrayList<>();
+        for (String line : required) {
+            if (!actual.contains(line)) missing.add(line);
+        }
+        assertTrue(missing.isEmpty(), missing + " not in " + actual);
+        return actual;
+    }
+
+    private static long countPrefix(List<String> lines, String prefix) {
+        return lines.stream().filter(line -> line.startsWith(prefix)).count();
+    }
+
+    @Test
+    @Timeout(value = 180, unit = TimeUnit.SECONDS)
     void timingScriptSelfCheckDoesNotLaunchASuite() throws Exception {
         Process process = new ProcessBuilder("python3", "scripts/time_dalton_run.py", "--self-check")
                 .directory(Path.of("").toAbsolutePath().toFile())
