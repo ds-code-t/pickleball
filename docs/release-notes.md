@@ -8,6 +8,7 @@ In progress. Dalton is an opt-in hydrated working copy. Git files stay the sourc
 - `dalton hydrate --dry-run` writes nothing. Gradle `daltonStatus` and the Workbench MCP tool `dalton` only forward to that CLI.
 - `dalton hydrate` copies features, configs, calls, components, resource maps, and templates into that database and skips unchanged SHA-256 hashes. `--dry-run` still writes nothing when the database is missing. Gradle `daltonHydrate` only forwards to the CLI. A run hydrates only when `pkb_dalton=true` or `dalton.properties` sets `enabled=true`.
 - A hydrated `.feature` file keeps its original bytes and also stores scenarios, steps, tags, docstrings, and data tables. With Dalton on, feature loading reads the database bytes. With Dalton off, loading does not open the database and stays on the files.
+- `dalton entity` stores business entities from `dalton-entities/<Type>/<id>.entity`. The reference `<entity:Type#id.field>` resolves only when Dalton is on. Secret fields must be references, not cleartext. `dalton entity export` writes database edits back and refuses when both sides changed.
 
 ## 2.2.0
 

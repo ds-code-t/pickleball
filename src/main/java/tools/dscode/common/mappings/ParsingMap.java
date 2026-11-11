@@ -337,6 +337,9 @@ public class ParsingMap extends MappingProcessor {
     @Override
     public Object get(String key) {
         String query = extractMapPrefix(key).key();
+        if (query != null && query.startsWith("entity:") && tools.dscode.dalton.DaltonConfig.enabled()) {
+            return tools.dscode.dalton.DaltonEntities.lookup(query);
+        }
         if (query != null && query.startsWith(CONFIG_REFERENCE_PREFIX)) {
             String configQuery = query.substring(CONFIG_REFERENCE_PREFIX.length());
             return super.get(configQuery.isBlank()
@@ -359,6 +362,9 @@ public class ParsingMap extends MappingProcessor {
     @Override
     public Object getCaseInsensitive(String key) {
         String query = extractMapPrefix(key).key();
+        if (query != null && query.startsWith("entity:") && tools.dscode.dalton.DaltonConfig.enabled()) {
+            return tools.dscode.dalton.DaltonEntities.lookup(query);
+        }
         if (query != null && query.startsWith(CONFIG_REFERENCE_PREFIX)) {
             String configQuery = query.substring(CONFIG_REFERENCE_PREFIX.length());
             return super.getCaseInsensitive(configQuery.isBlank()
@@ -1184,7 +1190,9 @@ public class ParsingMap extends MappingProcessor {
             }
 
             Object current;
-            if (ValuesSupport.hasRegisteredPrefix(source)) {
+            if (source.startsWith("entity:") && tools.dscode.dalton.DaltonConfig.enabled()) {
+                current = tools.dscode.dalton.DaltonEntities.lookup(source);
+            } else if (ValuesSupport.hasRegisteredPrefix(source)) {
                 current = ValuesSupport.callPrefix(source);
             } else if (source.startsWith("value:")) {
                 current = source.substring("value:".length());

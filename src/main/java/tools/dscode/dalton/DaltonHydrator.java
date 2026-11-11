@@ -65,9 +65,7 @@ public final class DaltonHydrator {
                     if (row == null) {
                         inserted++;
                         if (!options.dryRun()) {
-                            DaltonFiles.upsert(connection, new DaltonFiles.Row(
-                                    source.path(), hash, raw, mtime, source.sourceType(), now, hash, false));
-                            DaltonGherkin.store(connection, project, source.path(), source.sourceType(), raw);
+                            writeSource(connection, project, source, raw, hash, mtime, now);
                         }
                         continue;
                     }
@@ -81,14 +79,15 @@ public final class DaltonHydrator {
                         skipped++;
                         if (!options.dryRun()) {
                             DaltonGherkin.storeIfMissing(connection, project, source.path(), source.sourceType(), raw);
+                            if (DaltonEntities.isRecord(source.path(), source.sourceType())) {
+                                DaltonEntities.storeIfMissing(connection, project, source.path(), raw);
+                            }
                         }
                         continue;
                     }
                     updated++;
                     if (!options.dryRun()) {
-                        DaltonFiles.upsert(connection, new DaltonFiles.Row(
-                                source.path(), hash, raw, mtime, source.sourceType(), now, hash, false));
-                        DaltonGherkin.store(connection, project, source.path(), source.sourceType(), raw);
+                        writeSource(connection, project, source, raw, hash, mtime, now);
                     }
                 }
                 if (!options.dryRun()) {
@@ -111,6 +110,26 @@ public final class DaltonHydrator {
             DaltonLog.log(project, "hydrate", "files",
                     (options.dryRun() ? "dry-run " : "") + "inserted=" + inserted + " updated=" + updated);
             return new Result(inserted, updated, skipped, conflicts.size(), options.dryRun(), conflicts);
+        }
+    }
+
+    private static void writeSource(
+            java.sql.Connection connection,
+            Path project,
+            DaltonSources.Found source,
+            byte[] raw,
+            String hash,
+            long mtime,
+            String now
+    ) throws java.sql.SQLException {
+        if (DaltonEntities.isRecord(source.path(), source.sourceType())) {
+            DaltonEntities.parseRecord(raw);
+        }
+        DaltonFiles.upsert(connection, new DaltonFiles.Row(
+                source.path(), hash, raw, mtime, source.sourceType(), now, hash, false));
+        DaltonGherkin.store(connection, project, source.path(), source.sourceType(), raw);
+        if (DaltonEntities.isRecord(source.path(), source.sourceType())) {
+            DaltonEntities.store(connection, project, source.path(), raw);
         }
     }
 }

@@ -14,7 +14,7 @@ import java.sql.Statement;
  * consumer shadow JAR. WAL and {@code busy_timeout} are set on every open.
  */
 public final class DaltonDatabase implements AutoCloseable {
-    public static final int SCHEMA_VERSION = 2;
+    public static final int SCHEMA_VERSION = 3;
     static final String DRIVER = "org.sqlite.JDBC";
 
     private final Connection connection;
@@ -153,6 +153,19 @@ public final class DaltonDatabase implements AutoCloseable {
                         docstring_type TEXT,
                         table_json TEXT,
                         PRIMARY KEY (file_path, scenario_ord, ord)
+                    )
+                    """);
+            statement.execute("""
+                    CREATE TABLE IF NOT EXISTS entities (
+                        entity_type TEXT NOT NULL,
+                        entity_id TEXT NOT NULL,
+                        version INTEGER NOT NULL,
+                        payload_json TEXT NOT NULL,
+                        secret_refs TEXT NOT NULL,
+                        source_file TEXT,
+                        content_hash TEXT NOT NULL,
+                        updated_at TEXT NOT NULL,
+                        PRIMARY KEY (entity_type, entity_id)
                     )
                     """);
         }

@@ -50,6 +50,7 @@ public final class DaltonCli {
                 }
                 case "status" -> status(project, json(tokens), stdout);
                 case "hydrate" -> hydrate(project, tokens, stdout, stderr);
+                case "entity" -> entity(project, tokens, stdout, stderr);
                 default -> {
                     stderr.println("error: Unknown Dalton command: " + command);
                     stderr.println("fix: dalton help");
@@ -67,13 +68,20 @@ public final class DaltonCli {
         return """
                 Usage: dalton status [--project=<dir>] [--json]
                 Usage: dalton hydrate [--project=<dir>] [--path=<relative>] [--force] [--dry-run]
+                Usage: dalton entity list [--project=<dir>]
+                Usage: dalton entity get <type> <id> [--project=<dir>]
+                Usage: dalton entity put <type> <id> [--version=N] [--payload=<json>] [--payload-file=<path>] [--project=<dir>]
+                Usage: dalton entity remove <type> <id> [--force] [--project=<dir>]
+                Usage: dalton entity export [--force] [--project=<dir>]
                 Files stay the source of truth. The database is .pickleball/dalton/dalton.db and is gitignored.
                 status and hydrate --dry-run do not create a database when it is missing.
-                hydrate copies features, configs, calls, components, resource maps, and templates.
+                hydrate copies features, configs, calls, components, resource maps, templates, and dalton-entities/*.entity files.
                 A .feature file also stores scenarios, steps, tags, docstrings, and data tables. The original bytes stay in the file row.
                 Unchanged content hashes are skipped. --force rewrites the database rows from files.
                 Auto-hydrate on a run happens only when pkb_dalton=true or dalton.properties sets enabled=true.
                 With that flag on, feature loading reads those database bytes. A path that is not in the database stays on the file. With the flag off, loading does not open the database.
+                Entity files are dalton-entities/<Type>/<id>.entity. The reference is <entity:Type#id.field>. Secret fields must be references such as <password:name> or ~MASK;, never cleartext.
+                entity export writes a changed entity back to its file. It refuses when the file and the database both changed. --force overwrites the file.
                 sqlite-jdbc is required only when a command opens the database. It is not published in the Pickleball POM.
                 """;
     }
@@ -102,13 +110,16 @@ public final class DaltonCli {
             int version = database.schemaVersion();
             int files = count(database, "SELECT COUNT(*) FROM files");
             int scenarios = count(database, "SELECT COUNT(*) FROM scenarios");
+            int entities = count(database, "SELECT COUNT(*) FROM entities");
             if (json) {
                 out.println("{\"database\":\"present\",\"path\":\"" + shown + "\",\"schemaVersion\":"
-                        + version + ",\"files\":" + files + ",\"scenarios\":" + scenarios + ",\"driver\":true}");
+                        + version + ",\"files\":" + files + ",\"scenarios\":" + scenarios
+                        + ",\"entities\":" + entities + ",\"driver\":true}");
             } else {
                 out.println("Dalton schema " + version);
                 out.println("files " + files);
                 out.println("scenarios " + scenarios);
+                out.println("entities " + entities);
                 out.println("database " + shown);
             }
             return 0;
@@ -138,6 +149,101 @@ public final class DaltonCli {
             err.println("fix: dalton hydrate --dry-run");
             return 1;
         }
+    }
+
+    private static int entity(Path project, List<String> tokens, PrintStream out, PrintStream err) {
+        String action = tokens.size() < 2 ? "help" : tokens.get(1);
+        boolean force = has(tokens, "--force");
+        try {
+            return switch (action) {
+                case "list" -> {
+                    List<DaltonEntities.Entity> entities = DaltonEntities.list(project);
+                    if (entities.isEmpty()) out.println("entities 0");
+                    for (DaltonEntities.Entity entity : entities) {
+                        out.println(entity.type() + " " + entity.id() + " " + entity.version());
+                    }
+                    yield 0;
+                }
+                case "get" -> {
+                    String type = arg(tokens, 2);
+                    String id = arg(tokens, 3);
+                    DaltonEntities.Entity entity = DaltonEntities.get(project, type, id);
+                    if (entity == null) {
+                        err.println("error: entity not found: " + type + " " + id);
+                        err.println("fix: dalton entity list");
+                        yield 1;
+                    }
+                    out.write(DaltonEntities.canonicalFile(entity.type(), entity.id(), entity.version(), entity.payloadJson()));
+                    yield 0;
+                }
+                case "put" -> {
+                    String type = arg(tokens, 2);
+                    String id = arg(tokens, 3);
+                    String payload = payload(project, tokens);
+                    Integer version = version(tokens);
+                    DaltonEntities.Entity entity = DaltonEntities.put(project, type, id, version, payload);
+                    out.println("entity " + entity.type() + " " + entity.id() + " version " + entity.version());
+                    yield 0;
+                }
+                case "remove" -> {
+                    String type = arg(tokens, 2);
+                    String id = arg(tokens, 3);
+                    if (!Files.isRegularFile(DaltonPaths.database(project))) {
+                        err.println("error: entity not found: " + type + " " + id);
+                        yield 1;
+                    }
+                    boolean removed = DaltonEntities.remove(project, type, id, force);
+                    if (!removed) {
+                        err.println("error: entity not found: " + type + " " + id);
+                        yield 1;
+                    }
+                    out.println("removed " + type + " " + id);
+                    yield 0;
+                }
+                case "export" -> {
+                    DaltonEntities.ExportResult result = DaltonEntities.export(project, force);
+                    out.println(result.line());
+                    for (String conflict : result.conflictPaths()) err.println("conflict: " + conflict);
+                    yield result.conflicts() > 0 ? 1 : 0;
+                }
+                default -> {
+                    err.println("error: Unknown Dalton entity command: " + action);
+                    err.println("fix: dalton help");
+                    yield 2;
+                }
+            };
+        } catch (Exception failure) {
+            err.println("error: " + failure.getMessage());
+            err.println("fix: dalton help");
+            return failure.getMessage() != null && failure.getMessage().startsWith("conflict:") ? 1 : 1;
+        }
+    }
+
+    private static String arg(List<String> tokens, int index) {
+        if (index >= tokens.size() || tokens.get(index).startsWith("--")) {
+            throw new IllegalArgumentException("entity command needs a type and an id");
+        }
+        return tokens.get(index);
+    }
+
+    private static Integer version(List<String> tokens) {
+        for (String token : tokens) {
+            if (token.startsWith("--version=")) return Integer.valueOf(token.substring("--version=".length()));
+        }
+        return null;
+    }
+
+    private static String payload(Path project, List<String> tokens) throws java.io.IOException {
+        for (String token : tokens) {
+            if (token.startsWith("--payload=")) return token.substring("--payload=".length());
+            if (token.startsWith("--payload-file=")) {
+                String raw = token.substring("--payload-file=".length());
+                Path file = Path.of(raw);
+                if (!file.isAbsolute()) file = project.resolve(raw);
+                return Files.readString(file);
+            }
+        }
+        throw new IllegalArgumentException("entity put needs --payload or --payload-file");
     }
 
     private static int count(DaltonDatabase database, String sql) throws SQLException {

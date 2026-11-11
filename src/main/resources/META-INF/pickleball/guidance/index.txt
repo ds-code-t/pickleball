@@ -14,6 +14,7 @@ docs/consumer-agent-guide.md
 docs/consumer-project.md
 docs/cucumber-compatibility.md
 docs/custom-element-definitions.md
+docs/dalton-entities.md
 docs/data-element-query-runtime.md
 docs/data-values-and-elements.md
 docs/date-time-utilities.md

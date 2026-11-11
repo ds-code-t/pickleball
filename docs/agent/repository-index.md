@@ -36,6 +36,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/consumer-project.md`
 - `docs/cucumber-compatibility.md`
 - `docs/custom-element-definitions.md`
+- `docs/dalton-entities.md`
 - `docs/data-element-query-runtime.md`
 - `docs/data-values-and-elements.md`
 - `docs/date-time-utilities.md`
@@ -489,6 +490,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/dalton/DaltonCli.java`
 - `src/main/java/tools/dscode/dalton/DaltonConfig.java`
 - `src/main/java/tools/dscode/dalton/DaltonDatabase.java`
+- `src/main/java/tools/dscode/dalton/DaltonEntities.java`
 - `src/main/java/tools/dscode/dalton/DaltonFeatureSource.java`
 - `src/main/java/tools/dscode/dalton/DaltonFiles.java`
 - `src/main/java/tools/dscode/dalton/DaltonGherkin.java`
@@ -625,6 +627,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/coredefinitions/RunTypeAliasTest.java`
 - `src/test/java/tools/dscode/coredefinitions/XmlTableCellFeatureTest.java`
 - `src/test/java/tools/dscode/coredefinitions/XmlTableCellTest.java`
+- `src/test/java/tools/dscode/dalton/DaltonEntityTest.java`
 - `src/test/java/tools/dscode/dalton/DaltonFoundationTest.java`
 - `src/test/java/tools/dscode/dalton/DaltonHydrateTest.java`
 - `src/test/java/tools/dscode/dalton/DaltonParseTest.java`
