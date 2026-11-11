@@ -465,6 +465,19 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/dalton/DaltonRunWorker.java`
 - `src/main/java/tools/dscode/dalton/DaltonSecrets.java`
 - `src/main/java/tools/dscode/dalton/DaltonSources.java`
+- `src/main/java/tools/dscode/engine/convert/CucumberModelConverter.java`
+- `src/main/java/tools/dscode/engine/model/DocText.java`
+- `src/main/java/tools/dscode/engine/model/EngineFeature.java`
+- `src/main/java/tools/dscode/engine/model/EngineScenario.java`
+- `src/main/java/tools/dscode/engine/model/EngineStep.java`
+- `src/main/java/tools/dscode/engine/model/ExampleTable.java`
+- `src/main/java/tools/dscode/engine/model/RunResult.java`
+- `src/main/java/tools/dscode/engine/model/ScenarioResult.java`
+- `src/main/java/tools/dscode/engine/model/SourceLocation.java`
+- `src/main/java/tools/dscode/engine/model/Status.java`
+- `src/main/java/tools/dscode/engine/model/StepArgument.java`
+- `src/main/java/tools/dscode/engine/model/StepResult.java`
+- `src/main/java/tools/dscode/engine/model/Table.java`
 - `src/main/java/tools/dscode/internal/ValuesSupport.java`
 - `src/main/java/tools/dscode/launcher/PickleballWorkbenchLauncher.java`
 - `src/main/java/tools/dscode/launcher/QuietWarnings.java`
@@ -607,6 +620,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/dalton/DaltonRunTest.java`
 - `src/test/java/tools/dscode/dalton/DaltonScenarioHarness.java`
 - `src/test/java/tools/dscode/dalton/DaltonSecretsTest.java`
+- `src/test/java/tools/dscode/engine/convert/CucumberModelConverterTest.java`
 - `src/test/java/tools/dscode/expectedfailure/ExpectedFailureRunnerTest.java`
 - `src/test/java/tools/dscode/expectedfailure/ExpectedFailureSteps.java`
 - `src/test/java/tools/dscode/GuidancePackagingTest.java`

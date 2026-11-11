@@ -368,3 +368,7 @@ A functionality change is complete only when:
 - The feature map remains accurate.
 - The generated repository index is current.
 - The final response summarizes the implementation, affected contracts, documentation, tests, and any validation not performed.
+
+## Native engine (3.0.0 Round 3)
+
+Phase 1 adds Pickleball-owned model types in `tools.dscode.engine.model` (`EngineStep`, `EngineScenario`, `EngineFeature`, `Table`, `DocText`, `Status`, `RunResult`) and `CucumberModelConverter` at the adapter edge. Existing Cucumber execution is unchanged. The locked design remains `docs/maintainer/3.0.0-engine-design.md`.
