@@ -496,6 +496,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/dalton/DaltonFiles.java`
 - `src/main/java/tools/dscode/dalton/DaltonGherkin.java`
 - `src/main/java/tools/dscode/dalton/DaltonHashes.java`
+- `src/main/java/tools/dscode/dalton/DaltonHistory.java`
 - `src/main/java/tools/dscode/dalton/DaltonHydrator.java`
 - `src/main/java/tools/dscode/dalton/DaltonLog.java`
 - `src/main/java/tools/dscode/dalton/DaltonPaths.java`
@@ -631,6 +632,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/dalton/DaltonEntityTest.java`
 - `src/test/java/tools/dscode/dalton/DaltonExtractTest.java`
 - `src/test/java/tools/dscode/dalton/DaltonFoundationTest.java`
+- `src/test/java/tools/dscode/dalton/DaltonHistoryTest.java`
 - `src/test/java/tools/dscode/dalton/DaltonHydrateTest.java`
 - `src/test/java/tools/dscode/dalton/DaltonParseTest.java`
 - `src/test/java/tools/dscode/expectedfailure/ExpectedFailureRunnerTest.java`

@@ -18,6 +18,8 @@ The distribution arrow is an assembly input, not a Workbench-to-core Java depend
 
 Pickleball owns scenario execution semantics, Cucumber integration, DynamicControl/Gherkin execution, Mapping, browser/service behavior, the consumer-side Control Bridge, semantic hooks/breakpoints, Step Overrides, and woven Cucumber/AspectJ behavior.
 
+Workbench does not implement Dalton. The MCP tool `dalton` and `DaltonCliForwarder` only build `java -jar <pickleball.jar> dalton ...` for status, hydrate, extract, history, and entity commands. Gradle `daltonStatus`, `daltonHydrate`, `daltonExtract`, and `daltonHistory` do the same. Diagnostic reports stay on the existing reporting path.
+
 Workbench owns synchronization, `.pickleball/workbench/` disposable state, worker lifecycle, the protocol client, `WorkbenchLiveSession`, `WorkbenchServices` / `WorkbenchController`, MCP stdio, the headless live-scenario presentation model, and the Swing adapter. It does not import the worker entry point; it launches the protocol's class-name string on the captured consumer classpath.
 
 `pickleball-control-protocol` owns immutable wire records, request/response envelopes, transport constants, capabilities, version/minimum-version negotiation, and JDK-only `.pickleball` layout/store helpers (`PickleballLocalLayout`, `PickleballVersion`, `PickleballArtifactLocator`, `PickleballLocalStore`). Worker-side bridge server/coordinator/bootstrap and all translation to runtime operations remain in Pickleball core.

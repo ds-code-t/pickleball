@@ -10,6 +10,7 @@ In progress. Dalton is an opt-in hydrated working copy. Git files stay the sourc
 - A hydrated `.feature` file keeps its original bytes and also stores scenarios, steps, tags, docstrings, and data tables. With Dalton on, feature loading reads the database bytes. With Dalton off, loading does not open the database and stays on the files.
 - `dalton entity` stores business entities from `dalton-entities/<Type>/<id>.entity`. The reference `<entity:Type#id.field>` resolves only when Dalton is on. Secret fields must be references, not cleartext. `dalton entity export` writes database edits back and refuses when both sides changed.
 - `dalton extract` (alias `hydrate-out`) writes stored file bytes back to disk and does not reformat them. An unedited row stays as the original file. Both sides changed prints `conflict: <path>` and exits 1 unless `--force` is set. Gradle `daltonExtract` only forwards to that CLI.
+- `dalton history` stores run summaries beside diagnostic reports. It does not change `reports/diagnostic-runs` or `pkb_reportretention`. `retain` is date-stamped and size-capped. Gradle `daltonHistory`, Workbench, and MCP only forward to the CLI. Logging stays off unless `pkb_dalton_log` names the capability.
 
 ## 2.2.0
 

@@ -25,6 +25,20 @@ class DaltonCliForwarderTest {
     }
 
     @Test
+    void historyAndExtractForwardAsCliArguments() {
+        Path jar = Path.of("pickleball.jar");
+        List<String> history = DaltonCliForwarder.command(jar, project, List.of("history", "retain", "--days=7"));
+        assertEquals("dalton", history.get(3));
+        assertEquals("history", history.get(4));
+        assertEquals("retain", history.get(5));
+        assertEquals("--days=7", history.get(6));
+        assertTrue(history.get(7).startsWith("--project="), history.toString());
+        List<String> extract = DaltonCliForwarder.command(jar, project, List.of("extract", "--force"));
+        assertEquals("extract", extract.get(4));
+        assertEquals("--force", extract.get(5));
+    }
+
+    @Test
     void missingJarDoesNotInventADatabaseCommand() {
         DaltonCliForwarder.Result result = DaltonCliForwarder.run(project, List.of("hydrate", "--dry-run"), project.resolve("missing.jar"));
         assertEquals(1, result.exit());

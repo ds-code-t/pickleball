@@ -417,6 +417,20 @@ tasks.register('daltonExtract', JavaExec) {
     if (project.hasProperty('daltonForce')) args += ['--force']
 }
 
+tasks.register('daltonHistory', JavaExec) {
+    group = 'dalton'
+    description = 'Forward to the Dalton CLI history command. sqlite-jdbc is on this task classpath only and is not published.'
+    classpath = sourceSets.main.runtimeClasspath + configurations.detachedConfiguration(
+            dependencies.create('org.xerial:sqlite-jdbc:3.47.2.0')
+    )
+    mainClass = 'tools.dscode.dalton.DaltonCli'
+    args = ['dalton', 'history']
+    args += [project.hasProperty('daltonHistory') ? project.property('daltonHistory') : 'list']
+    if (project.hasProperty('daltonRun')) args += [project.property('daltonRun')]
+    if (project.hasProperty('daltonDays')) args += ['--days=' + project.property('daltonDays')]
+    if (project.hasProperty('daltonMaxBytes')) args += ['--max-bytes=' + project.property('daltonMaxBytes')]
+}
+
 tasks.register('verifySqliteNotPublished') {
     group = 'verification'
     description = 'sqlite-jdbc stays off the published POM and the consumer shadow JAR.'

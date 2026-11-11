@@ -51,6 +51,7 @@ public final class DaltonCli {
                 case "status" -> status(project, json(tokens), stdout);
                 case "hydrate" -> hydrate(project, tokens, stdout, stderr);
                 case "extract", "hydrate-out" -> extract(project, tokens, stdout, stderr);
+                case "history" -> history(project, tokens, stdout, stderr);
                 case "entity" -> entity(project, tokens, stdout, stderr);
                 default -> {
                     stderr.println("error: Unknown Dalton command: " + command);
@@ -70,6 +71,10 @@ public final class DaltonCli {
                 Usage: dalton status [--project=<dir>] [--json]
                 Usage: dalton hydrate [--project=<dir>] [--path=<relative>] [--force] [--dry-run]
                 Usage: dalton extract [--project=<dir>] [--path=<relative>] [--force]
+                Usage: dalton history list [--project=<dir>]
+                Usage: dalton history show <run-id> [--project=<dir>]
+                Usage: dalton history record <run-id> [--status=<text>] [--scenario=<name>] [--passed=N] [--failed=N] [--note=<text>] [--message=<text>] [--entity=<name>] [--started=<iso>] [--from=<run-index.json>] [--project=<dir>]
+                Usage: dalton history retain [--days=N] [--max-bytes=N] [--project=<dir>]
                 Usage: dalton entity list [--project=<dir>]
                 Usage: dalton entity get <type> <id> [--project=<dir>]
                 Usage: dalton entity put <type> <id> [--version=N] [--payload=<json>] [--payload-file=<path>] [--project=<dir>]
@@ -85,6 +90,7 @@ public final class DaltonCli {
                 Entity files are dalton-entities/<Type>/<id>.entity. The reference is <entity:Type#id.field>. Secret fields must be references such as <password:name> or ~MASK;, never cleartext.
                 entity export writes a changed entity back to its file. It is extract limited to dalton-entities/. It refuses when the file and the database both changed. --force overwrites the file from the stored bytes.
                 extract copies stored file bytes back to disk and does not reformat them. hydrate-out is the same command. An unedited row is left untouched. A deleted file is not recreated unless that row was edited or --force is set.
+                history stores a run summary in the database. It does not change diagnostic reports or pkb_reportretention. --from copies outcome and counts from a run-index.json file. retain drops runs older than --days and then the oldest runs until the note, scenario, and message bytes fit --max-bytes.
                 sqlite-jdbc is required only when a command opens the database. It is not published in the Pickleball POM.
                 """;
     }
@@ -114,15 +120,17 @@ public final class DaltonCli {
             int files = count(database, "SELECT COUNT(*) FROM files");
             int scenarios = count(database, "SELECT COUNT(*) FROM scenarios");
             int entities = count(database, "SELECT COUNT(*) FROM entities");
+            int runs = count(database, "SELECT COUNT(*) FROM runs");
             if (json) {
                 out.println("{\"database\":\"present\",\"path\":\"" + shown + "\",\"schemaVersion\":"
                         + version + ",\"files\":" + files + ",\"scenarios\":" + scenarios
-                        + ",\"entities\":" + entities + ",\"driver\":true}");
+                        + ",\"entities\":" + entities + ",\"runs\":" + runs + ",\"driver\":true}");
             } else {
                 out.println("Dalton schema " + version);
                 out.println("files " + files);
                 out.println("scenarios " + scenarios);
                 out.println("entities " + entities);
+                out.println("runs " + runs);
                 out.println("database " + shown);
             }
             return 0;
@@ -172,6 +180,110 @@ public final class DaltonCli {
             err.println("fix: dalton extract");
             return 1;
         }
+    }
+
+    private static int history(Path project, List<String> tokens, PrintStream out, PrintStream err) {
+        String action = tokens.size() < 2 || tokens.get(1).startsWith("--") ? "list" : tokens.get(1);
+        try {
+            return switch (action) {
+                case "list" -> {
+                    List<DaltonHistory.Run> runs = DaltonHistory.list(project);
+                    if (runs.isEmpty()) out.println("runs 0");
+                    for (DaltonHistory.Run run : runs) {
+                        out.println(run.id() + " " + run.status() + " " + run.startedAt()
+                                + " passed=" + run.passed() + " failed=" + run.failed());
+                    }
+                    yield 0;
+                }
+                case "show" -> {
+                    String id = arg(tokens, 2, "history show needs a run id");
+                    DaltonHistory.Run run = DaltonHistory.find(project, id);
+                    if (run == null) {
+                        err.println("error: run not found: " + id);
+                        err.println("fix: dalton history list");
+                        yield 1;
+                    }
+                    out.println("run " + run.id() + " status " + run.status());
+                    out.println("started " + run.startedAt());
+                    out.println("scenario " + run.scenario());
+                    out.println("passed " + run.passed());
+                    out.println("failed " + run.failed());
+                    if (!run.note().isBlank()) out.println("note " + run.note());
+                    for (DaltonHistory.LogLine line : DaltonHistory.logs(project, id)) {
+                        out.println(line.loggedAt() + " " + line.entity() + " " + line.message());
+                    }
+                    yield 0;
+                }
+                case "record" -> {
+                    String from = option(tokens, "--from=");
+                    DaltonHistory.Draft imported = from == null ? null : DaltonHistory.fromDiagnostic(project, from);
+                    String id = historyId(tokens, imported);
+                    DaltonHistory.Run run = DaltonHistory.record(project, new DaltonHistory.Draft(
+                            id,
+                            first(option(tokens, "--started="), imported == null ? null : imported.startedAt()),
+                            first(option(tokens, "--status="), imported == null ? null : imported.status()),
+                            first(option(tokens, "--scenario="), imported == null ? null : imported.scenario()),
+                            integer(option(tokens, "--passed="), imported == null ? 0 : imported.passed()),
+                            integer(option(tokens, "--failed="), imported == null ? 0 : imported.failed()),
+                            first(option(tokens, "--note="), imported == null ? "" : imported.note()),
+                            first(option(tokens, "--entity="), imported == null ? "run" : imported.entity()),
+                            option(tokens, "--message=")));
+                    out.println("run " + run.id() + " status " + run.status());
+                    yield 0;
+                }
+                case "retain" -> {
+                    int days = integer(option(tokens, "--days="), DaltonHistory.days());
+                    int maxBytes = integer(option(tokens, "--max-bytes="), DaltonHistory.maxBytes());
+                    DaltonHistory.RetainResult result = DaltonHistory.retain(project, days, maxBytes);
+                    out.println(result.line());
+                    boolean present = Files.isRegularFile(DaltonPaths.database(project));
+                    out.println("database " + (present ? "present" : "missing"));
+                    yield 0;
+                }
+                default -> {
+                    err.println("error: Unknown Dalton history command: " + action);
+                    err.println("fix: dalton help");
+                    yield 2;
+                }
+            };
+        } catch (Exception failure) {
+            err.println("error: " + failure.getMessage());
+            err.println("fix: dalton history list");
+            return 1;
+        }
+    }
+
+    private static String historyId(List<String> tokens, DaltonHistory.Draft imported) {
+        if (tokens.size() >= 3 && !tokens.get(2).startsWith("--")) return tokens.get(2);
+        if (imported != null && imported.id() != null && !imported.id().isBlank()) return imported.id();
+        throw new IllegalArgumentException("history record needs a run id");
+    }
+
+    private static String option(List<String> tokens, String prefix) {
+        for (String token : tokens) {
+            if (token.startsWith(prefix)) return token.substring(prefix.length());
+        }
+        return null;
+    }
+
+    private static String first(String chosen, String fallback) {
+        return chosen == null || chosen.isBlank() ? fallback : chosen;
+    }
+
+    private static int integer(String raw, int fallback) {
+        if (raw == null || raw.isBlank()) return fallback;
+        try {
+            return Integer.parseInt(raw.trim());
+        } catch (NumberFormatException failure) {
+            throw new IllegalArgumentException("expected an integer: " + raw);
+        }
+    }
+
+    private static String arg(List<String> tokens, int index, String message) {
+        if (index >= tokens.size() || tokens.get(index).startsWith("--")) {
+            throw new IllegalArgumentException(message);
+        }
+        return tokens.get(index);
     }
 
     private static int entity(Path project, List<String> tokens, PrintStream out, PrintStream err) {

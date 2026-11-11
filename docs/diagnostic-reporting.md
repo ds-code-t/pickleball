@@ -28,6 +28,8 @@ Explicit report steps are not suppressed by this setting.
 
 Workbench `discover` / `confirm` / `hint` default to `failed` even though ordinary diagnostic runs default to `all`. Override the Workbench overlay with `--retention=all|failed|none`. That flag does not change this table.
 
+Dalton run history is a separate opt-in store in `.pickleball/dalton/dalton.db`. `dalton history` does not delete diagnostic folders and does not read `pkb_reportretention`. Use it when you want a small queryable summary beside this report tree. `--from` copies outcome and counts from a `run-index.json` and does not modify that file.
+
 ## Diagnostic layout
 
 Default root:
