@@ -141,6 +141,12 @@ public final class DynamicSuiteEngine implements TestEngine {
                     mergedParameters
             );
 
+            if (tools.dscode.engine.EngineConfig.nativeSelected()) {
+                tools.dscode.engine.adapter.NativeSuiteExecution.execute(wrappedRequest);
+                logTrace("[DynamicSuiteEngine] Native execution completed");
+                return;
+            }
+
                 delegate.execute(wrappedRequest);
                 logTrace("[DynamicSuiteEngine] Delegate execution completed");
 

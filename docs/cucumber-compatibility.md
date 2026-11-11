@@ -76,6 +76,6 @@ Cucumber CLI `--tags` / `--name` / `--glue` projection can overlay ordinary and 
 
 ## Native engine CLI
 
-`engine run` and `engine step` run ordinary glue from text, a step list, a file, or a Dalton row. They do not start Cucumber. Gradle `engineRun`, Workbench, and MCP `engine` only forward to that CLI. A normal Cucumber or JUnit run is unchanged.
+`engine run` and `engine step` run ordinary glue from text, a step list, a file, or a Dalton row. They do not start Cucumber. Gradle `engineRun`, Workbench, and MCP `engine` only forward to that CLI. A normal Cucumber or JUnit run is unchanged. Set `pkb_engine=native` (or `PKB_ENGINE`, or `engine.properties` `mode=native`) to select the native engine for that suite. The default is `cucumber`, and the adapter stays available.
 
 [Documentation home](README.md) · [Next: Dynamic Steps](dynamic-steps.md)

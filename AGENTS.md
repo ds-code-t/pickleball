@@ -386,3 +386,5 @@ Phase 6 resolves scenarios from any `ScenarioSource` by tags, name, feature name
 Phase 7 runs scenarios and single steps through `PickleballEngine.run` and `runStep`. Sources are in-memory Gherkin, a runtime step list with nothing on disk, a file, or a Dalton row. `engine help`, `engine run`, and `engine step` are the CLI. The launcher, `dalton run --engine`, Gradle `engineRun`, Workbench `EngineCliForwarder`, and MCP `engine` only forward to that CLI and do not run steps themselves. `pkb_engine_log=run` logs the run. A Cucumber suite is unchanged.
 
 Phase 8 runs `DynamicControl.executeStep` when no Cucumber scenario is on the thread. The live and paused path is unchanged. The control bridge uses that native call only when it has no scenario lane. `pkb_engine_glue` names glue classes for that call.
+
+Phase 9 adds `EngineConfig`. `pkb_engine`, then `PKB_ENGINE`, then `engine.properties` `mode=` choose `native` or `cucumber`. The default is `cucumber`. Existing JUnit suites stay on the Cucumber adapter unless that toggle is `native`. `CucumberAdapterRun` and `DualRun` compare one feature on both paths.

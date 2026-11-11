@@ -467,9 +467,12 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/dalton/DaltonRunWorker.java`
 - `src/main/java/tools/dscode/dalton/DaltonSecrets.java`
 - `src/main/java/tools/dscode/dalton/DaltonSources.java`
+- `src/main/java/tools/dscode/engine/adapter/CucumberAdapterRun.java`
+- `src/main/java/tools/dscode/engine/adapter/NativeSuiteExecution.java`
 - `src/main/java/tools/dscode/engine/context/ExecutionContext.java`
 - `src/main/java/tools/dscode/engine/convert/CucumberModelConverter.java`
 - `src/main/java/tools/dscode/engine/EngineCli.java`
+- `src/main/java/tools/dscode/engine/EngineConfig.java`
 - `src/main/java/tools/dscode/engine/EngineLog.java`
 - `src/main/java/tools/dscode/engine/EngineOptions.java`
 - `src/main/java/tools/dscode/engine/match/AmbiguousMatchException.java`
@@ -489,6 +492,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/engine/model/StepArgument.java`
 - `src/main/java/tools/dscode/engine/model/StepResult.java`
 - `src/main/java/tools/dscode/engine/model/Table.java`
+- `src/main/java/tools/dscode/engine/parity/DualRun.java`
 - `src/main/java/tools/dscode/engine/parse/EncodingRewrite.java`
 - `src/main/java/tools/dscode/engine/parse/GherkinEngineParser.java`
 - `src/main/java/tools/dscode/engine/PickleballEngine.java`
@@ -643,7 +647,10 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/engine/context/ExecutionContextTest.java`
 - `src/test/java/tools/dscode/engine/convert/CucumberModelConverterTest.java`
 - `src/test/java/tools/dscode/engine/convert/NeutralDataTest.java`
+- `src/test/java/tools/dscode/engine/EngineConfigTest.java`
 - `src/test/java/tools/dscode/engine/match/StepRegistryTest.java`
+- `src/test/java/tools/dscode/engine/parity/DualRunSetupTest.java`
+- `src/test/java/tools/dscode/engine/parity/EchoParityGlue.java`
 - `src/test/java/tools/dscode/engine/parse/GherkinEngineParserTest.java`
 - `src/test/java/tools/dscode/engine/PickleballEngineTest.java`
 - `src/test/java/tools/dscode/engine/resolve/ScenarioResolverTest.java`
