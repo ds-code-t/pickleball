@@ -605,3 +605,7 @@ pkb_reportingmode=diagnostic
 Evidence/logging controls such as `pkb_reportingmode`, `pkb_reportretention`, `pkb_diagnostic_output`, `pkb_platformlog`, `pkb_gitsnapshot`, and `pkb_loglevel` are execution RunVars, even though they primarily affect evidence. If an agent intentionally changes one during a controlled rerun, its canonical name belongs in `pkb_changed_variables`.
 
 See [Diagnostic Reporting](diagnostic-reporting.md) and [Diagnostic Lineage Metadata](diagnostic-lineage-metadata.md).
+
+## Dalton
+
+Dalton is off unless you set `pkb_dalton=true` (or `PKB_DALTON`) or put `enabled=true` in a project-root `dalton.properties`. With it off, a run does not open `.pickleball/dalton/dalton.db` and feature loading stays on the files. The database is gitignored. `dalton hydrate` copies features, configs, calls, components, resource maps, and templates. A second hydrate skips a file whose bytes still hash the same. `--path` limits the copy. `--force` rewrites database rows from the files. `--dry-run` prints the counts and does not create a missing database. `sqlite-jdbc` is not in the published Pickleball POM. Put it on the classpath of the process that opens the database. Gradle `daltonHydrate` only forwards to `dalton hydrate`.

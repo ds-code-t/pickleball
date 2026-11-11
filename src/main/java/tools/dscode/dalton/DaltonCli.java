@@ -66,9 +66,12 @@ public final class DaltonCli {
     public static String help() {
         return """
                 Usage: dalton status [--project=<dir>] [--json]
-                Usage: dalton hydrate --dry-run [--project=<dir>] [--path=<relative>] [--force]
+                Usage: dalton hydrate [--project=<dir>] [--path=<relative>] [--force] [--dry-run]
                 Files stay the source of truth. The database is .pickleball/dalton/dalton.db and is gitignored.
-                status and hydrate --dry-run do not create a database.
+                status and hydrate --dry-run do not create a database when it is missing.
+                hydrate copies features, configs, calls, components, resource maps, and templates.
+                Unchanged content hashes are skipped. --force rewrites the database rows from files.
+                Auto-hydrate on a run happens only when pkb_dalton=true or dalton.properties sets enabled=true.
                 sqlite-jdbc is required only when a command opens the database. It is not published in the Pickleball POM.
                 """;
     }
@@ -112,17 +115,25 @@ public final class DaltonCli {
     }
 
     private static int hydrate(Path project, List<String> tokens, PrintStream out, PrintStream err) {
-        if (!has(tokens, "--dry-run")) {
-            err.println("error: hydrate needs --dry-run until file hydration is enabled");
-            err.println("fix: dalton hydrate --dry-run");
-            return 2;
+        List<String> paths = new ArrayList<>();
+        for (String token : tokens) {
+            if (token.startsWith("--path=")) paths.add(token.substring("--path=".length()));
         }
-        boolean present = Files.isRegularFile(DaltonPaths.database(project));
-        DaltonLog.log(project, "hydrate", "files", "dry-run");
-        out.println("dry-run");
-        out.println("would write 0");
-        out.println("database " + (present ? "present" : "missing"));
-        return 0;
+        boolean dryRun = has(tokens, "--dry-run");
+        boolean force = has(tokens, "--force");
+        try {
+            DaltonHydrator.Result result = DaltonHydrator.hydrate(
+                    project, new DaltonHydrator.Options(paths, force, dryRun));
+            out.println(result.line());
+            for (String conflict : result.conflictPaths()) err.println("conflict: " + conflict);
+            boolean present = Files.isRegularFile(DaltonPaths.database(project));
+            out.println("database " + (present ? "present" : "missing"));
+            return result.conflicts() > 0 ? 1 : 0;
+        } catch (Exception failure) {
+            err.println("error: " + failure.getMessage());
+            err.println("fix: dalton hydrate --dry-run");
+            return 1;
+        }
     }
 
     private static int count(DaltonDatabase database, String sql) throws SQLException {

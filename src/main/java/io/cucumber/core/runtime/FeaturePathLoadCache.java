@@ -108,6 +108,7 @@ public final class FeaturePathLoadCache {
     }
 
     static List<Feature> load(List<URI> paths, Supplier<ClassLoader> classLoader, Supplier<List<Feature>> original) {
+        tools.dscode.dalton.DaltonRuntime.beforeFeatureLoad();
         if (bypass) {
             return original.get();
         }

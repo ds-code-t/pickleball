@@ -1,0 +1,111 @@
+package tools.dscode.dalton;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.sql.Connection;
+import java.sql.SQLException;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+
+/** Copies source files into the Dalton database. Unchanged hashes are skipped. */
+public final class DaltonHydrator {
+    private DaltonHydrator() {
+    }
+
+    public record Options(List<String> paths, boolean force, boolean dryRun) {
+        public Options {
+            paths = paths == null ? List.of() : List.copyOf(paths);
+        }
+
+        public static Options full() {
+            return new Options(List.of(), false, false);
+        }
+    }
+
+    public record Result(int inserted, int updated, int skipped, int conflicts, boolean dryRun, List<String> conflictPaths) {
+        public Result {
+            conflictPaths = conflictPaths == null ? List.of() : List.copyOf(conflictPaths);
+        }
+
+        public String line() {
+            String prefix = dryRun ? "dry-run" : "hydrated";
+            return prefix + " inserted=" + inserted + " updated=" + updated
+                    + " skipped=" + skipped + " conflicts=" + conflicts;
+        }
+    }
+
+    public static Result hydrate(Path project, Options options) throws IOException, SQLException {
+        List<DaltonSources.Found> sources = DaltonSources.scan(project, options.paths());
+        boolean present = Files.isRegularFile(DaltonPaths.database(project));
+        if (options.dryRun() && !present) {
+            return new Result(sources.size(), 0, 0, 0, true, List.of());
+        }
+        if (!DaltonDatabase.driverPresent()) {
+            throw new SQLException("sqlite-jdbc is not on the classpath");
+        }
+        String now = Instant.now().toString();
+        try (DaltonDatabase database = DaltonDatabase.open(project)) {
+            Connection connection = database.connection();
+            Map<String, DaltonFiles.Row> existing = DaltonFiles.index(connection);
+            int inserted = 0;
+            int updated = 0;
+            int skipped = 0;
+            List<String> conflicts = new ArrayList<>();
+            connection.setAutoCommit(false);
+            try {
+                for (DaltonSources.Found source : sources) {
+                    byte[] raw = Files.readAllBytes(source.file());
+                    String hash = DaltonHashes.sha256(raw);
+                    long mtime = Files.getLastModifiedTime(source.file()).toMillis();
+                    DaltonFiles.Row row = existing.get(source.path());
+                    if (row == null) {
+                        inserted++;
+                        if (!options.dryRun()) {
+                            DaltonFiles.upsert(connection, new DaltonFiles.Row(
+                                    source.path(), hash, raw, mtime, source.sourceType(), now, hash, false));
+                        }
+                        continue;
+                    }
+                    boolean same = hash.equals(row.contentHash());
+                    boolean fileMoved = row.lastSyncedHash() != null && !hash.equals(row.lastSyncedHash());
+                    if (row.edited() && fileMoved && !options.force()) {
+                        conflicts.add(source.path());
+                        continue;
+                    }
+                    if (same && !options.force()) {
+                        skipped++;
+                        continue;
+                    }
+                    updated++;
+                    if (!options.dryRun()) {
+                        DaltonFiles.upsert(connection, new DaltonFiles.Row(
+                                source.path(), hash, raw, mtime, source.sourceType(), now, hash, false));
+                    }
+                }
+                if (!options.dryRun()) {
+                    try (var statement = connection.createStatement()) {
+                        String id = UUID.randomUUID().toString();
+                        statement.execute("UPDATE provenance SET hydration_id = '" + id
+                                + "', last_hydrated_at = '" + now + "', schema_version = " + DaltonDatabase.SCHEMA_VERSION
+                                + " WHERE id = 1");
+                    }
+                    connection.commit();
+                } else {
+                    connection.rollback();
+                }
+            } catch (SQLException | RuntimeException failure) {
+                connection.rollback();
+                throw failure;
+            } finally {
+                connection.setAutoCommit(true);
+            }
+            DaltonLog.log(project, "hydrate", "files",
+                    (options.dryRun() ? "dry-run " : "") + "inserted=" + inserted + " updated=" + updated);
+            return new Result(inserted, updated, skipped, conflicts.size(), options.dryRun(), conflicts);
+        }
+    }
+}

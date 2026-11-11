@@ -125,3 +125,7 @@ Template resolution behavior for ordinary runtime resource files is unchanged by
 ## Consumer-agent rule
 
 When a consumer agent needs project configuration data, read the version-matched Pickleball documentation and the consumer's active `pkb_configpath`. Prefer `<config:...>` for new references; preserve existing `<configs...>` references unless there is a reason to modernize them. Never rewrite config references to match a physical directory name.
+
+## Dalton hydrate
+
+`dalton hydrate` reads the same on-disk trees a project already keeps in Git: `src/test/resources/features`, `configs`, `calls`, `component`, `templates`, and `resource-maps`, plus `pickleball.properties` and `profiles.yaml` when they sit in `src/test/resources`. Paths are stored with `/` even when the CLI is given Windows `\`. File bytes are copied as-is, including non-UTF-8 bytes. Hydrate does not change `pkb_configpath`, `<config:...>`, or `<file:...>`. It does not run unless you invoke the CLI or set `pkb_dalton=true`.

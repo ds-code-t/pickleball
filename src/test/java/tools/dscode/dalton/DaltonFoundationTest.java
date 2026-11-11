@@ -84,8 +84,7 @@ class DaltonFoundationTest {
         }
         Capture capture = run("dalton", "hydrate", "--dry-run", "--project=" + project);
         assertEquals(0, capture.code, capture.err);
-        assertTrue(capture.out.contains("dry-run"), capture.out);
-        assertTrue(capture.out.contains("would write 0"), capture.out);
+        assertTrue(capture.out.contains("dry-run inserted=0 updated=0 skipped=0 conflicts=0"), capture.out);
         assertTrue(capture.out.contains("database present"), capture.out);
         try (DaltonDatabase database = DaltonDatabase.open(project)) {
             assertEquals(0, count(database));
@@ -96,17 +95,17 @@ class DaltonFoundationTest {
     void dryRunOnMissingDatabaseDoesNotCreateIt() {
         Capture capture = run("dalton", "hydrate", "--dry-run", "--project=" + project);
         assertEquals(0, capture.code, capture.err);
+        assertTrue(capture.out.contains("dry-run inserted=0 updated=0 skipped=0 conflicts=0"), capture.out);
         assertTrue(capture.out.contains("database missing"), capture.out);
         assertFalse(Files.exists(DaltonPaths.database(project)));
     }
 
     @Test
-    void hydrateWithoutDryRunIsRejected() {
+    void hydrateWithoutDryRunCreatesAnEmptyDatabase() {
         Capture capture = run("dalton", "hydrate", "--project=" + project);
-        assertEquals(2, capture.code);
-        assertTrue(capture.err.contains("error:"), capture.err);
-        assertTrue(capture.err.contains("--dry-run"), capture.err);
-        assertFalse(Files.exists(DaltonPaths.database(project)));
+        assertEquals(0, capture.code, capture.err);
+        assertTrue(capture.out.contains("hydrated inserted=0 updated=0 skipped=0 conflicts=0"), capture.out);
+        assertTrue(Files.isRegularFile(DaltonPaths.database(project)));
     }
 
     @Test

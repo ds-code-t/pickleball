@@ -6,7 +6,7 @@ In progress. Dalton is an opt-in hydrated working copy. Git files stay the sourc
 
 - `dalton status` reports a missing database and does not create one.
 - `dalton hydrate --dry-run` writes nothing. Gradle `daltonStatus` and the Workbench MCP tool `dalton` only forward to that CLI.
-- `sqlite-jdbc` is still not in the published POM or the consumer shadow JAR. A command that opens the database needs the driver on that classpath.
+- `dalton hydrate` copies features, configs, calls, components, resource maps, and templates into that database and skips unchanged SHA-256 hashes. `--dry-run` still writes nothing when the database is missing. Gradle `daltonHydrate` only forwards to the CLI. A run hydrates only when `pkb_dalton=true` or `dalton.properties` sets `enabled=true`.
 
 ## 2.2.0
 

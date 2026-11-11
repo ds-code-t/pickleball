@@ -26,7 +26,6 @@ public final class DaltonPaths {
         return root(project).resolve(LOG_FILE);
     }
 
-    /** Project-relative display form, always with {@code /}. */
     public static String display(Path project, Path file) {
         Path root = project.toAbsolutePath().normalize();
         Path absolute = file.toAbsolutePath().normalize();
@@ -37,5 +36,27 @@ public final class DaltonPaths {
             relative = absolute;
         }
         return relative.toString().replace('\\', '/');
+    }
+
+    /**
+     * Store and compare paths with {@code /} only. Rejects absolute paths and
+     * {@code ..}. A Windows {@code src\\features\\a.feature} becomes
+     * {@code src/features/a.feature}.
+     */
+    public static String normalizeRelative(String raw) {
+        if (raw == null || raw.isBlank()) {
+            throw new IllegalArgumentException("Dalton path is blank");
+        }
+        String value = raw.trim().replace('\\', '/');
+        while (value.startsWith("./")) value = value.substring(2);
+        if (value.startsWith("/") || value.matches("^[A-Za-z]:/.*")) {
+            throw new IllegalArgumentException("Dalton paths must be relative: " + raw);
+        }
+        for (String part : value.split("/")) {
+            if ("..".equals(part)) {
+                throw new IllegalArgumentException("Dalton paths must not contain ..: " + raw);
+            }
+        }
+        return value;
     }
 }

@@ -393,6 +393,18 @@ tasks.register('daltonStatus', JavaExec) {
     args = ['dalton', 'status']
 }
 
+tasks.register('daltonHydrate', JavaExec) {
+    group = 'dalton'
+    description = 'Forward to the Dalton CLI hydrate command. sqlite-jdbc is on this task classpath only and is not published.'
+    classpath = sourceSets.main.runtimeClasspath + configurations.detachedConfiguration(
+            dependencies.create('org.xerial:sqlite-jdbc:3.47.2.0')
+    )
+    mainClass = 'tools.dscode.dalton.DaltonCli'
+    args = ['dalton', 'hydrate']
+    if (project.hasProperty('daltonPath')) args += ['--path=' + project.property('daltonPath')]
+    if (project.hasProperty('daltonForce')) args += ['--force']
+}
+
 tasks.register('verifySqliteNotPublished') {
     group = 'verification'
     description = 'sqlite-jdbc stays off the published POM and the consumer shadow JAR.'

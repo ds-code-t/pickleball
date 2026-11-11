@@ -443,10 +443,15 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/coredefinitions/UtilitySteps.java`
 - `src/main/java/tools/dscode/cucumberextended/utilities/StringUtilities.java`
 - `src/main/java/tools/dscode/dalton/DaltonCli.java`
+- `src/main/java/tools/dscode/dalton/DaltonConfig.java`
 - `src/main/java/tools/dscode/dalton/DaltonDatabase.java`
+- `src/main/java/tools/dscode/dalton/DaltonFiles.java`
 - `src/main/java/tools/dscode/dalton/DaltonHashes.java`
+- `src/main/java/tools/dscode/dalton/DaltonHydrator.java`
 - `src/main/java/tools/dscode/dalton/DaltonLog.java`
 - `src/main/java/tools/dscode/dalton/DaltonPaths.java`
+- `src/main/java/tools/dscode/dalton/DaltonRuntime.java`
+- `src/main/java/tools/dscode/dalton/DaltonSources.java`
 - `src/main/java/tools/dscode/internal/ValuesSupport.java`
 - `src/main/java/tools/dscode/launcher/PickleballWorkbenchLauncher.java`
 - `src/main/java/tools/dscode/launcher/QuietWarnings.java`
@@ -506,6 +511,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/io/cucumber/core/gherkin/messages/MultilineArgumentPickleTest.java`
 - `src/test/java/io/cucumber/core/runner/StepRepetitionLimitTest.java`
 - `src/test/java/io/cucumber/core/runner/UntilPassOverheadTest.java`
+- `src/test/java/io/cucumber/core/runtime/DaltonFeatureLoadHookTest.java`
 - `src/test/java/io/cucumber/core/runtime/FeaturePathLoadCacheTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/AgentLiveFixTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/ChatLockChild.java`
@@ -573,6 +579,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/coredefinitions/XmlTableCellFeatureTest.java`
 - `src/test/java/tools/dscode/coredefinitions/XmlTableCellTest.java`
 - `src/test/java/tools/dscode/dalton/DaltonFoundationTest.java`
+- `src/test/java/tools/dscode/dalton/DaltonHydrateTest.java`
 - `src/test/java/tools/dscode/expectedfailure/ExpectedFailureRunnerTest.java`
 - `src/test/java/tools/dscode/expectedfailure/ExpectedFailureSteps.java`
 - `src/test/java/tools/dscode/GuidancePackagingTest.java`
