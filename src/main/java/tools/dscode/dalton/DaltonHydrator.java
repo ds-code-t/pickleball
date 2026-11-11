@@ -67,6 +67,7 @@ public final class DaltonHydrator {
                         if (!options.dryRun()) {
                             DaltonFiles.upsert(connection, new DaltonFiles.Row(
                                     source.path(), hash, raw, mtime, source.sourceType(), now, hash, false));
+                            DaltonGherkin.store(connection, project, source.path(), source.sourceType(), raw);
                         }
                         continue;
                     }
@@ -78,12 +79,16 @@ public final class DaltonHydrator {
                     }
                     if (same && !options.force()) {
                         skipped++;
+                        if (!options.dryRun()) {
+                            DaltonGherkin.storeIfMissing(connection, project, source.path(), source.sourceType(), raw);
+                        }
                         continue;
                     }
                     updated++;
                     if (!options.dryRun()) {
                         DaltonFiles.upsert(connection, new DaltonFiles.Row(
                                 source.path(), hash, raw, mtime, source.sourceType(), now, hash, false));
+                        DaltonGherkin.store(connection, project, source.path(), source.sourceType(), raw);
                     }
                 }
                 if (!options.dryRun()) {

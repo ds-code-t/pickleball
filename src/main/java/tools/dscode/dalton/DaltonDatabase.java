@@ -14,7 +14,7 @@ import java.sql.Statement;
  * consumer shadow JAR. WAL and {@code busy_timeout} are set on every open.
  */
 public final class DaltonDatabase implements AutoCloseable {
-    public static final int SCHEMA_VERSION = 1;
+    public static final int SCHEMA_VERSION = 2;
     static final String DRIVER = "org.sqlite.JDBC";
 
     private final Connection connection;
@@ -117,6 +117,42 @@ public final class DaltonDatabase implements AutoCloseable {
                         schema_version INTEGER NOT NULL,
                         hydration_id TEXT,
                         last_hydrated_at TEXT
+                    )
+                    """);
+            statement.execute("""
+                    CREATE TABLE IF NOT EXISTS feature_docs (
+                        file_path TEXT PRIMARY KEY,
+                        keyword TEXT NOT NULL,
+                        name TEXT NOT NULL,
+                        language TEXT NOT NULL,
+                        tags TEXT NOT NULL,
+                        description TEXT NOT NULL
+                    )
+                    """);
+            statement.execute("""
+                    CREATE TABLE IF NOT EXISTS scenarios (
+                        file_path TEXT NOT NULL,
+                        ord INTEGER NOT NULL,
+                        keyword TEXT NOT NULL,
+                        name TEXT NOT NULL,
+                        line INTEGER NOT NULL,
+                        tags TEXT NOT NULL,
+                        description TEXT NOT NULL,
+                        PRIMARY KEY (file_path, ord)
+                    )
+                    """);
+            statement.execute("""
+                    CREATE TABLE IF NOT EXISTS steps (
+                        file_path TEXT NOT NULL,
+                        scenario_ord INTEGER NOT NULL,
+                        ord INTEGER NOT NULL,
+                        keyword TEXT NOT NULL,
+                        text TEXT NOT NULL,
+                        line INTEGER NOT NULL,
+                        docstring TEXT,
+                        docstring_type TEXT,
+                        table_json TEXT,
+                        PRIMARY KEY (file_path, scenario_ord, ord)
                     )
                     """);
         }

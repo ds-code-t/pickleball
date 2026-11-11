@@ -70,8 +70,10 @@ public final class DaltonCli {
                 Files stay the source of truth. The database is .pickleball/dalton/dalton.db and is gitignored.
                 status and hydrate --dry-run do not create a database when it is missing.
                 hydrate copies features, configs, calls, components, resource maps, and templates.
+                A .feature file also stores scenarios, steps, tags, docstrings, and data tables. The original bytes stay in the file row.
                 Unchanged content hashes are skipped. --force rewrites the database rows from files.
                 Auto-hydrate on a run happens only when pkb_dalton=true or dalton.properties sets enabled=true.
+                With that flag on, feature loading reads those database bytes. A path that is not in the database stays on the file. With the flag off, loading does not open the database.
                 sqlite-jdbc is required only when a command opens the database. It is not published in the Pickleball POM.
                 """;
     }
@@ -99,12 +101,14 @@ public final class DaltonCli {
         try (DaltonDatabase database = DaltonDatabase.open(project)) {
             int version = database.schemaVersion();
             int files = count(database, "SELECT COUNT(*) FROM files");
+            int scenarios = count(database, "SELECT COUNT(*) FROM scenarios");
             if (json) {
                 out.println("{\"database\":\"present\",\"path\":\"" + shown + "\",\"schemaVersion\":"
-                        + version + ",\"files\":" + files + ",\"driver\":true}");
+                        + version + ",\"files\":" + files + ",\"scenarios\":" + scenarios + ",\"driver\":true}");
             } else {
                 out.println("Dalton schema " + version);
                 out.println("files " + files);
+                out.println("scenarios " + scenarios);
                 out.println("database " + shown);
             }
             return 0;

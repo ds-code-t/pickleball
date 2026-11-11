@@ -29,7 +29,7 @@ class DaltonFoundationTest {
     void schemaCreateAndMigrateUsesWalAndBusyTimeout() throws Exception {
         assertTrue(DaltonDatabase.driverPresent());
         try (DaltonDatabase database = DaltonDatabase.open(project)) {
-            assertEquals(1, database.schemaVersion());
+            assertEquals(2, database.schemaVersion());
             assertEquals("wal", database.pragma("journal_mode"));
             assertEquals("5000", database.pragma("busy_timeout"));
             assertEquals(Set.of(
@@ -38,16 +38,24 @@ class DaltonFoundationTest {
             ), columns(database, "files"));
             assertTrue(columns(database, "schema_meta").contains("key"));
             assertTrue(columns(database, "provenance").contains("schema_version"));
+            assertEquals(Set.of("file_path", "keyword", "name", "language", "tags", "description"),
+                    columns(database, "feature_docs"));
+            assertEquals(Set.of("file_path", "ord", "keyword", "name", "line", "tags", "description"),
+                    columns(database, "scenarios"));
+            assertEquals(Set.of(
+                    "file_path", "scenario_ord", "ord", "keyword", "text", "line",
+                    "docstring", "docstring_type", "table_json"
+            ), columns(database, "steps"));
         }
         try (DaltonDatabase again = DaltonDatabase.open(project)) {
-            assertEquals(1, again.schemaVersion());
+            assertEquals(2, again.schemaVersion());
         }
     }
 
     @Test
     void newerSchemaIsRejected() throws Exception {
         try (DaltonDatabase database = DaltonDatabase.open(project)) {
-            assertEquals(1, database.schemaVersion());
+            assertEquals(2, database.schemaVersion());
         }
         try (Connection connection = DriverManager.getConnection(DaltonDatabase.jdbcUrl(DaltonPaths.database(project)));
              Statement statement = connection.createStatement()) {
@@ -80,7 +88,7 @@ class DaltonFoundationTest {
     @Test
     void hydrateDryRunWritesNothing() throws Exception {
         try (DaltonDatabase database = DaltonDatabase.open(project)) {
-            assertEquals(1, database.schemaVersion());
+            assertEquals(2, database.schemaVersion());
         }
         Capture capture = run("dalton", "hydrate", "--dry-run", "--project=" + project);
         assertEquals(0, capture.code, capture.err);

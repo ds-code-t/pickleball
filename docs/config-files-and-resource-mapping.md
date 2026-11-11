@@ -129,3 +129,5 @@ When a consumer agent needs project configuration data, read the version-matched
 ## Dalton hydrate
 
 `dalton hydrate` reads the same on-disk trees a project already keeps in Git: `src/test/resources/features`, `configs`, `calls`, `component`, `templates`, and `resource-maps`, plus `pickleball.properties` and `profiles.yaml` when they sit in `src/test/resources`. Paths are stored with `/` even when the CLI is given Windows `\`. File bytes are copied as-is, including non-UTF-8 bytes. Hydrate does not change `pkb_configpath`, `<config:...>`, or `<file:...>`. It does not run unless you invoke the CLI or set `pkb_dalton=true`.
+
+With `pkb_dalton=true` (or `enabled=true` in `dalton.properties`), feature loading uses the hydrated `.feature` bytes. The query rows (scenarios, steps, tags, docstrings, and data tables) are not a second Gherkin dialect. Execution still hands the stored bytes to Cucumber. With Dalton off, that load does not open the database.

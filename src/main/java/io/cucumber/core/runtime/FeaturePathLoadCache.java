@@ -7,6 +7,7 @@ import io.cucumber.core.resource.ClasspathSupport;
 import io.cucumber.core.resource.ResourceScanner;
 import io.cucumber.core.runner.Phase4Timing;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
@@ -85,24 +86,26 @@ public final class FeaturePathLoadCache {
             return original.get();
         }
         java.net.URI uri = resource.getUri();
+        byte[] fromDb = tools.dscode.dalton.DaltonFeatureSource.bytesFor(uri);
         ClassLoader loader = Thread.currentThread().getContextClassLoader();
         if (loader == null) {
             loader = FeaturePathLoadCache.class.getClassLoader();
         }
         long[] stat = stat(uri, loader);
+        String token = fromDb == null ? "" : tools.dscode.dalton.DaltonHashes.sha256(fromDb);
         if (stat != null) {
             ResourceCached cached = RESOURCE_CACHE.get(uri);
-            if (cached != null && cached.size == stat[0] && cached.modified == stat[1]) {
+            if (cached != null && cached.size == stat[0] && cached.modified == stat[1] && token.equals(cached.token)) {
                 Phase4Timing.mark("feature-parse-cache-hit");
                 return cached.feature;
             }
         }
         Phase4Timing.mark("feature-parse-start");
         RESOURCE_PARSES.incrementAndGet();
-        Optional<Feature> parsed = original.get();
+        Optional<Feature> parsed = fromDb == null ? original.get() : parseBytes(uri, fromDb);
         Phase4Timing.mark("feature-parse-done");
         if (stat != null && uri != null) {
-            RESOURCE_CACHE.put(uri, new ResourceCached(stat[0], stat[1], parsed));
+            RESOURCE_CACHE.put(uri, new ResourceCached(stat[0], stat[1], token, parsed));
         }
         return parsed;
     }
@@ -215,6 +218,10 @@ public final class FeaturePathLoadCache {
     }
 
     private static byte[] read(URI uri, ClassLoader loader) {
+        byte[] fromDb = tools.dscode.dalton.DaltonFeatureSource.bytesFor(uri);
+        if (fromDb != null) {
+            return fromDb;
+        }
         try {
             if (uri != null && "file".equalsIgnoreCase(uri.getScheme())) {
                 return Files.readAllBytes(Path.of(uri));
@@ -241,7 +248,20 @@ public final class FeaturePathLoadCache {
             rows.add(uri.toString() + '\0' + stat[0] + '\0' + stat[1]);
         }
         Collections.sort(rows);
-        return String.join("\n", rows);
+        String fileStamp = String.join("\n", rows);
+        String suffix = tools.dscode.dalton.DaltonFeatureSource.cacheSuffix();
+        if (suffix == null) {
+            return fileStamp;
+        }
+        return fileStamp + "\ndalton:" + suffix;
+    }
+
+    private static Optional<Feature> parseBytes(URI uri, byte[] body) {
+        try {
+            return PARSER.parse(uri, new ByteArrayInputStream(body), UUID::randomUUID);
+        } catch (IOException failure) {
+            throw new UncheckedIOException(failure);
+        }
     }
 
     private static long[] stat(URI uri, ClassLoader loader) {
@@ -285,6 +305,6 @@ public final class FeaturePathLoadCache {
     private record Cached(String stamp, List<Feature> features) {
     }
 
-    private record ResourceCached(long size, long modified, Optional<Feature> feature) {
+    private record ResourceCached(long size, long modified, String token, Optional<Feature> feature) {
     }
 }

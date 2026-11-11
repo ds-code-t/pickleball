@@ -489,7 +489,9 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/dalton/DaltonCli.java`
 - `src/main/java/tools/dscode/dalton/DaltonConfig.java`
 - `src/main/java/tools/dscode/dalton/DaltonDatabase.java`
+- `src/main/java/tools/dscode/dalton/DaltonFeatureSource.java`
 - `src/main/java/tools/dscode/dalton/DaltonFiles.java`
+- `src/main/java/tools/dscode/dalton/DaltonGherkin.java`
 - `src/main/java/tools/dscode/dalton/DaltonHashes.java`
 - `src/main/java/tools/dscode/dalton/DaltonHydrator.java`
 - `src/main/java/tools/dscode/dalton/DaltonLog.java`
@@ -555,6 +557,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/io/cucumber/core/gherkin/messages/MultilineArgumentPickleTest.java`
 - `src/test/java/io/cucumber/core/runner/StepRepetitionLimitTest.java`
 - `src/test/java/io/cucumber/core/runner/UntilPassOverheadTest.java`
+- `src/test/java/io/cucumber/core/runtime/DaltonExecuteFromDbTest.java`
 - `src/test/java/io/cucumber/core/runtime/DaltonFeatureLoadHookTest.java`
 - `src/test/java/io/cucumber/core/runtime/FeaturePathLoadCacheTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/AgentLiveFixTest.java`
@@ -624,6 +627,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/coredefinitions/XmlTableCellTest.java`
 - `src/test/java/tools/dscode/dalton/DaltonFoundationTest.java`
 - `src/test/java/tools/dscode/dalton/DaltonHydrateTest.java`
+- `src/test/java/tools/dscode/dalton/DaltonParseTest.java`
 - `src/test/java/tools/dscode/expectedfailure/ExpectedFailureRunnerTest.java`
 - `src/test/java/tools/dscode/expectedfailure/ExpectedFailureSteps.java`
 - `src/test/java/tools/dscode/GuidancePackagingTest.java`

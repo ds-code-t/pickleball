@@ -110,7 +110,7 @@ When implementation, tests, examples, and documentation disagree:
 Dalton is opt-in. With no `pkb_dalton` setting and no Dalton config file, consumer projects stay on the file-only path. The locked design is `docs/maintainer/3.0.0-dalton-design.md`. The implementation plan is `docs/roadmaps/3.0.0-dalton-roadmap.md`.
 
 - Git files are the source of truth. The working copy is `.pickleball/dalton/dalton.db` (gitignored, including the explicit `.pickleball/dalton/` entry). A fresh clone has no database and must still run.
-- CLI: `dalton status` and `dalton hydrate` (`--path`, `--force`, `--dry-run`). Gradle `daltonStatus` and `daltonHydrate`, the Workbench action `DaltonCliForwarder`, and MCP `dalton` only forward to that CLI. Auto-hydrate on a run happens only when `pkb_dalton=true` or `dalton.properties` sets `enabled=true`.
+- CLI: `dalton status` and `dalton hydrate` (`--path`, `--force`, `--dry-run`). Gradle `daltonStatus` and `daltonHydrate`, the Workbench action `DaltonCliForwarder`, and MCP `dalton` only forward to that CLI. Auto-hydrate on a run happens only when `pkb_dalton=true` or `dalton.properties` sets `enabled=true`. With that flag on, feature loading reads hydrated `.feature` bytes. With it off, loading does not open the database.
 - `sqlite-jdbc` is not a published dependency. Tests and the Gradle forwarder put it on their own classpath. The consumer shadow JAR must not ship it.
 - Do not store cleartext secrets in Dalton. Entities hold secret references only, using the existing secrets and config approach.
 
