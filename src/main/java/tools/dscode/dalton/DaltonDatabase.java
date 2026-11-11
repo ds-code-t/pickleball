@@ -7,6 +7,7 @@ import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Embedded SQLite for the Dalton working copy. The driver is loaded by
@@ -21,6 +22,8 @@ public final class DaltonDatabase implements AutoCloseable {
 
     private final Connection connection;
     private final Path project;
+    /** One lock per database file so the first open finishes WAL setup before another connection exists. */
+    private static final ConcurrentHashMap<String, Object> OPEN_LOCKS = new ConcurrentHashMap<>();
 
     private DaltonDatabase(Connection connection, Path project) {
         this.connection = connection;
@@ -46,11 +49,14 @@ public final class DaltonDatabase implements AutoCloseable {
         } catch (java.io.IOException failure) {
             throw new SQLException("Could not create " + DaltonPaths.display(project, db.getParent()), failure);
         }
-        Connection connection = DriverManager.getConnection(jdbcUrl(db));
-        DaltonDatabase database = new DaltonDatabase(connection, project);
-        database.configure();
-        database.migrate();
-        return database;
+        Object lock = OPEN_LOCKS.computeIfAbsent(db.toAbsolutePath().normalize().toString(), ignored -> new Object());
+        synchronized (lock) {
+            Connection connection = DriverManager.getConnection(jdbcUrl(db));
+            DaltonDatabase database = new DaltonDatabase(connection, project);
+            database.configure();
+            database.migrate();
+            return database;
+        }
     }
 
     public static String jdbcUrl(Path database) {

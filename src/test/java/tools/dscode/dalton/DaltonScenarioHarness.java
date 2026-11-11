@@ -1,6 +1,7 @@
 package tools.dscode.dalton;
 
 import io.cucumber.core.runner.CurrentScenarioState;
+import io.cucumber.core.runner.GlobalState;
 import io.cucumber.core.runtime.FeaturePathLoadCache;
 import org.junit.platform.engine.TestExecutionResult;
 import org.junit.platform.engine.discovery.DiscoverySelectors;
@@ -52,6 +53,7 @@ public final class DaltonScenarioHarness {
         DaltonRunProbe.reset();
         FeaturePathLoadCache.clear();
         release();
+        releaseStickyGlobalRunner();
 
         List<String> tests = new ArrayList<>();
         try {
@@ -95,6 +97,28 @@ public final class DaltonScenarioHarness {
             field.set(null, null);
         } catch (ReflectiveOperationException exception) {
             throw new IllegalStateException(exception);
+        }
+    }
+
+    /**
+     * The first scenario in this JVM keeps {@link GlobalState#globalRunner}.
+     * Nested steps publish on that runner's bus, so a later in-process run
+     * would miss them while its own plugin bus still sees the root step.
+     * A warm {@code dalton run} is a fresh JVM and does not have that split.
+     */
+    private static void releaseStickyGlobalRunner() {
+        synchronized (GlobalState.class) {
+            GlobalState.globalRunner = null;
+            try {
+                Field glue = GlobalState.class.getDeclaredField("globalCachingGlue");
+                glue.setAccessible(true);
+                glue.set(null, null);
+                Field prepared = GlobalState.class.getDeclaredField("gluePrepared");
+                prepared.setAccessible(true);
+                prepared.setBoolean(null, false);
+            } catch (ReflectiveOperationException exception) {
+                throw new IllegalStateException(exception);
+            }
         }
     }
 }
