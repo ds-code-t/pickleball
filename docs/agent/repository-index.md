@@ -897,6 +897,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/catalog/JavaGlueIndex.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/catalog/LaunchSelection.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/catalog/ScenarioFilter.java`
+- `pickleball-workbench/src/main/java/tools/dscode/workbench/dalton/DaltonBrowser.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/dalton/DaltonCliForwarder.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/diagnostics/DiagnosticEvidenceNavigator.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/discover/LastDiscoverSnapshot.java`
@@ -940,6 +941,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/terminal/WorkerLogFiles.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/ui/AgentChatPanel.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/ui/ConfigTabModel.java`
+- `pickleball-workbench/src/main/java/tools/dscode/workbench/ui/DaltonPanel.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/ui/FeaturePickerPanel.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/ui/LongWork.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/ui/RunVarOverridePanel.java`
@@ -977,6 +979,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/catalog/JavaGlueIndexTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/catalog/LaunchSelectionTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/catalog/ScenarioFilterTest.java`
+- `pickleball-workbench/src/test/java/tools/dscode/workbench/dalton/DaltonBrowserTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/dalton/DaltonCliForwarderTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/diagnostics/DiagnosticEvidenceNavigatorTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/diagnostics/InvestigationHandoffTest.java`
