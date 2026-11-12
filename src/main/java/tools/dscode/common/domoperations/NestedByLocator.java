@@ -338,6 +338,12 @@ public final class NestedByLocator {
             }
             return false;
         }
+        // A driver that has not joined a browser is the page under test.
+        // A process-only session is not that page, so the Selenium walk stays.
+        if (context instanceof WebDriver && !tools.dscode.common.composite.CompositeRuntime.browserJoined()) {
+            CompositeLog.info("adapter", "nesting fallback");
+            return false;
+        }
         if (context == null || context instanceof WebDriver) return true;
         if (context instanceof CompositeWebElement composite) {
             return adapter.queryFlag("within")

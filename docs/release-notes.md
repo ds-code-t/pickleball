@@ -269,4 +269,6 @@ A live Chrome action smoke launches headless Chrome when `DOMENGINE_CHROME` or `
 
 `domengine conform --root DIR --live` evaluates the vendored fixtures in headless Chrome. With Chrome present that run checks the assertions the offline path skips and does not leave them skipped. The live test is skipped only when the Chrome binary is missing.
 
+An unjoined browser stays on Selenium for nesting and for a composite find. Asking the engine for its query flags does not launch Chrome. `ContextAnchorReproTest` and `NestAnchorReproTest` pass with or without Chrome. A joined browser still uses `--within` and `--nesting`.
+
 

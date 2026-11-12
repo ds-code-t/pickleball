@@ -40,6 +40,7 @@ class EnginePositionGateTest {
         temp = Files.createTempDirectory("pkb-nth");
         Path log = temp.resolve("calls.log");
         pin(stub(temp.resolve("composite"), log, true));
+        CompositeRuntime.joinForTests("http://127.0.0.1:9222");
         HtmlUnitDriver driver = new HtmlUnitDriver(false);
         try {
             DomCompositeAdapter.get().resetCommandsForTests();
@@ -78,6 +79,7 @@ class EnginePositionGateTest {
         temp = Files.createTempDirectory("pkb-nth-regex");
         Path log = temp.resolve("calls.log");
         pin(stub(temp.resolve("composite"), log, true));
+        CompositeRuntime.joinForTests("http://127.0.0.1:9222");
         HtmlUnitDriver driver = new HtmlUnitDriver(false);
         try {
             ElementMatch match = match("1", "");
@@ -101,6 +103,7 @@ class EnginePositionGateTest {
         temp = Files.createTempDirectory("pkb-nth-off");
         Path log = temp.resolve("calls.log");
         pin(stub(temp.resolve("composite"), log, false));
+        CompositeRuntime.joinForTests("http://127.0.0.1:9222");
         HtmlUnitDriver driver = new HtmlUnitDriver(false);
         try {
             DomCompositeAdapter.get().resetCommandsForTests();

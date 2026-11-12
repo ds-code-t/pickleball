@@ -743,7 +743,8 @@ public final class DomCompositeAdapter {
     private Set<String> queryFlags() {
         if (verbsForTests != null) return queryFlags == null ? Set.of() : queryFlags;
         if (!CompositeRuntime.primary()) return Set.of();
-        Client open = CompositeRuntime.ensureClient();
+        // Capabilities do not need a browser. ensureClient() would launch Chrome.
+        Client open = CompositeRuntime.client();
         if (open == null) return Set.of();
         pinClient(open);
         Set<String> cached = queryFlags;
