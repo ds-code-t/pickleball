@@ -1,0 +1,19 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>polish-stack-traps</title>
+<link rel="stylesheet" href="/site.css">
+</head>
+<body>
+<div id="iso" style="position:absolute;left:64px;top:64px;width:320px;height:160px;isolation:isolate;background:#ccc">
+  <div id="trapped" style="position:absolute;inset:0;z-index:9999;background:#0a0">trapped</div>
+</div>
+<div id="sib" style="position:absolute;left:64px;top:64px;width:320px;height:160px;z-index:1;background:#c00">sib</div>
+<div id="flat" style="z-index:50">flat</div>
+<div id="xf" style="position:absolute;left:64px;top:280px;width:80px;height:40px;transform:translateZ(0)"></div>
+<div id="filt" style="position:absolute;left:160px;top:280px;width:80px;height:40px;filter:blur(0)"></div>
+<div id="will" style="position:absolute;left:260px;top:280px;width:80px;height:40px;will-change:transform"></div>
+<div id="blend" style="position:absolute;left:360px;top:280px;width:80px;height:40px;mix-blend-mode:multiply"></div>
+</body>
+</html>

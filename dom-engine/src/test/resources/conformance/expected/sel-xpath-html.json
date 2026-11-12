@@ -1,0 +1,115 @@
+{
+  "case_id": "sel-xpath-html",
+  "group": "sel",
+  "path": "/sel/xpath-html.html",
+  "description": "HTML XPath is case-insensitive for element and attribute names. Attribute values stay case-sensitive.",
+  "capture": {
+    "viewport_width": 800,
+    "viewport_height": 600,
+    "device_scale_factor": 1,
+    "page_scale": 1,
+    "scroll_x": 0,
+    "scroll_y": 0,
+    "mobile": false,
+    "color_scheme": null,
+    "media": null,
+    "hit_budget": 1500,
+    "hit_cell_css_px": 32,
+    "settle": {
+      "overall_ms": 2500,
+      "network_idle_ms": 150,
+      "mutation_quiet_ms": 120,
+      "fonts_ms": 1200,
+      "images_ms": 1200,
+      "animations_ms": 600
+    }
+  },
+  "assertions": [
+    {
+      "kind": "element",
+      "id": "go"
+    },
+    {
+      "kind": "element",
+      "id": "t"
+    },
+    {
+      "kind": "element",
+      "id": "a"
+    },
+    {
+      "kind": "element",
+      "id": "b"
+    },
+    {
+      "kind": "element",
+      "id": "c"
+    },
+    {
+      "kind": "min_nodes",
+      "min": 4
+    },
+    {
+      "kind": "settled",
+      "value": true
+    },
+    {
+      "kind": "unknown",
+      "name": "http_bodies"
+    },
+    {
+      "kind": "unknown",
+      "name": "cookie_values"
+    },
+    {
+      "kind": "unknown",
+      "name": "indexed_db_records"
+    },
+    {
+      "kind": "unknown",
+      "name": "mutation_timeline"
+    },
+    {
+      "kind": "unknown",
+      "name": "user_agent_shadow"
+    }
+  ],
+  "queries": [
+    {
+      "xpath": "//button",
+      "mode": "selenium"
+    },
+    {
+      "xpath": "//BUTTON",
+      "mode": "selenium"
+    },
+    {
+      "xpath": "//button[@id='go']",
+      "mode": "selenium"
+    },
+    {
+      "xpath": "//button[@ID='go']",
+      "mode": "selenium"
+    },
+    {
+      "xpath": "//button[@id='GO']",
+      "mode": "selenium"
+    },
+    {
+      "xpath": "//p[contains(.,'hello')]",
+      "mode": "selenium"
+    },
+    {
+      "xpath": "//li[normalize-space()='two']",
+      "mode": "selenium"
+    },
+    {
+      "xpath": "(//li)[position()=2]",
+      "mode": "selenium"
+    },
+    {
+      "xpath": "//BUTTON",
+      "mode": "playwright"
+    }
+  ]
+}

@@ -38,10 +38,8 @@ class CliSurfaceTest {
 
         Path root = Files.createTempDirectory("conform");
         CliResult conform = DomEngineMain.dispatch(List.of("conform", "--root", root.toString()));
-        assertEquals(0, conform.exit(), conform.stderr());
-        JsonNode body = Jsons.MAPPER.readTree(conform.stdout());
-        assertEquals(0, body.path("cases").asInt());
-        assertTrue(body.path("ok").asBoolean());
+        assertEquals(1, conform.exit(), conform.stderr());
+        assertTrue(Jsons.MAPPER.readTree(conform.stderr()).path("error").asText().contains("expected"));
 
         JsonNode caps = Jsons.MAPPER.readTree(DomEngineMain.dispatch(List.of("capabilities")).stdout());
         assertTrue(caps.path("commands").toString().contains("mcp"));

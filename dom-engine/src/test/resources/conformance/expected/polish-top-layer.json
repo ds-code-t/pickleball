@@ -1,0 +1,96 @@
+{
+  "case_id": "polish-top-layer",
+  "group": "polish",
+  "path": "/polish/top-layer.html",
+  "description": "showModal closes popover=auto, keeps popover=manual, and the dialog backdrop takes hits outside the dialog box.",
+  "capture": {
+    "viewport_width": 800,
+    "viewport_height": 600,
+    "device_scale_factor": 1,
+    "page_scale": 1,
+    "scroll_x": 0,
+    "scroll_y": 0,
+    "mobile": false,
+    "color_scheme": null,
+    "media": null,
+    "hit_budget": 1500,
+    "hit_cell_css_px": 32,
+    "settle": {
+      "overall_ms": 2500,
+      "network_idle_ms": 150,
+      "mutation_quiet_ms": 120,
+      "fonts_ms": 1200,
+      "images_ms": 1200,
+      "animations_ms": 600
+    }
+  },
+  "assertions": [
+    {
+      "kind": "in_top_layer",
+      "id": "dlg",
+      "value": true
+    },
+    {
+      "kind": "in_top_layer",
+      "id": "man",
+      "value": true
+    },
+    {
+      "kind": "in_top_layer",
+      "id": "auto",
+      "value": false
+    },
+    {
+      "kind": "top_layer_above",
+      "above": "dlg",
+      "below": "man"
+    },
+    {
+      "kind": "hit",
+      "id": "dlg",
+      "x": 144,
+      "y": 112
+    },
+    {
+      "kind": "hit_not",
+      "id": "man",
+      "x": 144,
+      "y": 112
+    },
+    {
+      "kind": "hit",
+      "id": "dlg",
+      "x": 80,
+      "y": 432
+    },
+    {
+      "kind": "hit_not",
+      "id": "under",
+      "x": 80,
+      "y": 432
+    },
+    {
+      "kind": "settled",
+      "value": true
+    }
+  ],
+  "queries": [
+    {
+      "pw": "getByText('dialog-body')",
+      "mode": "playwright"
+    },
+    {
+      "pw": "getByText('manual')",
+      "mode": "playwright"
+    },
+    {
+      "pw": "getByRole('button', { name: 'Under' })",
+      "mode": "playwright"
+    },
+    {
+      "css": "#under",
+      "mode": "playwright",
+      "filter": "clickable"
+    }
+  ]
+}

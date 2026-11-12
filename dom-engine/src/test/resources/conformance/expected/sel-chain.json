@@ -1,0 +1,138 @@
+{
+  "case_id": "sel-chain",
+  "group": "sel",
+  "path": "/sel/chain.html",
+  "description": "Playwright filter, nth, and/or, and >> chaining.",
+  "capture": {
+    "viewport_width": 800,
+    "viewport_height": 600,
+    "device_scale_factor": 1,
+    "page_scale": 1,
+    "scroll_x": 0,
+    "scroll_y": 0,
+    "mobile": false,
+    "color_scheme": null,
+    "media": null,
+    "hit_budget": 1500,
+    "hit_cell_css_px": 32,
+    "settle": {
+      "overall_ms": 2500,
+      "network_idle_ms": 150,
+      "mutation_quiet_ms": 120,
+      "fonts_ms": 1200,
+      "images_ms": 1200,
+      "animations_ms": 600
+    }
+  },
+  "assertions": [
+    {
+      "kind": "element",
+      "id": "l1"
+    },
+    {
+      "kind": "element",
+      "id": "l2"
+    },
+    {
+      "kind": "element",
+      "id": "l3"
+    },
+    {
+      "kind": "element",
+      "id": "a"
+    },
+    {
+      "kind": "element",
+      "id": "b"
+    },
+    {
+      "kind": "element",
+      "id": "in"
+    },
+    {
+      "kind": "min_nodes",
+      "min": 4
+    },
+    {
+      "kind": "settled",
+      "value": true
+    },
+    {
+      "kind": "unknown",
+      "name": "http_bodies"
+    },
+    {
+      "kind": "unknown",
+      "name": "cookie_values"
+    },
+    {
+      "kind": "unknown",
+      "name": "indexed_db_records"
+    },
+    {
+      "kind": "unknown",
+      "name": "mutation_timeline"
+    },
+    {
+      "kind": "unknown",
+      "name": "user_agent_shadow"
+    }
+  ],
+  "queries": [
+    {
+      "pw": "locator('li').filter({ hasText: 'alpha' })",
+      "mode": "playwright"
+    },
+    {
+      "pw": "locator('li').filter({ visible: true })",
+      "mode": "playwright"
+    },
+    {
+      "pw": "locator('li >> visible=true')",
+      "mode": "playwright"
+    },
+    {
+      "pw": "locator('li').nth(1)",
+      "mode": "playwright",
+      "order": true
+    },
+    {
+      "pw": "locator('li').first()",
+      "mode": "playwright",
+      "order": true
+    },
+    {
+      "pw": "locator('li').last()",
+      "mode": "playwright",
+      "order": true
+    },
+    {
+      "pw": "locator('#a').and(page.locator('.on'))",
+      "mode": "playwright"
+    },
+    {
+      "pw": "locator('#a').or(page.locator('#b'))",
+      "mode": "playwright"
+    },
+    {
+      "pw": "locator('#box').locator('button')",
+      "mode": "playwright"
+    },
+    {
+      "pw": "locator('li').filter({ has: page.locator('b') })",
+      "mode": "playwright"
+    },
+    {
+      "pw": "locator('li').filter({ hasNot: page.locator('b') })",
+      "mode": "playwright"
+    },
+    {
+      "pw": "locator('li >> internal:has=\"b\"')",
+      "mode": "playwright"
+    },
+    {
+      "pw": "locator('li').filter({ hasText: 'gamma', visible: true })",
+      "mode": "playwright"
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>top layer order</title>
+<link rel="stylesheet" href="/site.css">
+
+</head>
+<body>
+<style>
+.layer { position: fixed; inset: auto; top: 40px; left: 40px; width: 360px; height: 220px;
+  margin: 0; border: 0; padding: 0; background: #c33; }
+#d1 { background: #36c; }
+</style>
+<div id="d1" class="layer" popover="manual">one</div>
+<div id="d2" class="layer" popover="manual">two</div>
+<script>
+document.getElementById("d1").showPopover();
+document.getElementById("d2").showPopover();
+</script>
+
+</body>
+</html>

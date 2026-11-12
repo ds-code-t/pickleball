@@ -1,0 +1,27 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>polish-a11y-tricks</title>
+<link rel="stylesheet" href="/site.css">
+</head>
+<body>
+<style>
+.sr { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+.skip { position:absolute; left:-10000px; top:0; }
+</style>
+<button id="save" style="position:absolute;left:40px;top:40px;width:200px;height:40px;margin:0;border:0;padding:0">Save <span id="hint" class="sr">the draft</span></button>
+<button id="secret" aria-hidden="true" style="position:absolute;left:40px;top:120px;width:220px;height:48px;margin:0;border:0;padding:0">Visible secret</button>
+<a id="skip" class="skip" href="#main">Skip to content</a>
+<a id="srlink" class="sr" href="#main">Screen reader link</a>
+<div id="main" tabindex="-1" style="position:absolute;left:40px;top:200px">Main</div>
+<div id="fake" tabindex="0" style="position:absolute;left:40px;top:280px;width:180px;height:48px;background:#36c;color:#fff">Press me</div>
+<div id="inertbox" inert style="position:absolute;left:40px;top:360px">
+  <button id="inertbtn" style="width:140px;height:40px;margin:0;border:0;padding:0">Inert</button>
+</div>
+<button id="after" style="position:absolute;left:220px;top:360px;width:140px;height:40px;margin:0;border:0;padding:0">After</button>
+<script>
+document.getElementById("fake").addEventListener("click", function () {});
+</script>
+</body>
+</html>

@@ -1,0 +1,23 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>gap-before-label</title>
+<link rel="stylesheet" href="/site.css">
+</head>
+<body>
+<style>
+#ghost::before { content: "GhostLabel"; }
+#icon::before { content: "Save"; }
+#link::before { content: "Go "; }
+#title::before { content: "Title"; }
+#rolebtn::before { content: "Click"; }
+</style>
+<div id="ghost" style="position:absolute;left:40px;top:40px;width:180px;height:40px;background:#36c"></div>
+<button id="icon" style="position:absolute;left:240px;top:40px;width:140px;height:40px;margin:0;border:0;padding:0"></button>
+<a id="link" href="#z" style="position:absolute;left:40px;top:100px">there</a>
+<h1 id="title" style="position:absolute;left:240px;top:96px;margin:0;font:20px/24px sans-serif"></h1>
+<div id="rolebtn" role="button" style="position:absolute;left:40px;top:160px;width:140px;height:40px;background:#0a0"></div>
+<button id="plain" style="position:absolute;left:240px;top:160px;width:140px;height:40px;margin:0;border:0;padding:0">Plain</button>
+</body>
+</html>

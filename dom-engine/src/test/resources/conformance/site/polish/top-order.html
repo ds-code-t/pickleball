@@ -1,0 +1,23 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>polish-top-order</title>
+<link rel="stylesheet" href="/site.css">
+</head>
+<body>
+<button id="under" style="position:absolute;left:40px;top:500px;width:140px;height:40px;margin:0;border:0;padding:0">Under</button>
+<div id="early" popover="manual" style="position:fixed;top:280px;left:40px;width:180px;height:90px;margin:0;border:0;padding:0;background:#c60">early</div>
+<div id="out" popover="manual" style="position:fixed;top:40px;left:40px;width:200px;height:100px;margin:0;border:0;padding:0;background:#36c">outside</div>
+<dialog id="dlg" style="position:fixed;top:40px;left:40px;width:360px;height:200px;margin:0;border:0;padding:0;background:#c33">
+  <span id="label">dialog-body</span>
+  <div id="inn" popover="manual" style="position:fixed;top:80px;left:240px;width:140px;height:80px;margin:0;border:0;padding:0;background:#0a0">inside</div>
+</dialog>
+<script>
+document.getElementById("early").showPopover();
+document.getElementById("dlg").showModal();
+document.getElementById("out").showPopover();
+document.getElementById("inn").showPopover();
+</script>
+</body>
+</html>

@@ -1,0 +1,46 @@
+{
+  "case_id": "net-service-worker",
+  "group": "net",
+  "path": "/net/service-worker.html",
+  "description": "A registered service worker is an explicit completeness unknown.",
+  "capture": {
+    "viewport_width": 800,
+    "viewport_height": 600,
+    "device_scale_factor": 1,
+    "page_scale": 1,
+    "scroll_x": 0,
+    "scroll_y": 0,
+    "mobile": false,
+    "color_scheme": null,
+    "media": null,
+    "hit_budget": 1500,
+    "hit_cell_css_px": 32,
+    "settle": {
+      "overall_ms": 4000,
+      "network_idle_ms": 150,
+      "mutation_quiet_ms": 120,
+      "fonts_ms": 1200,
+      "images_ms": 1200,
+      "animations_ms": 600
+    }
+  },
+  "assertions": [
+    {
+      "kind": "element",
+      "id": "sw-ready"
+    },
+    {
+      "kind": "text_contains",
+      "id": "sw-ready",
+      "text": "sw-registered"
+    },
+    {
+      "kind": "unknown",
+      "name": "service_worker"
+    },
+    {
+      "kind": "settled",
+      "value": true
+    }
+  ]
+}

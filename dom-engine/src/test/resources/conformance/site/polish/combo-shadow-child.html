@@ -1,0 +1,27 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>combo-shadow-child</title>
+<link rel="stylesheet" href="/site.css">
+</head>
+<body>
+<div id="scroller" style="position:absolute;left:0;top:0;width:210px;height:200px;overflow:auto;background:#f4f4f4">
+  <div style="height:160px">pad</div>
+  <div id="host" style="width:70px;height:36px;background:#ddd"></div>
+  <div style="height:280px"></div>
+</div>
+<div id="under" style="position:fixed;top:16px;left:20px;width:180px;height:64px;margin:0;border:0;padding:0;background:#ccc">under</div>
+<div id="xform" style="position:absolute;left:240px;top:90px;width:150px;height:80px;transform:translate(24px, 16px);background:#ddd">
+  <div id="localfix" style="position:fixed;top:8px;left:8px;width:80px;height:40px;background:#c33">fx</div>
+</div>
+<button id="leaf" style="position:absolute;left:250px;top:168px;width:120px;height:32px;margin:0;border:0;padding:0">Leaf</button>
+<script>
+const host = document.getElementById("host");
+const root = host.attachShadow({mode: "closed"});
+root.innerHTML = '<div id="pop" popover="manual" style="position:fixed;inset:auto;top:16px;left:20px;width:180px;height:64px;margin:0;border:0;padding:0;background:#36c">Pop</div><span id="secret">secret-label</span>';
+root.getElementById("pop").showPopover();
+document.getElementById("scroller").scrollTop = 160;
+</script>
+</body>
+</html>

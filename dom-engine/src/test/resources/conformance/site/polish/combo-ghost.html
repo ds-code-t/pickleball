@@ -1,0 +1,20 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>polish-combo-ghost</title>
+<link rel="stylesheet" href="/site.css">
+</head>
+<body>
+<style>
+.ghost::before { content: "Open"; }
+#icon::before { content: "Save"; }
+</style>
+<button id="real" style="position:absolute;left:40px;top:48px;width:160px;height:44px;margin:0;border:0;padding:0">Open</button>
+<button id="icon" style="position:absolute;left:240px;top:48px;width:120px;height:44px;margin:0;border:0;padding:0"></button>
+<div id="seed" class="ghost" data-stable="open" tabindex="0" style="position:absolute;left:40px;top:140px;width:160px;height:44px;background:#36c"></div>
+<script>
+document.getElementById("seed").id = "id-" + Math.floor(Math.random() * 1e9);
+</script>
+</body>
+</html>

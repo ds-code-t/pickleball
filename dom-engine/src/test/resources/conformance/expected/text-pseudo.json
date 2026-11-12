@@ -1,0 +1,89 @@
+{
+  "case_id": "text-pseudo",
+  "group": "text",
+  "path": "/text/pseudo.html",
+  "description": "::before and ::after content are nodes, not just paint.",
+  "capture": {
+    "viewport_width": 800,
+    "viewport_height": 600,
+    "device_scale_factor": 1,
+    "page_scale": 1,
+    "scroll_x": 0,
+    "scroll_y": 0,
+    "mobile": false,
+    "color_scheme": null,
+    "media": null,
+    "hit_budget": 1500,
+    "hit_cell_css_px": 32,
+    "settle": {
+      "overall_ms": 2500,
+      "network_idle_ms": 150,
+      "mutation_quiet_ms": 120,
+      "fonts_ms": 1200,
+      "images_ms": 1200,
+      "animations_ms": 600
+    }
+  },
+  "assertions": [
+    {
+      "kind": "pseudo",
+      "id": "box",
+      "pseudo": "before",
+      "text_contains": "BEFORE"
+    },
+    {
+      "kind": "pseudo",
+      "id": "box",
+      "pseudo": "after",
+      "text_contains": "AFTER"
+    },
+    {
+      "kind": "text_contains",
+      "id": "box",
+      "text": "core"
+    },
+    {
+      "kind": "ax_name_contains",
+      "id": "link",
+      "text": "PRE"
+    },
+    {
+      "kind": "query_count",
+      "pw": "getByRole('link', { name: 'PRE core' })",
+      "count": 1
+    },
+    {
+      "kind": "query_count",
+      "pw": "getByText('BEFORE')",
+      "count": 0
+    },
+    {
+      "kind": "query_count",
+      "by": "linkText=core",
+      "count": 1
+    },
+    {
+      "kind": "query_count",
+      "by": "linkText=PRE core",
+      "count": 0
+    }
+  ],
+  "queries": [
+    {
+      "pw": "getByText('core')",
+      "mode": "playwright"
+    },
+    {
+      "pw": "getByText('BEFORE')",
+      "mode": "playwright"
+    },
+    {
+      "pw": "getByRole('link', { name: 'PRE core' })",
+      "mode": "playwright"
+    },
+    {
+      "by": "linkText=core",
+      "mode": "selenium"
+    }
+  ]
+}

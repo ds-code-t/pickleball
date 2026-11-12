@@ -1,0 +1,92 @@
+{
+  "case_id": "polish-stack-traps",
+  "group": "polish",
+  "path": "/polish/stack-traps.html",
+  "description": "isolation, transform, filter, and will-change create contexts. A static z-index does not. The isolated child's z-index cannot escape.",
+  "capture": {
+    "viewport_width": 800,
+    "viewport_height": 600,
+    "device_scale_factor": 1,
+    "page_scale": 1,
+    "scroll_x": 0,
+    "scroll_y": 0,
+    "mobile": false,
+    "color_scheme": null,
+    "media": null,
+    "hit_budget": 1500,
+    "hit_cell_css_px": 32,
+    "settle": {
+      "overall_ms": 2500,
+      "network_idle_ms": 150,
+      "mutation_quiet_ms": 120,
+      "fonts_ms": 1200,
+      "images_ms": 1200,
+      "animations_ms": 600
+    }
+  },
+  "assertions": [
+    {
+      "kind": "stacking_context",
+      "id": "iso",
+      "value": true
+    },
+    {
+      "kind": "stacking_context",
+      "id": "xf",
+      "value": true
+    },
+    {
+      "kind": "stacking_context",
+      "id": "filt",
+      "value": true
+    },
+    {
+      "kind": "stacking_context",
+      "id": "will",
+      "value": true
+    },
+    {
+      "kind": "stacking_context",
+      "id": "blend",
+      "value": true
+    },
+    {
+      "kind": "stacking_context",
+      "id": "flat",
+      "value": false
+    },
+    {
+      "kind": "paint_above",
+      "above": "sib",
+      "below": "trapped"
+    },
+    {
+      "kind": "hit",
+      "id": "sib",
+      "x": 240,
+      "y": 144
+    },
+    {
+      "kind": "hit_not",
+      "id": "trapped",
+      "x": 240,
+      "y": 144
+    },
+    {
+      "kind": "settled",
+      "value": true
+    }
+  ],
+  "queries": [
+    {
+      "css": "#sib",
+      "mode": "playwright",
+      "filter": "clickable"
+    },
+    {
+      "css": "#trapped",
+      "mode": "playwright",
+      "filter": "clickable"
+    }
+  ]
+}

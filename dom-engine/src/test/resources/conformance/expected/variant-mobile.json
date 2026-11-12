@@ -1,0 +1,39 @@
+{
+  "case_id": "variant-mobile",
+  "group": "variant",
+  "path": "/variant/mobile.html",
+  "description": "Mobile emulation uses a phone viewport. The box is still the hit target.",
+  "capture": {
+    "viewport_width": 390,
+    "viewport_height": 844,
+    "device_scale_factor": 1,
+    "page_scale": 1,
+    "scroll_x": 0,
+    "scroll_y": 0,
+    "mobile": true,
+    "color_scheme": null,
+    "media": null,
+    "hit_budget": 1500,
+    "hit_cell_css_px": 32,
+    "settle": {
+      "overall_ms": 2500,
+      "network_idle_ms": 150,
+      "mutation_quiet_ms": 120,
+      "fonts_ms": 1200,
+      "images_ms": 1200,
+      "animations_ms": 600
+    }
+  },
+  "assertions": [
+    {
+      "kind": "hit",
+      "id": "go",
+      "x": 224,
+      "y": 144
+    },
+    {
+      "kind": "element",
+      "id": "go"
+    }
+  ]
+}

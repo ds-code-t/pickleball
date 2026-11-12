@@ -1,0 +1,19 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>text-pseudo-match</title>
+<link rel="stylesheet" href="/site.css">
+</head>
+<body>
+
+<style>
+#box::before { content: "BEFORE"; }
+#box::after { content: "AFTER"; }
+#link::before { content: "PRE "; }
+</style>
+<div id="box">core</div>
+<a id="link" href="#x">core</a>
+
+</body>
+</html>

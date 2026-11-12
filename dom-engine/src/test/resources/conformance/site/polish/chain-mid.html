@@ -1,0 +1,15 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>chain-mid</title>
+<link rel="stylesheet" href="/site.css">
+</head>
+<body>
+<div id="host"></div>
+<script>
+const r = document.getElementById("host").attachShadow({mode:"open"});
+r.innerHTML = '<iframe id="inner" src="/polish/chain-leaf.html" style="width:420px;height:180px;border:0"></iframe>';
+</script>
+</body>
+</html>

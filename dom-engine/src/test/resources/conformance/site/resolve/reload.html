@@ -1,0 +1,22 @@
+<!doctype html>
+<html data-resolve-ready="0">
+<head>
+<meta charset="utf-8">
+<title>resolve reload</title>
+<link rel="stylesheet" href="/site.css">
+</head>
+<body>
+<div id="host"></div>
+<script>
+const root = document.getElementById("host").attachShadow({mode: "open"});
+const frame = document.createElement("iframe");
+frame.id = "mid";
+frame.src = "/resolve/reload-frame.html";
+frame.style.cssText = "width:240px;height:120px;border:0;display:block";
+frame.addEventListener("load", function () {
+  document.documentElement.setAttribute("data-resolve-ready", "1");
+});
+root.appendChild(frame);
+</script>
+</body>
+</html>

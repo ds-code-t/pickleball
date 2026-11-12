@@ -1,0 +1,101 @@
+{
+  "case_id": "polish-bidi",
+  "group": "polish",
+  "path": "/polish/bidi.html",
+  "description": "inset-inline-start in an RTL document is a physical box on the right. Bidi controls do not reverse stored text.",
+  "capture": {
+    "viewport_width": 800,
+    "viewport_height": 600,
+    "device_scale_factor": 1,
+    "page_scale": 1,
+    "scroll_x": 0,
+    "scroll_y": 0,
+    "mobile": false,
+    "color_scheme": null,
+    "media": null,
+    "hit_budget": 1500,
+    "hit_cell_css_px": 32,
+    "settle": {
+      "overall_ms": 2500,
+      "network_idle_ms": 150,
+      "mutation_quiet_ms": 120,
+      "fonts_ms": 1200,
+      "images_ms": 1200,
+      "animations_ms": 600
+    }
+  },
+  "assertions": [
+    {
+      "kind": "style",
+      "id": "go",
+      "prop": "direction",
+      "value": "rtl"
+    },
+    {
+      "kind": "quad_box",
+      "id": "go",
+      "min_x": 610,
+      "max_x": 650,
+      "min_y": 40,
+      "max_y": 60,
+      "min_w": 130,
+      "max_w": 150
+    },
+    {
+      "kind": "hit",
+      "id": "go",
+      "x": 656,
+      "y": 64
+    },
+    {
+      "kind": "hit",
+      "id": "decoy",
+      "x": 80,
+      "y": 64
+    },
+    {
+      "kind": "hit_not",
+      "id": "go",
+      "x": 80,
+      "y": 64
+    },
+    {
+      "kind": "text_contains",
+      "id": "mix",
+      "text": "hello"
+    },
+    {
+      "kind": "text_contains",
+      "id": "mix",
+      "text": "مرحبا"
+    },
+    {
+      "kind": "text_contains",
+      "id": "mix",
+      "text": "END"
+    },
+    {
+      "kind": "text_contains",
+      "id": "bdo",
+      "text": "abc123"
+    },
+    {
+      "kind": "settled",
+      "value": true
+    }
+  ],
+  "queries": [
+    {
+      "pw": "getByRole('button', { name: 'ابدأ' })",
+      "mode": "playwright"
+    },
+    {
+      "pw": "getByText('hello مرحبا END')",
+      "mode": "playwright"
+    },
+    {
+      "pw": "getByText('abc123')",
+      "mode": "playwright"
+    }
+  ]
+}

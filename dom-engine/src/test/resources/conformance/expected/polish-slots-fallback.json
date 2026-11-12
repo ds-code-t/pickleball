@@ -1,0 +1,121 @@
+{
+  "case_id": "polish-slots-fallback",
+  "group": "polish",
+  "path": "/polish/slots-fallback.html",
+  "description": "Named and default slots record assignment. Fallback text is visible only on the unfilled host.",
+  "capture": {
+    "viewport_width": 800,
+    "viewport_height": 600,
+    "device_scale_factor": 1,
+    "page_scale": 1,
+    "scroll_x": 0,
+    "scroll_y": 0,
+    "mobile": false,
+    "color_scheme": null,
+    "media": null,
+    "hit_budget": 1500,
+    "hit_cell_css_px": 32,
+    "settle": {
+      "overall_ms": 2500,
+      "network_idle_ms": 150,
+      "mutation_quiet_ms": 120,
+      "fonts_ms": 1200,
+      "images_ms": 1200,
+      "animations_ms": 600
+    }
+  },
+  "assertions": [
+    {
+      "kind": "shadow",
+      "id": "filled",
+      "root": "open"
+    },
+    {
+      "kind": "shadow",
+      "id": "empty",
+      "root": "open"
+    },
+    {
+      "kind": "slot",
+      "id": "title",
+      "slot": "title"
+    },
+    {
+      "kind": "slot",
+      "id": "body",
+      "slot": ""
+    },
+    {
+      "kind": "visible",
+      "id": "filled-title",
+      "value": false
+    },
+    {
+      "kind": "visible",
+      "id": "filled-body",
+      "value": false
+    },
+    {
+      "kind": "displayed",
+      "id": "filled-title",
+      "value": false
+    },
+    {
+      "kind": "visible",
+      "id": "empty-title",
+      "value": true
+    },
+    {
+      "kind": "visible",
+      "id": "empty-body",
+      "value": true
+    },
+    {
+      "kind": "displayed",
+      "id": "empty-title",
+      "value": true
+    },
+    {
+      "kind": "settled",
+      "value": true
+    }
+  ],
+  "queries": [
+    {
+      "pw": "getByText('Given title')",
+      "mode": "playwright"
+    },
+    {
+      "pw": "getByText('Given body')",
+      "mode": "playwright"
+    },
+    {
+      "pw": "getByText('Fallback title')",
+      "mode": "playwright",
+      "filter": "visible"
+    },
+    {
+      "pw": "getByText('Fallback body')",
+      "mode": "playwright",
+      "filter": "visible"
+    },
+    {
+      "pw": "locator('#empty').getByText('Fallback title')",
+      "mode": "playwright",
+      "filter": "visible"
+    },
+    {
+      "pw": "locator('#filled').getByText('Fallback title')",
+      "mode": "playwright",
+      "filter": "visible"
+    },
+    {
+      "css": "#title",
+      "mode": "selenium"
+    },
+    {
+      "css": "#body",
+      "mode": "selenium"
+    }
+  ]
+}

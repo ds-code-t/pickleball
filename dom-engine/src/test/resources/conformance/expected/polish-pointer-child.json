@@ -1,0 +1,81 @@
+{
+  "case_id": "polish-pointer-child",
+  "group": "polish",
+  "path": "/polish/pointer-child.html",
+  "description": "pointer-events:none on the parent lets clicks through, except where a child sets pointer-events:auto.",
+  "capture": {
+    "viewport_width": 800,
+    "viewport_height": 600,
+    "device_scale_factor": 1,
+    "page_scale": 1,
+    "scroll_x": 0,
+    "scroll_y": 0,
+    "mobile": false,
+    "color_scheme": null,
+    "media": null,
+    "hit_budget": 1500,
+    "hit_cell_css_px": 32,
+    "settle": {
+      "overall_ms": 2500,
+      "network_idle_ms": 150,
+      "mutation_quiet_ms": 120,
+      "fonts_ms": 1200,
+      "images_ms": 1200,
+      "animations_ms": 600
+    }
+  },
+  "assertions": [
+    {
+      "kind": "style",
+      "id": "shell",
+      "prop": "pointer-events",
+      "value": "none"
+    },
+    {
+      "kind": "style",
+      "id": "kid",
+      "prop": "pointer-events",
+      "value": "auto"
+    },
+    {
+      "kind": "hit",
+      "id": "kid",
+      "x": 112,
+      "y": 112
+    },
+    {
+      "kind": "hit_not",
+      "id": "pass",
+      "x": 112,
+      "y": 112
+    },
+    {
+      "kind": "hit",
+      "id": "pass",
+      "x": 240,
+      "y": 144
+    },
+    {
+      "kind": "hit_not",
+      "id": "kid",
+      "x": 240,
+      "y": 144
+    },
+    {
+      "kind": "settled",
+      "value": true
+    }
+  ],
+  "queries": [
+    {
+      "css": "#kid",
+      "mode": "playwright",
+      "filter": "clickable"
+    },
+    {
+      "css": "#pass",
+      "mode": "playwright",
+      "filter": "clickable"
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>shadow-closed-query</title>
+<link rel="stylesheet" href="/site.css">
+</head>
+<body>
+
+<div id="host"></div>
+<script>
+const r = document.getElementById("host").attachShadow({mode:"closed"});
+r.innerHTML = '<span id="secret">secret</span>';
+</script>
+
+</body>
+</html>

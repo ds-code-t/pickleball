@@ -1,0 +1,307 @@
+{
+  "case_id": "gap-filter-fixed",
+  "group": "gap",
+  "path": "/gap/filter-fixed.html",
+  "description": "filter:blur(0), drop-shadow, backdrop-filter, will-change:transform, contain:paint, and transform each create a containing block for position:fixed. filter:none does not. The page is scrolled; geometry and hits follow the ancestor, not the viewport.",
+  "capture": {
+    "viewport_width": 800,
+    "viewport_height": 600,
+    "device_scale_factor": 1,
+    "page_scale": 1,
+    "scroll_x": 0,
+    "scroll_y": 400,
+    "mobile": false,
+    "color_scheme": null,
+    "media": null,
+    "hit_budget": 8000,
+    "hit_cell_css_px": 16,
+    "settle": {
+      "overall_ms": 2500,
+      "network_idle_ms": 150,
+      "mutation_quiet_ms": 120,
+      "fonts_ms": 1200,
+      "images_ms": 1200,
+      "animations_ms": 600
+    }
+  },
+  "assertions": [
+    {
+      "kind": "style_contains",
+      "id": "blurhost",
+      "prop": "filter",
+      "text": "blur"
+    },
+    {
+      "kind": "style",
+      "id": "nonehost",
+      "prop": "filter",
+      "value": "none"
+    },
+    {
+      "kind": "style_contains",
+      "id": "drophost",
+      "prop": "filter",
+      "text": "drop-shadow"
+    },
+    {
+      "kind": "style_contains",
+      "id": "backhost",
+      "prop": "backdrop-filter",
+      "text": "blur"
+    },
+    {
+      "kind": "style_contains",
+      "id": "willhost",
+      "prop": "will-change",
+      "text": "transform"
+    },
+    {
+      "kind": "style_contains",
+      "id": "painthost",
+      "prop": "contain",
+      "text": "paint"
+    },
+    {
+      "kind": "stacking_context",
+      "id": "blurhost",
+      "value": true
+    },
+    {
+      "kind": "stacking_context",
+      "id": "drophost",
+      "value": true
+    },
+    {
+      "kind": "stacking_context",
+      "id": "backhost",
+      "value": true
+    },
+    {
+      "kind": "stacking_context",
+      "id": "willhost",
+      "value": true
+    },
+    {
+      "kind": "stacking_context",
+      "id": "painthost",
+      "value": true
+    },
+    {
+      "kind": "stacking_context",
+      "id": "xformhost",
+      "value": true
+    },
+    {
+      "kind": "stacking_context",
+      "id": "nonehost",
+      "value": false
+    },
+    {
+      "kind": "quad_box",
+      "id": "vfixed",
+      "min_x": 4,
+      "max_x": 16,
+      "min_y": 400,
+      "max_y": 416,
+      "min_w": 56,
+      "max_w": 72,
+      "min_h": 24,
+      "max_h": 40
+    },
+    {
+      "kind": "quad_box",
+      "id": "nonefix",
+      "min_x": 112,
+      "max_x": 128,
+      "min_y": 440,
+      "max_y": 456,
+      "min_w": 56,
+      "max_w": 72,
+      "min_h": 24,
+      "max_h": 40
+    },
+    {
+      "kind": "quad_box",
+      "id": "blurhost",
+      "min_x": 36,
+      "max_x": 48,
+      "min_y": 516,
+      "max_y": 528
+    },
+    {
+      "kind": "quad_box",
+      "id": "blurfix",
+      "min_x": 44,
+      "max_x": 56,
+      "min_y": 524,
+      "max_y": 536,
+      "min_w": 56,
+      "max_w": 72,
+      "min_h": 24,
+      "max_h": 40
+    },
+    {
+      "kind": "quad_box",
+      "id": "dropfix",
+      "min_x": 284,
+      "max_x": 296,
+      "min_y": 524,
+      "max_y": 536
+    },
+    {
+      "kind": "quad_box",
+      "id": "backfix",
+      "min_x": 524,
+      "max_x": 536,
+      "min_y": 524,
+      "max_y": 536
+    },
+    {
+      "kind": "quad_box",
+      "id": "willfix",
+      "min_x": 44,
+      "max_x": 56,
+      "min_y": 684,
+      "max_y": 696
+    },
+    {
+      "kind": "quad_box",
+      "id": "paintfix",
+      "min_x": 284,
+      "max_x": 296,
+      "min_y": 684,
+      "max_y": 696
+    },
+    {
+      "kind": "quad_box",
+      "id": "xformhost",
+      "min_x": 536,
+      "max_x": 544,
+      "min_y": 686,
+      "max_y": 694
+    },
+    {
+      "kind": "quad_box",
+      "id": "xformfix",
+      "min_x": 544,
+      "max_x": 552,
+      "min_y": 694,
+      "max_y": 702
+    },
+    {
+      "kind": "quad_box",
+      "id": "nonehost",
+      "min_x": 36,
+      "max_x": 48,
+      "min_y": 1096,
+      "max_y": 1108
+    },
+    {
+      "kind": "hit",
+      "id": "vfixed",
+      "x": 32,
+      "y": 420
+    },
+    {
+      "kind": "hit",
+      "id": "nonefix",
+      "x": 144,
+      "y": 460
+    },
+    {
+      "kind": "hit_not",
+      "id": "nonehost",
+      "x": 144,
+      "y": 460
+    },
+    {
+      "kind": "hit",
+      "id": "blurfix",
+      "x": 72,
+      "y": 540
+    },
+    {
+      "kind": "hit_not",
+      "id": "vfixed",
+      "x": 72,
+      "y": 540
+    },
+    {
+      "kind": "hit",
+      "id": "dropfix",
+      "x": 312,
+      "y": 540
+    },
+    {
+      "kind": "hit",
+      "id": "backfix",
+      "x": 552,
+      "y": 540
+    },
+    {
+      "kind": "hit",
+      "id": "willfix",
+      "x": 72,
+      "y": 700
+    },
+    {
+      "kind": "hit",
+      "id": "paintfix",
+      "x": 312,
+      "y": 700
+    },
+    {
+      "kind": "hit",
+      "id": "xformfix",
+      "x": 572,
+      "y": 710
+    },
+    {
+      "kind": "hit_not",
+      "id": "vfixed",
+      "x": 572,
+      "y": 710
+    },
+    {
+      "kind": "settled",
+      "value": true
+    }
+  ],
+  "queries": [
+    {
+      "pw": "getByText('blur')",
+      "mode": "playwright"
+    },
+    {
+      "pw": "getByText('drop')",
+      "mode": "playwright"
+    },
+    {
+      "pw": "getByText('will')",
+      "mode": "playwright"
+    },
+    {
+      "pw": "getByText('paint')",
+      "mode": "playwright"
+    },
+    {
+      "pw": "getByText('port')",
+      "mode": "playwright"
+    },
+    {
+      "css": "#blurfix",
+      "mode": "playwright",
+      "filter": "clickable"
+    },
+    {
+      "css": "#nonefix",
+      "mode": "playwright",
+      "filter": "clickable"
+    },
+    {
+      "css": "#vfixed",
+      "mode": "playwright",
+      "filter": "clickable"
+    }
+  ]
+}

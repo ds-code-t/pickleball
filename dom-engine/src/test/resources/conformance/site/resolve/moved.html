@@ -1,0 +1,28 @@
+<!doctype html>
+<html data-resolve-ready="0">
+<head>
+<meta charset="utf-8">
+<title>resolve moved</title>
+<link rel="stylesheet" href="/site.css">
+<style>html, body { margin: 0; }</style>
+</head>
+<body>
+<div id="home">
+  <button id="target" class="before" data-stable="keep" type="button">alpha</button>
+</div>
+<div id="away"></div>
+<script>
+(function () {
+  const moved = location.search.indexOf("moved=1") !== -1;
+  const target = document.getElementById("target");
+  if (moved) {
+    target.className = "after";
+    target.textContent = "beta";
+    target.style.marginTop = "280px";
+    document.getElementById("away").appendChild(target);
+  }
+  document.documentElement.setAttribute("data-resolve-ready", "1");
+})();
+</script>
+</body>
+</html>

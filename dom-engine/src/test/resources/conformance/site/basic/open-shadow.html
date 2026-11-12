@@ -1,0 +1,21 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>open shadow</title>
+<link rel="stylesheet" href="/site.css">
+
+</head>
+<body>
+<div id="host"></div>
+<script>
+const r = document.getElementById("host").attachShadow({mode: "open"});
+const b = document.createElement("button");
+b.id = "in";
+b.textContent = "inside";
+b.style.cssText = "position:absolute;left:64px;top:64px;width:320px;height:160px;border:0;background:#36c;color:#fff";
+r.appendChild(b);
+</script>
+
+</body>
+</html>

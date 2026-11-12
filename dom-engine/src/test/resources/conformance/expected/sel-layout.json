@@ -1,0 +1,112 @@
+{
+  "case_id": "sel-layout",
+  "group": "sel",
+  "path": "/sel/layout.html",
+  "description": "Selenium relative locators against a known cross of buttons.",
+  "capture": {
+    "viewport_width": 800,
+    "viewport_height": 600,
+    "device_scale_factor": 1,
+    "page_scale": 1,
+    "scroll_x": 0,
+    "scroll_y": 0,
+    "mobile": false,
+    "color_scheme": null,
+    "media": null,
+    "hit_budget": 1500,
+    "hit_cell_css_px": 32,
+    "settle": {
+      "overall_ms": 2500,
+      "network_idle_ms": 150,
+      "mutation_quiet_ms": 120,
+      "fonts_ms": 1200,
+      "images_ms": 1200,
+      "animations_ms": 600
+    }
+  },
+  "assertions": [
+    {
+      "kind": "element",
+      "id": "anchor"
+    },
+    {
+      "kind": "element",
+      "id": "up"
+    },
+    {
+      "kind": "element",
+      "id": "down"
+    },
+    {
+      "kind": "element",
+      "id": "left"
+    },
+    {
+      "kind": "element",
+      "id": "right"
+    },
+    {
+      "kind": "element",
+      "id": "near"
+    },
+    {
+      "kind": "element",
+      "id": "far"
+    },
+    {
+      "kind": "min_nodes",
+      "min": 4
+    },
+    {
+      "kind": "settled",
+      "value": true
+    },
+    {
+      "kind": "unknown",
+      "name": "http_bodies"
+    },
+    {
+      "kind": "unknown",
+      "name": "cookie_values"
+    },
+    {
+      "kind": "unknown",
+      "name": "indexed_db_records"
+    },
+    {
+      "kind": "unknown",
+      "name": "mutation_timeline"
+    },
+    {
+      "kind": "unknown",
+      "name": "user_agent_shadow"
+    }
+  ],
+  "queries": [
+    {
+      "by": "tagName=button >> above=#anchor",
+      "mode": "selenium",
+      "order": true
+    },
+    {
+      "by": "tagName=button >> below=#anchor",
+      "mode": "selenium",
+      "order": true
+    },
+    {
+      "by": "tagName=button >> toLeftOf=#anchor",
+      "mode": "selenium",
+      "order": true
+    },
+    {
+      "by": "tagName=button >> toRightOf=#anchor",
+      "mode": "selenium",
+      "order": true
+    },
+    {
+      "by": "tagName=button >> near=#anchor@120",
+      "mode": "selenium",
+      "order": true
+    }
+  ]
+}

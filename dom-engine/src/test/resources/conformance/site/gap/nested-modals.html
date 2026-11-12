@@ -1,0 +1,25 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>gap-nested-modals</title>
+<link rel="stylesheet" href="/site.css">
+</head>
+<body>
+<button id="outside" style="position:absolute;left:40px;top:500px;width:140px;height:40px;margin:0;border:0;padding:0">Outside</button>
+<dialog id="a" aria-label="Dialog A" style="position:fixed;top:40px;left:40px;width:480px;height:280px;margin:0;border:0;padding:0;background:#c33">
+  <span id="alabel">dialog-a</span>
+  <button id="abtn" style="position:absolute;left:16px;top:48px;width:120px;height:40px;margin:0;border:0;padding:0">A-btn</button>
+  <dialog id="b" aria-label="Dialog B" style="position:fixed;top:80px;left:200px;width:240px;height:160px;margin:0;border:0;padding:0;background:#0a0">
+    <span id="blabel">dialog-b</span>
+    <button id="bbtn" style="position:absolute;left:16px;top:48px;width:120px;height:40px;margin:0;border:0;padding:0">B-btn</button>
+  </dialog>
+</dialog>
+<script>
+const a = document.getElementById("a");
+const b = document.getElementById("b");
+a.showModal();
+b.showModal();
+</script>
+</body>
+</html>

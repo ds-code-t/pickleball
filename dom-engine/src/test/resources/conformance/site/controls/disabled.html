@@ -1,0 +1,27 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>controls-disabled</title>
+<link rel="stylesheet" href="/site.css">
+</head>
+<body>
+
+<style>
+#dis,#aria,#ro,#inb,#fs,#ok { position:absolute; width:120px; height:48px; margin:0; padding:0; }
+#dis { left:16px; top:16px; }
+#aria { left:160px; top:16px; }
+#ro { left:304px; top:16px; }
+#inb { left:16px; top:100px; }
+#fs { left:160px; top:100px; }
+#ok { left:304px; top:100px; }
+</style>
+<button id="dis" disabled>No</button>
+<button id="aria" aria-disabled="true">Aria</button>
+<input id="ro" readonly value="ro">
+<div inert><button id="inb">Inert</button></div>
+<fieldset disabled><button id="fs">Field</button></fieldset>
+<button id="ok">Ok</button>
+
+</body>
+</html>

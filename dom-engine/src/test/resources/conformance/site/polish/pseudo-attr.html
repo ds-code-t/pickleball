@@ -1,0 +1,17 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>polish-pseudo-attr</title>
+<link rel="stylesheet" href="/site.css">
+</head>
+<body>
+<style>
+#link::before { content: attr(data-k) "!"; }
+#link::after { content: attr(data-k); }
+#mark::before { content: "«" attr(data-k) "»"; }
+</style>
+<a id="link" href="#z" data-k="badge">core</a>
+<b id="mark" data-k="badge">mark</b>
+</body>
+</html>

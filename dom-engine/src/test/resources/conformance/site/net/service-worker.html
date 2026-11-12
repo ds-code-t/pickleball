@@ -1,0 +1,21 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>service worker</title>
+<link rel="stylesheet" href="/site.css">
+
+</head>
+<body>
+<p id="sw">waiting</p>
+<script>
+navigator.serviceWorker.register("/net/sw.js").then(function () {
+  const n = document.createElement("span");
+  n.id = "sw-ready";
+  n.textContent = "sw-registered";
+  document.getElementById("sw").appendChild(n);
+});
+</script>
+
+</body>
+</html>

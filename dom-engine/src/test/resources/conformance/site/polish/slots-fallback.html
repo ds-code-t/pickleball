@@ -1,0 +1,24 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>polish-slots-fallback</title>
+<link rel="stylesheet" href="/site.css">
+</head>
+<body>
+<div id="filled">
+  <span id="title" slot="title">Given title</span>
+  <span id="body">Given body</span>
+</div>
+<div id="empty"></div>
+<script>
+function mount(el, prefix) {
+  const r = el.attachShadow({mode: "open"});
+  r.innerHTML = '<h1><slot name="title"><span id="' + prefix + '-title" class="fb">Fallback title</span></slot></h1>'
+    + '<p><slot><span id="' + prefix + '-body" class="fb">Fallback body</span></slot></p>';
+}
+mount(document.getElementById("filled"), "filled");
+mount(document.getElementById("empty"), "empty");
+</script>
+</body>
+</html>

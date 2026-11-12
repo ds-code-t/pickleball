@@ -1,0 +1,21 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>polish-sticky-fixed</title>
+<link rel="stylesheet" href="/site.css">
+</head>
+<body>
+<div id="vfixed" style="position:fixed;top:8px;left:8px;width:72px;height:40px;background:#36c">port-fixed</div>
+<div id="scroller" style="position:absolute;left:32px;top:32px;width:300px;height:180px;overflow:auto;background:#eee">
+  <div id="stick" style="position:sticky;top:0;height:36px;background:#111;color:#fff;z-index:2">stuck-head</div>
+  <div style="height:500px"><div id="row" style="height:48px;margin-top:240px;background:#0a0">scrolled-row</div></div>
+</div>
+<div id="xform" style="position:absolute;left:400px;top:80px;width:220px;height:180px;transform:translate(30px, 20px);background:#ddd">
+  <div id="fixed" style="position:fixed;top:8px;left:8px;width:72px;height:40px;background:#c33">local-fixed</div>
+</div>
+<script>
+document.getElementById("scroller").scrollTop = 200;
+</script>
+</body>
+</html>

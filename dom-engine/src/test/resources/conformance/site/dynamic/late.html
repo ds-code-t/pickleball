@@ -1,0 +1,21 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>late</title>
+<link rel="stylesheet" href="/site.css">
+
+</head>
+<body>
+<div id="slot"></div>
+<script>
+setTimeout(function () {
+  const d = document.createElement("div");
+  d.id = "late";
+  d.textContent = "appeared";
+  document.body.appendChild(d);
+}, 120);
+</script>
+
+</body>
+</html>

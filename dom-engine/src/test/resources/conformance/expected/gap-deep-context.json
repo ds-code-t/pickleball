@@ -1,0 +1,134 @@
+{
+  "case_id": "gap-deep-context",
+  "group": "gap",
+  "path": "/gap/deep-context.html",
+  "description": "Open shadow hosts an iframe. That iframe has a closed shadow (#leaf), an open shadow with a filled slot, and a sibling cross-origin frame. The frame port is COMPOSITE_CROSS_PORT (default 8766). Playwright stops at the closed root. Composite all-frames reaches #leaf.",
+  "capture": {
+    "viewport_width": 800,
+    "viewport_height": 600,
+    "device_scale_factor": 1,
+    "page_scale": 1,
+    "scroll_x": 0,
+    "scroll_y": 0,
+    "mobile": false,
+    "color_scheme": null,
+    "media": null,
+    "hit_budget": 1500,
+    "hit_cell_css_px": 32,
+    "settle": {
+      "overall_ms": 2500,
+      "network_idle_ms": 150,
+      "mutation_quiet_ms": 120,
+      "fonts_ms": 1200,
+      "images_ms": 1200,
+      "animations_ms": 600
+    }
+  },
+  "assertions": [
+    {
+      "kind": "shadow",
+      "id": "host",
+      "root": "open"
+    },
+    {
+      "kind": "shadow",
+      "id": "inner",
+      "root": "closed"
+    },
+    {
+      "kind": "shadow",
+      "id": "slot-host",
+      "root": "open"
+    },
+    {
+      "kind": "slot",
+      "id": "slotted",
+      "slot": "body"
+    },
+    {
+      "kind": "visible",
+      "id": "fallback",
+      "value": false
+    },
+    {
+      "kind": "displayed",
+      "id": "fallback",
+      "value": false
+    },
+    {
+      "kind": "visible",
+      "id": "slotted",
+      "value": true
+    },
+    {
+      "kind": "frame_text",
+      "frame_path": "0/0",
+      "text": "slotted-word"
+    },
+    {
+      "kind": "frame_text",
+      "frame_path": "0/0",
+      "text": "leaf"
+    },
+    {
+      "kind": "frame_text",
+      "frame_path": "0/1",
+      "text": "cross-origin-child"
+    },
+    {
+      "kind": "cross_origin_frame",
+      "frame_path": "0/1"
+    },
+    {
+      "kind": "query_count",
+      "pw": "locator('#host').frameLocator('#mid').locator('#inner')",
+      "count": 1
+    },
+    {
+      "kind": "query_count",
+      "pw": "locator('#host').frameLocator('#mid').locator('#leaf')",
+      "count": 0
+    },
+    {
+      "kind": "query_count",
+      "pw": "locator('#leaf')",
+      "count": 0
+    },
+    {
+      "kind": "query_count",
+      "css": "#leaf",
+      "mode": "composite",
+      "all_frames": true,
+      "count": 1
+    },
+    {
+      "kind": "query_count",
+      "css": "#slotted",
+      "mode": "composite",
+      "all_frames": true,
+      "count": 1
+    },
+    {
+      "kind": "settled",
+      "value": true
+    }
+  ],
+  "queries": [
+    {
+      "pw": "locator('#host').frameLocator('#mid').locator('#inner')",
+      "mode": "playwright"
+    },
+    {
+      "pw": "locator('#host').frameLocator('#mid').locator('#slotted')",
+      "mode": "playwright"
+    },
+    {
+      "pw": "locator('#host').frameLocator('#mid').locator('#leaf')",
+      "mode": "playwright"
+    },
+    {
+      "pw": "locator('#leaf')",
+      "mode": "playwright"
+    }
+  ]
+}

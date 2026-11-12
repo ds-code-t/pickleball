@@ -1,0 +1,151 @@
+{
+  "case_id": "polish-a11y-tricks",
+  "group": "polish",
+  "path": "/polish/a11y-tricks.html",
+  "description": "sr-only text, a visible aria-hidden button, an offscreen skip link, a clipped focusable link, a role-less tabindex div, and an inert control left out of tab order.",
+  "capture": {
+    "viewport_width": 800,
+    "viewport_height": 600,
+    "device_scale_factor": 1,
+    "page_scale": 1,
+    "scroll_x": 0,
+    "scroll_y": 0,
+    "mobile": false,
+    "color_scheme": null,
+    "media": null,
+    "hit_budget": 1500,
+    "hit_cell_css_px": 32,
+    "settle": {
+      "overall_ms": 2500,
+      "network_idle_ms": 150,
+      "mutation_quiet_ms": 120,
+      "fonts_ms": 1200,
+      "images_ms": 1200,
+      "animations_ms": 600
+    }
+  },
+  "assertions": [
+    {
+      "kind": "mismatch",
+      "id": "hint",
+      "value": "sr-only"
+    },
+    {
+      "kind": "ax_name_contains",
+      "id": "save",
+      "text": "draft"
+    },
+    {
+      "kind": "mismatch",
+      "id": "secret",
+      "value": "at-hidden"
+    },
+    {
+      "kind": "ax_role",
+      "id": "skip",
+      "role": "link"
+    },
+    {
+      "kind": "ax_name_contains",
+      "id": "skip",
+      "text": "Skip"
+    },
+    {
+      "kind": "mismatch",
+      "id": "skip",
+      "value": ""
+    },
+    {
+      "kind": "ax_role_not",
+      "id": "fake",
+      "role": "button"
+    },
+    {
+      "kind": "mismatch",
+      "id": "fake",
+      "value": "custom"
+    },
+    {
+      "kind": "hit",
+      "id": "fake",
+      "x": 112,
+      "y": 304
+    },
+    {
+      "kind": "focus_order",
+      "ids": [
+        "save",
+        "secret",
+        "skip",
+        "srlink",
+        "fake",
+        "after"
+      ]
+    },
+    {
+      "kind": "focus_absent",
+      "id": "inertbtn"
+    },
+    {
+      "kind": "element",
+      "id": "inertbtn"
+    },
+    {
+      "kind": "settled",
+      "value": true
+    }
+  ],
+  "queries": [
+    {
+      "pw": "getByRole('button', { name: 'Save the draft' })",
+      "mode": "playwright"
+    },
+    {
+      "pw": "getByRole('button', { name: 'Visible secret' })",
+      "mode": "playwright"
+    },
+    {
+      "pw": "getByRole('button', { name: 'Visible secret', includeHidden: true })",
+      "mode": "playwright"
+    },
+    {
+      "pw": "getByRole('link', { name: 'Skip to content' })",
+      "mode": "playwright"
+    },
+    {
+      "pw": "getByRole('link', { name: 'Screen reader link' })",
+      "mode": "playwright"
+    },
+    {
+      "pw": "getByRole('button', { name: 'Press me' })",
+      "mode": "playwright"
+    },
+    {
+      "pw": "getByText('Press me')",
+      "mode": "playwright"
+    },
+    {
+      "pw": "getByRole('button', { name: 'Inert' })",
+      "mode": "playwright"
+    },
+    {
+      "pw": "getByRole('button', { name: 'After' })",
+      "mode": "playwright"
+    },
+    {
+      "css": "#secret",
+      "mode": "selenium",
+      "filter": "displayed"
+    },
+    {
+      "css": "#skip",
+      "mode": "selenium",
+      "filter": "displayed"
+    },
+    {
+      "css": "#inertbtn",
+      "mode": "selenium",
+      "filter": "displayed"
+    }
+  ]
+}

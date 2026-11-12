@@ -1,0 +1,26 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>angular</title>
+<link rel="stylesheet" href="/site.css">
+
+</head>
+<body>
+<div ng-app="app" ng-controller="c">
+  <div id="list" data-virtual-total="1000" data-virtual-rendered="8">
+    <div class="css-ng91 row" ng-repeat="row in rows">{{row.label}}</div>
+  </div>
+  <button id="go" class="box" ng-click="noop()">Go</button>
+</div>
+<script src="/vendor/angular.min.js"></script>
+<script>
+angular.module("app", []).controller("c", function ($scope) {
+  $scope.rows = [];
+  for (var i = 0; i < 8; i++) $scope.rows.push({label: "row-" + i});
+  $scope.noop = function () {};
+});
+</script>
+
+</body>
+</html>

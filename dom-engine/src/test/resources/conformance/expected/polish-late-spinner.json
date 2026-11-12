@@ -1,0 +1,74 @@
+{
+  "case_id": "polish-late-spinner",
+  "group": "polish",
+  "path": "/polish/late-spinner.html",
+  "description": "The button is inserted during settle, while the spinner is still the hit target. The node is present and not clickable.",
+  "capture": {
+    "viewport_width": 800,
+    "viewport_height": 600,
+    "device_scale_factor": 1,
+    "page_scale": 1,
+    "scroll_x": 0,
+    "scroll_y": 0,
+    "mobile": false,
+    "color_scheme": null,
+    "media": null,
+    "hit_budget": 1500,
+    "hit_cell_css_px": 32,
+    "settle": {
+      "overall_ms": 2500,
+      "network_idle_ms": 150,
+      "mutation_quiet_ms": 120,
+      "fonts_ms": 1200,
+      "images_ms": 1200,
+      "animations_ms": 600
+    }
+  },
+  "assertions": [
+    {
+      "kind": "settled",
+      "value": true
+    },
+    {
+      "kind": "pending_contains",
+      "text": "loader spinner"
+    },
+    {
+      "kind": "element",
+      "id": "go"
+    },
+    {
+      "kind": "text_contains",
+      "id": "go",
+      "text": "Ready"
+    },
+    {
+      "kind": "hit",
+      "id": "spin",
+      "x": 240,
+      "y": 144
+    },
+    {
+      "kind": "hit_not",
+      "id": "go",
+      "x": 240,
+      "y": 144
+    }
+  ],
+  "queries": [
+    {
+      "pw": "getByRole('button', { name: 'Ready' })",
+      "mode": "playwright"
+    },
+    {
+      "css": "#go",
+      "mode": "playwright",
+      "filter": "clickable"
+    },
+    {
+      "css": "#spin",
+      "mode": "playwright",
+      "filter": "clickable"
+    }
+  ]
+}

@@ -1,0 +1,73 @@
+{
+  "case_id": "polish-virtual-nested",
+  "group": "polish",
+  "path": "/polish/virtual-nested.html",
+  "description": "A windowed row inside a scrolled list inside a scrolled outer panel sits at the visual offset of both scrollports.",
+  "capture": {
+    "viewport_width": 800,
+    "viewport_height": 600,
+    "device_scale_factor": 1,
+    "page_scale": 1,
+    "scroll_x": 0,
+    "scroll_y": 0,
+    "mobile": false,
+    "color_scheme": null,
+    "media": null,
+    "hit_budget": 1500,
+    "hit_cell_css_px": 32,
+    "settle": {
+      "overall_ms": 2500,
+      "network_idle_ms": 150,
+      "mutation_quiet_ms": 120,
+      "fonts_ms": 1200,
+      "images_ms": 1200,
+      "animations_ms": 600
+    }
+  },
+  "assertions": [
+    {
+      "kind": "quad_box",
+      "id": "row",
+      "min_x": 30,
+      "max_x": 55,
+      "min_y": 40,
+      "max_y": 60
+    },
+    {
+      "kind": "hit",
+      "id": "row",
+      "x": 80,
+      "y": 64
+    },
+    {
+      "kind": "hit_not",
+      "id": "lead",
+      "x": 80,
+      "y": 64
+    },
+    {
+      "kind": "text_contains",
+      "id": "row",
+      "text": "virtual-row-16"
+    },
+    {
+      "kind": "count_selector",
+      "selector": "#row-0",
+      "max": 0
+    },
+    {
+      "kind": "settled",
+      "value": true
+    }
+  ],
+  "queries": [
+    {
+      "pw": "getByText('virtual-row-16')",
+      "mode": "playwright"
+    },
+    {
+      "pw": "getByText('virtual-row-0')",
+      "mode": "playwright"
+    }
+  ]
+}

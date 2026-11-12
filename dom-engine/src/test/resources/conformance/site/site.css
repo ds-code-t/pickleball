@@ -1,0 +1,15 @@
+html, body { margin: 0; padding: 0; }
+.box {
+  position: absolute;
+  left: 64px;
+  top: 64px;
+  width: 320px;
+  height: 160px;
+  box-sizing: border-box;
+  background: #36c;
+  color: #fff;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  font: 16px/20px sans-serif;
+}

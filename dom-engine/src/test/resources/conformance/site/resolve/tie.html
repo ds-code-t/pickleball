@@ -1,0 +1,21 @@
+<!doctype html>
+<html data-resolve-ready="0">
+<head>
+<meta charset="utf-8">
+<title>resolve tie</title>
+<link rel="stylesheet" href="/site.css">
+</head>
+<body>
+<button type="button" data-testid="keep">keep-me</button>
+<script>
+if (new URLSearchParams(location.search).get("tie") === "1") {
+  var extra = document.createElement("button");
+  extra.type = "button";
+  extra.setAttribute("data-testid", "keep");
+  extra.textContent = "other";
+  document.body.appendChild(extra);
+}
+document.documentElement.setAttribute("data-resolve-ready", "1");
+</script>
+</body>
+</html>

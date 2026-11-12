@@ -1,0 +1,125 @@
+{
+  "case_id": "polish-sticky-fixed",
+  "group": "polish",
+  "path": "/polish/sticky-fixed.html",
+  "description": "Sticky inside a scrolled overflow box, and position:fixed inside translate(30px, 20px), use the transformed border box — not the ancestor's left/top and not the viewport.",
+  "capture": {
+    "viewport_width": 800,
+    "viewport_height": 600,
+    "device_scale_factor": 1,
+    "page_scale": 1,
+    "scroll_x": 0,
+    "scroll_y": 0,
+    "mobile": false,
+    "color_scheme": null,
+    "media": null,
+    "hit_budget": 1500,
+    "hit_cell_css_px": 32,
+    "settle": {
+      "overall_ms": 2500,
+      "network_idle_ms": 150,
+      "mutation_quiet_ms": 120,
+      "fonts_ms": 1200,
+      "images_ms": 1200,
+      "animations_ms": 600
+    }
+  },
+  "assertions": [
+    {
+      "kind": "quad_box",
+      "id": "row",
+      "min_x": 20,
+      "max_x": 48,
+      "min_y": 100,
+      "max_y": 120
+    },
+    {
+      "kind": "quad_box",
+      "id": "stick",
+      "min_y": 28,
+      "max_y": 40
+    },
+    {
+      "kind": "quad_box",
+      "id": "xform",
+      "min_x": 424,
+      "max_x": 436,
+      "min_y": 94,
+      "max_y": 106
+    },
+    {
+      "kind": "quad_box",
+      "id": "fixed",
+      "min_x": 432,
+      "max_x": 444,
+      "min_y": 102,
+      "max_y": 114
+    },
+    {
+      "kind": "quad_box",
+      "id": "vfixed",
+      "min_x": 0,
+      "max_x": 16,
+      "min_y": 0,
+      "max_y": 16
+    },
+    {
+      "kind": "hit",
+      "id": "stick",
+      "x": 160,
+      "y": 48
+    },
+    {
+      "kind": "hit",
+      "id": "row",
+      "x": 112,
+      "y": 112
+    },
+    {
+      "kind": "hit",
+      "id": "fixed",
+      "x": 464,
+      "y": 128
+    },
+    {
+      "kind": "hit_not",
+      "id": "vfixed",
+      "x": 464,
+      "y": 128
+    },
+    {
+      "kind": "hit",
+      "id": "vfixed",
+      "x": 48,
+      "y": 16
+    },
+    {
+      "kind": "settled",
+      "value": true
+    }
+  ],
+  "queries": [
+    {
+      "pw": "getByText('scrolled-row')",
+      "mode": "playwright"
+    },
+    {
+      "pw": "getByText('local-fixed')",
+      "mode": "playwright"
+    },
+    {
+      "pw": "getByText('port-fixed')",
+      "mode": "playwright"
+    },
+    {
+      "css": "#fixed",
+      "mode": "playwright",
+      "filter": "clickable"
+    },
+    {
+      "css": "#vfixed",
+      "mode": "playwright",
+      "filter": "clickable"
+    }
+  ]
+}

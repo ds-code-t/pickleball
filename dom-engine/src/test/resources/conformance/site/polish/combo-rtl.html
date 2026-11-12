@@ -1,0 +1,28 @@
+<!doctype html>
+<html dir="rtl">
+<head>
+<meta charset="utf-8">
+<title>polish-combo-rtl</title>
+<link rel="stylesheet" href="/site.css">
+</head>
+<body>
+<button id="back" style="position:fixed;inset:0;margin:0;border:0;padding:0;background:transparent">back</button>
+<div id="flex" style="display:flex;position:absolute;left:16px;top:80px;width:200px;height:48px">
+  <div id="hi" style="z-index:5;width:100px;height:48px;background:#0a0">hi</div>
+  <div id="lo" style="z-index:1;width:100px;margin-inline-start:-80px;height:48px;background:#c00">lo</div>
+</div>
+<div id="scroller" style="position:absolute;inset-inline-start:24px;top:36px;width:360px;height:200px;overflow:auto;background:#eee">
+  <div id="stick" style="position:sticky;top:0;height:32px;background:#111;color:#fff;z-index:3">رأس</div>
+  <div id="phantom" data-virtual-total="40" data-virtual-rendered="2" style="height:900px;position:relative">
+    <div id="row" class="vrow" style="position:absolute;top:240px;inset-inline-start:16px;width:120px;height:80px;background:#0a0">صف-16</div>
+    <div id="row2" class="vrow" style="position:absolute;top:340px;inset-inline-start:16px;width:120px;height:40px;background:#ccc">صف-17</div>
+  </div>
+</div>
+<div id="veil" style="position:fixed;inset:0;background:transparent;pointer-events:none;z-index:5">
+  <button id="chip" style="position:fixed;inset-inline-start:8px;top:8px;width:64px;height:28px;margin:0;border:0;padding:0;pointer-events:auto">رقاقة</button>
+</div>
+<script>
+document.getElementById("scroller").scrollTop = 272;
+</script>
+</body>
+</html>

@@ -1,0 +1,54 @@
+{
+  "case_id": "resolve-reload",
+  "group": "resolve",
+  "path": "/resolve/reload.html",
+  "description": "Open shadow hosts an iframe whose document has a closed shadow and #leaf. Backend ids are not stable across reload.",
+  "capture": {
+    "viewport_width": 800,
+    "viewport_height": 600,
+    "device_scale_factor": 1,
+    "page_scale": 1,
+    "scroll_x": 0,
+    "scroll_y": 0,
+    "mobile": false,
+    "color_scheme": null,
+    "media": null,
+    "hit_budget": 64,
+    "hit_cell_css_px": 200,
+    "settle": {
+      "overall_ms": 2500,
+      "network_idle_ms": 150,
+      "mutation_quiet_ms": 120,
+      "fonts_ms": 1200,
+      "images_ms": 1200,
+      "animations_ms": 600
+    }
+  },
+  "assertions": [
+    {
+      "kind": "shadow",
+      "id": "host",
+      "root": "open"
+    },
+    {
+      "kind": "element",
+      "id": "mid"
+    },
+    {
+      "kind": "shadow",
+      "id": "inner",
+      "root": "closed",
+      "child_id": "leaf"
+    },
+    {
+      "kind": "text_contains",
+      "id": "leaf",
+      "text": "leaf-word"
+    },
+    {
+      "kind": "frame_text",
+      "frame_path": "0/0",
+      "text": "leaf-word"
+    }
+  ]
+}

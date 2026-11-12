@@ -1,0 +1,38 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>gap-filter-fixed</title>
+<link rel="stylesheet" href="/site.css">
+</head>
+<body>
+<style>
+.host { position:absolute; width:180px; height:72px; box-sizing:border-box; }
+.fix { position:fixed; top:8px; left:8px; width:64px; height:32px; margin:0; box-sizing:border-box; color:#fff; font:12px/32px sans-serif; text-align:center; }
+</style>
+<div id="vfixed" class="fix" style="top:8px;left:8px;background:#36c">port</div>
+<div id="nonefix" class="fix" style="top:48px;left:120px;background:#c60">none-fix</div>
+<div id="blurhost" class="host" style="left:40px;top:520px;filter:blur(0);background:#ddd">
+  <div id="blurfix" class="fix" style="background:#c33">blur</div>
+</div>
+<div id="drophost" class="host" style="left:280px;top:520px;filter:drop-shadow(2px 2px 2px #000);background:#ddd">
+  <div id="dropfix" class="fix" style="background:#0a0">drop</div>
+</div>
+<div id="backhost" class="host" style="left:520px;top:520px;backdrop-filter:blur(0);background:#ddd">
+  <div id="backfix" class="fix" style="background:#808">back</div>
+</div>
+<div id="willhost" class="host" style="left:40px;top:680px;will-change:transform;background:#ddd">
+  <div id="willfix" class="fix" style="background:#06c">will</div>
+</div>
+<div id="painthost" class="host" style="left:280px;top:680px;contain:paint;background:#ddd">
+  <div id="paintfix" class="fix" style="background:#630">paint</div>
+</div>
+<div id="xformhost" class="host" style="left:520px;top:680px;transform:translate(20px, 10px);background:#ddd">
+  <div id="xformfix" class="fix" style="background:#033">xform</div>
+</div>
+<div id="nonehost" class="host" style="left:40px;top:1100px;filter:none;background:#bbb">
+  none-host
+</div>
+<div id="tall" style="height:1400px"></div>
+</body>
+</html>

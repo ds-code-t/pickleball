@@ -1,0 +1,19 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>shadow-slot-text</title>
+<link rel="stylesheet" href="/site.css">
+</head>
+<body>
+
+<div id="host">
+  <span id="light" slot="body">slotted words</span>
+</div>
+<script>
+const r = document.getElementById("host").attachShadow({mode:"open"});
+r.innerHTML = '<div id="wrap"><slot name="body"></slot></div>';
+</script>
+
+</body>
+</html>

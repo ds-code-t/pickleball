@@ -1,0 +1,40 @@
+{
+  "case_id": "resolve-tie",
+  "group": "resolve",
+  "path": "/resolve/tie.html",
+  "description": "One button with data-testid=keep. ?tie=1 adds a second button with the same test id so the stable selector ties and the content hash picks the original.",
+  "capture": {
+    "viewport_width": 800,
+    "viewport_height": 600,
+    "device_scale_factor": 1,
+    "page_scale": 1,
+    "scroll_x": 0,
+    "scroll_y": 0,
+    "mobile": false,
+    "color_scheme": null,
+    "media": null,
+    "hit_budget": 64,
+    "hit_cell_css_px": 200,
+    "settle": {
+      "overall_ms": 2500,
+      "network_idle_ms": 150,
+      "mutation_quiet_ms": 120,
+      "fonts_ms": 1200,
+      "images_ms": 1200,
+      "animations_ms": 600
+    }
+  },
+  "assertions": [
+    {
+      "kind": "text_contains",
+      "selector": "[data-testid=keep]",
+      "text": "keep-me"
+    },
+    {
+      "kind": "attr",
+      "selector": "[data-testid=keep]",
+      "name": "data-testid",
+      "value": "keep"
+    }
+  ]
+}

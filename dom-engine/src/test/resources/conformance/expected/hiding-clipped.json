@@ -1,0 +1,70 @@
+{
+  "case_id": "hiding-clipped",
+  "group": "hiding",
+  "path": "/hiding/clipped.html",
+  "description": "overflow:hidden clips a child that is outside the padding box.",
+  "capture": {
+    "viewport_width": 800,
+    "viewport_height": 600,
+    "device_scale_factor": 1,
+    "page_scale": 1,
+    "scroll_x": 0,
+    "scroll_y": 0,
+    "mobile": false,
+    "color_scheme": null,
+    "media": null,
+    "hit_budget": 1500,
+    "hit_cell_css_px": 32,
+    "settle": {
+      "overall_ms": 2500,
+      "network_idle_ms": 150,
+      "mutation_quiet_ms": 120,
+      "fonts_ms": 1200,
+      "images_ms": 1200,
+      "animations_ms": 600
+    }
+  },
+  "assertions": [
+    {
+      "kind": "style",
+      "id": "clip",
+      "prop": "overflow-x",
+      "value": "hidden"
+    },
+    {
+      "kind": "element",
+      "id": "child"
+    },
+    {
+      "kind": "hit_not",
+      "id": "child",
+      "x": 224,
+      "y": 144
+    },
+    {
+      "kind": "hit",
+      "id": "clip",
+      "x": 224,
+      "y": 144
+    }
+  ],
+  "queries": [
+    {
+      "css": "#child",
+      "mode": "playwright"
+    },
+    {
+      "css": "#child",
+      "mode": "selenium"
+    },
+    {
+      "pw": "getByText('out')",
+      "mode": "playwright"
+    },
+    {
+      "css": "#clip",
+      "mode": "playwright",
+      "filter": "visible"
+    }
+  ]
+}

@@ -1,0 +1,41 @@
+{
+  "case_id": "load-aria-busy",
+  "group": "load",
+  "path": "/load/aria-busy.html",
+  "description": "aria-busy fails the settledness gate on its own.",
+  "capture": {
+    "viewport_width": 800,
+    "viewport_height": 600,
+    "device_scale_factor": 1,
+    "page_scale": 1,
+    "scroll_x": 0,
+    "scroll_y": 0,
+    "mobile": false,
+    "color_scheme": null,
+    "media": null,
+    "hit_budget": 1500,
+    "hit_cell_css_px": 32,
+    "settle": {
+      "overall_ms": 800,
+      "network_idle_ms": 150,
+      "mutation_quiet_ms": 120,
+      "fonts_ms": 1200,
+      "images_ms": 1200,
+      "animations_ms": 600
+    }
+  },
+  "assertions": [
+    {
+      "kind": "settled",
+      "value": false
+    },
+    {
+      "kind": "pending_contains",
+      "text": "aria-busy"
+    },
+    {
+      "kind": "element",
+      "id": "b"
+    }
+  ]
+}

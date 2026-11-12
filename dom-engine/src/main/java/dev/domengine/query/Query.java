@@ -338,6 +338,7 @@ public final class Query {
         if (explicit != null && !explicit.isBlank()) return explicit.toLowerCase(Locale.ROOT);
         return switch (node.localName == null ? "" : node.localName) {
             case "button" -> "button";
+            case "dialog" -> "dialog";
             case "a" -> "link";
             case "textarea" -> "textbox";
             case "select" -> "combobox";

@@ -1,0 +1,61 @@
+{
+  "case_id": "hiding-offscreen",
+  "group": "hiding",
+  "path": "/hiding/offscreen.html",
+  "description": "A box parked off the document origin is not hit by a viewport sample.",
+  "capture": {
+    "viewport_width": 800,
+    "viewport_height": 600,
+    "device_scale_factor": 1,
+    "page_scale": 1,
+    "scroll_x": 0,
+    "scroll_y": 0,
+    "mobile": false,
+    "color_scheme": null,
+    "media": null,
+    "hit_budget": 1500,
+    "hit_cell_css_px": 32,
+    "settle": {
+      "overall_ms": 2500,
+      "network_idle_ms": 150,
+      "mutation_quiet_ms": 120,
+      "fonts_ms": 1200,
+      "images_ms": 1200,
+      "animations_ms": 600
+    }
+  },
+  "assertions": [
+    {
+      "kind": "element",
+      "id": "go"
+    },
+    {
+      "kind": "hit_not",
+      "id": "go",
+      "x": 224,
+      "y": 144
+    }
+  ],
+  "queries": [
+    {
+      "css": "#go",
+      "mode": "playwright",
+      "filter": "visible"
+    },
+    {
+      "css": "#go",
+      "mode": "playwright",
+      "filter": "in-viewport"
+    },
+    {
+      "css": "#go",
+      "mode": "selenium",
+      "filter": "displayed"
+    },
+    {
+      "css": "#go",
+      "mode": "selenium",
+      "filter": "in-viewport"
+    }
+  ]
+}

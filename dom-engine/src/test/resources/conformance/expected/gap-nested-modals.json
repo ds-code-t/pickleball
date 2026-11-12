@@ -1,0 +1,199 @@
+{
+  "case_id": "gap-nested-modals",
+  "group": "gap",
+  "path": "/gap/nested-modals.html",
+  "description": "showModal on A, then showModal on B from inside A. B is above A. A is inert: not hittable, not focusable, out of tab order. Hits on the overlap and on A's remaining box return B. Tab order stays inside B.",
+  "capture": {
+    "viewport_width": 800,
+    "viewport_height": 600,
+    "device_scale_factor": 1,
+    "page_scale": 1,
+    "scroll_x": 0,
+    "scroll_y": 0,
+    "mobile": false,
+    "color_scheme": null,
+    "media": null,
+    "hit_budget": 4000,
+    "hit_cell_css_px": 16,
+    "settle": {
+      "overall_ms": 2500,
+      "network_idle_ms": 150,
+      "mutation_quiet_ms": 120,
+      "fonts_ms": 1200,
+      "images_ms": 1200,
+      "animations_ms": 600
+    }
+  },
+  "assertions": [
+    {
+      "kind": "in_top_layer",
+      "id": "a",
+      "value": true
+    },
+    {
+      "kind": "in_top_layer",
+      "id": "b",
+      "value": true
+    },
+    {
+      "kind": "top_layer_above",
+      "above": "b",
+      "below": "a"
+    },
+    {
+      "kind": "ax_role",
+      "id": "b",
+      "role": "dialog"
+    },
+    {
+      "kind": "ax_name_contains",
+      "id": "b",
+      "text": "Dialog B"
+    },
+    {
+      "kind": "hit",
+      "id": "b",
+      "x": 280,
+      "y": 144
+    },
+    {
+      "kind": "hit_not",
+      "id": "abtn",
+      "x": 280,
+      "y": 144
+    },
+    {
+      "kind": "hit",
+      "id": "b",
+      "x": 80,
+      "y": 112
+    },
+    {
+      "kind": "hit_not",
+      "id": "abtn",
+      "x": 80,
+      "y": 112
+    },
+    {
+      "kind": "hit",
+      "id": "b",
+      "x": 80,
+      "y": 520
+    },
+    {
+      "kind": "hit_not",
+      "id": "outside",
+      "x": 80,
+      "y": 520
+    },
+    {
+      "kind": "hit",
+      "id": "bbtn",
+      "x": 248,
+      "y": 144
+    },
+    {
+      "kind": "clickable",
+      "id": "bbtn",
+      "value": true
+    },
+    {
+      "kind": "clickable",
+      "id": "abtn",
+      "value": false
+    },
+    {
+      "kind": "clickable",
+      "id": "outside",
+      "value": false
+    },
+    {
+      "kind": "focus_order",
+      "ids": [
+        "bbtn"
+      ]
+    },
+    {
+      "kind": "focus_absent",
+      "id": "abtn"
+    },
+    {
+      "kind": "focus_absent",
+      "id": "outside"
+    },
+    {
+      "kind": "query_count",
+      "pw": "getByRole('button', { name: 'B-btn' })",
+      "count": 1
+    },
+    {
+      "kind": "query_count",
+      "pw": "getByRole('button', { name: 'A-btn' })",
+      "count": 1
+    },
+    {
+      "kind": "query_count",
+      "pw": "getByRole('button', { name: 'Outside' })",
+      "count": 1
+    },
+    {
+      "kind": "query_count",
+      "pw": "getByRole('dialog', { name: 'Dialog B' })",
+      "count": 1
+    },
+    {
+      "kind": "query_count",
+      "pw": "getByRole('dialog', { name: 'Dialog A' })",
+      "count": 1
+    },
+    {
+      "kind": "settled",
+      "value": true
+    }
+  ],
+  "queries": [
+    {
+      "pw": "getByRole('button', { name: 'B-btn' })",
+      "mode": "playwright"
+    },
+    {
+      "pw": "getByRole('button', { name: 'A-btn' })",
+      "mode": "playwright"
+    },
+    {
+      "pw": "getByRole('button', { name: 'Outside' })",
+      "mode": "playwright"
+    },
+    {
+      "pw": "getByRole('dialog', { name: 'Dialog B' })",
+      "mode": "playwright"
+    },
+    {
+      "pw": "getByRole('dialog', { name: 'Dialog A' })",
+      "mode": "playwright"
+    },
+    {
+      "pw": "getByText('dialog-b')",
+      "mode": "playwright"
+    },
+    {
+      "pw": "getByText('dialog-a')",
+      "mode": "playwright"
+    },
+    {
+      "css": "#bbtn",
+      "mode": "playwright",
+      "filter": "clickable"
+    },
+    {
+      "css": "#abtn",
+      "mode": "playwright",
+      "filter": "clickable"
+    },
+    {
+      "css": "#outside",
+      "mode": "playwright",
+      "filter": "clickable"
+    }
+  ]
+}

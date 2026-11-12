@@ -1,0 +1,56 @@
+{
+  "case_id": "overlap-negative-z",
+  "group": "overlap",
+  "path": "/overlap/negative-z.html",
+  "description": "Negative z-index paints under an in-flow box at the same place.",
+  "capture": {
+    "viewport_width": 800,
+    "viewport_height": 600,
+    "device_scale_factor": 1,
+    "page_scale": 1,
+    "scroll_x": 0,
+    "scroll_y": 0,
+    "mobile": false,
+    "color_scheme": null,
+    "media": null,
+    "hit_budget": 1500,
+    "hit_cell_css_px": 32,
+    "settle": {
+      "overall_ms": 2500,
+      "network_idle_ms": 150,
+      "mutation_quiet_ms": 120,
+      "fonts_ms": 1200,
+      "images_ms": 1200,
+      "animations_ms": 600
+    }
+  },
+  "assertions": [
+    {
+      "kind": "style",
+      "id": "back",
+      "prop": "z-index",
+      "value": "-1"
+    },
+    {
+      "kind": "hit",
+      "id": "front",
+      "x": 224,
+      "y": 144
+    },
+    {
+      "kind": "hit_not",
+      "id": "back",
+      "x": 224,
+      "y": 144
+    },
+    {
+      "kind": "paint_above",
+      "above": "front",
+      "below": "back"
+    },
+    {
+      "kind": "settled",
+      "value": true
+    }
+  ]
+}

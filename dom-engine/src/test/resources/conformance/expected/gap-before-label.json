@@ -1,0 +1,242 @@
+{
+  "case_id": "gap-before-label",
+  "group": "gap",
+  "path": "/gap/before-label.html",
+  "description": "A role-less div's only visible label is ::before. Playwright getByText and Selenium innerText omit generated content. Chromium accname includes ::before only for name-from-content roles.",
+  "capture": {
+    "viewport_width": 800,
+    "viewport_height": 600,
+    "device_scale_factor": 1,
+    "page_scale": 1,
+    "scroll_x": 0,
+    "scroll_y": 0,
+    "mobile": false,
+    "color_scheme": null,
+    "media": null,
+    "hit_budget": 1500,
+    "hit_cell_css_px": 32,
+    "settle": {
+      "overall_ms": 2500,
+      "network_idle_ms": 150,
+      "mutation_quiet_ms": 120,
+      "fonts_ms": 1200,
+      "images_ms": 1200,
+      "animations_ms": 600
+    }
+  },
+  "assertions": [
+    {
+      "kind": "pseudo",
+      "id": "ghost",
+      "pseudo": "before",
+      "text_contains": "GhostLabel"
+    },
+    {
+      "kind": "pseudo",
+      "id": "icon",
+      "pseudo": "before",
+      "text_contains": "Save"
+    },
+    {
+      "kind": "pseudo",
+      "id": "link",
+      "pseudo": "before",
+      "text_contains": "Go"
+    },
+    {
+      "kind": "pseudo",
+      "id": "title",
+      "pseudo": "before",
+      "text_contains": "Title"
+    },
+    {
+      "kind": "pseudo",
+      "id": "rolebtn",
+      "pseudo": "before",
+      "text_contains": "Click"
+    },
+    {
+      "kind": "ax_role",
+      "id": "ghost",
+      "role": "generic"
+    },
+    {
+      "kind": "ax_role_not",
+      "id": "ghost",
+      "role": "button"
+    },
+    {
+      "kind": "ax_name_not_contains",
+      "id": "ghost",
+      "text": "GhostLabel"
+    },
+    {
+      "kind": "ax_name_contains",
+      "id": "icon",
+      "text": "Save"
+    },
+    {
+      "kind": "ax_role",
+      "id": "icon",
+      "role": "button"
+    },
+    {
+      "kind": "ax_name_contains",
+      "id": "link",
+      "text": "Go there"
+    },
+    {
+      "kind": "ax_name_contains",
+      "id": "title",
+      "text": "Title"
+    },
+    {
+      "kind": "ax_role",
+      "id": "title",
+      "role": "heading"
+    },
+    {
+      "kind": "ax_name_contains",
+      "id": "rolebtn",
+      "text": "Click"
+    },
+    {
+      "kind": "ax_role",
+      "id": "rolebtn",
+      "role": "button"
+    },
+    {
+      "kind": "text_contains",
+      "id": "link",
+      "text": "there"
+    },
+    {
+      "kind": "query_count",
+      "pw": "getByText('GhostLabel')",
+      "count": 0
+    },
+    {
+      "kind": "query_count",
+      "pw": "getByRole('button', { name: 'GhostLabel' })",
+      "count": 0
+    },
+    {
+      "kind": "query_count",
+      "pw": "getByText('Save')",
+      "count": 0
+    },
+    {
+      "kind": "query_count",
+      "pw": "getByRole('button', { name: 'Save' })",
+      "count": 1
+    },
+    {
+      "kind": "query_count",
+      "pw": "getByText('Go')",
+      "count": 0
+    },
+    {
+      "kind": "query_count",
+      "pw": "getByText('there')",
+      "count": 1
+    },
+    {
+      "kind": "query_count",
+      "pw": "getByRole('link', { name: 'Go there' })",
+      "count": 1
+    },
+    {
+      "kind": "query_count",
+      "pw": "getByText('Title')",
+      "count": 0
+    },
+    {
+      "kind": "query_count",
+      "pw": "getByRole('heading', { name: 'Title' })",
+      "count": 1
+    },
+    {
+      "kind": "query_count",
+      "pw": "getByText('Click')",
+      "count": 0
+    },
+    {
+      "kind": "query_count",
+      "pw": "getByRole('button', { name: 'Click' })",
+      "count": 1
+    },
+    {
+      "kind": "query_count",
+      "by": "linkText=there",
+      "count": 1
+    },
+    {
+      "kind": "query_count",
+      "by": "linkText=Go there",
+      "count": 0
+    },
+    {
+      "kind": "query_count",
+      "by": "partialLinkText=Go",
+      "count": 0
+    },
+    {
+      "kind": "settled",
+      "value": true
+    }
+  ],
+  "queries": [
+    {
+      "pw": "getByText('GhostLabel')",
+      "mode": "playwright"
+    },
+    {
+      "pw": "getByRole('button', { name: 'GhostLabel' })",
+      "mode": "playwright"
+    },
+    {
+      "pw": "getByText('Save')",
+      "mode": "playwright"
+    },
+    {
+      "pw": "getByRole('button', { name: 'Save' })",
+      "mode": "playwright"
+    },
+    {
+      "pw": "getByText('there')",
+      "mode": "playwright"
+    },
+    {
+      "pw": "getByRole('link', { name: 'Go there' })",
+      "mode": "playwright"
+    },
+    {
+      "pw": "getByRole('heading', { name: 'Title' })",
+      "mode": "playwright"
+    },
+    {
+      "pw": "getByRole('button', { name: 'Click' })",
+      "mode": "playwright"
+    },
+    {
+      "pw": "getByRole('button', { name: 'Plain' })",
+      "mode": "playwright"
+    },
+    {
+      "by": "linkText=there",
+      "mode": "selenium"
+    },
+    {
+      "by": "linkText=Go there",
+      "mode": "selenium"
+    },
+    {
+      "css": "#ghost",
+      "mode": "playwright"
+    },
+    {
+      "css": "#icon",
+      "mode": "playwright"
+    }
+  ]
+}

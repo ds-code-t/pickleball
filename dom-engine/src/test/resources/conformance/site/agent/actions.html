@@ -1,0 +1,71 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>agent actions</title>
+</head>
+<body>
+<button id="go">Go</button>
+<input id="name" />
+<span id="typed"></span>
+<div id="log"></div>
+<div id="panel" data-scroll="0" style="height:80px;width:200px;overflow:auto;border:1px solid #000">
+  <div id="bottom" style="height:400px">bottom</div>
+</div>
+<form id="ok-form" action="javascript:void(0)">
+  <input id="ok-name" name="n" required />
+  <button id="ok-submit" type="submit">Send</button>
+</form>
+<form id="bad-form" action="javascript:void(0)">
+  <input id="bad-name" name="n" required />
+  <button id="bad-submit" type="submit">Send invalid</button>
+</form>
+<button id="orphan" type="submit">No form</button>
+<input id="keys" />
+<div id="keylog"></div>
+<button id="dbl">Dbl</button>
+<div id="dbllog"></div>
+<button id="ctx">Ctx</button>
+<div id="ctxlog"></div>
+<div id="drag-src" draggable="true" style="width:40px;height:40px;background:#36c">src</div>
+<div id="drag-dst" style="width:80px;height:40px;background:#ccc">dst</div>
+<div id="draglog"></div>
+<script>
+document.getElementById("go").addEventListener("click", () => {
+  document.getElementById("log").textContent = "clicked";
+});
+document.getElementById("name").addEventListener("input", (e) => {
+  document.getElementById("typed").textContent = e.target.value;
+});
+document.getElementById("panel").addEventListener("scroll", (e) => {
+  e.currentTarget.setAttribute("data-scroll", String(e.currentTarget.scrollTop));
+});
+document.getElementById("ok-form").addEventListener("submit", (e) => {
+  e.preventDefault();
+  document.getElementById("log").textContent = "submitted";
+});
+document.getElementById("bad-form").addEventListener("submit", (e) => {
+  e.preventDefault();
+  document.getElementById("log").textContent = "should-not-submit";
+});
+document.getElementById("keys").addEventListener("keydown", (e) => {
+  const chord = (e.ctrlKey ? "CONTROL+" : "") + (e.shiftKey ? "SHIFT+" : "") + (e.key || "");
+  document.getElementById("keylog").textContent = chord;
+});
+document.getElementById("dbl").addEventListener("dblclick", () => {
+  document.getElementById("dbllog").textContent = "dbl";
+});
+document.getElementById("ctx").addEventListener("contextmenu", (e) => {
+  e.preventDefault();
+  document.getElementById("ctxlog").textContent = "ctx";
+});
+document.getElementById("drag-src").addEventListener("pointerdown", () => {
+  document.getElementById("draglog").textContent = "down";
+});
+document.getElementById("drag-dst").addEventListener("pointerup", () => {
+  const cur = document.getElementById("draglog").textContent;
+  document.getElementById("draglog").textContent = cur === "down" ? "dropped" : "up";
+});
+</script>
+</body>
+</html>

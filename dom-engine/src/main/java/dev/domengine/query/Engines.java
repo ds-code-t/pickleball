@@ -147,7 +147,7 @@ public final class Engines {
             for (DomNode candidate : lightElements(scope, true)) {
                 if (!role.equalsIgnoreCase(Query.roleOf(candidate))) continue;
                 if (name != null) {
-                    String accessible = candidate.accessibleName.isBlank() ? HtmlTree.textOf(candidate) : candidate.accessibleName;
+                    String accessible = accessibleName(candidate);
                     if (!accessible.equalsIgnoreCase(name) && !accessible.toLowerCase(Locale.ROOT).contains(name.toLowerCase(Locale.ROOT))) continue;
                 }
                 hits.add(candidate);
@@ -254,7 +254,7 @@ public final class Engines {
         List<DomNode> hits = new ArrayList<>();
         for (DomNode scope : scopes) {
             for (DomNode candidate : lightElements(scope, true)) {
-                if (hidden(candidate) && !expr.toLowerCase(Locale.ROOT).contains("hidden")) continue;
+                if (hidden(candidate) && !includesHidden(expr)) continue;
                 for (String group : groups) {
                     if (group.isBlank()) continue;
                     if (predicates(candidate, group)) {
@@ -270,7 +270,7 @@ public final class Engines {
     private static boolean predicates(DomNode node, String group) {
         for (String raw : group.split(",")) {
             String predicate = raw.trim();
-            if (predicate.isEmpty() || "includehidden".equalsIgnoreCase(predicate)) continue;
+            if (predicate.isEmpty() || predicate.toLowerCase(Locale.ROOT).startsWith("includehidden")) continue;
             if (!onePredicate(node, predicate)) return false;
         }
         return true;
@@ -330,14 +330,132 @@ public final class Engines {
         String name = key.toLowerCase(Locale.ROOT);
         return switch (name) {
             case "role" -> Query.roleOf(node);
-            case "name" -> node.accessibleName.isBlank() ? HtmlTree.textOf(node) : node.accessibleName;
+            case "name" -> accessibleName(node);
             case "text" -> HtmlTree.textOf(node);
             case "tag" -> node.localName;
             case "value" -> node.attributes.getOrDefault("value", node.nodeValue == null ? "" : node.nodeValue);
-            case "disabled" -> node.attributes.containsKey("disabled") ? "true" : "false";
+            case "disabled" -> disabled(node) ? "true" : "false";
             case "hidden" -> hidden(node) ? "true" : "false";
+            case "level" -> headingLevel(node);
+            case "checked" -> truthy(node, "checked", "aria-checked");
+            case "selected" -> truthy(node, "selected", "aria-selected");
+            case "expanded" -> truthy(node, null, "aria-expanded");
+            case "pressed" -> truthy(node, null, "aria-pressed");
             default -> node.attributes.getOrDefault(name, "");
         };
+    }
+
+    private static boolean includesHidden(String expr) {
+        String text = expr == null ? "" : expr.toLowerCase(Locale.ROOT);
+        return text.contains("includehidden") || text.contains("hidden=");
+    }
+
+    public static String accessibleName(DomNode node) {
+        if (node == null) return "";
+        if (!node.accessibleName.isBlank()) return node.accessibleName.trim();
+        String aria = node.attributes.get("aria-label");
+        if (aria != null && !aria.isBlank()) return aria.trim();
+        String labelledBy = node.attributes.get("aria-labelledby");
+        if (labelledBy != null && !labelledBy.isBlank()) {
+            StringBuilder built = new StringBuilder();
+            DomNode top = top(node);
+            for (String id : labelledBy.trim().split("\\s+")) {
+                DomNode ref = findId(top, id);
+                if (ref == null) continue;
+                if (!built.isEmpty()) built.append(' ');
+                built.append(HtmlTree.textOf(ref).trim());
+            }
+            if (!built.isEmpty()) return built.toString();
+        }
+        String id = node.attributes.get("id");
+        if (id != null && !id.isBlank()) {
+            DomNode label = findLabel(top(node), id);
+            if (label != null) {
+                String text = HtmlTree.textOf(label).trim();
+                if (!text.isEmpty()) return text;
+            }
+        }
+        if (node.parent != null && "label".equals(node.parent.localName)) {
+            String text = HtmlTree.textOf(node.parent).trim();
+            if (!text.isEmpty()) return text;
+        }
+        String alt = node.attributes.get("alt");
+        if (alt != null && !alt.isBlank()) return alt.trim();
+        if ("label".equals(node.localName)) return "";
+        if (!namesFromContent(node) && hasElementChild(node)) return "";
+        return HtmlTree.textOf(node).trim();
+    }
+
+    private static boolean namesFromContent(DomNode node) {
+        String tag = node.localName == null ? "" : node.localName;
+        if (switch (tag) {
+            case "button", "a", "h1", "h2", "h3", "h4", "h5", "h6", "option", "textarea", "summary", "td", "th", "caption", "legend" -> true;
+            default -> false;
+        }) return true;
+        return switch (Query.roleOf(node)) {
+            case "button", "link", "heading", "tab", "checkbox", "radio", "img", "textbox" -> true;
+            default -> false;
+        };
+    }
+
+    private static boolean hasElementChild(DomNode node) {
+        for (DomNode child : node.children) if (child.nodeType == 1) return true;
+        return false;
+    }
+
+    private static boolean disabled(DomNode node) {
+        if (node.attributes.containsKey("disabled")) return true;
+        if ("true".equalsIgnoreCase(node.attributes.get("aria-disabled"))) return true;
+        for (DomNode parent = node.parent; parent != null; parent = parent.parent) {
+            if (parent.attributes.containsKey("inert")) return true;
+            if ("fieldset".equals(parent.localName) && parent.attributes.containsKey("disabled")) return true;
+        }
+        return false;
+    }
+
+    private static String headingLevel(DomNode node) {
+        String aria = node.attributes.get("aria-level");
+        if (aria != null && !aria.isBlank()) return aria.trim();
+        String tag = node.localName == null ? "" : node.localName;
+        if (tag.length() == 2 && tag.charAt(0) == 'h' && Character.isDigit(tag.charAt(1))) return tag.substring(1);
+        return "";
+    }
+
+    private static String truthy(DomNode node, String attribute, String aria) {
+        if (attribute != null && node.attributes.containsKey(attribute)) return "true";
+        String value = aria == null ? null : node.attributes.get(aria);
+        if (value == null || value.isBlank()) return "false";
+        return "false".equalsIgnoreCase(value) ? "false" : "true";
+    }
+
+    private static DomNode top(DomNode node) {
+        DomNode cursor = node;
+        while (cursor.parent != null) cursor = cursor.parent;
+        return cursor;
+    }
+
+    private static DomNode findId(DomNode node, String id) {
+        if (node == null) return null;
+        if (id.equals(node.attributes.get("id"))) return node;
+        for (DomNode child : node.children) {
+            DomNode found = findId(child, id);
+            if (found != null) return found;
+        }
+        for (DomNode shadow : node.shadowRoots) {
+            DomNode found = findId(shadow, id);
+            if (found != null) return found;
+        }
+        return null;
+    }
+
+    private static DomNode findLabel(DomNode node, String id) {
+        if (node == null) return null;
+        if ("label".equals(node.localName) && id.equals(node.attributes.get("for"))) return node;
+        for (DomNode child : node.children) {
+            DomNode found = findLabel(child, id);
+            if (found != null) return found;
+        }
+        return null;
     }
 
     private static boolean hidden(DomNode node) {

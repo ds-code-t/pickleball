@@ -1,0 +1,233 @@
+{
+  "case_id": "polish-combo-rtl",
+  "group": "polish",
+  "path": "/polish/combo-rtl.html",
+  "description": "RTL sticky header covers the top of a windowed row. A transparent overlay does not take hits; its pointer-events:auto chip does, and that chip is not a hit against the overlay. A static flex item with z-index paints above the later sibling it overlaps.",
+  "capture": {
+    "viewport_width": 800,
+    "viewport_height": 600,
+    "device_scale_factor": 1,
+    "page_scale": 1,
+    "scroll_x": 0,
+    "scroll_y": 0,
+    "mobile": false,
+    "color_scheme": null,
+    "media": null,
+    "hit_budget": 4000,
+    "hit_cell_css_px": 16,
+    "settle": {
+      "overall_ms": 2500,
+      "network_idle_ms": 150,
+      "mutation_quiet_ms": 120,
+      "fonts_ms": 1200,
+      "images_ms": 1200,
+      "animations_ms": 600
+    }
+  },
+  "assertions": [
+    {
+      "kind": "style",
+      "id": "row",
+      "prop": "direction",
+      "value": "rtl"
+    },
+    {
+      "kind": "style",
+      "id": "veil",
+      "prop": "pointer-events",
+      "value": "none"
+    },
+    {
+      "kind": "style",
+      "id": "chip",
+      "prop": "pointer-events",
+      "value": "auto"
+    },
+    {
+      "kind": "stacking_context",
+      "id": "hi",
+      "value": true
+    },
+    {
+      "kind": "stacking_context",
+      "id": "lo",
+      "value": true
+    },
+    {
+      "kind": "stacking_context",
+      "id": "stick",
+      "value": true
+    },
+    {
+      "kind": "paint_above",
+      "above": "hi",
+      "below": "lo"
+    },
+    {
+      "kind": "quad_box",
+      "id": "hi",
+      "min_x": 108,
+      "max_x": 124,
+      "min_y": 72,
+      "max_y": 88,
+      "min_w": 92,
+      "max_w": 108,
+      "min_h": 40,
+      "max_h": 56
+    },
+    {
+      "kind": "quad_box",
+      "id": "lo",
+      "min_x": 88,
+      "max_x": 104,
+      "min_y": 72,
+      "max_y": 88,
+      "min_w": 92,
+      "max_w": 108,
+      "min_h": 40,
+      "max_h": 56
+    },
+    {
+      "kind": "quad_box",
+      "id": "row",
+      "min_x": 610,
+      "max_x": 670,
+      "min_y": 28,
+      "max_y": 48
+    },
+    {
+      "kind": "quad_box",
+      "id": "stick",
+      "min_x": 400,
+      "max_x": 440,
+      "min_y": 28,
+      "max_y": 46
+    },
+    {
+      "kind": "quad_box",
+      "id": "chip",
+      "min_x": 710,
+      "max_x": 746,
+      "min_y": 0,
+      "max_y": 16,
+      "min_w": 56,
+      "max_w": 72
+    },
+    {
+      "kind": "hit",
+      "id": "stick",
+      "x": 696,
+      "y": 56
+    },
+    {
+      "kind": "hit_not",
+      "id": "row",
+      "x": 696,
+      "y": 56
+    },
+    {
+      "kind": "hit_not",
+      "id": "veil",
+      "x": 696,
+      "y": 56
+    },
+    {
+      "kind": "hit",
+      "id": "row",
+      "x": 696,
+      "y": 88
+    },
+    {
+      "kind": "hit_not",
+      "id": "veil",
+      "x": 696,
+      "y": 88
+    },
+    {
+      "kind": "hit",
+      "id": "chip",
+      "x": 760,
+      "y": 24
+    },
+    {
+      "kind": "hit",
+      "id": "back",
+      "x": 24,
+      "y": 24
+    },
+    {
+      "kind": "hit_not",
+      "id": "veil",
+      "x": 24,
+      "y": 24
+    },
+    {
+      "kind": "hit",
+      "id": "lo",
+      "x": 104,
+      "y": 104
+    },
+    {
+      "kind": "hit_not",
+      "id": "hi",
+      "x": 104,
+      "y": 104
+    },
+    {
+      "kind": "hit",
+      "id": "hi",
+      "x": 120,
+      "y": 104
+    },
+    {
+      "kind": "hit_not",
+      "id": "lo",
+      "x": 120,
+      "y": 104
+    },
+    {
+      "kind": "count_selector",
+      "selector": ".vrow",
+      "min": 2,
+      "max": 2
+    },
+    {
+      "kind": "unknown",
+      "name": "virtualized_unmounted"
+    },
+    {
+      "kind": "text_contains",
+      "id": "row",
+      "text": "صف-16"
+    },
+    {
+      "kind": "settled",
+      "value": true
+    }
+  ],
+  "queries": [
+    {
+      "pw": "getByRole('button', { name: 'رقاقة' })",
+      "mode": "playwright",
+      "filter": "clickable"
+    },
+    {
+      "pw": "getByText('صف-16')",
+      "mode": "playwright"
+    },
+    {
+      "pw": "getByText('رأس')",
+      "mode": "playwright"
+    },
+    {
+      "css": "#back",
+      "mode": "playwright",
+      "filter": "clickable"
+    },
+    {
+      "css": "#hi",
+      "mode": "playwright",
+      "filter": "clickable"
+    }
+  ]
+}

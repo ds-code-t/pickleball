@@ -1,0 +1,151 @@
+{
+  "case_id": "polish-combo-shadow",
+  "group": "polish",
+  "path": "/polish/combo-shadow.html",
+  "description": "A manual popover in a closed shadow, inside an iframe that is translated and whose host has been scrolled away. The hit is the host, not the light-dom box underneath. Fixed inside the iframe's own translated ancestor is not the viewport.",
+  "capture": {
+    "viewport_width": 800,
+    "viewport_height": 600,
+    "device_scale_factor": 1,
+    "page_scale": 1,
+    "scroll_x": 0,
+    "scroll_y": 0,
+    "mobile": false,
+    "color_scheme": null,
+    "media": null,
+    "hit_budget": 4000,
+    "hit_cell_css_px": 16,
+    "settle": {
+      "overall_ms": 2500,
+      "network_idle_ms": 150,
+      "mutation_quiet_ms": 120,
+      "fonts_ms": 1200,
+      "images_ms": 1200,
+      "animations_ms": 600
+    }
+  },
+  "assertions": [
+    {
+      "kind": "shadow",
+      "id": "host",
+      "root": "closed",
+      "child_id": "pop"
+    },
+    {
+      "kind": "in_top_layer",
+      "id": "pop",
+      "value": true
+    },
+    {
+      "kind": "frame_text",
+      "frame_path": "0/0",
+      "text": "Leaf"
+    },
+    {
+      "kind": "frame_text",
+      "frame_path": "0/0",
+      "text": "Pop"
+    },
+    {
+      "kind": "frame_text",
+      "frame_path": "0/0",
+      "text": "secret-label"
+    },
+    {
+      "kind": "unknown",
+      "name": "closed_shadow_hit"
+    },
+    {
+      "kind": "quad_box",
+      "id": "pop",
+      "min_x": 86,
+      "max_x": 112,
+      "min_y": 64,
+      "max_y": 90,
+      "min_w": 168,
+      "max_w": 192,
+      "min_h": 56,
+      "max_h": 76
+    },
+    {
+      "kind": "quad_box",
+      "id": "localfix",
+      "min_x": 336,
+      "max_x": 366,
+      "min_y": 162,
+      "max_y": 190,
+      "min_w": 70,
+      "max_w": 92,
+      "min_h": 32,
+      "max_h": 48
+    },
+    {
+      "kind": "hit",
+      "id": "host",
+      "x": 248,
+      "y": 104
+    },
+    {
+      "kind": "hit_not",
+      "id": "under",
+      "x": 248,
+      "y": 104
+    },
+    {
+      "kind": "hit",
+      "id": "localfix",
+      "x": 424,
+      "y": 200
+    },
+    {
+      "kind": "hit_not",
+      "id": "host",
+      "x": 424,
+      "y": 200
+    },
+    {
+      "kind": "hit",
+      "id": "leaf",
+      "x": 360,
+      "y": 232
+    },
+    {
+      "kind": "hit",
+      "id": "outside",
+      "x": 88,
+      "y": 344
+    },
+    {
+      "kind": "settled",
+      "value": true
+    }
+  ],
+  "queries": [
+    {
+      "pw": "frameLocator('#outer').locator('#leaf')",
+      "mode": "playwright"
+    },
+    {
+      "pw": "frameLocator('#outer').locator('#localfix')",
+      "mode": "playwright"
+    },
+    {
+      "pw": "frameLocator('#outer').locator('#pop')",
+      "mode": "playwright"
+    },
+    {
+      "by": "css=#leaf",
+      "mode": "selenium",
+      "frame": "#outer"
+    },
+    {
+      "by": "css=#pop",
+      "mode": "selenium",
+      "frame": "#outer"
+    },
+    {
+      "pw": "getByRole('button', { name: 'Outside' })",
+      "mode": "playwright"
+    }
+  ]
+}

@@ -1,0 +1,54 @@
+{
+  "case_id": "forms-select",
+  "group": "forms",
+  "path": "/forms/select.html",
+  "description": "A custom listbox exposes role listbox and its option text.",
+  "capture": {
+    "viewport_width": 800,
+    "viewport_height": 600,
+    "device_scale_factor": 1,
+    "page_scale": 1,
+    "scroll_x": 0,
+    "scroll_y": 0,
+    "mobile": false,
+    "color_scheme": null,
+    "media": null,
+    "hit_budget": 1500,
+    "hit_cell_css_px": 32,
+    "settle": {
+      "overall_ms": 2500,
+      "network_idle_ms": 150,
+      "mutation_quiet_ms": 120,
+      "fonts_ms": 1200,
+      "images_ms": 1200,
+      "animations_ms": 600
+    }
+  },
+  "assertions": [
+    {
+      "kind": "ax_role",
+      "id": "list",
+      "role": "listbox"
+    },
+    {
+      "kind": "text_contains",
+      "id": "list",
+      "text": "Alpha"
+    },
+    {
+      "kind": "text_contains",
+      "id": "o2",
+      "text": "Beta"
+    }
+  ],
+  "queries": [
+    {
+      "pw": "getByRole('option', { name: 'Alpha' })",
+      "mode": "playwright"
+    },
+    {
+      "pw": "getByRole('listbox', { name: 'cities' })",
+      "mode": "playwright"
+    }
+  ]
+}

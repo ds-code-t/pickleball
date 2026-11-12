@@ -1,0 +1,81 @@
+{
+  "case_id": "polish-random-ids",
+  "group": "polish",
+  "path": "/polish/random-ids.html",
+  "description": "Both ids are replaced on load. The stale ids match nothing; the accessible names still do.",
+  "capture": {
+    "viewport_width": 800,
+    "viewport_height": 600,
+    "device_scale_factor": 1,
+    "page_scale": 1,
+    "scroll_x": 0,
+    "scroll_y": 0,
+    "mobile": false,
+    "color_scheme": null,
+    "media": null,
+    "hit_budget": 1500,
+    "hit_cell_css_px": 32,
+    "settle": {
+      "overall_ms": 2500,
+      "network_idle_ms": 150,
+      "mutation_quiet_ms": 120,
+      "fonts_ms": 1200,
+      "images_ms": 1200,
+      "animations_ms": 600
+    }
+  },
+  "assertions": [
+    {
+      "kind": "attr_matches",
+      "selector": "[data-stable=alpha]",
+      "name": "id",
+      "pattern": "^id-"
+    },
+    {
+      "kind": "attr_matches",
+      "selector": "[data-stable=beta]",
+      "name": "id",
+      "pattern": "^id-"
+    },
+    {
+      "kind": "count_selector",
+      "selector": "#alpha",
+      "max": 0
+    },
+    {
+      "kind": "count_selector",
+      "selector": "#beta",
+      "max": 0
+    },
+    {
+      "kind": "settled",
+      "value": true
+    }
+  ],
+  "queries": [
+    {
+      "pw": "getByRole('button', { name: 'Alpha' })",
+      "mode": "playwright"
+    },
+    {
+      "pw": "getByRole('button', { name: 'Beta' })",
+      "mode": "playwright"
+    },
+    {
+      "css": "#alpha",
+      "mode": "playwright"
+    },
+    {
+      "css": "[data-stable=beta]",
+      "mode": "selenium"
+    }
+  ],
+  "two_load": [
+    {
+      "css": "[data-stable=alpha]"
+    },
+    {
+      "css": "[data-stable=beta]"
+    }
+  ]
+}

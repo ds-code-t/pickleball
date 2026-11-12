@@ -1,0 +1,85 @@
+{
+  "case_id": "polish-pseudo-attr",
+  "group": "polish",
+  "path": "/polish/pseudo-attr.html",
+  "description": "Computed ::before/::after text resolves attr() and adjacent strings. Locators still see the element's own text.",
+  "capture": {
+    "viewport_width": 800,
+    "viewport_height": 600,
+    "device_scale_factor": 1,
+    "page_scale": 1,
+    "scroll_x": 0,
+    "scroll_y": 0,
+    "mobile": false,
+    "color_scheme": null,
+    "media": null,
+    "hit_budget": 1500,
+    "hit_cell_css_px": 32,
+    "settle": {
+      "overall_ms": 2500,
+      "network_idle_ms": 150,
+      "mutation_quiet_ms": 120,
+      "fonts_ms": 1200,
+      "images_ms": 1200,
+      "animations_ms": 600
+    }
+  },
+  "assertions": [
+    {
+      "kind": "pseudo",
+      "id": "link",
+      "pseudo": "before",
+      "text_contains": "badge!"
+    },
+    {
+      "kind": "pseudo",
+      "id": "link",
+      "pseudo": "after",
+      "text_contains": "badge"
+    },
+    {
+      "kind": "pseudo",
+      "id": "mark",
+      "pseudo": "before",
+      "text_contains": "«badge»"
+    },
+    {
+      "kind": "ax_name_contains",
+      "id": "link",
+      "text": "badge!corebadge"
+    },
+    {
+      "kind": "query_count",
+      "pw": "getByRole('link', { name: 'badge!corebadge' })",
+      "count": 1
+    },
+    {
+      "kind": "query_count",
+      "by": "linkText=core",
+      "count": 1
+    },
+    {
+      "kind": "query_count",
+      "by": "partialLinkText=badge!",
+      "count": 0
+    },
+    {
+      "kind": "settled",
+      "value": true
+    }
+  ],
+  "queries": [
+    {
+      "pw": "getByText('core')",
+      "mode": "playwright"
+    },
+    {
+      "pw": "getByRole('link', { name: 'badge!corebadge' })",
+      "mode": "playwright"
+    },
+    {
+      "by": "linkText=core",
+      "mode": "selenium"
+    }
+  ]
+}

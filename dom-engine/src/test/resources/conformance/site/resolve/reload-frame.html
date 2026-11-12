@@ -1,0 +1,15 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>resolve reload frame</title>
+<style>html, body { margin: 0; }</style>
+</head>
+<body>
+<div id="inner"></div>
+<script>
+const closed = document.getElementById("inner").attachShadow({mode: "closed"});
+closed.innerHTML = '<button id="leaf" type="button">leaf-word</button>';
+</script>
+</body>
+</html>

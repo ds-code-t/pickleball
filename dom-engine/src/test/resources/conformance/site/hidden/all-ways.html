@@ -1,0 +1,22 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>hidden-all-ways</title>
+<link rel="stylesheet" href="/site.css">
+</head>
+<body>
+
+<button id="show" style="position:absolute;left:64px;top:20px;width:100px;height:40px">Show</button>
+<button id="disp" style="display:none">Disp</button>
+<button id="vis" style="visibility:hidden;position:absolute;left:180px;top:20px;width:80px;height:40px">Vis</button>
+<button id="op" style="opacity:0;position:absolute;left:280px;top:20px;width:80px;height:40px">Op</button>
+<button id="zero" style="position:absolute;left:380px;top:20px;width:0;height:0;overflow:hidden">Zero</button>
+<button id="off" style="position:absolute;left:-2000px;top:20px;width:80px;height:40px">Off</button>
+<button id="clip" style="position:absolute;left:480px;top:20px;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)">Clip</button>
+<div inert style="position:absolute;left:64px;top:100px"><button id="inb" style="width:80px;height:40px">Inert</button></div>
+<button id="aria" aria-hidden="true" style="position:absolute;left:200px;top:100px;width:80px;height:40px">Aria</button>
+<div id="cv" style="content-visibility:hidden;position:absolute;left:320px;top:100px;width:80px;height:40px">Cv</div>
+
+</body>
+</html>
