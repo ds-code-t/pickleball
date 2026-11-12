@@ -6,6 +6,7 @@ import tools.dscode.common.coordination.AgentCoordination;
 import tools.dscode.control.protocol.AgentLog;
 import tools.dscode.control.protocol.Workspace;
 import tools.dscode.testengine.PKB_props;
+import tools.dscode.testengine.PickleballRunner;
 
 import javax.tools.DiagnosticCollector;
 import javax.tools.JavaCompiler;
@@ -19,10 +20,12 @@ import java.net.URLClassLoader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Properties;
 
 import io.cucumber.core.cli.Main;
 
@@ -174,7 +177,15 @@ class WorkbenchLaunchCorrectnessTest {
                 """);
         ByteArrayOutputStream stdout = new ByteArrayOutputStream();
         ByteArrayOutputStream stderr = new ByteArrayOutputStream();
-        int exit = WorkbenchAgentCommands.run(
+        Properties previousProperties = new Properties();
+        previousProperties.putAll(System.getProperties());
+        // Discover and Cucumber Main both read cucumber.* and pkb_* from this JVM.
+        // A previous suite test must not hand this fixture its feature list or browser.
+        clearInheritedLaunchProperties();
+        Map<String, String> hiddenRunnerValues = hideSuiteRunnerPaths();
+        int exit;
+        try {
+            exit = WorkbenchAgentCommands.run(
                 new String[]{"discover", temp.toString(), "--run-id=run-hook", "--tags=@smoke"},
                 new PrintStream(stdout, true, StandardCharsets.UTF_8),
                 new PrintStream(stderr, true, StandardCharsets.UTF_8),
@@ -200,6 +211,10 @@ class WorkbenchLaunchCorrectnessTest {
                 return 1;
             }
         );
+        } finally {
+            restoreSuiteRunnerPaths(hiddenRunnerValues);
+            System.setProperties(previousProperties);
+        }
         assertEquals(1, exit);
         String out = stdout.toString(StandardCharsets.UTF_8);
         String err = stderr.toString(StandardCharsets.UTF_8);
@@ -249,6 +264,102 @@ class WorkbenchLaunchCorrectnessTest {
         assertFalse(out.contains("summary status=LAUNCH_ERROR"), out);
     }
 
+    /** Drops suite launch settings so this fixture does not rerun the caller's features. */
+    private static void clearInheritedLaunchProperties() {
+        for (String key : new ArrayList<>(System.getProperties().stringPropertyNames())) {
+            if (key.startsWith("cucumber.") || key.startsWith("pkb_") || key.startsWith("webdriver.")) {
+                System.clearProperty(key);
+            }
+        }
+    }
+
+    /** A suite run leaves the first Cucumber runner and glue in place. This fixture needs a fresh one. */
+    private static final class GlobalGluePark {
+        Object runner;
+        Object glue;
+        boolean prepared;
+    }
+
+    private static GlobalGluePark parkGlobalGlue() {
+        GlobalGluePark park = new GlobalGluePark();
+        try {
+            Class<?> state = Class.forName("io.cucumber.core.runner.GlobalState");
+            java.lang.reflect.Field runner = state.getDeclaredField("globalRunner");
+            java.lang.reflect.Field glue = state.getDeclaredField("globalCachingGlue");
+            java.lang.reflect.Field prepared = state.getDeclaredField("gluePrepared");
+            runner.setAccessible(true);
+            glue.setAccessible(true);
+            prepared.setAccessible(true);
+            park.runner = runner.get(null);
+            park.glue = glue.get(null);
+            park.prepared = prepared.getBoolean(null);
+            runner.set(null, null);
+            glue.set(null, null);
+            prepared.setBoolean(null, false);
+        } catch (ReflectiveOperationException failure) {
+            throw new IllegalStateException(failure);
+        }
+        return park;
+    }
+
+    private static void restoreGlobalGlue(GlobalGluePark park) {
+        if (park == null) return;
+        try {
+            Class<?> state = Class.forName("io.cucumber.core.runner.GlobalState");
+            java.lang.reflect.Field runner = state.getDeclaredField("globalRunner");
+            java.lang.reflect.Field glue = state.getDeclaredField("globalCachingGlue");
+            java.lang.reflect.Field prepared = state.getDeclaredField("gluePrepared");
+            runner.setAccessible(true);
+            glue.setAccessible(true);
+            prepared.setAccessible(true);
+            runner.set(null, park.runner);
+            glue.set(null, park.glue);
+            prepared.setBoolean(null, park.prepared);
+        } catch (ReflectiveOperationException failure) {
+            throw new IllegalStateException(failure);
+        }
+    }
+
+    /** The live suite runner must not replace this fixture's glue or feature list. */
+    private static Map<String, String> hideSuiteRunnerPaths() {
+        PickleballRunner runner = PickleballRunner.rawInstance();
+        if (runner == null) return Map.of();
+        Map<String, String> saved = new LinkedHashMap<>();
+        for (String key : List.of(
+                "pkb_glue", "pkb_features", "pkb_browser", "pkb_tags",
+                "cucumber.glue", "cucumber.features", "cucumber.filter.tags"
+        )) {
+            if (runner.values().containsKey(key)) {
+                saved.put(key, runner.values().get(key));
+            }
+        }
+        try {
+            java.lang.reflect.Field field = PickleballRunner.class.getDeclaredField("values");
+            field.setAccessible(true);
+            @SuppressWarnings("unchecked")
+            Map<String, String> values = (Map<String, String>) field.get(runner);
+            for (String key : saved.keySet()) values.remove(key);
+        } catch (ReflectiveOperationException failure) {
+            throw new IllegalStateException(failure);
+        }
+        return saved;
+    }
+
+    private static void restoreSuiteRunnerPaths(Map<String, String> saved) {
+        if (saved == null || saved.isEmpty()) return;
+        PickleballRunner runner = PickleballRunner.rawInstance();
+        if (runner == null) return;
+        try {
+            java.lang.reflect.Field field = PickleballRunner.class.getDeclaredField("values");
+            field.setAccessible(true);
+            @SuppressWarnings("unchecked")
+            Map<String, String> values = (Map<String, String>) field.get(runner);
+            values.putAll(saved);
+        } catch (ReflectiveOperationException failure) {
+            throw new IllegalStateException(failure);
+        }
+    }
+
     /** Compiles the fixture and runs it as a Cucumber @BeforeAll hook, not Method.invoke. */
     private static void runCompiledBeforeAll(Path source, PrintStream err) throws Exception {
         JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
@@ -280,11 +391,18 @@ class WorkbenchLaunchCorrectnessTest {
         ClassLoader previousLoader = thread.getContextClassLoader();
         PrintStream previousOut = System.out;
         PrintStream previousErr = System.err;
+        Properties previousProperties = new Properties();
+        previousProperties.putAll(System.getProperties());
         Throwable thrown = null;
         try (URLClassLoader loader = new URLClassLoader(new URL[]{classes.toUri().toURL()}, WorkbenchLaunchCorrectnessTest.class.getClassLoader())) {
             thread.setContextClassLoader(loader);
             System.setOut(err);
             System.setErr(err);
+            // Cucumber Main merges cucumber.* and pkb_* from the JVM. A previous
+            // suite test must not add its features or browser to this hook fixture.
+            clearInheritedLaunchProperties();
+            Map<String, String> hiddenRunnerValues = hideSuiteRunnerPaths();
+            GlobalGluePark parkedGlue = parkGlobalGlue();
             try {
                 Main.run(
                         new String[]{"--glue", "com.example.site", "--monochrome", feature.toString()},
@@ -292,11 +410,15 @@ class WorkbenchLaunchCorrectnessTest {
                 );
             } catch (Throwable failure) {
                 thrown = failure;
+            } finally {
+                restoreGlobalGlue(parkedGlue);
+                restoreSuiteRunnerPaths(hiddenRunnerValues);
             }
         } finally {
             System.setOut(previousOut);
             System.setErr(previousErr);
             thread.setContextClassLoader(previousLoader);
+            System.setProperties(previousProperties);
         }
         if (thrown != null) thrown.printStackTrace(err);
     }

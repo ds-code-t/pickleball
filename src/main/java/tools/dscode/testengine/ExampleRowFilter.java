@@ -79,6 +79,12 @@ public final class ExampleRowFilter {
     ) {
         Objects.requireNonNull(root, "root");
         if (isInactive(example)) {
+            // Cucumber drops a tag or name miss while it discovers. When that
+            // filter did not run, the plan would still count the scenario and a
+            // native run that does not start it would look like a pass.
+            if ((tags != null && !tags.isBlank()) || (name != null && !name.isBlank())) {
+                prunePriorFilters(root, tags, name);
+            }
             return;
         }
         ExampleRowFilter filter = parse(example);
@@ -197,6 +203,21 @@ public final class ExampleRowFilter {
             }
         }
         return true;
+    }
+
+    /** Removes scenarios the tag or name filter rejects. An empty plan is not an error. */
+    private static void prunePriorFilters(TestDescriptor root, String tags, String name) {
+        List<TestDescriptor> tests = new ArrayList<>();
+        collectTests(root, tests);
+        Map<String, Optional<Feature>> features = new HashMap<>();
+        for (TestDescriptor test : tests) {
+            if (!looksLikeScenario(test)) continue;
+            Located located = locate(test, features);
+            if (located == null) continue;
+            if (!passesPriorFilters(located.pickle(), tags, name)) {
+                test.removeFromHierarchy();
+            }
+        }
     }
 
     private static void collectTests(TestDescriptor node, List<TestDescriptor> tests) {

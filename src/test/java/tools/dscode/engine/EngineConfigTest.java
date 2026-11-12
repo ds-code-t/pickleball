@@ -15,20 +15,22 @@ class EngineConfigTest {
     Path project;
 
     @Test
-    void defaultIsCucumberAndPropertyBeatsTheFile() throws Exception {
+    void defaultIsNativeAndPropertyBeatsTheFile() throws Exception {
         String previous = System.getProperty("pkb_engine");
         String previousProject = System.getProperty("pkb_engine_project");
         try {
             System.clearProperty("pkb_engine");
             System.setProperty("pkb_engine_project", project.toString());
+            assertEquals(EngineConfig.NATIVE, EngineConfig.mode());
+            assertTrue(EngineConfig.nativeSelected());
+            Files.writeString(project.resolve("engine.properties"), "mode=cucumber\n");
             assertEquals(EngineConfig.CUCUMBER, EngineConfig.mode());
             assertFalse(EngineConfig.nativeSelected());
-            Files.writeString(project.resolve("engine.properties"), "mode=native\n");
+            System.setProperty("pkb_engine", "native");
             assertEquals(EngineConfig.NATIVE, EngineConfig.mode());
             System.setProperty("pkb_engine", "cucumber");
             assertEquals(EngineConfig.CUCUMBER, EngineConfig.mode());
-            System.setProperty("pkb_engine", "native");
-            assertTrue(EngineConfig.nativeSelected());
+            assertFalse(EngineConfig.nativeSelected());
         } finally {
             restore("pkb_engine", previous);
             restore("pkb_engine_project", previousProject);

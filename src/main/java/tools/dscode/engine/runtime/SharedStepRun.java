@@ -367,8 +367,13 @@ public final class SharedStepRun {
         List<String> captures = match == null || match.captures() == null ? List.of() : match.captures();
         Object[] args = new Object[types.length];
         int capture = 0;
+        Object supplied = suppliedBody(extension);
         for (int index = 0; index < types.length; index++) {
             Class<?> raw = raw(types[index]);
+            if (index == types.length - 1 && supplied != null && !isTrailing(raw)) {
+                args[index] = supplied;
+                continue;
+            }
             if (index == types.length - 1 && isTrailing(raw)) {
                 args[index] = trailing(raw, step, extension);
                 continue;
@@ -377,6 +382,16 @@ public final class SharedStepRun {
             args[index] = convert(raw, value);
         }
         return args;
+    }
+
+    /** Doc string or table added with {@code addArg}, converted for the last glue parameter. */
+    private static Object suppliedBody(StepExtension extension) {
+        if (extension == null || extension.argument == null) return null;
+        if (extension.argument instanceof io.cucumber.core.stepexpression.DocStringArgument
+                || extension.argument instanceof io.cucumber.core.stepexpression.DataTableArgument) {
+            return extension.argument.getValue();
+        }
+        return null;
     }
 
     private static boolean isTrailing(Class<?> raw) {

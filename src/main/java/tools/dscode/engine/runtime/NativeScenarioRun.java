@@ -1,5 +1,6 @@
 package tools.dscode.engine.runtime;
 
+import io.cucumber.core.gherkin.Pickle;
 import io.cucumber.core.runner.CurrentScenarioState;
 import io.cucumber.core.runner.ScenarioStep;
 import io.cucumber.core.runner.StepExtension;
@@ -8,6 +9,8 @@ import tools.dscode.common.mappings.MapConfigurations;
 import tools.dscode.common.mappings.MappingProcessor;
 import tools.dscode.common.mappings.NodeMap;
 import tools.dscode.common.reporting.logging.Entry;
+import tools.dscode.common.reporting.diagnostic.DiagnosticRuntime;
+import tools.dscode.common.reporting.diagnostic.ReportRetentionPolicy;
 import tools.dscode.engine.EngineLog;
 import tools.dscode.engine.EngineOptions;
 import tools.dscode.engine.context.ExecutionContext;
@@ -28,10 +31,28 @@ import java.util.function.Consumer;
 
 /** Runs one neutral scenario on the shared step lifecycle. */
 public final class NativeScenarioRun {
+    private static final ThreadLocal<Throwable> FAILURE = new ThreadLocal<>();
+
     private NativeScenarioRun() {
     }
 
+    /** The failure recorded for the scenario that just finished on this thread. */
+    public static Throwable takeFailure() {
+        Throwable failure = FAILURE.get();
+        FAILURE.remove();
+        return failure;
+    }
+
     public static ScenarioResult run(EngineScenario scenario, StepRegistry registry, EngineOptions options) {
+        return run(scenario, registry, options, null);
+    }
+
+    public static ScenarioResult run(
+            EngineScenario scenario,
+            StepRegistry registry,
+            EngineOptions options,
+            Pickle source
+    ) {
         if (ExecutionContext.current() == null && CurrentScenarioState.currentScenarioState.get() == null) {
             MappingProcessor.resetCommonMaps();
         }
@@ -39,6 +60,9 @@ public final class NativeScenarioRun {
         List<StepResult> trailing = new ArrayList<>();
         boolean scenarioFailed = false;
         String scenarioFailure = "";
+        Throwable scenarioThrowable = null;
+        FAILURE.remove();
+        tools.dscode.Values.clearScenarioObjects();
         java.util.Set<StepExtension> recorded = java.util.Collections.newSetFromMap(new IdentityHashMap<>());
         Consumer<StepExtension> outerTrace = NativeStepTrace.current();
         NativeStepTrace.listen(frame -> {
@@ -46,11 +70,16 @@ public final class NativeScenarioRun {
             seen.add(new Seen(SharedStepRun.bound(frame), frame));
             if (outerTrace != null) outerTrace.accept(frame);
         });
-        try (ExecutionContext context = ExecutionContext.open(scenario)) {
+        CurrentScenarioState state = source == null
+                ? new CurrentScenarioState(scenario.name(), scenario.name())
+                : new CurrentScenarioState(scenario.name(), scenario.name(), source);
+        boolean diagnostic = source != null && DiagnosticRuntime.isDiagnostic();
+        try {
+            if (diagnostic) DiagnosticRuntime.startScenario(state);
+            try (ExecutionContext context = ExecutionContext.open(scenario)) {
             context.phase(ExecutionContext.Phase.RUNNING);
             context.resource("registry", registry);
             context.resource("instances", new IdentityHashMap<Class<?>, Object>());
-            CurrentScenarioState state = new CurrentScenarioState(scenario.name(), scenario.name());
             context.attachLegacy(state);
             installExamples(state, scenario);
             state.scenarioLog = Entry.of(scenario.name()).tag("Scenario").start();
@@ -141,6 +170,18 @@ public final class NativeScenarioRun {
                     if (hookFailure == null) hookFailure = thrown;
                     context.fail(thrown);
                 }
+                try {
+                    StepExtension cleanupStep = state.getCurrentStep() == null ? root : state.getCurrentStep();
+                    tools.dscode.common.control.ControlExecutionScope.withStep(cleanupStep, () -> {
+                        state.scenarioRunCleanUp();
+                        return null;
+                    });
+                } catch (Throwable thrown) {
+                    state.recordHardFailure(thrown);
+                    if (hookFailure == null) hookFailure = thrown;
+                    context.fail(thrown);
+                }
+                tools.dscode.Values.clearScenarioObjects();
                 if (hookFailure != null && seen.stream().noneMatch(item -> {
                     StepResult step = toResult(item.step(), item.frame());
                     return step.status() == Status.FAILED || step.status() == Status.UNDEFINED || step.status() == Status.AMBIGUOUS;
@@ -156,15 +197,21 @@ public final class NativeScenarioRun {
                 }
                 scenarioFailed = state.isScenarioFailed();
                 if (scenarioFailed && !state.stepFailures.isEmpty() && state.stepFailures.getLast() != null) {
-                    String text = state.stepFailures.getLast().getMessage();
+                    scenarioThrowable = state.stepFailures.getLast();
+                    String text = scenarioThrowable.getMessage();
                     scenarioFailure = text == null ? "" : text;
                 }
                 if (state.scenarioLog != null) state.scenarioLog.stop();
                 context.phase(ExecutionContext.Phase.CLEANUP);
                 SharedStepRun.forget();
             }
+        }
         } finally {
             NativeStepTrace.listen(outerTrace);
+            if (diagnostic) {
+                ReportRetentionPolicy.recordScenario(state.isScenarioFailed(), false);
+                DiagnosticRuntime.endScenario(state, false, null);
+            }
         }
         List<StepResult> results = new ArrayList<>();
         for (Seen item : seen) {
@@ -175,6 +222,7 @@ public final class NativeScenarioRun {
         if (scenarioFailed && outcome.status() != Status.FAILED && outcome.status() != Status.UNDEFINED) {
             outcome = new ScenarioResult(Status.FAILED, outcome.name(), outcome.steps(), scenarioFailure);
         }
+        if (scenarioFailed) FAILURE.set(scenarioThrowable);
         return outcome;
     }
 

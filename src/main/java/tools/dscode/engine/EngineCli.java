@@ -74,7 +74,7 @@ public final class EngineCli {
                 --dalton reads feature bytes from .pickleball/dalton/dalton.db. --glue is a glue class name.
                 Workbench, MCP, and Gradle forward this command and do not run steps themselves.
                 Logging: pkb_engine_log=run (or all). pkb_engine_log_entity limits lines. pkb_engine_log_max_bytes caps .pickleball/engine/engine.log.
-                The JUnit suite stays on Cucumber unless pkb_engine=native (else PKB_ENGINE, else engine.properties mode=). pkb_engine=cucumber keeps the adapter.
+                The JUnit suite uses the native engine unless pkb_engine=cucumber (else PKB_ENGINE, else engine.properties mode=cucumber). pkb_engine=cucumber keeps the adapter.
                 """;
     }
 

@@ -17,6 +17,8 @@ import tools.dscode.engine.runtime.NativeScenarioCatalog;
 import tools.dscode.engine.source.MemoryScenarioSource;
 import tools.dscode.engine.source.ScenarioSource;
 import tools.dscode.engine.source.StepListScenarioSource;
+import tools.dscode.common.reporting.logging.Level;
+import tools.dscode.testengine.PickleballRunner;
 import io.cucumber.core.runner.CurrentScenarioState;
 
 import java.util.ArrayList;
@@ -54,6 +56,10 @@ public final class PickleballEngine {
         boolean topLevel = ExecutionContext.current() == null;
         CurrentScenarioState parked = topLevel ? CurrentScenarioState.currentScenarioState.get() : null;
         if (topLevel) CurrentScenarioState.currentScenarioState.remove();
+        // Block conditionals log at DEBUG. The adapter uses that level so a
+        // surrounding suite that lowered the level still records the same lines.
+        Level previousLevel = PickleballRunner.LOG_LEVEL;
+        PickleballRunner.LOG_LEVEL = Level.DEBUG;
         try {
             for (EngineFeature feature : loaded) {
                 EngineFeature expanded = GherkinEngineParser.expand(feature);
@@ -63,6 +69,7 @@ public final class PickleballEngine {
                 }
             }
         } finally {
+            PickleballRunner.LOG_LEVEL = previousLevel;
             NativeScenarioCatalog.clear();
             if (topLevel && parked != null) CurrentScenarioState.currentScenarioState.set(parked);
         }

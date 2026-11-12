@@ -61,7 +61,6 @@ class DomAccessGuardTest {
             "src/main/java/io/cucumber/core/gherkin/messages/GherkinMessagesPickleStepMatcher.java",
             "src/main/java/io/cucumber/core/runner/CurrentScenarioState.java",
             "src/main/java/io/cucumber/core/runner/NPickleStepTestStepFactory.java",
-            "src/main/java/io/cucumber/core/runner/StepExtension.java",
             "src/main/java/io/cucumber/core/runner/modularexecutions/CucumberScanUtil.java",
             "src/main/java/io/cucumber/core/runner/util/CucumberQueryUtil.java",
             "src/main/java/io/cucumber/core/runner/util/KeyFunctions.java",

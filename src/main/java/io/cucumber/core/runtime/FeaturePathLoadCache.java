@@ -153,8 +153,9 @@ public final class FeaturePathLoadCache {
     }
 
     private static List<URI> enumerate(List<URI> paths, ClassLoader loader) {
+        ClassLoader scannerLoader = isolatedOwner(loader, paths);
         List<URI> found = new ArrayList<>();
-        ResourceScanner<Feature> scanner = new ResourceScanner<>(() -> loader, FeatureIdentifier::isFeature, resource -> {
+        ResourceScanner<Feature> scanner = new ResourceScanner<>(() -> scannerLoader, FeatureIdentifier::isFeature, resource -> {
             found.add(resource.getUri());
             return Optional.empty();
         });
@@ -162,6 +163,41 @@ public final class FeaturePathLoadCache {
             scanner.scanForResourcesUri(path);
         }
         return found;
+    }
+
+    /**
+     * {@code getResources} is parent-first, so a child loader that has its own
+     * {@code features} directory still sees the parent directory first. When
+     * this loader owns the path, scan only its URLs.
+     */
+    private static ClassLoader isolatedOwner(ClassLoader loader, List<URI> paths) {
+        if (!(loader instanceof java.net.URLClassLoader urls) || paths == null) return loader;
+        java.net.URL[] owned = urls.getURLs();
+        if (owned == null || owned.length == 0) return loader;
+        try {
+            java.lang.reflect.Method find = java.net.URLClassLoader.class.getDeclaredMethod("findResources", String.class);
+            find.setAccessible(true);
+            for (URI path : paths) {
+                String name = classpathName(path);
+                if (name == null) continue;
+                Object resources = find.invoke(urls, name);
+                if (resources instanceof java.util.Enumeration<?> enumeration && enumeration.hasMoreElements()) {
+                    return new java.net.URLClassLoader(owned, null);
+                }
+            }
+        } catch (ReflectiveOperationException ignored) {
+            return loader;
+        }
+        return loader;
+    }
+
+    private static String classpathName(URI path) {
+        if (path == null) return null;
+        String text = path.toString();
+        if (!text.startsWith("classpath:")) return null;
+        String name = text.substring("classpath:".length());
+        while (name.startsWith("/")) name = name.substring(1);
+        return name;
     }
 
     private static List<Feature> parseAll(List<URI> uris, ClassLoader loader) {

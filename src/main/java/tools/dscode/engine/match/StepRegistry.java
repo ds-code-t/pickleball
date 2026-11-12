@@ -18,16 +18,20 @@ import tools.dscode.engine.EngineLog;
 import tools.dscode.engine.model.DocText;
 import tools.dscode.engine.model.Table;
 
+import java.io.IOException;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.Type;
-import java.net.URL;
+import java.net.URI;
 import java.net.URISyntaxException;
+import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Enumeration;
+import java.util.jar.JarEntry;
+import java.util.jar.JarFile;
 import java.util.stream.Stream;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -94,37 +98,82 @@ public final class StepRegistry {
             Enumeration<URL> resources = loader.getResources(path);
             while (resources.hasMoreElements()) {
                 URL url = resources.nextElement();
-                if (!"file".equals(url.getProtocol())) continue;
-                Path dir;
-                try {
-                    dir = Path.of(url.toURI());
-                } catch (URISyntaxException failure) {
-                    continue;
-                }
-                if (!Files.isDirectory(dir)) continue;
-                try (Stream<Path> files = Files.list(dir)) {
-                    for (Path classFile : files.filter(file -> file.getFileName().toString().endsWith(".class")).toList()) {
-                        String binary = classFile.getFileName().toString();
-                        binary = binary.substring(0, binary.length() - ".class".length());
-                        if (binary.contains("$") && binary.matches(".*\\$\\d+.*")) continue;
-                        // JUnit fixtures in the same package are not glue. An explicit
-                        // scan() of the caller's class still loads that fixture.
-                        if (binary.endsWith("Test")) continue;
-                        int nested = binary.indexOf('$');
-                        if (nested > 0 && binary.substring(0, nested).endsWith("Test")) continue;
-                        String className = packageName + "." + binary;
-                        try {
-                            scan(Class.forName(className, true, loader));
-                        } catch (Throwable failure) {
-                            EngineLog.log(logProject, "registry", className, failure.toString());
-                        }
-                    }
+                if ("file".equals(url.getProtocol())) {
+                    scanDirectory(url, packageName, loader);
+                } else if ("jar".equals(url.getProtocol())) {
+                    scanJar(url, packageName, loader);
                 }
             }
         } catch (Exception failure) {
             EngineLog.log(logProject, "registry", packageName, failure.toString());
         }
         return this;
+    }
+
+    private void scanDirectory(URL url, String packageName, ClassLoader loader) {
+        Path dir;
+        try {
+            dir = Path.of(url.toURI());
+        } catch (URISyntaxException failure) {
+            return;
+        }
+        if (!Files.isDirectory(dir)) return;
+        try (Stream<Path> files = Files.list(dir)) {
+            for (Path classFile : files.filter(file -> file.getFileName().toString().endsWith(".class")).toList()) {
+                String binary = classFile.getFileName().toString();
+                binary = binary.substring(0, binary.length() - ".class".length());
+                consider(packageName, binary, loader);
+            }
+        } catch (IOException failure) {
+            EngineLog.log(logProject, "registry", packageName, failure.toString());
+        }
+    }
+
+    /** A consumer classpath is a jar. {@code getResources} returns {@code jar:} URLs, not directories. */
+    private void scanJar(URL url, String packageName, ClassLoader loader) {
+        String spec = url.toString();
+        int bang = spec.indexOf("!/");
+        if (bang < 0) return;
+        String filePart = spec.substring(0, bang);
+        if (filePart.startsWith("jar:")) filePart = filePart.substring("jar:".length());
+        Path jarPath;
+        try {
+            jarPath = Path.of(URI.create(filePart));
+        } catch (IllegalArgumentException failure) {
+            return;
+        }
+        String prefix = spec.substring(bang + 2);
+        if (!prefix.endsWith("/")) prefix = prefix + "/";
+        try (JarFile jar = new JarFile(jarPath.toFile())) {
+            Enumeration<JarEntry> entries = jar.entries();
+            while (entries.hasMoreElements()) {
+                JarEntry entry = entries.nextElement();
+                String name = entry.getName();
+                if (!name.startsWith(prefix) || name.endsWith("/")) continue;
+                if (name.indexOf('/', prefix.length()) >= 0) continue;
+                if (!name.endsWith(".class")) continue;
+                String binary = name.substring(prefix.length(), name.length() - ".class".length());
+                consider(packageName, binary, loader);
+            }
+        } catch (IOException failure) {
+            EngineLog.log(logProject, "registry", packageName, failure.toString());
+        }
+    }
+
+    private void consider(String packageName, String binary, ClassLoader loader) {
+        if (binary == null || binary.isBlank()) return;
+        if (binary.contains("$") && binary.matches(".*\\$\\d+.*")) return;
+        // JUnit fixtures in the same package are not glue. An explicit
+        // scan() of the caller's class still loads that fixture.
+        if (binary.endsWith("Test")) return;
+        int nested = binary.indexOf('$');
+        if (nested > 0 && binary.substring(0, nested).endsWith("Test")) return;
+        String className = packageName + "." + binary;
+        try {
+            scan(Class.forName(className, true, loader));
+        } catch (Throwable failure) {
+            EngineLog.log(logProject, "registry", className, failure.toString());
+        }
     }
 
     public GlueStep register(String keyword, String pattern, Method method) {

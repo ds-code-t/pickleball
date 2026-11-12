@@ -84,11 +84,15 @@ public class DynamicControlNoScenarioTest {
         assertEquals(ControlCallStatus.SUCCESS, result.status(), String.valueOf(result.error()));
         RunResult run = (RunResult) result.value();
         assertEquals(Status.PASSED, run.status(), run.message());
-        assertEquals("A", run.scenarios().getFirst().steps().get(1).returned());
-        assertEquals("yes", run.scenarios().getFirst().steps().get(3).returned());
-        assertEquals("", run.scenarios().getFirst().steps().get(5).returned());
+        var steps = run.scenarios().getFirst().steps();
+        assertEquals("A", steps.get(1).returned());
+        assertTrue(steps.get(4).text().contains("native read \"branch\""));
+        assertEquals("yes", steps.get(4).returned());
+        assertTrue(steps.get(6).text().contains("else-branch"));
+        assertEquals("", steps.get(6).returned());
         assertEquals(2, CountGlue.hits.get());
-        assertEquals("done", run.scenarios().getFirst().steps().get(11).returned());
+        assertTrue(steps.get(25).text().contains("native read \"made\""));
+        assertEquals("done", steps.get(25).returned());
         assertNull(GlobalState.getCurrentScenarioState());
         assertTrue(run.scenarios().getFirst().steps().getFirst().text().contains("save"));
     }

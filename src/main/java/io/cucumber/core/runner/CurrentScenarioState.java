@@ -158,12 +158,17 @@ public class CurrentScenarioState extends ScenarioMapping {
 
     /**
      * Native engine only. Cucumber runs keep using {@link #CurrentScenarioState(TestCase)}.
-     * {@code testCase} and {@code pickle} stay null; callers must tolerate that.
+     * {@code testCase} stays null. {@code source} is the Cucumber pickle when the suite
+     * has one, so diagnostic identity can record the same uri and line.
      */
     public CurrentScenarioState(String scenarioName, String featureName) {
+        this(scenarioName, featureName, null);
+    }
+
+    public CurrentScenarioState(String scenarioName, String featureName, Pickle source) {
         LOCAL.set(new ConcurrentHashMap<>());
         this.testCase = null;
-        this.pickle = null;
+        this.pickle = source;
         this.scenarioName = scenarioName == null ? "" : scenarioName;
         this.scenarioNameAndLine = this.scenarioName;
         this.featureName = featureName == null ? "" : featureName;

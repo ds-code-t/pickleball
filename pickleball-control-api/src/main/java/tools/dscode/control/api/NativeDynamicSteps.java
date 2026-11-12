@@ -7,6 +7,9 @@ import tools.dscode.engine.context.ExecutionContext;
 import tools.dscode.engine.model.EngineScenario;
 import tools.dscode.engine.model.RunResult;
 import tools.dscode.engine.model.Status;
+import tools.dscode.engine.match.StepKind;
+import tools.dscode.engine.match.StepMatch;
+import tools.dscode.engine.match.StepRegistry;
 import tools.dscode.engine.model.StepResult;
 
 import java.util.ArrayList;
@@ -50,6 +53,10 @@ public final class NativeDynamicSteps {
             }
         }
         String body = strip(text);
+        StepMatch match = registry(glue).match(body);
+        if (match.kind() == StepKind.UNDEFINED) {
+            return ControlCallResult.unavailable("'" + body + "' step is undefined");
+        }
         try (ExecutionContext context = ExecutionContext.open(EngineScenario.of("dynamic", List.of()))) {
             context.resource("glue", glue);
             String doc = argument == null || argument.isBlank() ? null : argument;
@@ -92,6 +99,12 @@ public final class NativeDynamicSteps {
         } catch (RuntimeException failure) {
             return ControlCallResult.failed(failure);
         }
+    }
+
+    private static StepRegistry registry(List<Class<?>> glue) {
+        StepRegistry created = new StepRegistry().scanPackage("tools.dscode.coredefinitions");
+        if (glue != null && !glue.isEmpty()) created.scan(glue.toArray(Class<?>[]::new));
+        return created;
     }
 
     private static String strip(String text) {

@@ -6,11 +6,17 @@ import io.cucumber.core.backend.TypeResolver;
 import io.cucumber.datatable.DataTable;
 import io.cucumber.datatable.DataTableTypeRegistryTableConverter;
 import io.cucumber.docstring.DocString;
+import io.cucumber.docstring.DocStringTypeRegistry;
 import io.cucumber.docstring.DocStringTypeRegistryDocStringConverter;
 
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.lang.reflect.Type;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 import static io.cucumber.core.runner.CurrentScenarioState.getDataTableTypeRegistryTableConverter;
 import static io.cucumber.core.runner.CurrentScenarioState.getDocStringTypeRegistryDocStringConverter;
@@ -84,6 +90,9 @@ public class DocStringBuilder {
         };
     }
 
+    private static final Map<Class<?>, Object> DOC_STRING_RECEIVERS = new IdentityHashMap<>();
+    private static volatile DocStringTypeRegistryDocStringConverter fallbackConverter;
+
     private static DocStringTypeRegistryDocStringConverter runtimeDocStringConverter() {
         try {
             DocStringTypeRegistryDocStringConverter converter = getDocStringTypeRegistryDocStringConverter();
@@ -92,9 +101,54 @@ public class DocStringBuilder {
             }
         } catch (Exception ignored) {
         }
-        return new DocStringTypeRegistryDocStringConverter(
-                new StepTypeRegistry(Locale.ENGLISH).docStringTypeRegistry()
-        );
+        return nativeDocStringConverter();
+    }
+
+    /**
+     * Native runs have no Cucumber glue registry. The same {@code @DocStringType}
+     * methods still convert registry, json, yaml, and xml arguments.
+     */
+    private static DocStringTypeRegistryDocStringConverter nativeDocStringConverter() {
+        DocStringTypeRegistryDocStringConverter existing = fallbackConverter;
+        if (existing != null) return existing;
+        synchronized (DocStringBuilder.class) {
+            if (fallbackConverter != null) return fallbackConverter;
+            DocStringTypeRegistry types = new StepTypeRegistry(Locale.ENGLISH).docStringTypeRegistry();
+            registerDocStringTypes(types, tools.dscode.coredefinitions.DocStringDefinitions.class);
+            fallbackConverter = new DocStringTypeRegistryDocStringConverter(types);
+            return fallbackConverter;
+        }
+    }
+
+    private static void registerDocStringTypes(DocStringTypeRegistry types, Class<?> owner) {
+        for (Method method : owner.getDeclaredMethods()) {
+            io.cucumber.java.DocStringType annotation = method.getAnnotation(io.cucumber.java.DocStringType.class);
+            if (annotation == null || method.getParameterCount() != 1) continue;
+            method.setAccessible(true);
+            types.defineDocStringType(new io.cucumber.docstring.DocStringType(
+                    method.getGenericReturnType(),
+                    annotation.contentType(),
+                    content -> invokeDocStringType(method, content)
+            ));
+        }
+    }
+
+    private static Object invokeDocStringType(Method method, String content) throws Throwable {
+        Object receiver = null;
+        if (!Modifier.isStatic(method.getModifiers())) {
+            receiver = DOC_STRING_RECEIVERS.computeIfAbsent(method.getDeclaringClass(), type -> {
+                try {
+                    return type.getDeclaredConstructor().newInstance();
+                } catch (ReflectiveOperationException failure) {
+                    throw new IllegalStateException(failure);
+                }
+            });
+        }
+        try {
+            return method.invoke(receiver, content);
+        } catch (InvocationTargetException failure) {
+            throw failure.getCause() == null ? failure : failure.getCause();
+        }
     }
 
     private static DataTableTypeRegistryTableConverter runtimeTableConverter() {

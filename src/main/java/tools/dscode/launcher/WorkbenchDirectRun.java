@@ -52,8 +52,11 @@ public final class WorkbenchDirectRun {
             SummaryGeneratingListener summary = new SummaryGeneratingListener();
             LauncherFactory.create().execute(request, summary);
             long found = summary.getSummary().getTestsFoundCount();
+            long started = summary.getSummary().getTestsStartedCount();
             long failed = summary.getSummary().getTestsFailedCount();
-            if (found == 0) return 1;
+            // A tag or name that matches nothing is an empty plan. A native run
+            // that leaves discovered scenarios unstarted is the same miss.
+            if (found == 0 || started == 0) return 1;
             return failed == 0 ? 0 : 1;
         } catch (RuntimeException failure) {
             System.err.println("error: direct launch failed: " + failure.getMessage());

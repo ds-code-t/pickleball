@@ -8,8 +8,8 @@ import java.nio.file.Path;
 /**
  * Selects the execution engine. Precedence matches Dalton:
  * system property {@code pkb_engine}, else env {@code PKB_ENGINE},
- * else {@code engine.properties} {@code mode=}. Default is {@code cucumber}.
- * The Cucumber adapter stays available either way.
+ * else {@code engine.properties} {@code mode=}. Default is {@code native}.
+ * {@code pkb_engine=cucumber} keeps the Cucumber adapter, which stays supported.
  */
 public final class EngineConfig {
     public static final String CUCUMBER = "cucumber";
@@ -45,8 +45,9 @@ public final class EngineConfig {
     }
 
     private static String normalize(String raw) {
-        if (raw == null) return CUCUMBER;
-        return NATIVE.equalsIgnoreCase(raw.trim()) ? NATIVE : CUCUMBER;
+        if (raw == null || raw.isBlank()) return NATIVE;
+        if (CUCUMBER.equalsIgnoreCase(raw.trim())) return CUCUMBER;
+        return NATIVE;
     }
 
     private static String flag() {

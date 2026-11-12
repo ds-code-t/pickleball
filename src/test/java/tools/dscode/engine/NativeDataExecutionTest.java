@@ -71,8 +71,10 @@ class NativeDataExecutionTest {
                 """;
         RunResult result = PickleballEngine.run(feature, EngineOptions.of(DataGlue.class));
         assertEquals(Status.PASSED, result.status(), result.toString());
-        assertEquals("[{sku=a, qty=1}]", result.scenarios().getFirst().steps().get(1).returned());
-        assertEquals("hello", result.scenarios().getFirst().steps().get(3).returned());
+        // Passed data-table and doc-string steps are finalizers. Cucumber emits
+        // nothing for them, so the native result lists the glue steps that read them.
+        assertEquals("[{sku=a, qty=1}]", result.scenarios().getFirst().steps().get(0).returned());
+        assertEquals("hello", result.scenarios().getFirst().steps().get(1).returned());
     }
 
     @Test

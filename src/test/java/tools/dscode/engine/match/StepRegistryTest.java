@@ -17,6 +17,8 @@ import tools.dscode.engine.EngineLog;
 
 import java.lang.reflect.Method;
 import java.lang.reflect.Type;
+import java.net.URL;
+import java.net.URLClassLoader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -24,6 +26,8 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.jar.JarEntry;
+import java.util.jar.JarOutputStream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -64,6 +68,47 @@ class StepRegistryTest {
         assertEquals("stub:run", StepRegistry.dispatchStub(registry.match("RUN SCENARIO: Checkout")));
         assertEquals("stub:service_call", StepRegistry.dispatchStub(registry.match("CALL: orders")));
         assertEquals(StepKind.UNDEFINED, registry.match("this step is not defined anywhere").kind());
+    }
+
+    @Test
+    void scanPackageReadsGlueFromAJar(@TempDir Path dir) throws Exception {
+        Path source = dir.resolve("gluejar/only/JarOnlyGlue.java");
+        Files.createDirectories(source.getParent());
+        Files.writeString(source, """
+                package gluejar.only;
+                import io.cucumber.java.en.Given;
+                public class JarOnlyGlue {
+                    @Given("jar only echo {string}")
+                    public void echo(String value) {}
+                }
+                """);
+        Path classes = dir.resolve("classes");
+        Files.createDirectories(classes);
+        javax.tools.JavaCompiler compiler = javax.tools.ToolProvider.getSystemJavaCompiler();
+        assertTrue(compiler != null, "JDK compiler is required");
+        int compiled = compiler.run(null, null, null,
+                "-cp", System.getProperty("java.class.path"),
+                "-d", classes.toString(),
+                source.toString());
+        assertEquals(0, compiled);
+        Path jar = dir.resolve("glue.jar");
+        try (JarOutputStream out = new JarOutputStream(Files.newOutputStream(jar))) {
+            out.putNextEntry(new JarEntry("gluejar/only/"));
+            out.closeEntry();
+            out.putNextEntry(new JarEntry("gluejar/only/JarOnlyGlue.class"));
+            out.write(Files.readAllBytes(classes.resolve("gluejar/only/JarOnlyGlue.class")));
+            out.closeEntry();
+        }
+        ClassLoader previous = Thread.currentThread().getContextClassLoader();
+        try (URLClassLoader loader = new URLClassLoader(new URL[]{jar.toUri().toURL()}, previous)) {
+            Thread.currentThread().setContextClassLoader(loader);
+            StepRegistry registry = new StepRegistry().scanPackage("gluejar.only");
+            StepMatch match = registry.match("jar only echo \"hi\"");
+            assertEquals(StepKind.GLUE, match.kind());
+            assertEquals(List.of("hi"), match.captures());
+        } finally {
+            Thread.currentThread().setContextClassLoader(previous);
+        }
     }
 
     @Test
