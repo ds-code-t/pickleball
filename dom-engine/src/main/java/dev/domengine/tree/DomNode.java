@@ -33,6 +33,9 @@ public final class DomNode {
     public String role = "";
     public String accessibleName = "";
     public boolean displayed = true;
+    public DomNode parent;
+    public double frameX;
+    public double frameY;
 
     public String tag() {
         if (localName != null && !localName.isBlank()) return localName.toLowerCase();
@@ -115,6 +118,40 @@ public final class DomNode {
             for (DomNode shadow : shadowRoots) shadows.add(shadow.toJson());
         }
         return node;
+    }
+
+    public void linkParents() {
+        for (DomNode child : children) {
+            child.parent = this;
+            child.linkParents();
+        }
+        for (DomNode shadow : shadowRoots) {
+            shadow.parent = this;
+            shadow.linkParents();
+        }
+    }
+
+    public boolean containsNode(DomNode other) {
+        DomNode cursor = other == null ? null : other.parent;
+        while (cursor != null) {
+            if (cursor == this) return true;
+            cursor = cursor.parent;
+        }
+        return false;
+    }
+
+    public static void renumber(DomNode root) {
+        long[] next = {1};
+        stamp(root, next);
+    }
+
+    private static void stamp(DomNode node, long[] next) {
+        if (node == null) return;
+        node.backendNodeId = next[0];
+        node.nodeId = next[0];
+        next[0]++;
+        for (DomNode child : node.children) stamp(child, next);
+        for (DomNode shadow : node.shadowRoots) stamp(shadow, next);
     }
 
     public int count() {

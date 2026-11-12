@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html>
+  <body>
+    <button id="go" class="primary" data-x="10" data-y="20" data-w="80" data-h="30">Save</button>
+    <div id="above" data-x="10" data-y="0" data-w="20" data-h="10"></div>
+    <div id="under" data-x="12" data-y="60" data-w="20" data-h="10"></div>
+    <div id="host">
+      <template shadowrootmode="open"><span id="inner">Inside</span></template>
+    </div>
+    <iframe id="child" data-x="0" data-y="100" data-w="200" data-h="80" srcdoc='<p id="framed" data-x="5" data-y="6" data-w="40" data-h="12">Frame</p>'></iframe>
+    <div class="item" id="one">One</div>
+    <div class="item" id="two">Two</div>
+  </body>
+</html>
