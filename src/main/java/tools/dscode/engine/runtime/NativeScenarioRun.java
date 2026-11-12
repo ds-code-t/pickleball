@@ -174,12 +174,17 @@ public final class NativeScenarioRun {
 
     private static Prepared prepareStep(EngineStep step, StepRegistry registry, CurrentScenarioState state) {
         String raw = step.text() == null ? "" : step.text();
+        String meta = step.metadata().get("metaText");
         int flag = raw.indexOf(GlobalConstants.PARSER_FLAG);
-        String meta = flag < 0 ? "" : raw.substring(flag + GlobalConstants.PARSER_FLAG.length());
-        String text = flag < 0 ? raw : raw.substring(0, flag);
+        String text = raw;
+        if (flag >= 0) {
+            meta = raw.substring(flag + GlobalConstants.PARSER_FLAG.length());
+            text = raw.substring(0, flag).strip();
+        }
+        if (meta == null) meta = "";
         EngineStep cleaned = text.equals(raw)
                 ? step
-                : new EngineStep(step.keyword(), text.strip(), step.argument(), step.location(), step.metadata(), step.fromBackground());
+                : new EngineStep(step.keyword(), text, step.argument(), step.location(), step.metadata(), step.fromBackground());
         StepExtension frame = frame(cleaned, registry, state);
         int nesting = 0;
         for (int index = 0; index < meta.length(); index++) {

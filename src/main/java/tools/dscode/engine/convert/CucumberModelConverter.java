@@ -171,14 +171,30 @@ public final class CucumberModelConverter {
             child.getRule().ifPresent(rule -> {
                 String ruleName = rule.getName() == null ? "" : rule.getName();
                 String ruleTags = joinTags(rule.getTags());
+                List<EngineStep> ruleBackground = new ArrayList<>();
                 for (RuleChild ruleChild : rule.getChildren()) {
-                    ruleChild.getBackground().ifPresent(value -> {
-                        for (Step step : value.getSteps()) {
-                            background.add(fromStep(step, sourceUri, true));
+                    if (ruleChild.getBackground().isPresent()) {
+                        for (Step step : ruleChild.getBackground().get().getSteps()) {
+                            ruleBackground.add(fromStep(step, sourceUri, true));
                         }
-                    });
+                        continue;
+                    }
                     ruleChild.getScenario().ifPresent(scenario -> {
                         EngineScenario converted = fromScenario(scenario, sourceUri, ruleName);
+                        if (!ruleBackground.isEmpty()) {
+                            List<EngineStep> steps = new ArrayList<>(ruleBackground);
+                            steps.addAll(converted.steps());
+                            converted = new EngineScenario(
+                                    converted.keyword(),
+                                    converted.name(),
+                                    converted.description(),
+                                    converted.tags(),
+                                    steps,
+                                    converted.examples(),
+                                    converted.location(),
+                                    converted.metadata()
+                            );
+                        }
                         if (!ruleTags.isBlank() || !ruleName.isBlank()) {
                             LinkedHashMap<String, String> meta = new LinkedHashMap<>(converted.metadata());
                             if (!ruleName.isBlank()) meta.put(EngineScenario.RULE_NAME, ruleName);

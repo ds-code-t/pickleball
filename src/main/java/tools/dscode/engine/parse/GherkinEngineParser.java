@@ -3,6 +3,8 @@ package tools.dscode.engine.parse;
 import io.cucumber.gherkin.GherkinParser;
 import io.cucumber.messages.types.Envelope;
 import io.cucumber.messages.types.ParseError;
+import io.cucumber.core.gherkin.messages.NGherkinFactory;
+import io.cucumber.messages.types.InlinePickleArgument;
 import tools.dscode.common.GlobalConstants;
 import tools.dscode.engine.convert.CucumberModelConverter;
 import tools.dscode.engine.model.EngineFeature;
@@ -90,16 +92,18 @@ public final class GherkinEngineParser {
     private static EngineScenario withBackground(EngineFeature feature, EngineScenario scenario, Map<String, String> extra) {
         List<EngineStep> steps = new ArrayList<>();
         for (EngineStep background : feature.background()) {
-            steps.add(copyBackground(background));
+            steps.add(official(copyBackground(background)));
         }
-        steps.addAll(scenario.steps());
+        for (EngineStep step : scenario.steps()) {
+            steps.add(official(step));
+        }
         LinkedHashMap<String, String> metadata = new LinkedHashMap<>(scenario.metadata());
         metadata.putAll(extra);
         return new EngineScenario(
                 scenario.keyword(),
                 scenario.name(),
                 scenario.description(),
-                mergeTags(feature.tags(), scenario.tags(), List.of()),
+                mergeTags(mergeTags(feature.tags(), ruleTags(scenario)), scenario.tags()),
                 steps,
                 List.of(),
                 scenario.location(),
@@ -127,9 +131,9 @@ public final class GherkinEngineParser {
         EngineScenario base = withBackground(feature, scenario, metadata);
         return new EngineScenario(
                 base.keyword(),
-                base.name(),
+                interpolateName(base.name(), table.headers(), row),
                 base.description(),
-                mergeTags(base.tags(), extraTags, List.of()),
+                mergeTags(base.tags(), extraTags),
                 base.steps(),
                 List.of(),
                 new SourceLocation(base.location().uri(), table.location().line(), table.location().column()),
@@ -166,18 +170,64 @@ public final class GherkinEngineParser {
         return new EngineStep(step.keyword(), step.text(), step.argument(), step.location(), step.metadata(), true);
     }
 
-    private static List<String> mergeTags(List<String> first, List<String> second, List<String> third) {
+    /** Same substitution PickleCompiler uses for the pickle name. Step text stays unsubstituted. */
+    private static String interpolateName(String name, List<String> headers, List<String> row) {
+        String text = name == null ? "" : name;
+        if (headers == null || row == null) return text;
+        int count = Math.min(headers.size(), row.size());
+        for (int index = 0; index < count; index++) {
+            String header = headers.get(index);
+            if (header == null) continue;
+            String value = row.get(index);
+            text = text.replace("<" + header + ">", value == null ? "" : value);
+        }
+        return text;
+    }
+
+    /**
+     * Pickle step text after {@code PickleStepMetaTextAspect}: flag suffix becomes
+     * meta text, an inline argument is split off, and escaped line breaks return.
+     */
+    private static EngineStep official(EngineStep step) {
+        String text = step.text() == null ? "" : step.text();
+        String meta = null;
+        int flag = text.indexOf(GlobalConstants.PARSER_FLAG);
+        if (flag >= 0) {
+            meta = text.substring(flag + GlobalConstants.PARSER_FLAG.length());
+            text = text.substring(0, flag);
+        }
+        InlinePickleArgument.Extracted inline = InlinePickleArgument.extract(text);
+        if (inline != null) text = inline.stepText();
+        text = NGherkinFactory.restoreStepLineBreaks(text);
+        if (meta != null) meta = NGherkinFactory.restoreStepLineBreaks(meta);
+        LinkedHashMap<String, String> metadata = new LinkedHashMap<>(step.metadata());
+        if (meta != null) metadata.put("metaText", meta);
+        if (inline != null) {
+            metadata.put("inlineArgumentType", inline.argumentType());
+            String argument = NGherkinFactory.restoreStepLineBreaks(inline.argumentText());
+            metadata.put("inlineArgumentText", argument == null ? "" : argument);
+        }
+        if (text.equals(step.text()) && metadata.equals(step.metadata())) return step;
+        return new EngineStep(step.keyword(), text, step.argument(), step.location(), metadata, step.fromBackground());
+    }
+
+    private static List<String> ruleTags(EngineScenario scenario) {
+        String raw = scenario.metadata().get("ruleTags");
+        if (raw == null || raw.isBlank()) return List.of();
+        return List.of(raw.split(" "));
+    }
+
+    private static List<String> mergeTags(List<String> first, List<String> second) {
         List<String> tags = new ArrayList<>();
         addTags(tags, first);
         addTags(tags, second);
-        addTags(tags, third);
         return List.copyOf(tags);
     }
 
     private static void addTags(List<String> tags, List<String> more) {
         if (more == null) return;
         for (String tag : more) {
-            if (tag != null && !tag.isBlank() && !tags.contains(tag)) tags.add(tag);
+            if (tag != null && !tag.isBlank()) tags.add(tag);
         }
     }
 }
