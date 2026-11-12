@@ -32,6 +32,7 @@ import tools.dscode.common.treeparsing.parsedComponents.DataElementMatch;
 import tools.dscode.common.treeparsing.parsedComponents.ElementMatch;
 import tools.dscode.common.dataoperations.NeutralRows;
 import tools.dscode.engine.context.ExecutionContext;
+import tools.dscode.engine.context.RunBindings;
 import tools.dscode.engine.model.DocText;
 import tools.dscode.engine.model.Table;
 import tools.dscode.common.treeparsing.parsedComponents.PhraseData;
@@ -58,9 +59,7 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import static io.cucumber.core.runner.GlobalState.getClosestScenarioStepAncestor;
-import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
-import static io.cucumber.core.runner.GlobalState.getRootScenarioStep;
+import tools.dscode.common.treeparsing.parsedComponents.PhraseData;
 import static io.cucumber.core.runner.util.TableUtils.DATA_OBJECT_KEY;
 import static io.cucumber.core.runner.util.TableUtils.ROW_KEY;
 import static io.cucumber.core.runner.util.TableUtils.TABLE_KEY;
@@ -254,6 +253,10 @@ public class ParsingMap extends MappingProcessor {
     }
 
     public ParsingMap() {
+    }
+
+    public ParsingMap(ExecutionContext context) {
+        executionContext(context);
     }
 
     ParsingMap(NodeMap nodeMap) {
@@ -609,8 +612,8 @@ public class ParsingMap extends MappingProcessor {
     private static Object nearestUnnamedMarkerData(
             boolean dataTableOnly
     ) {
-        ScenarioStep scenarioStep = getClosestScenarioStepAncestor();
-        StepExtension currentStep = GlobalState.getRunningStep();
+        ScenarioStep scenarioStep = RunBindings.of(null).closestScenarioStep();
+        StepExtension currentStep = RunBindings.of(null).runningStep();
         if (scenarioStep == null || currentStep == null) {
             return null;
         }
@@ -643,22 +646,35 @@ public class ParsingMap extends MappingProcessor {
     }
 
     public static ParsingMap getRunningParsingMap() {
-        CurrentScenarioState currentScenarioState =
-                getCurrentScenarioState();
+        return getRunningParsingMap(ExecutionContext.current());
+    }
+
+    public static ParsingMap getRunningParsingMap(ExecutionContext context) {
+        if (RunBindings.cucumberScenarioLive()) {
+            CurrentScenarioState currentScenarioState = GlobalState.getCurrentScenarioState();
+            if (currentScenarioState.currentPhrase != null) {
+                return currentScenarioState.currentPhrase.getPhraseParsingMap();
+            }
+            try {
+                return currentScenarioState.getCurrentStep().getStepParsingMap();
+            } catch (Throwable ignored) {
+                return currentScenarioState.getParsingMap();
+            }
+        }
+        RunBindings bindings = RunBindings.of(context);
+        CurrentScenarioState currentScenarioState = bindings.scenarioState();
         if (currentScenarioState == null) {
-            ExecutionContext context = ExecutionContext.current();
-            if (context != null && context.parsingMap() != null) {
-                return context.parsingMap();
+            ExecutionContext active = context != null ? context : ExecutionContext.current();
+            if (active != null && active.parsingMap() != null) {
+                return active.parsingMap();
             }
             return getGlobalsParsingmap();
         }
         if (currentScenarioState.currentPhrase != null) {
-            return currentScenarioState.currentPhrase
-                    .getPhraseParsingMap();
+            return currentScenarioState.currentPhrase.getPhraseParsingMap();
         }
         try {
-            return currentScenarioState.getCurrentStep()
-                    .getStepParsingMap();
+            return currentScenarioState.getCurrentStep().getStepParsingMap();
         } catch (Throwable ignored) {
             return currentScenarioState.getParsingMap();
         }
@@ -728,7 +744,7 @@ public class ParsingMap extends MappingProcessor {
     }
 
     public static Object resolveFromDocStringOrConfig(String key) {
-        StepExtension currentStep = GlobalState.getRunningStep();
+        StepExtension currentStep = RunBindings.of(null).runningStep();
         if (currentStep.argument instanceof DocStringArgument) {
             return valConverter.convert(
                     currentStep.argument.getValue()
@@ -740,12 +756,12 @@ public class ParsingMap extends MappingProcessor {
     }
 
     public static NodeMap getRootScenarioStepNodeMap() {
-        return getRootScenarioStep().getDefaultStepNodeMap();
+        return RunBindings.of(null).rootScenarioStep().getDefaultStepNodeMap();
     }
 
     public static NodeMap
     getClosestScenarioStepAncestorNodeMap() {
-        return getClosestScenarioStepAncestor()
+        return RunBindings.of(null).closestScenarioStep()
                 .getDefaultStepNodeMap();
     }
 

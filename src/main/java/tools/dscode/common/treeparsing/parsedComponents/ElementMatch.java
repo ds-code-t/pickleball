@@ -30,8 +30,8 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
-import static io.cucumber.core.runner.GlobalState.getRunningStep;
+import tools.dscode.engine.context.ExecutionContext;
+import tools.dscode.engine.context.RunBindings;
 import static tools.dscode.common.assertions.ValueWrapper.ValueTypes.DURATION;
 import static tools.dscode.common.assertions.ValueWrapper.createValueWrapper;
 import static tools.dscode.common.browseroperations.BrowserAlerts.getText;
@@ -659,8 +659,13 @@ public class ElementMatch {
         return wrappedElements;
     }
 
+    private RunBindings bindings() {
+        ExecutionContext ctx = parentPhrase == null ? null : parentPhrase.executionContext();
+        return RunBindings.of(ctx);
+    }
+
     private StepBase runningStepState() {
-        StepBase running = getRunningStep();
+        StepBase running = bindings().runningStep();
         if (running != null) {
             return running;
         }
@@ -670,8 +675,8 @@ public class ElementMatch {
         return null;
     }
 
-    private static boolean evaluatingUntilCondition() {
-        CurrentScenarioState state = getCurrentScenarioState();
+    private boolean evaluatingUntilCondition() {
+        io.cucumber.core.runner.CurrentScenarioState state = bindings().scenarioState();
         return state != null && state.evaluatingUntilCondition;
     }
 

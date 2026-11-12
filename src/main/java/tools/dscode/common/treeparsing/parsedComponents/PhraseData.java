@@ -21,11 +21,12 @@ import tools.dscode.common.treeparsing.parsedComponents.phraseoperations.Asserti
 import tools.dscode.common.treeparsing.parsedComponents.phraseoperations.OperationsInterface;
 import tools.dscode.common.treeparsing.parsedComponents.phraseoperations.PlaceHolderMatch;
 import tools.dscode.common.treeparsing.preparsing.LineData;
+import tools.dscode.engine.context.ExecutionContext;
+import tools.dscode.engine.context.RunBindings;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
-import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static io.cucumber.core.runner.GlobalState.lifecycle;
 import static io.cucumber.core.runner.util.TableUtils.ROW_KEY;
 import static tools.dscode.common.GlobalConstants.BOOK_END;
@@ -73,6 +74,14 @@ public abstract class PhraseData extends PassedData {
 //    boolean invertConditional = false;
     List<Object> repetitionContext = new ArrayList<>();
 
+
+    public ExecutionContext executionContext() {
+        return parsedLine == null ? ExecutionContext.current() : parsedLine.executionContext();
+    }
+
+    protected io.cucumber.core.runner.StepExtension runningStep() {
+        return RunBindings.of(executionContext()).runningStep();
+    }
 
     public String getPreviousTerminator() {
         return getPreviousPhrase() == null ? "" : getPreviousPhrase().termination.toString();
@@ -163,7 +172,7 @@ public abstract class PhraseData extends PassedData {
         if (phraseParsingMap == null) {
             PhraseData previousPhrase = getPreviousPhrase();
             if (isNewContext() || previousPhrase == null || previousPhrase.termination == '.' || previousPhrase.termination == '?') {
-                phraseParsingMap = getRunningStep().getStepParsingMap();
+                phraseParsingMap = runningStep().getStepParsingMap();
             } else {
                 phraseParsingMap = previousPhrase.getPhraseParsingMap();
             }
@@ -189,7 +198,7 @@ public abstract class PhraseData extends PassedData {
         if (end != null && (end == '.' || end == '?')) {
             return;
         }
-        var step = getRunningStep();
+        var step = runningStep();
         if (step != null && phraseParsingMap == step.getStepParsingMap()) {
             phraseParsingMap = null;
         }

@@ -17,7 +17,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static io.cucumber.core.runner.util.TableUtils.TABLE_KEY;
 import static io.cucumber.core.runner.util.TableUtils.toRowsStringMultimap;
 import static tools.dscode.common.assertions.AssertionChain.copyAssertionChainToNewPhrase;
@@ -89,7 +88,7 @@ public final class Phrase extends PhraseData {
                         emitText += nextPhrase.getText() + nextPhrase.termination + " ";
                         lastPhrase = nextPhrase;
                     }
-                    StepExtension runningStep = getRunningStep();
+                    StepExtension runningStep = runningStep();
                     runningStep.childSteps.add(runningStep.modifyStepExtension(
                             emitText,
                             runningStep.inheritedGherkinArgument()));
@@ -110,7 +109,7 @@ public final class Phrase extends PhraseData {
         inheritParsingMapFromPrevious();
         executePhrase();
         resolveResults();
-        setDefaultEntry(getRunningStep().stepEntry);
+        setDefaultEntry(runningStep().stepEntry);
         PhraseData nextResolvedPhrase = getNextResolvedPhrase();
         if (isContextTermination()) {
             if (termination.equals(':') || termination.equals('?')) {
@@ -145,7 +144,7 @@ public final class Phrase extends PhraseData {
         if (!text.equals(resolvedText)) {
             logDebug("Resolving `" + text + "` to `" + resolvedText + "`");
         }
-        StepExtension currentStep = getRunningStep();
+        StepExtension currentStep = runningStep();
         if (shouldRun()) {
             if (deferEvaluations && !evaluationsResolved && !suppressResolve && assertionChain == null) {
                 resolveForExecution();

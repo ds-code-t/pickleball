@@ -1,10 +1,10 @@
 package tools.dscode.common.assertions;
 
 import io.cucumber.core.runner.StepData;
+import tools.dscode.engine.context.ExecutionContext;
+import tools.dscode.engine.context.RunBindings;
 
 import java.util.function.Supplier;
-
-import static io.cucumber.core.runner.GlobalState.getRunningStep;
 
 public class ConditionRepeater {
 
@@ -13,8 +13,8 @@ public class ConditionRepeater {
      * Returns the result of the last logic execution (or null).
      * Throws if conditions array is null or empty.
      */
-    public static Object repeatUntil(Supplier<Object> logic, String... conditions) {
-        StepData runningStep = getRunningStep();
+    public static Object repeatUntil(ExecutionContext context, Supplier<Object> logic, String... conditions) {
+        StepData runningStep = RunBindings.of(context).runningStep();
         Object result;
         while (true) {
             result = logic.get();
@@ -34,14 +34,18 @@ public class ConditionRepeater {
         }
     }
 
+    public static Object repeatUntil(Supplier<Object> logic, String... conditions) {
+        return repeatUntil(ExecutionContext.current(), logic, conditions);
+    }
+
     /**
      * Alternative version: Repeats execution of the logic until the FIRST condition (in vararg order)
      * evaluates to true (short-circuit OR logic).
      * Returns the result of the last logic execution (or null).
      * Throws if conditions array is null or empty.
      */
-    public static Object repeatUntilAny(Supplier<Object> logic, String... conditions) {
-        StepData runningStep = getRunningStep();
+    public static Object repeatUntilAny(ExecutionContext context, Supplier<Object> logic, String... conditions) {
+        StepData runningStep = RunBindings.of(context).runningStep();
         Object result;
         while (true) {
             result = logic.get();
@@ -59,5 +63,9 @@ public class ConditionRepeater {
             }
             // Otherwise, repeat the loop
         }
+    }
+
+    public static Object repeatUntilAny(Supplier<Object> logic, String... conditions) {
+        return repeatUntilAny(ExecutionContext.current(), logic, conditions);
     }
 }

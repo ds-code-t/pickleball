@@ -5,9 +5,12 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.NullNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.collect.LinkedListMultimap;
+import io.cucumber.core.runner.ScenarioStep;
 import io.cucumber.core.runner.StepBase;
 import io.cucumber.core.runner.StepExtension;
 import tools.dscode.common.mappings.queries.Tokenized;
+import tools.dscode.engine.context.ExecutionContext;
+import tools.dscode.engine.context.RunBindings;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -21,9 +24,6 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.IntStream;
 
-import static io.cucumber.core.runner.GlobalState.getClosestScenarioStepAncestor;
-import static io.cucumber.core.runner.GlobalState.getRootScenarioStep;
-import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static tools.dscode.common.GlobalConstants.META_FLAG;
 
 /** A mutable JSON-backed map with JSONata reads and writable path queries. */
@@ -32,6 +32,7 @@ public class NodeMap extends ValueFormatting {
     public static final String MERGE_SUFFIX = "~merge;";
     private final Set<MapConfigurations.DataSource> dataSources = new HashSet<>();
     private MapConfigurations.MapType mapType = MapConfigurations.MapType.DEFAULT;
+    private ExecutionContext executionContext;
 
     public NodeMap() {
         this(MapConfigurations.MapType.DEFAULT);
@@ -40,6 +41,20 @@ public class NodeMap extends ValueFormatting {
     public NodeMap(MapConfigurations.MapType mapType) {
         super(MAPPER.createObjectNode());
         setMapType(mapType);
+    }
+
+    public NodeMap(MapConfigurations.MapType mapType, ExecutionContext context) {
+        this(mapType);
+        this.executionContext = context;
+    }
+
+    public NodeMap executionContext(ExecutionContext context) {
+        this.executionContext = context;
+        return this;
+    }
+
+    public ExecutionContext executionContext() {
+        return executionContext != null ? executionContext : ExecutionContext.current();
     }
 
     public NodeMap(ObjectNode root) {
@@ -390,6 +405,10 @@ public class NodeMap extends ValueFormatting {
     }
 
     public static NodeMap getNodeMap(String input) {
+        return getNodeMap(input, ExecutionContext.current());
+    }
+
+    public static NodeMap getNodeMap(String input, ExecutionContext context) {
         List<String> segments = input == null
                 ? List.of()
                 : Arrays.stream(input.split("\\."))
@@ -401,16 +420,19 @@ public class NodeMap extends ValueFormatting {
         if (segments.isEmpty()) {
             return MappingProcessor.getRunMap();
         }
+        RunBindings bindings = RunBindings.of(context);
         String mapType = segments.getLast();
         return switch (mapType) {
             case "DEFAULT" -> MappingProcessor.getDefaultsMap();
             case "OVERRIDE" -> MappingProcessor.getOverridesMap();
             case "SINGLETON" -> MappingProcessor.getSingletonMap();
-            case "SCENARIO ROOT", "ROOT SCENARIO" ->
-                    getRootScenarioStep().getDefaultStepNodeMap();
+            case "SCENARIO ROOT", "ROOT SCENARIO" -> {
+                ScenarioStep root = bindings.rootScenarioStep();
+                yield root == null ? null : root.getDefaultStepNodeMap();
+            }
             case "RUN" -> MappingProcessor.getRunMap();
-            case "STEP" -> getStepNodeMap(input, segments);
-            case "SCENARIO" -> getScenarioNodeMap(input, segments);
+            case "STEP" -> getStepNodeMap(input, segments, bindings);
+            case "SCENARIO" -> getScenarioNodeMap(input, segments, bindings);
             default -> throw new IllegalArgumentException(
                     "Unsupported NodeMap reference '" + input + "'. "
                             + "The final segment must be DEFAULT, OVERRIDE, SINGLETON, "
@@ -418,9 +440,9 @@ public class NodeMap extends ValueFormatting {
         };
     }
 
-    private static NodeMap getStepNodeMap(String input, List<String> segments) {
+    private static NodeMap getStepNodeMap(String input, List<String> segments, RunBindings bindings) {
         validateParentPrefixes(input, segments);
-        StepBase step = getRunningStep();
+        StepBase step = bindings.runningStep();
         for (int i = 0; i < segments.size() - 1; i++) {
             step = step.parentStep;
             if (step == null) {
@@ -430,10 +452,10 @@ public class NodeMap extends ValueFormatting {
         return step.getDefaultStepNodeMap();
     }
 
-    private static NodeMap getScenarioNodeMap(String input, List<String> segments) {
+    private static NodeMap getScenarioNodeMap(String input, List<String> segments, RunBindings bindings) {
         validateParentPrefixes(input, segments);
         int parentCount = segments.size() - 1;
-        StepExtension scenarioStep = getClosestScenarioStepAncestor();
+        StepExtension scenarioStep = bindings.closestScenarioStep();
         if (scenarioStep == null) {
             return null;
         }

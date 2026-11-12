@@ -1,6 +1,8 @@
 package tools.dscode.engine.context;
 
 import io.cucumber.core.runner.CurrentScenarioState;
+import io.cucumber.core.runner.ScenarioStep;
+
 import tools.dscode.common.mappings.MapConfigurations;
 import tools.dscode.common.mappings.MappingProcessor;
 import tools.dscode.common.mappings.NodeMap;
@@ -49,6 +51,7 @@ public final class ExecutionContext implements AutoCloseable {
     private final Instant opened = Instant.now();
     private Phase phase = Phase.READY;
     private CurrentScenarioState legacy;
+    private ScenarioStep rootStep;
     private boolean closed;
 
     private ExecutionContext(EngineScenario scenario) {
@@ -57,8 +60,8 @@ public final class ExecutionContext implements AutoCloseable {
         if (MappingProcessor.getRunMap() == null) {
             MappingProcessor.resetCommonMaps();
         }
-        this.parsingMap = new ParsingMap();
-        this.nodeMap = new NodeMap(MapConfigurations.MapType.RUN_MAP);
+        this.parsingMap = new ParsingMap(this);
+        this.nodeMap = new NodeMap(MapConfigurations.MapType.RUN_MAP, this);
         this.parsingMap.getMaps().removeAll(MapConfigurations.MapType.RUN_MAP);
         this.parsingMap.addMaps(nodeMap);
         this.scopes.push(new LinkedHashMap<>());
@@ -174,6 +177,16 @@ public final class ExecutionContext implements AutoCloseable {
 
     public CurrentScenarioState legacy() {
         return legacy;
+    }
+
+    /** Native scenario root. Cucumber roots stay on the test case. */
+    public ExecutionContext rootStep(ScenarioStep root) {
+        this.rootStep = root;
+        return this;
+    }
+
+    public ScenarioStep rootStep() {
+        return rootStep;
     }
 
     @Override

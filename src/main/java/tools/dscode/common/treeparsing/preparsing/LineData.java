@@ -5,6 +5,7 @@ import tools.dscode.common.assertions.AssertionChain;
 import tools.dscode.common.mappings.QuoteParser;
 import tools.dscode.common.treeparsing.parsedComponents.Phrase;
 import tools.dscode.common.treeparsing.parsedComponents.PhraseData;
+import tools.dscode.engine.context.ExecutionContext;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -39,7 +40,13 @@ public abstract class LineData implements Cloneable {
     public int inheritedConditionalState;
     public int previousSiblingConditionalState = 1;
     public StepBase stepExtension;
+    /** Context captured when the line was parsed. Null means the open native context. */
+    public ExecutionContext executionContext;
     private boolean deferConditionalChain;
+
+    public ExecutionContext executionContext() {
+        return executionContext != null ? executionContext : ExecutionContext.current();
+    }
 
 
     public void setInheritance(StepBase currentStep) {

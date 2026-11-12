@@ -5,14 +5,14 @@ import io.cucumber.core.runner.StepExtension;
 import io.cucumber.messages.types.InlinePickleArgument;
 import tools.dscode.common.assertions.AssertionChain;
 import tools.dscode.common.treeparsing.parsedComponents.PhraseData;
+import tools.dscode.engine.context.ExecutionContext;
+import tools.dscode.engine.context.RunBindings;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
-import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static tools.dscode.common.GlobalConstants.META_TEXT_SEPARATOR;
 import static tools.dscode.common.annotations.DefinitionFlag.BLOCK_CONDITIONAL;
 import static tools.dscode.common.annotations.DefinitionFlag.IGNORE_CHILDREN_IF_FALSE;
@@ -31,14 +31,15 @@ public final class ParsedLine extends LineData {
 
     private ParsedLine(String input) {
         super(input);
+        executionContext = ExecutionContext.current();
     }
 
 
     @Override
     public void runPhrases() {
-        isBlockConditionalStep = getRunningStep().definitionFlags.contains(BLOCK_CONDITIONAL);
+        isBlockConditionalStep = RunBindings.of(executionContext).runningStep().definitionFlags.contains(BLOCK_CONDITIONAL);
         if (stepExtension.overridePhrase != null) {
-            var state = getCurrentScenarioState();
+            var state = RunBindings.of(executionContext).scenarioState();
             boolean previous = state != null && state.evaluatingUntilCondition;
             if (state != null) {
                 state.evaluatingUntilCondition = true;
@@ -216,7 +217,7 @@ public final class ParsedLine extends LineData {
         }
 
 
-        getCurrentScenarioState().currentPhrase = (tools.dscode.common.treeparsing.parsedComponents.Phrase) phrase;
+        RunBindings.of(executionContext).currentPhrase((tools.dscode.common.treeparsing.parsedComponents.Phrase) phrase);
 
 //        if (stepEntry != null) {
 //            phrase.phraseEntry = getRunningStep().stepEntry.logWithType("PHRASE", phrase.toString()).tags("phrase").start();
@@ -226,7 +227,7 @@ public final class ParsedLine extends LineData {
         if(phrase.phraseEntry != null)
             phrase.phraseEntry.stop();
 
-        getCurrentScenarioState().currentPhrase = null;
+        RunBindings.of(executionContext).currentPhrase(null);
 
         if (phrase.assertionChainMembership != null) {
             phrase.assertionChainMembership.setPhraseIndex(phrase);

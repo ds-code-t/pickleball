@@ -16,7 +16,7 @@ import tools.dscode.common.util.datetime.BusinessTimeRange;
 import tools.dscode.common.util.datetime.DurationFormattingUtils;
 import tools.dscode.common.util.datetime.TemporalValue;
 
-import static io.cucumber.core.runner.GlobalState.getRunningStep;
+import tools.dscode.engine.context.RunBindings;
 import static tools.dscode.common.evaluations.AviatorUtil.isStringTruthy;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.normalizeText;
 
@@ -471,7 +471,7 @@ public class ValueWrapper {
                 ? normalizedText.trim()
                 : "DateTime:" + normalizedText.trim();
         return new ValueWrapper(
-                getRunningStep().resolveStepFromString(dateTimeString),
+                RunBindings.of(null).runningStep().resolveStepFromString(dateTimeString),
                 ValueTypes.DATE_TIME
         );
     }
@@ -484,7 +484,7 @@ public class ValueWrapper {
                 ? normalizedText.trim()
                 : "Duration:" + normalizedText.trim();
         return new ValueWrapper(
-                getRunningStep().resolveStepFromString(durationString),
+                RunBindings.of(null).runningStep().resolveStepFromString(durationString),
                 ValueTypes.DURATION
         );
     }
@@ -497,7 +497,7 @@ public class ValueWrapper {
                 ? normalizedText.trim()
                 : "TimeRange:" + normalizedText.trim();
         return new ValueWrapper(
-                getRunningStep().resolveStepFromString(timeRangeString),
+                RunBindings.of(null).runningStep().resolveStepFromString(timeRangeString),
                 ValueTypes.TIME_RANGE
         );
     }

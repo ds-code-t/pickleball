@@ -28,22 +28,20 @@ public final class NativeScenarioRun {
     }
 
     public static ScenarioResult run(EngineScenario scenario, StepRegistry registry, EngineOptions options) {
-        if (CurrentScenarioState.currentScenarioState.get() == null) {
+        if (ExecutionContext.current() == null && CurrentScenarioState.currentScenarioState.get() == null) {
             MappingProcessor.resetCommonMaps();
         }
         List<StepResult> results = new ArrayList<>();
-        CurrentScenarioState previousLive = CurrentScenarioState.currentScenarioState.get();
-        boolean restoreLive = previousLive != null;
         try (ExecutionContext context = ExecutionContext.open(scenario)) {
             context.phase(ExecutionContext.Phase.RUNNING);
             context.resource("registry", registry);
             context.resource("instances", new IdentityHashMap<Class<?>, Object>());
             CurrentScenarioState state = new CurrentScenarioState(scenario.name(), scenario.name());
             context.attachLegacy(state);
-            CurrentScenarioState.currentScenarioState.set(state);
             state.scenarioLog = Entry.of(scenario.name()).tag("Scenario").start();
             context.resource("tags", scenario.tags());
             ScenarioStep root = new ScenarioStep(scenario.name());
+            context.rootStep(root);
             List<Prepared> queue = new ArrayList<>();
             linkTree(prepare(scenario, registry, state), queue);
             Throwable hookFailure = null;
@@ -143,8 +141,6 @@ public final class NativeScenarioRun {
                 if (state.scenarioLog != null) state.scenarioLog.stop();
                 context.phase(ExecutionContext.Phase.CLEANUP);
                 SharedStepRun.forget();
-                if (restoreLive) CurrentScenarioState.currentScenarioState.set(previousLive);
-                else CurrentScenarioState.currentScenarioState.remove();
             }
         }
         return ScenarioResult.fromSteps(scenario.name(), results);

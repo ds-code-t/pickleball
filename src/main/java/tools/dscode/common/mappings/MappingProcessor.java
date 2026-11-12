@@ -13,6 +13,8 @@ import com.google.common.collect.LinkedListMultimap;
 import io.cucumber.datatable.DataTable;
 import io.cucumber.docstring.DocString;
 import tools.dscode.internal.ValuesSupport;
+import tools.dscode.engine.context.ExecutionContext;
+import tools.dscode.engine.context.RunBindings;
 import tools.dscode.common.mappings.queries.Tokenized;
 import tools.dscode.common.treeparsing.parsedComponents.ElementMatch;
 
@@ -30,7 +32,6 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static io.cucumber.core.runner.util.TableUtils.CELL_KEY;
 import static io.cucumber.core.runner.util.TableUtils.DATA_OBJECT_KEY;
 import static io.cucumber.core.runner.util.TableUtils.DOCSTRING_KEY;
@@ -65,6 +66,7 @@ import static tools.dscode.testengine.PKB_props.PKB_PREFIX;
 public abstract class MappingProcessor implements Map<String, Object> {
     private static final String FILE_REFERENCE_PREFIX = "file:";
     private static final String DATA_REFERENCE_PREFIX = "data:";
+    private ExecutionContext executionContext;
 
     protected final LinkedListMultimap<MapConfigurations.MapType, NodeMap> maps =
             LinkedListMultimap.create();
@@ -127,6 +129,19 @@ public abstract class MappingProcessor implements Map<String, Object> {
 
     public static NodeMap getDefaultsMap() {
         return defaultsMap.get();
+    }
+
+    public MappingProcessor executionContext(ExecutionContext context) {
+        this.executionContext = context;
+        return this;
+    }
+
+    public ExecutionContext executionContext() {
+        return executionContext != null ? executionContext : ExecutionContext.current();
+    }
+
+    protected io.cucumber.core.runner.StepExtension boundRunningStep() {
+        return RunBindings.of(executionContext()).runningStep();
     }
 
     public MappingProcessor() {
@@ -629,7 +644,7 @@ public abstract class MappingProcessor implements Map<String, Object> {
                     key = parsedObj.restoreAndStripBookEnds(decodeBackToText(key));
                     LogExpressionGuard.suspend();
                     try {
-                        replacement = getRunningStep()
+                        replacement = boundRunningStep()
                                 .createNewStepExtension(key.substring(1))
                                 .runAndGetReturnValue();
                     } finally {

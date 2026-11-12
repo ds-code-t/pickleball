@@ -16,6 +16,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
+import tools.dscode.engine.context.ExecutionContext;
+
 public final class DataContext {
     private final Object nativeSource;
     private final DataElementKind declaredKind;
@@ -25,6 +27,7 @@ public final class DataContext {
     private final DataSourceMetadata sourceMetadata;
     private final boolean sourceNull;
     private boolean modified;
+    private ExecutionContext executionContext;
 
     DataContext(
             Object nativeSource,
@@ -44,6 +47,15 @@ public final class DataContext {
                 declaredKind,
                 detachedValues
         );
+    }
+
+    public DataContext executionContext(ExecutionContext context) {
+        this.executionContext = context;
+        return this;
+    }
+
+    public ExecutionContext executionContext() {
+        return executionContext != null ? executionContext : ExecutionContext.current();
     }
 
     public Object nativeSource() {

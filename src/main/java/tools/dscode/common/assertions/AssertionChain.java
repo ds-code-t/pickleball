@@ -4,12 +4,12 @@ import io.cucumber.core.runner.StepExtension;
 import tools.dscode.common.treeparsing.parsedComponents.Phrase;
 import tools.dscode.common.treeparsing.parsedComponents.PhraseData;
 import tools.dscode.common.treeparsing.parsedComponents.phraseoperations.Attempt;
+import tools.dscode.engine.context.RunBindings;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
-import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static tools.dscode.common.reporting.logging.LogForwarder.logToDefaultLevel;
 import static tools.dscode.common.treeparsing.parsedComponents.Phrase.copyPhraseWithModifications;
 import static tools.dscode.common.treeparsing.parsedComponents.PhraseData.PhraseType.ACTION;
@@ -114,7 +114,7 @@ public class AssertionChain {
         parentPhrase.phraseConditionalMode = chainStatus ? 1 : -1;
 
         if (parentPhrase.metaTextPrefix.contains("BLOCK_CONDITIONAL")) {
-            StepExtension runningStep = getRunningStep();
+            StepExtension runningStep = RunBindings.of(parentPhrase == null ? null : parentPhrase.executionContext()).runningStep();
             if (runningStep == null) return;
             if (chainStatus) {
                 PhraseData nextPhrase = parentPhrase.getNextPhrase();

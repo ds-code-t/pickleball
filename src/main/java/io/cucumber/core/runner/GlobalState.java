@@ -216,6 +216,11 @@ public class GlobalState {
         return localOrGlobalOf(io.cucumber.core.runner.TestCaseState.class);
     }
 
+    public static boolean cucumberScenarioLive() {
+        CurrentScenarioState live = currentScenarioState.get();
+        return live != null && live.testCase != null;
+    }
+
     public static io.cucumber.core.runner.CurrentScenarioState getCurrentScenarioState() {
         CurrentScenarioState live = currentScenarioState.get();
         if (live != null) return live;
@@ -240,9 +245,11 @@ public class GlobalState {
     }
 
     public static ScenarioStep getRootScenarioStep() {
-        CurrentScenarioState currentScenarioState = getCurrentScenarioState();
-        if(currentScenarioState == null || currentScenarioState.testCase == null) return null;
-        return currentScenarioState.testCase.getRootScenarioStep();
+        CurrentScenarioState live = currentScenarioState.get();
+        if (live != null && live.testCase != null) {
+            return live.testCase.getRootScenarioStep();
+        }
+        return tools.dscode.engine.context.RunBindings.of(null).rootScenarioStep();
     }
 
 
