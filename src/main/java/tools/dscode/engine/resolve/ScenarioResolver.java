@@ -126,7 +126,10 @@ public final class ScenarioResolver {
             Collections.shuffle(hits, new Random(seed));
             return;
         }
-        hits.sort(Comparator.comparing((Hit hit) -> hit.featureName() + "\0" + hit.scenario().name()));
+        hits.sort(Comparator
+                .comparing((Hit hit) -> hit.scenario().location().uri())
+                .thenComparingInt(hit -> hit.scenario().location().line())
+                .thenComparing(hit -> hit.scenario().name()));
         if ("reverse".equalsIgnoreCase(mode)) Collections.reverse(hits);
     }
 }
