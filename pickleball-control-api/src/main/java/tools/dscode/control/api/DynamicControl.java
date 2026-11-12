@@ -126,6 +126,18 @@ public final class DynamicControl {
         return executeStep(created.value(), mappingContext);
     }
 
+    /**
+     * Runs a feature from text with no Cucumber scenario and nothing on disk.
+     * A live Cucumber test case keeps the adapter path and does not enter here.
+     */
+    public static ControlCallResult<Object> executeScenario(String feature, String scenarioName) {
+        if (GlobalState.getTestCase() != null) {
+            return ControlCallResult.unavailable(
+                    "DynamicControl.executeScenario is native-only. A Cucumber test case is already running.");
+        }
+        return NativeDynamicSteps.executeScenario(feature, scenarioName);
+    }
+
     public static ControlCallResult<Object> executeStep(StepExtension step) {
         return executeStep(step, null);
     }

@@ -1,8 +1,11 @@
 package tools.dscode.control.api;
 
+import tools.dscode.engine.EngineLog;
+import tools.dscode.engine.EngineOptions;
 import tools.dscode.engine.PickleballEngine;
 import tools.dscode.engine.context.ExecutionContext;
 import tools.dscode.engine.model.EngineScenario;
+import tools.dscode.engine.model.RunResult;
 import tools.dscode.engine.model.Status;
 import tools.dscode.engine.model.StepResult;
 
@@ -52,6 +55,42 @@ public final class NativeDynamicSteps {
             String doc = argument == null || argument.isBlank() ? null : argument;
             StepResult result = PickleballEngine.runStep(body, doc, context);
             return map(result);
+        }
+    }
+
+    /** Runs a whole feature from text. No feature file and no Cucumber scenario. */
+    public static ControlCallResult<Object> executeScenario(String feature, String scenarioName) {
+        List<Class<?>> glue = new ArrayList<>(GLUE);
+        String property = System.getProperty("pkb_engine_glue");
+        if (property != null && !property.isBlank()) {
+            for (String name : property.split(",")) {
+                String trimmed = name.trim();
+                if (trimmed.isEmpty()) continue;
+                try {
+                    Class<?> type = Class.forName(trimmed);
+                    if (!glue.contains(type)) glue.add(type);
+                } catch (ClassNotFoundException failure) {
+                    return ControlCallResult.failed(failure);
+                }
+            }
+        }
+        try {
+            EngineOptions options = EngineOptions.of(glue.toArray(Class<?>[]::new));
+            if (scenarioName != null && !scenarioName.isBlank()) options = options.scenario(scenarioName);
+            RunResult result = PickleballEngine.run(feature == null ? "" : feature, options);
+            EngineLog.log(options.project(), "control", "scenario", result.status().name());
+            if (result.status() == Status.PASSED || result.status() == Status.SKIPPED) {
+                return ControlCallResult.success(result);
+            }
+            String message = result.message() == null || result.message().isBlank()
+                    ? result.status().name()
+                    : result.message();
+            if (result.status() == Status.UNDEFINED || result.status() == Status.PENDING) {
+                return ControlCallResult.unavailable(message);
+            }
+            return ControlCallResult.failed(new IllegalStateException(message));
+        } catch (RuntimeException failure) {
+            return ControlCallResult.failed(failure);
         }
     }
 
