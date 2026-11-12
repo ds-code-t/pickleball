@@ -36,6 +36,7 @@ public final class BrowserSession implements AutoCloseable {
     private final Process chrome;
     private final CdpConnection connection;
     private volatile boolean closed;
+    private volatile boolean killedProcess;
 
     private BrowserSession(
             String id,
@@ -65,6 +66,14 @@ public final class BrowserSession implements AutoCloseable {
         CdpConnection connection = CdpConnection.connect(URI.create(endpoint.webSocket), Duration.ofSeconds(10));
         EngineLog.info("session", "attached " + id + " " + browser);
         return new BrowserSession(id, endpoint.http, false, process, 0, null, allow, null, connection);
+    }
+
+    public static BrowserSession reopen(String id, String cdp, boolean launched, boolean process, long pid, String profile) {
+        Endpoint endpoint = discover(normalize(cdp));
+        CdpConnection connection = CdpConnection.connect(URI.create(endpoint.webSocket), Duration.ofSeconds(10));
+        EngineLog.info("session", "reopened " + id + " " + endpoint.http);
+        Path dir = profile == null || profile.isBlank() ? null : Path.of(profile);
+        return new BrowserSession(id, endpoint.http, launched, process, pid, dir, List.of(), null, connection);
     }
 
     public static BrowserSession launch(String id, String url, boolean headed, boolean process, Path profile, List<String> allow) {
@@ -152,12 +161,28 @@ public final class BrowserSession implements AutoCloseable {
                 chrome.destroyForcibly();
                 killed = true;
             }
+        } else if (launched && pid > 0) {
+            try {
+                ProcessHandle.of(pid).ifPresent(handle -> {
+                    handle.destroy();
+                    try {
+                        handle.onExit().orTimeout(3, TimeUnit.SECONDS).join();
+                    } catch (Exception ignored) {
+                        handle.destroyForcibly();
+                    }
+                    if (handle.isAlive()) handle.destroyForcibly();
+                });
+                killed = ProcessHandle.of(pid).isEmpty() || ProcessHandle.of(pid).map(handle -> !handle.isAlive()).orElse(true);
+            } catch (Exception ignored) {
+                killed = false;
+            }
         }
+        killedProcess = killed;
         EngineLog.info("session", "closed " + id + " killed=" + killed);
     }
 
     public boolean killedBrowser() {
-        return launched && chrome != null && !chrome.isAlive();
+        return killedProcess;
     }
 
     static String normalize(String cdp) {

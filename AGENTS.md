@@ -403,3 +403,6 @@ The locked design for replacing the Rust DOM composite engine with a general-pur
 
 `domengine log list|tail|show` reads the capped engine logs. Pickleball `log` also lists `.pickleball/history.log`. The existing 10 MB front trim on that file is unchanged. The Workbench Logs tab only forwards to that CLI.
 
+`domengine session join` (`--id` or `--cdp`) and `domengine session log --id` (`--follow` streams until the session leaves the registry; refused inside `serve --stdio`) match the Rust composite. MCP only forwards those argv lists.
+
+

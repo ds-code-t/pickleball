@@ -29,6 +29,8 @@ import java.util.Map;
  * Workbench, MCP, and Gradle only forward here.
  */
 public final class DomEngineMain {
+    private static final ThreadLocal<Boolean> IN_STDIO = ThreadLocal.withInitial(() -> Boolean.FALSE);
+
     private DomEngineMain() {
     }
 
@@ -126,6 +128,7 @@ public final class DomEngineMain {
 
     public static void serve(java.io.InputStream in, java.io.OutputStream out) {
         EngineLog.info("serve", "stdio");
+        IN_STDIO.set(Boolean.TRUE);
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8))) {
             String line;
             while ((line = reader.readLine()) != null) {
@@ -153,6 +156,8 @@ public final class DomEngineMain {
             }
         } catch (Exception failure) {
             EngineLog.error("serve", failure.getMessage());
+        } finally {
+            IN_STDIO.set(Boolean.FALSE);
         }
     }
 
@@ -193,7 +198,7 @@ public final class DomEngineMain {
                 "click", "type", "scroll", "submit", "key", "dblclick", "contextclick", "drag", "eval",
                 "screenshot", "observe", "wait", "desktop", "mcp", "serve"
         ));
-        array(node, "session_verbs", List.of("create", "list", "attach", "close"));
+        array(node, "session_verbs", List.of("create", "list", "attach", "close", "join", "log"));
         array(node, "engines", dev.domengine.query.Query.ENGINES);
         array(node, "actions", PageActions.VERBS);
         array(node, "query_flags", dev.domengine.query.Query.QUERY_FLAGS);
@@ -206,12 +211,36 @@ public final class DomEngineMain {
     }
 
     private static CliResult session(List<String> args) {
-        List<String> rest = args.size() <= 1 ? List.of() : args.subList(1, args.size());
+        List<String> rest = new ArrayList<>(args.size() <= 1 ? List.of() : args.subList(1, args.size()));
+        Path sessionDir = peelSessionDir(rest);
+        if (sessionDir != null) SessionRegistry.get().useDirectory(sessionDir);
         String verb = rest.isEmpty() || rest.get(0).startsWith("--") ? "create" : rest.get(0);
         List<String> flagArgs = rest.isEmpty() || rest.get(0).startsWith("--") ? rest : rest.subList(1, rest.size());
         Map<String, String> flags = flags(flagArgs);
         if (flags.containsKey("__usage")) return error(2, "usage", flags.get("__usage"));
+        if (flags.containsKey("session-dir")) SessionRegistry.get().useDirectory(Path.of(flags.get("session-dir")));
         return sessionVerb(verb, flags);
+    }
+
+    /** {@code --session-dir} is global on the Rust CLI, so it may appear before the verb. */
+    private static Path peelSessionDir(List<String> args) {
+        Path dir = null;
+        for (int i = 0; i < args.size(); i++) {
+            String token = args.get(i);
+            String value = null;
+            if ("--session-dir".equals(token) && i + 1 < args.size()) {
+                value = args.get(i + 1);
+                args.remove(i + 1);
+                args.remove(i);
+                i--;
+            } else if (token.startsWith("--session-dir=")) {
+                value = token.substring("--session-dir=".length());
+                args.remove(i);
+                i--;
+            }
+            if (value != null && !value.isBlank()) dir = Path.of(value);
+        }
+        return dir;
     }
 
     private static CliResult sessionVerb(String verb, Map<String, String> flags) {
@@ -220,13 +249,34 @@ public final class DomEngineMain {
                 case "create" -> CliResult.ok(Jsons.pretty(create(flags).record()));
                 case "attach" -> CliResult.ok(Jsons.pretty(attach(flags).record()));
                 case "list" -> CliResult.ok(Jsons.pretty(SessionRegistry.get().list()));
-                case "close" -> CliResult.ok(Jsons.pretty(SessionRegistry.get().close(required(flags, "id"))));
+                case "close" -> CliResult.ok(Jsons.pretty(SessionRegistry.get().close(flags.get("id"))));
+                case "join" -> CliResult.ok(Jsons.pretty(joinSession(flags)));
+                case "log" -> sessionLog(flags);
                 default -> error(2, "usage", "unknown session verb: " + verb);
             };
         } catch (CdpException failure) {
             String message = failure.getMessage() == null ? "failed" : failure.getMessage();
             return error(1, codeFor(message), message);
         }
+    }
+
+    private static ObjectNode joinSession(Map<String, String> flags) {
+        String id = flags.get("id");
+        if (id != null && !id.isBlank()) return SessionRegistry.get().join(id);
+        String cdp = flags.get("cdp");
+        if (cdp != null && !cdp.isBlank()) {
+            return SessionRegistry.get().joinCdp(cdp, flag(flags, "i-accept-local-attach") || "1".equals(System.getenv("COMPOSITE_ATTACH")));
+        }
+        throw new CdpException("session join needs --id or --cdp");
+    }
+
+    private static CliResult sessionLog(Map<String, String> flags) {
+        if (flag(flags, "follow") && Boolean.TRUE.equals(IN_STDIO.get())) {
+            return error(1, "invalid", "session log --follow streams on the CLI; it does not run inside serve --stdio");
+        }
+        String id = required(flags, "id");
+        if (flag(flags, "follow")) return CliResult.ok(SessionRegistry.get().follow(id));
+        return CliResult.ok(Jsons.pretty(SessionRegistry.get().events(id)));
     }
 
     private static dev.domengine.session.BrowserSession create(Map<String, String> flags) {
@@ -274,8 +324,10 @@ public final class DomEngineMain {
             } catch (java.io.IOException failure) {
                 return error(1, "failed", "query file: " + failure.getMessage());
             }
-        } else if (flags.containsKey("session")) {
-            root = SessionRegistry.get().require(flags.get("session")).tree().root;
+        } else if (flags.containsKey("session") || SessionRegistry.get().joined() != null) {
+            BrowserSession session = bound(flags);
+            if (session == null) return error(2, "usage", "query requires --file or --session");
+            root = session.tree().root;
             root.linkParents();
         } else {
             return error(2, "usage", "query requires --file or --session");
@@ -284,20 +336,39 @@ public final class DomEngineMain {
     }
 
     private static CliResult action(String verb, Map<String, String> flags) {
-        if (!flags.containsKey("session")) return error(2, "usage", verb + " requires --session");
-        BrowserSession session = SessionRegistry.get().require(flags.get("session"));
-        return CliResult.ok(Jsons.pretty(PageActions.act(session, verb, flags)));
+        BrowserSession session = bound(flags);
+        if (session == null) return error(2, "usage", verb + " requires --session");
+        ObjectNode result = PageActions.act(session, verb, flags);
+        ObjectNode detail = Jsons.object();
+        detail.put("ok", true);
+        SessionRegistry.get().record(session.id, verb, detail);
+        return CliResult.ok(Jsons.pretty(result));
     }
 
     private static CliResult screenshot(Map<String, String> flags) {
-        if (!flags.containsKey("session")) return error(2, "usage", "screenshot requires --session");
-        BrowserSession session = SessionRegistry.get().require(flags.get("session"));
-        return CliResult.ok(Jsons.pretty(Observe.screenshot(session, flags)));
+        BrowserSession session = bound(flags);
+        if (session == null) return error(2, "usage", "screenshot requires --session");
+        ObjectNode result = Observe.screenshot(session, flags);
+        ObjectNode detail = Jsons.object();
+        detail.put("ok", true);
+        SessionRegistry.get().record(session.id, "screenshot", detail);
+        return CliResult.ok(Jsons.pretty(result));
+    }
+
+    private static BrowserSession bound(Map<String, String> flags) {
+        if (flags.containsKey("session") && flags.get("session") != null && !flags.get("session").isBlank()) {
+            return SessionRegistry.get().require(flags.get("session"));
+        }
+        String joined = SessionRegistry.get().joined();
+        if (joined == null || joined.isBlank()) return null;
+        return SessionRegistry.get().require(joined);
     }
 
     private static CliResult observe(String command, Map<String, String> flags) {
         BrowserSession session = null;
-        if (flags.containsKey("session")) session = SessionRegistry.get().require(flags.get("session"));
+        if (flags.containsKey("session") || (SessionRegistry.get().joined() != null && !flags.containsKey("file"))) {
+            session = bound(flags);
+        }
         dev.domengine.tree.DomNode root = Observe.rootFrom(flags, session);
         com.fasterxml.jackson.databind.node.ObjectNode result = Observe.waitFor(root, flags);
         result.put("command", command);
@@ -357,7 +428,7 @@ public final class DomEngineMain {
                     List.of()
             );
             ephemeral = true;
-        } else {
+        } else if ((session = bound(flags)) == null) {
             return error(2, "usage", "snapshot requires --session or --cdp");
         }
         try {
@@ -438,6 +509,7 @@ public final class DomEngineMain {
         if (text.contains("ambiguous")) return "ambiguous";
         if (text.contains("invalid")) return "invalid";
         if (text.contains("timed out") || text.contains("timeout")) return "timeout";
+        if (text.contains("needs --id") || text.contains("opt-in") || text.contains("does not run inside")) return "invalid";
         if (text.contains("requires") || text.contains("missing")) return "invalid";
         return "failed";
     }
@@ -457,7 +529,9 @@ public final class DomEngineMain {
                 domengine %s
                 version
                 capabilities
-                session create|list|attach|close
+                session create|list|attach|close|join|log [--session-dir DIR]
+                session join --id ID | --cdp URL [--i-accept-local-attach]
+                session log --id ID [--follow]
                 attach --cdp URL --i-accept-local-attach
                 snapshot --session ID | --cdp URL --i-accept-local-attach
                 query --file page.html --css SELECTOR [--pipeline ENGINE=EXPR] [--geometry] [--explain] [--viewport file.pgm]
