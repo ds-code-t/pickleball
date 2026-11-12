@@ -62,6 +62,42 @@ jobs:
           .\scripts\consumer_sim.ps1
           exit $LASTEXITCODE
 
+  dom-engine-live:
+    name: Java DOM live Chrome
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Install Chrome for Testing
+        shell: bash
+        run: |
+          set -euo pipefail
+          url="$(python3 - <<'PY'
+          import json, urllib.request
+          data = json.load(urllib.request.urlopen("https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions-with-downloads.json"))
+          downloads = data["channels"]["Stable"]["downloads"]["chrome"]
+          print(next(item["url"] for item in downloads if item["platform"] == "linux64"))
+          PY
+          )"
+          curl -fsSL -o /tmp/chrome-linux64.zip "$url"
+          unzip -q /tmp/chrome-linux64.zip -d "$RUNNER_TEMP/chrome"
+          echo "DOMENGINE_CHROME=$RUNNER_TEMP/chrome/chrome-linux64/chrome" >> "$GITHUB_ENV"
+          "$RUNNER_TEMP/chrome/chrome-linux64/chrome" --version
+
+      - name: DOM engine tests including live Chrome
+        run: ./gradlew --no-daemon :dom-engine:test
+
   gate:
     needs: [windows]
     if: always()

@@ -405,4 +405,7 @@ The locked design for replacing the Rust DOM composite engine with a general-pur
 
 `domengine session join` (`--id` or `--cdp`) and `domengine session log --id` (`--follow` streams until the session leaves the registry; refused inside `serve --stdio`) match the Rust composite. MCP only forwards those argv lists.
 
+Live Chrome action smoke (`LiveChromeActionSmokeTest`) runs when `DOMENGINE_CHROME` or a Chrome binary is on `PATH`. It is skipped only when that binary is missing. `ActionSmokeTest` still uses the fake DevTools server.
+
+
 

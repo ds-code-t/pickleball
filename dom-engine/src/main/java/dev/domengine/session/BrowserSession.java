@@ -94,11 +94,17 @@ public final class BrowserSession implements AutoCloseable {
         command.add("--user-data-dir=" + dir.toAbsolutePath());
         command.add("--no-first-run");
         command.add("--no-default-browser-check");
+        command.add("--no-sandbox");
+        command.add("--disable-dev-shm-usage");
+        command.add("--disable-gpu");
         if (!headed) command.add("--headless=new");
         command.add("about:blank");
         Process processHandle;
         try {
-            processHandle = new ProcessBuilder(command).redirectErrorStream(true).start();
+            processHandle = new ProcessBuilder(command)
+                    .redirectOutput(ProcessBuilder.Redirect.DISCARD)
+                    .redirectError(ProcessBuilder.Redirect.DISCARD)
+                    .start();
         } catch (IOException failure) {
             throw new CdpException("chrome launch: " + failure.getMessage());
         }
@@ -193,7 +199,7 @@ public final class BrowserSession implements AutoCloseable {
         return value;
     }
 
-    static String findChrome() {
+    public static String findChrome() {
         String env = System.getenv("DOMENGINE_CHROME");
         if (env != null && !env.isBlank()) return env;
         for (String name : List.of("google-chrome", "google-chrome-stable", "chromium", "chromium-browser", "chrome")) {

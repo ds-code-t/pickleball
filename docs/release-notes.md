@@ -265,3 +265,6 @@ On a page with buttons Save, Save All, and Autosave:
 
 `domengine session join --id` (or `--cdp`, with `--i-accept-local-attach` when that endpoint is not already a session) selects the default session. Later commands may omit `--session`. `domengine session log --id` prints that session's event log. `session log --follow` streams it until the session leaves the registry. `--follow` is refused inside `serve --stdio`. MCP only forwards those argv lists.
 
+A live Chrome action smoke launches headless Chrome when `DOMENGINE_CHROME` or `google-chrome` / `chromium` / `chrome` is on `PATH`, and it runs click, type, and scroll on a local page. The test is skipped only when that binary is missing. The fake DevTools action smoke still runs.
+
+

@@ -1146,6 +1146,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `dom-engine/src/test/java/dev/domengine/DocumentWalkFixtureTest.java`
 - `dom-engine/src/test/java/dev/domengine/EngineLogTest.java`
 - `dom-engine/src/test/java/dev/domengine/FakeCdp.java`
+- `dom-engine/src/test/java/dev/domengine/LiveChromeActionSmokeTest.java`
 - `dom-engine/src/test/java/dev/domengine/LogCommandTest.java`
 - `dom-engine/src/test/java/dev/domengine/McpForwardTest.java`
 - `dom-engine/src/test/java/dev/domengine/ObserveParityTest.java`
