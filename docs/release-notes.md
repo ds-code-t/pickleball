@@ -277,4 +277,6 @@ An unjoined browser stays on Selenium for nesting and for a composite find. Aski
 
 `domengine query --selector` and `--pipeline` accept `look=color=red` and `look=opacity>0.5,background-color=#fff`. A comma is AND and a pipe is OR inside that stage. `contrast` compares `color` with the painted background. Logging stays off unless `DOMENGINE_LOG` or `COMPOSITE_LOG` names `look`.
 
+A dynamic step can say `with look color equaling red` or `with look opacity greater than 0.5`. The clause is added after `with id attribute` / `with id noattribute` and does not change those phrases. It becomes a `look=` stage on the same forwarded selector. `pkb_composite_log=query` logs that selector and stays off unless named.
+
 

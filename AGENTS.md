@@ -421,5 +421,7 @@ Branch `3.0.0-query-visual` extends the Java engine query language. The locked d
 
 `look` matches computed style. `look=color=red` and `look=opacity>0.5,background-color=#fff` are stages. A comma is AND and a pipe is OR inside the stage. `contrast` is the contrast of `color` against the painted `background-color`. It is not a screenshot match, and there is no engine named `attribute`. `DOMENGINE_LOG=look` logs the matched properties and stays off by default.
 
+A step can add `with look <prop> <predicate>` after the existing attribute clause, for example `with look color equaling red` or `with look opacity greater than 0.5`. That clause is not an HTML attribute. `SelectorTranslator` maps it to a `look=` stage on the same engine query string. `with id attribute` and `with id noattribute` are unchanged. Cucumber step annotations stay single string literals. `pkb_composite_log=query` logs `forward selector=` and stays off by default.
+
 
 

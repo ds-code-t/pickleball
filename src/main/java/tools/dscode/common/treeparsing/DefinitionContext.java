@@ -355,7 +355,7 @@ public final class DefinitionContext {
             }
         };
 
-        ParseNode elementMatch = new ParseNode("(?:(?<selectionType>every|any|none\\s+of|none)\\b\\s*)?(?:(?<elementPosition>\\bfirst|\\blast|<<position>>)\\b\\s*)?(?:(?<state>(?:un|non-?)?(?:checked|selected|enabled|disabled|expanded|collapsed|required|empty|blank))\\b\\s*)?(?<text><<valueMask>>)?\\s*\\b(?<type>(?:\\b[A-Z][a-zA-Z]+\\b\\s*)+)(?<elPredicate>(?<predicate>\\s*<<predicate>>))*\\s*(?<atrPredicate>(?:(?:\\band\\s*)?\\bwith\\s+[a-z]+\\s+(?:<<predicate>>|(?:no)?attribute)\\s*))*") {
+        ParseNode elementMatch = new ParseNode("(?:(?<selectionType>every|any|none\\s+of|none)\\b\\s*)?(?:(?<elementPosition>\\bfirst|\\blast|<<position>>)\\b\\s*)?(?:(?<state>(?:un|non-?)?(?:checked|selected|enabled|disabled|expanded|collapsed|required|empty|blank))\\b\\s*)?(?<text><<valueMask>>)?\\s*\\b(?<type>(?:\\b[A-Z][a-zA-Z]+\\b\\s*)+)(?<elPredicate>(?<predicate>\\s*<<predicate>>))*\\s*(?<atrPredicate>(?:(?:\\band\\s*)?\\bwith\\s+[a-z]+\\s+(?:<<predicate>>|(?:no)?attribute)\\s*))*(?<lookPredicate>(?:(?:\\band\\s*|\\bor\\s*)?\\bwith\\s+look\\s+[a-z][a-z0-9-]*\\s+(?:greater\\s+than|less\\s+than|at\\s+least|at\\s+most|starting\\s+with|ending\\s+with|containing|equaling)\\s+(?:\"[^\"]*\"|'[^\']*'|[#A-Za-z0-9.%+-]+)\\s*)*)") {
             @Override
             public String onSubstitute(MatchNode self) {
                 self.putToLocalState("fullText", self.unmask(self.groups().get(0)));
@@ -376,6 +376,10 @@ public final class DefinitionContext {
 
                 self.putToLocalState("elPredicate", self.groups().get("elPredicate"));
                 self.putToLocalState("atrPredicate", self.groups().get("atrPredicate"));
+                String lookPredicate = self.groups().get("lookPredicate");
+                if (lookPredicate != null && !lookPredicate.isBlank()) {
+                    self.putToLocalState("lookPredicate", lookPredicate);
+                }
                 return self.token();
             }
         };

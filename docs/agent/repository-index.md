@@ -646,6 +646,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/common/composite/EnginePositionGateTest.java`
 - `src/test/java/tools/dscode/common/composite/GeometryViewTest.java`
 - `src/test/java/tools/dscode/common/composite/LeanWaitNestLiveTest.java`
+- `src/test/java/tools/dscode/common/composite/LookStepTest.java`
 - `src/test/java/tools/dscode/common/composite/PrimaryPathAuditTest.java`
 - `src/test/java/tools/dscode/common/composite/SelectorAndAdapterTest.java`
 - `src/test/java/tools/dscode/common/coordination/AgentCoordinationTest.java`

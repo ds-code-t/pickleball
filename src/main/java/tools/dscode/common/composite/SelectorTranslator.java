@@ -7,6 +7,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
@@ -58,6 +59,12 @@ public final class SelectorTranslator {
         role("field", "textbox");
     }
 
+    private static final Pattern LOOK_CLAUSE = Pattern.compile(
+            "(?i)\\bwith\\s+look\\s+([a-z][a-z0-9-]*)\\s+"
+                    + "(greater\\s+than|less\\s+than|at\\s+least|at\\s+most|starting\\s+with|ending\\s+with|containing|equaling)\\s+"
+                    + "(\"[^\"]*\"|'[^']*'|\\S+)"
+    );
+
     private SelectorTranslator() {
     }
 
@@ -98,12 +105,12 @@ public final class SelectorTranslator {
         if (phrase == null) {
             return new CompositeSelector(null, null, null, "web", null, "empty");
         }
-        if (phrase.xpath() != null && !phrase.xpath().isBlank()) {
+        if (phrase.xpath() != null && !phrase.xpath().isBlank() && lookStage(phrase.look()) == null) {
             CompositeSelector exact = new CompositeSelector(executableXPath(phrase.xpath()), null, null, source(phrase), ordinal(phrase), label(phrase));
             CompositeLog.debug("element", "xpath passthrough " + exact.describe());
             return exact;
         }
-        if (phrase.css() != null && !phrase.css().isBlank()) {
+        if (phrase.css() != null && !phrase.css().isBlank() && lookStage(phrase.look()) == null) {
             CompositeSelector exact = new CompositeSelector(null, phrase.css(), null, source(phrase), ordinal(phrase), label(phrase));
             CompositeLog.debug("element", "css passthrough " + exact.describe());
             return exact;
@@ -119,6 +126,11 @@ public final class SelectorTranslator {
         String word = phrase.contextWord() == null ? "" : phrase.contextWord().trim().toLowerCase(Locale.ROOT);
         List<String> context = contextStages(phrase);
         List<String> target = targetStages(phrase);
+        String look = lookStage(phrase.look());
+        if (look != null) {
+            if (target.isEmpty()) target.add(look);
+            else target.set(0, "(" + target.get(0) + " AND " + look + ")");
+        }
         switch (word) {
             case "before" -> {
                 stages.addAll(target);
@@ -138,8 +150,62 @@ public final class SelectorTranslator {
         }
         String pipeline = String.join(" >> ", stages.stream().filter(stage -> stage != null && !stage.isBlank()).toList());
         CompositeSelector selector = new CompositeSelector(null, null, pipeline, source(phrase), ordinal(phrase), label(phrase));
+        if (look != null) CompositeLog.info("query", "forward selector=" + pipeline);
         CompositeLog.debug("element", "phrase " + selector.describe());
         return selector;
+    }
+
+    /** English {@code with look color equaling red} becomes {@code look=color=red}. */
+    static String lookStage(String clause) {
+        if (clause == null || clause.isBlank()) return null;
+        String trimmed = clause.trim();
+        if (trimmed.toLowerCase(Locale.ROOT).startsWith("look=")) return trimmed;
+        Matcher matcher = LOOK_CLAUSE.matcher(trimmed);
+        StringBuilder stage = new StringBuilder();
+        int end = 0;
+        boolean any = false;
+        while (matcher.find()) {
+            if (any) {
+                String between = trimmed.substring(end, matcher.start()).toLowerCase(Locale.ROOT);
+                stage.append(between.contains(" or ") ? "|" : ",");
+            }
+            any = true;
+            end = matcher.end();
+            String property = matcher.group(1).toLowerCase(Locale.ROOT);
+            String value = cleanLookValue(matcher.group(3));
+            if (stage.length() == 0) stage.append("look=");
+            stage.append(property).append(lookOperator(matcher.group(2))).append(value);
+        }
+        return any ? stage.toString() : null;
+    }
+
+    private static String lookOperator(String words) {
+        String name = words.toLowerCase(Locale.ROOT).replaceAll("\\s+", " ").trim();
+        return switch (name) {
+            case "greater than" -> ">";
+            case "less than" -> "<";
+            case "at least" -> ">=";
+            case "at most" -> "<=";
+            case "starting with" -> "^=";
+            case "ending with" -> "$=";
+            case "containing" -> "~=";
+            default -> "=";
+        };
+    }
+
+    private static String cleanLookValue(String raw) {
+        String value = raw == null ? "" : raw.trim();
+        if (value.length() >= 2) {
+            char first = value.charAt(0);
+            char last = value.charAt(value.length() - 1);
+            if ((first == '"' && last == '"') || (first == '\'' && last == '\'')) {
+                value = value.substring(1, value.length() - 1);
+            }
+        }
+        while (value.endsWith(".") || value.endsWith(",") || value.endsWith("!")) {
+            value = value.substring(0, value.length() - 1);
+        }
+        return value;
     }
 
     private static List<String> contextStages(ElementPhrase phrase) {

@@ -68,6 +68,8 @@ public class ElementMatch {
     public List<String> valueTypes;
     public String state;
     public List<Attribute> attributes = new ArrayList<>();
+    /** Raw "with look ..." clause. It is not an HTML attribute. */
+    public String lookClause = "";
     public XPathy xPathy;
     //    public XPathy xPathyWithIndex;
     public Set<ElementType> elementTypes;
@@ -252,6 +254,10 @@ public class ElementMatch {
             }
         }
 
+        if (elementNode.localStateBoolean("lookPredicate")) {
+            this.lookClause = elementNode.getStringFromLocalState("lookPredicate").trim();
+        }
+
         if (elementTypes.contains(ElementType.HTML_TYPE)) {
             if (categoryFlags.contains(ExecutionDictionary.CategoryFlags.IFRAME)) {
                 elementTypes.add(ElementType.HTML_IFRAME);
@@ -393,6 +399,7 @@ public class ElementMatch {
 
         this.categoryFlags.addAll(getExecutionDictionary().getResolvedCategoryFlags(category));
         this.attributes.addAll(elementMatch.attributes);
+        this.lookClause = elementMatch.lookClause == null ? "" : elementMatch.lookClause;
 
         if (!textOps.isEmpty()) {
             defaultText = textOps.getFirst().text;
