@@ -26,7 +26,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class DomAccessGuardTest {
     static final Pattern RAW = Pattern.compile(
-            "(?<!ElementOperations)\\.(?:findElement|findElements|executeAsyncScript|executeScript|getDomAttribute|getDomProperty|getAttribute|getText|isDisplayed|isEnabled|isSelected|getTagName|getRect|getLocation|getSize|getCssValue|getShadowRoot|getPageSource)\\s*\\("
+            "(?<!ElementOperations)\\.(?:findElement|findElements|executeAsyncScript|executeScript|getDomAttribute|getDomProperty|getAttribute|getText|isDisplayed|isEnabled|isSelected|getTagName|getRect|getSize|getCssValue|getShadowRoot|getPageSource)\\s*\\("
+                    + "|(?<!getCodeSource\\(\\))\\.getLocation\\s*\\("
                     + "|switchTo\\s*\\(\\s*\\)\\s*\\.\\s*(?:frame|defaultContent|parentFrame|activeElement)\\s*\\("
                     + "|new\\s+Actions\\s*\\("
                     + "|new\\s+Select\\s*\\("
@@ -41,11 +42,11 @@ class DomAccessGuardTest {
             "pickleball-control-api/src/main/java/tools/dscode/control/bridge/ControlBridgeCoordinator.java",
             "pickleball-control-api/src/main/java/tools/dscode/control/bridge/ControlBridgeRuntime.java",
             "pickleball-control-api/src/main/java/tools/dscode/control/bridge/ControlBridgeStepResolver.java",
-            "pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/PickleballVersion.java",
             "pickleball-workbench/src/main/java/tools/dscode/workbench/mapping/MappingValueCodec.java",
             "pickleball-workbench/src/main/java/tools/dscode/workbench/sync/WorkbenchSynchronizer.java",
             "pickleball-workbench/src/main/java/tools/dscode/workbench/ui/AgentChatPanel.java",
             "pickleball-workbench/src/main/java/tools/dscode/workbench/ui/DaltonPanel.java",
+            "pickleball-workbench/src/main/java/tools/dscode/workbench/ui/LogPanel.java",
             "pickleball-workbench/src/main/java/tools/dscode/workbench/ui/FeaturePickerPanel.java",
             "pickleball-workbench/src/main/java/tools/dscode/workbench/ui/RunVarOverridePanel.java",
             "pickleball-workbench/src/main/java/tools/dscode/workbench/ui/TerminalPanel.java",
@@ -55,7 +56,6 @@ class DomAccessGuardTest {
             "src/main/aspectj/io/cucumber/core/runner/PickleStepDefinitionMatchArgumentPaddingAspect.aj",
             "src/main/aspectj/io/cucumber/gherkin/PickleCompilerAugment.aj",
             "src/main/aspectj/io/cucumber/messages/types/PickleStep_NestingLevel.aj",
-            "src/main/aspectj/tools/dscode/common/reporting/diagnostic/Diagnostic213CompletionAspect.aj",
             "src/main/java/io/cucumber/core/gherkin/messages/CucumberDeepCloneUtil.java",
             "src/main/java/io/cucumber/core/gherkin/messages/CucumberStepTextCloneUtil.java",
             "src/main/java/io/cucumber/core/gherkin/messages/GherkinMessagesPickleStepMatcher.java",
@@ -70,7 +70,6 @@ class DomAccessGuardTest {
             "src/main/java/tools/dscode/common/composite/ElementOperations.java",
             "src/main/java/tools/dscode/common/composite/ElementReads.java",
             "src/main/java/tools/dscode/common/reporting/diagnostic/ScenarioIdentity.java",
-            "src/main/java/tools/dscode/common/reporting/diagnostic/SourceProvenance.java",
             "src/main/java/tools/dscode/common/seleniumextensions/ElementSnapshotScript.java",
             "src/main/java/tools/dscode/common/treeparsing/parsedComponents/Phrase.java",
             "src/main/java/tools/dscode/dalton/DaltonRunTrace.java",
