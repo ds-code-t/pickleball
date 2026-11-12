@@ -19,8 +19,11 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Type;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -108,6 +111,216 @@ class StepRegistryTest {
         } finally {
             System.clearProperty("pkb_engine_log");
             System.clearProperty("pkb_engine_log_max_bytes");
+        }
+    }
+
+    @Test
+    void everyCoreDefinitionMatchesTheCucumberExpressionFactory() {
+        StepRegistry registry = new StepRegistry().scanPackage("tools.dscode.coredefinitions");
+        assertTrue(registry.steps().size() > 50, "scanned " + registry.steps().size());
+        ExpressionFactory factory = new ExpressionFactory(new ParameterTypeRegistry(Locale.ENGLISH));
+        List<String> problems = new ArrayList<>();
+        for (GlueStep step : registry.steps()) {
+            String pattern = step.pattern();
+            assertEquals(annotationValue(step), pattern, step.location());
+            if (step.dataTable()) {
+                assertTrue(hasParameter(step, DataTable.class), step.location());
+            }
+            if (step.docString()) {
+                assertTrue(hasParameter(step, io.cucumber.docstring.DocString.class), step.location());
+            }
+            String probe = satisfy(pattern);
+            Set<String> fromRegistry = new LinkedHashSet<>();
+            try {
+                StepMatch match = registry.match(probe);
+                if (match.matched() && match.step() != null) fromRegistry.add(match.step().location());
+            } catch (AmbiguousMatchException ambiguous) {
+                fromRegistry.addAll(ambiguous.locations());
+            }
+            Set<String> fromFactory = new LinkedHashSet<>();
+            for (GlueStep candidate : registry.steps()) {
+                Expression expression = factory.createExpression(candidate.pattern());
+                List<Argument<?>> arguments = expression.match(probe, candidate.expressionTypes().toArray(Type[]::new));
+                if (arguments != null) fromFactory.add(candidate.location());
+            }
+            if (!fromFactory.contains(step.location())) {
+                problems.add("probe missed its own pattern " + step.location() + " /" + pattern + "/ probe=[" + probe + "]");
+                continue;
+            }
+            if (!fromRegistry.equals(fromFactory)) {
+                problems.add("registry " + fromRegistry + " factory " + fromFactory + " probe=[" + probe + "] pattern=" + pattern);
+                continue;
+            }
+            if (fromRegistry.size() == 1) {
+                StepMatch match = registry.match(probe);
+                assertSameCapture(registry, factory, probe);
+                assertEquals(step.method(), match.step().method(), probe + " /" + pattern + "/");
+            }
+        }
+        assertTrue(problems.isEmpty(), String.join("\n", problems));
+    }
+
+    private static boolean hasParameter(GlueStep step, Class<?> type) {
+        for (Class<?> parameter : step.method().getParameterTypes()) {
+            if (parameter == type) return true;
+        }
+        return false;
+    }
+
+    private static String annotationValue(GlueStep step) {
+        for (java.lang.annotation.Annotation annotation : step.method().getAnnotations()) {
+            try {
+                Method value = annotation.annotationType().getMethod("value");
+                if (value.getReturnType() != String.class) continue;
+                Object text = value.invoke(annotation);
+                if (step.pattern().equals(text)) return step.pattern();
+            } catch (ReflectiveOperationException ignored) {
+            }
+        }
+        return "";
+    }
+
+    /** A string the pattern matches. Used only to compare matchers. */
+    static String satisfy(String pattern) {
+        String source = pattern == null ? "" : pattern;
+        boolean cucumber = !(source.startsWith("^") || source.startsWith("(?") || source.contains("\\"));
+        if (cucumber) {
+            String text = source;
+            text = text.replace("{string}", "\"x\"");
+            text = text.replace("{int}", "1");
+            text = text.replace("{long}", "1");
+            text = text.replace("{float}", "1.5");
+            text = text.replace("{double}", "1.5");
+            text = text.replace("{word}", "word");
+            text = text.replace("{}", "x");
+            return text;
+        }
+        return new Satisfier(source).parse();
+    }
+
+    private static final class Satisfier {
+        private final String source;
+        private int index;
+
+        private Satisfier(String source) {
+            this.source = source;
+        }
+
+        private String parse() {
+            String text = sequence(true);
+            return text;
+        }
+
+        private String sequence(boolean top) {
+            StringBuilder out = new StringBuilder();
+            while (index < source.length()) {
+                char current = source.charAt(index);
+                if (top && (current == '$')) {
+                    index++;
+                    break;
+                }
+                if (!top && current == ')') break;
+                if (!top && current == '|') break;
+                out.append(atom());
+            }
+            return out.toString();
+        }
+
+        private String atom() {
+            if (index >= source.length()) return "";
+            char current = source.charAt(index);
+            if (current == '^') {
+                index++;
+                return "";
+            }
+            if (current == '(') return group();
+            if (current == '\\') return escape();
+            if (current == '[') return clazz();
+            if (current == '.') {
+                index++;
+                return quantified("x");
+            }
+            index++;
+            return quantified(String.valueOf(current));
+        }
+
+        private String group() {
+            index++;
+            if (source.startsWith("?:", index)) index += 2;
+            else if (source.startsWith("?i:", index) || source.startsWith("?s:", index)) index += 3;
+            else if (source.startsWith("?is:", index) || source.startsWith("?si:", index)) index += 4;
+            else if (source.startsWith("?i)", index) || source.startsWith("?s)", index)
+                    || source.startsWith("?m)", index)) {
+                index += 3;
+                return "";
+            } else if (source.startsWith("?is)", index) || source.startsWith("?si)", index)) {
+                index += 4;
+                return "";
+            }
+            int start = index;
+            String chosen = sequence(false);
+            while (index < source.length() && source.charAt(index) == '|') {
+                index++;
+                sequence(false);
+            }
+            if (index < source.length() && source.charAt(index) == ')') index++;
+            if (start == index) {
+                return "";
+            }
+            return quantified(chosen);
+        }
+
+        private String escape() {
+            index++;
+            if (index >= source.length()) return "";
+            char code = source.charAt(index++);
+            String value = switch (code) {
+                case 'd', 'D' -> "1";
+                case 's' -> " ";
+                case 'S', 'w', 'W' -> "x";
+                case 'n' -> "\n";
+                case 't' -> "\t";
+                default -> String.valueOf(code);
+            };
+            return quantified(value);
+        }
+
+        private String clazz() {
+            index++;
+            boolean negated = index < source.length() && source.charAt(index) == '^';
+            if (negated) index++;
+            char chosen = 'x';
+            if (!negated && index < source.length() && source.charAt(index) != ']') {
+                if (source.charAt(index) == '\\' && index + 1 < source.length()) {
+                    index++;
+                    chosen = source.charAt(index++);
+                } else {
+                    chosen = source.charAt(index++);
+                }
+            }
+            while (index < source.length() && source.charAt(index) != ']') index++;
+            if (index < source.length()) index++;
+            return quantified(String.valueOf(chosen));
+        }
+
+        private String quantified(String value) {
+            if (index >= source.length()) return value;
+            char current = source.charAt(index);
+            if (current == '?' || current == '*' ) {
+                index++;
+                return value;
+            }
+            if (current == '+') {
+                index++;
+                return value;
+            }
+            if (current == '{') {
+                index++;
+                while (index < source.length() && source.charAt(index) != '}') index++;
+                if (index < source.length()) index++;
+                return value;
+            }
+            return value;
         }
     }
 
