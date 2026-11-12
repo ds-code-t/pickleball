@@ -75,6 +75,7 @@ class DomAccessGuardTest {
             "src/main/java/tools/dscode/common/seleniumextensions/ElementSnapshotScript.java",
             "src/main/java/tools/dscode/common/treeparsing/parsedComponents/Phrase.java",
             "src/main/java/tools/dscode/dalton/DaltonRunTrace.java",
+            "src/main/java/tools/dscode/engine/convert/CucumberModelConverter.java",
             "src/main/java/tools/dscode/launcher/WorkbenchElementInspect.java",
             "src/main/java/tools/dscode/launcher/WorkbenchOneShotLaunch.java",
             "src/main/java/tools/dscode/testengine/ExampleRowFilter.java"

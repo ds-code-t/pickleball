@@ -37,6 +37,7 @@ Dalton is an opt-in hydrated working copy. Git files stay the source of truth. T
 - Phase 9 keeps existing Cucumber and JUnit suites on the adapter. `pkb_engine=native` (else `PKB_ENGINE`, else `engine.properties` `mode=native`) selects the native engine. The default remains `cucumber`.
 - Phase 10 runs steps written during a step. They are not feature files. The step result records `source=runtime`.
 - Phase 11 compares a feature on the Cucumber adapter and the native engine. Plain glue matches. One `ASSERT` step matches. Browser and dynamic-step suites are not switched over. The default engine remains `cucumber`.
+- Phase 12 leaves the default engine at `cucumber`. Browser and dynamic-step suites are not the same on the native engine yet, so the default is not switched. The Cucumber adapter stays supported. Cucumber aspects stay. `engine help`, `engine run`, and `engine step` remain the CLI. Gradle, Workbench, MCP, and `dalton run --engine` only forward. Engine logging stays off unless `pkb_engine_log` names a capability. It is per entity, date-stamped, and size-capped.
 
 ## 2.2.0
 
