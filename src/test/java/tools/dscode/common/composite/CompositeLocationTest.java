@@ -37,7 +37,8 @@ class CompositeLocationTest {
     void missingBinaryIsEmptyAndFallsBackOnce() {
         Path project = temp.resolve("project");
         Path home = temp.resolve("home");
-        CompositeRuntime.use(project, Map.of(), ClassLoader.getSystemClassLoader(), home);
+        CompositeRuntime.use(project, Map.of(), new ClassLoader(null) {
+        }, home);
         assertTrue(CompositeBinaryLocator.locate().isEmpty());
         assertFalse(CompositeRuntime.primary());
         String line = CompositeLog.lastFallbackForTests();
@@ -84,8 +85,61 @@ class CompositeLocationTest {
         Path project = temp.resolve("repo").resolve("pickleball");
         Path sibling = temp.resolve("repo").resolve("dom-composite").resolve("target").resolve("release").resolve("composite");
         executable(sibling);
-        Optional<Path> home = CompositeBinaryLocator.locate(project, Map.of(), ClassLoader.getSystemClassLoader());
+        Optional<Path> home = CompositeBinaryLocator.locate(project, Map.of(), new ClassLoader(null) {
+        });
         assertEquals(sibling.toAbsolutePath().normalize(), home.orElseThrow());
+    }
+
+    @Test
+    void javaEnginePrecedesTheRustSibling() throws Exception {
+        Path project = temp.resolve("repo").resolve("pickleball");
+        Path sibling = temp.resolve("repo").resolve("dom-composite").resolve("target").resolve("release").resolve("composite");
+        executable(sibling);
+        ClassLoader loader = CompositeLocationTest.class.getClassLoader();
+        Optional<Path> javaEngine = CompositeBinaryLocator.locate(project, Map.of(), loader);
+        assertTrue(javaEngine.isPresent(), "java engine");
+        String script = Files.readString(javaEngine.orElseThrow());
+        assertTrue(script.contains("dev.domengine.cli.DomEngineMain"), script);
+        assertFalse(javaEngine.orElseThrow().equals(sibling.toAbsolutePath().normalize()));
+        assertEquals("3.0.0", CompositeRuntime.openProbe(javaEngine.orElseThrow()));
+    }
+
+    @Test
+    void explicitBinAndRustFlagBeatTheJavaEngine() throws Exception {
+        Path binary = stub(temp.resolve("explicit").resolve("composite"));
+        ClassLoader loader = CompositeLocationTest.class.getClassLoader();
+        Optional<Path> named = CompositeBinaryLocator.locate(
+                temp,
+                Map.of(DirectControlProvider.BIN_ENV, binary.toString()),
+                loader
+        );
+        assertEquals(binary.toAbsolutePath().normalize(), named.orElseThrow());
+
+        Path project = temp.resolve("rust-repo").resolve("pickleball");
+        Path sibling = temp.resolve("rust-repo").resolve("dom-composite").resolve("target").resolve("release").resolve("composite");
+        executable(sibling);
+        Optional<Path> rust = CompositeBinaryLocator.locate(
+                project,
+                Map.of("PKB_COMPOSITE_ENGINE", "rust"),
+                loader
+        );
+        assertEquals(sibling.toAbsolutePath().normalize(), rust.orElseThrow());
+    }
+
+    @Test
+    void daltonRecordsTheJavaEngineWhenEnabled() throws Exception {
+        Path project = temp.resolve("dalton-project");
+        Files.createDirectories(project);
+        CompositeRuntime.use(
+                project,
+                Map.of("PKB_DALTON", "true"),
+                CompositeLocationTest.class.getClassLoader(),
+                temp.resolve("home")
+        );
+        assertTrue(CompositeRuntime.primary(), CompositeLog.lastFallbackForTests());
+        assertEquals("3.0.0", CompositeRuntime.current().version());
+        String note = Files.readString(project.resolve(".pickleball/dalton/engine-sessions.log"));
+        assertTrue(note.contains("engine=3.0.0"), note);
     }
 
     @Test

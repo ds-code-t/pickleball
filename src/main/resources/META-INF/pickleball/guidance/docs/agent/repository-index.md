@@ -196,6 +196,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/common/composite/ElementStateScript.java`
 - `src/main/java/tools/dscode/common/composite/ElementView.java`
 - `src/main/java/tools/dscode/common/composite/EngineQuery.java`
+- `src/main/java/tools/dscode/common/composite/JavaEngineLocator.java`
 - `src/main/java/tools/dscode/common/composite/SelectorTranslator.java`
 - `src/main/java/tools/dscode/common/composite/VerbPlan.java`
 - `src/main/java/tools/dscode/common/control/ControlDecision.java`
@@ -1066,11 +1067,13 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `dom-engine/src/main/java/dev/domengine/cdp/CdpException.java`
 - `dom-engine/src/main/java/dev/domengine/cli/CliResult.java`
 - `dom-engine/src/main/java/dev/domengine/cli/DomEngineMain.java`
+- `dom-engine/src/main/java/dev/domengine/conform/Conformance.java`
 - `dom-engine/src/main/java/dev/domengine/desktop/DesktopTree.java`
 - `dom-engine/src/main/java/dev/domengine/EngineInfo.java`
 - `dom-engine/src/main/java/dev/domengine/image/TemplateMatch.java`
 - `dom-engine/src/main/java/dev/domengine/json/Jsons.java`
 - `dom-engine/src/main/java/dev/domengine/log/EngineLog.java`
+- `dom-engine/src/main/java/dev/domengine/mcp/McpServer.java`
 - `dom-engine/src/main/java/dev/domengine/query/Engines.java`
 - `dom-engine/src/main/java/dev/domengine/query/HtmlTree.java`
 - `dom-engine/src/main/java/dev/domengine/query/Query.java`
@@ -1082,9 +1085,11 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `dom-engine/src/test/java/dev/domengine/ActionSmokeTest.java`
 - `dom-engine/src/test/java/dev/domengine/CdpSessionAttachTest.java`
 - `dom-engine/src/test/java/dev/domengine/CliStdioTest.java`
+- `dom-engine/src/test/java/dev/domengine/CliSurfaceTest.java`
 - `dom-engine/src/test/java/dev/domengine/DocumentWalkFixtureTest.java`
 - `dom-engine/src/test/java/dev/domengine/EngineLogTest.java`
 - `dom-engine/src/test/java/dev/domengine/FakeCdp.java`
+- `dom-engine/src/test/java/dev/domengine/McpForwardTest.java`
 - `dom-engine/src/test/java/dev/domengine/ObserveParityTest.java`
 - `dom-engine/src/test/java/dev/domengine/SelectorParityTest.java`
 - `dom-engine/src/test/resources/fixtures/page.html`

@@ -6,7 +6,11 @@ import org.openqa.selenium.Capabilities;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.remote.RemoteWebDriver;
 
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
+import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -61,6 +65,9 @@ public final class CompositeRuntime {
                     "pkb_runvars." + CompositeBinaryLocator.BIN_KEY,
                     CompositeMode.KEY,
                     "pkb_runvars." + CompositeMode.KEY,
+                    CompositeBinaryLocator.ENGINE_KEY,
+                    "pkb_runvars." + CompositeBinaryLocator.ENGINE_KEY,
+                    "pkb_dalton",
                     CompositeLog.KEY,
                     "pkb_runvars." + CompositeLog.KEY,
                     CompositeLog.DIR_KEY,
@@ -313,6 +320,24 @@ public final class CompositeRuntime {
         }
     }
 
+    /**
+     * Optional Dalton note. The engine stays usable when Dalton is off.
+     * This adapter writes one line; it does not open the Dalton database.
+     */
+    private static void recordDalton(Sources sources, Path binary, String version) {
+        String flag = CompositeMode.read("pkb_dalton", sources);
+        if (flag == null || !(flag.equalsIgnoreCase("true") || "1".equals(flag))) return;
+        Path root = sources.project() == null ? Path.of("") : sources.project();
+        Path file = root.resolve(".pickleball").resolve("dalton").resolve("engine-sessions.log");
+        String line = Instant.now() + " engine=" + version + " bin=" + binary + "\n";
+        try {
+            Files.createDirectories(file.getParent());
+            Files.writeString(file, line, StandardCharsets.UTF_8, StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+        } catch (java.io.IOException failure) {
+            CompositeLog.debug("session", "dalton note: " + failure.getMessage());
+        }
+    }
+
     /** Test and startup probe. Spawns {@code composite serve --stdio} and asks for {@code version}. */
     public static String openProbe(Path binary) {
         Client opened = new Client(binary == null ? null : binary.toString(), logMap());
@@ -343,6 +368,7 @@ public final class CompositeRuntime {
             String version = opened.version().path("version").asText("");
             client = opened;
             CompositeLog.info("session", "client " + binary.get() + " version " + version);
+            recordDalton(sources, binary.get(), version);
             return new Decision(true, binary.get(), version, "composite");
         } catch (RuntimeException failure) {
             CompositeLog.fallbackOnce(

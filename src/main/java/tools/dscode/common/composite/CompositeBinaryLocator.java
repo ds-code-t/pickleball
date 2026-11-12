@@ -29,6 +29,17 @@ import java.util.jar.JarFile;
 public final class CompositeBinaryLocator {
     public static final String VERSION = "2.4.0";
     public static final String BIN_KEY = "pkb_composite_bin";
+    public static final String ENGINE_KEY = "pkb_composite_engine";
+
+    private static boolean rustRequested(CompositeRuntime.Sources sources) {
+        String engine = first(
+                text(sources.properties() == null ? null : sources.properties().get(ENGINE_KEY)),
+                text(sources.properties() == null ? null : sources.properties().get("pkb_runvars." + ENGINE_KEY)),
+                text(sources.env() == null ? null : sources.env().get("PKB_COMPOSITE_ENGINE")),
+                text(sources.env() == null ? null : sources.env().get(ENGINE_KEY))
+        );
+        return engine != null && "rust".equalsIgnoreCase(engine);
+    }
     public static final String GROUP = "dev.domcomposite";
     public static final String NATIVE_ARTIFACT = "composite-native";
     public static final List<String> CLASSIFIERS = List.of(
@@ -48,6 +59,8 @@ public final class CompositeBinaryLocator {
         copyProperty(properties, "pkb_runvars." + BIN_KEY);
         copyProperty(properties, CompositeMode.KEY);
         copyProperty(properties, "pkb_runvars." + CompositeMode.KEY);
+        copyProperty(properties, ENGINE_KEY);
+        copyProperty(properties, "pkb_runvars." + ENGINE_KEY);
         String home = System.getProperty("user.home", "");
         return locate(new CompositeRuntime.Sources(
                 project == null ? Path.of("").toAbsolutePath() : project,
@@ -73,6 +86,13 @@ public final class CompositeBinaryLocator {
         if (explicit != null) {
             CompositeLog.info("location", "binary " + explicit);
             return Optional.of(explicit);
+        }
+        if (!rustRequested(resolved)) {
+            Optional<Path> javaEngine = JavaEngineLocator.script(resolved.loader());
+            if (javaEngine.isPresent()) {
+                CompositeLog.info("location", "java " + javaEngine.get());
+                return javaEngine;
+            }
         }
         Optional<Path> discovered = DirectControlProvider.resolveBinary(
                 DirectControlProvider.TOKEN,

@@ -258,3 +258,7 @@ On a page with buttons Save, Save All, and Autosave:
 - A hard-failed scenario and a deferred `softFail` both fail the Cucumber scenario after cleanup. The workbook status and the JUnit result stay failed together. `CurrentScenarioState.absorbRecordedScenarioFailure` and `discardDeferredSoftFailure` are not a consumer API.
 - A static import of `Values` includes the documented methods and `Values.Context`. Framework helpers are not part of that import.
 - Sample `pkb_callpath` and `pkb_componentpath` values use the resources-folder names `calls` and `component`. When those properties are unset, the defaults remain `src/test/resources/calls` and `src/test/resources/component`.
+
+### Java DOM engine
+
+`dom-engine` is the general-purpose Java replacement for the Rust composite binary. The CLI is `domengine` (`serve --stdio` and `mcp` only forward). Pickleball prefers that engine when `dev.domengine.cli.DomEngineMain` is on the classpath. `pkb_composite_bin` and `COMPOSITE_BIN` still win. `pkb_composite_engine=rust` keeps the old binary. `pkb_composite=off` stays on Selenium. With `pkb_dalton=true`, the adapter appends one line to `.pickleball/dalton/engine-sessions.log` and does not open the Dalton database.

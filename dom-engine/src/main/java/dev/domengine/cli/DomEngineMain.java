@@ -64,7 +64,26 @@ public final class DomEngineMain {
         if ("desktop".equals(command)) {
             return desktop(args);
         }
-        Map<String, String> flags = flags(args.subList(1, args.size()));
+        if ("mcp".equals(command)) {
+            return mcp();
+        }
+        List<String> tail = new ArrayList<>(args.subList(1, args.size()));
+        String positional = null;
+        if (acceptsFile(command)) {
+            List<String> kept = new ArrayList<>();
+            boolean flagged = false;
+            for (String token : tail) {
+                if (!flagged && positional == null && !token.startsWith("--")) {
+                    positional = token;
+                    continue;
+                }
+                if (token.startsWith("--")) flagged = true;
+                kept.add(token);
+            }
+            tail = kept;
+        }
+        Map<String, String> flags = flags(tail);
+        if (positional != null && !flags.containsKey("file")) flags.put("file", positional);
         if (flags.containsKey("__usage")) {
             return error(2, "usage", flags.get("__usage"));
         }
@@ -75,6 +94,12 @@ public final class DomEngineMain {
                 case "attach" -> sessionVerb("attach", flags);
                 case "snapshot" -> snapshot(flags);
                 case "query" -> query(flags);
+                case "resolve" -> resolve(flags);
+                case "info" -> info(flags);
+                case "recommend" -> recommend(flags);
+                case "validate" -> validate(flags);
+                case "capture" -> capture(flags);
+                case "conform" -> conform(flags);
                 case "click", "type", "scroll", "submit", "key", "dblclick", "contextclick", "drag", "eval" ->
                         action(command, flags);
                 case "screenshot" -> screenshot(flags);
@@ -160,9 +185,10 @@ public final class DomEngineMain {
         node.put("name", EngineInfo.NAME);
         node.put("version", EngineInfo.VERSION);
         array(node, "commands", List.of(
-                "version", "capabilities", "session", "attach", "snapshot", "query",
+                "version", "capabilities", "session", "attach", "snapshot", "query", "resolve",
+                "info", "recommend", "validate", "capture", "conform",
                 "click", "type", "scroll", "submit", "key", "dblclick", "contextclick", "drag", "eval",
-                "screenshot", "observe", "wait", "desktop", "serve"
+                "screenshot", "observe", "wait", "desktop", "mcp", "serve"
         ));
         array(node, "session_verbs", List.of("create", "list", "attach", "close"));
         array(node, "engines", dev.domengine.query.Query.ENGINES);
@@ -382,7 +408,8 @@ public final class DomEngineMain {
 
     private static boolean isBoolean(String name) {
         return switch (name) {
-            case "process", "headed", "i-accept-local-attach", "follow", "stdio", "strict", "explain", "geometry", "count-only", "append" -> true;
+            case "process", "headed", "i-accept-local-attach", "follow", "stdio", "strict", "explain", "geometry", "count-only", "append",
+                    "submit", "all-frames", "describe", "auto-wait", "promote-visual", "mobile", "verify", "perform", "scroll" -> true;
             default -> false;
         };
     }
@@ -435,7 +462,115 @@ public final class DomEngineMain {
                 screenshot --session ID [--out file.png]
                 observe|wait --file page.html|--session ID --css SELECTOR [--timeout-ms N]
                 desktop list|attach|walk|query|resolve|close|click|type
+                query|resolve|info|recommend|validate [file] [--css SELECTOR]
+                capture --session ID | --file page.html | --url URL
+                conform --root DIR
+                mcp
                 serve --stdio
                 """.formatted(EngineInfo.VERSION);
+    }
+
+    private static boolean acceptsFile(String command) {
+        return switch (command) {
+            case "query", "resolve", "info", "recommend", "validate", "capture" -> true;
+            default -> false;
+        };
+    }
+
+    private static CliResult mcp() {
+        dev.domengine.mcp.McpServer.serve(System.in, System.out);
+        return CliResult.ok("");
+    }
+
+    private static CliResult resolve(Map<String, String> flags) {
+        flags.put("strict", "true");
+        return query(flags);
+    }
+
+    private static CliResult info(Map<String, String> flags) {
+        if (!flags.containsKey("file")) return error(2, "usage", "info requires a file");
+        try {
+            dev.domengine.tree.DomNode root = dev.domengine.query.HtmlTree.parse(
+                    java.nio.file.Files.readString(Path.of(flags.get("file"))));
+            ObjectNode node = Jsons.object();
+            node.put("ok", true);
+            node.put("file", flags.get("file"));
+            node.put("nodes", root.count());
+            return CliResult.ok(Jsons.pretty(node));
+        } catch (java.io.IOException failure) {
+            return error(1, "failed", "info file: " + failure.getMessage());
+        }
+    }
+
+    private static CliResult recommend(Map<String, String> flags) {
+        String pipeline = dev.domengine.query.Query.pipelineOf(flags);
+        if (pipeline == null) return error(2, "usage", "recommend requires a selector");
+        ObjectNode node = Jsons.object();
+        node.put("ok", true);
+        node.put("pipeline", pipeline);
+        node.put("engine", pipeline.contains("=") ? pipeline.substring(0, pipeline.indexOf('=')).trim() : "css");
+        return CliResult.ok(Jsons.pretty(node));
+    }
+
+    private static CliResult validate(Map<String, String> flags) {
+        String expected = flags.get("expected");
+        if (expected == null || expected.isBlank()) return error(2, "usage", "validate requires --expected");
+        dev.domengine.tree.DomNode root = rootOf(flags);
+        com.fasterxml.jackson.databind.JsonNode found = dev.domengine.query.Query.run(root, flags);
+        int count = found.path("nodes").size();
+        boolean numeric = expected.chars().allMatch(Character::isDigit);
+        boolean pass = numeric
+                ? count == Integer.parseInt(expected)
+                : found.path("nodes").toString().toLowerCase(Locale.ROOT).contains(expected.toLowerCase(Locale.ROOT));
+        if (!pass) throw new CdpException("validate mismatch");
+        ObjectNode node = Jsons.object();
+        node.put("ok", true);
+        node.put("count", count);
+        node.put("expected", expected);
+        return CliResult.ok(Jsons.pretty(node));
+    }
+
+    private static CliResult capture(Map<String, String> flags) {
+        if (flags.containsKey("session")) return screenshot(flags);
+        if (flags.containsKey("file")) return info(flags);
+        if (flags.containsKey("url")) {
+            BrowserSession session = SessionRegistry.get().create(
+                    "cap-" + System.nanoTime(),
+                    flags.get("url"),
+                    flags.get("cdp"),
+                    false,
+                    false,
+                    flag(flags, "i-accept-local-attach"),
+                    null,
+                    List.of()
+            );
+            try {
+                return CliResult.ok(Jsons.pretty(Observe.screenshot(session, flags)));
+            } finally {
+                SessionRegistry.get().close(session.id);
+            }
+        }
+        return error(2, "usage", "capture requires --session, --file, or --url");
+    }
+
+    private static CliResult conform(Map<String, String> flags) {
+        if (!flags.containsKey("root")) return error(2, "usage", "conform requires --root");
+        return CliResult.ok(Jsons.pretty(dev.domengine.conform.Conformance.run(Path.of(flags.get("root")))));
+    }
+
+    private static dev.domengine.tree.DomNode rootOf(Map<String, String> flags) {
+        if (flags.containsKey("file")) {
+            try {
+                return dev.domengine.query.HtmlTree.parse(java.nio.file.Files.readString(Path.of(flags.get("file"))));
+            } catch (java.io.IOException failure) {
+                throw new CdpException("query file: " + failure.getMessage());
+            }
+        }
+        if (flags.containsKey("session")) {
+            dev.domengine.tree.DomNode root = SessionRegistry.get().require(flags.get("session")).tree().root;
+            root.linkParents();
+            return root;
+        }
+        throw new CdpException("query requires --file or --session");
     }
 }

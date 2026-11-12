@@ -90,6 +90,7 @@ dependencies {
     // Shared wire DTOs/constants only. The protocol module is JDK-only and its
     // classes are embedded in the published Pickleball artifact below.
     implementation project(':pickleball-control-protocol')
+    implementation project(':dom-engine')
 
     api("io.cucumber:cucumber-junit-platform-engine:${cucumberVersion}") {
         // Prevent consumers from pulling the UNWOVEN cucumber internals transitively
@@ -377,7 +378,9 @@ tasks.shadowJar {
     from("NOTICE") { into "META-INF" }
     from("THIRD-PARTY-NOTICES.md") { into "META-INF" }
 
-    dependsOn 'ajcMain', 'expandWoven', 'classes', ':pickleball-workbench:shadowJar'
+    dependsOn 'ajcMain', 'expandWoven', 'classes', ':pickleball-workbench:shadowJar', ':dom-engine:classes'
+
+    from(project(':dom-engine').sourceSets.main.output)
 
     archiveBaseName.set('pickleball')
     archiveVersion.set(project.version.toString())
