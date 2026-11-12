@@ -411,5 +411,11 @@ Live Chrome action smoke (`LiveChromeActionSmokeTest`) runs when `DOMENGINE_CHRO
 
 An unjoined WebDriver stays on Selenium for nesting and for a composite find. Reading engine query flags does not launch Chrome. `ContextAnchorReproTest` and `NestAnchorReproTest` pass with or without a Chrome binary. `assertEquals(1, deepest.size())` is unchanged. A joined browser still sends `--within` and `--nesting`.
 
+## Query visual (3.0.0)
+
+Branch `3.0.0-query-visual` extends the Java engine query language. The locked design is `docs/maintainer/3.0.0-query-visual-design.md`. The roadmap is `docs/roadmaps/3.0.0-query-visual-roadmap.md`. Do not push this work to `3.0.0`.
+
+`>>` stays a sequential pipeline. `AND` is intersection, `OR` is union, and `NOT` is the complement of the current scope. Parentheses outrank `NOT`, then `AND`, then `OR`. Mixed `AND` and `OR` at the same level require parentheses. `domengine query --selector` and `--pipeline` accept the expression. `DOMENGINE_LOG=expr` or `COMPOSITE_LOG=expr` logs evaluation. That log stays off unless the entity is named. It is date-stamped and size-capped. Selenium fallback still returns null for `AND`, `OR`, and `NOT`.
+
 
 

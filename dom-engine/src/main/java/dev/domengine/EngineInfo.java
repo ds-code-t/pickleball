@@ -13,7 +13,7 @@ public final class EngineInfo {
 
     public static final List<String> LOG_ENTITIES = List.of(
             "cli", "serve", "capture", "cdp", "walk", "query", "resolve",
-            "session", "action", "wait", "desc", "desktop", "image", "visual", "log"
+            "session", "action", "wait", "desc", "desktop", "image", "visual", "expr", "log"
     );
 
     private EngineInfo() {

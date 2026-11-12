@@ -47,6 +47,21 @@ public final class Engines {
         return current;
     }
 
+    /** Light elements of the current scope. The complement of NOT is taken from this set. */
+    static List<DomNode> scopeElements(List<DomNode> current, DomNode root, String pierce) {
+        boolean intoShadow = pierce != null && (pierce.equals("open") || pierce.equals("all"));
+        List<DomNode> hits = new ArrayList<>();
+        for (DomNode scope : scopes(current, root)) {
+            hits.addAll(lightElements(scope, true));
+            if (!intoShadow) continue;
+            for (DomNode shadow : collectShadows(scope)) {
+                if ("open".equals(pierce) && "closed".equalsIgnoreCase(shadow.shadowMode)) continue;
+                hits.addAll(lightElements(shadow, true));
+            }
+        }
+        return Query.distinct(hits);
+    }
+
     static Query.Hit image(String expr, List<DomNode> scopes) {
         String raw = expr == null ? "" : expr.trim();
         if (raw.toLowerCase(Locale.ROOT).startsWith("ocr")) {

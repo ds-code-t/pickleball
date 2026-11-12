@@ -46,19 +46,25 @@ public final class Query {
     private static ObjectNode runArmed(DomNode root, Map<String, String> flags) {
         String pipeline = pipelineOf(flags);
         if (pipeline == null) throw new CdpException("query requires --css, --xpath, --text, --pipeline, or --selector");
-        List<Parsed> stages = parsePipeline(pipeline);
+        List<String> parts = splitStages(pipeline);
+        if (parts.isEmpty()) throw new CdpException("pipeline is empty");
         String pierce = flags.getOrDefault("pierce", "");
         List<DomNode> current = List.of(root);
         List<Stage> trace = new ArrayList<>();
         ObjectNode image = null;
-        for (Parsed stage : stages) {
+        for (String part : parts) {
+            String piece = part.trim();
+            if (piece.isEmpty()) throw new CdpException("invalid pipeline stage: " + pipeline);
             long start = System.nanoTime();
-            Hit hit = Engines.apply(stage.engine, stage.expr, current, root, pierce);
+            Expressions.Expr expr = Expressions.parse(piece);
+            Hit hit = Expressions.eval(expr, current, root, pierce);
             current = hit.nodes;
             if (hit.image != null) image = hit.image;
             long ms = (System.nanoTime() - start) / 1_000_000L;
-            trace.add(new Stage(stage.engine, stage.expr, hit.why, current.size(), ms));
-            EngineLog.info("query", stage.engine + " " + hit.why);
+            String engine = expr instanceof Expressions.Stage stage ? stage.engine() : "expr";
+            String shown = expr instanceof Expressions.Stage stage ? stage.expr() : piece;
+            trace.add(new Stage(engine, shown, hit.why, current.size(), ms));
+            EngineLog.info("query", engine + " " + hit.why);
         }
         requireWithin(root, flags.get("within"));
         current = within(current, flags.get("within"));
@@ -212,7 +218,18 @@ public final class Query {
         for (String engine : ENGINES) {
             if (text.startsWith(engine + "=") || text.contains(">>")) return true;
         }
-        return false;
+        if (text.startsWith("(") && text.contains("=")) return true;
+        return Expressions.hasOperator(text);
+    }
+
+    /** Engine name for a plain stage, or {@code expr} when the text is a boolean expression. */
+    public static String leadingEngine(String pipeline) {
+        if (pipeline == null || pipeline.isBlank()) return "css";
+        String trimmed = pipeline.trim();
+        if (trimmed.startsWith("(") || Expressions.hasOperator(trimmed)) return "expr";
+        int eq = trimmed.indexOf('=');
+        if (eq <= 0) return "css";
+        return trimmed.substring(0, eq).trim().toLowerCase(Locale.ROOT);
     }
 
     public static List<Parsed> parsePipeline(String text) {
@@ -220,6 +237,12 @@ public final class Query {
         List<Parsed> stages = new ArrayList<>();
         for (String part : parts) {
             String piece = part.trim();
+            if (piece.isEmpty()) throw new CdpException("invalid pipeline stage: " + text);
+            if (piece.startsWith("(") || Expressions.hasOperator(piece)) {
+                Expressions.parse(piece);
+                stages.add(new Parsed("expr", piece));
+                continue;
+            }
             int eq = piece.indexOf('=');
             if (eq <= 0) throw new CdpException("invalid pipeline stage: " + piece);
             String engine = piece.substring(0, eq).trim().toLowerCase(Locale.ROOT);
@@ -236,6 +259,7 @@ public final class Query {
         StringBuilder current = new StringBuilder();
         boolean quote = false;
         char quoteChar = 0;
+        int depth = 0;
         for (int i = 0; i < text.length(); i++) {
             char c = text.charAt(i);
             if (quote) {
@@ -249,7 +273,9 @@ public final class Query {
                 current.append(c);
                 continue;
             }
-            if (c == '>' && i + 1 < text.length() && text.charAt(i + 1) == '>') {
+            if (c == '(') depth++;
+            else if (c == ')' && depth > 0) depth--;
+            if (depth == 0 && c == '>' && i + 1 < text.length() && text.charAt(i + 1) == '>') {
                 parts.add(current.toString());
                 current.setLength(0);
                 i++;

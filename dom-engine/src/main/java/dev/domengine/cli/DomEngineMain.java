@@ -534,7 +534,9 @@ public final class DomEngineMain {
                 session log --id ID [--follow]
                 attach --cdp URL --i-accept-local-attach
                 snapshot --session ID | --cdp URL --i-accept-local-attach
-                query --file page.html --css SELECTOR [--pipeline ENGINE=EXPR] [--geometry] [--explain] [--viewport file.pgm]
+                query --file page.html --css SELECTOR [--selector EXPR] [--pipeline EXPR] [--geometry] [--explain] [--viewport file.pgm]
+                  EXPR accepts engine=value stages joined by >> and boolean AND, OR, and NOT
+                  example: (css=button AND text="Submit") >> near=50
                 click|type|scroll|submit|key|dblclick|contextclick|drag|eval --session ID
                 screenshot --session ID [--out file.png]
                 observe|wait --file page.html|--session ID --css SELECTOR [--timeout-ms N]
@@ -640,7 +642,7 @@ public final class DomEngineMain {
         ObjectNode node = Jsons.object();
         node.put("ok", true);
         node.put("pipeline", pipeline);
-        node.put("engine", pipeline.contains("=") ? pipeline.substring(0, pipeline.indexOf('=')).trim() : "css");
+        node.put("engine", dev.domengine.query.Query.leadingEngine(pipeline));
         return CliResult.ok(Jsons.pretty(node));
     }
 

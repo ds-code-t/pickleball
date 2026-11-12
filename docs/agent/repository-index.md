@@ -85,6 +85,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/maintainer/3.0.0-dalton-design.md`
 - `docs/maintainer/3.0.0-engine-design.md`
 - `docs/maintainer/3.0.0-java-dom-design.md`
+- `docs/maintainer/3.0.0-query-visual-design.md`
 - `docs/maintainer/consumer-sim-harness.md`
 - `docs/maintainer/guidance-goldens.md`
 - `docs/maintainer/pointer-eval-harness.md`
@@ -107,6 +108,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/roadmaps/3.0.0-dalton-round2-roadmap.md`
 - `docs/roadmaps/3.0.0-decouple-round3-roadmap.md`
 - `docs/roadmaps/3.0.0-java-dom-roadmap.md`
+- `docs/roadmaps/3.0.0-query-visual-roadmap.md`
 - `docs/service-call-scenarios.md`
 - `docs/step-overrides.md`
 - `docs/workbench-agent-detail.md`
@@ -1132,6 +1134,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `dom-engine/src/main/java/dev/domengine/log/LogDashboard.java`
 - `dom-engine/src/main/java/dev/domengine/mcp/McpServer.java`
 - `dom-engine/src/main/java/dev/domengine/query/Engines.java`
+- `dom-engine/src/main/java/dev/domengine/query/Expressions.java`
 - `dom-engine/src/main/java/dev/domengine/query/HtmlTree.java`
 - `dom-engine/src/main/java/dev/domengine/query/Query.java`
 - `dom-engine/src/main/java/dev/domengine/session/BrowserSession.java`
@@ -1140,6 +1143,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `dom-engine/src/main/java/dev/domengine/tree/DomNode.java`
 - `dom-engine/src/main/java/dev/domengine/tree/LiveTree.java`
 - `dom-engine/src/test/java/dev/domengine/ActionSmokeTest.java`
+- `dom-engine/src/test/java/dev/domengine/BooleanQueryTest.java`
 - `dom-engine/src/test/java/dev/domengine/CdpSessionAttachTest.java`
 - `dom-engine/src/test/java/dev/domengine/CliStdioTest.java`
 - `dom-engine/src/test/java/dev/domengine/CliSurfaceTest.java`

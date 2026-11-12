@@ -271,4 +271,6 @@ A live Chrome action smoke launches headless Chrome when `DOMENGINE_CHROME` or `
 
 An unjoined browser stays on Selenium for nesting and for a composite find. Asking the engine for its query flags does not launch Chrome. `ContextAnchorReproTest` and `NestAnchorReproTest` pass with or without Chrome. A joined browser still uses `--within` and `--nesting`.
 
+`domengine query --selector` and `--pipeline` accept `AND`, `OR`, and `NOT` around the existing engines. `>>` is still the sequential pipeline. Mixed `AND` and `OR` need parentheses. Logging stays off unless `DOMENGINE_LOG` or `COMPOSITE_LOG` names `expr`.
+
 

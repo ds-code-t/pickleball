@@ -1083,6 +1083,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `dom-engine/src/main/java/dev/domengine/log/LogDashboard.java`
 - `dom-engine/src/main/java/dev/domengine/mcp/McpServer.java`
 - `dom-engine/src/main/java/dev/domengine/query/Engines.java`
+- `dom-engine/src/main/java/dev/domengine/query/Expressions.java`
 - `dom-engine/src/main/java/dev/domengine/query/HtmlTree.java`
 - `dom-engine/src/main/java/dev/domengine/query/Query.java`
 - `dom-engine/src/main/java/dev/domengine/session/BrowserSession.java`
@@ -1091,6 +1092,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `dom-engine/src/main/java/dev/domengine/tree/DomNode.java`
 - `dom-engine/src/main/java/dev/domengine/tree/LiveTree.java`
 - `dom-engine/src/test/java/dev/domengine/ActionSmokeTest.java`
+- `dom-engine/src/test/java/dev/domengine/BooleanQueryTest.java`
 - `dom-engine/src/test/java/dev/domengine/CdpSessionAttachTest.java`
 - `dom-engine/src/test/java/dev/domengine/CliStdioTest.java`
 - `dom-engine/src/test/java/dev/domengine/CliSurfaceTest.java`
