@@ -483,7 +483,7 @@ public final class DomEngineMain {
     private static boolean isBoolean(String name) {
         return switch (name) {
             case "process", "headed", "i-accept-local-attach", "follow", "stdio", "strict", "explain", "geometry", "count-only", "append",
-                    "submit", "all-frames", "describe", "auto-wait", "promote-visual", "mobile", "verify", "perform", "scroll" -> true;
+                    "submit", "all-frames", "describe", "auto-wait", "promote-visual", "mobile", "verify", "perform", "scroll", "live" -> true;
             default -> false;
         };
     }
@@ -541,7 +541,7 @@ public final class DomEngineMain {
                 desktop list|attach|walk|query|resolve|close|click|type
                 query|resolve|info|recommend|validate [file] [--css SELECTOR]
                 capture --session ID | --file page.html | --url URL
-                conform --root DIR
+                conform --root DIR [--live]
                 log list|tail|show [--dir DIR] [--file NAME] [--lines N]
                 mcp
                 serve --stdio
@@ -687,7 +687,11 @@ public final class DomEngineMain {
 
     private static CliResult conform(Map<String, String> flags) {
         if (!flags.containsKey("root")) return error(2, "usage", "conform requires --root");
-        return CliResult.ok(Jsons.pretty(dev.domengine.conform.Conformance.run(Path.of(flags.get("root")))));
+        Path root = Path.of(flags.get("root"));
+        ObjectNode result = flag(flags, "live")
+                ? dev.domengine.conform.LiveConformance.run(root)
+                : dev.domengine.conform.Conformance.run(root);
+        return CliResult.ok(Jsons.pretty(result));
     }
 
     private static dev.domengine.tree.DomNode rootOf(Map<String, String> flags) {

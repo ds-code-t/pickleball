@@ -538,6 +538,10 @@ public final class Engines {
         return false;
     }
 
+    public static boolean selectorMatches(DomNode node, String selector) {
+        return matchesSelector(node, selector);
+    }
+
     static boolean matchesSelector(DomNode node, String selector) {
         if (selector == null || selector.isBlank() || "*".equals(selector)) return node.nodeType == 1;
         for (String group : splitTop(selector, ',')) {

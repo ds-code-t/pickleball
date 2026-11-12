@@ -72,6 +72,14 @@ public final class DomNode {
         if (children != null && children.isArray()) {
             for (JsonNode child : children) node.children.add(fromCdp(child));
         }
+        JsonNode content = raw.get("contentDocument");
+        if (content != null && !content.isNull() && !content.isMissingNode()) {
+            boolean already = false;
+            for (DomNode child : node.children) {
+                if (child.nodeType == 9) already = true;
+            }
+            if (!already) node.children.add(fromCdp(content));
+        }
         JsonNode shadows = raw.get("shadowRoots");
         if (shadows != null && shadows.isArray()) {
             for (JsonNode shadow : shadows) {

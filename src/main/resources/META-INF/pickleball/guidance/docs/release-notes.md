@@ -267,4 +267,6 @@ On a page with buttons Save, Save All, and Autosave:
 
 A live Chrome action smoke launches headless Chrome when `DOMENGINE_CHROME` or `google-chrome` / `chromium` / `chrome` is on `PATH`, and it runs click, type, and scroll on a local page. The test is skipped only when that binary is missing. The fake DevTools action smoke still runs.
 
+`domengine conform --root DIR --live` evaluates the vendored fixtures in headless Chrome. With Chrome present that run checks the assertions the offline path skips and does not leave them skipped. The live test is skipped only when the Chrome binary is missing.
+
 

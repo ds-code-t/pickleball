@@ -1074,6 +1074,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `dom-engine/src/main/java/dev/domengine/cli/CliResult.java`
 - `dom-engine/src/main/java/dev/domengine/cli/DomEngineMain.java`
 - `dom-engine/src/main/java/dev/domengine/conform/Conformance.java`
+- `dom-engine/src/main/java/dev/domengine/conform/LiveConformance.java`
 - `dom-engine/src/main/java/dev/domengine/desktop/DesktopTree.java`
 - `dom-engine/src/main/java/dev/domengine/EngineInfo.java`
 - `dom-engine/src/main/java/dev/domengine/image/TemplateMatch.java`
@@ -1098,6 +1099,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `dom-engine/src/test/java/dev/domengine/EngineLogTest.java`
 - `dom-engine/src/test/java/dev/domengine/FakeCdp.java`
 - `dom-engine/src/test/java/dev/domengine/LiveChromeActionSmokeTest.java`
+- `dom-engine/src/test/java/dev/domengine/LiveConformanceTest.java`
 - `dom-engine/src/test/java/dev/domengine/LogCommandTest.java`
 - `dom-engine/src/test/java/dev/domengine/McpForwardTest.java`
 - `dom-engine/src/test/java/dev/domengine/ObserveParityTest.java`

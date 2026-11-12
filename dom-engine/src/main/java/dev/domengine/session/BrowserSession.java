@@ -77,6 +77,18 @@ public final class BrowserSession implements AutoCloseable {
     }
 
     public static BrowserSession launch(String id, String url, boolean headed, boolean process, Path profile, List<String> allow) {
+        return launch(id, url, headed, process, profile, allow, List.of());
+    }
+
+    public static BrowserSession launch(
+            String id,
+            String url,
+            boolean headed,
+            boolean process,
+            Path profile,
+            List<String> allow,
+            List<String> extra
+    ) {
         Path dir = profile;
         try {
             if (dir == null) dir = Files.createTempDirectory("domengine-profile-");
@@ -98,6 +110,11 @@ public final class BrowserSession implements AutoCloseable {
         command.add("--disable-dev-shm-usage");
         command.add("--disable-gpu");
         if (!headed) command.add("--headless=new");
+        if (extra != null) {
+            for (String arg : extra) {
+                if (arg != null && !arg.isBlank()) command.add(arg);
+            }
+        }
         command.add("about:blank");
         Process processHandle;
         try {

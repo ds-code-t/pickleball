@@ -407,5 +407,7 @@ The locked design for replacing the Rust DOM composite engine with a general-pur
 
 Live Chrome action smoke (`LiveChromeActionSmokeTest`) runs when `DOMENGINE_CHROME` or a Chrome binary is on `PATH`. It is skipped only when that binary is missing. `ActionSmokeTest` still uses the fake DevTools server.
 
+`domengine conform --root DIR --live` evaluates the vendored Rust fixtures in headless Chrome, including the assertions offline `conform` skips. `LiveConformanceTest` skips only when that binary is missing. Offline `ConformanceSuiteTest` is unchanged.
+
 
 
