@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.function.Consumer;
 
 /** Runs one neutral scenario on the shared step lifecycle. */
 public final class NativeScenarioRun {
@@ -34,7 +35,17 @@ public final class NativeScenarioRun {
         if (ExecutionContext.current() == null && CurrentScenarioState.currentScenarioState.get() == null) {
             MappingProcessor.resetCommonMaps();
         }
-        List<StepResult> results = new ArrayList<>();
+        List<Seen> seen = new ArrayList<>();
+        List<StepResult> trailing = new ArrayList<>();
+        boolean scenarioFailed = false;
+        String scenarioFailure = "";
+        java.util.Set<StepExtension> recorded = java.util.Collections.newSetFromMap(new IdentityHashMap<>());
+        Consumer<StepExtension> outerTrace = NativeStepTrace.current();
+        NativeStepTrace.listen(frame -> {
+            if (frame == null || !recorded.add(frame)) return;
+            seen.add(new Seen(SharedStepRun.bound(frame), frame));
+            if (outerTrace != null) outerTrace.accept(frame);
+        });
         try (ExecutionContext context = ExecutionContext.open(scenario)) {
             context.phase(ExecutionContext.Phase.RUNNING);
             context.resource("registry", registry);
@@ -46,10 +57,22 @@ public final class NativeScenarioRun {
             context.resource("tags", scenario.tags());
             ScenarioStep root = new ScenarioStep(scenario.name());
             context.rootStep(root);
-            List<Prepared> queue = new ArrayList<>();
-            linkTree(prepare(scenario, registry, state), queue);
+            List<StepExtension> frames = new ArrayList<>();
+            for (EngineStep step : scenario.steps()) {
+                frames.add(prepareStep(step, registry, state).frame());
+            }
+            if (state.getParsingMap() != null && root.getDefaultStepNodeMap() != null) {
+                state.getParsingMap().addMapsToStart(root.getDefaultStepNodeMap());
+            }
+            for (StepExtension frame : frames) {
+                frame.setStepParsingMap(state.getParsingMap());
+            }
+            root.installNativeSteps(frames, state.getParsingMap(), null);
+            List<StepExtension> roots = new ArrayList<>();
+            for (io.cucumber.core.runner.StepBase child : new ArrayList<>(root.childSteps)) {
+                if (child instanceof StepExtension extension) roots.add(extension);
+            }
             Throwable hookFailure = null;
-            StepExtension previous = null;
             try {
                 try {
                     if (registry != null) registry.fire("before", scenario.tags(), SharedStepRun.instances(context));
@@ -58,31 +81,14 @@ public final class NativeScenarioRun {
                     context.fail(thrown);
                 }
                 if (hookFailure == null) {
-                for (int index = 0; index < queue.size(); index++) {
-                    Prepared prepared = queue.get(index);
-                    EngineStep engineStep = prepared.step();
-                    StepExtension frame = prepared.frame();
-                    frame.parentStep = root;
+                for (int index = 0; index < roots.size(); index++) {
+                    StepExtension frame = roots.get(index);
+                    EngineStep engineStep = SharedStepRun.bound(frame);
+                    io.cucumber.core.runner.StepBase savedNext = frame.nextSibling;
                     frame.nextSibling = null;
-                    frame.previousSibling = previous;
-                    previous = frame;
-                    root.childSteps.clear();
-                    root.childSteps.add(frame);
-                    context.pushStep(engineStep);
+                    context.pushStep(engineStep == null ? tools.dscode.engine.model.EngineStep.of("* ", frame.getStepText()) : engineStep);
                     try {
                         state.runStep(frame);
-                        if (state.isScenarioComplete()
-                                && frame.result != null
-                                && frame.result.getStatus() == io.cucumber.plugin.event.Status.PASSED) {
-                            Throwable failure = state.stepFailures.isEmpty()
-                                    ? new RuntimeException("scenario failed")
-                                    : state.stepFailures.getLast();
-                            frame.result = new Result(
-                                    io.cucumber.plugin.event.Status.FAILED,
-                                    frame.result.getDuration() == null ? java.time.Duration.ZERO : frame.result.getDuration(),
-                                    failure
-                            );
-                        }
                     } catch (Throwable thrown) {
                         context.fail(thrown);
                         if (frame.result == null) {
@@ -92,35 +98,39 @@ public final class NativeScenarioRun {
                                     thrown
                             );
                         }
+                        NativeStepTrace.record(frame);
+                        state.recordHardFailure(thrown);
                     } finally {
+                        frame.nextSibling = savedNext;
                         context.popStep();
                     }
                     StepResult result = toResult(engineStep, frame);
-                    results.add(result);
                     if (result.returned() != null && !result.returned().isEmpty()) {
                         context.scope().put("returned", result.returned());
                     }
                     List<EngineStep> written = context.drainWritten();
                     if (!written.isEmpty()) {
-                        List<Prepared> stamped = new ArrayList<>();
-                        for (EngineStep extra : written) {
-                            EngineStep marked = extra.metadata().containsKey("source")
-                                    ? extra
-                                    : extra.withMetadata("source", "runtime");
-                            stamped.add(prepareStep(marked, registry, state));
+                        StepExtension cursor = frame;
+                        for (EngineStep writtenStep : written) {
+                            EngineStep marked = writtenStep.metadata().containsKey("source")
+                                    ? writtenStep
+                                    : writtenStep.withMetadata("source", "runtime");
+                            StepExtension extra = prepareStep(marked, registry, state).frame();
+                            extra.parentStep = root;
+                            extra.previousSibling = cursor;
+                            cursor.nextSibling = extra;
+                            cursor = extra;
                             EngineLog.log(options == null ? null : options.project(), "run", "runtime", marked.text());
                         }
-                        queue.addAll(index + 1, stamped);
-                    }
-                    if (result.status() == Status.FAILED
-                            || result.status() == Status.UNDEFINED
-                            || result.status() == Status.AMBIGUOUS) {
-                        if (options == null || !options.continueOnFailure()) {
-                            for (int rest = index + 1; rest < queue.size(); rest++) {
-                                results.add(StepResult.of(Status.SKIPPED, queue.get(rest).step().text(), "skipped"));
-                            }
-                            break;
+                        cursor.nextSibling = savedNext;
+                        if (savedNext != null) savedNext.previousSibling = cursor;
+                        List<StepExtension> extras = new ArrayList<>();
+                        StepExtension walk = (StepExtension) frame.nextSibling;
+                        while (walk != null && walk != savedNext) {
+                            extras.add(walk);
+                            walk = (StepExtension) walk.nextSibling;
                         }
+                        roots.addAll(index + 1, extras);
                     }
                 }
                 }
@@ -131,9 +141,11 @@ public final class NativeScenarioRun {
                     if (hookFailure == null) hookFailure = thrown;
                     context.fail(thrown);
                 }
-                if (hookFailure != null && results.stream().noneMatch(step ->
-                        step.status() == Status.FAILED || step.status() == Status.UNDEFINED || step.status() == Status.AMBIGUOUS)) {
-                    results.add(new StepResult(
+                if (hookFailure != null && seen.stream().noneMatch(item -> {
+                    StepResult step = toResult(item.step(), item.frame());
+                    return step.status() == Status.FAILED || step.status() == Status.UNDEFINED || step.status() == Status.AMBIGUOUS;
+                })) {
+                    trailing.add(new StepResult(
                             Status.FAILED,
                             "*",
                             "hook",
@@ -142,12 +154,31 @@ public final class NativeScenarioRun {
                             ""
                     ));
                 }
+                scenarioFailed = state.isScenarioFailed();
+                if (scenarioFailed && !state.stepFailures.isEmpty() && state.stepFailures.getLast() != null) {
+                    String text = state.stepFailures.getLast().getMessage();
+                    scenarioFailure = text == null ? "" : text;
+                }
                 if (state.scenarioLog != null) state.scenarioLog.stop();
                 context.phase(ExecutionContext.Phase.CLEANUP);
                 SharedStepRun.forget();
             }
+        } finally {
+            NativeStepTrace.listen(outerTrace);
         }
-        return ScenarioResult.fromSteps(scenario.name(), results);
+        List<StepResult> results = new ArrayList<>();
+        for (Seen item : seen) {
+            results.add(toResult(item.step(), item.frame()));
+        }
+        results.addAll(trailing);
+        ScenarioResult outcome = ScenarioResult.fromSteps(scenario.name(), results);
+        if (scenarioFailed && outcome.status() != Status.FAILED && outcome.status() != Status.UNDEFINED) {
+            outcome = new ScenarioResult(Status.FAILED, outcome.name(), outcome.steps(), scenarioFailure);
+        }
+        return outcome;
+    }
+
+    private record Seen(EngineStep step, StepExtension frame) {
     }
 
     private static void installExamples(CurrentScenarioState state, EngineScenario scenario) {
@@ -223,18 +254,39 @@ public final class NativeScenarioRun {
         }
     }
 
+    public static StepExtension preparedFrame(EngineStep step, StepRegistry registry, CurrentScenarioState state) {
+        return prepareStep(step, registry, state).frame();
+    }
+
     public static StepExtension frame(EngineStep engineStep, StepRegistry registry, CurrentScenarioState state) {
         StepExtension frame = new StepExtension(engineStep.keyword(), engineStep.text());
         SharedStepRun.remember(frame, engineStep);
+        String inlineType = engineStep.metadata().get("inlineArgumentType");
+        String inlineText = engineStep.metadata().get("inlineArgumentText");
+        if (inlineType != null) frame.nativeInlineType = inlineType;
+        if (inlineText != null) frame.nativeInlineText = inlineText;
         frame.setStepParsingMap(state.getParsingMap());
         if (registry != null) {
             StepMatch match = registry.match(engineStep.text());
             if (match.step() != null && match.step().method() != null) {
                 frame.attachNativeMethod(match.step().method());
                 SharedStepRun.prepareData(frame, match);
+                if (frame.isStepMarker && match.captures() != null && !match.captures().isEmpty()
+                        && match.captures().getFirst() != null) {
+                    frame.stepMarkerText = match.captures().getFirst().trim();
+                }
             }
         }
         return frame;
+    }
+
+    private static void appendChildren(StepExtension frame, List<StepResult> results) {
+        if (frame == null || frame.childSteps == null) return;
+        for (Object child : frame.childSteps) {
+            if (!(child instanceof StepExtension extension)) continue;
+            results.add(toResult(null, extension));
+            appendChildren(extension, results);
+        }
     }
 
     private static StepResult toResult(EngineStep step, StepExtension frame) {
@@ -255,15 +307,41 @@ public final class NativeScenarioRun {
         }
         String returned = frame.nativeReturned == null ? "" : String.valueOf(frame.nativeReturned);
         String noted = message == null ? "" : message;
-        String source = step.metadata().get("source");
+        String source = step == null ? null : step.metadata().get("source");
         if (source != null && !source.isBlank()) {
             String mark = "source=" + source;
             noted = noted.isBlank() ? mark : noted + " " + mark;
         }
         long millis = frame.result == null || frame.result.getDuration() == null
                 ? 0
-                : Math.max(0, frame.result.getDuration().toMillis());
-        return new StepResult(status, step.keyword(), step.text(), noted, millis, returned);
+                : frame.result.getDuration().toMillis();
+        return new StepResult(status, keyword(frame, step), displayText(frame, step), noted, millis, returned);
+    }
+
+    private static String keyword(StepExtension frame, EngineStep step) {
+        if (step != null && step.keyword() != null) return step.keyword();
+        return frame.nativeKeyword == null ? "" : frame.nativeKeyword;
+    }
+
+    private static String displayText(StepExtension frame, EngineStep step) {
+        if (frame.substituteLoggingText != null && !frame.substituteLoggingText.isBlank()) {
+            return frame.substituteLoggingText;
+        }
+        boolean skipped = frame.skipped
+                || frame.logAndIgnore
+                || (frame.result != null && frame.result.getStatus() == io.cucumber.plugin.event.Status.SKIPPED);
+        String base = step == null || step.text() == null ? "" : step.text();
+        if (!skipped && frame.isDynamicStep && frame.lineData != null
+                && frame.lineData.runningText != null && !frame.lineData.runningText.isBlank()) {
+            base = frame.lineData.runningText;
+        } else if (frame.getStepText() != null && !frame.getStepText().isBlank()) {
+            base = frame.getStepText();
+        }
+        int nesting = Math.max(0, frame.getNestingLevel());
+        // initializeScenarioSteps adds one level. Cucumber prints " : ".repeat(level - 1).
+        String prefix = " : ".repeat(Math.max(0, nesting - 1));
+        if (prefix.isEmpty() || base.startsWith(prefix)) return base;
+        return prefix + base;
     }
 
     private static Status map(io.cucumber.plugin.event.Status status) {

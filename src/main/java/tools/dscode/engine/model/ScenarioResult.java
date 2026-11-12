@@ -19,14 +19,21 @@ public record ScenarioResult(
     public static ScenarioResult fromSteps(String name, List<StepResult> steps) {
         Status status = Status.PASSED;
         String message = "";
+        boolean skipped = false;
         if (steps != null) {
             for (StepResult step : steps) {
+                if (step.status() == Status.SKIPPED) {
+                    skipped = true;
+                }
                 if (step.status() == Status.FAILED || step.status() == Status.AMBIGUOUS || step.status() == Status.UNDEFINED) {
                     status = step.status() == Status.UNDEFINED ? Status.UNDEFINED : Status.FAILED;
                     message = step.message();
                     break;
                 }
             }
+        }
+        if (status == Status.PASSED && skipped) {
+            status = Status.SKIPPED;
         }
         return new ScenarioResult(status, name, steps == null ? List.of() : steps, message);
     }

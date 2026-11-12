@@ -65,18 +65,37 @@ public final class ScenarioStepData {
         stepText = sourceStep.getUnmodifiedText();
         stepMarkerText = sourceStep.stepMarkerText;
         stepExpression = findStepExpression(sourceStep);
-
-        PickleStepArgument pickleArgument = sourceStep.pickleStepTestStep
-                .getPickleStep()
-                .getArgument()
-                .orElse(null);
-
-        dataTable = sourceStep.dataTable != null
-                ? sourceStep.dataTable
-                : dataTableFromPickleArgument(pickleArgument);
-        docString = sourceStep.docString != null
-                ? sourceStep.docString
-                : docStringFromPickleArgument(pickleArgument);
+        DataTable resolvedTable;
+        DocString resolvedDoc;
+        if (sourceStep.pickleStepTestStep == null) {
+            tools.dscode.engine.model.EngineStep bound =
+                    tools.dscode.engine.runtime.SharedStepRun.bound(sourceStep);
+            resolvedTable = sourceStep.dataTable;
+            resolvedDoc = sourceStep.docString;
+            if (resolvedTable == null
+                    && bound != null
+                    && bound.argument() instanceof tools.dscode.engine.model.StepArgument.TableArg table) {
+                resolvedTable = tools.dscode.engine.convert.CucumberModelConverter.toDataTable(table.table());
+            }
+            if (resolvedDoc == null
+                    && bound != null
+                    && bound.argument() instanceof tools.dscode.engine.model.StepArgument.DocArg doc) {
+                resolvedDoc = tools.dscode.engine.convert.CucumberModelConverter.toDocString(doc.doc());
+            }
+        } else {
+            PickleStepArgument pickleArgument = sourceStep.pickleStepTestStep
+                    .getPickleStep()
+                    .getArgument()
+                    .orElse(null);
+            resolvedTable = sourceStep.dataTable != null
+                    ? sourceStep.dataTable
+                    : dataTableFromPickleArgument(pickleArgument);
+            resolvedDoc = sourceStep.docString != null
+                    ? sourceStep.docString
+                    : docStringFromPickleArgument(pickleArgument);
+        }
+        dataTable = resolvedTable;
+        docString = resolvedDoc;
     }
 
     private static StepExtension selectedSourceStep(
@@ -252,6 +271,9 @@ public final class ScenarioStepData {
     private static StepExpression findStepExpression(
             StepExtension stepExtension
     ) {
+        if (stepExtension.pickleStepTestStep == null) {
+            return nativeStepExpression(stepExtension);
+        }
         PickleStepDefinitionMatch definitionMatch =
                 stepExtension.pickleStepTestStep.getDefinitionMatch();
         if (definitionMatch == null) {
@@ -262,6 +284,32 @@ public final class ScenarioStepData {
         return stepDefinition instanceof CoreStepDefinition coreStepDefinition
                 ? coreStepDefinition.getExpression()
                 : null;
+    }
+
+    /** Cucumber's expression is package-private. Native frames build the same kind from the glue pattern. */
+    private static StepExpression nativeStepExpression(StepExtension stepExtension) {
+        java.lang.reflect.Method method = stepExtension.method;
+        String pattern = method == null ? "" : cucumberPattern(method);
+        if (pattern.isBlank()) return null;
+        try {
+            var registry = new io.cucumber.cucumberexpressions.ParameterTypeRegistry(java.util.Locale.ENGLISH);
+            var expression = new io.cucumber.cucumberexpressions.ExpressionFactory(registry).createExpression(pattern);
+            return io.cucumber.core.stepexpression.NativeStepExpressions.of(expression);
+        } catch (RuntimeException failure) {
+            return null;
+        }
+    }
+
+    private static String cucumberPattern(java.lang.reflect.Method method) {
+        for (java.lang.annotation.Annotation annotation : method.getAnnotations()) {
+            try {
+                Object value = annotation.annotationType().getMethod("value").invoke(annotation);
+                if (value instanceof String pattern && !pattern.isBlank()) return pattern;
+            } catch (ReflectiveOperationException ignored) {
+                // Not a step annotation.
+            }
+        }
+        return "";
     }
 
     private static NodeMap firstCopy(

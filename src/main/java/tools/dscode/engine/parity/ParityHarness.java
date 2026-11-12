@@ -31,7 +31,9 @@ public final class ParityHarness {
         Path copy = dir.resolve(feature.getFileName().toString());
         try {
             Files.writeString(copy, text);
+            DualRun.begin(glue);
             RunResult adapter = CucumberAdapterRun.run(copy, glue.getPackageName());
+            DualRun.reset();
             RunResult nativeResult = PickleballEngine.run(text, EngineOptions.of(glue).project(dir));
             List<DualRun.Divergence> found = new ArrayList<>(DualRun.diff(adapter, nativeResult));
             found.addAll(returned(adapter, nativeResult));

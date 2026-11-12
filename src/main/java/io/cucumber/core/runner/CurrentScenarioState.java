@@ -46,6 +46,7 @@ import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
 import static io.cucumber.core.runner.GlobalState.lifecycle;
 import static io.cucumber.core.runner.GlobalState.pickleballLog;
 import static io.cucumber.core.runner.StepLogic.stepCloner;
+import tools.dscode.engine.runtime.NativeStepTrace;
 import static org.junit.jupiter.api.Assertions.fail;
 import static tools.dscode.common.GlobalConstants.ALWAYS_RUN;
 import static tools.dscode.common.GlobalConstants.RUN_IF_SCENARIO_FAILED;
@@ -527,6 +528,11 @@ public class CurrentScenarioState extends ScenarioMapping {
             stepExtension.setToLogAll();
         }
 
+        // Cucumber records flag metadata when the pickle is matched. Native
+        // steps must do the same before shouldRun, or ALWAYS RUN is skipped
+        // after a hard failure and its inline child never exists.
+        tools.dscode.engine.runtime.SharedStepRun.bindGlue(stepExtension);
+
         if (!shouldRun(stepExtension)) {
             stepExtension.skipped = true;
             runNextSibling(stepExtension);
@@ -576,6 +582,14 @@ public class CurrentScenarioState extends ScenarioMapping {
             scenarioLog.fail("SCENARIO FAILED: " + throwable.getMessage());
         }
 
+        if (stepExtension.hasFinalizerAction()
+                && stepExtension.result != null
+                && stepExtension.result.getStatus() != Status.FAILED
+                && stepExtension.result.getStatus() != Status.UNDEFINED) {
+            // Passed finalizers are noLogging on the Cucumber path and emit nothing.
+        } else {
+            NativeStepTrace.record(stepExtension);
+        }
 
 //        if (isScenarioComplete())
 //            return;
@@ -668,11 +682,11 @@ public class CurrentScenarioState extends ScenarioMapping {
                                 );
                                 clonedStep.nextSibling = null;
                                 try (UntilPassTiming.Scope ignoredSubstitute = UntilPassTiming.open("substitute-step")) {
+                                    String substitute = ", ---" + clonedStep.overridePhrase.assertionChain;
+                                    clonedStep.substituteLoggingText = substitute;
                                     if (clonedStep.pickleStepTestStep != null) {
                                         clonedStep.pickleStepTestStep.substituteStep = clonedStep
-                                                .createNewStepExtension(
-                                                        ", ---" + clonedStep.overridePhrase.assertionChain
-                                                )
+                                                .createNewStepExtension(substitute)
                                                 .pickleStepTestStep;
                                     }
                                 }

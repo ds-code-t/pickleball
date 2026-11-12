@@ -257,6 +257,10 @@ public abstract class StepData extends StepMapping {
     }
 
     public boolean hasInlineArgument() {
+        if (pickleStepTestStep == null) {
+            return nativeInlineType != null && !nativeInlineType.isBlank()
+                    && nativeInlineText != null && !nativeInlineText.isBlank();
+        }
         PickleStep pickleStep = getPickleStep();
         return pickleStep != null && pickleStep.hasInlineArgument();
     }

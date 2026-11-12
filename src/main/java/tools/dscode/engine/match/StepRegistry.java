@@ -107,6 +107,11 @@ public final class StepRegistry {
                         String binary = classFile.getFileName().toString();
                         binary = binary.substring(0, binary.length() - ".class".length());
                         if (binary.contains("$") && binary.matches(".*\\$\\d+.*")) continue;
+                        // JUnit fixtures in the same package are not glue. An explicit
+                        // scan() of the caller's class still loads that fixture.
+                        if (binary.endsWith("Test")) continue;
+                        int nested = binary.indexOf('$');
+                        if (nested > 0 && binary.substring(0, nested).endsWith("Test")) continue;
                         String className = packageName + "." + binary;
                         try {
                             scan(Class.forName(className, true, loader));

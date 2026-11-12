@@ -56,7 +56,7 @@ public final class NativeModularRun {
                 if (!includeBackground && step.fromBackground()) continue;
                 StepExtension frame = state == null
                         ? new StepExtension(step.keyword(), step.text())
-                        : NativeScenarioRun.frame(step, registry, state);
+                        : NativeScenarioRun.preparedFrame(step, registry, state);
                 if (frame.isStepMarker && registry != null) {
                     StepMatch match = registry.match(step.text());
                     if (!match.captures().isEmpty() && match.captures().getFirst() != null) {

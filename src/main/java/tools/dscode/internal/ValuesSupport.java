@@ -88,6 +88,21 @@ public final class ValuesSupport {
         }
     }
 
+    /** Copy of the registered prefixes. Dual-run restores this between engines. */
+    public static java.util.Map<String, BiFunction<Values.Context, String, PrefixValue>> prefixSnapshot() {
+        return new java.util.HashMap<>(PREFIXES);
+    }
+
+    /** Replaces the registry with a previous {@link #prefixSnapshot()}. */
+    public static void restorePrefixes(
+            java.util.Map<String, BiFunction<Values.Context, String, PrefixValue>> snapshot
+    ) {
+        PREFIXES.clear();
+        if (snapshot != null) {
+            PREFIXES.putAll(snapshot);
+        }
+    }
+
     public static Object callPrefix(String source) {
         int colon = source == null ? -1 : source.indexOf(':');
         if (colon <= 0) {

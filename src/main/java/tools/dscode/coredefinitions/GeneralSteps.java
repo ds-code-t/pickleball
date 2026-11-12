@@ -61,6 +61,12 @@ public class GeneralSteps extends CoreSteps {
         return id + " " + message;
     }
 
+    /** One engine run owns the ids. A second engine in the same JVM starts again at 1. */
+    public static void resetRegisteredThrowables() {
+        REGISTERED_THROWABLE_ID.set(0);
+        REGISTERED_THROWABLES.clear();
+    }
+
     private static Throwable removeRegisteredThrowable(String message) {
         if (message == null || message.isBlank()) {
             return null;

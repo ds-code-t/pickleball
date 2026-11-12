@@ -1,23 +1,90 @@
 package tools.dscode.engine.parity;
 
+import tools.dscode.coredefinitions.GeneralSteps;
 import tools.dscode.engine.EngineOptions;
 import tools.dscode.engine.PickleballEngine;
 import tools.dscode.engine.adapter.CucumberAdapterRun;
 import tools.dscode.engine.model.RunResult;
 import tools.dscode.engine.model.ScenarioResult;
 import tools.dscode.engine.model.StepResult;
+import tools.dscode.internal.ValuesSupport;
 
+import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Enumeration;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.function.BiFunction;
 
 /** Runs one feature on the Cucumber adapter and the native engine and lists differences. */
 public final class DualRun {
     public record Divergence(String scenario, String field, String adapter, String nativeEngine) {
     }
 
+    private static Map<String, BiFunction<tools.dscode.Values.Context, String, tools.dscode.PrefixValue>> BASELINE;
+
     private DualRun() {
+    }
+
+    /**
+     * Loads glue so static prefix registrations exist, then remembers those
+     * prefixes. Each engine starts from that baseline. A prefix registered
+     * while one engine runs is removed before the next engine.
+     */
+    public static void begin(Class<?> glue) {
+        Map<String, BiFunction<tools.dscode.Values.Context, String, tools.dscode.PrefixValue>> before =
+                ValuesSupport.prefixSnapshot();
+        warm(glue);
+        Map<String, BiFunction<tools.dscode.Values.Context, String, tools.dscode.PrefixValue>> after =
+                ValuesSupport.prefixSnapshot();
+        if (BASELINE == null) {
+            BASELINE = new HashMap<>(after);
+        } else {
+            after.forEach((key, value) -> {
+                if (!before.containsKey(key)) BASELINE.put(key, value);
+            });
+        }
+        reset();
+    }
+
+    public static void reset() {
+        GeneralSteps.resetRegisteredThrowables();
+        if (BASELINE != null) ValuesSupport.restorePrefixes(BASELINE);
+    }
+
+    private static void warm(Class<?> glue) {
+        if (glue == null) return;
+        ClassLoader loader = glue.getClassLoader();
+        String resource = glue.getPackageName().replace('.', '/');
+        try {
+            Enumeration<URL> urls = loader.getResources(resource);
+            while (urls.hasMoreElements()) {
+                URL url = urls.nextElement();
+                if (!"file".equalsIgnoreCase(url.getProtocol())) continue;
+                Path dir = Path.of(url.toURI());
+                if (!Files.isDirectory(dir)) continue;
+                try (var files = Files.list(dir)) {
+                    for (Path file : files.toList()) {
+                        String name = file.getFileName().toString();
+                        if (!name.endsWith(".class") || name.contains("$")) continue;
+                        try {
+                            Class.forName(
+                                    glue.getPackageName() + "." + name.substring(0, name.length() - 6),
+                                    true,
+                                    loader
+                            );
+                        } catch (Throwable ignored) {
+                            // One glue class failing to initialize must not skip the rest.
+                        }
+                    }
+                }
+            }
+        } catch (Exception ignored) {
+            // A glue class that fails to initialize is reported by the engine.
+        }
     }
 
     public static List<Divergence> compare(String gherkin, Class<?> glue) throws Exception {
@@ -25,7 +92,9 @@ public final class DualRun {
         Path feature = dir.resolve("dual.feature");
         try {
             Files.writeString(feature, gherkin);
+            begin(glue);
             RunResult adapter = CucumberAdapterRun.run(feature, glue.getPackageName());
+            reset();
             RunResult nativeResult = PickleballEngine.run(gherkin, EngineOptions.of(glue));
             return diff(adapter, nativeResult);
         } finally {
@@ -63,10 +132,17 @@ public final class DualRun {
                     found.add(new Divergence(name, "step-text", a.text(), b.text()));
                 }
                 if (a.status() != b.status()) {
-                    found.add(new Divergence(name, "step-status", a.status().name(), b.status().name()));
+                    found.add(new Divergence(name, "step-status", a.status().name() + note(a), b.status().name() + note(b)));
                 }
             }
         }
         return List.copyOf(found);
+    }
+
+    private static String note(StepResult step) {
+        if (step == null || step.message() == null || step.message().isBlank()) return "";
+        String text = step.message().replace('\n', ' ').replace('\r', ' ');
+        if (text.length() > 400) text = text.substring(0, 400);
+        return " " + text;
     }
 }

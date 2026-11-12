@@ -51,6 +51,10 @@ sourceSets {
     runnerFixtures {
         java.srcDir 'src/runnerFixtures/java'
     }
+    // Consumer glue for dual-run. Not a test source set, so its JUnit checks are not executed here.
+    consumerGlue {
+        java.srcDir 'maven-consumer-project/src/test/java'
+    }
     test { java { srcDirs += ['src/test/aspectj'] } }
 }
 
@@ -71,6 +75,14 @@ configurations {
     ajcRuntime {
         canBeConsumed = false
         canBeResolved = true
+    }
+    // External jars for compiling consumer glue. Not the test compile classpath:
+    // that includes this project's classes and would cycle through processResources.
+    consumerGlueLibs {
+        canBeConsumed = false
+        canBeResolved = true
+        extendsFrom testImplementation
+        extendsFrom testCompileOnly
     }
 }
 
@@ -96,6 +108,10 @@ dependencies {
     api("org.junit.jupiter:junit-jupiter-api:5.13.4")
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:5.13.4")
     testImplementation sourceSets.runnerFixtures.output
+    // Consumer glue is compiled for dual-run only. It is not a test source set,
+    // so its JUnit checks are not discovered as :test. The output is added on the
+    // test task classpath below, not as a testImplementation dependency, or the
+    // glue compile classpath would cycle.
     // cucumber-core is excluded from the test runtime so woven classes win.
     // That exclude also drops transitives only cucumber-core requests.
     // datatable and docstring are separate modules. They are not woven, and the
@@ -218,6 +234,25 @@ tasks.named('classes') { dependsOn 'ajcMain' }
 tasks.named('compileRunnerFixturesJava') {
     dependsOn tasks.named('classes')
     classpath = files(sourceSets.main.output, sourceSets.main.compileClasspath)
+}
+
+tasks.named('compileConsumerGlueJava') {
+    dependsOn tasks.named('ajcMain')
+    dependsOn tasks.named('expandWoven')
+    dependsOn ':pickleball-control-api:classes'
+    def controlApiClasses = file('pickleball-control-api/build/classes/java/main')
+    def woven = layout.buildDirectory.dir('woven-expanded')
+    classpath = files(
+            sourceSets.main.java.destinationDirectory,
+            controlApiClasses,
+            woven,
+            configurations.consumerGlueLibs
+    )
+}
+
+tasks.named('compileTestJava') {
+    dependsOn tasks.named('compileConsumerGlueJava')
+    classpath += sourceSets.consumerGlue.output
 }
 
 // --- BINARY WEAVING OF DEPENDENCY JARS ---
@@ -925,9 +960,16 @@ tasks.test {
     }
     dependsOn("expandWoven")
     dependsOn("publishToMavenLocal")
+    dependsOn("compileConsumerGlueJava")
+    dependsOn(":pickleball-control-api:classes")
 
-    // Put woven classes FIRST so they beat the unwoven dependency jars
-    classpath = files(wovenExpanded) + classpath
+    // Put woven classes FIRST so they beat the unwoven dependency jars.
+    // Consumer glue and the control API are on this classpath only so dual-run
+    // can execute maven-consumer step definitions. They are not test sources.
+    // Consumer resources stay last so they do not shadow root resources.
+    def controlApiClasses = file('pickleball-control-api/build/classes/java/main')
+    def consumerResources = file('maven-consumer-project/src/test/resources')
+    classpath = files(wovenExpanded, controlApiClasses, sourceSets.consumerGlue.output) + classpath + files(consumerResources)
 }
 
 configurations.named("testRuntimeClasspath") {

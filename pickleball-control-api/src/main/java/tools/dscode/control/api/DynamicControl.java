@@ -42,7 +42,7 @@ public final class DynamicControl {
      * Workbench, so the controller remains independent of Cucumber/Pickleball.</p>
      */
     public static ControlCallResult<StepExtension> createStep(String text, String argument) {
-        if (GlobalState.getCurrentScenarioState() == null || GlobalState.getTestCase() == null) {
+        if (GlobalState.getCurrentScenarioState() == null) {
             return ControlCallResult.unavailable("Dynamic step creation requires an active Pickleball test context.");
         }
         return attempt(() -> {

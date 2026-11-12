@@ -57,6 +57,8 @@ public abstract class StepBase implements Cloneable {
     public StepBase nextSibling;
 
     public String overrideLoggingText = null;
+    /** Until-loop stand-in. Cucumber emits this text with no nesting prefix. */
+    public String substituteLoggingText = null;
 
     protected List<Argument> arguments;
     public Argument argument;
@@ -188,6 +190,7 @@ public abstract class StepBase implements Cloneable {
         try {
             // 1. Shallow copy of this StepBase
             StepBase copy = (StepBase) super.clone();
+            tools.dscode.engine.runtime.SharedStepRun.transfer(this, copy);
 
             copy.clones = new ArrayList<>();
             copy.isClone = true;

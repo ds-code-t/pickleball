@@ -17,6 +17,7 @@ import tools.dscode.engine.runtime.NativeScenarioCatalog;
 import tools.dscode.engine.source.MemoryScenarioSource;
 import tools.dscode.engine.source.ScenarioSource;
 import tools.dscode.engine.source.StepListScenarioSource;
+import io.cucumber.core.runner.CurrentScenarioState;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -38,11 +39,21 @@ public final class PickleballEngine {
     public static RunResult run(ScenarioSource source, EngineOptions options) {
         EngineOptions settings = options == null ? EngineOptions.of() : options;
         StepRegistry registry = new StepRegistry().logTo(settings.project());
-        if (settings.glue() != null) registry.scan(settings.glue().toArray(Class<?>[]::new));
+        if (settings.glue() != null) {
+            registry.scan(settings.glue().toArray(Class<?>[]::new));
+            for (Class<?> type : settings.glue()) {
+                if (type != null && type.getPackageName() != null && !type.getPackageName().isBlank()) {
+                    registry.scanPackage(type.getPackageName());
+                }
+            }
+        }
         registry.scanPackage("tools.dscode.coredefinitions");
         List<EngineFeature> loaded = source.load();
         NativeScenarioCatalog.bind(settings.project(), loaded);
         List<ScenarioResult> scenarios = new ArrayList<>();
+        boolean topLevel = ExecutionContext.current() == null;
+        CurrentScenarioState parked = topLevel ? CurrentScenarioState.currentScenarioState.get() : null;
+        if (topLevel) CurrentScenarioState.currentScenarioState.remove();
         try {
             for (EngineFeature feature : loaded) {
                 EngineFeature expanded = GherkinEngineParser.expand(feature);
@@ -53,6 +64,7 @@ public final class PickleballEngine {
             }
         } finally {
             NativeScenarioCatalog.clear();
+            if (topLevel && parked != null) CurrentScenarioState.currentScenarioState.set(parked);
         }
         RunResult result = RunResult.of(scenarios);
         EngineLog.log(settings.project(), "run", source.id(), result.status() + " scenarios=" + scenarios.size());

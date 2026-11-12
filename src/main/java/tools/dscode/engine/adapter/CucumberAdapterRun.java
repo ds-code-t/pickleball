@@ -16,7 +16,9 @@ import tools.dscode.engine.model.RunResult;
 import tools.dscode.engine.model.ScenarioResult;
 import tools.dscode.engine.model.Status;
 import tools.dscode.engine.model.StepResult;
+import tools.dscode.testengine.PKB_props;
 import tools.dscode.testengine.PickleballRunner;
+import io.cucumber.core.runner.modularexecutions.CucumberScanUtil;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -32,14 +34,24 @@ public final class CucumberAdapterRun {
     public static RunResult run(Path featureFile, String gluePackage) {
         synchronized (RECORD) {
             RECORD.setLength(0);
+            String featureRoot = "wd-file:" + featureFile.toAbsolutePath().getParent();
+            String[] previousFeatures = new String[1];
+            RuntimeOptionsBuilder options = new RuntimeOptionsBuilder()
+                    .addFeature(FeatureWithLines.parse(featureFile.toAbsolutePath().toString()))
+                    .addGlue(GluePath.parse("tools.dscode.coredefinitions"))
+                    .setNoSummary();
+            if (gluePackage != null && !gluePackage.isBlank()
+                    && !"tools.dscode.coredefinitions".equals(gluePackage)) {
+                options.addGlue(GluePath.parse(gluePackage));
+            }
             Runtime runtime = Runtime.builder()
-                    .withRuntimeOptions(new RuntimeOptionsBuilder()
-                            .addFeature(FeatureWithLines.parse(featureFile.toAbsolutePath().toString()))
-                            .addGlue(GluePath.parse(gluePackage))
-                            .setNoSummary()
-                            .build())
+                    .withRuntimeOptions(options.build())
                     .withAdditionalPlugins((EventListener) publisher -> {
                         publisher.registerHandlerFor(TestCaseStarted.class, event -> {
+                            PickleballRunner.LOG_LEVEL = Level.DEBUG;
+                            if (previousFeatures[0] == null) previousFeatures[0] = PKB_props.features();
+                            PKB_props.features(featureRoot);
+                            CucumberScanUtil.clearCache();
                             append("CASE\t" + escape(event.getTestCase().getName()));
                             for (String text : plannedTexts(event.getTestCase())) {
                                 if (!internal(text)) append("PLAN\t" + escape(text));
@@ -54,21 +66,19 @@ public final class CucumberAdapterRun {
                                 append("END\t" + event.getResult().getStatus().name()));
                     })
                     .build();
-            // A previous suite may leave PickleballRunner.LOG_LEVEL at ERROR.
-            // Passed steps then set noLogging and emit no finish event, so the
-            // harness would only see the internal root step. Restore after.
+            // Block conditionals log at DEBUG. INFO drops their finish events.
+            // TRACE also records Aviator trace lines that contain pkbLazy tokens,
+            // which the lazy-boolean checks reject. DEBUG keeps the finish events
+            // and leaves those trace lines out.
             Level previous = PickleballRunner.LOG_LEVEL;
-            boolean quiet = previous != null && previous.ordinal() > Level.INFO.ordinal();
-            if (quiet) {
-                PickleballRunner.LOG_LEVEL = Level.INFO;
-            }
+            PickleballRunner.LOG_LEVEL = Level.DEBUG;
             try {
                 runtime.run();
                 return parse(RECORD.toString());
             } finally {
-                if (quiet) {
-                    PickleballRunner.LOG_LEVEL = previous;
-                }
+                PickleballRunner.LOG_LEVEL = previous;
+                if (previousFeatures[0] != null) PKB_props.features(previousFeatures[0]);
+                CucumberScanUtil.clearCache();
             }
         }
     }
@@ -150,55 +160,14 @@ public final class CucumberAdapterRun {
      */
     private static ScenarioResult close(String name, Status status, List<StepResult> planned, List<StepResult> seen) {
         List<StepResult> steps;
-        if (seen.size() >= planned.size()) {
+        if (!seen.isEmpty()) {
             steps = seen;
-        } else if (seen.isEmpty()) {
+        } else {
             Status fill = status == Status.PASSED ? Status.PASSED : status == Status.FAILED && planned.size() == 1 ? Status.FAILED : Status.SKIPPED;
             steps = new ArrayList<>();
             for (StepResult plan : planned) {
                 steps.add(StepResult.of(fill, plan.text(), ""));
             }
-        } else {
-            steps = new ArrayList<>();
-            int cursor = 0;
-            for (StepResult plan : planned) {
-                if (cursor < seen.size() && seen.get(cursor).text().equals(plan.text())) {
-                    steps.add(seen.get(cursor));
-                    cursor++;
-                } else {
-                    steps.add(StepResult.of(Status.PASSED, plan.text(), "gap"));
-                }
-            }
-            while (cursor < seen.size()) {
-                steps.add(seen.get(cursor));
-                cursor++;
-            }
-            int failAt = -1;
-            for (int index = 0; index < steps.size(); index++) {
-                Status stepStatus = steps.get(index).status();
-                if (!"gap".equals(steps.get(index).message())
-                        && (stepStatus == Status.FAILED || stepStatus == Status.UNDEFINED || stepStatus == Status.AMBIGUOUS)) {
-                    failAt = index;
-                    break;
-                }
-            }
-            if (failAt < 0 && status != Status.PASSED) {
-                failAt = steps.size();
-            }
-            List<StepResult> filled = new ArrayList<>();
-            for (int index = 0; index < steps.size(); index++) {
-                StepResult step = steps.get(index);
-                if (!"gap".equals(step.message())) {
-                    filled.add(step);
-                } else if (status == Status.PASSED) {
-                    filled.add(StepResult.of(Status.PASSED, step.text(), ""));
-                } else if (failAt < 0 || index < failAt) {
-                    filled.add(StepResult.of(Status.PASSED, step.text(), ""));
-                } else {
-                    filled.add(StepResult.of(Status.SKIPPED, step.text(), ""));
-                }
-            }
-            steps = filled;
         }
         return new ScenarioResult(status, name, steps, "");
     }

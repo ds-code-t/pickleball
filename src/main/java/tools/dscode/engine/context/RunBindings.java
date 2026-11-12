@@ -51,6 +51,10 @@ public final class RunBindings {
         if (cucumberScenarioLive()) {
             return GlobalState.getRunningStep();
         }
+        // Cucumber reaches this through GlobalState.getRunningStep, which the
+        // control aspect redirects to the detached step. Native has no aspect.
+        StepExtension override = tools.dscode.common.control.ControlExecutionScope.currentStepOverride();
+        if (override != null) return override;
         CurrentScenarioState state = scenarioState();
         return state == null ? null : state.getCurrentStep();
     }

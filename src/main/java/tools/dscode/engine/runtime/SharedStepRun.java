@@ -22,6 +22,7 @@ import tools.dscode.engine.model.EngineStep;
 import tools.dscode.engine.model.StepArgument;
 import tools.dscode.engine.model.Table;
 import tools.dscode.engine.convert.CucumberModelConverter;
+import tools.dscode.coredefinitions.GeneralSteps;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -37,6 +38,7 @@ import static io.cucumber.core.runner.GlobalState.lifecycle;
 import static io.cucumber.core.runner.util.TableUtils.DOCSTRING_KEY;
 import static io.cucumber.core.runner.util.TableUtils.TABLE_KEY;
 import static io.cucumber.core.runner.util.TableUtils.toRowsStringMultimap;
+import static tools.dscode.common.GlobalConstants.HARD_ERROR_STEP;
 import static tools.dscode.common.annotations.DefinitionFlag.NO_STEP_TEXT_RESOLUTION;
 import static tools.dscode.common.domoperations.LeanWaits.safeWaitForPageReady;
 import static tools.dscode.common.reporting.logging.LogForwarder.closestEntryToScenario;
@@ -59,8 +61,44 @@ public final class SharedStepRun {
         if (step != null && engineStep != null) BOUND.get().put(step, engineStep);
     }
 
+    /** Cloned frames must keep the table or doc string of the frame they copy. */
+    public static void transfer(Object from, Object to) {
+        if (!(from instanceof StepExtension source) || !(to instanceof StepExtension target)) return;
+        EngineStep engineStep = BOUND.get().get(source);
+        if (engineStep != null) BOUND.get().put(target, engineStep);
+    }
+
+    public static EngineStep bound(StepExtension step) {
+        if (step == null) return null;
+        return BOUND.get().get(step);
+    }
+
     public static void forget() {
         BOUND.remove();
+    }
+
+    /**
+     * Cucumber matches a pickle before the step runs, so flag metadata and an
+     * inline child already exist. Native steps created as plain text do not.
+     * Bind the same glue method once, before {@code shouldRun}.
+     */
+    public static void bindGlue(StepExtension step) {
+        if (step == null || step.pickleStepTestStep != null || step.method != null) return;
+        StepRegistry registry = registry(ExecutionContext.current());
+        if (registry == null) return;
+        String text = step.getUnmodifiedText();
+        StepMatch match;
+        try {
+            match = registry.match(text);
+        } catch (RuntimeException thrown) {
+            // Ambiguous and other match failures stay unbound so run() reports them.
+            return;
+        }
+        if (match.kind() == StepKind.OVERRIDE || !match.matched()
+                || match.step() == null || match.step().method() == null) {
+            return;
+        }
+        step.attachNativeMethod(match.step().method());
     }
 
     /** Comma steps, block conditionals, and synthetic dynamic steps. */
@@ -76,6 +114,75 @@ public final class SharedStepRun {
         currentStep.lineData.runPhrases();
     }
 
+    /** Glue return value for a synthetic step. Cucumber frames keep {@code StepExtension.runAndGetReturnValue}. */
+    public static Object valueOf(StepExtension step) {
+        try {
+            Object value = invoke(step);
+            step.nativeReturned = value;
+            return value;
+        } catch (RuntimeException | Error thrown) {
+            throw thrown;
+        } catch (Throwable thrown) {
+            Throwable cause = unwrap(thrown);
+            if (cause instanceof RuntimeException runtime) throw runtime;
+            if (cause instanceof Error error) throw error;
+            throw new RuntimeException(cause);
+        }
+    }
+
+    /** Gherkin table or doc string text for a native frame. Empty when the step has neither. */
+    public static String renderedArgument(StepExtension step) {
+        EngineStep bound = bound(step);
+        if (bound == null) return "";
+        return render(bound.argument());
+    }
+
+    /** Binds a rendered Gherkin argument onto a synthetic native step so glue sees the table or doc string. */
+    public static void attachRenderedArgument(StepExtension step, String gherkinArgument) {
+        if (step == null || gherkinArgument == null || gherkinArgument.isBlank()) return;
+        String feature = "Feature: Argument\n  Scenario: One\n    * step\n" + gherkinArgument + "\n";
+        tools.dscode.engine.model.EngineFeature parsed =
+                tools.dscode.engine.parse.GherkinEngineParser.parse("memory:argument.feature", feature);
+        if (parsed.scenarios().isEmpty() || parsed.scenarios().getFirst().steps().isEmpty()) return;
+        EngineStep parsedStep = parsed.scenarios().getFirst().steps().getFirst();
+        if (parsedStep.argument() instanceof StepArgument.None) return;
+        remember(step, new EngineStep(
+                step.nativeKeyword,
+                step.getStepText(),
+                parsedStep.argument(),
+                parsedStep.location(),
+                parsedStep.metadata(),
+                false
+        ));
+        if (parsedStep.argument() instanceof StepArgument.TableArg table) {
+            step.dataTable = CucumberModelConverter.toDataTable(table.table());
+        } else if (parsedStep.argument() instanceof StepArgument.DocArg doc) {
+            step.docString = CucumberModelConverter.toDocString(doc.doc());
+        }
+    }
+
+    private static String render(StepArgument argument) {
+        if (argument instanceof StepArgument.DocArg doc) {
+            String content = doc.doc().content() == null ? "" : doc.doc().content().replace("\r\n", "\n").replace("\r", "\n");
+            String fence = content.lines().anyMatch(line -> line.equals("\"\"\"")) ? "```" : "\"\"\"";
+            String media = doc.doc().mediaType().isBlank() ? "" : " " + doc.doc().mediaType().trim();
+            String body = content.lines().map(line -> "      " + line).collect(java.util.stream.Collectors.joining("\n"));
+            return "      " + fence + media + "\n" + body + "\n      " + fence;
+        }
+        if (argument instanceof StepArgument.TableArg table) {
+            if (table.table().isEmpty()) return "";
+            return table.table().rows().stream()
+                    .map(row -> "      | " + row.stream()
+                            .map(cell -> {
+                                String value = cell == null ? "" : cell;
+                                return value.replace("\\", "\\\\").replace("|", "\\|").replace("\n", "\\n");
+                            })
+                            .collect(java.util.stream.Collectors.joining(" | ")) + " |")
+                    .collect(java.util.stream.Collectors.joining("\n"));
+        }
+        return "";
+    }
+
     public static Result run(StepExtension step) {
         Instant start = Instant.now();
         try {
@@ -84,8 +191,15 @@ public final class SharedStepRun {
                     .tags("Step")
                     .start();
             setDefaultEntry(step.stepEntry);
+            step.attachPendingInlineChildIfAny();
             lifecycle.fire(Phase.BEFORE_SCENARIO_STEP);
             fireHooks("beforestep", contextOf());
+            if (step.logAndIgnore) {
+                Result result = new Result(Status.SKIPPED, Duration.between(start, Instant.now()), null);
+                step.result = result;
+                step.skipped = true;
+                return result;
+            }
             if (step.runNativeFinalizer()) {
                 Result result = new Result(Status.PASSED, Duration.between(start, Instant.now()), null);
                 step.result = result;
@@ -97,7 +211,7 @@ public final class SharedStepRun {
             step.result = result;
             return result;
         } catch (UndefinedStep undefined) {
-            return finish(step, Status.UNDEFINED, start, undefined);
+            return hardError(step, start, undefined);
         } catch (AmbiguousMatchException ambiguous) {
             return finish(step, Status.AMBIGUOUS, start, ambiguous);
         } catch (Throwable thrown) {
@@ -110,6 +224,25 @@ public final class SharedStepRun {
             }
             lifecycle.fire(Phase.AFTER_SCENARIO_STEP);
             if (step.stepEntry != null) step.stepEntry.stop();
+        }
+    }
+
+    private static Result hardError(StepExtension step, Instant start, Throwable cause) {
+        String original = step.getStepText();
+        String message;
+        try {
+            message = GeneralSteps.registerStepThrowable(
+                    new RuntimeException("Step: '" + original + "' failed", cause));
+        } catch (RuntimeException ignored) {
+            message = GeneralSteps.registerStepThrowable(cause);
+        }
+        step.nativeText = HARD_ERROR_STEP + message;
+        step.isDynamicStep = false;
+        try {
+            GeneralSteps.hardFailStep(message);
+            return finish(step, Status.FAILED, start, new RuntimeException(message));
+        } catch (Throwable thrown) {
+            return finish(step, Status.FAILED, start, thrown);
         }
     }
 
@@ -218,7 +351,7 @@ public final class SharedStepRun {
         }
         method.setAccessible(true);
         EngineStep engineStep = BOUND.get().get(step);
-        Object[] args = arguments(method, match, engineStep);
+        Object[] args = arguments(method, match, engineStep, step);
         try {
             return method.invoke(target, args);
         } catch (InvocationTargetException failure) {
@@ -229,7 +362,7 @@ public final class SharedStepRun {
         }
     }
 
-    private static Object[] arguments(Method method, StepMatch match, EngineStep step) {
+    private static Object[] arguments(Method method, StepMatch match, EngineStep step, StepExtension extension) {
         Type[] types = method.getGenericParameterTypes();
         List<String> captures = match == null || match.captures() == null ? List.of() : match.captures();
         Object[] args = new Object[types.length];
@@ -237,7 +370,7 @@ public final class SharedStepRun {
         for (int index = 0; index < types.length; index++) {
             Class<?> raw = raw(types[index]);
             if (index == types.length - 1 && isTrailing(raw)) {
-                args[index] = trailing(raw, step);
+                args[index] = trailing(raw, step, extension);
                 continue;
             }
             String value = capture < captures.size() ? captures.get(capture++) : null;
@@ -250,7 +383,12 @@ public final class SharedStepRun {
         return raw == DataTable.class || raw == Table.class || raw == DocString.class || raw == DocText.class;
     }
 
-    private static Object trailing(Class<?> raw, EngineStep step) {
+    private static Object trailing(Class<?> raw, EngineStep step, StepExtension extension) {
+        if ((raw == DataTable.class || raw == Table.class) && inlineDataTable(extension) != null) {
+            List<List<String>> rows = inlineDataTable(extension);
+            if (raw == Table.class) return new Table(rows);
+            return DataTable.create(rows);
+        }
         if (step == null) {
             if (raw == DataTable.class) return DataTable.emptyDataTable();
             if (raw == Table.class) return Table.empty();
@@ -269,6 +407,14 @@ public final class SharedStepRun {
         if (raw == Table.class) return Table.empty();
         if (raw == DocText.class) return DocText.of("");
         return DocString.create("");
+    }
+
+    /** {@code DT:::} replaces the Gherkin table. Other inline types do not. */
+    private static List<List<String>> inlineDataTable(StepExtension extension) {
+        if (extension == null || !"DT".equals(extension.nativeInlineType)) return null;
+        String inline = extension.nativeInlineText;
+        if (inline == null || inline.isBlank()) return null;
+        return io.cucumber.messages.types.InlinePickleArgument.inlineDataTableRows(inline);
     }
 
     private static Object convert(Class<?> raw, String value) {

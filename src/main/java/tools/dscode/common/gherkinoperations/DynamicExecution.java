@@ -53,6 +53,15 @@ public class DynamicExecution {
 
     public static StepExtension getCustomStep(String stepText, String argumentText) {
         argumentText = argumentText == null || argumentText.isBlank() ? "" : argumentText;
+        if (!io.cucumber.core.runner.GlobalState.cucumberScenarioLive()) {
+            StepExtension nativeStep = new StepExtension("* ", stepText);
+            nativeStep.setStepParsingMap(getRunningParsingMap());
+            if (!argumentText.isBlank()) {
+                tools.dscode.engine.runtime.SharedStepRun.attachRenderedArgument(nativeStep, argumentText);
+            }
+            tools.dscode.engine.runtime.SharedStepRun.bindGlue(nativeStep);
+            return nativeStep;
+        }
         StepExtension modifiedStep = new StepExtension(getTestCase(), getPickleStepTestStepFromStrings(getGivenKeyword(), stepText, argumentText));
         modifiedStep.setStepParsingMap(getRunningParsingMap());
         return modifiedStep;

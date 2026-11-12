@@ -29,6 +29,7 @@ import java.util.stream.Collectors;
 
 import static io.cucumber.core.gherkin.messages.NGherkinFactory.argumentToGherkinText;
 import static io.cucumber.core.gherkin.messages.NGherkinFactory.getGherkinArgumentText;
+import static io.cucumber.core.gherkin.messages.NGherkinFactory.gherkinDataTableForInlineType;
 import static io.cucumber.core.gherkin.messages.NGherkinFactory.realGherkinArgument;
 import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
 import static io.cucumber.core.runner.GlobalState.getGlobalEventBus;
@@ -218,7 +219,15 @@ public class StepExtension extends StepData {
         addChildStep(createNewStepExtension(inline));
     }
 
+    /** Native {@code run} has no pickle path, so a flag inline child stored at match time is attached here. */
+    public void attachPendingInlineChildIfAny() {
+        attachPendingInlineChild();
+    }
+
     public Object runAndGetReturnValue() {
+        if (pickleStepTestStep == null) {
+            return tools.dscode.engine.runtime.SharedStepRun.valueOf(this);
+        }
         Object instanceOrNull;
         try {
             instanceOrNull = method.getDeclaringClass().getDeclaredConstructor().newInstance();
@@ -249,6 +258,10 @@ public class StepExtension extends StepData {
     }
 
     public Object nativeReturned;
+
+    public boolean hasFinalizerAction() {
+        return finalizerAction != null;
+    }
 
     /** Native frames have no pickle runner, so a finalizer callback runs here. */
     public boolean runNativeFinalizer() {
@@ -459,7 +472,7 @@ public class StepExtension extends StepData {
 
     public StepExtension modifyStepExtension(String newText) {
         if (pickleStepTestStep == null) {
-            return modifyStepExtension(newText, nativeInlineText == null ? "" : nativeInlineText);
+            return modifyStepExtension(newText, inheritedGherkinArgument());
         }
         return modifyStepExtension(newText, getGherkinArgumentText(pickleStepTestStep.getStep()));
     }
@@ -467,11 +480,18 @@ public class StepExtension extends StepData {
     public StepExtension modifyStepExtension(String newText, String gherkinArgument) {
         if (pickleStepTestStep == null) {
             StepExtension modifiedStep = new StepExtension(nativeKeyword, newText);
-            modifiedStep.nativeInlineText = gherkinArgument == null ? "" : gherkinArgument;
+            modifiedStep.nativeInlineType = nativeInlineType;
+            modifiedStep.nativeInlineText = nativeInlineText == null ? "" : nativeInlineText;
             modifiedStep.setStepParsingMap(getStepParsingMap());
             modifiedStep.parentStep = parentStep;
             modifiedStep.nestingLevel = nestingLevel;
             modifiedStep.lineData = lineData == null ? null : lineData.clone();
+            tools.dscode.engine.runtime.SharedStepRun.attachRenderedArgument(modifiedStep, gherkinArgument);
+            if (gherkinArgument != null && !gherkinArgument.isBlank()
+                    && tools.dscode.engine.runtime.SharedStepRun.bound(modifiedStep) == null) {
+                tools.dscode.engine.runtime.SharedStepRun.transfer(this, modifiedStep);
+            }
+            tools.dscode.engine.runtime.SharedStepRun.bindGlue(modifiedStep);
             return modifiedStep;
         }
         StepExtension modifiedStep = new StepExtension(
@@ -490,7 +510,13 @@ public class StepExtension extends StepData {
 
     public String inheritedGherkinArgument() {
         if (pickleStepTestStep == null) {
-            return nativeInlineText == null ? "" : nativeInlineText;
+            // The real table or doc string wins. A marker peeled off the end of
+            // the line is nativeInline* and belongs on the last branch only.
+            String rendered = tools.dscode.engine.runtime.SharedStepRun.renderedArgument(this);
+            if (rendered != null && !rendered.isBlank()) return rendered;
+            String inlineTable = gherkinDataTableForInlineType(nativeInlineType, nativeInlineText);
+            if (inlineTable != null) return inlineTable;
+            return "";
         }
         return realGherkinArgument(pickleStepTestStep.getStep());
     }
@@ -501,11 +527,19 @@ public class StepExtension extends StepData {
 
     public StepExtension createNewStepExtension(String stepText, String gherkinArgument) {
         if (pickleStepTestStep == null) {
-            StepExtension modifiedStep = new StepExtension(nativeKeyword, stepText);
-            modifiedStep.nativeInlineText = gherkinArgument == null ? "" : gherkinArgument;
+            io.cucumber.messages.types.InlinePickleArgument.Extracted inline =
+                    io.cucumber.messages.types.InlinePickleArgument.extract(stepText);
+            String body = inline == null ? stepText : inline.stepText();
+            StepExtension modifiedStep = new StepExtension(nativeKeyword, body);
+            if (inline != null) {
+                modifiedStep.nativeInlineType = inline.argumentType();
+                modifiedStep.nativeInlineText = inline.argumentText() == null ? "" : inline.argumentText();
+            }
             modifiedStep.setStepParsingMap(getStepParsingMap());
             modifiedStep.parentStep = parentStep;
             modifiedStep.nestingLevel = nestingLevel;
+            tools.dscode.engine.runtime.SharedStepRun.attachRenderedArgument(modifiedStep, gherkinArgument);
+            tools.dscode.engine.runtime.SharedStepRun.bindGlue(modifiedStep);
             return modifiedStep;
         }
         PickleStepTestStep newPickleStepTestStep = getPickleStepTestStepFromStrings(

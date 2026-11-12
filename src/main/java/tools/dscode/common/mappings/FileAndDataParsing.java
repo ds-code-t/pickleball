@@ -380,6 +380,23 @@ public final class FileAndDataParsing {
         String parentResourcePath = slash >= 0 ? normalized.substring(0, slash) : "";
         String requestedName = slash >= 0 ? normalized.substring(slash + 1) : normalized;
 
+        // ClassLoader.getResource("") is only the first classpath root. A bare
+        // name such as "configs" has to be resolved across every root, or a
+        // later test-resources directory is invisible.
+        if (parentResourcePath.isBlank()) {
+            URL direct = getResourceUrl(requestedName);
+            if (direct != null) {
+                try {
+                    return nodeFromResourceUrl(direct, resolveTemplates);
+                } catch (ParseFailureException | DataQueryException e) {
+                    throw e;
+                } catch (Exception e) {
+                    return null;
+                }
+            }
+            return jarRootResource(normalized, resolveTemplates);
+        }
+
         URL parentUrl = getResourceUrl(parentResourcePath);
         if (parentUrl == null) {
             return jarRootResource(normalized, resolveTemplates);
@@ -643,6 +660,36 @@ public final class FileAndDataParsing {
             .configure(DeserializationFeature.ACCEPT_EMPTY_STRING_AS_NULL_OBJECT, true)
             .configure(JsonParser.Feature.IGNORE_UNDEFINED, true)
             .build();
+
+    private static JsonNode nodeFromResourceUrl(URL url, boolean resolveTemplates) throws IOException {
+        if (url == null) return null;
+        if ("jar".equalsIgnoreCase(url.getProtocol())) {
+            try (FileSystem fs = FileSystems.newFileSystem(toJarUri(url), Map.of())) {
+                String spec = url.toString();
+                int bang = spec.indexOf("!/");
+                String inside = bang >= 0 ? spec.substring(bang + 2) : "";
+                while (inside.startsWith("/")) inside = inside.substring(1);
+                Path matched = inside.isBlank() ? fs.getPath("/") : fs.getPath(inside);
+                return Files.exists(matched) ? buildFromRoot(matched, resolveTemplates) : null;
+            } catch (ParseFailureException | DataQueryException failure) {
+                throw failure;
+            } catch (IOException failure) {
+                throw failure;
+            } catch (Exception failure) {
+                return null;
+            }
+        }
+        try {
+            Path path = Path.of(url.toURI());
+            return Files.exists(path) ? buildFromRoot(path, resolveTemplates) : null;
+        } catch (ParseFailureException | DataQueryException failure) {
+            throw failure;
+        } catch (IOException failure) {
+            throw failure;
+        } catch (Exception failure) {
+            return null;
+        }
+    }
 
     private static URL getResourceUrl(String path) {
         return ResourceLocations.loader().getResource(path);

@@ -108,7 +108,7 @@ class NativeDynamicExecutionTest {
                     * native read "branch"
                 """, EngineOptions.of(ReadGlue.class));
         assertEquals(Status.PASSED, taken.status(), taken.message());
-        assertEquals("yes", taken.scenarios().getFirst().steps().get(1).returned());
+        assertEquals("yes", taken.scenarios().getFirst().steps().getLast().returned());
 
         RunResult skipped = PickleballEngine.run("""
                 Feature: If
@@ -117,7 +117,7 @@ class NativeDynamicExecutionTest {
                     * native read "branch"
                 """, EngineOptions.of(ReadGlue.class));
         assertEquals(Status.PASSED, skipped.status(), skipped.message());
-        assertEquals("", skipped.scenarios().getFirst().steps().get(1).returned());
+        assertEquals("", skipped.scenarios().getFirst().steps().getLast().returned());
     }
 
     @Test
@@ -130,7 +130,7 @@ class NativeDynamicExecutionTest {
                     * native read "branch"
                 """, EngineOptions.of(ReadGlue.class));
         assertEquals(Status.PASSED, result.status(), result.message());
-        assertEquals("yes", result.scenarios().getFirst().steps().get(2).returned());
+        assertEquals("yes", result.scenarios().getFirst().steps().getLast().returned());
     }
 
     @Test
@@ -157,7 +157,7 @@ class NativeDynamicExecutionTest {
                 """, EngineOptions.of(ReadGlue.class).scenario("Caller"));
         assertEquals(Status.PASSED, result.status(), result.message());
         assertEquals(1, result.scenarios().size());
-        assertEquals("done", result.scenarios().getFirst().steps().get(1).returned());
+        assertEquals("done", result.scenarios().getFirst().steps().getLast().returned());
     }
 
     @Test
@@ -174,7 +174,7 @@ class NativeDynamicExecutionTest {
                 """;
         RunResult result = PickleballEngine.run(feature, EngineOptions.of(ReadGlue.class).scenario("Caller"));
         assertEquals(Status.PASSED, result.status(), result.message());
-        assertEquals("done", result.scenarios().getFirst().steps().get(3).returned());
+        assertEquals("done", result.scenarios().getFirst().steps().getLast().returned());
     }
 
     @Test
@@ -184,8 +184,11 @@ class NativeDynamicExecutionTest {
                   Scenario: One
                     * this step is not defined anywhere
                 """, EngineOptions.of());
-        assertEquals(Status.UNDEFINED, result.scenarios().getFirst().steps().getFirst().status());
+        assertEquals(Status.FAILED, result.scenarios().getFirst().steps().getFirst().status());
+        assertTrue(result.scenarios().getFirst().steps().getFirst().text().contains("FAIL ERROR:"));
+        assertTrue(result.scenarios().getFirst().steps().getFirst().text().contains("this step is not defined anywhere"));
         assertNotEquals(Status.PASSED, result.status());
+        assertEquals(Status.FAILED, result.status());
     }
 
     @Test

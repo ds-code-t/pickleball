@@ -673,7 +673,9 @@ public class ModularScenarios extends CoreSteps {
             String matchType,
             boolean requireSinglePerMap
     ) {
-        if (io.cucumber.core.runner.GlobalState.getTestCase() == null && NativeScenarioCatalog.active()) {
+        if (NativeScenarioCatalog.active()
+                && (io.cucumber.core.runner.GlobalState.getTestCase() == null
+                || tools.dscode.engine.context.ExecutionContext.current() != null)) {
             return collectNative(maps, featuresPath, runType, matchType, requireSinglePerMap);
         }
         List<PickleMatch> matches = new ArrayList<>();
@@ -759,7 +761,16 @@ public class ModularScenarios extends CoreSteps {
             RunType runType
     ) {
         if (runType == null) {
-            return featuresPath;
+            if (featuresPath != null && !featuresPath.isBlank()) {
+                return featuresPath;
+            }
+            // A blank caller path leaves the row's pkb_features in place, the
+            // same way CucumberScanUtil.listPickles reads that column.
+            String fromRow = firstNonBlank(
+                    map == null ? "" : map.get(PKB_FEATURES),
+                    map == null ? "" : map.get(CUCUMBER_FEATURES)
+            );
+            return fromRow.isBlank() ? featuresPath : fromRow;
         }
         if (runType.pathProperty() == null) {
             return null;
