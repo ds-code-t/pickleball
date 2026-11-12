@@ -249,6 +249,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/common/composite/ElementView.java`
 - `src/main/java/tools/dscode/common/composite/EngineQuery.java`
 - `src/main/java/tools/dscode/common/composite/JavaEngineLocator.java`
+- `src/main/java/tools/dscode/common/composite/LookFind.java`
 - `src/main/java/tools/dscode/common/composite/SelectorTranslator.java`
 - `src/main/java/tools/dscode/common/composite/VerbPlan.java`
 - `src/main/java/tools/dscode/common/control/ControlDecision.java`
@@ -646,6 +647,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/common/composite/EnginePositionGateTest.java`
 - `src/test/java/tools/dscode/common/composite/GeometryViewTest.java`
 - `src/test/java/tools/dscode/common/composite/LeanWaitNestLiveTest.java`
+- `src/test/java/tools/dscode/common/composite/LookLiveFindTest.java`
 - `src/test/java/tools/dscode/common/composite/LookStepTest.java`
 - `src/test/java/tools/dscode/common/composite/PrimaryPathAuditTest.java`
 - `src/test/java/tools/dscode/common/composite/SelectorAndAdapterTest.java`

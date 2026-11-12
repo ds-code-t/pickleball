@@ -165,6 +165,13 @@ public final class XPathyUtils {
     public static XPathy applyAttrPredicate(XPathy base, String attrName, ValueWrapper value, ExecutionDictionary.Op mode) {
         Objects.requireNonNull(base, "base must not be null");
         if (attrName == null || attrName.isBlank()) throw new IllegalArgumentException("attrName must not be null/blank");
+        String attrExpr = "@" + attrName.trim();
+        if (mode == ExecutionDictionary.Op.HAS) {
+            return XPathy.from(base.getXpath().trim() + "[" + attrExpr + "]");
+        }
+        if (mode == ExecutionDictionary.Op.HAS_NOT) {
+            return XPathy.from(base.getXpath().trim() + "[not(" + attrExpr + ")]");
+        }
         Objects.requireNonNull(value, "value must not be null");
 
         ExecutionDictionary.Op op = normalizeOp(mode);

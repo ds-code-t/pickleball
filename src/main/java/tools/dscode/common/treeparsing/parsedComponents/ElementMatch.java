@@ -242,9 +242,17 @@ public class ElementMatch {
                     String predicateType = "has";
                     ValueWrapper predicateVal = null;
                     if (predicate != null) {
-                        MatchNode predicateNode = elementNode.getMatchNode(predicate.trim());
-                        predicateType = (String) predicateNode.getFromLocalState("predicateType");
-                        predicateVal = predicateNode.getValueWrapper("predicateVal");
+                        String word = predicate.trim();
+                        MatchNode predicateNode = elementNode.getMatchNode(word);
+                        if (predicateNode != null) {
+                            predicateType = (String) predicateNode.getFromLocalState("predicateType");
+                            predicateVal = predicateNode.getValueWrapper("predicateVal");
+                        } else if (word.equalsIgnoreCase("attribute") || word.equalsIgnoreCase("noattribute")) {
+                            // The grammar accepts the literal words. They are not nested predicate nodes.
+                            predicateType = word.toLowerCase(Locale.ROOT).startsWith("no") ? "has not" : "has";
+                        } else {
+                            throw new RuntimeException("Invalid attribute predicate: " + attr);
+                        }
                     }
 
                     attributes.add(new Attribute(attrName, predicateType, predicateVal));

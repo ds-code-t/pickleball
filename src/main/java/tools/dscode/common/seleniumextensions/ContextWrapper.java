@@ -45,6 +45,7 @@ public class ContextWrapper {
             return getElementListFromSearchContext(searchContext, elementTerminalXPath, elementMatch);
         }
         List<WebElement> candidates = findAll(searchContext, elementTerminalXPath, elementMatch);
+        candidates = tools.dscode.common.composite.LookFind.retain(searchContext, candidates, elementMatch);
         List<WebElement> related = applySpatial(searchContext, candidates);
         return PositionSelection.apply(related, elementMatch);
     }
@@ -128,6 +129,11 @@ public class ContextWrapper {
 
     public static List<WebElement> getElementListFromSearchContext(SearchContext searchContext, XPathy xPathy, ElementMatch elementMatch) {
         logTrace("getElementListFromSearchContext: " + elementMatch);
+        if (tools.dscode.common.composite.LookFind.present(elementMatch)) {
+            List<WebElement> found = findAll(searchContext, xPathy, elementMatch);
+            found = tools.dscode.common.composite.LookFind.retain(searchContext, found, elementMatch);
+            return PositionSelection.apply(found, elementMatch);
+        }
         String xpath = adjustedXPath(searchContext, xPathy.getXpath(), elementMatch);
         logDebug("XPATH: " + prettyPrintXPath(xpath));
         return findWithRetry(searchContext, new By.ByXPath(xpath), elementMatch);

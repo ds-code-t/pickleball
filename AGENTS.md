@@ -423,5 +423,7 @@ Branch `3.0.0-query-visual` extends the Java engine query language. The locked d
 
 A step can add `with look <prop> <predicate>` after the existing attribute clause, for example `with look color equaling red` or `with look opacity greater than 0.5`. That clause is not an HTML attribute. `SelectorTranslator` maps it to a `look=` stage on the same engine query string. `with id attribute` and `with id noattribute` are unchanged. Cucumber step annotations stay single string literals. `pkb_composite_log=query` logs `forward selector=` and stays off by default.
 
+A parsed step with that clause applies the look stage on the production find (`ElementWrapper.getWrappedElements` / `ContextWrapper`). The XPath hit list is filtered by `dev.domengine.query.Query` using the same `(role AND look)` string. Attribute and noattribute grammar still apply. `pkb_composite=off` fails the find instead of ignoring look. Selenium is not asked to evaluate a look stage.
+
 
 
