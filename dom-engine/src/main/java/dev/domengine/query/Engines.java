@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import dev.domengine.cdp.CdpException;
 import dev.domengine.image.TemplateMatch;
 import dev.domengine.json.Jsons;
+import dev.domengine.log.EngineLog;
 import dev.domengine.tree.DomNode;
 
 import java.nio.file.Path;
@@ -15,6 +16,7 @@ import java.util.Locale;
 /** Built-in pipeline engines. Each stage receives the previous nodes and returns the next set. */
 public final class Engines {
     private static final ThreadLocal<TemplateMatch.Gray> VIEWPORT = new ThreadLocal<>();
+    private static final ThreadLocal<String> SPACE = new ThreadLocal<>();
 
     private Engines() {
     }
@@ -23,6 +25,12 @@ public final class Engines {
     public static void useViewport(TemplateMatch.Gray gray) {
         if (gray == null) VIEWPORT.remove();
         else VIEWPORT.set(gray);
+    }
+
+    /** {@code visual_viewport_relative} or {@code null} for document CSS pixels. */
+    public static void useSpace(String space) {
+        if (space == null || space.isBlank()) SPACE.remove();
+        else SPACE.set(space);
     }
 
     public static Query.Hit apply(String engine, String expr, List<DomNode> current, DomNode root, String pierce) {
@@ -35,6 +43,9 @@ public final class Engines {
             case "shadow" -> shadow(expr, current, root);
             case "near" -> near(expr, current, root);
             case "below" -> below(expr, current, root);
+            case "above" -> relative("above", expr, current, root);
+            case "left-of", "left" -> relative("left-of", expr, current, root);
+            case "right-of", "right" -> relative("right-of", expr, current, root);
             case "desc" -> desc(expr, scopes(current, root));
             case "a11y" -> a11y(expr, scopes(current, root));
             case "image" -> image(expr, scopes(current, root));
@@ -245,6 +256,53 @@ public final class Engines {
         }
         hits.sort((a, b) -> Double.compare(a.y, b.y));
         return new Query.Hit(Query.distinct(hits), "below matched " + hits.size());
+    }
+
+    static Query.Hit relative(String name, String expr, List<DomNode> anchors, DomNode root) {
+        String selector = expr == null || expr.isBlank() ? "*" : expr;
+        List<DomNode> candidates = css(selector, List.of(root), false).nodes;
+        String space = spaceName();
+        List<DomNode> hits = new ArrayList<>();
+        for (DomNode candidate : candidates) {
+            if (!candidate.hasBox || !candidate.displayed) continue;
+            for (DomNode anchor : anchors) {
+                if (anchor == candidate || !anchor.hasBox || !anchor.displayed) continue;
+                if (placed(name, candidate, anchor)) {
+                    hits.add(candidate);
+                    break;
+                }
+            }
+        }
+        hits.sort((a, b) -> Double.compare(minDistanceInSpace(a, anchors), minDistanceInSpace(b, anchors)));
+        List<DomNode> distinct = Query.distinct(hits);
+        EngineLog.info("visual", space + " " + name + " ranked " + distinct.size());
+        return new Query.Hit(distinct, name + " matched " + distinct.size() + " space=" + space);
+    }
+
+    private static boolean placed(String name, DomNode candidate, DomNode anchor) {
+        return switch (name) {
+            case "above" -> originY(candidate) + candidate.height <= originY(anchor);
+            case "left-of" -> originX(candidate) + candidate.width <= originX(anchor);
+            case "right-of" -> originX(candidate) >= originX(anchor) + anchor.width;
+            default -> false;
+        };
+    }
+
+    private static String spaceName() {
+        String space = SPACE.get();
+        return space == null || space.isBlank() ? "document_css_px" : space;
+    }
+
+    private static boolean visualSpace() {
+        return "visual_viewport_relative".equals(spaceName());
+    }
+
+    private static double originX(DomNode node) {
+        return visualSpace() && node.hasVisual ? node.visualX : node.x;
+    }
+
+    private static double originY(DomNode node) {
+        return visualSpace() && node.hasVisual ? node.visualY : node.y;
     }
 
     static Query.Hit desc(String expr, List<DomNode> scopes) {
@@ -749,5 +807,23 @@ public final class Engines {
             if (anchor.hasBox && node.hasBox) best = Math.min(best, distance(node, anchor));
         }
         return best;
+    }
+
+    private static double minDistanceInSpace(DomNode node, List<DomNode> anchors) {
+        double best = Double.MAX_VALUE;
+        for (DomNode anchor : anchors) {
+            if (anchor.hasBox && node.hasBox && anchor.displayed && node.displayed) {
+                best = Math.min(best, distanceInSpace(node, anchor));
+            }
+        }
+        return best;
+    }
+
+    private static double distanceInSpace(DomNode a, DomNode b) {
+        double ax = originX(a) + a.width / 2;
+        double ay = originY(a) + a.height / 2;
+        double bx = originX(b) + b.width / 2;
+        double by = originY(b) + b.height / 2;
+        return Math.hypot(ax - bx, ay - by);
     }
 }

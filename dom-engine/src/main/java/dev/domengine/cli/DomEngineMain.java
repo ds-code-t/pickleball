@@ -536,6 +536,7 @@ public final class DomEngineMain {
                 snapshot --session ID | --cdp URL --i-accept-local-attach
                 query --file page.html --css SELECTOR [--selector EXPR] [--pipeline EXPR] [--geometry] [--explain] [--viewport file.pgm]
                   EXPR accepts engine=value stages joined by >> and boolean AND, OR, and NOT
+                  relatives: near below above left-of right-of (left and right are aliases)
                   example: (css=button AND text="Submit") >> near=50
                 click|type|scroll|submit|key|dblclick|contextclick|drag|eval --session ID
                 screenshot --session ID [--out file.png]

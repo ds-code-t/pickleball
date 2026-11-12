@@ -36,6 +36,9 @@ public final class DomNode {
     public DomNode parent;
     public double frameX;
     public double frameY;
+    public boolean hasVisual;
+    public double visualX;
+    public double visualY;
 
     public String tag() {
         if (localName != null && !localName.isBlank()) return localName.toLowerCase();

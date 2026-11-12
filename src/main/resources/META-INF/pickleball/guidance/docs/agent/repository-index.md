@@ -1107,6 +1107,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `dom-engine/src/test/java/dev/domengine/ObserveParityTest.java`
 - `dom-engine/src/test/java/dev/domengine/SelectorParityTest.java`
 - `dom-engine/src/test/java/dev/domengine/SessionJoinLogTest.java`
+- `dom-engine/src/test/java/dev/domengine/VisualRelativeTest.java`
 - `dom-engine/src/test/resources/conformance/expected/a11y-at-hidden.json`
 - `dom-engine/src/test/resources/conformance/expected/a11y-custom-tag.json`
 - `dom-engine/src/test/resources/conformance/expected/a11y-hidden-role.json`

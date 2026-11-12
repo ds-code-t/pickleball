@@ -76,6 +76,9 @@ public final class LiveTree {
                 if (model != null && model.has("border")) {
                     double[] quad = quad(model.get("border"));
                     if (quad != null) {
+                        node.visualX = quad[0];
+                        node.visualY = quad[1];
+                        node.hasVisual = true;
                         node.x = quad[0] + scrollX;
                         node.y = quad[1] + scrollY;
                         node.width = quad[2];

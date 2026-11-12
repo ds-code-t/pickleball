@@ -19,10 +19,10 @@ import java.util.Map;
 /** Pipeline query over one context tree. The CLI, HTTP, and MCP only forward the stage string. */
 public final class Query {
     public static final List<String> ENGINES = List.of(
-            "css", "xpath", "text", "role", "frame", "shadow", "near", "below", "desc", "a11y", "image"
+            "css", "xpath", "text", "role", "frame", "shadow", "near", "below", "above", "left-of", "right-of", "desc", "a11y", "image"
     );
     public static final List<String> QUERY_FLAGS = List.of(
-            "within", "nesting", "nth", "every", "count-only", "geometry", "pierce", "point", "viewport"
+            "within", "nesting", "nth", "every", "count-only", "geometry", "pierce", "point", "viewport", "exposure"
     );
 
     private Query() {
@@ -35,11 +35,14 @@ public final class Query {
         if (root == null) throw new CdpException("query has no document");
         String viewport = flags.get("viewport");
         boolean armed = viewport != null && !viewport.isBlank();
+        boolean human = "human".equalsIgnoreCase(flags.get("exposure"));
         if (armed) Engines.useViewport(TemplateMatch.read(Path.of(viewport)));
+        if (human) Engines.useSpace("visual_viewport_relative");
         try {
             return runArmed(root, flags);
         } finally {
             if (armed) Engines.useViewport(null);
+            if (human) Engines.useSpace(null);
         }
     }
 
@@ -222,14 +225,19 @@ public final class Query {
         return Expressions.hasOperator(text);
     }
 
-    /** Engine name for a plain stage, or {@code expr} when the text is a boolean expression. */
+    /** {@code left} and {@code right} are aliases. Existing engine names are unchanged. */
+    public static String canonicalEngine(String engine) {
+        if ("left".equals(engine)) return "left-of";
+        if ("right".equals(engine)) return "right-of";
+        return engine;
+    }
     public static String leadingEngine(String pipeline) {
         if (pipeline == null || pipeline.isBlank()) return "css";
         String trimmed = pipeline.trim();
         if (trimmed.startsWith("(") || Expressions.hasOperator(trimmed)) return "expr";
         int eq = trimmed.indexOf('=');
         if (eq <= 0) return "css";
-        return trimmed.substring(0, eq).trim().toLowerCase(Locale.ROOT);
+        return canonicalEngine(trimmed.substring(0, eq).trim().toLowerCase(Locale.ROOT));
     }
 
     public static List<Parsed> parsePipeline(String text) {
@@ -245,7 +253,7 @@ public final class Query {
             }
             int eq = piece.indexOf('=');
             if (eq <= 0) throw new CdpException("invalid pipeline stage: " + piece);
-            String engine = piece.substring(0, eq).trim().toLowerCase(Locale.ROOT);
+            String engine = canonicalEngine(piece.substring(0, eq).trim().toLowerCase(Locale.ROOT));
             String expr = piece.substring(eq + 1).trim();
             if (!ENGINES.contains(engine)) throw new CdpException("invalid engine: " + engine);
             stages.add(new Parsed(engine, expr));

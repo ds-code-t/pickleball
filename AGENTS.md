@@ -417,5 +417,7 @@ Branch `3.0.0-query-visual` extends the Java engine query language. The locked d
 
 `>>` stays a sequential pipeline. `AND` is intersection, `OR` is union, and `NOT` is the complement of the current scope. Parentheses outrank `NOT`, then `AND`, then `OR`. Mixed `AND` and `OR` at the same level require parentheses. `domengine query --selector` and `--pipeline` accept the expression. `DOMENGINE_LOG=expr` or `COMPOSITE_LOG=expr` logs evaluation. That log stays off unless the entity is named. It is date-stamped and size-capped. Selenium fallback still returns null for `AND`, `OR`, and `NOT`.
 
+`above`, `left-of`, and `right-of` are pipeline engines beside `near` and `below`. `left` and `right` are aliases. A candidate is above when its bottom is at or above the anchor top, left-of when its right edge is at or left of the anchor left, and right-of when its left edge is at or right of the anchor right. Hits need a box and must be displayed, then sort by center distance. `near` and `below` are unchanged. `exposure=human` uses the visual box when one was stored. `DOMENGINE_LOG=visual` logs the space and rank count and stays off by default.
+
 
 

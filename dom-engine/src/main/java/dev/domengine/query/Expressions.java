@@ -311,7 +311,7 @@ final class Expressions {
             String piece = text.trim();
             int eq = piece.indexOf('=');
             if (eq <= 0) throw new CdpException("invalid pipeline stage: " + piece);
-            String engine = piece.substring(0, eq).trim().toLowerCase(Locale.ROOT);
+            String engine = Query.canonicalEngine(piece.substring(0, eq).trim().toLowerCase(Locale.ROOT));
             String expr = piece.substring(eq + 1).trim();
             if (!Query.ENGINES.contains(engine)) throw new CdpException("invalid engine: " + engine);
             return new Stage(engine, expr);
