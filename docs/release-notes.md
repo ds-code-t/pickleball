@@ -275,4 +275,6 @@ An unjoined browser stays on Selenium for nesting and for a composite find. Aski
 
 `domengine query` also accepts `above`, `left-of`, and `right-of`. `left` and `right` are aliases. `near` and `below` are unchanged. `exposure=human` uses the visual box when the engine stored one. `DOMENGINE_LOG=visual` logs that ranking and stays off unless named.
 
+`domengine query --selector` and `--pipeline` accept `look=color=red` and `look=opacity>0.5,background-color=#fff`. A comma is AND and a pipe is OR inside that stage. `contrast` compares `color` with the painted background. Logging stays off unless `DOMENGINE_LOG` or `COMPOSITE_LOG` names `look`.
+
 

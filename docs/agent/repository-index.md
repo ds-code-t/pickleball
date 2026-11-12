@@ -1136,6 +1136,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `dom-engine/src/main/java/dev/domengine/query/Engines.java`
 - `dom-engine/src/main/java/dev/domengine/query/Expressions.java`
 - `dom-engine/src/main/java/dev/domengine/query/HtmlTree.java`
+- `dom-engine/src/main/java/dev/domengine/query/Look.java`
 - `dom-engine/src/main/java/dev/domengine/query/Query.java`
 - `dom-engine/src/main/java/dev/domengine/session/BrowserSession.java`
 - `dom-engine/src/main/java/dev/domengine/session/SessionRegistry.java`
@@ -1154,6 +1155,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `dom-engine/src/test/java/dev/domengine/LiveChromeActionSmokeTest.java`
 - `dom-engine/src/test/java/dev/domengine/LiveConformanceTest.java`
 - `dom-engine/src/test/java/dev/domengine/LogCommandTest.java`
+- `dom-engine/src/test/java/dev/domengine/LookQueryTest.java`
 - `dom-engine/src/test/java/dev/domengine/McpForwardTest.java`
 - `dom-engine/src/test/java/dev/domengine/ObserveParityTest.java`
 - `dom-engine/src/test/java/dev/domengine/SelectorParityTest.java`

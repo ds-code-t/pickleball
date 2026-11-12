@@ -48,6 +48,7 @@ public final class Engines {
             case "right-of", "right" -> relative("right-of", expr, current, root);
             case "desc" -> desc(expr, scopes(current, root));
             case "a11y" -> a11y(expr, scopes(current, root));
+            case "look" -> Look.apply(expr, scopes(current, root));
             case "image" -> image(expr, scopes(current, root));
             default -> throw new CdpException("invalid engine: " + engine);
         };

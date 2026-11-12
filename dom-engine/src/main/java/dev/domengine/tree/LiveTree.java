@@ -10,6 +10,7 @@ import dev.domengine.log.EngineLog;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * Thin CDP adapter. {@code DOM.getDocument} with pierce, plus {@code Page.getFrameTree}.
@@ -61,8 +62,10 @@ public final class LiveTree {
                 if (styles != null && styles.isArray()) {
                     for (JsonNode entry : styles) {
                         String name = entry.path("name").asText("");
-                        if ("display".equals(name) && "none".equals(entry.path("value").asText(""))) node.displayed = false;
-                        if ("visibility".equals(name) && "hidden".equals(entry.path("value").asText(""))) node.displayed = false;
+                        String value = entry.path("value").asText("");
+                        if (!name.isEmpty()) node.computed.put(name.toLowerCase(Locale.ROOT), value);
+                        if ("display".equals(name) && "none".equals(value)) node.displayed = false;
+                        if ("visibility".equals(name) && "hidden".equals(value)) node.displayed = false;
                     }
                 }
             } catch (RuntimeException failure) {

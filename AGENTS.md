@@ -419,5 +419,7 @@ Branch `3.0.0-query-visual` extends the Java engine query language. The locked d
 
 `above`, `left-of`, and `right-of` are pipeline engines beside `near` and `below`. `left` and `right` are aliases. A candidate is above when its bottom is at or above the anchor top, left-of when its right edge is at or left of the anchor left, and right-of when its left edge is at or right of the anchor right. Hits need a box and must be displayed, then sort by center distance. `near` and `below` are unchanged. `exposure=human` uses the visual box when one was stored. `DOMENGINE_LOG=visual` logs the space and rank count and stays off by default.
 
+`look` matches computed style. `look=color=red` and `look=opacity>0.5,background-color=#fff` are stages. A comma is AND and a pipe is OR inside the stage. `contrast` is the contrast of `color` against the painted `background-color`. It is not a screenshot match, and there is no engine named `attribute`. `DOMENGINE_LOG=look` logs the matched properties and stays off by default.
+
 
 

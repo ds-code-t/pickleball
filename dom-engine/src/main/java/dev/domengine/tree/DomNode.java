@@ -39,6 +39,8 @@ public final class DomNode {
     public boolean hasVisual;
     public double visualX;
     public double visualY;
+    /** Computed longhands from the browser. Empty means the style attribute is the offline source. */
+    public final Map<String, String> computed = new LinkedHashMap<>();
 
     public String tag() {
         if (localName != null && !localName.isBlank()) return localName.toLowerCase();

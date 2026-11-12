@@ -537,6 +537,7 @@ public final class DomEngineMain {
                 query --file page.html --css SELECTOR [--selector EXPR] [--pipeline EXPR] [--geometry] [--explain] [--viewport file.pgm]
                   EXPR accepts engine=value stages joined by >> and boolean AND, OR, and NOT
                   relatives: near below above left-of right-of (left and right are aliases)
+                  look: look=color=red or look=opacity>0.5,background-color=#fff (comma AND, pipe OR)
                   example: (css=button AND text="Submit") >> near=50
                 click|type|scroll|submit|key|dblclick|contextclick|drag|eval --session ID
                 screenshot --session ID [--out file.png]
