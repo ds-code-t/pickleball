@@ -400,3 +400,6 @@ G9 closed the dual-run gap. Repo features and every `maven-consumer-project` fea
 ## Java DOM Engine (3.0.0)
 
 The locked design for replacing the Rust DOM composite engine with a general-purpose Java engine is `docs/maintainer/3.0.0-java-dom-design.md`. The mandatory multi-phase roadmap is `docs/roadmaps/3.0.0-java-dom-roadmap.md`. Implementation stays on branch 3.0.0. The engine interface remains general-purpose. Open PRs #2 and #3 on ds-code-t/dom-composite must not be merged.
+
+`domengine log list|tail|show` reads the capped engine logs. Pickleball `log` also lists `.pickleball/history.log`. The existing 10 MB front trim on that file is unchanged. The Workbench Logs tab only forwards to that CLI.
+

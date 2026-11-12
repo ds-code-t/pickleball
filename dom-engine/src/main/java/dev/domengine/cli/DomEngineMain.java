@@ -54,6 +54,9 @@ public final class DomEngineMain {
         if (args.isEmpty() || wantsHelp(args)) {
             return CliResult.ok(helpText());
         }
+        if ("log".equals(args.get(0))) {
+            return logs(args);
+        }
         if (args.size() == 1 && ("--version".equals(args.get(0)) || "-V".equals(args.get(0)))) {
             return CliResult.ok(EngineInfo.NAME + " " + EngineInfo.VERSION + "\n");
         }
@@ -186,7 +189,7 @@ public final class DomEngineMain {
         node.put("version", EngineInfo.VERSION);
         array(node, "commands", List.of(
                 "version", "capabilities", "session", "attach", "snapshot", "query", "resolve",
-                "info", "recommend", "validate", "capture", "conform",
+                "info", "recommend", "validate", "capture", "conform", "log",
                 "click", "type", "scroll", "submit", "key", "dblclick", "contextclick", "drag", "eval",
                 "screenshot", "observe", "wait", "desktop", "mcp", "serve"
         ));
@@ -465,6 +468,7 @@ public final class DomEngineMain {
                 query|resolve|info|recommend|validate [file] [--css SELECTOR]
                 capture --session ID | --file page.html | --url URL
                 conform --root DIR
+                log list|tail|show [--dir DIR] [--file NAME] [--lines N]
                 mcp
                 serve --stdio
                 """.formatted(EngineInfo.VERSION);
@@ -475,6 +479,60 @@ public final class DomEngineMain {
             case "query", "resolve", "info", "recommend", "validate", "capture" -> true;
             default -> false;
         };
+    }
+
+    private static CliResult logs(List<String> args) {
+        List<String> rest = args.size() <= 1 ? List.of() : args.subList(1, args.size());
+        String verb = rest.isEmpty() || rest.get(0).startsWith("--") ? "" : rest.get(0);
+        List<String> flagArgs = verb.isEmpty() ? rest : rest.subList(1, rest.size());
+        List<Path> dirs = new ArrayList<>();
+        String file = null;
+        int lines = 40;
+        for (int index = 0; index < flagArgs.size(); index++) {
+            String token = flagArgs.get(index);
+            if (!token.startsWith("--")) return error(2, "usage", "unexpected argument: " + token);
+            String name = token.substring(2);
+            String value;
+            int equals = name.indexOf('=');
+            if (equals >= 0) {
+                value = name.substring(equals + 1);
+                name = name.substring(0, equals);
+            } else {
+                if (index + 1 >= flagArgs.size() || flagArgs.get(index + 1).startsWith("--")) {
+                    return error(2, "usage", "missing value for --" + name);
+                }
+                value = flagArgs.get(++index);
+            }
+            switch (name) {
+                case "dir" -> dirs.add(Path.of(value));
+                case "file" -> file = value;
+                case "lines" -> {
+                    try {
+                        lines = Integer.parseInt(value.trim());
+                    } catch (NumberFormatException failure) {
+                        return error(2, "usage", "missing value for --lines");
+                    }
+                }
+                default -> {
+                    return error(2, "usage", "unknown flag --" + name);
+                }
+            }
+        }
+        if (dirs.isEmpty()) dirs.add(EngineLog.directory());
+        EngineLog.info("log", verb.isEmpty() ? "usage" : verb);
+        try {
+            return switch (verb) {
+                case "list" -> CliResult.ok(Jsons.pretty(dev.domengine.log.LogDashboard.list(dirs)));
+                case "tail" -> CliResult.ok(Jsons.pretty(dev.domengine.log.LogDashboard.tail(dirs, file, lines)));
+                case "show" -> CliResult.ok(Jsons.pretty(dev.domengine.log.LogDashboard.show(dirs, file)));
+                default -> error(2, "usage", "log expects list, tail, or show");
+            };
+        } catch (CdpException failure) {
+            String message = failure.getMessage() == null ? "not found" : failure.getMessage();
+            return error(1, codeFor(message), message);
+        } catch (java.io.IOException failure) {
+            return error(1, "failed", failure.getMessage() == null ? "failed" : failure.getMessage());
+        }
     }
 
     private static CliResult mcp() {

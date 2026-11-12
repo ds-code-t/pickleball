@@ -1,6 +1,7 @@
 package dev.domengine;
 
 import dev.domengine.log.EngineLog;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -14,6 +15,29 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class EngineLogTest {
     @TempDir
     Path temp;
+
+    @AfterEach
+    void resetLog() {
+        EngineLog.resetForTests();
+    }
+
+    @Test
+    void trimsTheActiveFileFromTheFront() throws Exception {
+        EngineLog.configure(Map.of(
+                "COMPOSITE_LOG", "walk",
+                "COMPOSITE_LOG_DIR", temp.toString(),
+                "COMPOSITE_LOG_CAP_BYTES", "1000000",
+                "COMPOSITE_LOG_MAX_BYTES", "1000000"
+        ));
+        EngineLog.testingTrimCeiling(80);
+        EngineLog.info("walk", "HEAD-MARKER");
+        EngineLog.info("walk", "z".repeat(200));
+        Path log = Files.list(temp).filter(path -> path.getFileName().toString().endsWith(".log")).findFirst().orElseThrow();
+        String text = Files.readString(log);
+        assertTrue(Files.size(log) <= 80, text);
+        assertTrue(!text.contains("HEAD-MARKER"), text);
+        assertTrue(text.contains("z"), text);
+    }
 
     @Test
     void staysOffUntilAnEntityIsNamed() throws Exception {

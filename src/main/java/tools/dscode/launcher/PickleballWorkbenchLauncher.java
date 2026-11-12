@@ -59,6 +59,11 @@ public final class PickleballWorkbenchLauncher {
             if (engine != 0) exitProcess(engine);
             return;
         }
+        int logs = dispatchLogIfAny(args, System.out, System.err);
+        if (logs >= 0) {
+            if (logs != 0) exitProcess(logs);
+            return;
+        }
         int dalton = dispatchDaltonIfAny(args, System.out, System.err);
         if (dalton >= 0) {
             if (dalton != 0) exitProcess(dalton);
@@ -79,6 +84,15 @@ public final class PickleballWorkbenchLauncher {
     static int dispatchEngineIfAny(String[] args, PrintStream out, PrintStream err) {
         if (!tools.dscode.engine.EngineCli.handles(args)) return -1;
         return tools.dscode.engine.EngineCli.execute(args, out, err);
+    }
+
+    /**
+     * The log dashboard is a core CLI, not a Workbench verb. It forwards to
+     * {@code domengine log} and does not rewrite {@code history.log}.
+     */
+    static int dispatchLogIfAny(String[] args, PrintStream out, PrintStream err) {
+        if (!tools.dscode.common.composite.DomLogCli.handles(args)) return -1;
+        return tools.dscode.common.composite.DomLogCli.execute(args, out, err);
     }
 
     /**

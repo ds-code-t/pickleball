@@ -237,6 +237,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/common/composite/CompositeSelector.java`
 - `src/main/java/tools/dscode/common/composite/CompositeWebElement.java`
 - `src/main/java/tools/dscode/common/composite/DomCompositeAdapter.java`
+- `src/main/java/tools/dscode/common/composite/DomLogCli.java`
 - `src/main/java/tools/dscode/common/composite/ElementOperations.java`
 - `src/main/java/tools/dscode/common/composite/ElementPhrase.java`
 - `src/main/java/tools/dscode/common/composite/ElementReads.java`
@@ -725,6 +726,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/GuidancePackagingTest.java`
 - `src/test/java/tools/dscode/launcher/AgentExpansionTest.java`
 - `src/test/java/tools/dscode/launcher/DaltonCliLaunchTest.java`
+- `src/test/java/tools/dscode/launcher/DomLogCliLaunchTest.java`
 - `src/test/java/tools/dscode/launcher/EngineCliLaunchTest.java`
 - `src/test/java/tools/dscode/launcher/GuidanceCommandGoldenTest.java`
 - `src/test/java/tools/dscode/launcher/PickleballWorkbenchLauncherTest.java`
@@ -991,6 +993,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/lease/WorkbenchPermissionDecision.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/lease/WorkbenchPermissionKind.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/lease/WorkbenchPermissionRequest.java`
+- `pickleball-workbench/src/main/java/tools/dscode/workbench/log/LogCliForwarder.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/mapping/MappingTreeModel.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/mapping/MappingValueCodec.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/mcp/WorkbenchAttachServer.java`
@@ -1025,6 +1028,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/ui/ConfigTabModel.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/ui/DaltonPanel.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/ui/FeaturePickerPanel.java`
+- `pickleball-workbench/src/main/java/tools/dscode/workbench/ui/LogPanel.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/ui/LongWork.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/ui/RunVarOverridePanel.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/ui/TerminalPanel.java`
@@ -1068,6 +1072,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/discover/LastDiscoverSnapshotTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/engine/EngineCliForwarderTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/lease/WorkbenchControlLeaseTest.java`
+- `pickleball-workbench/src/test/java/tools/dscode/workbench/log/LogCliForwarderTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/mapping/MappingValueCodecTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/mcp/WorkbenchAttachServerProgressTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/mcp/WorkbenchAttachServerTest.java`
@@ -1093,6 +1098,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/terminal/WorkerLogBufferTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/ui/ConfigTabModelTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/ui/DaltonPanelTest.java`
+- `pickleball-workbench/src/test/java/tools/dscode/workbench/ui/LogPanelTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/ui/LongWorkTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/ui/RunVarOverridePanelTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/ui/web/WorkbenchWebResourceTest.java`
@@ -1122,6 +1128,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `dom-engine/src/main/java/dev/domengine/image/TemplateMatch.java`
 - `dom-engine/src/main/java/dev/domengine/json/Jsons.java`
 - `dom-engine/src/main/java/dev/domengine/log/EngineLog.java`
+- `dom-engine/src/main/java/dev/domengine/log/LogDashboard.java`
 - `dom-engine/src/main/java/dev/domengine/mcp/McpServer.java`
 - `dom-engine/src/main/java/dev/domengine/query/Engines.java`
 - `dom-engine/src/main/java/dev/domengine/query/HtmlTree.java`
@@ -1139,6 +1146,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `dom-engine/src/test/java/dev/domengine/DocumentWalkFixtureTest.java`
 - `dom-engine/src/test/java/dev/domengine/EngineLogTest.java`
 - `dom-engine/src/test/java/dev/domengine/FakeCdp.java`
+- `dom-engine/src/test/java/dev/domengine/LogCommandTest.java`
 - `dom-engine/src/test/java/dev/domengine/McpForwardTest.java`
 - `dom-engine/src/test/java/dev/domengine/ObserveParityTest.java`
 - `dom-engine/src/test/java/dev/domengine/SelectorParityTest.java`

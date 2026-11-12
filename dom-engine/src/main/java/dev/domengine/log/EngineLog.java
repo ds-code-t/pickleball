@@ -29,6 +29,7 @@ public final class EngineLog {
     private static final AtomicLong CORRELATION = new AtomicLong();
     private static String correlation = "h0";
     private static long writtenBytes;
+    private static volatile long trimCeiling = TEN_MB;
 
     private EngineLog() {
     }
@@ -38,7 +39,13 @@ public final class EngineLog {
             config = Config.from(System.getenv());
             writtenBytes = 0;
             correlation = "h0";
+            trimCeiling = TEN_MB;
         }
+    }
+
+    /** Lowers the front-trim ceiling for a unit test. Production stays at {@link #TEN_MB}. */
+    public static void testingTrimCeiling(long bytes) {
+        trimCeiling = bytes < 32 ? 32 : bytes;
     }
 
     public static void configure(Map<String, String> env) {
@@ -106,6 +113,9 @@ public final class EngineLog {
                 Files.writeString(file, line, StandardCharsets.UTF_8,
                         StandardOpenOption.CREATE, StandardOpenOption.APPEND);
                 writtenBytes += bytes.length;
+                if (Files.size(file) > trimCeiling) {
+                    trimFromFront(file, trimCeiling);
+                }
                 System.err.print(line);
             } catch (IOException ignored) {
                 // Logging must not fail the command.
@@ -164,8 +174,10 @@ public final class EngineLog {
             Path directory = Path.of(dir == null || dir.isBlank() ? "composite-logs" : dir);
             long cap = parse(first(env, "COMPOSITE_LOG_CAP_BYTES", "DOMENGINE_LOG_CAP_BYTES"), DEFAULT_CAP_BYTES);
             if (cap < 64) cap = 64;
-            long max = parse(first(env, "COMPOSITE_LOG_MAX_BYTES", "DOMENGINE_LOG_MAX_BYTES"), cap * 4);
-            if (max < cap) max = cap;
+            String maxRaw = first(env, "COMPOSITE_LOG_MAX_BYTES", "DOMENGINE_LOG_MAX_BYTES");
+            long fallback = Math.min(cap * 4, TEN_MB);
+            long max = maxRaw == null || maxRaw.isBlank() ? fallback : parse(maxRaw, fallback);
+            if (max < cap && maxRaw != null && !maxRaw.isBlank()) max = cap;
             return new Config(entities, level.toLowerCase(Locale.ROOT), directory, cap, max);
         }
 
