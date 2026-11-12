@@ -1109,11 +1109,15 @@ This inventory helps coding agents discover relevant files. It does not replace 
 ## Java DOM engine module
 
 - `dom-engine/build.gradle`
+- `dom-engine/src/main/java/dev/domengine/action/Observe.java`
+- `dom-engine/src/main/java/dev/domengine/action/PageActions.java`
 - `dom-engine/src/main/java/dev/domengine/cdp/CdpConnection.java`
 - `dom-engine/src/main/java/dev/domengine/cdp/CdpException.java`
 - `dom-engine/src/main/java/dev/domengine/cli/CliResult.java`
 - `dom-engine/src/main/java/dev/domengine/cli/DomEngineMain.java`
+- `dom-engine/src/main/java/dev/domengine/desktop/DesktopTree.java`
 - `dom-engine/src/main/java/dev/domengine/EngineInfo.java`
+- `dom-engine/src/main/java/dev/domengine/image/TemplateMatch.java`
 - `dom-engine/src/main/java/dev/domengine/json/Jsons.java`
 - `dom-engine/src/main/java/dev/domengine/log/EngineLog.java`
 - `dom-engine/src/main/java/dev/domengine/query/Engines.java`
@@ -1124,11 +1128,13 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `dom-engine/src/main/java/dev/domengine/tree/ContextWalker.java`
 - `dom-engine/src/main/java/dev/domengine/tree/DomNode.java`
 - `dom-engine/src/main/java/dev/domengine/tree/LiveTree.java`
+- `dom-engine/src/test/java/dev/domengine/ActionSmokeTest.java`
 - `dom-engine/src/test/java/dev/domengine/CdpSessionAttachTest.java`
 - `dom-engine/src/test/java/dev/domengine/CliStdioTest.java`
 - `dom-engine/src/test/java/dev/domengine/DocumentWalkFixtureTest.java`
 - `dom-engine/src/test/java/dev/domengine/EngineLogTest.java`
 - `dom-engine/src/test/java/dev/domengine/FakeCdp.java`
+- `dom-engine/src/test/java/dev/domengine/ObserveParityTest.java`
 - `dom-engine/src/test/java/dev/domengine/SelectorParityTest.java`
 - `dom-engine/src/test/resources/fixtures/page.html`
 

@@ -4,10 +4,12 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import dev.domengine.cdp.CdpException;
+import dev.domengine.image.TemplateMatch;
 import dev.domengine.json.Jsons;
 import dev.domengine.log.EngineLog;
 import dev.domengine.tree.DomNode;
 
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -20,7 +22,7 @@ public final class Query {
             "css", "xpath", "text", "role", "frame", "shadow", "near", "below", "desc", "a11y", "image"
     );
     public static final List<String> QUERY_FLAGS = List.of(
-            "within", "nesting", "nth", "every", "count-only", "geometry", "pierce", "point"
+            "within", "nesting", "nth", "every", "count-only", "geometry", "pierce", "point", "viewport"
     );
 
     private Query() {
@@ -31,6 +33,17 @@ public final class Query {
 
     public static ObjectNode run(DomNode root, Map<String, String> flags) {
         if (root == null) throw new CdpException("query has no document");
+        String viewport = flags.get("viewport");
+        boolean armed = viewport != null && !viewport.isBlank();
+        if (armed) Engines.useViewport(TemplateMatch.read(Path.of(viewport)));
+        try {
+            return runArmed(root, flags);
+        } finally {
+            if (armed) Engines.useViewport(null);
+        }
+    }
+
+    private static ObjectNode runArmed(DomNode root, Map<String, String> flags) {
         String pipeline = pipelineOf(flags);
         if (pipeline == null) throw new CdpException("query requires --css, --xpath, --text, --pipeline, or --selector");
         List<Parsed> stages = parsePipeline(pipeline);

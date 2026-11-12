@@ -9,6 +9,9 @@ import dev.domengine.json.Jsons;
 import dev.domengine.log.EngineLog;
 import dev.domengine.session.BrowserSession;
 import dev.domengine.session.SessionRegistry;
+import dev.domengine.action.Observe;
+import dev.domengine.action.PageActions;
+import dev.domengine.desktop.DesktopTree;
 import dev.domengine.tree.LiveTree;
 
 import java.io.BufferedReader;
@@ -58,6 +61,9 @@ public final class DomEngineMain {
         if ("session".equals(command)) {
             return session(args);
         }
+        if ("desktop".equals(command)) {
+            return desktop(args);
+        }
         Map<String, String> flags = flags(args.subList(1, args.size()));
         if (flags.containsKey("__usage")) {
             return error(2, "usage", flags.get("__usage"));
@@ -69,6 +75,10 @@ public final class DomEngineMain {
                 case "attach" -> sessionVerb("attach", flags);
                 case "snapshot" -> snapshot(flags);
                 case "query" -> query(flags);
+                case "click", "type", "scroll", "submit", "key", "dblclick", "contextclick", "drag", "eval" ->
+                        action(command, flags);
+                case "screenshot" -> screenshot(flags);
+                case "observe", "wait" -> observe(command, flags);
                 case "serve" -> serveRefused();
                 default -> error(2, "usage", "unknown command: " + command);
             };
@@ -149,12 +159,16 @@ public final class DomEngineMain {
         node.put("ok", true);
         node.put("name", EngineInfo.NAME);
         node.put("version", EngineInfo.VERSION);
-        array(node, "commands", List.of("version", "capabilities", "session", "attach", "snapshot", "query", "serve"));
+        array(node, "commands", List.of(
+                "version", "capabilities", "session", "attach", "snapshot", "query",
+                "click", "type", "scroll", "submit", "key", "dblclick", "contextclick", "drag", "eval",
+                "screenshot", "observe", "wait", "desktop", "serve"
+        ));
         array(node, "session_verbs", List.of("create", "list", "attach", "close"));
         array(node, "engines", dev.domengine.query.Query.ENGINES);
-        array(node, "actions", List.of());
+        array(node, "actions", PageActions.VERBS);
         array(node, "query_flags", dev.domengine.query.Query.QUERY_FLAGS);
-        array(node, "desktop", List.of());
+        array(node, "desktop", DesktopTree.VERBS);
         ObjectNode logging = node.putObject("logging");
         logging.put("default", "off");
         array(logging, "entities", EngineInfo.LOG_ENTITIES);
@@ -240,6 +254,60 @@ public final class DomEngineMain {
         return CliResult.ok(Jsons.pretty(dev.domengine.query.Query.run(root, flags)));
     }
 
+    private static CliResult action(String verb, Map<String, String> flags) {
+        if (!flags.containsKey("session")) return error(2, "usage", verb + " requires --session");
+        BrowserSession session = SessionRegistry.get().require(flags.get("session"));
+        return CliResult.ok(Jsons.pretty(PageActions.act(session, verb, flags)));
+    }
+
+    private static CliResult screenshot(Map<String, String> flags) {
+        if (!flags.containsKey("session")) return error(2, "usage", "screenshot requires --session");
+        BrowserSession session = SessionRegistry.get().require(flags.get("session"));
+        return CliResult.ok(Jsons.pretty(Observe.screenshot(session, flags)));
+    }
+
+    private static CliResult observe(String command, Map<String, String> flags) {
+        BrowserSession session = null;
+        if (flags.containsKey("session")) session = SessionRegistry.get().require(flags.get("session"));
+        dev.domengine.tree.DomNode root = Observe.rootFrom(flags, session);
+        com.fasterxml.jackson.databind.node.ObjectNode result = Observe.waitFor(root, flags);
+        result.put("command", command);
+        return CliResult.ok(Jsons.pretty(result));
+    }
+
+    private static CliResult desktop(List<String> args) {
+        List<String> rest = args.size() <= 1 ? List.of() : args.subList(1, args.size());
+        String verb = rest.isEmpty() || rest.get(0).startsWith("--") ? "list" : rest.get(0);
+        List<String> flagArgs = rest.isEmpty() || rest.get(0).startsWith("--") ? rest : rest.subList(1, rest.size());
+        Map<String, String> flags = flags(flagArgs);
+        if (flags.containsKey("__usage")) return error(2, "usage", flags.get("__usage"));
+        try {
+            return switch (verb) {
+                case "list" -> CliResult.ok(Jsons.pretty(DesktopTree.list()));
+                case "attach" -> {
+                    String id = flags.getOrDefault("id", "d" + System.nanoTime());
+                    String fixture = required(flags, "fixture");
+                    DesktopTree.Session attached = DesktopTree.attach(id, Path.of(fixture));
+                    com.fasterxml.jackson.databind.node.ObjectNode node = Jsons.object();
+                    node.put("ok", true);
+                    node.put("id", attached.id());
+                    node.put("backend", attached.backend());
+                    yield CliResult.ok(Jsons.pretty(node));
+                }
+                case "walk" -> CliResult.ok(Jsons.pretty(DesktopTree.walk(required(flags, "id"))));
+                case "query" -> CliResult.ok(Jsons.pretty(DesktopTree.query(required(flags, "id"), flags)));
+                case "resolve" -> CliResult.ok(Jsons.pretty(DesktopTree.resolve(required(flags, "id"), flags)));
+                case "click" -> CliResult.ok(Jsons.pretty(DesktopTree.click(required(flags, "id"), flags)));
+                case "type" -> CliResult.ok(Jsons.pretty(DesktopTree.type(required(flags, "id"), flags)));
+                case "close" -> CliResult.ok(Jsons.pretty(DesktopTree.close(required(flags, "id"))));
+                default -> error(2, "usage", "unknown desktop verb: " + verb);
+            };
+        } catch (CdpException failure) {
+            String message = failure.getMessage() == null ? "failed" : failure.getMessage();
+            return error(1, codeFor(message), message);
+        }
+    }
+
     private static CliResult snapshot(Map<String, String> flags) {
         BrowserSession session;
         boolean ephemeral = false;
@@ -314,7 +382,7 @@ public final class DomEngineMain {
 
     private static boolean isBoolean(String name) {
         return switch (name) {
-            case "process", "headed", "i-accept-local-attach", "follow", "stdio", "strict", "explain", "geometry", "count-only" -> true;
+            case "process", "headed", "i-accept-local-attach", "follow", "stdio", "strict", "explain", "geometry", "count-only", "append" -> true;
             default -> false;
         };
     }
@@ -362,7 +430,11 @@ public final class DomEngineMain {
                 session create|list|attach|close
                 attach --cdp URL --i-accept-local-attach
                 snapshot --session ID | --cdp URL --i-accept-local-attach
-                query --file page.html --css SELECTOR [--pipeline ENGINE=EXPR] [--geometry] [--explain]
+                query --file page.html --css SELECTOR [--pipeline ENGINE=EXPR] [--geometry] [--explain] [--viewport file.pgm]
+                click|type|scroll|submit|key|dblclick|contextclick|drag|eval --session ID
+                screenshot --session ID [--out file.png]
+                observe|wait --file page.html|--session ID --css SELECTOR [--timeout-ms N]
+                desktop list|attach|walk|query|resolve|close|click|type
                 serve --stdio
                 """.formatted(EngineInfo.VERSION);
     }

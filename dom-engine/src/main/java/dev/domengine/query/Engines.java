@@ -1,17 +1,28 @@
 package dev.domengine.query;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import dev.domengine.cdp.CdpException;
+import dev.domengine.image.TemplateMatch;
 import dev.domengine.json.Jsons;
 import dev.domengine.tree.DomNode;
 
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
 /** Built-in pipeline engines. Each stage receives the previous nodes and returns the next set. */
 public final class Engines {
+    private static final ThreadLocal<TemplateMatch.Gray> VIEWPORT = new ThreadLocal<>();
+
     private Engines() {
+    }
+
+    /** Viewport for the next image stage. {@code null} clears it. */
+    public static void useViewport(TemplateMatch.Gray gray) {
+        if (gray == null) VIEWPORT.remove();
+        else VIEWPORT.set(gray);
     }
 
     public static Query.Hit apply(String engine, String expr, List<DomNode> current, DomNode root, String pierce) {
@@ -26,7 +37,7 @@ public final class Engines {
             case "below" -> below(expr, current, root);
             case "desc" -> desc(expr, scopes(current, root));
             case "a11y" -> a11y(expr, scopes(current, root));
-            case "image" -> throw new CdpException("image engine needs a viewport screenshot");
+            case "image" -> image(expr, scopes(current, root));
             default -> throw new CdpException("invalid engine: " + engine);
         };
     }
@@ -34,6 +45,38 @@ public final class Engines {
     private static List<DomNode> scopes(List<DomNode> current, DomNode root) {
         if (current == null || current.isEmpty()) return List.of(root);
         return current;
+    }
+
+    static Query.Hit image(String expr, List<DomNode> scopes) {
+        String raw = expr == null ? "" : expr.trim();
+        if (raw.toLowerCase(Locale.ROOT).startsWith("ocr")) {
+            throw new CdpException("ocr is not available in this build");
+        }
+        TemplateMatch.Gray viewport = VIEWPORT.get();
+        if (viewport == null) throw new CdpException("image engine needs a viewport screenshot");
+        TemplateMatch.Gray template = raw.startsWith("P2") ? TemplateMatch.parse(raw) : TemplateMatch.read(Path.of(raw));
+        List<DomNode> hits = new ArrayList<>();
+        double best = 0;
+        for (DomNode scope : scopes) {
+            for (DomNode node : lightElements(scope, true)) {
+                if (!node.hasBox) continue;
+                TemplateMatch.Gray crop = TemplateMatch.crop(
+                        viewport,
+                        (int) Math.round(node.x),
+                        (int) Math.round(node.y),
+                        (int) Math.round(node.width),
+                        (int) Math.round(node.height)
+                );
+                double score = TemplateMatch.score(template, crop);
+                if (score > best) best = score;
+                if (score >= 0.8) hits.add(node);
+            }
+        }
+        ObjectNode image = Jsons.object();
+        image.put("confidence", best);
+        image.put("template", raw);
+        image.put("matched", hits.size());
+        return new Query.Hit(Query.distinct(hits), TemplateMatch.why(best, raw), image);
     }
 
     static Query.Hit css(String expr, List<DomNode> scopes, boolean pierceShadows) {

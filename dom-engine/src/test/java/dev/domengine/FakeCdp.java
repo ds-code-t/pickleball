@@ -23,6 +23,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public final class FakeCdp implements AutoCloseable {
     private static final String GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
 
+    private static final String PNG_1X1 =
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
+
     public final int port;
     public final List<String> methods = new CopyOnWriteArrayList<>();
     private final ServerSocket server;
@@ -137,6 +140,21 @@ public final class FakeCdp implements AutoCloseable {
             if ("DOM.getDocument".equals(method)) result.set("root", document);
             else if ("Page.getFrameTree".equals(method)) result.set("frameTree", frameTree);
             else if ("Browser.getVersion".equals(method)) result.put("product", "Fake/1");
+            else if ("DOM.getBoxModel".equals(method)) {
+                ObjectNode model = result.putObject("model");
+                var border = model.putArray("border");
+                for (double value : new double[] {10, 20, 90, 20, 90, 50, 10, 50}) border.add(value);
+            } else if ("DOM.resolveNode".equals(method)) {
+                result.putObject("object").put("objectId", "obj-1");
+            } else if ("Runtime.callFunctionOn".equals(method) || "Runtime.evaluate".equals(method)) {
+                ObjectNode value = result.putObject("result");
+                value.put("type", "string");
+                value.put("value", "BUTTON");
+            } else if ("Page.captureScreenshot".equals(method)) {
+                result.put("data", PNG_1X1);
+            } else if ("Input.dispatchMouseEvent".equals(method) || "Input.insertText".equals(method) || "Input.dispatchKeyEvent".equals(method)) {
+                result.put("ok", true);
+            }
             writeFrame(out, Jsons.compact(response));
         }
     }
