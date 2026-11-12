@@ -245,11 +245,13 @@ public abstract class StepData extends StepMapping {
     }
 
     public String getInlineArgumentType() {
+        if (pickleStepTestStep == null) return nativeInlineType == null ? "" : nativeInlineType;
         PickleStep pickleStep = getPickleStep();
         return pickleStep == null ? "" : pickleStep.getInlineArgumentType();
     }
 
     public String getInlineArgumentText() {
+        if (pickleStepTestStep == null) return nativeInlineText == null ? "" : nativeInlineText;
         PickleStep pickleStep = getPickleStep();
         return pickleStep == null ? "" : pickleStep.getInlineArgumentText();
     }
@@ -348,6 +350,17 @@ public abstract class StepData extends StepMapping {
 
     }
 
+    /** Native engine frame. No pickle and no Cucumber test case. */
+    StepData(String text) {
+        this.testCase = null;
+        this.pickleStepTestStep = null;
+        this.nativeText = text == null ? "" : text;
+        this.codeLocation = "";
+        this.isCoreStep = false;
+        this.arguments = new ArrayList<>();
+        this.argument = null;
+    }
+
     public abstract Result run();
 
     public abstract Result execute(io.cucumber.core.runner.PickleStepTestStep executionPickleStepTestStep, ExecutionMode executionMode);
@@ -362,7 +375,7 @@ public abstract class StepData extends StepMapping {
 
 
     public String getUnmodifiedText() {
-//        return pickleStepTestStep.getStep().step .getOriginalText();
+        if (pickleStepTestStep == null) return nativeText == null ? "" : nativeText;
         return (String) getProperty(getProperty(pickleStepTestStep.getStep(), "pickleStep"), "text");
     }
 

@@ -6,7 +6,12 @@ import io.cucumber.cucumberexpressions.ExpressionFactory;
 import io.cucumber.cucumberexpressions.ParameterTypeRegistry;
 import io.cucumber.datatable.DataTable;
 import io.cucumber.docstring.DocString;
+import io.cucumber.java.After;
+import io.cucumber.java.AfterStep;
+import io.cucumber.java.Before;
+import io.cucumber.java.BeforeStep;
 import io.cucumber.java.StepDefinitionAnnotation;
+import io.cucumber.tagexpressions.TagExpressionParser;
 import tools.dscode.control.override.StepOverrideRegistry;
 import tools.dscode.control.override.StepOverrideRule;
 import tools.dscode.engine.EngineLog;
@@ -14,12 +19,20 @@ import tools.dscode.engine.model.DocText;
 import tools.dscode.engine.model.Table;
 
 import java.lang.annotation.Annotation;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.lang.reflect.Type;
+import java.net.URL;
+import java.net.URISyntaxException;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Enumeration;
+import java.util.stream.Stream;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -35,6 +48,7 @@ import java.util.regex.Pattern;
  */
 public final class StepRegistry {
     private final List<GlueStep> steps = new ArrayList<>();
+    private final List<Hook> hooks = new ArrayList<>();
     private final ExpressionFactory expressions;
     private final Map<String, Expression> compiled = new LinkedHashMap<>();
     private Path logProject;
@@ -63,6 +77,47 @@ public final class StepRegistry {
             for (Method method : type.getMethods()) {
                 scanMethod(method);
             }
+            for (Class<?> nested : type.getDeclaredClasses()) {
+                scan(nested);
+            }
+        }
+        return this;
+    }
+
+    /** Loads every class in a package the same way a Cucumber glue path does. */
+    public StepRegistry scanPackage(String packageName) {
+        if (packageName == null || packageName.isBlank()) return this;
+        ClassLoader loader = Thread.currentThread().getContextClassLoader();
+        if (loader == null) loader = StepRegistry.class.getClassLoader();
+        String path = packageName.replace('.', '/');
+        try {
+            Enumeration<URL> resources = loader.getResources(path);
+            while (resources.hasMoreElements()) {
+                URL url = resources.nextElement();
+                if (!"file".equals(url.getProtocol())) continue;
+                Path dir;
+                try {
+                    dir = Path.of(url.toURI());
+                } catch (URISyntaxException failure) {
+                    continue;
+                }
+                if (!Files.isDirectory(dir)) continue;
+                try (Stream<Path> files = Files.list(dir)) {
+                    for (Path classFile : files.filter(file -> file.getFileName().toString().endsWith(".class")).toList()) {
+                        String binary = classFile.getFileName().toString();
+                        binary = binary.substring(0, binary.length() - ".class".length());
+                        if (binary.contains("$") && binary.matches(".*\\$\\d+.*")) continue;
+                        String className = packageName + "." + binary;
+                        try {
+                            scan(Class.forName(className, true, loader));
+                        } catch (Throwable failure) {
+                            EngineLog.log(logProject, "registry", className, failure.toString());
+                        }
+                    }
+                }
+            }
+        } catch (Exception failure) {
+            EngineLog.log(logProject, "registry", packageName, failure.toString());
         }
         return this;
     }
@@ -171,10 +226,70 @@ public final class StepRegistry {
     }
 
     private void scanMethod(Method method) {
+        scanHook(method);
         for (Annotation annotation : method.getAnnotations()) {
             for (Found found : valuesOf(annotation)) {
                 add(define(found.keyword(), found.pattern(), method));
             }
+        }
+    }
+
+    private void scanHook(Method method) {
+        if (method == null || method.getParameterCount() != 0) return;
+        Before before = method.getAnnotation(Before.class);
+        if (before != null) hooks.add(new Hook("before", before.order(), before.value(), method));
+        After after = method.getAnnotation(After.class);
+        if (after != null) hooks.add(new Hook("after", after.order(), after.value(), method));
+        BeforeStep beforeStep = method.getAnnotation(BeforeStep.class);
+        if (beforeStep != null) hooks.add(new Hook("beforestep", beforeStep.order(), beforeStep.value(), method));
+        AfterStep afterStep = method.getAnnotation(AfterStep.class);
+        if (afterStep != null) hooks.add(new Hook("afterstep", afterStep.order(), afterStep.value(), method));
+    }
+
+    public List<Hook> hooks(String phase) {
+        List<Hook> found = new ArrayList<>();
+        for (Hook hook : hooks) {
+            if (hook.phase().equals(phase)) found.add(hook);
+        }
+        found.sort(Comparator.comparingInt(Hook::order));
+        if (phase != null && phase.startsWith("after")) Collections.reverse(found);
+        return found;
+    }
+
+    /** Runs scanned Cucumber hooks. Zero-argument methods only. */
+    public void fire(String phase, List<String> tags, Map<Class<?>, Object> instances) {
+        Map<Class<?>, Object> targets = instances == null ? new IdentityHashMap<>() : instances;
+        for (Hook hook : hooks(phase)) {
+            if (!hook.matches(tags)) continue;
+            Method method = hook.method();
+            Object target = null;
+            if (!Modifier.isStatic(method.getModifiers())) {
+                target = targets.computeIfAbsent(method.getDeclaringClass(), type -> {
+                    try {
+                        return type.getDeclaredConstructor().newInstance();
+                    } catch (ReflectiveOperationException failure) {
+                        throw new IllegalStateException(failure);
+                    }
+                });
+            }
+            method.setAccessible(true);
+            try {
+                method.invoke(target);
+            } catch (InvocationTargetException failure) {
+                Throwable cause = failure.getCause() == null ? failure : failure.getCause();
+                if (cause instanceof RuntimeException runtime) throw runtime;
+                if (cause instanceof Error error) throw error;
+                throw new IllegalStateException(cause);
+            } catch (IllegalAccessException failure) {
+                throw new IllegalStateException(failure);
+            }
+        }
+    }
+
+    public record Hook(String phase, int order, String tags, Method method) {
+        public boolean matches(List<String> scenarioTags) {
+            if (tags == null || tags.isBlank()) return true;
+            return TagExpressionParser.parse(tags.trim()).evaluate(scenarioTags == null ? List.of() : scenarioTags);
         }
     }
 

@@ -131,9 +131,9 @@ public class ScenarioStep extends StepExtension {
 
     private int sourceLine(StepExtension step) {
         Integer registeredLine = sourceStepLines.get(step);
-        return registeredLine != null
-                ? registeredLine
-                : step.pickleStepTestStep.getStepLine();
+        if (registeredLine != null) return registeredLine;
+        if (step == null || step.pickleStepTestStep == null) return 0;
+        return step.pickleStepTestStep.getStepLine();
     }
 
     static <T> T findNearestByLine(
@@ -299,6 +299,33 @@ public class ScenarioStep extends StepExtension {
                 ? null
                 : sourcePickle.getUri();
     }
+
+    /** Native parent so step flags see a scenario ancestor. No pickle is compiled. */
+    public ScenarioStep(String name) {
+        super("* ", tools.dscode.common.GlobalConstants.SCENARIO_STEP + (name == null ? "" : name));
+        this.sourcePickle = null;
+        this.sourceScenarioName = name == null ? "" : name;
+        this.sourceFeatureUri = null;
+        getDefaultStepNodeMap().put("SCENARIO NAME", this.sourceScenarioName);
+        getDefaultStepNodeMap().put("ROOT SCENARIO NAME", this.sourceScenarioName);
+    }
+
+    /** Attaches native frames. Cucumber scenario creation still uses pickles. */
+    public void installNativeSteps(
+            List<StepExtension> inputSteps,
+            ParsingMap parsingMap,
+            String startStepMarker
+    ) {
+        if (parsingMap != null) {
+            stepParsingMap.clear();
+            stepParsingMap.getMaps().putAll(parsingMap.getMaps());
+        }
+        initializeScenarioSteps(
+                inputSteps == null ? List.of() : inputSteps,
+                parsingMap,
+                startStepMarker == null || startStepMarker.isBlank() ? DEFAULT_START_STEP_MARKER : startStepMarker
+        );
+    }
     private void initializeScenarioSteps(
             List<StepExtension> inputSteps,
             ParsingMap parsingMap,
@@ -409,7 +436,9 @@ public class ScenarioStep extends StepExtension {
                     nextStep = (StepExtension) nextStep.nextSibling;
                 }
                 s--;
-                StepExtension newStep = new StepExtension(
+                StepExtension newStep = pickleStepTestStep == null
+                        ? currentStep.modifyStepExtension(newStepText)
+                        : new StepExtension(
                         testCase,
                         getPickleStepTestStepFromStrings(
                                 pickleStepTestStep,
@@ -448,7 +477,7 @@ public class ScenarioStep extends StepExtension {
             StepExtension step = inputSteps.get(index);
             sourceStepLines.put(
                     step,
-                    step.pickleStepTestStep.getStepLine()
+                    step.pickleStepTestStep == null ? index + 1 : step.pickleStepTestStep.getStepLine()
             );
             if (!step.isStepMarker) {
                 continue;

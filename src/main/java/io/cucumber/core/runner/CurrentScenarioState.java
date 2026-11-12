@@ -499,7 +499,7 @@ public class CurrentScenarioState extends ScenarioMapping {
             return;
         if (isUnselectedBlockChild(stepExtension)) {
             stepExtension.skipped = true;
-            logSkip("Skipping Step: " + stepExtension.pickleStepTestStep.getStepText());
+            logSkip("Skipping Step: " + stepExtension.getStepText());
             runNextSibling(stepExtension);
             return;
         }
@@ -530,7 +530,7 @@ public class CurrentScenarioState extends ScenarioMapping {
         if (!shouldRun(stepExtension)) {
             stepExtension.skipped = true;
             runNextSibling(stepExtension);
-            logSkip("Skipping Step: " + stepExtension.pickleStepTestStep.getStepText());
+            logSkip("Skipping Step: " + stepExtension.getStepText());
             return;
         }
 
@@ -560,7 +560,7 @@ public class CurrentScenarioState extends ScenarioMapping {
         if (!stepExtension.result.getStatus().equals(Status.PASSED) && !stepExtension.result.getStatus().equals(Status.SKIPPED) && throwable == null) {
 
             if (status.equals(Status.UNDEFINED))
-                throwable = new RuntimeException("'" + stepExtension.pickleStepTestStep.getStep().getText() + "' step is undefined");
+                throwable = new RuntimeException("'" + stepExtension.getStepText() + "' step is undefined");
             else
                 throwable = new RuntimeException("Step failed with status: " + status);
         }
@@ -646,7 +646,7 @@ public class CurrentScenarioState extends ScenarioMapping {
                                 exhaustedUntil = new RuntimeException(
                                         limit
                                                 + " for step '"
-                                                + failedStep.pickleStepTestStep.getStepText()
+                                                + failedStep.getStepText()
                                                 + "'"
                                 );
                                 recordHardFailure(exhaustedUntil);
@@ -668,11 +668,13 @@ public class CurrentScenarioState extends ScenarioMapping {
                                 );
                                 clonedStep.nextSibling = null;
                                 try (UntilPassTiming.Scope ignoredSubstitute = UntilPassTiming.open("substitute-step")) {
-                                    clonedStep.pickleStepTestStep.substituteStep = clonedStep
-                                            .createNewStepExtension(
-                                                    ", ---" + clonedStep.overridePhrase.assertionChain
-                                            )
-                                            .pickleStepTestStep;
+                                    if (clonedStep.pickleStepTestStep != null) {
+                                        clonedStep.pickleStepTestStep.substituteStep = clonedStep
+                                                .createNewStepExtension(
+                                                        ", ---" + clonedStep.overridePhrase.assertionChain
+                                                )
+                                                .pickleStepTestStep;
+                                    }
                                 }
                                 long pause = StepData.untilPauseMillis(
                                         clonedStep.startTime,
@@ -694,7 +696,7 @@ public class CurrentScenarioState extends ScenarioMapping {
                                     exhaustedUntil = new RuntimeException(
                                             limit
                                                     + " for step '"
-                                                    + clonedStep.pickleStepTestStep.getStepText()
+                                                    + clonedStep.getStepText()
                                                     + "'"
                                     );
                                     recordHardFailure(exhaustedUntil);

@@ -144,6 +144,47 @@ public class StepExtension extends StepData {
         }
     }
 
+    /**
+     * Native frame. Cucumber runs keep using {@link #StepExtension(TestCase, PickleStepTestStep)}.
+     */
+    public StepExtension(String keyword, String text) {
+        super(text == null ? "" : text.strip());
+        this.nativeKeyword = keyword == null || keyword.isBlank() ? "* " : keyword;
+        this.definitionFlags = new ArrayList<>();
+        this.methodName = "";
+        this.isDynamicStep = false;
+        this.isStepMarker = false;
+        this.isCoreConditionalStep = false;
+    }
+
+    /** Binds a glue method discovered by the native registry. Cucumber frames already have one. */
+    public void attachNativeMethod(java.lang.reflect.Method bound) {
+        method = bound;
+        methodName = bound == null ? "" : bound.getName();
+        if (bound != null) {
+            codeLocation = bound.getDeclaringClass().getName() + "." + bound.getName();
+            isCoreStep = codeLocation.startsWith(corePackagePath);
+            tools.dscode.common.annotations.DefinitionFlags flags =
+                    bound.getAnnotation(tools.dscode.common.annotations.DefinitionFlags.class);
+            if (flags != null) {
+                for (DefinitionFlag flag : flags.value()) {
+                    if (flag.toString().startsWith("_")) {
+                        definitionFlags.add(DefinitionFlag.valueOf(flag.toString().substring(1)));
+                    } else {
+                        inheritableDefinitionFlags.add(flag);
+                        definitionFlags.add(flag);
+                    }
+                }
+            }
+        }
+        isDynamicStep = isCoreStep && methodName.startsWith("executeDynamicStep");
+        isStepMarker = isCoreStep && methodName.equals("stepMarker");
+        isCoreConditionalStep = isCoreStep && methodName.equals("runConditional");
+        if (isCoreStep && methodName.startsWith("flagStep_")) {
+            recordFlagStep();
+        }
+    }
+
     private void recordFlagStep() {
         isFlagStep = true;
         String text = getUnmodifiedText();
@@ -207,7 +248,19 @@ public class StepExtension extends StepData {
         arguments.add(arg);
     }
 
+    public Object nativeReturned;
+
+    /** Native frames have no pickle runner, so a finalizer callback runs here. */
+    public boolean runNativeFinalizer() {
+        if (finalizerAction == null) return false;
+        finalizerAction.accept(this);
+        return true;
+    }
+
     public Result run() {
+        if (pickleStepTestStep == null) {
+            return tools.dscode.engine.runtime.SharedStepRun.run(this);
+        }
         attachPendingInlineChild();
         result = null;
         ExecutionMode executionMode = ExecutionMode.RUN;
@@ -340,7 +393,7 @@ public class StepExtension extends StepData {
     }
 
     public void setToLogAll() {
-        pickleStepTestStep.setNoLogging(false);
+        if (pickleStepTestStep != null) pickleStepTestStep.setNoLogging(false);
         new ArrayList<>(definitionFlags).forEach(f -> {
             String flagString = f.toString().toLowerCase();
             if (flagString.contains("ignore") || flagString.contains("logging")) {
@@ -351,7 +404,7 @@ public class StepExtension extends StepData {
 
     @Override
     public String toString() {
-        return "SE: " + pickleStepTestStep.getStep().getText();
+        return "SE: " + getStepText();
     }
 
     public List<StepExtension> insertChildStepsByString(List<String> newStepStrings) {
@@ -405,10 +458,22 @@ public class StepExtension extends StepData {
     }
 
     public StepExtension modifyStepExtension(String newText) {
+        if (pickleStepTestStep == null) {
+            return modifyStepExtension(newText, nativeInlineText == null ? "" : nativeInlineText);
+        }
         return modifyStepExtension(newText, getGherkinArgumentText(pickleStepTestStep.getStep()));
     }
 
     public StepExtension modifyStepExtension(String newText, String gherkinArgument) {
+        if (pickleStepTestStep == null) {
+            StepExtension modifiedStep = new StepExtension(nativeKeyword, newText);
+            modifiedStep.nativeInlineText = gherkinArgument == null ? "" : gherkinArgument;
+            modifiedStep.setStepParsingMap(getStepParsingMap());
+            modifiedStep.parentStep = parentStep;
+            modifiedStep.nestingLevel = nestingLevel;
+            modifiedStep.lineData = lineData == null ? null : lineData.clone();
+            return modifiedStep;
+        }
         StepExtension modifiedStep = new StepExtension(
                 testCase,
                 getPickleStepTestStepFromStrings(
@@ -424,6 +489,9 @@ public class StepExtension extends StepData {
     }
 
     public String inheritedGherkinArgument() {
+        if (pickleStepTestStep == null) {
+            return nativeInlineText == null ? "" : nativeInlineText;
+        }
         return realGherkinArgument(pickleStepTestStep.getStep());
     }
 
@@ -432,6 +500,14 @@ public class StepExtension extends StepData {
     }
 
     public StepExtension createNewStepExtension(String stepText, String gherkinArgument) {
+        if (pickleStepTestStep == null) {
+            StepExtension modifiedStep = new StepExtension(nativeKeyword, stepText);
+            modifiedStep.nativeInlineText = gherkinArgument == null ? "" : gherkinArgument;
+            modifiedStep.setStepParsingMap(getStepParsingMap());
+            modifiedStep.parentStep = parentStep;
+            modifiedStep.nestingLevel = nestingLevel;
+            return modifiedStep;
+        }
         PickleStepTestStep newPickleStepTestStep = getPickleStepTestStepFromStrings(
                 pickleStepTestStep.getStep().getKeyword(),
                 stepText,
@@ -456,7 +532,7 @@ public class StepExtension extends StepData {
         finalizer.finalizerAction = action;
         finalizer.overrideLoggingText = loggingText;
         finalizer.waitForPageReady = false;
-        finalizer.pickleStepTestStep.setNoLogging(true);
+        if (finalizer.pickleStepTestStep != null) finalizer.pickleStepTestStep.setNoLogging(true);
         return finalizer;
     }
 

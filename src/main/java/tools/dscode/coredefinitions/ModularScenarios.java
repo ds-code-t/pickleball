@@ -11,6 +11,10 @@ import tools.dscode.common.CoreSteps;
 import tools.dscode.common.mappings.MapConfigurations;
 import tools.dscode.common.mappings.NodeMap;
 import tools.dscode.common.mappings.ParsingMap;
+import tools.dscode.engine.model.EngineScenario;
+import tools.dscode.engine.resolve.ScenarioResolver;
+import tools.dscode.engine.runtime.NativeModularRun;
+import tools.dscode.engine.runtime.NativeScenarioCatalog;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -30,9 +34,12 @@ import static tools.dscode.common.variables.RunVars.resolveFromVars;
 import static tools.dscode.testengine.PKB_props.PKB_CALL_PATH;
 import static tools.dscode.testengine.PKB_props.PKB_COMPONENT_PATH;
 import static tools.dscode.testengine.PKB_props.PKB_DATA_PATH;
+import static tools.dscode.testengine.PKB_props.PKB_EXAMPLE;
 import static tools.dscode.testengine.PKB_props.PKB_FEATURES;
 import static tools.dscode.testengine.PKB_props.PKB_FEATURE_NAME;
+import static tools.dscode.testengine.PKB_props.PKB_LIMIT;
 import static tools.dscode.testengine.PKB_props.PKB_NAME;
+import static tools.dscode.testengine.PKB_props.PKB_ORDER;
 import static tools.dscode.testengine.PKB_props.PKB_TAGS;
 public class ModularScenarios extends CoreSteps {
     static final String RUN_TAGS = "Run Tags";
@@ -86,7 +93,7 @@ public class ModularScenarios extends CoreSteps {
             );
             validateRunSelectionMatchCount(
                     rowMatches.stream()
-                            .map(match -> match.pickle().getName())
+                            .map(PickleMatch::name)
                             .toList(),
                     selection
             );
@@ -94,7 +101,8 @@ public class ModularScenarios extends CoreSteps {
                 matches.add(new PickleMatch(
                         rowMatch.pickle(),
                         rowMatch.passedValues(),
-                        includeBackground
+                        includeBackground,
+                        rowMatch.engineScenario()
                 ));
             }
         }
@@ -527,7 +535,7 @@ public class ModularScenarios extends CoreSteps {
                 false
         );
         validateMatchCount(
-                matches.stream().map(match -> match.pickle().getName()).toList(),
+                matches.stream().map(PickleMatch::name).toList(),
                 "S".equals(pluralFlag),
                 singularStepText,
                 matchType
@@ -551,7 +559,7 @@ public class ModularScenarios extends CoreSteps {
                 false
         );
         validateMatchCount(
-                matches.stream().map(match -> match.pickle().getName()).toList(),
+                matches.stream().map(PickleMatch::name).toList(),
                 "S".equals(pluralFlag),
                 singularStepText,
                 matchType
@@ -665,6 +673,9 @@ public class ModularScenarios extends CoreSteps {
             String matchType,
             boolean requireSinglePerMap
     ) {
+        if (io.cucumber.core.runner.GlobalState.getTestCase() == null && NativeScenarioCatalog.active()) {
+            return collectNative(maps, featuresPath, runType, matchType, requireSinglePerMap);
+        }
         List<PickleMatch> matches = new ArrayList<>();
         for (Map<String, String> map : maps) {
             Map<String, String> scanOptions = new HashMap<>(map);
@@ -703,6 +714,88 @@ public class ModularScenarios extends CoreSteps {
             pickles.forEach(pickle -> matches.add(new PickleMatch(pickle, map)));
         }
         return matches;
+    }
+
+    private static List<PickleMatch> collectNative(
+            List<Map<String, String>> maps,
+            String featuresPath,
+            RunType runType,
+            String matchType,
+            boolean requireSinglePerMap
+    ) {
+        List<PickleMatch> matches = new ArrayList<>();
+        for (Map<String, String> map : maps) {
+            String path = nativePath(map, featuresPath, runType);
+            List<ScenarioResolver.Hit> hits;
+            try {
+                hits = ScenarioResolver.resolve(NativeScenarioCatalog.source(path), nativeQuery(map));
+            } catch (IllegalArgumentException exception) {
+                if (matchType == null || !isNoMatchException(exception)) {
+                    throw exception;
+                }
+                throw new IllegalArgumentException(
+                        "No " + matchType + " matched the provided scenario filters. "
+                                + exception.getMessage(),
+                        exception
+                );
+            }
+            if (requireSinglePerMap && hits.size() > 1) {
+                throw new IllegalArgumentException(
+                        "Expected one " + matchType + " per filter row, but matched "
+                                + hits.size() + ": "
+                                + hits.stream().map(hit -> hit.scenario().name()).toList()
+                );
+            }
+            for (ScenarioResolver.Hit hit : hits) {
+                matches.add(new PickleMatch(null, map, true, hit.scenario()));
+            }
+        }
+        return matches;
+    }
+
+    private static String nativePath(
+            Map<String, String> map,
+            String featuresPath,
+            RunType runType
+    ) {
+        if (runType == null) {
+            return featuresPath;
+        }
+        if (runType.pathProperty() == null) {
+            return null;
+        }
+        String rowPath = normalize(map.get(runType.pathProperty()));
+        return rowPath.isBlank() ? configuredRunPath(runType) : rowPath;
+    }
+
+    private static ScenarioResolver.Query nativeQuery(Map<String, String> map) {
+        String tags = firstNonBlank(map.get(RUN_TAGS), map.get(PKB_TAGS), map.get(FILTER_TAGS_PROPERTY_NAME));
+        if (!tags.isBlank()) {
+            tags = tags.replaceAll("(?<!@)(%[A-Za-z])", "@$1");
+        }
+        String name = firstNonBlank(map.get(PKB_NAME), map.get(FILTER_NAME_PROPERTY_NAME));
+        String feature = normalize(map.get(PKB_FEATURE_NAME));
+        String example = normalize(map.get(PKB_EXAMPLE));
+        String order = normalize(map.get(PKB_ORDER));
+        Integer limit = null;
+        String limitText = normalize(map.get(PKB_LIMIT));
+        if (!limitText.isBlank()) {
+            limit = Integer.valueOf(limitText);
+        }
+        return new ScenarioResolver.Query(
+                blankToNull(tags),
+                blankToNull(name),
+                blankToNull(feature),
+                blankToNull(example),
+                null,
+                blankToNull(order),
+                limit
+        );
+    }
+
+    private static String blankToNull(String value) {
+        String normalized = normalize(value);
+        return normalized.isBlank() ? null : normalized;
     }
 
     private static void applyRunTypePathOverride(
@@ -806,6 +899,15 @@ public class ModularScenarios extends CoreSteps {
             PickleMatch match,
             BiConsumer<ScenarioStep, Map<String, String>> scenarioInitializer
     ) {
+        if (match.engineScenario() != null) {
+            return NativeModularRun.materialize(
+                    match.engineScenario(),
+                    match.passedValues(),
+                    match.includeBackground(),
+                    match.passedValues().get(STEP_MARKER),
+                    scenarioInitializer
+            );
+        }
         ParsingMap scenarioStepParsingMap = new ParsingMap();
         NodeMap passedMap = new NodeMap(MapConfigurations.MapType.PASSED_MAP);
         passedMap.merge(match.passedValues());
@@ -840,7 +942,7 @@ public class ModularScenarios extends CoreSteps {
                 "Scenario data lookup matched " + matches.size()
                         + " component scenarios after ordering and limit were applied: "
                         + matches.stream()
-                        .map(match -> match.pickle().getName())
+                        .map(PickleMatch::name)
                         .toList()
                         + ". Refine the filters to return exactly one scenario."
         );
@@ -1094,10 +1196,20 @@ public class ModularScenarios extends CoreSteps {
     private record PickleMatch(
             Pickle pickle,
             Map<String, String> passedValues,
-            boolean includeBackground
+            boolean includeBackground,
+            EngineScenario engineScenario
     ) {
         private PickleMatch(Pickle pickle, Map<String, String> passedValues) {
-            this(pickle, passedValues, true);
+            this(pickle, passedValues, true, null);
+        }
+
+        private PickleMatch(Pickle pickle, Map<String, String> passedValues, boolean includeBackground) {
+            this(pickle, passedValues, includeBackground, null);
+        }
+
+        private String name() {
+            if (engineScenario != null) return engineScenario.name();
+            return pickle == null ? "" : pickle.getName();
         }
     }
 }

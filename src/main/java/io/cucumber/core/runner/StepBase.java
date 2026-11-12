@@ -109,12 +109,21 @@ public abstract class StepBase implements Cloneable {
     public DocString docString;
     public DataTable dataTable;
 
+    /** Text used when this step was built by the native engine and has no pickle. */
+    public String nativeText;
+    public String nativeKeyword = "* ";
+    public String nativeInlineType = "";
+    public String nativeInlineText = "";
+
     public ParsingMap getStepParsingMap() {
         return stepParsingMap;
     }
 
-    /** Returns the original Cucumber step text without exposing package-private runner types. */
+    /** Returns the original step text. Native frames have no pickle. */
     public String getStepText() {
+        if (pickleStepTestStep == null) {
+            return nativeText == null ? "" : nativeText;
+        }
         return pickleStepTestStep.getStepText();
     }
 

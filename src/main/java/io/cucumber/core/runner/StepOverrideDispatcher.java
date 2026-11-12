@@ -27,16 +27,27 @@ public final class StepOverrideDispatcher {
                         "Step Override no longer exists for step '" + resolvedStepText + "'."
                 ));
 
-        String originalStepText = step.pickleStepTestStep.unresolvedText == null
-                ? resolvedStepText
-                : step.pickleStepTestStep.unresolvedText;
+        String originalStepText;
+        String keyword;
+        Object argument;
+        if (step.pickleStepTestStep == null) {
+            originalStepText = resolvedStepText;
+            keyword = step.nativeKeyword == null ? "" : step.nativeKeyword.trim();
+            argument = null;
+        } else {
+            originalStepText = step.pickleStepTestStep.unresolvedText == null
+                    ? resolvedStepText
+                    : step.pickleStepTestStep.unresolvedText;
+            keyword = step.pickleStepTestStep.getStep().getKeyword();
+            argument = step.pickleStepTestStep.getStep().getArgument();
+        }
 
         StepOverrideContext context = new StepOverrideContext(
                 originalStepText,
                 resolvedStepText,
-                step.pickleStepTestStep.getStep().getKeyword(),
+                keyword,
                 match.captures(),
-                step.pickleStepTestStep.getStep().getArgument(),
+                argument,
                 getCurrentScenarioState(),
                 step,
                 getRunningParsingMap()
