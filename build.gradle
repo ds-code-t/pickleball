@@ -972,6 +972,32 @@ tasks.test {
     classpath = files(wovenExpanded, controlApiClasses, sourceSets.consumerGlue.output) + classpath + files(consumerResources)
 }
 
+// One test worker, a bounded heap, and a capped console so a full dual-run
+// fits beside the Gradle JVM. maxHeapSize is a ceiling; smaller tests do not
+// reserve it. CI runs the same tasks and has room for this ceiling.
+allprojects {
+    tasks.withType(Test).configureEach { task ->
+        task.maxParallelForks = 1
+        task.maxHeapSize = '1536m'
+        task.minHeapSize = '128m'
+        task.jvmArgs(
+                '-XX:+UseSerialGC',
+                '-XX:MaxMetaspaceSize=384m',
+                '-XX:ReservedCodeCacheSize=64m',
+                '-Xss384k',
+                '-XX:MaxDirectMemorySize=64m',
+                '-Dpkb.test.console.cap=on',
+                '-Dpkb.test.console.forward.bytes=262144',
+                '-Dpkb.test.console.file.bytes=4194304'
+        )
+        def consoleDir = task.project.layout.buildDirectory.dir("test-console/${task.name}")
+        task.systemProperty('pkb.test.console.dir', consoleDir.get().asFile.absolutePath)
+        task.doFirst {
+            consoleDir.get().asFile.mkdirs()
+        }
+    }
+}
+
 configurations.named("testRuntimeClasspath") {
     exclude group: "io.cucumber", module: "cucumber-core"
     exclude group: "io.cucumber", module: "cucumber-gherkin"
