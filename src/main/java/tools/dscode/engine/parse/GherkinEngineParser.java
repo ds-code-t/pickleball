@@ -117,8 +117,8 @@ public final class GherkinEngineParser {
             int overall
     ) {
         LinkedHashMap<String, String> metadata = new LinkedHashMap<>(scenario.metadata());
-        metadata.put("exampleHeaders", String.join("\t", table.headers()));
-        metadata.put("exampleValues", String.join("\t", row));
+        metadata.put("exampleHeaders", joinCells(table.headers()));
+        metadata.put("exampleValues", joinCells(row));
         metadata.put("exampleTable", Integer.toString(tableIndex));
         metadata.put("exampleRow", Integer.toString(rowIndex));
         metadata.put("exampleOverall", Integer.toString(overall));
@@ -135,6 +135,17 @@ public final class GherkinEngineParser {
                 new SourceLocation(base.location().uri(), table.location().line(), table.location().column()),
                 metadata
         );
+    }
+
+    private static String joinCells(List<String> cells) {
+        if (cells == null || cells.isEmpty()) return "";
+        StringBuilder joined = new StringBuilder();
+        for (int index = 0; index < cells.size(); index++) {
+            if (index > 0) joined.append('\t');
+            String cell = cells.get(index);
+            if (cell != null) joined.append(cell);
+        }
+        return joined.toString();
     }
 
     private static List<String> scenarioTags(List<String> headers, List<String> row) {

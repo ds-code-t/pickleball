@@ -13,8 +13,11 @@ import com.google.common.collect.LinkedListMultimap;
 import io.cucumber.datatable.DataTable;
 import io.cucumber.docstring.DocString;
 import tools.dscode.internal.ValuesSupport;
+import tools.dscode.engine.model.DocText;
+import tools.dscode.engine.model.Table;
 import tools.dscode.engine.context.ExecutionContext;
 import tools.dscode.engine.context.RunBindings;
+import tools.dscode.common.dataoperations.NeutralRows;
 import tools.dscode.common.mappings.queries.Tokenized;
 import tools.dscode.common.treeparsing.parsedComponents.ElementMatch;
 
@@ -1062,6 +1065,9 @@ public abstract class MappingProcessor implements Map<String, Object> {
                 return raw == null ? List.of() : List.of(raw);
             }
             Object raw = getDataElementValue(element);
+            if (raw instanceof Table table) {
+                return List.of(table);
+            }
             if (raw instanceof DataTable dataTable) {
                 return List.of(dataTable);
             }
@@ -1130,7 +1136,11 @@ public abstract class MappingProcessor implements Map<String, Object> {
                 return filterGroupedValues(headers, headers, element, false);
             case DATA_OBJECT_KEY:
                 Object raw = getDataElementValue(element);
-                if (raw instanceof DataTable dataTable) {
+                if (raw instanceof Table table) {
+                    raw = NeutralRows.toJson(table);
+                } else if (raw instanceof DocText doc) {
+                    raw = NeutralRows.text(doc);
+                } else if (raw instanceof DataTable dataTable) {
                     raw = dataTableToJsonNode(dataTable);
                 } else if (raw instanceof DocString docString) {
                     try {

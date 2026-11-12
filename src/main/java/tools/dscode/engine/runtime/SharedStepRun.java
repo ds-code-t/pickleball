@@ -6,6 +6,7 @@ import io.cucumber.docstring.DocString;
 import io.cucumber.plugin.event.Result;
 import io.cucumber.plugin.event.Status;
 import tools.dscode.common.annotations.Phase;
+import tools.dscode.common.dataoperations.NeutralRows;
 import tools.dscode.common.mappings.MapConfigurations;
 import tools.dscode.common.mappings.MappingProcessor;
 import tools.dscode.common.mappings.NodeMap;
@@ -173,27 +174,30 @@ public final class SharedStepRun {
         String name = step.method.getName();
         EngineStep engineStep = BOUND.get().get(step);
         if ("docString".equals(name) && engineStep != null && engineStep.argument() instanceof StepArgument.DocArg docArg) {
-            DocString doc = CucumberModelConverter.toDocString(docArg.doc());
+            DocText neutral = docArg.doc();
+            DocString doc = CucumberModelConverter.toDocString(neutral);
             step.docString = doc;
             step.dataArgumentStep = true;
             String docName = match.captures().isEmpty() ? null : match.captures().getFirst();
             if (docName != null && !docName.isBlank() && MappingProcessor.getRunMap() != null) {
-                MappingProcessor.getRunMap().put(docName.trim(), doc);
+                MappingProcessor.getRunMap().put(docName.trim(), neutral);
             }
             step.dataContextStepNodeMap = new NodeMap(MapConfigurations.MapType.PHRASE_MAP);
             step.dataContextStepNodeMap.setDataSource(MapConfigurations.DataSource.DOC_STRING);
-            step.dataContextStepNodeMap.put(DOCSTRING_KEY, doc);
+            step.dataContextStepNodeMap.put(DOCSTRING_KEY, neutral);
         } else if ("dataTable".equals(name) && engineStep != null && engineStep.argument() instanceof StepArgument.TableArg tableArg) {
-            DataTable table = CucumberModelConverter.toDataTable(tableArg.table());
+            Table neutral = tableArg.table();
+            DataTable table = CucumberModelConverter.toDataTable(neutral);
             step.dataTable = table;
             step.dataArgumentStep = true;
             String tableName = match.captures().isEmpty() ? null : match.captures().getFirst();
             if (tableName != null && !tableName.isBlank() && MappingProcessor.getRunMap() != null) {
-                MappingProcessor.getRunMap().put(tableName.trim(), table);
+                MappingProcessor.getRunMap().put(tableName.trim(), neutral);
             }
             step.dataContextStepNodeMap = new NodeMap(MapConfigurations.MapType.PHRASE_MAP);
             step.dataContextStepNodeMap.setDataSource(MapConfigurations.DataSource.DATA_TABLE);
-            step.dataContextStepNodeMap.put(TABLE_KEY, table);
+            step.dataContextStepNodeMap.put(TABLE_KEY, neutral);
+            step.dataContextStepNodeMap.put("rows", NeutralRows.toJson(neutral));
             step.dataContextStepNodeMap.merge(toRowsStringMultimap(table));
         }
     }

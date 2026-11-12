@@ -1748,6 +1748,12 @@ public class ParsingMap extends MappingProcessor {
             if (value == null || value instanceof NullNode) {
                 return "";
             }
+            if (value instanceof Table table) {
+                return NeutralRows.toJson(table).toString();
+            }
+            if (value instanceof DocText doc) {
+                return NeutralRows.text(doc);
+            }
             if (value instanceof DataTable || value instanceof DocString) {
                 return ValueFormatting.toReferenceText(value);
             }
@@ -1846,6 +1852,9 @@ public class ParsingMap extends MappingProcessor {
             if (value instanceof DataTable dataTable) {
                 return dataTable;
             }
+            if (value instanceof Table table) {
+                return jsonNodeToDataTable(NeutralRows.toJson(table));
+            }
             Object normalized = javaConversionSource(value);
             JsonNode node = normalized instanceof JsonNode jsonNode
                     ? jsonNode
@@ -1864,6 +1873,9 @@ public class ParsingMap extends MappingProcessor {
             if (value instanceof DocString docString) {
                 return docString;
             }
+            if (value instanceof DocText doc) {
+                return DocString.create(doc.content(), doc.mediaType().isBlank() ? null : doc.mediaType());
+            }
             boolean structured = value instanceof JsonNode
                     || value instanceof Map<?, ?>
                     || value instanceof Collection<?>
@@ -1880,6 +1892,12 @@ public class ParsingMap extends MappingProcessor {
         }
 
         private static Object javaConversionSource(Object value) {
+            if (value instanceof Table table) {
+                return NeutralRows.toJson(table);
+            }
+            if (value instanceof DocText doc) {
+                return NeutralRows.text(doc);
+            }
             if (value instanceof DataTable dataTable) {
                 return dataTableToJsonNode(dataTable);
             }
@@ -1973,6 +1991,15 @@ public class ParsingMap extends MappingProcessor {
                 }
                 if (value instanceof JsonNode node) {
                     return restoreJson(node);
+                }
+                if (value instanceof Table table) {
+                    List<List<String>> cells = table.rows().stream()
+                            .map(row -> row.stream().map(this::restore).toList())
+                            .toList();
+                    return new Table(cells);
+                }
+                if (value instanceof DocText doc) {
+                    return new DocText(restore(doc.content()), doc.mediaType());
                 }
                 if (value instanceof DataTable table) {
                     List<List<String>> cells = table.cells().stream()

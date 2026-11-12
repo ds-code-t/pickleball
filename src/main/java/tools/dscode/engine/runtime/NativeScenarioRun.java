@@ -4,7 +4,9 @@ import io.cucumber.core.runner.CurrentScenarioState;
 import io.cucumber.core.runner.ScenarioStep;
 import io.cucumber.core.runner.StepExtension;
 import io.cucumber.plugin.event.Result;
+import tools.dscode.common.mappings.MapConfigurations;
 import tools.dscode.common.mappings.MappingProcessor;
+import tools.dscode.common.mappings.NodeMap;
 import tools.dscode.common.reporting.logging.Entry;
 import tools.dscode.engine.EngineLog;
 import tools.dscode.engine.EngineOptions;
@@ -19,6 +21,7 @@ import tools.dscode.common.GlobalConstants;
 import tools.dscode.engine.model.StepResult;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.IdentityHashMap;
 import java.util.List;
 
@@ -38,6 +41,7 @@ public final class NativeScenarioRun {
             context.resource("instances", new IdentityHashMap<Class<?>, Object>());
             CurrentScenarioState state = new CurrentScenarioState(scenario.name(), scenario.name());
             context.attachLegacy(state);
+            installExamples(state, scenario);
             state.scenarioLog = Entry.of(scenario.name()).tag("Scenario").start();
             context.resource("tags", scenario.tags());
             ScenarioStep root = new ScenarioStep(scenario.name());
@@ -144,6 +148,17 @@ public final class NativeScenarioRun {
             }
         }
         return ScenarioResult.fromSteps(scenario.name(), results);
+    }
+
+    private static void installExamples(CurrentScenarioState state, EngineScenario scenario) {
+        if (state == null || scenario == null || state.getParsingMap() == null) return;
+        String headers = scenario.metadata().get("exampleHeaders");
+        String values = scenario.metadata().get("exampleValues");
+        if (headers == null || values == null) return;
+        NodeMap examples = new NodeMap(MapConfigurations.MapType.EXAMPLE_MAP);
+        examples.merge(Arrays.asList(headers.split("\t", -1)), Arrays.asList(values.split("\t", -1)));
+        state.getParsingMap().addMaps(examples);
+        EngineLog.log(null, "run", "examples", headers);
     }
 
     private record Prepared(EngineStep step, StepExtension frame, int nesting) {
