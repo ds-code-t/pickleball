@@ -1,0 +1,43 @@
+plugins {
+    id 'java-library'
+    id 'application'
+}
+
+group = 'dev.domengine'
+version = '3.0.0'
+
+repositories {
+    mavenCentral()
+}
+
+java {
+    toolchain { languageVersion = JavaLanguageVersion.of(21) }
+}
+
+application {
+    mainClass = 'dev.domengine.cli.DomEngineMain'
+    applicationName = 'domengine'
+}
+
+dependencies {
+    implementation 'com.fasterxml.jackson.core:jackson-databind:2.20.0'
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.13.4'
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.13.4'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher:1.13.4'
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    options.release = 21
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+    maxParallelForks = 1
+}
+
+tasks.named('jar') {
+    manifest {
+        attributes('Main-Class': 'dev.domengine.cli.DomEngineMain')
+    }
+}

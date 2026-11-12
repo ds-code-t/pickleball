@@ -72,6 +72,11 @@ GROUPS: tuple[tuple[str, tuple[str, ...]], ...] = (
         "pickleball-workbench/src/main/**/*",
         "pickleball-workbench/src/test/**/*",
     )),
+    ("Java DOM engine module", (
+        "dom-engine/build.gradle",
+        "dom-engine/src/main/**/*",
+        "dom-engine/src/test/**/*",
+    )),
     ("Maven consumer Java support", (
         "maven-consumer-project/src/test/java/**/*.java",
     )),

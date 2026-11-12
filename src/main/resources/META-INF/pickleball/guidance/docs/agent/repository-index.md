@@ -1057,6 +1057,26 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/worker/WorkbenchLiveSessionTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/worker/WorkbenchWorkerManagerTest.java`
 
+## Java DOM engine module
+
+- `dom-engine/build.gradle`
+- `dom-engine/src/main/java/dev/domengine/cdp/CdpConnection.java`
+- `dom-engine/src/main/java/dev/domengine/cdp/CdpException.java`
+- `dom-engine/src/main/java/dev/domengine/cli/CliResult.java`
+- `dom-engine/src/main/java/dev/domengine/cli/DomEngineMain.java`
+- `dom-engine/src/main/java/dev/domengine/EngineInfo.java`
+- `dom-engine/src/main/java/dev/domengine/json/Jsons.java`
+- `dom-engine/src/main/java/dev/domengine/log/EngineLog.java`
+- `dom-engine/src/main/java/dev/domengine/session/BrowserSession.java`
+- `dom-engine/src/main/java/dev/domengine/session/SessionRegistry.java`
+- `dom-engine/src/main/java/dev/domengine/tree/DomNode.java`
+- `dom-engine/src/main/java/dev/domengine/tree/LiveTree.java`
+- `dom-engine/src/test/java/dev/domengine/CdpSessionAttachTest.java`
+- `dom-engine/src/test/java/dev/domengine/CliStdioTest.java`
+- `dom-engine/src/test/java/dev/domengine/DocumentWalkFixtureTest.java`
+- `dom-engine/src/test/java/dev/domengine/EngineLogTest.java`
+- `dom-engine/src/test/java/dev/domengine/FakeCdp.java`
+
 ## Maven consumer Java support
 
 - `maven-consumer-project/src/test/java/com/example/pickleball/AreaBControlFlowChecks.java`
