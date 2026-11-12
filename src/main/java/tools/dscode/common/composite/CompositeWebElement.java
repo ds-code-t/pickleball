@@ -297,7 +297,8 @@ public final class CompositeWebElement implements WebElement {
     public List<WebElement> findElements(By by) {
         if (by == null) return List.of();
         DomCompositeAdapter adapter = DomCompositeAdapter.get();
-        if (adapter.queryFlag("within") && nodeId != null && !nodeId.isBlank()) {
+        if (adapter.queryFlag("within") && nodeId != null && !nodeId.isBlank()
+                && CompositeRuntime.browserJoined()) {
             return adapter.findScoped(by, nodeId, null, null);
         }
         CompositeLog.info("adapter", "within fallback");

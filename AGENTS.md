@@ -409,5 +409,7 @@ Live Chrome action smoke (`LiveChromeActionSmokeTest`) runs when `DOMENGINE_CHRO
 
 `domengine conform --root DIR --live` evaluates the vendored Rust fixtures in headless Chrome, including the assertions offline `conform` skips. `LiveConformanceTest` skips only when that binary is missing. Offline `ConformanceSuiteTest` is unchanged.
 
+An unjoined WebDriver stays on Selenium for nesting and for a composite find. Reading engine query flags does not launch Chrome. `ContextAnchorReproTest` and `NestAnchorReproTest` pass with or without a Chrome binary. `assertEquals(1, deepest.size())` is unchanged. A joined browser still sends `--within` and `--nesting`.
+
 
 

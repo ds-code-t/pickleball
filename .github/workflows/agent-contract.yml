@@ -98,6 +98,9 @@ jobs:
       - name: DOM engine tests including live Chrome
         run: ./gradlew --no-daemon :dom-engine:test
 
+      - name: Unjoined-driver repro tests
+        run: ./gradlew --no-daemon :test --tests tools.dscode.common.composite.ContextAnchorReproTest --tests tools.dscode.common.domoperations.NestAnchorReproTest
+
   gate:
     needs: [windows]
     if: always()

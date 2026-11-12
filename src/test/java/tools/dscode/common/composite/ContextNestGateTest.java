@@ -43,6 +43,7 @@ class ContextNestGateTest {
         temp = Files.createTempDirectory("pkb-within");
         Path log = temp.resolve("calls.log");
         pin(stub(temp.resolve("composite"), log, true));
+        CompositeRuntime.joinForTests("http://127.0.0.1:9222");
         CompositeWebElement bare = element(null);
         assertNull(bare.anchor());
         List<WebElement> found = bare.findElements(By.xpath(".//span"));
@@ -62,6 +63,7 @@ class ContextNestGateTest {
         temp = Files.createTempDirectory("pkb-paren");
         Path log = temp.resolve("calls.log");
         pin(stub(temp.resolve("composite"), log, true));
+        CompositeRuntime.joinForTests("http://127.0.0.1:9222");
         CompositeWebElement host = element("panel");
         List<WebElement> found = host.findElements(By.xpath("(//span[@class='child'])[1]"));
         assertEquals("inside", found.getFirst().getText());
@@ -76,6 +78,7 @@ class ContextNestGateTest {
         temp = Files.createTempDirectory("pkb-nest");
         Path log = temp.resolve("calls.log");
         pin(stub(temp.resolve("composite"), log, true));
+        CompositeRuntime.joinForTests("http://127.0.0.1:9222");
         HtmlUnitDriver driver = new HtmlUnitDriver(false);
         try {
             DomCompositeAdapter.get().resetCommandsForTests();
