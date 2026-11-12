@@ -204,27 +204,36 @@ tasks.withType(JavaCompile).configureEach {
 tasks.register('ajcMain', JavaExec) {
     group = 'build'
     description = 'Compile Java + AspectJ (main) with ajc'
-    dependsOn ':pickleball-control-protocol:jar'
+    // -classpath is only a string passed to ajc. Gradle does not infer project
+    // jars from that string, so a clean checkout never built :dom-engine:jar
+    // and DomLogCli could not resolve dev.domengine. Take the compile classpath
+    // as a real input and build those jars first. The path is read at execution
+    // time, after the jars exist.
+    def ajcClasspath = files(sourceSets.main.compileClasspath, configurations.ajcRuntime)
+    dependsOn ajcClasspath
+    dependsOn ':dom-engine:jar', ':pickleball-control-protocol:jar'
 
-    def outDir = sourceSets.main.java.destinationDirectory.get().asFile
+    def outDir = sourceSets.main.java.destinationDirectory
     inputs.files(sourceSets.main.java)
+    inputs.files(ajcClasspath)
     outputs.dir(outDir)
 
     mainClass.set('org.aspectj.tools.ajc.Main')
     classpath = configurations.ajcTools
 
-    def cp = files(sourceSets.main.compileClasspath, configurations.ajcRuntime).asPath
     def allSourceRoots = sourceSets.main.java.srcDirs
             .collect { it.absolutePath }
             .join(File.pathSeparator)
 
-    args = [
-            '-21',
-            '-sourceroots', allSourceRoots,
-            '-d', outDir.absolutePath,
-            '-classpath', cp,
-            '-Xlint:ignore'
-    ]
+    doFirst {
+        args = [
+                '-21',
+                '-sourceroots', allSourceRoots,
+                '-d', outDir.get().asFile.absolutePath,
+                '-classpath', ajcClasspath.asPath,
+                '-Xlint:ignore'
+        ]
+    }
 }
 
 // Disable javac—ajc produces the class files
