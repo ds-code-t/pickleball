@@ -7,6 +7,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 ## Top-level project files
 
 - `build.gradle`
+- `gradle.properties`
 - `gradlew`
 - `gradlew.bat`
 - `maven-consumer-project/.github/copilot-instructions.md`
@@ -83,6 +84,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/maintainer/2.1.19-workbench-expansion-roadmap.md`
 - `docs/maintainer/3.0.0-dalton-design.md`
 - `docs/maintainer/3.0.0-engine-design.md`
+- `docs/maintainer/3.0.0-java-dom-design.md`
 - `docs/maintainer/consumer-sim-harness.md`
 - `docs/maintainer/guidance-goldens.md`
 - `docs/maintainer/pointer-eval-harness.md`
@@ -104,6 +106,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/roadmaps/3.0.0-dalton-roadmap.md`
 - `docs/roadmaps/3.0.0-dalton-round2-roadmap.md`
 - `docs/roadmaps/3.0.0-decouple-round3-roadmap.md`
+- `docs/roadmaps/3.0.0-java-dom-roadmap.md`
 - `docs/service-call-scenarios.md`
 - `docs/step-overrides.md`
 - `docs/workbench-agent-detail.md`
@@ -781,6 +784,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/testengine/WorkspaceLaunchEndToEndTest.java`
 - `src/test/java/tools/dscode/testengine/WorkspaceLaunchTest.java`
 - `src/test/java/tools/dscode/testengine/WorkspaceSeedTest.java`
+- `src/test/java/tools/dscode/testsupport/CappedTestConsole.java`
 - `src/test/java/tools/dscode/untilpass/UntilPassBrowserSteps.java`
 - `src/test/java/tools/dscode/untilpass/UntilPassChromeLookupTest.java`
 - `src/test/resources/element-batch/edge.html`
@@ -789,6 +793,8 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/resources/expected-failure/release-216-expected-failure.feature`
 - `src/test/resources/guidance-golden/documented-help.txt`
 - `src/test/resources/launch-parity/observe.feature`
+- `src/test/resources/META-INF/services/org.junit.platform.launcher.LauncherSessionListener`
+- `src/test/resources/META-INF/services/org.junit.platform.launcher.TestExecutionListener`
 - `src/test/resources/multiline-assert/multiline-assert.feature`
 - `src/test/resources/position/ordinals.html`
 - `src/test/resources/scenario-object/scenario-object.feature`
