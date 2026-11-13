@@ -29,6 +29,7 @@ import java.util.Properties;
 
 import io.cucumber.core.cli.Main;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -168,6 +169,36 @@ class WorkbenchLaunchCorrectnessTest {
         assertTrue(text.contains("BeforeAllSite.open"), "missing hook frame");
         assertTrue(text.contains("console truncated"), "missing truncation marker");
         assertEquals(cause, WorkbenchAgentCommands.launchCause(text));
+    }
+
+    @Test
+    void launchCaptureBytesIncludeHeadMarkerAndTail() throws Exception {
+        ByteArrayOutputStream small = WorkbenchAgentCommands.captureBuffer();
+        small.write("small\n".getBytes(StandardCharsets.UTF_8));
+        assertArrayEquals("small\n".getBytes(StandardCharsets.UTF_8), small.toByteArray());
+        assertEquals(6, small.size());
+
+        ByteArrayOutputStream buffer = WorkbenchAgentCommands.captureBuffer();
+        buffer.write("BeforeAllSite.open\n".getBytes(StandardCharsets.UTF_8));
+        byte[] block = "line\n".getBytes(StandardCharsets.UTF_8);
+        for (int i = 0; i < 200_000; i++) buffer.write(block, 0, block.length);
+        String cause = "Caused by: java.net.BindException: Address already in use\n";
+        buffer.write(cause.getBytes(StandardCharsets.UTF_8));
+
+        byte[] bytes = buffer.toByteArray();
+        String text = new String(bytes, StandardCharsets.UTF_8);
+        assertEquals(bytes.length, buffer.size());
+        assertTrue(text.contains("BeforeAllSite.open"), text.substring(0, Math.min(80, text.length())));
+        assertTrue(text.contains("console truncated"), "missing truncation marker");
+        assertTrue(text.contains("BindException"), "tail was dropped");
+        assertTrue(bytes.length < WorkbenchAgentCommands.CaptureBuffer.HEAD
+                + WorkbenchAgentCommands.CaptureBuffer.TAIL
+                + 200, "length=" + bytes.length);
+        ByteArrayOutputStream copy = new ByteArrayOutputStream();
+        buffer.writeTo(copy);
+        assertArrayEquals(bytes, copy.toByteArray());
+        assertEquals(text, buffer.toString(StandardCharsets.UTF_8));
+        assertTrue(buffer.toString(0).contains("BindException"));
     }
 
     @Test

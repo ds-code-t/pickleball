@@ -2414,6 +2414,35 @@ public final class WorkbenchAgentCommands {
         }
 
         @Override
+        public synchronized int size() {
+            if (!truncated) return count;
+            long total = (long) count + markerBytes().length + tailFilled;
+            return total > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) total;
+        }
+
+        /** Head, the truncation marker, and the tail. Not the head alone. */
+        @Override
+        public synchronized byte[] toByteArray() {
+            if (!truncated) return super.toByteArray();
+            byte[] mark = markerBytes();
+            byte[] tail = tailBytes();
+            byte[] out = new byte[count + mark.length + tail.length];
+            System.arraycopy(buf, 0, out, 0, count);
+            System.arraycopy(mark, 0, out, count, mark.length);
+            System.arraycopy(tail, 0, out, count + mark.length, tail.length);
+            return out;
+        }
+
+        @Override
+        public synchronized void writeTo(java.io.OutputStream out) throws java.io.IOException {
+            if (!truncated) {
+                super.writeTo(out);
+                return;
+            }
+            out.write(toByteArray());
+        }
+
+        @Override
         public synchronized String toString() {
             return toString(StandardCharsets.UTF_8);
         }
@@ -2421,9 +2450,18 @@ public final class WorkbenchAgentCommands {
         @Override
         public synchronized String toString(Charset charset) {
             if (!truncated) return super.toString(charset);
-            return new String(buf, 0, count, charset)
-                    + "\n... console truncated " + dropped + " bytes ...\n"
-                    + new String(tailBytes(), charset);
+            return new String(toByteArray(), charset);
+        }
+
+        @Override
+        @Deprecated
+        public synchronized String toString(int hibyte) {
+            byte[] bytes = toByteArray();
+            return new String(bytes, hibyte, 0, bytes.length);
+        }
+
+        private byte[] markerBytes() {
+            return ("\n... console truncated " + dropped + " bytes ...\n").getBytes(StandardCharsets.US_ASCII);
         }
 
         private void appendTail(byte[] buffer, int offset, int length) {
