@@ -3,6 +3,7 @@ package tools.dscode.common.agentcontrol;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.remote.RemoteWebDriver;
+import tools.dscode.common.agentsurface.AgentSurfaceRouter;
 import tools.dscode.common.composite.CompositeLog;
 import tools.dscode.common.composite.CompositeRuntime;
 import tools.dscode.common.driver.DriverConstruction;
@@ -12,6 +13,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * One controller for observe, launch, windows, chat, highlight, overlay, HTML,
@@ -61,6 +63,8 @@ public final class AgentControl {
     ) {
         Map<String, String> values = args == null ? Map.of() : args;
         try {
+            Optional<Result> routed = AgentSurfaceRouter.route(project, runId, op, values, agentId);
+            if (routed.isPresent()) return routed.get();
             return switch (op == null ? "" : op) {
                 case "observe" -> observe(project, runId, values);
                 case "launch" -> launch(project, runId, values, extraArgs);
