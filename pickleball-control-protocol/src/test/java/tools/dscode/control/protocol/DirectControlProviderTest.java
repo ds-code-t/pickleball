@@ -54,7 +54,7 @@ class DirectControlProviderTest {
                 liveComposite(Map.of(JavaEngineLauncher.ENGINE_ENV, "rust")));
         assertEquals(DirectControlProvider.Kind.BINARY_MISSING, outcome.kind());
         assertNull(outcome.handle());
-        assertTrue(outcome.message().contains("composite binary not found"));
+        assertTrue(outcome.message().contains("no DOM engine found"));
     }
 
     @Test

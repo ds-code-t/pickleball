@@ -17,7 +17,7 @@ import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Optional dom-composite attach for one live Workbench session.
+ * Optional DOM-engine attach (in-repo Java engine by default) for one live Workbench session.
  *
  * <p>{@code composite} runs the in-repo Java engine through
  * {@link JavaEngineLauncher} unless an explicit binary or a Rust request says
@@ -210,7 +210,7 @@ public final class DirectControlProvider {
         if (binary.isEmpty()) {
             return Outcome.idle(
                     Kind.BINARY_MISSING,
-                    "Direct-control provider skipped: composite binary not found."
+                    "Direct-control provider skipped: no DOM engine found (Java engine not on the classpath; no COMPOSITE_BIN, pkb_composite_bin, or Rust build)."
             );
         }
         Path sessionDir = sessionDirectory(request.project(), request.runId());
