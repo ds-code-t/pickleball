@@ -94,8 +94,7 @@ public final class CompositeBinaryLocator {
                 return javaEngine;
             }
         }
-        Optional<Path> discovered = DirectControlProvider.resolveBinary(
-                DirectControlProvider.TOKEN,
+        Optional<Path> discovered = DirectControlProvider.resolveRustBinary(
                 resolved.project(),
                 environment
         );

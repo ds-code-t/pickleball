@@ -55,6 +55,14 @@ dependencies {
     // It must never compile or run against the root Pickleball runtime.
     implementation project(':pickleball-control-protocol')
     workbenchEmbed project(':pickleball-control-protocol')
+    // The in-repo Java DOM engine classes ride in the thin JAR so the default
+    // pkb_direct_control_provider=composite handoff (DirectControlProvider via
+    // JavaEngineLauncher) has an engine to run. Non-transitive: its Jackson
+    // comes from the controller runtime libs (jackson-databind above), never
+    // shaded. It is not a compile or runtime project dependency of Workbench.
+    workbenchEmbed(project(':dom-engine')) {
+        transitive = false
+    }
 
     // OpenJFX WebView is Workbench-only presentation. Ordinary platform JARs are
     // resolved onto the forked controller classpath at launch; they are not
@@ -388,6 +396,12 @@ tasks.register('verifyWorkbenchArtifact') {
             }
             if (jar.getEntry('tools/dscode/control/protocol/ControlProtocol.class') == null) {
                 throw new GradleException('Workbench executable is missing the neutral control protocol')
+            }
+            if (jar.getEntry('tools/dscode/control/protocol/JavaEngineLauncher.class') == null) {
+                throw new GradleException('Workbench executable is missing the Java engine launcher')
+            }
+            if (jar.getEntry('dev/domengine/cli/DomEngineMain.class') == null) {
+                throw new GradleException('Workbench executable is missing the in-repo Java DOM engine')
             }
             def manifestEntry = jar.getEntry('META-INF/pickleball/workbench-runtime-libs.txt')
             if (manifestEntry == null) {

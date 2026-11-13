@@ -19,6 +19,10 @@ import java.util.concurrent.TimeUnit;
 /**
  * Optional dom-composite attach for one live Workbench session.
  *
+ * <p>{@code composite} runs the in-repo Java engine through
+ * {@link JavaEngineLauncher} unless an explicit binary or a Rust request says
+ * otherwise; see {@link #resolveBinary(String, Path, Map)}.</p>
+ *
  * <p>The only reader of {@code pkb_direct_control_provider} is
  * {@link #configured}. A blank value, a non-live run, or a missing CDP
  * address starts nothing. {@code session attach} is a short command: it
@@ -61,30 +65,74 @@ public final class DirectControlProvider {
     }
 
     /**
-     * {@code composite} uses {@code COMPOSITE_BIN}, then {@code COMPOSITE_HOME}
-     * or a sibling {@code dom-composite} checkout
+     * {@code composite} uses {@code COMPOSITE_BIN}, then {@code pkb_composite_bin}
+     * (system property, {@code pkb_runvars.} property, environment), then the
+     * in-repo Java engine on this class loader ({@link JavaEngineLauncher})
+     * unless {@code pkb_composite_engine=rust} / {@code PKB_COMPOSITE_ENGINE=rust},
+     * then {@code COMPOSITE_HOME} or a sibling {@code dom-composite} checkout
      * ({@code target/debug/composite}, then {@code target/release/composite}).
      * Any other value is a path to the binary.
      */
     public static Optional<Path> resolveBinary(String configured, Path project, Map<String, String> env) {
+        return resolveBinary(configured, project, env, DirectControlProvider.class.getClassLoader());
+    }
+
+    /** {@link #resolveBinary(String, Path, Map)} with the class loader that is searched for the Java engine. */
+    public static Optional<Path> resolveBinary(
+            String configured,
+            Path project,
+            Map<String, String> env,
+            ClassLoader engineLoader
+    ) {
         String value = blank(configured);
         if (value == null) return Optional.empty();
         Map<String, String> environment = env == null ? System.getenv() : env;
         if (TOKEN.equals(value)) {
             Path named = executable(environment.get(BIN_ENV));
             if (named != null) return Optional.of(named);
-            for (Path home : homes(project, environment)) {
-                Path debug = executable(home.resolve("target").resolve("debug").resolve(TOKEN).toString());
-                if (debug != null) return Optional.of(debug);
-                Path release = executable(home.resolve("target").resolve("release").resolve(TOKEN).toString());
-                if (release != null) return Optional.of(release);
+            Path bin = explicitBin(project, environment);
+            if (bin != null) return Optional.of(bin);
+            if (!JavaEngineLauncher.rustRequested(environment)) {
+                Optional<Path> java = JavaEngineLauncher.script(engineLoader);
+                if (java.isPresent()) return java;
             }
-            return Optional.empty();
+            return rustHomes(project, environment);
         }
         Path given = Path.of(value);
         if (!given.isAbsolute() && project != null) given = project.resolve(given);
         Path file = executable(given.toString());
         return file == null ? Optional.empty() : Optional.of(file);
+    }
+
+    /**
+     * Rust {@code composite} only: {@code COMPOSITE_BIN}, then {@code COMPOSITE_HOME}
+     * or a sibling {@code dom-composite} checkout. Never the Java engine.
+     */
+    public static Optional<Path> resolveRustBinary(Path project, Map<String, String> env) {
+        Map<String, String> environment = env == null ? System.getenv() : env;
+        Path named = executable(environment.get(BIN_ENV));
+        if (named != null) return Optional.of(named);
+        return rustHomes(project, environment);
+    }
+
+    private static Optional<Path> rustHomes(Path project, Map<String, String> environment) {
+        for (Path home : homes(project, environment)) {
+            Path debug = executable(home.resolve("target").resolve("debug").resolve(TOKEN).toString());
+            if (debug != null) return Optional.of(debug);
+            Path release = executable(home.resolve("target").resolve("release").resolve(TOKEN).toString());
+            if (release != null) return Optional.of(release);
+        }
+        return Optional.empty();
+    }
+
+    private static Path explicitBin(Path project, Map<String, String> environment) {
+        String named = blank(System.getProperty(JavaEngineLauncher.BIN_KEY));
+        if (named == null) named = blank(System.getProperty("pkb_runvars." + JavaEngineLauncher.BIN_KEY));
+        if (named == null) named = blank(environment.get(JavaEngineLauncher.BIN_KEY));
+        if (named == null) return null;
+        Path path = Path.of(named);
+        if (!path.isAbsolute() && project != null) path = project.resolve(path);
+        return executable(path.toString());
     }
 
     /**

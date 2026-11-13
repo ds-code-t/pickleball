@@ -98,6 +98,9 @@ jobs:
       - name: DOM engine tests including live Chrome
         run: ./gradlew --no-daemon :dom-engine:test
 
+      - name: Workbench direct-control attach on the Java engine
+        run: ./gradlew --no-daemon :pickleball-control-protocol:test --tests tools.dscode.control.protocol.DirectControlProviderTest
+
       - name: Unjoined-driver repro tests
         run: ./gradlew --no-daemon :test --tests tools.dscode.common.composite.ContextAnchorReproTest --tests tools.dscode.common.domoperations.NestAnchorReproTest
 

@@ -26,7 +26,7 @@ import tools.dscode.control.protocol.DirectControlProvider;
 public final class CompositeRuntime {
     public static final String MISSING = "dom-composite binary not found; using the legacy Selenium element path for this run";
     public static final String MISSING_FIX =
-            "Set COMPOSITE_BIN, COMPOSITE_HOME, or pkb_composite_bin, or build the sibling dom-composite checkout (target/release/composite). pkb_composite=off keeps Selenium without this message.";
+            "The in-repo Java engine (dev.domengine) ships in the Pickleball jar; check that it is on the test classpath and that pkb_composite_engine is not rust. For the Rust binary set COMPOSITE_BIN, COMPOSITE_HOME, or pkb_composite_bin, or build the sibling dom-composite checkout (target/release/composite). pkb_composite=off keeps Selenium without this message.";
 
     private static volatile Decision decision;
     private static volatile Client client;

@@ -48,10 +48,49 @@ class DirectControlProviderTest {
 
     @Test
     void missingBinarySkipsWithAClearMessage() {
-        DirectControlProvider.Outcome outcome = DirectControlProvider.open(liveComposite(Map.of()));
+        // The in-repo Java engine is on this test classpath, so only an explicit
+        // Rust request leaves "composite" with nothing to run.
+        DirectControlProvider.Outcome outcome = DirectControlProvider.open(
+                liveComposite(Map.of(JavaEngineLauncher.ENGINE_ENV, "rust")));
         assertEquals(DirectControlProvider.Kind.BINARY_MISSING, outcome.kind());
         assertNull(outcome.handle());
         assertTrue(outcome.message().contains("composite binary not found"));
+    }
+
+    @Test
+    void compositeTokenResolvesTheInRepoJavaEngine() throws Exception {
+        Path launcher = DirectControlProvider.resolveBinary(DirectControlProvider.TOKEN, temp, Map.of())
+                .orElseThrow(() -> new AssertionError("composite must resolve the Java engine on the classpath"));
+        assertTrue(Files.isExecutable(launcher), launcher.toString());
+        String body = Files.readString(launcher);
+        assertTrue(body.contains(JavaEngineLauncher.MAIN_CLASS), body);
+        assertTrue(body.contains("jackson-databind") || body.contains("jackson/databind"), body);
+        assertEquals(launcher, DirectControlProvider.resolveBinary(DirectControlProvider.TOKEN, temp, Map.of()).orElseThrow(),
+                "the launcher is stable for one classpath");
+        Process version = new ProcessBuilder(launcher.toString(), "version").redirectErrorStream(true).start();
+        assertTrue(version.waitFor(30, TimeUnit.SECONDS), "java engine version did not finish");
+        String output = new String(version.getInputStream().readAllBytes());
+        assertEquals(0, version.exitValue(), output);
+        assertTrue(output.contains("3.0.0"), output);
+    }
+
+    @Test
+    void explicitBinariesAndRustRequestWinOverTheJavaEngine() throws IOException {
+        Path named = script("#!/bin/sh\nexit 0\n");
+        assertEquals(named.toAbsolutePath().normalize(), DirectControlProvider.resolveBinary(
+                DirectControlProvider.TOKEN, temp, Map.of(DirectControlProvider.BIN_ENV, named.toString())).orElseThrow());
+        assertEquals(named.toAbsolutePath().normalize(), DirectControlProvider.resolveBinary(
+                DirectControlProvider.TOKEN, temp, Map.of(JavaEngineLauncher.BIN_KEY, named.toString())).orElseThrow());
+        assertTrue(DirectControlProvider.resolveBinary(
+                DirectControlProvider.TOKEN, temp, Map.of(JavaEngineLauncher.ENGINE_ENV, "rust")).isEmpty());
+        assertTrue(DirectControlProvider.resolveBinary(
+                DirectControlProvider.TOKEN, temp, Map.of(JavaEngineLauncher.ENGINE_KEY, "RUST")).isEmpty());
+        assertTrue(DirectControlProvider.resolveRustBinary(temp, Map.of()).isEmpty(),
+                "the Rust-only lookup never returns the Java engine");
+        ClassLoader noEngine = new ClassLoader(null) {
+        };
+        assertTrue(DirectControlProvider.resolveBinary(DirectControlProvider.TOKEN, temp, Map.of(), noEngine).isEmpty(),
+                "without the engine classes there is nothing to run");
     }
 
     @Test
@@ -143,10 +182,9 @@ class DirectControlProviderTest {
         Optional<Path> binary = DirectControlProvider.resolveBinary(
                 DirectControlProvider.TOKEN, temp, System.getenv());
         Optional<Path> chrome = chromeBinary();
-        Assumptions.assumeTrue(
-                binary.isPresent() && chrome.isPresent(),
-                "skipped: composite binary or Chrome is not present"
-        );
+        Assumptions.assumeTrue(chrome.isPresent(), "skipped: Chrome is not present");
+        assertTrue(binary.isPresent(),
+                "composite must resolve the in-repo Java engine (or an explicit COMPOSITE_BIN)");
         Path page = temp.resolve("page.html");
         Files.writeString(page, """
                 <!DOCTYPE html>
@@ -377,8 +415,10 @@ class DirectControlProviderTest {
 
     private static Optional<Path> chromeBinary() throws IOException {
         List<Path> candidates = new ArrayList<>();
-        String named = System.getenv("CHROME_BIN");
-        if (named != null && !named.isBlank()) candidates.add(Path.of(named));
+        for (String variable : List.of("CHROME_BIN", "DOMENGINE_CHROME")) {
+            String named = System.getenv(variable);
+            if (named != null && !named.isBlank()) candidates.add(Path.of(named));
+        }
         String path = System.getenv("PATH");
         if (path != null) {
             for (String dir : path.split(":")) {
