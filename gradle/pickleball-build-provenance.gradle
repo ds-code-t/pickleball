@@ -1,11 +1,13 @@
 import java.nio.charset.StandardCharsets
-import java.security.MessageDigest
 import java.net.URI
 
 // Embeds the exact Pickleball source revision used to build the Maven artifact.
 def buildInfoDir = layout.buildDirectory.dir('generated/pickleball-build-provenance')
 
 // Gradle 9 removed Project.exec inside task actions; a plain process keeps the stamp populated.
+// Status, log, and rev-parse stay here. The diff hash is a forked JDK-only process
+// (WorkingTreeDiffHash) so a multi-megabyte `git diff --binary` is never a String
+// in this daemon.
 def gitWorkDir = rootProject.projectDir
 def gitText = { Object... args ->
     try {
@@ -19,13 +21,6 @@ def gitText = { Object... args ->
         ''
     }
 }
-
-def sha256 = { String value ->
-    byte[] digest = MessageDigest.getInstance('SHA-256')
-            .digest((value ?: '').getBytes(StandardCharsets.UTF_8))
-    digest.collect { String.format('%02x', it & 0xff) }.join()
-}
-
 
 def sanitizeRemote = { String remote ->
     if (!remote) return ''
@@ -44,33 +39,36 @@ def sanitizeRemote = { String remote ->
     remote.trim()
 }
 
-def fileSha256 = { File file ->
-    if (file == null || !file.isFile()) return ''
-    MessageDigest digest = MessageDigest.getInstance('SHA-256')
-    file.withInputStream { input ->
-        byte[] buffer = new byte[8192]
-        int read
-        while ((read = input.read(buffer)) >= 0) digest.update(buffer, 0, read)
+def workingTreeStamp = {
+    File outDir = layout.buildDirectory.dir('provenance-hasher').get().asFile
+    outDir.mkdirs()
+    String javaHome = System.getProperty('java.home')
+    File source = rootProject.file('src/main/java/tools/dscode/release/WorkingTreeDiffHash.java')
+    Process compile = new ProcessBuilder([
+            javaHome + '/bin/javac', '-d', outDir.absolutePath, source.absolutePath
+    ]).redirectError(ProcessBuilder.Redirect.INHERIT).start()
+    if (compile.waitFor() != 0) {
+        throw new GradleException('Could not compile WorkingTreeDiffHash')
     }
-    digest.digest().collect { String.format('%02x', it & 0xff) }.join()
+    Process run = new ProcessBuilder([
+            javaHome + '/bin/java', '-Xmx128m', '-cp', outDir.absolutePath,
+            'tools.dscode.release.WorkingTreeDiffHash', rootProject.projectDir.absolutePath
+    ]).redirectError(ProcessBuilder.Redirect.INHERIT).start()
+    String output = new String(run.inputStream.readAllBytes(), StandardCharsets.UTF_8)
+    if (run.waitFor() != 0) {
+        throw new GradleException('WorkingTreeDiffHash failed')
+    }
+    String[] lines = output.split('\n', -1)
+    boolean dirty = lines.length > 0 && Boolean.parseBoolean(lines[0].trim())
+    String hash = lines.length > 1 ? lines[1].trim() : ''
+    return [dirty, dirty ? hash : '']
 }
 
 def generateBuildProvenance = tasks.register('generatePickleballBuildProvenance') {
     outputs.dir(buildInfoDir)
     outputs.upToDateWhen { false }
     doLast {
-        String status = gitText('status', '--porcelain', '--untracked-files=normal')
-        String unstaged = status ? gitText('diff', '--binary') : ''
-        String staged = status ? gitText('diff', '--cached', '--binary', 'HEAD') : ''
-        String untracked = ''
-        if (status) {
-            untracked = gitText('ls-files', '--others', '--exclude-standard')
-                    .readLines()
-                    .findAll { !it.isBlank() }
-                    .collect { path -> "${path}=${fileSha256(rootProject.file(path))}" }
-                    .join('\n')
-        }
-
+        def stamp = workingTreeStamp()
         Properties properties = new Properties()
         properties.setProperty('repositoryName', rootProject.name)
         properties.setProperty('version', project.version.toString())
@@ -78,8 +76,8 @@ def generateBuildProvenance = tasks.register('generatePickleballBuildProvenance'
         properties.setProperty('branch', gitText('symbolic-ref', '--short', '-q', 'HEAD') ?: gitText('rev-parse', '--abbrev-ref', 'HEAD'))
         properties.setProperty('commit', gitText('rev-parse', 'HEAD'))
         properties.setProperty('commitMessage', gitText('log', '-1', '--pretty=%B'))
-        properties.setProperty('dirty', Boolean.toString(!status.isBlank()))
-        properties.setProperty('workingTreeDiffHash', status.isBlank() ? '' : sha256(status + '\n' + unstaged + '\n' + staged + '\n' + untracked))
+        properties.setProperty('dirty', Boolean.toString(stamp[0]))
+        properties.setProperty('workingTreeDiffHash', stamp[1])
 
         File target = buildInfoDir.get().file('META-INF/pickleball-build.properties').asFile
         target.parentFile.mkdirs()

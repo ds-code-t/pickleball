@@ -603,6 +603,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/pickleruntime/CucumberOptionResolver.java`
 - `src/main/java/tools/dscode/PrefixValue.java`
 - `src/main/java/tools/dscode/registry/GlobalRegistry.java`
+- `src/main/java/tools/dscode/release/WorkingTreeDiffHash.java`
 - `src/main/java/tools/dscode/testengine/DynamicEngineDiscoveryRequest.java`
 - `src/main/java/tools/dscode/testengine/DynamicSuiteBootstrap.java`
 - `src/main/java/tools/dscode/testengine/DynamicSuiteConfigUtils.java`
@@ -782,6 +783,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/WorkspaceLaunchForkTest.java`
 - `src/test/java/tools/dscode/parallelutilities/ParallelCountEstimatorTest.java`
 - `src/test/java/tools/dscode/release/Release217ReportedBugsTest.java`
+- `src/test/java/tools/dscode/release/WorkingTreeDiffHashTest.java`
 - `src/test/java/tools/dscode/Release216BehaviorTest.java`
 - `src/test/java/tools/dscode/Release217Phase1Test.java`
 - `src/test/java/tools/dscode/scenarioobject/ScenarioObjectHookTest.java`

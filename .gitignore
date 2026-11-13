@@ -53,3 +53,8 @@ bin/
 .datetime-update-backup/
 ajcore.*.txt
 maven-consumer-project/reports/
+
+### Generated workbook and HTML. Nothing reads the committed bytes.
+### A normal consumer test still writes reports/ inside that project.
+/reports/
+
