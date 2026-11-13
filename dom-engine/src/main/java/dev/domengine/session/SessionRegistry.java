@@ -258,6 +258,14 @@ public final class SessionRegistry {
             if (session.isClosed() || session.cdp == null) continue;
             if (wanted.equals(session.cdp) || wantedKey.equals(endpointKey(session.cdp))) return session.id;
         }
+        // A browser-level join (no page target) still reuses any session on that host:port.
+        if (wantedKey.contains("/devtools/page/")) return null;
+        for (BrowserSession session : sessions.values()) {
+            if (session.isClosed() || session.cdp == null) continue;
+            String have = endpointKey(session.cdp);
+            int page = have.indexOf("/devtools/page/");
+            if (page > 0 && wantedKey.equals(have.substring(0, page))) return session.id;
+        }
         return null;
     }
 
@@ -266,8 +274,15 @@ public final class SessionRegistry {
         int scheme = value.indexOf("://");
         int start = scheme < 0 ? 0 : scheme + 3;
         int slash = value.indexOf('/', start);
-        if (slash > 0) value = value.substring(0, slash);
-        return value.toLowerCase(java.util.Locale.ROOT);
+        String page = "";
+        if (slash > 0) {
+            int marker = value.indexOf("/devtools/page/", slash);
+            if (marker >= 0) page = value.substring(marker);
+            value = value.substring(start, slash);
+        } else {
+            value = value.substring(start);
+        }
+        return value.toLowerCase(java.util.Locale.ROOT) + page;
     }
 
     private void loadMissing() {

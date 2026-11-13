@@ -65,7 +65,7 @@ public final class BrowserSession implements AutoCloseable {
         Endpoint endpoint = discover(browser);
         CdpConnection connection = CdpConnection.connect(URI.create(endpoint.webSocket), Duration.ofSeconds(10));
         EngineLog.info("session", "attached " + id + " " + browser);
-        return new BrowserSession(id, endpoint.http, false, process, 0, null, allow, null, connection);
+        return new BrowserSession(id, recordedCdp(endpoint), false, process, 0, null, allow, null, connection);
     }
 
     public static BrowserSession reopen(String id, String cdp, boolean launched, boolean process, long pid, String profile) {
@@ -73,7 +73,7 @@ public final class BrowserSession implements AutoCloseable {
         CdpConnection connection = CdpConnection.connect(URI.create(endpoint.webSocket), Duration.ofSeconds(10));
         EngineLog.info("session", "reopened " + id + " " + endpoint.http);
         Path dir = profile == null || profile.isBlank() ? null : Path.of(profile);
-        return new BrowserSession(id, endpoint.http, launched, process, pid, dir, List.of(), null, connection);
+        return new BrowserSession(id, recordedCdp(endpoint), launched, process, pid, dir, List.of(), null, connection);
     }
 
     public static BrowserSession launch(String id, String url, boolean headed, boolean process, Path profile, List<String> allow) {
@@ -260,12 +260,24 @@ public final class BrowserSession implements AutoCloseable {
         throw new CdpException("timed out waiting for DevToolsActivePort");
     }
 
+    /**
+     * Endpoint a session reports as {@code cdp}. A session attached to one page
+     * target keeps that page's devtools URL, so two tabs on one host:port stay
+     * two sessions and callers can see which tab is selected. A browser-level
+     * attach reports the http base.
+     */
+    static String recordedCdp(Endpoint endpoint) {
+        String socket = endpoint.webSocket;
+        if (socket != null && socket.contains("/devtools/page/") && endpoint.pinnedPage) return socket;
+        return endpoint.http;
+    }
+
     static Endpoint discover(String cdp) {
         if (cdp.startsWith("ws://") || cdp.startsWith("wss://")) {
             String http = "http" + cdp.substring(2);
             int slash = http.indexOf("/devtools");
             if (slash > 0) http = http.substring(0, slash);
-            return new Endpoint(http, cdp);
+            return new Endpoint(http, cdp, cdp.contains("/devtools/page/"));
         }
         HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
         String base = stripPath(cdp);
@@ -290,7 +302,7 @@ public final class BrowserSession implements AutoCloseable {
             }
             if (pageSocket.isBlank()) throw new CdpException("cdp endpoint has no page target");
             EngineLog.info("cdp", "discovered " + base);
-            return new Endpoint(base, pageSocket);
+            return new Endpoint(base, pageSocket, false);
         } catch (CdpException failure) {
             throw failure;
         } catch (InterruptedException failure) {
@@ -311,6 +323,6 @@ public final class BrowserSession implements AutoCloseable {
         return value.toLowerCase(Locale.ROOT).startsWith("http") ? value : "http://" + value;
     }
 
-    public record Endpoint(String http, String webSocket) {
+    public record Endpoint(String http, String webSocket, boolean pinnedPage) {
     }
 }

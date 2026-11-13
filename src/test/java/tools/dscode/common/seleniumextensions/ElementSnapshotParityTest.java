@@ -1,7 +1,6 @@
 package tools.dscode.common.seleniumextensions;
 
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.openqa.selenium.htmlunit.HtmlUnitDriver;
@@ -20,9 +19,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Selenium and composite producers must return the same snapshot fields.
- * The composite producer does not shell out. A live dom-composite process is
- * a separate case and runs only when this repo vendors the binary. Host
- * PATH, ~/.m2, and sibling checkouts are ignored.
+ * The composite producer does not shell out. The live engine case uses the
+ * in-repo Java engine (dev.domengine), which replaced the vendored Rust
+ * binary. Host PATH, ~/.m2, and sibling checkouts are ignored.
  */
 class ElementSnapshotParityTest {
     private HtmlUnitDriver driver;
@@ -75,16 +74,22 @@ class ElementSnapshotParityTest {
     }
 
     @Test
-    void liveCompositeBinaryIsUsedOnlyWhenThisRepoVendorsIt() {
-        Path binary = repoVendoredBinary();
-        Assumptions.assumeTrue(
-                binary != null,
-                "skipped: dom-composite binary is not vendored in this repo "
-                        + "(src/main/resources/dev/domcomposite/natives/<classifier>/composite). "
-                        + "A host PATH, ~/.m2, or sibling checkout binary is ignored."
-        );
-        assertTrue(Files.isRegularFile(binary), binary.toString());
-        assertTrue(Files.isExecutable(binary), binary.toString());
+    void liveEngineIsTheInRepoJavaEngineWithoutAVendoredBinary(@org.junit.jupiter.api.io.TempDir Path project)
+            throws Exception {
+        java.util.Map<String, String> env = new java.util.HashMap<>();
+        env.put("PATH", System.getenv().getOrDefault("PATH", ""));
+        Path launcher = tools.dscode.common.composite.CompositeBinaryLocator.locate(
+                project, env, getClass().getClassLoader()
+        ).orElseThrow(() -> new AssertionError("in-repo Java engine did not resolve"));
+        assertTrue(Files.isRegularFile(launcher), launcher.toString());
+        assertTrue(Files.isExecutable(launcher), launcher.toString());
+        String script = Files.readString(launcher);
+        assertTrue(script.contains("dev.domengine.cli.DomEngineMain"), script);
+        Process process = new ProcessBuilder(launcher.toString(), "version").redirectErrorStream(true).start();
+        assertTrue(process.waitFor(60, java.util.concurrent.TimeUnit.SECONDS), "engine version timed out");
+        String out = new String(process.getInputStream().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+        assertEquals(0, process.exitValue(), out);
+        assertTrue(out.contains("\"version\""), out);
     }
 
     private void assertParity(String id) {
@@ -127,19 +132,5 @@ class ElementSnapshotParityTest {
         assertEquals(1, described.size());
         assertNotNull(described.get(0).geometry());
         assertTrue(described.get(0).geometry().matches(new ElementSnapshot.Bounds(8, 9, 10, 11)));
-    }
-
-    /** Only a binary checked into this repo. Never a machine-local composite. */
-    static Path repoVendoredBinary() {
-        String classifier = tools.dscode.common.composite.CompositeBinaryLocator.classifier();
-        String name = tools.dscode.common.composite.CompositeBinaryLocator.binaryName(classifier);
-        Path root = Path.of("").toAbsolutePath();
-        Path vendored = root.resolve("src/main/resources/dev/domcomposite/natives")
-                .resolve(classifier)
-                .resolve(name);
-        if (Files.isRegularFile(vendored) && Files.isExecutable(vendored)) {
-            return vendored.toAbsolutePath().normalize();
-        }
-        return null;
     }
 }

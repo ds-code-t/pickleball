@@ -25,7 +25,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Real Chrome DevTools calls. Proxy drivers in {@link AgentLiveFixTest} do not prove these.
- * Skips only when this machine has no Chrome binary, or, for observe, no engine binary.
+ * Skips only when this machine has no Chrome binary. Observe runs on the
+ * in-repo Java engine unless PKB_LIVE_COMPOSITE names an external engine.
  * A binary that fails to open is a failure.
  */
 class LiveChromeCdpTest {
@@ -106,8 +107,6 @@ class LiveChromeCdpTest {
         String chrome = chromeBinary();
         Path engine = compositeBinary();
         Assumptions.assumeTrue(chrome != null, "skipped: no Chrome binary on this machine");
-        Assumptions.assumeTrue(engine != null,
-                "skipped: composite binary is not built; this does not prove a live settle Session");
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext("/picked-tab", exchange -> {
             byte[] body = "ok".getBytes(StandardCharsets.UTF_8);
@@ -126,12 +125,12 @@ class LiveChromeCdpTest {
             String targetB = targetId(browser);
             assertFalse(targetA.equals(targetB), targetA + " vs " + targetB);
             Files.createDirectories(temp.resolve("logs"));
-            CompositeRuntime.use(temp, Map.of(
-                    "COMPOSITE_BIN", engine.toString(),
-                    "pkb_composite", "on",
-                    "pkb_composite_log", "session,observe,cdp",
-                    "pkb_composite_log_dir", temp.resolve("logs").toString()
-            ), getClass().getClassLoader(), temp);
+            Map<String, String> env = new java.util.LinkedHashMap<>();
+            if (engine != null) env.put("COMPOSITE_BIN", engine.toString());
+            env.put("pkb_composite", "on");
+            env.put("pkb_composite_log", "session,observe,cdp");
+            env.put("pkb_composite_log_dir", temp.resolve("logs").toString());
+            CompositeRuntime.use(temp, env, getClass().getClassLoader(), temp);
             assertTrue(CompositeRuntime.primary(), String.valueOf(tools.dscode.common.composite.CompositeLog.lastFallbackForTests()));
             assertNotNull(CompositeRuntime.client(), "engine client did not start");
             PageSurfaces.manage(browser, "chrome-headless-quiet", false);
@@ -244,12 +243,14 @@ class LiveChromeCdpTest {
         return null;
     }
 
-    /** Engine binary built from observe-buffers. Not under /tmp: JUnit temp projects treat /tmp/dom-composite as a sibling checkout. */
+    /**
+     * Optional external engine named by PKB_LIVE_COMPOSITE. Null means the
+     * in-repo Java engine (dev.domengine), which replaced the Rust binary.
+     */
     private static Path compositeBinary() {
         String env = System.getenv("PKB_LIVE_COMPOSITE");
         Path[] candidates = {
-                env == null || env.isBlank() ? null : Path.of(env.trim()),
-                Path.of("/opt/pkb-composite/composite")
+                env == null || env.isBlank() ? null : Path.of(env.trim())
         };
         for (Path candidate : candidates) {
             if (candidate != null && Files.isRegularFile(candidate) && Files.isExecutable(candidate)) {
