@@ -132,13 +132,14 @@ class DaltonHistoryTest {
     @Test
     void gradleTasksForwardToTheDaltonCli() throws Exception {
         String gradle = Files.readString(Path.of("build.gradle"), StandardCharsets.UTF_8);
-        assertTrue(gradle.contains("tasks.register('daltonStatus'"), gradle);
-        assertTrue(gradle.contains("tasks.register('daltonHydrate'"), gradle);
-        assertTrue(gradle.contains("tasks.register('daltonExtract'"), gradle);
-        assertTrue(gradle.contains("tasks.register('daltonHistory'"), gradle);
-        assertTrue(gradle.contains("tasks.register('daltonFeature'"), gradle);
-        assertTrue(gradle.contains("tasks.register('daltonQuery'"), gradle);
-        assertTrue(gradle.contains("tasks.register('daltonRun'"), gradle);
+        assertTrue(gradle.contains("tasks.register('daltonStatus'"), excerpt(gradle, "tasks.register('daltonStatus'"));
+        assertTrue(gradle.contains("tasks.register('daltonHydrate'"), excerpt(gradle, "tasks.register('daltonHydrate'"));
+        assertTrue(gradle.contains("tasks.register('daltonExtract'"), excerpt(gradle, "tasks.register('daltonExtract'"));
+        assertTrue(gradle.contains("tasks.register('daltonHistory'"), excerpt(gradle, "tasks.register('daltonHistory'"));
+        assertTrue(gradle.contains("tasks.register('daltonFeature'"), excerpt(gradle, "tasks.register('daltonFeature'"));
+        assertTrue(gradle.contains("tasks.register('daltonEdit'"), excerpt(gradle, "tasks.register('daltonEdit'"));
+        assertTrue(gradle.contains("tasks.register('daltonQuery'"), excerpt(gradle, "tasks.register('daltonQuery'"));
+        assertTrue(gradle.contains("tasks.register('daltonRun'"), excerpt(gradle, "tasks.register('daltonRun'"));
         int forwards = 0;
         int cursor = 0;
         String needle = "mainClass = 'tools.dscode.dalton.DaltonCli'";
@@ -148,13 +149,25 @@ class DaltonHistoryTest {
             forwards++;
             cursor += needle.length();
         }
-        assertEquals(7, forwards, gradle);
-        assertTrue(gradle.contains("args = ['dalton', 'status']"), gradle);
-        assertTrue(gradle.contains("args = ['dalton', 'hydrate']"), gradle);
-        assertTrue(gradle.contains("args = ['dalton', 'extract']"), gradle);
-        assertTrue(gradle.contains("args = ['dalton', 'history']"), gradle);
-        assertTrue(gradle.contains("args = ['dalton', 'feature']"), gradle);
-        assertTrue(gradle.contains("args = ['dalton', 'run']"), gradle);
+        assertEquals(8, forwards, excerpt(gradle, needle));
+        assertTrue(gradle.contains("args = ['dalton', 'status']"), excerpt(gradle, "args = ['dalton', 'status']"));
+        assertTrue(gradle.contains("args = ['dalton', 'hydrate']"), excerpt(gradle, "args = ['dalton', 'hydrate']"));
+        assertTrue(gradle.contains("args = ['dalton', 'extract']"), excerpt(gradle, "args = ['dalton', 'extract']"));
+        assertTrue(gradle.contains("args = ['dalton', 'history']"), excerpt(gradle, "args = ['dalton', 'history']"));
+        assertTrue(gradle.contains("args = ['dalton', 'feature']"), excerpt(gradle, "args = ['dalton', 'feature']"));
+        assertTrue(gradle.contains("args = ['dalton', 'run']"), excerpt(gradle, "args = ['dalton', 'run']"));
+    }
+
+    /** Assertion messages stay a short window. The full build file is not the failure text. */
+    private static String excerpt(String text, String needle) {
+        if (text == null || text.isEmpty()) return "";
+        int at = needle == null ? -1 : text.indexOf(needle);
+        int from = at < 0 ? 0 : Math.max(0, at - 80);
+        int to = Math.min(text.length(), from + 240);
+        String window = text.substring(from, to).replace('\n', ' ').replace('\r', ' ');
+        if (from > 0) window = "..." + window;
+        if (to < text.length()) window = window + "...";
+        return window;
     }
 
     private static void restore(String key, String value) {
