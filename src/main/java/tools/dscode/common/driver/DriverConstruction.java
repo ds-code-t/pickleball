@@ -314,7 +314,7 @@ public final class DriverConstruction {
     }
 
     /** Locates the DOM engine when a browser session starts. A missing engine does not fail the driver. */
-    private static RemoteWebDriver ready(RemoteWebDriver driver) {
+    public static RemoteWebDriver ready(RemoteWebDriver driver) {
         AgentDriverHooks.ready(driver);
         CompositeRuntime.attach(driver);
         return driver;
