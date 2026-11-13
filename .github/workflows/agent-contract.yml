@@ -65,7 +65,7 @@ jobs:
   dom-engine-live:
     name: Java DOM live Chrome
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -92,8 +92,23 @@ jobs:
           )"
           curl -fsSL -o /tmp/chrome-linux64.zip "$url"
           unzip -q /tmp/chrome-linux64.zip -d "$RUNNER_TEMP/chrome"
-          echo "DOMENGINE_CHROME=$RUNNER_TEMP/chrome/chrome-linux64/chrome" >> "$GITHUB_ENV"
-          "$RUNNER_TEMP/chrome/chrome-linux64/chrome" --version
+          driver="$(python3 - <<'PY'
+          import json, urllib.request
+          data = json.load(urllib.request.urlopen("https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions-with-downloads.json"))
+          downloads = data["channels"]["Stable"]["downloads"]["chromedriver"]
+          print(next(item["url"] for item in downloads if item["platform"] == "linux64"))
+          PY
+          )"
+          curl -fsSL -o /tmp/chromedriver-linux64.zip "$driver"
+          unzip -q /tmp/chromedriver-linux64.zip -d "$RUNNER_TEMP/chrome"
+          chrome="$RUNNER_TEMP/chrome/chrome-linux64/chrome"
+          echo "DOMENGINE_CHROME=$chrome" >> "$GITHUB_ENV"
+          echo "CHROME_BIN=$chrome" >> "$GITHUB_ENV"
+          echo "$RUNNER_TEMP/chrome/chromedriver-linux64" >> "$GITHUB_PATH"
+          sudo ln -sfn "$chrome" /usr/local/bin/google-chrome
+          sudo ln -sfn "$RUNNER_TEMP/chrome/chromedriver-linux64/chromedriver" /usr/local/bin/chromedriver
+          "$chrome" --version
+          chromedriver --version
 
       - name: DOM engine tests including live Chrome
         run: ./gradlew --no-daemon :dom-engine:test
@@ -104,11 +119,24 @@ jobs:
       - name: Unjoined-driver repro tests
         run: ./gradlew --no-daemon :test --tests tools.dscode.common.composite.ContextAnchorReproTest --tests tools.dscode.common.domoperations.NestAnchorReproTest
 
+      - name: Java engine adapter live tests
+        run: ./gradlew --no-daemon :test --tests tools.dscode.common.composite.live.*
+
+      - name: Consumer @dom-composite on native and cucumber
+        run: |
+          set -euo pipefail
+          ./gradlew --no-daemon publishToMavenLocal -x test
+          cd maven-consumer-project
+          mvn -B test -Dpkb_tags=@dom-composite -Dpkb_engine=native
+          mvn -B test -Dpkb_tags=@dom-composite -Dpkb_engine=cucumber
+
   gate:
-    needs: [windows]
+    needs: [windows, dom-engine-live]
     if: always()
     runs-on: windows-latest
     steps:
-      - name: Block the release unless Windows passed
+      - name: Block the release unless Windows and live Chrome passed
         shell: bash
-        run: test "${{ needs.windows.result }}" = "success"
+        run: |
+          test "${{ needs.windows.result }}" = "success"
+          test "${{ needs.dom-engine-live.result }}" = "success"

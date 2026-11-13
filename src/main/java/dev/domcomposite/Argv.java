@@ -31,6 +31,8 @@ public final class Argv {
         {"cdp", "cdp"},
         {"session", "session"},
         {"session_dir", "session-dir"},
+        {"node_id", "node-id"},
+        {"node_ids", "node-ids"},
         {"timeout_ms", "timeout-ms"},
         {"desc", "desc"},
         {"stability_ms", "stability-ms"},
@@ -109,7 +111,7 @@ public final class Argv {
                     pushValues(argv, node, new String[][] {{"key", "key"}});
                 }
                 if ("eval".equals(cmd)) {
-                    pushValues(argv, node, new String[][] {{"source", "source"}, {"node_id", "node-id"}, {"node_ids", "node-ids"}});
+                    pushValues(argv, node, new String[][] {{"source", "source"}});
                 }
                 if ("query".equals(cmd)) {
                     pushValues(argv, node, new String[][] {
