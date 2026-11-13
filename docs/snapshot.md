@@ -37,7 +37,7 @@ Offline viewport size is the `html` or `body` box when that element has one, oth
 
 `dev.domengine.affinity.AffinityScorer` is a pure scorer. `score(label, interactable, relations)` returns an `AffinityScore` of `total`, `parts`, and `reasons`. `scoreValue` returns `total`.
 
-The relations argument is `List<?>` until `dev.domengine.query.RelationTerm` exists. A map or a record with `relation`, `negated`, `anchor`, and `weight` is read. G3 does not declare `RelationTerm`.
+The relations argument is `List<dev.domengine.query.RelationTerm>`. Each term is read through `relation()`, `negated()`, `anchor()`, and `weight()`. The relation name is the enum constant (`INSIDE`, `LEFT_OF`), lower-cased, with `-` mapped to `_`.
 
 Explicit evidence short-circuits to 1.0 and records the part `explicit`:
 

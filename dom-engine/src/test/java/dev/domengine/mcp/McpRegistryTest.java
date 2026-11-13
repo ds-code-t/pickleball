@@ -56,7 +56,7 @@ class McpRegistryTest {
     @Test
     void browserAndDesktopReturnTheProducerError() throws Exception {
         assertProducerError("browser", "CompositeSnapshots.browser failed", "waiting on engine-defects Phase 5");
-        assertProducerError("desktop", "CompositeSnapshots.desktop failed", "Phase 3 writes the desktop snapshot");
+        assertProducerError("desktop", "CompositeSnapshots.desktop failed", "session not found");
     }
 
     private static void assertProducerError(String kind, String failed, String detail) throws Exception {

@@ -1,13 +1,13 @@
 package dev.domengine.affinity;
 
 import dev.domengine.query.HtmlTree;
+import dev.domengine.query.RelationTerm;
 import dev.domengine.tree.DomNode;
 import org.junit.jupiter.api.Test;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
-import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -53,12 +53,9 @@ class AffinityScoreTest {
         input.attributes.put("id", "name");
         form.linkParents();
         double base = AffinityScorer.scoreValue(label, input, List.of());
-        AffinityScore penalized = AffinityScorer.score(label, input, List.of(Map.of(
-                "relation", "INSIDE",
-                "negated", true,
-                "anchor", "dialog",
-                "weight", 1.0
-        )));
+        AffinityScore penalized = AffinityScorer.score(label, input, List.of(
+                new RelationTerm(RelationTerm.Relation.INSIDE, true, "dialog", 1.0)
+        ));
         assertTrue(base >= 0.5, "base " + base);
         assertEquals(0.5, base - penalized.total(), 1e-9);
         assertTrue(penalized.reasons().contains("negated inside satisfied"), penalized.reasons().toString());

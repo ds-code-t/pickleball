@@ -5,6 +5,7 @@ import dev.domengine.premap.Platform;
 import dev.domengine.premap.SectionDetector;
 import dev.domengine.query.HtmlTree;
 import dev.domengine.query.Query;
+import dev.domengine.query.RelationTerm;
 import dev.domengine.tree.DomNode;
 
 import java.lang.reflect.Method;
@@ -18,9 +19,8 @@ import java.util.WeakHashMap;
 
 /**
  * Pure label-to-control scorer.
- * The parameter is {@code List<?>} until G2 Phase 1 lands {@code dev.domengine.query.RelationTerm}.
- * A {@code RelationTerm} record (accessors {@code relation}, {@code negated}, {@code anchor}, {@code weight})
- * is read without this package declaring that type. Maps with the same keys are accepted.
+ * Relations are {@link RelationTerm}. Each term is read through {@code relation()},
+ * {@code negated()}, {@code anchor()}, and {@code weight()}.
  */
 public final class AffinityScorer {
     private static final Map<DomNode, Map<DomNode, Integer>> ORDER = CollectionsOrder();
@@ -28,15 +28,15 @@ public final class AffinityScorer {
     private AffinityScorer() {
     }
 
-    public static AffinityScore score(DomNode label, DomNode interactable, List<?> relations) {
+    public static AffinityScore score(DomNode label, DomNode interactable, List<RelationTerm> relations) {
         return score(label, interactable, relations, AffinityWeights.fromEnv());
     }
 
-    public static double scoreValue(DomNode label, DomNode interactable, List<?> relations) {
+    public static double scoreValue(DomNode label, DomNode interactable, List<RelationTerm> relations) {
         return score(label, interactable, relations).total();
     }
 
-    public static AffinityScore score(DomNode label, DomNode interactable, List<?> relations, AffinityWeights weights) {
+    public static AffinityScore score(DomNode label, DomNode interactable, List<RelationTerm> relations, AffinityWeights weights) {
         if (explicit(label, interactable)) {
             Map<String, Double> parts = new LinkedHashMap<>();
             parts.put("explicit", 1.0);
@@ -70,7 +70,7 @@ public final class AffinityScorer {
         return new AffinityScore(clamp(total), parts, reasons);
     }
 
-    public static double scoreValue(DomNode label, DomNode interactable, List<?> relations, AffinityWeights weights) {
+    public static double scoreValue(DomNode label, DomNode interactable, List<RelationTerm> relations, AffinityWeights weights) {
         return score(label, interactable, relations, weights).total();
     }
 
@@ -142,7 +142,7 @@ public final class AffinityScorer {
     }
 
     private static double applyRelations(
-            DomNode label, DomNode interactable, List<?> relations,
+            DomNode label, DomNode interactable, List<RelationTerm> relations,
             Map<String, Double> parts, List<String> reasons, double total
     ) {
         if (relations == null || relations.isEmpty()) return total;
