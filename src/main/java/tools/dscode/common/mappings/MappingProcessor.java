@@ -647,8 +647,13 @@ public abstract class MappingProcessor implements Map<String, Object> {
                     key = parsedObj.restoreAndStripBookEnds(decodeBackToText(key));
                     LogExpressionGuard.suspend();
                     try {
-                        replacement = boundRunningStep()
-                                .createNewStepExtension(key.substring(1))
+                        io.cucumber.core.runner.StepExtension parent = boundRunningStep();
+                        String body = key.substring(1);
+                        if (parent == null) {
+                            throw new IllegalStateException("'" + body + "' step is undefined");
+                        }
+                        replacement = parent
+                                .createNewStepExtension(body)
                                 .runAndGetReturnValue();
                     } finally {
                         LogExpressionGuard.resume();
