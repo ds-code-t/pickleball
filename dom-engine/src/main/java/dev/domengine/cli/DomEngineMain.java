@@ -52,7 +52,11 @@ public final class DomEngineMain {
     }
 
     public static CliResult dispatch(List<String> argv) {
-        List<String> args = argv == null ? List.of() : argv;
+        List<String> args = new ArrayList<>(argv == null ? List.of() : argv);
+        // --session-dir is global on the Rust CLI: `composite --session-dir DIR query ...`
+        // and `composite query ... --session-dir DIR` both name the registry.
+        Path globalSessionDir = peelSessionDir(args);
+        if (globalSessionDir != null) SessionRegistry.get().useDirectory(globalSessionDir);
         if (args.isEmpty() || wantsHelp(args)) {
             return CliResult.ok(helpText());
         }

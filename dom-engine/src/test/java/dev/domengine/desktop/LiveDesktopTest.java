@@ -36,6 +36,8 @@ class LiveDesktopTest {
         assertFalse(live.stderr().contains("\"ok\" : true"), live.stderr());
         assertFalse(live.stdout().contains("\"ok\" : true"), live.stdout());
         assertFalse(live.stdout().contains("\"ok\":true"), live.stdout());
+        assertFalse(live.stderr().contains("\"ok\": true"), live.stderr());
+        assertFalse(live.stdout().contains("\"ok\": true"), live.stdout());
 
         CdpException windows = assertThrows(CdpException.class, () -> WindowsUia.capture(""));
         assertTrue(windows.getMessage().contains("requires Windows"), windows.getMessage());
@@ -251,7 +253,8 @@ class LiveDesktopTest {
         Assumptions.assumeTrue(accessibilityBusIsUp(), "no AT-SPI bus");
         CliResult live = DomEngineMain.dispatch(List.of("desktop", "attach", "--id", "liveok", "--live"));
         assertEquals(0, live.exit(), live.stderr());
-        assertTrue(live.stdout().contains("\"ok\":true") || live.stdout().contains("\"ok\" : true"), live.stdout());
+        assertTrue(live.stdout().contains("\"ok\":true") || live.stdout().contains("\"ok\": true")
+                || live.stdout().contains("\"ok\" : true"), live.stdout());
     }
 
     private static boolean accessibilityBusIsUp() {
