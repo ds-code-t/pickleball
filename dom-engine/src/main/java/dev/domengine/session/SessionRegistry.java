@@ -78,6 +78,20 @@ public final class SessionRegistry {
             Path profile,
             List<String> allow
     ) {
+        return create(id, url, cdp, headed, process, acceptAttach, profile, allow, null);
+    }
+
+    public BrowserSession create(
+            String id,
+            String url,
+            String cdp,
+            boolean headed,
+            boolean process,
+            boolean acceptAttach,
+            Path profile,
+            List<String> allow,
+            String pageId
+    ) {
         if (id == null || id.isBlank()) throw new CdpException("session id is missing");
         synchronized (this) {
             loadMissing();
@@ -87,7 +101,7 @@ public final class SessionRegistry {
                 if (!acceptAttach && !"1".equals(System.getenv("COMPOSITE_ATTACH"))) {
                     throw new CdpException("attach requires --i-accept-local-attach or COMPOSITE_ATTACH=1");
                 }
-                session = BrowserSession.attach(id, cdp, process, allow == null ? List.of() : allow);
+                session = BrowserSession.attach(id, cdp, process, allow == null ? List.of() : allow, pageId);
             } else {
                 session = BrowserSession.launch(id, url, headed, process, profile, allow == null ? List.of() : allow);
             }

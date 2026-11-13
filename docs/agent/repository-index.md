@@ -1199,6 +1199,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `dom-engine/src/test/java/dev/domengine/EngineLogTest.java`
 - `dom-engine/src/test/java/dev/domengine/FakeCdp.java`
 - `dom-engine/src/test/java/dev/domengine/LiveChromeActionSmokeTest.java`
+- `dom-engine/src/test/java/dev/domengine/LiveChromeBrowserAttachTest.java`
 - `dom-engine/src/test/java/dev/domengine/LiveChromeObserveEventsTest.java`
 - `dom-engine/src/test/java/dev/domengine/LiveConformanceTest.java`
 - `dom-engine/src/test/java/dev/domengine/LogCommandTest.java`

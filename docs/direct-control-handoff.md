@@ -61,6 +61,8 @@ java -jar pickleball-<version>.jar domengine session attach --cdp http://127.0.0
 
 `<version>` is `3.0.0`. `composite session attach ...` in older examples is the same verb set. The command Pickleball itself runs is whatever path the locator or launcher resolved.
 
+A browser-level CDP URL (`/devtools/browser/`, including ChromeDriver `se:cdp`) is joined to the current tab's page target. `DOM.*` is never sent to the browser target. Pass `target` (the `Target.getTargetInfo` id) with `cdp` when the caller already knows the tab. A later window or tab switch opens that page's session.
+
 Use a directory you own. Do not reuse `.pickleball/runs/<runId>/session/composite` while Pickleball's provider is attached; that id is already in the registry.
 
 `domengine attach --cdp ...` is the same command. Later commands use `--session <sessionId> --session-dir <directory>`, or `--cdp` with the same address. Attach itself exits as soon as the registry entry is written.

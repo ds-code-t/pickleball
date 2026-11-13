@@ -18,10 +18,15 @@ class BrowserSessionEndpointTest {
     }
 
     @Test
-    void browserLevelSocketReportsTheHttpBase() {
-        BrowserSession.Endpoint endpoint = BrowserSession.discover("ws://127.0.0.1:9222/devtools/browser/XYZ");
-        assertFalse(endpoint.pinnedPage());
-        assertEquals("http://127.0.0.1:9222", BrowserSession.recordedCdp(endpoint));
+    void browserLevelSocketReportsTheHttpBase() throws Exception {
+        try (dev.domengine.FakeCdp fake = dev.domengine.FakeCdp.start()) {
+            BrowserSession.Endpoint endpoint = BrowserSession.discover(
+                    "ws://127.0.0.1:" + fake.port + "/devtools/browser/XYZ");
+            assertFalse(endpoint.pinnedPage());
+            assertEquals("http://127.0.0.1:" + fake.port, BrowserSession.recordedCdp(endpoint));
+            assertTrue(endpoint.webSocket().contains("/devtools/page/PAGE1"), endpoint.webSocket());
+            assertFalse(endpoint.webSocket().contains("/devtools/browser/"), endpoint.webSocket());
+        }
     }
 
     @Test

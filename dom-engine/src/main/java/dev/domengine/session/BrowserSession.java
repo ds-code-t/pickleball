@@ -63,8 +63,12 @@ public final class BrowserSession implements AutoCloseable {
     }
 
     public static BrowserSession attach(String id, String cdp, boolean process, List<String> allow) {
+        return attach(id, cdp, process, allow, null);
+    }
+
+    public static BrowserSession attach(String id, String cdp, boolean process, List<String> allow, String pageId) {
         String browser = normalize(cdp);
-        Endpoint endpoint = discover(browser);
+        Endpoint endpoint = discover(browser, pageId);
         CdpConnection connection = CdpConnection.connect(URI.create(endpoint.webSocket), Duration.ofSeconds(10));
         SessionEvents events = watch(connection);
         EngineLog.info("session", "attached " + id + " " + browser);
@@ -300,36 +304,66 @@ public final class BrowserSession implements AutoCloseable {
     }
 
     static Endpoint discover(String cdp) {
+        return discover(cdp, null);
+    }
+
+    /**
+     * A browser-level socket ({@code /devtools/browser/}) is never the connection.
+     * {@code DOM.*} does not exist on that target. The page socket comes from
+     * {@code /json/list}. {@code pageId} selects that tab; otherwise the first page is used.
+     * A {@code /devtools/page/} URL stays that page.
+     */
+    static Endpoint discover(String cdp, String pageId) {
+        if ((cdp.startsWith("ws://") || cdp.startsWith("wss://")) && cdp.contains("/devtools/page/")) {
+            String http = "http" + cdp.substring(2);
+            int slash = http.indexOf("/devtools");
+            if (slash > 0) http = http.substring(0, slash);
+            return new Endpoint(http, cdp, true);
+        }
         if (cdp.startsWith("ws://") || cdp.startsWith("wss://")) {
             String http = "http" + cdp.substring(2);
             int slash = http.indexOf("/devtools");
             if (slash > 0) http = http.substring(0, slash);
-            return new Endpoint(http, cdp, cdp.contains("/devtools/page/"));
+            return discoverHttp(http, pageId);
         }
+        return discoverHttp(stripPath(cdp), pageId);
+    }
+
+    private static Endpoint discoverHttp(String base, String pageId) {
         HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
-        String base = stripPath(cdp);
+        String http = stripPath(base);
         try {
-            HttpRequest version = HttpRequest.newBuilder(URI.create(base + "/json/version")).GET().timeout(Duration.ofSeconds(5)).build();
-            HttpResponse<String> versionBody = client.send(version, HttpResponse.BodyHandlers.ofString());
-            JsonNode versionJson = Jsons.MAPPER.readTree(versionBody.body());
-            HttpRequest list = HttpRequest.newBuilder(URI.create(base + "/json/list")).GET().timeout(Duration.ofSeconds(5)).build();
+            HttpRequest version = HttpRequest.newBuilder(URI.create(http + "/json/version")).GET().timeout(Duration.ofSeconds(5)).build();
+            client.send(version, HttpResponse.BodyHandlers.ofString());
+            HttpRequest list = HttpRequest.newBuilder(URI.create(http + "/json/list")).GET().timeout(Duration.ofSeconds(5)).build();
             HttpResponse<String> listBody = client.send(list, HttpResponse.BodyHandlers.ofString());
             JsonNode pages = Jsons.MAPPER.readTree(listBody.body());
             String pageSocket = null;
+            boolean wanted = pageId != null && !pageId.isBlank();
             if (pages.isArray()) {
                 for (JsonNode page : pages) {
-                    if ("page".equals(page.path("type").asText())) {
-                        pageSocket = page.path("webSocketDebuggerUrl").asText(null);
-                        if (pageSocket != null && !pageSocket.isBlank()) break;
+                    if (!"page".equals(page.path("type").asText())) continue;
+                    String socket = page.path("webSocketDebuggerUrl").asText("");
+                    if (socket.isBlank() || socket.contains("/devtools/browser/")) continue;
+                    String id = page.path("id").asText("");
+                    if (wanted) {
+                        if (pageId.equals(id) || socket.contains("/devtools/page/" + pageId)) {
+                            pageSocket = socket;
+                            break;
+                        }
+                        continue;
                     }
+                    pageSocket = socket;
+                    break;
                 }
             }
-            if (pageSocket == null || pageSocket.isBlank()) {
-                pageSocket = versionJson.path("webSocketDebuggerUrl").asText("");
+            if (pageSocket == null || pageSocket.isBlank() || pageSocket.contains("/devtools/browser/")) {
+                throw new CdpException(wanted
+                        ? "cdp endpoint has no page target " + pageId
+                        : "cdp endpoint has no page target");
             }
-            if (pageSocket.isBlank()) throw new CdpException("cdp endpoint has no page target");
-            EngineLog.info("cdp", "discovered " + base);
-            return new Endpoint(base, pageSocket, false);
+            EngineLog.info("cdp", "discovered " + http + (wanted ? " page=" + pageId : ""));
+            return new Endpoint(http, pageSocket, wanted);
         } catch (CdpException failure) {
             throw failure;
         } catch (InterruptedException failure) {

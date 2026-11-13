@@ -282,6 +282,8 @@ public final class CompositeRuntime {
             config.put("cdp", normalized);
             config.put("i_accept_local_attach", true);
             config.put("process", true);
+            String page = pageTargetId(driver);
+            if (page != null) config.put("target", page);
             Session session = client.openSession(config);
             SESSIONS_BY_CDP.put(key, session.id());
             rememberJoined(normalized);
@@ -402,12 +404,36 @@ public final class CompositeRuntime {
     }
 
     /**
+     * Current tab from {@code Target.getTargetInfo}, or null when this driver
+     * has no CDP command. The joined address stays the browser endpoint; the
+     * engine uses this id to open the page socket.
+     */
+    static String pageTargetId(WebDriver driver) {
+        if (driver == null) return null;
+        try {
+            java.lang.reflect.Method method = driver.getClass().getMethod(
+                    "executeCdpCommand", String.class, Map.class);
+            Object raw = method.invoke(driver, "Target.getTargetInfo", Map.of());
+            if (!(raw instanceof Map<?, ?> map)) return null;
+            Object body = map.get("targetInfo") instanceof Map<?, ?> nested ? nested : map;
+            if (!(body instanceof Map<?, ?> target)) return null;
+            Object id = target.get("targetId");
+            if (id == null || id.toString().isBlank()) return null;
+            return id.toString();
+        } catch (ReflectiveOperationException | RuntimeException ignored) {
+            return null;
+        }
+    }
+
+    /**
      * Debugger address already published on the driver. {@code se:cdp} wins.
      * Otherwise the Chromium {@code debuggerAddress} on {@code goog:chromeOptions}
      * or {@code ms:edgeOptions}: the map that matches {@code browserName}
      * (edge vs chrome) is read first, then the other. Null when none of those
-     * fields is present. {@link #attach} and {@link #focusPage} use this read.
-     * A null page target passed to {@link #focusPage} is still browser-level focus.
+     * fields is present. {@link #attach} sends that address plus the current
+     * page target when the driver can answer {@code Target.getTargetInfo}.
+     * The engine joins that page. A browser-level socket is not a DOM target.
+     * A null page target passed to {@link #focusPage} keeps the browser-keyed session.
      */
     public static String cdpAddress(Capabilities capabilities) {
         if (capabilities == null) return null;

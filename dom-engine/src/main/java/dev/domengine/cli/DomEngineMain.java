@@ -303,7 +303,8 @@ public final class DomEngineMain {
                 process,
                 accept,
                 profile == null ? null : Path.of(profile),
-                allow(flags.get("allow"))
+                allow(flags.get("allow")),
+                flags.get("target")
         );
     }
 
@@ -322,7 +323,8 @@ public final class DomEngineMain {
                 flag(copy, "process"),
                 true,
                 null,
-                allow(copy.get("allow"))
+                allow(copy.get("allow")),
+                copy.get("target")
         );
     }
 

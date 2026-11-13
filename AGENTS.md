@@ -405,7 +405,7 @@ The locked design for replacing the Rust DOM composite engine with a general-pur
 
 `domengine session join` (`--id` or `--cdp`) and `domengine session log --id` (`--follow` streams until the session leaves the registry; refused inside `serve --stdio`) match the Rust composite. MCP only forwards those argv lists.
 
-`domengine session create --url` returns only after that document's `readyState` is `complete` (bounded wait). Chrome that the engine or a live test starts uses `ChromeProcess`: `--remote-debugging-port=0`, the port from `DevToolsActivePort`, and a 30 second debugger wait. Live Chrome action smoke (`LiveChromeActionSmokeTest`) runs when `DOMENGINE_CHROME` or a Chrome binary is on `PATH`. It is skipped only when that binary is missing. `ActionSmokeTest` still uses the fake DevTools server.
+`domengine session create --url` returns only after that document's `readyState` is `complete` (bounded wait). A browser-level CDP URL is attached to the current tab's page target; `DOM.*` is not sent to a browser target. Chrome that the engine or a live test starts uses `ChromeProcess`: `--remote-debugging-port=0`, the port from `DevToolsActivePort`, and a 30 second debugger wait. Live Chrome action smoke (`LiveChromeActionSmokeTest`) runs when `DOMENGINE_CHROME` or a Chrome binary is on `PATH`. It is skipped only when that binary is missing. `ActionSmokeTest` still uses the fake DevTools server.
 
 `domengine conform --root DIR --live` evaluates the vendored Rust fixtures in headless Chrome, including the assertions offline `conform` skips. `LiveConformanceTest` skips only when that binary is missing. Offline `ConformanceSuiteTest` is unchanged.
 
