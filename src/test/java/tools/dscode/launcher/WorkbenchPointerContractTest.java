@@ -166,6 +166,8 @@ class WorkbenchPointerContractTest {
         String sourceIndex = Files.readString(Path.of("docs/agent/repository-index.md"));
         assertTrue(sourceIndex.contains("docs/ai-diagnostic-reporting-plan.md"));
         assertTrue(sourceIndex.contains("docs/workbench-thin-packaging-roadmap.md"));
+        assertTrue(sourceIndex.contains("docs/audits/3.0.0-architecture-doc-audit.md"));
+        assertTrue(Files.isRegularFile(Path.of("docs/audits/3.0.0-architecture-doc-audit.md")));
         String sourceMap = Files.readString(Path.of("docs/agent/feature-map.md"));
         String packagedMap = Files.readString(packaged.resolve("docs/agent/feature-map.md"));
         assertFalse(sourceMap.contains("docs/ai-diagnostic-reporting-plan.md"), sourceMap);
