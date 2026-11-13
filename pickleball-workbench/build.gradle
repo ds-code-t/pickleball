@@ -59,7 +59,9 @@ dependencies {
     // pkb_direct_control_provider=composite handoff (DirectControlProvider via
     // JavaEngineLauncher) has an engine to run. Non-transitive: its Jackson
     // comes from the controller runtime libs (jackson-databind above), never
-    // shaded. It is not a compile or runtime project dependency of Workbench.
+    // shaded. The same jar is also a non-transitive runtime dependency so
+    // installDist can put it on the distribution classpath. It is not a
+    // compile dependency and it is not published.
     workbenchEmbed(project(':dom-engine')) {
         transitive = false
     }
@@ -82,6 +84,16 @@ dependencies {
 
     // Optional diagnostic index. Runtime only, not shaded, not in the published POM.
     runtimeOnly 'org.xerial:sqlite-jdbc:3.47.2.0'
+
+    // Own jar on the runtime and test classpaths. installDist lib carries it, and
+    // JavaEngineLauncher sees DomEngineMain from the test loader. Not compiled
+    // against, not published, and not transitive.
+    runtimeOnly(project(':dom-engine')) {
+        transitive = false
+    }
+    testRuntimeOnly(project(':dom-engine')) {
+        transitive = false
+    }
 
     testImplementation 'org.junit.jupiter:junit-jupiter:5.13.4'
     testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.13.4'
@@ -469,10 +481,13 @@ tasks.register('verifyWorkbenchRuntimeBoundary') {
                 def component = artifact.id.componentIdentifier
                 component.projectPath
             }.sort()
-            if (projectDependencies != [':pickleball-control-protocol']) {
+            def expectedProjects = configurationName == 'runtimeClasspath'
+                    ? [':dom-engine', ':pickleball-control-protocol']
+                    : [':pickleball-control-protocol']
+            if (projectDependencies != expectedProjects) {
                 throw new GradleException(
                         "Workbench ${configurationName} project dependencies must be exactly " +
-                                ':pickleball-control-protocol: ' + projectDependencies
+                                "${expectedProjects}: " + projectDependencies
                 )
             }
 
@@ -757,4 +772,25 @@ tasks.named('test') {
             tasks.named('verifyWorkbenchMcpStdio'),
             tasks.named('reportWorkbenchMcpImpact')
     )
+}
+
+tasks.register('verifyWorkbenchEngineInstalled') {
+    group = 'verification'
+    description = 'The installed Workbench distribution carries the Java DOM engine jar.'
+    dependsOn tasks.named('installDist')
+
+    doLast {
+        def root = layout.buildDirectory.dir('install').get().asFile
+        def jars = []
+        if (root.isDirectory()) {
+            root.eachFileRecurse { file ->
+                if (file.isFile() && file.name.startsWith('dom-engine') && file.name.endsWith('.jar')) {
+                    jars << file
+                }
+            }
+        }
+        if (jars.isEmpty()) {
+            throw new GradleException('installDist has no dom-engine jar under ' + root)
+        }
+    }
 }

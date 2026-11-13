@@ -755,6 +755,7 @@ tasks.register('verifyStrictControllerIsolation') {
             ':pickleball-control-protocol:verifyProtocolIsolation',
             ':pickleball-workbench:verifyWorkbenchArtifact',
             ':pickleball-workbench:verifyWorkbenchRuntimeBoundary',
+            ':pickleball-workbench:verifyWorkbenchEngineInstalled',
             ':pickleball-workbench:verifyWorkbenchPublishedDependencyContract',
             tasks.named('verifyEmbeddedWorkbench')
     )
