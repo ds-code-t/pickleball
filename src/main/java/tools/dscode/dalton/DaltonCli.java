@@ -97,7 +97,7 @@ public final class DaltonCli {
                 Usage: dalton feature put <relative-path> [--text=<gherkin>] [--file=<path>] [--project=<dir>]
                 Usage: dalton feature scenario-add|scenario-modify|scenario-delete|step-add|step-modify|step-delete --feature=<relative-path> [--name=<text>] [--scenario=<ord-or-name>] [--step=<ord>] [--keyword=<Given|When|Then|And|But|*>] [--text=<text>] [--file=<path>] [--confirm] [--force] [--json] [--project=<dir>]
                 Usage: dalton category list|show|put|remove [--id=<name>] [--text=<yaml>] [--file=<path>] [--confirm] [--force] [--json] [--project=<dir>]
-                Usage: dalton file put|delete --path=<relative> [--text=<text>] [--file=<path>] [--confirm] [--force] [--json] [--project=<dir>]
+                Usage: dalton file put|delete|show --path=<relative> [--text=<text>] [--file=<path>] [--confirm] [--force] [--json] [--project=<dir>]
                 Usage: dalton glue list|show|put|remove [--path=<relative.java-or-glue/js>] [--text=<source>] [--file=<path>] [--confirm] [--force] [--json] [--project=<dir>]
                 Usage: dalton files list [--project=<dir>] [--json]
                 Usage: dalton files show <relative-path> [--project=<dir>] [--json]
@@ -337,6 +337,9 @@ public final class DaltonCli {
                     err.println("error: file not found: " + DaltonPaths.normalizeRelative(path));
                     err.println("fix: dalton files list");
                     return 1;
+                }
+                if (detail.text() != null) {
+                    detail = new DaltonQuery.FileDetail(detail.summary(), FileRules.redact(detail.text()), detail.base64());
                 }
                 DaltonLog.log(project, "query", detail.summary().path(), "show");
                 if (json) out.println(DaltonQuery.fileJson(detail));

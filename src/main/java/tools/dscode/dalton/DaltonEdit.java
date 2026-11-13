@@ -71,7 +71,7 @@ public final class DaltonEdit {
     private static boolean known(String family, String action) {
         return switch (family) {
             case "category" -> Set.of("list", "show", "put", "remove").contains(action);
-            case "file" -> Set.of("put", "delete").contains(action);
+            case "file" -> Set.of("put", "delete", "show").contains(action);
             case "glue" -> Set.of("list", "show", "put", "remove").contains(action);
             case "feature" -> isFeatureEdit(action);
             default -> false;
@@ -101,6 +101,7 @@ public final class DaltonEdit {
     private static Outcome file(Path project, String action, List<String> tokens) throws Exception {
         String path = option(tokens, "--path=");
         return switch (action) {
+            case "show" -> show(project, DaltonPaths.normalizeRelative(path));
             case "put" -> put(project, path, tokens);
             case "delete" -> delete(project, path, tokens);
             default -> throw new IllegalArgumentException("Unknown Dalton edit command: file " + action);
@@ -225,7 +226,7 @@ public final class DaltonEdit {
     }
 
     private static Outcome show(Path project, String path) throws Exception {
-        String text = readExisting(project, path);
+        String text = FileRules.redact(readExisting(project, path));
         return Outcome.shown(path, idOf(path), text);
     }
 
