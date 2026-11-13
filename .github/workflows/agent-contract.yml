@@ -131,11 +131,14 @@ jobs:
       - name: Consumer @dom-composite on native and cucumber
         run: |
           set -euo pipefail
-          export PATH="${CHROME_TEST_BIN}:$PATH"
+          if [ -n "${CHROME_TEST_BIN:-}" ]; then
+            PATH="$(printf '%s\n' "$PATH" | tr ':' '\n' | grep -vxF "$CHROME_TEST_BIN" | paste -sd: -)"
+            export PATH
+          fi
           ./gradlew --no-daemon publishToMavenLocal -x test
           cd maven-consumer-project
-          mvn -B test -Dpkb_tags=@dom-composite -Dpkb_engine=native
-          mvn -B test -Dpkb_tags=@dom-composite -Dpkb_engine=cucumber
+          mvn -B test -Dpkb_tags=@dom-composite -Dpkb_engine=native -Dpkb_runvars.pkb_browser=CHROME_HEADLESS
+          mvn -B test -Dpkb_tags=@dom-composite -Dpkb_engine=cucumber -Dpkb_runvars.pkb_browser=CHROME_HEADLESS
 
   gate:
     needs: [windows, dom-engine-live]
