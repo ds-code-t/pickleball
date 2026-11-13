@@ -1,6 +1,6 @@
 # Pickleball Documentation
 
-Pickleball extends Cucumber with a dynamic feature-file language while preserving normal Cucumber behavior. The pages below describe the supported authoring model and link to real executable examples in [`maven-consumer-project`](consumer-project.md).
+Pickleball's dynamic runtime reads feature-file text. The default execution engine is native. Cucumber is a supported compatibility adapter (`pkb_engine=cucumber`), so standard Gherkin features and Java step definitions still work. The pages below describe the supported authoring model and link to real executable examples in [`maven-consumer-project`](consumer-project.md).
 
 When these docs are materialized from the Maven dependency with Workbench `export-guidance`, links to `../maven-consumer-project/...` resolve to the version-matched, read-only reference snapshot exported beside the docs. Human readers can inspect those working features, configuration, calls, data, runner, and local test-site examples without checking out the Pickleball source repository. Consumer AI agents should follow `.pickleball/AGENT-GUIDE.md` first and open a specific guide only when needed.
 
@@ -13,7 +13,7 @@ When these docs are materialized from the Maven dependency with Workbench `expor
 
 ## Browser scenarios
 
-- [Dynamic steps](dynamic-steps.md) — describe Selenium elements, actions, assertions, values, contexts, and phrase chains directly in Gherkin.
+- [Dynamic steps](dynamic-steps.md) — describe page elements, actions, assertions, values, contexts, and phrase chains directly in Gherkin.
 - [Custom element definitions](custom-element-definitions.md) — optionally add project-specific element names without placing selectors in feature files.
 - [Reserved element names](reserved-element-names.md) — Step Repetition, Step Duration, Data Elements, time, Match, Loading, and browser or window names. Any other name is HTML.
 - [Keyboard expressions](key-parser-dsl.md) — express sequential, simultaneous, and held-key input.
@@ -43,7 +43,7 @@ When these docs are materialized from the Maven dependency with Workbench `expor
 - [Dynamic control API](dynamic-control-api.md) — optional retry-friendly dynamic Gherkin execution, isolated/scoped ParsingMap control, snapshots, value interception, synchronous semantic hooks, and the consumer-side Control Bridge used by Workbench.
 - [Step Overrides](step-overrides.md) — live REGEX/REPLACE step implementation authoring in a persistent worker, including generated Java handlers and Workbench management.
 - [Pickleball Workbench](pickleball-workbench.md) — dependency-matched external controller embedded opaquely in Pickleball, with a neutral versioned protocol, strict core-free artifact/process boundary, consumer-classpath worker, MCP stdio, and Swing UI.
-- [Direct-control handoff](direct-control-handoff.md) — session descriptor, `session list` / `session info`, and how dom-composite 2.4.0 attaches to a live Workbench browser without closing it.
+- [Direct-control handoff](direct-control-handoff.md) — session descriptor, `session list` / `session info`, and how the in-repo Java DOM engine (or an explicit Rust override) attaches to a live Workbench browser without closing it.
 - [Workbench live player](pickleball-workbench-player.md) — click-to-seek playhead, Play from start, Step vs From Here, wait-at-end add-and-continue, in-place Gherkin editing, and the default local-site demo.
 - [Diagnostic lineage and metadata](diagnostic-lineage-metadata.md) — distinguish lineage annotations, execution/evidence RunVars, controls, and derived evidence.
 - [Diagnostic reporting](diagnostic-reporting.md) — sparse-first AI evidence, source provenance, step/capability metadata, trace evidence, screenshots/fingerprints, comparison, and retention.
