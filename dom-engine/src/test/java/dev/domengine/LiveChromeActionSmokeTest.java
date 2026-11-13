@@ -91,6 +91,49 @@ class LiveChromeActionSmokeTest {
         }
     }
 
+    @Test
+    void zeroDeltaScrollBringsTheTargetIntoView() throws Exception {
+        String chrome = BrowserSession.findChrome();
+        assumeTrue(chrome != null, "skipped: Chrome is not present");
+        byte[] page = """
+                <!DOCTYPE html><html><body>
+                <p id="scroll-state">Scroll State: top</p>
+                <div id="spacer" style="height:1800px"></div>
+                <button id="scroll-target" type="button">Scroll Target</button>
+                <script>
+                  window.addEventListener('scroll', function () {
+                    if (window.scrollY > 40) document.getElementById('scroll-state').textContent = 'Scroll State: moved';
+                  });
+                </script>
+                </body></html>
+                """.getBytes(StandardCharsets.UTF_8);
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/", exchange -> {
+            exchange.getResponseHeaders().add("Content-Type", "text/html; charset=utf-8");
+            exchange.sendResponseHeaders(200, page.length);
+            exchange.getResponseBody().write(page);
+            exchange.close();
+        });
+        server.start();
+        Path dir = Files.createTempDirectory("domengine-live-scroll");
+        String url = "http://127.0.0.1:" + server.getAddress().getPort() + "/";
+        try {
+            CliResult created = DomEngineMain.dispatch(List.of(
+                    "session", "create", "--id", "live-scroll", "--url", url, "--session-dir", dir.toString()));
+            assertEquals(0, created.exit(), created.stderr());
+            assertOk(DomEngineMain.dispatch(List.of(
+                    "scroll", "--session", "live-scroll", "--css", "#scroll-target", "--dx", "0", "--dy", "0")));
+            CliResult state = DomEngineMain.dispatch(List.of(
+                    "eval", "--session", "live-scroll", "--css", "#scroll-state",
+                    "--source", "function(){return this.textContent}"));
+            assertOk(state);
+            assertEquals("Scroll State: moved", Jsons.MAPPER.readTree(state.stdout()).path("value").asText(), state.stdout());
+        } finally {
+            server.stop(0);
+            DomEngineMain.dispatch(List.of("session", "close", "--id", "live-scroll", "--session-dir", dir.toString()));
+        }
+    }
+
     private static void assertOk(CliResult result) {
         assertEquals(0, result.exit(), result.stderr());
     }

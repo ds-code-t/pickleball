@@ -208,8 +208,17 @@ public final class HtmlTree {
             builder.append(node.nodeValue);
             return;
         }
+        int mark = builder.length();
         for (DomNode child : node.children) appendText(child, builder);
-        for (DomNode shadow : node.shadowRoots) appendText(shadow, builder);
+        if (node.shadowRoots.isEmpty()) return;
+        String light = builder.substring(mark).replaceAll("\\s+", " ").trim();
+        for (DomNode shadow : node.shadowRoots) {
+            StringBuilder extra = new StringBuilder();
+            appendText(shadow, extra);
+            String shadowText = extra.toString().replaceAll("\\s+", " ").trim();
+            if (shadowText.isEmpty() || shadowText.equals(light)) continue;
+            builder.append(extra);
+        }
     }
 
     public static void link(DomNode node) {

@@ -47,11 +47,11 @@ public final class PageActions {
         double y = node.hasBox ? node.y + node.height / 2 : 1;
         CdpConnection cdp = session.connection();
         ObjectNode result = switch (verb) {
-            case "click" -> mouseClick(cdp, x, y, "left", 1);
+            case "click" -> "option".equals(node.tag()) ? selectOption(cdp, node) : mouseClick(cdp, x, y, "left", 1);
             case "dblclick" -> mouseClick(cdp, x, y, "left", 2);
             case "contextclick" -> mouseClick(cdp, x, y, "right", 1);
             case "type" -> type(cdp, x, y, flags.getOrDefault("text", ""), "true".equals(flags.get("append")), "true".equals(flags.get("submit")));
-            case "scroll" -> scroll(cdp, x, y, number(flags.get("dx")), number(flags.get("dy")));
+            case "scroll" -> scroll(cdp, node, x, y, number(flags.get("dx")), number(flags.get("dy")));
             case "key" -> key(cdp, flags.get("key"));
             case "submit" -> submit(cdp, node);
             case "eval" -> eval(cdp, node, flags.get("source"));
@@ -175,6 +175,15 @@ public final class PageActions {
         return null;
     }
 
+    /** A native option has no hit target. Selecting it is the click. */
+    private static ObjectNode selectOption(CdpConnection cdp, DomNode node) {
+        String source = "function(){ if(!this || this.tagName!=='OPTION') return false; this.selected=true; var select=this.closest('select'); if(select){ select.dispatchEvent(new Event('input',{bubbles:true})); select.dispatchEvent(new Event('change',{bubbles:true})); } return true; }";
+        callOn(cdp, node, source);
+        ObjectNode result = Jsons.object();
+        result.put("selected", true);
+        return result;
+    }
+
     private static ObjectNode mouseClick(CdpConnection cdp, double x, double y, String button, int count) {
         mouse(cdp, "mousePressed", x, y, button, count);
         mouse(cdp, "mouseReleased", x, y, button, count);
@@ -209,17 +218,31 @@ public final class PageActions {
         return result;
     }
 
-    private static ObjectNode scroll(CdpConnection cdp, double x, double y, double dx, double dy) {
-        ObjectNode params = Jsons.object();
-        params.put("type", "mouseWheel");
-        params.put("x", x);
-        params.put("y", y);
-        params.put("deltaX", dx);
-        params.put("deltaY", dy);
-        cdp.call("Input.dispatchMouseEvent", params, java.time.Duration.ofSeconds(5));
+    private static ObjectNode scroll(CdpConnection cdp, DomNode node, double x, double y, double dx, double dy) {
+        boolean intoView = false;
+        if (node != null && node.nodeId > 0 && dx == 0 && dy == 0) {
+            ObjectNode into = Jsons.object();
+            into.put("nodeId", node.nodeId);
+            try {
+                cdp.call("DOM.scrollIntoViewIfNeeded", into, java.time.Duration.ofSeconds(5));
+                intoView = true;
+            } catch (RuntimeException ignored) {
+                // A node with no box still reports the zero wheel below.
+            }
+        }
+        if (!intoView) {
+            ObjectNode params = Jsons.object();
+            params.put("type", "mouseWheel");
+            params.put("x", x);
+            params.put("y", y);
+            params.put("deltaX", dx);
+            params.put("deltaY", dy);
+            cdp.call("Input.dispatchMouseEvent", params, java.time.Duration.ofSeconds(5));
+        }
         ObjectNode result = Jsons.object();
         result.put("dx", dx);
         result.put("dy", dy);
+        result.put("into_view", intoView);
         return result;
     }
 

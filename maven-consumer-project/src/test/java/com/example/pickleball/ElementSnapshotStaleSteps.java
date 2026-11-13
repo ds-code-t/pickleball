@@ -2,7 +2,6 @@ package com.example.pickleball;
 
 import io.cucumber.java.en.Given;
 import org.openqa.selenium.By;
-import org.openqa.selenium.JavascriptExecutor;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 import tools.dscode.common.composite.ElementOperations;
@@ -28,7 +27,7 @@ public final class ElementSnapshotStaleSteps {
             throw new AssertionError("stable selector was: " + wrapper.snapshot().stableSelector());
         }
         WebElement button = ElementOperations.findElement(driver, By.id("replace"));
-        ((JavascriptExecutor) driver).executeScript("arguments[0].click();", button);
+        ElementOperations.click(driver, button);
         String text;
         try {
             text = wrapper.getText();

@@ -102,6 +102,76 @@ class LiveChromeXPathTest {
         }
     }
 
+    @Test
+    void optionTextIsVisibleUnderTheSelect() throws Exception {
+        String chrome = BrowserSession.findChrome();
+        assumeTrue(chrome != null, "skipped: Chrome is not present");
+        byte[] page = """
+                <!DOCTYPE html><html><body>
+                <label for="account-type">Account Type</label>
+                <select id="account-type">
+                  <option value="">Choose an account type</option>
+                  <option>Standard</option>
+                  <option>Premium</option>
+                  <option>Enterprise</option>
+                </select>
+                </body></html>
+                """.getBytes(StandardCharsets.UTF_8);
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/", exchange -> {
+            exchange.getResponseHeaders().add("Content-Type", "text/html; charset=utf-8");
+            exchange.sendResponseHeaders(200, page.length);
+            exchange.getResponseBody().write(page);
+            exchange.close();
+        });
+        server.start();
+        Path dir = Files.createTempDirectory("domengine-live-option");
+        String url = "http://127.0.0.1:" + server.getAddress().getPort() + "/";
+        try {
+            CliResult created = DomEngineMain.dispatch(List.of(
+                    "session", "create", "--id", "live-option", "--url", url, "--session-dir", dir.toString()));
+            assertEquals(0, created.exit(), created.stderr());
+            CliResult counted = DomEngineMain.dispatch(List.of(
+                    "eval", "--session", "live-option", "--css", "select",
+                    "--source", "function(){ return document.evaluate('.//option | .//a', this, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null).snapshotLength; }"));
+            assertEquals(0, counted.exit(), counted.stderr());
+            CliResult all = DomEngineMain.dispatch(List.of(
+                    "query", "--session", "live-option", "--css", "option"));
+            assertEquals(0, all.exit(), all.stderr());
+            JsonNode select = querySession("live-option", "//select[@id='account-type']", null);
+            String handle = select.path("nodes").get(0).path("handle").asText();
+            JsonNode relative = querySession("live-option", ".//option | .//a", handle);
+            assertTrue(relative.path("nodes").size() >= 3,
+                    "eval=" + counted.stdout() + " css=" + all.stdout() + " relative=" + relative);
+            boolean premium = false;
+            for (JsonNode node : relative.path("composite")) {
+                if ("Premium".equals(node.path("text").asText())) premium = true;
+            }
+            assertTrue(premium, relative.toString());
+            assertOk(DomEngineMain.dispatch(List.of(
+                    "click", "--session", "live-option", "--xpath", "//option[normalize-space(.)='Premium']")));
+            CliResult value = DomEngineMain.dispatch(List.of(
+                    "eval", "--session", "live-option", "--css", "#account-type",
+                    "--source", "function(){ return this.value; }"));
+            assertOk(value);
+            assertEquals("Premium", Jsons.MAPPER.readTree(value.stdout()).path("value").asText(), value.stdout());
+        } finally {
+            server.stop(0);
+            DomEngineMain.dispatch(List.of("session", "close", "--id", "live-option", "--session-dir", dir.toString()));
+        }
+    }
+
+    private static JsonNode querySession(String session, String xpath, String within) throws Exception {
+        List<String> args = new ArrayList<>(List.of("query", "--session", session, "--xpath", xpath));
+        if (within != null) {
+            args.add("--within");
+            args.add(within);
+        }
+        CliResult result = DomEngineMain.dispatch(args);
+        assertEquals(0, result.exit(), xpath + " " + result.stderr());
+        return Jsons.MAPPER.readTree(result.stdout());
+    }
+
     private static void assertIds(String xpath, String... expected) throws Exception {
         assertEquals(List.of(expected), ids(query(xpath)), xpath);
     }
