@@ -119,6 +119,9 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/roadmaps/3.0.0-engine-defects-roadmap.md`
 - `docs/roadmaps/3.0.0-java-dom-roadmap.md`
 - `docs/roadmaps/3.0.0-locked-G1-protocol.md`
+- `docs/roadmaps/3.0.0-locked-G2-query.md`
+- `docs/roadmaps/3.0.0-locked-G3-snapshot.md`
+- `docs/roadmaps/3.0.0-locked-G4-surfaces-dalton-rust.md`
 - `docs/roadmaps/3.0.0-locked-R1-facade-boundary.md`
 - `docs/roadmaps/3.0.0-locked-R2-query-completion.md`
 - `docs/roadmaps/3.0.0-locked-R3-snapshot-premap.md`
