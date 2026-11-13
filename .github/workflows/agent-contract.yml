@@ -83,32 +83,38 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          url="$(python3 - <<'PY'
+          meta="$(python3 - <<'PY'
           import json, urllib.request
           data = json.load(urllib.request.urlopen("https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions-with-downloads.json"))
-          downloads = data["channels"]["Stable"]["downloads"]["chrome"]
-          print(next(item["url"] for item in downloads if item["platform"] == "linux64"))
+          stable = data["channels"]["Stable"]
+          def url(kind):
+              return next(item["url"] for item in stable["downloads"][kind] if item["platform"] == "linux64")
+          print(stable["version"])
+          print(url("chrome"))
+          print(url("chromedriver"))
           PY
           )"
+          version="$(printf '%s\n' "$meta" | sed -n '1p')"
+          url="$(printf '%s\n' "$meta" | sed -n '2p')"
+          driver="$(printf '%s\n' "$meta" | sed -n '3p')"
           curl -fsSL -o /tmp/chrome-linux64.zip "$url"
           unzip -q /tmp/chrome-linux64.zip -d "$RUNNER_TEMP/chrome"
-          driver="$(python3 - <<'PY'
-          import json, urllib.request
-          data = json.load(urllib.request.urlopen("https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions-with-downloads.json"))
-          downloads = data["channels"]["Stable"]["downloads"]["chromedriver"]
-          print(next(item["url"] for item in downloads if item["platform"] == "linux64"))
-          PY
-          )"
           curl -fsSL -o /tmp/chromedriver-linux64.zip "$driver"
           unzip -q /tmp/chromedriver-linux64.zip -d "$RUNNER_TEMP/chrome"
           chrome="$RUNNER_TEMP/chrome/chrome-linux64/chrome"
+          bindir="$RUNNER_TEMP/chrome/bin"
+          mkdir -p "$bindir"
+          ln -sfn "$chrome" "$bindir/google-chrome"
+          ln -sfn "$chrome" "$bindir/google-chrome-stable"
+          ln -sfn "$chrome" "$bindir/chrome"
+          ln -sfn "$RUNNER_TEMP/chrome/chromedriver-linux64/chromedriver" "$bindir/chromedriver"
           echo "DOMENGINE_CHROME=$chrome" >> "$GITHUB_ENV"
           echo "CHROME_BIN=$chrome" >> "$GITHUB_ENV"
-          echo "$RUNNER_TEMP/chrome/chromedriver-linux64" >> "$GITHUB_PATH"
-          sudo ln -sfn "$chrome" /usr/local/bin/google-chrome
-          sudo ln -sfn "$RUNNER_TEMP/chrome/chromedriver-linux64/chromedriver" /usr/local/bin/chromedriver
-          "$chrome" --version
-          chromedriver --version
+          echo "CHROME_TEST_BIN=$bindir" >> "$GITHUB_ENV"
+          echo "$bindir" >> "$GITHUB_PATH"
+          "$bindir/google-chrome" --version
+          "$bindir/chromedriver" --version
+          echo "chrome-for-testing $version"
 
       - name: DOM engine tests including live Chrome
         run: ./gradlew --no-daemon :dom-engine:test
@@ -125,6 +131,7 @@ jobs:
       - name: Consumer @dom-composite on native and cucumber
         run: |
           set -euo pipefail
+          export PATH="${CHROME_TEST_BIN}:$PATH"
           ./gradlew --no-daemon publishToMavenLocal -x test
           cd maven-consumer-project
           mvn -B test -Dpkb_tags=@dom-composite -Dpkb_engine=native
