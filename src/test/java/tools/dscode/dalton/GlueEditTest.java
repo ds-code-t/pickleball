@@ -104,6 +104,45 @@ class GlueEditTest {
         assertFalse(Files.exists(project.resolve(".pickleball/dalton/glue.fingerprint")));
     }
 
+    @Test
+    void javaGlueRemoveDeletesTheFile() throws Exception {
+        String source = """
+                package sample;
+                import io.cucumber.java.en.Given;
+                public class Steps {
+                  @Given("ready")
+                  public void ready() {}
+                }
+                """;
+        String path = "src/test/java/sample/Steps.java";
+        Capture put = run("dalton", "glue", "put", "--path=" + path,
+                "--text=" + source, "--json", "--project=" + project);
+        assertEquals(0, put.code, put.err);
+        assertTrue(Files.isRegularFile(project.resolve(path)), put.out);
+
+        Capture removed = run("dalton", "glue", "remove", "--path=" + path,
+                "--confirm", "--json", "--project=" + project);
+        assertEquals(0, removed.code, removed.err);
+        var body = JSON.readTree(removed.out);
+        assertTrue(body.get("ok").asBoolean(), removed.out);
+        assertEquals("glue", body.get("family").asText());
+        assertEquals("remove", body.get("action").asText());
+        assertEquals(path, body.get("path").asText());
+        assertEquals("deleted", body.get("message").asText());
+        assertTrue(body.get("applied").asBoolean(), removed.out);
+        assertFalse(Files.exists(project.resolve(path)));
+
+        Capture listed = run("dalton", "glue", "list", "--json", "--project=" + project);
+        assertEquals(0, listed.code, listed.err);
+        assertFalse(listed.out.contains(path), listed.out);
+
+        Capture again = run("dalton", "glue", "remove", "--path=" + path,
+                "--confirm", "--json", "--project=" + project);
+        assertEquals(1, again.code, again.out + again.err);
+        assertTrue(again.err.contains("not found"), again.err);
+        assertFalse(JSON.readTree(again.out).get("ok").asBoolean(), again.out);
+    }
+
     private static Capture run(String... args) {
         ByteArrayOutputStream stdout = new ByteArrayOutputStream();
         ByteArrayOutputStream stderr = new ByteArrayOutputStream();
