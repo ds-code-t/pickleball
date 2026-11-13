@@ -387,9 +387,13 @@ tasks.shadowJar {
     from("NOTICE") { into "META-INF" }
     from("THIRD-PARTY-NOTICES.md") { into "META-INF" }
 
-    dependsOn 'ajcMain', 'expandWoven', 'classes', ':pickleball-workbench:shadowJar', ':dom-engine:classes'
+    dependsOn 'ajcMain', 'expandWoven', 'classes', ':pickleball-workbench:shadowJar', ':dom-engine:jar'
 
-    from(project(':dom-engine').sourceSets.main.output)
+    // from(sourceSets.main.output) did not embed dev.domengine. Zip the module jar instead.
+    from({ zipTree(project(':dom-engine').tasks.named('jar').get().archiveFile.get().asFile) }) {
+        exclude 'META-INF/MANIFEST.MF'
+        exclude 'META-INF/*.SF', 'META-INF/*.RSA', 'META-INF/*.DSA'
+    }
 
     archiveBaseName.set('pickleball')
     archiveVersion.set(project.version.toString())
@@ -978,6 +982,12 @@ tasks.register("centralBundleZip", Zip) {
 }
 
 // Lifecycle
+tasks.named('sourcesJar', Jar) {
+    from(project(':dom-engine').file('src/main/java')) {
+        include 'dev/domengine/**/*.java'
+    }
+}
+
 tasks.assemble { dependsOn tasks.shadowJar }
 
 // If we're only doing publishToMavenLocal, never run signing tasks
