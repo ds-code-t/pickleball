@@ -183,11 +183,14 @@ dependencies {
     // Align all io.cucumber modules in THIS build, and also share alignment intent with consumers (Gradle)
     api(platform("io.cucumber:cucumber-bom:${cucumberVersion}"))
 
-    // xpath and selenium. Browser lifecycle stays here.
-    // dom-composite 2.4.0 Java binding (dev.domcomposite.Client / Session) is vendored
-    // under src/main/java/dev/domcomposite from github.com/ds-code-t/dom-composite
-    // commit d63887c. It is not on Maven Central (maven.deploy.skip). Native
-    // classifiers are optional: classpath dev/domcomposite/natives/<os-arch>/composite
+    // Selenium is browser lifecycle and the pkb_composite=off element path.
+    // The in-repo Java DOM engine (project(':dom-engine')) is embedded in the jar
+    // and is the default element engine.
+    // The vendored dev.domcomposite Client / Session under src/main/java/dev/domcomposite
+    // is the stdio client for the engine CLI (github.com/ds-code-t/dom-composite
+    // commit d63887c; not on Maven Central, maven.deploy.skip).
+    // Rust native classifiers matter only for the pkb_composite_engine=rust override:
+    // classpath dev/domcomposite/natives/<os-arch>/composite
     // or dev.domcomposite:composite-native:2.4.0:<classifier>. See docs/configuration.md.
     implementation('org.seleniumhq.selenium:selenium-java') {
         version { strictly('[4.44,5.0)') }
