@@ -86,6 +86,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/maintainer/3.0.0-engine-design.md`
 - `docs/maintainer/3.0.0-java-dom-design.md`
 - `docs/maintainer/3.0.0-query-visual-design.md`
+- `docs/maintainer/3.0.0-workbench-edit-design.md`
 - `docs/maintainer/consumer-sim-harness.md`
 - `docs/maintainer/guidance-goldens.md`
 - `docs/maintainer/pointer-eval-harness.md`
@@ -109,6 +110,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/roadmaps/3.0.0-decouple-round3-roadmap.md`
 - `docs/roadmaps/3.0.0-java-dom-roadmap.md`
 - `docs/roadmaps/3.0.0-query-visual-roadmap.md`
+- `docs/roadmaps/3.0.0-workbench-edit-roadmap.md`
 - `docs/service-call-scenarios.md`
 - `docs/step-overrides.md`
 - `docs/workbench-agent-detail.md`

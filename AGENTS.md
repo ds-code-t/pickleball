@@ -427,3 +427,9 @@ A parsed step with that clause applies the look stage on the production find (`E
 
 
 
+
+## Workbench full-edit, engine-in-jar, and live native desktop (3.0.0)
+
+The locked design is `docs/maintainer/3.0.0-workbench-edit-design.md`. The mandatory roadmap is `docs/roadmaps/3.0.0-workbench-edit-roadmap.md`. Implementation stays on branch `3.0.0`. Version stays 3.0.0.
+
+The Workbench GUI can add, delete, and modify element categories, general configuration and data files, scenarios and scenario steps, and Java (and JS/TS source) step-definition functions, all through one CLI-first edit model. The Java DOM engine is packaged inside the pickleball jar and sources jar (`dev.domengine` classes and sources; a verification test fails if they are missing) and is the default path inside Pickleball. Do not publish a separate `dom-engine` artifact as a substitute. Live native desktop access runs on the machine where the engine runs (Windows UI Automation, macOS Accessibility, Linux AT-SPI). The fixture backend is kept for tests and CI. Browser DOM and desktop UI share one query language, one verb set, and one walk/attach/resolve model; named platform exceptions are justified in the design. Selenium fallback (`pkb_composite=off`) stays working. Open PRs #2 and #3 on ds-code-t/dom-composite must not be merged, and nothing is pushed to that repo.
