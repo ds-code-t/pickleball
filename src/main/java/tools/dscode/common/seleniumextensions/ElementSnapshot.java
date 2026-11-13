@@ -9,7 +9,7 @@ import java.util.Map;
 /**
  * Immutable description of one element, taken once.
  *
- * <p>Both the Selenium path and the dom-composite path produce this same record
+ * <p>Both the Selenium path and the DOM engine path produce this same record
  * from one shared script. Read it from {@code ElementWrapper.snapshot()}.
  * Do not parse two XPaths, and do not treat {@code siblingIndex} or
  * {@code sameTagIndex} as 0 unless this element really is the first sibling.

@@ -313,7 +313,7 @@ public final class DriverConstruction {
                 : new RemoteWebDriver(new URL(remoteUrl), capabilities));
     }
 
-    /** Locates dom-composite when a browser session starts. A missing binary does not fail the driver. */
+    /** Locates the DOM engine when a browser session starts. A missing engine does not fail the driver. */
     private static RemoteWebDriver ready(RemoteWebDriver driver) {
         AgentDriverHooks.ready(driver);
         CompositeRuntime.attach(driver);

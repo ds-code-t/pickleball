@@ -39,7 +39,7 @@ import static tools.dscode.common.util.debug.DebugUtils.debugFlags;
  * deprecated {@link #getAttributeSnapshot()}) do not take another snapshot.
  * {@link #refreshSnapshot()} is the only refresh. {@link #takeSnapshot()}
  * calls it. A {@link org.openqa.selenium.StaleElementReferenceException} or a
- * dom-composite {@code StaleException} also calls it once, then retries the
+ * the engine client's {@code StaleException} also calls it once, then retries the
  * operation on the replacement element.
  *
  * <p>Refresh finds exactly one node by {@link ElementSnapshot#stableSelector()}.

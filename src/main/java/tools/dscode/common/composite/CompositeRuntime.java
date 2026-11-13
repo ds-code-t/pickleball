@@ -21,12 +21,12 @@ import tools.dscode.control.protocol.DirectControlProvider;
 
 /**
  * One composite client for this JVM. Browser startup calls {@link #attach}.
- * A missing binary logs once and leaves the legacy Selenium path in place.
+ * A missing engine logs once and leaves the legacy Selenium path in place.
  */
 public final class CompositeRuntime {
-    public static final String MISSING = "dom-composite binary not found; using the legacy Selenium element path for this run";
+    public static final String MISSING = "DOM engine not found (no in-repo Java engine on the classpath and no explicit binary); using the legacy Selenium element path for this run";
     public static final String MISSING_FIX =
-            "The in-repo Java engine (dev.domengine) ships in the Pickleball jar; check that it is on the test classpath and that pkb_composite_engine is not rust. For the Rust binary set COMPOSITE_BIN, COMPOSITE_HOME, or pkb_composite_bin, or build the sibling dom-composite checkout (target/release/composite). pkb_composite=off keeps Selenium without this message.";
+            "The in-repo Java engine (dev.domengine) ships in the Pickleball jar; check that it is on the test classpath and that pkb_composite_engine is not rust. For the optional Rust override set pkb_composite_engine=rust and COMPOSITE_BIN, COMPOSITE_HOME, or pkb_composite_bin, or build the sibling dom-composite checkout (target/release/composite). pkb_composite=off keeps Selenium without this message.";
 
     private static volatile Decision decision;
     private static volatile Client client;
@@ -289,8 +289,8 @@ public final class CompositeRuntime {
         } catch (RuntimeException failure) {
             CompositeLog.errorFix(
                     "session",
-                    "dom-composite could not join the browser session: " + failure.getMessage(),
-                    "Leave pkb_composite=auto so this run stays on Selenium, or fix COMPOSITE_BIN."
+                    "DOM engine could not join the browser session: " + failure.getMessage(),
+                    "Leave pkb_composite=auto so this run stays on Selenium; check that the in-repo Java engine is on the classpath, or fix the explicit pkb_composite_bin / COMPOSITE_BIN path."
             );
             if (SESSIONS_BY_CDP.isEmpty()) forceLegacy();
         }
@@ -313,8 +313,8 @@ public final class CompositeRuntime {
         } catch (RuntimeException failure) {
             CompositeLog.errorFix(
                     "session",
-                    "dom-composite could not join the page session: " + failure.getMessage(),
-                    "Leave pkb_composite=auto so this run stays on Selenium, or fix COMPOSITE_BIN."
+                    "DOM engine could not join the page session: " + failure.getMessage(),
+                    "Leave pkb_composite=auto so this run stays on Selenium; check that the in-repo Java engine is on the classpath, or fix the explicit pkb_composite_bin / COMPOSITE_BIN path."
             );
             return false;
         }
@@ -372,7 +372,7 @@ public final class CompositeRuntime {
             return new Decision(true, binary.get(), version, "composite");
         } catch (RuntimeException failure) {
             CompositeLog.fallbackOnce(
-                    "dom-composite client failed (" + failure.getMessage() + "); using the legacy Selenium element path for this run",
+                    "DOM engine client failed (" + failure.getMessage() + "); using the legacy Selenium element path for this run",
                     MISSING_FIX
             );
             return Decision.legacy("client");

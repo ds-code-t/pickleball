@@ -14,8 +14,10 @@ import java.util.Set;
  * Selectors used to reach a composite element so the shared snapshot script
  * can run against the live node.
  *
- * <p>dom-composite 2.4.0 has no element-scoped JavaScript eval, and a
- * {@link CompositeWebElement} is not a WebDriver node, so it cannot be passed
+ * <p>This lookup is the fallback for an engine without {@code eval}, such as
+ * the Rust 2.4.0 override. The Java engine lists {@code eval}, so a composite
+ * snapshot is one {@code eval} when {@code capabilities.actions} lists it.
+ * A {@link CompositeWebElement} is not a WebDriver node, so it cannot be passed
  * as {@code arguments[0]}. The script locates the node through one of these
  * selectors and then uses the same function the Selenium producer runs on a
  * live element. The snapshot stores the selector that function derives, which

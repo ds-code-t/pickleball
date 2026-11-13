@@ -637,10 +637,10 @@ public final class DomCompositeAdapter {
         Set<String> reported = desktopVerbs();
         if (reported.contains(verb.toLowerCase(Locale.ROOT))) return;
         String shown = reported.isEmpty() ? "(none)" : String.join(", ", reported);
-        String error = "dom-composite " + CompositeBinaryLocator.VERSION
-                + " has no desktop " + verb + " verb (capabilities.desktop is " + shown + ")";
-        String fix = "Upstream must add desktop verb `" + verb
-                + "`. Expected verbs are `desktop click` and `desktop type`. "
+        String error = "DOM engine has no desktop " + verb + " verb (capabilities.desktop is " + shown + ")";
+        String fix = "The in-repo Java engine supports desktop click and desktop type. "
+                + "Unset pkb_composite_engine=rust and any explicit binary to use it. "
+                + "For the Rust override, expected verbs are `desktop click` and `desktop type`. "
                 + "2.4.0 desktop verbs are " + String.join(", ", DESKTOP_VERBS_2_4_0) + ". "
                 + "Drop in dev.domcomposite:composite-native:" + CompositeBinaryLocator.VERSION
                 + " classifiers " + String.join(", ", CompositeBinaryLocator.CLASSIFIERS)
@@ -655,7 +655,7 @@ public final class DomCompositeAdapter {
     }
 
     /**
-     * Visual relatives use the engine geometry view. A binary that lacks the
+     * Visual relatives use the engine geometry view. An engine that lacks the
      * flag or the engine name does not get a box invented here.
      */
     private void requireVisual(String selector) {

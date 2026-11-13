@@ -13,7 +13,7 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * CLI-first log for the dom-composite adapter. Off unless
+ * CLI-first log for the DOM engine adapter. Off unless
  * {@code pkb_composite_log} names an entity ({@code location}, {@code adapter},
  * {@code session}, {@code element}, {@code fallback}, {@code batch}, {@code state},
  * {@code position}, {@code geometry}, {@code query}, {@code exposure})

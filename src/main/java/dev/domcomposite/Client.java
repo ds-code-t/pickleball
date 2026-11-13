@@ -28,7 +28,9 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.databind.node.TextNode;
 
 /**
- * Thin client for the {@code composite} CLI.
+ * Thin client for the engine CLI. By default that CLI is the in-repo Java
+ * engine launcher. An explicit {@code pkb_composite_bin} or {@code COMPOSITE_BIN}
+ * path, or {@code pkb_composite_engine=rust}, selects the Rust {@code composite} binary.
  *
  * <p>Every call is one line to a long-lived {@code composite serve --stdio}
  * child. This class does not capture, query, resolve, or validate. It is safe

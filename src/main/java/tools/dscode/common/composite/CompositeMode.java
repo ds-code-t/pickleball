@@ -4,11 +4,14 @@ import java.util.Locale;
 import java.util.Map;
 
 /**
- * {@code pkb_composite} selects the element backend for this run.
- * {@code auto} (default) uses dom-composite when a binary is located and
- * otherwise the legacy Selenium path. {@code on} is the same choice but the
- * missing-binary line is always printed. {@code off} keeps Selenium and does
- * not look for the binary.
+ * {@code pkb_composite} selects the element path for this run.
+ * {@code auto} (default) uses the DOM engine (the in-repo Java engine unless
+ * an explicit binary or {@code pkb_composite_engine=rust} is set) and the
+ * legacy Selenium path when no engine can be located or started.
+ * {@code on} (also {@code true}, {@code required}, {@code composite}) is the
+ * same choice, always prints the missing-engine line, and accepts
+ * {@code composite} on {@code PATH}. {@code off} (also {@code false},
+ * {@code legacy}, {@code selenium}) keeps Selenium and does not look for an engine.
  */
 public enum CompositeMode {
     AUTO,

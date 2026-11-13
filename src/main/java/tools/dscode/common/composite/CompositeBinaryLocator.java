@@ -19,12 +19,17 @@ import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 
 /**
- * Finds the {@code composite} binary. Order: {@code pkb_composite_bin},
- * {@code COMPOSITE_BIN}, {@code COMPOSITE_HOME} or a sibling {@code dom-composite}
- * checkout ({@code target/debug} then {@code target/release}), a classpath
- * native for this OS/arch, then a local Maven classifier jar
- * {@code dev.domcomposite:composite-native:2.4.0:<classifier>}.
- * {@code pkb_composite=on} also accepts {@code composite} on {@code PATH}.
+ * Finds the DOM engine. Order:
+ * an explicit path (property {@code pkb_composite_bin}, then
+ * {@code pkb_runvars.pkb_composite_bin}, then env {@code COMPOSITE_BIN}, then
+ * env {@code pkb_composite_bin}; the first non-blank spec only), then the
+ * in-repo Java engine launcher unless {@code pkb_composite_engine=rust}, then
+ * the Rust fallbacks ({@code COMPOSITE_HOME} or a sibling {@code dom-composite}
+ * checkout, {@code target/debug} then {@code target/release}), a classpath
+ * native, the Maven classifier jar, and {@code composite} on {@code PATH}
+ * only when {@code pkb_composite=on}.
+ * {@code VERSION}, {@code GROUP}, {@code NATIVE_ARTIFACT}, and {@code CLASSIFIERS}
+ * name the optional Rust override, not the Java engine.
  */
 public final class CompositeBinaryLocator {
     public static final String VERSION = "2.4.0";
@@ -118,7 +123,7 @@ public final class CompositeBinaryLocator {
                 return Optional.of(path);
             }
         }
-        CompositeLog.debug("location", "no composite binary for " + classifier);
+        CompositeLog.debug("location", "no DOM engine for " + classifier);
         return Optional.empty();
     }
 

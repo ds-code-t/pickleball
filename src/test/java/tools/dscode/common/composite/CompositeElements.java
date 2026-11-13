@@ -3,7 +3,7 @@ package tools.dscode.common.composite;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
-/** Builds a composite hit for snapshot tests. Not a live dom-composite session. */
+/** Builds a composite hit for snapshot tests. Not a live engine session. */
 public final class CompositeElements {
     private CompositeElements() {
     }

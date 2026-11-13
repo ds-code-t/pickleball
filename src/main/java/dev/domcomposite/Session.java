@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 
 /**
  * One named browser session owned by a {@link Client}. Not a singleton.
+ * The CLI is the in-repo Java engine launcher by default, or an explicit Rust binary.
  * Closing it asks the CLI to close that id and does not stop the sidecar.
  */
 public final class Session implements AutoCloseable {
