@@ -87,10 +87,14 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/maintainer/3.0.0-engine-defects-design.md`
 - `docs/maintainer/3.0.0-engine-design.md`
 - `docs/maintainer/3.0.0-java-dom-design.md`
+- `docs/maintainer/3.0.0-locked-decisions-prior-audit.md`
+- `docs/maintainer/3.0.0-locked-decisions-sweep.md`
 - `docs/maintainer/3.0.0-query-visual-design.md`
+- `docs/maintainer/3.0.0-snapshot-coverage-audit.md`
 - `docs/maintainer/3.0.0-workbench-edit-design.md`
 - `docs/maintainer/consumer-sim-harness.md`
 - `docs/maintainer/guidance-goldens.md`
+- `docs/maintainer/locked-decisions-digest-2026-11-13.md`
 - `docs/maintainer/pointer-eval-harness.md`
 - `docs/maintainer/tech-debt.md`
 - `docs/mapping-and-templating.md`
