@@ -89,7 +89,7 @@ dictionary.category("Close Button")
         .addBase("//*[self::button and @aria-label='Close']");
 ```
 
-`Loading` is registered with `CategoryFlags.ALL_CONTEXTS` and the built-in locator. When composite is primary, that scan is one query. Otherwise it is the Java walk of the current document, the top document, frames, and open shadow roots. `category("Loading").or(xpath)` adds a clause and keeps both. `reset()` clears them. `restoreBuiltinLoading()` puts the locator and the flag back. Add the `or` again after that restore. A category that `inheritsFrom("Loading")` inherits the scan. Only a flagged category searches every context. `Button` does not.
+`Loading` is registered with `CategoryFlags.ALL_CONTEXTS` and the built-in locator. With the DOM engine (default), that scan is one query when the engine accepts `--pierce`. An engine that does not, such as the Rust 2.4.0 override, keeps the Java walk of the current document, the top document, frames, and open shadow roots. `category("Loading").or(xpath)` adds a clause and keeps both. `reset()` clears them. `restoreBuiltinLoading()` puts the locator and the flag back. Add the `or` again after that restore. A category that `inheritsFrom("Loading")` inherits the scan. Only a flagged category searches every context. `Button` does not.
 
 Do not re-register a built-in with the same locator as a "new" category. `Radio Button` is already built in; the consumer does not register it.
 
