@@ -8,6 +8,10 @@ All consumers, including tooling that uses dynamic control, depend only on Pickl
 
 Installing Pickleball with no control handler and never invoking the bundled control API preserves normal execution behavior. Dynamic execution, Mapping interception, bridge startup, browser/service evidence, breakpoints, and Step Overrides are opt-in.
 
+## Browser facade
+
+`tools.dscode.browser.BrowserFacade` is the protocol boundary for a live page. `ProtocolSelector.forDriver` returns `SeleniumAdapter`. Methods on that boundary are `send`, `evaluateIsolated`, `addPreload`, `addBinding`, `screenshot`, `frameTree`, `find`, `click`, and `type`. The Selenium adapter implements the library half of those methods. `send` is refused with `error:` and `fix:` because a scripted adapter does not speak CDP or BiDi. `evaluateIsolated` runs through `JavascriptExecutor` and does not create an isolated world. Nothing here changes `pkb_composite`, agent commands, or the control bridge. G3 and G4 are expected to call this facade instead of `executeCdpCommand`. Direct `CdpAdapter` and `BidiAdapter` sockets are not wired yet.
+
 ## Dynamic execution and Mapping
 
 `DynamicControl` executes Cucumber/Pickleball steps against the currently active Pickleball test context. Detached failures are returned as structured `FAILED` results instead of automatically failing the paused scenario, allowing controller tooling to inspect a failed hypothesis and try another action.

@@ -223,6 +223,11 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/io/cucumber/core/stepexpression/NativeStepExpressions.java`
 - `src/main/java/io/cucumber/java/en/ReturnStep.java`
 - `src/main/java/io/cucumber/messages/types/InlinePickleArgument.java`
+- `src/main/java/tools/dscode/browser/BindingListener.java`
+- `src/main/java/tools/dscode/browser/BrowserFacade.java`
+- `src/main/java/tools/dscode/browser/FrameNode.java`
+- `src/main/java/tools/dscode/browser/ProtocolSelector.java`
+- `src/main/java/tools/dscode/browser/SeleniumAdapter.java`
 - `src/main/java/tools/dscode/common/agentcontrol/AgentControl.java`
 - `src/main/java/tools/dscode/common/agentcontrol/AgentDriverHooks.java`
 - `src/main/java/tools/dscode/common/agentcontrol/AgentLaunch.java`
@@ -655,6 +660,8 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/io/cucumber/core/runtime/DaltonExecuteFromDbTest.java`
 - `src/test/java/io/cucumber/core/runtime/DaltonFeatureLoadHookTest.java`
 - `src/test/java/io/cucumber/core/runtime/FeaturePathLoadCacheTest.java`
+- `src/test/java/tools/dscode/browser/FacadeContractTest.java`
+- `src/test/java/tools/dscode/browser/ProtocolSelectorTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/AgentLiveFixTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/ChatLockChild.java`
 - `src/test/java/tools/dscode/common/agentcontrol/LiveChromeCdpTest.java`
