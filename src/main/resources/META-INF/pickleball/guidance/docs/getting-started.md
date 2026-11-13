@@ -9,14 +9,14 @@ A consumer normally needs the Pickleball test dependency and one runner extendin
 - Java 21
 - the project's wrapper: `mvnw` or `mvnw.cmd`, `gradlew` or `gradlew.bat`, or `java -jar` on the wrapper jar. Pick the script from the OS. Do not require a machine-wide Maven or Gradle install
 - a Selenium-supported browser for browser scenarios
-- optional: the `composite` binary from [dom-composite](https://github.com/ds-code-t/dom-composite) 2.4.0 when element operations should use that entry point. Without it, Pickleball keeps Selenium for that run. Set `COMPOSITE_BIN` or `pkb_composite_bin` to the binary. See [Configuration](configuration.md).
+- nothing extra for element operations: the in-repo Java DOM engine is in the Pickleball jar. `pkb_composite=off` forces the Selenium element path. `pkb_composite_engine=rust` with an explicit binary path is an optional override. See [Configuration](configuration.md).
 
 ## Maven dependency
 
 ```xml
 <properties>
     <maven.compiler.release>21</maven.compiler.release>
-    <pickleball.version>2.1.16</pickleball.version>
+    <pickleball.version>3.0.0</pickleball.version>
 </properties>
 
 <dependency>
@@ -107,7 +107,7 @@ The Pickleball dependency carries its version-matched, controller-only Workbench
 java -jar ~/.m2/repository/tools/dscode/pickleball/<version>/pickleball-<version>.jar ui .
 ```
 
-After `export-guidance`, `.pickleball/open/pickleball-workbench.sh` (`.cmd` / `.ps1` on Windows) is a relocatable opener: copy it anywhere, it walks up for the project and resolves a pickleball jar. The launcher extracts verified bytes beneath `.pickleball/v/<version>/workbench/controller/<sha256>/` when `current.json` is complete (legacy `.pickleball/workbench/` otherwise), resolves controller libraries into the matching `lib/<version>/`, and starts a separate controller JVM with `java -cp`. Workbench then synchronizes the project and starts a second, consumer-owned worker JVM from the resolved test runtime. Core, Cucumber, Selenium, service behavior, mappings, and steps execute only in that worker. See [Pickleball Workbench](pickleball-workbench.md).
+After `export-guidance`, `.pickleball/open/pickleball-workbench.sh` (`.cmd` / `.ps1` on Windows) is a relocatable opener: copy it anywhere, it walks up for the project and resolves a pickleball jar. The launcher extracts verified bytes beneath `.pickleball/v/<version>/workbench/controller/<sha256>/` when `current.json` is complete (legacy `.pickleball/workbench/` otherwise), resolves controller libraries into the matching `lib/<version>/`, and starts a separate controller JVM with `java -cp`. Workbench then synchronizes the project and starts a second, consumer-owned worker JVM from the resolved test runtime. Core, the native engine (or the Cucumber adapter), the DOM engine, Selenium browser lifecycle, service behavior, mappings, and steps execute only in that worker. See [Pickleball Workbench](pickleball-workbench.md).
 
 Filter normally with RunVars such as:
 
