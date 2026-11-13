@@ -9,17 +9,32 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/** Linux AT-SPI over the session bus. dbus-send is the client. No bus is a failure, not an empty tree. */
+/** Linux AT-SPI. dbus-send uses {@code --session} with {@code DBUS_SESSION_BUS_ADDRESS} set to the accessibility bus. {@code --address=} does not complete Hello. No bus is a failure, not an empty tree. */
 final class AtSpi {
     private static final Pattern NUMBER = Pattern.compile("(?:uint32|int32|uint16|int16)\\s+(-?\\d+)");
+    static final String GET_ROLE = "org.a11y.atspi.Accessible.GetRole";
+    static final String GET_ROLE_NAME = "org.a11y.atspi.Accessible.GetRoleName";
+    static final String PROPERTIES_GET = "org.freedesktop.DBus.Properties.Get";
+    /** Null uses the process session bus. A test value replaces it so a live bus cannot answer. */
+    private static final ThreadLocal<String> SESSION_BUS_OVERRIDE = new ThreadLocal<>();
 
     private AtSpi() {
     }
 
     record Ref(String dest, String path) {
+    }
+
+    /** Command line and environment for one accessibility-bus call. Never uses {@code --address=}. */
+    record BusCall(List<String> command, Map<String, String> env) {
+    }
+
+    static void useSessionBusForTests(String address) {
+        if (address == null) SESSION_BUS_OVERRIDE.remove();
+        else SESSION_BUS_OVERRIDE.set(address);
     }
 
     static void requireLinux() {
@@ -93,17 +108,20 @@ final class AtSpi {
 
     static String busAddress() {
         requireLinux();
-        String session = System.getenv("DBUS_SESSION_BUS_ADDRESS");
-        if ((session == null || session.isBlank()) && !Files.exists(sessionBusSocket())) {
+        String override = SESSION_BUS_OVERRIDE.get();
+        String session = override != null ? override : System.getenv("DBUS_SESSION_BUS_ADDRESS");
+        boolean socketPresent = override == null && Files.exists(sessionBusSocket());
+        if ((session == null || session.isBlank()) && !socketPresent) {
             throw new CdpException("AT-SPI unavailable: no session bus (DBUS_SESSION_BUS_ADDRESS is unset)");
         }
         if (NativeDesktop.tool("dbus-send") == null) {
             throw new CdpException("AT-SPI unavailable: dbus-send is not installed");
         }
+        Map<String, String> env = override == null ? Map.of() : Map.of("DBUS_SESSION_BUS_ADDRESS", session);
         NativeDesktop.CommandResult result = NativeDesktop.run(List.of(
                 "dbus-send", "--session", "--print-reply",
                 "--dest=org.a11y.Bus", "/org/a11y/bus", "org.a11y.Bus.GetAddress"
-        ));
+        ), env);
         if (result.timedOut()) {
             throw new CdpException("AT-SPI unavailable: dbus-send timed out calling org.a11y.Bus.GetAddress");
         }
@@ -115,31 +133,44 @@ final class AtSpi {
         return strings.get(0);
     }
 
-    /** AT-SPI role number to the shared query role. Unknown numbers stay {@code unknown}; the number is stored separately. */
+    /**
+     * Numeric fallback when GetRoleName is empty. Numbers are {@code AtspiRole} in at-spi2-core 2.56:
+     * {@code FOCUS_TRAVERSABLE} is 21, so frame is 23 not 22; {@code EXTENDED} follows window, so application is 75 not 74.
+     * GetRoleName plus {@link NativeDesktop#mapRole} is the source of truth.
+     */
     static String roleName(int role) {
         return switch (role) {
             case 7 -> "checkbox";
             case 11 -> "combobox";
+            case 14, 23, 69 -> "window";
             case 16 -> "dialog";
-            case 22, 68 -> "window";
-            case 26 -> "img";
-            case 28 -> "label";
-            case 30 -> "list";
-            case 31 -> "listitem";
-            case 32 -> "menu";
-            case 34 -> "menuitem";
-            case 36 -> "tab";
-            case 39, 60, 78 -> "textbox";
-            case 42, 61 -> "button";
-            case 43 -> "radio";
-            case 54 -> "table";
-            case 55 -> "cell";
-            case 74 -> "application";
-            case 82 -> "heading";
-            case 87 -> "link";
-            case 91, 92, 93, 94, 95 -> "document";
+            case 27 -> "img";
+            case 29 -> "label";
+            case 31 -> "list";
+            case 32 -> "listitem";
+            case 33 -> "menu";
+            case 34 -> "menubar";
+            case 35 -> "menuitem";
+            case 37 -> "tab";
+            case 39 -> "panel";
+            case 40, 61, 79 -> "textbox";
+            case 43, 62 -> "button";
+            case 44 -> "radio";
+            case 55 -> "table";
+            case 56 -> "cell";
+            case 60 -> "terminal";
+            case 75 -> "application";
+            case 82, 92, 93, 94, 95, 96 -> "document";
+            case 83 -> "heading";
+            case 88 -> "link";
             default -> "unknown";
         };
+    }
+
+    /** GetRoleName wins. A blank name uses {@link #roleName(int)}. */
+    static String mappedRole(String roleLabel, int role) {
+        if (roleLabel != null && !roleLabel.isBlank()) return NativeDesktop.mapRole("atspi", roleLabel);
+        return roleName(role);
     }
 
     static List<String> strings(String output) {
@@ -204,12 +235,13 @@ final class AtSpi {
         node.attributes.put("desktop-backend", "atspi");
         node.attributes.put("atspi-dest", dest);
         node.attributes.put("atspi-path", path);
-        int role = propertyInt(address, dest, path, "Role");
-        String mapped = roleName(role);
+        int role = methodInt(address, dest, path, GET_ROLE);
+        String roleLabel = methodString(address, dest, path, GET_ROLE_NAME);
+        String mapped = mappedRole(roleLabel, role);
         node.role = mapped;
         node.localName = mapped;
         node.nodeName = mapped.toUpperCase(Locale.ROOT);
-        node.accessibleName = propertyString(address, dest, path, "Name");
+        node.accessibleName = accessibleName(address, dest, path);
         node.attributes.put("atspi-role", Integer.toString(role));
         int[] box = extents(address, dest, path);
         if (box != null) {
@@ -233,21 +265,25 @@ final class AtSpi {
         return node;
     }
 
-    private static String propertyString(String address, String dest, String path, String name) {
+    private static String accessibleName(String address, String dest, String path) {
         NativeDesktop.CommandResult result = call(
-                address, dest, path, "org.freedesktop.DBus.Properties.Get",
-                "string:org.a11y.atspi.Accessible", "string:" + name
+                address, dest, path, PROPERTIES_GET,
+                "string:org.a11y.atspi.Accessible", "string:Name"
         );
         if (result.timedOut() || result.exit() != 0) return "";
         List<String> values = strings(result.output());
         return values.isEmpty() ? "" : values.get(0);
     }
 
-    private static int propertyInt(String address, String dest, String path, String name) {
-        NativeDesktop.CommandResult result = call(
-                address, dest, path, "org.freedesktop.DBus.Properties.Get",
-                "string:org.a11y.atspi.Accessible", "string:" + name
-        );
+    private static String methodString(String address, String dest, String path, String method, String... typed) {
+        NativeDesktop.CommandResult result = call(address, dest, path, method, typed);
+        if (result.timedOut() || result.exit() != 0) return "";
+        List<String> values = strings(result.output());
+        return values.isEmpty() ? "" : values.get(0);
+    }
+
+    private static int methodInt(String address, String dest, String path, String method, String... typed) {
+        NativeDesktop.CommandResult result = call(address, dest, path, method, typed);
         if (result.timedOut() || result.exit() != 0) return -1;
         return lastInt(result.output(), -1);
     }
@@ -291,15 +327,20 @@ final class AtSpi {
     ) {
         Path tool = NativeDesktop.tool("dbus-send");
         if (tool == null) throw new CdpException("AT-SPI unavailable: dbus-send is not installed");
+        BusCall invocation = busCall(tool.toString(), address, dest, path, method, typed);
+        return NativeDesktop.run(invocation.command(), invocation.env());
+    }
+
+    static BusCall busCall(String tool, String address, String dest, String path, String method, String... typed) {
         List<String> command = new ArrayList<>();
-        command.add(tool.toString());
-        command.add("--address=" + address);
+        command.add(tool);
+        command.add("--session");
         command.add("--print-reply");
         command.add("--dest=" + dest);
         command.add(path);
         command.add(method);
         for (String arg : typed) command.add(arg);
-        return NativeDesktop.run(command);
+        return new BusCall(List.copyOf(command), Map.of("DBUS_SESSION_BUS_ADDRESS", address));
     }
 
     private static String required(DomNode node, String name) {

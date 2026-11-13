@@ -234,7 +234,7 @@ public final class NativeDesktop {
         for (DomNode child : node.children) stamp(child, platform);
     }
 
-    private static String mapRole(String backend, String raw) {
+    static String mapRole(String backend, String raw) {
         String value = raw == null ? "" : raw.trim();
         if ("ax".equals(backend) && value.startsWith("AX")) value = value.substring(2);
         value = value.toLowerCase(Locale.ROOT).replace('_', ' ').replace(" ", "");

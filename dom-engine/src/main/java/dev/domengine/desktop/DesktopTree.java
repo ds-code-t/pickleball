@@ -80,6 +80,7 @@ public final class DesktopTree {
 
     public static void resetForTests() {
         SESSIONS.clear();
+        AtSpi.useSessionBusForTests(null);
     }
 
     public static DomNode project(JsonNode json) {
