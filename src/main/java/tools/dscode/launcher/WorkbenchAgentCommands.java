@@ -25,6 +25,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -554,8 +555,8 @@ public final class WorkbenchAgentCommands {
                     ),
                     run
             );
-            ByteArrayOutputStream capturedOut = new ByteArrayOutputStream();
-            ByteArrayOutputStream capturedErr = new ByteArrayOutputStream();
+            ByteArrayOutputStream capturedOut = captureBuffer();
+            ByteArrayOutputStream capturedErr = captureBuffer();
             PrintStream captureOut = new PrintStream(capturedOut, true, StandardCharsets.UTF_8);
             PrintStream captureErr = new PrintStream(capturedErr, true, StandardCharsets.UTF_8);
             Bounded mavenResult = directOrFallback(
@@ -685,8 +686,8 @@ public final class WorkbenchAgentCommands {
                     ),
                     run
             );
-            ByteArrayOutputStream capturedOut = new ByteArrayOutputStream();
-            ByteArrayOutputStream capturedErr = new ByteArrayOutputStream();
+            ByteArrayOutputStream capturedOut = captureBuffer();
+            ByteArrayOutputStream capturedErr = captureBuffer();
             PrintStream captureOut = new PrintStream(capturedOut, true, StandardCharsets.UTF_8);
             PrintStream captureErr = new PrintStream(capturedErr, true, StandardCharsets.UTF_8);
             Bounded mavenResult = directOrFallback(
@@ -2354,6 +2355,109 @@ public final class WorkbenchAgentCommands {
         } catch (Exception failure) {
             err.println("Could not read retained pkb_run_profile: " + failure.getMessage());
             return mavenExit == 0 ? 1 : mavenExit;
+        }
+    }
+
+    /** Launch stdout/stderr. Head and tail are kept so a huge run cannot exhaust the test heap. */
+    static ByteArrayOutputStream captureBuffer() {
+        return new CaptureBuffer();
+    }
+
+    /**
+     * Bounded stand-in for the launch console. The first {@link #HEAD} bytes and
+     * the last {@link #TAIL} bytes are kept. {@code launchCause} reads the tail,
+     * so the last {@code Caused by} line survives. Bytes in the middle are counted
+     * and replaced with one truncation line.
+     */
+    static final class CaptureBuffer extends ByteArrayOutputStream {
+        static final int HEAD = 256 * 1024;
+        static final int TAIL = 512 * 1024;
+        private final byte[] tail = new byte[TAIL];
+        private int tailStart;
+        private int tailFilled;
+        private long dropped;
+        private boolean truncated;
+
+        @Override
+        public synchronized void write(int bite) {
+            byte[] one = {(byte) bite};
+            write(one, 0, 1);
+        }
+
+        @Override
+        public synchronized void write(byte[] buffer, int offset, int length) {
+            if (buffer == null) throw new NullPointerException();
+            if (offset < 0 || length < 0 || offset > buffer.length - length) {
+                throw new IndexOutOfBoundsException();
+            }
+            if (length == 0) return;
+            int room = HEAD - count;
+            if (room > 0) {
+                int take = Math.min(room, length);
+                super.write(buffer, offset, take);
+                offset += take;
+                length -= take;
+            }
+            if (length > 0) {
+                appendTail(buffer, offset, length);
+                truncated = true;
+            }
+        }
+
+        @Override
+        public synchronized void reset() {
+            super.reset();
+            tailStart = 0;
+            tailFilled = 0;
+            dropped = 0;
+            truncated = false;
+        }
+
+        @Override
+        public synchronized String toString() {
+            return toString(StandardCharsets.UTF_8);
+        }
+
+        @Override
+        public synchronized String toString(Charset charset) {
+            if (!truncated) return super.toString(charset);
+            return new String(buf, 0, count, charset)
+                    + "\n... console truncated " + dropped + " bytes ...\n"
+                    + new String(tailBytes(), charset);
+        }
+
+        private void appendTail(byte[] buffer, int offset, int length) {
+            if (length >= TAIL) {
+                dropped += tailFilled + (long) length - TAIL;
+                System.arraycopy(buffer, offset + length - TAIL, tail, 0, TAIL);
+                tailStart = 0;
+                tailFilled = TAIL;
+                return;
+            }
+            int first = Math.min(length, TAIL - tailStart);
+            System.arraycopy(buffer, offset, tail, tailStart, first);
+            int rest = length - first;
+            if (rest > 0) System.arraycopy(buffer, offset + first, tail, 0, rest);
+            if (tailFilled + length > TAIL) {
+                dropped += tailFilled + (long) length - TAIL;
+                tailFilled = TAIL;
+            } else {
+                tailFilled += length;
+            }
+            tailStart = (tailStart + length) % TAIL;
+        }
+
+        private byte[] tailBytes() {
+            if (tailFilled == 0) return new byte[0];
+            byte[] out = new byte[tailFilled];
+            if (tailFilled < TAIL || tailStart == 0) {
+                System.arraycopy(tail, 0, out, 0, tailFilled);
+                return out;
+            }
+            int first = TAIL - tailStart;
+            System.arraycopy(tail, tailStart, out, 0, first);
+            System.arraycopy(tail, 0, out, first, tailStart);
+            return out;
         }
     }
 

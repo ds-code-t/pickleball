@@ -154,6 +154,23 @@ class WorkbenchLaunchCorrectnessTest {
     }
 
     @Test
+    void launchCaptureKeepsTheCauseWhenTheConsoleIsHuge() throws Exception {
+        ByteArrayOutputStream buffer = WorkbenchAgentCommands.captureBuffer();
+        buffer.write("BeforeAllSite.open\n".getBytes(StandardCharsets.UTF_8));
+        byte[] block = "line\n".getBytes(StandardCharsets.UTF_8);
+        for (int i = 0; i < 200_000; i++) buffer.write(block, 0, block.length);
+        String cause = "Caused by: java.net.BindException: Address already in use";
+        buffer.write((cause + "\n").getBytes(StandardCharsets.UTF_8));
+        String text = buffer.toString(StandardCharsets.UTF_8);
+        assertTrue(text.length() < WorkbenchAgentCommands.CaptureBuffer.HEAD
+                + WorkbenchAgentCommands.CaptureBuffer.TAIL
+                + 200, "length=" + text.length());
+        assertTrue(text.contains("BeforeAllSite.open"), "missing hook frame");
+        assertTrue(text.contains("console truncated"), "missing truncation marker");
+        assertEquals(cause, WorkbenchAgentCommands.launchCause(text));
+    }
+
+    @Test
     void beforeAllHookThatThrowsIsLaunchErrorWithTheConsoleCause() throws Exception {
         writeFeature();
         Path hook = temp.resolve("src/test/java/com/example/site/BeforeAllSite.java");
