@@ -336,7 +336,7 @@ public final class AffinityScorer {
         };
     }
 
-    static boolean labelLike(DomNode node) {
+    public static boolean labelLike(DomNode node) {
         if (node == null) return false;
         if (node.nodeType == 3) return !textOf(node).isBlank();
         String tag = node.localName == null ? "" : node.localName;

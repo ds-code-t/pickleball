@@ -126,4 +126,54 @@ public final class TemplateMatch {
     public static String why(double score, String template) {
         return String.format(Locale.ROOT, "image matched conf=%.2f template=%s", score, template);
     }
+
+    /** 64-bit dHash plus luminance mean and standard deviation. Additive. {@code score} and {@code crop} are unchanged. */
+    public record Features(long dhash, double mean, double stddev) {
+    }
+
+    public static Features features(Gray gray) {
+        if (gray == null || gray.pixels == null || gray.pixels.length == 0 || gray.width <= 0 || gray.height <= 0) {
+            return new Features(0, 0, 0);
+        }
+        double mean = 0;
+        for (int pixel : gray.pixels) mean += pixel;
+        mean /= gray.pixels.length;
+        double variance = 0;
+        for (int pixel : gray.pixels) {
+            double delta = pixel - mean;
+            variance += delta * delta;
+        }
+        variance /= gray.pixels.length;
+        return new Features(dhash(gray), mean, Math.sqrt(variance));
+    }
+
+    /**
+     * Coarse gate. A candidate stays when its dHash is within 10 bits and its mean is within 18 levels.
+     * Identical crops pass. Different widgets usually fail.
+     */
+    public static boolean prefilter(Features features, Features template) {
+        if (features == null || template == null) return false;
+        int distance = Long.bitCount(features.dhash ^ template.dhash);
+        return distance <= 10 && Math.abs(features.mean - template.mean) <= 18;
+    }
+
+    private static long dhash(Gray gray) {
+        long hash = 0;
+        int bit = 0;
+        for (int y = 0; y < 8; y++) {
+            for (int x = 0; x < 8; x++) {
+                int left = sample(gray, x, y);
+                int right = sample(gray, x + 1, y);
+                if (left < right) hash |= 1L << bit;
+                bit++;
+            }
+        }
+        return hash;
+    }
+
+    private static int sample(Gray gray, int x, int y) {
+        int sx = Math.min(gray.width - 1, x * gray.width / 9);
+        int sy = Math.min(gray.height - 1, y * gray.height / 8);
+        return gray.pixels[sy * gray.width + sx];
+    }
 }

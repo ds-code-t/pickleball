@@ -172,6 +172,10 @@ public final class SnapshotContext {
         return screenshot;
     }
 
+    public byte[] screenshotPng() {
+        return screenshot == null || screenshot.bytes() == null ? new byte[0] : screenshot.bytes();
+    }
+
     public List<String> warnings() {
         return warnings;
     }

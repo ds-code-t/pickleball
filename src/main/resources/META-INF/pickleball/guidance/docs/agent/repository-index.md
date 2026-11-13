@@ -1242,6 +1242,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `dom-engine/src/test/java/dev/domengine/DocumentWalkFixtureTest.java`
 - `dom-engine/src/test/java/dev/domengine/EngineLogTest.java`
 - `dom-engine/src/test/java/dev/domengine/FakeCdp.java`
+- `dom-engine/src/test/java/dev/domengine/image/TemplateFeaturesTest.java`
 - `dom-engine/src/test/java/dev/domengine/LiveChromeActionSmokeTest.java`
 - `dom-engine/src/test/java/dev/domengine/LiveChromeBrowserAttachTest.java`
 - `dom-engine/src/test/java/dev/domengine/LiveChromeObserveEventsTest.java`
@@ -1257,7 +1258,9 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `dom-engine/src/test/java/dev/domengine/premap/BoxCapTest.java`
 - `dom-engine/src/test/java/dev/domengine/premap/OneMatchTest.java`
 - `dom-engine/src/test/java/dev/domengine/premap/PreMapCliTest.java`
+- `dom-engine/src/test/java/dev/domengine/premap/PreMapIndexTest.java`
 - `dom-engine/src/test/java/dev/domengine/premap/PreMapLookupDefaultsTest.java`
+- `dom-engine/src/test/java/dev/domengine/premap/PreMapTest.java`
 - `dom-engine/src/test/java/dev/domengine/premap/SectionDetectionTest.java`
 - `dom-engine/src/test/java/dev/domengine/RustCliShapeTest.java`
 - `dom-engine/src/test/java/dev/domengine/SelectorParityTest.java`

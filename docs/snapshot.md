@@ -20,7 +20,7 @@ The machine-readable schema is `dom-engine/src/main/resources/dev/domengine/snap
 | `source` | `kind` (`html` or `a11y-xml`), `text` or `path`, `bytes` |
 | `frames[]` | `id`, `parent_id`, `url`, `frame_path`, `offset` |
 | `nodes[]` | Flat list. See below |
-| `premap` | Sections, labels, caps. Indexes, viewport map, colours, and image features are present and empty until the later pre-map phase |
+| `premap` | Sections, labels, caps, indexes, viewport map, colours, and image features |
 | `warnings[]` | Strings raised during capture |
 
 Each `nodes[]` entry has `handle`, `parent`, `tag`, `role`, `name`, `text` (at most 200 characters), `value`, `attributes`, `states`, `frame_id`, `frame_path`, `shadow_path`, `xpath`, `path`, `boxes`, `in_viewport`, `interactable`, `capped`, `cap_reason`, `section_path`, and `paint`.
@@ -92,7 +92,42 @@ Desktop kinds, from the projected role, are `window`, `dialog`, `pane`, `group`,
 
 Titles are chosen in this order: `aria-labelledby` text, `aria-label`, the first heading inside (not used as the title of a heading section), then `legend`, `caption`, or `summary` for those kinds, then the accessible name. Shadow trees and iframe documents nest inside the section that contains the host or the iframe.
 
-`PreMap` is the document model those results will be stored in. `PreMapLookup.PASS_THROUGH` and `PreMapLookup.installed()` return an empty `current` and an empty `candidates`, so a caller evaluates the clause live. `store` and `forTree` keep a map, and `forTree` caches an offline tree by identity. `candidates` on that lookup stays empty until the indexes are filled. `current` stays empty until runtime lookups.
+## Pre-map (core)
+
+Every `CompositeSnapshotBuilder.build` runs `PreMapBuilder`. There is no flag to skip it. The pre-map is the thing a later query is supposed to read, so the expensive work happens once at capture.
+
+`PreMapLookup.installed()` and `PreMapLookup.PASS_THROUGH` still return an empty `current` and an empty `candidates`. `current` stays empty until runtime lookups. `forTree` caches a built pre-map by tree identity, and `candidates` on that lookup reads the indexes. An empty document has nothing to index, so `candidates` stays empty there. That is the pass-through default the existing test locks. `store` keeps a session map for a later `current`.
+
+What is filled now:
+
+- `sections`, `labels`, `unlabeled`, and `boxes` (the caps and the rejected count).
+- `indexes`:
+  - `by_role`, `by_tag`, `by_id`, `by_class`, `by_xpath` (the index-qualified path)
+  - `by_role_name`, key `role` + tab + name. The name is the accessible name, or the bound label text when the control has none
+  - `by_text_token` (lowercase tokens). An exact string is stored under a prefix that a token lookup does not use
+  - `by_section_title` (the section title, and `#` plus the section id, mapping to every element whose `section_path` contains that section)
+  - `interactables`, `in_viewport`
+- `viewport_map`: handle to the `image_px` box when a screenshot is present, otherwise the visual or document box.
+- `colours`: `fg`, `bg`, and WCAG `contrast`. Colour walks ancestors. A painted background stops at the first non-transparent one. Missing colours are black on white.
+- `image`: a 16 by 16 luminance `grid` of the screenshot, and `nodes` for each interactable and label with `dhash`, `mean`, `stddev`, and `mean_rgb`.
+
+`PreMapLookup.candidates(kind, value)` returns an empty `Optional` when the index cannot answer, and a list (possibly empty) when it can. Kinds:
+
+| Kind | Value | Answer |
+|---|---|---|
+| `role`, `tag`, `class` | case-insensitive name | handles |
+| `id`, `xpath-abs` | exact id or absolute xpath | handles |
+| `role-name` | `role` + tab + name | handles |
+| `text` | one token | handles whose text contains that token |
+| `text-exact` | the whole string | handles whose text or accessible name equals it |
+| `css-simple` | one compound selector (`button.primary`, `input#email`, `.tool`) | intersection of the tag, id, and class indexes. A combinator, comma, pseudo, or attribute selector is an empty `Optional` |
+| `label` | a label handle or the label's exact text | the bound control |
+| `section` | a section id or title | elements inside that section |
+| `image` | `dhash` or `dhash@mean` | interactables kept by `TemplateMatch.prefilter` |
+
+`TemplateMatch.Features` is the 64-bit dHash plus luminance mean and standard deviation. `prefilter` keeps a candidate when the dHash is within 10 bits and the mean is within 18 levels. `score` and `crop` are unchanged. A runtime query is a lookup because those indexes already name the handles. Anything the index cannot answer is still evaluated live.
+
+The build logs `premap build nodes=<n> ms=<t>`. The budget is 250 ms for 2,000 nodes. The log is the check. The test does not assert the time.
 
 ## Desktop producers
 
