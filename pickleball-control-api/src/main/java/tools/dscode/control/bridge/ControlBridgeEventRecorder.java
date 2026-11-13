@@ -45,23 +45,30 @@ final class ControlBridgeEventRecorder implements ControlHookHandler, AutoClosea
         StepExtension step = ControlExecutionScope.currentStepOverride();
         if (step == null) step = GlobalState.getRunningStep();
         Phrase phrase = GlobalState.getRunningPhrase();
-        ControlBridgeEvent snapshot = new ControlBridgeEvent(
-                sequence.incrementAndGet(),
-                Instant.now().toString(),
-                Thread.currentThread().threadId(),
-                scenario.id.toString(),
-                scenario.scenarioName,
-                event.hook().name(),
-                clipped(event.signature()),
-                safeStepText(step),
-                phrase == null ? null : clipped(Objects.toString(phrase))
-        );
+        String scenarioId = scenario.id.toString();
+        String scenarioName = scenario.scenarioName;
+        String hook = event.hook().name();
+        String signature = clipped(event.signature());
+        String stepText = safeStepText(step);
+        String phraseText = phrase == null ? null : clipped(Objects.toString(phrase));
 
         synchronized (lock) {
             if (closed) {
                 return ControlDecision.CONTINUE;
             }
-            events.addLast(snapshot);
+            // Sequence and append share this lock. Incrementing outside it lets
+            // two hooks land in the deque behind a later number.
+            events.addLast(new ControlBridgeEvent(
+                    sequence.incrementAndGet(),
+                    Instant.now().toString(),
+                    Thread.currentThread().threadId(),
+                    scenarioId,
+                    scenarioName,
+                    hook,
+                    signature,
+                    stepText,
+                    phraseText
+            ));
             while (events.size() > MAX_EVENTS) {
                 events.removeFirst();
             }
@@ -72,20 +79,23 @@ final class ControlBridgeEventRecorder implements ControlHookHandler, AutoClosea
     /** One event for a detached execute-step, on the same stream as anchor hooks. */
     void recordExecutedStep(String scenarioId, String scenarioName, String stepText, String status) {
         if (closed) return;
-        ControlBridgeEvent snapshot = new ControlBridgeEvent(
-                sequence.incrementAndGet(),
-                Instant.now().toString(),
-                Thread.currentThread().threadId(),
-                scenarioId,
-                scenarioName,
-                "EXECUTE_STEP",
-                status == null ? "" : status,
-                clipped(stepText),
-                null
-        );
+        String scenario = scenarioId;
+        String name = scenarioName;
+        String text = clipped(stepText);
+        String hookStatus = status == null ? "" : status;
         synchronized (lock) {
             if (closed) return;
-            events.addLast(snapshot);
+            events.addLast(new ControlBridgeEvent(
+                    sequence.incrementAndGet(),
+                    Instant.now().toString(),
+                    Thread.currentThread().threadId(),
+                    scenario,
+                    name,
+                    "EXECUTE_STEP",
+                    hookStatus,
+                    text,
+                    null
+            ));
             while (events.size() > MAX_EVENTS) events.removeFirst();
         }
     }

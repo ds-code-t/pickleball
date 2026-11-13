@@ -208,6 +208,11 @@ public final class ControlBridgeTestSteps {
                 throw new IllegalStateException(failure);
             }
         });
+        // The client posts pause on another thread. Returning before that flag
+        // is set lets the scenario reach a later hook first. Adapter and native
+        // runs then disagree on step order. The HTTP server is multi-threaded,
+        // so this poll does not deadlock with the blocked pause POST.
+        awaitPauseRequested(expectedScenarioId);
     }
 
     @Given("^CONTROL BRIDGE IPC SYNC POINT$")
@@ -245,6 +250,12 @@ public final class ControlBridgeTestSteps {
         assertEquals("UNAVAILABLE", outcome.wrongTarget().status(), "wrong scenario target");
         assertEquals("SUCCESS", outcome.paused().status(), "pause result");
         assertTrue(outcome.paused().runtime().paused(), "runtime should report paused");
+        assertEquals("AFTER_STEP", outcome.paused().runtime().lastHook(), "pause hook");
+        assertTrue(
+                outcome.paused().runtime().stepText() != null
+                        && outcome.paused().runtime().stepText().contains("BEGIN CONTROL BRIDGE IPC TEST"),
+                "pause step should be BEGIN, not a later step the client lost the race to"
+        );
 
         assertEquals("SUCCESS", outcome.browserPage().status(), "browser page status");
         assertTrue(!outcome.browserPage().page().pageSource().isBlank(), "browser page DOM source");
@@ -326,6 +337,19 @@ public final class ControlBridgeTestSteps {
                 try { Files.deleteIfExists(sessionDirectory); } catch (IOException ignored) { }
             }
         }
+    }
+
+    private void awaitPauseRequested(String scenarioId) throws Exception {
+        long deadline = System.nanoTime() + Duration.ofSeconds(20).toNanos();
+        while (System.nanoTime() < deadline) {
+            for (ControlBridgeScenarioStatus active : scenarios()) {
+                if (scenarioId.equals(active.scenarioId()) && active.pauseRequested()) return;
+            }
+            Thread.sleep(20);
+        }
+        throw new AssertionError(
+                "Pause was not requested before BEGIN returned for scenario " + scenarioId
+        );
     }
 
     private ControlBridgeScenarioStatus awaitScenario(String scenarioId) throws Exception {
