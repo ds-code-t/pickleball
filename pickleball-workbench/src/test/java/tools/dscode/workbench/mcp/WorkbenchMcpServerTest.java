@@ -92,7 +92,8 @@ class WorkbenchMcpServerTest {
             "workbench_go",
             "workbench_agent_command",
             "dalton",
-            "engine"
+            "engine",
+            "domengine"
     );
 
     @TempDir

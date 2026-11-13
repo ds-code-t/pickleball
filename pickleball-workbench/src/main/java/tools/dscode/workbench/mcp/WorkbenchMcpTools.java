@@ -10,6 +10,7 @@ import tools.dscode.control.protocol.ControlBridgeMappingSnapshot;
 import tools.dscode.control.protocol.DiagnosticQuery;
 import tools.dscode.workbench.WorkbenchServices;
 import tools.dscode.workbench.dalton.DaltonCliForwarder;
+import tools.dscode.workbench.engine.DomEngineCliForwarder;
 import tools.dscode.workbench.engine.EngineCliForwarder;
 import tools.dscode.workbench.nav.WorkbenchGoLink;
 import tools.dscode.workbench.lease.WorkbenchCallContext;
@@ -403,6 +404,16 @@ final class WorkbenchMcpTools {
                         )
                 ), "args"),
                 arguments -> forwardEngine(arguments.get("args")));
+        add("domengine",
+                "Forward arguments to the Java DOM engine CLI (query, desktop, session). Does not run the engine inside Workbench.",
+                schema(Map.of(
+                        "args", Map.of(
+                                "type", "array",
+                                "description", "Arguments after domengine. Example: [\"version\"], [\"desktop\", \"list\"], or [\"query\", \"--help\"].",
+                                "items", Map.of("type", "string")
+                        )
+                ), "args"),
+                arguments -> forwardDomEngine(arguments.get("args")));
     }
 
     private Object forwardDalton(Object rawArgs) {
@@ -418,6 +429,28 @@ final class WorkbenchMcpTools {
             throw new IllegalArgumentException("error: dalton requires args.\nfix: Pass {\"args\":[\"status\"]}.");
         }
         DaltonCliForwarder.Result result = DaltonCliForwarder.run(services.projectRoot(), args);
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("exit", result.exit());
+        body.put("out", result.out());
+        body.put("err", result.err());
+        body.put("forwarded", args);
+        return body;
+    }
+
+    private Object forwardDomEngine(Object rawArgs) {
+        List<String> args = new ArrayList<>();
+        if (rawArgs instanceof List<?> list) {
+            for (Object item : list) {
+                if (item != null && !String.valueOf(item).isBlank()) args.add(String.valueOf(item));
+            }
+        } else if (rawArgs != null) {
+            throw new IllegalArgumentException("error: domengine requires args as a list of strings.\nfix: Pass {\"args\":[\"version\"]}.");
+        }
+        if (args.isEmpty()) {
+            throw new IllegalArgumentException("error: domengine requires args.\nfix: Pass {\"args\":[\"version\"]}.");
+        }
+        DomEngineCliForwarder.Result result =
+                DomEngineCliForwarder.run(services.projectRoot(), args);
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("exit", result.exit());
         body.put("out", result.out());

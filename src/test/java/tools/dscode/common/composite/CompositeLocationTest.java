@@ -91,6 +91,26 @@ class CompositeLocationTest {
     }
 
     @Test
+    void offStaysSeleniumWhenTheJavaEngineIsOnTheClasspath() throws Exception {
+        System.setProperty(CompositeMode.KEY, "off");
+        Path project = temp.resolve("off-project");
+        CompositeRuntime.use(
+                project,
+                Map.of("PKB_COMPOSITE", "off"),
+                CompositeLocationTest.class.getClassLoader(),
+                temp.resolve("home")
+        );
+        assertFalse(CompositeRuntime.primary());
+        Optional<Path> javaEngine = CompositeBinaryLocator.locate(
+                project,
+                Map.of(),
+                CompositeLocationTest.class.getClassLoader()
+        );
+        assertTrue(javaEngine.isPresent(), "java engine stays locatable");
+        assertTrue(Files.readString(javaEngine.orElseThrow()).contains("dev.domengine.cli.DomEngineMain"));
+    }
+
+    @Test
     void javaEnginePrecedesTheRustSibling() throws Exception {
         Path project = temp.resolve("repo").resolve("pickleball");
         Path sibling = temp.resolve("repo").resolve("dom-composite").resolve("target").resolve("release").resolve("composite");

@@ -518,6 +518,20 @@ tasks.register('daltonEdit', JavaExec) {
     if (project.hasProperty('daltonForce')) args += ['--force']
 }
 
+tasks.register('domengine', JavaExec) {
+    group = 'domengine'
+    description = 'Forward arguments to the pickleball domengine CLI. Does not publish a dom-engine artifact.'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'tools.dscode.launcher.PickleballWorkbenchLauncher'
+    def engineArgs = project.hasProperty('domengineArgs') ? project.property('domengineArgs').toString() : 'version'
+    def forwarded = ['domengine']
+    engineArgs.split(',').each { piece ->
+        def trimmed = piece == null ? '' : piece.toString().trim()
+        if (!trimmed.isEmpty()) forwarded.add(trimmed)
+    }
+    args(forwarded)
+}
+
 tasks.register('daltonQuery', JavaExec) {
     group = 'dalton'
     description = 'Forward to a Dalton CLI read command. sqlite-jdbc is on this task classpath only and is not published.'

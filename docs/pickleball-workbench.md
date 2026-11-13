@@ -719,3 +719,9 @@ The Editor tab adds, changes, and deletes element categories, configuration and 
 | Glue | `dalton glue list\|show\|put\|remove` |
 
 Deletes ask for confirmation, then pass `--confirm`. A conflict or an untracked database edit is refused unless `--force`. When Dalton is off the command writes the file. When Dalton is on, put sets `db_edited` and leaves the file until `dalton extract`. Scenario and step edits splice one region, keep comments outside it, normalize the indent of that region, and write valid Gherkin through `feature put`. `dalton scenario put` and `dalton step put` stay rejected. Java `@Given` / `@When` / `@Then` / `@And` / `@But` values stay one string literal. Files under `glue/js/` are source only; there is no JS/TS step runtime. A secret field must be a reference (`<name>` or `~MASK`). `pkb_dalton_log=edit` logs each edit, date-stamped, per entity, and size-capped.
+
+## Java DOM engine
+
+The Java DOM engine is part of Pickleball, not a side artifact. `dev.domengine` classes are inside the pickleball jar and the sources are inside the sources jar. There is no published `dom-engine` Maven artifact. `pkb_composite=off` stays on Selenium. The default locate path is the Java engine unless `pkb_composite_engine=rust` or an explicit binary is set.
+
+Workbench does not call engine classes. MCP `domengine` and `DomEngineCliForwarder` only build `java -jar <pickleball.jar> domengine ...` (no `--project`, so engine flags are not given a Workbench flag). Gradle `domengine` forwards the same word through `PickleballWorkbenchLauncher` (`-PdomengineArgs=desktop,list`, default `version`). The step CLI `engine` is a different command. `DOMENGINE_LOG` or `COMPOSITE_LOG` names an entity (`cli`, `desktop`, `query`) or `all`. That log is date-stamped and size-capped, and it stays off until an entity is named.

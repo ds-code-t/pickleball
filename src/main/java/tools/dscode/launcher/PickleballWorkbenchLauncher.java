@@ -59,6 +59,11 @@ public final class PickleballWorkbenchLauncher {
             if (engine != 0) exitProcess(engine);
             return;
         }
+        int domengine = dispatchDomEngineIfAny(args, System.out, System.err);
+        if (domengine >= 0) {
+            if (domengine != 0) exitProcess(domengine);
+            return;
+        }
         int logs = dispatchLogIfAny(args, System.out, System.err);
         if (logs >= 0) {
             if (logs != 0) exitProcess(logs);
@@ -84,6 +89,24 @@ public final class PickleballWorkbenchLauncher {
     static int dispatchEngineIfAny(String[] args, PrintStream out, PrintStream err) {
         if (!tools.dscode.engine.EngineCli.handles(args)) return -1;
         return tools.dscode.engine.EngineCli.execute(args, out, err);
+    }
+
+    /**
+     * The Java DOM engine is a core CLI. Returns {@code -1} when {@code args}
+     * are not a {@code domengine} invocation. Workbench only forwards.
+     */
+    static int dispatchDomEngineIfAny(String[] args, PrintStream out, PrintStream err) {
+        if (args == null || args.length == 0 || args[0] == null || !"domengine".equals(args[0].trim())) return -1;
+        PrintStream stdout = out == null ? System.out : out;
+        PrintStream stderr = err == null ? System.err : err;
+        java.util.List<String> rest = new java.util.ArrayList<>();
+        for (int index = 1; index < args.length; index++) {
+            if (args[index] != null) rest.add(args[index]);
+        }
+        dev.domengine.cli.CliResult result = dev.domengine.cli.DomEngineMain.dispatch(rest);
+        if (result.stdout() != null && !result.stdout().isEmpty()) stdout.print(result.stdout());
+        if (result.stderr() != null && !result.stderr().isEmpty()) stderr.print(result.stderr());
+        return result.exit();
     }
 
     /**
