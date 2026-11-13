@@ -15,6 +15,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -33,11 +34,19 @@ public final class DomCompositeAdapter {
     private final AtomicInteger commands = new AtomicInteger();
     private volatile Client verbClient;
     private volatile Set<String> desktopVerbs;
+    private volatile int desktopFailures;
+    private volatile long desktopBlockedUntil;
     private volatile Set<String> actionVerbs;
+    private volatile int actionFailures;
+    private volatile long actionBlockedUntil;
     private volatile Set<String> queryFlags;
+    private volatile int queryFailures;
+    private volatile long queryBlockedUntil;
     private volatile Map<String, Set<String>> verbFlags;
     private volatile boolean verbFlagsLoaded;
     private volatile Set<String> engines;
+    private volatile int engineFailures;
+    private volatile long engineBlockedUntil;
     private volatile boolean multiEvalPinned;
     private volatile Set<String> verbsForTests;
     private volatile boolean dryRun;
@@ -65,12 +74,20 @@ public final class DomCompositeAdapter {
         verbsForTests = null;
         dryRun = false;
         actionVerbs = null;
+        actionFailures = 0;
+        actionBlockedUntil = 0L;
         queryFlags = null;
+        queryFailures = 0;
+        queryBlockedUntil = 0L;
         verbFlags = null;
         verbFlagsLoaded = false;
         engines = null;
+        engineFailures = 0;
+        engineBlockedUntil = 0L;
         multiEvalPinned = false;
         desktopVerbs = null;
+        desktopFailures = 0;
+        desktopBlockedUntil = 0L;
         verbClient = null;
         recorded.clear();
         commands.set(0);
@@ -787,9 +804,23 @@ public final class DomCompositeAdapter {
         pinClient(open);
         Set<String> cached = engines;
         if (cached != null) return cached;
-        Set<String> loaded = loadNamedVerbs(open, "engines", List.of());
-        engines = loaded;
-        return loaded;
+        if (System.currentTimeMillis() < engineBlockedUntil) {
+            return engineFallback(open);
+        }
+        Optional<Set<String>> loaded = loadNamedVerbs(open, "engines", List.of());
+        if (loaded.isPresent()) {
+            engineFailures = 0;
+            engineBlockedUntil = 0L;
+            engines = loaded.get();
+            return engines;
+        }
+        noteProbeFailure("engines");
+        return engineFallback(open);
+    }
+
+    private Set<String> engineFallback(Client open) {
+        if (javaEngine(open)) return Set.copyOf(dev.domengine.query.Query.ENGINES);
+        return Set.of();
     }
 
     /**
@@ -816,9 +847,18 @@ public final class DomCompositeAdapter {
         pinClient(open);
         Set<String> cached = desktopVerbs;
         if (cached != null) return cached;
-        Set<String> loaded = loadNamedVerbs(open, "desktop", DESKTOP_VERBS_2_4_0);
-        desktopVerbs = loaded;
-        return loaded;
+        if (System.currentTimeMillis() < desktopBlockedUntil) {
+            return namedFallback(open, DESKTOP_VERBS_2_4_0, dev.domengine.desktop.DesktopTree.VERBS);
+        }
+        Optional<Set<String>> loaded = loadNamedVerbs(open, "desktop", DESKTOP_VERBS_2_4_0);
+        if (loaded.isPresent()) {
+            desktopFailures = 0;
+            desktopBlockedUntil = 0L;
+            desktopVerbs = loaded.get();
+            return desktopVerbs;
+        }
+        noteProbeFailure("desktop");
+        return namedFallback(open, DESKTOP_VERBS_2_4_0, dev.domengine.desktop.DesktopTree.VERBS);
     }
 
     private Set<String> actionVerbs() {
@@ -828,20 +868,37 @@ public final class DomCompositeAdapter {
         pinClient(open);
         Set<String> cached = actionVerbs;
         if (cached != null) return cached;
-        Set<String> loaded = loadNamedVerbs(open, "actions", VerbPlan.ACTIONS_2_4_0);
-        actionVerbs = loaded;
-        return loaded;
+        if (System.currentTimeMillis() < actionBlockedUntil) {
+            return namedFallback(open, VerbPlan.ACTIONS_2_4_0, dev.domengine.action.PageActions.VERBS);
+        }
+        Optional<Set<String>> loaded = loadNamedVerbs(open, "actions", VerbPlan.ACTIONS_2_4_0);
+        if (loaded.isPresent()) {
+            actionFailures = 0;
+            actionBlockedUntil = 0L;
+            actionVerbs = loaded.get();
+            return actionVerbs;
+        }
+        noteProbeFailure("actions");
+        return namedFallback(open, VerbPlan.ACTIONS_2_4_0, dev.domengine.action.PageActions.VERBS);
     }
 
     private void pinClient(Client open) {
         if (open == verbClient) return;
         verbClient = open;
         desktopVerbs = null;
+        desktopFailures = 0;
+        desktopBlockedUntil = 0L;
         actionVerbs = null;
+        actionFailures = 0;
+        actionBlockedUntil = 0L;
         queryFlags = null;
+        queryFailures = 0;
+        queryBlockedUntil = 0L;
         verbFlags = null;
         verbFlagsLoaded = false;
         engines = null;
+        engineFailures = 0;
+        engineBlockedUntil = 0L;
         multiEvalPinned = false;
     }
 
@@ -854,10 +911,21 @@ public final class DomCompositeAdapter {
         pinClient(open);
         Set<String> cached = queryFlags;
         if (cached != null) return cached;
-        Set<String> loaded = loadNamedVerbs(open, "query_flags", List.of());
-        queryFlags = loaded;
-        loadMultiEval(open);
-        return loaded;
+        if (System.currentTimeMillis() < queryBlockedUntil) {
+            multiEvalPinned = false;
+            return namedFallback(open, List.of(), dev.domengine.query.Query.QUERY_FLAGS);
+        }
+        Optional<Set<String>> loaded = loadNamedVerbs(open, "query_flags", List.of());
+        if (loaded.isPresent()) {
+            queryFailures = 0;
+            queryBlockedUntil = 0L;
+            queryFlags = loaded.get();
+            loadMultiEval(open);
+            return queryFlags;
+        }
+        multiEvalPinned = false;
+        noteProbeFailure("query_flags");
+        return namedFallback(open, List.of(), dev.domengine.query.Query.QUERY_FLAGS);
     }
 
     /** {@code null} when the engine has no {@code verb_flags} object. A failed read is not cached. */
@@ -902,19 +970,64 @@ public final class DomCompositeAdapter {
         }
     }
 
-    private static Set<String> loadNamedVerbs(Client open, String field, List<String> fallback) {
+    /**
+     * A present value is cached. Empty means the capabilities call failed and must not be cached.
+     * A successful document with no array for {@code field} caches {@code absentFallback}.
+     */
+    private static Optional<Set<String>> loadNamedVerbs(Client open, String field, List<String> absentFallback) {
         try {
             JsonNode caps = open.capabilities();
             JsonNode list = caps == null ? null : caps.get(field);
-            if (list == null || !list.isArray()) return Set.copyOf(fallback);
+            if (list == null || !list.isArray()) return Optional.of(Set.copyOf(absentFallback));
             Set<String> verbs = new LinkedHashSet<>();
             for (JsonNode item : list) {
                 String name = item.asText("").trim().toLowerCase(Locale.ROOT);
                 if (!name.isEmpty()) verbs.add(name);
             }
-            return Set.copyOf(verbs);
-        } catch (RuntimeException ignored) {
-            return Set.copyOf(fallback);
+            return Optional.of(Set.copyOf(verbs));
+        } catch (RuntimeException ex) {
+            return Optional.empty();
+        }
+    }
+
+    /** Two failed reads in a row wait five seconds before the next probe. The first retry is immediate. */
+    private void noteProbeFailure(String field) {
+        CompositeLog.debug("adapter", "capabilities " + field + " failed");
+        long now = System.currentTimeMillis();
+        switch (field) {
+            case "desktop" -> {
+                if (++desktopFailures >= 2) desktopBlockedUntil = now + 5_000L;
+            }
+            case "actions" -> {
+                if (++actionFailures >= 2) actionBlockedUntil = now + 5_000L;
+            }
+            case "query_flags" -> {
+                if (++queryFailures >= 2) queryBlockedUntil = now + 5_000L;
+            }
+            default -> {
+                if (++engineFailures >= 2) engineBlockedUntil = now + 5_000L;
+            }
+        }
+    }
+
+    private static Set<String> namedFallback(Client open, List<String> rust24, List<String> javaEngine) {
+        return javaEngine(open) ? Set.copyOf(javaEngine) : Set.copyOf(rust24);
+    }
+
+    private static boolean javaEngine(Client open) {
+        String identity = engineIdentity(open);
+        return identity.contains("domengine");
+    }
+
+    /** {@code capabilities.name} or {@code version}. Empty when that call also fails. */
+    private static String engineIdentity(Client open) {
+        try {
+            JsonNode version = open.version();
+            if (version == null || version.isNull()) return "";
+            return (version.path("name").asText("") + " " + version.path("version").asText(""))
+                    .toLowerCase(Locale.ROOT);
+        } catch (RuntimeException ex) {
+            return "";
         }
     }
 
