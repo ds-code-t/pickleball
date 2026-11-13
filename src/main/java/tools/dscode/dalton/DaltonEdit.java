@@ -258,6 +258,7 @@ public final class DaltonEdit {
         if (!tokens.contains("--confirm")) {
             throw new IllegalArgumentException("confirmation required");
         }
+        CategoryRules.beforeDelete(relative);
         refuseConflict(project, relative, tokens.contains("--force"));
         boolean removed;
         if (DaltonConfig.enabled(project)) {

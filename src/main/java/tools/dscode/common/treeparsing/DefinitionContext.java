@@ -942,7 +942,9 @@ public final class DefinitionContext {
 
 
     public static ExecutionDictionary getExecutionDictionary() {
-        return EXECUTION_DICTIONARY_THREAD_LOCAL.get();
+        ExecutionDictionary dictionary = EXECUTION_DICTIONARY_THREAD_LOCAL.get();
+        tools.dscode.dalton.ProjectElementCategories.ensureLoaded(dictionary);
+        return dictionary;
     }
 
 

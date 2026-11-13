@@ -1072,6 +1072,21 @@ public class ExecutionDictionary {
         return result.isEmpty() ? Set.of() : EnumSet.copyOf(result);
     }
 
+    /** Names registered on this dictionary, including built-in children. */
+    public Set<String> registeredCategoryNames() {
+        java.util.LinkedHashSet<String> names = new java.util.LinkedHashSet<>();
+        names.addAll(orReg.keySet());
+        names.addAll(andReg.keySet());
+        names.addAll(primaryBaseReg.keySet());
+        names.addAll(alternateBaseReg.keySet());
+        names.addAll(categoryFlags.keySet());
+        names.addAll(contextReg.keySet());
+        names.addAll(categoryParents.keySet());
+        names.addAll(categoryParents.values());
+        names.removeIf(name -> name == null || name.isBlank());
+        return Set.copyOf(names);
+    }
+
     // ========================================================
     // SearchContext builders (optional override per category)
     // ========================================================
