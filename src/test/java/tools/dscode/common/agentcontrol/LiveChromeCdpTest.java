@@ -183,18 +183,64 @@ class LiveChromeCdpTest {
         return new ChromeDriver(options);
     }
 
+    /**
+     * Same Chrome lookup the rest of the suite uses, plus an explicit pin.
+     * Dom-engine order: {@code DOMENGINE_CHROME}, then {@code google-chrome},
+     * {@code google-chrome-stable}, {@code chromium}, {@code chromium-browser},
+     * {@code chrome} on {@code PATH}. A missing binary skips. A binary that
+     * fails to open is a failure.
+     */
     private static String chromeBinary() {
-        String[] candidates = {
+        String pinned = firstExecutable(
                 System.getenv("PKB_CHROME_BINARY"),
                 System.getenv("CHROME_BINARY"),
-                System.getProperty("pickleball.chrome.binary"),
-                "/opt/pw-browsers/chromium_headless_shell-1248/chrome-headless-shell-linux64/chrome-headless-shell"
-        };
-        for (String candidate : candidates) {
-            if (candidate == null || candidate.isBlank()) continue;
-            Path file = Path.of(candidate.trim());
-            if (Files.isRegularFile(file) && Files.isExecutable(file)) return file.toString();
+                System.getProperty("pickleball.chrome.binary")
+        );
+        if (pinned != null) return pinned;
+        String domengine = System.getenv("DOMENGINE_CHROME");
+        if (domengine != null && !domengine.isBlank()) {
+            String named = executableFile(domengine.trim());
+            if (named != null) return named;
+            return domengine.trim();
         }
+        String onPath = firstOnPath(
+                "google-chrome",
+                "google-chrome-stable",
+                "chromium",
+                "chromium-browser",
+                "chrome"
+        );
+        if (onPath != null) return onPath;
+        return executableFile("/opt/pw-browsers/chromium_headless_shell-1248/chrome-headless-shell-linux64/chrome-headless-shell");
+    }
+
+    private static String firstExecutable(String... candidates) {
+        if (candidates == null) return null;
+        for (String candidate : candidates) {
+            String found = executableFile(candidate);
+            if (found != null) return found;
+        }
+        return null;
+    }
+
+    private static String firstOnPath(String... names) {
+        String path = System.getenv("PATH");
+        if (path == null || names == null) return null;
+        for (String name : names) {
+            if (name == null || name.isBlank()) continue;
+            for (String entry : path.split(java.io.File.pathSeparator)) {
+                if (entry == null || entry.isBlank()) continue;
+                String found = executableFile(Path.of(entry).resolve(name).toString());
+                if (found != null) return found;
+            }
+        }
+        return null;
+    }
+
+    private static String executableFile(String candidate) {
+        if (candidate == null || candidate.isBlank()) return null;
+        Path file = Path.of(candidate.trim());
+        if (Files.isRegularFile(file) && Files.isExecutable(file)) return file.toString();
         return null;
     }
 
