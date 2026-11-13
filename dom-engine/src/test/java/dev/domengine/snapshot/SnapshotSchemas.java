@@ -10,11 +10,11 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.fail;
 
 /** Checks a document against the draft 2020-12 subset this schema uses. */
-final class SnapshotSchemas {
+public final class SnapshotSchemas {
     private SnapshotSchemas() {
     }
 
-    static void assertValid(JsonNode schema, JsonNode document) {
+    public static void assertValid(JsonNode schema, JsonNode document) {
         List<String> errors = new ArrayList<>();
         check(schema, schema, document, "$", errors);
         if (!errors.isEmpty()) fail(String.join("\n", errors));

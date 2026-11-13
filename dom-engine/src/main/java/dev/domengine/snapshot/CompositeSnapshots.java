@@ -31,9 +31,10 @@ public final class CompositeSnapshots {
     }
 
     public static ObjectNode desktop(String sessionId, SnapshotOptions options) {
-        throw new IllegalStateException(
-                "error: desktop snapshot is not produced in this build.\n"
-                        + "fix: Phase 3 writes the desktop snapshot.");
+        dev.domengine.desktop.DesktopTree.Session session = dev.domengine.desktop.DesktopTree.require(sessionId);
+        java.util.Map<String, String> flags = new java.util.LinkedHashMap<>();
+        if (options != null) flags.putAll(options.flags());
+        return DesktopSnapshotProducer.produce(session, flags);
     }
 
     private static String read(String file) {

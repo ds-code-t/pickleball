@@ -42,7 +42,26 @@ final class WindowsUia {
                   } catch {}
                   $id = ''
                   try { $id = (($el.GetRuntimeId() | ForEach-Object { $_.ToString() }) -join '.') } catch {}
+                  $states = @()
+                  try { if (-not $el.Current.IsEnabled) { $states += 'disabled' } } catch {}
+                  try { if ($el.Current.HasKeyboardFocus) { $states += 'focused' } } catch {}
+                  try { if ($el.Current.IsOffscreen) { $states += 'offscreen' } } catch {}
+                  try {
+                    $toggle = $el.GetCurrentPattern([System.Windows.Automation.TogglePattern]::Pattern)
+                    if ([string]$toggle.Current.ToggleState -eq 'On') { $states += 'checked' }
+                  } catch {}
+                  try {
+                    $expand = $el.GetCurrentPattern([System.Windows.Automation.ExpandCollapsePattern]::Pattern)
+                    if ([string]$expand.Current.ExpandCollapseState -eq 'Expanded') { $states += 'expanded' }
+                  } catch {}
+                  $labeled = ''
+                  try {
+                    $by = $el.GetCurrentPropertyValue([System.Windows.Automation.AutomationElement]::LabeledByProperty)
+                    if ($null -ne $by) { $labeled = (($by.GetRuntimeId() | ForEach-Object { $_.ToString() }) -join '.') }
+                  } catch {}
                   Write-Output ("NODE`t{0}`t{1}`t{2}`t{3}`t{4}`t{5}`t{6}`t{7}" -f $depth, $role, $x, $y, $w, $h, $id, (Clean $name))
+                  Write-Output ("STATE`t{0}`t{1}" -f $id, ($states -join ','))
+                  if ($labeled) { Write-Output ("REL`t{0}`tlabeled-by`t{1}" -f $id, $labeled) }
                   if ($depth -ge 12) { return }
                   $kids = @()
                   try { $kids = $el.FindAll([System.Windows.Automation.TreeScope]::Children, [System.Windows.Automation.Condition]::TrueCondition) } catch { $kids = @() }
@@ -152,7 +171,9 @@ final class WindowsUia {
         NativeDesktop.CommandResult result = powershell(captureScript(), Map.of());
         if (result.timedOut()) throw new CdpException("UIA unavailable: PowerShell timed out");
         if (result.exit() != 0) throw new CdpException("UIA unavailable: " + NativeDesktop.oneLine(result.output()));
-        return NativeDesktop.parseLines(result.output(), "uia");
+        DomNode root = NativeDesktop.parseLines(result.output(), "uia");
+        DesktopAnnotations.apply(root, result.output(), "uia-runtime-id");
+        return root;
     }
 
     static void click(DomNode node) {

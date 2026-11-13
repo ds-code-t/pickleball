@@ -1,6 +1,6 @@
 # Snapshot and pre-map
 
-`domengine premap --file page.html` writes a composite snapshot (`schema` `pickleball.composite-snapshot`, `version` 1, `transport` `fixture`). The builder always runs the pre-map. Live browser and desktop producers are not in this build: `CompositeSnapshots.browser` waits on engine-defects Phase 5, and `CompositeSnapshots.desktop` is Phase 3.
+`domengine premap --file page.html` writes a composite snapshot (`schema` `pickleball.composite-snapshot`, `version` 1, `transport` `fixture`). The builder always runs the pre-map. `domengine desktop snapshot` writes the same artifact for a desktop session. `CompositeSnapshots.browser` is not in this build: it waits on engine-defects Phase 5.
 
 Logging uses `dev.domengine.log.EngineLog`. The entities are `snapshot`, `premap`, `affinity`, and `desktop-shot` (`DOMENGINE_LOG` or `COMPOSITE_LOG`). A protocol or tool fallback logs one WARN per run and reason through `SnapshotWarnings.once(reason)`.
 
@@ -27,11 +27,11 @@ Each `nodes[]` entry has `handle`, `parent`, `tag`, `role`, `name`, `text` (at m
 
 `xpath` is absolute and index-qualified inside one frame document, for example `/html[1]/body[1]/form[1]/input[2]`. Inside a shadow tree it is the path from the shadow root, and `shadow_path` is the host XPath chain joined by ` >> `. `path` is the `backend_node_id`. The offline query engine rejects numeric index predicates, so `XPathIndex.resolve` is the resolver that honors them. The engine still finds the node when those indexes are removed.
 
-Coordinate spaces are separate. Offline HTML fills `document_css_px` from `data-x`, `data-y`, `data-w`, and `data-h`. `layout_viewport`, `visual_viewport`, `frame_document`, and `screen_px` stay null until a live producer has those measurements. They are not copies of `document_css_px`.
+Coordinate spaces are separate. Offline HTML fills `document_css_px` from `data-x`, `data-y`, `data-w`, and `data-h`. `layout_viewport`, `visual_viewport`, and `frame_document` stay null until a live browser producer has those measurements. They are not copies of `document_css_px`. A desktop snapshot leaves `document_css_px` null and fills `screen_px` from the accessibility box.
 
-`image_px = (visual_viewport box) × image_scale`. `image_scale` is screenshot width divided by `viewport.css_width` (1 when there is no screenshot). When a screenshot is present and `visual_viewport` is null, `image_px` uses `document_css_px` and logs one warning, `snapshot fallback image_px used document_css_px`.
+`image_px = (visual_viewport box) × image_scale`. `image_scale` is screenshot width divided by `viewport.css_width` (1 when there is no screenshot). When a screenshot is present and `visual_viewport` is null, offline HTML uses `document_css_px` and logs one warning, `snapshot fallback image_px used document_css_px`. Desktop snapshots are in screen space: `image_px` is the `screen_px` box minus the window origin, times `image_scale`, and that warning is not logged. The window origin is `viewport.screen`.
 
-Offline viewport size is the `html` or `body` box when that element has one, otherwise 1280 by 800. `--out-dir` writes `snapshot.json` and, when `--screenshot` is set, `screenshot.png`. Without `--out-dir` the screenshot is inlined as `base64` and `path` names the file that was read.
+Offline viewport size is the `html` or `body` box when that element has one, otherwise 1280 by 800. A desktop window with a box is the viewport when the tree has no `html` or `body` box. `--out-dir` writes `snapshot.json` and, when a screenshot was captured or `--screenshot` is set, `screenshot.png`. Without `--out-dir` the screenshot is inlined as `base64` and `path` names the file that was read.
 
 ## Label affinity
 
@@ -92,4 +92,33 @@ Desktop kinds, from the projected role, are `window`, `dialog`, `pane`, `group`,
 
 Titles are chosen in this order: `aria-labelledby` text, `aria-label`, the first heading inside (not used as the title of a heading section), then `legend`, `caption`, or `summary` for those kinds, then the accessible name. Shadow trees and iframe documents nest inside the section that contains the host or the iframe.
 
-`PreMap` is the document model those results will be stored in. `PreMapLookup.PASS_THROUGH` and `PreMapLookup.installed()` return an empty `current` and an empty `candidates`, so a caller evaluates the clause live. `store` and `forTree` keep a map, and `forTree` caches an offline tree by identity. `candidates` on that lookup stays empty until the indexes are filled.
+`PreMap` is the document model those results will be stored in. `PreMapLookup.PASS_THROUGH` and `PreMapLookup.installed()` return an empty `current` and an empty `candidates`, so a caller evaluates the clause live. `store` and `forTree` keep a map, and `forTree` caches an offline tree by identity. `candidates` on that lookup stays empty until the indexes are filled. `current` stays empty until runtime lookups.
+
+## Desktop producers
+
+`DesktopSnapshotProducer` builds one composite snapshot from a `DesktopTree` session. `domengine desktop snapshot --id ID [--screenshot file.png] [--out-dir DIR]` is the CLI. `DesktopTree.VERBS` includes `snapshot`. `doc_version` is `desktop:` plus the session sequence. `attach` starts at 0. `walk`, `click`, and `type` bump the sequence. A fixture does not recapture the tree. A live session recaptures on `walk`.
+
+A fixture session has no display. It requires `--screenshot file.png` and otherwise fails with `error: desktop fixture snapshot needs --screenshot`. A live session captures the window rectangle (the root box, or the union of node boxes) when `--screenshot` is omitted. The source is `a11y-xml`: the projected tree serialised as `<node role name x y w h>`. `path` is `uia-runtime-id`, `ax-path`, or `atspi-path` when the capture wrote one, otherwise the numeric id. `xpath` is the index-qualified path over that tree.
+
+Platform and transport:
+
+| Host | `platform` | Live `transport` | Tree |
+|---|---|---|---|
+| Windows | `windows-uia` | `uia` | `WindowsUia.capture`. States `disabled`, `focused`, `offscreen`, `checked` (Toggle On), `expanded`. `LabeledBy` is `labeled-by` plus the label runtime id |
+| macOS | `macos-ax` | `ax` | `MacAccessibility.capture`. States from AXEnabled, AXFocused, AXValue on checkboxes and radios, AXExpanded, and AXOffScreen. `AXTitleUIElement` is resolved to a sibling `ax-path` and stored as `labeled-by` |
+| Linux | `linux-atspi` | `atspi` | `AtSpi.capture`. `GetState` bits: enabled absent is `disabled`, checked, expanded, focused, and showing+visible both clear is `offscreen` (`displayed` false, reported as `hidden` because the schema state list has no `offscreen`). `GetRelationSet` types label-for and labelled-by |
+
+A fixture's platform follows `os.name` and its transport is `fixture`.
+
+Screenshot tools, in order:
+
+- Windows: PowerShell `System.Drawing.CopyFromScreen` after `SetProcessDPIAware`, so pixels match UIA physical coordinates.
+- macOS: `screencapture -x -R x,y,w,h -t png -`. `image_scale` is image pixels divided by AX points (2.0 on Retina). A black or empty PNG, or a `could not` / `permission` error, is `error: screen recording permission denied` with a `fix:` line. It does not fall through to Robot.
+- Linux Wayland (`XDG_SESSION_TYPE=wayland` or `WAYLAND_DISPLAY`): `grim -g "x,y wxh" -`.
+- Linux X11: ImageMagick `import -window root -crop WxH+X+Y png:-`, then `xwd -root -silent` parsed in Java.
+
+`image_scale` is also the ratio of returned pixels to the requested width when the tool command names that width.
+
+When the native tool is missing and a display exists (`DISPLAY`, `WAYLAND_DISPLAY`, or Windows or macOS), the fallback is `java.awt.Robot` in a child JVM (`DesktopScreenshot robot x y width height`). That logs one WARN per run and reason: `desktop-shot fallback robot reason=native-tool-missing`. With no display and no tool the error is `error: desktop screenshot failed` and the `fix:` names grim, ImageMagick `import`, or `xwd`. A snapshot is not returned without a screenshot. Every capture subprocess has a 10 second timeout and its process tree is killed on timeout.
+
+The Windows live UIA test is `LiveDesktopSnapshotTest` (the capture script names `UIAutomationClient`, `LabeledBy`, and `IsOffscreen`). The workflow step that runs it on `windows-latest` waits on Phase 8, which waits on engine-defects Phase 7. macOS has no CI runner. On this Linux host the live AT-SPI test skips with `no AT-SPI bus` because `DBUS_SESSION_BUS_ADDRESS` is unset and there is no session socket, and `DISPLAY` is unset.

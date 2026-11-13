@@ -35,9 +35,17 @@ public final class DesktopTree {
     private DesktopTree() {
     }
 
-    public record Session(String id, String backend, DomNode root, boolean live, String platform, String window) {
+    public record Session(String id, String backend, DomNode root, boolean live, String platform, String window, long sequence) {
+        public Session(String id, String backend, DomNode root, boolean live, String platform, String window) {
+            this(id, backend, root, live, platform, window, 0);
+        }
+
         public Session(String id, String backend, DomNode root) {
-            this(id, backend, root, false, "", "");
+            this(id, backend, root, false, "", "", 0);
+        }
+
+        public Session bump() {
+            return new Session(id, backend, root, live, platform, window, sequence + 1);
         }
     }
 
@@ -127,7 +135,7 @@ public final class DesktopTree {
     }
 
     public static final List<String> VERBS = List.of(
-            "list", "attach", "walk", "query", "resolve", "close", "click", "type"
+            "list", "attach", "walk", "query", "resolve", "close", "click", "type", "snapshot"
     );
 
     public static ObjectNode list() {
@@ -159,7 +167,10 @@ public final class DesktopTree {
             DomNode fresh = NativeDesktop.capture(session.window);
             fresh.linkParents();
             DomNode.renumber(fresh);
-            session = new Session(session.id, "live", fresh, true, session.platform, session.window);
+            session = new Session(session.id, "live", fresh, true, session.platform, session.window, session.sequence + 1);
+            SESSIONS.put(id, session);
+        } else {
+            session = session.bump();
             SESSIONS.put(id, session);
         }
         ObjectNode node = Jsons.object();
@@ -208,6 +219,7 @@ public final class DesktopTree {
         String text = flags.getOrDefault("text", "");
         boolean append = "true".equals(flags.get("append"));
         if (session.live) NativeDesktop.type(node, text, append);
+        store(session.bump());
         node.nodeValue = append ? (node.nodeValue == null ? "" : node.nodeValue) + text : text;
         ObjectNode result = Jsons.object();
         result.put("ok", true);
@@ -219,8 +231,17 @@ public final class DesktopTree {
         return result;
     }
 
+    public static ObjectNode snapshot(String id, Map<String, String> flags) {
+        return dev.domengine.snapshot.DesktopSnapshotProducer.produce(require(id), flags);
+    }
+
+    private static void store(Session session) {
+        SESSIONS.put(session.id(), session);
+    }
+
     public static ObjectNode click(Session session, DomNode node) {
         if (session.live) NativeDesktop.click(node);
+        store(session.bump());
         ObjectNode result = Jsons.object();
         result.put("ok", true);
         result.put("backend", session.backend);

@@ -55,6 +55,43 @@ public final class SnapshotContext {
         this.screenshot = screenshot;
     }
 
+    public static SnapshotContext desktop(
+            DomNode root,
+            SnapshotOptions options,
+            String xml,
+            String platform,
+            String transport,
+            String docVersion
+    ) {
+        SnapshotOptions used = options == null ? new SnapshotOptions() : options;
+        double[] viewport = viewport(root);
+        if (root != null && root.hasBox && root.width > 0 && root.height > 0 && sizedDocument(root) == null) {
+            viewport = new double[] {root.width, root.height};
+        }
+        java.util.Map<String, String> flags = new java.util.LinkedHashMap<>(used.flags());
+        flags.put("screen-space", "true");
+        if (root != null && root.hasBox) {
+            flags.put("screen-origin-x", Double.toString(root.x));
+            flags.put("screen-origin-y", Double.toString(root.y));
+        }
+        PngImage image = used.screenshot().isBlank() ? null : PngImage.read(java.nio.file.Path.of(used.screenshot()));
+        return new SnapshotContext(
+                dev.domengine.premap.Platform.DESKTOP,
+                platform == null || platform.isBlank() ? "linux-atspi" : platform,
+                transport == null || transport.isBlank() ? "fixture" : transport,
+                used.sessionId(),
+                docVersion == null ? "desktop:0" : docVersion,
+                used.id(),
+                dev.domengine.premap.BoxCaps.fromFlags(flags),
+                viewport[0],
+                viewport[1],
+                flags,
+                "a11y-xml",
+                xml == null ? "" : xml,
+                image
+        );
+    }
+
     public static SnapshotContext empty() {
         return new SnapshotContext(Platform.BROWSER, "chromium", "fixture", "", "offline:0", "",
                 BoxCaps.defaults(), 1280, 800, Map.of(), "html", "", null);

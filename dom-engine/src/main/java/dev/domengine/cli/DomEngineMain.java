@@ -337,6 +337,29 @@ public final class DomEngineMain {
         );
     }
 
+    private static CliResult desktopSnapshot(Map<String, String> flags) {
+        com.fasterxml.jackson.databind.node.ObjectNode json = DesktopTree.snapshot(required(flags, "id"), flags);
+        String dir = flags.get("out-dir");
+        if (dir != null && !dir.isBlank()) {
+            try {
+                Path out = Path.of(dir);
+                java.nio.file.Files.createDirectories(out);
+                String shot = flags.get("screenshot");
+                if (shot != null && !shot.isBlank()) {
+                    java.nio.file.Files.copy(
+                            Path.of(shot),
+                            out.resolve("screenshot.png"),
+                            java.nio.file.StandardCopyOption.REPLACE_EXISTING
+                    );
+                }
+                java.nio.file.Files.writeString(out.resolve("snapshot.json"), Jsons.pretty(json));
+            } catch (java.io.IOException failure) {
+                return error(1, "failed", "desktop snapshot out-dir: " + failure.getMessage());
+            }
+        }
+        return CliResult.ok(Jsons.pretty(json));
+    }
+
     private static CliResult premap(Map<String, String> flags) {
         String unknown = VerbFlags.unrecognized("premap", flags);
         if (unknown != null) return error(2, "usage", "unrecognized flag --" + unknown + " for premap");
@@ -538,6 +561,7 @@ public final class DomEngineMain {
                 case "resolve" -> CliResult.ok(Jsons.pretty(DesktopTree.resolve(required(flags, "id"), flags)));
                 case "click" -> CliResult.ok(Jsons.pretty(DesktopTree.click(required(flags, "id"), flags)));
                 case "type" -> CliResult.ok(Jsons.pretty(DesktopTree.type(required(flags, "id"), flags)));
+                case "snapshot" -> desktopSnapshot(flags);
                 case "close" -> CliResult.ok(Jsons.pretty(DesktopTree.close(required(flags, "id"))));
                 default -> error(2, "usage", "unknown desktop verb: " + verb);
             };
@@ -690,9 +714,11 @@ public final class DomEngineMain {
                 observe|wait --file page.html|--session ID --css SELECTOR [--timeout-ms N]
                 observe --session ID|--cdp URL [--type KIND] [--url TEXT] [--since MS] [--until MS] [--limit N] [--wait-ms N]
                   no selector: CDP events the session buffered since attach (network, navigation, console, log)
-                desktop list|attach|walk|query|resolve|close|click|type
+                desktop list|attach|walk|query|resolve|close|click|type|snapshot
                   attach --fixture FILE   replays a recorded tree
                   attach --live [--name WINDOW]   Windows UIA, macOS AX, or Linux AT-SPI
+                  snapshot --id ID [--screenshot file.png] [--out-dir DIR]
+                  a fixture snapshot needs --screenshot
                   query and resolve use the same --pipeline, --css, --xpath, and --text as browser query
                   frame, shadow, and pierce are browser-only and are rejected on desktop
                   live click and type act on the OS control; a missing bus, permission, or input tool fails

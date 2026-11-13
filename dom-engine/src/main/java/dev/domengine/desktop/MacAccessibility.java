@@ -28,6 +28,18 @@ final class MacAccessibility {
                   return value
                 end clean
 
+                on parentOf(pathText)
+                  set AppleScript's text item delimiters to "/"
+                  set parts to text items of pathText
+                  if (count of parts) < 2 then
+                    set AppleScript's text item delimiters to ""
+                    return ""
+                  end if
+                  set parentPath to (items 1 thru -2 of parts) as text
+                  set AppleScript's text item delimiters to ""
+                  return parentPath
+                end parentOf
+
                 on dump(el, depth, pathText)
                   if depth > 12 then
                     return "TRUNCATED" & linefeed
@@ -53,6 +65,54 @@ final class MacAccessibility {
                     set h to item 2 of s
                   end try
                   set lineText to "NODE" & tab & depth & tab & r & tab & x & tab & y & tab & w & tab & h & tab & pathText & tab & my clean(n) & linefeed
+                  set states to ""
+                  try
+                    set enabledFlag to enabled of el
+                    if enabledFlag is false then set states to "disabled"
+                  end try
+                  try
+                    if focused of el is true then
+                      if states is "" then
+                        set states to "focused"
+                      else
+                        set states to states & ",focused"
+                      end if
+                    end if
+                  end try
+                  try
+                    set titleEl to value of attribute "AXTitleUIElement" of el
+                    set titlePath to ""
+                    try
+                      set ownerEl to value of attribute "AXParent" of el
+                      set sibs to UI elements of ownerEl
+                      set sibIndex to 1
+                      repeat with sib in sibs
+                        if sib is titleEl then
+                          set base to my parentOf(pathText)
+                          if base is "" then
+                            set titlePath to sibIndex as text
+                          else
+                            set titlePath to base & "/" & sibIndex
+                          end if
+                        end if
+                        set sibIndex to sibIndex + 1
+                      end repeat
+                    end try
+                    if titlePath is not "" then set lineText to lineText & "REL" & tab & pathText & tab & "labeled-by" & tab & titlePath & linefeed
+                  end try
+                  try
+                    set checkedFlag to value of attribute "AXValue" of el
+                    if (role of el as text) is "AXCheckBox" or (role of el as text) is "AXRadioButton" then
+                      if checkedFlag is 1 or checkedFlag is true then set states to states & ",checked"
+                    end if
+                  end try
+                  try
+                    if value of attribute "AXExpanded" of el is true then set states to states & ",expanded"
+                  end try
+                  try
+                    if value of attribute "AXOffScreen" of el is true then set states to states & ",offscreen"
+                  end try
+                  set lineText to lineText & "STATE" & tab & pathText & tab & states & linefeed
                   set more to ""
                   try
                     set kids to UI elements of el
@@ -176,7 +236,9 @@ final class MacAccessibility {
         NativeDesktop.CommandResult result = osascript(captureScript(), Map.of());
         if (result.timedOut()) throw new CdpException("AX unavailable: osascript timed out");
         failIfDenied(result, "AX unavailable: ");
-        return NativeDesktop.parseLines(result.output(), "ax");
+        DomNode root = NativeDesktop.parseLines(result.output(), "ax");
+        DesktopAnnotations.apply(root, result.output(), "ax-path");
+        return root;
     }
 
     static void click(DomNode node) {

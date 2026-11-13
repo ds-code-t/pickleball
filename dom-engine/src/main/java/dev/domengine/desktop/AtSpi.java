@@ -253,6 +253,10 @@ final class AtSpi {
             node.frameY = node.y;
             node.hasBox = node.width > 0 && node.height > 0;
         }
+        NativeDesktop.CommandResult states = call(address, dest, path, "org.a11y.atspi.Accessible.GetState");
+        if (!states.timedOut() && states.exit() == 0) DesktopAnnotations.applyAtspiStates(node, states.output());
+        NativeDesktop.CommandResult relations = call(address, dest, path, "org.a11y.atspi.Accessible.GetRelationSet");
+        if (!relations.timedOut() && relations.exit() == 0) DesktopAnnotations.applyAtspiRelations(node, relations.output());
         List<Ref> children = children(address, dest, path, root);
         for (Ref child : children) {
             if (count[0] >= NativeDesktop.WALK_NODES) {

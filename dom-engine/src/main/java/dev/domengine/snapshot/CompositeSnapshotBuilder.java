@@ -68,10 +68,10 @@ public final class CompositeSnapshotBuilder {
                 0,
                 0,
                 1,
-                0,
-                0,
-                0,
-                0,
+                screenX(root, ctx),
+                screenY(root, ctx),
+                screenW(root, ctx),
+                screenH(root, ctx),
                 image == null ? 0 : image.width(),
                 image == null ? 0 : image.height(),
                 image == null ? 1 : ctx.imageScale(),
@@ -85,6 +85,44 @@ public final class CompositeSnapshotBuilder {
                 premap,
                 List.copyOf(ctx.warnings())
         );
+    }
+
+    private static String nativePath(DomNode node) {
+        for (String key : new String[] {"uia-runtime-id", "ax-path", "atspi-path"}) {
+            String value = node.attributes.get(key);
+            if (value != null && !value.isBlank()) return value;
+        }
+        return Long.toString(node.backendNodeId);
+    }
+
+    private static double flagDouble(SnapshotContext ctx, String key) {
+        String raw = ctx.flags().get(key);
+        if (raw == null || raw.isBlank()) return 0;
+        try {
+            return Double.parseDouble(raw);
+        } catch (NumberFormatException ignored) {
+            return 0;
+        }
+    }
+
+    private static boolean screenSpace(DomNode root, SnapshotContext ctx) {
+        return "true".equals(ctx.flags().get("screen-space")) && root != null && root.hasBox;
+    }
+
+    private static double screenX(DomNode root, SnapshotContext ctx) {
+        return screenSpace(root, ctx) ? root.x : 0;
+    }
+
+    private static double screenY(DomNode root, SnapshotContext ctx) {
+        return screenSpace(root, ctx) ? root.y : 0;
+    }
+
+    private static double screenW(DomNode root, SnapshotContext ctx) {
+        return screenSpace(root, ctx) ? root.width : 0;
+    }
+
+    private static double screenH(DomNode root, SnapshotContext ctx) {
+        return screenSpace(root, ctx) ? root.height : 0;
     }
 
     private static void collect(DomNode node, XPathIndex.Result index, SnapshotContext ctx, List<ObjectNode> nodes) {
@@ -113,7 +151,7 @@ public final class CompositeSnapshotBuilder {
         json.put("frame_path", index.framePath(node));
         json.put("shadow_path", node.shadowPath == null ? "" : node.shadowPath);
         json.put("xpath", node.xpath == null ? "" : node.xpath);
-        json.put("path", Long.toString(node.backendNodeId));
+        json.put("path", nativePath(node));
         json.set("boxes", boxes(node, ctx));
         json.put("in_viewport", inViewport(node, ctx));
         json.put("interactable", AffinityScorer.interactable(node));
@@ -126,21 +164,31 @@ public final class CompositeSnapshotBuilder {
 
     private static ObjectNode boxes(DomNode node, SnapshotContext ctx) {
         ObjectNode boxes = Jsons.object();
-        putBox(boxes, "document_css_px", node.hasBox ? new Box(node.x, node.y, node.width, node.height) : null);
+        boolean screen = "true".equals(ctx.flags().get("screen-space"));
+        Box document = !screen && node.hasBox ? new Box(node.x, node.y, node.width, node.height) : null;
+        putBox(boxes, "document_css_px", document);
         putBox(boxes, "layout_viewport", node.hasLayoutViewport
                 ? new Box(node.layoutViewportX, node.layoutViewportY, node.layoutViewportWidth, node.layoutViewportHeight)
                 : null);
         Box visual = node.hasVisual ? new Box(node.visualX, node.visualY, node.width, node.height) : null;
         putBox(boxes, "visual_viewport", visual);
         putBox(boxes, "frame_document", null);
-        putBox(boxes, "screen_px", null);
+        Box screenBox = screen && node.hasBox ? new Box(node.x, node.y, node.width, node.height) : null;
+        putBox(boxes, "screen_px", screenBox);
         Box image = null;
         if (ctx.screenshot() != null) {
-            Box source = visual != null ? visual : (node.hasBox ? new Box(node.x, node.y, node.width, node.height) : null);
+            Box source = visual != null ? visual : (screen ? screenBox : document);
             if (source != null) {
                 double scale = ctx.imageScale();
-                image = new Box(source.x() * scale, source.y() * scale, source.width() * scale, source.height() * scale);
-                if (visual == null) SnapshotWarnings.once("image_px used document_css_px");
+                double originX = screen ? flagDouble(ctx, "screen-origin-x") : 0;
+                double originY = screen ? flagDouble(ctx, "screen-origin-y") : 0;
+                image = new Box(
+                        (source.x() - originX) * scale,
+                        (source.y() - originY) * scale,
+                        source.width() * scale,
+                        source.height() * scale
+                );
+                if (visual == null && !screen) SnapshotWarnings.once("image_px used document_css_px");
             }
         }
         putBox(boxes, "image_px", image);

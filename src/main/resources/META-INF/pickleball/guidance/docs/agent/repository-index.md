@@ -1155,6 +1155,8 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `dom-engine/src/main/java/dev/domengine/conform/Conformance.java`
 - `dom-engine/src/main/java/dev/domengine/conform/LiveConformance.java`
 - `dom-engine/src/main/java/dev/domengine/desktop/AtSpi.java`
+- `dom-engine/src/main/java/dev/domengine/desktop/DesktopAnnotations.java`
+- `dom-engine/src/main/java/dev/domengine/desktop/DesktopScreenshot.java`
 - `dom-engine/src/main/java/dev/domengine/desktop/DesktopTree.java`
 - `dom-engine/src/main/java/dev/domengine/desktop/MacAccessibility.java`
 - `dom-engine/src/main/java/dev/domengine/desktop/NativeDesktop.java`
@@ -1192,6 +1194,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `dom-engine/src/main/java/dev/domengine/snapshot/CompositeSnapshot.java`
 - `dom-engine/src/main/java/dev/domengine/snapshot/CompositeSnapshotBuilder.java`
 - `dom-engine/src/main/java/dev/domengine/snapshot/CompositeSnapshots.java`
+- `dom-engine/src/main/java/dev/domengine/snapshot/DesktopSnapshotProducer.java`
 - `dom-engine/src/main/java/dev/domengine/snapshot/PngImage.java`
 - `dom-engine/src/main/java/dev/domengine/snapshot/SnapshotContext.java`
 - `dom-engine/src/main/java/dev/domengine/snapshot/SnapshotOptions.java`
@@ -1210,6 +1213,9 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `dom-engine/src/test/java/dev/domengine/CliSurfaceTest.java`
 - `dom-engine/src/test/java/dev/domengine/ConformanceSuiteTest.java`
 - `dom-engine/src/test/java/dev/domengine/desktop/DesktopOneMatchTest.java`
+- `dom-engine/src/test/java/dev/domengine/desktop/DesktopScreenshotTest.java`
+- `dom-engine/src/test/java/dev/domengine/desktop/DesktopSnapshotTest.java`
+- `dom-engine/src/test/java/dev/domengine/desktop/LiveDesktopSnapshotTest.java`
 - `dom-engine/src/test/java/dev/domengine/desktop/LiveDesktopTest.java`
 - `dom-engine/src/test/java/dev/domengine/DocumentWalkFixtureTest.java`
 - `dom-engine/src/test/java/dev/domengine/EngineLogTest.java`
