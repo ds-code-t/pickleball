@@ -13,6 +13,7 @@ import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class DaltonEditContractTest {
@@ -118,8 +119,12 @@ class DaltonEditContractTest {
         JsonNode json = JSON.readTree(add.out);
         assertEquals("feature scenario-add", json.get("command").asText());
         assertEquals("scenario-add", json.get("action").asText());
-        assertFalse(json.get("applied").asBoolean());
-        assertEquals(original, Files.readString(project.resolve("features/pay.feature")));
+        assertTrue(json.get("applied").asBoolean());
+        String rewritten = Files.readString(project.resolve("features/pay.feature"));
+        assertTrue(rewritten.contains("Scenario: One"), rewritten);
+        assertTrue(rewritten.contains("Scenario: Two"), rewritten);
+        assertTrue(rewritten.contains("Given later"), rewritten);
+        assertNotNull(tools.dscode.dalton.DaltonGherkin.parse(rewritten));
 
         Capture step = run("dalton", "feature", "step-delete", "--feature=features/pay.feature", "--scenario=One", "--json", "--project=" + project);
         assertEquals(1, step.code);

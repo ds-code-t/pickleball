@@ -117,12 +117,7 @@ public final class DaltonEdit {
         };
     }
 
-    /**
-     * Command names and the JSON envelope are stable here. Gherkin regeneration
-     * is applied by {@link GherkinRewrite} once that class is on the classpath
-     * path used by later phases; until then a valid request is accepted and
-     * nothing is written.
-     */
+    /** Scenario and step edits regenerate Gherkin, then write through feature put or the file. */
     private static Outcome feature(Path project, String action, List<String> tokens) {
         String feature = option(tokens, "--feature=");
         if (feature == null || feature.isBlank()) {
@@ -283,7 +278,7 @@ public final class DaltonEdit {
         EditRules.validate(project, path, body);
     }
 
-    private static void refuseConflict(Path project, String path, boolean force) throws Exception {
+    static void refuseConflict(Path project, String path, boolean force) throws Exception {
         if (force || !DaltonConfig.enabled(project) || !DaltonQuery.databasePresent(project)) return;
         for (DaltonQuery.Conflict conflict : DaltonQuery.conflicts(project)) {
             if (path.equals(conflict.path())) {
