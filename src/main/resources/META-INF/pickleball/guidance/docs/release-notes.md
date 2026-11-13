@@ -2,6 +2,8 @@
 
 ## 3.0.0
 
+The native engine is the default execution engine. `pkb_engine=cucumber` keeps the Cucumber adapter. The in-repo Java DOM engine is the default element engine and ships in the jar. Rust is an explicit override only (`pkb_composite_engine=rust` or an explicit binary). Dalton is opt-in.
+
 - Workbench direct control: `pkb_direct_control_provider=composite` now runs the in-repo Java engine, carried in the thin Workbench jar, when no `COMPOSITE_BIN` or `pkb_composite_bin` is set and Rust is not requested (`pkb_composite_engine=rust`). Before this it looked only for the Rust binary and skipped. The engine CLI accepts the global `--session-dir` on every verb and prints Rust-layout pretty JSON.
 
 Dalton is an opt-in hydrated working copy. Git files stay the source of truth. The database is `.pickleball/dalton/dalton.db`, gitignored, and never required for a fresh clone or CI. With Dalton off, feature loading, configuration, and execution are unchanged. A normal `mvn test` or `gradlew test` does not open that database.
@@ -36,14 +38,43 @@ Dalton is an opt-in hydrated working copy. Git files stay the source of truth. T
 - Phase 6 finds scenarios by tags, name, feature name, example rows, and step text from files, memory, or Dalton. The Cucumber scan rules stay the same.
 - Phase 7 runs a scenario or one step from text, a step list, a file, or a Dalton database row. Cucumber is not required. `engine run` and `engine step` are the CLI. Gradle `engineRun`, Workbench, MCP `engine`, and `dalton run --engine` only forward to that CLI. A normal Cucumber run is unchanged.
 - Phase 8 runs `DynamicControl.executeStep` with no Cucumber scenario on the thread. A live or paused scenario still uses the existing detached step. The control bridge does this only when no scenario lane is active.
-- Phase 9 keeps existing Cucumber and JUnit suites on the adapter. `pkb_engine=native` (else `PKB_ENGINE`, else `engine.properties` `mode=native`) selects the native engine. The default remains `cucumber`.
+- Phase 9 keeps existing Cucumber and JUnit suites on the adapter. `pkb_engine=native` (else `PKB_ENGINE`, else `engine.properties` `mode=native`) selects the native engine. The default remains `cucumber` (later superseded by G9/P12 below: the default is now `native`).
 - Phase 10 runs steps written during a step. They are not feature files. The step result records `source=runtime`.
-- Phase 11 compares a feature on the Cucumber adapter and the native engine. Plain glue matches. One `ASSERT` step matches. Browser and dynamic-step suites are not switched over. The default engine remains `cucumber`.
-- Phase 12 leaves the default engine at `cucumber`. Browser and dynamic-step suites are not the same on the native engine yet, so the default is not switched. The Cucumber adapter stays supported. Cucumber aspects stay. `engine help`, `engine run`, and `engine step` remain the CLI. Gradle, Workbench, MCP, and `dalton run --engine` only forward. Engine logging stays off unless `pkb_engine_log` names a capability. It is per entity, date-stamped, and size-capped.
+- Phase 11 compares a feature on the Cucumber adapter and the native engine. Plain glue matches. One `ASSERT` step matches. Browser and dynamic-step suites are not switched over. The default engine remains `cucumber` (later superseded by G9/P12 below: the default is now `native`).
+- Phase 12 leaves the default engine at `cucumber` (later superseded by G9/P12 below: the default is now `native`). Browser and dynamic-step suites are not the same on the native engine yet, so the default is not switched. The Cucumber adapter stays supported. Cucumber aspects stay. `engine help`, `engine run`, and `engine step` remain the CLI. Gradle, Workbench, MCP, and `dalton run --engine` only forward. Engine logging stays off unless `pkb_engine_log` names a capability. It is per entity, date-stamped, and size-capped.
 
 - G9 dual-run is green for every repo feature and every `maven-consumer-project` feature. The default engine is now `native`. `pkb_engine=cucumber` keeps the Cucumber adapter. Cucumber-core aspects stay, because the adapter still uses them.
 
 - Live Linux desktop calls the accessibility bus with `dbus-send --session` and `DBUS_SESSION_BUS_ADDRESS` set to that bus. `--address=` is not used. Role is `GetRoleName` and `GetRole`, not `Properties.Get`. The numeric fallback matches at-spi2-core 2.56, so a button is not a radio and a frame is a window. `desktop attach --name` and `role=button` use that mapping. A missing bus still fails with `AT-SPI unavailable`.
+
+
+### Java DOM engine
+
+`dom-engine` is the general-purpose Java replacement for the Rust composite binary. The CLI is `domengine` (`serve --stdio` and `mcp` only forward). Pickleball prefers that engine when `dev.domengine.cli.DomEngineMain` is on the classpath. `pkb_composite_bin` and `COMPOSITE_BIN` still win. `pkb_composite_engine=rust` keeps the old binary. `pkb_composite=off` stays on Selenium. With `pkb_dalton=true`, the adapter appends one line to `.pickleball/dalton/engine-sessions.log` and does not open the Dalton database. `domengine conform --root` checks the vendored Rust fixtures where static HTML can express the assertion. Live hit-testing, focus order, top layer, screenshots, Playwright-only queries, and scripted shadow roots are skipped, not failed. `domengine log list`, `log tail`, and `log show` read the capped engine logs. Pickleball `log` also lists `.pickleball/history.log`. That file still trims from the front above 10 MB. Engine logs use the same front trim. The Workbench Logs tab only forwards to the CLI.
+
+`domengine session join --id` (or `--cdp`, with `--i-accept-local-attach` when that endpoint is not already a session) selects the default session. Later commands may omit `--session`. `domengine session log --id` prints that session's event log. `session log --follow` streams it until the session leaves the registry. `--follow` is refused inside `serve --stdio`. MCP only forwards those argv lists.
+
+A live Chrome action smoke launches headless Chrome when `DOMENGINE_CHROME` or `google-chrome` / `chromium` / `chrome` is on `PATH`, and it runs click, type, and scroll on a local page. The test is skipped only when that binary is missing. The fake DevTools action smoke still runs.
+
+`domengine conform --root DIR --live` evaluates the vendored fixtures in headless Chrome. With Chrome present that run checks the assertions the offline path skips and does not leave them skipped. The live test is skipped only when the Chrome binary is missing.
+
+An unjoined browser stays on Selenium for nesting and for a composite find. Asking the engine for its query flags does not launch Chrome. `ContextAnchorReproTest` and `NestAnchorReproTest` pass with or without Chrome. A joined browser still uses `--within` and `--nesting`.
+
+`domengine query --selector` and `--pipeline` accept `AND`, `OR`, and `NOT` around the existing engines. `>>` is still the sequential pipeline. Mixed `AND` and `OR` need parentheses. Logging stays off unless `DOMENGINE_LOG` or `COMPOSITE_LOG` names `expr`.
+
+`domengine query` also accepts `above`, `left-of`, and `right-of`. `left` and `right` are aliases. `near` and `below` are unchanged. `exposure=human` uses the visual box when the engine stored one. `DOMENGINE_LOG=visual` logs that ranking and stays off unless named.
+
+`domengine query --selector` and `--pipeline` accept `look=color=red` and `look=opacity>0.5,background-color=#fff`. A comma is AND and a pipe is OR inside that stage. `contrast` compares `color` with the painted background. Logging stays off unless `DOMENGINE_LOG` or `COMPOSITE_LOG` names `look`.
+
+A dynamic step can say `with look color equaling red` or `with look opacity greater than 0.5`. The clause is added after `with id attribute` / `with id noattribute` and does not change those phrases. The live find applies the `look=` stage and still applies the attribute clause. `pkb_composite=off` fails that step instead of ignoring look. `pkb_composite_log=query` logs that selector and stays off unless named.
+
+### Regression Fix-back 1
+
+Workbench launch capture keeps the first 256KB and the last 512KB of a run console, so a long workbook dump cannot exhaust the worker. The last `Caused by` line is still read. `LiveChromeCdpTest` finds Chrome on `PATH` the same way the engine does. `EditPanel` is classified with the other Swing panels. Gradle `daltonEdit` forwards to `DaltonCli` with the other dalton tasks. Breaking-change list stays empty.
+
+### Regression Fix-back 2
+
+The control-bridge pause for "Paused runtime supports retry-friendly investigation and control" is requested before BEGIN returns, so both engines pause on AFTER_STEP of that step. Step order is still compared by position. Build provenance hashes the working-tree diff without loading it into the Gradle daemon. Generated `reports/` HTML and `report.xlsx` are no longer tracked. A capped launch console's byte view includes the head, the truncation marker, and the tail. Breaking-change list stays empty.
 
 ## 2.2.0
 
@@ -262,33 +293,3 @@ On a page with buttons Save, Save All, and Autosave:
 - A hard-failed scenario and a deferred `softFail` both fail the Cucumber scenario after cleanup. The workbook status and the JUnit result stay failed together. `CurrentScenarioState.absorbRecordedScenarioFailure` and `discardDeferredSoftFailure` are not a consumer API.
 - A static import of `Values` includes the documented methods and `Values.Context`. Framework helpers are not part of that import.
 - Sample `pkb_callpath` and `pkb_componentpath` values use the resources-folder names `calls` and `component`. When those properties are unset, the defaults remain `src/test/resources/calls` and `src/test/resources/component`.
-
-### Java DOM engine
-
-`dom-engine` is the general-purpose Java replacement for the Rust composite binary. The CLI is `domengine` (`serve --stdio` and `mcp` only forward). Pickleball prefers that engine when `dev.domengine.cli.DomEngineMain` is on the classpath. `pkb_composite_bin` and `COMPOSITE_BIN` still win. `pkb_composite_engine=rust` keeps the old binary. `pkb_composite=off` stays on Selenium. With `pkb_dalton=true`, the adapter appends one line to `.pickleball/dalton/engine-sessions.log` and does not open the Dalton database. `domengine conform --root` checks the vendored Rust fixtures where static HTML can express the assertion. Live hit-testing, focus order, top layer, screenshots, Playwright-only queries, and scripted shadow roots are skipped, not failed. `domengine log list`, `log tail`, and `log show` read the capped engine logs. Pickleball `log` also lists `.pickleball/history.log`. That file still trims from the front above 10 MB. Engine logs use the same front trim. The Workbench Logs tab only forwards to the CLI.
-
-`domengine session join --id` (or `--cdp`, with `--i-accept-local-attach` when that endpoint is not already a session) selects the default session. Later commands may omit `--session`. `domengine session log --id` prints that session's event log. `session log --follow` streams it until the session leaves the registry. `--follow` is refused inside `serve --stdio`. MCP only forwards those argv lists.
-
-A live Chrome action smoke launches headless Chrome when `DOMENGINE_CHROME` or `google-chrome` / `chromium` / `chrome` is on `PATH`, and it runs click, type, and scroll on a local page. The test is skipped only when that binary is missing. The fake DevTools action smoke still runs.
-
-`domengine conform --root DIR --live` evaluates the vendored fixtures in headless Chrome. With Chrome present that run checks the assertions the offline path skips and does not leave them skipped. The live test is skipped only when the Chrome binary is missing.
-
-An unjoined browser stays on Selenium for nesting and for a composite find. Asking the engine for its query flags does not launch Chrome. `ContextAnchorReproTest` and `NestAnchorReproTest` pass with or without Chrome. A joined browser still uses `--within` and `--nesting`.
-
-`domengine query --selector` and `--pipeline` accept `AND`, `OR`, and `NOT` around the existing engines. `>>` is still the sequential pipeline. Mixed `AND` and `OR` need parentheses. Logging stays off unless `DOMENGINE_LOG` or `COMPOSITE_LOG` names `expr`.
-
-`domengine query` also accepts `above`, `left-of`, and `right-of`. `left` and `right` are aliases. `near` and `below` are unchanged. `exposure=human` uses the visual box when the engine stored one. `DOMENGINE_LOG=visual` logs that ranking and stays off unless named.
-
-`domengine query --selector` and `--pipeline` accept `look=color=red` and `look=opacity>0.5,background-color=#fff`. A comma is AND and a pipe is OR inside that stage. `contrast` compares `color` with the painted background. Logging stays off unless `DOMENGINE_LOG` or `COMPOSITE_LOG` names `look`.
-
-A dynamic step can say `with look color equaling red` or `with look opacity greater than 0.5`. The clause is added after `with id attribute` / `with id noattribute` and does not change those phrases. The live find applies the `look=` stage and still applies the attribute clause. `pkb_composite=off` fails that step instead of ignoring look. `pkb_composite_log=query` logs that selector and stays off unless named.
-
-### Regression Fix-back 1
-
-Workbench launch capture keeps the first 256KB and the last 512KB of a run console, so a long workbook dump cannot exhaust the worker. The last `Caused by` line is still read. `LiveChromeCdpTest` finds Chrome on `PATH` the same way the engine does. `EditPanel` is classified with the other Swing panels. Gradle `daltonEdit` forwards to `DaltonCli` with the other dalton tasks. Breaking-change list stays empty.
-
-### Regression Fix-back 2
-
-The control-bridge pause for "Paused runtime supports retry-friendly investigation and control" is requested before BEGIN returns, so both engines pause on AFTER_STEP of that step. Step order is still compared by position. Build provenance hashes the working-tree diff without loading it into the Gradle daemon. Generated `reports/` HTML and `report.xlsx` are no longer tracked. A capped launch console's byte view includes the head, the truncation marker, and the tail. Breaking-change list stays empty.
-
-
