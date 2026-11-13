@@ -197,6 +197,16 @@ dependencies {
     }
     testImplementation('org.seleniumhq.selenium:htmlunit3-driver:4.44.0')
 
+    // Optional scripted library. Not selected by ProtocolSelector.forDriver.
+    // compileOnly so a Selenium-only runtime does not download Playwright.
+    // The wide range is the locked G1 constraint.
+    compileOnly('com.microsoft.playwright:playwright') {
+        version { strictly '[1.40.0, 2.0.0)' }
+    }
+    testImplementation('com.microsoft.playwright:playwright') {
+        version { strictly '[1.40.0, 2.0.0)' }
+    }
+
     implementation files('libs/xpathy-3.0.0.jar')
 }
 

@@ -43,6 +43,8 @@ public final class SeleniumAdapter implements BrowserFacade {
 
     @Override
     public Object send(String method, Map<String, ?> params) {
+        BrowserLog.warnOnce("selenium-send",
+                "SeleniumAdapter has no direct method " + method + "; refusing executeCdpCommand");
         throw new UnsupportedOperationException(
                 "error: SeleniumAdapter does not send protocol method " + method + ".\n"
                         + "fix: Use CdpAdapter or BidiAdapter for a direct method. "
@@ -51,6 +53,9 @@ public final class SeleniumAdapter implements BrowserFacade {
 
     @Override
     public Object evaluateIsolated(String worldName, String fn, Object... args) {
+        BrowserLog.warnOnce("selenium-executeScript",
+                "isolated world " + (worldName == null ? "" : worldName)
+                        + " is not available; JavascriptExecutor.executeScript");
         if (!(driver instanceof JavascriptExecutor executor)) {
             throw new IllegalStateException(
                     "error: this driver cannot evaluate script.\n"
@@ -69,6 +74,8 @@ public final class SeleniumAdapter implements BrowserFacade {
         if (script == null) {
             throw new IllegalArgumentException("error: preload script is null.\nfix: Pass the script text.");
         }
+        BrowserLog.warnOnce("selenium-preload",
+                "SeleniumAdapter has no addScriptToEvaluateOnNewDocument; running the script on the current document");
         preloads.add(script);
         if (driver instanceof JavascriptExecutor executor) {
             executor.executeScript(script);
@@ -80,6 +87,8 @@ public final class SeleniumAdapter implements BrowserFacade {
         if (name == null || name.isBlank()) {
             throw new IllegalArgumentException("error: binding name is blank.\nfix: Pass the binding name.");
         }
+        BrowserLog.warnOnce("selenium-binding",
+                "SeleniumAdapter cannot push binding " + name + "; the listener is stored and will not be called");
         bindings.put(name, listener);
     }
 

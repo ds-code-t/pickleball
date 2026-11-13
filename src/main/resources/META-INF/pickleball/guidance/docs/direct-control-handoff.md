@@ -6,6 +6,20 @@ A live Workbench session can publish a descriptor so the DOM engine can attach t
 
 A normal `mvn test` or `gradlew test` does not write a descriptor. An unset or blank `pkb_direct_control_provider` does nothing: no provider process, no extra log line, no change to that run.
 
+## Protocol adapters
+
+`BrowserFacade` in `tools.dscode.browser` is the wire a caller uses when it needs the page itself. `ProtocolSelector.forDriver` chooses:
+
+| Driver | Endpoint | Adapter |
+|---|---|---|
+| Chrome, Chromium, Edge | `se:cdp`, `webSocketDebuggerUrl`, or `debuggerAddress` | `CdpAdapter` on its own websocket |
+| Firefox | `webSocketUrl` or `se:bidi` | `BidiAdapter` on its own websocket |
+| anything else, or the endpoint is missing or the socket fails | | `SeleniumAdapter` |
+
+`CdpAdapter` sends CDP methods. Isolated script is `Page.createIsolatedWorld` then `Runtime.evaluate` in that world. Preload is `Page.addScriptToEvaluateOnNewDocument`. Bindings are `Runtime.addBinding` and the push event `Runtime.bindingCalled`. Screenshot is `Page.captureScreenshot`. Frames are `Page.getFrameTree`. `BidiAdapter` uses `script.callFunction` with `target.sandbox`, `script.addPreloadScript`, a BiDi channel delivered as `script.message`, `browsingContext.captureScreenshot`, and `browsingContext.getTree`. Neither adapter calls Selenium `executeCdpCommand` or the engine `CdpConnection`.
+
+`SeleniumAdapter` is the library path (`find`, `click`, `type`, `TakesScreenshot`). Its direct methods log one `WARN browser.fallback` per run and reason, then either run `executeScript` or refuse `send`. `PlaywrightAdapter` is optional (`com.microsoft.playwright:playwright` `[1.40.0, 2.0.0)`) and is not selected from a WebDriver. `Preference.LIBRARY` forces `SeleniumAdapter` with no fallback line. Logging is `pkb_browser_log` / `pkb_browser_fallback_log` in [Configuration](configuration.md). `ElementOperations` still uses the composite path described below. This section does not change attach.
+
 ## Find
 
 Workbench, MCP, and the control bridge forward one engine query string through `ElementOperations` → `DomCompositeAdapter`. The string is the composite selector (`css=`, `xpath=`, `text=`, `image=`, `near=`, `below=`, `above=`, `left-of=`, `right-of=`, `>>`, AND/OR/NOT). Those relative stages are visual distance in the geometry view, not document order. An engine without that view does not get a box invented in Java. `--explain` ranks the batch. `image=` promotes to a node when asked and the engine can bind one. A visual-only hit stays labeled and is not a DOM node. A limit returns handles. One later act uses one handle. There is no batch click. Category+text still uses the execution dictionary. Gherkin phrases, including `after` and `before` as document order, are unchanged. A controller query defaults to `exposure=human` (inside the visual viewport). `lower` is per query and labels every node. An action defaults to `human` and refuses a target a person could not click. Offline `--html` is a labelled source read and does not pretend to run that query.
