@@ -1017,6 +1017,10 @@ tasks.test {
     dependsOn("publishToMavenLocal")
     dependsOn("compileConsumerGlueJava")
     dependsOn(":pickleball-control-api:classes")
+    // DomEnginePackagingTest reads these jars. publishToMavenLocal can be up to
+    // date from the local Maven cache while build/libs is empty, so depend on
+    // the jar tasks themselves. This does not publish.
+    dependsOn tasks.named('shadowJar'), tasks.named('sourcesJar')
 
     // Put woven classes FIRST so they beat the unwoven dependency jars.
     // Consumer glue and the control API are on this classpath only so dual-run
