@@ -281,4 +281,8 @@ An unjoined browser stays on Selenium for nesting and for a composite find. Aski
 
 A dynamic step can say `with look color equaling red` or `with look opacity greater than 0.5`. The clause is added after `with id attribute` / `with id noattribute` and does not change those phrases. The live find applies the `look=` stage and still applies the attribute clause. `pkb_composite=off` fails that step instead of ignoring look. `pkb_composite_log=query` logs that selector and stays off unless named.
 
+### Regression Fix-back 1
+
+Workbench launch capture keeps the first 256KB and the last 512KB of a run console, so a long workbook dump cannot exhaust the worker. The last `Caused by` line is still read. `LiveChromeCdpTest` finds Chrome on `PATH` the same way the engine does. `EditPanel` is classified with the other Swing panels. Gradle `daltonEdit` forwards to `DaltonCli` with the other dalton tasks. Breaking-change list stays empty.
+
 
