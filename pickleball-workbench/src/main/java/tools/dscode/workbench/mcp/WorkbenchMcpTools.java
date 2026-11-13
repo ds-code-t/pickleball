@@ -414,6 +414,17 @@ final class WorkbenchMcpTools {
                         )
                 ), "args"),
                 arguments -> forwardDomEngine(arguments.get("args")));
+        for (McpRegistry.Command command : McpRegistry.builtins(services, args -> forwardDomEngine(args))) {
+            add(command.name(), command.description(), command.schema(), command.handler());
+        }
+        for (McpRegistry.Command command : McpRegistry.extras()) {
+            if (!tools.containsKey(command.name())) {
+                add(command.name(), command.description(), command.schema(), command.handler());
+            }
+        }
+        McpRegistry.contribute((name, description, schema, handler) -> {
+            if (!tools.containsKey(name)) add(name, description, schema, handler);
+        });
     }
 
     private Object forwardDalton(Object rawArgs) {

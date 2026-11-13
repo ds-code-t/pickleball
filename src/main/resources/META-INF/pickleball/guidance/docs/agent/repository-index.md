@@ -996,6 +996,9 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/log/LogCliForwarder.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/mapping/MappingTreeModel.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/mapping/MappingValueCodec.java`
+- `pickleball-workbench/src/main/java/tools/dscode/workbench/mcp/McpCommandContributor.java`
+- `pickleball-workbench/src/main/java/tools/dscode/workbench/mcp/McpRegistry.java`
+- `pickleball-workbench/src/main/java/tools/dscode/workbench/mcp/SnapshotCommand.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/mcp/WorkbenchAttachServer.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/mcp/WorkbenchCommandQueue.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/mcp/WorkbenchMcpServer.java`
@@ -1138,7 +1141,10 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `dom-engine/src/main/java/dev/domengine/json/Jsons.java`
 - `dom-engine/src/main/java/dev/domengine/log/EngineLog.java`
 - `dom-engine/src/main/java/dev/domengine/log/LogDashboard.java`
+- `dom-engine/src/main/java/dev/domengine/mcp/McpCommand.java`
+- `dom-engine/src/main/java/dev/domengine/mcp/McpRegistry.java`
 - `dom-engine/src/main/java/dev/domengine/mcp/McpServer.java`
+- `dom-engine/src/main/java/dev/domengine/mcp/SnapshotDispatch.java`
 - `dom-engine/src/main/java/dev/domengine/query/Engines.java`
 - `dom-engine/src/main/java/dev/domengine/query/Expressions.java`
 - `dom-engine/src/main/java/dev/domengine/query/HtmlTree.java`
@@ -1169,6 +1175,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `dom-engine/src/test/java/dev/domengine/LiveConformanceTest.java`
 - `dom-engine/src/test/java/dev/domengine/LogCommandTest.java`
 - `dom-engine/src/test/java/dev/domengine/LookQueryTest.java`
+- `dom-engine/src/test/java/dev/domengine/mcp/McpRegistryTest.java`
 - `dom-engine/src/test/java/dev/domengine/McpForwardTest.java`
 - `dom-engine/src/test/java/dev/domengine/ObserveEventsTest.java`
 - `dom-engine/src/test/java/dev/domengine/ObserveParityTest.java`

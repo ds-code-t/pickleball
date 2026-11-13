@@ -491,6 +491,20 @@ Do not add banners, normal logging, worker output, test output, or diagnostic me
 
 ### MCP tools
 
+The public agent catalogue is the MCP registry, not a second runtime. These commands are registered beside the `workbench_*` tools:
+
+```text
+query
+click
+type
+snapshot
+observe
+launch
+surfaces
+```
+
+`query`, `click`, `type`, and `observe` forward to the `domengine` CLI the same way the `domengine` tool does. `snapshot` returns CompositeSnapshot JSON. Until the G3 producers are on the classpath that JSON is a schema-shaped placeholder (`pickleball.composite-snapshot`, version 1) and its `warnings` say so. `launch` forwards to `AgentControl`. `surfaces` with no `op` lists the page-surface operations; with an `op` it forwards that operation to `AgentControl`. `workbench_agent_command` remains the internal op forwarder. Popup commands are added by an `McpCommandContributor` on the classpath. They are not edited into `WorkbenchMcpServer`.
+
 The MCP server is an adapter over `WorkbenchServices` / `WorkbenchController`, which in turn delegates live operations to `WorkbenchLiveSession`. It does not implement a second Pickleball runtime.
 
 Project and worker lifecycle:

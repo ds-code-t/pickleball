@@ -3,7 +3,6 @@ package dev.domengine.mcp;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import dev.domengine.EngineInfo;
-import dev.domengine.cli.CliResult;
 import dev.domengine.cli.DomEngineMain;
 import dev.domengine.json.Jsons;
 import dev.domengine.log.EngineLog;
@@ -16,8 +15,12 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * MCP stdio server. Every tool call forwards an argv list to {@link DomEngineMain}.
- * Workbench and hosts do not reimplement the engine here.
+ * MCP stdio server. Tools come from {@link McpRegistry}. The {@code domengine}
+ * tool still forwards an argv list to {@link DomEngineMain}. {@code query},
+ * {@code click}, {@code type}, and {@code observe} do the same with a command name.
+ * {@code snapshot} returns G3 CompositeSnapshot JSON, or a schema-shaped placeholder
+ * until that class exists. Workbench registers its own copy of the catalogue.
+ * Extra commands are registered; this class is not edited for them.
  */
 public final class McpServer {
     private McpServer() {
@@ -65,30 +68,21 @@ public final class McpServer {
 
     private static ObjectNode tools() {
         ObjectNode result = Jsons.object();
-        ObjectNode tool = result.putArray("tools").addObject();
-        tool.put("name", "domengine");
-        tool.put("description", "Forward an argv list to the domengine CLI");
-        ObjectNode schema = tool.putObject("inputSchema");
-        schema.put("type", "object");
-        schema.putObject("properties").putObject("argv").put("type", "array");
+        var listed = result.putArray("tools");
+        for (McpCommand command : McpRegistry.commands()) {
+            ObjectNode tool = listed.addObject();
+            tool.put("name", command.name());
+            tool.put("description", command.description());
+            tool.set("inputSchema", command.inputSchema());
+        }
         return result;
     }
 
     private static ObjectNode call(JsonNode params) {
         String name = params.path("name").asText("");
-        if (!"domengine".equals(name)) throw new IllegalArgumentException("unknown tool " + name);
-        List<String> argv = new ArrayList<>();
-        JsonNode raw = params.path("arguments").get("argv");
-        if (raw != null && raw.isArray()) {
-            for (JsonNode item : raw) argv.add(item.asText(""));
-        }
-        CliResult result = DomEngineMain.dispatch(argv);
-        ObjectNode body = Jsons.object();
-        ObjectNode content = body.putArray("content").addObject();
-        content.put("type", "text");
-        content.put("text", result.exit() == 0 ? result.stdout() : result.stderr());
-        if (result.exit() != 0) body.put("isError", true);
-        return body;
+        McpCommand command = McpRegistry.find(name);
+        if (command == null) throw new IllegalArgumentException("unknown tool " + name);
+        return command.call(params.path("arguments"));
     }
 
     private static ObjectNode ok(JsonNode id, JsonNode result) {

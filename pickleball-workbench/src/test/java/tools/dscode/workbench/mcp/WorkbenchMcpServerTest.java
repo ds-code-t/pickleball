@@ -93,7 +93,14 @@ class WorkbenchMcpServerTest {
             "workbench_agent_command",
             "dalton",
             "engine",
-            "domengine"
+            "domengine",
+            "query",
+            "click",
+            "type",
+            "snapshot",
+            "observe",
+            "launch",
+            "surfaces"
     );
 
     @TempDir
@@ -106,6 +113,17 @@ class WorkbenchMcpServerTest {
             return null;
         }), JSON);
         assertEquals(DOCUMENTED_TOOLS, tools.names());
+    }
+
+    @Test
+    void snapshotCommandReturnsTheCompositeSnapshotShape() {
+        WorkbenchMcpTools tools = new WorkbenchMcpTools(fakeServices((method, args) -> null), JSON);
+        Object value = tools.call("snapshot", Map.of("kind", "offline"));
+        assertTrue(value instanceof Map<?, ?> map && "pickleball.composite-snapshot".equals(map.get("schema")));
+        assertEquals(1, ((Map<?, ?>) value).get("version"));
+        assertTrue(String.valueOf(((Map<?, ?>) value).get("warnings")).contains("g3-producers-absent"));
+        Object listed = tools.call("surfaces", Map.of());
+        assertTrue(String.valueOf(listed).contains("html-write"));
     }
 
     @Test
