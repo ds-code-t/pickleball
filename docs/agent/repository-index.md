@@ -90,6 +90,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/maintainer/3.0.0-locked-decisions-design.md`
 - `docs/maintainer/3.0.0-locked-decisions-prior-audit.md`
 - `docs/maintainer/3.0.0-locked-decisions-sweep.md`
+- `docs/maintainer/3.0.0-locked-groups-plan.md`
 - `docs/maintainer/3.0.0-query-visual-design.md`
 - `docs/maintainer/3.0.0-snapshot-coverage-audit.md`
 - `docs/maintainer/3.0.0-workbench-edit-design.md`
