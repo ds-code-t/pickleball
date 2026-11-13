@@ -2,7 +2,7 @@
 
 > **Working feature examples:** [`mapping-and-resources.feature`](../maven-consumer-project/src/test/resources/features/mapping-and-resources.feature) demonstrates standard `Scenario Outline` and `Examples` syntax with Pickleball steps; [`component-scenarios.feature`](../maven-consumer-project/src/test/resources/features/component-scenarios.feature) demonstrates reusable Pickleball behavior inside normal Cucumber feature structure.
 
-Pickleball is built on Cucumber rather than replacing it. A consumer can use Pickleball's dynamic steps where they are useful and ordinary Cucumber Java step definitions where project-specific Java behavior is still needed.
+Cucumber is a supported compatibility adapter. The default engine is native, and `pkb_engine=cucumber` keeps Cucumber. Standard Cucumber features and Java step definitions keep working, and dynamic steps can be mixed with them.
 
 ## Standard Cucumber behavior remains available
 
