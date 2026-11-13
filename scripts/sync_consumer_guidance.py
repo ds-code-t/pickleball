@@ -44,6 +44,7 @@ MAINTAINER_ONLY_DOCS = (
 MAINTAINER_ONLY_PREFIXES = (
     "docs/maintainer/",
     "docs/roadmaps/",
+    "docs/audits/",
 )
 # Planning notes stay in the source repository index. Export omits them.
 EXPORT_ONLY_DOCS = (
@@ -146,6 +147,7 @@ def consumer_doc_bytes(relative: str, source: Path) -> bytes:
             line for line in text.splitlines(keepends=True)
             if "docs/maintainer/" not in line
             and "docs/roadmaps/" not in line
+            and "docs/audits/" not in line
             and not any(path in line for path in EXPORT_ONLY_DOCS)
         ]
         data = "".join(kept).encode("utf-8")

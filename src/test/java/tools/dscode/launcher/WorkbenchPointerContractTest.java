@@ -138,6 +138,7 @@ class WorkbenchPointerContractTest {
                 String relative = packaged.relativize(path).toString().replace('\\', '/');
                 assertFalse(relative.startsWith("docs/maintainer/"), relative);
                 assertFalse(relative.startsWith("docs/roadmaps/"), relative);
+                assertFalse(relative.startsWith("docs/audits/"), relative);
                 assertFalse(relative.endsWith("ai-diagnostic-reporting-plan.md"), relative);
                 assertFalse(relative.endsWith("workbench-thin-packaging-roadmap.md"), relative);
             });
@@ -145,11 +146,13 @@ class WorkbenchPointerContractTest {
         String index = Files.readString(packaged.resolve("index.txt"));
         assertFalse(index.contains("docs/maintainer/"));
         assertFalse(index.contains("docs/roadmaps/"));
+        assertFalse(index.contains("docs/audits/"));
         assertFalse(index.contains("docs/ai-diagnostic-reporting-plan.md"));
         assertFalse(index.contains("docs/workbench-thin-packaging-roadmap.md"));
         String packagedIndex = Files.readString(packaged.resolve("docs/agent/repository-index.md"));
         assertFalse(packagedIndex.contains("docs/maintainer/"));
         assertFalse(packagedIndex.contains("docs/roadmaps/"));
+        assertFalse(packagedIndex.contains("docs/audits/"));
         assertFalse(packagedIndex.contains("docs/ai-diagnostic-reporting-plan.md"));
         assertFalse(packagedIndex.contains("docs/workbench-thin-packaging-roadmap.md"));
         String packagedReadme = Files.readString(packaged.resolve("docs/README.md"));
