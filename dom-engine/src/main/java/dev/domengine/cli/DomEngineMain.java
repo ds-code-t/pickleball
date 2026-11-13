@@ -7,6 +7,7 @@ import dev.domengine.EngineInfo;
 import dev.domengine.cdp.CdpException;
 import dev.domengine.json.Jsons;
 import dev.domengine.log.EngineLog;
+import dev.domengine.premap.OneMatchException;
 import dev.domengine.query.LiveXPath;
 import dev.domengine.session.BrowserSession;
 import dev.domengine.session.SessionRegistry;
@@ -508,6 +509,11 @@ public final class DomEngineMain {
                 case "close" -> CliResult.ok(Jsons.pretty(DesktopTree.close(required(flags, "id"))));
                 default -> error(2, "usage", "unknown desktop verb: " + verb);
             };
+        } catch (OneMatchException failure) {
+            String message = failure.getMessage() == null ? "not found" : failure.getMessage();
+            com.fasterxml.jackson.databind.node.ObjectNode node = Jsons.error(codeFor(message), message);
+            node.set("candidates", failure.toJson());
+            return CliResult.fail(1, Jsons.pretty(node));
         } catch (CdpException failure) {
             String message = failure.getMessage() == null ? "failed" : failure.getMessage();
             return error(1, codeFor(message), message);
@@ -657,6 +663,7 @@ public final class DomEngineMain {
                   query and resolve use the same --pipeline, --css, --xpath, and --text as browser query
                   frame, shadow, and pierce are browser-only and are rejected on desktop
                   live click and type act on the OS control; a missing bus, permission, or input tool fails
+                  click, type, and resolve list candidates when more than one node matches
                 query|resolve|info|recommend|validate [file] [--css SELECTOR]
                 capture --session ID | --file page.html | --url URL
                 conform --root DIR [--live]

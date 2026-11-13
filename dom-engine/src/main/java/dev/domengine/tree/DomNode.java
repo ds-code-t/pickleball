@@ -41,6 +41,32 @@ public final class DomNode {
     public double visualY;
     /** Computed longhands from the browser. Empty means the style attribute is the offline source. */
     public final Map<String, String> computed = new LinkedHashMap<>();
+    /** Absolute index-qualified XPath inside the frame document, or the shadow-root-relative path. */
+    public String xpath = "";
+    /** Host XPaths from the document down to this shadow tree, separated by ` >> `. Empty in light DOM. */
+    public String shadowPath = "";
+    /** Root-to-innermost section ids, separated by `/`. */
+    public String sectionPath = "";
+    public boolean capped;
+    public String capReason = "";
+    /** D10 row-state names: hidden, disabled, checked, selected, readonly, required, expanded, focused. */
+    public final List<String> states = new ArrayList<>();
+    public Paint paint;
+    public boolean hasLayoutViewport;
+    public double layoutViewportX;
+    public double layoutViewportY;
+    public double layoutViewportWidth;
+    public double layoutViewportHeight;
+
+    /** Colour and image sample. Null until a producer or the pre-map fills it. */
+    public static final class Paint {
+        public String color = "";
+        public String background = "";
+        public double contrast = Double.NaN;
+        public String meanRgb = "";
+        public long dhash;
+        public boolean hasDhash;
+    }
 
     public String tag() {
         if (localName != null && !localName.isBlank()) return localName.toLowerCase();

@@ -130,6 +130,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/roadmaps/3.0.0-query-visual-roadmap.md`
 - `docs/roadmaps/3.0.0-workbench-edit-roadmap.md`
 - `docs/service-call-scenarios.md`
+- `docs/snapshot.md`
 - `docs/step-overrides.md`
 - `docs/workbench-agent-detail.md`
 - `docs/workbench-thin-packaging-roadmap.md`
@@ -1195,6 +1196,9 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `dom-engine/build.gradle`
 - `dom-engine/src/main/java/dev/domengine/action/Observe.java`
 - `dom-engine/src/main/java/dev/domengine/action/PageActions.java`
+- `dom-engine/src/main/java/dev/domengine/affinity/AffinityScore.java`
+- `dom-engine/src/main/java/dev/domengine/affinity/AffinityScorer.java`
+- `dom-engine/src/main/java/dev/domengine/affinity/AffinityWeights.java`
 - `dom-engine/src/main/java/dev/domengine/cdp/CdpConnection.java`
 - `dom-engine/src/main/java/dev/domengine/cdp/CdpException.java`
 - `dom-engine/src/main/java/dev/domengine/cli/CliResult.java`
@@ -1216,6 +1220,16 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `dom-engine/src/main/java/dev/domengine/mcp/McpRegistry.java`
 - `dom-engine/src/main/java/dev/domengine/mcp/McpServer.java`
 - `dom-engine/src/main/java/dev/domengine/mcp/SnapshotDispatch.java`
+- `dom-engine/src/main/java/dev/domengine/premap/Box.java`
+- `dom-engine/src/main/java/dev/domengine/premap/BoxCaps.java`
+- `dom-engine/src/main/java/dev/domengine/premap/Candidate.java`
+- `dom-engine/src/main/java/dev/domengine/premap/OneMatch.java`
+- `dom-engine/src/main/java/dev/domengine/premap/OneMatchException.java`
+- `dom-engine/src/main/java/dev/domengine/premap/Platform.java`
+- `dom-engine/src/main/java/dev/domengine/premap/PreMap.java`
+- `dom-engine/src/main/java/dev/domengine/premap/PreMapLookup.java`
+- `dom-engine/src/main/java/dev/domengine/premap/Section.java`
+- `dom-engine/src/main/java/dev/domengine/premap/SectionDetector.java`
 - `dom-engine/src/main/java/dev/domengine/query/Engines.java`
 - `dom-engine/src/main/java/dev/domengine/query/Expressions.java`
 - `dom-engine/src/main/java/dev/domengine/query/HtmlTree.java`
@@ -1226,15 +1240,19 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `dom-engine/src/main/java/dev/domengine/session/ChromeProcess.java`
 - `dom-engine/src/main/java/dev/domengine/session/SessionEvents.java`
 - `dom-engine/src/main/java/dev/domengine/session/SessionRegistry.java`
+- `dom-engine/src/main/java/dev/domengine/snapshot/SnapshotWarnings.java`
 - `dom-engine/src/main/java/dev/domengine/tree/ContextWalker.java`
 - `dom-engine/src/main/java/dev/domengine/tree/DomNode.java`
 - `dom-engine/src/main/java/dev/domengine/tree/LiveTree.java`
 - `dom-engine/src/test/java/dev/domengine/ActionSmokeTest.java`
+- `dom-engine/src/test/java/dev/domengine/affinity/AffinityScoreTest.java`
+- `dom-engine/src/test/java/dev/domengine/affinity/AffinityWeightsTest.java`
 - `dom-engine/src/test/java/dev/domengine/BooleanQueryTest.java`
 - `dom-engine/src/test/java/dev/domengine/CdpSessionAttachTest.java`
 - `dom-engine/src/test/java/dev/domengine/CliStdioTest.java`
 - `dom-engine/src/test/java/dev/domengine/CliSurfaceTest.java`
 - `dom-engine/src/test/java/dev/domengine/ConformanceSuiteTest.java`
+- `dom-engine/src/test/java/dev/domengine/desktop/DesktopOneMatchTest.java`
 - `dom-engine/src/test/java/dev/domengine/desktop/LiveDesktopTest.java`
 - `dom-engine/src/test/java/dev/domengine/DocumentWalkFixtureTest.java`
 - `dom-engine/src/test/java/dev/domengine/EngineLogTest.java`
@@ -1251,6 +1269,10 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `dom-engine/src/test/java/dev/domengine/ObserveEventsTest.java`
 - `dom-engine/src/test/java/dev/domengine/ObserveParityTest.java`
 - `dom-engine/src/test/java/dev/domengine/OfflineXPathTest.java`
+- `dom-engine/src/test/java/dev/domengine/premap/BoxCapTest.java`
+- `dom-engine/src/test/java/dev/domengine/premap/OneMatchTest.java`
+- `dom-engine/src/test/java/dev/domengine/premap/PreMapLookupDefaultsTest.java`
+- `dom-engine/src/test/java/dev/domengine/premap/SectionDetectionTest.java`
 - `dom-engine/src/test/java/dev/domengine/RustCliShapeTest.java`
 - `dom-engine/src/test/java/dev/domengine/SelectorParityTest.java`
 - `dom-engine/src/test/java/dev/domengine/session/BrowserSessionEndpointTest.java`
@@ -1555,6 +1577,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `dom-engine/src/test/resources/conformance/site/variant/dpi.html`
 - `dom-engine/src/test/resources/conformance/site/variant/mobile.html`
 - `dom-engine/src/test/resources/conformance/site/variant/print.html`
+- `dom-engine/src/test/resources/fixtures/affinity-form.html`
 - `dom-engine/src/test/resources/fixtures/page.html`
 
 ## Maven consumer Java support

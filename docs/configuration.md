@@ -451,6 +451,11 @@ Missing or blank `pkb_configpath` uses the classpath resource root `configs`. Pi
 | `pkb_direct_control_provider` | blank, `composite`, or a path | blank is off. `composite` attaches the DOM engine using the provider order in [Direct-control handoff](direct-control-handoff.md). Any other value is a path |
 | `pkb_composite_log` | `off`, `all`, or `location,adapter,session,element,fallback,batch,state,position` | CLI-first adapter log. Unset is off. `batch` or `all` writes one TRACE line per describe and no per-element line: `TRACE batch mode=<composite, selenium-batch, or selenium-legacy> selector=<by> nodes=<count> durationMs=<n>`. `state` or `all` writes one `TRACE state snapshot miss fallback` line only when a state check has no snapshot. `adapter` or `all` writes the verb, snapshot, scan, wait, nest, and live lines. `element` or `all` writes `INFO element find selenium unattached` when a primary engine has not joined that WebDriver and the find uses Selenium. `position` or `all` writes `TRACE position apply size=<n> position=<p> selection=<s> kept=<k> durationMs=<ms>` when a find keeps a 1-based index, `last`, or `every`. One date-stamped file, 1 MiB cap |
 | `pkb_composite_log_dir` | directory | log directory. Default is the temp directory `pickleball-composite-logs` |
+| `pkb_premap_box_max_area` | `0.6` or `900px` | Engine flag `--box-max-area`. A ratio of the viewport, or pixels when the value ends in `px`. Default ratio 0.60. Env `DOMENGINE_BOX_CAPS` accepts `area=` |
+| `pkb_premap_box_max_width` | `0.98` or `900px` | Engine flag `--box-max-width`. Default ratio 0.98 |
+| `pkb_premap_box_max_height` | `0.98` or `900px` | Engine flag `--box-max-height`. Default ratio 0.98 |
+| `pkb_premap_one_match_margin` | `0.15` | Engine flag `--one-match-margin`. The top score must lead the second by at least this much or the match is ambiguous |
+| `pkb_premap_affinity_weights` | `proximity=0.3,alignment=0.2,role=0.15,text=0.1,section=0.15` | Engine flag `--affinity-weights` and env `DOMENGINE_AFFINITY_WEIGHTS`. Unknown keys are a usage error. Weights are re-normalised to sum to 1 |
 
 ## Example row filter
 

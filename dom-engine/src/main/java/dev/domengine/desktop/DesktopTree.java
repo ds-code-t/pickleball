@@ -6,14 +6,21 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import dev.domengine.cdp.CdpException;
 import dev.domengine.json.Jsons;
 import dev.domengine.log.EngineLog;
+import dev.domengine.premap.BoxCaps;
+import dev.domengine.premap.Candidate;
+import dev.domengine.premap.OneMatch;
+import dev.domengine.premap.OneMatchException;
 import dev.domengine.query.Query;
 import dev.domengine.tree.DomNode;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -168,37 +175,24 @@ public final class DesktopTree {
     public static ObjectNode query(String id, Map<String, String> flags) {
         rejectBrowserOnly(flags);
         Session session = require(id);
-        ObjectNode found = Query.run(session.root, flags);
+        ObjectNode found = Query.run(session.root, flagsForQuery(flags));
         found.put("backend", session.backend);
         EngineLog.info("desktop", "query " + id);
         return found;
     }
 
     public static DomNode one(String id, Map<String, String> flags) {
-        rejectBrowserOnly(flags);
-        Session session = require(id);
-        JsonNode found = Query.run(session.root, flags);
-        JsonNode nodes = found.get("nodes");
-        if (nodes == null || nodes.isEmpty()) throw new CdpException("not found");
-        if (nodes.size() > 1) throw new CdpException("ambiguous");
-        String handle = nodes.get(0).path("handle").asText("");
-        DomNode node = find(session.root, handle);
-        if (node == null) throw new CdpException("not found");
-        return node;
+        return select(id, flags, true).node;
     }
 
     public static ObjectNode resolve(String id, Map<String, String> flags) {
-        rejectBrowserOnly(flags);
-        Session session = require(id);
-        ObjectNode found = Query.run(session.root, flags);
-        JsonNode nodes = found.get("nodes");
-        if (nodes == null || nodes.isEmpty()) throw new CdpException("not found");
-        if (nodes.size() > 1) throw new CdpException("ambiguous");
-        String handle = nodes.get(0).path("handle").asText("");
-        DomNode node = find(session.root, handle);
-        if (node == null) throw new CdpException("not found");
-        found.put("backend", session.backend);
-        found.set("node", node.toJson());
+        Selected selected = select(id, flags, false);
+        ObjectNode found = Query.run(selected.session.root, flagsForQuery(flags));
+        found.put("backend", selected.session.backend);
+        found.set("node", selected.node.toJson());
+        if (selected.resolved.explain() != null && !selected.resolved.explain().isBlank()) {
+            found.put("explain_match", selected.resolved.explain());
+        }
         EngineLog.info("desktop", "resolve " + id);
         return found;
     }
@@ -235,6 +229,84 @@ public final class DesktopTree {
         result.put("role", node.role);
         EngineLog.info("desktop", "click " + session.id + " " + node.accessibleName);
         return result;
+    }
+
+    private record Selected(Session session, DomNode node, OneMatch.Resolved resolved) {
+    }
+
+    private static Selected select(String id, Map<String, String> flags, boolean act) {
+        rejectBrowserOnly(flags);
+        Session session = require(id);
+        Map<String, String> queryFlags = flagsForQuery(flags);
+        JsonNode found = Query.run(session.root, queryFlags);
+        JsonNode nodes = found.get("nodes");
+        double[] viewport = viewport(session.root);
+        BoxCaps caps = BoxCaps.fromFlags(flags);
+        List<Candidate> candidates = new ArrayList<>();
+        if (nodes != null) {
+            for (JsonNode hit : nodes) {
+                DomNode node = find(session.root, hit.path("handle").asText(""));
+                if (node == null) continue;
+                candidates.add(Candidate.of(node, score(hit), List.of(), viewport[0], viewport[1], caps));
+            }
+        }
+        Set<String> exempt = askedRoles(flags, queryFlags);
+        OneMatch.Policy policy = act
+                ? OneMatch.Policy.act(margin(flags), exempt)
+                : OneMatch.Policy.resolve(margin(flags), exempt);
+        OneMatch.Resolved resolved = OneMatch.resolve(candidates, policy);
+        DomNode node = find(session.root, resolved.chosen().handle());
+        if (node == null) throw new OneMatchException("not found", resolved.candidates());
+        return new Selected(session, node, resolved);
+    }
+
+    private static Double score(JsonNode hit) {
+        if (hit != null && hit.has("score") && hit.get("score").isNumber()) return hit.get("score").asDouble();
+        return null;
+    }
+
+    private static double[] viewport(DomNode root) {
+        if (root != null && root.hasBox && root.width > 0 && root.height > 0) return new double[] {root.width, root.height};
+        return new double[] {1920, 1080};
+    }
+
+    private static double margin(Map<String, String> flags) {
+        String raw = flags == null ? null : flags.get("one-match-margin");
+        if (raw == null || raw.isBlank()) return 0.15;
+        try {
+            return Double.parseDouble(raw.trim());
+        } catch (NumberFormatException failure) {
+            throw new CdpException("usage: one-match margin");
+        }
+    }
+
+    private static Set<String> askedRoles(Map<String, String> flags, Map<String, String> queryFlags) {
+        String role = flags == null ? null : flags.get("role");
+        if ((role == null || role.isBlank()) && queryFlags != null) {
+            String pipeline = queryFlags.getOrDefault("pipeline", "");
+            for (String stage : pipeline.split(">>")) {
+                String trimmed = stage.trim();
+                if (trimmed.startsWith("role=")) {
+                    role = trimmed.substring(5).trim();
+                    int bracket = role.indexOf('[');
+                    if (bracket >= 0) role = role.substring(0, bracket).trim();
+                }
+            }
+        }
+        if (role == null || role.isBlank()) return Set.of();
+        return Set.of(role);
+    }
+
+    private static Map<String, String> flagsForQuery(Map<String, String> flags) {
+        if (flags == null) return Map.of();
+        if (Query.pipelineOf(flags) != null) return flags;
+        String role = flags.get("role");
+        if (role == null || role.isBlank()) return flags;
+        Map<String, String> copy = new LinkedHashMap<>(flags);
+        String name = flags.get("name");
+        String expr = name == null || name.isBlank() ? role : role + "[name=\"" + name + "\"]";
+        copy.put("pipeline", "role=" + expr);
+        return copy;
     }
 
     private static DomNode find(DomNode node, String handle) {

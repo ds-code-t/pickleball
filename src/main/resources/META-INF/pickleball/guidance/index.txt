@@ -37,6 +37,7 @@ docs/pickleball-workbench.md
 docs/release-notes.md
 docs/reserved-element-names.md
 docs/service-call-scenarios.md
+docs/snapshot.md
 docs/step-overrides.md
 docs/workbench-agent-detail.md
 maven-consumer-project/pom.xml
