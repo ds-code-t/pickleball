@@ -28,6 +28,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/agent/README.md`
 - `docs/agent/repository-index.md`
 - `docs/ai-run-configuration.md`
+- `docs/audits/3.0.0-architecture-doc-audit.md`
 - `docs/block-conditionals.md`
 - `docs/component-scenarios.md`
 - `docs/config-files-and-resource-mapping.md`
