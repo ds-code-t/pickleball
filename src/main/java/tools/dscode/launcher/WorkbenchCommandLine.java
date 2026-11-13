@@ -30,6 +30,7 @@ final class WorkbenchCommandLine {
             "highlight", "unhighlight",
             "overlay", "overlay-poll", "overlay-remove",
             "html-write", "html-replace", "html-insert", "html-remove", "html-cleanup",
+            "popup-open", "popup-status", "popup-close",
             "capture-scenario",
             "help"
     );
@@ -56,7 +57,7 @@ final class WorkbenchCommandLine {
             "--text-file", "--text-b64", "--session-file", "--feature", "--run", "--from-here",
             "--stop-after", "--cursor", "--fields", "--config", "--from-run", "--expect",
             "--category", "--status", "--kind", "--scenario", "--html",
-            "--query", "--exposure"
+            "--query", "--exposure", "--target", "--pane", "--on-top", "--headless"
     );
 
     private WorkbenchCommandLine() {

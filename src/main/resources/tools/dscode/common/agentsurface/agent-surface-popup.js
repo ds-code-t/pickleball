@@ -33,6 +33,38 @@
     send(row.textSha256 || "");
   }
 
+  var loadedSurface = {};
+
+  function kindOf(row) {
+    var sentence = row.sentence || "";
+    return sentence.indexOf("overlay") >= 0 ? "overlay" : "html";
+  }
+
+  function ensureSurface(kind) {
+    if (loadedSurface[kind]) return;
+    loadedSurface[kind] = true;
+    var script = document.createElement("script");
+    script.src = "assets/surface/" + kind + ".js?t=" + encodeURIComponent(token);
+    document.body.appendChild(script);
+  }
+
+  function mount(row) {
+    var holder = document.createElement("div");
+    if (row.handle) holder.setAttribute("data-pkb-handle", row.handle);
+    var shadow = holder.attachShadow({ mode: "open" });
+    var kind = kindOf(row);
+    var link = document.createElement("link");
+    link.rel = "stylesheet";
+    link.href = "assets/surface/" + kind + ".css?t=" + encodeURIComponent(token);
+    var body = document.createElement("div");
+    body.className = "pkb-surface";
+    body.innerHTML = row.html || "";
+    shadow.appendChild(link);
+    shadow.appendChild(body);
+    ensureSurface(kind);
+    return holder;
+  }
+
   function apply(row) {
     var target = pane(row.pane || "instructions");
     if (!target) return;
@@ -49,16 +81,18 @@
       ack(row);
       return;
     }
-    var holder = document.createElement("div");
-    holder.innerHTML = row.html || "";
-    if (row.handle) holder.setAttribute("data-pkb-handle", row.handle);
+    var holder = mount(row);
     if (row.op === "replace" && node(row.handle)) {
       node(row.handle).replaceWith(holder);
     } else if (row.op === "insert" && node(row.handle)) {
       var anchor = node(row.handle);
       if (row.where === "before") anchor.before(holder);
       else if (row.where === "after") anchor.after(holder);
-      else anchor.appendChild(holder);
+      else {
+        var inner = anchor.shadowRoot && anchor.shadowRoot.querySelector(".pkb-surface");
+        if (inner) inner.appendChild(holder);
+        else anchor.appendChild(holder);
+      }
     } else if (row.op === "remove") {
       var found = node(row.handle) || document.getElementById(row.handle || "");
       if (found) found.remove();

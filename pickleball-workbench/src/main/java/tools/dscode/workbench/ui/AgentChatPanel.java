@@ -3,6 +3,7 @@ package tools.dscode.workbench.ui;
 import tools.dscode.workbench.WorkbenchSessionActions;
 
 import javax.swing.JButton;
+import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
@@ -17,6 +18,8 @@ public final class AgentChatPanel extends JPanel {
     private final WorkbenchSessionActions actions;
     private final JTextArea history = new JTextArea(12, 40);
     private final JTextField input = new JTextField();
+    final JButton openPopup = new JButton("Open popup");
+    final JLabel popupStatus = new JLabel("popup closed");
 
     AgentChatPanel(WorkbenchSessionActions actions) {
         super(new BorderLayout());
@@ -33,7 +36,13 @@ public final class AgentChatPanel extends JPanel {
             show(history(actions, 50));
         });
         row.add(send, BorderLayout.EAST);
+        openPopup.addActionListener(event -> {
+            Map<String, Object> opened = openPopup(actions, selectedRun(actions, null));
+            popupStatus.setText(statusLine(opened));
+        });
+        row.add(openPopup, BorderLayout.WEST);
         add(row, BorderLayout.SOUTH);
+        add(popupStatus, BorderLayout.NORTH);
         show(history(actions, 50));
         Timer timer = new Timer(1000, event -> show(poll(actions, "")));
         timer.setRepeats(true);
@@ -49,6 +58,25 @@ public final class AgentChatPanel extends JPanel {
         args.put("runId", run);
         args.put("channel", "run");
         return actions.dispatch("chat-send", args);
+    }
+
+    public static Map<String, Object> openPopup(WorkbenchSessionActions actions, String runId) {
+        String run = selectedRun(actions, runId);
+        if (run == null) return refused("popup-open");
+        Map<String, String> args = new LinkedHashMap<>();
+        args.put("runId", run);
+        return actions.dispatch("popup-open", args);
+    }
+
+    public static String statusLine(Map<String, Object> status) {
+        if (status == null) return "popup closed";
+        Object state = status.get("state");
+        Object fallback = status.get("fallback");
+        String line = "popup " + (state == null ? "closed" : state);
+        if (fallback != null && !String.valueOf(fallback).isBlank() && !"null".equals(String.valueOf(fallback))) {
+            line = line + " fallback=" + fallback;
+        }
+        return line;
     }
 
     public static Map<String, Object> history(WorkbenchSessionActions actions, int limit) {

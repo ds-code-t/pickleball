@@ -100,7 +100,10 @@ class WorkbenchMcpServerTest {
             "snapshot",
             "observe",
             "launch",
-            "surfaces"
+            "surfaces",
+            "agent_popup_open",
+            "agent_popup_status",
+            "agent_popup_close"
     );
 
     @TempDir

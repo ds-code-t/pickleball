@@ -90,7 +90,7 @@ When implementation, tests, examples, and documentation disagree:
 
 ## Repository structure
 
-- `src/main/java` — framework implementation and Cucumber integrations
+- `src/main/java` — framework implementation and Cucumber integrations. In-page agent surfaces and the popup live in `tools.dscode.common.agentcontrol` and `tools.dscode.common.agentsurface` (`docs/direct-control-handoff.md`).
 - `src/main/aspectj` — AspectJ integrations and weaving behavior
 - `src/main/resources` — framework resources
 - `pickleball-control-protocol` — JDK-only shared boundary for core/worker and Workbench: versioned wire records, capability/version constants, request/response envelopes, plus layout/store helpers (`PickleballLocalLayout`, `PickleballVersion`, `PickleballArtifactLocator`, `PickleballLocalStore`) so `.pickleball` paths stay dependency-free. No non-JDK libraries; no Pickleball/Cucumber/Selenium runtime.

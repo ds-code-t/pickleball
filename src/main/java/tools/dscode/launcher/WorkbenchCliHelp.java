@@ -145,7 +145,7 @@ final class WorkbenchCliHelp {
         text.append("coordination: short-log note inbox finish presence post history gc-runs gc-versions use-version export-guidance\n");
         text.append("descriptors: session list | session info <sessionId> [--json] | session hold <sessionId> | session release <sessionId>\n");
         text.append("page: inspect-page find-element\n");
-        text.append("agent: observe launch windows tabs chat-send chat-history chat-poll highlight unhighlight overlay overlay-poll overlay-remove html-write html-replace html-insert html-remove html-cleanup capture-scenario\n");
+        text.append("agent: observe launch windows tabs chat-send chat-history chat-poll highlight unhighlight overlay overlay-poll overlay-remove html-write html-replace html-insert html-remove html-cleanup popup-open popup-status popup-close capture-scenario\n");
         text.append("retrieval: query runs | query get | query query | query search | query props | query errors | query tail\n");
         text.append("controller: sync worker-check live-check ui mcp session\n");
         text.append("all:");

@@ -134,6 +134,7 @@ public final class WorkbenchAgentCommands {
                      "highlight", "unhighlight",
                      "overlay", "overlay-poll", "overlay-remove",
                      "html-write", "html-replace", "html-insert", "html-remove", "html-cleanup",
+                     "popup-open", "popup-status", "popup-close",
                      "capture-scenario" -> agentControl(parsed, safeOut, safeErr);
                 case "help" -> help(args, safeOut, safeErr);
                 default -> {
@@ -1875,6 +1876,11 @@ public final class WorkbenchAgentCommands {
         copyFlag(args, parsed, "html");
         copyFlag(args, parsed, "page");
         copyFlag(args, parsed, "after");
+        copyFlag(args, parsed, "target");
+        copyFlag(args, parsed, "pane");
+        copyFlag(args, parsed, "query");
+        copyFlag(args, parsed, "on-top");
+        copyFlag(args, parsed, "headless");
         if (parsed.coordination().text() != null) args.put("text", parsed.coordination().text());
         if (parsed.coordination().limit() != null) args.put("limit", parsed.coordination().limit().toString());
         if (parsed.coordination().id() != null) args.put("id", parsed.coordination().id());

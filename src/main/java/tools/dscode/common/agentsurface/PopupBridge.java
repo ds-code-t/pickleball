@@ -90,7 +90,11 @@ public final class PopupBridge implements AutoCloseable {
             String path = exchange.getRequestURI().getPath();
             String method = exchange.getRequestMethod();
             if ("GET".equals(method) && ("/".equals(path) || path.isEmpty())) {
-                send(exchange, 200, "text/html; charset=utf-8", resource("agent-surface-popup.html"));
+                String shell = new String(resource("agent-surface-popup.html"), StandardCharsets.UTF_8);
+                String query = java.net.URLEncoder.encode(token, StandardCharsets.UTF_8);
+                shell = shell.replace("assets/agent-surface-popup.css", "assets/agent-surface-popup.css?t=" + query)
+                        .replace("assets/agent-surface-popup.js", "assets/agent-surface-popup.js?t=" + query);
+                send(exchange, 200, "text/html; charset=utf-8", shell);
                 return;
             }
             if ("GET".equals(method) && path.startsWith("/assets/")) {

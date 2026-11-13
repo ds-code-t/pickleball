@@ -46,7 +46,16 @@ public final class PopupSurfaceBridge {
     }
 
     public static void sendChat(Path project, String runId, String channel, String source, String text) throws IOException {
-        ChatLog.send(project, runId, channel, source, "", text);
+        sendChat(project, runId, channel, source, "", text);
+    }
+
+    public static Map<String, Object> sendChat(Path project, String runId, String channel, String source, String agent, String text) throws IOException {
+        ChatLog.Message message = ChatLog.send(project, runId, channel, source, agent, text);
+        return ChatLog.toMap(message);
+    }
+
+    public static List<Map<String, Object>> pollInput(Path project, String runId) throws IOException {
+        return PageSurfaces.pollInput(project, runId);
     }
 
     public static List<String> readLines(Path file) throws IOException {

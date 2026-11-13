@@ -231,8 +231,26 @@ Always on top (`pkb_agent_popup_on_top=true` by default): Windows calls `SetWind
 
 The channel is loopback HTTP and server-sent events on `127.0.0.1` only. Every request needs the 128-bit token (`?t=` or `X-Pkb-Popup-Token`), compared in constant time, and `Host: 127.0.0.1:<port>`. Anything else is 403. Responses send `Content-Security-Policy: default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'`, `X-Content-Type-Options: nosniff`, and `Cache-Control: no-store`. `GET /events` resumes from `Last-Event-ID`. `GET /poll` is the fallback and logs `sse-unavailable` once. `POST /chat` stores a human line on the run chat channel. `POST /input` appends the same `overlay-events.jsonl` that `overlay-poll` reads. `POST /rendered` records the client ack (`seq`, `pane`, `handle`, `textSha256`).
 
-The shell has Chat, Instructions, and Diagram. Agent HTML is neutralized and labeled before it is written to `surfaces.jsonl`. No Chromium, or a browser that exits at launch, logs one warning (`no-chromium` or `launch-failed`) and writes `host.json` with `state=closed`. The ledger rows stay on disk. `popup-status` reports `fallback` context through `warnings` and `alwaysOnTop.reason`.
+The shell has Chat, Instructions, and Diagram. Agent HTML is neutralized and labeled before it is written to `surfaces.jsonl`. The shell mounts that HTML in an open shadow root and loads the G1 surface assets for `html` and `overlay` from `GET /assets/surface/<kind>.css` and `GET /assets/surface/<kind>.js` (the same bytes as `SurfaceAssets.css` and `SurfaceAssets.js`). An overlay sentence uses the overlay kind; other panes use the html kind. No Chromium, or a browser that exits at launch, logs one warning (`no-chromium` or `launch-failed`) and writes `host.json` with `state=closed`. The ledger rows stay on disk. `popup-status` reports `fallback` context through `warnings` and `alwaysOnTop.reason`. A surface op that cannot open the window returns `ok=true`, `target=none`, and `fallback=no-chromium`, and the ledger row is still stored.
 
 Logging is off unless `pkb_agent_popup_log` is `true`, `all`, or a list of `lifecycle,browser,ontop,bridge,route,highlight,ledger`. Lines start with an ISO-8601 timestamp in `.pickleball/runs/<run-id>/agent/popup/popup.log`, capped by `pkb_agent_popup_log_max_bytes` (default 1048576, minimum 64). Warnings go to stderr once per run and reason even when the log is off, and into `popup-status` `warnings`.
+
+| Mode | Session | Op | Route |
+|---|---|---|---|
+| `off` | any | existing surface op | page, unchanged |
+| any | any | `--target=page` | page |
+| any | any | `--target=popup` | popup |
+| any | any | `--target=native` on highlight | native box |
+| `auto` | browser (`pkb_agent_session=browser` or a live page) | surface op | page |
+| `auto` | desktop | `chat-send`, `overlay`, `html-*`, `overlay-poll` | popup |
+| `auto` | desktop | highlight with bounds or `--query` | native |
+| `auto` | desktop | highlight with only `--handle`, or `--html`/`--page` file | page |
+| `always` | browser | `chat-send`, and `html-*`/`overlay` without `--handle` | popup |
+| `always` | browser | handle-anchored HTML or overlay, and highlight | page |
+
+### Native highlight
+
+`highlight --target=native` (and a desktop highlight that already has bounds) draws four 3 px `#ff2d55` strips from `--x --y --width --height` or from the `x`, `y`, `width`, and `height` fields of `--query` JSON. HiDPI uses `GraphicsConfiguration.getDefaultTransform()`. A headless runtime draws nothing and returns `drawn=false` `reason=headless`. The caption goes to the popup Instructions pane. The Workbench caption window is used only when the result says `popup=false`.
+
 
 

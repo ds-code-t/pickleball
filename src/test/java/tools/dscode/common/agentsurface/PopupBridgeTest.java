@@ -32,6 +32,15 @@ class PopupBridgeTest {
             assertEquals(200, ok.status);
             assertTrue(ok.csp.contains("default-src 'none'"));
             assertEquals("nosniff", ok.nosniff);
+            HttpResult shell = request(bridge, "/", "GET", null, "abc", "127.0.0.1:" + bridge.port());
+            assertEquals(200, shell.status);
+            assertTrue(shell.body.contains("assets/agent-surface-popup.js?t=abc"), shell.body);
+            HttpResult css = request(bridge, "/assets/surface/html.css", "GET", null, "abc", "127.0.0.1:" + bridge.port());
+            assertEquals(200, css.status);
+            assertEquals(tools.dscode.browser.SurfaceAssets.css("html"), css.body);
+            HttpResult script = request(bridge, "/assets/surface/overlay.js", "GET", null, "abc", "127.0.0.1:" + bridge.port());
+            assertEquals(200, script.status);
+            assertEquals(tools.dscode.browser.SurfaceAssets.js("overlay"), script.body);
             PopupLedger.append(project, "r1", "append", "instructions", "h1", "", "<p>one</p>", "", "");
             PopupLedger.append(project, "r1", "append", "instructions", "h2", "", "<p>two</p>", "", "");
             HttpResult events = request(bridge, "/events", "GET", null, "abc", "127.0.0.1:" + bridge.port());

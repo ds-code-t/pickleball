@@ -40,6 +40,15 @@ public final class WorkbenchNativeOverlay {
     public static void place(Map<String, Object> command) {
         if (command == null) return;
         String id = String.valueOf(command.getOrDefault("id", "overlay"));
+        boolean boxed = command.get("width") instanceof Number && command.get("height") instanceof Number;
+        if (boxed) {
+            int x = number(command.get("x"));
+            int y = number(command.get("y"));
+            tools.dscode.control.protocol.surface.NativeHighlightBox.show(
+                    id, x, y, number(command.get("width")), number(command.get("height")));
+        }
+        boolean popup = Boolean.TRUE.equals(command.get("popup")) || "true".equalsIgnoreCase(String.valueOf(command.get("popup")));
+        if (popup) return;
         String shown = caption(command);
         if (GraphicsEnvironment.isHeadless()) return;
         Object left = command.get("x");
@@ -63,6 +72,8 @@ public final class WorkbenchNativeOverlay {
                 ? "*"
                 : String.valueOf(id);
         REMOVED.add(key);
+        if ("*".equals(key)) tools.dscode.control.protocol.surface.NativeHighlightBox.hide(null);
+        else tools.dscode.control.protocol.surface.NativeHighlightBox.hide(key);
         if (GraphicsEnvironment.isHeadless()) {
             if ("*".equals(key)) WINDOWS.clear();
             else WINDOWS.remove(key);
@@ -84,6 +95,10 @@ public final class WorkbenchNativeOverlay {
     public static void resetForTests() {
         REMOVED.clear();
         WINDOWS.clear();
+    }
+
+    private static int number(Object value) {
+        return value instanceof Number number ? number.intValue() : 0;
     }
 
     private static String text(Object value) {
