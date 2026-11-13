@@ -15,6 +15,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.Consumer;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -24,6 +26,7 @@ public final class CdpConnection implements AutoCloseable {
     private final WebSocket socket;
     private final AtomicLong ids = new AtomicLong();
     private final ConcurrentHashMap<Long, CompletableFuture<JsonNode>> pending = new ConcurrentHashMap<>();
+    private final CopyOnWriteArrayList<Consumer<JsonNode>> eventListeners = new CopyOnWriteArrayList<>();
     private volatile boolean closed;
 
     private CdpConnection(WebSocket socket) {
@@ -84,6 +87,15 @@ public final class CdpConnection implements AutoCloseable {
         return closed;
     }
 
+    /**
+     * Receives every CDP event frame ({@code method} without {@code id}) this
+     * socket reads. Listeners run on the socket reader thread, so they must
+     * not block and must not call {@link #call} themselves.
+     */
+    public void addEventListener(Consumer<JsonNode> listener) {
+        if (listener != null) eventListeners.add(listener);
+    }
+
     @Override
     public void close() {
         if (closed) return;
@@ -105,7 +117,18 @@ public final class CdpConnection implements AutoCloseable {
             EngineLog.debug("cdp", "non-json frame");
             return;
         }
-        if (!message.has("id")) return;
+        if (!message.has("id")) {
+            if (message.has("method")) {
+                for (Consumer<JsonNode> listener : eventListeners) {
+                    try {
+                        listener.accept(message);
+                    } catch (RuntimeException failure) {
+                        EngineLog.debug("cdp", "event listener failed: " + failure.getMessage());
+                    }
+                }
+            }
+            return;
+        }
         long id = message.get("id").asLong();
         CompletableFuture<JsonNode> future = pending.remove(id);
         if (future != null) future.complete(message);

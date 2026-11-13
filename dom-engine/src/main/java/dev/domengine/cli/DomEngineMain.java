@@ -199,6 +199,12 @@ public final class DomEngineMain {
                 "screenshot", "observe", "wait", "desktop", "mcp", "serve"
         ));
         array(node, "session_verbs", List.of("create", "list", "attach", "close", "join", "log"));
+        ObjectNode observe = node.putObject("observe");
+        observe.put("events", true);
+        observe.put("source", "cdp-session");
+        observe.put("buffer", dev.domengine.session.SessionEvents.CAPACITY);
+        array(observe, "kinds", List.of("network", "navigation", "console", "log"));
+        array(observe, "flags", List.of("session", "cdp", "type", "url", "since", "until", "limit", "wait-ms"));
         array(node, "engines", dev.domengine.query.Query.ENGINES);
         array(node, "actions", PageActions.VERBS);
         array(node, "query_flags", dev.domengine.query.Query.QUERY_FLAGS);
@@ -365,6 +371,7 @@ public final class DomEngineMain {
     }
 
     private static CliResult observe(String command, Map<String, String> flags) {
+        if (!queriesDom(flags)) return observeEvents(command, flags);
         BrowserSession session = null;
         if (flags.containsKey("session") || (SessionRegistry.get().joined() != null && !flags.containsKey("file"))) {
             session = bound(flags);
@@ -372,6 +379,67 @@ public final class DomEngineMain {
         dev.domengine.tree.DomNode root = Observe.rootFrom(flags, session);
         com.fasterxml.jackson.databind.node.ObjectNode result = Observe.waitFor(root, flags);
         result.put("command", command);
+        return CliResult.ok(Jsons.pretty(result));
+    }
+
+    /** Query-wait form: a file, or any selector flag the query engine reads. */
+    private static boolean queriesDom(Map<String, String> flags) {
+        if (flags.containsKey("file")) return true;
+        if (flags.containsKey("text")) return true;
+        return dev.domengine.query.Query.pipelineOf(flags) != null;
+    }
+
+    /**
+     * Event form ({@code observe --session ID} with no selector): rows the
+     * session's CDP socket buffered since attach or launch, filtered by
+     * {@code --type}, {@code --url}, {@code --since}, {@code --until},
+     * {@code --limit}. {@code --wait-ms N} waits up to N ms for a match.
+     * {@code --cdp} reads the session already on that endpoint; it attaches a
+     * new one only with a positive wait and the local-attach opt-in, since a
+     * new socket has no history.
+     */
+    private static CliResult observeEvents(String command, Map<String, String> flags) {
+        long waitMs = 0;
+        String rawWait = flags.containsKey("wait-ms") ? flags.get("wait-ms") : flags.get("timeout-ms");
+        if (rawWait != null && !rawWait.isBlank()) {
+            try {
+                waitMs = Long.parseLong(rawWait.trim());
+            } catch (NumberFormatException failure) {
+                return error(2, "usage", "invalid --wait-ms: " + rawWait);
+            }
+        }
+        BrowserSession session;
+        String cdp = flags.get("cdp");
+        if ((flags.get("session") == null || flags.get("session").isBlank()) && cdp != null && !cdp.isBlank()) {
+            session = SessionRegistry.get().findCdp(cdp);
+            if (session == null) {
+                boolean accept = flag(flags, "i-accept-local-attach") || "1".equals(System.getenv("COMPOSITE_ATTACH"));
+                if (waitMs <= 0 || !accept) {
+                    return error(1, "failed", "observe failed: no engine CDP Session event buffer for " + cdp
+                            + "; a new socket has no history (attach with a positive --wait-ms and --i-accept-local-attach)");
+                }
+                session = SessionRegistry.get().create("s" + System.nanoTime(), null, cdp, false, false, true, null, List.of());
+            }
+        } else {
+            session = bound(flags);
+        }
+        if (session == null) {
+            return error(2, "usage", "observe needs --session, --cdp, a joined session, or a query selector with --file");
+        }
+        dev.domengine.session.SessionEvents.Filter filter = dev.domengine.session.SessionEvents.Filter.of(flags);
+        List<ObjectNode> rows = session.events().read(filter, waitMs);
+        EngineLog.info("observe", "session=" + session.id + " wait_ms=" + waitMs + " count=" + rows.size()
+                + " buffered=" + session.events().size());
+        ObjectNode result = Jsons.object();
+        result.put("ok", true);
+        result.put("command", command);
+        result.put("source", "cdp-session");
+        result.put("sentence", "Events already buffered on the engine CDP Session.");
+        result.put("session", session.id);
+        result.put("buffered", session.events().size());
+        result.put("dropped", session.events().dropped());
+        result.put("count", rows.size());
+        result.set("events", dev.domengine.session.SessionEvents.toArray(rows));
         return CliResult.ok(Jsons.pretty(result));
     }
 
@@ -549,6 +617,8 @@ public final class DomEngineMain {
                 click|type|scroll|submit|key|dblclick|contextclick|drag|eval --session ID
                 screenshot --session ID [--out file.png]
                 observe|wait --file page.html|--session ID --css SELECTOR [--timeout-ms N]
+                observe --session ID|--cdp URL [--type KIND] [--url TEXT] [--since MS] [--until MS] [--limit N] [--wait-ms N]
+                  no selector: CDP events the session buffered since attach (network, navigation, console, log)
                 desktop list|attach|walk|query|resolve|close|click|type
                   attach --fixture FILE   replays a recorded tree
                   attach --live [--name WINDOW]   Windows UIA, macOS AX, or Linux AT-SPI

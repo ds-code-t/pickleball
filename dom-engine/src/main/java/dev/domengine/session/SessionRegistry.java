@@ -252,6 +252,16 @@ public final class SessionRegistry {
         }
     }
 
+    /** Live session already using {@code cdp} (same rules as {@code session join --cdp}), or null. */
+    public BrowserSession findCdp(String cdp) {
+        if (cdp == null || cdp.isBlank()) return null;
+        synchronized (this) {
+            loadMissing();
+            String id = findByCdp(BrowserSession.normalize(cdp));
+            return id == null ? null : sessions.get(id);
+        }
+    }
+
     private String findByCdp(String wanted) {
         String wantedKey = endpointKey(wanted);
         for (BrowserSession session : sessions.values()) {

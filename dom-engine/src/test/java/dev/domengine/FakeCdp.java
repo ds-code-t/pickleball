@@ -28,6 +28,8 @@ public final class FakeCdp implements AutoCloseable {
 
     public final int port;
     public final List<String> methods = new CopyOnWriteArrayList<>();
+    /** CDP event frames sent right after the reply to {@code Network.enable}, as Chrome replays traffic. */
+    public final List<ObjectNode> eventsAfterNetworkEnable = new CopyOnWriteArrayList<>();
     private final ServerSocket server;
     private final ExecutorService pool = Executors.newCachedThreadPool();
     private final AtomicBoolean running = new AtomicBoolean(true);
@@ -156,6 +158,9 @@ public final class FakeCdp implements AutoCloseable {
                 result.put("ok", true);
             }
             writeFrame(out, Jsons.compact(response));
+            if ("Network.enable".equals(method)) {
+                for (ObjectNode event : eventsAfterNetworkEnable) writeFrame(out, Jsons.compact(event));
+            }
         }
     }
 

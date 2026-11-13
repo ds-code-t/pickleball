@@ -35,6 +35,7 @@ public final class BrowserSession implements AutoCloseable {
     public final List<String> allow;
     private final Process chrome;
     private final CdpConnection connection;
+    private final SessionEvents events;
     private volatile boolean closed;
     private volatile boolean killedProcess;
 
@@ -47,7 +48,8 @@ public final class BrowserSession implements AutoCloseable {
             Path profile,
             List<String> allow,
             Process chrome,
-            CdpConnection connection
+            CdpConnection connection,
+            SessionEvents events
     ) {
         this.id = id;
         this.cdp = cdp;
@@ -58,22 +60,25 @@ public final class BrowserSession implements AutoCloseable {
         this.allow = allow;
         this.chrome = chrome;
         this.connection = connection;
+        this.events = events == null ? new SessionEvents() : events;
     }
 
     public static BrowserSession attach(String id, String cdp, boolean process, List<String> allow) {
         String browser = normalize(cdp);
         Endpoint endpoint = discover(browser);
         CdpConnection connection = CdpConnection.connect(URI.create(endpoint.webSocket), Duration.ofSeconds(10));
+        SessionEvents events = watch(connection);
         EngineLog.info("session", "attached " + id + " " + browser);
-        return new BrowserSession(id, recordedCdp(endpoint), false, process, 0, null, allow, null, connection);
+        return new BrowserSession(id, recordedCdp(endpoint), false, process, 0, null, allow, null, connection, events);
     }
 
     public static BrowserSession reopen(String id, String cdp, boolean launched, boolean process, long pid, String profile) {
         Endpoint endpoint = discover(normalize(cdp));
         CdpConnection connection = CdpConnection.connect(URI.create(endpoint.webSocket), Duration.ofSeconds(10));
+        SessionEvents events = watch(connection);
         EngineLog.info("session", "reopened " + id + " " + endpoint.http);
         Path dir = profile == null || profile.isBlank() ? null : Path.of(profile);
-        return new BrowserSession(id, recordedCdp(endpoint), launched, process, pid, dir, List.of(), null, connection);
+        return new BrowserSession(id, recordedCdp(endpoint), launched, process, pid, dir, List.of(), null, connection, events);
     }
 
     public static BrowserSession launch(String id, String url, boolean headed, boolean process, Path profile, List<String> allow) {
@@ -129,18 +134,44 @@ public final class BrowserSession implements AutoCloseable {
         String http = "http://127.0.0.1:" + port;
         Endpoint endpoint = discover(http);
         CdpConnection connection = CdpConnection.connect(URI.create(endpoint.webSocket), Duration.ofSeconds(10));
+        SessionEvents events = watch(connection);
         if (url != null && !url.isBlank()) {
             ObjectNode params = Jsons.object();
             params.put("url", url);
             connection.call("Page.navigate", params, Duration.ofSeconds(15));
         }
         EngineLog.info("session", "launched " + id + " pid=" + processHandle.pid());
-        return new BrowserSession(id, endpoint.http, true, process, processHandle.pid(), dir, allow, processHandle, connection);
+        return new BrowserSession(id, endpoint.http, true, process, processHandle.pid(), dir, allow, processHandle, connection, events);
     }
 
     public CdpConnection connection() {
         if (closed || connection == null) throw new CdpException("session " + id + " is closed");
         return connection;
+    }
+
+    /** CDP events this session's socket has seen since attach or launch. */
+    public SessionEvents events() {
+        return events;
+    }
+
+    /**
+     * Starts the session event buffer: the listener goes on before the domains
+     * are enabled, so nothing after attach is missed. These are the domains the
+     * Rust retained Session enabled for observe ({@code Page}, {@code Runtime},
+     * {@code Network}, {@code Log}). A target that refuses a domain still opens;
+     * observe then has fewer kinds, which is logged, not hidden.
+     */
+    static SessionEvents watch(CdpConnection connection) {
+        SessionEvents events = new SessionEvents();
+        connection.addEventListener(events::accept);
+        for (String domain : List.of("Network.enable", "Page.enable", "Runtime.enable", "Log.enable")) {
+            try {
+                connection.call(domain, Jsons.object(), Duration.ofSeconds(5));
+            } catch (CdpException failure) {
+                EngineLog.info("observe", domain + " refused: " + failure.getMessage());
+            }
+        }
+        return events;
     }
 
     public LiveTree tree() {
