@@ -35,6 +35,8 @@ public final class DomCompositeAdapter {
     private volatile Set<String> desktopVerbs;
     private volatile Set<String> actionVerbs;
     private volatile Set<String> queryFlags;
+    private volatile Map<String, Set<String>> verbFlags;
+    private volatile boolean verbFlagsLoaded;
     private volatile Set<String> engines;
     private volatile boolean multiEvalPinned;
     private volatile Set<String> verbsForTests;
@@ -64,6 +66,8 @@ public final class DomCompositeAdapter {
         dryRun = false;
         actionVerbs = null;
         queryFlags = null;
+        verbFlags = null;
+        verbFlagsLoaded = false;
         engines = null;
         multiEvalPinned = false;
         desktopVerbs = null;
@@ -90,6 +94,23 @@ public final class DomCompositeAdapter {
     public boolean queryFlag(String flag) {
         if (flag == null || flag.isBlank()) return false;
         return queryFlags().contains(flag.toLowerCase(Locale.ROOT));
+    }
+
+    /**
+     * True when this engine lists {@code flag} for {@code verb}.
+     * An engine with no {@code verb_flags} object keeps the old send-everything path.
+     */
+    private boolean optionalFlag(String verb, String flag) {
+        Map<String, Set<String>> known = verbFlagMap();
+        if (known == null) return true;
+        Set<String> listed = known.get(verb == null ? "" : verb.toLowerCase(Locale.ROOT));
+        return listed != null && listed.contains(flag == null ? "" : flag.toLowerCase(Locale.ROOT));
+    }
+
+    private void stripUnlistedScopes(Map<String, Object> body, String verb) {
+        if (verbFlagMap() == null || body == null) return;
+        if (!optionalFlag(verb, "frame")) body.remove("frame");
+        if (!optionalFlag(verb, "shadow")) body.remove("shadow");
     }
 
     /** True when {@code capabilities.eval_nodes} is present. One eval can take several node ids. */
@@ -170,7 +191,8 @@ public final class DomCompositeAdapter {
         Map<String, Object> body = new LinkedHashMap<>(selector.body(list(frames), list(shadows)));
         if (within != null && !within.isBlank()) body.put("within", within);
         if (nesting != null && !nesting.isBlank()) body.put("nesting", nesting);
-        if (filter != null && !filter.isBlank()) body.put("filter", filter);
+        if (filter != null && !filter.isBlank() && optionalFlag("query", "filter")) body.put("filter", filter);
+        stripUnlistedScopes(body, "query");
         if (position != null) {
             body.put("nth", position.nth());
             if (position.every() != null) body.put("every", position.every());
@@ -362,6 +384,7 @@ public final class DomCompositeAdapter {
                         selector.xpath(), selector.css(), selector.pipeline(), selector.source(), null, selector.phrase())
                 : selector;
         Map<String, Object> body = new LinkedHashMap<>(used.body(list(frames), list(shadows)));
+        stripUnlistedScopes(body, "query");
         if (engineNth) {
             body.put("nth", ordinal);
             CompositeLog.info("adapter", "nth " + ordinal);
@@ -381,9 +404,13 @@ public final class DomCompositeAdapter {
      * A null result means the caller keeps the Java walk (composite off, dry-run, or a binary that rejects pierce).
      */
     public JsonNode queryAllContexts(String xpath) {
+        if (verbFlagMap() != null && !optionalFlag("query", "all-frames")) {
+            CompositeLog.info("adapter", "scan fallback");
+            return null;
+        }
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("xpath", xpath == null ? "" : xpath);
-        body.put("mode", "composite");
+        if (verbFlagMap() == null) body.put("mode", "composite");
         body.put("all_frames", true);
         body.put("pierce", "open");
         attachGeometry(body);
@@ -425,7 +452,7 @@ public final class DomCompositeAdapter {
         String id = element.attributes().get("id");
         String css = element.selector().css();
         String hoverCss = id != null && !id.isBlank() ? "#" + id : css;
-        if (hoverCss != null && !hoverCss.isBlank()) extra.put("force_hover", hoverCss);
+        if (hoverCss != null && !hoverCss.isBlank() && optionalFlag("query", "force-hover")) extra.put("force_hover", hoverCss);
         act("query", element, extra);
     }
 
@@ -537,9 +564,10 @@ public final class DomCompositeAdapter {
      */
     public JsonNode eval(CompositeWebElement element, String source) {
         Map<String, Object> body = new LinkedHashMap<>(element.actionBody(list(frames), list(shadows)));
+        stripUnlistedScopes(body, "eval");
         body.put("source", source == null ? "" : source);
         String nodeId = element.nodeId();
-        if (nodeId != null && !nodeId.isBlank()) body.put("node_id", nodeId);
+        if (nodeId != null && !nodeId.isBlank() && optionalFlag("eval", "node-id")) body.put("node_id", nodeId);
         record("eval");
         CompositeLog.info("adapter", "eval " + element.selector().describe());
         if (dryRun) return null;
@@ -562,6 +590,10 @@ public final class DomCompositeAdapter {
         record("query");
         CompositeLog.info("adapter", "wait " + rules + " poll=150");
         if (dryRun) return true;
+        if (verbFlagMap() != null && !optionalFlag("query", "wait-for")) {
+            CompositeLog.info("adapter", "wait fallback");
+            return false;
+        }
         Client open = CompositeRuntime.ensureClient();
         if (open == null) return false;
         try {
@@ -736,6 +768,8 @@ public final class DomCompositeAdapter {
         desktopVerbs = null;
         actionVerbs = null;
         queryFlags = null;
+        verbFlags = null;
+        verbFlagsLoaded = false;
         engines = null;
         multiEvalPinned = false;
     }
@@ -753,6 +787,38 @@ public final class DomCompositeAdapter {
         queryFlags = loaded;
         loadMultiEval(open);
         return loaded;
+    }
+
+    /** {@code null} when the engine has no {@code verb_flags} object. A failed read is not cached. */
+    private Map<String, Set<String>> verbFlagMap() {
+        if (verbsForTests != null) return verbFlags;
+        if (verbFlagsLoaded) return verbFlags;
+        Client open = CompositeRuntime.client();
+        if (open == null) return null;
+        try {
+            JsonNode caps = open.capabilities();
+            JsonNode object = caps == null ? null : caps.get("verb_flags");
+            if (object == null || !object.isObject()) {
+                verbFlags = null;
+            } else {
+                Map<String, Set<String>> parsed = new LinkedHashMap<>();
+                object.fields().forEachRemaining(entry -> {
+                    Set<String> names = new LinkedHashSet<>();
+                    if (entry.getValue() != null && entry.getValue().isArray()) {
+                        for (JsonNode item : entry.getValue()) {
+                            String name = item.asText("").trim().toLowerCase(Locale.ROOT);
+                            if (!name.isEmpty()) names.add(name);
+                        }
+                    }
+                    parsed.put(entry.getKey().toLowerCase(Locale.ROOT), Set.copyOf(names));
+                });
+                verbFlags = Map.copyOf(parsed);
+            }
+            verbFlagsLoaded = true;
+            return verbFlags;
+        } catch (RuntimeException ignored) {
+            return null;
+        }
     }
 
     private void loadMultiEval(Client open) {
@@ -812,6 +878,7 @@ public final class DomCompositeAdapter {
     private void act(String command, CompositeWebElement element, Map<String, Object> extra) {
         Map<String, Object> body = new LinkedHashMap<>(element.actionBody(list(frames), list(shadows)));
         body.putAll(extra);
+        stripUnlistedScopes(body, "query".equals(command) ? "query" : command);
         record(command);
         CompositeLog.info("adapter", command + " " + element.selector().describe());
         if (dryRun) return;

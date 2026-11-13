@@ -213,6 +213,10 @@ public final class DomEngineMain {
         array(node, "engines", dev.domengine.query.Query.ENGINES);
         array(node, "actions", PageActions.VERBS);
         array(node, "query_flags", dev.domengine.query.Query.QUERY_FLAGS);
+        ObjectNode verbFlags = node.putObject("verb_flags");
+        for (Map.Entry<String, List<String>> entry : VerbFlags.VERBS.entrySet()) {
+            array(verbFlags, entry.getKey(), entry.getValue());
+        }
         array(node, "desktop", DesktopTree.VERBS);
         ObjectNode logging = node.putObject("logging");
         logging.put("default", "off");
@@ -330,6 +334,8 @@ public final class DomEngineMain {
     }
 
     private static CliResult query(Map<String, String> flags) {
+        String unknown = VerbFlags.unrecognized("query", flags);
+        if (unknown != null) return error(2, "usage", "unrecognized flag --" + unknown + " for query");
         dev.domengine.tree.DomNode root;
         if (flags.containsKey("file")) {
             try {
@@ -355,6 +361,8 @@ public final class DomEngineMain {
     }
 
     private static CliResult action(String verb, Map<String, String> flags) {
+        String unknown = VerbFlags.unrecognized(verb, flags);
+        if (unknown != null) return error(2, "usage", "unrecognized flag --" + unknown + " for " + verb);
         BrowserSession session = bound(flags);
         if (session == null) return error(2, "usage", verb + " requires --session");
         LiveXPath.use(session.connection());

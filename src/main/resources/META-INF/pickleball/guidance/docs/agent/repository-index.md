@@ -1112,6 +1112,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `dom-engine/src/main/java/dev/domengine/cdp/CdpException.java`
 - `dom-engine/src/main/java/dev/domengine/cli/CliResult.java`
 - `dom-engine/src/main/java/dev/domengine/cli/DomEngineMain.java`
+- `dom-engine/src/main/java/dev/domengine/cli/VerbFlags.java`
 - `dom-engine/src/main/java/dev/domengine/conform/Conformance.java`
 - `dom-engine/src/main/java/dev/domengine/conform/LiveConformance.java`
 - `dom-engine/src/main/java/dev/domengine/desktop/AtSpi.java`
@@ -1165,6 +1166,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `dom-engine/src/test/java/dev/domengine/session/SessionEventsTest.java`
 - `dom-engine/src/test/java/dev/domengine/SessionJoinLogTest.java`
 - `dom-engine/src/test/java/dev/domengine/SharedSurfaceTest.java`
+- `dom-engine/src/test/java/dev/domengine/VerbFlagTest.java`
 - `dom-engine/src/test/java/dev/domengine/VisualRelativeTest.java`
 - `dom-engine/src/test/resources/conformance/expected/a11y-at-hidden.json`
 - `dom-engine/src/test/resources/conformance/expected/a11y-custom-tag.json`

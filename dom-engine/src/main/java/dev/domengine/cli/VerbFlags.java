@@ -1,0 +1,62 @@
+package dev.domengine.cli;
+
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+/**
+ * Flags each verb actually reads. A flag is listed only when the verb uses it.
+ * {@code capabilities.verb_flags} is this map.
+ */
+public final class VerbFlags {
+    private static final List<String> SELECTORS = List.of(
+            "session", "session-dir", "css", "xpath", "text", "pipeline", "selector", "expr", "pw", "by",
+            "within", "pierce", "strict"
+    );
+
+    public static final Map<String, List<String>> VERBS = verbs();
+
+    private VerbFlags() {
+    }
+
+    public static List<String> of(String verb) {
+        List<String> flags = VERBS.get(verb);
+        return flags == null ? List.of() : flags;
+    }
+
+    public static String unrecognized(String verb, Map<String, String> flags) {
+        if (flags == null) return null;
+        Set<String> allowed = new LinkedHashSet<>(of(verb));
+        for (String name : flags.keySet()) {
+            if (name.startsWith("__")) continue;
+            if (!allowed.contains(name)) return name;
+        }
+        return null;
+    }
+
+    private static Map<String, List<String>> verbs() {
+        Map<String, List<String>> map = new LinkedHashMap<>();
+        map.put("query", join(SELECTORS, List.of(
+                "file", "nesting", "nth", "every", "count-only", "geometry", "point", "viewport", "exposure", "explain"
+        )));
+        List<String> click = join(SELECTORS, List.of());
+        map.put("click", click);
+        map.put("dblclick", click);
+        map.put("contextclick", click);
+        map.put("submit", click);
+        map.put("type", join(SELECTORS, List.of("append", "submit")));
+        map.put("scroll", join(SELECTORS, List.of("dx", "dy")));
+        map.put("key", join(SELECTORS, List.of("key")));
+        map.put("eval", join(SELECTORS, List.of("source")));
+        map.put("drag", List.of("session", "session-dir", "source", "target"));
+        return Map.copyOf(map);
+    }
+
+    private static List<String> join(List<String> left, List<String> right) {
+        LinkedHashSet<String> both = new LinkedHashSet<>(left);
+        both.addAll(right);
+        return List.copyOf(both);
+    }
+}
