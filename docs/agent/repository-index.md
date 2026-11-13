@@ -661,6 +661,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/common/composite/ActionVerbPlanTest.java`
 - `src/test/java/tools/dscode/common/composite/AllContextsPlanTest.java`
 - `src/test/java/tools/dscode/common/composite/CompositeElements.java`
+- `src/test/java/tools/dscode/common/composite/CompositeFallbackLogTest.java`
 - `src/test/java/tools/dscode/common/composite/CompositeLocationTest.java`
 - `src/test/java/tools/dscode/common/composite/ContextAnchorReproTest.java`
 - `src/test/java/tools/dscode/common/composite/ContextNestGateTest.java`

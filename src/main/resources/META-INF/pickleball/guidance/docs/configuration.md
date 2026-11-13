@@ -92,6 +92,14 @@ pkb_options
 
 `pkb_run_profile` is the canonical resolved output and is reserved for Pickleball. External `pkb_run_profile` / `pkb_run_profile.<pkb_var>` input is rejected; use `pkb_runvars` / `pkb_runvars.<pkb_var>` for controlled runs, or `pkb_overriderunvars` / `pkb_overriderunvars.<pkb_var>` for a sealed complete map.
 
+## DOM engine
+
+`pkb_composite` is `auto` (default), `on`, or `off`. `auto` uses the in-repo Java DOM engine and the Selenium element path when the engine is missing, the client fails to start, or a join fails. `on` is the same choice and always prints `error:` and `fix:`. `off` stays on Selenium and does not look for an engine.
+
+`pkb_composite_fallback_log` is `warn` (default), `info`, or `off`. Read order matches `pkb_composite`: system property, `pkb_runvars.pkb_composite_fallback_log`, env `PKB_COMPOSITE_FALLBACK_LOG`, then the run variable. Each `auto` fallback logs one line per run and reason (missing, client, join) at that level, with the engine path or `none` and the fix text. The line goes to stderr, the Pickleball log, and a run-level `composite.fallback` diagnostic event (`run-events.jsonl` and `compositeFallbacks` on `run-index.json`). `off` prints none of those lines. `pkb_composite=off` stays quiet. An explicit binary that is not the Java launcher, or `pkb_composite_engine=rust`, logs one INFO line naming the source key even when `pkb_composite_log` is off.
+
+Env `COMPOSITE_BIN` is working-directory relative. Property `pkb_composite_bin`, `pkb_runvars.pkb_composite_bin`, and env `pkb_composite_bin` resolve against the project. Direct control and element lookup use that same rule.
+
 Diagnostic lineage is separate metadata:
 
 ```text

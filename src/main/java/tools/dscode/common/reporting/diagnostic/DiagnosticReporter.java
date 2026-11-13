@@ -33,6 +33,7 @@ import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.Deque;
 import java.util.LinkedHashMap;
@@ -83,6 +84,7 @@ final class DiagnosticReporter {
     private final ThreadLocal<Deque<NestedContext>> nested = ThreadLocal.withInitial(ArrayDeque::new);
     private final ThreadLocal<Deque<StepContext>> steps = ThreadLocal.withInitial(ArrayDeque::new);
     private final Set<String> runCapabilities = ConcurrentHashMap.newKeySet();
+    private final List<Map<String, Object>> compositeFallbacks = Collections.synchronizedList(new ArrayList<>());
     private final SourceProvenance sourceProvenance;
     private final Map<String, SourceProvenance.ReferencedFile> referenced = new ConcurrentHashMap<>();
     private final boolean directRunProfile;
@@ -262,6 +264,15 @@ final class DiagnosticReporter {
                 "level", level.name(),
                 "text", sanitizeText(message)
         ));
+    }
+
+    void recordRunEvent(String type, Map<String, ?> data) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        if (data != null) data.forEach(body::put);
+        append(runEvents, event(type, body));
+        if (!"composite.fallback".equals(type)) return;
+        compositeFallbacks.add(body);
+        writeRunIndex(finished ? runOutcome() : "RUNNING", finished ? "COMPLETE" : "IN_PROGRESS");
     }
 
     void beginStep(StepExtension step) {
@@ -751,6 +762,9 @@ final class DiagnosticReporter {
             index.put("nativeCapabilityCounts", runCapabilityCounts());
             index.put("capabilitySemantics", "Presence means native Pickleball instrumentation observed the capability; absence does not prove the capability was unused by consumer-defined code.");
             index.put("scenarios", scenarioList);
+            if (!compositeFallbacks.isEmpty()) {
+                index.put("compositeFallbacks", List.copyOf(compositeFallbacks));
+            }
             index.put("paths", Map.of(
                     "manifest", "manifest.json",
                     "configuration", "configuration.json",
@@ -782,7 +796,7 @@ final class DiagnosticReporter {
                             for (String key : List.of(
                                     "runId", "outcome", "completion", "startedAt", "reportRetention",
                                     "configurationHash", "runProfile", "runProfileFingerprint",
-                                    "comparisonMetadata", "counts", "lineage"
+                                    "comparisonMetadata", "counts", "lineage", "compositeFallbacks"
                             )) {
                                 summary.put(key, index.get(key));
                             }

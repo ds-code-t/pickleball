@@ -161,6 +161,25 @@ class CompositeLocationTest {
     }
 
     @Test
+    void relativeCompositeBinResolvesTheSameAbsolutePathOnBothResolvers() throws Exception {
+        Path binary = executable(temp.resolve("relative-bin").resolve("composite"));
+        Path cwd = Path.of("").toAbsolutePath();
+        String relative = cwd.relativize(binary.toAbsolutePath()).toString();
+        assertFalse(Path.of(relative).isAbsolute(), relative);
+        Path project = temp.resolve("not-the-working-directory");
+        Files.createDirectories(project);
+        Map<String, String> env = Map.of(DirectControlProvider.BIN_ENV, relative);
+        ClassLoader empty = new ClassLoader(null) {
+        };
+        Optional<Path> located = CompositeBinaryLocator.locate(project, env, empty);
+        Optional<Path> provided = DirectControlProvider.resolveBinary(
+                DirectControlProvider.TOKEN, project, env, empty);
+        Path absolute = binary.toAbsolutePath().normalize();
+        assertEquals(absolute, located.orElseThrow());
+        assertEquals(located, provided);
+    }
+
+    @Test
     void daltonRecordsTheJavaEngineWhenEnabled() throws Exception {
         Path project = temp.resolve("dalton-project");
         Files.createDirectories(project);

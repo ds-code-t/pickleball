@@ -142,9 +142,13 @@ public final class DirectControlProvider {
      * {@code pkb_composite_bin}. Blank values are omitted.
      *
      * <p>{@code compositeBin} marks env {@code COMPOSITE_BIN}. That slot stays
-     * working-directory relative. The other slots resolve against the project.</p>
+     * working-directory relative. The other slots resolve against the project.
+     * {@code sourceKey} is the property or env name that supplied the spec.</p>
      */
-    public record ExplicitEngineCandidate(String spec, boolean compositeBin) {
+    public record ExplicitEngineCandidate(String spec, boolean compositeBin, String sourceKey) {
+        public ExplicitEngineCandidate(String spec, boolean compositeBin) {
+            this(spec, compositeBin, compositeBin ? BIN_ENV : JavaEngineLauncher.BIN_KEY);
+        }
     }
 
     public static List<ExplicitEngineCandidate> explicitEngineCandidates(
@@ -167,7 +171,7 @@ public final class DirectControlProvider {
     ) {
         if (source == null) return;
         String value = blank(source.get(key));
-        if (value != null) candidates.add(new ExplicitEngineCandidate(value, compositeBin));
+        if (value != null) candidates.add(new ExplicitEngineCandidate(value, compositeBin, key));
     }
 
     private static void copyLiveProperty(Map<String, String> properties, String key) {

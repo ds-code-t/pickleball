@@ -84,9 +84,14 @@ public final class CompositeBinaryLocator {
         List<DirectControlProvider.ExplicitEngineCandidate> candidates =
                 DirectControlProvider.explicitEngineCandidates(properties, environment);
         if (!candidates.isEmpty()) {
-            Path explicit = executable(candidates.get(0).spec(), resolved.project());
+            DirectControlProvider.ExplicitEngineCandidate candidate = candidates.get(0);
+            Path base = candidate.compositeBin() ? null : resolved.project();
+            Path explicit = executable(candidate.spec(), base);
             if (explicit != null) {
                 CompositeLog.info("location", "binary " + explicit);
+                if (!javaLauncherScript(explicit)) {
+                    CompositeLog.overrideOnce(candidate.sourceKey(), explicit.toString());
+                }
                 return Optional.of(explicit);
             }
         }
@@ -103,6 +108,9 @@ public final class CompositeBinaryLocator {
         );
         if (discovered.isPresent()) {
             CompositeLog.info("location", "binary " + discovered.get());
+            if (rustRequested(resolved)) {
+                CompositeLog.overrideOnce(rustSourceKey(resolved), discovered.get().toString());
+            }
             return discovered;
         }
         String classifier = classifier();
@@ -216,6 +224,25 @@ public final class CompositeBinaryLocator {
             if (candidate != null) return candidate;
         }
         return null;
+    }
+
+    private static boolean javaLauncherScript(Path path) {
+        try {
+            String text = Files.readString(path);
+            return text.contains("dev.domengine.cli.DomEngineMain");
+        } catch (IOException failure) {
+            return false;
+        }
+    }
+
+    private static String rustSourceKey(CompositeRuntime.Sources sources) {
+        Map<String, String> properties = sources.properties() == null ? Map.of() : sources.properties();
+        if (text(properties.get(ENGINE_KEY)) != null) return ENGINE_KEY;
+        if (text(properties.get("pkb_runvars." + ENGINE_KEY)) != null) return "pkb_runvars." + ENGINE_KEY;
+        Map<String, String> env = sources.env() == null ? Map.of() : sources.env();
+        if (text(env.get("PKB_COMPOSITE_ENGINE")) != null) return "PKB_COMPOSITE_ENGINE";
+        if (text(env.get(ENGINE_KEY)) != null) return ENGINE_KEY;
+        return ENGINE_KEY;
     }
 
     private static Path executable(String value, Path project) {

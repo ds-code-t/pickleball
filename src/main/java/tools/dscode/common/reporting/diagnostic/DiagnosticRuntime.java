@@ -55,6 +55,12 @@ public final class DiagnosticRuntime {
         if (DIAGNOSTIC_MODE && reporter != null) reporter.recordFilteredLog(level, message);
     }
 
+    /** Run-level diagnostic event. No-op unless diagnostic reporting is on. */
+    public static void recordRunEvent(String type, Map<String, ?> data) {
+        if (!DIAGNOSTIC_MODE || reporter == null || type == null || type.isBlank()) return;
+        reporter.recordRunEvent(type, data);
+    }
+
     public static void beginStep(StepExtension step) {
         try (io.cucumber.core.runner.UntilPassTiming.Scope ignored =
                      io.cucumber.core.runner.UntilPassTiming.open("diagnostics")) {

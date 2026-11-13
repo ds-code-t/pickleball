@@ -71,7 +71,9 @@ public final class CompositeRuntime {
                     CompositeLog.KEY,
                     "pkb_runvars." + CompositeLog.KEY,
                     CompositeLog.DIR_KEY,
-                    "pkb_runvars." + CompositeLog.DIR_KEY
+                    "pkb_runvars." + CompositeLog.DIR_KEY,
+                    CompositeLog.FALLBACK_KEY,
+                    "pkb_runvars." + CompositeLog.FALLBACK_KEY
             )) {
                 String value = System.getProperty(key);
                 if (value != null) properties.put(key, value);
@@ -289,10 +291,8 @@ public final class CompositeRuntime {
             rememberJoined(normalized);
             CompositeLog.info("session", "joined " + normalized + " id=" + session.id());
         } catch (RuntimeException failure) {
-            CompositeLog.errorFix(
-                    "session",
-                    "DOM engine could not join the browser session: " + failure.getMessage(),
-                    "Leave pkb_composite=auto so this run stays on Selenium; check that the in-repo Java engine is on the classpath, or fix the explicit pkb_composite_bin / COMPOSITE_BIN path."
+            noteJoinFailure(
+                    "DOM engine could not join the browser session: " + failure.getMessage()
             );
             if (SESSIONS_BY_CDP.isEmpty()) forceLegacy();
         }
@@ -313,11 +313,7 @@ public final class CompositeRuntime {
             CompositeLog.info("session", "joined " + normalized + " id=" + session.id());
             return true;
         } catch (RuntimeException failure) {
-            CompositeLog.errorFix(
-                    "session",
-                    "DOM engine could not join the page session: " + failure.getMessage(),
-                    "Leave pkb_composite=auto so this run stays on Selenium; check that the in-repo Java engine is on the classpath, or fix the explicit pkb_composite_bin / COMPOSITE_BIN path."
-            );
+            noteJoinFailure("DOM engine could not join the page session: " + failure.getMessage());
             return false;
         }
     }
@@ -362,7 +358,7 @@ public final class CompositeRuntime {
         }
         Optional<Path> binary = CompositeBinaryLocator.locate(sources);
         if (binary.isEmpty()) {
-            CompositeLog.fallbackOnce(MISSING, MISSING_FIX);
+            CompositeLog.fallbackOnce("missing", MISSING, MISSING_FIX, null);
             return Decision.legacy("missing");
         }
         try {
@@ -374,8 +370,10 @@ public final class CompositeRuntime {
             return new Decision(true, binary.get(), version, "composite");
         } catch (RuntimeException failure) {
             CompositeLog.fallbackOnce(
+                    "client",
                     "DOM engine client failed (" + failure.getMessage() + "); using the legacy Selenium element path for this run",
-                    MISSING_FIX
+                    MISSING_FIX,
+                    binary.get().toString()
             );
             return Decision.legacy("client");
         }
@@ -397,6 +395,17 @@ public final class CompositeRuntime {
         joinedCdp = cdp == null || cdp.isBlank() ? null : cdp;
         if (joinedCdp == null) THREAD_JOINED.remove();
         else THREAD_JOINED.set(joinedCdp);
+    }
+
+    private static void noteJoinFailure(String error) {
+        Decision prior = decision;
+        String engine = prior == null || prior.binary() == null ? null : prior.binary().toString();
+        CompositeLog.fallbackOnce(
+                "join",
+                error,
+                "Leave pkb_composite=auto so this run stays on Selenium; check that the in-repo Java engine is on the classpath, or fix the explicit pkb_composite_bin / COMPOSITE_BIN path.",
+                engine
+        );
     }
 
     private static void forceLegacy() {

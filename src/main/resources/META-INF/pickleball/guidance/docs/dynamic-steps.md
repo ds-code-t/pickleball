@@ -12,6 +12,10 @@ Then , click the "Submit" Button
 
 Pickleball parses the text after the comma into values, elements, contexts, actions, assertions, and conditions.
 
+## DOM engine translation
+
+Element finds and actions go through the in-repo Java DOM engine unless `pkb_composite=off`. An `auto` fallback (missing engine, client failed to start, or a failed join) logs one line per run and reason. The level is `pkb_composite_fallback_log` (`warn` by default, or `info`, or `off`). `pkb_composite=on` still prints `error:` and `fix:`.
+
 ## Element descriptions
 
 An element can be described by its business-visible characteristics:

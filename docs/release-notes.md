@@ -4,6 +4,8 @@
 
 The native engine is the default execution engine. `pkb_engine=cucumber` keeps the Cucumber adapter. The in-repo Java DOM engine is the default element engine and ships in the jar. Rust is an explicit override only (`pkb_composite_engine=rust` or an explicit binary). Dalton is opt-in.
 
+- `pkb_composite_fallback_log` (`warn` by default, `info`, or `off`) logs one line per run and reason when `auto` falls back to Selenium (missing engine, client failed, join failed). The line names the engine path or `none` and the fix. It is also a `composite.fallback` diagnostic event. `pkb_composite=off` stays quiet. `pkb_composite=on` still prints `error:` and `fix:`. An explicit non-Java binary, or `pkb_composite_engine=rust`, logs one INFO line naming the source key. Env `COMPOSITE_BIN` resolves from the working directory; the other explicit engine slots resolve from the project. A browser-level CDP URL is joined to the current tab's page target. `session create --url` returns only after that document is complete.
+
 - Workbench direct control: `pkb_direct_control_provider=composite` now runs the in-repo Java engine, carried in the thin Workbench jar, when no `COMPOSITE_BIN` or `pkb_composite_bin` is set and Rust is not requested (`pkb_composite_engine=rust`). Before this it looked only for the Rust binary and skipped. The engine CLI accepts the global `--session-dir` on every verb and prints Rust-layout pretty JSON.
 
 Dalton is an opt-in hydrated working copy. Git files stay the source of truth. The database is `.pickleball/dalton/dalton.db`, gitignored, and never required for a fresh clone or CI. With Dalton off, feature loading, configuration, and execution are unchanged. A normal `mvn test` or `gradlew test` does not open that database.
