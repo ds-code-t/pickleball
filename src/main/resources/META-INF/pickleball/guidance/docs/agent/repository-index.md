@@ -658,6 +658,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/common/assertions/MultilineAssertTest.java`
 - `src/test/java/tools/dscode/common/composite/ActionVerbPlanTest.java`
 - `src/test/java/tools/dscode/common/composite/AllContextsPlanTest.java`
+- `src/test/java/tools/dscode/common/composite/CapabilityProbeTest.java`
 - `src/test/java/tools/dscode/common/composite/CompositeElements.java`
 - `src/test/java/tools/dscode/common/composite/CompositeFallbackLogTest.java`
 - `src/test/java/tools/dscode/common/composite/CompositeLocationTest.java`
@@ -1130,6 +1131,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/discover/LastDiscoverSnapshotTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/engine/DomEngineCliForwarderTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/engine/EngineCliForwarderTest.java`
+- `pickleball-workbench/src/test/java/tools/dscode/workbench/JavaEngineClasspathTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/lease/WorkbenchControlLeaseTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/log/LogCliForwarderTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/mapping/MappingValueCodecTest.java`
