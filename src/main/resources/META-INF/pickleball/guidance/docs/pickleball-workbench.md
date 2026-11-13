@@ -705,3 +705,17 @@ For changed consumer bridge behavior, use only the affected focused tags—never
 Run these invocations sequentially because the scenarios deliberately verify the process-global bridge bootstrap.
 
 A warm launch adds `-o` (Maven) or `--offline` (Gradle) once the project has compiled test classes. If that offline launch fails only because a build plugin or provider was never downloaded (output contains `in offline mode` or `has not been downloaded from it before`), `discover` and `confirm` re-run the same command once without the offline flag and write `stage=maven-retry-online` to `launch-timing.txt`. Any other failure is reported as is. A normal `mvn test` is unchanged.
+
+## Editor
+
+The Editor tab adds, changes, and deletes element categories, configuration and data files, scenarios, scenario steps, and Java or JS/TS glue. Every button builds a `dalton` argument list and `DaltonCliForwarder` runs it. The tab does not open SQLite and does not load Dalton classes. MCP `dalton` and Gradle `daltonEdit` forward the same commands.
+
+| Surface | Command |
+|---|---|
+| Categories | `dalton category list\|show\|put\|remove` |
+| Files | `dalton file put\|delete\|show` |
+| Scenarios | `dalton feature scenario-add\|scenario-modify\|scenario-delete` |
+| Steps | `dalton feature step-add\|step-modify\|step-delete` |
+| Glue | `dalton glue list\|show\|put\|remove` |
+
+Deletes ask for confirmation, then pass `--confirm`. A conflict or an untracked database edit is refused unless `--force`. When Dalton is off the command writes the file. When Dalton is on, put sets `db_edited` and leaves the file until `dalton extract`. Scenario and step edits splice one region, keep comments outside it, normalize the indent of that region, and write valid Gherkin through `feature put`. `dalton scenario put` and `dalton step put` stay rejected. Java `@Given` / `@When` / `@Then` / `@And` / `@But` values stay one string literal. Files under `glue/js/` are source only; there is no JS/TS step runtime. A secret field must be a reference (`<name>` or `~MASK`). `pkb_dalton_log=edit` logs each edit, date-stamped, per entity, and size-capped.

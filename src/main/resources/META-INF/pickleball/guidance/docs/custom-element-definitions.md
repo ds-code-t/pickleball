@@ -186,3 +186,17 @@ Do not create a separate category for every individual element. Dynamic text, st
 - [Catalog page DOM](../maven-consumer-project/src/test/resources/site/catalog.html)
 
 [Previous: Execution Configuration](configuration.md) · [Documentation home](README.md)
+
+## Project category files
+
+A project can add categories without a Java hook. Put a YAML file at `dalton-entities/ElementCategory/<Name>.yaml`. Pickleball loads those files after the built-in categories, on the next run, the first time the execution dictionary is used. Saving a file does not change a run that has already started.
+
+```yaml
+name: Status Badge
+base: //*[contains(concat(' ', normalize-space(@class), ' '), ' status-badge ')]
+inherits: Contains Text
+overlay: false
+```
+
+`dalton category put|remove` is the write path. The Workbench Editor only forwards. A built-in name is immutable. `overlay: true` adds a project locator and does not replace the built-in. `Loading` keeps `ALL_CONTEXTS`. `ALL_CONTEXTS` is a flag, not a name. Reserved names in [Reserved element names](reserved-element-names.md) are rejected. When Dalton is on, the put is stored with `db_edited` and the file is written by `dalton extract`. When Dalton is off, the command writes the YAML file and does not open the database.
+

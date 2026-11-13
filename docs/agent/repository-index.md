@@ -503,11 +503,13 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/coredefinitions/TableSteps.java`
 - `src/main/java/tools/dscode/coredefinitions/UtilitySteps.java`
 - `src/main/java/tools/dscode/cucumberextended/utilities/StringUtilities.java`
+- `src/main/java/tools/dscode/dalton/CategoryRules.java`
 - `src/main/java/tools/dscode/dalton/DaltonCli.java`
 - `src/main/java/tools/dscode/dalton/DaltonConfig.java`
 - `src/main/java/tools/dscode/dalton/DaltonContent.java`
 - `src/main/java/tools/dscode/dalton/DaltonDatabase.java`
 - `src/main/java/tools/dscode/dalton/DaltonDiscovery.java`
+- `src/main/java/tools/dscode/dalton/DaltonEdit.java`
 - `src/main/java/tools/dscode/dalton/DaltonEntities.java`
 - `src/main/java/tools/dscode/dalton/DaltonExtractor.java`
 - `src/main/java/tools/dscode/dalton/DaltonFeatureSource.java`
@@ -525,6 +527,11 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/dalton/DaltonRunWorker.java`
 - `src/main/java/tools/dscode/dalton/DaltonSecrets.java`
 - `src/main/java/tools/dscode/dalton/DaltonSources.java`
+- `src/main/java/tools/dscode/dalton/EditRules.java`
+- `src/main/java/tools/dscode/dalton/FileRules.java`
+- `src/main/java/tools/dscode/dalton/GherkinRewrite.java`
+- `src/main/java/tools/dscode/dalton/GlueRules.java`
+- `src/main/java/tools/dscode/dalton/ProjectElementCategories.java`
 - `src/main/java/tools/dscode/engine/adapter/CucumberAdapterRun.java`
 - `src/main/java/tools/dscode/engine/adapter/NativeSuiteExecution.java`
 - `src/main/java/tools/dscode/engine/context/ExecutionContext.java`
@@ -696,9 +703,11 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/coredefinitions/RunTypeAliasTest.java`
 - `src/test/java/tools/dscode/coredefinitions/XmlTableCellFeatureTest.java`
 - `src/test/java/tools/dscode/coredefinitions/XmlTableCellTest.java`
+- `src/test/java/tools/dscode/dalton/CategoryEditTest.java`
 - `src/test/java/tools/dscode/dalton/DaltonDiscoveryTest.java`
 - `src/test/java/tools/dscode/dalton/DaltonDriverMissingTest.java`
 - `src/test/java/tools/dscode/dalton/DaltonEdgeTest.java`
+- `src/test/java/tools/dscode/dalton/DaltonEditContractTest.java`
 - `src/test/java/tools/dscode/dalton/DaltonEditTest.java`
 - `src/test/java/tools/dscode/dalton/DaltonEntityTest.java`
 - `src/test/java/tools/dscode/dalton/DaltonExtractTest.java`
@@ -711,6 +720,9 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/dalton/DaltonRunTest.java`
 - `src/test/java/tools/dscode/dalton/DaltonScenarioHarness.java`
 - `src/test/java/tools/dscode/dalton/DaltonSecretsTest.java`
+- `src/test/java/tools/dscode/dalton/FileEditTest.java`
+- `src/test/java/tools/dscode/dalton/GherkinRewriteTest.java`
+- `src/test/java/tools/dscode/dalton/GlueEditTest.java`
 - `src/test/java/tools/dscode/engine/context/ExecutionContextTest.java`
 - `src/test/java/tools/dscode/engine/context/RunBindingsTest.java`
 - `src/test/java/tools/dscode/engine/convert/CucumberModelConverterTest.java`
@@ -1034,6 +1046,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/ui/AgentChatPanel.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/ui/ConfigTabModel.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/ui/DaltonPanel.java`
+- `pickleball-workbench/src/main/java/tools/dscode/workbench/ui/EditPanel.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/ui/FeaturePickerPanel.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/ui/LogPanel.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/ui/LongWork.java`
@@ -1105,6 +1118,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/terminal/WorkerLogBufferTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/ui/ConfigTabModelTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/ui/DaltonPanelTest.java`
+- `pickleball-workbench/src/test/java/tools/dscode/workbench/ui/EditPanelTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/ui/LogPanelTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/ui/LongWorkTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/ui/RunVarOverridePanelTest.java`
