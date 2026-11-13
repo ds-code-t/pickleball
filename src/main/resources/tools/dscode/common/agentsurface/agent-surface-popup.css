@@ -1,0 +1,9 @@
+html, body { margin: 0; height: 100%; background: #10141a; color: #e7edf5; font: 14px/1.4 sans-serif; }
+main { display: grid; grid-template-rows: 1fr 1fr auto; height: 100%; }
+section { overflow: auto; padding: 12px; border-bottom: 1px solid #2a3340; }
+#chat { background: #161b22; }
+#instructions { background: #121820; }
+#diagram { background: #0e141c; }
+form { display: flex; gap: 8px; padding: 8px; }
+input { flex: 1; }
+button, [role="button"] { cursor: pointer; }

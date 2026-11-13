@@ -657,3 +657,21 @@ Dalton logging is off unless `pkb_dalton_log` is `true`, `all`, or a comma-separ
 The database is not encrypted. A secret field must be a `<...>` reference or `~MASK;`, never cleartext. The built-in names are `password`, `passwd`, `secret`, `token`, `api_key`, `api-key`, `apikey`, `credential`, `private_key`, and `private-key`. `secret-fields=` in `dalton.properties` adds names (repeat the key or separate them with commas). `pkb_dalton_secret_fields` wins over that file. A value of 32 or more characters with no spaces on any other field prints `warn: high-entropy value on <field>` and is stored. The warning does not include the value. Rejection stays on the name list.
 
 Parallel runs share that database through SQLite WAL and a 5 second busy timeout. A lock that lasts longer fails the command and does not fall back to the files. Paths are stored with `/` on Windows and Linux. `dalton run` uses `mvnw.cmd` or `gradlew.bat` on Windows and quotes a classpath that contains a space. The warm worker listens on loopback only. There is no file watcher. A large feature tree is copied by SHA-256, so an unchanged file is not parsed again.
+
+## Agent surface popup
+
+| Key | Default | Meaning |
+|---|---|---|
+| `pkb_agent_popup` | `auto` | `off` keeps today's page behaviour. `auto` uses the popup for a desktop session and the page when a browser page is open. `always` also mirrors chat, and sends handle-less HTML and overlays, to the popup during a browser session. `false`/`no`/`0` mean `off`. `true`/`on`/`1` mean `always`. |
+| `pkb_agent_popup_browser` | unset | First browser probe. Then `PKB_AGENT_POPUP_BROWSER`, then `DOMENGINE_CHROME`, then the per-OS install list. |
+| `pkb_agent_popup_headless` | false | Adds `--headless=new` for tests and CI. |
+| `pkb_agent_popup_on_top` | true | Tries the OS always-on-top call. `false` skips it. |
+| `pkb_agent_popup_size` | `420x640` | `width,height` or `widthxheight`. |
+| `pkb_agent_popup_position` | `right` | `right`, `left`, or `<x>,<y>` in screen pixels. |
+| `pkb_agent_popup_idle_minutes` | 30 | Minutes with no new ledger row before the host exits. A decimal is allowed. |
+| `pkb_agent_popup_log` | off | `true`, `all`, or `lifecycle,browser,ontop,bridge,route,highlight,ledger`. |
+| `pkb_agent_popup_log_entity` | all | Limits log lines to a run id or handle. |
+| `pkb_agent_popup_log_max_bytes` | 1048576 | Cap for `popup.log` and `host.out`. Minimum 64. |
+
+Env names are the same keys in upper case (`PKB_AGENT_POPUP`, `PKB_AGENT_POPUP_HEADLESS`, and the rest). A system property wins over the environment variable.
+

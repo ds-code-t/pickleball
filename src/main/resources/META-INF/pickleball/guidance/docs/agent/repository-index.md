@@ -176,8 +176,20 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/common/agentcontrol/LaunchTemplates.java`
 - `src/main/java/tools/dscode/common/agentcontrol/ObserveEvents.java`
 - `src/main/java/tools/dscode/common/agentcontrol/PageSurfaces.java`
+- `src/main/java/tools/dscode/common/agentcontrol/PopupSurfaceBridge.java`
 - `src/main/java/tools/dscode/common/agentcontrol/ScenarioCapture.java`
 - `src/main/java/tools/dscode/common/agentcontrol/WindowRegistry.java`
+- `src/main/java/tools/dscode/common/agentsurface/PopupBridge.java`
+- `src/main/java/tools/dscode/common/agentsurface/PopupBrowserLocator.java`
+- `src/main/java/tools/dscode/common/agentsurface/PopupCli.java`
+- `src/main/java/tools/dscode/common/agentsurface/PopupConfig.java`
+- `src/main/java/tools/dscode/common/agentsurface/PopupHost.java`
+- `src/main/java/tools/dscode/common/agentsurface/PopupHostMain.java`
+- `src/main/java/tools/dscode/common/agentsurface/PopupLauncher.java`
+- `src/main/java/tools/dscode/common/agentsurface/PopupLedger.java`
+- `src/main/java/tools/dscode/common/agentsurface/PopupLog.java`
+- `src/main/java/tools/dscode/common/agentsurface/PopupOnTop.java`
+- `src/main/java/tools/dscode/common/agentsurface/PopupStatus.java`
 - `src/main/java/tools/dscode/common/annotations/DefinitionFlag.java`
 - `src/main/java/tools/dscode/common/annotations/DefinitionFlags.java`
 - `src/main/java/tools/dscode/common/annotations/IgnoreDefinition.java`
@@ -603,6 +615,9 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/resources/tools/dscode/browser/surface/overlay.css`
 - `src/main/resources/tools/dscode/browser/surface/overlay.html`
 - `src/main/resources/tools/dscode/browser/surface/surface-events.js`
+- `src/main/resources/tools/dscode/common/agentsurface/agent-surface-popup.css`
+- `src/main/resources/tools/dscode/common/agentsurface/agent-surface-popup.html`
+- `src/main/resources/tools/dscode/common/agentsurface/agent-surface-popup.js`
 
 ## Framework tests
 
@@ -624,6 +639,13 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/common/agentcontrol/ChatLockChild.java`
 - `src/test/java/tools/dscode/common/agentcontrol/LiveChromeCdpTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/SurfaceIdChild.java`
+- `src/test/java/tools/dscode/common/agentsurface/live/AgentSurfacePopupLiveTest.java`
+- `src/test/java/tools/dscode/common/agentsurface/PopupBridgeTest.java`
+- `src/test/java/tools/dscode/common/agentsurface/PopupBrowserLocatorTest.java`
+- `src/test/java/tools/dscode/common/agentsurface/PopupLedgerTest.java`
+- `src/test/java/tools/dscode/common/agentsurface/PopupLifecycleTest.java`
+- `src/test/java/tools/dscode/common/agentsurface/PopupLogTest.java`
+- `src/test/java/tools/dscode/common/agentsurface/PopupOnTopTest.java`
 - `src/test/java/tools/dscode/common/assertions/AssertionClauseSplitterTest.java`
 - `src/test/java/tools/dscode/common/assertions/MultilineAssertFeatureTest.java`
 - `src/test/java/tools/dscode/common/assertions/MultilineAssertTest.java`
