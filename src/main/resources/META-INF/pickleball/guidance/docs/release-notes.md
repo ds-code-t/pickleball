@@ -41,6 +41,8 @@ Dalton is an opt-in hydrated working copy. Git files stay the source of truth. T
 
 - G9 dual-run is green for every repo feature and every `maven-consumer-project` feature. The default engine is now `native`. `pkb_engine=cucumber` keeps the Cucumber adapter. Cucumber-core aspects stay, because the adapter still uses them.
 
+- Live Linux desktop calls the accessibility bus with `dbus-send --session` and `DBUS_SESSION_BUS_ADDRESS` set to that bus. `--address=` is not used. Role is `GetRoleName` and `GetRole`, not `Properties.Get`. The numeric fallback matches at-spi2-core 2.56, so a button is not a radio and a frame is a window. `desktop attach --name` and `role=button` use that mapping. A missing bus still fails with `AT-SPI unavailable`.
+
 ## 2.2.0
 
 _No changes yet._
