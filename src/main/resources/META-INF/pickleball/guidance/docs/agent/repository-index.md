@@ -895,6 +895,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/FailureRecord.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/GherkinKeywords.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/InvestigationHandoff.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/JavaEngineLauncher.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/JsonLite.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/OutputFormatter.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/PickleballArtifactLocator.java`
@@ -1115,6 +1116,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `dom-engine/src/main/java/dev/domengine/query/Look.java`
 - `dom-engine/src/main/java/dev/domengine/query/Query.java`
 - `dom-engine/src/main/java/dev/domengine/session/BrowserSession.java`
+- `dom-engine/src/main/java/dev/domengine/session/SessionEvents.java`
 - `dom-engine/src/main/java/dev/domengine/session/SessionRegistry.java`
 - `dom-engine/src/main/java/dev/domengine/tree/ContextWalker.java`
 - `dom-engine/src/main/java/dev/domengine/tree/DomNode.java`
@@ -1130,12 +1132,17 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `dom-engine/src/test/java/dev/domengine/EngineLogTest.java`
 - `dom-engine/src/test/java/dev/domengine/FakeCdp.java`
 - `dom-engine/src/test/java/dev/domengine/LiveChromeActionSmokeTest.java`
+- `dom-engine/src/test/java/dev/domengine/LiveChromeObserveEventsTest.java`
 - `dom-engine/src/test/java/dev/domengine/LiveConformanceTest.java`
 - `dom-engine/src/test/java/dev/domengine/LogCommandTest.java`
 - `dom-engine/src/test/java/dev/domengine/LookQueryTest.java`
 - `dom-engine/src/test/java/dev/domengine/McpForwardTest.java`
+- `dom-engine/src/test/java/dev/domengine/ObserveEventsTest.java`
 - `dom-engine/src/test/java/dev/domengine/ObserveParityTest.java`
+- `dom-engine/src/test/java/dev/domengine/RustCliShapeTest.java`
 - `dom-engine/src/test/java/dev/domengine/SelectorParityTest.java`
+- `dom-engine/src/test/java/dev/domengine/session/BrowserSessionEndpointTest.java`
+- `dom-engine/src/test/java/dev/domengine/session/SessionEventsTest.java`
 - `dom-engine/src/test/java/dev/domengine/SessionJoinLogTest.java`
 - `dom-engine/src/test/java/dev/domengine/SharedSurfaceTest.java`
 - `dom-engine/src/test/java/dev/domengine/VisualRelativeTest.java`

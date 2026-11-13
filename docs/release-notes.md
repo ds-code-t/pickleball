@@ -2,6 +2,8 @@
 
 ## 3.0.0
 
+- Workbench direct control: `pkb_direct_control_provider=composite` now runs the in-repo Java engine, carried in the thin Workbench jar, when no `COMPOSITE_BIN` or `pkb_composite_bin` is set and Rust is not requested (`pkb_composite_engine=rust`). Before this it looked only for the Rust binary and skipped. The engine CLI accepts the global `--session-dir` on every verb and prints Rust-layout pretty JSON.
+
 Dalton is an opt-in hydrated working copy. Git files stay the source of truth. The database is `.pickleball/dalton/dalton.db`, gitignored, and never required for a fresh clone or CI. With Dalton off, feature loading, configuration, and execution are unchanged. A normal `mvn test` or `gradlew test` does not open that database.
 
 - `dalton status` reports a missing database and does not create one.
