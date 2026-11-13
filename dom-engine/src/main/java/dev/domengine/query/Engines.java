@@ -2,6 +2,7 @@ package dev.domengine.query;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import dev.domengine.cdp.CdpConnection;
 import dev.domengine.cdp.CdpException;
 import dev.domengine.image.TemplateMatch;
 import dev.domengine.json.Jsons;
@@ -126,7 +127,20 @@ public final class Engines {
 
     static Query.Hit xpath(String expr, List<DomNode> scopes, String pierce) {
         String cleaned = expr == null ? "" : expr.trim();
-        while (cleaned.startsWith("(") && cleaned.endsWith(")")) cleaned = cleaned.substring(1, cleaned.length() - 1).trim();
+        if (cleaned.isEmpty()) throw new CdpException("invalid xpath");
+        CdpConnection live = LiveXPath.connection();
+        if (live != null) {
+            List<DomNode> hits = new ArrayList<>();
+            DomNode pinned = LiveXPath.withinNode();
+            for (DomNode scope : scopes) {
+                DomNode context = pinned != null && documentScope(scope) ? pinned : scope;
+                hits.addAll(LiveXPath.nodesFor(context, LiveXPath.backendIds(live, cleaned, context)));
+            }
+            List<DomNode> distinct = Query.distinct(hits);
+            return new Query.Hit(distinct, "xpath matched " + distinct.size());
+        }
+        String offline = stripWrapping(cleaned);
+        if (!offlineSupported(offline)) throw new CdpException("invalid xpath: " + cleaned);
         boolean intoShadow = pierce != null && (pierce.equals("open") || pierce.equals("all"));
         List<DomNode> hits = new ArrayList<>();
         for (DomNode scope : scopes) {
@@ -138,11 +152,49 @@ public final class Engines {
                 }
             }
             for (DomNode candidate : pool) {
-                if (xpathMatches(candidate, cleaned)) hits.add(candidate);
+                if (xpathMatches(candidate, offline)) hits.add(candidate);
             }
         }
         List<DomNode> distinct = Query.distinct(hits);
         return new Query.Hit(distinct, "xpath matched " + distinct.size());
+    }
+
+    private static boolean documentScope(DomNode scope) {
+        return scope != null && (scope.nodeType == 9 || scope.parent == null);
+    }
+
+    /** The parsed-tree matcher only understands this subset. Anything else is an error, not zero hits. */
+    static boolean offlineSupported(String expr) {
+        if (expr == null || expr.isBlank()) return false;
+        if (expr.startsWith("//")) {
+            String rest = expr.substring(2);
+            int bracket = rest.indexOf('[');
+            String tag = bracket < 0 ? rest : rest.substring(0, bracket);
+            if (tag.isBlank() || tag.contains("/") || tag.contains("(") || tag.contains(" ") || tag.contains(":")) return false;
+            if (bracket < 0) return true;
+            if (!rest.endsWith("]")) return false;
+            String predicate = rest.substring(bracket + 1, rest.length() - 1).trim();
+            if (predicate.startsWith("@") && !predicate.contains("[") && !containsWord(predicate, "and") && !containsWord(predicate, "or")) {
+                return true;
+            }
+            return predicate.startsWith("contains(") && predicate.endsWith(")") && predicate.indexOf('(') == predicate.lastIndexOf('(');
+        }
+        if (expr.startsWith("/")) {
+            return !expr.contains("[") && !expr.contains("(") && !expr.contains("@") && !expr.contains("::");
+        }
+        return false;
+    }
+
+    private static boolean containsWord(String text, String word) {
+        return text.toLowerCase(java.util.Locale.ROOT).contains(" " + word + " ");
+    }
+
+    private static String stripWrapping(String expr) {
+        String cleaned = expr;
+        while (cleaned.startsWith("(") && cleaned.endsWith(")")) {
+            cleaned = cleaned.substring(1, cleaned.length() - 1).trim();
+        }
+        return cleaned;
     }
 
     static Query.Hit text(String expr, List<DomNode> scopes) {

@@ -685,6 +685,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/common/composite/GeometryViewTest.java`
 - `src/test/java/tools/dscode/common/composite/LeanWaitNestLiveTest.java`
 - `src/test/java/tools/dscode/common/composite/live/JavaEngineAdapterLiveTest.java`
+- `src/test/java/tools/dscode/common/composite/live/JavaEngineXPathLiveTest.java`
 - `src/test/java/tools/dscode/common/composite/LookLiveFindTest.java`
 - `src/test/java/tools/dscode/common/composite/LookStepTest.java`
 - `src/test/java/tools/dscode/common/composite/PrimaryPathAuditTest.java`
@@ -1198,6 +1199,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `dom-engine/src/main/java/dev/domengine/query/Engines.java`
 - `dom-engine/src/main/java/dev/domengine/query/Expressions.java`
 - `dom-engine/src/main/java/dev/domengine/query/HtmlTree.java`
+- `dom-engine/src/main/java/dev/domengine/query/LiveXPath.java`
 - `dom-engine/src/main/java/dev/domengine/query/Look.java`
 - `dom-engine/src/main/java/dev/domengine/query/Query.java`
 - `dom-engine/src/main/java/dev/domengine/session/BrowserSession.java`
@@ -1220,12 +1222,14 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `dom-engine/src/test/java/dev/domengine/LiveChromeActionSmokeTest.java`
 - `dom-engine/src/test/java/dev/domengine/LiveChromeBrowserAttachTest.java`
 - `dom-engine/src/test/java/dev/domengine/LiveChromeObserveEventsTest.java`
+- `dom-engine/src/test/java/dev/domengine/LiveChromeXPathTest.java`
 - `dom-engine/src/test/java/dev/domengine/LiveConformanceTest.java`
 - `dom-engine/src/test/java/dev/domengine/LogCommandTest.java`
 - `dom-engine/src/test/java/dev/domengine/LookQueryTest.java`
 - `dom-engine/src/test/java/dev/domengine/McpForwardTest.java`
 - `dom-engine/src/test/java/dev/domengine/ObserveEventsTest.java`
 - `dom-engine/src/test/java/dev/domengine/ObserveParityTest.java`
+- `dom-engine/src/test/java/dev/domengine/OfflineXPathTest.java`
 - `dom-engine/src/test/java/dev/domengine/RustCliShapeTest.java`
 - `dom-engine/src/test/java/dev/domengine/SelectorParityTest.java`
 - `dom-engine/src/test/java/dev/domengine/session/BrowserSessionEndpointTest.java`

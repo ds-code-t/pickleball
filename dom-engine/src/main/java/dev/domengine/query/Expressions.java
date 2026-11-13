@@ -167,11 +167,12 @@ final class Expressions {
         return tokens;
     }
 
-    /** Read one stage, keeping CSS or XPath parentheses inside it. */
+    /** Read one stage, keeping CSS or XPath parentheses and bracket predicates inside it. */
     private static int readStage(String text, int i) {
         int n = text.length();
         boolean quote = false;
         char quoteChar = 0;
+        int brackets = 0;
         while (i < n) {
             char c = text.charAt(i);
             if (quote) {
@@ -189,9 +190,19 @@ final class Expressions {
                 i = skipBalanced(text, i);
                 continue;
             }
+            if (c == '[') {
+                brackets++;
+                i++;
+                continue;
+            }
+            if (c == ']' && brackets > 0) {
+                brackets--;
+                i++;
+                continue;
+            }
             if (c == ')') return i;
             if (c == '>' && i + 1 < n && text.charAt(i + 1) == '>') return i;
-            if (isOpAt(text, i, "AND") || isOpAt(text, i, "OR") || isOpAt(text, i, "NOT")) return i;
+            if (brackets == 0 && (isOpAt(text, i, "AND") || isOpAt(text, i, "OR") || isOpAt(text, i, "NOT"))) return i;
             i++;
         }
         return i;

@@ -323,7 +323,7 @@ For child steps, use [Nested Steps](nested-steps.md). For report-focused branch 
 
 ## DOM engine translation
 
-Gherkin element phrases do not change. `SelectorTranslator` is the only place that turns a phrase into an engine pipeline. `ExecutionDictionary` still builds the XPath it already built. That XPath, and any CSS, is passed through. A space between an XPath function name and `(` is removed, because the engine rejects `not (`.
+Gherkin element phrases do not change. `SelectorTranslator` is the only place that turns a phrase into an engine pipeline. `ExecutionDictionary` still builds the XPath it already built. That XPath, and any CSS, is passed through. On a live session, XPath is XPath 1.0 evaluated by the page (`document.evaluate`, ordered snapshot). That includes `or`, `and`, `normalize-space`, positional predicates, and paths such as `//li/a`. An invalid expression is an error, not zero hits. A relative XPath under `within` uses that node as the context. An offline file query accepts only the small subset a parsed tree can check and rejects the rest. The translator still removes a space between a function name and `(` so every engine sees the same text.
 
 | Phrase | Pipeline |
 |---|---|

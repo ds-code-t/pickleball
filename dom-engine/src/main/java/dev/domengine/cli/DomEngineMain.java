@@ -7,6 +7,7 @@ import dev.domengine.EngineInfo;
 import dev.domengine.cdp.CdpException;
 import dev.domengine.json.Jsons;
 import dev.domengine.log.EngineLog;
+import dev.domengine.query.LiveXPath;
 import dev.domengine.session.BrowserSession;
 import dev.domengine.session.SessionRegistry;
 import dev.domengine.action.Observe;
@@ -336,25 +337,36 @@ public final class DomEngineMain {
             } catch (java.io.IOException failure) {
                 return error(1, "failed", "query file: " + failure.getMessage());
             }
-        } else if (flags.containsKey("session") || SessionRegistry.get().joined() != null) {
+            return CliResult.ok(Jsons.pretty(dev.domengine.query.Query.run(root, flags)));
+        }
+        if (flags.containsKey("session") || SessionRegistry.get().joined() != null) {
             BrowserSession session = bound(flags);
             if (session == null) return error(2, "usage", "query requires --file or --session");
             root = session.tree().root;
             root.linkParents();
-        } else {
-            return error(2, "usage", "query requires --file or --session");
+            LiveXPath.use(session.connection());
+            try {
+                return CliResult.ok(Jsons.pretty(dev.domengine.query.Query.run(root, flags)));
+            } finally {
+                LiveXPath.use(null);
+            }
         }
-        return CliResult.ok(Jsons.pretty(dev.domengine.query.Query.run(root, flags)));
+        return error(2, "usage", "query requires --file or --session");
     }
 
     private static CliResult action(String verb, Map<String, String> flags) {
         BrowserSession session = bound(flags);
         if (session == null) return error(2, "usage", verb + " requires --session");
-        ObjectNode result = PageActions.act(session, verb, flags);
-        ObjectNode detail = Jsons.object();
-        detail.put("ok", true);
-        SessionRegistry.get().record(session.id, verb, detail);
-        return CliResult.ok(Jsons.pretty(result));
+        LiveXPath.use(session.connection());
+        try {
+            ObjectNode result = PageActions.act(session, verb, flags);
+            ObjectNode detail = Jsons.object();
+            detail.put("ok", true);
+            SessionRegistry.get().record(session.id, verb, detail);
+            return CliResult.ok(Jsons.pretty(result));
+        } finally {
+            LiveXPath.use(null);
+        }
     }
 
     private static CliResult screenshot(Map<String, String> flags) {
@@ -383,9 +395,14 @@ public final class DomEngineMain {
             session = bound(flags);
         }
         dev.domengine.tree.DomNode root = Observe.rootFrom(flags, session);
-        com.fasterxml.jackson.databind.node.ObjectNode result = Observe.waitFor(root, flags);
-        result.put("command", command);
-        return CliResult.ok(Jsons.pretty(result));
+        if (session != null) LiveXPath.use(session.connection());
+        try {
+            com.fasterxml.jackson.databind.node.ObjectNode result = Observe.waitFor(root, flags);
+            result.put("command", command);
+            return CliResult.ok(Jsons.pretty(result));
+        } finally {
+            LiveXPath.use(null);
+        }
     }
 
     /** Query-wait form: a file, or any selector flag the query engine reads. */
@@ -617,6 +634,7 @@ public final class DomEngineMain {
                 snapshot --session ID | --cdp URL --i-accept-local-attach
                 query --file page.html --css SELECTOR [--selector EXPR] [--pipeline EXPR] [--geometry] [--explain] [--viewport file.pgm]
                   EXPR accepts engine=value stages joined by >> and boolean AND, OR, and NOT
+                  live xpath is XPath 1.0 via document.evaluate. An invalid expression is an error, not zero hits.
                   relatives: near below above left-of right-of (left and right are aliases)
                   look: look=color=red or look=opacity>0.5,background-color=#fff (comma AND, pipe OR)
                   example: (css=button AND text="Submit") >> near=50

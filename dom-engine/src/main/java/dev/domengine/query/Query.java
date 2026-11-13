@@ -38,12 +38,29 @@ public final class Query {
         boolean human = "human".equalsIgnoreCase(flags.get("exposure"));
         if (armed) Engines.useViewport(TemplateMatch.read(Path.of(viewport)));
         if (human) Engines.useSpace("visual_viewport_relative");
+        String withinId = flags.get("within");
+        if (withinId != null && !withinId.isBlank()) LiveXPath.within(findId(root, withinId));
         try {
             return runArmed(root, flags);
         } finally {
+            LiveXPath.within(null);
             if (armed) Engines.useViewport(null);
             if (human) Engines.useSpace(null);
         }
+    }
+
+    static DomNode findId(DomNode node, String id) {
+        if (node == null || id == null) return null;
+        if (id.equals(node.id()) || id.equals(Long.toString(node.backendNodeId))) return node;
+        for (DomNode child : node.children) {
+            DomNode found = findId(child, id);
+            if (found != null) return found;
+        }
+        for (DomNode shadow : node.shadowRoots) {
+            DomNode found = findId(shadow, id);
+            if (found != null) return found;
+        }
+        return null;
     }
 
     private static ObjectNode runArmed(DomNode root, Map<String, String> flags) {
