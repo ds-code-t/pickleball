@@ -179,6 +179,8 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/common/agentcontrol/PopupSurfaceBridge.java`
 - `src/main/java/tools/dscode/common/agentcontrol/ScenarioCapture.java`
 - `src/main/java/tools/dscode/common/agentcontrol/WindowRegistry.java`
+- `src/main/java/tools/dscode/common/agentsurface/AgentSurfaceRouter.java`
+- `src/main/java/tools/dscode/common/agentsurface/NativeHighlight.java`
 - `src/main/java/tools/dscode/common/agentsurface/PopupBridge.java`
 - `src/main/java/tools/dscode/common/agentsurface/PopupBrowserLocator.java`
 - `src/main/java/tools/dscode/common/agentsurface/PopupCli.java`
@@ -639,13 +641,18 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/common/agentcontrol/ChatLockChild.java`
 - `src/test/java/tools/dscode/common/agentcontrol/LiveChromeCdpTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/SurfaceIdChild.java`
+- `src/test/java/tools/dscode/common/agentsurface/AgentSurfaceRouterTest.java`
 - `src/test/java/tools/dscode/common/agentsurface/live/AgentSurfacePopupLiveTest.java`
+- `src/test/java/tools/dscode/common/agentsurface/NativeHighlightRouteTest.java`
 - `src/test/java/tools/dscode/common/agentsurface/PopupBridgeTest.java`
 - `src/test/java/tools/dscode/common/agentsurface/PopupBrowserLocatorTest.java`
+- `src/test/java/tools/dscode/common/agentsurface/PopupCleanupTest.java`
+- `src/test/java/tools/dscode/common/agentsurface/PopupInputEventsTest.java`
 - `src/test/java/tools/dscode/common/agentsurface/PopupLedgerTest.java`
 - `src/test/java/tools/dscode/common/agentsurface/PopupLifecycleTest.java`
 - `src/test/java/tools/dscode/common/agentsurface/PopupLogTest.java`
 - `src/test/java/tools/dscode/common/agentsurface/PopupOnTopTest.java`
+- `src/test/java/tools/dscode/common/agentsurface/PopupSurfaceParityTest.java`
 - `src/test/java/tools/dscode/common/assertions/AssertionClauseSplitterTest.java`
 - `src/test/java/tools/dscode/common/assertions/MultilineAssertFeatureTest.java`
 - `src/test/java/tools/dscode/common/assertions/MultilineAssertTest.java`
@@ -768,6 +775,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/launcher/EngineCliLaunchTest.java`
 - `src/test/java/tools/dscode/launcher/GuidanceCommandGoldenTest.java`
 - `src/test/java/tools/dscode/launcher/PickleballWorkbenchLauncherTest.java`
+- `src/test/java/tools/dscode/launcher/PopupVerbCoverageTest.java`
 - `src/test/java/tools/dscode/launcher/Release218RecommendationsTest.java`
 - `src/test/java/tools/dscode/launcher/SecretRedactionTest.java`
 - `src/test/java/tools/dscode/launcher/SessionHealthWaitTest.java`
@@ -986,6 +994,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/speed/ProcessTree.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/speed/StageScheduler.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/speed/WarmProcess.java`
+- `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/surface/NativeHighlightBox.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/WindowDriver.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/WorkbenchFeatureIndex.java`
 - `pickleball-control-protocol/src/main/java/tools/dscode/control/protocol/Workspace.java`
@@ -1007,6 +1016,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/SessionHoldTest.java`
 - `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/SleepGapMonitorTest.java`
 - `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/speed/SpeedTypesTest.java`
+- `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/surface/NativeHighlightBoxTest.java`
 - `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/WorkbenchFeatureIndexTest.java`
 - `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/WorkspaceTest.java`
 
@@ -1040,6 +1050,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/mapping/MappingValueCodec.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/mcp/McpCommandContributor.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/mcp/McpRegistry.java`
+- `pickleball-workbench/src/main/java/tools/dscode/workbench/mcp/popup/PopupMcpCommands.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/mcp/SnapshotCommand.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/mcp/WorkbenchAttachServer.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/mcp/WorkbenchCommandQueue.java`
@@ -1098,6 +1109,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/worker/WorkbenchLiveSession.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/worker/WorkbenchWorkerManager.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/worker/WorkbenchWorkerStatus.java`
+- `pickleball-workbench/src/main/resources/META-INF/services/tools.dscode.workbench.mcp.McpCommandContributor`
 - `pickleball-workbench/src/main/resources/tools/dscode/workbench/ui/web/diagnostic-explorer.css`
 - `pickleball-workbench/src/main/resources/tools/dscode/workbench/ui/web/diagnostic-explorer.html`
 - `pickleball-workbench/src/main/resources/tools/dscode/workbench/ui/web/diagnostic-explorer.js`
@@ -1121,6 +1133,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/lease/WorkbenchControlLeaseTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/log/LogCliForwarderTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/mapping/MappingValueCodecTest.java`
+- `pickleball-workbench/src/test/java/tools/dscode/workbench/mcp/popup/PopupMcpCommandsTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/mcp/WorkbenchAttachServerProgressTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/mcp/WorkbenchAttachServerTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/mcp/WorkbenchCommandQueueTest.java`
@@ -1143,6 +1156,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/sync/WorkbenchSynchronizerTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/sync/WorkbenchSyncPlannerTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/terminal/WorkerLogBufferTest.java`
+- `pickleball-workbench/src/test/java/tools/dscode/workbench/ui/AgentChatPanelPopupTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/ui/ConfigTabModelTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/ui/DaltonPanelTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/ui/EditPanelTest.java`
@@ -1150,6 +1164,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/ui/LongWorkTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/ui/RunVarOverridePanelTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/ui/web/WorkbenchWebResourceTest.java`
+- `pickleball-workbench/src/test/java/tools/dscode/workbench/ui/WorkbenchNativeOverlayHighlightTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/ui/WorkbenchUiControllerTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/ui/WorkbenchUiSettingsTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/WorkbenchApplicationSyncFailureTest.java`
@@ -1203,13 +1218,16 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `dom-engine/src/main/java/dev/domengine/premap/PreMapLookup.java`
 - `dom-engine/src/main/java/dev/domengine/premap/Section.java`
 - `dom-engine/src/main/java/dev/domengine/premap/SectionDetector.java`
+- `dom-engine/src/main/java/dev/domengine/query/Displayed.java`
 - `dom-engine/src/main/java/dev/domengine/query/Engines.java`
 - `dom-engine/src/main/java/dev/domengine/query/Expressions.java`
+- `dom-engine/src/main/java/dev/domengine/query/Frames.java`
 - `dom-engine/src/main/java/dev/domengine/query/HtmlTree.java`
 - `dom-engine/src/main/java/dev/domengine/query/LiveXPath.java`
 - `dom-engine/src/main/java/dev/domengine/query/Look.java`
 - `dom-engine/src/main/java/dev/domengine/query/Query.java`
 - `dom-engine/src/main/java/dev/domengine/query/RelationTerm.java`
+- `dom-engine/src/main/java/dev/domengine/query/RowStates.java`
 - `dom-engine/src/main/java/dev/domengine/session/BrowserSession.java`
 - `dom-engine/src/main/java/dev/domengine/session/ChromeProcess.java`
 - `dom-engine/src/main/java/dev/domengine/session/SessionEvents.java`
@@ -1247,6 +1265,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `dom-engine/src/test/java/dev/domengine/LiveChromeActionSmokeTest.java`
 - `dom-engine/src/test/java/dev/domengine/LiveChromeBrowserAttachTest.java`
 - `dom-engine/src/test/java/dev/domengine/LiveChromeObserveEventsTest.java`
+- `dom-engine/src/test/java/dev/domengine/LiveChromeQueryFlagsTest.java`
 - `dom-engine/src/test/java/dev/domengine/LiveChromeXPathTest.java`
 - `dom-engine/src/test/java/dev/domengine/LiveConformanceTest.java`
 - `dom-engine/src/test/java/dev/domengine/LogCommandTest.java`
@@ -1265,6 +1284,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `dom-engine/src/test/java/dev/domengine/premap/SectionDetectionTest.java`
 - `dom-engine/src/test/java/dev/domengine/query/RelationTermParseTest.java`
 - `dom-engine/src/test/java/dev/domengine/query/RelationTermTest.java`
+- `dom-engine/src/test/java/dev/domengine/QueryFlagOfflineTest.java`
 - `dom-engine/src/test/java/dev/domengine/RustCliShapeTest.java`
 - `dom-engine/src/test/java/dev/domengine/SelectorParityTest.java`
 - `dom-engine/src/test/java/dev/domengine/session/BrowserSessionEndpointTest.java`
