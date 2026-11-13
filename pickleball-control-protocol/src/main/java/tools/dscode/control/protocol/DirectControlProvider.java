@@ -65,13 +65,16 @@ public final class DirectControlProvider {
     }
 
     /**
-     * {@code composite} uses {@code COMPOSITE_BIN}, then {@code pkb_composite_bin}
-     * (system property, {@code pkb_runvars.} property, environment), then the
-     * in-repo Java engine on this class loader ({@link JavaEngineLauncher})
-     * unless {@code pkb_composite_engine=rust} / {@code PKB_COMPOSITE_ENGINE=rust},
+     * {@code composite} uses the same explicit-engine order as the root
+     * {@code CompositeBinaryLocator}: property {@code pkb_composite_bin},
+     * {@code pkb_runvars.pkb_composite_bin}, env {@code COMPOSITE_BIN}, env
+     * {@code pkb_composite_bin}. Then the in-repo Java engine on this class
+     * loader ({@link JavaEngineLauncher}) unless
+     * {@code pkb_composite_engine=rust} / {@code PKB_COMPOSITE_ENGINE=rust},
      * then {@code COMPOSITE_HOME} or a sibling {@code dom-composite} checkout
      * ({@code target/debug/composite}, then {@code target/release/composite}).
-     * Any other value is a path to the binary.
+     * Any other value is a path to the binary. The candidate list is
+     * {@link #explicitEngineCandidates}.
      */
     public static Optional<Path> resolveBinary(String configured, Path project, Map<String, String> env) {
         return resolveBinary(configured, project, env, DirectControlProvider.class.getClassLoader());
@@ -88,10 +91,17 @@ public final class DirectControlProvider {
         if (value == null) return Optional.empty();
         Map<String, String> environment = env == null ? System.getenv() : env;
         if (TOKEN.equals(value)) {
-            Path named = executable(environment.get(BIN_ENV));
-            if (named != null) return Optional.of(named);
-            Path bin = explicitBin(project, environment);
-            if (bin != null) return Optional.of(bin);
+            Map<String, String> properties = new LinkedHashMap<>();
+            copyLiveProperty(properties, JavaEngineLauncher.BIN_KEY);
+            copyLiveProperty(properties, "pkb_runvars." + JavaEngineLauncher.BIN_KEY);
+            List<ExplicitEngineCandidate> candidates = explicitEngineCandidates(properties, environment);
+            if (!candidates.isEmpty()) {
+                ExplicitEngineCandidate candidate = candidates.get(0);
+                Path path = candidate.compositeBin()
+                        ? executable(candidate.spec())
+                        : projectExecutable(project, candidate.spec());
+                if (path != null) return Optional.of(path);
+            }
             if (!JavaEngineLauncher.rustRequested(environment)) {
                 Optional<Path> java = JavaEngineLauncher.script(engineLoader);
                 if (java.isPresent()) return java;
@@ -125,12 +135,48 @@ public final class DirectControlProvider {
         return Optional.empty();
     }
 
-    private static Path explicitBin(Path project, Map<String, String> environment) {
-        String named = blank(System.getProperty(JavaEngineLauncher.BIN_KEY));
-        if (named == null) named = blank(System.getProperty("pkb_runvars." + JavaEngineLauncher.BIN_KEY));
-        if (named == null) named = blank(environment.get(JavaEngineLauncher.BIN_KEY));
-        if (named == null) return null;
-        Path path = Path.of(named);
+    /**
+     * Explicit engine path before the Java launcher. Shared with the root
+     * locator so the two cannot drift. Order: property {@code pkb_composite_bin},
+     * {@code pkb_runvars.pkb_composite_bin}, env {@code COMPOSITE_BIN}, env
+     * {@code pkb_composite_bin}. Blank values are omitted.
+     *
+     * <p>{@code compositeBin} marks env {@code COMPOSITE_BIN}. That slot stays
+     * working-directory relative. The other slots resolve against the project.</p>
+     */
+    public record ExplicitEngineCandidate(String spec, boolean compositeBin) {
+    }
+
+    public static List<ExplicitEngineCandidate> explicitEngineCandidates(
+            Map<String, String> properties,
+            Map<String, String> environment
+    ) {
+        List<ExplicitEngineCandidate> candidates = new ArrayList<>();
+        addCandidate(candidates, properties, JavaEngineLauncher.BIN_KEY, false);
+        addCandidate(candidates, properties, "pkb_runvars." + JavaEngineLauncher.BIN_KEY, false);
+        addCandidate(candidates, environment, BIN_ENV, true);
+        addCandidate(candidates, environment, JavaEngineLauncher.BIN_KEY, false);
+        return candidates;
+    }
+
+    private static void addCandidate(
+            List<ExplicitEngineCandidate> candidates,
+            Map<String, String> source,
+            String key,
+            boolean compositeBin
+    ) {
+        if (source == null) return;
+        String value = blank(source.get(key));
+        if (value != null) candidates.add(new ExplicitEngineCandidate(value, compositeBin));
+    }
+
+    private static void copyLiveProperty(Map<String, String> properties, String key) {
+        String value = blank(System.getProperty(key));
+        if (value != null) properties.put(key, value);
+    }
+
+    private static Path projectExecutable(Path project, String spec) {
+        Path path = Path.of(spec);
         if (!path.isAbsolute() && project != null) path = project.resolve(path);
         return executable(path.toString());
     }

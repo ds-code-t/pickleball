@@ -147,6 +147,20 @@ class CompositeLocationTest {
     }
 
     @Test
+    void propertyBinBeatsCompositeBinOnBothResolvers() throws Exception {
+        Path propertyBin = executable(temp.resolve("property").resolve("composite"));
+        Path envBin = executable(temp.resolve("env").resolve("composite"));
+        System.setProperty(CompositeBinaryLocator.BIN_KEY, propertyBin.toString());
+        Map<String, String> env = Map.of(DirectControlProvider.BIN_ENV, envBin.toString());
+        ClassLoader loader = CompositeLocationTest.class.getClassLoader();
+        Optional<Path> located = CompositeBinaryLocator.locate(temp, env, loader);
+        Optional<Path> provided = DirectControlProvider.resolveBinary(
+                DirectControlProvider.TOKEN, temp, env);
+        assertEquals(propertyBin.toAbsolutePath().normalize(), located.orElseThrow());
+        assertEquals(located, provided);
+    }
+
+    @Test
     void daltonRecordsTheJavaEngineWhenEnabled() throws Exception {
         Path project = temp.resolve("dalton-project");
         Files.createDirectories(project);

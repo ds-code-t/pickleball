@@ -30,8 +30,8 @@ import java.util.Set;
  * Callers treat that path exactly like the old {@code composite} binary.</p>
  *
  * <p>Shared by {@link DirectControlProvider} (Workbench direct-control handoff)
- * and the root {@code CompositeBinaryLocator}. Explicit binaries
- * ({@code COMPOSITE_BIN}, {@code pkb_composite_bin}) win before this;
+ * and the root {@code CompositeBinaryLocator}. An explicit
+ * {@code pkb_composite_bin} or {@code COMPOSITE_BIN} wins before this;
  * {@code pkb_composite_engine=rust} / {@code PKB_COMPOSITE_ENGINE=rust} skips it.</p>
  */
 public final class JavaEngineLauncher {

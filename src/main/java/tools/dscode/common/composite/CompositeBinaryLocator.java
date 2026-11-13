@@ -76,16 +76,14 @@ public final class CompositeBinaryLocator {
         CompositeRuntime.Sources resolved = sources == null ? CompositeRuntime.sources() : sources;
         Map<String, String> environment = resolved.env() == null ? Map.of() : resolved.env();
         Map<String, String> properties = resolved.properties() == null ? Map.of() : resolved.properties();
-        String named = first(
-                text(properties.get(BIN_KEY)),
-                text(properties.get("pkb_runvars." + BIN_KEY)),
-                text(environment.get(DirectControlProvider.BIN_ENV)),
-                text(environment.get(BIN_KEY))
-        );
-        Path explicit = executable(named, resolved.project());
-        if (explicit != null) {
-            CompositeLog.info("location", "binary " + explicit);
-            return Optional.of(explicit);
+        List<DirectControlProvider.ExplicitEngineCandidate> candidates =
+                DirectControlProvider.explicitEngineCandidates(properties, environment);
+        if (!candidates.isEmpty()) {
+            Path explicit = executable(candidates.get(0).spec(), resolved.project());
+            if (explicit != null) {
+                CompositeLog.info("location", "binary " + explicit);
+                return Optional.of(explicit);
+            }
         }
         if (!rustRequested(resolved)) {
             Optional<Path> javaEngine = JavaEngineLocator.script(resolved.loader());
