@@ -38,6 +38,7 @@ public final class LiveTree {
         List<Frame> frames = new ArrayList<>();
         collectFrames(frameTree.get("frameTree"), frames);
         DomNode root = DomNode.fromCdp(document.get("root"));
+        graftOutOfProcess(connection, root, timeout);
         String top = frames.isEmpty() ? "main" : frames.get(0).id;
         List<String> children = new ArrayList<>();
         for (int i = 1; i < frames.size(); i++) children.add(frames.get(i).id);
@@ -65,7 +66,8 @@ public final class LiveTree {
                         String value = entry.path("value").asText("");
                         if (!name.isEmpty()) node.computed.put(name.toLowerCase(Locale.ROOT), value);
                         if ("display".equals(name) && "none".equals(value)) node.displayed = false;
-                        if ("visibility".equals(name) && "hidden".equals(value)) node.displayed = false;
+                        if ("visibility".equals(name) && ("hidden".equals(value) || "collapse".equals(value))) node.displayed = false;
+                        if ("opacity".equals(name) && ("0".equals(value) || value.startsWith("0.0"))) node.displayed = false;
                     }
                 }
             } catch (RuntimeException failure) {
@@ -86,6 +88,7 @@ public final class LiveTree {
                         node.y = quad[1] + scrollY;
                         node.width = quad[2];
                         node.height = quad[3];
+                        node.boxRead = true;
                         node.hasBox = node.width > 0 && node.height > 0;
                     }
                 }
@@ -130,6 +133,78 @@ public final class LiveTree {
             maxY = Math.max(maxY, y);
         }
         return new double[] {minX, minY, Math.max(0, maxX - minX), Math.max(0, maxY - minY)};
+    }
+
+    /**
+     * Same-origin frames arrive as {@code contentDocument}. A cross-origin iframe has no document
+     * on this target, so the child target is attached flattened and its document is grafted on.
+     */
+    private static void graftOutOfProcess(CdpConnection connection, DomNode root, Duration timeout) {
+        List<DomNode> empty = new ArrayList<>();
+        collectEmptyFrames(root, empty);
+        if (empty.isEmpty()) return;
+        JsonNode listed;
+        try {
+            ObjectNode auto = Jsons.object();
+            auto.put("autoAttach", true);
+            auto.put("waitForDebuggerOnStart", false);
+            auto.put("flatten", true);
+            connection.call("Target.setAutoAttach", auto, timeout);
+            listed = connection.call("Target.getTargets", Jsons.object(), timeout);
+        } catch (RuntimeException failure) {
+            EngineLog.info("frame", "targets " + failure.getMessage());
+            return;
+        }
+        JsonNode infos = listed.path("targetInfos");
+        if (!infos.isArray()) return;
+        boolean[] used = new boolean[empty.size()];
+        for (JsonNode info : infos) {
+            if (!"iframe".equals(info.path("type").asText(""))) continue;
+            String targetId = info.path("targetId").asText("");
+            String url = info.path("url").asText("");
+            int slot = matchFrame(empty, used, url);
+            if (slot < 0 || targetId.isBlank()) continue;
+            try {
+                ObjectNode attach = Jsons.object();
+                attach.put("targetId", targetId);
+                attach.put("flatten", true);
+                JsonNode session = connection.call("Target.attachToTarget", attach, timeout);
+                String sessionId = session.path("sessionId").asText("");
+                if (sessionId.isBlank()) continue;
+                ObjectNode params = Jsons.object();
+                params.put("pierce", true);
+                params.put("depth", -1);
+                JsonNode child = connection.call("DOM.getDocument", params, sessionId, timeout);
+                DomNode document = DomNode.fromCdp(child.get("root"));
+                empty.get(slot).children.add(document);
+                used[slot] = true;
+                EngineLog.info("frame", "oopif " + targetId);
+            } catch (RuntimeException failure) {
+                EngineLog.info("frame", "oopif " + failure.getMessage());
+            }
+        }
+    }
+
+    private static void collectEmptyFrames(DomNode node, List<DomNode> into) {
+        if (node == null) return;
+        if (node.iframe && !hasDocument(node)) into.add(node);
+        for (DomNode child : node.children) collectEmptyFrames(child, into);
+    }
+
+    private static boolean hasDocument(DomNode frame) {
+        for (DomNode child : frame.children) if (child.nodeType == 9) return true;
+        return false;
+    }
+
+    private static int matchFrame(List<DomNode> frames, boolean[] used, String url) {
+        int fallback = -1;
+        for (int i = 0; i < frames.size(); i++) {
+            if (used[i]) continue;
+            String src = frames.get(i).attributes.getOrDefault("src", "");
+            if (!src.isBlank() && url != null && (url.equals(src) || url.endsWith(src) || url.contains(src))) return i;
+            if (fallback < 0) fallback = i;
+        }
+        return fallback;
     }
 
     public ObjectNode toJson() {

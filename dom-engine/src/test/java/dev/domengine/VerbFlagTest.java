@@ -13,7 +13,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class VerbFlagTest {
@@ -27,7 +26,7 @@ class VerbFlagTest {
             for (JsonNode item : listed.path(entry.getKey())) actual.add(item.asText());
             assertEquals(entry.getValue(), actual, entry.getKey());
         }
-        assertFalse(listed.path("query").toString().contains("wait-for"));
+        assertTrue(listed.path("query").toString().contains("wait-for"));
         assertTrue(listed.path("query").toString().contains("within"));
     }
 

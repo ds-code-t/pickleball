@@ -113,6 +113,27 @@ public final class DomCompositeAdapter {
         if (!optionalFlag(verb, "shadow")) body.remove("shadow");
     }
 
+    /**
+     * Drops keys the verb does not list. An engine with no {@code verb_flags}
+     * object keeps every key, including the old {@code mode=composite} body.
+     */
+    private void keepListed(Map<String, Object> body, String verb) {
+        Map<String, Set<String>> known = verbFlagMap();
+        if (known == null || body == null) return;
+        Set<String> listed = known.get(verb == null ? "" : verb.toLowerCase(Locale.ROOT));
+        if (listed == null) return;
+        body.keySet().removeIf(key -> !listed.contains(key.replace('_', '-')));
+    }
+
+    private static RuntimeException mapStale(RuntimeException ex) {
+        String message = ex.getMessage() == null ? "" : ex.getMessage().toLowerCase(Locale.ROOT);
+        if (ex instanceof dev.domcomposite.StaleException || message.contains("stale")) {
+            return new org.openqa.selenium.StaleElementReferenceException(
+                    ex.getMessage() == null ? "stale" : ex.getMessage(), ex);
+        }
+        return ex;
+    }
+
     /** True when {@code capabilities.eval_nodes} is present. One eval can take several node ids. */
     public boolean multiEval() {
         if (verbsForTests != null) return multiEvalPinned;
@@ -203,6 +224,7 @@ public final class DomCompositeAdapter {
         if (nesting != null && !nesting.isBlank()) CompositeLog.info("adapter", "nesting " + nesting);
         if (position != null) CompositeLog.info("adapter", position.logLine());
         attachGeometry(body);
+        keepListed(body, "query");
         if (dryRun) return null;
         Client open = CompositeRuntime.ensureClient();
         if (open == null) throw new IllegalStateException("composite client is not open");
@@ -229,7 +251,8 @@ public final class DomCompositeAdapter {
     }
 
     /**
-     * One eval for every node. A binary without {@code eval_nodes} evaluates the first node only.
+     * One eval for every node. A binary without {@code eval_nodes} evaluates each node
+     * and returns a {@code values} array. One node keeps the single {@code eval} object.
      */
     public JsonNode evalAll(List<CompositeWebElement> elements, String source) {
         List<CompositeWebElement> present = new ArrayList<>();
@@ -238,10 +261,19 @@ public final class DomCompositeAdapter {
                 if (element != null && element.nodeId() != null && !element.nodeId().isBlank()) present.add(element);
             }
         }
-        if (present.size() <= 1 || !multiEval()) {
+        if (present.isEmpty()) return null;
+        if (!multiEval()) {
             CompositeLog.info("adapter", "eval fallback");
-            if (present.isEmpty()) return null;
-            return eval(present.getFirst(), source);
+            if (present.size() == 1) return eval(present.getFirst(), source);
+            com.fasterxml.jackson.databind.node.ObjectNode wrapped = dev.domengine.json.Jsons.object();
+            com.fasterxml.jackson.databind.node.ArrayNode values = wrapped.putArray("values");
+            for (CompositeWebElement element : present) {
+                JsonNode one = eval(element, source);
+                com.fasterxml.jackson.databind.node.ObjectNode row = values.addObject();
+                row.put("node_id", element.nodeId());
+                if (one != null && one.has("value")) row.set("value", one.get("value"));
+            }
+            return wrapped;
         }
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("source", source == null ? "" : source);
@@ -311,13 +343,28 @@ public final class DomCompositeAdapter {
             CompositeLog.info("query", "promote visual");
         }
         attachGeometry(body);
+        keepListed(body, "query");
         CompositeLog.info("query", "engine " + query.text());
         CompositeLog.trace("query", "forward selector=" + query.text());
         record("query");
         if (dryRun) return null;
         Client open = CompositeRuntime.ensureClient();
         if (open == null) throw new IllegalStateException("composite client is not open");
-        return open.query(body);
+        JsonNode json = open.query(body);
+        if (query.limit() != null && !queryFlag("limit")) json = sliceLimit(json, query.limit());
+        return json;
+    }
+
+    /** Keeps the first N composite and node rows when the engine has no {@code limit} flag. */
+    private static JsonNode sliceLimit(JsonNode json, int limit) {
+        if (!(json instanceof com.fasterxml.jackson.databind.node.ObjectNode object) || limit < 0) return json;
+        for (String name : List.of("composite", "nodes", "matches")) {
+            JsonNode list = object.get(name);
+            if (list == null || !list.isArray() || list.size() <= limit) continue;
+            com.fasterxml.jackson.databind.node.ArrayNode sliced = object.putArray(name);
+            for (int i = 0; i < limit; i++) sliced.add(list.get(i));
+        }
+        return object;
     }
 
     /** One click or type. Human exposure is whatever the query already carries. */
@@ -341,9 +388,14 @@ public final class DomCompositeAdapter {
         if (dryRun) return null;
         Client open = CompositeRuntime.ensureClient();
         if (open == null) throw new IllegalStateException("composite client is not open");
-        JsonNode json = "type".equals(action)
-                ? open.type(withText(body, typed))
-                : open.click(body);
+        if ("type".equals(action)) withText(body, typed);
+        keepListed(body, action);
+        JsonNode json;
+        try {
+            json = "type".equals(action) ? open.type(body) : open.click(body);
+        } catch (RuntimeException ex) {
+            throw mapStale(ex);
+        }
         JsonNode node = json == null ? null : json.get("node");
         if (node == null || node.isNull()) {
             throw new org.openqa.selenium.NoSuchElementException("no match for " + used.text());
@@ -392,6 +444,7 @@ public final class DomCompositeAdapter {
             CompositeLog.info("adapter", "position java");
         }
         attachGeometry(body);
+        keepListed(body, "query");
         CompositeLog.debug("adapter", "find " + used.describe());
         org.openqa.selenium.WebDriver owner = dispatchOwner();
         String tab = tools.dscode.common.agentcontrol.AgentControl.queryTab(owner);
@@ -413,6 +466,7 @@ public final class DomCompositeAdapter {
         if (verbFlagMap() == null) body.put("mode", "composite");
         body.put("all_frames", true);
         body.put("pierce", "open");
+        keepListed(body, "query");
         attachGeometry(body);
         record("query");
         CompositeLog.info("adapter", "scan all-contexts");
@@ -448,12 +502,23 @@ public final class DomCompositeAdapter {
     }
 
     public void hover(CompositeWebElement element) {
-        Map<String, Object> extra = new LinkedHashMap<>();
-        String id = element.attributes().get("id");
-        String css = element.selector().css();
-        String hoverCss = id != null && !id.isBlank() ? "#" + id : css;
-        if (hoverCss != null && !hoverCss.isBlank() && optionalFlag("query", "force-hover")) extra.put("force_hover", hoverCss);
-        act("query", element, extra);
+        hover(null, element);
+    }
+
+    /**
+     * Engine {@code hover} when {@code actions} lists it. Otherwise Selenium, and a no-op log when
+     * this hit has no driver so a stub binary does not throw.
+     */
+    public void hover(org.openqa.selenium.WebDriver driver, CompositeWebElement element) {
+        if (actionListed("hover")) {
+            act("hover", element, Map.of("force_hover", Boolean.TRUE));
+            return;
+        }
+        if (driver == null) {
+            CompositeLog.info("adapter", "hover fallback");
+            return;
+        }
+        new org.openqa.selenium.interactions.Actions(driver).moveToElement(element).perform();
     }
 
     public void scroll(CompositeWebElement element, int dx, int dy) {
@@ -485,6 +550,7 @@ public final class DomCompositeAdapter {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("point", x + "," + y);
         body.put("mode", "composite");
+        keepListed(body, "query");
         attachGeometry(body);
         record("query");
         CompositeLog.info("geometry", "point");
@@ -568,12 +634,17 @@ public final class DomCompositeAdapter {
         body.put("source", source == null ? "" : source);
         String nodeId = element.nodeId();
         if (nodeId != null && !nodeId.isBlank() && optionalFlag("eval", "node-id")) body.put("node_id", nodeId);
+        keepListed(body, "eval");
         record("eval");
         CompositeLog.info("adapter", "eval " + element.selector().describe());
         if (dryRun) return null;
         Client open = CompositeRuntime.ensureClient();
         if (open == null) throw new IllegalStateException("composite client is not open");
-        return open.eval(body);
+        try {
+            return open.eval(body);
+        } catch (RuntimeException ex) {
+            throw mapStale(ex);
+        }
     }
 
     /**
@@ -861,9 +932,25 @@ public final class DomCompositeAdapter {
         CompositeLog.debug("session", "frame " + id);
     }
 
+    public void popFrame() {
+        if (!frames.get().isEmpty()) frames.get().removeLast();
+        CompositeLog.debug("session", "frame pop");
+    }
+
+    public void clearFrames() {
+        frames.get().clear();
+        shadows.get().clear();
+        CompositeLog.debug("session", "frames clear");
+    }
+
     public void pushShadow(String id) {
         if (id != null && !id.isBlank()) shadows.get().addLast(id);
         CompositeLog.debug("session", "shadow " + id);
+    }
+
+    public void popShadow() {
+        if (!shadows.get().isEmpty()) shadows.get().removeLast();
+        CompositeLog.debug("session", "shadow pop");
     }
 
     public List<WebElement> findInFrame(String frameId, By by) {
@@ -878,22 +965,32 @@ public final class DomCompositeAdapter {
     private void act(String command, CompositeWebElement element, Map<String, Object> extra) {
         Map<String, Object> body = new LinkedHashMap<>(element.actionBody(list(frames), list(shadows)));
         body.putAll(extra);
-        stripUnlistedScopes(body, "query".equals(command) ? "query" : command);
+        String verb = "query".equals(command) ? "query" : command;
+        stripUnlistedScopes(body, verb);
+        if (verbFlagMap() != null && optionalFlag(verb, "node-id")) {
+            String nodeId = element.nodeId();
+            if (nodeId != null && !nodeId.isBlank()) body.put("node_id", nodeId);
+        }
+        keepListed(body, verb);
         record(command);
         CompositeLog.info("adapter", command + " " + element.selector().describe());
         if (dryRun) return;
         Client open = CompositeRuntime.ensureClient();
         if (open == null) throw new IllegalStateException("composite client is not open");
-        switch (command) {
-            case "click" -> open.click(body);
-            case "type" -> open.type(body);
-            case "scroll" -> open.scroll(body);
-            case "submit" -> open.submit(body);
-            case "key" -> open.key(body);
-            case "dblclick" -> open.dblclick(body);
-            case "contextclick" -> open.contextclick(body);
-            case "query" -> open.query(body);
-            default -> open.command(command, body);
+        try {
+            switch (command) {
+                case "click" -> open.click(body);
+                case "type" -> open.type(body);
+                case "scroll" -> open.scroll(body);
+                case "submit" -> open.submit(body);
+                case "key" -> open.key(body);
+                case "dblclick" -> open.dblclick(body);
+                case "contextclick" -> open.contextclick(body);
+                case "query" -> open.query(body);
+                default -> open.command(command, body);
+            }
+        } catch (RuntimeException ex) {
+            throw mapStale(ex);
         }
     }
 

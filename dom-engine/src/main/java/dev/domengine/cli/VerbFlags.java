@@ -39,17 +39,20 @@ public final class VerbFlags {
     private static Map<String, List<String>> verbs() {
         Map<String, List<String>> map = new LinkedHashMap<>();
         map.put("query", join(SELECTORS, List.of(
-                "file", "nesting", "nth", "every", "count-only", "geometry", "point", "viewport", "exposure", "explain"
+                "file", "nesting", "nth", "every", "count-only", "geometry", "point", "viewport", "exposure", "explain",
+                "filter", "limit", "wait-for", "timeout-ms", "poll-ms", "stability-ms", "all-frames", "frame", "shadow"
         )));
-        List<String> click = join(SELECTORS, List.of());
+        List<String> identity = List.of("node-id", "refind", "frame", "shadow");
+        List<String> click = join(SELECTORS, identity);
         map.put("click", click);
         map.put("dblclick", click);
         map.put("contextclick", click);
         map.put("submit", click);
-        map.put("type", join(SELECTORS, List.of("append", "submit")));
-        map.put("scroll", join(SELECTORS, List.of("dx", "dy")));
-        map.put("key", join(SELECTORS, List.of("key")));
-        map.put("eval", join(SELECTORS, List.of("source")));
+        map.put("hover", join(SELECTORS, List.of("node-id", "refind", "frame", "shadow", "force-hover")));
+        map.put("type", join(SELECTORS, List.of("append", "submit", "node-id", "refind", "frame", "shadow")));
+        map.put("scroll", join(SELECTORS, List.of("dx", "dy", "node-id", "refind", "frame", "shadow")));
+        map.put("key", join(SELECTORS, List.of("key", "node-id", "refind", "frame", "shadow")));
+        map.put("eval", join(SELECTORS, List.of("source", "node-id", "node-ids", "refind", "frame", "shadow")));
         map.put("drag", List.of("session", "session-dir", "source", "target"));
         map.put("premap", List.of(
                 "file", "screenshot", "out-dir",

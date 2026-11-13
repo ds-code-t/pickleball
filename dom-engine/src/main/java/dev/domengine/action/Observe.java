@@ -13,32 +13,101 @@ import dev.domengine.tree.DomNode;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
+import java.util.Set;
+import java.util.function.Supplier;
 
-/** Poll a query until it matches or the deadline passes. {@code timeout-ms} 0 fails at once. */
+/** Poll a query until it matches or the deadline passes. {@code timeout-ms} 0 fails at once when nothing matches. */
 public final class Observe {
+    private static final Set<String> MODES = Set.of("attached", "visible", "hidden", "detached");
+
     private Observe() {
     }
 
     public static ObjectNode waitFor(DomNode root, Map<String, String> flags) {
-        long timeout = longFlag(flags, "timeout-ms", 1000);
-        long poll = longFlag(flags, "poll-ms", 50);
-        long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(Math.max(0, timeout));
-        JsonNode last = Query.run(root, flags);
-        while (empty(last) && System.nanoTime() < deadline) {
-            sleep(poll);
-            last = Query.run(root, flags);
-        }
-        if (empty(last)) throw new CdpException("timeout");
-        EngineLog.info("wait", "poll_ms=" + poll + " matched");
-        ObjectNode result = (ObjectNode) last;
-        result.put("waited", true);
-        return result;
+        return poll(() -> root, flags);
     }
 
     public static ObjectNode waitSession(BrowserSession session, Map<String, String> flags) {
-        DomNode root = session.tree().root;
-        root.linkParents();
-        return waitFor(root, flags);
+        return poll(() -> {
+            DomNode root = session.tree().root;
+            root.linkParents();
+            return root;
+        }, flags);
+    }
+
+    /**
+     * One fresh tree per poll. {@code --wait-for} selects the rule. Without it, any hit matches,
+     * which is the {@code wait} verb.
+     */
+    public static ObjectNode poll(Supplier<DomNode> roots, Map<String, String> flags) {
+        String mode = flags.get("wait-for");
+        if (mode != null && !mode.isBlank() && !MODES.contains(mode)) throw new CdpException("invalid wait-for");
+        long timeout = longFlag(flags, "timeout-ms", 1000);
+        long pollMs = longFlag(flags, "poll-ms", 50);
+        long stability = longFlag(flags, "stability-ms", 0);
+        long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(Math.max(0, timeout));
+        long stableSince = -1;
+        ObjectNode last = Jsons.object();
+        while (true) {
+            DomNode root = roots.get();
+            if (root != null) root.linkParents();
+            try {
+                last = Query.run(root, flags);
+            } catch (CdpException failure) {
+                String message = failure.getMessage() == null ? "" : failure.getMessage();
+                if (!message.contains("not found")) throw failure;
+                last = Jsons.object();
+                last.put("ok", true);
+                last.putArray("nodes");
+                last.putArray("composite");
+            }
+            boolean ok = mode == null || mode.isBlank() ? !empty(last) : matched(mode, last);
+            long now = System.nanoTime();
+            if (!ok) {
+                stableSince = -1;
+            } else if (stability <= 0) {
+                last.put("waited", true);
+                EngineLog.info("wait", "poll_ms=" + pollMs + " matched " + (mode == null ? "attached" : mode));
+                return last;
+            } else {
+                if (stableSince < 0) stableSince = now;
+                if (now - stableSince >= java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(stability)) {
+                    last.put("waited", true);
+                    EngineLog.info("wait", "poll_ms=" + pollMs + " stable " + mode);
+                    return last;
+                }
+            }
+            if (now >= deadline) throw new CdpException("timeout");
+            sleep(pollMs);
+        }
+    }
+
+    private static boolean matched(String mode, JsonNode result) {
+        boolean any = !empty(result);
+        boolean shown = displayed(result);
+        return switch (mode) {
+            case "attached" -> any;
+            case "detached" -> !any;
+            case "visible" -> shown;
+            case "hidden" -> !shown;
+            default -> throw new CdpException("invalid wait-for");
+        };
+    }
+
+    private static boolean displayed(JsonNode result) {
+        JsonNode rows = result.get("composite");
+        if (rows == null || !rows.isArray()) return !empty(result);
+        for (JsonNode row : rows) {
+            boolean hidden = false;
+            JsonNode states = row.get("states");
+            if (states != null && states.isArray()) {
+                for (JsonNode state : states) {
+                    if ("hidden".equals(state.asText())) hidden = true;
+                }
+            }
+            if (!hidden) return true;
+        }
+        return false;
     }
 
     public static ObjectNode screenshot(BrowserSession session, Map<String, String> flags) {

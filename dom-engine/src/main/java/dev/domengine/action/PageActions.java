@@ -11,6 +11,7 @@ import dev.domengine.session.BrowserSession;
 import dev.domengine.tree.DomNode;
 import dev.domengine.tree.LiveTree;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -18,17 +19,29 @@ import java.util.Map;
 /** Browser actions over CDP. One match is required. */
 public final class PageActions {
     public static final List<String> VERBS = List.of(
-            "click", "type", "scroll", "submit", "key", "dblclick", "contextclick", "drag", "eval"
+            "click", "type", "scroll", "submit", "key", "dblclick", "contextclick", "drag", "eval", "hover"
     );
 
+    private static final java.util.concurrent.ConcurrentHashMap<String, Long> FORCED = new java.util.concurrent.ConcurrentHashMap<>();
+
     private PageActions() {
+    }
+
+    public static void releaseHover(BrowserSession session) {
+        if (session == null) return;
+        Long nodeId = FORCED.remove(session.id);
+        if (nodeId == null || session.connection() == null) return;
+        clearPseudo(session.connection(), nodeId);
     }
 
     public static ObjectNode act(BrowserSession session, String verb, Map<String, String> flags) {
         LiveTree tree = session.tree();
         tree.root.linkParents();
         if ("drag".equals(verb)) return drag(session, tree, flags);
-        DomNode node = one(tree, flags);
+        if ("eval".equals(verb) && flags.get("node-ids") != null && !flags.get("node-ids").isBlank()) {
+            return evalMany(session, flags);
+        }
+        DomNode node = one(tree, flags, session.connection());
         if (!node.hasBox) tree.enrich(session.connection(), List.of(node), 0, 0);
         double x = node.hasBox ? node.x + node.width / 2 : 1;
         double y = node.hasBox ? node.y + node.height / 2 : 1;
@@ -42,6 +55,7 @@ public final class PageActions {
             case "key" -> key(cdp, flags.get("key"));
             case "submit" -> submit(cdp, node);
             case "eval" -> eval(cdp, node, flags.get("source"));
+            case "hover" -> hover(session, tree, node, flags);
             default -> throw new CdpException("invalid action: " + verb);
         };
         result.put("ok", true);
@@ -52,8 +66,8 @@ public final class PageActions {
     }
 
     private static ObjectNode drag(BrowserSession session, LiveTree tree, Map<String, String> flags) {
-        DomNode source = one(tree, Map.of("css", selector(flags.get("source"))));
-        DomNode target = one(tree, Map.of("css", selector(flags.get("target"))));
+        DomNode source = one(tree, Map.of("css", selector(flags.get("source"))), session.connection());
+        DomNode target = one(tree, Map.of("css", selector(flags.get("target"))), session.connection());
         if (!source.hasBox) tree.enrich(session.connection(), List.of(source), 0, 0);
         if (!target.hasBox) tree.enrich(session.connection(), List.of(target), 0, 0);
         double x1 = source.hasBox ? source.x + source.width / 2 : 1;
@@ -80,15 +94,72 @@ public final class PageActions {
         return trimmed;
     }
 
-    private static DomNode one(LiveTree tree, Map<String, String> flags) {
-        JsonNode found = Query.run(tree.root, flags);
-        JsonNode nodes = found.get("nodes");
-        if (nodes == null || nodes.isEmpty()) throw new CdpException("not found");
-        if (nodes.size() > 1) throw new CdpException("ambiguous");
-        String handle = nodes.get(0).path("handle").asText("");
-        DomNode node = find(tree.root, handle);
-        if (node == null) throw new CdpException("not found");
+    private static DomNode one(LiveTree tree, Map<String, String> flags, CdpConnection cdp) {
+        DomNode pinned = byIdentity(tree, flags, cdp);
+        if (pinned != null) return pinned;
+        if ("true".equals(flags.get("refind")) || flags.get("node-id") == null || flags.get("node-id").isBlank()) {
+            JsonNode found = Query.run(tree.root, flags);
+            JsonNode nodes = found.get("nodes");
+            if (nodes == null || nodes.isEmpty()) throw new CdpException("not found");
+            if (nodes.size() > 1) throw new CdpException("ambiguous");
+            String handle = nodes.get(0).path("handle").asText("");
+            DomNode node = find(tree.root, handle);
+            if (node == null) throw new CdpException("not found");
+            return node;
+        }
+        throw new CdpException("stale");
+    }
+
+    /** {@code --node-id} is a backend node id, or {@code frame:backend}. A miss is {@code stale} unless {@code --refind}. */
+    private static DomNode byIdentity(LiveTree tree, Map<String, String> flags, CdpConnection cdp) {
+        String raw = flags.get("node-id");
+        if (raw == null || raw.isBlank()) return null;
+        long backend;
+        try {
+            backend = backendOf(raw);
+        } catch (RuntimeException failure) {
+            if ("true".equals(flags.get("refind"))) return null;
+            throw new CdpException("stale");
+        }
+        try {
+            ObjectNode params = Jsons.object();
+            params.put("backendNodeId", backend);
+            JsonNode resolved = cdp.call("DOM.resolveNode", params, java.time.Duration.ofSeconds(5));
+            if (resolved.path("object").path("objectId").asText("").isBlank()) {
+                if ("true".equals(flags.get("refind"))) return null;
+                throw new CdpException("stale");
+            }
+        } catch (CdpException failure) {
+            if ("true".equals(flags.get("refind"))) return null;
+            throw new CdpException("stale");
+        }
+        DomNode node = findBackend(tree.root, backend);
+        if (node == null) {
+            if ("true".equals(flags.get("refind"))) return null;
+            throw new CdpException("stale");
+        }
+        EngineLog.info("identity", "node " + backend);
         return node;
+    }
+
+    private static long backendOf(String raw) {
+        String text = raw.trim();
+        int colon = text.lastIndexOf(':');
+        String number = colon >= 0 ? text.substring(colon + 1) : text;
+        return Long.parseLong(number);
+    }
+
+    private static DomNode findBackend(DomNode node, long backend) {
+        if (node.backendNodeId == backend && node.nodeType == 1) return node;
+        for (DomNode child : node.children) {
+            DomNode found = findBackend(child, backend);
+            if (found != null) return found;
+        }
+        for (DomNode shadow : node.shadowRoots) {
+            DomNode found = findBackend(shadow, backend);
+            if (found != null) return found;
+        }
+        return null;
     }
 
     private static DomNode find(DomNode node, String handle) {
@@ -191,6 +262,123 @@ public final class PageActions {
         result.put("kind", "eval");
         result.put("backend_node_id", node.backendNodeId);
         result.set("value", called.path("result").path("value").isMissingNode() ? Jsons.object().put("value", "") : called.path("result").get("value"));
+        return result;
+    }
+
+    private static ObjectNode hover(BrowserSession session, LiveTree tree, DomNode node, Map<String, String> flags) {
+        CdpConnection cdp = session.connection();
+        if (node.nodeId > 0) {
+            ObjectNode into = Jsons.object();
+            into.put("nodeId", node.nodeId);
+            try {
+                cdp.call("DOM.scrollIntoViewIfNeeded", into, java.time.Duration.ofSeconds(5));
+            } catch (RuntimeException ignored) {
+                // A node with no box still gets the move at its last point.
+            }
+            tree.enrich(cdp, List.of(node), 0, 0);
+        }
+        double x = node.hasBox ? node.x + node.width / 2 : 1;
+        double y = node.hasBox ? node.y + node.height / 2 : 1;
+        mouse(cdp, "mouseMoved", x, y, "none", 0);
+        if ("true".equals(flags.get("force-hover")) && node.nodeId > 0) {
+            Long previous = FORCED.put(session.id, node.nodeId);
+            if (previous != null && previous != node.nodeId) clearPseudo(cdp, previous);
+            try {
+                cdp.call("CSS.enable", Jsons.object(), java.time.Duration.ofSeconds(5));
+            } catch (RuntimeException ignored) {
+                // forcePseudoState enables the domain itself on current Chrome.
+            }
+            ObjectNode pseudo = Jsons.object();
+            pseudo.put("nodeId", node.nodeId);
+            pseudo.putArray("forcedPseudoClasses").add("hover");
+            cdp.call("CSS.forcePseudoState", pseudo, java.time.Duration.ofSeconds(5));
+        }
+        EngineLog.info("hover", node.id());
+        ObjectNode result = Jsons.object();
+        result.put("x", x);
+        result.put("y", y);
+        return result;
+    }
+
+    private static void clearPseudo(CdpConnection cdp, long nodeId) {
+        try {
+            ObjectNode pseudo = Jsons.object();
+            pseudo.put("nodeId", nodeId);
+            pseudo.putArray("forcedPseudoClasses");
+            cdp.call("CSS.forcePseudoState", pseudo, java.time.Duration.ofSeconds(5));
+        } catch (RuntimeException ignored) {
+            // The previous node may already be gone.
+        }
+    }
+
+    /** One {@code Runtime.callFunctionOn} for every id. A missing id is {@code {"stale":true}} in its slot. */
+    private static ObjectNode evalMany(BrowserSession session, Map<String, String> flags) {
+        String source = flags.get("source");
+        if (source == null || source.isBlank()) throw new CdpException("eval source is empty");
+        String[] parts = flags.get("node-ids").split(",");
+        CdpConnection cdp = session.connection();
+        List<String> objectIds = new ArrayList<>();
+        List<Integer> slots = new ArrayList<>();
+        boolean[] stale = new boolean[parts.length];
+        String[] ids = new String[parts.length];
+        for (int i = 0; i < parts.length; i++) {
+            String raw = parts[i].trim();
+            ids[i] = raw;
+            if (raw.isEmpty()) {
+                stale[i] = true;
+                continue;
+            }
+            try {
+                ObjectNode resolve = Jsons.object();
+                resolve.put("backendNodeId", backendOf(raw));
+                JsonNode resolved = cdp.call("DOM.resolveNode", resolve, java.time.Duration.ofSeconds(5));
+                String objectId = resolved.path("object").path("objectId").asText("");
+                if (objectId.isBlank()) {
+                    stale[i] = true;
+                    continue;
+                }
+                slots.add(i);
+                objectIds.add(objectId);
+            } catch (RuntimeException failure) {
+                stale[i] = true;
+            }
+        }
+        JsonNode values = Jsons.object().putArray("value");
+        if (!objectIds.isEmpty()) {
+            String wrapped = "function(){ const fn = " + source + "; const out = [];"
+                    + " for (let i = 0; i < arguments.length; i++) {"
+                    + " const el = arguments[i];"
+                    + " if (!el) { out.push({stale:true}); continue; }"
+                    + " try { out.push(fn.call(el)); } catch (e) { out.push({error:String(e)}); }"
+                    + " } return out; }";
+            ObjectNode call = Jsons.object();
+            call.put("functionDeclaration", wrapped);
+            call.put("objectId", objectIds.get(0));
+            call.put("returnByValue", true);
+            com.fasterxml.jackson.databind.node.ArrayNode args = call.putArray("arguments");
+            for (String objectId : objectIds) args.addObject().put("objectId", objectId);
+            JsonNode called = cdp.call("Runtime.callFunctionOn", call, java.time.Duration.ofSeconds(5));
+            values = called.path("result").path("value");
+            EngineLog.info("batch", "callFunctionOn=1 nodes=" + objectIds.size());
+        }
+        ObjectNode result = Jsons.object();
+        result.put("kind", "eval");
+        com.fasterxml.jackson.databind.node.ArrayNode rows = result.putArray("values");
+        int cursor = 0;
+        for (int i = 0; i < parts.length; i++) {
+            ObjectNode row = rows.addObject();
+            row.put("node_id", ids[i]);
+            if (stale[i]) {
+                row.put("stale", true);
+                continue;
+            }
+            JsonNode value = values.isArray() && cursor < values.size() ? values.get(cursor) : Jsons.object();
+            cursor++;
+            if (value.isObject() && value.path("stale").asBoolean(false)) row.put("stale", true);
+            else row.set("value", value);
+        }
+        result.put("ok", true);
+        result.put("session", session.id);
         return result;
     }
 

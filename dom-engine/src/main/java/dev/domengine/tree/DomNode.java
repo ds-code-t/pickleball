@@ -30,10 +30,15 @@ public final class DomNode {
     public double width;
     public double height;
     public boolean hasBox;
+    /** True once a live box model was read, including a zero-size box. */
+    public boolean boxRead;
     public String role = "";
     public String accessibleName = "";
     public boolean displayed = true;
     public DomNode parent;
+    public String framePath = "";
+    /** Live or offline row-state object. Null until a query fills it. */
+    public com.fasterxml.jackson.databind.JsonNode liveState;
     public double frameX;
     public double frameY;
     public boolean hasVisual;

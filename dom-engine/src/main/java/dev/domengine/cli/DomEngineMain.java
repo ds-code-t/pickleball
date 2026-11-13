@@ -112,7 +112,7 @@ public final class DomEngineMain {
                 case "validate" -> validate(flags);
                 case "capture" -> capture(flags);
                 case "conform" -> conform(flags);
-                case "click", "type", "scroll", "submit", "key", "dblclick", "contextclick", "drag", "eval" ->
+                case "click", "type", "scroll", "submit", "key", "dblclick", "contextclick", "drag", "eval", "hover" ->
                         action(command, flags);
                 case "screenshot" -> screenshot(flags);
                 case "observe", "wait" -> observe(command, flags);
@@ -202,7 +202,7 @@ public final class DomEngineMain {
         array(node, "commands", List.of(
                 "version", "capabilities", "session", "attach", "snapshot", "premap", "query", "resolve",
                 "info", "recommend", "validate", "capture", "conform", "log",
-                "click", "type", "scroll", "submit", "key", "dblclick", "contextclick", "drag", "eval",
+                "click", "type", "scroll", "submit", "key", "dblclick", "contextclick", "drag", "hover", "eval",
                 "screenshot", "observe", "wait", "desktop", "mcp", "serve"
         ));
         array(node, "session_verbs", List.of("create", "list", "attach", "close", "join", "log"));
@@ -215,6 +215,8 @@ public final class DomEngineMain {
         array(node, "engines", dev.domengine.query.Query.ENGINES);
         array(node, "actions", PageActions.VERBS);
         array(node, "query_flags", dev.domengine.query.Query.QUERY_FLAGS);
+        node.put("eval_nodes", "256");
+        array(node, "row_states", dev.domengine.query.RowStates.NAMES);
         ObjectNode verbFlags = node.putObject("verb_flags");
         for (Map.Entry<String, List<String>> entry : VerbFlags.VERBS.entrySet()) {
             array(verbFlags, entry.getKey(), entry.getValue());
@@ -399,6 +401,9 @@ public final class DomEngineMain {
             } catch (java.io.IOException failure) {
                 return error(1, "failed", "query file: " + failure.getMessage());
             }
+            if (flags.get("wait-for") != null && !flags.get("wait-for").isBlank()) {
+                return CliResult.ok(Jsons.pretty(dev.domengine.action.Observe.waitFor(root, flags)));
+            }
             return CliResult.ok(Jsons.pretty(dev.domengine.query.Query.run(root, flags)));
         }
         if (flags.containsKey("session") || SessionRegistry.get().joined() != null) {
@@ -408,7 +413,10 @@ public final class DomEngineMain {
             root.linkParents();
             LiveXPath.use(session.connection());
             try {
-                return CliResult.ok(Jsons.pretty(dev.domengine.query.Query.run(root, flags)));
+                ObjectNode ran = flags.get("wait-for") == null || flags.get("wait-for").isBlank()
+                        ? dev.domengine.query.Query.run(root, flags)
+                        : dev.domengine.action.Observe.waitSession(session, flags);
+                return CliResult.ok(Jsons.pretty(ran));
             } finally {
                 LiveXPath.use(null);
             }
@@ -461,7 +469,9 @@ public final class DomEngineMain {
         dev.domengine.tree.DomNode root = Observe.rootFrom(flags, session);
         if (session != null) LiveXPath.use(session.connection());
         try {
-            com.fasterxml.jackson.databind.node.ObjectNode result = Observe.waitFor(root, flags);
+            com.fasterxml.jackson.databind.node.ObjectNode result = session == null
+                    ? Observe.waitFor(root, flags)
+                    : Observe.waitSession(session, flags);
             result.put("command", command);
             return CliResult.ok(Jsons.pretty(result));
         } finally {
@@ -651,7 +661,8 @@ public final class DomEngineMain {
     private static boolean isBoolean(String name) {
         return switch (name) {
             case "process", "headed", "i-accept-local-attach", "follow", "stdio", "strict", "explain", "geometry", "count-only", "append",
-                    "submit", "all-frames", "describe", "auto-wait", "promote-visual", "mobile", "verify", "perform", "scroll", "live" -> true;
+                    "submit", "all-frames", "describe", "auto-wait", "promote-visual", "mobile", "verify", "perform", "scroll", "live",
+                    "force-hover", "refind" -> true;
             default -> false;
         };
     }
@@ -673,6 +684,7 @@ public final class DomEngineMain {
 
     private static String codeFor(String message) {
         String text = message.toLowerCase(Locale.ROOT);
+        if (text.contains("stale")) return "stale";
         if (text.contains("not found") || text.contains("no page target")) return "not_found";
         if (text.contains("ambiguous")) return "ambiguous";
         if (text.contains("invalid")) return "invalid";

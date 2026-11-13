@@ -123,7 +123,8 @@ public final class LiveXPath {
     }
 
     private static String contextObject(CdpConnection cdp, DomNode context, List<String> release) {
-        if (context == null || context.backendNodeId <= 0 || context.nodeType == 9) return null;
+        if (context == null || context.backendNodeId <= 0) return null;
+        if (context.nodeType == 9 && context.parent == null) return null;
         ObjectNode params = Jsons.object();
         params.put("backendNodeId", context.backendNodeId);
         JsonNode resolved = cdp.call("DOM.resolveNode", params, TIMEOUT);

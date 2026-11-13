@@ -36,7 +36,7 @@ public final class Engines {
 
     public static Query.Hit apply(String engine, String expr, List<DomNode> current, DomNode root, String pierce) {
         return switch (engine) {
-            case "css" -> css(expr, scopes(current, root), false);
+            case "css" -> css(expr, scopes(current, root), pierce != null && (pierce.equals("open") || pierce.equals("all")));
             case "xpath" -> xpath(expr, scopes(current, root), pierce);
             case "text" -> text(expr, scopes(current, root));
             case "role" -> role(expr, scopes(current, root));

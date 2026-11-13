@@ -179,7 +179,7 @@ public final class ElementOperations {
     public static void hover(WebDriver driver, WebElement element) {
         WebElement raw = unwrap(element);
         if (raw instanceof CompositeWebElement composite) {
-            DomCompositeAdapter.get().hover(composite);
+            DomCompositeAdapter.get().hover(driver, composite);
             return;
         }
         new Actions(driver).moveToElement(raw).perform();
@@ -345,7 +345,13 @@ public final class ElementOperations {
     }
 
     public static void defaultContent(WebDriver driver) {
-        driver.switchTo().defaultContent();
+        DomCompositeAdapter.get().clearFrames();
+        if (driver != null) driver.switchTo().defaultContent();
+    }
+
+    public static void parentFrame(WebDriver driver) {
+        DomCompositeAdapter.get().popFrame();
+        if (driver != null) driver.switchTo().parentFrame();
     }
 
     /** Full document HTML. There is no composite page-source verb, so this is the one Selenium call. */

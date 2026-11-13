@@ -320,8 +320,13 @@ public final class CompositeWebElement implements WebElement {
         return new SearchContext() {
             @Override
             public List<WebElement> findElements(By by) {
-                DomCompositeAdapter.get().pushShadow(id);
-                return DomCompositeAdapter.get().find(by);
+                DomCompositeAdapter adapter = DomCompositeAdapter.get();
+                adapter.pushShadow(id);
+                try {
+                    return adapter.find(by);
+                } finally {
+                    adapter.popShadow();
+                }
             }
 
             @Override

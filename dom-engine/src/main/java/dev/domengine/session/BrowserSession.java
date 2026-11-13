@@ -180,6 +180,11 @@ public final class BrowserSession implements AutoCloseable {
     public void close() {
         if (closed) return;
         closed = true;
+        try {
+            dev.domengine.action.PageActions.releaseHover(this);
+        } catch (RuntimeException ignored) {
+            // Closing still wins if the pseudo-state clear fails.
+        }
         if (connection != null) connection.close();
         boolean killed = false;
         if (launched && chrome != null) {

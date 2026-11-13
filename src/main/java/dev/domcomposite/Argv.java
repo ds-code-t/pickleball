@@ -86,7 +86,7 @@ public final class Argv {
         switch (cmd) {
             case "capture" -> pushBools(argv, node, new String[][] {{"mobile", "mobile"}});
             case "query", "resolve", "click", "type", "scroll", "submit", "key", "dblclick",
-                    "contextclick", "eval" -> {
+                    "contextclick", "eval", "hover" -> {
                 pushValues(argv, node, SELECTOR_FLAGS);
                 pushBools(argv, node, new String[][] {
                     {"strict", "strict"},
@@ -95,6 +95,8 @@ public final class Argv {
                     {"describe", "describe"},
                     {"auto_wait", "auto-wait"},
                     {"promote_visual", "promote-visual"},
+                    {"force_hover", "force-hover"},
+                    {"refind", "refind"},
                 });
                 if ("type".equals(cmd)) {
                     pushValues(argv, node, new String[][] {{"text", "text"}});

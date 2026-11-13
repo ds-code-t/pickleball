@@ -22,7 +22,8 @@ public final class Query {
             "css", "xpath", "text", "role", "frame", "shadow", "near", "below", "above", "left-of", "right-of", "desc", "a11y", "look", "image"
     );
     public static final List<String> QUERY_FLAGS = List.of(
-            "within", "nesting", "nth", "every", "count-only", "geometry", "pierce", "point", "viewport", "exposure"
+            "within", "nesting", "nth", "every", "count-only", "geometry", "pierce", "point", "viewport", "exposure",
+            "filter", "limit"
     );
 
     private Query() {
@@ -38,10 +39,11 @@ public final class Query {
         boolean human = "human".equalsIgnoreCase(flags.get("exposure"));
         if (armed) Engines.useViewport(TemplateMatch.read(Path.of(viewport)));
         if (human) Engines.useSpace("visual_viewport_relative");
+        DomNode scoped = Frames.scope(root, flags);
         String withinId = flags.get("within");
-        if (withinId != null && !withinId.isBlank()) LiveXPath.within(findId(root, withinId));
+        if (withinId != null && !withinId.isBlank()) LiveXPath.within(findId(scoped, withinId));
         try {
-            return runArmed(root, flags);
+            return runArmed(scoped, flags);
         } finally {
             LiveXPath.within(null);
             if (armed) Engines.useViewport(null);
@@ -65,41 +67,55 @@ public final class Query {
 
     private static ObjectNode runArmed(DomNode root, Map<String, String> flags) {
         String pipeline = pipelineOf(flags);
-        if (pipeline == null) throw new CdpException("query requires --css, --xpath, --text, --pipeline, or --selector");
-        List<String> parts = splitStages(pipeline);
-        if (parts.isEmpty()) throw new CdpException("pipeline is empty");
+        boolean point = flags.get("point") != null && !flags.get("point").isBlank();
+        if (pipeline == null && !point) throw new CdpException("query requires --css, --xpath, --text, --pipeline, or --selector");
         String pierce = flags.getOrDefault("pierce", "");
-        List<DomNode> current = List.of(root);
         List<Stage> trace = new ArrayList<>();
         ObjectNode image = null;
-        for (String part : parts) {
-            String piece = part.trim();
-            if (piece.isEmpty()) throw new CdpException("invalid pipeline stage: " + pipeline);
-            long start = System.nanoTime();
-            Expressions.Expr expr = Expressions.parse(piece);
-            Hit hit = Expressions.eval(expr, current, root, pierce);
-            current = hit.nodes;
-            if (hit.image != null) image = hit.image;
-            long ms = (System.nanoTime() - start) / 1_000_000L;
-            String engine = expr instanceof Expressions.Stage stage ? stage.engine() : "expr";
-            String shown = expr instanceof Expressions.Stage stage ? stage.expr() : piece;
-            trace.add(new Stage(engine, shown, hit.why, current.size(), ms));
-            EngineLog.info("query", engine + " " + hit.why);
+        List<DomNode> current = new ArrayList<>();
+        if (!point) {
+            if ("true".equals(flags.get("all-frames"))) {
+                for (Frames.Doc doc : Frames.documents(root)) {
+                    StageRun run = stages(doc.node(), pipeline, pierce);
+                    trace.addAll(run.trace);
+                    if (run.image != null) image = run.image;
+                    for (DomNode node : run.nodes) node.framePath = doc.path();
+                    current.addAll(run.nodes);
+                }
+                EngineLog.info("frame", "all-frames docs=" + Frames.documents(root).size());
+            } else {
+                StageRun run = stages(root, pipeline, pierce);
+                trace.addAll(run.trace);
+                image = run.image;
+                current.addAll(run.nodes);
+            }
         }
         requireWithin(root, flags.get("within"));
         current = within(current, flags.get("within"));
         current = nesting(current, flags.get("nesting"));
+        dev.domengine.cdp.CdpConnection connection = LiveXPath.connection();
+        if (connection != null && !current.isEmpty()) Displayed.prepare(connection, current);
+        String filter = flags.get("filter");
+        if (filter != null && !filter.isBlank()) {
+            if (!"displayed".equalsIgnoreCase(filter)) throw new CdpException("invalid filter");
+            List<DomNode> shown = new ArrayList<>();
+            for (DomNode node : current) if (Displayed.isDisplayed(node)) shown.add(node);
+            current = shown;
+            EngineLog.info("query", "filter displayed");
+        }
         current = nth(current, flags.get("nth"), flags.get("every"));
-        if (flags.get("point") != null && !flags.get("point").isBlank()) current = hitAt(root, flags.get("point"));
+        if (point) current = hitAt(root, flags.get("point"));
+        current = limit(current, flags.get("limit"));
         boolean geometry = "true".equals(flags.get("geometry"));
         boolean explain = "true".equals(flags.get("explain"));
         boolean countOnly = "true".equals(flags.get("count-only"));
         boolean strict = "true".equals(flags.get("strict"));
         if (strict && current.isEmpty()) throw new CdpException("not found");
         if (strict && current.size() > 1) throw new CdpException("ambiguous");
+        if (!countOnly && connection != null && !current.isEmpty()) RowStates.fill(connection, current);
         ObjectNode result = Jsons.object();
         result.put("ok", true);
-        result.put("source", pipeline);
+        result.put("source", pipeline == null ? "" : pipeline);
         if (countOnly) {
             result.put("count", current.size());
             result.put("count_only", true);
@@ -130,6 +146,46 @@ public final class Query {
             EngineLog.info("query", "pierce " + pierce);
         }
         return result;
+    }
+
+    private record StageRun(List<DomNode> nodes, List<Stage> trace, ObjectNode image) {
+    }
+
+    private static StageRun stages(DomNode root, String pipeline, String pierce) {
+        List<String> parts = splitStages(pipeline);
+        if (parts.isEmpty()) throw new CdpException("pipeline is empty");
+        List<DomNode> current = List.of(root);
+        List<Stage> trace = new ArrayList<>();
+        ObjectNode image = null;
+        for (String part : parts) {
+            String piece = part.trim();
+            if (piece.isEmpty()) throw new CdpException("invalid pipeline stage: " + pipeline);
+            long start = System.nanoTime();
+            Expressions.Expr expr = Expressions.parse(piece);
+            Hit hit = Expressions.eval(expr, current, root, pierce);
+            current = hit.nodes;
+            if (hit.image != null) image = hit.image;
+            long ms = (System.nanoTime() - start) / 1_000_000L;
+            String engine = expr instanceof Expressions.Stage stage ? stage.engine() : "expr";
+            String shown = expr instanceof Expressions.Stage stage ? stage.expr() : piece;
+            trace.add(new Stage(engine, shown, hit.why, current.size(), ms));
+            EngineLog.info("query", engine + " " + hit.why);
+        }
+        return new StageRun(current, trace, image);
+    }
+
+    private static List<DomNode> limit(List<DomNode> nodes, String raw) {
+        if (raw == null || raw.isBlank()) return nodes;
+        int count;
+        try {
+            count = Integer.parseInt(raw.trim());
+        } catch (NumberFormatException failure) {
+            throw new CdpException("invalid limit");
+        }
+        if (count < 0) throw new CdpException("invalid limit");
+        if (nodes.size() <= count) return nodes;
+        EngineLog.info("query", "limit " + count);
+        return new ArrayList<>(nodes.subList(0, count));
     }
 
     private static void requireWithin(DomNode root, String id) {
@@ -334,6 +390,7 @@ public final class Query {
         if (geometry && node.hasBox) json.set("geometry", geometry(node));
         String role = roleOf(node);
         if (!role.isEmpty()) json.put("role", role);
+        if (node.framePath != null && !node.framePath.isBlank()) json.put("frame", node.framePath);
         return json;
     }
 
@@ -350,7 +407,8 @@ public final class Query {
         ObjectNode attrs = json.putObject("attributes");
         node.attributes.forEach(attrs::put);
         ArrayNode states = json.putArray("states");
-        if (node.attributes.containsKey("disabled")) states.add("disabled");
+        RowStates.add(states, node);
+        if (node.framePath != null && !node.framePath.isBlank()) json.put("frame", node.framePath);
         ArrayNode children = json.putArray("children");
         for (DomNode child : node.children) {
             if (child.nodeType != 1 || child.iframe) continue;

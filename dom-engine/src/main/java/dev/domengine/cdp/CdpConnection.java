@@ -56,11 +56,17 @@ public final class CdpConnection implements AutoCloseable {
     }
 
     public JsonNode call(String method, ObjectNode params, Duration timeout) {
+        return call(method, params, null, timeout);
+    }
+
+    /** {@code sessionId} routes a flattened child-target call. Null stays on this target. */
+    public JsonNode call(String method, ObjectNode params, String sessionId, Duration timeout) {
         if (closed) throw new CdpException("cdp connection is closed");
         long id = ids.incrementAndGet();
         ObjectNode request = Jsons.object();
         request.put("id", id);
         request.put("method", method);
+        if (sessionId != null && !sessionId.isBlank()) request.put("sessionId", sessionId);
         request.set("params", params == null ? Jsons.object() : params);
         CompletableFuture<JsonNode> done = new CompletableFuture<>();
         pending.put(id, done);
