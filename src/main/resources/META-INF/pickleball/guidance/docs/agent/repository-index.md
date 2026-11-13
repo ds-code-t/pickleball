@@ -597,6 +597,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/common/composite/ContextAnchorReproTest.java`
 - `src/test/java/tools/dscode/common/composite/ContextNestGateTest.java`
 - `src/test/java/tools/dscode/common/composite/DomAccessGuardTest.java`
+- `src/test/java/tools/dscode/common/composite/DomEnginePackagingTest.java`
 - `src/test/java/tools/dscode/common/composite/ElementBatchEdgeTest.java`
 - `src/test/java/tools/dscode/common/composite/ElementBatchLogTest.java`
 - `src/test/java/tools/dscode/common/composite/ElementSnapshotEvalTest.java`
@@ -692,6 +693,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/GuidancePackagingTest.java`
 - `src/test/java/tools/dscode/launcher/AgentExpansionTest.java`
 - `src/test/java/tools/dscode/launcher/DaltonCliLaunchTest.java`
+- `src/test/java/tools/dscode/launcher/DomEngineCliLaunchTest.java`
 - `src/test/java/tools/dscode/launcher/DomLogCliLaunchTest.java`
 - `src/test/java/tools/dscode/launcher/EngineCliLaunchTest.java`
 - `src/test/java/tools/dscode/launcher/GuidanceCommandGoldenTest.java`
@@ -950,6 +952,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/dalton/DaltonCliForwarder.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/diagnostics/DiagnosticEvidenceNavigator.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/discover/LastDiscoverSnapshot.java`
+- `pickleball-workbench/src/main/java/tools/dscode/workbench/engine/DomEngineCliForwarder.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/engine/EngineCliForwarder.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/lease/WorkbenchCallContext.java`
 - `pickleball-workbench/src/main/java/tools/dscode/workbench/lease/WorkbenchControlLease.java`
@@ -1037,6 +1040,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/diagnostics/DiagnosticEvidenceNavigatorTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/diagnostics/InvestigationHandoffTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/discover/LastDiscoverSnapshotTest.java`
+- `pickleball-workbench/src/test/java/tools/dscode/workbench/engine/DomEngineCliForwarderTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/engine/EngineCliForwarderTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/lease/WorkbenchControlLeaseTest.java`
 - `pickleball-workbench/src/test/java/tools/dscode/workbench/log/LogCliForwarderTest.java`
@@ -1092,7 +1096,11 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `dom-engine/src/main/java/dev/domengine/cli/DomEngineMain.java`
 - `dom-engine/src/main/java/dev/domengine/conform/Conformance.java`
 - `dom-engine/src/main/java/dev/domengine/conform/LiveConformance.java`
+- `dom-engine/src/main/java/dev/domengine/desktop/AtSpi.java`
 - `dom-engine/src/main/java/dev/domengine/desktop/DesktopTree.java`
+- `dom-engine/src/main/java/dev/domengine/desktop/MacAccessibility.java`
+- `dom-engine/src/main/java/dev/domengine/desktop/NativeDesktop.java`
+- `dom-engine/src/main/java/dev/domengine/desktop/WindowsUia.java`
 - `dom-engine/src/main/java/dev/domengine/EngineInfo.java`
 - `dom-engine/src/main/java/dev/domengine/image/TemplateMatch.java`
 - `dom-engine/src/main/java/dev/domengine/json/Jsons.java`
@@ -1115,6 +1123,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `dom-engine/src/test/java/dev/domengine/CliStdioTest.java`
 - `dom-engine/src/test/java/dev/domengine/CliSurfaceTest.java`
 - `dom-engine/src/test/java/dev/domengine/ConformanceSuiteTest.java`
+- `dom-engine/src/test/java/dev/domengine/desktop/LiveDesktopTest.java`
 - `dom-engine/src/test/java/dev/domengine/DocumentWalkFixtureTest.java`
 - `dom-engine/src/test/java/dev/domengine/EngineLogTest.java`
 - `dom-engine/src/test/java/dev/domengine/FakeCdp.java`
@@ -1126,6 +1135,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `dom-engine/src/test/java/dev/domengine/ObserveParityTest.java`
 - `dom-engine/src/test/java/dev/domengine/SelectorParityTest.java`
 - `dom-engine/src/test/java/dev/domengine/SessionJoinLogTest.java`
+- `dom-engine/src/test/java/dev/domengine/SharedSurfaceTest.java`
 - `dom-engine/src/test/java/dev/domengine/VisualRelativeTest.java`
 - `dom-engine/src/test/resources/conformance/expected/a11y-at-hidden.json`
 - `dom-engine/src/test/resources/conformance/expected/a11y-custom-tag.json`

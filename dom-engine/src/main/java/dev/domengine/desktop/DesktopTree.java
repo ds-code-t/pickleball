@@ -187,13 +187,19 @@ public final class DesktopTree {
     }
 
     public static ObjectNode resolve(String id, Map<String, String> flags) {
-        DomNode node = one(id, flags);
-        ObjectNode result = Jsons.object();
-        result.put("ok", true);
-        result.put("backend", require(id).backend);
-        result.set("node", node.toJson());
+        rejectBrowserOnly(flags);
+        Session session = require(id);
+        ObjectNode found = Query.run(session.root, flags);
+        JsonNode nodes = found.get("nodes");
+        if (nodes == null || nodes.isEmpty()) throw new CdpException("not found");
+        if (nodes.size() > 1) throw new CdpException("ambiguous");
+        String handle = nodes.get(0).path("handle").asText("");
+        DomNode node = find(session.root, handle);
+        if (node == null) throw new CdpException("not found");
+        found.put("backend", session.backend);
+        found.set("node", node.toJson());
         EngineLog.info("desktop", "resolve " + id);
-        return result;
+        return found;
     }
 
     public static ObjectNode click(String id, Map<String, String> flags) {
