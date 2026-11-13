@@ -1,5 +1,7 @@
 # Pickleball 2.1.9 strict Workbench controller isolation
 
+> Historical (2.1.9).
+
 This drop-in targets branch `2.1.9` at commit `9c255431f23a4fa48a3615b387610b3367f476af`.
 
 Copy the archive contents over the project root, preserving paths. Every included project file is a complete replacement or new file. The bundle intentionally requires no file deletion; the obsolete `gradle/pickleball-published-variant.gradle` is replaced by a migration tombstone so a drag-and-drop overlay cannot retain its old build logic.

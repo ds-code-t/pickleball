@@ -1,5 +1,7 @@
 # Bug 1 — Blank data-table cells never resolve
 
+> Historical (2.1.10).
+
 **Status:** Confirmed defect. Fixed.  
 **Version found:** Pickleball 2.1.10  
 **Severity:** High — silent data corruption that inverts conditional logic.
