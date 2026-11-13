@@ -18,8 +18,9 @@ import java.util.List;
  * MCP stdio server. Tools come from {@link McpRegistry}. The {@code domengine}
  * tool still forwards an argv list to {@link DomEngineMain}. {@code query},
  * {@code click}, {@code type}, and {@code observe} do the same with a command name.
- * {@code snapshot} returns G3 CompositeSnapshot JSON, or a schema-shaped placeholder
- * until that class exists. Workbench registers its own copy of the catalogue.
+ * {@code snapshot} calls G3 {@code CompositeSnapshots} and returns that JSON.
+ * Kinds {@code browser} and {@code desktop} return the producer's error text while
+ * those producers are unimplemented. Workbench registers its own copy of the catalogue.
  * Extra commands are registered; this class is not edited for them.
  */
 public final class McpServer {

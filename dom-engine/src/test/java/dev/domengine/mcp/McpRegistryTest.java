@@ -54,6 +54,30 @@ class McpRegistryTest {
     }
 
     @Test
+    void browserAndDesktopReturnTheProducerError() throws Exception {
+        assertProducerError("browser", "CompositeSnapshots.browser failed", "waiting on engine-defects Phase 5");
+        assertProducerError("desktop", "CompositeSnapshots.desktop failed", "Phase 3 writes the desktop snapshot");
+    }
+
+    private static void assertProducerError(String kind, String failed, String detail) throws Exception {
+        String request = """
+                {"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"snapshot","arguments":{"kind":"%s"}}}
+                """.formatted(kind);
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        McpServer.serve(new ByteArrayInputStream(request.getBytes(StandardCharsets.UTF_8)), out);
+        String framed = out.toString(StandardCharsets.UTF_8);
+        JsonNode result = null;
+        for (byte[] frame : McpServer.frames(framed.getBytes(StandardCharsets.UTF_8))) {
+            JsonNode node = Jsons.MAPPER.readTree(frame);
+            if ("1".equals(node.path("id").asText())) result = node.path("result");
+        }
+        assertTrue(result != null && result.path("isError").asBoolean(), framed);
+        String text = result.path("content").path(0).path("text").asText();
+        assertTrue(text.contains(failed), text);
+        assertTrue(text.contains(detail), text);
+    }
+
+    @Test
     void anExtraCommandRegistersWithoutEditingTheServer() throws Exception {
         McpRegistry.register(new McpCommand() {
             @Override

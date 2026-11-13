@@ -88,7 +88,13 @@ public final class SnapshotDispatch {
         Object[] params = new Object[types.length];
         for (int i = 0; i < types.length; i++) {
             Object value = adaptOne(types[i], arguments);
-            if (value == UNADAPTED) return null;
+            if (value == UNADAPTED) {
+                if (!types[i].isPrimitive()) {
+                    params[i] = null;
+                    continue;
+                }
+                return null;
+            }
             params[i] = value;
         }
         return params;

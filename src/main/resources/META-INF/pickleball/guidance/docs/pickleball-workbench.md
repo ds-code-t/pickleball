@@ -503,7 +503,7 @@ launch
 surfaces
 ```
 
-`query`, `click`, `type`, and `observe` forward to the `domengine` CLI the same way the `domengine` tool does. `snapshot` returns CompositeSnapshot JSON. Until the G3 producers are on the classpath that JSON is a schema-shaped placeholder (`pickleball.composite-snapshot`, version 1) and its `warnings` say so. `launch` forwards to `AgentControl`. `surfaces` with no `op` lists the page-surface operations; with an `op` it forwards that operation to `AgentControl`. `workbench_agent_command` remains the internal op forwarder. Popup commands are added by an `McpCommandContributor` on the classpath. They are not edited into `WorkbenchMcpServer`.
+`query`, `click`, `type`, and `observe` forward to the `domengine` CLI the same way the `domengine` tool does. The engine `snapshot` command calls `CompositeSnapshots` and returns that JSON. On Workbench, `snapshot` does the same when `CompositeSnapshots` or `SnapshotProducers.page` is on the classpath; otherwise the body is a schema-shaped placeholder (`pickleball.composite-snapshot`, version 1) and its `warnings` say so. `launch` forwards to `AgentControl`. `surfaces` with no `op` lists the page-surface operations; with an `op` it forwards that operation to `AgentControl`. `workbench_agent_command` remains the internal op forwarder. Popup commands are added by an `McpCommandContributor` on the classpath. They are not edited into `WorkbenchMcpServer`.
 
 The MCP server is an adapter over `WorkbenchServices` / `WorkbenchController`, which in turn delegates live operations to `WorkbenchLiveSession`. It does not implement a second Pickleball runtime.
 

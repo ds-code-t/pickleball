@@ -115,7 +115,12 @@ public final class McpRegistry {
             @Override
             public ObjectNode call(JsonNode arguments) {
                 EngineLog.info("mcp", "call snapshot");
-                return tool(Jsons.compact(SnapshotDispatch.render(arguments)), false);
+                try {
+                    return tool(Jsons.compact(SnapshotDispatch.render(arguments)), false);
+                } catch (RuntimeException failure) {
+                    String message = failure.getMessage() == null ? failure.toString() : failure.getMessage();
+                    return tool(message, true);
+                }
             }
         };
     }
