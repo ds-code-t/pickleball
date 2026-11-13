@@ -60,7 +60,7 @@ class DocumentWalkFixtureTest {
             ));
             assertEquals(0, snap.exit(), snap.stderr());
             JsonNode json = Jsons.MAPPER.readTree(snap.stdout());
-            assertTrue(json.path("nodes").asInt() > 5);
+            assertTrue(json.path("nodes").size() > 5, snap.stdout());
             assertEquals("main", json.path("frames").get(0).path("id").asText());
             assertEquals("child", json.path("frames").get(1).path("id").asText());
             assertTrue(snap.stdout().contains("shadow_root"));

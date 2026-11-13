@@ -59,12 +59,18 @@ public final class XPathIndex {
         Map<String, Integer> counts = new java.util.LinkedHashMap<>();
         if (children == null) return;
         for (DomNode child : children) {
-            if (child == null || child.nodeType != 1) continue;
+            if (child == null) continue;
+            if (child.nodeType == 9) {
+                assignSiblings(child.children, parentPath, shadowPath, frameId, framePath, result);
+                continue;
+            }
+            if (child.nodeType != 1) continue;
             String tag = tag(child);
             int index = counts.merge(tag, 1, Integer::sum);
             child.xpath = parentPath + "/" + tag + "[" + index + "]";
             child.shadowPath = shadowPath == null ? "" : shadowPath;
             child.frameId = frameId == null || frameId.isBlank() ? "main" : frameId;
+            child.framePath = framePath == null ? "" : framePath;
             result.frameIds.put(child, child.frameId);
             result.framePaths.put(child, framePath == null ? "" : framePath);
             if (child.iframe) {

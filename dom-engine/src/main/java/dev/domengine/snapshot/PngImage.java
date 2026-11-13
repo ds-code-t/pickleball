@@ -41,6 +41,15 @@ final class PngImage {
         return new PngImage(width, height, sha256(bytes), Base64.getEncoder().encodeToString(bytes), bytes);
     }
 
+    static PngImage decode(byte[] bytes) {
+        if (bytes == null || bytes.length < 24 || bytes[0] != (byte) 0x89 || bytes[1] != 0x50 || bytes[2] != 0x4E || bytes[3] != 0x47) {
+            throw new CdpException("error: screenshot is not a png\nfix: Page.captureScreenshot must return a PNG.");
+        }
+        int width = readInt(bytes, 16);
+        int height = readInt(bytes, 20);
+        return new PngImage(width, height, sha256(bytes), Base64.getEncoder().encodeToString(bytes), bytes);
+    }
+
     int width() {
         return width;
     }

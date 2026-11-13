@@ -59,6 +59,10 @@ public final class VerbFlags {
                 "box-max-area", "box-max-width", "box-max-height",
                 "one-match-margin", "affinity-weights"
         ));
+        map.put("snapshot", List.of(
+                "session", "session-dir", "cdp", "i-accept-local-attach", "out-dir", "full-page",
+                "box-max-area", "box-max-width", "box-max-height", "one-match-margin", "affinity-weights"
+        ));
         return Map.copyOf(map);
     }
 

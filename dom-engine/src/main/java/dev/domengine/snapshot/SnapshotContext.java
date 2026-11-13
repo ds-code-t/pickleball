@@ -24,6 +24,12 @@ public final class SnapshotContext {
     private final String sourceText;
     private final PngImage screenshot;
     private final List<String> warnings = new ArrayList<>();
+    private final double devicePixelRatio;
+    private final double scrollX;
+    private final double scrollY;
+    private final double visualOffsetX;
+    private final double visualOffsetY;
+    private final double visualScale;
 
     private SnapshotContext(
             Platform platform,
@@ -38,7 +44,13 @@ public final class SnapshotContext {
             Map<String, String> flags,
             String sourceKind,
             String sourceText,
-            PngImage screenshot
+            PngImage screenshot,
+            double devicePixelRatio,
+            double scrollX,
+            double scrollY,
+            double visualOffsetX,
+            double visualOffsetY,
+            double visualScale
     ) {
         this.platform = platform == null ? Platform.BROWSER : platform;
         this.snapshotPlatform = snapshotPlatform == null || snapshotPlatform.isBlank() ? "chromium" : snapshotPlatform;
@@ -53,6 +65,12 @@ public final class SnapshotContext {
         this.sourceKind = sourceKind == null ? "html" : sourceKind;
         this.sourceText = sourceText == null ? "" : sourceText;
         this.screenshot = screenshot;
+        this.devicePixelRatio = devicePixelRatio <= 0 ? 1 : devicePixelRatio;
+        this.scrollX = scrollX;
+        this.scrollY = scrollY;
+        this.visualOffsetX = visualOffsetX;
+        this.visualOffsetY = visualOffsetY;
+        this.visualScale = visualScale <= 0 ? 1 : visualScale;
     }
 
     public static SnapshotContext desktop(
@@ -88,13 +106,15 @@ public final class SnapshotContext {
                 flags,
                 "a11y-xml",
                 xml == null ? "" : xml,
-                image
+                image,
+                1, 0, 0, 0, 0, 1
         );
     }
 
     public static SnapshotContext empty() {
         return new SnapshotContext(Platform.BROWSER, "chromium", "fixture", "", "offline:0", "",
-                BoxCaps.defaults(), 1280, 800, Map.of(), "html", "", null);
+                BoxCaps.defaults(), 1280, 800, Map.of(), "html", "", null,
+                1, 0, 0, 0, 0, 1);
     }
 
     public static SnapshotContext offline(DomNode root, SnapshotOptions options, String html) {
@@ -116,7 +136,44 @@ public final class SnapshotContext {
                 used.flags(),
                 "html",
                 text,
-                image
+                image,
+                1, 0, 0, 0, 0, 1
+        );
+    }
+
+    public static SnapshotContext browser(
+            SnapshotOptions options,
+            String platform,
+            String sessionId,
+            String docVersion,
+            String html,
+            PngImage image,
+            dev.domengine.tree.LiveTree.Layout layout
+    ) {
+        SnapshotOptions used = options == null ? new SnapshotOptions() : options;
+        dev.domengine.tree.LiveTree.Layout metrics = layout == null
+                ? new dev.domengine.tree.LiveTree.Layout(1280, 800, 0, 0, 0, 0, 1, 1)
+                : layout;
+        return new SnapshotContext(
+                Platform.BROWSER,
+                platform == null || platform.isBlank() ? "chrome" : platform,
+                "cdp",
+                sessionId == null ? used.sessionId() : sessionId,
+                docVersion == null ? "" : docVersion,
+                used.id(),
+                BoxCaps.fromFlags(used.flags()),
+                metrics.cssWidth(),
+                metrics.cssHeight(),
+                used.flags(),
+                "html",
+                html == null ? "" : html,
+                image,
+                metrics.devicePixelRatio(),
+                metrics.scrollX(),
+                metrics.scrollY(),
+                metrics.offsetX(),
+                metrics.offsetY(),
+                metrics.scale()
         );
     }
 
@@ -183,6 +240,30 @@ public final class SnapshotContext {
     public double imageScale() {
         if (screenshot == null || screenshot.width() <= 0 || viewportWidth <= 0) return 1;
         return screenshot.width() / viewportWidth;
+    }
+
+    public double devicePixelRatio() {
+        return devicePixelRatio;
+    }
+
+    public double scrollX() {
+        return scrollX;
+    }
+
+    public double scrollY() {
+        return scrollY;
+    }
+
+    public double visualOffsetX() {
+        return visualOffsetX;
+    }
+
+    public double visualOffsetY() {
+        return visualOffsetY;
+    }
+
+    public double visualScale() {
+        return visualScale;
     }
 
     private static double[] viewport(DomNode root) {

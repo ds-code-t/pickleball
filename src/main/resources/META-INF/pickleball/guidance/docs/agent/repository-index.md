@@ -1217,6 +1217,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `dom-engine/src/main/java/dev/domengine/premap/Box.java`
 - `dom-engine/src/main/java/dev/domengine/premap/BoxCaps.java`
 - `dom-engine/src/main/java/dev/domengine/premap/Candidate.java`
+- `dom-engine/src/main/java/dev/domengine/premap/DocVersion.java`
 - `dom-engine/src/main/java/dev/domengine/premap/OneMatch.java`
 - `dom-engine/src/main/java/dev/domengine/premap/OneMatchException.java`
 - `dom-engine/src/main/java/dev/domengine/premap/Platform.java`
@@ -1239,6 +1240,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `dom-engine/src/main/java/dev/domengine/session/ChromeProcess.java`
 - `dom-engine/src/main/java/dev/domengine/session/SessionEvents.java`
 - `dom-engine/src/main/java/dev/domengine/session/SessionRegistry.java`
+- `dom-engine/src/main/java/dev/domengine/snapshot/CdpSnapshotProducer.java`
 - `dom-engine/src/main/java/dev/domengine/snapshot/CompositeSnapshot.java`
 - `dom-engine/src/main/java/dev/domengine/snapshot/CompositeSnapshotBuilder.java`
 - `dom-engine/src/main/java/dev/domengine/snapshot/CompositeSnapshots.java`
@@ -1299,8 +1301,12 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `dom-engine/src/test/java/dev/domengine/session/SessionEventsTest.java`
 - `dom-engine/src/test/java/dev/domengine/SessionJoinLogTest.java`
 - `dom-engine/src/test/java/dev/domengine/SharedSurfaceTest.java`
+- `dom-engine/src/test/java/dev/domengine/snapshot/CdpSnapshotProducerTest.java`
 - `dom-engine/src/test/java/dev/domengine/snapshot/CompositeSnapshotModelTest.java`
 - `dom-engine/src/test/java/dev/domengine/snapshot/CompositeSnapshotSchemaTest.java`
+- `dom-engine/src/test/java/dev/domengine/snapshot/DocVersionTest.java`
+- `dom-engine/src/test/java/dev/domengine/snapshot/LiveChromeSnapshotTest.java`
+- `dom-engine/src/test/java/dev/domengine/snapshot/LiveEdgeSnapshotTest.java`
 - `dom-engine/src/test/java/dev/domengine/snapshot/SnapshotSchemas.java`
 - `dom-engine/src/test/java/dev/domengine/snapshot/XPathIndexTest.java`
 - `dom-engine/src/test/java/dev/domengine/VerbFlagTest.java`

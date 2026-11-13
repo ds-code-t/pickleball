@@ -62,12 +62,12 @@ public final class CompositeSnapshotBuilder {
                 duration,
                 ctx.viewportWidth(),
                 ctx.viewportHeight(),
-                1,
-                0,
-                0,
-                0,
-                0,
-                1,
+                ctx.devicePixelRatio(),
+                ctx.scrollX(),
+                ctx.scrollY(),
+                ctx.visualOffsetX(),
+                ctx.visualOffsetY(),
+                ctx.visualScale(),
                 screenX(root, ctx),
                 screenY(root, ctx),
                 screenW(root, ctx),
@@ -170,9 +170,17 @@ public final class CompositeSnapshotBuilder {
         putBox(boxes, "layout_viewport", node.hasLayoutViewport
                 ? new Box(node.layoutViewportX, node.layoutViewportY, node.layoutViewportWidth, node.layoutViewportHeight)
                 : null);
-        Box visual = node.hasVisual ? new Box(node.visualX, node.visualY, node.width, node.height) : null;
+        Box visual = node.hasVisual
+                ? new Box(
+                node.visualX,
+                node.visualY,
+                node.visualWidth > 0 ? node.visualWidth : node.width,
+                node.visualHeight > 0 ? node.visualHeight : node.height)
+                : null;
         putBox(boxes, "visual_viewport", visual);
-        putBox(boxes, "frame_document", null);
+        putBox(boxes, "frame_document", node.hasFrameDocument
+                ? new Box(node.frameDocumentX, node.frameDocumentY, node.frameDocumentWidth, node.frameDocumentHeight)
+                : null);
         Box screenBox = screen && node.hasBox ? new Box(node.x, node.y, node.width, node.height) : null;
         putBox(boxes, "screen_px", screenBox);
         Box image = null;

@@ -29,7 +29,9 @@
     "frames": { "type": "array", "items": { "$ref": "#/$defs/frame" } },
     "nodes": { "type": "array", "items": { "$ref": "#/$defs/node" } },
     "premap": { "$ref": "#/$defs/premap" },
-    "warnings": { "type": "array", "items": { "type": "string" } }
+    "warnings": { "type": "array", "items": { "type": "string" } },
+    "ok": { "type": "boolean" },
+    "document": { "type": "object" }
   },
   "$defs": {
     "viewport": {

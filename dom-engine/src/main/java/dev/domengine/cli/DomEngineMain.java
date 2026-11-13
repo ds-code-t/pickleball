@@ -610,8 +610,8 @@ public final class DomEngineMain {
             return error(2, "usage", "snapshot requires --session or --cdp");
         }
         try {
-            LiveTree tree = session.tree();
-            return CliResult.ok(Jsons.pretty(tree.toJson()));
+            com.fasterxml.jackson.databind.node.ObjectNode json = dev.domengine.snapshot.CdpSnapshotProducer.produce(session, flags);
+            return CliResult.ok(Jsons.pretty(json));
         } finally {
             if (ephemeral) SessionRegistry.get().close(session.id);
         }
@@ -662,7 +662,7 @@ public final class DomEngineMain {
         return switch (name) {
             case "process", "headed", "i-accept-local-attach", "follow", "stdio", "strict", "explain", "geometry", "count-only", "append",
                     "submit", "all-frames", "describe", "auto-wait", "promote-visual", "mobile", "verify", "perform", "scroll", "live",
-                    "force-hover", "refind" -> true;
+                    "force-hover", "refind", "full-page" -> true;
             default -> false;
         };
     }
@@ -713,7 +713,7 @@ public final class DomEngineMain {
                 session join --id ID | --cdp URL [--i-accept-local-attach]
                 session log --id ID [--follow]
                 attach --cdp URL --i-accept-local-attach
-                snapshot --session ID | --cdp URL --i-accept-local-attach
+                snapshot --session ID | --cdp URL --i-accept-local-attach [--full-page] [--out-dir DIR]
                 premap --file page.html [--screenshot shot.png] [--out-dir DIR]
                 query --file page.html --css SELECTOR [--selector EXPR] [--pipeline EXPR] [--geometry] [--explain] [--viewport file.pgm]
                   EXPR accepts engine=value stages joined by >> and boolean AND, OR, and NOT

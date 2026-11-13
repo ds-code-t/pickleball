@@ -25,9 +25,9 @@ public final class CompositeSnapshots {
     }
 
     public static ObjectNode browser(BrowserSession session, SnapshotOptions options) {
-        throw new IllegalStateException(
-                "error: browser snapshot is not produced in this build.\n"
-                        + "fix: waiting on engine-defects Phase 5.");
+        java.util.Map<String, String> flags = new java.util.LinkedHashMap<>();
+        if (options != null) flags.putAll(options.flags());
+        return CdpSnapshotProducer.produce(session, flags);
     }
 
     public static ObjectNode desktop(String sessionId, SnapshotOptions options) {

@@ -55,7 +55,7 @@ class McpRegistryTest {
 
     @Test
     void browserAndDesktopReturnTheProducerError() throws Exception {
-        assertProducerError("browser", "CompositeSnapshots.browser failed", "waiting on engine-defects Phase 5");
+        assertProducerError("browser", "CompositeSnapshots.browser failed", "browser snapshot needs a page session");
         assertProducerError("desktop", "CompositeSnapshots.desktop failed", "session not found");
     }
 

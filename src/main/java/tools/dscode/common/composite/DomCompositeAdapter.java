@@ -372,6 +372,33 @@ public final class DomCompositeAdapter {
         return json;
     }
 
+    /**
+     * Page composite snapshot. Refuses when the joined engine does not list
+     * {@code capabilities.snapshot_schema}.
+     */
+    public JsonNode compositeSnapshot(JsonNode options) {
+        Client open = CompositeRuntime.ensureClient();
+        if (open == null || !snapshotSchema(open)) {
+            throw new IllegalStateException(
+                    "error: snapshot_schema is absent.\n"
+                            + "fix: Join an engine that reports capabilities.snapshot_schema.");
+        }
+        CompositeLog.info("snapshot", "schema");
+        return open.snapshot(options == null ? com.fasterxml.jackson.databind.node.JsonNodeFactory.instance.objectNode() : options);
+    }
+
+    private static boolean snapshotSchema(Client open) {
+        try {
+            JsonNode caps = open.capabilities();
+            JsonNode schema = caps == null ? null : caps.get("snapshot_schema");
+            if (schema == null || schema.isNull()) return false;
+            if (schema.isNumber()) return schema.asInt() >= 1;
+            return !schema.asText("").isBlank();
+        } catch (RuntimeException failure) {
+            return false;
+        }
+    }
+
     /** Keeps the first N composite and node rows when the engine has no {@code limit} flag. */
     private static JsonNode sliceLimit(JsonNode json, int limit) {
         if (!(json instanceof com.fasterxml.jackson.databind.node.ObjectNode object) || limit < 0) return json;

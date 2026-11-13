@@ -62,6 +62,15 @@ public final class DomNode {
     public double layoutViewportY;
     public double layoutViewportWidth;
     public double layoutViewportHeight;
+    /** Box in the frame document that owns the node. Distinct from the top-document box. */
+    public boolean hasFrameDocument;
+    public double frameDocumentX;
+    public double frameDocumentY;
+    public double frameDocumentWidth;
+    public double frameDocumentHeight;
+    /** Visual-viewport size. Zero means the builder uses the document size. */
+    public double visualWidth;
+    public double visualHeight;
 
     /** Colour and image sample. Null until a producer or the pre-map fills it. */
     public static final class Paint {

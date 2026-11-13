@@ -150,10 +150,31 @@ public final class FakeCdp implements AutoCloseable {
                 result.putObject("object").put("objectId", "obj-1");
             } else if ("Runtime.callFunctionOn".equals(method) || "Runtime.evaluate".equals(method)) {
                 ObjectNode value = result.putObject("result");
-                value.put("type", "string");
-                value.put("value", "BUTTON");
+                String expression = request.path("params").path("expression").asText("");
+                if (expression.contains("__pkbPremapCount")) {
+                    value.put("type", "number");
+                    value.put("value", 4);
+                } else {
+                    value.put("type", "string");
+                    value.put("value", "BUTTON");
+                }
             } else if ("Page.captureScreenshot".equals(method)) {
                 result.put("data", PNG_1X1);
+            } else if ("DOMSnapshot.captureSnapshot".equals(method)) {
+                snapshot(result);
+            } else if ("Page.getLayoutMetrics".equals(method)) {
+                metrics(result);
+            } else if ("Accessibility.getFullAXTree".equals(method)) {
+                ax(result);
+            } else if ("DOM.getOuterHTML".equals(method)) {
+                long id = request.path("params").path("backendNodeId").asLong();
+                result.put("outerHTML", id == 18 || id == 8
+                        ? "<html><body><p id=\"framed\">framed</p></body></html>"
+                        : "<html><body><div id=\"host\"></div><button id=\"go\">Go</button><iframe id=\"child\"></iframe></body></html>");
+            } else if ("Page.addScriptToEvaluateOnNewDocument".equals(method)) {
+                result.put("identifier", "premap-1");
+            } else if ("Page.createIsolatedWorld".equals(method)) {
+                result.put("executionContextId", 17);
             } else if ("Input.dispatchMouseEvent".equals(method) || "Input.insertText".equals(method) || "Input.dispatchKeyEvent".equals(method)) {
                 result.put("ok", true);
             }
@@ -261,6 +282,7 @@ public final class FakeCdp implements AutoCloseable {
         ObjectNode tree = Jsons.object();
         ObjectNode frame = tree.putObject("frame");
         frame.put("id", "main");
+        frame.put("loaderId", "L1");
         frame.put("url", "http://fixture/");
         tree.putArray("childFrames").add(child);
         return tree;
@@ -291,6 +313,76 @@ public final class FakeCdp implements AutoCloseable {
         var array = node.putArray("attributes");
         for (String attr : attrs) array.add(attr);
         return node;
+    }
+
+    private static void snapshot(ObjectNode result) {
+        var strings = result.putArray("strings");
+        for (String value : List.of("block", "visible", "1", "rgb(0, 0, 0)", "rgb(255, 255, 255)", "16px", "400", "pointer", "auto")) {
+            strings.add(value);
+        }
+        var documents = result.putArray("documents");
+        ObjectNode main = documents.addObject();
+        var mainNodes = main.putObject("nodes");
+        var mainIds = mainNodes.putArray("backendNodeId");
+        for (int id : new int[] {1, 11, 2, 3, 4, 7}) mainIds.add(id);
+        ObjectNode mainLayout = main.putObject("layout");
+        mainLayout.putArray("nodeIndex").add(4).add(5);
+        var mainBounds = mainLayout.putArray("bounds");
+        mainBounds.add(box(10, 200, 80, 20));
+        mainBounds.add(box(0, 300, 200, 150));
+        var mainStyles = mainLayout.putArray("styles");
+        mainStyles.add(styleRow());
+        mainStyles.add(styleRow());
+        ObjectNode child = documents.addObject();
+        var childNodes = child.putObject("nodes");
+        var childIds = childNodes.putArray("backendNodeId");
+        for (int id : new int[] {8, 18, 9}) childIds.add(id);
+        ObjectNode childLayout = child.putObject("layout");
+        childLayout.putArray("nodeIndex").add(2);
+        childLayout.putArray("bounds").add(box(4, 6, 40, 12));
+        childLayout.putArray("styles").add(styleRow());
+    }
+
+    private static com.fasterxml.jackson.databind.node.ArrayNode box(double x, double y, double w, double h) {
+        var array = Jsons.MAPPER.createArrayNode();
+        array.add(x);
+        array.add(y);
+        array.add(w);
+        array.add(h);
+        return array;
+    }
+
+    private static com.fasterxml.jackson.databind.node.ArrayNode styleRow() {
+        var array = Jsons.MAPPER.createArrayNode();
+        for (int i = 0; i < 9; i++) array.add(i);
+        return array;
+    }
+
+    private static void metrics(ObjectNode result) {
+        ObjectNode layout = result.putObject("cssLayoutViewport");
+        layout.put("clientWidth", 800);
+        layout.put("clientHeight", 600);
+        layout.put("pageX", 0);
+        layout.put("pageY", 80);
+        ObjectNode visual = result.putObject("cssVisualViewport");
+        visual.put("clientWidth", 800);
+        visual.put("clientHeight", 600);
+        visual.put("pageX", 0);
+        visual.put("pageY", 80);
+        visual.put("offsetX", 0);
+        visual.put("offsetY", 10);
+        visual.put("scale", 1);
+        result.put("devicePixelRatio", 1);
+    }
+
+    private static void ax(ObjectNode result) {
+        ObjectNode node = result.putArray("nodes").addObject();
+        node.put("backendDOMNodeId", 4);
+        node.putObject("role").put("value", "button");
+        node.putObject("name").put("value", "Go");
+        ObjectNode disabled = node.putArray("properties").addObject();
+        disabled.put("name", "disabled");
+        disabled.putObject("value").put("value", true);
     }
 
     @Override

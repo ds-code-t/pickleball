@@ -1,6 +1,6 @@
 # Snapshot and pre-map
 
-`domengine premap --file page.html` writes a composite snapshot (`schema` `pickleball.composite-snapshot`, `version` 1, `transport` `fixture`). The builder always runs the pre-map. `domengine desktop snapshot` writes the same artifact for a desktop session. `CompositeSnapshots.browser` is not in this build: it waits on engine-defects Phase 5.
+`domengine premap --file page.html` writes a composite snapshot (`schema` `pickleball.composite-snapshot`, `version` 1, `transport` `fixture`). The builder always runs the pre-map. `domengine desktop snapshot` writes the same artifact for a desktop session. `domengine snapshot --session ID` (or `--cdp URL --i-accept-local-attach`) writes it for Chrome, Chromium, and Edge. The browser JSON adds `ok: true` and `document`, the pierced tree from `DomNode.toJson` (that object still contains `shadow_root`).
 
 Logging uses `dev.domengine.log.EngineLog`. The entities are `snapshot`, `premap`, `affinity`, and `desktop-shot` (`DOMENGINE_LOG` or `COMPOSITE_LOG`). A protocol or tool fallback logs one WARN per run and reason through `SnapshotWarnings.once(reason)`.
 
@@ -27,7 +27,7 @@ Each `nodes[]` entry has `handle`, `parent`, `tag`, `role`, `name`, `text` (at m
 
 `xpath` is absolute and index-qualified inside one frame document, for example `/html[1]/body[1]/form[1]/input[2]`. Inside a shadow tree it is the path from the shadow root, and `shadow_path` is the host XPath chain joined by ` >> `. `path` is the `backend_node_id`. The offline query engine rejects numeric index predicates, so `XPathIndex.resolve` is the resolver that honors them. The engine still finds the node when those indexes are removed.
 
-Coordinate spaces are separate. Offline HTML fills `document_css_px` from `data-x`, `data-y`, `data-w`, and `data-h`. `layout_viewport`, `visual_viewport`, and `frame_document` stay null until a live browser producer has those measurements. They are not copies of `document_css_px`. A desktop snapshot leaves `document_css_px` null and fills `screen_px` from the accessibility box.
+Coordinate spaces are separate. Offline HTML fills `document_css_px` from `data-x`, `data-y`, `data-w`, and `data-h`. `layout_viewport`, `visual_viewport`, and `frame_document` stay null on that path. They are not copies of `document_css_px`. The CDP producer fills all four from one `DOMSnapshot.captureSnapshot` and `Page.getLayoutMetrics`. A desktop snapshot leaves `document_css_px` null and fills `screen_px` from the accessibility box.
 
 `image_px = (visual_viewport box) × image_scale`. `image_scale` is screenshot width divided by `viewport.css_width` (1 when there is no screenshot). When a screenshot is present and `visual_viewport` is null, offline HTML uses `document_css_px` and logs one warning, `snapshot fallback image_px used document_css_px`. Desktop snapshots are in screen space: `image_px` is the `screen_px` box minus the window origin, times `image_scale`, and that warning is not logged. The window origin is `viewport.screen`.
 
@@ -128,6 +128,38 @@ What is filled now:
 `TemplateMatch.Features` is the 64-bit dHash plus luminance mean and standard deviation. `prefilter` keeps a candidate when the dHash is within 10 bits and the mean is within 18 levels. `score` and `crop` are unchanged. A runtime query is a lookup because those indexes already name the handles. Anything the index cannot answer is still evaluated live.
 
 The build logs `premap build nodes=<n> ms=<t>`. The budget is 250 ms for 2,000 nodes. The log is the check. The test does not assert the time.
+
+## Browser producers (CDP)
+
+`CdpSnapshotProducer` is the Chrome, Chromium, and Edge producer. `CompositeSnapshots.browser(session, options)` calls it. A null session fails with `error: browser snapshot needs a page session` and `fix: Attach with --session or --cdp before snapshot.`
+
+`Browser.getVersion` sets `platform`. A product string that contains `Edg/` is `edge`. One that contains `Chromium/` is `chromium`. Chrome, including Chrome for Testing, is `chrome`. `transport` is `cdp`.
+
+The call list is one shot per document, not one shot per node:
+
+1. `DOM.getDocument` with `pierce` and `Page.getFrameTree` (`LiveTree.read`). A same-origin iframe arrives as `contentDocument`. A cross-origin iframe is grafted from its child target.
+2. One `DOMSnapshot.captureSnapshot` (`computedStyles`, `includeDOMRects`) joined to nodes by `backendNodeId`, plus one `Page.getLayoutMetrics`.
+3. One `Accessibility.getFullAXTree` per frame, for `role`, `name`, and the states `disabled`, `checked`, `selected`, `expanded`, `focused`, `readonly`, and `required`.
+4. One `Page.captureScreenshot` (`format` `png`, `fromSurface` true). `--full-page` adds `captureBeyondViewport`. The default clip is the layout viewport.
+5. One `DOM.getOuterHTML` per frame document. The texts are joined with a `<!-- frame:id -->` marker. `source.kind` is `html`.
+6. `doc_version` is `<loaderId>:<mutationCount>`. The counter lives in the isolated world `pkb-premap`. The producer installs it with `Page.addScriptToEvaluateOnNewDocument`, opens the world with `Page.createIsolatedWorld`, and reads it with one `Runtime.evaluate`. A failure keeps `<loaderId>:0` and logs one warning.
+
+`LiveTree.readLayout` does not call `CSS.getComputedStyleForNode`, `DOM.getBoxModel`, `Accessibility.getPartialAXTree`, or `DOM.resolveNode`. Those stay on the per-node `enrich` path used by actions.
+
+Box spaces, from the snapshot bounds (frame-document coordinates) and the layout metrics:
+
+| Space | Value |
+|---|---|
+| `frame_document` | The snapshot bounds, unchanged |
+| `document_css_px` | `frame_document` plus the enclosing iframe's document position. The main frame origin is `0,0` |
+| `layout_viewport` | `document_css_px` minus `cssLayoutViewport` `pageX` / `pageY` |
+| `visual_viewport` | (`layout_viewport` minus the visual viewport `offsetX` / `offsetY`) times `scale` |
+
+`display: none`, `visibility: hidden` or `collapse`, and `opacity: 0` from that same style row set `displayed` false, which the builder reports as the state `hidden`. `frames[]` uses the CDP frame ids. A child frame's `frame_path` is the iframe's index-qualified XPath and its `offset` is the iframe's document position. A node's `frame_path` is that same chain (` >> ` between nested iframes). `document.evaluate` of a node's `xpath` in that frame returns the same element.
+
+`--out-dir DIR` writes `screenshot.png` and `snapshot.json`. Without it the screenshot is inlined as `base64`.
+
+`DomCompositeAdapter.compositeSnapshot(options)` forwards the options to the joined engine when `capabilities.snapshot_schema` is listed. A missing capability throws `error: snapshot_schema is absent`.
 
 ## Desktop producers
 
