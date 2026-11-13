@@ -44,5 +44,8 @@ class CliSurfaceTest {
         JsonNode caps = Jsons.MAPPER.readTree(DomEngineMain.dispatch(List.of("capabilities")).stdout());
         assertTrue(caps.path("commands").toString().contains("mcp"));
         assertTrue(caps.path("commands").toString().contains("resolve"));
+        assertTrue(caps.path("commands").toString().contains("premap"));
+        assertEquals(1, caps.path("snapshot_schema").asInt());
+        assertTrue(caps.path("premap").asBoolean());
     }
 }

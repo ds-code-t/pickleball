@@ -304,4 +304,61 @@ public final class PreMap {
                     interactables, inViewport, image, colours);
         }
     }
+
+    public static PreMap fromJson(com.fasterxml.jackson.databind.JsonNode node, String sessionId, String docVersion) {
+        java.util.ArrayList<Section> sections = new java.util.ArrayList<>();
+        node.path("sections").forEach(section -> sections.add(Section.fromJson(section)));
+        java.util.ArrayList<LabelRef> labels = new java.util.ArrayList<>();
+        node.path("labels").forEach(label -> labels.add(labelFrom(label)));
+        java.util.ArrayList<String> unlabeled = new java.util.ArrayList<>();
+        node.path("unlabeled").forEach(handle -> unlabeled.add(handle.asText("")));
+        Map<String, String> boxes = new LinkedHashMap<>();
+        node.path("boxes").fields().forEachRemaining(entry -> boxes.put(entry.getKey(), entry.getValue().asText("")));
+        Builder builder = builder(sessionId, docVersion)
+                .sections(sections)
+                .labels(labels)
+                .unlabeled(unlabeled)
+                .boxes(boxes);
+        node.path("viewport_map").fields().forEachRemaining(entry -> {
+            if (entry.getValue() instanceof ObjectNode box) builder.viewport(entry.getKey(), box.deepCopy());
+        });
+        builder.indexes(
+                index(node, "by_role"),
+                index(node, "by_role_name"),
+                index(node, "by_text_token"),
+                index(node, "by_tag"),
+                index(node, "by_id"),
+                index(node, "by_class"),
+                index(node, "by_xpath"),
+                index(node, "by_section_title"),
+                strings(node.path("indexes").path("interactables")),
+                strings(node.path("indexes").path("in_viewport"))
+        );
+        com.fasterxml.jackson.databind.JsonNode image = node.get("image");
+        if (image instanceof ObjectNode object) builder.image(object.deepCopy());
+        node.path("colours").fields().forEachRemaining(entry -> {
+            if (entry.getValue() instanceof ObjectNode colour) builder.colour(entry.getKey(), colour.deepCopy());
+        });
+        return builder.build();
+    }
+
+    private static LabelRef labelFrom(com.fasterxml.jackson.databind.JsonNode node) {
+        Map<String, Double> parts = new LinkedHashMap<>();
+        node.path("parts").fields().forEachRemaining(entry -> parts.put(entry.getKey(), entry.getValue().asDouble()));
+        java.util.ArrayList<String> reasons = new java.util.ArrayList<>();
+        node.path("reasons").forEach(reason -> reasons.add(reason.asText("")));
+        return new LabelRef(node.path("label").asText(""), node.path("target").asText(""), node.path("score").asDouble(), parts, reasons);
+    }
+
+    private static Map<String, List<String>> index(com.fasterxml.jackson.databind.JsonNode node, String name) {
+        Map<String, List<String>> map = new LinkedHashMap<>();
+        node.path("indexes").path(name).fields().forEachRemaining(entry -> map.put(entry.getKey(), strings(entry.getValue())));
+        return map;
+    }
+
+    private static List<String> strings(com.fasterxml.jackson.databind.JsonNode node) {
+        java.util.ArrayList<String> values = new java.util.ArrayList<>();
+        if (node != null) node.forEach(value -> values.add(value.asText("")));
+        return values;
+    }
 }

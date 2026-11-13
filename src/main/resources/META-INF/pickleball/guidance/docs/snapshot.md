@@ -1,8 +1,37 @@
 # Snapshot and pre-map
 
-The DOM engine scores labels, caps oversized boxes, and detects nested sections before it builds a page snapshot. The page-level composite snapshot artifact is not produced yet. What follows is the behaviour that is implemented now.
+`domengine premap --file page.html` writes a composite snapshot (`schema` `pickleball.composite-snapshot`, `version` 1, `transport` `fixture`). The builder always runs the pre-map. Live browser and desktop producers are not in this build: `CompositeSnapshots.browser` waits on engine-defects Phase 5, and `CompositeSnapshots.desktop` is Phase 3.
 
 Logging uses `dev.domengine.log.EngineLog`. The entities are `snapshot`, `premap`, `affinity`, and `desktop-shot` (`DOMENGINE_LOG` or `COMPOSITE_LOG`). A protocol or tool fallback logs one WARN per run and reason through `SnapshotWarnings.once(reason)`.
+
+## Schema
+
+The machine-readable schema is `dom-engine/src/main/resources/dev/domengine/snapshot/composite-snapshot.schema.json` (JSON Schema draft 2020-12). `capabilities` reports `snapshot_schema` 1 and `premap` true.
+
+| Field | Contents |
+|---|---|
+| `schema`, `version`, `id` | `pickleball.composite-snapshot`, version 1, snapshot id |
+| `session_id`, `doc_version` | Session id. Offline `doc_version` is `offline:` plus the first 12 hex digits of the SHA-256 of the HTML |
+| `platform` | `chrome`, `chromium`, `edge`, `firefox`, `windows-uia`, `macos-ax`, or `linux-atspi`. Offline HTML uses `chromium` unless `--platform` is set |
+| `transport` | `cdp`, `bidi`, `selenium-fallback`, `uia`, `ax`, `atspi`, or `fixture`. Offline premap uses `fixture` |
+| `captured_at`, `duration_ms` | ISO-8601 time with a numeric offset. Capture duration in milliseconds |
+| `viewport` | `css_width`, `css_height`, `device_pixel_ratio`, `scroll_x`, `scroll_y`, `visual` (`offset_x`, `offset_y`, `scale`), `screen` (`x`, `y`, `width`, `height`) |
+| `screenshot` | `format` `png`, `width_px`, `height_px`, `image_scale`, `clip`, `sha256`, and `path` or `base64` |
+| `source` | `kind` (`html` or `a11y-xml`), `text` or `path`, `bytes` |
+| `frames[]` | `id`, `parent_id`, `url`, `frame_path`, `offset` |
+| `nodes[]` | Flat list. See below |
+| `premap` | Sections, labels, caps. Indexes, viewport map, colours, and image features are present and empty until the later pre-map phase |
+| `warnings[]` | Strings raised during capture |
+
+Each `nodes[]` entry has `handle`, `parent`, `tag`, `role`, `name`, `text` (at most 200 characters), `value`, `attributes`, `states`, `frame_id`, `frame_path`, `shadow_path`, `xpath`, `path`, `boxes`, `in_viewport`, `interactable`, `capped`, `cap_reason`, `section_path`, and `paint`.
+
+`xpath` is absolute and index-qualified inside one frame document, for example `/html[1]/body[1]/form[1]/input[2]`. Inside a shadow tree it is the path from the shadow root, and `shadow_path` is the host XPath chain joined by ` >> `. `path` is the `backend_node_id`. The offline query engine rejects numeric index predicates, so `XPathIndex.resolve` is the resolver that honors them. The engine still finds the node when those indexes are removed.
+
+Coordinate spaces are separate. Offline HTML fills `document_css_px` from `data-x`, `data-y`, `data-w`, and `data-h`. `layout_viewport`, `visual_viewport`, `frame_document`, and `screen_px` stay null until a live producer has those measurements. They are not copies of `document_css_px`.
+
+`image_px = (visual_viewport box) × image_scale`. `image_scale` is screenshot width divided by `viewport.css_width` (1 when there is no screenshot). When a screenshot is present and `visual_viewport` is null, `image_px` uses `document_css_px` and logs one warning, `snapshot fallback image_px used document_css_px`.
+
+Offline viewport size is the `html` or `body` box when that element has one, otherwise 1280 by 800. `--out-dir` writes `snapshot.json` and, when `--screenshot` is set, `screenshot.png`. Without `--out-dir` the screenshot is inlined as `base64` and `path` names the file that was read.
 
 ## Label affinity
 

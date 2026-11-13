@@ -42,4 +42,20 @@ public record Section(
         node.put("member_count", memberCount);
         return node;
     }
+
+    public static Section fromJson(com.fasterxml.jackson.databind.JsonNode node) {
+        java.util.ArrayList<String> children = new java.util.ArrayList<>();
+        node.path("child_ids").forEach(child -> children.add(child.asText("")));
+        return new Section(
+                node.path("id").asText(""),
+                node.path("kind").asText(""),
+                node.path("title").asText(""),
+                node.path("handle").asText(""),
+                Box.fromJson(node.get("box")),
+                node.path("depth").asInt(0),
+                node.path("parent_id").asText(""),
+                children,
+                node.path("member_count").asInt(0)
+        );
+    }
 }

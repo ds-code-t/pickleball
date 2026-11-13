@@ -104,6 +104,7 @@ public final class DomEngineMain {
                 case "capabilities" -> CliResult.ok(Jsons.pretty(capabilities()));
                 case "attach" -> sessionVerb("attach", flags);
                 case "snapshot" -> snapshot(flags);
+                case "premap" -> premap(flags);
                 case "query" -> query(flags);
                 case "resolve" -> resolve(flags);
                 case "info" -> info(flags);
@@ -199,7 +200,7 @@ public final class DomEngineMain {
         node.put("name", EngineInfo.NAME);
         node.put("version", EngineInfo.VERSION);
         array(node, "commands", List.of(
-                "version", "capabilities", "session", "attach", "snapshot", "query", "resolve",
+                "version", "capabilities", "session", "attach", "snapshot", "premap", "query", "resolve",
                 "info", "recommend", "validate", "capture", "conform", "log",
                 "click", "type", "scroll", "submit", "key", "dblclick", "contextclick", "drag", "eval",
                 "screenshot", "observe", "wait", "desktop", "mcp", "serve"
@@ -223,6 +224,8 @@ public final class DomEngineMain {
         logging.put("default", "off");
         array(logging, "entities", EngineInfo.LOG_ENTITIES);
         node.putObject("attach").put("requires", "i_accept_local_attach");
+        node.put("snapshot_schema", EngineInfo.SNAPSHOT_SCHEMA);
+        node.put("premap", EngineInfo.PREMAP);
         return node;
     }
 
@@ -332,6 +335,35 @@ public final class DomEngineMain {
                 allow(copy.get("allow")),
                 copy.get("target")
         );
+    }
+
+    private static CliResult premap(Map<String, String> flags) {
+        String unknown = VerbFlags.unrecognized("premap", flags);
+        if (unknown != null) return error(2, "usage", "unrecognized flag --" + unknown + " for premap");
+        if (!flags.containsKey("file") || flags.get("file").isBlank()) return error(2, "usage", "premap requires --file");
+        dev.domengine.tree.DomNode root;
+        try {
+            root = dev.domengine.query.HtmlTree.parse(java.nio.file.Files.readString(Path.of(flags.get("file"))));
+        } catch (java.io.IOException failure) {
+            return error(1, "failed", "premap file: " + failure.getMessage());
+        }
+        com.fasterxml.jackson.databind.node.ObjectNode json = dev.domengine.snapshot.CompositeSnapshots.offline(
+                root, dev.domengine.snapshot.SnapshotOptions.fromFlags(flags));
+        String dir = flags.get("out-dir");
+        if (dir != null && !dir.isBlank()) {
+            try {
+                Path out = Path.of(dir);
+                java.nio.file.Files.createDirectories(out);
+                String shot = flags.get("screenshot");
+                if (shot != null && !shot.isBlank()) {
+                    java.nio.file.Files.copy(Path.of(shot), out.resolve("screenshot.png"), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                }
+                java.nio.file.Files.writeString(out.resolve("snapshot.json"), Jsons.pretty(json));
+            } catch (java.io.IOException failure) {
+                return error(1, "failed", "premap out-dir: " + failure.getMessage());
+            }
+        }
+        return CliResult.ok(Jsons.pretty(json));
     }
 
     private static CliResult query(Map<String, String> flags) {
@@ -646,6 +678,7 @@ public final class DomEngineMain {
                 session log --id ID [--follow]
                 attach --cdp URL --i-accept-local-attach
                 snapshot --session ID | --cdp URL --i-accept-local-attach
+                premap --file page.html [--screenshot shot.png] [--out-dir DIR]
                 query --file page.html --css SELECTOR [--selector EXPR] [--pipeline EXPR] [--geometry] [--explain] [--viewport file.pgm]
                   EXPR accepts engine=value stages joined by >> and boolean AND, OR, and NOT
                   live xpath is XPath 1.0 via document.evaluate. An invalid expression is an error, not zero hits.
@@ -675,7 +708,7 @@ public final class DomEngineMain {
 
     private static boolean acceptsFile(String command) {
         return switch (command) {
-            case "query", "resolve", "info", "recommend", "validate", "capture" -> true;
+            case "query", "resolve", "info", "recommend", "validate", "capture", "premap" -> true;
             default -> false;
         };
     }

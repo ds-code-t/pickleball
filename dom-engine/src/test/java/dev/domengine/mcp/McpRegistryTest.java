@@ -25,11 +25,11 @@ class McpRegistryTest {
     void theCatalogueIsThePublicAgentEntry() {
         List<String> names = McpRegistry.names();
         assertEquals(List.of("domengine", "query", "click", "type", "snapshot", "observe", "launch", "surfaces"), names);
-        assertFalse(SnapshotDispatch.producersPresent());
+        assertTrue(SnapshotDispatch.producersPresent());
     }
 
     @Test
-    void snapshotReturnsTheSchemaShapeUntilG3Lands() throws Exception {
+    void snapshotReturnsTheCompositeSnapshot() throws Exception {
         String request = """
                 {"jsonrpc":"2.0","id":1,"method":"tools/list"}
                 {"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"snapshot","arguments":{"kind":"offline"}}}
@@ -45,7 +45,7 @@ class McpRegistryTest {
         JsonNode snapshot = content(text, "2");
         assertEquals("pickleball.composite-snapshot", snapshot.path("schema").asText());
         assertEquals(1, snapshot.path("version").asInt());
-        assertTrue(snapshot.path("warnings").toString().contains("g3-producers-absent"), snapshot.toString());
+        assertFalse(snapshot.path("warnings").toString().contains("g3-producers-absent"), snapshot.toString());
         assertTrue(snapshot.has("premap"));
         assertTrue(snapshot.has("nodes"));
         assertTrue(text.contains("fix: Call the workbench MCP launch command"), text);

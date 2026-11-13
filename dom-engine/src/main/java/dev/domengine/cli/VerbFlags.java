@@ -51,6 +51,11 @@ public final class VerbFlags {
         map.put("key", join(SELECTORS, List.of("key")));
         map.put("eval", join(SELECTORS, List.of("source")));
         map.put("drag", List.of("session", "session-dir", "source", "target"));
+        map.put("premap", List.of(
+                "file", "screenshot", "out-dir",
+                "box-max-area", "box-max-width", "box-max-height",
+                "one-match-margin", "affinity-weights"
+        ));
         return Map.copyOf(map);
     }
 

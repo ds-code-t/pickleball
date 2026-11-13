@@ -25,4 +25,9 @@ public record Box(double x, double y, double width, double height) {
         node.put("height", height);
         return node;
     }
+
+    public static Box fromJson(com.fasterxml.jackson.databind.JsonNode node) {
+        if (node == null || node.isNull() || node.isMissingNode() || !node.isObject()) return new Box(0, 0, 0, 0);
+        return new Box(node.path("x").asDouble(), node.path("y").asDouble(), node.path("width").asDouble(), node.path("height").asDouble());
+    }
 }

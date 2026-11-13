@@ -1,0 +1,254 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:pickleball:composite-snapshot:1",
+  "title": "pickleball.composite-snapshot",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema", "version", "id", "session_id", "doc_version", "platform", "transport",
+    "captured_at", "duration_ms", "viewport", "screenshot", "source", "frames", "nodes",
+    "premap", "warnings"
+  ],
+  "properties": {
+    "schema": { "const": "pickleball.composite-snapshot" },
+    "version": { "const": 1 },
+    "id": { "type": "string" },
+    "session_id": { "type": "string" },
+    "doc_version": { "type": "string" },
+    "platform": {
+      "enum": ["chrome", "chromium", "edge", "firefox", "windows-uia", "macos-ax", "linux-atspi"]
+    },
+    "transport": {
+      "enum": ["cdp", "bidi", "selenium-fallback", "uia", "ax", "atspi", "fixture"]
+    },
+    "captured_at": { "type": "string" },
+    "duration_ms": { "type": "integer" },
+    "viewport": { "$ref": "#/$defs/viewport" },
+    "screenshot": { "$ref": "#/$defs/screenshot" },
+    "source": { "$ref": "#/$defs/source" },
+    "frames": { "type": "array", "items": { "$ref": "#/$defs/frame" } },
+    "nodes": { "type": "array", "items": { "$ref": "#/$defs/node" } },
+    "premap": { "$ref": "#/$defs/premap" },
+    "warnings": { "type": "array", "items": { "type": "string" } }
+  },
+  "$defs": {
+    "viewport": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["css_width", "css_height", "device_pixel_ratio", "scroll_x", "scroll_y", "visual", "screen"],
+      "properties": {
+        "css_width": { "type": "number" },
+        "css_height": { "type": "number" },
+        "device_pixel_ratio": { "type": "number" },
+        "scroll_x": { "type": "number" },
+        "scroll_y": { "type": "number" },
+        "visual": { "$ref": "#/$defs/visual" },
+        "screen": { "$ref": "#/$defs/screen" }
+      }
+    },
+    "visual": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["offset_x", "offset_y", "scale"],
+      "properties": {
+        "offset_x": { "type": "number" },
+        "offset_y": { "type": "number" },
+        "scale": { "type": "number" }
+      }
+    },
+    "screen": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["x", "y", "width", "height"],
+      "properties": {
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "width": { "type": "number" },
+        "height": { "type": "number" }
+      }
+    },
+    "screenshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["format", "width_px", "height_px", "image_scale", "clip", "sha256"],
+      "properties": {
+        "format": { "const": "png" },
+        "width_px": { "type": "integer" },
+        "height_px": { "type": "integer" },
+        "image_scale": { "type": "number" },
+        "clip": { "type": ["object", "null"] },
+        "sha256": { "type": "string" },
+        "path": { "type": "string" },
+        "base64": { "type": "string" }
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "text", "bytes"],
+      "properties": {
+        "kind": { "enum": ["html", "a11y-xml"] },
+        "text": { "type": "string" },
+        "path": { "type": "string" },
+        "bytes": { "type": "integer" }
+      }
+    },
+    "frame": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "parent_id", "url", "frame_path", "offset"],
+      "properties": {
+        "id": { "type": "string" },
+        "parent_id": { "type": "string" },
+        "url": { "type": "string" },
+        "frame_path": { "type": "string" },
+        "offset": { "$ref": "#/$defs/point" }
+      }
+    },
+    "point": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["x", "y"],
+      "properties": { "x": { "type": "number" }, "y": { "type": "number" } }
+    },
+    "box": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["x", "y", "width", "height"],
+      "properties": {
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "width": { "type": "number" },
+        "height": { "type": "number" }
+      }
+    },
+    "nullableBox": { "anyOf": [ { "$ref": "#/$defs/box" }, { "type": "null" } ] },
+    "node": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "handle", "parent", "tag", "role", "name", "text", "value", "attributes", "states",
+        "frame_id", "frame_path", "shadow_path", "xpath", "path", "boxes",
+        "in_viewport", "interactable", "capped", "cap_reason", "section_path", "paint"
+      ],
+      "properties": {
+        "handle": { "type": "string" },
+        "parent": { "type": "string" },
+        "tag": { "type": "string" },
+        "role": { "type": "string" },
+        "name": { "type": "string" },
+        "text": { "type": "string" },
+        "value": { "type": "string" },
+        "attributes": { "type": "object", "additionalProperties": { "type": "string" } },
+        "states": {
+          "type": "array",
+          "items": { "enum": ["hidden", "disabled", "checked", "selected", "readonly", "required", "expanded", "focused"] }
+        },
+        "frame_id": { "type": "string" },
+        "frame_path": { "type": "string" },
+        "shadow_path": { "type": "string" },
+        "xpath": { "type": "string" },
+        "path": { "type": "string" },
+        "boxes": { "$ref": "#/$defs/boxes" },
+        "in_viewport": { "type": "boolean" },
+        "interactable": { "type": "boolean" },
+        "capped": { "type": "boolean" },
+        "cap_reason": { "type": "string" },
+        "section_path": { "type": "string" },
+        "paint": { "$ref": "#/$defs/paint" }
+      }
+    },
+    "boxes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["document_css_px", "layout_viewport", "visual_viewport", "frame_document", "screen_px", "image_px"],
+      "properties": {
+        "document_css_px": { "$ref": "#/$defs/nullableBox" },
+        "layout_viewport": { "$ref": "#/$defs/nullableBox" },
+        "visual_viewport": { "$ref": "#/$defs/nullableBox" },
+        "frame_document": { "$ref": "#/$defs/nullableBox" },
+        "screen_px": { "$ref": "#/$defs/nullableBox" },
+        "image_px": { "$ref": "#/$defs/nullableBox" }
+      }
+    },
+    "paint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["color", "background", "contrast", "mean_rgb", "dhash"],
+      "properties": {
+        "color": { "type": "string" },
+        "background": { "type": "string" },
+        "contrast": { "type": ["number", "null"] },
+        "mean_rgb": { "type": "string" },
+        "dhash": { "type": ["integer", "null"] }
+      }
+    },
+    "premap": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sections", "labels", "unlabeled", "boxes", "viewport_map", "indexes", "image", "colours"],
+      "properties": {
+        "sections": { "type": "array", "items": { "$ref": "#/$defs/section" } },
+        "labels": { "type": "array", "items": { "$ref": "#/$defs/label" } },
+        "unlabeled": { "type": "array", "items": { "type": "string" } },
+        "boxes": { "type": "object", "additionalProperties": { "type": "string" } },
+        "viewport_map": { "type": "object", "additionalProperties": { "$ref": "#/$defs/box" } },
+        "indexes": { "$ref": "#/$defs/indexes" },
+        "image": { "type": "object" },
+        "colours": { "type": "object" }
+      }
+    },
+    "section": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "title", "handle", "box", "depth", "parent_id", "child_ids", "member_count"],
+      "properties": {
+        "id": { "type": "string" },
+        "kind": { "type": "string" },
+        "title": { "type": "string" },
+        "handle": { "type": "string" },
+        "box": { "$ref": "#/$defs/box" },
+        "depth": { "type": "integer" },
+        "parent_id": { "type": "string" },
+        "child_ids": { "type": "array", "items": { "type": "string" } },
+        "member_count": { "type": "integer" }
+      }
+    },
+    "label": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["label", "target", "score", "parts", "reasons"],
+      "properties": {
+        "label": { "type": "string" },
+        "target": { "type": "string" },
+        "score": { "type": "number" },
+        "parts": { "type": "object", "additionalProperties": { "type": "number" } },
+        "reasons": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "indexes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "by_role", "by_role_name", "by_text_token", "by_tag", "by_id", "by_class",
+        "by_xpath", "by_section_title", "interactables", "in_viewport"
+      ],
+      "properties": {
+        "by_role": { "$ref": "#/$defs/handleIndex" },
+        "by_role_name": { "$ref": "#/$defs/handleIndex" },
+        "by_text_token": { "$ref": "#/$defs/handleIndex" },
+        "by_tag": { "$ref": "#/$defs/handleIndex" },
+        "by_id": { "$ref": "#/$defs/handleIndex" },
+        "by_class": { "$ref": "#/$defs/handleIndex" },
+        "by_xpath": { "$ref": "#/$defs/handleIndex" },
+        "by_section_title": { "$ref": "#/$defs/handleIndex" },
+        "interactables": { "type": "array", "items": { "type": "string" } },
+        "in_viewport": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "handleIndex": {
+      "type": "object",
+      "additionalProperties": { "type": "array", "items": { "type": "string" } }
+    }
+  }
+}

@@ -246,20 +246,8 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/common/agentcontrol/LaunchTemplates.java`
 - `src/main/java/tools/dscode/common/agentcontrol/ObserveEvents.java`
 - `src/main/java/tools/dscode/common/agentcontrol/PageSurfaces.java`
-- `src/main/java/tools/dscode/common/agentcontrol/PopupSurfaceBridge.java`
 - `src/main/java/tools/dscode/common/agentcontrol/ScenarioCapture.java`
 - `src/main/java/tools/dscode/common/agentcontrol/WindowRegistry.java`
-- `src/main/java/tools/dscode/common/agentsurface/PopupBridge.java`
-- `src/main/java/tools/dscode/common/agentsurface/PopupBrowserLocator.java`
-- `src/main/java/tools/dscode/common/agentsurface/PopupCli.java`
-- `src/main/java/tools/dscode/common/agentsurface/PopupConfig.java`
-- `src/main/java/tools/dscode/common/agentsurface/PopupHost.java`
-- `src/main/java/tools/dscode/common/agentsurface/PopupHostMain.java`
-- `src/main/java/tools/dscode/common/agentsurface/PopupLauncher.java`
-- `src/main/java/tools/dscode/common/agentsurface/PopupLedger.java`
-- `src/main/java/tools/dscode/common/agentsurface/PopupLog.java`
-- `src/main/java/tools/dscode/common/agentsurface/PopupOnTop.java`
-- `src/main/java/tools/dscode/common/agentsurface/PopupStatus.java`
 - `src/main/java/tools/dscode/common/annotations/DefinitionFlag.java`
 - `src/main/java/tools/dscode/common/annotations/DefinitionFlags.java`
 - `src/main/java/tools/dscode/common/annotations/IgnoreDefinition.java`
@@ -673,9 +661,6 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/resources/META-INF/pickleball/configs/CHROME_HEADLESS.yaml`
 - `src/main/resources/META-INF/services/org.junit.platform.engine.TestEngine`
 - `src/main/resources/META-INF/services/org.junit.platform.launcher.LauncherSessionListener`
-- `src/main/resources/tools/dscode/common/agentsurface/agent-surface-popup.css`
-- `src/main/resources/tools/dscode/common/agentsurface/agent-surface-popup.html`
-- `src/main/resources/tools/dscode/common/agentsurface/agent-surface-popup.js`
 
 ## Framework tests
 
@@ -1247,6 +1232,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `dom-engine/src/main/java/dev/domengine/premap/OneMatchException.java`
 - `dom-engine/src/main/java/dev/domengine/premap/Platform.java`
 - `dom-engine/src/main/java/dev/domengine/premap/PreMap.java`
+- `dom-engine/src/main/java/dev/domengine/premap/PreMapBuilder.java`
 - `dom-engine/src/main/java/dev/domengine/premap/PreMapLookup.java`
 - `dom-engine/src/main/java/dev/domengine/premap/Section.java`
 - `dom-engine/src/main/java/dev/domengine/premap/SectionDetector.java`
@@ -1260,10 +1246,18 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `dom-engine/src/main/java/dev/domengine/session/ChromeProcess.java`
 - `dom-engine/src/main/java/dev/domengine/session/SessionEvents.java`
 - `dom-engine/src/main/java/dev/domengine/session/SessionRegistry.java`
+- `dom-engine/src/main/java/dev/domengine/snapshot/CompositeSnapshot.java`
+- `dom-engine/src/main/java/dev/domengine/snapshot/CompositeSnapshotBuilder.java`
+- `dom-engine/src/main/java/dev/domengine/snapshot/CompositeSnapshots.java`
+- `dom-engine/src/main/java/dev/domengine/snapshot/PngImage.java`
+- `dom-engine/src/main/java/dev/domengine/snapshot/SnapshotContext.java`
+- `dom-engine/src/main/java/dev/domengine/snapshot/SnapshotOptions.java`
 - `dom-engine/src/main/java/dev/domengine/snapshot/SnapshotWarnings.java`
+- `dom-engine/src/main/java/dev/domengine/snapshot/XPathIndex.java`
 - `dom-engine/src/main/java/dev/domengine/tree/ContextWalker.java`
 - `dom-engine/src/main/java/dev/domengine/tree/DomNode.java`
 - `dom-engine/src/main/java/dev/domengine/tree/LiveTree.java`
+- `dom-engine/src/main/resources/dev/domengine/snapshot/composite-snapshot.schema.json`
 - `dom-engine/src/test/java/dev/domengine/ActionSmokeTest.java`
 - `dom-engine/src/test/java/dev/domengine/affinity/AffinityScoreTest.java`
 - `dom-engine/src/test/java/dev/domengine/affinity/AffinityWeightsTest.java`
@@ -1291,6 +1285,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `dom-engine/src/test/java/dev/domengine/OfflineXPathTest.java`
 - `dom-engine/src/test/java/dev/domengine/premap/BoxCapTest.java`
 - `dom-engine/src/test/java/dev/domengine/premap/OneMatchTest.java`
+- `dom-engine/src/test/java/dev/domengine/premap/PreMapCliTest.java`
 - `dom-engine/src/test/java/dev/domengine/premap/PreMapLookupDefaultsTest.java`
 - `dom-engine/src/test/java/dev/domengine/premap/SectionDetectionTest.java`
 - `dom-engine/src/test/java/dev/domengine/RustCliShapeTest.java`
@@ -1299,6 +1294,10 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `dom-engine/src/test/java/dev/domengine/session/SessionEventsTest.java`
 - `dom-engine/src/test/java/dev/domengine/SessionJoinLogTest.java`
 - `dom-engine/src/test/java/dev/domengine/SharedSurfaceTest.java`
+- `dom-engine/src/test/java/dev/domengine/snapshot/CompositeSnapshotModelTest.java`
+- `dom-engine/src/test/java/dev/domengine/snapshot/CompositeSnapshotSchemaTest.java`
+- `dom-engine/src/test/java/dev/domengine/snapshot/SnapshotSchemas.java`
+- `dom-engine/src/test/java/dev/domengine/snapshot/XPathIndexTest.java`
 - `dom-engine/src/test/java/dev/domengine/VerbFlagTest.java`
 - `dom-engine/src/test/java/dev/domengine/VisualRelativeTest.java`
 - `dom-engine/src/test/resources/conformance/expected/a11y-at-hidden.json`
