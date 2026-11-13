@@ -12,12 +12,15 @@ import dev.domengine.tree.DomNode;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Desktop accessibility tree. The fixture backend replays a recorded tree on every OS.
- * Native AT-SPI / UIA / AX is not required for the fixture path.
+ * Desktop accessibility tree. {@code --fixture} replays a recorded tree on every OS.
+ * {@code --live} reads Windows UI Automation, macOS Accessibility, or Linux AT-SPI
+ * and sends click and type to that platform. A missing bus, permission, or input
+ * tool throws. The live path does not report success for a recorded tree.
  */
 public final class DesktopTree {
     private static final ConcurrentHashMap<String, Session> SESSIONS = new ConcurrentHashMap<>();
@@ -25,7 +28,10 @@ public final class DesktopTree {
     private DesktopTree() {
     }
 
-    public record Session(String id, String backend, DomNode root) {
+    public record Session(String id, String backend, DomNode root, boolean live, String platform, String window) {
+        public Session(String id, String backend, DomNode root) {
+            this(id, backend, root, false, "", "");
+        }
     }
 
     public static Session attach(String id, Path fixture) {
@@ -42,6 +48,19 @@ public final class DesktopTree {
         } catch (Exception failure) {
             throw new CdpException("desktop fixture: " + failure.getMessage());
         }
+    }
+
+    /** Live attach. {@code windowName} is empty for the whole desktop, or a window/application/dialog name. */
+    public static Session attachLive(String id, String windowName) {
+        String name = windowName == null ? "" : windowName;
+        String platform = NativeDesktop.platformId();
+        DomNode root = NativeDesktop.capture(name);
+        root.linkParents();
+        DomNode.renumber(root);
+        Session session = new Session(id, "live", root, true, platform, name);
+        SESSIONS.put(id, session);
+        EngineLog.info("desktop", "attach live " + id + " " + platform + (name.isBlank() ? "" : " " + name));
+        return session;
     }
 
     public static Session require(String id) {
@@ -106,28 +125,47 @@ public final class DesktopTree {
     public static ObjectNode list() {
         ObjectNode node = Jsons.object();
         node.put("ok", true);
-        node.put("backend", "fixture");
+        boolean anyLive = false;
+        boolean anyFixture = false;
+        for (Session session : SESSIONS.values()) {
+            if (session.live) anyLive = true;
+            else anyFixture = true;
+        }
+        String backend = "fixture";
+        if (anyLive && anyFixture) backend = "mixed";
+        else if (anyLive) backend = "live";
+        node.put("backend", backend);
         ArrayNode sessions = node.putArray("sessions");
         for (Session session : SESSIONS.values()) {
             ObjectNode one = sessions.addObject();
             one.put("id", session.id);
             one.put("backend", session.backend);
+            one.put("live", session.live);
         }
         return node;
     }
 
     public static ObjectNode walk(String id) {
         Session session = require(id);
+        if (session.live) {
+            DomNode fresh = NativeDesktop.capture(session.window);
+            fresh.linkParents();
+            DomNode.renumber(fresh);
+            session = new Session(session.id, "live", fresh, true, session.platform, session.window);
+            SESSIONS.put(id, session);
+        }
         ObjectNode node = Jsons.object();
         node.put("ok", true);
         node.put("id", session.id);
         node.put("backend", session.backend);
+        node.put("live", session.live);
         node.set("tree", session.root.toJson());
         EngineLog.info("desktop", "walk " + id);
         return node;
     }
 
     public static ObjectNode query(String id, Map<String, String> flags) {
+        rejectBrowserOnly(flags);
         Session session = require(id);
         ObjectNode found = Query.run(session.root, flags);
         found.put("backend", session.backend);
@@ -136,6 +174,7 @@ public final class DesktopTree {
     }
 
     public static DomNode one(String id, Map<String, String> flags) {
+        rejectBrowserOnly(flags);
         Session session = require(id);
         JsonNode found = Query.run(session.root, flags);
         JsonNode nodes = found.get("nodes");
@@ -167,6 +206,7 @@ public final class DesktopTree {
         DomNode node = one(id, flags);
         String text = flags.getOrDefault("text", "");
         boolean append = "true".equals(flags.get("append"));
+        if (session.live) NativeDesktop.type(node, text, append);
         node.nodeValue = append ? (node.nodeValue == null ? "" : node.nodeValue) + text : text;
         ObjectNode result = Jsons.object();
         result.put("ok", true);
@@ -179,6 +219,7 @@ public final class DesktopTree {
     }
 
     public static ObjectNode click(Session session, DomNode node) {
+        if (session.live) NativeDesktop.click(node);
         ObjectNode result = Jsons.object();
         result.put("ok", true);
         result.put("backend", session.backend);
@@ -196,5 +237,22 @@ public final class DesktopTree {
             if (found != null) return found;
         }
         return null;
+    }
+
+    static void rejectBrowserOnly(Map<String, String> flags) {
+        if (flags == null) return;
+        String pierce = flags.get("pierce");
+        if (pierce != null && !pierce.isBlank() && !"false".equalsIgnoreCase(pierce)) {
+            throw new CdpException("pierce is browser-only");
+        }
+        if ("true".equals(flags.get("all-frames"))) throw new CdpException("frame is browser-only");
+        String pipeline = flags.getOrDefault("pipeline", "") + "\n" + flags.getOrDefault("selector", "")
+                + "\n" + flags.getOrDefault("expr", "");
+        for (String stage : pipeline.split(">>")) {
+            String trimmed = stage.trim().toLowerCase(Locale.ROOT);
+            if (trimmed.startsWith("frame=") || trimmed.startsWith("shadow=")) {
+                throw new CdpException("frame and shadow are browser-only");
+            }
+        }
     }
 }

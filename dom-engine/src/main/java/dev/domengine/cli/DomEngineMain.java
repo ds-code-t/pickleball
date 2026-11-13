@@ -386,12 +386,19 @@ public final class DomEngineMain {
                 case "list" -> CliResult.ok(Jsons.pretty(DesktopTree.list()));
                 case "attach" -> {
                     String id = flags.getOrDefault("id", "d" + System.nanoTime());
-                    String fixture = required(flags, "fixture");
-                    DesktopTree.Session attached = DesktopTree.attach(id, Path.of(fixture));
+                    boolean live = "true".equals(flags.get("live"));
+                    if (live && flags.get("fixture") != null && !flags.get("fixture").isBlank()) {
+                        throw new CdpException("desktop attach accepts --fixture or --live, not both");
+                    }
+                    DesktopTree.Session attached = live
+                            ? DesktopTree.attachLive(id, flags.getOrDefault("name", ""))
+                            : DesktopTree.attach(id, Path.of(required(flags, "fixture")));
                     com.fasterxml.jackson.databind.node.ObjectNode node = Jsons.object();
                     node.put("ok", true);
                     node.put("id", attached.id());
                     node.put("backend", attached.backend());
+                    node.put("live", attached.live());
+                    if (!attached.platform().isBlank()) node.put("platform", attached.platform());
                     yield CliResult.ok(Jsons.pretty(node));
                 }
                 case "walk" -> CliResult.ok(Jsons.pretty(DesktopTree.walk(required(flags, "id"))));
@@ -543,6 +550,11 @@ public final class DomEngineMain {
                 screenshot --session ID [--out file.png]
                 observe|wait --file page.html|--session ID --css SELECTOR [--timeout-ms N]
                 desktop list|attach|walk|query|resolve|close|click|type
+                  attach --fixture FILE   replays a recorded tree
+                  attach --live [--name WINDOW]   Windows UIA, macOS AX, or Linux AT-SPI
+                  query and resolve use the same --pipeline, --css, --xpath, and --text as browser query
+                  frame, shadow, and pierce are browser-only and are rejected on desktop
+                  live click and type act on the OS control; a missing bus, permission, or input tool fails
                 query|resolve|info|recommend|validate [file] [--css SELECTOR]
                 capture --session ID | --file page.html | --url URL
                 conform --root DIR [--live]
