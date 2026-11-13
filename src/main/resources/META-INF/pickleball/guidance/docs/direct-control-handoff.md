@@ -205,6 +205,10 @@ When those two descriptor fields are set, the session is already attached. Do no
 
 ```text
 java -jar pickleball-<version>.jar domengine --session-dir <compositeSessionDir> query --session <compositeSessionId> --css 'body'
+java -jar pickleball-<version>.jar domengine --session-dir <compositeSessionDir> query --session <compositeSessionId> --css 'button' --wait-for visible --filter displayed --timeout-ms 2000
+java -jar pickleball-<version>.jar domengine --session-dir <compositeSessionDir> hover --session <compositeSessionId> --css 'button' --force-hover
+java -jar pickleball-<version>.jar domengine --session-dir <compositeSessionDir> query --session <compositeSessionId> --css '#inner' --frame <frameId>
+java -jar pickleball-<version>.jar domengine --session-dir <compositeSessionDir> click --session <compositeSessionId> --node-id <backendNodeId>
 ```
 
 The same directory is the MCP join:

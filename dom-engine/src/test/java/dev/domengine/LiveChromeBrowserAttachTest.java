@@ -57,6 +57,7 @@ class LiveChromeBrowserAttachTest {
         Path dir = Files.createTempDirectory("domengine-browser-attach");
         try {
             assertTrue(chrome.debuggerOpen(), "Chrome debugger did not open");
+            BrowserSession.awaitInitialDocument(chrome.http(), url);
             HttpClient client = HttpClient.newHttpClient();
             HttpResponse<String> version = client.send(
                     HttpRequest.newBuilder(URI.create(chrome.http() + "/json/version")).GET().timeout(Duration.ofSeconds(5)).build(),

@@ -283,6 +283,40 @@ public final class BrowserSession implements AutoCloseable {
                 + (last == null || last.getMessage() == null ? "" : " (" + last.getMessage() + ")"));
     }
 
+    /**
+     * The debugger socket can open before the page Chrome was started with has
+     * a document. Polls for that page target, then {@link #awaitDocument}.
+     */
+    public static void awaitInitialDocument(String http, String url) {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(15);
+        CdpException last = null;
+        Endpoint endpoint = null;
+        while (System.nanoTime() < deadline) {
+            try {
+                endpoint = discover(http);
+                break;
+            } catch (CdpException failure) {
+                last = failure;
+            }
+            try {
+                Thread.sleep(50);
+            } catch (InterruptedException failure) {
+                Thread.currentThread().interrupt();
+                throw new CdpException("document ready interrupted");
+            }
+        }
+        if (endpoint == null) {
+            throw new CdpException("timed out waiting for a page target"
+                    + (last == null || last.getMessage() == null ? "" : " (" + last.getMessage() + ")"));
+        }
+        CdpConnection connection = CdpConnection.connect(URI.create(endpoint.webSocket), Duration.ofSeconds(5));
+        try {
+            awaitDocument(connection, url);
+        } finally {
+            connection.close();
+        }
+    }
+
     static boolean sameDocument(String requested, String href) {
         if (requested == null || href == null) return false;
         return stripFragment(requested).equals(stripFragment(href));
