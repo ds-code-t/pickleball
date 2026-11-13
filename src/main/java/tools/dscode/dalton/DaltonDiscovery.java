@@ -69,11 +69,24 @@ public final class DaltonDiscovery {
         return maxBytes;
     }
 
+    public boolean hashOnly() {
+        return "hash-only".equals(binaryPolicy);
+    }
+
+    /** Null when the file is text. Otherwise the binary reason (extension or content). */
+    public String binaryKind(Path file) {
+        if (file == null) return null;
+        String extension = extension(file.getFileName().toString());
+        if (BINARY_EXTENSIONS.contains(extension)) return "extension " + extension;
+        return sniff(file);
+    }
+
     /** Null means keep the file. {@code relativePath} uses {@code /}. */
     public String skipReason(String relativePath, Path file) {
         String relative = relativePath.replace('\\', '/');
         for (String exclude : excludes) {
             if (glob(exclude, relative) || directoryHit(relative, exclude)) {
+                if (hashOnly() && binaryExtensionGlob(exclude)) continue;
                 return "exclude " + exclude;
             }
         }
@@ -85,16 +98,25 @@ public final class DaltonDiscovery {
         }
         if (size > maxBytes) return "size " + size + " > " + maxBytes;
         String extension = extension(file.getFileName().toString());
-        if (BINARY_EXTENSIONS.contains(extension)) return "binary extension " + extension;
-        if (!BINARY_SKIP.equals(binaryPolicy) && !"hash-only".equals(binaryPolicy)) {
+        if (BINARY_EXTENSIONS.contains(extension)) {
+            if (!hashOnly()) return "binary extension " + extension;
+        } else if (!BINARY_SKIP.equals(binaryPolicy) && !"hash-only".equals(binaryPolicy)) {
             return "binary-policy " + binaryPolicy + " is not supported; skipped";
         }
         String sniffed = sniff(file);
         if (sniffed != null) {
-            if ("hash-only".equals(binaryPolicy)) return "binary " + sniffed + "; hash-only is not implemented";
+            if (hashOnly()) return null;
             return "binary " + sniffed;
         }
         return null;
+    }
+
+    private static boolean binaryExtensionGlob(String exclude) {
+        if (exclude == null) return false;
+        for (String extension : BINARY_EXTENSIONS) {
+            if (exclude.endsWith("*" + extension) || exclude.endsWith(extension)) return true;
+        }
+        return false;
     }
 
     static boolean glob(String glob, String path) {

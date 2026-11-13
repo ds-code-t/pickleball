@@ -10,14 +10,15 @@ import java.sql.Statement;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Embedded SQLite for the Dalton working copy. The driver is loaded by
- * reflection so {@code sqlite-jdbc} stays off the published POM and the
- * consumer shadow JAR. WAL and {@code busy_timeout} are set on every open.
+ * Embedded SQLite for the Dalton working copy. {@code org.xerial:sqlite-jdbc}
+ * is a published runtime dependency and is still not shaded into the consumer
+ * shadow JAR. WAL and {@code busy_timeout} are set on every open.
  */
 public final class DaltonDatabase implements AutoCloseable {
-    public static final int SCHEMA_VERSION = 4;
+    public static final int SCHEMA_VERSION = 5;
     public static final String MISSING_DRIVER =
-            "Dalton is enabled but org.xerial:sqlite-jdbc is not on the classpath. Add it as testRuntimeOnly / test scope or use the Gradle dalton* tasks.";
+            "Dalton is enabled but org.xerial:sqlite-jdbc is not on the classpath. Add it as testRuntimeOnly / test scope or use the Gradle dalton* tasks. "
+                    + "Dalton is on by default; add org.xerial:sqlite-jdbc or set pkb_dalton=false to run file-only.";
     static final String DRIVER = "org.sqlite.JDBC";
 
     private final Connection connection;
@@ -203,12 +204,37 @@ public final class DaltonDatabase implements AutoCloseable {
         if (current > SCHEMA_VERSION) {
             throw new SQLException("Dalton schema " + current + " is newer than this build (" + SCHEMA_VERSION + ")");
         }
+        addColumn("files", "git_blob", "TEXT");
+        addColumn("files", "binary_ref", "INTEGER NOT NULL DEFAULT 0");
+        addColumn("files", "byte_size", "INTEGER");
+        addColumn("provenance", "git_commit", "TEXT");
+        addColumn("provenance", "git_branch", "TEXT");
+        addColumn("provenance", "git_remote", "TEXT");
+        addColumn("provenance", "github_repo", "TEXT");
+        addColumn("provenance", "git_dirty", "INTEGER");
         try (Statement statement = connection.createStatement()) {
             statement.execute("INSERT INTO schema_meta(key, value) VALUES ('schema_version', '"
                     + SCHEMA_VERSION + "') ON CONFLICT(key) DO UPDATE SET value = '" + SCHEMA_VERSION + "'");
             statement.execute("INSERT INTO provenance(id, schema_version) VALUES (1, " + SCHEMA_VERSION
                     + ") ON CONFLICT(id) DO UPDATE SET schema_version = " + SCHEMA_VERSION);
         }
+    }
+
+    private void addColumn(String table, String column, String definition) throws SQLException {
+        if (hasColumn(table, column)) return;
+        try (Statement statement = connection.createStatement()) {
+            statement.execute("ALTER TABLE " + table + " ADD COLUMN " + column + " " + definition);
+        }
+    }
+
+    private boolean hasColumn(String table, String column) throws SQLException {
+        try (Statement statement = connection.createStatement();
+             ResultSet rows = statement.executeQuery("PRAGMA table_info(" + table + ")")) {
+            while (rows.next()) {
+                if (column.equalsIgnoreCase(rows.getString("name"))) return true;
+            }
+        }
+        return false;
     }
 
     @Override

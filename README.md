@@ -20,7 +20,7 @@ Pickleball also adds:
 - configurable `pkb_configpath` loading with recommended `<config:...>` references and legacy `<configs...>` compatibility;
 - a dependency-matched Workbench controller embedded as an opaque payload, with all Pickleball execution isolated in a separate consumer worker JVM;
 - optional `pkb_reportingmode=diagnostic` evidence capture with lightweight run/scenario indexes, losslessly compressed deep trace evidence, Git/source provenance, structured step/capability metadata, binary screenshots, compact visual fingerprints, failure clustering, cross-run comparison, and configurable evidence retention;
-- opt-in Dalton, a Git-files-to-SQLite working copy for features, configs, logs, and entities (Git files stay the source of truth); and
+- Dalton on by default, a Git-files-to-SQLite working copy for features, configs, logs, and entities (Git files stay the source of truth; `pkb_dalton=false` opts out); and
 - a small consumer setup consisting primarily of the Pickleball dependency and one test runner.
 
 Pickleball remains compatible with standard Cucumber features such as tags, Scenario Outlines, Examples tables, DataTables, DocStrings, hooks, plugins, and custom Java step definitions. Dynamic Pickleball steps and ordinary project-specific Cucumber steps can be used together in the same suite.

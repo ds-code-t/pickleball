@@ -6,11 +6,16 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 
 /**
- * Dalton is off unless {@code pkb_dalton} / {@code PKB_DALTON} is true or
- * the project root has {@code dalton.properties} with {@code enabled=true}.
- * An explicit false beats the file.
+ * Dalton is on unless it is turned off. Precedence: {@code pkb_dalton}
+ * system property, then {@code PKB_DALTON}, then {@code dalton.properties}
+ * {@code enabled=} or {@code pkb_dalton=} when that key is present, otherwise
+ * the default is on. Accepted values are {@code true|false|yes|no|on|off|1|0}.
+ * Anything else fails at first use. Files stay the Git source of truth;
+ * {@code .pickleball/dalton/dalton.db} is the working copy.
  */
 public final class DaltonConfig {
+    public static final String ACCEPTED = "true|false|yes|no|on|off|1|0";
+
     private DaltonConfig() {
     }
 
@@ -27,9 +32,12 @@ public final class DaltonConfig {
     }
 
     public static boolean enabled(Path project) {
-        String flag = flag();
-        if (flag != null) return truthy(flag);
-        return fileEnabled(project);
+        return decide(project).enabled();
+    }
+
+    /** {@code property}, {@code env}, {@code file}, or {@code default}. */
+    public static String source(Path project) {
+        return decide(project).source();
     }
 
     public static boolean truthy(String raw) {
@@ -41,18 +49,45 @@ public final class DaltonConfig {
                 || "1".equals(value);
     }
 
-    private static String flag() {
-        String property = System.getProperty("pkb_dalton");
-        if (property != null && !property.isBlank()) return property;
-        String env = System.getenv("PKB_DALTON");
-        if (env != null && !env.isBlank()) return env;
-        return null;
+    public static boolean falsy(String raw) {
+        if (raw == null) return false;
+        String value = raw.trim();
+        return "false".equalsIgnoreCase(value)
+                || "no".equalsIgnoreCase(value)
+                || "off".equalsIgnoreCase(value)
+                || "0".equals(value);
     }
 
-    private static boolean fileEnabled(Path project) {
-        if (project == null) return false;
+    private record Decision(boolean enabled, String source) {
+    }
+
+    private static Decision decide(Path project) {
+        String property = System.getProperty("pkb_dalton");
+        if (property != null && !property.isBlank()) {
+            return new Decision(parse(property, "pkb_dalton"), "property");
+        }
+        String env = System.getenv("PKB_DALTON");
+        if (env != null && !env.isBlank()) {
+            return new Decision(parse(env, "PKB_DALTON"), "env");
+        }
+        String file = fileValue(project);
+        if (file != null) {
+            return new Decision(parse(file, "dalton.properties"), "file");
+        }
+        return new Decision(true, "default");
+    }
+
+    private static boolean parse(String raw, String key) {
+        if (truthy(raw)) return true;
+        if (falsy(raw)) return false;
+        throw new IllegalArgumentException(key + " must be " + ACCEPTED + " but was '" + raw.trim() + "'");
+    }
+
+    /** The {@code enabled} or {@code pkb_dalton} value, or null when the key is absent. */
+    private static String fileValue(Path project) {
+        if (project == null) return null;
         Path file = project.resolve("dalton.properties");
-        if (!Files.isRegularFile(file)) return false;
+        if (!Files.isRegularFile(file)) return null;
         try {
             for (String line : Files.readAllLines(file, StandardCharsets.UTF_8)) {
                 String trimmed = line.trim();
@@ -62,12 +97,12 @@ public final class DaltonConfig {
                 String key = trimmed.substring(0, split).trim();
                 String value = trimmed.substring(split + 1).trim();
                 if ("enabled".equalsIgnoreCase(key) || "pkb_dalton".equalsIgnoreCase(key)) {
-                    return truthy(value);
+                    return value;
                 }
             }
         } catch (IOException ignored) {
-            return false;
+            return null;
         }
-        return false;
+        return null;
     }
 }

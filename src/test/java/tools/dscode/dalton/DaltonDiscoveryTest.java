@@ -144,7 +144,12 @@ class DaltonDiscoveryTest {
         write("dalton.properties", "binary-policy=hash-only\n");
         Files.write(project.resolve("features/noise.dat"), new byte[] {0, 9});
         Capture hashOnly = run("dalton", "status", "--project=" + project);
-        assertTrue(hashOnly.out.contains("hash-only is not implemented"), hashOnly.out);
+        assertFalse(hashOnly.out.contains("hash-only is not implemented"), hashOnly.out);
+        Capture stored = run("dalton", "hydrate", "--project=" + project);
+        assertEquals(0, stored.code, stored.out + stored.err);
+        DaltonFiles.Row noise = row("features/noise.dat");
+        assertTrue(noise != null && noise.binaryRef(), String.valueOf(noise));
+        assertEquals(0, noise.raw().length);
 
         write("dalton.properties", "binary-policy=keep\n");
         Capture unknown = run("dalton", "status", "--project=" + project);

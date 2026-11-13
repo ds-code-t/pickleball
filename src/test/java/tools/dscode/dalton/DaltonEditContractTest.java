@@ -2,6 +2,8 @@ package tools.dscode.dalton;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -21,6 +23,20 @@ class DaltonEditContractTest {
 
     @TempDir
     Path project;
+
+    private String previousDalton;
+
+    @BeforeEach
+    void filePathIsTheOptOutTheseAssertionsCover() {
+        previousDalton = System.getProperty("pkb_dalton");
+        System.setProperty("pkb_dalton", "false");
+    }
+
+    @AfterEach
+    void restoreDaltonFlag() {
+        if (previousDalton == null) System.clearProperty("pkb_dalton");
+        else System.setProperty("pkb_dalton", previousDalton);
+    }
 
     @Test
     void jsonEnvelopeIsStableAndValidationRunsBeforeWrite() throws Exception {
@@ -83,6 +99,7 @@ class DaltonEditContractTest {
 
     @Test
     void daltonOnSetsDbEditedAndRefusesAConflict() throws Exception {
+        System.clearProperty("pkb_dalton");
         Files.writeString(project.resolve("dalton.properties"), "enabled=true\n");
         Files.createDirectories(project.resolve("configs"));
         Files.writeString(project.resolve("configs/app.yaml"), "browser: chrome\n");

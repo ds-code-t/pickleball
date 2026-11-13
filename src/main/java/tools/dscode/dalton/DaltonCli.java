@@ -118,12 +118,12 @@ public final class DaltonCli {
                 entity export writes a changed entity back to its file. It is extract limited to dalton-entities/. It refuses when the file and the database both changed. --force overwrites the file from the stored bytes.
                 extract copies stored file bytes back to disk and does not reformat them. hydrate-out is the same command. An unedited row is left untouched. A deleted file is not recreated unless that row was edited or --force is set.
                 history stores a run summary in the database. It does not change diagnostic reports or pkb_reportretention. --from copies outcome and counts from a run-index.json file. retain drops runs older than --days and then the oldest runs until the note, scenario, and message bytes fit --max-bytes.
-                sqlite-jdbc is required only when a command opens the database. It is not published in the Pickleball POM. When Dalton is enabled and that driver is missing, status, hydrate, extract, and the auto-hydrate hook fail with: Dalton is enabled but org.xerial:sqlite-jdbc is not on the classpath. Add it as testRuntimeOnly / test scope or use the Gradle dalton* tasks. They do not fall back to the files. Gradle dalton* tasks put the driver on their own classpath.
+                sqlite-jdbc is a published runtime dependency (scope runtime, not shaded into the consumer shadow JAR). When Dalton is enabled and that driver is missing, status, hydrate, extract, and the auto-hydrate hook fail with: Dalton is enabled but org.xerial:sqlite-jdbc is not on the classpath. Add it as testRuntimeOnly / test scope or use the Gradle dalton* tasks. They do not fall back to the files. Gradle dalton* tasks put the driver on their own classpath.
                 feature put writes that .feature text into the database. It sets db_edited, leaves last_synced_hash, and replaces the stored scenarios, steps, tags, docstrings, and data tables in the same transaction. Bad Gherkin is rejected and the previous rows stay. The file is not changed until dalton extract. Use --file for multiline text. dalton scenario put and dalton step put are rejected. A database row whose content hash moved while db_edited is still 0 is an untracked DB edit. hydrate reports it and will not overwrite it unless --force is set.
                 category, file, glue, and feature scenario-add, scenario-modify, scenario-delete, step-add, step-modify, and step-delete are the shared edit model. --json prints one object with ok, command, family, action, dalton, path, id, dbEdited, conflict, confirmRequired, applied, items, text, message, error, and fix. remove and delete require --confirm and do not write without it. Validation runs before a write. A conflict or an untracked DB edit on that path is refused unless --force is set. When Dalton is off the command writes the file and does not open the database. When Dalton is on, put uses the same db_edited write as feature put. Set pkb_dalton_log=edit to log each edit. The log is date-stamped, per entity, and size-capped.
                 entity put uses that same write, so the entity file row and the entity table stay together.
                 files, features, scenarios, steps, and conflicts are read-only. They do not create a database. --json prints one stable JSON object. Text mode prints labels. conflicts lists an untracked database edit and a row edited on both sides.
-                Discovery reads include, exclude, max-file-size (default 1048576), and binary-policy (default skip) from dalton.properties. System properties pkb_dalton_include, pkb_dalton_exclude, pkb_dalton_max_file_size, and pkb_dalton_binary_policy win over that file. An empty include keeps the fixed directories. Exclude is added to the defaults, which already skip .git, target, build, .pickleball, and common binary extensions. A file over the size limit, or a binary by extension or by a null byte or a high control-byte ratio, is ignored. dalton status prints skipped and up to five sample lines and does not create a database. Hydrate prints ignored= for those files. --path still applies the limits. --path --force is the only bypass. hash-only is not implemented. Set pkb_dalton_log=discover to log each reason.
+                Discovery reads include, exclude, max-file-size (default 1048576), and binary-policy (default skip) from dalton.properties. System properties pkb_dalton_include, pkb_dalton_exclude, pkb_dalton_max_file_size, and pkb_dalton_binary_policy win over that file. An empty include keeps the fixed directories. Exclude is added to the defaults, which already skip .git, target, build, .pickleball, and common binary extensions. A file over the size limit, or a binary by extension or by a null byte or a high control-byte ratio, is ignored. dalton status prints skipped and up to five sample lines and does not create a database. Hydrate prints ignored= for those files. --path still applies the limits. --path --force is the only bypass. hash-only stores a binary as a reference row (empty raw content, sha256, git blob, byte size) and extract reports binary_ref_changed when the file on disk no longer matches. Set pkb_dalton_log=discover,git,binary to log each reason.
                 dalton run executes from the database on a warm JVM. It sets pkb_dalton=true and uses the pickleball-test-engine, the same engine as a normal run. --tags, --name, and --glue become pkb_tags, pkb_name, and pkb_glue. It prints one line per scenario (`scenario PASSED|FAILED <name>`) and one line per step (`step PASSED|FAILED <text>`). Java glue is fingerprinted by path, size, and modification time. A change compiles once with mvnw test-compile or gradlew testClasses, then restarts the worker. The classpath is pkb_dalton_run_classpath or the Workbench classpath.cache. --dry-run prints the plan and writes nothing. Full Gradle or Maven remains the CI build. Set pkb_dalton_log=run to log the worker. --engine forwards the same selection to the native engine CLI and does not start the Cucumber runner.
                 """;
     }
@@ -171,35 +171,51 @@ public final class DaltonCli {
     }
 
     private static int status(Path project, boolean json, PrintStream out) {
+        boolean enabled;
+        String source;
+        try {
+            enabled = DaltonConfig.enabled(project);
+            source = DaltonConfig.source(project);
+        } catch (IllegalArgumentException failure) {
+            out.println("error: " + failure.getMessage());
+            return 1;
+        }
         Path db = DaltonPaths.database(project);
         String shown = DaltonPaths.display(project, db);
         boolean present = Files.isRegularFile(db);
         boolean driver = DaltonDatabase.driverPresent();
-        if (!driver && DaltonConfig.enabled(project)) {
-            DaltonLog.log(project, "status", "files", "missing-driver " + shown);
+        String enabledLine = "enabled=" + enabled + " source=" + source;
+        if (!driver && enabled) {
+            DaltonLog.log(project, "status", "files", "missing-driver " + shown + " source=" + source);
             if (json) {
                 out.println("{\"database\":\"" + (present ? "present" : "missing") + "\",\"path\":\""
-                        + jsonEscape(shown) + "\",\"driver\":false,\"error\":\""
+                        + jsonEscape(shown) + "\",\"driver\":false,\"enabled\":" + enabled
+                        + ",\"enabledSource\":\"" + jsonEscape(source) + "\",\"error\":\""
                         + jsonEscape(DaltonDatabase.MISSING_DRIVER) + "\"}");
             } else {
+                out.println(enabledLine);
                 out.println(DaltonDatabase.MISSING_DRIVER);
             }
             return 1;
         }
-        DaltonLog.log(project, "status", "files", present ? "present " + shown : "missing " + shown);
+        DaltonLog.log(project, "status", "files", (present ? "present " : "missing ") + shown + " source=" + source);
         List<DaltonSources.Skip> skipped = discoverySkips(project);
         if (!present) {
             if (json) {
                 out.println("{\"database\":\"missing\",\"path\":\"" + jsonEscape(shown) + "\",\"driver\":" + driver
-                        + ",\"files\":0" + skipJson(skipped));
+                        + ",\"files\":0,\"enabled\":" + enabled + ",\"enabledSource\":\"" + jsonEscape(source) + "\""
+                        + gitJson(project, null) + skipJson(skipped));
             } else {
+                out.println(enabledLine);
                 out.println("Dalton database missing: " + shown);
                 if (!driver) out.println("sqlite-jdbc is not on the classpath");
+                printGit(out, project, null);
                 printSkips(out, skipped);
             }
             return 0;
         }
         if (!driver) {
+            out.println(enabledLine);
             out.println("Dalton database missing: " + shown);
             out.println("sqlite-jdbc is not on the classpath");
             printSkips(out, skipped);
@@ -212,18 +228,24 @@ public final class DaltonCli {
             int entities = count(database, "SELECT COUNT(*) FROM entities");
             int runs = count(database, "SELECT COUNT(*) FROM runs");
             int conflicts = DaltonQuery.conflicts(project, database.connection()).size();
+            int binaryRefs = count(database, "SELECT COUNT(*) FROM files WHERE binary_ref = 1");
             if (json) {
                 out.println("{\"database\":\"present\",\"path\":\"" + jsonEscape(shown) + "\",\"schemaVersion\":"
                         + version + ",\"files\":" + files + ",\"scenarios\":" + scenarios
                         + ",\"entities\":" + entities + ",\"runs\":" + runs
-                        + ",\"conflicts\":" + conflicts + ",\"driver\":true" + skipJson(skipped));
+                        + ",\"conflicts\":" + conflicts + ",\"driver\":true,\"enabled\":" + enabled
+                        + ",\"enabledSource\":\"" + jsonEscape(source) + "\",\"binaryRefs\":" + binaryRefs
+                        + gitJson(project, database) + skipJson(skipped));
             } else {
+                out.println(enabledLine);
                 out.println("Dalton schema " + version);
                 out.println("files " + files);
                 out.println("scenarios " + scenarios);
                 out.println("entities " + entities);
                 out.println("runs " + runs);
                 out.println("conflicts " + conflicts);
+                out.println("binaryRefs " + binaryRefs);
+                printGit(out, project, database);
                 printSkips(out, skipped);
                 out.println("database " + shown);
             }
@@ -231,6 +253,37 @@ public final class DaltonCli {
         } catch (SQLException failure) {
             out.println("error: " + failure.getMessage());
             return 1;
+        }
+    }
+
+    private static String gitJson(Path project, DaltonDatabase database) {
+        DaltonGit.Snapshot git = DaltonGit.capture(project);
+        int changed = changed(project, database);
+        return ",\"git\":{\"commit\":\"" + jsonEscape(git.commit())
+                + "\",\"branch\":\"" + jsonEscape(git.branch())
+                + "\",\"remote\":\"" + jsonEscape(git.remote())
+                + "\",\"githubRepo\":\"" + jsonEscape(git.githubRepo())
+                + "\",\"dirty\":" + git.dirty()
+                + ",\"changed\":" + changed + "}";
+    }
+
+    private static void printGit(PrintStream out, Path project, DaltonDatabase database) {
+        DaltonGit.Snapshot git = DaltonGit.capture(project);
+        int changed = changed(project, database);
+        out.println("git.commit " + git.commit());
+        out.println("git.branch " + git.branch());
+        out.println("git.remote " + git.remote());
+        out.println("git.githubRepo " + git.githubRepo());
+        out.println("git.dirty " + git.dirty());
+        out.println("git.changed " + changed);
+    }
+
+    private static int changed(Path project, DaltonDatabase database) {
+        if (database == null) return 0;
+        try {
+            return DaltonGit.changed(project, DaltonFiles.index(database.connection()).values());
+        } catch (SQLException failure) {
+            return 0;
         }
     }
 

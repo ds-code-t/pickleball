@@ -1,6 +1,8 @@
 package tools.dscode.dalton;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -19,6 +21,20 @@ class GlueEditTest {
 
     @TempDir
     Path project;
+
+    private String previousDalton;
+
+    @BeforeEach
+    void filePathIsTheOptOutTheseAssertionsCover() {
+        previousDalton = System.getProperty("pkb_dalton");
+        System.setProperty("pkb_dalton", "false");
+    }
+
+    @AfterEach
+    void restoreDaltonFlag() {
+        if (previousDalton == null) System.clearProperty("pkb_dalton");
+        else System.setProperty("pkb_dalton", previousDalton);
+    }
 
     @Test
     void javaAnnotationsMustBeSingleLiterals() throws Exception {

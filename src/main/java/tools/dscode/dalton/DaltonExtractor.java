@@ -25,19 +25,26 @@ public final class DaltonExtractor {
         }
     }
 
-    public record Result(int written, int skipped, int conflicts, List<String> conflictPaths) {
+    public record Result(int written, int skipped, int conflicts, List<String> conflictPaths, List<String> notices) {
         public Result {
             conflictPaths = conflictPaths == null ? List.of() : List.copyOf(conflictPaths);
+            notices = notices == null ? List.of() : List.copyOf(notices);
+        }
+
+        public Result(int written, int skipped, int conflicts, List<String> conflictPaths) {
+            this(written, skipped, conflicts, conflictPaths, List.of());
         }
 
         public String line() {
-            return "extracted written=" + written + " skipped=" + skipped + " conflicts=" + conflicts;
+            String text = "extracted written=" + written + " skipped=" + skipped + " conflicts=" + conflicts;
+            if (!notices.isEmpty()) text = text + " " + String.join(" ", notices);
+            return text;
         }
     }
 
     public static Result extract(Path project, Options options) throws IOException, SQLException {
         if (!Files.isRegularFile(DaltonPaths.database(project))) {
-            return new Result(0, 0, 0, List.of());
+            return new Result(0, 0, 0, List.of(), List.of());
         }
         if (!DaltonDatabase.driverPresent()) {
             throw new SQLException(DaltonDatabase.MISSING_DRIVER);
@@ -50,11 +57,12 @@ public final class DaltonExtractor {
             int written = 0;
             int skipped = 0;
             List<String> conflicts = new ArrayList<>();
+            List<String> notices = new ArrayList<>();
             connection.setAutoCommit(false);
             try {
                 for (DaltonFiles.Row row : rows) {
                     if (!selected(row.path(), options.paths())) continue;
-                    switch (apply(project, connection, row, options.force(), now)) {
+                    switch (apply(project, connection, row, options.force(), now, notices)) {
                         case WRITTEN -> written++;
                         case SKIPPED -> skipped++;
                         case CONFLICT -> conflicts.add(row.path());
@@ -72,7 +80,10 @@ public final class DaltonExtractor {
             for (String conflict : conflicts) {
                 DaltonLog.log(project, "extract", conflict, "conflict");
             }
-            return new Result(written, skipped, conflicts.size(), conflicts);
+            for (String notice : notices) {
+                DaltonLog.log(project, "binary", notice, notice);
+            }
+            return new Result(written, skipped, conflicts.size(), conflicts, notices);
         }
     }
 
@@ -85,8 +96,18 @@ public final class DaltonExtractor {
             Connection connection,
             DaltonFiles.Row row,
             boolean force,
-            String now
+            String now,
+            List<String> notices
     ) throws IOException, SQLException {
+        if (row.binaryRef()) {
+            Path disk = project.resolve(row.path());
+            byte[] existing = Files.isRegularFile(disk) ? Files.readAllBytes(disk) : new byte[0];
+            String diskHash = DaltonHashes.sha256(existing);
+            if (!diskHash.equals(row.contentHash())) {
+                notices.add("binary_ref_changed " + row.path());
+            }
+            return Outcome.SKIPPED;
+        }
         byte[] desired = row.raw() == null ? new byte[0] : row.raw();
         Path disk = project.resolve(row.path());
         byte[] existing = Files.isRegularFile(disk) ? Files.readAllBytes(disk) : null;

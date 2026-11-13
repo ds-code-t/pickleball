@@ -1,5 +1,7 @@
 package tools.dscode.dalton;
 
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import tools.dscode.common.domoperations.ExecutionDictionary;
@@ -18,6 +20,20 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class CategoryEditTest {
     @TempDir
     Path project;
+
+    private String previousDalton;
+
+    @BeforeEach
+    void filePathIsTheOptOutTheseAssertionsCover() {
+        previousDalton = System.getProperty("pkb_dalton");
+        System.setProperty("pkb_dalton", "false");
+    }
+
+    @AfterEach
+    void restoreDaltonFlag() {
+        if (previousDalton == null) System.clearProperty("pkb_dalton");
+        else System.setProperty("pkb_dalton", previousDalton);
+    }
 
     @Test
     void projectCategoryLoadsAfterBuiltinsOnTheNextDictionary() throws Exception {
@@ -107,6 +123,7 @@ class CategoryEditTest {
 
     @Test
     void daltonOnStoresTheCategoryInTheDatabaseUntilTheNextLoad() throws Exception {
+        System.clearProperty("pkb_dalton");
         Files.writeString(project.resolve("dalton.properties"), "enabled=true\n");
         Capture put = run("dalton", "category", "put", "--id=Badge",
                 "--text=name: Badge\nbase: //from-db\n", "--json", "--project=" + project);

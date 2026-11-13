@@ -175,8 +175,20 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/common/agentcontrol/LaunchTemplates.java`
 - `src/main/java/tools/dscode/common/agentcontrol/ObserveEvents.java`
 - `src/main/java/tools/dscode/common/agentcontrol/PageSurfaces.java`
+- `src/main/java/tools/dscode/common/agentcontrol/PopupSurfaceBridge.java`
 - `src/main/java/tools/dscode/common/agentcontrol/ScenarioCapture.java`
 - `src/main/java/tools/dscode/common/agentcontrol/WindowRegistry.java`
+- `src/main/java/tools/dscode/common/agentsurface/PopupBridge.java`
+- `src/main/java/tools/dscode/common/agentsurface/PopupBrowserLocator.java`
+- `src/main/java/tools/dscode/common/agentsurface/PopupCli.java`
+- `src/main/java/tools/dscode/common/agentsurface/PopupConfig.java`
+- `src/main/java/tools/dscode/common/agentsurface/PopupHost.java`
+- `src/main/java/tools/dscode/common/agentsurface/PopupHostMain.java`
+- `src/main/java/tools/dscode/common/agentsurface/PopupLauncher.java`
+- `src/main/java/tools/dscode/common/agentsurface/PopupLedger.java`
+- `src/main/java/tools/dscode/common/agentsurface/PopupLog.java`
+- `src/main/java/tools/dscode/common/agentsurface/PopupOnTop.java`
+- `src/main/java/tools/dscode/common/agentsurface/PopupStatus.java`
 - `src/main/java/tools/dscode/common/annotations/DefinitionFlag.java`
 - `src/main/java/tools/dscode/common/annotations/DefinitionFlags.java`
 - `src/main/java/tools/dscode/common/annotations/IgnoreDefinition.java`
@@ -477,6 +489,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/dalton/DaltonFeatureSource.java`
 - `src/main/java/tools/dscode/dalton/DaltonFiles.java`
 - `src/main/java/tools/dscode/dalton/DaltonGherkin.java`
+- `src/main/java/tools/dscode/dalton/DaltonGit.java`
 - `src/main/java/tools/dscode/dalton/DaltonHashes.java`
 - `src/main/java/tools/dscode/dalton/DaltonHistory.java`
 - `src/main/java/tools/dscode/dalton/DaltonHydrator.java`
@@ -589,6 +602,9 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/resources/META-INF/pickleball/configs/CHROME_HEADLESS.yaml`
 - `src/main/resources/META-INF/services/org.junit.platform.engine.TestEngine`
 - `src/main/resources/META-INF/services/org.junit.platform.launcher.LauncherSessionListener`
+- `src/main/resources/tools/dscode/common/agentsurface/agent-surface-popup.css`
+- `src/main/resources/tools/dscode/common/agentsurface/agent-surface-popup.html`
+- `src/main/resources/tools/dscode/common/agentsurface/agent-surface-popup.js`
 
 ## Framework tests
 
@@ -679,6 +695,8 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/coredefinitions/XmlTableCellFeatureTest.java`
 - `src/test/java/tools/dscode/coredefinitions/XmlTableCellTest.java`
 - `src/test/java/tools/dscode/dalton/CategoryEditTest.java`
+- `src/test/java/tools/dscode/dalton/DaltonBinaryRefTest.java`
+- `src/test/java/tools/dscode/dalton/DaltonDefaultOnTest.java`
 - `src/test/java/tools/dscode/dalton/DaltonDiscoveryTest.java`
 - `src/test/java/tools/dscode/dalton/DaltonDriverMissingTest.java`
 - `src/test/java/tools/dscode/dalton/DaltonEdgeTest.java`
@@ -687,6 +705,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/dalton/DaltonEntityTest.java`
 - `src/test/java/tools/dscode/dalton/DaltonExtractTest.java`
 - `src/test/java/tools/dscode/dalton/DaltonFoundationTest.java`
+- `src/test/java/tools/dscode/dalton/DaltonGitInfoTest.java`
 - `src/test/java/tools/dscode/dalton/DaltonHistoryTest.java`
 - `src/test/java/tools/dscode/dalton/DaltonHydrateTest.java`
 - `src/test/java/tools/dscode/dalton/DaltonParseTest.java`
@@ -694,6 +713,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/dalton/DaltonRunProbe.java`
 - `src/test/java/tools/dscode/dalton/DaltonRunTest.java`
 - `src/test/java/tools/dscode/dalton/DaltonScenarioHarness.java`
+- `src/test/java/tools/dscode/dalton/DaltonSchemaUpgradeTest.java`
 - `src/test/java/tools/dscode/dalton/DaltonSecretsTest.java`
 - `src/test/java/tools/dscode/dalton/FileEditTest.java`
 - `src/test/java/tools/dscode/dalton/GherkinRewriteTest.java`

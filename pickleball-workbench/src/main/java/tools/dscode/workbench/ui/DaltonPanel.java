@@ -197,7 +197,38 @@ final class DaltonPanel extends JPanel {
             }
         }
         String err = result.err() == null ? "" : result.err().trim();
-        status.setText(result.exit() == 0 ? "exit 0" : (err.isEmpty() ? "exit " + result.exit() : err));
+        status.setText(result.exit() == 0 ? "exit 0" + enabledHint(body) : (err.isEmpty() ? "exit " + result.exit() : err));
+    }
+
+    static String enabledHint(String body) {
+        if (body == null || !body.contains("\"enabledSource\"")) return "";
+        String source = quotedAfter(body, "\"enabledSource\"");
+        String enabled = booleanAfter(body, "\"enabled\"");
+        if (enabled.isEmpty() && source.isEmpty()) return "";
+        return " enabled=" + enabled + " source=" + source;
+    }
+
+    private static String quotedAfter(String body, String key) {
+        int at = body.indexOf(key);
+        if (at < 0) return "";
+        int colon = body.indexOf(':', at + key.length());
+        if (colon < 0) return "";
+        int open = body.indexOf('"', colon + 1);
+        if (open < 0) return "";
+        int close = body.indexOf('"', open + 1);
+        if (close < 0) return "";
+        return body.substring(open + 1, close);
+    }
+
+    private static String booleanAfter(String body, String key) {
+        int at = body.indexOf(key);
+        if (at < 0) return "";
+        int colon = body.indexOf(':', at + key.length());
+        if (colon < 0) return "";
+        String rest = body.substring(colon + 1).trim();
+        if (rest.startsWith("true")) return "true";
+        if (rest.startsWith("false")) return "false";
+        return "";
     }
 
     private void setBusy(boolean busy) {

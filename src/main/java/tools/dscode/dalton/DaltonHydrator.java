@@ -52,6 +52,7 @@ public final class DaltonHydrator {
     public static Result hydrate(Path project, Options options) throws IOException, SQLException {
         boolean bypassLimits = options.force() && !options.paths().isEmpty();
         DaltonSources.Scan scan = DaltonSources.scan(project, options.paths(), bypassLimits);
+        DaltonDiscovery discovery = DaltonDiscovery.load(project);
         List<DaltonSources.Found> sources = scan.found();
         int ignored = scan.skipped().size();
         boolean present = Files.isRegularFile(DaltonPaths.database(project));
@@ -80,7 +81,7 @@ public final class DaltonHydrator {
                     if (row == null) {
                         inserted++;
                         if (!options.dryRun()) {
-                            writeSource(connection, project, source, raw, hash, mtime, now);
+                            writeSource(connection, project, discovery, source, raw, hash, mtime, now);
                         }
                         continue;
                     }
@@ -114,15 +115,25 @@ public final class DaltonHydrator {
                     }
                     updated++;
                     if (!options.dryRun()) {
-                        writeSource(connection, project, source, raw, hash, mtime, now);
+                        writeSource(connection, project, discovery, source, raw, hash, mtime, now);
                     }
                 }
                 if (!options.dryRun()) {
-                    try (var statement = connection.createStatement()) {
-                        String id = UUID.randomUUID().toString();
-                        statement.execute("UPDATE provenance SET hydration_id = '" + id
-                                + "', last_hydrated_at = '" + now + "', schema_version = " + DaltonDatabase.SCHEMA_VERSION
-                                + " WHERE id = 1");
+                    DaltonGit.Snapshot git = DaltonGit.capture(project);
+                    try (var statement = connection.prepareStatement("""
+                            UPDATE provenance SET hydration_id = ?, last_hydrated_at = ?, schema_version = ?,
+                                git_commit = ?, git_branch = ?, git_remote = ?, github_repo = ?, git_dirty = ?
+                            WHERE id = 1
+                            """)) {
+                        statement.setString(1, UUID.randomUUID().toString());
+                        statement.setString(2, now);
+                        statement.setInt(3, DaltonDatabase.SCHEMA_VERSION);
+                        statement.setString(4, git.commit());
+                        statement.setString(5, git.branch());
+                        statement.setString(6, git.remote());
+                        statement.setString(7, git.githubRepo());
+                        statement.setInt(8, git.available() && git.dirty() ? 1 : 0);
+                        statement.executeUpdate();
                     }
                     connection.commit();
                 } else {
@@ -144,20 +155,32 @@ public final class DaltonHydrator {
     private static void writeSource(
             java.sql.Connection connection,
             Path project,
+            DaltonDiscovery discovery,
             DaltonSources.Found source,
             byte[] raw,
             String hash,
             long mtime,
             String now
     ) throws java.sql.SQLException {
-        if (DaltonEntities.isRecord(source.path(), source.sourceType())) {
-            DaltonEntities.parseRecord(project, raw);
+        byte[] body = raw == null ? new byte[0] : raw;
+        String kind = discovery.binaryKind(source.file());
+        boolean binaryRef = kind != null && discovery.hashOnly();
+        byte[] stored = binaryRef ? new byte[0] : body;
+        String sourceType = binaryRef ? "binary-ref" : source.sourceType();
+        String gitBlob = DaltonHashes.gitBlob(body);
+        if (!binaryRef && DaltonEntities.isRecord(source.path(), source.sourceType())) {
+            DaltonEntities.parseRecord(project, body);
         }
         DaltonFiles.upsert(connection, new DaltonFiles.Row(
-                source.path(), hash, raw, mtime, source.sourceType(), now, hash, false));
-        DaltonGherkin.store(connection, project, source.path(), source.sourceType(), raw);
+                source.path(), hash, stored, mtime, sourceType, now, hash, false,
+                gitBlob, binaryRef, body.length));
+        if (binaryRef) {
+            DaltonLog.log(project, "binary", source.path(), "binary-ref " + kind + " bytes=" + body.length);
+            return;
+        }
+        DaltonGherkin.store(connection, project, source.path(), source.sourceType(), body);
         if (DaltonEntities.isRecord(source.path(), source.sourceType())) {
-            DaltonEntities.store(connection, project, source.path(), raw);
+            DaltonEntities.store(connection, project, source.path(), body);
         }
     }
 }

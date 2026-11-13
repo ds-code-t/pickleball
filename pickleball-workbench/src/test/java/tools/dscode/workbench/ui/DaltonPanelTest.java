@@ -57,6 +57,8 @@ class DaltonPanelTest {
 
         click(panel, "Status", status);
         assertEquals(List.of("status"), forwarded.get(0));
+        assertTrue(status.getText().contains("enabled=true"), status.getText());
+        assertTrue(status.getText().contains("source=default"), status.getText());
         assertEquals("database present  files=3  scenarios=2", row(list, 0));
 
         click(panel, "Hydrate", status);
@@ -154,7 +156,7 @@ class DaltonPanelTest {
     private static String body(List<String> args) {
         String key = String.join(" ", args);
         if (key.equals("status")) {
-            return "{\"database\":\"present\",\"files\":3,\"scenarios\":2}";
+            return "{\"database\":\"present\",\"files\":3,\"scenarios\":2,\"enabled\":true,\"enabledSource\":\"default\"}";
         }
         if (key.equals("hydrate")) return "hydrated inserted=1";
         if (key.equals("extract")) return "extracted 1";
@@ -191,7 +193,7 @@ class DaltonPanelTest {
         while (System.nanoTime() < deadline) {
             String[] text = new String[1];
             SwingUtilities.invokeAndWait(() -> text[0] = status.getText());
-            if ("exit 0".equals(text[0])) return;
+            if (text[0] != null && text[0].startsWith("exit 0")) return;
             Thread.sleep(20);
         }
         throw new AssertionError(title + " status stayed " + status.getText());

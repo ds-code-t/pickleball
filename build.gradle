@@ -151,9 +151,10 @@ dependencies {
     api('io.rest-assured:rest-assured:6.0.0')
 
     // JDBC drivers are published as transitive dependencies. They are not shaded.
-    // sqlite-jdbc is not one of them. The Workbench controller resolves it as a
-    // runtime library. A normal consumer classpath and this POM do not include it.
+    // sqlite-jdbc is a published runtime dependency (POM scope runtime) and is
+    // still kept out of the consumer shadow JAR.
     implementation 'com.h2database:h2:2.3.232'
+    runtimeOnly 'org.xerial:sqlite-jdbc:3.47.2.0'
     testRuntimeOnly 'org.xerial:sqlite-jdbc:3.47.2.0'
     implementation 'org.postgresql:postgresql:42.7.7'
     implementation 'com.microsoft.sqlserver:mssql-jdbc:12.10.1.jre11'
@@ -449,7 +450,7 @@ tasks.shadowJar {
 
 tasks.register('engineRun', JavaExec) {
     group = 'engine'
-    description = 'Forward to the engine CLI. sqlite-jdbc is on this task classpath only and is not published.'
+    description = 'Forward to the engine CLI. sqlite-jdbc is a published runtime dependency and is also on this task classpath.'
     classpath = sourceSets.main.runtimeClasspath + configurations.detachedConfiguration(
             dependencies.create('org.xerial:sqlite-jdbc:3.47.2.0')
     )
@@ -466,7 +467,7 @@ tasks.register('engineRun', JavaExec) {
 
 tasks.register('daltonStatus', JavaExec) {
     group = 'dalton'
-    description = 'Forward to the Dalton CLI status command. sqlite-jdbc is on this task classpath only and is not published.'
+    description = 'Forward to the Dalton CLI status command. sqlite-jdbc is a published runtime dependency and is also on this task classpath.'
     classpath = sourceSets.main.runtimeClasspath + configurations.detachedConfiguration(
             dependencies.create('org.xerial:sqlite-jdbc:3.47.2.0')
     )
@@ -476,7 +477,7 @@ tasks.register('daltonStatus', JavaExec) {
 
 tasks.register('daltonHydrate', JavaExec) {
     group = 'dalton'
-    description = 'Forward to the Dalton CLI hydrate command. sqlite-jdbc is on this task classpath only and is not published.'
+    description = 'Forward to the Dalton CLI hydrate command. sqlite-jdbc is a published runtime dependency and is also on this task classpath.'
     classpath = sourceSets.main.runtimeClasspath + configurations.detachedConfiguration(
             dependencies.create('org.xerial:sqlite-jdbc:3.47.2.0')
     )
@@ -488,7 +489,7 @@ tasks.register('daltonHydrate', JavaExec) {
 
 tasks.register('daltonExtract', JavaExec) {
     group = 'dalton'
-    description = 'Forward to the Dalton CLI extract command. sqlite-jdbc is on this task classpath only and is not published.'
+    description = 'Forward to the Dalton CLI extract command. sqlite-jdbc is a published runtime dependency and is also on this task classpath.'
     classpath = sourceSets.main.runtimeClasspath + configurations.detachedConfiguration(
             dependencies.create('org.xerial:sqlite-jdbc:3.47.2.0')
     )
@@ -500,7 +501,7 @@ tasks.register('daltonExtract', JavaExec) {
 
 tasks.register('daltonFeature', JavaExec) {
     group = 'dalton'
-    description = 'Forward to the Dalton CLI feature command. sqlite-jdbc is on this task classpath only and is not published.'
+    description = 'Forward to the Dalton CLI feature command. sqlite-jdbc is a published runtime dependency and is also on this task classpath.'
     classpath = sourceSets.main.runtimeClasspath + configurations.detachedConfiguration(
             dependencies.create('org.xerial:sqlite-jdbc:3.47.2.0')
     )
@@ -514,7 +515,7 @@ tasks.register('daltonFeature', JavaExec) {
 
 tasks.register('daltonEdit', JavaExec) {
     group = 'dalton'
-    description = 'Forward to the Dalton edit CLI (category, file, glue, feature scenario/step). sqlite-jdbc is on this task classpath only and is not published.'
+    description = 'Forward to the Dalton edit CLI (category, file, glue, feature scenario/step). sqlite-jdbc is a published runtime dependency and is also on this task classpath.'
     classpath = sourceSets.main.runtimeClasspath + configurations.detachedConfiguration(
             dependencies.create('org.xerial:sqlite-jdbc:3.47.2.0')
     )
@@ -547,7 +548,7 @@ tasks.register('domengine', JavaExec) {
 
 tasks.register('daltonQuery', JavaExec) {
     group = 'dalton'
-    description = 'Forward to a Dalton CLI read command. sqlite-jdbc is on this task classpath only and is not published.'
+    description = 'Forward to a Dalton CLI read command. sqlite-jdbc is a published runtime dependency and is also on this task classpath.'
     classpath = sourceSets.main.runtimeClasspath + configurations.detachedConfiguration(
             dependencies.create('org.xerial:sqlite-jdbc:3.47.2.0')
     )
@@ -562,7 +563,7 @@ tasks.register('daltonQuery', JavaExec) {
 
 tasks.register('daltonHistory', JavaExec) {
     group = 'dalton'
-    description = 'Forward to the Dalton CLI history command. sqlite-jdbc is on this task classpath only and is not published.'
+    description = 'Forward to the Dalton CLI history command. sqlite-jdbc is a published runtime dependency and is also on this task classpath.'
     classpath = sourceSets.main.runtimeClasspath + configurations.detachedConfiguration(
             dependencies.create('org.xerial:sqlite-jdbc:3.47.2.0')
     )
@@ -576,7 +577,7 @@ tasks.register('daltonHistory', JavaExec) {
 
 tasks.register('daltonRun', JavaExec) {
     group = 'dalton'
-    description = 'Forward to the Dalton CLI run command. sqlite-jdbc is on this task classpath only and is not published.'
+    description = 'Forward to the Dalton CLI run command. sqlite-jdbc is a published runtime dependency and is also on this task classpath.'
     classpath = sourceSets.main.runtimeClasspath + configurations.detachedConfiguration(
             dependencies.create('org.xerial:sqlite-jdbc:3.47.2.0')
     )
@@ -598,7 +599,7 @@ tasks.register('daltonRun', JavaExec) {
 
 tasks.register('daltonRunClasspath') {
     group = 'dalton'
-    description = 'Write the test runtime classpath used by warm dalton run. Does not publish sqlite-jdbc.'
+    description = 'Write the test runtime classpath used by warm dalton run. sqlite-jdbc is a published runtime dependency.'
     def out = layout.buildDirectory.file('dalton-run-classpath.txt')
     outputs.file(out)
     doLast {
@@ -610,14 +611,43 @@ tasks.register('daltonRunClasspath') {
     }
 }
 
-tasks.register('verifySqliteNotPublished') {
+tasks.register('verifySqlitePackaging') {
     group = 'verification'
-    description = 'sqlite-jdbc stays off the published POM and the consumer shadow JAR.'
+    description = 'sqlite-jdbc is a runtime POM dependency and is not inside the consumer shadow JAR.'
     dependsOn tasks.named('generatePomFileForMavenPublication'), tasks.named('shadowJar')
     doLast {
-        def pom = layout.buildDirectory.file('publications/maven/pom-default.xml').get().asFile.text
-        if (pom.contains('sqlite-jdbc') || pom.contains('org.xerial')) {
-            throw new GradleException('Published Pickleball POM must not include sqlite-jdbc.')
+        def childText = { org.w3c.dom.Node parent, String name ->
+            def children = parent.getChildNodes()
+            for (int c = 0; c < children.getLength(); c++) {
+                def child = children.item(c)
+                if (child.getNodeType() == org.w3c.dom.Node.ELEMENT_NODE && child.getNodeName() == name) {
+                    return child.getTextContent().trim()
+                }
+            }
+            return ''
+        }
+        def pomFile = layout.buildDirectory.file('publications/maven/pom-default.xml').get().asFile
+        def factory = javax.xml.parsers.DocumentBuilderFactory.newInstance()
+        factory.setNamespaceAware(false)
+        factory.setFeature('http://apache.org/xml/features/disallow-doctype-decl', true)
+        def doc = factory.newDocumentBuilder().parse(pomFile)
+        def nodes = doc.getElementsByTagName('dependency')
+        def hits = []
+        for (int i = 0; i < nodes.getLength(); i++) {
+            def node = nodes.item(i)
+            def group = childText(node, 'groupId')
+            def artifact = childText(node, 'artifactId')
+            if (group == 'org.xerial' && artifact == 'sqlite-jdbc') {
+                hits.add([version: childText(node, 'version'), scope: childText(node, 'scope')])
+            }
+        }
+        if (hits.size() != 1) {
+            throw new GradleException('Published Pickleball POM must contain exactly one org.xerial:sqlite-jdbc dependency, found ' + hits.size())
+        }
+        def version = hits[0].version
+        def scope = hits[0].scope
+        if (version != '3.47.2.0' || scope != 'runtime') {
+            throw new GradleException('sqlite-jdbc must be version 3.47.2.0 scope runtime, was ' + version + ' ' + scope)
         }
         def jar = tasks.named('shadowJar').get().archiveFile.get().asFile
         def zip = new java.util.zip.ZipFile(jar)
@@ -641,7 +671,7 @@ tasks.named('test') {
         showCauses true
         showStackTraces true
     }
-    dependsOn tasks.named('verifySqliteNotPublished')
+    dependsOn tasks.named('verifySqlitePackaging')
 }
 
 tasks.register('verifyEmbeddedWorkbench') {
@@ -833,7 +863,6 @@ publishing {
 
                     if (!g || !a || !v) return
                     if (bundledOrOverriddenGA.contains(ga)) return
-                    if (ga == 'org.xerial:sqlite-jdbc') return
                     if (!added.add(ga)) return
 
                     def d = depsNode.appendNode('dependency')
@@ -846,7 +875,11 @@ publishing {
                         d.appendNode('version', v)
                     }
 
-                    d.appendNode('scope', 'compile')
+                    if (ga == 'org.xerial:sqlite-jdbc') {
+                        d.appendNode('scope', 'runtime')
+                    } else {
+                        d.appendNode('scope', 'compile')
+                    }
                 }
 
                 def engineDep = depsNode.children().find {
