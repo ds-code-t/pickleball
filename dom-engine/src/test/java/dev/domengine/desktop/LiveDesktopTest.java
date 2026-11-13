@@ -27,9 +27,10 @@ class LiveDesktopTest {
     void liveAttachFailsClearlyAndForeignPlatformsDoNotRun() {
         CliResult live = DomEngineMain.dispatch(List.of("desktop", "attach", "--id", "live1", "--live"));
         assertEquals(1, live.exit(), live.stderr());
-        assertTrue(live.stderr().contains("AT-SPI"), live.stderr());
-        assertTrue(live.stderr().contains("session bus"), live.stderr());
+        assertTrue(live.stderr().contains("AT-SPI unavailable"), live.stderr());
+        assertFalse(live.stderr().contains("\"ok\" : true"), live.stderr());
         assertFalse(live.stdout().contains("\"ok\" : true"), live.stdout());
+        assertFalse(live.stdout().contains("\"ok\":true"), live.stdout());
 
         CdpException windows = assertThrows(CdpException.class, () -> WindowsUia.capture(""));
         assertTrue(windows.getMessage().contains("requires Windows"), windows.getMessage());
