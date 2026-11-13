@@ -1,0 +1,1 @@
+function(token){ if (!this || this.nodeType !== 1) return false; this.setAttribute('data-pkb-bridge', token); return true; }

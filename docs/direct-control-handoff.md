@@ -20,6 +20,19 @@ A normal `mvn test` or `gradlew test` does not write a descriptor. An unset or b
 
 `SeleniumAdapter` is the library path (`find`, `click`, `type`, `TakesScreenshot`). Its direct methods log one `WARN browser.fallback` per run and reason, then either run `executeScript` or refuse `send`. `PlaywrightAdapter` is optional (`com.microsoft.playwright:playwright` `[1.40.0, 2.0.0)`) and is not selected from a WebDriver. `Preference.LIBRARY` forces `SeleniumAdapter` with no fallback line. Logging is `pkb_browser_log` / `pkb_browser_fallback_log` in [Configuration](configuration.md). `ElementOperations` still uses the composite path described below. This section does not change attach.
 
+## Surface assets
+
+`tools.dscode.browser.SurfaceAssets` loads the only copy of the page-surface assets from `src/main/resources/tools/dscode/browser/surface/`. `PageSurfaces` reads `script("live-helper")`, `script("bridge-mark")`, `script("frame-mark")`, and `script("frame-restore")` from that loader. Those four strings are not also written in `PageSurfaces.java`.
+
+| Call | What it returns |
+|---|---|
+| `html(kind)` / `css(kind)` / `js(kind)` | Host markup, stylesheet, and script for `html`, `overlay`, or `highlight` |
+| `instructions`, `diagram` | The `html` assets |
+| `style` | The `highlight` sentence |
+| `sentence(kind)` | `agent-injected HTML; a person did not author this node`, `agent-injected overlay; a person did not author this UI`, or `agent style; a person did not author this highlight` |
+
+`js("html")` and `js("overlay")` are the same event script (`surface-events.js`): click and change on `[data-pkb-agent]`, stored on `window.__pkbEvents`. That script is a substring of `live-helper.js`. `overlay.css` is the host chrome the live helper also applies inline: `position: fixed`, `z-index: 2147483646`, `background: #fffef2`, `border: 2px solid #222`, `padding: 8px`, `max-width: 280px`. Left and top are not in the stylesheet. `html` has no chrome of its own. `highlight` has no host markup and no listener; the caller supplies the reversible style. An unknown kind or script name throws `IllegalArgumentException` with an `error:` line and a `fix:` line.
+
 ## Find
 
 Workbench, MCP, and the control bridge forward one engine query string through `ElementOperations` → `DomCompositeAdapter`. The string is the composite selector (`css=`, `xpath=`, `text=`, `image=`, `near=`, `below=`, `above=`, `left-of=`, `right-of=`, `>>`, AND/OR/NOT). Those relative stages are visual distance in the geometry view, not document order. An engine without that view does not get a box invented in Java. `--explain` ranks the batch. `image=` promotes to a node when asked and the engine can bind one. A visual-only hit stays labeled and is not a DOM node. A limit returns handles. One later act uses one handle. There is no batch click. Category+text still uses the execution dictionary. Gherkin phrases, including `after` and `before` as document order, are unchanged. A controller query defaults to `exposure=human` (inside the visual viewport). `lower` is per query and labels every node. An action defaults to `human` and refuses a target a person could not click. Offline `--html` is a labelled source read and does not pretend to run that query.

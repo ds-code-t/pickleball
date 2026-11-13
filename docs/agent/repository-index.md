@@ -238,6 +238,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/browser/ProtocolSocket.java`
 - `src/main/java/tools/dscode/browser/ProtocolSockets.java`
 - `src/main/java/tools/dscode/browser/SeleniumAdapter.java`
+- `src/main/java/tools/dscode/browser/SurfaceAssets.java`
 - `src/main/java/tools/dscode/common/agentcontrol/AgentControl.java`
 - `src/main/java/tools/dscode/common/agentcontrol/AgentDriverHooks.java`
 - `src/main/java/tools/dscode/common/agentcontrol/AgentLaunch.java`
@@ -661,6 +662,18 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/resources/META-INF/pickleball/configs/CHROME_HEADLESS.yaml`
 - `src/main/resources/META-INF/services/org.junit.platform.engine.TestEngine`
 - `src/main/resources/META-INF/services/org.junit.platform.launcher.LauncherSessionListener`
+- `src/main/resources/tools/dscode/browser/surface/bridge-mark.js`
+- `src/main/resources/tools/dscode/browser/surface/frame-mark.js`
+- `src/main/resources/tools/dscode/browser/surface/frame-restore.js`
+- `src/main/resources/tools/dscode/browser/surface/highlight.css`
+- `src/main/resources/tools/dscode/browser/surface/highlight.html`
+- `src/main/resources/tools/dscode/browser/surface/highlight.js`
+- `src/main/resources/tools/dscode/browser/surface/html.css`
+- `src/main/resources/tools/dscode/browser/surface/html.html`
+- `src/main/resources/tools/dscode/browser/surface/live-helper.js`
+- `src/main/resources/tools/dscode/browser/surface/overlay.css`
+- `src/main/resources/tools/dscode/browser/surface/overlay.html`
+- `src/main/resources/tools/dscode/browser/surface/surface-events.js`
 
 ## Framework tests
 
@@ -677,6 +690,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/browser/PlaywrightAdapterTest.java`
 - `src/test/java/tools/dscode/browser/ProtocolSelectorTest.java`
 - `src/test/java/tools/dscode/browser/ScriptedSocket.java`
+- `src/test/java/tools/dscode/browser/SurfaceAssetsTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/AgentLiveFixTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/ChatLockChild.java`
 - `src/test/java/tools/dscode/common/agentcontrol/LiveChromeCdpTest.java`
