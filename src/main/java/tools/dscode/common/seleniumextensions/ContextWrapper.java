@@ -136,7 +136,10 @@ public class ContextWrapper {
         }
         String xpath = adjustedXPath(searchContext, xPathy.getXpath(), elementMatch);
         logDebug("XPATH: " + prettyPrintXPath(xpath));
-        return findWithRetry(searchContext, new By.ByXPath(xpath), elementMatch);
+        org.openqa.selenium.By locator = xpath.equals(xPathy.getXpath())
+                ? tools.dscode.common.composite.CombinedBy.of(elementMatch.combinedClause, xpath)
+                : new By.ByXPath(xpath);
+        return findWithRetry(searchContext, locator, elementMatch);
     }
 
     private static String adjustedXPath(SearchContext searchContext, String xpath, ElementMatch elementMatch) {
@@ -199,10 +202,13 @@ public class ContextWrapper {
         logDebug("XPATH: " + prettyPrintXPath(xpath));
         boolean displayedElementsOnly =
                 !elementMatch.categoryFlags.contains(ExecutionDictionary.CategoryFlags.NON_DISPLAY_ELEMENT);
+        org.openqa.selenium.By locator = xpath.equals(xPathy.getXpath())
+                ? tools.dscode.common.composite.CombinedBy.of(elementMatch.combinedClause, xpath)
+                : new By.ByXPath(xpath);
         return NestedByLocator.retainFullMatches(
                 findWithRetry(
                         searchContext,
-                        new By.ByXPath(xpath),
+                        locator,
                         Duration.ofSeconds(10),
                         displayedElementsOnly,
                         nestingMode(elementMatch)

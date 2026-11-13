@@ -71,6 +71,8 @@ public class ElementMatch {
     /** Raw "with look ..." clause. It is not an HTML attribute. */
     public String lookClause = "";
     public XPathy xPathy;
+    /** Combined clause when the category XPath reaches the find unmodified. */
+    public String combinedClause;
     //    public XPathy xPathyWithIndex;
     public Set<ElementType> elementTypes;
     public Set<SpecialUse> specialUseSet = new HashSet<>();
@@ -299,6 +301,7 @@ public class ElementMatch {
         if (textOps.isEmpty()) {
             ExecutionDictionary.CategoryResolution categoryResolution = dict.getFinalCategoryResolution(category, null, null);
             elPredictXPaths.add(categoryResolution.xpath());
+            combinedClause = categoryResolution.combined();
         }
 
         for (TextOp textOp : textOps) {
@@ -309,10 +312,12 @@ public class ElementMatch {
                     regex ? null : textOp.op()
             );
             elPredictXPaths.add(categoryResolution.xpath());
+            combinedClause = elPredictXPaths.size() == 1 ? categoryResolution.combined() : null;
         }
 
 
         if (!state.isEmpty()) {
+            combinedClause = null;
 
             boolean un = state.startsWith("un") || state.startsWith("non");
 
@@ -380,6 +385,7 @@ public class ElementMatch {
         for (Attribute attribute : attributes) {
             xPathy = applyAttrPredicate(xPathy, attribute.attrName, attribute.predicateVal, attribute.predicateType);
         }
+        if (!attributes.isEmpty()) combinedClause = null;
 
 
     }
@@ -459,6 +465,7 @@ public class ElementMatch {
         }
 
         if (!state.isEmpty()) {
+            combinedClause = null;
             boolean un = state.startsWith("un") || state.startsWith("non");
 
             if (un) state = state.replaceAll("^(?:un|non-?)", "");
@@ -511,6 +518,7 @@ public class ElementMatch {
                     attribute.predicateType
             );
         }
+        if (!attributes.isEmpty()) combinedClause = null;
     }
 
 

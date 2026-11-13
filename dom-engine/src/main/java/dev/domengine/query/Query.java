@@ -12,9 +12,11 @@ import dev.domengine.tree.DomNode;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 /** Pipeline query over one context tree. The CLI, HTTP, and MCP only forward the stage string. */
 public final class Query {
@@ -26,7 +28,14 @@ public final class Query {
             "filter", "limit"
     );
 
+    private static final Set<String> XPATH_FALLBACKS = new LinkedHashSet<>();
+
     private Query() {
+    }
+
+    /** Clears the once-per-process XPath-fallback warning set. */
+    static void resetXPathFallbackForTests() {
+        XPATH_FALLBACKS.clear();
     }
 
     public record Stage(String engine, String expr, String why, int count, long ms) {
@@ -90,6 +99,20 @@ public final class Query {
                 current.addAll(run.nodes);
             }
         }
+        String explicit = explicitPipeline(flags);
+        String xpathValue = flags.get("xpath");
+        boolean fellBack = false;
+        if (!point && explicit != null && xpathValue != null && !xpathValue.isBlank() && current.isEmpty()) {
+            String xpath = xpathValue.trim();
+            long start = System.nanoTime();
+            Hit hit = Expressions.eval(Expressions.parse("xpath=" + xpath), List.of(root), root, pierce);
+            current = new ArrayList<>(hit.nodes);
+            long ms = (System.nanoTime() - start) / 1_000_000L;
+            trace.add(new Stage("xpath", xpath, "fallback: combined matched 0", current.size(), ms));
+            fellBack = true;
+            warnXPathFallback(xpath);
+            EngineLog.info("query", "xpath fallback " + hit.why);
+        }
         requireWithin(root, flags.get("within"));
         current = within(current, flags.get("within"));
         current = nesting(current, flags.get("nesting"));
@@ -116,6 +139,7 @@ public final class Query {
         ObjectNode result = Jsons.object();
         result.put("ok", true);
         result.put("source", pipeline == null ? "" : pipeline);
+        if (fellBack) result.put("fallback", "xpath");
         if (countOnly) {
             result.put("count", current.size());
             result.put("count_only", true);
@@ -273,6 +297,24 @@ public final class Query {
         return kept;
     }
 
+    /** A pipeline, expression, or selector flag. {@code xpath} alone is not a combined form. */
+    private static String explicitPipeline(Map<String, String> flags) {
+        for (String key : List.of("pipeline", "expr", "selector")) {
+            String value = flags.get(key);
+            if (value != null && !value.isBlank()) return value.trim();
+        }
+        return null;
+    }
+
+    private static void warnXPathFallback(String xpath) {
+        String shown = xpath.length() > 120 ? xpath.substring(0, 120) : xpath;
+        boolean first;
+        synchronized (XPATH_FALLBACKS) {
+            first = XPATH_FALLBACKS.add(xpath);
+        }
+        if (first) EngineLog.warn("query", "xpath fallback " + shown);
+    }
+
     public static String pipelineOf(Map<String, String> flags) {
         if (flags.containsKey("pipeline") && !flags.get("pipeline").isBlank()) return flags.get("pipeline").trim();
         if (flags.containsKey("expr") && !flags.get("expr").isBlank()) return flags.get("expr").trim();
@@ -308,9 +350,20 @@ public final class Query {
         if (pipeline == null || pipeline.isBlank()) return "css";
         String trimmed = pipeline.trim();
         if (trimmed.startsWith("(") || Expressions.hasOperator(trimmed)) return "expr";
-        int eq = trimmed.indexOf('=');
+        int eq = indexOfEngineEquals(trimmed);
         if (eq <= 0) return "css";
         return canonicalEngine(trimmed.substring(0, eq).trim().toLowerCase(Locale.ROOT));
+    }
+
+    /** Index where the engine name ends. {@code text~=} keeps the comparator on the expression. */
+    public static int indexOfEngineEquals(String piece) {
+        if (piece == null) return -1;
+        int eq = piece.indexOf('=');
+        if (eq > 0) {
+            char prev = piece.charAt(eq - 1);
+            if (prev == '~' || prev == '^' || prev == '$') return eq - 1;
+        }
+        return eq;
     }
 
     public static List<Parsed> parsePipeline(String text) {
@@ -326,8 +379,11 @@ public final class Query {
             }
             int eq = piece.indexOf('=');
             if (eq <= 0) throw new CdpException("invalid pipeline stage: " + piece);
-            String engine = canonicalEngine(piece.substring(0, eq).trim().toLowerCase(Locale.ROOT));
-            String expr = piece.substring(eq + 1).trim();
+            int nameEnd = eq;
+            char prev = piece.charAt(eq - 1);
+            if (prev == '~' || prev == '^' || prev == '$') nameEnd = eq - 1;
+            String engine = canonicalEngine(piece.substring(0, nameEnd).trim().toLowerCase(Locale.ROOT));
+            String expr = nameEnd < eq ? piece.substring(nameEnd).trim() : piece.substring(eq + 1).trim();
             if (!ENGINES.contains(engine)) throw new CdpException("invalid engine: " + engine);
             stages.add(new Parsed(engine, expr));
         }

@@ -198,18 +198,65 @@ public final class Engines {
     }
 
     static Query.Hit text(String expr, List<DomNode> scopes) {
-        String expected = unquote(expr);
-        boolean exact = expr != null && (expr.startsWith("\"") || expr.startsWith("'"));
+        String raw = expr == null ? "" : expr.trim();
+        String mode = "plain";
+        String body = raw;
+        if (raw.startsWith("~=")) {
+            mode = "contains";
+            body = raw.substring(2).trim();
+        } else if (raw.startsWith("^=")) {
+            mode = "starts";
+            body = raw.substring(2).trim();
+        } else if (raw.startsWith("$=")) {
+            mode = "ends";
+            body = raw.substring(2).trim();
+        }
+        boolean quoted = !body.isEmpty() && (body.charAt(0) == '"' || body.charAt(0) == '\'');
+        String expected = unquote(body);
+        java.util.regex.Pattern pattern = null;
+        if ("plain".equals(mode) && quoted && expected.length() >= 2 && expected.startsWith("^") && expected.endsWith("$")) {
+            try {
+                pattern = java.util.regex.Pattern.compile(expected);
+                mode = "regex";
+            } catch (java.util.regex.PatternSyntaxException ignored) {
+                pattern = null;
+            }
+        }
         List<DomNode> hits = new ArrayList<>();
         for (DomNode scope : scopes) {
             for (DomNode candidate : lightElements(scope, true)) {
-                String text = HtmlTree.textOf(candidate);
-                if (exact ? text.equals(expected) : text.toLowerCase(Locale.ROOT).contains(expected.toLowerCase(Locale.ROOT))) {
-                    if (!expected.isEmpty()) hits.add(candidate);
-                }
+                if (textHit(candidate, expected, mode, quoted, pattern)) hits.add(candidate);
             }
         }
         return new Query.Hit(Query.distinct(hits), "text matched " + hits.size());
+    }
+
+    private static boolean textHit(DomNode candidate, String expected, String mode, boolean quoted, java.util.regex.Pattern pattern) {
+        if (expected.isEmpty() && pattern == null) return false;
+        String text = HtmlTree.textOf(candidate);
+        String own = ownText(candidate);
+        return switch (mode) {
+            case "contains" -> containsText(text, expected) || containsText(own, expected);
+            case "starts" -> text.startsWith(expected) || own.startsWith(expected);
+            case "ends" -> text.endsWith(expected) || own.endsWith(expected);
+            case "regex" -> pattern.matcher(text).matches() || pattern.matcher(own).matches();
+            default -> quoted
+                    ? text.equals(expected) || (!own.isEmpty() && own.equals(expected))
+                    : containsText(text, expected);
+        };
+    }
+
+    private static boolean containsText(String text, String expected) {
+        return !expected.isEmpty() && text.toLowerCase(Locale.ROOT).contains(expected.toLowerCase(Locale.ROOT));
+    }
+
+    /** Direct text nodes only, so a section label still matches when a control sits inside it. */
+    private static String ownText(DomNode node) {
+        StringBuilder builder = new StringBuilder();
+        for (DomNode child : node.children) {
+            if (child.nodeType == 3 && child.nodeValue != null) builder.append(child.nodeValue);
+        }
+        return builder.toString().replaceAll("\\s+", " ").trim();
     }
 
     static Query.Hit role(String expr, List<DomNode> scopes) {
@@ -359,6 +406,18 @@ public final class Engines {
     }
 
     static Query.Hit desc(String expr, List<DomNode> scopes) {
+        String raw = expr == null ? "" : expr.trim();
+        if (!raw.startsWith("{")) {
+            String label = unquote(raw);
+            List<DomNode> hits = new ArrayList<>();
+            for (DomNode scope : scopes) {
+                for (DomNode candidate : lightElements(scope, true)) {
+                    if (labelHit(candidate, label)) hits.add(candidate);
+                }
+            }
+            List<DomNode> distinct = Query.distinct(hits);
+            return new Query.Hit(distinct, "desc matched " + distinct.size());
+        }
         JsonNode description;
         try {
             description = Jsons.MAPPER.readTree(expr);
@@ -372,6 +431,17 @@ public final class Engines {
             }
         }
         return new Query.Hit(Query.distinct(hits), "desc matched " + hits.size());
+    }
+
+    private static boolean labelHit(DomNode node, String label) {
+        if (label == null || label.isBlank()) return false;
+        String folded = label.toLowerCase(Locale.ROOT);
+        if (HtmlTree.textOf(node).toLowerCase(Locale.ROOT).contains(folded)) return true;
+        if (accessibleName(node).toLowerCase(Locale.ROOT).contains(folded)) return true;
+        String id = node.attributes.getOrDefault("id", "");
+        if (id.toLowerCase(Locale.ROOT).contains(folded)) return true;
+        String classes = node.attributes.getOrDefault("class", "");
+        return classes.toLowerCase(Locale.ROOT).contains(folded);
     }
 
     static Query.Hit a11y(String expr, List<DomNode> scopes) {

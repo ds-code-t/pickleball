@@ -63,7 +63,7 @@ class LookStepTest {
         EngineQuery query = EngineQuery.of(pipeline);
         assertEquals(pipeline, query.text());
         assertNull(query.seleniumFallback());
-        assertEquals("role=button >> text=\"Save\"", SelectorTranslator.phrase(ElementPhrase.of("Button", "Save")).pipeline());
+        assertEquals("(role=button AND text=\"Save\")", SelectorTranslator.phrase(ElementPhrase.of("Button", "Save")).pipeline());
     }
 
     @Test

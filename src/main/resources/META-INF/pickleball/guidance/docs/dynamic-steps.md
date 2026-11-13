@@ -327,13 +327,13 @@ Gherkin element phrases do not change. `SelectorTranslator` is the only place th
 
 | Phrase | Pipeline |
 |---|---|
-| the `"Save"` Button | `role=button >> text="Save"` |
-| the Button containing `'log'` | `role=button >> text~="log"` (single quotes fold case) |
-| the Button matching `"Save"` | `role=button >> text="^Save$"` (full match) |
-| the `"Save"` Button in the `"Billing"` Section | context stages, then the target |
-| the `"Save"` Button after the `"Billing"` Section | context, then `below=1`, then the target |
-| the `"Save"` Button before the `"Billing"` Section | target, then `below=1`, then the context |
-| a custom `Product Card` | `desc="Product Card"` plus the text stage |
+| the `"Save"` Button | `(role=button AND text="Save")` |
+| the Button containing `'log'` | `(role=button AND text~="log")` (single quotes fold case) |
+| the Button matching `"Save"` | `(role=button AND text="^Save$")` (full match) |
+| the `"Save"` Button in the `"Billing"` Section | `(role=region AND text="Billing") >> (role=button AND text="Save")` |
+| the `"Save"` Button after the `"Billing"` Section | context group, then `below=1`, then the target group |
+| the `"Save"` Button before the `"Billing"` Section | target group, then `below=1`, then the context group |
+| a custom `Product Card` | `(desc="Product Card" AND text=...)` |
 | `first` / `2nd` / `last` / `every 2nd` | one `PositionSelection` after displayed, nesting, and regex. An engine query ordinal uses that same index |
 
 The DOM engine is the default (`pkb_composite=auto`). `pkb_composite=off` keeps Selenium for that run and does not translate. An explicit binary or `pkb_composite_engine=rust` uses the Rust override instead of the in-repo Java engine. See [Configuration](configuration.md).

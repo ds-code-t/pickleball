@@ -1,5 +1,9 @@
 package tools.dscode.common.composite;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import dev.domengine.json.Jsons;
+import dev.domengine.query.HtmlTree;
+import dev.domengine.query.Query;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -11,7 +15,9 @@ import org.openqa.selenium.WebElement;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.PosixFilePermission;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -35,7 +41,7 @@ class SelectorAndAdapterTest {
     }
 
     @Test
-    void phrasesKeepMatchQuoteContextAndCategory() {
+    void phrasesKeepMatchQuoteContextAndCategory() throws Exception {
         CompositeSelector button = SelectorTranslator.phrase(ElementPhrase.of("Button", "Save"));
         assertTrue(button.pipeline().contains("role=button"), button.pipeline());
         assertTrue(button.pipeline().contains("text=\"Save\""), button.pipeline());
@@ -49,8 +55,8 @@ class SelectorAndAdapterTest {
 
         CompositeSelector context = SelectorTranslator.phrase(
                 ElementPhrase.of("Button", "Save").context("in", "Billing", "Section"));
-        assertTrue(context.pipeline().startsWith("role=region"), context.pipeline());
-        assertTrue(context.pipeline().contains("text=\"Billing\" >> role=button"), context.pipeline());
+        assertEquals("(role=region AND text=\"Billing\") >> (role=button AND text=\"Save\")", context.pipeline());
+        assertEquals(List.of("save"), ids(context.pipeline()));
 
         CompositeSelector after = SelectorTranslator.phrase(
                 ElementPhrase.of("Button", "Save").context("after", "Billing", "Section"));
@@ -61,7 +67,7 @@ class SelectorAndAdapterTest {
 
         CompositeSelector xpath = SelectorTranslator.phrase(ElementPhrase.of("Button", "Save").xpath("//button[@id='save']"));
         assertEquals("//button[@id='save']", xpath.xpath());
-        assertTrue(xpath.pipeline() == null);
+        assertEquals("(role=button AND text=\"Save\")", xpath.pipeline());
 
         CompositeSelector spaced = SelectorTranslator.fromBy(By.xpath("//input[( not ( @hidden ))]"));
         assertEquals("//input[( not( @hidden ))]", spaced.xpath());
@@ -168,6 +174,22 @@ class SelectorAndAdapterTest {
         assertFalse(ElementOperations.primary());
         assertTrue(ElementOperations.findElements(context, By.id("save")).isEmpty());
         assertEquals(1, hits.get());
+    }
+
+    private static List<String> ids(String pipeline) throws Exception {
+        String html = """
+                <div id="billing" role="region">
+                  Billing
+                  <button id="save">Save</button>
+                </div>
+                """;
+        JsonNode json = Jsons.MAPPER.readTree(Jsons.pretty(Query.run(HtmlTree.parse(html), Map.of("pipeline", pipeline))));
+        List<String> ids = new ArrayList<>();
+        for (JsonNode node : json.path("nodes")) {
+            String id = node.path("attributes").path("id").asText("");
+            if (!id.isEmpty()) ids.add(id);
+        }
+        return ids;
     }
 
     private static Path stub(Path path, Path log, boolean desktopClick) throws Exception {

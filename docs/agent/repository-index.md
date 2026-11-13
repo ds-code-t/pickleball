@@ -282,6 +282,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/common/browseroperations/WindowElement.java`
 - `src/main/java/tools/dscode/common/browseroperations/WindowSafeAccess.java`
 - `src/main/java/tools/dscode/common/browseroperations/WindowSwitch.java`
+- `src/main/java/tools/dscode/common/composite/CombinedBy.java`
 - `src/main/java/tools/dscode/common/composite/CompositeBinaryLocator.java`
 - `src/main/java/tools/dscode/common/composite/CompositeLog.java`
 - `src/main/java/tools/dscode/common/composite/CompositeMode.java`
@@ -302,6 +303,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/common/composite/LookFind.java`
 - `src/main/java/tools/dscode/common/composite/SelectorTranslator.java`
 - `src/main/java/tools/dscode/common/composite/VerbPlan.java`
+- `src/main/java/tools/dscode/common/composite/XPathDefinitions.java`
 - `src/main/java/tools/dscode/common/control/ControlDecision.java`
 - `src/main/java/tools/dscode/common/control/ControlEvent.java`
 - `src/main/java/tools/dscode/common/control/ControlExecutionScope.java`
@@ -730,6 +732,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/common/composite/ActionVerbPlanTest.java`
 - `src/test/java/tools/dscode/common/composite/AllContextsPlanTest.java`
 - `src/test/java/tools/dscode/common/composite/CapabilityProbeTest.java`
+- `src/test/java/tools/dscode/common/composite/CombinedFormTest.java`
 - `src/test/java/tools/dscode/common/composite/CompositeElements.java`
 - `src/test/java/tools/dscode/common/composite/CompositeFallbackLogTest.java`
 - `src/test/java/tools/dscode/common/composite/CompositeLocationTest.java`
@@ -750,6 +753,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/common/composite/LookStepTest.java`
 - `src/test/java/tools/dscode/common/composite/PrimaryPathAuditTest.java`
 - `src/test/java/tools/dscode/common/composite/SelectorAndAdapterTest.java`
+- `src/test/java/tools/dscode/common/composite/XPathFallbackTest.java`
 - `src/test/java/tools/dscode/common/coordination/AgentCoordinationTest.java`
 - `src/test/java/tools/dscode/common/coordination/PathPrefixResolutionTest.java`
 - `src/test/java/tools/dscode/common/coordination/RunConfigIsolationTest.java`
@@ -1358,6 +1362,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `dom-engine/src/test/java/dev/domengine/premap/SectionDetectionTest.java`
 - `dom-engine/src/test/java/dev/domengine/query/RelationTermParseTest.java`
 - `dom-engine/src/test/java/dev/domengine/query/RelationTermTest.java`
+- `dom-engine/src/test/java/dev/domengine/query/XPathClauseTest.java`
 - `dom-engine/src/test/java/dev/domengine/QueryFlagOfflineTest.java`
 - `dom-engine/src/test/java/dev/domengine/RustCliShapeTest.java`
 - `dom-engine/src/test/java/dev/domengine/SelectorParityTest.java`

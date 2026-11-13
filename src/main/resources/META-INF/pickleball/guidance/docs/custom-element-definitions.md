@@ -103,7 +103,8 @@ Do not re-register a built-in with the same locator as a "new" category. `Radio 
 | `addAlternateBase(xpath)` | Register an alternate structural locator for the same category. |
 | `children("Buttons", ...)` | Register plural or alias names that inherit from this category. |
 | `inheritsFrom(...)` | Pull in another category's matchers, including the text-matching parents below. |
-| `and(...)` / `or(...)` | Add extra locator builders or constant XPath fragments. |
+| `and(...)` / `or(...)` | Add extra locator builders or constant XPath fragments. XPath builders still work. They are deprecated for a new definition that can be written as a combined clause. |
+| `combined(clause)` | Add a Control Engine clause, for example `role=button`. Children inherit it. This is the form to use for a new definition. |
 | `andAnyCategories(...)` / `orCategories(...)` | Reuse other categories' matchers without copying their XPath. Related methods include `andCategories` and `orAllCategories`. |
 | `reset()` | Clear this category's own registrations before redefining it. |
 | `flags(...)` | Attach lookup flags. |
@@ -161,7 +162,11 @@ The iframe and shadow helpers set the matching flag for you.
 
 ## How a category reaches the page
 
-The dictionary still owns the XPath for a built-in or custom category. `ElementOperations` is the only lookup. With the DOM engine (default), that XPath is sent as `xpath` and is not rewritten. A phrase that has not yet been turned into XPath is translated once by `SelectorTranslator`: known categories become `role=...`, and any other capitalized name, including `Product Card`, becomes `desc="..."`.
+The dictionary resolves a category to a combined clause when one was registered, and keeps the XPath as the fallback. `SelectorTranslator` emits the combined form first: target clauses are one AND group, for example `(role=button AND text="Save")`, and context clauses are another. A phrase that also carries XPath sends both. The Control Engine runs the combined pipeline and runs the XPath only when that pipeline matches nothing. A custom category defined only by XPath still resolves. It logs one deprecation warning per run and definition (`xpath-definition:<category>`) telling the author to add `combined(...)`. Built-in categories that have no faithful engine clause stay XPath and do not warn.
+
+Built-ins with a combined clause, because the role engine reproduces them: `Button`, `Submit Button`, `Link`, `Textbox`, `Textarea`, `Dropdown`, `Radio Button`, and `Checkbox`. These stay XPath-only, with the reason: `Close Button` (also links, images, and an id prefix), `Date Textbox` (date-specific attributes), `Toggle` (not `role=switch`), `Text` (any text container), `Icon` / `Image` (img, icon font, svg, or an empty link), `Menu` / `Menu Item` (a list item, not `role=menu`), `Modal` / `Dialog` (dialog, or a modal id, or a misspelled aria attribute), `Tab` / `Tab Panel` only when the XPath is a bare role — the built-in also inherits text and label matchers, so it stays XPath — `Section` / `Question` (a `div`, not `role=region`), and `Table`, `Row`, `Header`, `Header Row`, `Cell`, `Column`, and `Field` (structural XPath the role engine does not reproduce).
+
+A phrase that has not yet been turned into XPath is translated once by `SelectorTranslator`. Known categories become `role=...` inside the AND group. Any other capitalized name, including `Product Card`, becomes `desc="..."`. Pure CSS still passes through and is not deprecated.
 
 The same translator covers an OS desktop element. Set the phrase source to desktop. A template image becomes `image=template=<path>`. OCR text becomes `image=ocr~="<text>"`. The pipeline starts with `source=desktop`. Query, OCR, and template matching go through that one adapter. Desktop click and type work on the Java engine, which lists those verbs. They fail with `error:` / `fix:` only when `capabilities.desktop` lacks the verb, such as the Rust 2.4.0 override. Browser `submit`, `dblclick`, `contextclick`, `drag`, and `key` follow `capabilities.actions` the same way.
 

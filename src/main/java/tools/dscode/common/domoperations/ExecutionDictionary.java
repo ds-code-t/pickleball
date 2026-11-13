@@ -9,6 +9,7 @@ import org.openqa.selenium.SearchContext;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 import tools.dscode.common.assertions.ValueWrapper;
+import tools.dscode.common.composite.XPathDefinitions;
 import tools.dscode.common.treeparsing.parsedComponents.ElementType;
 import tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly;
 import tools.dscode.common.treeparsing.xpathcomponents.XPathyBuilder;
@@ -39,6 +40,10 @@ import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.deepNo
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.descendantDeepNormalizedVisibleText;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.tryConvertToXPathy;
 
+/**
+ * Dictionary layer. A category resolves to XPath and, when {@code combined(clause)} was
+ * registered, a Control Engine clause. The XPath stays the fallback.
+ */
 public class ExecutionDictionary {
 
 
@@ -164,6 +169,10 @@ public class ExecutionDictionary {
 
     // childCategory -> [parentCategory1, parentCategory2, ...]
     private final Multimap<String, String> categoryParents = ArrayListMultimap.create();
+    /** Combined (non-XPath) clauses, inherited the same way builders are. */
+    private final Map<String, List<String>> combinedReg = new LinkedHashMap<>();
+    /** Names registered while the dictionary was constructed. Later names are user definitions. */
+    private final Set<String> builtinCategories = new HashSet<>();
 
     private final ConcurrentMap<String, CopyOnWriteArrayList<Builder>> orReg = new ConcurrentHashMap<>();
     private final ConcurrentMap<String, CopyOnWriteArrayList<Builder>> andReg = new ConcurrentHashMap<>();
@@ -183,6 +192,8 @@ public class ExecutionDictionary {
     protected ExecutionDictionary() {
         register();
         defaultRegistrations();
+        registerCombinedBuiltins();
+        sealBuiltins();
     }
 
     /**
@@ -311,6 +322,7 @@ public class ExecutionDictionary {
         categoryFlags.remove(category);
         primaryBaseReg.remove(category);
         alternateBaseReg.remove(category);
+        combinedReg.remove(category);
         categoryParents.removeAll(category);
 
         lineageCache.clear();
@@ -631,13 +643,93 @@ public class ExecutionDictionary {
     }
 
     public record CategoryResolution(String category, ValueWrapper value, Op op, XPathy xpath,
-                                     Set<CategoryFlags> flags) {
+                                     Set<CategoryFlags> flags, String combined) {
+        /** The pre-combined constructor. {@code combined} stays null. */
+        public CategoryResolution(String category, ValueWrapper value, Op op, XPathy xpath, Set<CategoryFlags> flags) {
+            this(category, value, op, xpath, flags, null);
+        }
     }
 
     public CategoryResolution getFinalCategoryResolution(String category, ValueWrapper value, Op op) {
         XPathy xpath = resolveFinalXPath(category, value, op);
         Set<CategoryFlags> flags = getResolvedCategoryFlags(category);
-        return new CategoryResolution(category, value, op, xpath, flags);
+        boolean defined = !combinedClauses(category).isEmpty();
+        String combined = combinedFor(category, value, op).orElse(null);
+        if (!defined && category != null && !category.isBlank() && !builtinCategories.contains(category) && xpath != null) {
+            XPathDefinitions.deprecatedOnce(category, xpath.getXpath());
+        }
+        return new CategoryResolution(category, value, op, xpath, flags, combined);
+    }
+
+    /**
+     * The combined clause for a category, plus the text predicate the operator can express.
+     * {@code EQUALS} and {@code DEFAULT} use {@code text="v"}. {@code CONTAINS} uses {@code text~="v"}.
+     * {@code STARTS_WITH} uses {@code text^="v"}. {@code MATCHES} uses {@code text="^v$"}.
+     * Any other operator, or a category with no combined clause, is empty.
+     */
+    public Optional<String> combinedFor(String category, ValueWrapper value, Op op) {
+        List<String> clauses = combinedClauses(category);
+        if (clauses.isEmpty()) return Optional.empty();
+        String clause = clauses.size() == 1 ? clauses.get(0) : "(" + String.join(" AND ", clauses) + ")";
+        if (value == null || value.isNullOrBlank()) return Optional.of(clause);
+        String text = textClause(value.toNonNullString(), op == null ? Op.DEFAULT : op);
+        if (text == null) return Optional.empty();
+        return Optional.of("(" + clause + " AND " + text + ")");
+    }
+
+    private List<String> combinedClauses(String category) {
+        if (category == null || category.isBlank()) return List.of();
+        LinkedHashSet<String> clauses = new LinkedHashSet<>();
+        for (String name : resolveCategoryLineage(category)) {
+            List<String> local = combinedReg.get(name);
+            if (local != null) clauses.addAll(local);
+        }
+        return List.copyOf(clauses);
+    }
+
+    private static String textClause(String raw, Op op) {
+        String value = raw == null ? "" : raw.trim();
+        if (value.length() >= 2) {
+            char first = value.charAt(0);
+            char last = value.charAt(value.length() - 1);
+            if ((first == '"' && last == '"') || (first == '\'' && last == '\'')) {
+                value = value.substring(1, value.length() - 1);
+            }
+        }
+        String quoted = "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\"";
+        return switch (op) {
+            case EQUALS, DEFAULT -> "text=" + quoted;
+            case CONTAINS -> "text~=" + quoted;
+            case STARTS_WITH -> "text^=" + quoted;
+            case MATCHES -> "text=\"^" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "$\"";
+            default -> null;
+        };
+    }
+
+    /**
+     * Built-in categories whose XPath meaning a Control Engine role clause reproduces.
+     * Name-or-attribute matchers and structural XPath that the role engine does not
+     * reproduce stay XPath and are not deprecated: they are built-ins, not user definitions.
+     */
+    private void registerCombinedBuiltins() {
+        category("Button").combined("role=button");
+        category("Submit Button").combined("role=button");
+        category("Link").combined("role=link");
+        category("Textbox").combined("role=textbox");
+        category("Textarea").combined("role=textbox");
+        category("Dropdown").combined("role=combobox");
+        category("Radio Button").combined("role=radio");
+        category("Checkbox").combined("role=checkbox");
+    }
+
+    private void sealBuiltins() {
+        builtinCategories.addAll(combinedReg.keySet());
+        builtinCategories.addAll(orReg.keySet());
+        builtinCategories.addAll(andReg.keySet());
+        builtinCategories.addAll(primaryBaseReg.keySet());
+        builtinCategories.addAll(alternateBaseReg.keySet());
+        builtinCategories.addAll(categoryParents.keySet());
+        builtinCategories.addAll(categoryParents.values());
     }
 
     private Optional<XPathy> resolveFromParts(
@@ -816,6 +908,16 @@ public class ExecutionDictionary {
             for (String cat : categories) {
                 if (cat == null || cat.isBlank()) continue;
                 dict.registerAlternateBaseXpath(cat, xpath);
+            }
+            return this;
+        }
+
+        /** One combined clause. Later calls add another. Children inherit them through {@code inheritsFrom}. */
+        public CategorySpec combined(String clause) {
+            if (clause == null || clause.isBlank()) return this;
+            for (String cat : categories) {
+                if (cat == null || cat.isBlank()) continue;
+                dict.combinedReg.computeIfAbsent(cat, key -> new ArrayList<>()).add(clause.trim());
             }
             return this;
         }

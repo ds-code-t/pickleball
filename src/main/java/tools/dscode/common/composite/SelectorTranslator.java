@@ -11,12 +11,13 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Maps a Pickleball element phrase, or a Selenium {@link By} the execution
- * dictionary already built, onto one composite selector. XPath and CSS produced
- * by the dictionary pass through. A space between an XPath function name and
- * {@code (} is removed first. Composite's parser rejects {@code not (}; the
- * expression is otherwise unchanged. Phrase text, quote type, context words,
- * and categories are translated here and nowhere else.
+ * Dictionary layer. Maps a Pickleball element phrase, or a Selenium {@link By}
+ * the execution dictionary already built, onto one composite selector.
+ * The combined form is one AND group per target and one per context. A phrase
+ * that also carries XPath keeps that XPath as the fallback. A pure XPath
+ * definition stays XPath and logs one deprecation warning. Pure CSS still
+ * passes through and is not deprecated. A space between an XPath function
+ * name and {@code (} is removed first. The expression is otherwise unchanged.
  */
 public final class SelectorTranslator {
     private static final Pattern FUNCTION_SPACE = Pattern.compile(
@@ -72,6 +73,12 @@ public final class SelectorTranslator {
         if (by == null) {
             return new CompositeSelector(null, null, null, "web", null, "empty");
         }
+        if (by instanceof CombinedBy combined) {
+            CompositeSelector selector = new CompositeSelector(
+                    executableXPath(combined.xpath()), null, blankToNull(combined.combined()), "web", null, by.toString());
+            CompositeLog.debug("element", "by " + selector.describe());
+            return selector;
+        }
         String rendered = by.toString();
         int colon = rendered.indexOf(':');
         String kind = colon < 0 ? rendered : rendered.substring(0, colon).trim();
@@ -105,14 +112,16 @@ public final class SelectorTranslator {
         if (phrase == null) {
             return new CompositeSelector(null, null, null, "web", null, "empty");
         }
-        if (phrase.xpath() != null && !phrase.xpath().isBlank() && lookStage(phrase.look()) == null) {
-            CompositeSelector exact = new CompositeSelector(executableXPath(phrase.xpath()), null, null, source(phrase), ordinal(phrase), label(phrase));
-            CompositeLog.debug("element", "xpath passthrough " + exact.describe());
-            return exact;
-        }
-        if (phrase.css() != null && !phrase.css().isBlank() && lookStage(phrase.look()) == null) {
+        String look = lookStage(phrase.look());
+        if (pureCss(phrase, look)) {
             CompositeSelector exact = new CompositeSelector(null, phrase.css(), null, source(phrase), ordinal(phrase), label(phrase));
             CompositeLog.debug("element", "css passthrough " + exact.describe());
+            return exact;
+        }
+        if (pureXPath(phrase, look)) {
+            XPathDefinitions.deprecatedOnce(label(phrase), phrase.xpath());
+            CompositeSelector exact = new CompositeSelector(executableXPath(phrase.xpath()), null, null, source(phrase), ordinal(phrase), label(phrase));
+            CompositeLog.debug("element", "xpath passthrough " + exact.describe());
             return exact;
         }
         List<String> stages = new ArrayList<>();
@@ -124,35 +133,84 @@ public final class SelectorTranslator {
             stages.add("image=ocr~=" + quote(phrase.ocr().trim()));
         }
         String word = phrase.contextWord() == null ? "" : phrase.contextWord().trim().toLowerCase(Locale.ROOT);
-        List<String> context = contextStages(phrase);
-        List<String> target = targetStages(phrase);
-        String look = lookStage(phrase.look());
-        if (look != null) {
-            if (target.isEmpty()) target.add(look);
-            else target.set(0, "(" + target.get(0) + " AND " + look + ")");
-        }
+        String context = group(contextClauses(phrase));
+        String target = group(targetClauses(phrase, look));
         switch (word) {
             case "before" -> {
-                stages.addAll(target);
+                add(stages, target);
                 stages.add("below=1");
-                stages.addAll(context);
+                add(stages, context);
             }
             case "after" -> {
-                stages.addAll(context);
+                add(stages, context);
                 stages.add("below=1");
-                stages.addAll(target);
+                add(stages, target);
             }
             case "in", "from", "for" -> {
-                stages.addAll(context);
-                stages.addAll(target);
+                add(stages, context);
+                add(stages, target);
             }
-            default -> stages.addAll(target);
+            default -> add(stages, target);
         }
         String pipeline = String.join(" >> ", stages.stream().filter(stage -> stage != null && !stage.isBlank()).toList());
-        CompositeSelector selector = new CompositeSelector(null, null, pipeline, source(phrase), ordinal(phrase), label(phrase));
+        String xpath = phrase.xpath() != null && !phrase.xpath().isBlank() ? executableXPath(phrase.xpath()) : null;
+        if (!pipeline.isBlank()) {
+            CompositeLog.info("query", "combined " + pipeline + " fallback=" + (xpath != null));
+        }
+        CompositeSelector selector = new CompositeSelector(xpath, null, pipeline.isBlank() ? null : pipeline, source(phrase), ordinal(phrase), label(phrase));
         if (look != null) CompositeLog.info("query", "forward selector=" + pipeline);
         CompositeLog.debug("element", "phrase " + selector.describe());
         return selector;
+    }
+
+    private static boolean pureCss(ElementPhrase phrase, String look) {
+        return phrase.css() != null && !phrase.css().isBlank() && look == null && !hasXPath(phrase)
+                && !hasText(phrase) && !hasCategory(phrase) && state(phrase.state()) == null
+                && !hasContext(phrase) && !hasImage(phrase);
+    }
+
+    private static boolean pureXPath(ElementPhrase phrase, String look) {
+        return hasXPath(phrase) && look == null && (phrase.css() == null || phrase.css().isBlank())
+                && !hasText(phrase) && !hasCategory(phrase) && state(phrase.state()) == null
+                && !hasContext(phrase) && !hasImage(phrase);
+    }
+
+    private static boolean hasXPath(ElementPhrase phrase) {
+        return phrase.xpath() != null && !phrase.xpath().isBlank();
+    }
+
+    private static boolean hasText(ElementPhrase phrase) {
+        return phrase.text() != null && !phrase.text().isBlank();
+    }
+
+    private static boolean hasCategory(ElementPhrase phrase) {
+        return phrase.category() != null && !phrase.category().isBlank();
+    }
+
+    private static boolean hasContext(ElementPhrase phrase) {
+        return (phrase.contextWord() != null && !phrase.contextWord().isBlank())
+                || (phrase.contextText() != null && !phrase.contextText().isBlank())
+                || (phrase.contextCategory() != null && !phrase.contextCategory().isBlank());
+    }
+
+    private static boolean hasImage(ElementPhrase phrase) {
+        return "desktop".equals(source(phrase))
+                || (phrase.template() != null && !phrase.template().isBlank())
+                || (phrase.ocr() != null && !phrase.ocr().isBlank());
+    }
+
+    private static void add(List<String> stages, String clause) {
+        if (clause != null && !clause.isBlank()) stages.add(clause);
+    }
+
+    private static String group(List<String> clauses) {
+        if (clauses.isEmpty()) return null;
+        if (clauses.size() == 1) return clauses.get(0);
+        return "(" + String.join(" AND ", clauses) + ")";
+    }
+
+    private static String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value;
     }
 
     /** English {@code with look color equaling red} becomes {@code look=color=red}. */
@@ -208,30 +266,32 @@ public final class SelectorTranslator {
         return value;
     }
 
-    private static List<String> contextStages(ElementPhrase phrase) {
-        List<String> stages = new ArrayList<>();
+    private static List<String> contextClauses(ElementPhrase phrase) {
+        List<String> clauses = new ArrayList<>();
         String role = role(phrase.contextCategory());
-        if (role != null) stages.add(role);
+        if (role != null) clauses.add(role);
         else if (phrase.contextCategory() != null && !phrase.contextCategory().isBlank()) {
-            stages.add("desc=" + quote(phrase.contextCategory().trim()));
+            clauses.add("desc=" + quote(phrase.contextCategory().trim()));
         }
         if (phrase.contextText() != null && !phrase.contextText().isBlank()) {
-            stages.add("text=" + quote(fold(phrase.contextText().trim(), phrase.quote())));
+            clauses.add("text=" + quote(fold(phrase.contextText().trim(), phrase.quote())));
         }
-        return stages;
+        return clauses;
     }
 
-    private static List<String> targetStages(ElementPhrase phrase) {
-        List<String> stages = new ArrayList<>();
+    private static List<String> targetClauses(ElementPhrase phrase, String look) {
+        List<String> clauses = new ArrayList<>();
         String role = role(phrase.category());
-        if (role != null) stages.add(role);
+        if (role != null) clauses.add(role);
         else if (phrase.category() != null && !phrase.category().isBlank()) {
-            stages.add("desc=" + quote(phrase.category().trim()));
+            clauses.add("desc=" + quote(phrase.category().trim()));
         }
         String state = state(phrase.state());
-        if (state != null) stages.add(state);
-        if (phrase.text() != null && !phrase.text().isBlank()) stages.add(textStage(phrase));
-        return stages;
+        if (state != null) clauses.add(state);
+        if (phrase.text() != null && !phrase.text().isBlank()) clauses.add(textStage(phrase));
+        if (look != null) clauses.add(look);
+        if (phrase.css() != null && !phrase.css().isBlank()) clauses.add("css=" + phrase.css().trim());
+        return clauses;
     }
 
     private static String textStage(ElementPhrase phrase) {
