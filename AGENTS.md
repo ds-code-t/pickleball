@@ -467,3 +467,7 @@ This section supersedes the earlier sentences it names. Those sentences stay in 
 **Native engine phases.** Supersedes "The default is `cucumber`" in Phase 9, "The default stays `cucumber`" in Phase 11, and "Phase 12 does not switch the default to native" plus "EngineConfig stays `cucumber` unless `pkb_engine=native`" in Phase 12. Those sentences are the phase record. The G9 paragraph in the same section is the current rule and matches code: the default is `native`. `pkb_engine=cucumber` keeps the adapter. Phase 1 through Phase 8, Phase 10, and the logging sentences in Phase 12 stay as written.
 
 **Java DOM Engine (3.0.0).** The paragraphs from "`domengine log list`" through "A joined browser still sends `--within` and `--nesting`" stay accurate. The opening "locked design for replacing the Rust DOM composite engine" names the design doc. The replacement is what ships: the Java engine is the default element engine. Rust wire-compatibility comments inside `dom-engine` stay. Rust is not required and is not the normal path.
+
+## Engine defects (3.0.0)
+
+The locked design for the remaining Java DOM engine and native-engine defects (D1-D12, G1-G6, the live Chrome CI flake, and uncertain items U1-U5) is `docs/maintainer/3.0.0-engine-defects-design.md`. The mandatory phased roadmap is `docs/roadmaps/3.0.0-engine-defects-roadmap.md`. The standalone Build prompt is `prompts/3.0.0-engine-defects-build.md`. Implementation stays on branch 3.0.0. The engine interface stays general-purpose. Open PRs #2 and #3 on ds-code-t/dom-composite must not be merged.
