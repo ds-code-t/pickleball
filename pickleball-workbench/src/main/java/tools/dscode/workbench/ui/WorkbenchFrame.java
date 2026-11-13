@@ -586,6 +586,7 @@ final class WorkbenchFrame extends JFrame {
         rightTabs.addTab("Explorer", diagnosticsPanel());
         rightTabs.addTab("Report", reportPanel());
         rightTabs.addTab("Dalton", new DaltonPanel(() -> controller.projectRoot()));
+        rightTabs.addTab("Editor", new EditPanel(() -> controller.projectRoot()));
         rightTabs.addTab("Logs", new LogPanel(() -> controller.projectRoot()));
         rightTabs.addTab("Chat", new AgentChatPanel(actions));
         diagnosticTailTimer.setRepeats(true);

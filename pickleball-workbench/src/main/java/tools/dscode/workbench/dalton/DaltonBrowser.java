@@ -103,6 +103,76 @@ public final class DaltonBrowser {
         return List.copyOf(args);
     }
 
+    public static List<String> categoryList() {
+        return List.of("category", "list", "--json");
+    }
+
+    public static List<String> categoryShow(String id) {
+        return List.of("category", "show", "--id=" + id.trim(), "--json");
+    }
+
+    public static List<String> categoryPut(String id, Path file) {
+        return List.of("category", "put", "--id=" + id.trim(), "--file=" + file.toAbsolutePath().normalize(), "--json");
+    }
+
+    public static List<String> categoryRemove(String id) {
+        return List.of("category", "remove", "--id=" + id.trim(), "--confirm", "--json");
+    }
+
+    public static List<String> filePut(String path, Path file) {
+        return List.of("file", "put", "--path=" + path.trim(), "--file=" + file.toAbsolutePath().normalize(), "--json");
+    }
+
+    public static List<String> fileDelete(String path) {
+        return List.of("file", "delete", "--path=" + path.trim(), "--confirm", "--json");
+    }
+
+    public static List<String> glueList() {
+        return List.of("glue", "list", "--json");
+    }
+
+    public static List<String> glueShow(String path) {
+        return List.of("glue", "show", "--path=" + path.trim(), "--json");
+    }
+
+    public static List<String> gluePut(String path, Path file) {
+        return List.of("glue", "put", "--path=" + path.trim(), "--file=" + file.toAbsolutePath().normalize(), "--json");
+    }
+
+    public static List<String> glueRemove(String path) {
+        return List.of("glue", "remove", "--path=" + path.trim(), "--confirm", "--json");
+    }
+
+    public static List<String> scenarioAdd(String feature, String name, Path file) {
+        return List.of("feature", "scenario-add", "--feature=" + feature.trim(), "--name=" + name.trim(),
+                "--file=" + file.toAbsolutePath().normalize(), "--json");
+    }
+
+    public static List<String> scenarioModify(String feature, String scenario, Path file) {
+        return List.of("feature", "scenario-modify", "--feature=" + feature.trim(), "--scenario=" + scenario.trim(),
+                "--file=" + file.toAbsolutePath().normalize(), "--json");
+    }
+
+    public static List<String> scenarioDelete(String feature, String scenario) {
+        return List.of("feature", "scenario-delete", "--feature=" + feature.trim(), "--scenario=" + scenario.trim(),
+                "--confirm", "--json");
+    }
+
+    public static List<String> stepAdd(String feature, String scenario, Path file) {
+        return List.of("feature", "step-add", "--feature=" + feature.trim(), "--scenario=" + scenario.trim(),
+                "--file=" + file.toAbsolutePath().normalize(), "--json");
+    }
+
+    public static List<String> stepModify(String feature, String scenario, String step, Path file) {
+        return List.of("feature", "step-modify", "--feature=" + feature.trim(), "--scenario=" + scenario.trim(),
+                "--step=" + step.trim(), "--file=" + file.toAbsolutePath().normalize(), "--json");
+    }
+
+    public static List<String> stepDelete(String feature, String scenario, String step) {
+        return List.of("feature", "step-delete", "--feature=" + feature.trim(), "--scenario=" + scenario.trim(),
+                "--step=" + step.trim(), "--confirm", "--json");
+    }
+
     /** Human lines for a CLI body. JSON becomes labels. Other text is kept. */
     public static List<String> labels(String body) {
         String trimmed = body == null ? "" : body.trim();
@@ -117,6 +187,7 @@ public final class DaltonBrowser {
                 return arrayLabels(root.get("scenarios"), DaltonBrowser::scenarioLabel, "Scenarios");
             }
             if (root.has("conflicts") && root.get("conflicts").isArray()) return arrayLabels(root.get("conflicts"), DaltonBrowser::conflictLabel, "Conflicts");
+            if (root.has("items") && root.get("items").isArray()) return arrayLabels(root.get("items"), DaltonBrowser::itemLabel, "Items");
             if (root.has("path") && root.has("sourceType")) return List.of(fileLabel(root));
             if (root.has("path") && root.has("name")) return List.of(featureLabel(root));
             if (root.has("database")) return List.of(statusLabel(root));
@@ -192,6 +263,14 @@ public final class DaltonBrowser {
         String message = node.path("message").asText();
         if (!message.isBlank()) return message;
         return node.path("kind").asText() + " " + node.path("path").asText();
+    }
+
+    private static String itemLabel(JsonNode node) {
+        String id = node.path("id").asText();
+        String path = node.path("path").asText();
+        if (id.isBlank()) return path;
+        if (path.isBlank() || path.equals(id)) return id;
+        return id + "  " + path;
     }
 
     private static String statusLabel(JsonNode node) {

@@ -388,7 +388,7 @@ final class WorkbenchMcpTools {
                 schema(Map.of(
                         "args", Map.of(
                                 "type", "array",
-                                "description", "Arguments after dalton. Example: [\"status\"], [\"files\", \"list\", \"--json\"], [\"feature\", \"put\", \"features/a.feature\", \"--file=a.feature\"], [\"conflicts\"], [\"run\"], [\"run\", \"--dry-run\"], or [\"history\", \"list\"].",
+                                "description", "Arguments after dalton. Example: [\"status\"], [\"files\", \"list\", \"--json\"], [\"category\", \"list\", \"--json\"], [\"file\", \"put\", \"--path=configs/a.yaml\", \"--text=a: 1\"], [\"glue\", \"list\", \"--json\"], [\"feature\", \"scenario-add\", \"--feature=features/a.feature\", \"--name=One\"], [\"conflicts\"], or [\"run\", \"--dry-run\"].",
                                 "items", Map.of("type", "string")
                         )
                 ), "args"),

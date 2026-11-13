@@ -495,6 +495,25 @@ tasks.register('daltonFeature', JavaExec) {
     if (project.hasProperty('daltonFile')) args += ['--file=' + project.property('daltonFile')]
 }
 
+tasks.register('daltonEdit', JavaExec) {
+    group = 'dalton'
+    description = 'Forward to the Dalton edit CLI (category, file, glue, feature scenario/step). sqlite-jdbc is on this task classpath only and is not published.'
+    classpath = sourceSets.main.runtimeClasspath + configurations.detachedConfiguration(
+            dependencies.create('org.xerial:sqlite-jdbc:3.47.2.0')
+    )
+    mainClass = 'tools.dscode.dalton.DaltonCli'
+    args = ['dalton']
+    def editArgs = project.hasProperty('daltonArgs') ? project.property('daltonArgs').toString() : 'category,list'
+    args += editArgs.split(',')
+    if (project.hasProperty('daltonJson')) args += ['--json']
+    if (project.hasProperty('daltonPath')) args += ['--path=' + project.property('daltonPath')]
+    if (project.hasProperty('daltonId')) args += ['--id=' + project.property('daltonId')]
+    if (project.hasProperty('daltonText')) args += ['--text=' + project.property('daltonText')]
+    if (project.hasProperty('daltonFile')) args += ['--file=' + project.property('daltonFile')]
+    if (project.hasProperty('daltonConfirm')) args += ['--confirm']
+    if (project.hasProperty('daltonForce')) args += ['--force']
+}
+
 tasks.register('daltonQuery', JavaExec) {
     group = 'dalton'
     description = 'Forward to a Dalton CLI read command. sqlite-jdbc is on this task classpath only and is not published.'

@@ -53,7 +53,14 @@ public final class DaltonCli {
                 case "extract", "hydrate-out" -> extract(project, tokens, stdout, stderr);
                 case "history" -> history(project, tokens, stdout, stderr);
                 case "entity" -> entity(project, tokens, stdout, stderr);
-                case "feature" -> feature(project, tokens, stdout, stderr);
+                case "feature" -> {
+                    String featureAction = action(tokens);
+                    if (DaltonEdit.isFeatureEdit(featureAction)) {
+                        yield DaltonEdit.execute(project, tokens, stdout, stderr);
+                    }
+                    yield feature(project, tokens, stdout, stderr);
+                }
+                case "category", "file", "glue" -> DaltonEdit.execute(project, tokens, stdout, stderr);
                 case "files" -> files(project, tokens, json(tokens), stdout, stderr);
                 case "features" -> features(project, tokens, json(tokens), stdout, stderr);
                 case "scenario", "scenarios" -> scenarios(project, tokens, json(tokens), stdout, stderr);
@@ -88,6 +95,10 @@ public final class DaltonCli {
                 Usage: dalton entity remove <type> <id> [--force] [--project=<dir>]
                 Usage: dalton entity export [--force] [--project=<dir>]
                 Usage: dalton feature put <relative-path> [--text=<gherkin>] [--file=<path>] [--project=<dir>]
+                Usage: dalton feature scenario-add|scenario-modify|scenario-delete|step-add|step-modify|step-delete --feature=<relative-path> [--name=<text>] [--scenario=<ord-or-name>] [--step=<ord>] [--keyword=<Given|When|Then|And|But|*>] [--text=<text>] [--file=<path>] [--confirm] [--force] [--json] [--project=<dir>]
+                Usage: dalton category list|show|put|remove [--id=<name>] [--text=<yaml>] [--file=<path>] [--confirm] [--force] [--json] [--project=<dir>]
+                Usage: dalton file put|delete --path=<relative> [--text=<text>] [--file=<path>] [--confirm] [--force] [--json] [--project=<dir>]
+                Usage: dalton glue list|show|put|remove [--path=<relative.java-or-glue/js>] [--text=<source>] [--file=<path>] [--confirm] [--force] [--json] [--project=<dir>]
                 Usage: dalton files list [--project=<dir>] [--json]
                 Usage: dalton files show <relative-path> [--project=<dir>] [--json]
                 Usage: dalton features list [--project=<dir>] [--json]
@@ -109,6 +120,7 @@ public final class DaltonCli {
                 history stores a run summary in the database. It does not change diagnostic reports or pkb_reportretention. --from copies outcome and counts from a run-index.json file. retain drops runs older than --days and then the oldest runs until the note, scenario, and message bytes fit --max-bytes.
                 sqlite-jdbc is required only when a command opens the database. It is not published in the Pickleball POM. When Dalton is enabled and that driver is missing, status, hydrate, extract, and the auto-hydrate hook fail with: Dalton is enabled but org.xerial:sqlite-jdbc is not on the classpath. Add it as testRuntimeOnly / test scope or use the Gradle dalton* tasks. They do not fall back to the files. Gradle dalton* tasks put the driver on their own classpath.
                 feature put writes that .feature text into the database. It sets db_edited, leaves last_synced_hash, and replaces the stored scenarios, steps, tags, docstrings, and data tables in the same transaction. Bad Gherkin is rejected and the previous rows stay. The file is not changed until dalton extract. Use --file for multiline text. dalton scenario put and dalton step put are rejected. A database row whose content hash moved while db_edited is still 0 is an untracked DB edit. hydrate reports it and will not overwrite it unless --force is set.
+                category, file, glue, and feature scenario-add, scenario-modify, scenario-delete, step-add, step-modify, and step-delete are the shared edit model. --json prints one object with ok, command, family, action, dalton, path, id, dbEdited, conflict, confirmRequired, applied, items, text, message, error, and fix. remove and delete require --confirm and do not write without it. Validation runs before a write. A conflict or an untracked DB edit on that path is refused unless --force is set. When Dalton is off the command writes the file and does not open the database. When Dalton is on, put uses the same db_edited write as feature put. Set pkb_dalton_log=edit to log each edit. The log is date-stamped, per entity, and size-capped.
                 entity put uses that same write, so the entity file row and the entity table stay together.
                 files, features, scenarios, steps, and conflicts are read-only. They do not create a database. --json prints one stable JSON object. Text mode prints labels. conflicts lists an untracked database edit and a row edited on both sides.
                 Discovery reads include, exclude, max-file-size (default 1048576), and binary-policy (default skip) from dalton.properties. System properties pkb_dalton_include, pkb_dalton_exclude, pkb_dalton_max_file_size, and pkb_dalton_binary_policy win over that file. An empty include keeps the fixed directories. Exclude is added to the defaults, which already skip .git, target, build, .pickleball, and common binary extensions. A file over the size limit, or a binary by extension or by a null byte or a high control-byte ratio, is ignored. dalton status prints skipped and up to five sample lines and does not create a database. Hydrate prints ignored= for those files. --path still applies the limits. --path --force is the only bypass. hash-only is not implemented. Set pkb_dalton_log=discover to log each reason.

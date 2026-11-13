@@ -111,4 +111,49 @@ public final class DaltonContent {
         }
         return "content";
     }
+
+    /**
+     * Removes a stored file row and its projections. Does not create a database.
+     * Returns whether a row or a disk file was removed.
+     */
+    public static boolean delete(Path project, String relativePath) throws SQLException, java.io.IOException {
+        String path = DaltonPaths.normalizeRelative(relativePath);
+        boolean removed = false;
+        if (java.nio.file.Files.isRegularFile(DaltonPaths.database(project))) {
+            try (DaltonDatabase database = DaltonDatabase.open(project)) {
+                Connection connection = database.connection();
+                connection.setAutoCommit(false);
+                try {
+                    for (String sql : java.util.List.of(
+                            "DELETE FROM steps WHERE file_path = ?",
+                            "DELETE FROM scenarios WHERE file_path = ?",
+                            "DELETE FROM feature_docs WHERE file_path = ?",
+                            "DELETE FROM entities WHERE source_file = ?",
+                            "DELETE FROM files WHERE path = ?"
+                    )) {
+                        try (java.sql.PreparedStatement statement = connection.prepareStatement(sql)) {
+                            statement.setString(1, path);
+                            if (statement.executeUpdate() > 0) removed = true;
+                        }
+                    }
+                    connection.commit();
+                } catch (SQLException | RuntimeException failure) {
+                    connection.rollback();
+                    throw failure;
+                } finally {
+                    connection.setAutoCommit(true);
+                }
+            }
+        }
+        Path disk = project.resolve(path);
+        if (java.nio.file.Files.isRegularFile(disk)) {
+            java.nio.file.Files.delete(disk);
+            removed = true;
+        }
+        if (removed) {
+            DaltonLog.log(project, "edit", path, "delete");
+        }
+        return removed;
+    }
 }
+
