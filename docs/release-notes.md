@@ -285,4 +285,8 @@ A dynamic step can say `with look color equaling red` or `with look opacity grea
 
 Workbench launch capture keeps the first 256KB and the last 512KB of a run console, so a long workbook dump cannot exhaust the worker. The last `Caused by` line is still read. `LiveChromeCdpTest` finds Chrome on `PATH` the same way the engine does. `EditPanel` is classified with the other Swing panels. Gradle `daltonEdit` forwards to `DaltonCli` with the other dalton tasks. Breaking-change list stays empty.
 
+### Regression Fix-back 2
+
+The control-bridge pause for "Paused runtime supports retry-friendly investigation and control" is requested before BEGIN returns, so both engines pause on AFTER_STEP of that step. Step order is still compared by position. Build provenance hashes the working-tree diff without loading it into the Gradle daemon. Generated `reports/` HTML and `report.xlsx` are no longer tracked. A capped launch console's byte view includes the head, the truncation marker, and the tail. Breaking-change list stays empty.
+
 

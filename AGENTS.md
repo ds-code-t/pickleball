@@ -447,3 +447,7 @@ Linux live desktop reaches the accessibility bus with `dbus-send --session` and 
 ## Regression Fix-back 1 (3.0.0)
 
 `EditPanel.getText()` is Swing and is classified with `LogPanel`. Gradle `daltonEdit` is the eighth `DaltonCli` forward. Workbench launch console capture keeps a 256KB head and a 512KB tail so the suite workbook printed into an in-process hook run cannot exhaust the test heap. `LiveChromeCdpTest` uses the dom-engine Chrome lookup (`DOMENGINE_CHROME`, then `google-chrome`, `google-chrome-stable`, `chromium`, `chromium-browser`, `chrome` on `PATH`). Breaking-change list stays empty. Scoreboards: `docs/roadmaps/3.0.0-java-dom-roadmap.md` and `docs/roadmaps/3.0.0-workbench-edit-roadmap.md`.
+
+## Regression Fix-back 2 (3.0.0)
+
+The control-bridge IPC pause is held until BEGIN has set `pauseRequested`, and VERIFY requires that pause to be AFTER_STEP of BEGIN, so the adapter and the native engine record the same step order under suite load. Step order is not sorted. Event sequence numbers are assigned under the same lock as the append. Build provenance streams the git diff into a hash instead of buffering it in the Gradle daemon. Root `reports/` workbook HTML and `report.xlsx` are generated and gitignored. `CaptureBuffer.toByteArray`, `size`, and `writeTo` return the capped head, the truncation marker, and the tail. Breaking-change list stays empty. Scoreboards: `docs/roadmaps/3.0.0-java-dom-roadmap.md` and `docs/roadmaps/3.0.0-workbench-edit-roadmap.md`.
