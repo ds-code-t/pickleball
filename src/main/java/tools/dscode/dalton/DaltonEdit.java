@@ -245,8 +245,9 @@ public final class DaltonEdit {
             Files.createDirectories(disk.getParent());
             Files.write(disk, body);
         }
-        GlueRules.afterWrite(project, relative);
-        return Outcome.written(relative, idOf(relative), edited, new String(body, StandardCharsets.UTF_8));
+        String note = GlueRules.afterWrite(project, relative);
+        return Outcome.written(relative, idOf(relative), edited, new String(body, StandardCharsets.UTF_8),
+                note == null || note.isBlank() ? "written" : "written; " + note);
     }
 
     private static Outcome delete(Path project, String path, List<String> tokens) throws Exception {
@@ -411,7 +412,12 @@ public final class DaltonEdit {
         }
 
         static Outcome written(String path, String id, boolean dbEdited, String text) {
-            return new Outcome(true, path, id, dbEdited, false, false, true, List.of(new Item(id, path, id)), text, "written", "", "", 0);
+            return written(path, id, dbEdited, text, "written");
+        }
+
+        static Outcome written(String path, String id, boolean dbEdited, String text, String message) {
+            return new Outcome(true, path, id, dbEdited, false, false, true, List.of(new Item(id, path, id)), text,
+                    message == null || message.isBlank() ? "written" : message, "", "", 0);
         }
 
         static Outcome deleted(String path, String id, boolean dbEdited) {
