@@ -19,8 +19,9 @@ dependencies {
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher:1.13.4'
     testRuntimeOnly 'org.xerial:sqlite-jdbc:3.47.2.0'
     // Test-only: the real direct-control attach runs the in-repo Java engine,
-    // found reflectively by JavaEngineLauncher. Main stays JDK-only.
-    testRuntimeOnly project(':dom-engine')
+    // found reflectively by JavaEngineLauncher. The live Chrome helper is the
+    // same launcher the engine uses. Main stays JDK-only.
+    testImplementation project(':dom-engine')
 }
 
 tasks.withType(JavaCompile).configureEach {

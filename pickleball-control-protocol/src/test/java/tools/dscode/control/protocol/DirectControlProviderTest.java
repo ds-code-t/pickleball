@@ -3,11 +3,9 @@ package tools.dscode.control.protocol;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.io.TempDir;
+import dev.domengine.session.ChromeProcess;
 
 import java.io.IOException;
-import java.net.HttpURLConnection;
-import java.net.ServerSocket;
-import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -191,25 +189,17 @@ class DirectControlProviderTest {
                 <html><head><title>composite</title></head>
                 <body><h1 id="marker">pickleball-composite-marker</h1></body></html>
                 """);
-        Path profile = temp.resolve("chrome-profile");
-        Files.createDirectories(profile);
-        int port = freePort();
-        Process browser = new ProcessBuilder(
+        Path profile = ChromeProcess.newProfile();
+        ChromeProcess browser = ChromeProcess.start(
                 chrome.orElseThrow().toString(),
-                "--headless=new",
-                "--no-sandbox",
-                "--disable-gpu",
-                "--disable-dev-shm-usage",
-                "--no-first-run",
-                "--remote-debugging-port=" + port,
-                "--user-data-dir=" + profile,
+                profile,
+                true,
+                List.of(),
                 page.toUri().toString()
-        ).redirectOutput(ProcessBuilder.Redirect.DISCARD)
-                .redirectError(ProcessBuilder.Redirect.DISCARD)
-                .start();
+        );
         DirectControlProvider.Handle provider = null;
         try {
-            assertTrue(waitForDebugger(port), "Chrome debugger did not open");
+            assertTrue(browser.debuggerOpen(), "Chrome debugger did not open");
             publishPaused();
             DirectControlProvider.Outcome outcome = DirectControlProvider.open(new DirectControlProvider.Request(
                     true,
@@ -217,7 +207,7 @@ class DirectControlProviderTest {
                     temp,
                     "run-1",
                     "session-1",
-                    "127.0.0.1:" + port,
+                    "127.0.0.1:" + browser.port(),
                     descriptor(),
                     log(),
                     binary.orElseThrow(),
@@ -235,7 +225,7 @@ class DirectControlProviderTest {
             provider.detach();
             provider = null;
             assertTrue(browser.isAlive(), "session close must leave Chrome running");
-            assertTrue(waitForDebugger(port), "Chrome debugger must still answer after close");
+            assertTrue(browser.debuggerOpen(), "Chrome debugger must still answer after close");
             SessionDescriptor published = SessionDescriptorWriter.read(temp, "run-1").orElseThrow();
             assertEquals(
                     DirectControlProvider.sessionDirectory(temp, "run-1").toString(),
@@ -244,10 +234,8 @@ class DirectControlProviderTest {
             assertEquals("session-1", published.compositeSessionId());
         } finally {
             if (provider != null) provider.detach();
-            if (browser.isAlive()) {
-                browser.destroy();
-                if (!browser.waitFor(5, TimeUnit.SECONDS)) browser.destroyForcibly();
-            }
+            browser.destroyTree();
+            ChromeProcess.deleteProfile(profile);
         }
     }
 
@@ -388,28 +376,6 @@ class DirectControlProviderTest {
             return output;
         } finally {
             Files.deleteIfExists(out);
-        }
-    }
-
-    private static boolean waitForDebugger(int port) throws Exception {
-        URI version = URI.create("http://127.0.0.1:" + port + "/json/version");
-        for (int i = 0; i < 50; i++) {
-            try {
-                HttpURLConnection connection = (HttpURLConnection) version.toURL().openConnection();
-                connection.setConnectTimeout(200);
-                connection.setReadTimeout(200);
-                if (connection.getResponseCode() == 200) return true;
-            } catch (IOException ignored) {
-                // Chrome is still starting.
-            }
-            Thread.sleep(100);
-        }
-        return false;
-    }
-
-    private static int freePort() throws IOException {
-        try (ServerSocket socket = new ServerSocket(0)) {
-            return socket.getLocalPort();
         }
     }
 

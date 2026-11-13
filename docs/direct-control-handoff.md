@@ -65,7 +65,7 @@ Use a directory you own. Do not reuse `.pickleball/runs/<runId>/session/composit
 
 `domengine attach --cdp ...` is the same command. Later commands use `--session <sessionId> --session-dir <directory>`, or `--cdp` with the same address. Attach itself exits as soon as the registry entry is written.
 
-Java (`dev.domcomposite.Client` / `Session`). This is the stdio client for the engine CLI. By default that CLI is the in-repo Java engine launcher (`java -cp ... dev.domengine.cli.DomEngineMain`). An explicit binary uses the same client. `openSession` sends `session create` / `POST /v1/session/create`. It takes the fields this contract names (`cdp` and `id`). Also pass `i_accept_local_attach` so the engine records `launched: false`. Do not pass `url`. The CLI command that only attaches, and does not create a browser, is `domengine session attach` (older examples say `composite session attach`).
+Java (`dev.domcomposite.Client` / `Session`). This is the stdio client for the engine CLI. By default that CLI is the in-repo Java engine launcher (`java -cp ... dev.domengine.cli.DomEngineMain`). An explicit binary uses the same client. `openSession` sends `session create` / `POST /v1/session/create`. It takes the fields this contract names (`cdp` and `id`). Also pass `i_accept_local_attach` so the engine records `launched: false`. Do not pass `url` on an attach. A create that does pass `--url` returns only after that document is complete. The CLI command that only attaches, and does not create a browser, is `domengine session attach` (older examples say `composite session attach`).
 
 ```java
 try (Client client = new Client();

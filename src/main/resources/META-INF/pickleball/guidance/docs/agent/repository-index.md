@@ -1116,6 +1116,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `dom-engine/src/main/java/dev/domengine/query/Look.java`
 - `dom-engine/src/main/java/dev/domengine/query/Query.java`
 - `dom-engine/src/main/java/dev/domengine/session/BrowserSession.java`
+- `dom-engine/src/main/java/dev/domengine/session/ChromeProcess.java`
 - `dom-engine/src/main/java/dev/domengine/session/SessionEvents.java`
 - `dom-engine/src/main/java/dev/domengine/session/SessionRegistry.java`
 - `dom-engine/src/main/java/dev/domengine/tree/ContextWalker.java`

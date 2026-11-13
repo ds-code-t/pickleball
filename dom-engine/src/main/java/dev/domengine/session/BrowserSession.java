@@ -16,7 +16,6 @@ import java.net.http.HttpResponse;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.TimeUnit;
@@ -96,7 +95,7 @@ public final class BrowserSession implements AutoCloseable {
     ) {
         Path dir = profile;
         try {
-            if (dir == null) dir = Files.createTempDirectory("domengine-profile-");
+            if (dir == null) dir = ChromeProcess.newProfile();
             else Files.createDirectories(dir);
         } catch (IOException failure) {
             throw new CdpException("profile: " + failure.getMessage());
@@ -105,33 +104,9 @@ public final class BrowserSession implements AutoCloseable {
         if (chrome == null) {
             throw new CdpException("chrome not found on PATH (google-chrome, chromium, or chromium-browser)");
         }
-        List<String> command = new ArrayList<>();
-        command.add(chrome);
-        command.add("--remote-debugging-port=0");
-        command.add("--user-data-dir=" + dir.toAbsolutePath());
-        command.add("--no-first-run");
-        command.add("--no-default-browser-check");
-        command.add("--no-sandbox");
-        command.add("--disable-dev-shm-usage");
-        command.add("--disable-gpu");
-        if (!headed) command.add("--headless=new");
-        if (extra != null) {
-            for (String arg : extra) {
-                if (arg != null && !arg.isBlank()) command.add(arg);
-            }
-        }
-        command.add("about:blank");
-        Process processHandle;
-        try {
-            processHandle = new ProcessBuilder(command)
-                    .redirectOutput(ProcessBuilder.Redirect.DISCARD)
-                    .redirectError(ProcessBuilder.Redirect.DISCARD)
-                    .start();
-        } catch (IOException failure) {
-            throw new CdpException("chrome launch: " + failure.getMessage());
-        }
-        int port = awaitPort(dir, processHandle);
-        String http = "http://127.0.0.1:" + port;
+        ChromeProcess launched = ChromeProcess.start(chrome, dir, !headed, extra, "about:blank");
+        Process processHandle = launched.process();
+        String http = launched.http();
         Endpoint endpoint = discover(http);
         CdpConnection connection = CdpConnection.connect(URI.create(endpoint.webSocket), Duration.ofSeconds(10));
         SessionEvents events = watch(connection);
@@ -139,6 +114,7 @@ public final class BrowserSession implements AutoCloseable {
             ObjectNode params = Jsons.object();
             params.put("url", url);
             connection.call("Page.navigate", params, Duration.ofSeconds(15));
+            awaitDocument(connection, url);
         }
         EngineLog.info("session", "launched " + id + " pid=" + processHandle.pid());
         return new BrowserSession(id, endpoint.http, true, process, processHandle.pid(), dir, allow, processHandle, connection, events);
@@ -203,18 +179,8 @@ public final class BrowserSession implements AutoCloseable {
         if (connection != null) connection.close();
         boolean killed = false;
         if (launched && chrome != null) {
-            chrome.destroy();
-            try {
-                killed = chrome.waitFor(3, TimeUnit.SECONDS) || !chrome.isAlive();
-                if (chrome.isAlive()) {
-                    chrome.destroyForcibly();
-                    killed = true;
-                }
-            } catch (InterruptedException failure) {
-                Thread.currentThread().interrupt();
-                chrome.destroyForcibly();
-                killed = true;
-            }
+            ChromeProcess.destroyTree(chrome);
+            killed = !chrome.isAlive();
         } else if (launched && pid > 0) {
             try {
                 ProcessHandle.of(pid).ifPresent(handle -> {
@@ -268,27 +234,57 @@ public final class BrowserSession implements AutoCloseable {
         return null;
     }
 
-    private static int awaitPort(Path profile, Process process) {
-        Path file = profile.resolve("DevToolsActivePort");
+    /**
+     * Polls until the current document is {@code complete} and its location is
+     * the navigated URL. {@code about:blank} is already complete, so a ready
+     * check that ignores the URL returns before the page's listeners exist.
+     */
+    static void awaitDocument(CdpConnection connection, String url) {
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(15);
+        CdpException last = null;
         while (System.nanoTime() < deadline) {
-            if (!process.isAlive()) throw new CdpException("chrome exited before DevToolsActivePort");
-            if (Files.isRegularFile(file)) {
-                try {
-                    String line = Files.readString(file).lines().findFirst().orElse("");
-                    return Integer.parseInt(line.trim());
-                } catch (IOException | NumberFormatException failure) {
-                    throw new CdpException("DevToolsActivePort: " + failure.getMessage());
+            try {
+                ObjectNode params = Jsons.object();
+                params.put("expression", "document.readyState + '\\n' + String(location.href)");
+                params.put("returnByValue", true);
+                JsonNode result = connection.call("Runtime.evaluate", params, Duration.ofSeconds(2));
+                if (result.has("exceptionDetails")) {
+                    last = new CdpException("document not ready");
+                } else {
+                    String value = result.path("result").path("value").asText("");
+                    int split = value.indexOf('\n');
+                    String state = split < 0 ? "" : value.substring(0, split);
+                    String href = split < 0 ? "" : value.substring(split + 1);
+                    if ("complete".equals(state) && sameDocument(url, href)) {
+                        EngineLog.debug("session", "document ready " + href);
+                        return;
+                    }
                 }
+            } catch (CdpException failure) {
+                last = failure;
             }
             try {
                 Thread.sleep(50);
             } catch (InterruptedException failure) {
                 Thread.currentThread().interrupt();
-                throw new CdpException("chrome launch interrupted");
+                throw new CdpException("document ready interrupted");
             }
         }
-        throw new CdpException("timed out waiting for DevToolsActivePort");
+        throw new CdpException("timed out waiting for document ready: " + url
+                + (last == null || last.getMessage() == null ? "" : " (" + last.getMessage() + ")"));
+    }
+
+    static boolean sameDocument(String requested, String href) {
+        if (requested == null || href == null) return false;
+        return stripFragment(requested).equals(stripFragment(href));
+    }
+
+    private static String stripFragment(String value) {
+        String trimmed = value.trim();
+        int hash = trimmed.indexOf('#');
+        if (hash >= 0) trimmed = trimmed.substring(0, hash);
+        while (trimmed.endsWith("/")) trimmed = trimmed.substring(0, trimmed.length() - 1);
+        return trimmed;
     }
 
     /**
