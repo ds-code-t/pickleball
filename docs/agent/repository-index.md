@@ -689,6 +689,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/common/domoperations/LoadingCategoryDefinitionTest.java`
 - `src/test/java/tools/dscode/common/domoperations/NestAnchorReproTest.java`
 - `src/test/java/tools/dscode/common/domoperations/PositionSelectionTest.java`
+- `src/test/java/tools/dscode/common/driver/ApplyDebugPortTest.java`
 - `src/test/java/tools/dscode/common/driver/DriverDownloadFallbackTest.java`
 - `src/test/java/tools/dscode/common/mappings/ParsingMapGreaterThanMaskTest.java`
 - `src/test/java/tools/dscode/common/mappings/queries/DocumentAndReservedFieldReadTest.java`

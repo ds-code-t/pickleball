@@ -37,6 +37,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
+import io.cucumber.core.runner.CurrentScenarioState;
 import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
 import static tools.dscode.common.domoperations.SeleniumUtils.isDevToolsListening;
 import static tools.dscode.common.mappings.ValueFormatting.MAPPER;
@@ -718,7 +719,7 @@ public final class DriverConstruction {
     }
 
     public static void applyDebugPort(ChromiumOptions<?> options, String browserName, ObjectNode fullConfiguration) {
-        if (!getCurrentScenarioState().debugBrowser) {
+        if (!debugBrowserRequested()) {
             return;
         }
 
@@ -731,6 +732,17 @@ public final class DriverConstruction {
             logInfo("Starting new " + browserName + " browser on debugging port: " + debugPort);
             options.addArguments("--remote-debugging-port=" + debugPort);
         }
+    }
+
+    /**
+     * Scenario state wins when a scenario is open. Otherwise the run-level
+     * flag copied onto scenario state ({@code pkb_debug_browser}) applies.
+     * Agent {@code launch --start} builds a driver with neither.
+     */
+    private static boolean debugBrowserRequested() {
+        CurrentScenarioState state = getCurrentScenarioState();
+        if (state != null) return state.debugBrowser;
+        return CurrentScenarioState.globalDebugBrowser;
     }
 
     public static Integer resolveDebugPort(ObjectNode fullConfiguration) {
