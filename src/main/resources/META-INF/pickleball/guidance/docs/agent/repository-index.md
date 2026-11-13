@@ -674,6 +674,8 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/dalton/FileEditTest.java`
 - `src/test/java/tools/dscode/dalton/GherkinRewriteTest.java`
 - `src/test/java/tools/dscode/dalton/GlueEditTest.java`
+- `src/test/java/tools/dscode/engine/adapter/NativeSuiteHookTest.java`
+- `src/test/java/tools/dscode/engine/adapter/SuiteHookSteps.java`
 - `src/test/java/tools/dscode/engine/context/ExecutionContextTest.java`
 - `src/test/java/tools/dscode/engine/context/RunBindingsTest.java`
 - `src/test/java/tools/dscode/engine/convert/CucumberModelConverterTest.java`
@@ -773,6 +775,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/resources/multiline-assert/multiline-assert.feature`
 - `src/test/resources/position/ordinals.html`
 - `src/test/resources/scenario-object/scenario-object.feature`
+- `src/test/resources/suite-hooks/suite-hook.feature`
 - `src/test/resources/tools/dscode/common/agentcontrol/context-dom.js`
 - `src/test/resources/tools/dscode/common/agentcontrol/live-helper-dom.js`
 - `src/test/resources/tools/dscode/common/agentcontrol/persistent-tab-dom.js`

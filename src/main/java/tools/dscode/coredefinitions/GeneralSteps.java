@@ -42,6 +42,10 @@ public class GeneralSteps extends CoreSteps {
 
     private static final AtomicInteger REGISTERED_THROWABLE_ID = new AtomicInteger();
     private static final ConcurrentMap<Integer, Throwable> REGISTERED_THROWABLES = new ConcurrentHashMap<>();
+    /** Test probe. Production leaves this null. */
+    public static volatile Runnable beforeSuiteForTests;
+    /** Test probe. Runs after {@code AFTER_CUCUMBER_RUN} and before log close. */
+    public static volatile Runnable afterSuiteForTests;
 
     public static String registerStepThrowable(Throwable throwable) {
         if (throwable == null) {
@@ -162,11 +166,27 @@ public class GeneralSteps extends CoreSteps {
 
     @BeforeAll
     public static void beforeAll() {
+        startSuite();
+    }
+
+    /** Suite start for the Cucumber adapter and the native engine. */
+    public static void startSuite() {
         lifecycle.fire(Phase.BEFORE_CUCUMBER_RUN);
+        Runnable probe = beforeSuiteForTests;
+        if (probe != null) probe.run();
     }
 
     @AfterAll
     public static void afterAll() {
+        finishSuite();
+    }
+
+    /**
+     * Suite finish for the Cucumber adapter and the native engine.
+     * Order: {@code AFTER_CUCUMBER_RUN}, close logs, finish ReportPortal,
+     * stop the pickleball log, then {@code AgentCoordination.finishCurrent}.
+     */
+    public static void finishSuite() {
         CleanupTrace.print("[AfterAll] START");
 
         Throwable failure = null;
@@ -178,6 +198,15 @@ public class GeneralSteps extends CoreSteps {
         } catch (Throwable t) {
             CleanupTrace.printThrowable("[AfterAll] THROWABLE: lifecycle.fire(AFTER_CUCUMBER_RUN)", t);
             failure = rememberFailure(failure, t);
+        }
+
+        Runnable probe = afterSuiteForTests;
+        if (probe != null) {
+            try {
+                probe.run();
+            } catch (Throwable t) {
+                failure = rememberFailure(failure, t);
+            }
         }
 
         CleanupTrace.print("[AfterAll] START: Log.global().closeAll()");

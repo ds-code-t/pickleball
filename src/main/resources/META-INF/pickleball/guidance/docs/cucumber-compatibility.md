@@ -2,7 +2,7 @@
 
 > **Working feature examples:** [`mapping-and-resources.feature`](../maven-consumer-project/src/test/resources/features/mapping-and-resources.feature) demonstrates standard `Scenario Outline` and `Examples` syntax with Pickleball steps; [`component-scenarios.feature`](../maven-consumer-project/src/test/resources/features/component-scenarios.feature) demonstrates reusable Pickleball behavior inside normal Cucumber feature structure.
 
-Cucumber is a supported compatibility adapter. The default engine is native, and `pkb_engine=cucumber` keeps Cucumber. Standard Cucumber features and Java step definitions keep working, and dynamic steps can be mixed with them.
+Cucumber is a supported compatibility adapter. The default engine is native, and `pkb_engine=cucumber` keeps Cucumber. Standard Cucumber features and Java step definitions keep working, and dynamic steps can be mixed with them. Both engines fire `BEFORE_CUCUMBER_RUN` before the first scenario and `AFTER_CUCUMBER_RUN` after the last, then close logs, finish ReportPortal, stop the pickleball log, and call `AgentCoordination.finishCurrent`.
 
 ## Standard Cucumber behavior remains available
 

@@ -19,6 +19,7 @@ import org.junit.platform.engine.EngineExecutionListener;
 import org.junit.platform.engine.ExecutionRequest;
 import org.junit.platform.engine.TestDescriptor;
 import org.junit.platform.engine.TestExecutionResult;
+import tools.dscode.coredefinitions.GeneralSteps;
 import tools.dscode.dalton.DaltonFeatureSource;
 import tools.dscode.engine.EngineLog;
 import tools.dscode.engine.EngineOptions;
@@ -77,6 +78,7 @@ public final class NativeSuiteExecution {
         listener.executionStarted(root);
         Throwable failure = null;
         try {
+            GeneralSteps.startSuite();
             String tags = setting(request, Constants.FILTER_TAGS_PROPERTY_NAME, "pkb_tags");
             String name = setting(request, Constants.FILTER_NAME_PROPERTY_NAME, "pkb_name");
             String glue = setting(request, Constants.GLUE_PROPERTY_NAME, "pkb_glue");
@@ -88,6 +90,12 @@ public final class NativeSuiteExecution {
         } catch (Throwable error) {
             failure = error;
         } finally {
+            try {
+                GeneralSteps.finishSuite();
+            } catch (Throwable cleanup) {
+                if (failure == null) failure = cleanup;
+                else failure.addSuppressed(cleanup);
+            }
             if (parked == null) {
                 io.cucumber.core.runner.CurrentScenarioState.currentScenarioState.remove();
             } else {
