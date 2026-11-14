@@ -299,7 +299,7 @@ final class PageSurfaces {
         }
         Hide hidden = hideHighlight(handle);
         if (hidden == Hide.FAILED) {
-            throw new IllegalStateException("Overlay.hideHighlight failed");
+            throw hideFailed();
         }
         boolean cdpOnly = handle != null && CDP_HIGHLIGHTS.remove(handle);
         if (handle == null || handle.isBlank()) CDP_HIGHLIGHTS.clear();
@@ -506,14 +506,19 @@ final class PageSurfaces {
     }
 
     static void cleanupManaged() {
-        if (hideHighlight(null) == Hide.FAILED) {
-            throw new IllegalStateException("Overlay.hideHighlight failed");
+        Hide hidden = hideHighlight(null);
+        if (hidden == Hide.FAILED) {
+            throw hideFailed();
         }
         CDP_HIGHLIGHTS.clear();
         RuntimeException first = null;
         for (Managed managed : List.copyOf(MANAGED)) {
             WebDriver web = managed.driver;
             try {
+                if (absent(web, null)) {
+                    CompositeLog.info("html", "cleanup skipped closed driver " + managed.id);
+                    continue;
+                }
                 List<String> handles = new ArrayList<>(tabsOf(web));
                 if (handles.isEmpty()) throw new IllegalStateException("tab enumeration failed");
                 for (String handle : handles) {
@@ -631,6 +636,8 @@ final class PageSurfaces {
             return false;
         }
     }
+
+    private static volatile String lastHideDetail = "none";
 
     private enum Hide { HIDDEN, SKIPPED, FAILED }
 
@@ -788,6 +795,7 @@ final class PageSurfaces {
             sites.addAll(HIGHLIGHT_SITES);
         } else {
             for (Managed managed : MANAGED) {
+                if (absent(managed.driver, null)) continue;
                 List<String> tabs = tabsOf(managed.driver);
                 if (tabs.isEmpty()) throw new IllegalStateException("tab enumeration failed");
                 for (String tab : tabs) sites.add(new HighlightSite("", managed.driver, tab));
@@ -798,16 +806,34 @@ final class PageSurfaces {
         for (HighlightSite site : sites) {
             String key = System.identityHashCode(site.driver) + "|" + site.tab;
             if (!seen.add(key)) continue;
+            if (absent(site.driver, site.tab)) {
+                CompositeLog.info("window", "hide skipped closed " + site.tab);
+                continue;
+            }
             String previous = currentHandle(site.driver);
             if (!site.tab.isBlank() && !activate(site.driver, site.tab)) {
+                if (absent(site.driver, site.tab)) {
+                    CompositeLog.info("window", "hide skipped closed " + site.tab);
+                    continue;
+                }
                 CompositeLog.info("window", "hide tab switch failed " + site.tab);
+                lastHideDetail = "branch=hide-tab-switch tab=" + site.tab
+                        + " handle=" + currentHandle(site.driver)
+                        + " driver=" + (site.driver == null ? "null" : site.driver.getClass().getName());
                 worst = Hide.FAILED;
                 continue;
             }
             worst = worse(worst, hideOn(site.driver));
             if (previous != null && !previous.isBlank() && !previous.equals(site.tab) && !activate(site.driver, previous)) {
-                CompositeLog.info("window", "hide tab restore failed " + previous);
-                worst = Hide.FAILED;
+                if (absent(site.driver, previous)) {
+                    CompositeLog.info("window", "hide skipped closed " + previous);
+                } else {
+                    CompositeLog.info("window", "hide tab restore failed " + previous);
+                    lastHideDetail = "branch=hide-tab-restore tab=" + previous
+                            + " site=" + site.tab
+                            + " driver=" + (site.driver == null ? "null" : site.driver.getClass().getName());
+                    worst = Hide.FAILED;
+                }
             }
         }
         if (worst != Hide.FAILED) {
@@ -824,7 +850,7 @@ final class PageSurfaces {
     }
 
     private static Hide hideOn(WebDriver web) {
-        if (!cdpCapable(web)) return Hide.SKIPPED;
+        if (web == null || absent(web, null) || !cdpCapable(web)) return Hide.SKIPPED;
         try {
             BrowserFacade facade = directPage(web);
             if (facade != null && !"cdp".equals(facade.protocol())) return Hide.SKIPPED;
@@ -833,9 +859,53 @@ final class PageSurfaces {
             cdp(web, "Overlay.hideHighlight", Map.of());
             return Hide.HIDDEN;
         } catch (RuntimeException failure) {
+            if (targetGone(failure)) {
+                CompositeLog.info("highlight", "Overlay.hideHighlight skipped closed target " + failure.getMessage());
+                return Hide.SKIPPED;
+            }
+            lastHideDetail = "branch=hideOn " + failure.getClass().getName() + ": " + failure.getMessage();
             CompositeLog.info("highlight", "Overlay.hideHighlight failed " + failure.getMessage());
             return Hide.FAILED;
         }
+    }
+
+    private static IllegalStateException hideFailed() {
+        return new IllegalStateException("Overlay.hideHighlight failed [" + lastHideDetail + "]");
+    }
+
+    /** A quit driver or a tab that is no longer a window handle. A null handle list is not this. */
+    private static boolean absent(WebDriver web, String tab) {
+        if (web == null) return true;
+        try {
+            java.util.Set<String> handles = web.getWindowHandles();
+            if (handles == null) return false;
+            return tab != null && !tab.isBlank() && !handles.contains(tab);
+        } catch (RuntimeException failure) {
+            return targetGone(failure);
+        }
+    }
+
+    private static boolean targetGone(RuntimeException failure) {
+        Throwable current = failure;
+        while (current != null) {
+            if (current instanceof org.openqa.selenium.NoSuchSessionException
+                    || current instanceof org.openqa.selenium.NoSuchWindowException) {
+                return true;
+            }
+            String message = current.getMessage() == null ? "" : current.getMessage().toLowerCase(Locale.ROOT);
+            if (message.contains("invalid session")
+                    || message.contains("session deleted")
+                    || message.contains("no such window")
+                    || message.contains("target window already closed")
+                    || message.contains("inspected target navigated or closed")
+                    || message.contains("session with given id not found")
+                    || message.contains("no session with given id")
+                    || message.contains("target closed")) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
     }
 
     private static boolean cdpCapable(WebDriver web) {

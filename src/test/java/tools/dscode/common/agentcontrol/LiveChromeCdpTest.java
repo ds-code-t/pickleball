@@ -103,6 +103,20 @@ class LiveChromeCdpTest {
     }
 
     @Test
+    void cleanupHidesHighlightOnAFreshCdpSession() throws Exception {
+        String binary = chromeBinary();
+        Assumptions.assumeTrue(binary != null, "skipped: no Chrome binary on this machine");
+        ChromeOptions options = new ChromeOptions();
+        options.setBinary(binary);
+        options.addArguments("--headless=new", "--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu", "--remote-allow-origins=*");
+        browser = new ChromeDriver(options);
+        browser.get("data:text/html,<!doctype html><button id='stay'>Stay</button>");
+        PageSurfaces.manage(browser, "chrome-headed-quiet", true);
+        Map<String, Object> cleaned = PageSurfaces.cleanup(null);
+        assertEquals(true, cleaned.get("cleaned"), cleaned.toString());
+    }
+
+    @Test
     void observeReadsTheSettleSessionOfTheSelectedTab() throws Exception {
         String chrome = chromeBinary();
         Path engine = compositeBinary();

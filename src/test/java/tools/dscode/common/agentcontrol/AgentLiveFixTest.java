@@ -5,6 +5,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.openqa.selenium.NoSuchSessionException;
 import org.openqa.selenium.JavascriptExecutor;
 import org.openqa.selenium.MutableCapabilities;
 import org.openqa.selenium.WebDriver;
@@ -1044,6 +1045,58 @@ class AgentLiveFixTest {
         IllegalStateException failure = assertThrows(IllegalStateException.class, () -> PageSurfaces.unhighlight(null, "a:1"));
         assertTrue(failure.getMessage().contains("hideHighlight"), failure.getMessage());
         assertFalse(hidden.contains("tab-2"), hidden.toString());
+    }
+
+    @Test
+    void cleanupSkipsAClosedTabAQuitDriverAndAGoneCdpTarget() throws Exception {
+        AtomicReference<String> current = new AtomicReference<>("tab-1");
+        LinkedHashSet<String> tabs = new LinkedHashSet<>(List.of("tab-1", "tab-2"));
+        List<String> hidden = new ArrayList<>();
+        WebDriver live = tabsCdp(current, tabs, (method, params) -> {
+            if ("Page.getFrameTree".equals(method)) {
+                return Map.of("frameTree", Map.of("frame", Map.of("id", "a")));
+            }
+            if ("Overlay.hideHighlight".equals(method)) hidden.add(current.get());
+            return Map.of();
+        }, spec -> Map.of("ok", true, "removed", 1));
+        PageSurfaces.manage(live, "chrome-headed-quiet", true);
+        PageSurfaces.bindFrame(live, "tab-2", "a");
+        PageSurfaces.highlight(null, "a:1", "yellow", null, null, null, null, null);
+        tabs.remove("tab-2");
+        current.set("tab-1");
+        hidden.clear();
+        Map<String, Object> closedTab = PageSurfaces.cleanup(null);
+        assertEquals(true, closedTab.get("cleaned"), closedTab.toString());
+        assertFalse(hidden.contains("tab-2"), hidden.toString());
+        PageSurfaces.clearDriver();
+
+        AtomicBoolean quit = new AtomicBoolean();
+        List<String> afterQuit = new ArrayList<>();
+        WebDriver dead = quitDriver(quit, afterQuit);
+        PageSurfaces.manage(dead, "chrome-headed-quiet", true);
+        PageSurfaces.bindFrame(dead, "tab-a", "a");
+        assertEquals("Overlay.highlightNode", PageSurfaces.highlight(null, "a:2", "yellow", null, null, null, null, null).get("cdp"));
+        quit.set(true);
+        afterQuit.clear();
+        Map<String, Object> quitCleanup = PageSurfaces.cleanup(null);
+        assertEquals(true, quitCleanup.get("cleaned"), quitCleanup.toString());
+        assertTrue(afterQuit.isEmpty(), afterQuit.toString());
+        PageSurfaces.clearDriver();
+
+        WebDriver gone = cdpDriver("tab-a", (method, params) -> {
+            if ("Page.getFrameTree".equals(method)) {
+                return Map.of("frameTree", Map.of("frame", Map.of("id", "a")));
+            }
+            if ("Overlay.hideHighlight".equals(method)) {
+                throw new IllegalStateException("Session with given id not found");
+            }
+            return Map.of();
+        }, spec -> Map.of("ok", true, "removed", 1));
+        PageSurfaces.manage(gone, "chrome-headed-quiet", true);
+        PageSurfaces.bindFrame(gone, "tab-a", "a");
+        PageSurfaces.highlight(null, "a:3", "outline-red", null, null, null, null, null);
+        Map<String, Object> goneTarget = PageSurfaces.cleanup(null);
+        assertEquals(true, goneTarget.get("cleaned"), goneTarget.toString());
     }
 
     @Test
@@ -2104,6 +2157,33 @@ class AgentLiveFixTest {
                         yield cdp.apply(String.valueOf(args[0]), params);
                     }
                     default -> defaultValue(method.getReturnType());
+                }
+        );
+        self.set(driver);
+        return driver;
+    }
+
+    private static WebDriver quitDriver(AtomicBoolean quit, List<String> calls) {
+        AtomicReference<WebDriver> self = new AtomicReference<>();
+        Object switcher = locator(self, null);
+        WebDriver driver = (WebDriver) Proxy.newProxyInstance(
+                WebDriver.class.getClassLoader(),
+                new Class<?>[]{WebDriver.class, JavascriptExecutor.class, CdpProbe.class},
+                (proxy, method, args) -> {
+                    if (quit.get() && !"toString".equals(method.getName()) && !"hashCode".equals(method.getName()) && !"equals".equals(method.getName())) {
+                        if ("executeCdpCommand".equals(method.getName()) && args != null && args.length > 0) {
+                            calls.add(String.valueOf(args[0]));
+                        }
+                        throw new NoSuchSessionException("invalid session id");
+                    }
+                    return switch (method.getName()) {
+                        case "getWindowHandles" -> Set.of("tab-a");
+                        case "getWindowHandle" -> "tab-a";
+                        case "switchTo" -> switcher;
+                        case "executeScript" -> Map.of("ok", true, "removed", 1);
+                        case "executeCdpCommand" -> Map.of("frameTree", Map.of("frame", Map.of("id", "a")));
+                        default -> defaultValue(method.getReturnType());
+                    };
                 }
         );
         self.set(driver);
