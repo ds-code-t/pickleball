@@ -163,13 +163,19 @@ class LiveChromeActionSmokeTest {
             CliResult created = DomEngineMain.dispatch(List.of(
                     "session", "create", "--id", "live-key", "--url", url, "--session-dir", dir.toString()));
             assertEquals(0, created.exit(), created.stderr());
-            assertOk(DomEngineMain.dispatch(List.of("click", "--session", "live-key", "--css", "#box")));
             assertOk(DomEngineMain.dispatch(List.of("key", "--session", "live-key", "--css", "#box", "--key", "ENTER")));
             CliResult state = DomEngineMain.dispatch(List.of(
                     "eval", "--session", "live-key", "--css", "#last-key",
                     "--source", "function(){return this.textContent}"));
             assertOk(state);
             assertEquals("Last Key: Enter", Jsons.MAPPER.readTree(state.stdout()).path("value").asText(), state.stdout());
+            assertOk(DomEngineMain.dispatch(List.of("type", "--session", "live-key", "--css", "#box", "--text", "Ava")));
+            assertOk(DomEngineMain.dispatch(List.of("type", "--session", "live-key", "--css", "#box", "--text", "a")));
+            CliResult typed = DomEngineMain.dispatch(List.of(
+                    "eval", "--session", "live-key", "--css", "#box",
+                    "--source", "function(){return this.value}"));
+            assertOk(typed);
+            assertEquals("Avaa", Jsons.MAPPER.readTree(typed.stdout()).path("value").asText(), typed.stdout());
         } finally {
             server.stop(0);
             DomEngineMain.dispatch(List.of("session", "close", "--id", "live-key", "--session-dir", dir.toString()));
