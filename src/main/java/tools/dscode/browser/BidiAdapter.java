@@ -174,11 +174,48 @@ public final class BidiAdapter implements BrowserFacade {
         return new FrameNode(id, parent, node.path("url").asText(""), children);
     }
 
-    private static Object remoteValue(JsonNode node) {
+    /** A BiDi RemoteValue, or a CDP return-by-value node, as a plain map, list, or scalar. */
+    public static Object remoteValue(JsonNode node) {
         if (node == null || node.isMissingNode() || node.isNull()) return null;
+        String type = node.path("type").asText("");
+        if (("success".equals(type) || type.isEmpty()) && node.has("result")) return remoteValue(node.get("result"));
+        if ("object".equals(type)) return objectValue(node.get("value"));
+        if ("array".equals(type) || "set".equals(type)) return arrayValue(node.get("value"));
+        if ("null".equals(type) || "undefined".equals(type)) return null;
         if (node.has("type") && node.has("value")) return JsonRpc.value(node.get("value"));
         if (node.has("result")) return remoteValue(node.get("result"));
         return JsonRpc.value(node);
+    }
+
+    /** Object properties are {@code [[key, RemoteValue], ...]}. A CDP value is already a JSON object. */
+    private static Object objectValue(JsonNode value) {
+        if (value == null || value.isNull() || value.isMissingNode()) return new LinkedHashMap<String, Object>();
+        if (value.isObject()) return JsonRpc.value(value);
+        Map<String, Object> map = new LinkedHashMap<>();
+        if (!value.isArray()) return map;
+        for (JsonNode pair : value) {
+            if (!pair.isArray() || pair.size() < 2) continue;
+            JsonNode key = pair.get(0);
+            String name = key.isObject() ? key.path("value").asText("") : key.asText("");
+            map.put(name, remoteValue(pair.get(1)));
+        }
+        return map;
+    }
+
+    private static Object arrayValue(JsonNode value) {
+        if (value == null || value.isNull() || value.isMissingNode()) return List.of();
+        if (!value.isArray()) return JsonRpc.value(value);
+        boolean remote = false;
+        for (JsonNode item : value) {
+            if (item.isObject() && item.has("type")) {
+                remote = true;
+                break;
+            }
+        }
+        if (!remote) return JsonRpc.value(value);
+        List<Object> list = new ArrayList<>();
+        for (JsonNode item : value) list.add(remoteValue(item));
+        return list;
     }
 
     private static List<Map<String, Object>> arguments(Object... args) {

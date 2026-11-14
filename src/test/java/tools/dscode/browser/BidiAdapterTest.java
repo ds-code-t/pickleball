@@ -5,9 +5,11 @@ import org.junit.jupiter.api.Test;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class BidiAdapterTest {
@@ -51,5 +53,43 @@ class BidiAdapterTest {
         String call = socket.sent().stream().filter(line -> line.contains("script.callFunction")).findFirst().orElseThrow();
         assertTrue(call.contains("pkb-snapshot"), call);
         assertTrue(call.contains("sandbox"), call);
+    }
+
+    @Test
+    void callFunctionObjectExposesOuterHtml() {
+        String html = "<html><body><h1 id=\"marker\">pickleball-live-firefox</h1></body></html>";
+        ScriptedSocket socket = new ScriptedSocket().auto(request -> {
+            String method = ScriptedSocket.method(request);
+            long id = ScriptedSocket.id(request);
+            if ("browsingContext.getTree".equals(method)) {
+                return "{\"id\":" + id + ",\"type\":\"success\",\"result\":{"
+                        + "\"contexts\":[{\"context\":\"ctx-1\",\"url\":\"http://127.0.0.1/\",\"children\":[]}]}}";
+            }
+            if ("script.callFunction".equals(method)) {
+                return "{\"id\":" + id + ",\"type\":\"success\",\"result\":{\"type\":\"success\",\"realm\":\"r\",\"result\":{"
+                        + "\"type\":\"object\",\"value\":["
+                        + "[\"outerHTML\",{\"type\":\"string\",\"value\":" + jsonString(html) + "}],"
+                        + "[\"root\",{\"type\":\"object\",\"value\":["
+                        + "[\"tag\",{\"type\":\"string\",\"value\":\"html\"}],"
+                        + "[\"children\",{\"type\":\"array\",\"value\":["
+                        + "{\"type\":\"object\",\"value\":[[\"tag\",{\"type\":\"string\",\"value\":\"h1\"}]]}"
+                        + "]}]"
+                        + "]}]"
+                        + "]}}}";
+            }
+            return "{\"id\":" + id + ",\"type\":\"success\",\"result\":{}}";
+        });
+        BidiAdapter adapter = new BidiAdapter(socket, "ctx-1");
+        Object value = adapter.evaluateIsolated("pkb-premap", "function () { return document.documentElement; }");
+        Map<?, ?> walk = assertInstanceOf(Map.class, value);
+        String outer = String.valueOf(walk.get("outerHTML"));
+        assertTrue(outer.contains("pickleball-live-firefox"), outer);
+        Map<?, ?> root = assertInstanceOf(Map.class, walk.get("root"));
+        assertEquals("html", root.get("tag"));
+        assertInstanceOf(List.class, root.get("children"));
+    }
+
+    private static String jsonString(String text) {
+        return "\"" + text.replace("\\", "\\\\").replace("\"", "\\\"") + "\"";
     }
 }

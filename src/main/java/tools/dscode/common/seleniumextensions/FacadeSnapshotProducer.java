@@ -10,6 +10,7 @@ import dev.domengine.snapshot.SnapshotOptions;
 import dev.domengine.tree.DomNode;
 import org.openqa.selenium.HasCapabilities;
 import org.openqa.selenium.WebDriver;
+import tools.dscode.browser.BidiAdapter;
 import tools.dscode.browser.BrowserFacade;
 import tools.dscode.browser.FrameNode;
 import tools.dscode.browser.SeleniumAdapter;
@@ -163,10 +164,8 @@ public final class FacadeSnapshotProducer {
     }
 
     private static Object unwrap(Object value) {
-        JsonNode node = Jsons.MAPPER.valueToTree(value);
-        if (node.has("result")) return unwrap(Jsons.MAPPER.convertValue(node.get("result"), Object.class));
-        if (node.has("value") && node.has("type")) return Jsons.MAPPER.convertValue(node.get("value"), Object.class);
-        return value;
+        if (value == null) return null;
+        return BidiAdapter.remoteValue(Jsons.MAPPER.valueToTree(value));
     }
 
     private static DomNode stitch(List<JsonNode> walks, List<FrameNode> frames) {

@@ -67,7 +67,7 @@ function () {
     };
   }
   var visual = window.visualViewport || {};
-  return JSON.stringify({
+  return {
     url: String(location.href || ""),
     outerHTML: document.documentElement ? document.documentElement.outerHTML : "",
     scrollX: window.scrollX || window.pageXOffset || 0,
@@ -83,5 +83,5 @@ function () {
       height: visual.height || 0
     },
     root: document.documentElement ? walk(document.documentElement) : null
-  });
+  };
 }
