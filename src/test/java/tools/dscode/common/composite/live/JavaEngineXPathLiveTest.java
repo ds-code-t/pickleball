@@ -3,11 +3,13 @@ package tools.dscode.common.composite.live;
 import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assumptions;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.openqa.selenium.By;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.chrome.ChromeOptions;
+import tools.dscode.common.composite.CompositeMode;
 import tools.dscode.common.composite.CompositeRuntime;
 import tools.dscode.common.composite.ElementOperations;
 import tools.dscode.common.driver.DriverConstruction;
@@ -26,8 +28,14 @@ class JavaEngineXPathLiveTest {
     private ChromeDriver browser;
     private HttpServer server;
 
+    @BeforeEach
+    void useTheEngine() {
+        System.setProperty(CompositeMode.KEY, "on");
+    }
+
     @AfterEach
     void release() {
+        System.clearProperty(CompositeMode.KEY);
         CompositeRuntime.resetForTests();
         if (browser != null) {
             try {

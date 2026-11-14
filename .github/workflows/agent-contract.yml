@@ -158,6 +158,8 @@ jobs:
         run: ./gradlew --no-daemon :test --tests tools.dscode.common.composite.live.*
 
       - name: Consumer @dom-composite on native and cucumber
+        env:
+          PKB_COMPOSITE: "on"
         run: |
           set -euo pipefail
           if [ -n "${CHROME_TEST_BIN:-}" ]; then
@@ -166,8 +168,8 @@ jobs:
           fi
           ./gradlew --no-daemon publishToMavenLocal -x test
           cd maven-consumer-project
-          mvn -B test -Dpkb_tags=@dom-composite -Dpkb_engine=native -Dpkb_runvars.pkb_browser=CHROME_HEADLESS
-          mvn -B test -Dpkb_tags=@dom-composite -Dpkb_engine=cucumber -Dpkb_runvars.pkb_browser=CHROME_HEADLESS
+          mvn -B test -Dpkb_tags=@dom-composite -Dpkb_engine=native -Dpkb_composite=on -Dpkb_runvars.pkb_browser=CHROME_HEADLESS
+          mvn -B test -Dpkb_tags=@dom-composite -Dpkb_engine=cucumber -Dpkb_composite=on -Dpkb_runvars.pkb_browser=CHROME_HEADLESS
 
   gate:
     needs: [windows, dom-engine-live]
