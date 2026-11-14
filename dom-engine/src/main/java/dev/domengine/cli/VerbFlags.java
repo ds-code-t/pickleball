@@ -40,7 +40,8 @@ public final class VerbFlags {
         Map<String, List<String>> map = new LinkedHashMap<>();
         map.put("query", join(SELECTORS, List.of(
                 "file", "nesting", "nth", "every", "count-only", "geometry", "point", "viewport", "exposure", "explain",
-                "filter", "limit", "wait-for", "timeout-ms", "poll-ms", "stability-ms", "all-frames", "frame", "shadow"
+                "filter", "limit", "wait-for", "timeout-ms", "poll-ms", "stability-ms", "all-frames", "frame", "shadow",
+                "rank", "doc-version"
         )));
         List<String> identity = List.of("node-id", "refind", "frame", "shadow");
         List<String> click = join(SELECTORS, identity);

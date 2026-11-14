@@ -33,6 +33,7 @@ final class Relations {
 
     static Query.Hit filter(RelationTerm term, List<DomNode> scope, DomNode root, String pierce) {
         List<DomNode> anchors = anchorNodes(term, root, pierce);
+        QueryHooks.note(anchors);
         String label = label(term);
         List<String> anchorIds = ids(anchors);
         List<DomNode> candidates = new ArrayList<>();

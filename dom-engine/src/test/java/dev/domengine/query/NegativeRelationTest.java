@@ -12,6 +12,7 @@ import org.junit.jupiter.api.io.TempDir;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -155,6 +156,30 @@ class NegativeRelationTest {
         assertEquals(1, count(log, "not-near anchors="), log);
     }
 
+    @Test
+    void affinityRankLowersANegatedSatisfiedTerm() throws Exception {
+        DomNode root = HtmlTree.parse("""
+                <button id="far" data-x="0" data-y="0" data-w="10" data-h="10">Far</button>
+                <button id="near" data-x="450" data-y="400" data-w="10" data-h="10">Near</button>
+                <div id="anchor" data-x="400" data-y="400" data-w="40" data-h="20">Anchor</div>
+                """);
+        String pipeline = "role=button AND (css=button OR not-near(css=#anchor))";
+        assertEquals(List.of("far", "near"), ids(query(root, pipeline)));
+        JsonNode ranked = query(root, Map.of("pipeline", pipeline, "rank", "affinity", "explain", "true"));
+        assertEquals("affinity", ranked.path("rank").path("mode").asText());
+        assertEquals(List.of("near", "far"), ids(ranked), ranked.path("rank").toString());
+        Map<String, Double> totals = totalsById(ranked);
+        assertTrue(totals.get("near") > totals.get("far"), totals.toString());
+        boolean lowered = false;
+        for (JsonNode score : ranked.path("rank").path("scores")) {
+            if (!"far".equals(idFor(ranked, score.path("handle").asText()))) continue;
+            for (JsonNode reason : score.path("reasons")) {
+                if (reason.asText().startsWith("negated ")) lowered = true;
+            }
+        }
+        assertTrue(lowered, ranked.path("rank").toString());
+    }
+
     private static void assertComplement(DomNode root, String relation, String anchor, String kind, String kept, String dropped) throws Exception {
         String positive = "css=" + kind + " AND " + relation + "(" + anchor + ")";
         String negative = "css=" + kind + " AND not-" + relation + "(" + anchor + ")";
@@ -206,5 +231,21 @@ class NegativeRelationTest {
             count++;
             from = at + needle.length();
         }
+    }
+
+    private static Map<String, Double> totalsById(JsonNode json) {
+        Map<String, Double> totals = new LinkedHashMap<>();
+        for (JsonNode score : json.path("rank").path("scores")) {
+            String id = idFor(json, score.path("handle").asText());
+            if (!id.isBlank()) totals.put(id, score.path("total").asDouble());
+        }
+        return totals;
+    }
+
+    private static String idFor(JsonNode json, String handle) {
+        for (JsonNode node : json.path("nodes")) {
+            if (handle.equals(node.path("handle").asText())) return node.path("attributes").path("id").asText("");
+        }
+        return "";
     }
 }

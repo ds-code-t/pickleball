@@ -120,6 +120,11 @@ public final class DomEngineMain {
                 case "serve" -> serveRefused();
                 default -> error(2, "usage", "unknown command: " + command);
             };
+        } catch (OneMatchException failure) {
+            String message = failure.getMessage() == null ? "not found" : failure.getMessage();
+            com.fasterxml.jackson.databind.node.ObjectNode node = Jsons.error(codeFor(message), message);
+            node.set("candidates", failure.toJson());
+            return CliResult.fail(1, Jsons.pretty(node));
         } catch (CdpException failure) {
             String message = failure.getMessage() == null ? "failed" : failure.getMessage();
             String code = codeFor(message);

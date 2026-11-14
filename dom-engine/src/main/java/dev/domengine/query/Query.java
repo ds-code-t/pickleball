@@ -26,7 +26,7 @@ public final class Query {
     );
     public static final List<String> QUERY_FLAGS = List.of(
             "within", "nesting", "nth", "every", "count-only", "geometry", "pierce", "point", "viewport", "exposure",
-            "filter", "limit"
+            "filter", "limit", "rank", "doc-version"
     );
 
     private static final Set<String> XPATH_FALLBACKS = new LinkedHashSet<>();
@@ -58,6 +58,8 @@ public final class Query {
             LiveXPath.within(null);
             if (armed) Engines.useViewport(null);
             if (human) Engines.useSpace(null);
+            QueryHooks.log();
+            QueryHooks.reset();
         }
     }
 
@@ -79,6 +81,7 @@ public final class Query {
         String pipeline = pipelineOf(flags);
         boolean point = flags.get("point") != null && !flags.get("point").isBlank();
         if (pipeline == null && !point) throw new CdpException("query requires --css, --xpath, --text, --pipeline, or --selector");
+        QueryHooks.premap(root, flags);
         String pierce = flags.getOrDefault("pierce", "");
         List<Stage> trace = new ArrayList<>();
         ObjectNode image = null;
@@ -114,6 +117,8 @@ public final class Query {
             warnXPathFallback(xpath);
             EngineLog.info("query", "xpath fallback " + hit.why);
         }
+        List<RelationTerm> terms = pipeline == null ? List.of() : RelationTerm.parseAll(pipeline);
+        current = QueryHooks.rank(current, terms, flags);
         requireWithin(root, flags.get("within"));
         current = within(current, flags.get("within"));
         current = nesting(current, flags.get("nesting"));
@@ -133,8 +138,7 @@ public final class Query {
         boolean explain = "true".equals(flags.get("explain"));
         boolean countOnly = "true".equals(flags.get("count-only"));
         boolean strict = "true".equals(flags.get("strict"));
-        if (strict && current.isEmpty()) throw new CdpException("not found");
-        if (strict && current.size() > 1) throw new CdpException("ambiguous");
+        if (strict) current = List.of(QueryHooks.one(current, terms, flags));
         if (!countOnly) RowStates.fillBound(current);
         ObjectNode result = Jsons.object();
         result.put("ok", true);
@@ -173,6 +177,7 @@ public final class Query {
                     one.put("weight", term.weight());
                 }
             }
+            result.set("rank", QueryHooks.explainRank(flags));
         }
         if (image != null) result.set("image", image);
         if (!pierce.isBlank()) {

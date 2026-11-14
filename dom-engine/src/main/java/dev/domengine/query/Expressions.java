@@ -103,7 +103,10 @@ final class Expressions {
 
     static Query.Hit eval(Expr expr, List<DomNode> scope, DomNode root, String pierce) {
         return switch (expr) {
-            case Stage stage -> Engines.apply(stage.engine, stage.expr, scope, root, pierce);
+            case Stage stage -> {
+                Query.Hit hit = Engines.apply(stage.engine, stage.expr, scope, root, pierce);
+                yield new Query.Hit(QueryHooks.candidates(stage, hit.nodes), hit.why, hit.image);
+            }
             case Group group -> eval(group.inner, scope, root, pierce);
             case Not not -> negate(not, scope, root, pierce);
             case And and -> intersect(and, scope, root, pierce);
@@ -115,6 +118,7 @@ final class Expressions {
 
     private static Query.Hit evaluateRelation(Rel rel, List<DomNode> scope, DomNode root, String pierce) {
         if (rel.candidates == null) return Relations.filter(rel.term, scope, root, pierce);
+        QueryHooks.note(scope);
         if (rel.term.negated()) return Relations.negativeStage(rel.term, rel.candidates, scope, root, pierce);
         return Engines.apply(rel.term.relation().engine(), rel.candidates, scope, root, pierce);
     }
