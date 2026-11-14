@@ -19,7 +19,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * ({@code docs/maintainer} other than the Dalton design, roadmaps, audits,
  * prompts) and {@code docs/release-notes.md} are history and stay out.
  * The generated repository index stays out; {@code refresh_agent_index.py --check}
- * owns it.
+ * owns it. A current-behaviour doc also fails when it says the Control Engine
+ * is the default, or that {@code pkb_composite=auto} starts that engine.
+ * Unset, auto, and off use {@code SeleniumAdapter}. Only {@code pkb_composite=on}
+ * starts the Control Engine.
  */
 class CurrentDocsTest {
     private static final Pattern RUST = Pattern.compile("(?i)\\brust\\b");
@@ -31,6 +34,17 @@ class CurrentDocsTest {
     private static final Pattern FIX_BACK = Pattern.compile("Fix-back");
     private static final Pattern ROUND3_HEADING = Pattern.compile("(?m)^#{1,6} .*Round 3");
     private static final Pattern DATED_HEADING = Pattern.compile("(?m)^#{1,6} .*\\(3\\.0\\.0\\)");
+    private static final Pattern STALE_ENGINE_DEFAULT = Pattern.compile(
+            "Control Engine \\(default"
+                    + "|Control Engine is the default"
+                    + "|Java engine default"
+                    + "|Java engine is the default"
+                    + "|default locate path is the Java engine"
+                    + "|pkb_composite=off` forces the Selenium"
+                    + "|element path when `pkb_composite=off`"
+                    + "|An `auto` fallback \\(missing engine");
+    private static final Pattern STALE_AUTO_START = Pattern.compile(
+            "pkb_composite=auto`?(?:\\)|\\s|\\.)[^.\\n]{0,120}(?:uses that engine|uses that path|go through it|Element finds)");
     private static final int OPT_IN_WINDOW = 80;
 
     @Test
@@ -52,6 +66,12 @@ class CurrentDocsTest {
                 if (ROUND3_HEADING.matcher(line).find()) hits.add(rel + ":" + n + ": Round 3 heading: " + clip(line));
                 if (rel.equals("AGENTS.md") && DATED_HEADING.matcher(line).find()) {
                     hits.add(rel + ":" + n + ": dated heading: " + clip(line));
+                }
+                if (STALE_ENGINE_DEFAULT.matcher(line).find()) {
+                    hits.add(rel + ":" + n + ": stale engine default: " + clip(line));
+                }
+                if (STALE_AUTO_START.matcher(line).find()) {
+                    hits.add(rel + ":" + n + ": pkb_composite=auto starts the engine: " + clip(line));
                 }
             }
             optInNextToDalton(rel, text, hits);

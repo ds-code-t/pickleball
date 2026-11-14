@@ -10,8 +10,8 @@ For most tests, feature authors can create new scenarios without adding Java cod
 
 Pickleball also adds:
 
-- element finding, actions, state, geometry, and observation through the in-repo Java DOM engine packaged in the jar;
-- Selenium/WebDriver for browser lifecycle, and for the element path when `pkb_composite=off`;
+- element finding, actions, state, geometry, and observation through `SeleniumAdapter` unless `pkb_composite=on` starts the in-repo Java DOM engine packaged in the jar;
+- Selenium/WebDriver for browser lifecycle, and for the element path when `pkb_composite` is unset, `auto`, or `off`;
 - nested steps that pass conditions and page context to child steps;
 - inline and block `if` / `else-if` / `else` flow;
 - mapping and templating for scenario values, saved values, JSON-like data, and resource files;
@@ -25,6 +25,6 @@ Pickleball also adds:
 
 Pickleball remains compatible with standard Cucumber features such as tags, Scenario Outlines, Examples tables, DataTables, DocStrings, hooks, plugins, and custom Java step definitions. Dynamic Pickleball steps and ordinary project-specific Cucumber steps can be used together in the same suite.
 
-The working [`maven-consumer-project`](docs/consumer-project.md) starts a loopback test server during the run. Its scenarios exercise a local HTML test site through the DOM engine (WebDriver starts the browser) and service calls against local REST and SOAP endpoints.
+The working [`maven-consumer-project`](docs/consumer-project.md) starts a loopback test server during the run. Its scenarios exercise a local HTML test site through `SeleniumAdapter` unless `pkb_composite=on` starts the DOM engine (WebDriver starts the browser) and service calls against local REST and SOAP endpoints.
 
 [Read the Pickleball documentation](docs/README.md) · [Pickleball Workbench](docs/pickleball-workbench.md) · [Consumer project guide](docs/consumer-project.md) · [Execution configuration](docs/configuration.md) · [AI run configuration](docs/ai-run-configuration.md) · [Diagnostic lineage metadata](docs/diagnostic-lineage-metadata.md) · [Diagnostic reporting](docs/diagnostic-reporting.md)

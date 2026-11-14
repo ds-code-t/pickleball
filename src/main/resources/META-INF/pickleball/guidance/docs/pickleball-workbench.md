@@ -736,7 +736,7 @@ Deletes ask for confirmation, then pass `--confirm`. A conflict or an untracked 
 
 ## Java DOM engine
 
-The Java DOM engine is part of Pickleball, not a side artifact. `dev.domengine` classes are inside the pickleball jar and the sources are inside the sources jar. There is no published `dom-engine` Maven artifact. `pkb_composite=off` stays on Selenium. The default locate path is the Java engine. An explicit `pkb_composite_bin` still wins. `pkb_composite_engine` is not a selector.
+The Java DOM engine is part of Pickleball, not a side artifact. `dev.domengine` classes are inside the pickleball jar and the sources are inside the sources jar. There is no published `dom-engine` Maven artifact. Unset, `auto`, and `off` use `SeleniumAdapter` and do not look for an engine. `pkb_composite=on` locates the Java engine. An explicit `pkb_composite_bin` still wins. `pkb_composite_engine` is not a selector.
 
 Workbench does not call engine classes. MCP `domengine` and `DomEngineCliForwarder` only build `java -jar <pickleball.jar> domengine ...` (no `--project`, so engine flags are not given a Workbench flag). Gradle `domengine` forwards the same word through `PickleballWorkbenchLauncher` (`-PdomengineArgs=desktop,list`, default `version`). The step CLI `engine` is a different command. `DOMENGINE_LOG` or `COMPOSITE_LOG` names an entity (`cli`, `desktop`, `query`) or `all`. That log is date-stamped and size-capped, and it stays off until an entity is named.
 
