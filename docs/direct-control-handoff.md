@@ -2,7 +2,7 @@
 
 Contract version 1 (`session-descriptor.v1`). Pickleball 3.0.0.
 
-A live Workbench session can publish a descriptor so the DOM engine can attach to the browser Pickleball already owns. `pkb_direct_control_provider=composite` runs the in-repo Java DOM engine. Rust is an explicit override only. Pickleball stays the owner of the browser process and the WebDriver. The engine only attaches, acts, and detaches.
+A live Workbench session can publish a descriptor so the DOM engine can attach to the browser Pickleball already owns. `pkb_direct_control_provider=composite` runs the in-repo Java DOM engine. Pickleball stays the owner of the browser process and the WebDriver. The engine only attaches, acts, and detaches.
 
 A normal `mvn test` or `gradlew test` does not write a descriptor. An unset or blank `pkb_direct_control_provider` does nothing: no provider process, no extra log line, no change to that run.
 
@@ -162,18 +162,16 @@ The absolute directory and the id from the attach JSON are written on the descri
 
 Detach runs `session close` for that id and directory. It does not destroy a process. A session this command did not launch returns `"killed": false` and leaves Chrome or Edge running. A missing engine skips; it does not fail the run.
 
-`composite` resolves to the in-repo Java engine (`dev.domengine.cli.DomEngineMain`) when its classes are on the classpath. The Pickleball jar and the thin Workbench jar both carry it, and Workbench supplies Jackson from its runtime libs. `JavaEngineLauncher` writes a small `java -cp <engine+jackson> dev.domengine.cli.DomEngineMain "$@"` launcher (`.cmd` on Windows). Workbench uses it through `DirectControlProvider`. Element operations use it through `CompositeBinaryLocator`. The Java engine takes `--session-dir` before or after any verb, as the Rust CLI did, and prints the same pretty JSON layout (`"launched": false`).
+`composite` resolves to the in-repo Java engine (`dev.domengine.cli.DomEngineMain`) when its classes are on the classpath. The Pickleball jar and the thin Workbench jar both carry it, and Workbench supplies Jackson from its runtime libs. `JavaEngineLauncher` writes a small `java -cp <engine+jackson> dev.domengine.cli.DomEngineMain "$@"` launcher (`.cmd` on Windows). Workbench uses it through `DirectControlProvider`. Element operations use it through `CompositeBinaryLocator`. The Java engine takes `--session-dir` before or after any verb and prints pretty JSON (`"launched": false`).
 
 `DirectControlProvider.resolveBinary("composite", ...)` and `CompositeBinaryLocator.locate` share one explicit-engine order (`explicitEngineCandidates`):
 
 1. system property `pkb_composite_bin`
 2. system property `pkb_runvars.pkb_composite_bin`
-3. env `COMPOSITE_BIN`
-4. env `pkb_composite_bin`
+3. env `COMPOSITE_BIN` (working-directory relative)
+4. env `pkb_composite_bin` (project relative)
 
-Then, unless Rust is requested (`pkb_composite_engine=rust` as a property, a `pkb_runvars.` property, env `PKB_COMPOSITE_ENGINE`, or env `pkb_composite_engine`), the Java engine launcher. That lookup runs when `pkb_composite=on`. Unset, `auto`, and `off` do not start it.
-
-Then the Rust homes, and only when the steps above did not choose an engine: `COMPOSITE_HOME`, or a sibling checkout named `dom-composite` (`target/debug/composite`, then `target/release/composite`). The root locator continues on that Rust path only: a classpath native `dev/domcomposite/natives/<classifier>/composite` (`linux-x64`, `linux-aarch64`, `windows-x64`, `macos-aarch64`, `macos-x64`; Windows uses `composite.exe`), then the Maven classifier jar `dev.domcomposite:composite-native:2.4.0:<classifier>` under `~/.m2`, then an executable named `composite` on `PATH` when `pkb_composite=on`. The provider does not search those last three. Any other `pkb_direct_control_provider` value is a path.
+An explicit executable is returned before the engine key is checked. Then `pkb_composite_engine` (system property, then `pkb_runvars.pkb_composite_engine`, then env `PKB_COMPOSITE_ENGINE`, then env `pkb_composite_engine`). Unset does nothing. `java` warns once (`pkb_composite_engine is no longer used; the Java control engine is the only engine`) and stays on the Java launcher. Any other value throws `pkb_composite_engine=<value> is not supported in 3.0.0`. Then the in-repo Java launcher. That lookup runs when `pkb_composite=on`. Unset, `auto`, and `off` do not start it. Any other `pkb_direct_control_provider` value is a path.
 
 A missing engine on `pkb_composite=on` logs once (`error:` / `fix:`) and that run keeps `SeleniumAdapter`. Unset, `auto`, and `off` skip the lookup and use `SeleniumAdapter` for elements. `AgentProtocolController` is the direct CDP/BiDi entry and calls `CompositeRuntime.focusPage` rather than attaching on its own. Selenium also remains the element path when the engine cannot be started, when a join fails, or when the WebDriver has not joined an engine session. WebDriver still starts the browser either way.
 
@@ -181,27 +179,11 @@ Element operations join an already-attached session when the driver publishes a 
 
 Logging is off unless `pkb_composite_log` is `all` or a comma list of `location`, `adapter`, `session`, `element`, `fallback`, `batch`, `state`, `position`. `batch` writes one `TRACE batch mode=<composite|selenium-batch|selenium-legacy> selector=<by> nodes=<count> durationMs=<n>` line per describe and no per-element line. `state` writes one `TRACE state snapshot miss fallback` line only when a state check has no snapshot. `adapter` writes the verb, snapshot, scan, wait, nest, and live lines. `position` writes one `TRACE position apply` line per find. Lines go to the CLI and to `composite-YYYY-MM-DD.log` under `pkb_composite_log_dir` (default the temp directory `pickleball-composite-logs`). One file is capped at 1 MiB.
 
-### Optional Rust override
-
-Set `pkb_composite_engine=rust` (or `PKB_COMPOSITE_ENGINE=rust`), or set an explicit `pkb_composite_bin` / `COMPOSITE_BIN` path, to skip the Java engine. The override then looks at `COMPOSITE_HOME`, a sibling `dom-composite` checkout, the classpath natives, and `dev.domcomposite:composite-native:2.4.0:<classifier>`.
-
-The Rust 2.4.0 binary's desktop verbs are only `list`, `attach`, `walk`, `query`, `resolve`, and `close`. Browser actions on that binary are `click`, `type`, and `scroll`. That binary has no `desktop click` and no `desktop type`. A desktop click or type then fails immediately. The CLI prints `error:` and `fix:`. It is not a silent no-op, and it is not hidden when logging is off. The `fix:` names the missing verb and still names `dev.domcomposite:composite-native:2.4.0`. Unset the Rust request and the explicit binary to use the in-repo Java engine, which supports `desktop click` and `desktop type`.
-
-Native binaries are not published. Pickleball extracts them when they are present and Rust was requested or an explicit binary was not already chosen:
-
-| Coordinate | Value |
-|---|---|
-| Maven | `dev.domcomposite:composite-native:2.4.0:<classifier>` |
-| Classifiers | `linux-x64`, `linux-aarch64`, `windows-x64`, `macos-aarch64`, `macos-x64` |
-| Binary entry | `composite`, or `composite.exe` on `windows-x64` |
-| Classpath | `dev/domcomposite/natives/<classifier>/composite[.exe]` |
-| Local jar | `~/.m2/repository/dev/domcomposite/composite-native/2.4.0/composite-native-2.4.0-<classifier>.jar` |
-
-The runtime decision reads one set of inputs: project directory, environment, class loader, and Maven home. Production uses the working directory, the process environment, the context class loader, and `user.home`. A test pins those four so a host binary, a host `COMPOSITE_BIN`, or a host `~/.m2` classifier cannot leak into that decision.
+The runtime decision reads one set of inputs: project directory, environment, class loader, and Maven home. Production uses the working directory, the process environment, the context class loader, and `user.home`. A test pins those four so a host binary or a host `COMPOSITE_BIN` cannot leak into that decision.
 
 ## Desktop click and type
 
-The Java engine reports desktop `list`, `attach`, `walk`, `query`, `resolve`, `close`, `click`, and `type`. Desktop click and type work by default. The `error:` / `fix:` refusal applies only when `capabilities.desktop` lacks the verb, which is the Rust 2.4.0 override above. When an engine's `capabilities.desktop` lists `click` or `type`, `DomCompositeAdapter` forwards that verb.
+The Java engine reports desktop `list`, `attach`, `walk`, `query`, `resolve`, `close`, `click`, and `type`. Desktop click and type work by default. When `capabilities.desktop` lacks the verb, the CLI prints `error:` and `fix:`. When it lists `click` or `type`, `DomCompositeAdapter` forwards that verb.
 
 When those two descriptor fields are set, the session is already attached. Do not attach again. Join it:
 
