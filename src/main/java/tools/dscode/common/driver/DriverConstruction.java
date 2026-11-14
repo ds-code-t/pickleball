@@ -13,6 +13,8 @@ import org.openqa.selenium.chromium.ChromiumOptions;
 import org.openqa.selenium.edge.EdgeDriver;
 import org.openqa.selenium.edge.EdgeDriverService;
 import org.openqa.selenium.edge.EdgeOptions;
+import tools.dscode.browser.BrowserFacade;
+import tools.dscode.browser.ProtocolSelector;
 import tools.dscode.common.agentcontrol.AgentDriverHooks;
 import tools.dscode.common.agentcontrol.AgentLaunch;
 import tools.dscode.common.composite.CompositeRuntime;
@@ -314,11 +316,31 @@ public final class DriverConstruction {
                 : new RemoteWebDriver(new URL(remoteUrl), capabilities));
     }
 
-    /** Locates the DOM engine when a browser session starts. A missing engine does not fail the driver. */
+    /**
+     * Locates the DOM engine when a browser session starts, then selects the
+     * scripted library protocol. A published debugger or BiDi websocket is not
+     * opened here. Agent direct access uses {@link tools.dscode.browser.AgentProtocolController}.
+     */
     public static RemoteWebDriver ready(RemoteWebDriver driver) {
         AgentDriverHooks.ready(driver);
         CompositeRuntime.attach(driver);
+        scriptedProtocol(driver);
         return driver;
+    }
+
+    /**
+     * Scripted construction. Always {@code SeleniumAdapter}.
+     * {@link ProtocolSelector.Preference#LIBRARY} does not open a CDP or BiDi socket.
+     */
+    public static BrowserFacade scriptedProtocol(WebDriver driver) {
+        BrowserFacade facade = ProtocolSelector.forDriver(driver, ProtocolSelector.Preference.LIBRARY);
+        if (facade == null || !"selenium".equals(facade.protocol())) {
+            String protocol = facade == null ? "none" : facade.protocol();
+            throw new IllegalStateException(
+                    "error: scripted DriverConstruction selected " + protocol + ".\n"
+                            + "fix: Construction uses Preference.LIBRARY. Direct protocols go through AgentProtocolController.");
+        }
+        return facade;
     }
 
     public static MutableCapabilities buildRemoteCapabilities(
