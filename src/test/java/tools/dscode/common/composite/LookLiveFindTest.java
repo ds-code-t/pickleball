@@ -47,6 +47,7 @@ class LookLiveFindTest {
 
     @Test
     void liveStepFindAppliesLookAndKeepsAttributeGrammar() throws Exception {
+        System.setProperty("pkb_composite", "on");
         driver = open();
         ElementMatch blue = step(driver, "click the Button with look color equaling blue.");
         assertTrue(blue.lookClause.contains("color equaling blue"), blue.lookClause);

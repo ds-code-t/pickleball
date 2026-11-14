@@ -155,6 +155,7 @@ class ActionVerbPlanTest {
         Path log = temp.resolve("calls.log");
         Path binary = stub(temp.resolve("composite"), log, true);
         System.setProperty(CompositeBinaryLocator.BIN_KEY, binary.toString());
+        System.setProperty(CompositeMode.KEY, "on");
         System.setProperty(CompositeLog.KEY, "adapter");
         System.setProperty(CompositeLog.DIR_KEY, temp.resolve("logs").toString());
         assertTrue(ElementOperations.primary());
@@ -192,6 +193,7 @@ class ActionVerbPlanTest {
         Path log = temp.resolve("press.log");
         Path binary = stub(temp.resolve("press").resolve("composite"), log, true);
         System.setProperty(CompositeBinaryLocator.BIN_KEY, binary.toString());
+        System.setProperty(CompositeMode.KEY, "on");
         WebElement found = ElementOperations.findElements(null, org.openqa.selenium.By.cssSelector("#save")).get(0);
         ElementOperations.appendKeys(null, found, "A");
         found.sendKeys("Ava");
@@ -207,6 +209,7 @@ class ActionVerbPlanTest {
         Path log = temp.resolve("old.log");
         Path binary = stub(temp.resolve("old").resolve("composite"), log, false);
         System.setProperty(CompositeBinaryLocator.BIN_KEY, binary.toString());
+        System.setProperty(CompositeMode.KEY, "on");
         System.setProperty(CompositeLog.KEY, "adapter");
         System.setProperty(CompositeLog.DIR_KEY, temp.resolve("logs").toString());
         WebElement found = ElementOperations.findElements(null, org.openqa.selenium.By.cssSelector("#save")).get(0);

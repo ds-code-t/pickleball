@@ -15,11 +15,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Direct {@code findElement} / {@code Actions} calls may exist only in the
- * legacy branch. Every other source file must call {@code ElementOperations}.
+ * library adapter, the Selenium {@code By} implementation, and ElementOperations.
+ * Every other source file must call {@code ElementOperations}.
  */
 class PrimaryPathAuditTest {
     private static final Set<String> LEGACY = Set.of(
-            "ElementOperations.java"
+            "ElementOperations.java",
+            "SeleniumAdapter.java",
+            "CombinedBy.java"
     );
     private static final Pattern CALL = Pattern.compile(
             "(?<!ElementOperations)\\.(findElement|findElements)\\(|new Actions\\("

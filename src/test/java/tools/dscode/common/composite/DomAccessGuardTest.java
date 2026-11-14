@@ -69,6 +69,7 @@ class DomAccessGuardTest {
             "src/main/java/tools/dscode/common/agentcontrol/PageSurfaces.java",
             "src/main/java/tools/dscode/common/assertions/AssertionChain.java",
             "src/main/java/tools/dscode/common/browseroperations/BrowserAlerts.java",
+            "src/main/java/tools/dscode/common/composite/CombinedBy.java",
             "src/main/java/tools/dscode/common/composite/ElementOperations.java",
             "src/main/java/tools/dscode/common/composite/ElementReads.java",
             "src/main/java/tools/dscode/common/reporting/diagnostic/ScenarioIdentity.java",

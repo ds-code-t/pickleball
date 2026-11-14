@@ -153,6 +153,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/io/cucumber/core/stepexpression/NativeStepExpressions.java`
 - `src/main/java/io/cucumber/java/en/ReturnStep.java`
 - `src/main/java/io/cucumber/messages/types/InlinePickleArgument.java`
+- `src/main/java/tools/dscode/browser/AgentProtocolController.java`
 - `src/main/java/tools/dscode/browser/BidiAdapter.java`
 - `src/main/java/tools/dscode/browser/BindingListener.java`
 - `src/main/java/tools/dscode/browser/BrowserFacade.java`
@@ -633,6 +634,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/io/cucumber/core/runtime/DaltonExecuteFromDbTest.java`
 - `src/test/java/io/cucumber/core/runtime/DaltonFeatureLoadHookTest.java`
 - `src/test/java/io/cucumber/core/runtime/FeaturePathLoadCacheTest.java`
+- `src/test/java/tools/dscode/browser/AgentBoundaryTest.java`
 - `src/test/java/tools/dscode/browser/BidiAdapterTest.java`
 - `src/test/java/tools/dscode/browser/CdpAdapterTest.java`
 - `src/test/java/tools/dscode/browser/FacadeContractTest.java`
@@ -668,6 +670,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/common/composite/CompositeLocationTest.java`
 - `src/test/java/tools/dscode/common/composite/ContextAnchorReproTest.java`
 - `src/test/java/tools/dscode/common/composite/ContextNestGateTest.java`
+- `src/test/java/tools/dscode/common/composite/DefaultPathTest.java`
 - `src/test/java/tools/dscode/common/composite/DictionaryLayerBoundaryTest.java`
 - `src/test/java/tools/dscode/common/composite/DomAccessGuardTest.java`
 - `src/test/java/tools/dscode/common/composite/DomEnginePackagingTest.java`

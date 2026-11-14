@@ -35,7 +35,7 @@ public final class LookFind {
 
     /**
      * Keeps candidates the Java engine accepts for this look clause.
-     * {@code pkb_composite=off} fails. Selenium is not asked to evaluate look.
+     * Unset, {@code auto}, and {@code off} fail. Selenium is not asked to evaluate look.
      */
     public static List<WebElement> retain(SearchContext context, List<WebElement> candidates, ElementMatch match) {
         if (!present(match)) {
@@ -49,10 +49,12 @@ public final class LookFind {
             );
         }
         EngineQuery query = EngineQuery.of(pipeline);
-        if (CompositeMode.current().disabled()) {
+        if (!CompositeMode.current().required()) {
+            String why = CompositeMode.current().disabled()
+                    ? "pkb_composite=off cannot evaluate "
+                    : "the library path cannot evaluate ";
             throw new IllegalStateException(
-                    "error: a with-look step needs the Java engine. fix: leave pkb_composite unset or set it to auto. pkb_composite=off cannot evaluate "
-                            + query.text()
+                    "error: a with-look step needs the Java engine. fix: set pkb_composite=on. " + why + query.text()
             );
         }
         if (query.seleniumFallback() != null) {

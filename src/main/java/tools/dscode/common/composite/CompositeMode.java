@@ -5,13 +5,11 @@ import java.util.Map;
 
 /**
  * {@code pkb_composite} selects the element path for this run.
- * {@code auto} (default) uses the DOM engine (the in-repo Java engine unless
- * an explicit binary or {@code pkb_composite_engine=rust} is set) and the
- * legacy Selenium path when no engine can be located or started.
- * {@code on} (also {@code true}, {@code required}, {@code composite}) is the
- * same choice, always prints the missing-engine line, and accepts
- * {@code composite} on {@code PATH}. {@code off} (also {@code false},
- * {@code legacy}, {@code selenium}) keeps Selenium and does not look for an engine.
+ * Unset, {@code auto}, and {@code off} (also {@code false}, {@code legacy},
+ * {@code selenium}) use the library adapter ({@code SeleniumAdapter}).
+ * {@code on} (also {@code true}, {@code required}, {@code composite}) forces
+ * the Java engine for compatibility and logs that choice. Direct CDP/BiDi is
+ * not selected here.
  */
 public enum CompositeMode {
     AUTO,

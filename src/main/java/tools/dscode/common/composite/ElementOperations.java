@@ -11,6 +11,10 @@ import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.interactions.Actions;
 import org.openqa.selenium.support.ui.Select;
+import tools.dscode.browser.BrowserFacade;
+import tools.dscode.browser.BrowserLog;
+import tools.dscode.browser.ProtocolSelector;
+import tools.dscode.browser.SeleniumAdapter;
 import tools.dscode.common.domoperations.KeyParser;
 import tools.dscode.common.seleniumextensions.ElementWrapper;
 
@@ -19,10 +23,9 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * Single entry for element lookup and actions. Composite when the binary is
- * up and a browser session is joined. A primary binary that has not joined a
- * browser uses the WebDriver's Selenium find. The other Selenium calls in
- * this class are the legacy path for a run that does not have the binary.
+ * Single entry for element lookup and actions. {@code pkb_composite=on} uses the
+ * Java engine. Unset, {@code auto}, and {@code off} use {@link SeleniumAdapter}
+ * and do not call a direct protocol.
  */
 public final class ElementOperations {
     private static final AtomicInteger FINDS = new AtomicInteger();
@@ -33,6 +36,22 @@ public final class ElementOperations {
 
     public static boolean primary() {
         return CompositeRuntime.primary();
+    }
+
+    /**
+     * Scripted path. Always {@link SeleniumAdapter}. A direct adapter is refused.
+     */
+    public static BrowserFacade library(WebDriver driver) {
+        BrowserFacade facade = ProtocolSelector.forDriver(driver, ProtocolSelector.Preference.LIBRARY);
+        if (!(facade instanceof SeleniumAdapter) || !"selenium".equals(facade.protocol())) {
+            String protocol = facade == null ? "none" : facade.protocol();
+            BrowserLog.warnOnce("scripted-direct", "scripted ElementOperations refused " + protocol);
+            throw new IllegalStateException(
+                    "error: scripted ElementOperations cannot use " + protocol + ".\n"
+                            + "fix: Direct protocols go through AgentProtocolController. "
+                            + "pkb_composite=on uses the Java engine.");
+        }
+        return facade;
     }
 
     public static List<WebElement> findElements(SearchContext context, By by) {
@@ -49,6 +68,7 @@ public final class ElementOperations {
             return context.findElements(by);
         }
         if (context == null) return List.of();
+        if (context instanceof WebDriver driver && !primary()) library(driver);
         return context.findElements(by);
     }
 
@@ -87,6 +107,8 @@ public final class ElementOperations {
         }
         if (primary()) {
             CompositeLog.errorFix("element", "click had no composite element", "Look the element up through ElementOperations so the hit stays on the adapter.");
+        } else if (driver != null) {
+            library(driver);
         }
         raw.click();
     }
@@ -130,9 +152,11 @@ public final class ElementOperations {
             return;
         }
         if (raw == null) {
+            if (driver != null && !primary()) library(driver);
             new Actions(driver).sendKeys(keys).perform();
             return;
         }
+        if (driver != null && !primary()) library(driver);
         raw.sendKeys(keys);
     }
 

@@ -53,6 +53,7 @@ public final class CompositeLog {
     private static final Set<String> FALLBACK_REASONS = ConcurrentHashMap.newKeySet();
     private static final Set<String> SNAPSHOT_FALLBACKS = ConcurrentHashMap.newKeySet();
     private static final AtomicBoolean OVERRIDE = new AtomicBoolean();
+    private static final AtomicBoolean ENGINE_ON = new AtomicBoolean();
     private static final List<String> LINES = new CopyOnWriteArrayList<>();
     private static volatile String lastFallback;
     private static volatile String lastOverride;
@@ -65,6 +66,7 @@ public final class CompositeLog {
         FALLBACK_REASONS.clear();
         SNAPSHOT_FALLBACKS.clear();
         OVERRIDE.set(false);
+        ENGINE_ON.set(false);
         LINES.clear();
         lastFallback = null;
         lastOverride = null;
@@ -162,6 +164,14 @@ public final class CompositeLog {
         emit(line);
         pickleball(label, line);
         diagnostic(label, key, error, fix, engineText);
+    }
+
+    /** One INFO line per run when {@code pkb_composite=on} selects the Java engine. */
+    public static void compatibilityOn() {
+        if (!ENGINE_ON.compareAndSet(false, true)) return;
+        String line = "INFO composite.engine pkb_composite=on";
+        emit(line);
+        pickleball("INFO", line);
     }
 
     /**

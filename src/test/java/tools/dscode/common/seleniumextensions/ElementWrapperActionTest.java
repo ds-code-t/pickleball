@@ -9,6 +9,7 @@ import org.openqa.selenium.WebElement;
 import org.openqa.selenium.htmlunit.HtmlUnitDriver;
 import tools.dscode.common.composite.CompositeBinaryLocator;
 import tools.dscode.common.composite.CompositeLog;
+import tools.dscode.common.composite.CompositeMode;
 import tools.dscode.common.composite.CompositeRuntime;
 import tools.dscode.common.composite.CompositeWebElement;
 import tools.dscode.common.composite.ElementOperations;
@@ -39,6 +40,7 @@ class ElementWrapperActionTest {
     void tearDown() {
         if (driver != null) driver.quit();
         System.clearProperty(CompositeBinaryLocator.BIN_KEY);
+        System.clearProperty(CompositeMode.KEY);
         SnapshotPages.resetPin();
     }
 
@@ -85,6 +87,7 @@ class ElementWrapperActionTest {
         Path log = temp.resolve("calls.log");
         Path binary = stub(temp.resolve("composite"), log);
         System.setProperty(CompositeBinaryLocator.BIN_KEY, binary.toString());
+        System.setProperty(CompositeMode.KEY, "on");
         CompositeRuntime.resetForTests();
         assertTrue(ElementOperations.primary(), CompositeLog.lastFallbackForTests());
         List<WebElement> page = ElementOperations.findElements(driver, By.cssSelector("#save"));

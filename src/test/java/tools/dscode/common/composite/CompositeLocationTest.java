@@ -41,6 +41,11 @@ class CompositeLocationTest {
         }, home);
         assertTrue(CompositeBinaryLocator.locate().isEmpty());
         assertFalse(CompositeRuntime.primary());
+        assertTrue(CompositeLog.lastFallbackForTests() == null);
+        CompositeRuntime.resetForTests();
+        CompositeRuntime.use(project, Map.of("PKB_COMPOSITE", "on"), new ClassLoader(null) {
+        }, home);
+        assertFalse(CompositeRuntime.primary());
         String line = CompositeLog.lastFallbackForTests();
         assertTrue(line != null && line.contains("error:"), line);
         assertTrue(line.contains("fix:"), line);
@@ -58,14 +63,13 @@ class CompositeLocationTest {
         };
         CompositeRuntime.use(project, Map.of(), loader, home);
         assertFalse(CompositeRuntime.primary());
-        String missing = CompositeLog.lastFallbackForTests();
-        assertTrue(missing != null && missing.contains("error:") && missing.contains("fix:"), missing);
+        assertTrue(CompositeLog.lastFallbackForTests() == null);
 
         CompositeRuntime.resetForTests();
         Path binary = stub(temp.resolve("present").resolve("composite"));
         CompositeRuntime.use(
                 project,
-                Map.of(DirectControlProvider.BIN_ENV, binary.toString()),
+                Map.of(DirectControlProvider.BIN_ENV, binary.toString(), "pkb_composite", "on"),
                 loader,
                 home
         );
@@ -185,7 +189,7 @@ class CompositeLocationTest {
         Files.createDirectories(project);
         CompositeRuntime.use(
                 project,
-                Map.of("PKB_DALTON", "true"),
+                Map.of("PKB_DALTON", "true", "PKB_COMPOSITE", "on"),
                 CompositeLocationTest.class.getClassLoader(),
                 temp.resolve("home")
         );
@@ -213,6 +217,7 @@ class CompositeLocationTest {
     void clientOpensWhenTheBinarySpeaksStdio() throws Exception {
         Path binary = stub(temp.resolve("composite"));
         System.setProperty(CompositeBinaryLocator.BIN_KEY, binary.toString());
+        System.setProperty(CompositeMode.KEY, "on");
         System.setProperty(CompositeLog.DIR_KEY, temp.resolve("logs").toString());
         assertEquals("2.4.0", CompositeRuntime.openProbe(binary));
         assertTrue(CompositeRuntime.primary());

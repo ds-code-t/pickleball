@@ -82,6 +82,7 @@ class ElementSnapshotEvalTest {
         Path log = temp.resolve("calls.log");
         Path binary = stub(temp.resolve("composite"), log, true);
         System.setProperty(CompositeBinaryLocator.BIN_KEY, binary.toString());
+        System.setProperty(CompositeMode.KEY, "on");
         System.setProperty(CompositeLog.KEY, "adapter");
         System.setProperty(CompositeLog.DIR_KEY, temp.resolve("logs").toString());
         assertTrue(ElementOperations.primary());

@@ -171,11 +171,11 @@ Detach runs `session close` for that id and directory. It does not destroy a pro
 3. env `COMPOSITE_BIN`
 4. env `pkb_composite_bin`
 
-Then, unless Rust is requested (`pkb_composite_engine=rust` as a property, a `pkb_runvars.` property, env `PKB_COMPOSITE_ENGINE`, or env `pkb_composite_engine`), the Java engine launcher. In a normal run the Java engine is on the classpath, so that launcher is what runs.
+Then, unless Rust is requested (`pkb_composite_engine=rust` as a property, a `pkb_runvars.` property, env `PKB_COMPOSITE_ENGINE`, or env `pkb_composite_engine`), the Java engine launcher. That lookup runs when `pkb_composite=on`. Unset, `auto`, and `off` do not start it.
 
 Then the Rust homes, and only when the steps above did not choose an engine: `COMPOSITE_HOME`, or a sibling checkout named `dom-composite` (`target/debug/composite`, then `target/release/composite`). The root locator continues on that Rust path only: a classpath native `dev/domcomposite/natives/<classifier>/composite` (`linux-x64`, `linux-aarch64`, `windows-x64`, `macos-aarch64`, `macos-x64`; Windows uses `composite.exe`), then the Maven classifier jar `dev.domcomposite:composite-native:2.4.0:<classifier>` under `~/.m2`, then an executable named `composite` on `PATH` when `pkb_composite=on`. The provider does not search those last three. Any other `pkb_direct_control_provider` value is a path.
 
-A missing engine logs once (`error:` / `fix:`) and that run keeps the legacy Selenium element path. `pkb_composite=off` skips the lookup and uses Selenium for elements. `pkb_composite=auto` is the default. Selenium also remains the element path when the engine cannot be started, when a join fails, or when the WebDriver has not joined an engine session. WebDriver still starts the browser either way.
+A missing engine on `pkb_composite=on` logs once (`error:` / `fix:`) and that run keeps `SeleniumAdapter`. Unset, `auto`, and `off` skip the lookup and use `SeleniumAdapter` for elements. `AgentProtocolController` is the direct CDP/BiDi entry and calls `CompositeRuntime.focusPage` rather than attaching on its own. Selenium also remains the element path when the engine cannot be started, when a join fails, or when the WebDriver has not joined an engine session. WebDriver still starts the browser either way.
 
 Element operations join an already-attached session when the driver publishes a CDP address. That join uses `Client.openSession` with `cdp` and `i_accept_local_attach`. It does not launch a second browser and it does not replace `pkb_direct_control_provider`.
 

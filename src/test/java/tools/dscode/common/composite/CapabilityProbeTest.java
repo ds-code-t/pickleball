@@ -22,6 +22,7 @@ class CapabilityProbeTest {
     @AfterEach
     void clean() {
         System.clearProperty(CompositeBinaryLocator.BIN_KEY);
+        System.clearProperty(CompositeMode.KEY);
         System.clearProperty(CompositeLog.DIR_KEY);
         CompositeRuntime.resetForTests();
     }
@@ -31,6 +32,7 @@ class CapabilityProbeTest {
         Path log = temp.resolve("calls.log");
         Path binary = stub(temp.resolve("composite"), log, "2.4.0", "", "once");
         System.setProperty(CompositeBinaryLocator.BIN_KEY, binary.toString());
+        System.setProperty(CompositeMode.KEY, "on");
         System.setProperty(CompositeLog.DIR_KEY, temp.resolve("logs").toString());
         assertTrue(ElementOperations.primary());
         assertFalse(DomCompositeAdapter.get().actionListed("hover"));
@@ -42,6 +44,7 @@ class CapabilityProbeTest {
         Path log = temp.resolve("java.log");
         Path binary = stub(temp.resolve("java-composite"), log, "3.0.0", "domengine", "always");
         System.setProperty(CompositeBinaryLocator.BIN_KEY, binary.toString());
+        System.setProperty(CompositeMode.KEY, "on");
         System.setProperty(CompositeLog.DIR_KEY, temp.resolve("logs").toString());
         ElementOperations.JsonDesktop first = ElementOperations.desktop("click", ElementPhrase.of("Button", "Save"));
         ElementOperations.JsonDesktop second = ElementOperations.desktop("click", ElementPhrase.of("Button", "Save"));
@@ -61,6 +64,7 @@ class CapabilityProbeTest {
         Path log = temp.resolve("rust.log");
         Path binary = stub(temp.resolve("rust-composite"), log, "2.4.0", "", "always");
         System.setProperty(CompositeBinaryLocator.BIN_KEY, binary.toString());
+        System.setProperty(CompositeMode.KEY, "on");
         System.setProperty(CompositeLog.DIR_KEY, temp.resolve("logs").toString());
         IllegalStateException click = assertThrows(
                 IllegalStateException.class,

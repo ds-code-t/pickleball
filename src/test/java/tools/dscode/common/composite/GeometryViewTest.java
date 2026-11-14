@@ -34,6 +34,7 @@ class GeometryViewTest {
     void tearDown() {
         CompositeRuntime.resetForTests();
         System.clearProperty(CompositeBinaryLocator.BIN_KEY);
+        System.clearProperty(CompositeMode.KEY);
         System.clearProperty(CompositeLog.KEY);
         System.clearProperty(CompositeLog.DIR_KEY);
     }
@@ -327,6 +328,7 @@ class GeometryViewTest {
 
     private void pin(Path binary) {
         System.setProperty(CompositeBinaryLocator.BIN_KEY, binary.toString());
+        System.setProperty(CompositeMode.KEY, "on");
         System.setProperty(CompositeLog.KEY, "geometry,adapter");
         System.setProperty(CompositeLog.DIR_KEY, temp.resolve("logs").toString());
         CompositeRuntime.resetForTests();

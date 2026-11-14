@@ -92,6 +92,7 @@ class SelectorAndAdapterTest {
         Path log = temp.resolve("calls.log");
         Path binary = stub(temp.resolve("composite"), log, false);
         System.setProperty(CompositeBinaryLocator.BIN_KEY, binary.toString());
+        System.setProperty(CompositeMode.KEY, "on");
         System.setProperty(CompositeLog.DIR_KEY, temp.resolve("logs").toString());
         assertTrue(ElementOperations.primary());
         List<WebElement> found = ElementOperations.findElements(null, By.xpath("//button"));
@@ -119,6 +120,7 @@ class SelectorAndAdapterTest {
         Path log = temp.resolve("calls.log");
         Path binary = stub(temp.resolve("composite"), log, false);
         System.setProperty(CompositeBinaryLocator.BIN_KEY, binary.toString());
+        System.setProperty(CompositeMode.KEY, "on");
         System.setProperty(CompositeLog.DIR_KEY, temp.resolve("logs").toString());
         IllegalStateException click = assertThrows(
                 IllegalStateException.class,
@@ -147,6 +149,7 @@ class SelectorAndAdapterTest {
         Path log = temp.resolve("forward.log");
         Path binary = stub(temp.resolve("forward").resolve("composite"), log, true);
         System.setProperty(CompositeBinaryLocator.BIN_KEY, binary.toString());
+        System.setProperty(CompositeMode.KEY, "on");
         System.setProperty(CompositeLog.DIR_KEY, temp.resolve("logs").toString());
         ElementOperations.JsonDesktop hit = ElementOperations.desktop("click", ElementPhrase.of("Button", "Save"));
         assertEquals(1, hit.size());

@@ -80,7 +80,7 @@ class PageElementQueryTest {
         Path binary = stub(temp.resolve("composite"));
         CompositeRuntime.use(
                 temp.resolve("project"),
-                Map.of(DirectControlProvider.BIN_ENV, binary.toString()),
+                Map.of(DirectControlProvider.BIN_ENV, binary.toString(), "pkb_composite", "on"),
                 new ClassLoader(null) {
                 },
                 temp.resolve("home")
@@ -129,7 +129,7 @@ class PageElementQueryTest {
         Path binary = stub(temp.resolve("composite"));
         CompositeRuntime.use(
                 temp.resolve("project"),
-                Map.of(DirectControlProvider.BIN_ENV, binary.toString()),
+                Map.of(DirectControlProvider.BIN_ENV, binary.toString(), "pkb_composite", "on"),
                 new ClassLoader(null) {
                 },
                 temp.resolve("home")
@@ -171,7 +171,7 @@ class PageElementQueryTest {
         Path binary = stub(temp.resolve("composite"));
         CompositeRuntime.use(
                 temp.resolve("project"),
-                Map.of(DirectControlProvider.BIN_ENV, binary.toString()),
+                Map.of(DirectControlProvider.BIN_ENV, binary.toString(), "pkb_composite", "on"),
                 new ClassLoader(null) {
                 },
                 temp.resolve("home")
@@ -214,7 +214,7 @@ class PageElementQueryTest {
         Path binary = stub(temp.resolve("composite"), true);
         CompositeRuntime.use(
                 temp.resolve("project"),
-                Map.of(DirectControlProvider.BIN_ENV, binary.toString()),
+                Map.of(DirectControlProvider.BIN_ENV, binary.toString(), "pkb_composite", "on"),
                 new ClassLoader(null) {
                 },
                 temp.resolve("home")
@@ -243,7 +243,7 @@ class PageElementQueryTest {
         Path binary = stub(temp.resolve("composite-old"), false);
         CompositeRuntime.use(
                 temp.resolve("project"),
-                Map.of(DirectControlProvider.BIN_ENV, binary.toString()),
+                Map.of(DirectControlProvider.BIN_ENV, binary.toString(), "pkb_composite", "on"),
                 new ClassLoader(null) {
                 },
                 temp.resolve("home")
@@ -264,7 +264,7 @@ class PageElementQueryTest {
         Path binary = stub(temp.resolve("composite"), true);
         CompositeRuntime.use(
                 temp.resolve("project"),
-                Map.of(DirectControlProvider.BIN_ENV, binary.toString()),
+                Map.of(DirectControlProvider.BIN_ENV, binary.toString(), "pkb_composite", "on"),
                 new ClassLoader(null) {
                 },
                 temp.resolve("home")
@@ -288,7 +288,7 @@ class PageElementQueryTest {
         Path binary = stub(temp.resolve("composite"), true);
         CompositeRuntime.use(
                 temp.resolve("project"),
-                Map.of(DirectControlProvider.BIN_ENV, binary.toString()),
+                Map.of(DirectControlProvider.BIN_ENV, binary.toString(), "pkb_composite", "on"),
                 new ClassLoader(null) {
                 },
                 temp.resolve("home")

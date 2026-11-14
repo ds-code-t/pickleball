@@ -198,6 +198,7 @@ class LeanWaitNestLiveTest {
 
     private void pin(Path binary) {
         System.setProperty(CompositeBinaryLocator.BIN_KEY, binary.toString());
+        System.setProperty(CompositeMode.KEY, "on");
         System.setProperty(CompositeLog.KEY, "adapter");
         System.setProperty(CompositeLog.DIR_KEY, temp.resolve("logs").toString());
         CompositeRuntime.resetForTests();

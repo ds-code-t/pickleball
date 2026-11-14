@@ -42,27 +42,34 @@ class CompositeFallbackLogTest {
         };
         CompositeRuntime.use(project, Map.of(), empty, temp.resolve("home"));
         assertFalse(CompositeRuntime.primary());
-        assertFalse(CompositeRuntime.primary());
-        List<String> lines = fallbackLines();
-        assertEquals(1, lines.size(), lines.toString());
-        assertTrue(lines.get(0).startsWith("WARN composite.fallback reason=missing"), lines.get(0));
-        assertTrue(lines.get(0).contains("engine=none"), lines.get(0));
-        assertTrue(lines.get(0).contains("error:"), lines.get(0));
-        assertTrue(lines.get(0).contains("fix:"), lines.get(0));
-        String kept = CompositeLog.lastFallbackForTests();
-        assertTrue(kept != null && kept.contains("error:") && kept.contains("fix:"), kept);
-
-        CompositeRuntime.resetForTests();
-        CompositeRuntime.use(project, Map.of("PKB_COMPOSITE_FALLBACK_LOG", "off"), empty, temp.resolve("home"));
-        assertFalse(CompositeRuntime.primary());
         assertTrue(fallbackLines().isEmpty(), fallbackLines().toString());
 
         CompositeRuntime.resetForTests();
-        CompositeRuntime.use(project, Map.of("PKB_COMPOSITE_FALLBACK_LOG", "info"), empty, temp.resolve("home"));
+        CompositeRuntime.use(project, Map.of("PKB_COMPOSITE", "on"), empty, temp.resolve("home"));
+        assertFalse(CompositeRuntime.primary());
+        assertFalse(CompositeRuntime.primary());
+        List<String> lines = fallbackLines();
+        assertEquals(2, lines.size(), lines.toString());
+        assertTrue(lines.get(0).startsWith("error:"), lines.get(0));
+        assertTrue(lines.get(1).startsWith("fix:"), lines.get(1));
+        assertTrue(lines.get(0).contains("DOM engine") || lines.get(1).contains("pkb_composite=on"), lines.toString());
+        String kept = CompositeLog.lastFallbackForTests();
+        assertTrue(kept != null && kept.contains("error:") && kept.contains("fix:") && kept.contains("reason: missing"), kept);
+
+        CompositeRuntime.resetForTests();
+        CompositeRuntime.use(project, Map.of("PKB_COMPOSITE", "on", "PKB_COMPOSITE_FALLBACK_LOG", "off"), empty, temp.resolve("home"));
+        assertFalse(CompositeRuntime.primary());
+        List<String> required = fallbackLines();
+        assertEquals(2, required.size(), required.toString());
+        assertTrue(required.get(0).startsWith("error:"), required.toString());
+        assertTrue(required.get(1).startsWith("fix:"), required.toString());
+
+        CompositeRuntime.resetForTests();
+        CompositeRuntime.use(project, Map.of("PKB_COMPOSITE", "on", "PKB_COMPOSITE_FALLBACK_LOG", "info"), empty, temp.resolve("home"));
         assertFalse(CompositeRuntime.primary());
         List<String> info = fallbackLines();
-        assertEquals(1, info.size(), info.toString());
-        assertTrue(info.get(0).startsWith("INFO composite.fallback reason=missing"), info.get(0));
+        assertEquals(2, info.size(), info.toString());
+        assertTrue(info.stream().noneMatch(line -> line.contains("composite.fallback")), info.toString());
 
         CompositeRuntime.resetForTests();
         CompositeRuntime.use(project, Map.of("PKB_COMPOSITE", "off"), empty, temp.resolve("home"));
@@ -78,16 +85,18 @@ class CompositeFallbackLogTest {
         };
         CompositeRuntime.use(
                 temp.resolve("client-project"),
-                Map.of(DirectControlProvider.BIN_ENV, dead.toString()),
+                Map.of(DirectControlProvider.BIN_ENV, dead.toString(), "pkb_composite", "on"),
                 empty,
                 temp.resolve("home")
         );
         assertFalse(CompositeRuntime.primary());
         assertFalse(CompositeRuntime.primary());
         List<String> client = fallbackLines();
-        assertEquals(1, client.size(), client.toString());
-        assertTrue(client.get(0).contains("reason=client"), client.get(0));
-        assertFalse(client.get(0).contains("engine=none"), client.get(0));
+        assertEquals(2, client.size(), client.toString());
+        assertTrue(client.get(0).startsWith("error:"), client.toString());
+        assertTrue(client.get(1).startsWith("fix:"), client.toString());
+        assertTrue(CompositeLog.lastFallbackForTests().contains("reason: client"), CompositeLog.lastFallbackForTests());
+        assertFalse(client.get(0).contains("engine=none"), client.toString());
 
         CompositeRuntime.resetForTests();
         Path binary = executable(temp.resolve("join").resolve("composite"), """
@@ -177,7 +186,7 @@ class CompositeFallbackLogTest {
                 "pkb_run_id", "fallback-run"
         ));
         assertTrue(DiagnosticRuntime.isDiagnostic());
-        CompositeRuntime.use(temp.resolve("diag"), Map.of(), new ClassLoader(null) {
+        CompositeRuntime.use(temp.resolve("diag"), Map.of("PKB_COMPOSITE", "on"), new ClassLoader(null) {
         }, temp.resolve("home"));
         assertFalse(CompositeRuntime.primary());
         Path events = DiagnosticRuntime.runRoot().resolve("run-events.jsonl");

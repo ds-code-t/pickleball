@@ -352,10 +352,16 @@ public final class CompositeRuntime {
 
     static Decision decide(Sources sources) {
         CompositeMode mode = CompositeMode.parse(CompositeMode.read(CompositeMode.KEY, sources));
-        if (mode.disabled()) {
-            CompositeLog.debug("location", "pkb_composite=off");
-            return Decision.legacy("off");
+        if (!mode.required()) {
+            if (mode.disabled()) {
+                CompositeLog.debug("location", "pkb_composite=off");
+                return Decision.legacy("off");
+            }
+            CompositeLog.info("location", "library selenium");
+            return Decision.legacy("library");
         }
+        CompositeLog.info("location", "pkb_composite=on");
+        CompositeLog.compatibilityOn();
         Optional<Path> binary = CompositeBinaryLocator.locate(sources);
         if (binary.isEmpty()) {
             CompositeLog.fallbackOnce("missing", MISSING, MISSING_FIX, null);
@@ -403,7 +409,7 @@ public final class CompositeRuntime {
         CompositeLog.fallbackOnce(
                 "join",
                 error,
-                "Leave pkb_composite=auto so this run stays on Selenium; check that the in-repo Java engine is on the classpath, or fix the explicit pkb_composite_bin / COMPOSITE_BIN path.",
+                "pkb_composite=on asked for the Java engine and the join failed. Check that the engine is on the classpath, or fix the explicit pkb_composite_bin / COMPOSITE_BIN path. Unset, auto, and off stay on SeleniumAdapter.",
                 engine
         );
     }
