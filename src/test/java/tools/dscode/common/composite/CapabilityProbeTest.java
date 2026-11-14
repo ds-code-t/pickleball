@@ -66,12 +66,11 @@ class CapabilityProbeTest {
         System.setProperty(CompositeBinaryLocator.BIN_KEY, binary.toString());
         System.setProperty(CompositeMode.KEY, "on");
         System.setProperty(CompositeLog.DIR_KEY, temp.resolve("logs").toString());
-        IllegalStateException click = assertThrows(
-                IllegalStateException.class,
-                () -> ElementOperations.desktop("click", ElementPhrase.of("Button", "Save"))
-        );
-        assertTrue(click.getMessage().contains("desktop click"), click.getMessage());
-        assertTrue(CompositeLog.lastErrorForTests().contains("dev.domcomposite:composite-native:2.4.0"));
+        ElementOperations.JsonDesktop hit = ElementOperations.desktop("click", ElementPhrase.of("Button", "Save"));
+        assertEquals(1, hit.size());
+        String error = CompositeLog.lastErrorForTests();
+        assertTrue(error == null || !error.contains("composite-native"), String.valueOf(error));
+        assertTrue(Files.readString(log).contains("desktop"), Files.readString(log));
     }
 
     private static Path stub(Path path, Path log, String version, String name, String fail) throws Exception {

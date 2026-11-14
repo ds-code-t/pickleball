@@ -7,9 +7,9 @@ import java.util.Optional;
 
 /**
  * Launcher for the in-repo Java engine. Explicit {@code pkb_composite_bin} wins
- * before this. {@code pkb_composite_engine=rust} skips it. The launcher itself
- * lives in the JDK-only protocol module ({@link JavaEngineLauncher}) so the
- * Workbench direct-control provider resolves the same engine the same way.
+ * before this. The launcher itself lives in the JDK-only protocol module
+ * ({@link JavaEngineLauncher}) so the Workbench direct-control provider
+ * resolves the same engine the same way.
  */
 final class JavaEngineLocator {
     private JavaEngineLocator() {

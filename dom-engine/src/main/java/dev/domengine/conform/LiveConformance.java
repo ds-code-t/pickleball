@@ -32,7 +32,7 @@ import java.util.concurrent.Executors;
 
 /**
  * Live-Chrome conformance. The offline {@link Conformance} path stays unchanged.
- * Every assertion kind in the Rust fixtures is evaluated against a real browser
+ * Every assertion kind in the control-engine fixtures is evaluated against a real browser
  * when Chrome is present. A checked disagreement is a failure. An assertion is
  * skipped only when this engine has no required capability, and the skip is named.
  */

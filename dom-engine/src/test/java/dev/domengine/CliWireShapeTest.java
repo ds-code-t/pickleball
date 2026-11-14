@@ -17,11 +17,11 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Wire shapes the Workbench direct-control provider relies on, as the Rust
- * {@code composite} CLI produced them: {@code --session-dir} is a global flag on
- * every verb, and pretty JSON is {@code serde_json::to_string_pretty} layout.
+ * Wire shapes the Workbench direct-control provider relies on. {@code --session-dir}
+ * is a global flag on every verb, and pretty JSON uses two-space indent, one
+ * array element per line, and empty {@code []} / {@code {}}.
  */
-class RustCliShapeTest {
+class CliWireShapeTest {
     @AfterEach
     void clean() {
         SessionRegistry.resetForTests();

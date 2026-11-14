@@ -22,7 +22,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Named sessions owned by this CLI process.
- * The registry file and the per-session event log match the Rust composite:
+ * The registry file and the per-session event log are the wire contract:
  * {@code registry.json} plus {@code <id>.events.jsonl} under {@code --session-dir}
  * or {@code COMPOSITE_SESSION_DIR} (default {@code composite-sessions} in the temp dir).
  */
@@ -173,7 +173,7 @@ public final class SessionRegistry {
 
     /**
      * Join by id. Later commands that omit {@code --session} use this session.
-     * Output matches the Rust CLI: {@code joined} plus the session record.
+     * Output is {@code joined} plus the session record.
      */
     public ObjectNode join(String id) {
         if (id == null || id.isBlank()) throw new CdpException("session join needs --id or --cdp");

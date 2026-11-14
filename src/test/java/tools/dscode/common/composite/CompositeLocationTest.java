@@ -6,7 +6,8 @@ import org.junit.jupiter.api.io.TempDir;
 
 import tools.dscode.control.protocol.DirectControlProvider;
 
-import java.nio.charset.StandardCharsets;
+import java.net.URL;
+import java.net.URLClassLoader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.PosixFilePermission;
@@ -18,6 +19,7 @@ import java.util.jar.JarOutputStream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class CompositeLocationTest {
@@ -91,7 +93,8 @@ class CompositeLocationTest {
         executable(sibling);
         Optional<Path> home = CompositeBinaryLocator.locate(project, Map.of(), new ClassLoader(null) {
         });
-        assertEquals(sibling.toAbsolutePath().normalize(), home.orElseThrow());
+        assertTrue(home.isEmpty(), String.valueOf(home));
+        assertFalse(home.isPresent() && home.orElseThrow().equals(sibling.toAbsolutePath().normalize()));
     }
 
     @Test
@@ -125,6 +128,8 @@ class CompositeLocationTest {
         String script = Files.readString(javaEngine.orElseThrow());
         assertTrue(script.contains("dev.domengine.cli.DomEngineMain"), script);
         assertFalse(javaEngine.orElseThrow().equals(sibling.toAbsolutePath().normalize()));
+        assertTrue(CompositeBinaryLocator.locate(project, Map.of(), new ClassLoader(null) {
+        }).isEmpty(), "a sibling checkout is never returned");
         assertEquals("3.0.0", CompositeRuntime.openProbe(javaEngine.orElseThrow()));
     }
 
@@ -139,15 +144,16 @@ class CompositeLocationTest {
         );
         assertEquals(binary.toAbsolutePath().normalize(), named.orElseThrow());
 
-        Path project = temp.resolve("rust-repo").resolve("pickleball");
-        Path sibling = temp.resolve("rust-repo").resolve("dom-composite").resolve("target").resolve("release").resolve("composite");
+        Path project = temp.resolve("flag-repo").resolve("pickleball");
+        Path sibling = temp.resolve("flag-repo").resolve("dom-composite").resolve("target").resolve("release").resolve("composite");
         executable(sibling);
-        Optional<Path> rust = CompositeBinaryLocator.locate(
+        IllegalStateException failure = assertThrows(IllegalStateException.class, () -> CompositeBinaryLocator.locate(
                 project,
                 Map.of("PKB_COMPOSITE_ENGINE", "rust"),
                 loader
-        );
-        assertEquals(sibling.toAbsolutePath().normalize(), rust.orElseThrow());
+        ));
+        assertTrue(failure.getMessage().contains("pkb_composite_engine=rust is not supported in 3.0.0"), failure.getMessage());
+        assertFalse(failure.getMessage().contains(sibling.toString()), failure.getMessage());
     }
 
     @Test
@@ -201,16 +207,35 @@ class CompositeLocationTest {
 
     @Test
     void classifierJarExtractsABinary() throws Exception {
-        Path jar = temp.resolve("composite-native-2.4.0-linux-x64.jar");
+        Path jar = temp.resolve("bundled.jar");
         try (JarOutputStream out = new JarOutputStream(Files.newOutputStream(jar))) {
             out.putNextEntry(new JarEntry("composite"));
-            out.write("#!/bin/sh\nexit 0\n".getBytes(StandardCharsets.UTF_8));
+            out.write("#!/bin/sh\nexit 0\n".getBytes(java.nio.charset.StandardCharsets.UTF_8));
             out.closeEntry();
         }
-        Optional<Path> extracted = CompositeBinaryLocator.extractJarForTests(jar, "linux-x64");
-        assertTrue(extracted.isPresent(), "extracted");
-        assertTrue(Files.isRegularFile(extracted.get()));
-        assertTrue(Files.isExecutable(extracted.get()));
+        Path home = temp.resolve("home");
+        Path installed = home.resolve(".m2").resolve("repository").resolve("dev").resolve("domcomposite")
+                .resolve("composite-native").resolve("2.4.0")
+                .resolve("composite-native-2.4.0-linux-x64.jar");
+        Files.createDirectories(installed.getParent());
+        Files.copy(jar, installed);
+        try (URLClassLoader loader = new URLClassLoader(
+                new URL[] {jar.toUri().toURL()},
+                CompositeLocationTest.class.getClassLoader()
+        )) {
+            Optional<Path> located = CompositeBinaryLocator.locate(new CompositeRuntime.Sources(
+                    temp.resolve("project"),
+                    Map.of(),
+                    loader,
+                    home,
+                    Map.of(),
+                    true
+            ));
+            assertTrue(located.isPresent(), "java engine");
+            String script = Files.readString(located.orElseThrow());
+            assertTrue(script.contains("dev.domengine.cli.DomEngineMain"), script);
+            assertFalse(located.orElseThrow().toString().contains("pickleball-composite-bin"), located.toString());
+        }
     }
 
     @Test

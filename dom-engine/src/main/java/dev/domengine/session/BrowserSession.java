@@ -137,8 +137,7 @@ public final class BrowserSession implements AutoCloseable {
     /**
      * Starts the session event buffer: the listener goes on before the domains
      * are enabled, so nothing after attach is missed. These are the domains the
-     * Rust retained Session enabled for observe ({@code Page}, {@code Runtime},
-     * {@code Network}, {@code Log}). A target that refuses a domain still opens;
+     * observe ({@code Page}, {@code Runtime}, {@code Network}, {@code Log}). A target that refuses a domain still opens;
      * observe then has fewer kinds, which is logged, not hidden.
      */
     static SessionEvents watch(CdpConnection connection) {

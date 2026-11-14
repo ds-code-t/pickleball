@@ -56,7 +56,7 @@ public final class DomEngineMain {
 
     public static CliResult dispatch(List<String> argv) {
         List<String> args = new ArrayList<>(argv == null ? List.of() : argv);
-        // --session-dir is global on the Rust CLI: `composite --session-dir DIR query ...`
+        // --session-dir is global on the control-engine CLI: `domengine --session-dir DIR query ...`
         // and `composite query ... --session-dir DIR` both name the registry.
         Path globalSessionDir = peelSessionDir(args);
         if (globalSessionDir != null) SessionRegistry.get().useDirectory(globalSessionDir);
@@ -310,7 +310,7 @@ public final class DomEngineMain {
         return sessionVerb(verb, flags);
     }
 
-    /** {@code --session-dir} is global on the Rust CLI, so it may appear before the verb. */
+    /** {@code --session-dir} is global on the control-engine CLI, so it may appear before the verb. */
     private static Path peelSessionDir(List<String> args) {
         Path dir = null;
         for (int i = 0; i < args.size(); i++) {

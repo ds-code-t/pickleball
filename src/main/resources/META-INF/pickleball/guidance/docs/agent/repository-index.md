@@ -605,7 +605,6 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/testengine/WorkspaceSeed.java`
 - `src/main/java/tools/dscode/testengine/WorkspaceSeedMain.java`
 - `src/main/java/tools/dscode/Values.java`
-- `src/main/resources/dev/domcomposite/natives/README.txt`
 - `src/main/resources/META-INF/pickleball/configs/CHROME_HEADLESS.yaml`
 - `src/main/resources/META-INF/services/org.junit.platform.engine.TestEngine`
 - `src/main/resources/META-INF/services/org.junit.platform.launcher.LauncherSessionListener`
@@ -689,6 +688,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/common/composite/live/JavaEngineXPathLiveTest.java`
 - `src/test/java/tools/dscode/common/composite/LookLiveFindTest.java`
 - `src/test/java/tools/dscode/common/composite/LookStepTest.java`
+- `src/test/java/tools/dscode/common/composite/NoRustLeftTest.java`
 - `src/test/java/tools/dscode/common/composite/PrimaryPathAuditTest.java`
 - `src/test/java/tools/dscode/common/composite/RelationPhraseTest.java`
 - `src/test/java/tools/dscode/common/composite/SelectorAndAdapterTest.java`
@@ -1024,6 +1024,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/DiagnosticQueryTest.java`
 - `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/DiagnosticSqliteIndexTest.java`
 - `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/DirectControlProviderTest.java`
+- `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/EngineKeyRemovedTest.java`
 - `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/ExampleRowSelectorTest.java`
 - `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/FailureRecordTest.java`
 - `pickleball-control-protocol/src/test/java/tools/dscode/control/protocol/PickleballPathsTest.java`
@@ -1279,6 +1280,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `dom-engine/src/test/java/dev/domengine/CdpSessionAttachTest.java`
 - `dom-engine/src/test/java/dev/domengine/CliStdioTest.java`
 - `dom-engine/src/test/java/dev/domengine/CliSurfaceTest.java`
+- `dom-engine/src/test/java/dev/domengine/CliWireShapeTest.java`
 - `dom-engine/src/test/java/dev/domengine/ConformanceSuiteTest.java`
 - `dom-engine/src/test/java/dev/domengine/desktop/DesktopOneMatchTest.java`
 - `dom-engine/src/test/java/dev/domengine/desktop/DesktopScreenshotTest.java`
@@ -1322,7 +1324,6 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `dom-engine/src/test/java/dev/domengine/query/RelativeLocatorTest.java`
 - `dom-engine/src/test/java/dev/domengine/query/XPathClauseTest.java`
 - `dom-engine/src/test/java/dev/domengine/QueryFlagOfflineTest.java`
-- `dom-engine/src/test/java/dev/domengine/RustCliShapeTest.java`
 - `dom-engine/src/test/java/dev/domengine/SelectorParityTest.java`
 - `dom-engine/src/test/java/dev/domengine/session/BrowserSessionEndpointTest.java`
 - `dom-engine/src/test/java/dev/domengine/session/ChromeProcessTest.java`
@@ -1476,6 +1477,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `dom-engine/src/test/resources/conformance/expected/variant-dpi.json`
 - `dom-engine/src/test/resources/conformance/expected/variant-mobile.json`
 - `dom-engine/src/test/resources/conformance/expected/variant-print.json`
+- `dom-engine/src/test/resources/conformance/README.md`
 - `dom-engine/src/test/resources/conformance/site/a11y/at-hidden.html`
 - `dom-engine/src/test/resources/conformance/site/a11y/custom-tag.html`
 - `dom-engine/src/test/resources/conformance/site/a11y/hidden-role.html`

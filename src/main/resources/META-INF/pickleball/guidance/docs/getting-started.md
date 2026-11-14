@@ -9,7 +9,7 @@ A consumer normally needs the Pickleball test dependency and one runner extendin
 - Java 21
 - the project's wrapper: `mvnw` or `mvnw.cmd`, `gradlew` or `gradlew.bat`, or `java -jar` on the wrapper jar. Pick the script from the OS. Do not require a machine-wide Maven or Gradle install
 - a Selenium-supported browser for browser scenarios
-- nothing extra for element operations: the in-repo Java DOM engine is in the Pickleball jar. `pkb_composite=off` forces the Selenium element path. `pkb_composite_engine=rust` with an explicit binary path is an optional override. See [Configuration](configuration.md).
+- nothing extra for element operations: the in-repo Java DOM engine is in the Pickleball jar. `pkb_composite=off` forces the Selenium element path. An explicit `pkb_composite_bin` points at a domengine launcher. `pkb_composite_engine` is not a selector: unset does nothing, `java` warns once, and any other value fails at engine start. See [Configuration](configuration.md).
 
 ## Maven dependency
 

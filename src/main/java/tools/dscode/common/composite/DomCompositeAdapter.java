@@ -22,10 +22,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 /** The only composite call path for find, click, type, hover, scroll, keys, and desktop. */
 public final class DomCompositeAdapter {
-    /** Desktop verbs composite 2.4.0 reports. Click and type are not in this set. */
-    public static final List<String> DESKTOP_VERBS_2_4_0 = List.of(
-            "list", "attach", "walk", "query", "resolve", "close"
-    );
 
     private static final DomCompositeAdapter INSTANCE = new DomCompositeAdapter();
     private final ThreadLocal<ArrayDeque<String>> frames = ThreadLocal.withInitial(ArrayDeque::new);
@@ -793,17 +789,11 @@ public final class DomCompositeAdapter {
         if (reported.contains(verb.toLowerCase(Locale.ROOT))) return;
         String shown = reported.isEmpty() ? "(none)" : String.join(", ", reported);
         String error = "DOM engine has no desktop " + verb + " verb (capabilities.desktop is " + shown + ")";
-        String fix = "The in-repo Java engine supports desktop click and desktop type. "
-                + "Unset pkb_composite_engine=rust and any explicit binary to use it. "
-                + "For the Rust override, expected verbs are `desktop click` and `desktop type`. "
-                + "2.4.0 desktop verbs are " + String.join(", ", DESKTOP_VERBS_2_4_0) + ". "
-                + "Drop in dev.domcomposite:composite-native:" + CompositeBinaryLocator.VERSION
-                + " classifiers " + String.join(", ", CompositeBinaryLocator.CLASSIFIERS)
-                + ". The binary name is composite, or composite.exe on windows-x64. "
-                + "Classpath entry: dev/domcomposite/natives/<classifier>/composite[.exe]. "
-                + "Maven jar: ~/.m2/repository/dev/domcomposite/composite-native/"
-                + CompositeBinaryLocator.VERSION + "/composite-native-" + CompositeBinaryLocator.VERSION
-                + "-<classifier>.jar. When capabilities.desktop lists `" + verb
+        String fix = "The Java control engine supports desktop click and desktop type. "
+                + "Set pkb_composite_bin to a domengine launcher when that engine is not already on the classpath. "
+                + "Expected verbs include desktop click and desktop type. "
+                + "The launcher name is composite, or composite.exe on windows-x64, and the classifier includes linux-x64. "
+                + "When capabilities.desktop lists `" + verb
                 + "`, this adapter forwards it. No Pickleball change is required.";
         CompositeLog.always(error, fix);
         throw new IllegalStateException("error: " + error);
@@ -878,14 +868,14 @@ public final class DomCompositeAdapter {
 
     private Set<String> desktopVerbs() {
         Client open = CompositeRuntime.ensureClient();
-        if (open == null) return Set.copyOf(DESKTOP_VERBS_2_4_0);
+        if (open == null) return Set.copyOf(dev.domengine.desktop.DesktopTree.VERBS);
         pinClient(open);
         Set<String> cached = desktopVerbs;
         if (cached != null) return cached;
         if (System.currentTimeMillis() < desktopBlockedUntil) {
-            return namedFallback(open, DESKTOP_VERBS_2_4_0, dev.domengine.desktop.DesktopTree.VERBS);
+            return Set.copyOf(dev.domengine.desktop.DesktopTree.VERBS);
         }
-        Optional<Set<String>> loaded = loadNamedVerbs(open, "desktop", DESKTOP_VERBS_2_4_0);
+        Optional<Set<String>> loaded = loadNamedVerbs(open, "desktop", dev.domengine.desktop.DesktopTree.VERBS);
         if (loaded.isPresent()) {
             desktopFailures = 0;
             desktopBlockedUntil = 0L;
@@ -893,7 +883,7 @@ public final class DomCompositeAdapter {
             return desktopVerbs;
         }
         noteProbeFailure("desktop");
-        return namedFallback(open, DESKTOP_VERBS_2_4_0, dev.domengine.desktop.DesktopTree.VERBS);
+        return Set.copyOf(dev.domengine.desktop.DesktopTree.VERBS);
     }
 
     private Set<String> actionVerbs() {
@@ -1045,8 +1035,8 @@ public final class DomCompositeAdapter {
         }
     }
 
-    private static Set<String> namedFallback(Client open, List<String> rust24, List<String> javaEngine) {
-        return javaEngine(open) ? Set.copyOf(javaEngine) : Set.copyOf(rust24);
+    private static Set<String> namedFallback(Client open, List<String> older, List<String> javaEngine) {
+        return javaEngine(open) ? Set.copyOf(javaEngine) : Set.copyOf(older);
     }
 
     private static boolean javaEngine(Client open) {

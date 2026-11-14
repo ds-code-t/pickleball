@@ -45,14 +45,15 @@ class DirectControlProviderTest {
     }
 
     @Test
-    void missingBinarySkipsWithAClearMessage() {
-        // The in-repo Java engine is on this test classpath, so only an explicit
-        // Rust request leaves "composite" with nothing to run.
-        DirectControlProvider.Outcome outcome = DirectControlProvider.open(
-                liveComposite(Map.of(JavaEngineLauncher.ENGINE_ENV, "rust")));
-        assertEquals(DirectControlProvider.Kind.BINARY_MISSING, outcome.kind());
-        assertNull(outcome.handle());
-        assertTrue(outcome.message().contains("no DOM engine found"));
+    void missingBinarySkipsWithAClearMessage() throws Exception {
+        IllegalStateException failure = assertThrows(IllegalStateException.class, () ->
+                DirectControlProvider.open(liveComposite(Map.of(JavaEngineLauncher.ENGINE_ENV, "rust"))));
+        assertTrue(failure.getMessage().contains("pkb_composite_engine=rust is not supported in 3.0.0"), failure.getMessage());
+        assertTrue(failure.getMessage().contains("Java control engine is the only engine"), failure.getMessage());
+        assertTrue(failure.getMessage().contains("pkb_composite_bin"), failure.getMessage());
+        Path launcher = DirectControlProvider.resolveBinary(DirectControlProvider.TOKEN, temp, Map.of())
+                .orElseThrow(() -> new AssertionError("no explicit binary still resolves the Java engine"));
+        assertTrue(Files.readString(launcher).contains(JavaEngineLauncher.MAIN_CLASS), launcher.toString());
     }
 
     @Test
@@ -79,12 +80,17 @@ class DirectControlProviderTest {
                 DirectControlProvider.TOKEN, temp, Map.of(DirectControlProvider.BIN_ENV, named.toString())).orElseThrow());
         assertEquals(named.toAbsolutePath().normalize(), DirectControlProvider.resolveBinary(
                 DirectControlProvider.TOKEN, temp, Map.of(JavaEngineLauncher.BIN_KEY, named.toString())).orElseThrow());
-        assertTrue(DirectControlProvider.resolveBinary(
-                DirectControlProvider.TOKEN, temp, Map.of(JavaEngineLauncher.ENGINE_ENV, "rust")).isEmpty());
-        assertTrue(DirectControlProvider.resolveBinary(
-                DirectControlProvider.TOKEN, temp, Map.of(JavaEngineLauncher.ENGINE_KEY, "RUST")).isEmpty());
-        assertTrue(DirectControlProvider.resolveRustBinary(temp, Map.of()).isEmpty(),
-                "the Rust-only lookup never returns the Java engine");
+        assertEquals(named.toAbsolutePath().normalize(), DirectControlProvider.resolveBinary(
+                DirectControlProvider.TOKEN, temp,
+                Map.of(DirectControlProvider.BIN_ENV, named.toString(), JavaEngineLauncher.ENGINE_ENV, "rust")).orElseThrow());
+        IllegalStateException rust = assertThrows(IllegalStateException.class, () -> DirectControlProvider.resolveBinary(
+                DirectControlProvider.TOKEN, temp, Map.of(JavaEngineLauncher.ENGINE_ENV, "rust")));
+        assertTrue(rust.getMessage().contains("pkb_composite_engine=rust is not supported in 3.0.0"), rust.getMessage());
+        IllegalStateException upper = assertThrows(IllegalStateException.class, () -> DirectControlProvider.resolveBinary(
+                DirectControlProvider.TOKEN, temp, Map.of(JavaEngineLauncher.ENGINE_KEY, "RUST")));
+        assertTrue(upper.getMessage().contains("pkb_composite_engine=RUST is not supported in 3.0.0"), upper.getMessage());
+        assertThrows(NoSuchMethodException.class, () ->
+                DirectControlProvider.class.getMethod("resolveRustBinary", Path.class, Map.class));
         ClassLoader noEngine = new ClassLoader(null) {
         };
         assertTrue(DirectControlProvider.resolveBinary(DirectControlProvider.TOKEN, temp, Map.of(), noEngine).isEmpty(),

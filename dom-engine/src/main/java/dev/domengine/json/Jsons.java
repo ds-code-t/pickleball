@@ -10,9 +10,9 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 public final class Jsons {
     public static final ObjectMapper MAPPER = new ObjectMapper();
     /**
-     * Same layout as the Rust CLI ({@code serde_json::to_string_pretty}):
-     * two-space indent, {@code "key": value}, one array element per line,
-     * {@code []} and {@code {}} for empty containers, {@code \n} line ends.
+     * Pretty JSON wire layout: two-space indent, {@code "key": value}, one array
+     * element per line, {@code []} and {@code {}} for empty containers, {@code \n}
+     * line ends.
      */
     private static final DefaultPrettyPrinter PRETTY;
 

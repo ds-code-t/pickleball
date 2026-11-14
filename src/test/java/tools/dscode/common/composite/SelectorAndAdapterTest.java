@@ -131,10 +131,10 @@ class SelectorAndAdapterTest {
         assertTrue(line.contains("error:"), line);
         assertTrue(line.contains("fix:"), line);
         assertTrue(line.contains("desktop type"), line);
-        assertTrue(line.contains("dev.domcomposite:composite-native:2.4.0"), line);
+        assertTrue(line.contains("Java control engine") && line.contains("pkb_composite_bin"), line);
         assertTrue(line.contains("linux-x64"), line);
         assertTrue(line.contains("composite.exe"), line);
-        assertTrue(line.contains("composite-native-2.4.0-<classifier>.jar"), line);
+        assertFalse(line.contains("composite-native"), line);
         List<WebElement> found = DomCompositeAdapter.get().find(
                 SelectorTranslator.phrase(ElementPhrase.of("Button", "Save").source("desktop")));
         CompositeWebElement element = assertInstanceOf(CompositeWebElement.class, found.get(0));

@@ -23,7 +23,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 /**
- * Offline conformance against the Rust suite's HTML pages and expected JSON.
+ * Offline conformance against the control-engine wire contract's HTML pages and expected JSON.
  * Layout, hit-testing, and scripted shadow roots are recorded as skipped.
  * A checked assertion that disagrees is a failure.
  */

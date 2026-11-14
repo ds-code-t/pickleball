@@ -185,14 +185,7 @@ dependencies {
     api(platform("io.cucumber:cucumber-bom:${cucumberVersion}"))
 
     // Selenium is browser lifecycle and the pkb_composite=off element path.
-    // The in-repo Java DOM engine (project(':dom-engine')) is embedded in the jar
-    // and is the default element engine.
-    // The vendored dev.domcomposite Client / Session under src/main/java/dev/domcomposite
-    // is the stdio client for the engine CLI (github.com/ds-code-t/dom-composite
-    // commit d63887c; not on Maven Central, maven.deploy.skip).
-    // Rust native classifiers matter only for the pkb_composite_engine=rust override:
-    // classpath dev/domcomposite/natives/<os-arch>/composite
-    // or dev.domcomposite:composite-native:2.4.0:<classifier>. See docs/configuration.md.
+    // The embedded Java control engine (project(':dom-engine')) ships in the jar; the vendored dev.domcomposite Client and Session are its stdio client.
     implementation('org.seleniumhq.selenium:selenium-java') {
         version { strictly('[4.44,5.0)') }
     }

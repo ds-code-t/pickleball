@@ -16,17 +16,16 @@ import java.util.concurrent.TimeUnit;
 /**
  * CDP events one {@link BrowserSession} saw on its own socket since it
  * attached or launched: {@code Network.*}, {@code Page.frameNavigated},
- * {@code Runtime.consoleAPICalled}, and {@code Log.entryAdded}. This is the
- * Java form of the Rust composite Session event deque that {@code observe}
- * read. Rows use the Rust projection: {@code method}, {@code kind},
+ * {@code Runtime.consoleAPICalled}, and {@code Log.entryAdded}. Rows are the
+ * observe projection: {@code method}, {@code kind},
  * {@code url}, {@code text}, {@code level}, {@code at} (unix ms),
  * {@code status}, {@code mime}, {@code httpMethod}, {@code failed}.
  * The buffer is bounded; the oldest rows drop first.
  */
 public final class SessionEvents {
-    /** Same cap as the Rust Session deque. */
+    /** Oldest rows drop first. The buffer holds this many events. */
     public static final int CAPACITY = 2000;
-    /** Longest {@code --wait-ms} honoured, as in Rust. */
+    /** Longest {@code --wait-ms} honoured by {@code observe}. */
     public static final long MAX_WAIT_MS = 30_000;
     private static final int INFLIGHT_CAP = 4096;
 
@@ -121,7 +120,7 @@ public final class SessionEvents {
     }
 
     /**
-     * Rust {@code observe::filter_events}: kind or CDP method substring
+     * {@code observe} filter: kind or CDP method substring
      * (case-insensitive), url-or-text substring, inclusive {@code at} window,
      * newest {@code limit} rows ({@code 0} keeps every match).
      */
@@ -189,7 +188,7 @@ public final class SessionEvents {
             case "Network.loadingFinished", "Network.loadingFailed" -> {
                 String id = p.path("requestId").asText("");
                 String[] known = inflight.remove(id);
-                // Unknown id: a request before attach, or a data:/blob:/chrome: request; url stays empty as in Rust.
+                // Unknown id: a request before attach, or a data:/blob:/chrome: request; url stays empty.
                 String url = known == null ? "" : known[0];
                 boolean failed = "Network.loadingFailed".equals(method);
                 String text = failed ? p.path("errorText").asText("") : "";
@@ -252,7 +251,7 @@ public final class SessionEvents {
         return row;
     }
 
-    /** Rust {@code wall_ms}: {@code wallTime} seconds, then an epoch-sized {@code timestamp}, then now. */
+    /** {@code wallTime} seconds, then an epoch-sized {@code timestamp}, then now. */
     static long wallMs(JsonNode params) {
         JsonNode wall = params.get("wallTime");
         if (wall != null && wall.isNumber()) return (long) (wall.asDouble() * 1000.0);
@@ -266,7 +265,7 @@ public final class SessionEvents {
         return System.currentTimeMillis();
     }
 
-    /** Rust {@code ignored_url}. */
+    /** URLs observe does not record. */
     static boolean ignoredUrl(String url) {
         return url.startsWith("data:")
                 || url.startsWith("blob:")

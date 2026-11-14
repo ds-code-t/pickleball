@@ -9,7 +9,6 @@ import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.attribute.FileTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -28,9 +27,9 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.databind.node.TextNode;
 
 /**
- * Thin client for the engine CLI. By default that CLI is the in-repo Java
- * engine launcher. An explicit {@code pkb_composite_bin} or {@code COMPOSITE_BIN}
- * path, or {@code pkb_composite_engine=rust}, selects the Rust {@code composite} binary.
+ * Thin client for the Java control engine CLI. An explicit
+ * {@code pkb_composite_bin} or {@code COMPOSITE_BIN} selects that binary.
+ * Callers that already resolved a launcher pass it in.
  *
  * <p>Every call is one line to a long-lived {@code composite serve --stdio}
  * child. This class does not capture, query, resolve, or validate. It is safe
@@ -141,40 +140,19 @@ public final class Client implements AutoCloseable {
     }
 
     /**
-     * {@code COMPOSITE_BIN} when it points at a file, otherwise the newest
-     * {@code target/debug/composite} or {@code target/release/composite} walked
-     * up from the working directory, otherwise {@code composite} on {@code PATH}.
+     * Explicit {@code COMPOSITE_BIN}, then env {@code pkb_composite_bin}, when
+     * that value names a file. Otherwise {@code domengine} on {@code PATH}.
      */
     public static String findBin() {
-        String envBin = System.getenv("COMPOSITE_BIN");
-        if (envBin != null && !envBin.isEmpty() && Files.isRegularFile(Path.of(envBin))) {
-            return envBin;
-        }
-        List<Path> roots = new ArrayList<>();
-        Path dir = Path.of("").toAbsolutePath();
-        for (int i = 0; i < 8 && dir != null; i++) {
-            roots.add(dir);
-            dir = dir.getParent();
-        }
-        Path best = null;
-        FileTime bestTime = null;
-        for (Path root : roots) {
-            for (String rel : new String[] {"target/debug/composite", "target/release/composite"}) {
-                Path candidate = root.resolve(rel);
-                if (!Files.isRegularFile(candidate)) continue;
-                FileTime mtime;
-                try {
-                    mtime = Files.getLastModifiedTime(candidate);
-                } catch (IOException e) {
-                    continue;
-                }
-                if (bestTime == null || mtime.compareTo(bestTime) > 0) {
-                    best = candidate;
-                    bestTime = mtime;
-                }
-            }
-        }
-        return best == null ? "composite" : best.toString();
+        String envBin = fileIfPresent(System.getenv("COMPOSITE_BIN"));
+        if (envBin != null) return envBin;
+        String named = fileIfPresent(System.getenv("pkb_composite_bin"));
+        return named == null ? "domengine" : named;
+    }
+
+    private static String fileIfPresent(String value) {
+        if (value == null || value.isEmpty()) return null;
+        return Files.isRegularFile(Path.of(value)) ? value : null;
     }
 
     public String bin() {

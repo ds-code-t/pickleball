@@ -20,8 +20,9 @@ import java.util.concurrent.TimeUnit;
  * Optional DOM-engine attach (in-repo Java engine by default) for one live Workbench session.
  *
  * <p>{@code composite} runs the in-repo Java engine through
- * {@link JavaEngineLauncher} unless an explicit binary or a Rust request says
- * otherwise; see {@link #resolveBinary(String, Path, Map)}.</p>
+ * {@link JavaEngineLauncher} unless an explicit binary is set;
+ * see {@link #resolveBinary(String, Path, Map)}. {@link JavaEngineLauncher#checkEngineKey(Map)}
+ * runs after that explicit path and before the launcher.</p>
  *
  * <p>The only reader of {@code pkb_direct_control_provider} is
  * {@link #configured}. A blank value, a non-live run, or a missing CDP
@@ -34,7 +35,6 @@ public final class DirectControlProvider {
     public static final String KEY = "pkb_direct_control_provider";
     public static final String RUNVARS_PROPERTY = "pkb_runvars." + KEY;
     public static final String BIN_ENV = "COMPOSITE_BIN";
-    public static final String HOME_ENV = "COMPOSITE_HOME";
     public static final String TOKEN = "composite";
     public static final Duration COMMAND_TIMEOUT = Duration.ofSeconds(30);
 
@@ -68,13 +68,10 @@ public final class DirectControlProvider {
      * {@code composite} uses the same explicit-engine order as the root
      * {@code CompositeBinaryLocator}: property {@code pkb_composite_bin},
      * {@code pkb_runvars.pkb_composite_bin}, env {@code COMPOSITE_BIN}, env
-     * {@code pkb_composite_bin}. Then the in-repo Java engine on this class
-     * loader ({@link JavaEngineLauncher}) unless
-     * {@code pkb_composite_engine=rust} / {@code PKB_COMPOSITE_ENGINE=rust},
-     * then {@code COMPOSITE_HOME} or a sibling {@code dom-composite} checkout
-     * ({@code target/debug/composite}, then {@code target/release/composite}).
-     * Any other value is a path to the binary. The candidate list is
-     * {@link #explicitEngineCandidates}.
+     * {@code pkb_composite_bin}. An explicit executable is returned before
+     * {@link JavaEngineLauncher#checkEngineKey(Map)}. Then the in-repo Java
+     * engine on this class loader. Any other value is a path to the binary.
+     * The candidate list is {@link #explicitEngineCandidates}.
      */
     public static Optional<Path> resolveBinary(String configured, Path project, Map<String, String> env) {
         return resolveBinary(configured, project, env, DirectControlProvider.class.getClassLoader());
@@ -102,37 +99,13 @@ public final class DirectControlProvider {
                         : projectExecutable(project, candidate.spec());
                 if (path != null) return Optional.of(path);
             }
-            if (!JavaEngineLauncher.rustRequested(environment)) {
-                Optional<Path> java = JavaEngineLauncher.script(engineLoader);
-                if (java.isPresent()) return java;
-            }
-            return rustHomes(project, environment);
+            JavaEngineLauncher.checkEngineKey(environment);
+            return JavaEngineLauncher.script(engineLoader);
         }
         Path given = Path.of(value);
         if (!given.isAbsolute() && project != null) given = project.resolve(given);
         Path file = executable(given.toString());
         return file == null ? Optional.empty() : Optional.of(file);
-    }
-
-    /**
-     * Rust {@code composite} only: {@code COMPOSITE_BIN}, then {@code COMPOSITE_HOME}
-     * or a sibling {@code dom-composite} checkout. Never the Java engine.
-     */
-    public static Optional<Path> resolveRustBinary(Path project, Map<String, String> env) {
-        Map<String, String> environment = env == null ? System.getenv() : env;
-        Path named = executable(environment.get(BIN_ENV));
-        if (named != null) return Optional.of(named);
-        return rustHomes(project, environment);
-    }
-
-    private static Optional<Path> rustHomes(Path project, Map<String, String> environment) {
-        for (Path home : homes(project, environment)) {
-            Path debug = executable(home.resolve("target").resolve("debug").resolve(TOKEN).toString());
-            if (debug != null) return Optional.of(debug);
-            Path release = executable(home.resolve("target").resolve("release").resolve(TOKEN).toString());
-            if (release != null) return Optional.of(release);
-        }
-        return Optional.empty();
     }
 
     /**
@@ -214,7 +187,7 @@ public final class DirectControlProvider {
         if (binary.isEmpty()) {
             return Outcome.idle(
                     Kind.BINARY_MISSING,
-                    "Direct-control provider skipped: no DOM engine found (Java engine not on the classpath; no COMPOSITE_BIN, pkb_composite_bin, or Rust build)."
+                    "Direct-control provider skipped: no DOM engine found (Java engine not on the classpath; no COMPOSITE_BIN or pkb_composite_bin)."
             );
         }
         Path sessionDir = sessionDirectory(request.project(), request.runId());
@@ -287,17 +260,6 @@ public final class DirectControlProvider {
             return value;
         }
         return "http://" + value;
-    }
-
-    private static List<Path> homes(Path project, Map<String, String> env) {
-        List<Path> homes = new ArrayList<>();
-        String home = blank(env.get(HOME_ENV));
-        if (home != null) homes.add(Path.of(home));
-        if (project != null) {
-            Path parent = project.toAbsolutePath().normalize().getParent();
-            if (parent != null) homes.add(parent.resolve("dom-composite"));
-        }
-        return homes;
     }
 
     private static Path executable(String value) {

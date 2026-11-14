@@ -18,6 +18,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Launcher for the in-repo Java DOM engine ({@code dev.domengine.cli.DomEngineMain}).
@@ -31,14 +32,18 @@ import java.util.Set;
  *
  * <p>Shared by {@link DirectControlProvider} (Workbench direct-control handoff)
  * and the root {@code CompositeBinaryLocator}. An explicit
- * {@code pkb_composite_bin} or {@code COMPOSITE_BIN} wins before this;
- * {@code pkb_composite_engine=rust} / {@code PKB_COMPOSITE_ENGINE=rust} skips it.</p>
+ * {@code pkb_composite_bin} or {@code COMPOSITE_BIN} wins before this.
+ * {@link #checkEngineKey(Map)} rejects any {@code pkb_composite_engine} value
+ * other than unset or {@code java}.</p>
  */
 public final class JavaEngineLauncher {
     public static final String MAIN_CLASS = "dev.domengine.cli.DomEngineMain";
     public static final String ENGINE_KEY = "pkb_composite_engine";
     public static final String ENGINE_ENV = "PKB_COMPOSITE_ENGINE";
     public static final String BIN_KEY = "pkb_composite_bin";
+    static final String ENGINE_KEY_WARN =
+            "pkb_composite_engine is no longer used; the Java control engine is the only engine";
+    private static final AtomicBoolean ENGINE_KEY_WARNED = new AtomicBoolean();
     private static final List<String> JACKSON = List.of(
             "com.fasterxml.jackson.databind.ObjectMapper",
             "com.fasterxml.jackson.core.JsonFactory",
@@ -59,18 +64,53 @@ public final class JavaEngineLauncher {
     }
 
     /**
-     * True when {@code pkb_composite_engine} (system property, then
-     * {@code pkb_runvars.} property) or {@code PKB_COMPOSITE_ENGINE} /
-     * {@code pkb_composite_engine} in {@code env} is {@code rust}.
+     * {@code pkb_composite_engine} from the system property, then
+     * {@code pkb_runvars.} property, then {@code PKB_COMPOSITE_ENGINE} /
+     * {@code pkb_composite_engine} in {@code env}. Unset returns. {@code java}
+     * is accepted and warns once per JVM. Any other value throws.
      */
-    public static boolean rustRequested(Map<String, String> env) {
-        String engine = first(
-                text(System.getProperty(ENGINE_KEY)),
-                text(System.getProperty("pkb_runvars." + ENGINE_KEY)),
+    public static void checkEngineKey(Map<String, String> env) {
+        applyEngineKey(readEngineKey(true, null, env));
+    }
+
+    /**
+     * Same slots as {@link #checkEngineKey(Map)}, reading {@code properties}
+     * instead of the live JVM properties. The root locator uses this so a test
+     * override does not see the host {@code -D}.
+     */
+    public static void checkEngineKey(Map<String, String> properties, Map<String, String> env) {
+        applyEngineKey(readEngineKey(false, properties, env));
+    }
+
+    private static String readEngineKey(boolean liveProperties, Map<String, String> properties, Map<String, String> env) {
+        String property = liveProperties ? text(System.getProperty(ENGINE_KEY)) : text(mapGet(properties, ENGINE_KEY));
+        String runvars = liveProperties
+                ? text(System.getProperty("pkb_runvars." + ENGINE_KEY))
+                : text(mapGet(properties, "pkb_runvars." + ENGINE_KEY));
+        return first(
+                property,
+                runvars,
                 env == null ? null : text(env.get(ENGINE_ENV)),
                 env == null ? null : text(env.get(ENGINE_KEY))
         );
-        return engine != null && "rust".equalsIgnoreCase(engine);
+    }
+
+    private static void applyEngineKey(String engine) {
+        if (engine == null) return;
+        if ("java".equalsIgnoreCase(engine)) {
+            if (ENGINE_KEY_WARNED.compareAndSet(false, true)) {
+                System.err.println("WARN " + ENGINE_KEY_WARN);
+            }
+            return;
+        }
+        throw new IllegalStateException(
+                "pkb_composite_engine=" + engine + " is not supported in 3.0.0: the Java control engine is the only engine. "
+                        + "Remove the setting; use pkb_composite_bin only to point at a domengine launcher."
+        );
+    }
+
+    private static String mapGet(Map<String, String> values, String key) {
+        return values == null ? null : values.get(key);
     }
 
     /**
