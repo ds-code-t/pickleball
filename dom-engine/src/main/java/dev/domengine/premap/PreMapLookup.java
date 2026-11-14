@@ -31,13 +31,16 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * Offline lookups read a tree pre-map. {@link #installed()} is {@link #PASS_THROUGH}:
- * with no live session it still answers nothing, which is what a file query and the
- * hook tests lock. A live browser or desktop session is cached here by
- * {@code session + doc_version}. {@code store} does not satisfy {@code current}.
+ * Offline lookups read a tree pre-map. {@link #installed()} is the live session
+ * lookup, not {@link #PASS_THROUGH}. With no live session it still answers nothing,
+ * which is what a file query and the hook tests lock. A live browser or desktop
+ * session is cached here by {@code session + doc_version + tree}. {@code store}
+ * does not satisfy {@code current}.
  */
 public final class PreMapLookup {
     public static final PreMapLookup PASS_THROUGH = new PreMapLookup(true, null);
+    /** Live session lookup. {@link #installed()} returns this, not {@link #PASS_THROUGH}. */
+    private static final PreMapLookup LIVE = new PreMapLookup(true, null);
     private static final IdentityHashMap<DomNode, PreMap> TREES = new IdentityHashMap<>();
     private static final ConcurrentHashMap<String, PreMap> SESSIONS = new ConcurrentHashMap<>();
     private static final ConcurrentHashMap<String, Cached> CACHE = new ConcurrentHashMap<>();
@@ -58,7 +61,7 @@ public final class PreMapLookup {
     }
 
     public static PreMapLookup installed() {
-        return PASS_THROUGH;
+        return LIVE;
     }
 
     /** Query flags for this thread, so a rebuild can see an image or look clause. */

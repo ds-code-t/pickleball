@@ -96,7 +96,7 @@ Titles are chosen in this order: `aria-labelledby` text, `aria-label`, the first
 
 Every `CompositeSnapshotBuilder.build` runs `PreMapBuilder`. There is no flag to skip it. The pre-map is the thing a later query is supposed to read, so the expensive work happens once at capture.
 
-`PreMapLookup.forTree` caches a file query by tree identity, and `candidates` on that lookup reads the indexes. An empty document has nothing to index, so `candidates` stays empty there. `store` keeps a map for a caller that already built one. It does not satisfy `current`. `installed()` is still the `PASS_THROUGH` object, so a process with no live session answers nothing. That is the check `HookCallSiteTest` locks. A live browser or desktop session is served by that same object.
+`PreMapLookup.forTree` caches a file query by tree identity, and `candidates` on that lookup reads the indexes. An empty document has nothing to index, so `candidates` stays empty there. `store` keeps a map for a caller that already built one. It does not satisfy `current`. `installed()` is the live session lookup, not `PASS_THROUGH`. With no live session it still answers nothing. A live browser or desktop session is served by that lookup.
 
 ## Runtime lookups
 

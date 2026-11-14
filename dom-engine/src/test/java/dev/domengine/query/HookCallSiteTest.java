@@ -21,7 +21,7 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -133,8 +133,8 @@ class HookCallSiteTest {
     }
 
     @Test
-    void installedLookupIsStillPassThrough() {
-        assertSame(PreMapLookup.PASS_THROUGH, PreMapLookup.installed());
+    void installedLookupIsTheLiveSession() {
+        assertNotSame(PreMapLookup.PASS_THROUGH, PreMapLookup.installed());
         assertTrue(PreMapLookup.installed().passThrough());
         assertTrue(PreMapLookup.installed().current("session", "1").isEmpty());
         PreMapLookup.store("session", null);
