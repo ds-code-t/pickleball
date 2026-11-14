@@ -37,7 +37,7 @@ A normal `mvn test` or `gradlew test` does not write a descriptor. An unset or b
 
 Workbench, MCP, and the control bridge forward one engine query string through `ElementOperations` → `DomCompositeAdapter`. The string is the composite selector (`css=`, `xpath=`, `text=`, `image=`, `near=`, `below=`, `above=`, `left-of=`, `right-of=`, `>>`, AND/OR/NOT). Those relative stages are visual distance in the geometry view, not document order. An engine without that view does not get a box invented in Java. `--explain` ranks the batch. `image=` promotes to a node when asked and the engine can bind one. A visual-only hit stays labeled and is not a DOM node. A limit returns handles. One later act uses one handle. There is no batch click. Category+text still uses the execution dictionary. Gherkin phrases, including `after` and `before` as document order, are unchanged. A controller query defaults to `exposure=human` (inside the visual viewport). `lower` is per query and labels every node. An action defaults to `human` and refuses a target a person could not click. Offline `--html` is a labelled source read and does not pretend to run that query.
 
-Capabilities name this the Control Engine. `display_name`, `syntax`, and `platforms` are computed from the engine constants. The verb matrix and the layer rules are in [Query visual design](maintainer/3.0.0-query-visual-design.md).
+Capabilities name this the Control Engine. `display_name`, `syntax`, and `platforms` are computed from the engine constants. The verb matrix and the layer rules stay in the maintainer query-visual design.
 
 ## Descriptor
 
