@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.openqa.selenium.NoSuchSessionException;
+import org.openqa.selenium.NoSuchWindowException;
 import org.openqa.selenium.JavascriptExecutor;
 import org.openqa.selenium.MutableCapabilities;
 import org.openqa.selenium.WebDriver;
@@ -1097,6 +1098,14 @@ class AgentLiveFixTest {
         PageSurfaces.highlight(null, "a:3", "outline-red", null, null, null, null, null);
         Map<String, Object> goneTarget = PageSurfaces.cleanup(null);
         assertEquals(true, goneTarget.get("cleaned"), goneTarget.toString());
+        PageSurfaces.clearDriver();
+
+        List<String> visited = new ArrayList<>();
+        WebDriver stale = staleWindowDriver(visited);
+        PageSurfaces.manage(stale, "chrome-headed-quiet", true);
+        Map<String, Object> staleCleanup = PageSurfaces.cleanup(null);
+        assertEquals(true, staleCleanup.get("cleaned"), staleCleanup.toString());
+        assertEquals(List.of("tab-a"), visited);
     }
 
     @Test
@@ -2184,6 +2193,42 @@ class AgentLiveFixTest {
                         case "executeCdpCommand" -> Map.of("frameTree", Map.of("frame", Map.of("id", "a")));
                         default -> defaultValue(method.getReturnType());
                     };
+                }
+        );
+        self.set(driver);
+        return driver;
+    }
+
+    /** The closed tab stays in the handle list. Selecting it reports no such window. */
+    private static WebDriver staleWindowDriver(List<String> visited) {
+        AtomicReference<String> current = new AtomicReference<>("tab-a");
+        AtomicReference<WebDriver> self = new AtomicReference<>();
+        Object switcher = Proxy.newProxyInstance(
+                WebDriver.class.getClassLoader(),
+                new Class<?>[]{WebDriver.TargetLocator.class},
+                (proxy, method, args) -> {
+                    if ("window".equals(method.getName()) && args != null && args.length > 0) {
+                        String tab = String.valueOf(args[0]);
+                        if ("tab-gone".equals(tab)) throw new NoSuchWindowException("no such window");
+                        current.set(tab);
+                        return self.get();
+                    }
+                    if ("defaultContent".equals(method.getName()) || "parentFrame".equals(method.getName())) return self.get();
+                    return defaultValue(method.getReturnType());
+                }
+        );
+        WebDriver driver = (WebDriver) Proxy.newProxyInstance(
+                WebDriver.class.getClassLoader(),
+                new Class<?>[]{WebDriver.class, JavascriptExecutor.class},
+                (proxy, method, args) -> switch (method.getName()) {
+                    case "getWindowHandles" -> Set.of("tab-a", "tab-gone");
+                    case "getWindowHandle" -> current.get();
+                    case "switchTo" -> switcher;
+                    case "executeScript" -> {
+                        visited.add(current.get());
+                        yield Map.of("ok", true, "removed", 1);
+                    }
+                    default -> defaultValue(method.getReturnType());
                 }
         );
         self.set(driver);

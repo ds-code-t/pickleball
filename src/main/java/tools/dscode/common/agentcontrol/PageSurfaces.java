@@ -519,10 +519,23 @@ final class PageSurfaces {
                     CompositeLog.info("html", "cleanup skipped closed driver " + managed.id);
                     continue;
                 }
-                List<String> handles = new ArrayList<>(tabsOf(web));
+                List<String> handles;
+                try {
+                    handles = new ArrayList<>(tabsOf(web));
+                } catch (RuntimeException failure) {
+                    if (closed(failure)) {
+                        CompositeLog.info("html", "cleanup skipped closed driver " + managed.id);
+                        continue;
+                    }
+                    throw failure;
+                }
                 if (handles.isEmpty()) throw new IllegalStateException("tab enumeration failed");
                 for (String handle : handles) {
                     if (!handle.isBlank() && !activate(web, handle)) {
+                        if (absent(web, handle) || closed(lastActivateFailure.get())) {
+                            CompositeLog.info("html", "cleanup skipped closed tab " + handle);
+                            continue;
+                        }
                         throw new IllegalStateException("tab switch failed");
                     }
                     if (!resetTop(web)) throw new IllegalStateException("top document reset failed");
@@ -812,7 +825,7 @@ final class PageSurfaces {
             }
             String previous = currentHandle(site.driver);
             if (!site.tab.isBlank() && !activate(site.driver, site.tab)) {
-                if (absent(site.driver, site.tab)) {
+                if (absent(site.driver, site.tab) || closed(lastActivateFailure.get())) {
                     CompositeLog.info("window", "hide skipped closed " + site.tab);
                     continue;
                 }
@@ -885,6 +898,12 @@ final class PageSurfaces {
         }
     }
 
+    private static final ThreadLocal<RuntimeException> lastActivateFailure = new ThreadLocal<>();
+
+    private static boolean closed(RuntimeException failure) {
+        return failure != null && targetGone(failure);
+    }
+
     private static boolean targetGone(RuntimeException failure) {
         Throwable current = failure;
         while (current != null) {
@@ -896,6 +915,8 @@ final class PageSurfaces {
             if (message.contains("invalid session")
                     || message.contains("session deleted")
                     || message.contains("no such window")
+                    || message.contains("no such target")
+                    || message.contains("no target with given id")
                     || message.contains("target window already closed")
                     || message.contains("inspected target navigated or closed")
                     || message.contains("session with given id not found")
@@ -2328,6 +2349,7 @@ final class PageSurfaces {
 
     static boolean activate(WebDriver web, String tab) {
         if (web == null || tab == null || tab.isBlank()) return true;
+        lastActivateFailure.remove();
         Focus priorFocus = THREAD_FOCUS.get();
         WebDriver priorDriver = driver;
         String priorTab = focusedTab;
@@ -2356,6 +2378,7 @@ final class PageSurfaces {
             rememberPageTarget(web, tab, target);
             return true;
         } catch (RuntimeException failure) {
+            lastActivateFailure.set(failure);
             CompositeLog.info("window", "activate failed " + tab + " " + failure.getMessage());
             restoreActivation(web, priorWindow, priorFocus, priorDriver, priorTab);
             return false;
