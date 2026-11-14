@@ -11,6 +11,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 
@@ -22,6 +23,8 @@ import java.util.stream.Stream;
  */
 public final class ChromeProcess {
     public static final long DEBUGGER_WAIT_SECONDS = 30;
+    /** Each attempt waits this long for {@code DevToolsActivePort}. A timeout relaunches once. */
+    static final long PORT_WAIT_SECONDS = 45;
 
     private final Process process;
     private final Path profile;
@@ -47,6 +50,14 @@ public final class ChromeProcess {
      * {@code initialUrl} is the page argument, or {@code about:blank} when blank.
      */
     public static ChromeProcess start(String binary, Path profile, boolean headless, List<String> extraArgs, String initialUrl) {
+        return start(binary, profile, headless, extraArgs, initialUrl, PORT_WAIT_SECONDS);
+    }
+
+    /**
+     * Same launcher with an explicit port wait. A {@code DevToolsActivePort} timeout
+     * wipes {@code profile} and relaunches once. Other failures are not retried.
+     */
+    static ChromeProcess start(String binary, Path profile, boolean headless, List<String> extraArgs, String initialUrl, long portWaitSeconds) {
         if (binary == null || binary.isBlank()) throw new CdpException("chrome binary is missing");
         Path dir = profile;
         try {
@@ -55,6 +66,50 @@ public final class ChromeProcess {
         } catch (IOException failure) {
             throw new CdpException("profile: " + failure.getMessage());
         }
+        try {
+            return spawn(binary, dir, headless, extraArgs, initialUrl, portWaitSeconds);
+        } catch (CdpException failure) {
+            if (!isPortTimeout(failure)) throw failure;
+            try {
+                resetProfile(dir);
+            } catch (CdpException cleanup) {
+                throw new CdpException(failure.getMessage() + " relaunch-cleanup=" + cleanup.getMessage());
+            }
+            try {
+                return spawn(binary, dir, headless, extraArgs, initialUrl, portWaitSeconds);
+            } catch (CdpException again) {
+                if (!isPortTimeout(again)) throw again;
+                throw new CdpException(again.getMessage() + " relaunch=1");
+            }
+        }
+    }
+
+    private static ChromeProcess spawn(String binary, Path dir, boolean headless, List<String> extraArgs, String initialUrl, long portWaitSeconds) {
+        List<String> command = command(binary, dir, headless, extraArgs, initialUrl);
+        Process handle;
+        Path log = dir.resolve("launch.log");
+        try {
+            ProcessBuilder builder = new ProcessBuilder(command)
+                    .redirectErrorStream(true)
+                    .redirectOutput(ProcessBuilder.Redirect.to(log.toFile()));
+            // The JVM bus stays as-is so AT-SPI can use it. Only this browser child changes.
+            sanitizeSessionBus(builder.environment());
+            handle = builder.start();
+        } catch (IOException failure) {
+            throw new CdpException("chrome launch: " + failure.getMessage());
+        }
+        int chosen;
+        try {
+            chosen = awaitPort(dir, handle, portWaitSeconds);
+        } catch (RuntimeException failure) {
+            destroyTree(handle);
+            releaseProfile(dir);
+            throw failure;
+        }
+        return new ChromeProcess(handle, dir, chosen);
+    }
+
+    private static List<String> command(String binary, Path dir, boolean headless, List<String> extraArgs, String initialUrl) {
         List<String> command = new ArrayList<>();
         command.add(binary);
         command.add("--remote-debugging-port=0");
@@ -63,6 +118,11 @@ public final class ChromeProcess {
         command.add("--no-default-browser-check");
         command.add("--disable-background-networking");
         command.add("--disable-component-update");
+        command.add("--disable-extensions");
+        command.add("--disable-default-apps");
+        command.add("--disable-sync");
+        command.add("--disable-breakpad");
+        command.add("--disable-features=Translate,MediaRouter,DialMediaRouteProvider,OptimizationHints");
         command.add("--no-sandbox");
         command.add("--disable-dev-shm-usage");
         command.add("--disable-gpu");
@@ -74,25 +134,36 @@ public final class ChromeProcess {
             }
         }
         command.add(initialUrl == null || initialUrl.isBlank() ? "about:blank" : initialUrl);
-        Process handle;
-        Path log = dir.resolve("launch.log");
+        return command;
+    }
+
+    /**
+     * Chromium logs a parse error and can skip {@code DevToolsActivePort} when
+     * {@code DBUS_SESSION_BUS_ADDRESS} is not {@code unix:} or {@code tcp:}.
+     * {@code disabled:} stops that retry loop on this process only.
+     */
+    static void sanitizeSessionBus(Map<String, String> environment) {
+        if (environment == null) return;
+        String address = environment.get("DBUS_SESSION_BUS_ADDRESS");
+        if (address == null || address.isBlank()) return;
+        String trimmed = address.trim();
+        if (trimmed.startsWith("unix:") || trimmed.startsWith("tcp:")) return;
+        environment.put("DBUS_SESSION_BUS_ADDRESS", "disabled:");
+    }
+
+    private static boolean isPortTimeout(CdpException failure) {
+        String message = failure.getMessage();
+        return message != null && message.contains("timed out waiting for DevToolsActivePort");
+    }
+
+    private static void resetProfile(Path dir) {
+        releaseProfile(dir);
+        deleteProfile(dir);
         try {
-            handle = new ProcessBuilder(command)
-                    .redirectErrorStream(true)
-                    .redirectOutput(ProcessBuilder.Redirect.to(log.toFile()))
-                    .start();
+            Files.createDirectories(dir);
         } catch (IOException failure) {
-            throw new CdpException("chrome launch: " + failure.getMessage());
+            throw new CdpException("profile: " + failure.getMessage());
         }
-        int chosen;
-        try {
-            chosen = awaitPort(dir, handle, DEBUGGER_WAIT_SECONDS);
-        } catch (RuntimeException failure) {
-            destroyTree(handle);
-            releaseProfile(dir);
-            throw failure;
-        }
-        return new ChromeProcess(handle, dir, chosen);
     }
 
     public Process process() {
@@ -272,12 +343,44 @@ public final class ChromeProcess {
         Path log = profile.resolve("launch.log");
         if (!Files.isRegularFile(log)) return "";
         try {
-            String text = Files.readString(log).replace('\r', ' ').replace('\n', ' ').trim();
-            if (text.length() > 400) text = text.substring(text.length() - 400);
-            return text;
+            return collapseLog(Files.readString(log));
         } catch (IOException failure) {
             return "";
         }
+    }
+
+    /** Repeated stderr lines become one line plus a count, so a dbus loop does not hide the rest. */
+    static String collapseLog(String text) {
+        if (text == null || text.isBlank()) return "";
+        List<String> collapsed = new ArrayList<>();
+        String previous = null;
+        int run = 0;
+        for (String raw : text.split("\\R", -1)) {
+            String line = raw.replace('\r', ' ').trim();
+            if (line.isEmpty()) continue;
+            if (line.equals(previous)) {
+                run++;
+                continue;
+            }
+            appendRun(collapsed, previous, run);
+            previous = line;
+            run = 1;
+        }
+        appendRun(collapsed, previous, run);
+        if (collapsed.isEmpty()) return "";
+        String joined = String.join(" | ", collapsed);
+        if (joined.length() <= 900) return joined;
+        String head = collapsed.get(0);
+        String tail = collapsed.get(collapsed.size() - 1);
+        if (collapsed.size() == 1) {
+            return head.substring(0, 400) + " … " + head.substring(head.length() - 400);
+        }
+        return head + " | … " + (collapsed.size() - 2) + " more | " + tail;
+    }
+
+    private static void appendRun(List<String> collapsed, String line, int run) {
+        if (line == null || run <= 0) return;
+        collapsed.add(run == 1 ? line : line + " (x" + run + ")");
     }
 
     private static String commandLine(ProcessHandle handle) {
