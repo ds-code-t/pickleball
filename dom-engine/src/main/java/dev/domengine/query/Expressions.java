@@ -109,8 +109,16 @@ final class Expressions {
             case And and -> intersect(and, scope, root, pierce);
             case Or or -> union(or, scope, root, pierce);
             case Seq seq -> sequence(seq, scope, root, pierce);
-            case Rel rel -> throw new CdpException("invalid engine: " + (rel.term.negated() ? "not-" : "") + rel.term.relation().engine());
+            case Rel rel -> evaluateRelation(rel, scope, root, pierce);
         };
+    }
+
+    private static Query.Hit evaluateRelation(Rel rel, List<DomNode> scope, DomNode root, String pierce) {
+        if (rel.term.negated()) {
+            throw new CdpException("invalid engine: not-" + rel.term.relation().engine());
+        }
+        if (rel.candidates == null) return Relations.filter(rel.term, scope, root, pierce);
+        return Engines.apply(rel.term.relation().engine(), rel.candidates, scope, root, pierce);
     }
 
     private static Query.Hit negate(Not not, List<DomNode> scope, DomNode root, String pierce) {
@@ -443,6 +451,9 @@ final class Expressions {
             if (relations) {
                 Expr rel = relationStage(piece);
                 if (rel != null) return rel;
+            } else {
+                Expr rel = positiveFilter(piece);
+                if (rel != null) return rel;
             }
             int eq = piece.indexOf('=');
             if (eq <= 0) throw new CdpException("invalid pipeline stage: " + piece);
@@ -453,6 +464,15 @@ final class Expressions {
             String expr = nameEnd < eq ? piece.substring(nameEnd).trim() : piece.substring(eq + 1).trim();
             if (!Query.ENGINES.contains(engine)) throw new CdpException("invalid engine: " + engine);
             return new Stage(engine, expr);
+        }
+
+        /** Production parse accepts a positive filter form. Stage form and negatives stay on the engine path. */
+        private Expr positiveFilter(String piece) {
+            if (piece.regionMatches(true, 0, "not-", 0, 4)) return null;
+            if (relationNameEnd(piece, 0) < 0) return null;
+            Expr rel = relationStage(piece);
+            if (rel instanceof Rel parsed && parsed.candidates == null && !parsed.term.negated()) return parsed;
+            return null;
         }
 
         private Expr relationStage(String piece) {

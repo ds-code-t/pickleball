@@ -21,7 +21,8 @@ import java.util.Set;
 /** Pipeline query over one context tree. The CLI, HTTP, and MCP only forward the stage string. */
 public final class Query {
     public static final List<String> ENGINES = List.of(
-            "css", "xpath", "text", "role", "frame", "shadow", "near", "below", "above", "left-of", "right-of", "desc", "a11y", "look", "image"
+            "css", "xpath", "text", "role", "frame", "shadow", "near", "below", "above", "left-of", "right-of",
+            "inside", "after", "before", "desc", "a11y", "look", "image"
     );
     public static final List<String> QUERY_FLAGS = List.of(
             "within", "nesting", "nth", "every", "count-only", "geometry", "pierce", "point", "viewport", "exposure",

@@ -17,7 +17,7 @@ public final class EngineInfo {
 
     public static final List<String> LOG_ENTITIES = List.of(
             "cli", "serve", "capture", "cdp", "walk", "query", "resolve",
-            "session", "action", "wait", "hover", "frame", "identity", "state", "batch", "observe", "desc", "desktop", "image", "visual", "expr", "look", "log",
+            "session", "action", "wait", "hover", "frame", "identity", "state", "batch", "observe", "desc", "desktop", "image", "visual", "expr", "relation", "look", "log",
             "snapshot", "premap", "affinity", "desktop-shot"
     );
 

@@ -331,8 +331,8 @@ Gherkin element phrases do not change. `SelectorTranslator` is the only place th
 | the Button containing `'log'` | `(role=button AND text~="log")` (single quotes fold case) |
 | the Button matching `"Save"` | `(role=button AND text="^Save$")` (full match) |
 | the `"Save"` Button in the `"Billing"` Section | `(role=region AND text="Billing") >> (role=button AND text="Save")` |
-| the `"Save"` Button after the `"Billing"` Section | context group, then `below=1`, then the target group |
-| the `"Save"` Button before the `"Billing"` Section | target group, then `below=1`, then the context group |
+| the `"Save"` Button after the `"Billing"` Section | `(role=button AND text="Save") AND after(role=region AND text="Billing")` |
+| the `"Save"` Button before the `"Billing"` Section | `(role=button AND text="Save") AND before(role=region AND text="Billing")` |
 | a custom `Product Card` | `(desc="Product Card" AND text=...)` |
 | `first` / `2nd` / `last` / `every 2nd` | one `PositionSelection` after displayed, nesting, and regex. An engine query ordinal uses that same index |
 

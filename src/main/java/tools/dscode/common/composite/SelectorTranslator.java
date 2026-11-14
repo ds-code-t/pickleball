@@ -135,17 +135,10 @@ public final class SelectorTranslator {
         String word = phrase.contextWord() == null ? "" : phrase.contextWord().trim().toLowerCase(Locale.ROOT);
         String context = group(contextClauses(phrase));
         String target = group(targetClauses(phrase, look));
-        switch (word) {
-            case "before" -> {
-                add(stages, target);
-                stages.add("below=1");
-                add(stages, context);
-            }
-            case "after" -> {
-                add(stages, context);
-                stages.add("below=1");
-                add(stages, target);
-            }
+        String relation = relationWord(word);
+        if (relation != null && context != null) {
+            add(stages, (target == null ? "" : target + " AND ") + relation + "(" + unwrap(context) + ")");
+        } else switch (word) {
             case "in", "from", "for" -> {
                 add(stages, context);
                 add(stages, target);
@@ -161,6 +154,25 @@ public final class SelectorTranslator {
         if (look != null) CompositeLog.info("query", "forward selector=" + pipeline);
         CompositeLog.debug("element", "phrase " + selector.describe());
         return selector;
+    }
+
+    private static String relationWord(String word) {
+        return switch (word) {
+            case "after" -> "after";
+            case "before" -> "before";
+            case "above" -> "above";
+            case "below" -> "below";
+            case "near" -> "near";
+            case "inside" -> "inside";
+            case "left of", "left-of" -> "left-of";
+            case "right of", "right-of" -> "right-of";
+            default -> null;
+        };
+    }
+
+    private static String unwrap(String grouped) {
+        if (grouped.startsWith("(") && grouped.endsWith(")")) return grouped.substring(1, grouped.length() - 1);
+        return grouped;
     }
 
     private static boolean pureCss(ElementPhrase phrase, String look) {

@@ -2,6 +2,7 @@ package tools.dscode.common.composite;
 
 import org.openqa.selenium.By;
 
+import java.util.List;
 import java.util.Locale;
 
 /**
@@ -78,8 +79,9 @@ public record EngineQuery(
         return built;
     }
 
-    /** Selenium can run a single css= or xpath= stage. Anything else needs the engine. */
+    /** Selenium can run a single css= or xpath= stage. A relation form needs the engine. */
     public By seleniumFallback() {
+        if (relationForm(text)) return null;
         if (text.contains(">>") || text.contains(" AND ") || text.contains(" OR ") || text.startsWith("NOT ")) {
             return null;
         }
@@ -92,19 +94,63 @@ public record EngineQuery(
 
     /**
      * The first visual-relative engine in this selector, or null.
-     * Gherkin after/before are document order and do not use this.
+     * {@code after} and {@code before} are document order, not geometry.
+     * A filter form {@code name(} counts the same as {@code name=}.
      */
     public static String visualRelative(String selector) {
         if (selector == null || selector.isBlank()) return null;
-        for (String chunk : selector.split("(?i)>>|\\bAND\\b|\\bOR\\b|\\bNOT\\b")) {
-            String trimmed = chunk.trim();
-            while (trimmed.startsWith("(")) trimmed = trimmed.substring(1).trim();
-            int eq = trimmed.indexOf('=');
-            if (eq <= 0) continue;
-            String name = trimmed.substring(0, eq).trim().toLowerCase(Locale.ROOT);
-            if (VISUAL_RELATIVES.contains(name)) return name;
+        boolean quote = false;
+        char quoteChar = 0;
+        for (int i = 0; i < selector.length(); i++) {
+            char c = selector.charAt(i);
+            if (quote) {
+                if (c == quoteChar) quote = false;
+                continue;
+            }
+            if (c == '"' || c == '\'') {
+                quote = true;
+                quoteChar = c;
+                continue;
+            }
+            if (i > 0) {
+                char before = selector.charAt(i - 1);
+                if (Character.isLetterOrDigit(before) || before == '-' || before == '_' || before == '=') continue;
+            }
+            String name = visualNameAt(selector, i);
+            if (name != null) return canonicalRelative(name);
         }
         return null;
+    }
+
+    private static String visualNameAt(String text, int start) {
+        for (String name : List.of("left-of", "right-of", "inside", "above", "below", "near", "left", "right")) {
+            if (!text.regionMatches(true, start, name, 0, name.length())) continue;
+            int end = start + name.length();
+            if (end > text.length()) continue;
+            if (end == text.length()) return null;
+            char next = text.charAt(end);
+            if (next == '=' || next == '(' || next == '@') return name.toLowerCase(Locale.ROOT);
+        }
+        return null;
+    }
+
+    private static boolean relationForm(String text) {
+        if (text == null || text.isBlank()) return false;
+        String trimmed = text.trim();
+        if (trimmed.regionMatches(true, 0, "not-", 0, 4)) trimmed = trimmed.substring(4).trim();
+        return visualNameAt(trimmed, 0) != null
+                || documentNameAt(trimmed, 0);
+    }
+
+    private static boolean documentNameAt(String text, int start) {
+        for (String name : List.of("before", "after")) {
+            if (!text.regionMatches(true, start, name, 0, name.length())) continue;
+            int end = start + name.length();
+            if (end >= text.length()) return false;
+            char next = text.charAt(end);
+            if (next == '=' || next == '(' || next == '@') return true;
+        }
+        return false;
     }
 
     /** Capability name for a visual relative. {@code left} and {@code right} are aliases. */
@@ -115,6 +161,6 @@ public record EngineQuery(
     }
 
     private static final java.util.Set<String> VISUAL_RELATIVES = java.util.Set.of(
-            "near", "below", "above", "left-of", "right-of", "left", "right"
+            "near", "below", "above", "left-of", "right-of", "left", "right", "inside"
     );
 }

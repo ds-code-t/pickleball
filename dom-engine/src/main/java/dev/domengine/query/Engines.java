@@ -47,6 +47,9 @@ public final class Engines {
             case "above" -> relative("above", expr, current, root);
             case "left-of", "left" -> relative("left-of", expr, current, root);
             case "right-of", "right" -> relative("right-of", expr, current, root);
+            case "inside" -> Relations.inside(expr, current, root);
+            case "after" -> Relations.after(expr, current, root, pierce);
+            case "before" -> Relations.before(expr, current, root, pierce);
             case "desc" -> desc(expr, scopes(current, root));
             case "a11y" -> a11y(expr, scopes(current, root));
             case "look" -> Look.apply(expr, scopes(current, root));
@@ -388,7 +391,7 @@ public final class Engines {
         };
     }
 
-    private static String spaceName() {
+    static String spaceName() {
         String space = SPACE.get();
         return space == null || space.isBlank() ? "document_css_px" : space;
     }
@@ -397,11 +400,11 @@ public final class Engines {
         return "visual_viewport_relative".equals(spaceName());
     }
 
-    private static double originX(DomNode node) {
+    static double originX(DomNode node) {
         return visualSpace() && node.hasVisual ? node.visualX : node.x;
     }
 
-    private static double originY(DomNode node) {
+    static double originY(DomNode node) {
         return visualSpace() && node.hasVisual ? node.visualY : node.y;
     }
 
@@ -916,6 +919,10 @@ public final class Engines {
         return trimmed;
     }
 
+    static double centerDistance(DomNode a, DomNode b) {
+        return distance(a, b);
+    }
+
     private static double distance(DomNode a, DomNode b) {
         double ax = a.x + a.width / 2;
         double ay = a.y + a.height / 2;
@@ -932,7 +939,7 @@ public final class Engines {
         return best;
     }
 
-    private static double minDistanceInSpace(DomNode node, List<DomNode> anchors) {
+    static double minDistanceInSpace(DomNode node, List<DomNode> anchors) {
         double best = Double.MAX_VALUE;
         for (DomNode anchor : anchors) {
             if (anchor.hasBox && node.hasBox && anchor.displayed && node.displayed) {

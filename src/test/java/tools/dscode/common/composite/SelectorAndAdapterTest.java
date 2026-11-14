@@ -60,7 +60,7 @@ class SelectorAndAdapterTest {
 
         CompositeSelector after = SelectorTranslator.phrase(
                 ElementPhrase.of("Button", "Save").context("after", "Billing", "Section"));
-        assertTrue(after.pipeline().contains("below=1"), after.pipeline());
+        assertEquals("(role=button AND text=\"Save\") AND after(role=region AND text=\"Billing\")", after.pipeline());
 
         CompositeSelector custom = SelectorTranslator.phrase(ElementPhrase.of("Product Card", "Mug"));
         assertTrue(custom.pipeline().contains("desc=\"Product Card\""), custom.pipeline());

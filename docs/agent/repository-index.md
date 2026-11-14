@@ -752,6 +752,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/common/composite/LookLiveFindTest.java`
 - `src/test/java/tools/dscode/common/composite/LookStepTest.java`
 - `src/test/java/tools/dscode/common/composite/PrimaryPathAuditTest.java`
+- `src/test/java/tools/dscode/common/composite/RelationPhraseTest.java`
 - `src/test/java/tools/dscode/common/composite/SelectorAndAdapterTest.java`
 - `src/test/java/tools/dscode/common/composite/XPathFallbackTest.java`
 - `src/test/java/tools/dscode/common/coordination/AgentCoordinationTest.java`
@@ -1305,6 +1306,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `dom-engine/src/main/java/dev/domengine/query/LiveXPath.java`
 - `dom-engine/src/main/java/dev/domengine/query/Look.java`
 - `dom-engine/src/main/java/dev/domengine/query/Query.java`
+- `dom-engine/src/main/java/dev/domengine/query/Relations.java`
 - `dom-engine/src/main/java/dev/domengine/query/RelationTerm.java`
 - `dom-engine/src/main/java/dev/domengine/query/RowStates.java`
 - `dom-engine/src/main/java/dev/domengine/session/BrowserSession.java`
@@ -1364,6 +1366,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `dom-engine/src/test/java/dev/domengine/premap/SectionDetectionTest.java`
 - `dom-engine/src/test/java/dev/domengine/query/RelationTermParseTest.java`
 - `dom-engine/src/test/java/dev/domengine/query/RelationTermTest.java`
+- `dom-engine/src/test/java/dev/domengine/query/RelativeLocatorTest.java`
 - `dom-engine/src/test/java/dev/domengine/query/XPathClauseTest.java`
 - `dom-engine/src/test/java/dev/domengine/QueryFlagOfflineTest.java`
 - `dom-engine/src/test/java/dev/domengine/RustCliShapeTest.java`

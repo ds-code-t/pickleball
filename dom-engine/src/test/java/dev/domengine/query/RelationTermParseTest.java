@@ -147,9 +147,7 @@ class RelationTermParseTest {
                 () -> Expressions.parse("css=#a >> not-near=div"));
         assertEquals("invalid engine: not-near", notNear.getMessage());
 
-        CdpException filter = assertThrows(CdpException.class,
-                () -> Expressions.parse("near(role=button)"));
-        assertTrue(filter.getMessage().startsWith("invalid engine"), filter.getMessage());
+        assertEquals("near(role=button)", Expressions.render(Expressions.parse("near(role=button)")));
     }
 
     private static void assertInvalid(String text) {
