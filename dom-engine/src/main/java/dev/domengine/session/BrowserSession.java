@@ -293,8 +293,8 @@ public final class BrowserSession implements AutoCloseable {
         Endpoint endpoint = null;
         while (System.nanoTime() < deadline) {
             try {
-                endpoint = discover(http);
-                break;
+                endpoint = discoverForDocument(http, url);
+                if (endpoint != null) break;
             } catch (CdpException failure) {
                 last = failure;
             }
@@ -314,6 +314,34 @@ public final class BrowserSession implements AutoCloseable {
             awaitDocument(connection, url);
         } finally {
             connection.close();
+        }
+    }
+
+    /** A page whose listed URL is the start URL, or null while that tab is not listed yet. */
+    private static Endpoint discoverForDocument(String http, String url) {
+        HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
+        String base = stripPath(http);
+        try {
+            HttpRequest list = HttpRequest.newBuilder(URI.create(base + "/json/list")).GET().timeout(Duration.ofSeconds(5)).build();
+            HttpResponse<String> listBody = client.send(list, HttpResponse.BodyHandlers.ofString());
+            JsonNode pages = Jsons.MAPPER.readTree(listBody.body());
+            if (pages.isArray()) {
+                for (JsonNode page : pages) {
+                    if (!"page".equals(page.path("type").asText())) continue;
+                    if (!sameDocument(url, page.path("url").asText(""))) continue;
+                    String socket = page.path("webSocketDebuggerUrl").asText("");
+                    if (socket.isBlank() || socket.contains("/devtools/browser/")) continue;
+                    return new Endpoint(base, socket, true);
+                }
+            }
+            return null;
+        } catch (InterruptedException failure) {
+            Thread.currentThread().interrupt();
+            throw new CdpException("cdp discover interrupted");
+        } catch (CdpException failure) {
+            throw failure;
+        } catch (Exception failure) {
+            throw new CdpException("cdp discover failed: " + failure.getMessage());
         }
     }
 
