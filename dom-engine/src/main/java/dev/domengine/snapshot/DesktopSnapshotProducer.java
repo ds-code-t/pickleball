@@ -34,8 +34,10 @@ public final class DesktopSnapshotProducer {
             }
         }
         String xml = xml(session.root());
-        String platform = session.live() ? platformName(session.platform()) : platformName(os());
-        String transport = session.live() ? transportName(session.platform()) : "fixture";
+        String declared = session.platform();
+        boolean named = declared != null && !declared.isBlank();
+        String platform = session.live() || named ? platformName(declared) : platformName(os());
+        String transport = session.live() ? transportName(declared) : "fixture";
         long started = System.nanoTime();
         SnapshotContext context = SnapshotContext.desktop(
                 session.root(),

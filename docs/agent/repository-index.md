@@ -1406,6 +1406,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `dom-engine/src/test/java/dev/domengine/snapshot/DocVersionTest.java`
 - `dom-engine/src/test/java/dev/domengine/snapshot/LiveChromeSnapshotTest.java`
 - `dom-engine/src/test/java/dev/domengine/snapshot/LiveEdgeSnapshotTest.java`
+- `dom-engine/src/test/java/dev/domengine/snapshot/SnapshotCoverageTest.java`
 - `dom-engine/src/test/java/dev/domengine/snapshot/XPathIndexTest.java`
 - `dom-engine/src/test/java/dev/domengine/VerbFlagTest.java`
 - `dom-engine/src/test/java/dev/domengine/VisualRelativeTest.java`

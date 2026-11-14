@@ -34,6 +34,8 @@ public final class FakeCdp implements AutoCloseable {
     public final List<String> texts = new CopyOnWriteArrayList<>();
     /** Non-zero {@code modifiers} on a key event. */
     public final List<Integer> modifiers = new CopyOnWriteArrayList<>();
+    /** {@code Browser.getVersion} product. The default stays {@code Fake/1}, which the producer reads as chrome. */
+    public String product = "Fake/1";
     /** CDP event frames sent right after the reply to {@code Network.enable}, as Chrome replays traffic. */
     public final List<ObjectNode> eventsAfterNetworkEnable = new CopyOnWriteArrayList<>();
     private final ServerSocket server;
@@ -147,7 +149,7 @@ public final class FakeCdp implements AutoCloseable {
             ObjectNode result = response.putObject("result");
             if ("DOM.getDocument".equals(method)) result.set("root", document);
             else if ("Page.getFrameTree".equals(method)) result.set("frameTree", frameTree);
-            else if ("Browser.getVersion".equals(method)) result.put("product", "Fake/1");
+            else if ("Browser.getVersion".equals(method)) result.put("product", product);
             else if ("DOM.getBoxModel".equals(method)) {
                 ObjectNode model = result.putObject("model");
                 var border = model.putArray("border");

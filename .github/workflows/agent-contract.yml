@@ -62,6 +62,10 @@ jobs:
           .\scripts\consumer_sim.ps1
           exit $LASTEXITCODE
 
+      - name: Windows UIA live snapshot
+        shell: pwsh
+        run: .\gradlew.bat --no-daemon :dom-engine:test --tests dev.domengine.snapshot.SnapshotCoverageTest.liveDesktopWhenThePlatformExists
+
   dom-engine-live:
     name: Java DOM live Chrome
     runs-on: ubuntu-latest
@@ -170,6 +174,34 @@ jobs:
           cd maven-consumer-project
           mvn -B test -Dpkb_tags=@dom-composite -Dpkb_engine=native -Dpkb_composite=on -Dpkb_runvars.pkb_browser=CHROME_HEADLESS
           mvn -B test -Dpkb_tags=@dom-composite -Dpkb_engine=cucumber -Dpkb_composite=on -Dpkb_runvars.pkb_browser=CHROME_HEADLESS
+
+      - name: Linux desktop live snapshot
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y at-spi2-core xvfb imagemagick dbus-x11
+          xvfb-run -a bash -lc '
+            set -euo pipefail
+            if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ]; then
+              eval "$(dbus-launch --sh-syntax)"
+              export DBUS_SESSION_BUS_ADDRESS
+            fi
+            launcher=""
+            for candidate in /usr/libexec/at-spi-bus-launcher /usr/lib/at-spi2-core/at-spi-bus-launcher; do
+              if [ -x "$candidate" ]; then launcher="$candidate"; break; fi
+            done
+            if [ -n "$launcher" ]; then
+              "$launcher" --launch-immediately >/tmp/at-spi-bus.log 2>&1 &
+              sleep 1
+            fi
+            ./gradlew --no-daemon :dom-engine:test --tests dev.domengine.desktop.LiveDesktopSnapshotTest --tests dev.domengine.snapshot.SnapshotCoverageTest.liveDesktopWhenThePlatformExists
+          '
+
+      - name: Edge live snapshot
+        run: ./gradlew --no-daemon :dom-engine:test --tests dev.domengine.snapshot.LiveEdgeSnapshotTest
+
+      - name: Firefox live snapshot
+        run: ./gradlew --no-daemon :test --tests tools.dscode.common.seleniumextensions.LiveFirefoxSnapshotTest
 
   gate:
     needs: [windows, dom-engine-live]
