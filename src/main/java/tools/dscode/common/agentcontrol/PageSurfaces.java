@@ -668,6 +668,7 @@ final class PageSurfaces {
             frames.add(owner.frameId);
         }
         addLiveChildFrames(web, frames);
+        if (cdpCapable(web)) frames.retainAll(liveFrameIds(web));
         return new ArrayList<>(frames);
     }
 
@@ -689,6 +690,44 @@ final class PageSurfaces {
             throw new IllegalStateException("frame enumeration failed");
         }
         collectChildFrameIds(root.get("frameTree"), frames, true);
+    }
+
+    /** Every frame id in the current tree, including the root. Empty when this driver has no CDP. */
+    private static Set<String> liveFrameIds(WebDriver web) {
+        if (!cdpCapable(web)) return Set.of();
+        Object tree;
+        try {
+            tree = cdp(web, "Page.getFrameTree", Map.of());
+        } catch (RuntimeException failure) {
+            CompositeLog.info("window", "frame enumeration failed " + failure.getMessage());
+            throw new IllegalStateException("frame enumeration failed", failure);
+        }
+        if (!(tree instanceof Map<?, ?> root) || !(root.get("frameTree") instanceof Map<?, ?>)) {
+            CompositeLog.info("window", "frame enumeration failed");
+            throw new IllegalStateException("frame enumeration failed");
+        }
+        java.util.LinkedHashSet<String> ids = new java.util.LinkedHashSet<>();
+        collectFrameIds(root.get("frameTree"), ids);
+        return ids;
+    }
+
+    private static void collectFrameIds(Object node, java.util.Set<String> ids) {
+        if (!(node instanceof Map<?, ?> map)) {
+            CompositeLog.info("window", "frame enumeration failed");
+            throw new IllegalStateException("frame enumeration failed");
+        }
+        Object frame = map.get("frame");
+        String id = frame instanceof Map<?, ?> frameMap && frameMap.get("id") != null
+                ? String.valueOf(frameMap.get("id")).trim()
+                : "";
+        if (!id.isBlank() && !"null".equals(id)) ids.add(id);
+        Object children = map.get("childFrames");
+        if (children instanceof List<?> list) {
+            for (Object child : list) collectFrameIds(child, ids);
+        } else if (children != null) {
+            CompositeLog.info("window", "frame enumeration failed");
+            throw new IllegalStateException("frame enumeration failed");
+        }
     }
 
     private static void collectChildFrameIds(Object node, java.util.Set<String> frames, boolean root) {
@@ -781,6 +820,9 @@ final class PageSurfaces {
     private static Hide hideOn(WebDriver web) {
         if (!cdpCapable(web)) return Hide.SKIPPED;
         try {
+            BrowserFacade facade = directPage(web);
+            if (facade != null && !"cdp".equals(facade.protocol())) return Hide.SKIPPED;
+            cdp(web, "Overlay.enable", Map.of());
             cdp(web, "Overlay.hideHighlight", Map.of());
             return Hide.HIDDEN;
         } catch (RuntimeException failure) {
@@ -1208,6 +1250,9 @@ final class PageSurfaces {
                 CompositeLog.info("window", "frame enter failed " + frameId + " frame is not in the tree");
                 return false;
             }
+            if (chain.isEmpty()) return true;
+            cdp(web, "DOM.enable", Map.of());
+            cdp(web, "Runtime.enable", Map.of());
             for (String id : chain) {
                 Object owner = cdp(web, "DOM.getFrameOwner", Map.of("frameId", id));
                 Integer backend = backendOf(owner);

@@ -11,6 +11,7 @@ import tools.dscode.browser.ProtocolSelector;
 import tools.dscode.browser.ProtocolSockets;
 import tools.dscode.browser.ScriptedSocket;
 
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -82,6 +83,83 @@ class IsolatedWorldTest {
         assertEquals(1, socket.methods().stream().filter("Target.attachToTarget"::equals).count());
     }
 
+    @Test
+    void cleanupEnablesOverlayThenHidesAndSkipsAFrameThatIsGone() throws Exception {
+        ScriptedSocket socket = cleanupSocket("{\"frameTree\":{\"frame\":{\"id\":\"ROOT\"}}}");
+        ProtocolSockets.useFactoryForTests(uri -> socket);
+        ProtocolSelector.useEndpointsForTests(driver -> java.net.URI.create("ws://127.0.0.1:9/devtools/browser"));
+        WebDriver driver = pageDriver();
+        PageSurfaces.manage(driver, "chrome-headed-quiet", true);
+        PageSurfaces.bindFrame(driver, "tab", "main");
+        Map<String, Object> cleaned = PageSurfaces.cleanup(null);
+        assertEquals(true, cleaned.get("cleaned"));
+        List<String> methods = socket.methods();
+        int hide = methods.indexOf("Overlay.hideHighlight");
+        assertTrue(hide > 0, methods.toString());
+        assertEquals("Overlay.enable", methods.get(hide - 1), methods.toString());
+        assertFalse(methods.contains("DOM.getFrameOwner"), methods.toString());
+    }
+
+    @Test
+    void childFrameEntryEnablesDomBeforeTheOwner() throws Exception {
+        ScriptedSocket socket = cleanupSocket("""
+                {"frameTree":{"frame":{"id":"ROOT"},"childFrames":[{"frame":{"id":"CHILD"}}]}}""");
+        ProtocolSockets.useFactoryForTests(uri -> socket);
+        ProtocolSelector.useEndpointsForTests(driver -> java.net.URI.create("ws://127.0.0.1:9/devtools/browser"));
+        WebDriver driver = pageDriver();
+        PageSurfaces.manage(driver, "chrome-headed-quiet", true);
+        Map<String, Object> cleaned = PageSurfaces.cleanup(null);
+        assertEquals(true, cleaned.get("cleaned"));
+        List<String> methods = socket.methods();
+        int owner = methods.indexOf("DOM.getFrameOwner");
+        assertTrue(owner > 0, methods.toString());
+        assertEquals("DOM.enable", methods.get(owner - 2), methods.toString());
+        assertEquals("Runtime.enable", methods.get(owner - 1), methods.toString());
+    }
+
+    @Test
+    void bidiCleanupSkipsOverlayHide() throws Exception {
+        ScriptedSocket socket = new ScriptedSocket().auto(request -> {
+            String method = ScriptedSocket.method(request);
+            return switch (method) {
+                case "Page.getFrameTree" -> ScriptedSocket.cdp(request, "{\"frameTree\":{\"frame\":{\"id\":\"ROOT\"}}}");
+                case "browsingContext.getTree" -> ScriptedSocket.cdp(request,
+                        "{\"contexts\":[{\"context\":\"ctx\",\"url\":\"https://example.test\",\"children\":[]}]}");
+                case "script.callFunction" -> ScriptedSocket.cdp(request,
+                        "{\"type\":\"object\",\"value\":{\"ok\":true}}");
+                default -> ScriptedSocket.cdp(request, "{}");
+            };
+        });
+        ProtocolSockets.useFactoryForTests(uri -> socket);
+        WebDriver driver = firefoxDriver();
+        PageSurfaces.manage(driver, "firefox", true);
+        Map<String, Object> cleaned = PageSurfaces.cleanup(null);
+        assertEquals(true, cleaned.get("cleaned"));
+        assertFalse(socket.methods().contains("Overlay.hideHighlight"), socket.methods().toString());
+        assertFalse(socket.methods().contains("Overlay.enable"), socket.methods().toString());
+        assertTrue(socket.methods().contains("script.callFunction"), socket.methods().toString());
+    }
+
+    private static ScriptedSocket cleanupSocket(String frameTree) {
+        return new ScriptedSocket().auto(request -> {
+            String method = ScriptedSocket.method(request);
+            return switch (method) {
+                case "Target.attachToTarget" -> ScriptedSocket.cdp(request, "{\"sessionId\":\"sess-9\"}");
+                case "Page.getFrameTree" -> ScriptedSocket.cdp(request, frameTree);
+                case "Page.createIsolatedWorld" -> ScriptedSocket.cdp(request, "{\"executionContextId\":7}");
+                case "Runtime.evaluate" -> ScriptedSocket.cdp(request,
+                        "{\"result\":{\"type\":\"object\",\"value\":{\"ok\":true}}}");
+                case "DOM.getFrameOwner" -> ScriptedSocket.cdp(request, "{\"backendNodeId\":7}");
+                case "DOM.resolveNode" -> ScriptedSocket.cdp(request, "{\"object\":{\"objectId\":\"obj-frame\"}}");
+                case "Runtime.callFunctionOn" -> request.contains("removeAttribute")
+                        ? ScriptedSocket.cdp(request, "{\"result\":{\"value\":\"true\"}}")
+                        : ScriptedSocket.cdp(request,
+                        "{\"result\":{\"value\":\"{\\\"name\\\":\\\"child\\\",\\\"changedName\\\":false,\\\"hadName\\\":true,\\\"previousName\\\":\\\"child\\\",\\\"hadBridge\\\":false,\\\"previousBridge\\\":null}\"}}");
+                default -> ScriptedSocket.cdp(request, "{}");
+            };
+        });
+    }
+
     private static WebDriver driver(AtomicInteger scripts) {
         return (WebDriver) java.lang.reflect.Proxy.newProxyInstance(
                 IsolatedWorldTest.class.getClassLoader(),
@@ -124,6 +202,32 @@ class IsolatedWorldTest {
                             (locator, called, locatorArgs) -> null);
                     case "executeScript" -> Map.of("ok", true);
                     case "toString" -> "chrome";
+                    case "equals" -> proxy == args[0];
+                    case "hashCode" -> System.identityHashCode(proxy);
+                    default -> null;
+                });
+    }
+
+    private static WebDriver firefoxDriver() {
+        return (WebDriver) java.lang.reflect.Proxy.newProxyInstance(
+                IsolatedWorldTest.class.getClassLoader(),
+                new Class<?>[]{WebDriver.class, HasCapabilities.class, JavascriptExecutor.class, Cdp.class},
+                (proxy, method, args) -> switch (method.getName()) {
+                    case "getCapabilities" -> {
+                        MutableCapabilities caps = new MutableCapabilities();
+                        caps.setCapability("browserName", "firefox");
+                        caps.setCapability("webSocketUrl", "ws://127.0.0.1:9/session");
+                        yield caps;
+                    }
+                    case "getWindowHandle" -> "tab";
+                    case "getWindowHandles" -> java.util.Set.of("tab");
+                    case "executeCdpCommand" -> Map.of();
+                    case "switchTo" -> java.lang.reflect.Proxy.newProxyInstance(
+                            IsolatedWorldTest.class.getClassLoader(),
+                            new Class<?>[]{WebDriver.TargetLocator.class},
+                            (locator, called, locatorArgs) -> null);
+                    case "executeScript" -> Map.of("ok", true);
+                    case "toString" -> "firefox";
                     case "equals" -> proxy == args[0];
                     case "hashCode" -> System.identityHashCode(proxy);
                     default -> null;
