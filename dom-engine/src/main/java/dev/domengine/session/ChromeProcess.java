@@ -58,7 +58,6 @@ public final class ChromeProcess {
         List<String> command = new ArrayList<>();
         command.add(binary);
         command.add("--remote-debugging-port=0");
-        command.add("--remote-allow-origins=*");
         command.add("--user-data-dir=" + dir.toAbsolutePath());
         command.add("--no-first-run");
         command.add("--no-default-browser-check");
