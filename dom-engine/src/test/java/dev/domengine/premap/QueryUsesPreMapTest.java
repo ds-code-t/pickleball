@@ -51,7 +51,8 @@ class QueryUsesPreMapTest {
             JsonNode first = Query.run(root, flags);
             assertTrue(first.path("premap").asText().startsWith("rebuilt"), first.toString());
             assertEquals(1, PreMapLookup.rebuildsForTests());
-            assertTrue(cdp.methods.stream().anyMatch(method -> method.startsWith("DOM.")), cdp.methods.toString());
+            assertTrue(cdp.methods.stream().anyMatch("DOMSnapshot.captureSnapshot"::equals), cdp.methods.toString());
+            assertEquals(0, cdp.methods.stream().filter("DOM.getDocument"::equals).count(), cdp.methods.toString());
             assertTrue(cdp.methods.stream().noneMatch("Page.captureScreenshot"::equals), cdp.methods.toString());
             List<String> indexed = PreMapLookup.installed().candidates("role", "button").orElseThrow();
             List<String> handles = handles(first);
@@ -72,7 +73,8 @@ class QueryUsesPreMapTest {
             JsonNode third = Query.run(root, flags);
             assertTrue(third.path("premap").asText().startsWith("rebuilt"), third.toString());
             assertEquals(2, PreMapLookup.rebuildsForTests());
-            assertEquals(1, cdp.methods.stream().filter("DOM.getDocument"::equals).count(), cdp.methods.toString());
+            assertEquals(0, cdp.methods.stream().filter("DOM.getDocument"::equals).count(), cdp.methods.toString());
+            assertEquals(1, cdp.methods.stream().filter("DOMSnapshot.captureSnapshot"::equals).count(), cdp.methods.toString());
         }
         String text = Files.readString(Files.list(logs).filter(path -> path.getFileName().toString().endsWith(".log")).findFirst().orElseThrow());
         assertTrue(text.contains("rebuild nodes="), text);

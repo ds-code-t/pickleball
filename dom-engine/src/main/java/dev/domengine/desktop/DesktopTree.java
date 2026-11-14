@@ -51,6 +51,7 @@ public final class DesktopTree {
 
     public static Session attach(String id, Path fixture) {
         if (fixture == null || !Files.isRegularFile(fixture)) throw new CdpException("desktop fixture not found");
+        dev.domengine.premap.PreMapLookup.forget(id);
         try {
             JsonNode json = Jsons.MAPPER.readTree(Files.readString(fixture));
             DomNode root = project(json);
@@ -68,6 +69,7 @@ public final class DesktopTree {
     /** Live attach. {@code windowName} is empty for the whole desktop, or a window/application/dialog name. */
     public static Session attachLive(String id, String windowName) {
         String name = windowName == null ? "" : windowName;
+        dev.domengine.premap.PreMapLookup.forget(id);
         String platform = NativeDesktop.platformId();
         DomNode root = NativeDesktop.capture(name);
         root.linkParents();
@@ -91,6 +93,7 @@ public final class DesktopTree {
 
     public static ObjectNode close(String id) {
         if (SESSIONS.remove(id) == null) throw new CdpException("session not found: " + id);
+        dev.domengine.premap.PreMapLookup.forget(id);
         ObjectNode node = Jsons.object();
         node.put("ok", true);
         node.put("id", id);

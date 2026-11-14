@@ -51,6 +51,7 @@ final class QueryHooks {
         String session = flags == null ? null : flags.get("session");
         if (session != null && !session.isBlank()) {
             PreMapLookup.noteQuery(flags);
+            PreMapLookup.noteRoot(root);
             PreMapLookup lookup = PreMapLookup.installed();
             Optional<dev.domengine.premap.PreMap> map = lookup.current(session, flags.get("doc-version"));
             LOOKUP.set(lookup);

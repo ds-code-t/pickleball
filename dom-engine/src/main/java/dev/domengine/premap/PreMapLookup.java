@@ -44,6 +44,7 @@ public final class PreMapLookup {
     private static final ThreadLocal<PreMap> ACTIVE = new ThreadLocal<>();
     private static final ThreadLocal<String> EXPLAIN = ThreadLocal.withInitial(() -> "none");
     private static final ThreadLocal<Map<String, String>> QUERY = new ThreadLocal<>();
+    private static final ThreadLocal<DomNode> HELD = new ThreadLocal<>();
     private static final AtomicInteger HITS = new AtomicInteger();
     private static final AtomicInteger REBUILDS = new AtomicInteger();
     private static final Duration TIMEOUT = Duration.ofSeconds(15);
@@ -63,6 +64,23 @@ public final class PreMapLookup {
     /** Query flags for this thread, so a rebuild can see an image or look clause. */
     public static void noteQuery(Map<String, String> flags) {
         QUERY.set(flags);
+    }
+
+    /** The tree the query is already walking. A rebuild uses it and does not call {@code DOM.getDocument}. */
+    public static void noteRoot(DomNode root) {
+        HELD.set(root);
+    }
+
+    /** Drops cached maps for a session whose tree was replaced. */
+    public static void forget(String sessionId) {
+        if (sessionId == null || sessionId.isBlank()) return;
+        String prefix = sessionId + "\u0000";
+        CACHE.keySet().removeIf(key -> key.startsWith(prefix));
+    }
+
+    private static String cacheKey(String sessionId, String version, Object root) {
+        int identity = root == null ? 0 : System.identityHashCode(root);
+        return sessionId + "\u0000" + version + "\u0000" + identity;
     }
 
     /** {@code hit} or {@code rebuilt <ms>} after {@link #current(String, String)}. Otherwise {@code none}. */
@@ -88,6 +106,7 @@ public final class PreMapLookup {
         ACTIVE.remove();
         EXPLAIN.remove();
         QUERY.remove();
+        HELD.remove();
         HITS.set(0);
         REBUILDS.set(0);
     }
@@ -120,6 +139,8 @@ public final class PreMapLookup {
             if (desktop != null) return remember(desktopCurrent(desktop, docVersion));
         } catch (RuntimeException failure) {
             SnapshotWarnings.once("premap-rebuild " + oneLine(failure));
+        } finally {
+            HELD.remove();
         }
         return Optional.empty();
     }
@@ -174,11 +195,12 @@ public final class PreMapLookup {
     private static Built browserCurrent(BrowserSession session, String docVersion) {
         boolean image = needsImage();
         String version = docVersion == null || docVersion.isBlank() ? readVersion(session.connection()) : docVersion.trim();
-        String key = session.id + "\u0000" + version;
+        DomNode held = HELD.get();
+        String key = cacheKey(session.id, version, held);
         Cached cached = CACHE.get(key);
         if (cached != null && (!image || cached.imaged)) return hit(cached);
         long started = System.nanoTime();
-        LiveTree tree = LiveTree.read(session.connection());
+        LiveTree tree = held == null ? LiveTree.read(session.connection()) : new LiveTree(held, List.of());
         LiveTree.Layout layout = tree.readLayout(session.connection());
         if (version.isBlank()) version = DocVersion.of(tree.loaderId, 0);
         byte[] png = image ? screenshot(session.connection()) : null;
@@ -214,7 +236,7 @@ public final class PreMapLookup {
         String version = docVersion == null || docVersion.isBlank()
                 ? "desktop:" + session.sequence()
                 : docVersion.trim();
-        String key = session.id() + "\u0000" + version;
+        String key = cacheKey(session.id(), version, session.root());
         Cached cached = CACHE.get(key);
         if (cached != null && (!image || cached.imaged)) return hit(cached);
         long started = System.nanoTime();
