@@ -95,8 +95,9 @@ class IsolatedWorldTest {
         assertEquals(true, cleaned.get("cleaned"));
         List<String> methods = socket.methods();
         int hide = methods.indexOf("Overlay.hideHighlight");
-        assertTrue(hide > 0, methods.toString());
+        assertTrue(hide > 1, methods.toString());
         assertEquals("Overlay.enable", methods.get(hide - 1), methods.toString());
+        assertEquals("DOM.enable", methods.get(hide - 2), methods.toString());
         assertFalse(methods.contains("DOM.getFrameOwner"), methods.toString());
     }
 

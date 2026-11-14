@@ -828,6 +828,7 @@ final class PageSurfaces {
         try {
             BrowserFacade facade = directPage(web);
             if (facade != null && !"cdp".equals(facade.protocol())) return Hide.SKIPPED;
+            cdp(web, "DOM.enable", Map.of());
             cdp(web, "Overlay.enable", Map.of());
             cdp(web, "Overlay.hideHighlight", Map.of());
             return Hide.HIDDEN;
