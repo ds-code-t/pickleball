@@ -27,7 +27,7 @@ public final class ProtocolSelector {
     }
 
     @FunctionalInterface
-    interface Endpoints {
+    public interface Endpoints {
         URI cdp(WebDriver driver);
 
         default URI bidi(WebDriver driver) {

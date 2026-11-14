@@ -643,7 +643,10 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/browser/ScriptedSocket.java`
 - `src/test/java/tools/dscode/browser/SurfaceAssetsTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/AgentLiveFixTest.java`
+- `src/test/java/tools/dscode/common/agentcontrol/BindingEventTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/ChatLockChild.java`
+- `src/test/java/tools/dscode/common/agentcontrol/FallbackLogTest.java`
+- `src/test/java/tools/dscode/common/agentcontrol/IsolatedWorldTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/LiveChromeCdpTest.java`
 - `src/test/java/tools/dscode/common/agentcontrol/SurfaceIdChild.java`
 - `src/test/java/tools/dscode/common/agentsurface/AgentSurfaceRouterTest.java`

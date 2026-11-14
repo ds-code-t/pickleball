@@ -6,6 +6,9 @@ import org.openqa.selenium.JavascriptExecutor;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.chromium.ChromiumDriver;
 import org.openqa.selenium.remote.RemoteWebDriver;
+import tools.dscode.browser.BrowserFacade;
+import tools.dscode.browser.BrowserLog;
+import tools.dscode.browser.ProtocolSelector;
 import tools.dscode.browser.SurfaceAssets;
 import tools.dscode.common.composite.CompositeLog;
 import tools.dscode.common.composite.CompositeRuntime;
@@ -61,6 +64,9 @@ final class PageSurfaces {
     }
 
     private static final String LIVE_HELPER = SurfaceAssets.script("live-helper");
+    private static final java.util.concurrent.ConcurrentHashMap<Integer, BrowserFacade> FACADES = new java.util.concurrent.ConcurrentHashMap<>();
+    private static final java.util.Set<Integer> SURFACE_PROTOCOL = java.util.concurrent.ConcurrentHashMap.newKeySet();
+    private static final java.util.concurrent.ConcurrentLinkedQueue<Map<String, String>> PUSHED = new java.util.concurrent.ConcurrentLinkedQueue<>();
 
     /** Predefined DOM.resolveNode stamp. Not agent script. Removed by the helper after lookup. */
     static final String BRIDGE_MARK = SurfaceAssets.script("bridge-mark");
@@ -227,6 +233,9 @@ final class PageSurfaces {
         }
         LIVE_IDS.clear();
         PAGE_TARGETS.clear();
+        FACADES.clear();
+        SURFACE_PROTOCOL.clear();
+        PUSHED.clear();
     }
 
     static String presetCss(String preset, String explicit) {
@@ -539,6 +548,7 @@ final class PageSurfaces {
     }
 
     private static void drainLiveInputs(Path project, String runId) throws IOException {
+        flushPushed(project, runId);
         for (Managed managed : MANAGED) {
             if (!(managed.driver instanceof JavascriptExecutor)) continue;
             String current = currentHandle(managed.driver);
@@ -789,6 +799,8 @@ final class PageSurfaces {
     }
 
     private static Object cdp(WebDriver web, String method, Map<String, Object> params) {
+        BrowserFacade facade = direct(web);
+        if (facade != null) return facade.send(method, params);
         try {
             return web.getClass().getMethod("executeCdpCommand", String.class, Map.class).invoke(web, method, params);
         } catch (java.lang.reflect.InvocationTargetException failure) {
@@ -798,6 +810,83 @@ final class PageSurfaces {
         } catch (ReflectiveOperationException failure) {
             throw new IllegalStateException(failure);
         }
+    }
+
+    private static Object evaluateHelper(WebDriver web, JavascriptExecutor executor, Map<String, Object> spec) {
+        BrowserFacade facade = direct(web);
+        if (facade != null) {
+            installSurface(web, facade);
+            String json;
+            try {
+                json = AgentStore.JSON.writeValueAsString(spec);
+            } catch (IOException failure) {
+                throw new IllegalStateException(failure);
+            }
+            return facade.evaluateIsolated("pkb-surface", helperFunction(), json);
+        }
+        if (executor == null) {
+            throw new IllegalStateException("no live browser");
+        }
+        BrowserLog.warnOnce(
+                "page-surface-script",
+                "PageSurfaces used Selenium executeScript; no CDP or BiDi session");
+        return executor.executeScript(LIVE_HELPER, spec);
+    }
+
+    private static void installSurface(WebDriver web, BrowserFacade facade) {
+        if (!SURFACE_PROTOCOL.add(System.identityHashCode(web))) return;
+        facade.addPreload(SurfaceAssets.js("html"));
+        facade.addBinding("pkbSurface", (name, payload) -> PUSHED.add(bindingEvent(name, payload)));
+    }
+
+    private static Map<String, String> bindingEvent(String name, Object payload) {
+        Map<String, String> event = new LinkedHashMap<>();
+        if (payload instanceof Map<?, ?> map) {
+            map.forEach((key, raw) -> {
+                if (key != null && raw != null) event.put(String.valueOf(key), String.valueOf(raw));
+            });
+        } else if (payload != null) {
+            event.put("value", String.valueOf(payload));
+        }
+        event.putIfAbsent("type", "binding");
+        event.put("binding", name == null ? "pkbSurface" : name);
+        return event;
+    }
+
+    private static void flushPushed(Path project, String runId) throws IOException {
+        Map<String, String> event;
+        while ((event = PUSHED.poll()) != null) recordInput(project, runId, event);
+    }
+
+    static List<Map<String, String>> pushedForTests() {
+        return List.copyOf(PUSHED);
+    }
+
+    private static BrowserFacade direct(WebDriver web) {
+        if (web == null) return null;
+        int key = System.identityHashCode(web);
+        BrowserFacade cached = FACADES.get(key);
+        if (cached != null) {
+            String protocol = cached.protocol();
+            return "cdp".equals(protocol) || "bidi".equals(protocol) ? cached : null;
+        }
+        BrowserFacade opened;
+        try {
+            opened = ProtocolSelector.forDriver(web, ProtocolSelector.Preference.DIRECT);
+        } catch (RuntimeException failure) {
+            BrowserLog.warnOnce("page-surface-direct", "direct protocol failed: " + failure.getMessage());
+            return null;
+        }
+        FACADES.put(key, opened);
+        String protocol = opened.protocol();
+        return "cdp".equals(protocol) || "bidi".equals(protocol) ? opened : null;
+    }
+
+    private static String helperFunction() {
+        String body = LIVE_HELPER.startsWith("var spec = arguments[0];")
+                ? LIVE_HELPER.substring("var spec = arguments[0];".length())
+                : LIVE_HELPER;
+        return "function(raw){ var spec = JSON.parse(raw);" + body + "}";
     }
 
     private record ParsedColors(double[] content, double[] border, boolean unsupported) {}
@@ -1279,7 +1368,8 @@ final class PageSurfaces {
     }
 
     private static LiveResult runLive(WebDriver current, String op, String handle, String where, String css, String html, String kind, String sentence, String id, boolean measure, Integer x, Integer y) {
-        if (!(current instanceof JavascriptExecutor executor)) {
+        JavascriptExecutor executor = current instanceof JavascriptExecutor js ? js : null;
+        if (executor == null && direct(current) == null) {
             return new LiveResult(false, "no live browser", null, null, 0);
         }
         HandleRef ref = HandleRef.parse(handle);
@@ -1301,7 +1391,7 @@ final class PageSurfaces {
         if (x != null) spec.put("x", x);
         if (y != null) spec.put("y", y);
         try {
-            Object value = executor.executeScript(LIVE_HELPER, spec);
+            Object value = evaluateHelper(current, executor, spec);
             if (!(value instanceof Map<?, ?> map) || !Boolean.TRUE.equals(map.get("ok"))) {
                 String error = value instanceof Map<?, ?> failed && failed.get("error") != null
                         ? String.valueOf(failed.get("error"))

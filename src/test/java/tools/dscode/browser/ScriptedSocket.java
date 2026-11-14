@@ -8,26 +8,26 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 
 /** Test socket. {@code sendText} can auto-reply on the same thread before {@code call} waits. */
-final class ScriptedSocket implements ProtocolSocket {
+public final class ScriptedSocket implements ProtocolSocket {
     private final List<String> sent = new CopyOnWriteArrayList<>();
     private Consumer<String> listener = text -> {
     };
     private Function<String, String> auto = text -> null;
 
-    ScriptedSocket auto(Function<String, String> auto) {
+    public ScriptedSocket auto(Function<String, String> auto) {
         this.auto = auto == null ? text -> null : auto;
         return this;
     }
 
-    List<String> sent() {
+    public List<String> sent() {
         return List.copyOf(sent);
     }
 
-    List<String> methods() {
+    public List<String> methods() {
         return sent.stream().map(ScriptedSocket::method).toList();
     }
 
-    void inbound(String text) {
+    public void inbound(String text) {
         listener.accept(text);
     }
 
@@ -48,7 +48,7 @@ final class ScriptedSocket implements ProtocolSocket {
     public void close() {
     }
 
-    static String method(String json) {
+    public static String method(String json) {
         try {
             return JsonRpc.MAPPER.readTree(json).path("method").asText("");
         } catch (Exception failure) {
@@ -73,7 +73,7 @@ final class ScriptedSocket implements ProtocolSocket {
     }
 
     /** CDP success with a JSON result object. */
-    static String cdp(String request, String resultJson) {
+    public static String cdp(String request, String resultJson) {
         return "{\"id\":" + id(request) + ",\"result\":" + resultJson + "}";
     }
 }
