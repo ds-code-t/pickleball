@@ -11,11 +11,11 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Dictionary layer. Maps a Pickleball element phrase, or a Selenium {@link By}
- * the execution dictionary already built, onto one composite selector.
- * The combined form is one AND group per target and one per context. A phrase
- * that also carries XPath keeps that XPath as the fallback. A pure XPath
- * definition stays XPath and logs one deprecation warning. Pure CSS still
+ * Dictionary layer of the Control Engine. Maps a Pickleball element phrase,
+ * or a Selenium {@link By} the execution dictionary already built, onto one
+ * selector. The combined form is one AND group per target and one per context.
+ * A phrase that also carries XPath keeps that XPath as the fallback. A pure
+ * XPath definition stays XPath and logs one deprecation warning. Pure CSS still
  * passes through and is not deprecated. A space between an XPath function
  * name and {@code (} is removed first. The expression is otherwise unchanged.
  */

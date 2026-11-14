@@ -6,8 +6,8 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * Dictionary layer. The engine query object is one pipeline or expression
- * string, plus the exposure, limit, and explain flags the composite CLI
+ * Dictionary layer of the Control Engine. The query object is one pipeline or
+ * expression string, plus the exposure, limit, and explain flags the CLI
  * already accepts. {@code after} and {@code before} are document order, not
  * visual relatives. Workbench, MCP, and the control bridge only forward this object.
  */
@@ -80,7 +80,7 @@ public record EngineQuery(
         return built;
     }
 
-    /** Selenium can run a single css= or xpath= stage. Operators and relations need the engine. */
+    /** Selenium can run a single css= or xpath= stage. Operators and relations need the Control Engine. */
     public By seleniumFallback() {
         if (text == null || text.isBlank()) return null;
         if (text.contains(">>") || relationForm(text) || "expr".equals(dev.domengine.query.Query.leadingEngine(text))) return null;
