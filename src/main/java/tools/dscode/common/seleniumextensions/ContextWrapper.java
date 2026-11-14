@@ -137,9 +137,24 @@ public class ContextWrapper {
         String xpath = adjustedXPath(searchContext, xPathy.getXpath(), elementMatch);
         logDebug("XPATH: " + prettyPrintXPath(xpath));
         org.openqa.selenium.By locator = xpath.equals(xPathy.getXpath())
-                ? tools.dscode.common.composite.CombinedBy.of(elementMatch.combinedClause, xpath)
+                ? tools.dscode.common.composite.CombinedBy.of(scopedCombined(elementMatch, xPathy), xpath)
                 : new By.ByXPath(xpath);
         return findWithRetry(searchContext, locator, elementMatch);
+    }
+
+    /**
+     * A combined clause is the target alone. A search xpath that also names a context
+     * is not that clause, so the unscoped pipeline must not run ahead of it.
+     */
+    private static String scopedCombined(ElementMatch elementMatch, XPathy searched) {
+        if (elementMatch == null || elementMatch.combinedClause == null || elementMatch.combinedClause.isBlank()) {
+            return null;
+        }
+        if (elementMatch.xPathy != null && searched != null
+                && !searched.getXpath().equals(elementMatch.xPathy.getXpath())) {
+            return null;
+        }
+        return elementMatch.combinedClause;
     }
 
     private static String adjustedXPath(SearchContext searchContext, String xpath, ElementMatch elementMatch) {
@@ -203,7 +218,7 @@ public class ContextWrapper {
         boolean displayedElementsOnly =
                 !elementMatch.categoryFlags.contains(ExecutionDictionary.CategoryFlags.NON_DISPLAY_ELEMENT);
         org.openqa.selenium.By locator = xpath.equals(xPathy.getXpath())
-                ? tools.dscode.common.composite.CombinedBy.of(elementMatch.combinedClause, xpath)
+                ? tools.dscode.common.composite.CombinedBy.of(scopedCombined(elementMatch, xPathy), xpath)
                 : new By.ByXPath(xpath);
         return NestedByLocator.retainFullMatches(
                 findWithRetry(

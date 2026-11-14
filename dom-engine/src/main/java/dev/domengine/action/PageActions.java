@@ -43,11 +43,15 @@ public final class PageActions {
         }
         DomNode node = one(tree, flags, session.connection());
         if (!node.hasBox) tree.enrich(session.connection(), List.of(node), 0, 0);
-        double x = node.hasBox ? node.x + node.width / 2 : 1;
-        double y = node.hasBox ? node.y + node.height / 2 : 1;
         CdpConnection cdp = session.connection();
+        boolean optionClick = "click".equals(verb) && "option".equals(node.tag());
+        double[] point = optionClick || "scroll".equals(verb) || "key".equals(verb) || "submit".equals(verb) || "eval".equals(verb) || "hover".equals(verb)
+                ? boxPoint(node)
+                : aim(cdp, tree, node);
+        double x = point[0];
+        double y = point[1];
         ObjectNode result = switch (verb) {
-            case "click" -> "option".equals(node.tag()) ? selectOption(cdp, node) : mouseClick(cdp, x, y, "left", 1);
+            case "click" -> optionClick ? selectOption(cdp, node) : mouseClick(cdp, x, y, "left", 1);
             case "dblclick" -> mouseClick(cdp, x, y, "left", 2);
             case "contextclick" -> mouseClick(cdp, x, y, "right", 1);
             case "type" -> type(cdp, x, y, flags.getOrDefault("text", ""), "true".equals(flags.get("append")), "true".equals(flags.get("submit")));
@@ -66,18 +70,14 @@ public final class PageActions {
     }
 
     private static ObjectNode drag(BrowserSession session, LiveTree tree, Map<String, String> flags) {
-        DomNode source = one(tree, Map.of("css", selector(flags.get("source"))), session.connection());
-        DomNode target = one(tree, Map.of("css", selector(flags.get("target"))), session.connection());
-        if (!source.hasBox) tree.enrich(session.connection(), List.of(source), 0, 0);
-        if (!target.hasBox) tree.enrich(session.connection(), List.of(target), 0, 0);
-        double x1 = source.hasBox ? source.x + source.width / 2 : 1;
-        double y1 = source.hasBox ? source.y + source.height / 2 : 1;
-        double x2 = target.hasBox ? target.x + target.width / 2 : 20;
-        double y2 = target.hasBox ? target.y + target.height / 2 : 20;
         CdpConnection cdp = session.connection();
-        mouse(cdp, "mousePressed", x1, y1, "left", 1);
-        mouse(cdp, "mouseMoved", x2, y2, "left", 1);
-        mouse(cdp, "mouseReleased", x2, y2, "left", 1);
+        DomNode source = one(tree, locatorFlags(flags.get("source")), cdp);
+        DomNode target = one(tree, locatorFlags(flags.get("target")), cdp);
+        double[] from = aim(cdp, tree, source);
+        double[] to = aim(cdp, tree, target);
+        mouse(cdp, "mousePressed", from[0], from[1], "left", 1);
+        mouse(cdp, "mouseMoved", to[0], to[1], "left", 1);
+        mouse(cdp, "mouseReleased", to[0], to[1], "left", 1);
         ObjectNode result = Jsons.object();
         result.put("ok", true);
         result.put("session", session.id);
@@ -87,11 +87,73 @@ public final class PageActions {
         return result;
     }
 
-    private static String selector(String raw) {
+    /** A drag locator is a CSS string, or a JSON object of css/xpath/pipeline/selector flags. */
+    private static Map<String, String> locatorFlags(String raw) {
         if (raw == null || raw.isBlank()) throw new CdpException("invalid drag locator");
         String trimmed = raw.trim();
-        if (trimmed.startsWith("{")) return trimmed;
-        return trimmed;
+        if (!trimmed.startsWith("{")) return Map.of("css", trimmed);
+        JsonNode node;
+        try {
+            node = Jsons.MAPPER.readTree(trimmed);
+        } catch (Exception failure) {
+            throw new CdpException("invalid drag locator");
+        }
+        if (!node.isObject()) throw new CdpException("invalid drag locator");
+        Map<String, String> flags = new java.util.LinkedHashMap<>();
+        copyText(node, flags, "css");
+        copyText(node, flags, "xpath");
+        copyText(node, flags, "pipeline");
+        copyText(node, flags, "selector");
+        copyText(node, flags, "text");
+        copyText(node, flags, "frame");
+        copyText(node, flags, "shadow");
+        if (flags.isEmpty()) throw new CdpException("invalid drag locator");
+        return flags;
+    }
+
+    private static void copyText(JsonNode node, Map<String, String> flags, String key) {
+        JsonNode value = node.get(key);
+        if (value != null && value.isTextual() && !value.asText().isBlank()) flags.put(key, value.asText());
+    }
+
+    /** Scroll the node into view, then aim at its viewport center. */
+    private static double[] aim(CdpConnection cdp, LiveTree tree, DomNode node) {
+        bringIntoView(cdp, node);
+        if (node != null) tree.enrich(cdp, List.of(node), 0, 0);
+        double[] center = clientCenter(cdp, node);
+        if (center != null) return center;
+        return boxPoint(node);
+    }
+
+    private static double[] boxPoint(DomNode node) {
+        double x = node != null && node.hasBox ? node.x + node.width / 2 : 1;
+        double y = node != null && node.hasBox ? node.y + node.height / 2 : 1;
+        return new double[] {x, y};
+    }
+
+    private static void bringIntoView(CdpConnection cdp, DomNode node) {
+        if (cdp == null || node == null || node.nodeId <= 0) return;
+        ObjectNode into = Jsons.object();
+        into.put("nodeId", node.nodeId);
+        try {
+            cdp.call("DOM.scrollIntoViewIfNeeded", into, java.time.Duration.ofSeconds(5));
+        } catch (RuntimeException ignored) {
+            // A node with no box still gets the last known point.
+        }
+    }
+
+    /** Viewport center from {@code getBoundingClientRect}. Null when the call does not return one. */
+    private static double[] clientCenter(CdpConnection cdp, DomNode node) {
+        if (cdp == null || node == null || node.nodeId <= 0) return null;
+        try {
+            ObjectNode called = callOn(cdp, node, "function(){ var r=this.getBoundingClientRect(); return {x:r.x+r.width/2, y:r.y+r.height/2, w:r.width, h:r.height}; }");
+            JsonNode value = called.path("result").path("value");
+            if (!value.has("x") || !value.has("y")) return null;
+            if (value.path("w").asDouble(0) <= 0 || value.path("h").asDouble(0) <= 0) return null;
+            return new double[] {value.path("x").asDouble(), value.path("y").asDouble()};
+        } catch (RuntimeException ignored) {
+            return null;
+        }
     }
 
     private static DomNode one(LiveTree tree, Map<String, String> flags, CdpConnection cdp) {
@@ -253,20 +315,71 @@ public final class PageActions {
         for (String part : parts) {
             if (!KNOWN.contains(part.toUpperCase(Locale.ROOT)) && part.length() != 1) throw new CdpException("invalid key");
         }
-        for (int i = 0; i < parts.length - 1; i++) press(cdp, parts[i], "keyDown");
-        press(cdp, parts[parts.length - 1], "keyDown");
-        press(cdp, parts[parts.length - 1], "keyUp");
-        for (int i = parts.length - 2; i >= 0; i--) press(cdp, parts[i], "keyUp");
+        int modifiers = 0;
+        for (int i = 0; i < parts.length - 1; i++) {
+            modifiers |= stroke(parts[i]).bit;
+            press(cdp, parts[i], "keyDown", modifiers);
+        }
+        press(cdp, parts[parts.length - 1], "keyDown", modifiers);
+        press(cdp, parts[parts.length - 1], "keyUp", modifiers);
+        for (int i = parts.length - 2; i >= 0; i--) {
+            modifiers &= ~stroke(parts[i]).bit;
+            press(cdp, parts[i], "keyUp", modifiers);
+        }
         ObjectNode result = Jsons.object();
         result.put("key", key);
         return result;
     }
 
-    private static void press(CdpConnection cdp, String key, String type) {
+    private static void press(CdpConnection cdp, String key, String type, int modifiers) {
+        Stroke stroke = stroke(key);
         ObjectNode params = Jsons.object();
         params.put("type", type);
-        params.put("key", key.toUpperCase(Locale.ROOT));
+        params.put("key", stroke.key);
+        params.put("code", stroke.code);
+        if (stroke.vk != 0) {
+            params.put("windowsVirtualKeyCode", stroke.vk);
+            params.put("nativeVirtualKeyCode", stroke.vk);
+        }
+        if (modifiers != 0) params.put("modifiers", modifiers);
         cdp.call("Input.dispatchKeyEvent", params, java.time.Duration.ofSeconds(5));
+    }
+
+    /** DOM {@code event.key} / {@code event.code}. A single letter stays the token the caller sent. */
+    private static Stroke stroke(String token) {
+        String name = token == null ? "" : token.toUpperCase(Locale.ROOT);
+        return switch (name) {
+            case "ENTER" -> new Stroke("Enter", "Enter", 13, 0);
+            case "TAB" -> new Stroke("Tab", "Tab", 9, 0);
+            case "ESCAPE" -> new Stroke("Escape", "Escape", 27, 0);
+            case "ARROWUP" -> new Stroke("ArrowUp", "ArrowUp", 38, 0);
+            case "ARROWDOWN" -> new Stroke("ArrowDown", "ArrowDown", 40, 0);
+            case "ARROWLEFT" -> new Stroke("ArrowLeft", "ArrowLeft", 37, 0);
+            case "ARROWRIGHT" -> new Stroke("ArrowRight", "ArrowRight", 39, 0);
+            case "BACKSPACE" -> new Stroke("Backspace", "Backspace", 8, 0);
+            case "DELETE" -> new Stroke("Delete", "Delete", 46, 0);
+            case "HOME" -> new Stroke("Home", "Home", 36, 0);
+            case "END" -> new Stroke("End", "End", 35, 0);
+            case "PAGEUP" -> new Stroke("PageUp", "PageUp", 33, 0);
+            case "PAGEDOWN" -> new Stroke("PageDown", "PageDown", 34, 0);
+            case "SPACE" -> new Stroke(" ", "Space", 32, 0);
+            case "CONTROL" -> new Stroke("Control", "ControlLeft", 17, 2);
+            case "SHIFT" -> new Stroke("Shift", "ShiftLeft", 16, 8);
+            case "ALT" -> new Stroke("Alt", "AltLeft", 18, 1);
+            case "META" -> new Stroke("Meta", "MetaLeft", 91, 4);
+            default -> {
+                if (name.length() == 1 && name.charAt(0) >= 'A' && name.charAt(0) <= 'Z') {
+                    yield new Stroke(name, "Key" + name, name.charAt(0), 0);
+                }
+                if (name.length() == 1 && name.charAt(0) >= '0' && name.charAt(0) <= '9') {
+                    yield new Stroke(name, "Digit" + name, name.charAt(0), 0);
+                }
+                yield new Stroke(token == null ? "" : token, name, 0, 0);
+            }
+        };
+    }
+
+    private record Stroke(String key, String code, int vk, int bit) {
     }
 
     private static ObjectNode submit(CdpConnection cdp, DomNode node) {

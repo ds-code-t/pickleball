@@ -28,6 +28,8 @@ public final class FakeCdp implements AutoCloseable {
 
     public final int port;
     public final List<String> methods = new CopyOnWriteArrayList<>();
+    /** {@code Input.dispatchKeyEvent} {@code key} values, in order. */
+    public final List<String> keys = new CopyOnWriteArrayList<>();
     /** CDP event frames sent right after the reply to {@code Network.enable}, as Chrome replays traffic. */
     public final List<ObjectNode> eventsAfterNetworkEnable = new CopyOnWriteArrayList<>();
     private final ServerSocket server;
@@ -176,6 +178,7 @@ public final class FakeCdp implements AutoCloseable {
             } else if ("Page.createIsolatedWorld".equals(method)) {
                 result.put("executionContextId", 17);
             } else if ("Input.dispatchMouseEvent".equals(method) || "Input.insertText".equals(method) || "Input.dispatchKeyEvent".equals(method)) {
+                if ("Input.dispatchKeyEvent".equals(method)) keys.add(request.path("params").path("key").asText(""));
                 result.put("ok", true);
             }
             writeFrame(out, Jsons.compact(response));
