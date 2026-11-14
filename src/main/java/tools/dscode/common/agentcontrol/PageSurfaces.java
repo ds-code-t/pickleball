@@ -1039,9 +1039,11 @@ final class PageSurfaces {
     }
 
     private static String helperFunction() {
-        String body = LIVE_HELPER.startsWith("var spec = arguments[0];")
-                ? LIVE_HELPER.substring("var spec = arguments[0];".length())
-                : LIVE_HELPER;
+        int semi = LIVE_HELPER.indexOf(';');
+        String body = LIVE_HELPER;
+        if (semi > 0 && LIVE_HELPER.substring(0, semi).contains("arguments[0]")) {
+            body = LIVE_HELPER.substring(semi + 1);
+        }
         return "function(raw){ var spec = JSON.parse(raw);" + body + "}";
     }
 
