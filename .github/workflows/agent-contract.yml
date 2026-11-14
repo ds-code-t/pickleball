@@ -63,6 +63,7 @@ jobs:
           exit $LASTEXITCODE
 
       - name: Windows UIA live snapshot
+        if: always()
         shell: pwsh
         run: .\gradlew.bat --no-daemon :dom-engine:test --tests dev.domengine.snapshot.SnapshotCoverageTest.liveDesktopWhenThePlatformExists
 
@@ -176,6 +177,7 @@ jobs:
           mvn -B test -Dpkb_tags=@dom-composite -Dpkb_engine=cucumber -Dpkb_composite=on -Dpkb_runvars.pkb_browser=CHROME_HEADLESS
 
       - name: Linux desktop live snapshot
+        if: always()
         run: |
           set -euo pipefail
           sudo apt-get update
@@ -198,9 +200,11 @@ jobs:
           '
 
       - name: Edge live snapshot
+        if: always()
         run: ./gradlew --no-daemon :dom-engine:test --tests dev.domengine.snapshot.LiveEdgeSnapshotTest
 
       - name: Firefox live snapshot
+        if: always()
         run: ./gradlew --no-daemon :test --tests tools.dscode.common.seleniumextensions.LiveFirefoxSnapshotTest
 
   gate:
