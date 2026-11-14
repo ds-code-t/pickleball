@@ -35,8 +35,25 @@ public final class DocVersion {
             })()
             """;
 
-    private DocVersion() {
-    }
+    /** Function form for BiDi {@code script.addPreloadScript}. CDP uses {@link #SCRIPT}. */
+    public static final String INSTALL = """
+            function(){
+              if (!globalThis.__pkbPremapInstalled) {
+                globalThis.__pkbPremapInstalled = true;
+                globalThis.__pkbPremapCount = 0;
+                var bump = function(){ globalThis.__pkbPremapCount++; };
+                var arm = function(){
+                  try {
+                    var root = document.documentElement || document;
+                    new MutationObserver(bump).observe(root, {subtree:true, childList:true, attributes:true, characterData:true});
+                  } catch (e) {}
+                };
+                if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', arm);
+                else arm();
+              }
+              return String(globalThis.__pkbPremapCount || 0);
+            }
+            """;
 
     public static String of(String loaderId, long mutations) {
         String loader = loaderId == null ? "" : loaderId;

@@ -177,6 +177,53 @@ public final class SnapshotContext {
         );
     }
 
+    /**
+     * A page snapshot from a facade (CDP, BiDi, or the Selenium fallback).
+     * {@code png} may be null. A non-PNG byte array fails the same way a bad file does.
+     */
+    public static SnapshotContext captured(
+            SnapshotOptions options,
+            String platform,
+            String transport,
+            String docVersion,
+            String html,
+            byte[] png,
+            double cssWidth,
+            double cssHeight,
+            double devicePixelRatio,
+            double scrollX,
+            double scrollY,
+            double visualOffsetX,
+            double visualOffsetY,
+            double visualScale
+    ) {
+        SnapshotOptions used = options == null ? new SnapshotOptions() : options;
+        PngImage image = png == null || png.length == 0 ? null : PngImage.decode(png);
+        double width = cssWidth > 0 ? cssWidth : 1280;
+        double height = cssHeight > 0 ? cssHeight : 800;
+        return new SnapshotContext(
+                Platform.BROWSER,
+                platform == null || platform.isBlank() ? "chromium" : platform,
+                transport == null || transport.isBlank() ? "cdp" : transport,
+                used.sessionId(),
+                docVersion == null ? "" : docVersion,
+                used.id(),
+                BoxCaps.fromFlags(used.flags()),
+                width,
+                height,
+                used.flags(),
+                "html",
+                html == null ? "" : html,
+                image,
+                devicePixelRatio,
+                scrollX,
+                scrollY,
+                visualOffsetX,
+                visualOffsetY,
+                visualScale
+        );
+    }
+
     public Platform platform() {
         return platform;
     }

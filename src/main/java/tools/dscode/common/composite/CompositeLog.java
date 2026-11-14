@@ -25,6 +25,9 @@ import tools.dscode.common.reporting.logging.LogForwarder;
  * {@code session}, {@code element}, {@code fallback}, {@code batch}, {@code state},
  * {@code position}, {@code geometry}, {@code query}, {@code exposure})
  * or {@code all}.
+ * {@code snapshot} writes page-snapshot lines. A Selenium page fallback is not gated
+ * on that entity: {@link #snapshotFallback(String)} prints one
+ * {@code WARN snapshot fallback selenium reason=} line per run and reason.
  * {@code query} writes {@code INFO query category} for dictionary XPath and
  * {@code INFO query engine} plus {@code TRACE query forward selector=} for an
  * engine pipeline or expression. {@code exposure} writes the lower-level act.
@@ -48,6 +51,7 @@ public final class CompositeLog {
     public static final long CAP_BYTES = 1_048_576L;
 
     private static final Set<String> FALLBACK_REASONS = ConcurrentHashMap.newKeySet();
+    private static final Set<String> SNAPSHOT_FALLBACKS = ConcurrentHashMap.newKeySet();
     private static final AtomicBoolean OVERRIDE = new AtomicBoolean();
     private static final List<String> LINES = new CopyOnWriteArrayList<>();
     private static volatile String lastFallback;
@@ -59,6 +63,7 @@ public final class CompositeLog {
 
     public static void resetForTests() {
         FALLBACK_REASONS.clear();
+        SNAPSHOT_FALLBACKS.clear();
         OVERRIDE.set(false);
         LINES.clear();
         lastFallback = null;
@@ -102,6 +107,19 @@ public final class CompositeLog {
 
     public static void debug(String entity, String message) {
         line(entity, "DEBUG", message);
+    }
+
+    /**
+     * One {@code WARN snapshot fallback selenium reason=} line per process and reason.
+     * Printed even when {@code pkb_composite_log} is off. A second call with the same
+     * reason does not print again.
+     */
+    public static void snapshotFallback(String reason) {
+        String key = reason == null || reason.isBlank() ? "no-adapter" : reason.trim();
+        if (!SNAPSHOT_FALLBACKS.add(key)) return;
+        String text = "WARN snapshot fallback selenium reason=" + key;
+        LINES.add(text);
+        System.err.println(text);
     }
 
     /**

@@ -161,6 +161,18 @@ Box spaces, from the snapshot bounds (frame-document coordinates) and the layout
 
 `DomCompositeAdapter.compositeSnapshot(options)` forwards the options to the joined engine when `capabilities.snapshot_schema` is listed. A missing capability throws `error: snapshot_schema is absent`.
 
+## Firefox and root producers
+
+`SnapshotProducers.page(driver, options)` is the root page snapshot. It tries three producers, in order:
+
+1. The joined engine, when `CompositeRuntime.browserJoined()` is true and `capabilities.snapshot_schema` is listed. That is `Client.snapshot`, the same CDP producer as `domengine snapshot`.
+2. `FacadeSnapshotProducer`. `ProtocolSelector.forDriver` returns a `BidiAdapter` for Firefox and a `CdpAdapter` for Chromium when the engine is not joined. The facade walks every browsing context from `frameTree()`, reads `page-walk.js` in the `pkb-premap` world, takes one screenshot through the adapter, and builds with `CompositeSnapshotBuilder` in this process. `doc_version` is `<context id>:<mutation count>`. The counter is installed with `addPreload` and read with `evaluateIsolated`. Firefox's `platform` is `firefox` and its `transport` is `bidi`. A Chromium facade keeps `transport` `cdp`.
+3. The Selenium fallback. `transport` is `selenium-fallback`. The same walk script runs through `JavascriptExecutor`, and the screenshot is `TakesScreenshot`. There is no `executeCdpCommand` on this path.
+
+`page-walk.js` returns, for the document it runs in, the tag, attributes, role and name hints, a computed-style subset, `getBoundingClientRect`, `getClientRects`, scroll offsets, `visualViewport`, row states, an index-qualified XPath, and `outerHTML`. The builder still assigns the XPath index. `frame_document` is the rect plus that frame's scroll. `document_css_px` adds the enclosing iframe's document position. `layout_viewport` subtracts the top document scroll. `visual_viewport` subtracts the visual offset and multiplies by scale. Those four are not copies of each other.
+
+A missing direct adapter logs one line, `WARN snapshot fallback selenium reason=no-adapter`. An adapter that throws logs `WARN snapshot fallback selenium reason=adapter-error:<message>`, once per run and reason, even when `pkb_composite_log` is off. The artifact is still returned. `CompositeSnapshotProducer` per-element snapshots are unchanged.
+
 ## Desktop producers
 
 `DesktopSnapshotProducer` builds one composite snapshot from a `DesktopTree` session. `domengine desktop snapshot --id ID [--screenshot file.png] [--out-dir DIR]` is the CLI. `DesktopTree.VERBS` includes `snapshot`. `doc_version` is `desktop:` plus the session sequence. `attach` starts at 0. `walk`, `click`, and `type` bump the sequence. A fixture does not recapture the tree. A live session recaptures on `walk`.

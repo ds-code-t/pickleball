@@ -455,6 +455,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/common/seleniumextensions/ElementSnapshot.java`
 - `src/main/java/tools/dscode/common/seleniumextensions/ElementSnapshotScript.java`
 - `src/main/java/tools/dscode/common/seleniumextensions/ElementWrapper.java`
+- `src/main/java/tools/dscode/common/seleniumextensions/FacadeSnapshotProducer.java`
 - `src/main/java/tools/dscode/common/seleniumextensions/SeleniumSnapshotProducer.java`
 - `src/main/java/tools/dscode/common/seleniumextensions/SnapshotLookup.java`
 - `src/main/java/tools/dscode/common/seleniumextensions/SnapshotProducers.java`
@@ -781,7 +782,10 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/test/java/tools/dscode/common/seleniumextensions/ElementWrapperActionTest.java`
 - `src/test/java/tools/dscode/common/seleniumextensions/ElementWrapperRefreshTest.java`
 - `src/test/java/tools/dscode/common/seleniumextensions/ElementWrapperSnapshotTest.java`
+- `src/test/java/tools/dscode/common/seleniumextensions/FacadeSnapshotProducerTest.java`
+- `src/test/java/tools/dscode/common/seleniumextensions/LiveFirefoxSnapshotTest.java`
 - `src/test/java/tools/dscode/common/seleniumextensions/SeleniumSnapshotProducerTest.java`
+- `src/test/java/tools/dscode/common/seleniumextensions/SnapshotFallbackWarnTest.java`
 - `src/test/java/tools/dscode/common/seleniumextensions/SnapshotPages.java`
 - `src/test/java/tools/dscode/common/servicecalls/JdbcTypeMappingTest.java`
 - `src/test/java/tools/dscode/common/treeparsing/PhraseSyntaxTest.java`
@@ -1321,12 +1325,14 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `dom-engine/src/main/java/dev/domengine/snapshot/PngImage.java`
 - `dom-engine/src/main/java/dev/domengine/snapshot/SnapshotContext.java`
 - `dom-engine/src/main/java/dev/domengine/snapshot/SnapshotOptions.java`
+- `dom-engine/src/main/java/dev/domengine/snapshot/SnapshotSchemas.java`
 - `dom-engine/src/main/java/dev/domengine/snapshot/SnapshotWarnings.java`
 - `dom-engine/src/main/java/dev/domengine/snapshot/XPathIndex.java`
 - `dom-engine/src/main/java/dev/domengine/tree/ContextWalker.java`
 - `dom-engine/src/main/java/dev/domengine/tree/DomNode.java`
 - `dom-engine/src/main/java/dev/domengine/tree/LiveTree.java`
 - `dom-engine/src/main/resources/dev/domengine/snapshot/composite-snapshot.schema.json`
+- `dom-engine/src/main/resources/dev/domengine/snapshot/page-walk.js`
 - `dom-engine/src/test/java/dev/domengine/ActionSmokeTest.java`
 - `dom-engine/src/test/java/dev/domengine/affinity/AffinityScoreTest.java`
 - `dom-engine/src/test/java/dev/domengine/affinity/AffinityWeightsTest.java`
@@ -1381,7 +1387,6 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `dom-engine/src/test/java/dev/domengine/snapshot/DocVersionTest.java`
 - `dom-engine/src/test/java/dev/domengine/snapshot/LiveChromeSnapshotTest.java`
 - `dom-engine/src/test/java/dev/domengine/snapshot/LiveEdgeSnapshotTest.java`
-- `dom-engine/src/test/java/dev/domengine/snapshot/SnapshotSchemas.java`
 - `dom-engine/src/test/java/dev/domengine/snapshot/XPathIndexTest.java`
 - `dom-engine/src/test/java/dev/domengine/VerbFlagTest.java`
 - `dom-engine/src/test/java/dev/domengine/VisualRelativeTest.java`

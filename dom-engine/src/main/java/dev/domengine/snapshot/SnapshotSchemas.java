@@ -7,8 +7,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
-import static org.junit.jupiter.api.Assertions.fail;
-
 /** Checks a document against the draft 2020-12 subset this schema uses. */
 public final class SnapshotSchemas {
     private SnapshotSchemas() {
@@ -17,7 +15,7 @@ public final class SnapshotSchemas {
     public static void assertValid(JsonNode schema, JsonNode document) {
         List<String> errors = new ArrayList<>();
         check(schema, schema, document, "$", errors);
-        if (!errors.isEmpty()) fail(String.join("\n", errors));
+        if (!errors.isEmpty()) throw new AssertionError(String.join("\n", errors));
     }
 
     private static void check(JsonNode root, JsonNode schema, JsonNode value, String path, List<String> errors) {
