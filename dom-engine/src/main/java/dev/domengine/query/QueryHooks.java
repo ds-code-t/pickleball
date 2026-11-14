@@ -50,11 +50,12 @@ final class QueryHooks {
         ONE.set("ok");
         String session = flags == null ? null : flags.get("session");
         if (session != null && !session.isBlank()) {
+            PreMapLookup.noteQuery(flags);
             PreMapLookup lookup = PreMapLookup.installed();
             Optional<dev.domengine.premap.PreMap> map = lookup.current(session, flags.get("doc-version"));
             LOOKUP.set(lookup);
             SESSION_MAP.set(map.isPresent());
-            PREMAP.set(map.isPresent() ? "hit" : "none");
+            PREMAP.set(map.isPresent() ? PreMapLookup.statusForExplain() : "none");
             return;
         }
         PreMapLookup lookup = root == null ? PreMapLookup.PASS_THROUGH : PreMapLookup.forTree(root);
@@ -142,6 +143,11 @@ final class QueryHooks {
 
     static void log() {
         EngineLog.info("query", "premap=" + PREMAP.get() + " rank=" + RANK.get() + " one=" + ONE.get());
+    }
+
+    static String premapStatus() {
+        String value = PREMAP.get();
+        return value == null || value.isBlank() ? "none" : value;
     }
 
     static JsonNode explainRank(Map<String, String> flags) {

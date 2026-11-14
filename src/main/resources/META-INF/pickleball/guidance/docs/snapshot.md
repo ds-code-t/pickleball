@@ -96,7 +96,16 @@ Titles are chosen in this order: `aria-labelledby` text, `aria-label`, the first
 
 Every `CompositeSnapshotBuilder.build` runs `PreMapBuilder`. There is no flag to skip it. The pre-map is the thing a later query is supposed to read, so the expensive work happens once at capture.
 
-`PreMapLookup.installed()` and `PreMapLookup.PASS_THROUGH` still return an empty `current` and an empty `candidates`. `current` stays empty until runtime lookups. `forTree` caches a built pre-map by tree identity, and `candidates` on that lookup reads the indexes. An empty document has nothing to index, so `candidates` stays empty there. That is the pass-through default the existing test locks. `store` keeps a session map for a later `current`.
+`PreMapLookup.forTree` caches a file query by tree identity, and `candidates` on that lookup reads the indexes. An empty document has nothing to index, so `candidates` stays empty there. `store` keeps a map for a caller that already built one. It does not satisfy `current`. `installed()` is still the `PASS_THROUGH` object, so a process with no live session answers nothing. That is the check `HookCallSiteTest` locks. A live browser or desktop session is served by that same object.
+
+## Runtime lookups
+
+A session query reads `doc_version`, then `PreMapLookup.current(sessionId, docVersion)`.
+
+- Browser version is `<loaderId>:<mutationCount>`. When the query does not pass `--doc-version`, one isolated-world evaluate in `pkb-premap` reads the count (`Page.getFrameTree` supplies the loader id). Desktop version is `desktop:<sequence>`. `click`, `type`, and `walk` bump that sequence.
+- A cache hit returns the pre-map for that session and version. It does not read the DOM again. `--explain` shows `premap: hit`. The entity `premap` logs `hit nodes=<n> ms=0`.
+- A miss rebuilds through the producer path. A browser reads structure (`DOM.getDocument`) and layout (one `DOMSnapshot.captureSnapshot` plus `Page.getLayoutMetrics`). A desktop rebuilds from the tree already captured for that sequence. The screenshot is taken only when the query has an `image` or `look` clause, and that capture stays with the cached version. `--explain` shows `premap: rebuilt <ms>`. The entity `premap` logs `rebuild nodes=<n> ms=<t>`.
+- G2's hook asks `candidates` for each searchable stage. A session map, or `--rank affinity`, ranks relatives with `AffinityScorer`. `--strict` resolves through `OneMatch`, and an ambiguous match lists the candidates and reasons.
 
 What is filled now:
 

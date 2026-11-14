@@ -178,6 +178,7 @@ public final class Query {
                 }
             }
             result.set("rank", QueryHooks.explainRank(flags));
+            result.put("premap", QueryHooks.premapStatus());
         }
         if (image != null) result.set("image", image);
         if (!pierce.isBlank()) {

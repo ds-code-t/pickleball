@@ -78,6 +78,11 @@ public final class DesktopTree {
         return session;
     }
 
+    public static Session open(String id) {
+        if (id == null || id.isBlank()) return null;
+        return SESSIONS.get(id);
+    }
+
     public static Session require(String id) {
         Session session = SESSIONS.get(id);
         if (session == null) throw new CdpException("session not found: " + id);
@@ -186,7 +191,7 @@ public final class DesktopTree {
     public static ObjectNode query(String id, Map<String, String> flags) {
         rejectBrowserOnly(flags);
         Session session = require(id);
-        ObjectNode found = Query.run(session.root, flagsForQuery(flags));
+        ObjectNode found = Query.run(session.root, withSession(session, flags));
         found.put("backend", session.backend);
         EngineLog.info("desktop", "query " + id);
         return found;
@@ -198,7 +203,7 @@ public final class DesktopTree {
 
     public static ObjectNode resolve(String id, Map<String, String> flags) {
         Selected selected = select(id, flags, false);
-        ObjectNode found = Query.run(selected.session.root, flagsForQuery(flags));
+        ObjectNode found = Query.run(selected.session.root, withSession(selected.session, flags));
         found.put("backend", selected.session.backend);
         found.set("node", selected.node.toJson());
         if (selected.resolved.explain() != null && !selected.resolved.explain().isBlank()) {
@@ -259,7 +264,7 @@ public final class DesktopTree {
         rejectBrowserOnly(flags);
         Session session = require(id);
         Map<String, String> queryFlags = flagsForQuery(flags);
-        JsonNode found = Query.run(session.root, queryFlags);
+        JsonNode found = Query.run(session.root, withSession(session, flags));
         JsonNode nodes = found.get("nodes");
         double[] viewport = viewport(session.root);
         BoxCaps caps = BoxCaps.fromFlags(flags);
@@ -327,6 +332,15 @@ public final class DesktopTree {
         String name = flags.get("name");
         String expr = name == null || name.isBlank() ? role : role + "[name=\"" + name + "\"]";
         copy.put("pipeline", "role=" + expr);
+        return copy;
+    }
+
+    private static Map<String, String> withSession(Session session, Map<String, String> flags) {
+        Map<String, String> copy = new LinkedHashMap<>(flagsForQuery(flags));
+        copy.put("session", session.id);
+        if (copy.get("doc-version") == null || copy.get("doc-version").isBlank()) {
+            copy.put("doc-version", "desktop:" + session.sequence);
+        }
         return copy;
     }
 

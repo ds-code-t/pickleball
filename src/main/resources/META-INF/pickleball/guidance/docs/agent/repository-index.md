@@ -1307,7 +1307,9 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `dom-engine/src/test/java/dev/domengine/premap/PreMapCliTest.java`
 - `dom-engine/src/test/java/dev/domengine/premap/PreMapIndexTest.java`
 - `dom-engine/src/test/java/dev/domengine/premap/PreMapLookupDefaultsTest.java`
+- `dom-engine/src/test/java/dev/domengine/premap/PreMapStalenessTest.java`
 - `dom-engine/src/test/java/dev/domengine/premap/PreMapTest.java`
+- `dom-engine/src/test/java/dev/domengine/premap/QueryUsesPreMapTest.java`
 - `dom-engine/src/test/java/dev/domengine/premap/SectionDetectionTest.java`
 - `dom-engine/src/test/java/dev/domengine/query/BooleanConfirmTest.java`
 - `dom-engine/src/test/java/dev/domengine/query/ControlEngineCapabilitiesTest.java`
