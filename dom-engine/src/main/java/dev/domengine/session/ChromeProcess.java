@@ -66,6 +66,7 @@ public final class ChromeProcess {
         command.add("--no-sandbox");
         command.add("--disable-dev-shm-usage");
         command.add("--disable-gpu");
+        command.add("--remote-allow-origins=*");
         if (headless) command.add("--headless=new");
         if (extraArgs != null) {
             for (String arg : extraArgs) {
@@ -74,15 +75,23 @@ public final class ChromeProcess {
         }
         command.add(initialUrl == null || initialUrl.isBlank() ? "about:blank" : initialUrl);
         Process handle;
+        Path log = dir.resolve("launch.log");
         try {
             handle = new ProcessBuilder(command)
-                    .redirectOutput(ProcessBuilder.Redirect.DISCARD)
-                    .redirectError(ProcessBuilder.Redirect.DISCARD)
+                    .redirectErrorStream(true)
+                    .redirectOutput(ProcessBuilder.Redirect.to(log.toFile()))
                     .start();
         } catch (IOException failure) {
             throw new CdpException("chrome launch: " + failure.getMessage());
         }
-        int chosen = awaitPort(dir, handle, DEBUGGER_WAIT_SECONDS);
+        int chosen;
+        try {
+            chosen = awaitPort(dir, handle, DEBUGGER_WAIT_SECONDS);
+        } catch (RuntimeException failure) {
+            destroyTree(handle);
+            releaseProfile(dir);
+            throw failure;
+        }
         return new ChromeProcess(handle, dir, chosen);
     }
 
@@ -139,6 +148,7 @@ public final class ChromeProcess {
      */
     public void destroyTree() {
         destroyTree(process);
+        releaseProfile(profile);
     }
 
     public static void destroyTree(Process process) {
@@ -161,6 +171,30 @@ public final class ChromeProcess {
             handle.descendants().forEach(ProcessHandle::destroyForcibly);
             process.destroyForcibly();
         }
+    }
+
+    /**
+     * Stops every process whose command line still names this profile.
+     * A Chromium launcher can exit after its browser child is up; that child
+     * is no longer a descendant of the process this JVM started.
+     *
+     * @return true when at least one process was signaled
+     */
+    public static boolean releaseProfile(Path profile) {
+        if (profile == null) return false;
+        String marker = profile.toAbsolutePath().toString();
+        boolean signaled = false;
+        for (ProcessHandle handle : ProcessHandle.allProcesses().toList()) {
+            if (!commandLine(handle).contains(marker)) continue;
+            signaled = true;
+            handle.descendants().forEach(child -> {
+                child.destroy();
+                child.destroyForcibly();
+            });
+            handle.destroy();
+            handle.destroyForcibly();
+        }
+        return signaled;
     }
 
     /** Deletes a profile directory, retrying while Chrome still has files open. */
@@ -200,15 +234,8 @@ public final class ChromeProcess {
         Path file = profile.resolve("DevToolsActivePort");
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(timeoutSeconds);
         while (System.nanoTime() < deadline) {
-            if (!process.isAlive()) throw new CdpException("chrome exited before DevToolsActivePort");
-            if (Files.isRegularFile(file)) {
-                try {
-                    String line = Files.readString(file).lines().findFirst().orElse("").trim();
-                    if (!line.isEmpty()) return Integer.parseInt(line);
-                } catch (IOException | NumberFormatException ignored) {
-                    // Chrome is still writing the file.
-                }
-            }
+            Integer port = readPort(file);
+            if (port != null) return port;
             try {
                 Thread.sleep(50);
             } catch (InterruptedException failure) {
@@ -216,6 +243,51 @@ public final class ChromeProcess {
                 throw new CdpException("chrome launch interrupted");
             }
         }
-        throw new CdpException("timed out waiting for DevToolsActivePort");
+        Integer exit = null;
+        if (!process.isAlive()) {
+            try {
+                exit = process.exitValue();
+            } catch (IllegalThreadStateException ignored) {
+                exit = null;
+            }
+        }
+        String tail = launchTail(profile);
+        throw new CdpException("timed out waiting for DevToolsActivePort"
+                + (exit == null ? "" : " launcher-exit=" + exit)
+                + (tail.isEmpty() ? "" : " log=" + tail));
+    }
+
+    private static Integer readPort(Path file) {
+        if (!Files.isRegularFile(file)) return null;
+        try {
+            String line = Files.readString(file).lines().findFirst().orElse("").trim();
+            if (line.isEmpty()) return null;
+            return Integer.parseInt(line);
+        } catch (IOException | NumberFormatException ignored) {
+            return null;
+        }
+    }
+
+    private static String launchTail(Path profile) {
+        Path log = profile.resolve("launch.log");
+        if (!Files.isRegularFile(log)) return "";
+        try {
+            String text = Files.readString(log).replace('\r', ' ').replace('\n', ' ').trim();
+            if (text.length() > 400) text = text.substring(text.length() - 400);
+            return text;
+        } catch (IOException failure) {
+            return "";
+        }
+    }
+
+    private static String commandLine(ProcessHandle handle) {
+        String reported = handle.info().commandLine().orElse("");
+        if (!reported.isEmpty()) return reported;
+        Path cmdline = Path.of("/proc", Long.toString(handle.pid()), "cmdline");
+        try {
+            return Files.readString(cmdline).replace('\0', ' ');
+        } catch (IOException failure) {
+            return "";
+        }
     }
 }

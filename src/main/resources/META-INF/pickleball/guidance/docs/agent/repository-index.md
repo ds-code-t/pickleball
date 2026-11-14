@@ -1317,6 +1317,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `dom-engine/src/test/java/dev/domengine/RustCliShapeTest.java`
 - `dom-engine/src/test/java/dev/domengine/SelectorParityTest.java`
 - `dom-engine/src/test/java/dev/domengine/session/BrowserSessionEndpointTest.java`
+- `dom-engine/src/test/java/dev/domengine/session/ChromeProcessTest.java`
 - `dom-engine/src/test/java/dev/domengine/session/SessionEventsTest.java`
 - `dom-engine/src/test/java/dev/domengine/SessionJoinLogTest.java`
 - `dom-engine/src/test/java/dev/domengine/SharedSurfaceTest.java`

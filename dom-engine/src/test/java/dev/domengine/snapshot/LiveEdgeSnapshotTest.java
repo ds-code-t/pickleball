@@ -57,9 +57,10 @@ class LiveEdgeSnapshotTest {
         server.start();
         String url = "http://127.0.0.1:" + server.getAddress().getPort() + "/";
         Path profile = ChromeProcess.newProfile();
-        ChromeProcess browser = ChromeProcess.start(edge.toString(), profile, true, List.of(), url);
         Path dir = Files.createTempDirectory("domengine-edge-snap");
+        ChromeProcess browser = null;
         try {
+            browser = ChromeProcess.start(edge.toString(), profile, true, List.of(), url);
             assertTrue(browser.debuggerOpen(), "Edge debugger did not open");
             try {
                 BrowserSession.awaitInitialDocument(browser.http(), url);
@@ -108,12 +109,22 @@ class LiveEdgeSnapshotTest {
             assertTrue(json.path("nodes").size() > 3, snap.stdout());
         } finally {
             server.stop(0);
-            browser.destroyTree();
+            if (browser != null) browser.destroyTree();
+            else ChromeProcess.releaseProfile(profile);
             ChromeProcess.deleteProfile(profile);
         }
     }
 
     private static Path edgeBinary() {
+        Path launcher = launcherOnPath();
+        Path real = launcher == null ? null : realEdge(launcher);
+        if (real != null) return real;
+        if (launcher != null) return launcher;
+        Path bundled = Path.of("/opt/microsoft/msedge/msedge");
+        return Files.isExecutable(bundled) ? bundled : null;
+    }
+
+    private static Path launcherOnPath() {
         String path = System.getenv("PATH");
         if (path == null) return null;
         for (String dir : path.split(":")) {
@@ -122,6 +133,20 @@ class LiveEdgeSnapshotTest {
                 if (Files.isExecutable(candidate)) return candidate;
             }
         }
+        return null;
+    }
+
+    /** The deb wrapper exits after spawning {@code msedge}. The real binary keeps the debug port. */
+    private static Path realEdge(Path launcher) {
+        try {
+            Path resolved = launcher.toRealPath();
+            Path beside = resolved.getParent().resolve("msedge");
+            if (Files.isExecutable(beside) && !beside.equals(resolved)) return beside;
+        } catch (java.io.IOException ignored) {
+            // Fall through to the path entry itself.
+        }
+        Path beside = launcher.resolveSibling("msedge");
+        if (Files.isExecutable(beside) && !beside.equals(launcher)) return beside;
         return null;
     }
 }

@@ -206,6 +206,7 @@ public final class BrowserSession implements AutoCloseable {
                 killed = false;
             }
         }
+        if (launched && profile != null && ChromeProcess.releaseProfile(profile)) killed = true;
         killedProcess = killed;
         EngineLog.info("session", "closed " + id + " killed=" + killed);
     }
@@ -284,8 +285,9 @@ public final class BrowserSession implements AutoCloseable {
     }
 
     /**
-     * The debugger socket can open before the page Chrome was started with has
-     * a document. Polls for that page target, then {@link #awaitDocument}.
+     * The debugger socket can open before the page the browser was started with
+     * has a document. Polls for the first page target, navigates to {@code url}
+     * when that page is not already the document, then {@link #awaitDocument}.
      */
     public static void awaitInitialDocument(String http, String url) {
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(15);
@@ -310,8 +312,21 @@ public final class BrowserSession implements AutoCloseable {
                     + (last == null || last.getMessage() == null ? "" : " (" + last.getMessage() + ")"));
         }
         CdpConnection connection = CdpConnection.connect(URI.create(endpoint.webSocket), Duration.ofSeconds(5));
+        CdpException navigateFailure = null;
         try {
-            awaitDocument(connection, url);
+            ObjectNode params = Jsons.object();
+            params.put("url", url);
+            try {
+                connection.call("Page.navigate", params, Duration.ofSeconds(15));
+            } catch (CdpException failure) {
+                navigateFailure = failure;
+            }
+            try {
+                awaitDocument(connection, url);
+            } catch (CdpException failure) {
+                if (navigateFailure == null || navigateFailure.getMessage() == null) throw failure;
+                throw new CdpException(failure.getMessage() + " (navigate: " + navigateFailure.getMessage() + ")");
+            }
         } finally {
             connection.close();
         }
