@@ -69,7 +69,8 @@ class LiveFirefoxSnapshotTest {
                     json.path("transport").asText());
             assertTrue(Files.exists(out.resolve("screenshot.png")));
             assertTrue(json.path("screenshot").path("width_px").asInt() > 0);
-            assertTrue(json.path("source").path("text").asText().contains("pickleball-live-firefox"));
+            String source = json.path("source").path("text").asText();
+            assertTrue(source.contains("pickleball-live-firefox"), source.length() > 240 ? source.substring(0, 240) : source);
             assertTrue(json.path("doc_version").asText().contains(":"), json.path("doc_version").asText());
             assertTrue(json.path("premap").has("indexes"));
             JsonNode button = byId(json, "go");

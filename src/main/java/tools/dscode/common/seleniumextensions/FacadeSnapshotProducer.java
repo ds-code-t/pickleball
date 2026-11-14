@@ -51,7 +51,7 @@ public final class FacadeSnapshotProducer {
         for (int i = 0; i < frames.size(); i++) {
             FrameNode frame = frames.get(i);
             Object value = evaluate(facade, frame, i == 0, WALK);
-            walks.add(Jsons.MAPPER.valueToTree(value));
+            walks.add(asWalk(value));
         }
         byte[] png = facade.screenshot(Map.of("format", "png"));
         String version = docVersion(facade, frames.get(0).id());
@@ -278,6 +278,32 @@ public final class FacadeSnapshotProducer {
             }
             place(child, nextX, nextY, top);
         }
+    }
+
+    /** BiDi returns object graphs as remote handles. A JSON string comes back by value. */
+    private static JsonNode asWalk(Object value) {
+        if (value instanceof String text) {
+            String trimmed = text.trim();
+            if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+                try {
+                    return Jsons.MAPPER.readTree(trimmed);
+                } catch (java.io.IOException ignored) {
+                    return Jsons.MAPPER.valueToTree(value);
+                }
+            }
+        }
+        JsonNode node = Jsons.MAPPER.valueToTree(value);
+        if (node.isTextual()) {
+            String trimmed = node.asText().trim();
+            if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+                try {
+                    return Jsons.MAPPER.readTree(trimmed);
+                } catch (java.io.IOException ignored) {
+                    return node;
+                }
+            }
+        }
+        return node;
     }
 
     private static String sources(List<JsonNode> walks, List<FrameNode> frames) {
